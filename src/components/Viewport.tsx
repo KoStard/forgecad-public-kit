@@ -214,6 +214,8 @@ function MeasureLine({ a, b }: { a: number[]; b: number[] }) {
 
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
+  const result = useForgeStore((s) => s.result);
+  const isSketch = result?.sketch && !result?.shape;
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -249,6 +251,7 @@ export function Viewport() {
           sectionColor="#555"
           fadeDistance={400}
           infiniteGrid
+          rotation={isSketch ? [Math.PI / 2, 0, 0] : undefined}
         />
         <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
       </Canvas>
