@@ -73,11 +73,12 @@ async function init() {
 
   const result = runScript(code, opts?.fileName || 'main.forge.js', opts?.allFiles || {});
 
-  if (result.error || !result.shape) {
+  if (result.error || (!result.shape && !result.sketch)) {
     return { ok: false, error: result.error || 'No shape returned' };
   }
 
-  const shape = result.shape;
+  // Auto-extrude sketches into a thin 3D shape for rendering
+  const shape = result.shape || result.sketch.extrude(1);
   const geo = shapeToGeometry(shape);
   const { scene, camera } = buildScene(geo);
 

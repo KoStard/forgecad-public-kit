@@ -173,7 +173,9 @@ try {
     console.log(`  Images: ${savedFiles.join(', ')}`);
     console.log(`  Size:   ${sz[0]} × ${sz[1]} × ${sz[2]} mm`);
     console.log(`  Volume: ${result.volume.toFixed(1)} mm³`);
-    console.log(`  Bounds: [${bb.min.map(v => v.toFixed(1))}] → [${bb.max.map(v => v.toFixed(1))}]`);
+    if (bb.min[0] != null) {
+      console.log(`  Bounds: [${bb.min.map(v => v.toFixed(1))}] → [${bb.max.map(v => v.toFixed(1))}]`);
+    }
 
     if (result.params.length > 0) {
       console.log(`  Params:`);
