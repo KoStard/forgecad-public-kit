@@ -38,6 +38,14 @@ Environment variables:
 
 Requires Chrome/Chromium installed (uses Puppeteer for headless rendering).
 
+### SVG Export
+
+Export a 2D sketch to SVG (no browser needed, runs in Node directly):
+
+```bash
+npm run svg path/to/file.sketch.js [output.svg]
+```
+
 ## How It Works
 
 Write JavaScript/TypeScript in the left panel. The forge API is available globally:

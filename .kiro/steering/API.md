@@ -246,6 +246,84 @@ Star shape.
 const star5 = star(5, 30, 15);
 ```
 
+### Path Builder
+
+Fluent API for tracing 2D outlines point by point.
+
+#### `path()`
+Creates a new path builder.
+
+```javascript
+const triangle = path()
+  .moveTo(0, 0)
+  .lineH(50)
+  .lineV(30)
+  .close();
+```
+
+**Methods:**
+- `.moveTo(x, y)` — Set starting point
+- `.lineTo(x, y)` — Line to absolute position
+- `.lineH(dx)` — Horizontal line (relative)
+- `.lineV(dy)` — Vertical line (relative)
+- `.lineAngled(length, degrees)` — Line at angle (0°=right, 90°=up)
+- `.close()` — Close path into a `Sketch` (auto-fixes winding)
+- `.stroke(width, join?)` — Thicken path into solid profile (see below)
+
+### Stroke
+
+Thicken a polyline (centerline) into a solid profile with uniform width. Proper miter joins at vertices.
+
+#### `path().stroke(width, join?)`
+#### `stroke(points, width, join?)`
+
+**Parameters:**
+- `width` (number) — Profile thickness
+- `join` ('Square' | 'Round', optional) — Corner style. Default: 'Square' (miter)
+
+**Returns:** `Sketch`
+
+```javascript
+// Fluent path builder
+const bracket = path()
+  .moveTo(0, 0)
+  .lineH(50)
+  .lineV(-70)
+  .lineAngled(20, 235)
+  .stroke(4);
+
+// Or with point array
+const bracket = stroke([[0, 0], [50, 0], [50, -70]], 4);
+
+// Rounded corners
+const rounded = stroke([[0, 0], [50, 0], [50, -50]], 4, 'Round');
+```
+
+### Anchor Positioning
+
+#### `.attachTo(target, targetAnchor, selfAnchor?)`
+Position a sketch relative to another using named anchor points.
+
+**Parameters:**
+- `target` (Sketch) — The sketch to attach to
+- `targetAnchor` (Anchor) — Point on target: 'center', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'top', 'bottom', 'left', 'right'
+- `selfAnchor` (Anchor, optional) — Point on this sketch to align. Default: 'center'
+
+**Returns:** `Sketch`
+
+```javascript
+const plate = rect(50, 4);
+const arm = rect(4, 70).attachTo(plate, 'bottom-left', 'top-left');
+return union2d(plate, arm);
+```
+
+#### `.rotateAround(degrees, pivot)`
+Rotate around a specific point instead of origin.
+
+```javascript
+const hook = rect(4, 20).rotateAround(-35, [2, 0]);
+```
+
 ### 2D Transforms
 
 Same as 3D but in 2D:
@@ -348,7 +426,7 @@ ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.j
 - `*.sketch.js` — 2D sketch file, must return a `Sketch`
 - `*.forge.js` — 3D part file, must return a `Shape`
 
-### `importSketch(fileName)`
+### `˝(fileName)`
 Executes another file and returns its result as a `Sketch`. The target file must return a `Sketch`.
 
 **Parameters:**
