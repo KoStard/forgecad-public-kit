@@ -13,6 +13,31 @@ npm run dev
 
 Open `http://localhost:5173` — you'll see a split-pane editor + 3D viewport.
 
+### Open a project folder
+
+```bash
+npm run open ./examples
+```
+
+Loads all `.forge.js` and `.sketch.js` files from the given directory into the editor. Without a path, opens with a blank file.
+
+### CLI Render
+
+Render a script to PNG without opening the browser:
+
+```bash
+npm run render path/to/file.forge.js [output.png]
+```
+
+Renders front, side, top, and isometric views. Output filenames are auto-suffixed (`_front.png`, `_side.png`, etc.). Works with both `.forge.js` (3D) and `.sketch.js` (2D, auto-extruded) files.
+
+Environment variables:
+- `FORGE_ANGLES=front,side,top,iso` — which angles to render (default: all four)
+- `FORGE_SIZE=1024` — image size in pixels
+- `FORGE_PORT=5173` — dev server port
+
+Requires Chrome/Chromium installed (uses Puppeteer for headless rendering).
+
 ## How It Works
 
 Write JavaScript/TypeScript in the left panel. The forge API is available globally:

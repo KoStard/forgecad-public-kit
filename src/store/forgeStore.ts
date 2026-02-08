@@ -1,44 +1,20 @@
 import { create } from 'zustand';
 import { runScript, type ParamDef, type RunResult } from '@forge/index';
 import { setParamOverrides } from '@forge/params';
+import projectFiles from 'virtual:forge-project';
 
-const DEFAULT_PROJECT: Record<string, string> = {
-  'bracket-profile.sketch.js': `// 2D Sketch: L-bracket profile
-// This sketch defines the cross-section of a mounting bracket.
-
-const w = param("Width", 40, { min: 20, max: 80, unit: "mm" });
-const h = param("Height", 30, { min: 15, max: 60, unit: "mm" });
-const t = param("Thickness", 5, { min: 2, max: 12, unit: "mm" });
-
-// L-shape profile
-const outer = polygon([
-  [0, 0], [w, 0], [w, t],
-  [t, t], [t, h], [0, h]
-]);
-
-return outer;
-`,
-  'bracket.forge.js': `// 3D Part: Mounting Bracket
-// Imports the 2D profile and extrudes it into a 3D bracket with holes.
-
-const profile = importSketch("bracket-profile.sketch.js");
-const depth = param("Depth", 60, { min: 30, max: 120, unit: "mm" });
-const holeDia = param("Hole Diameter", 6, { min: 3, max: 12, unit: "mm" });
-
-// Extrude the 2D profile into 3D
-const body = profile.extrude(depth);
-
-// Drill mounting holes
-const hole1 = cylinder(depth + 2, holeDia / 2)
-  .rotate(90, 0, 0)
-  .translate(20, depth / 2, 2.5);
-
-const hole2 = cylinder(10, holeDia / 2)
-  .translate(2.5, depth / 2, 20);
-
-return body.subtract(hole1).subtract(hole2);
-`,
+const EMPTY_FILE: Record<string, string> = {
+  'untitled.forge.js': '// New part\n\nreturn box(50, 30, 10);\n',
 };
+
+const INITIAL_FILES = projectFiles && Object.keys(projectFiles).length > 0
+  ? projectFiles as Record<string, string>
+  : EMPTY_FILE;
+
+const initialActive = (() => {
+  const names = Object.keys(INITIAL_FILES);
+  return names.find((n) => n.endsWith('.forge.js')) || names[0];
+})();
 
 export interface ProjectFile {
   name: string;
@@ -46,7 +22,6 @@ export interface ProjectFile {
 }
 
 interface ForgeStore {
-  // Project files
   files: Record<string, string>;
   activeFile: string;
   setActiveFile: (name: string) => void;
@@ -55,36 +30,29 @@ interface ForgeStore {
   deleteFile: (name: string) => void;
   renameFile: (oldName: string, newName: string) => void;
 
-  // Editor
   dirty: boolean;
 
-  // File handle (File System Access API)
   fileHandle: FileSystemFileHandle | null;
   setFileHandle: (h: FileSystemFileHandle | null) => void;
 
-  // Execution result
   result: RunResult | null;
   params: ParamDef[];
   paramOverrides: Record<string, number>;
 
-  // Actions
   execute: () => void;
   setParam: (name: string, value: number) => void;
 
-  // Measurement
   measureMode: boolean;
   toggleMeasure: () => void;
   measurePoints: number[][];
   addMeasurePoint: (pt: number[]) => void;
   clearMeasure: () => void;
 
-  // File operations
   newProject: () => void;
   saveFile: () => Promise<void>;
   saveFileAs: () => Promise<void>;
   loadFromText: (text: string, name: string) => void;
 
-  // UI state
   kernelReady: boolean;
   setKernelReady: (v: boolean) => void;
   fileExplorerOpen: boolean;
@@ -92,11 +60,10 @@ interface ForgeStore {
 }
 
 export const useForgeStore = create<ForgeStore>((set, get) => ({
-  files: { ...DEFAULT_PROJECT },
-  activeFile: 'bracket.forge.js',
+  files: { ...INITIAL_FILES },
+  activeFile: initialActive,
   setActiveFile: (name) => {
     set({ activeFile: name, paramOverrides: {} });
-    // Re-execute with new active file
     setTimeout(() => get().execute(), 0);
   },
   updateFileCode: (name, code) => {
@@ -119,7 +86,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const remaining = { ...files };
     delete remaining[name];
     const names = Object.keys(remaining);
-    if (names.length === 0) return; // don't delete last file
+    if (names.length === 0) return;
     const newActive = name === activeFile ? names[0] : activeFile;
     set({ files: remaining, activeFile: newActive, paramOverrides: {} });
     setTimeout(() => get().execute(), 0);
@@ -166,7 +133,6 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set({ result, params: result.params });
   },
 
-  // --- Measurement ---
   measureMode: false,
   toggleMeasure: () => {
     set((s) => ({ measureMode: !s.measureMode, measurePoints: [] }));
@@ -178,11 +144,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
   clearMeasure: () => set({ measurePoints: [], measureMode: false }),
 
-  // --- File operations ---
   newProject: () => {
     set({
-      files: { ...DEFAULT_PROJECT },
-      activeFile: 'bracket.forge.js',
+      files: { ...INITIAL_FILES },
+      activeFile: initialActive,
       fileHandle: null,
       dirty: false,
       paramOverrides: {},

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "open": "vite --",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "render": "node cli/forge-render.mjs"
