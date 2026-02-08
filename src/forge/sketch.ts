@@ -9,6 +9,8 @@ import type { CrossSection } from 'manifold-3d';
 import { getWasm } from './kernel';
 import { Shape } from './kernel';
 
+type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
+
 /** Immutable wrapper around CrossSection with chainable API */
 export class Sketch {
   constructor(public readonly cross: CrossSection) {}
@@ -21,6 +23,13 @@ export class Sketch {
 
   rotate(degrees: number): Sketch {
     return new Sketch(this.cross.rotate(degrees));
+  }
+
+  /** Rotate around a specific point instead of origin */
+  rotateAround(degrees: number, pivot: [number, number]): Sketch {
+    return this.translate(-pivot[0], -pivot[1])
+      .rotate(degrees)
+      .translate(pivot[0], pivot[1]);
   }
 
   scale(v: number | [number, number]): Sketch {
@@ -100,6 +109,9 @@ export class Sketch {
 
   /** Get raw polygon contours for rendering */
   toPolygons() { return this.cross.toPolygons(); }
+
+  /** Attach this sketch to another at specified anchor points */
+  attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor): Sketch;
 }
 
 // --- 2D Primitive constructors ---
@@ -189,3 +201,79 @@ export function intersection2d(...sketches: Sketch[]): Sketch {
 export function hull2d(...sketches: Sketch[]): Sketch {
   return new Sketch(getWasm().CrossSection.hull(sketches.map(s => s.cross)));
 }
+
+// --- Path Builder ---
+
+/** Fluent path builder for 2D profiles */
+export class PathBuilder {
+  private points: [number, number][] = [];
+  private x = 0;
+  private y = 0;
+
+  moveTo(x: number, y: number): this {
+    this.x = x;
+    this.y = y;
+    this.points.push([x, y]);
+    return this;
+  }
+
+  lineTo(x: number, y: number): this {
+    this.x = x;
+    this.y = y;
+    this.points.push([x, y]);
+    return this;
+  }
+
+  lineH(dx: number): this {
+    return this.lineTo(this.x + dx, this.y);
+  }
+
+  lineV(dy: number): this {
+    return this.lineTo(this.x, this.y + dy);
+  }
+
+  lineAngled(length: number, degrees: number): this {
+    const rad = degrees * Math.PI / 180;
+    return this.lineTo(this.x + length * Math.cos(rad), this.y + length * Math.sin(rad));
+  }
+
+  close(): Sketch {
+    if (this.points.length < 3) throw new Error('Path needs at least 3 points');
+    return polygon(this.points);
+  }
+}
+
+export function path(): PathBuilder {
+  return new PathBuilder();
+}
+
+// --- Anchor-based positioning ---
+
+function getAnchorPoint(sketch: Sketch, anchor: Anchor): [number, number] {
+  const b = sketch.bounds();
+  const [minX, minY] = b.min;
+  const [maxX, maxY] = b.max;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+
+  switch (anchor) {
+    case 'center': return [cx, cy];
+    case 'top-left': return [minX, maxY];
+    case 'top-right': return [maxX, maxY];
+    case 'bottom-left': return [minX, minY];
+    case 'bottom-right': return [maxX, minY];
+    case 'top': return [cx, maxY];
+    case 'bottom': return [cx, minY];
+    case 'left': return [minX, cy];
+    case 'right': return [maxX, cy];
+  }
+}
+
+/** Attach this sketch to another at specified anchor points */
+Sketch.prototype.attachTo = function(target: Sketch, targetAnchor: Anchor, selfAnchor: Anchor = 'center'): Sketch {
+  const targetPt = getAnchorPoint(target, targetAnchor);
+  const selfPt = getAnchorPoint(this, selfAnchor);
+  const dx = targetPt[0] - selfPt[0];
+  const dy = targetPt[1] - selfPt[1];
+  return this.translate(dx, dy);
+};

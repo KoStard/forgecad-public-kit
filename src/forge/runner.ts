@@ -8,7 +8,7 @@
  */
 
 import { Shape, box, cylinder, sphere, union, difference, intersection } from './kernel';
-import { Sketch, rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, union2d, difference2d, intersection2d, hull2d } from './sketch';
+import { Sketch, rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, union2d, difference2d, intersection2d, hull2d, path } from './sketch';
 import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
 import { partLibrary } from './library';
 
@@ -61,7 +61,7 @@ function executeFile(
     'box', 'cylinder', 'sphere',
     'union', 'difference', 'intersection',
     // 2D
-    'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star',
+    'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path',
     'union2d', 'difference2d', 'intersection2d', 'hull2d',
     // Params & classes
     'param', 'Shape', 'Sketch', 'lib',
@@ -73,7 +73,7 @@ function executeFile(
   return fn(
     box, cylinder, sphere,
     union, difference, intersection,
-    rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star,
+    rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path,
     union2d, difference2d, intersection2d, hull2d,
     param, Shape, Sketch, partLibrary,
     importSketch, importPart,
