@@ -18,9 +18,9 @@ const btnStyle = (active = false): React.CSSProperties => ({
 });
 
 function Toolbar() {
-  const fileName = useForgeStore((s) => s.fileName);
+  const activeFile = useForgeStore((s) => s.activeFile);
   const dirty = useForgeStore((s) => s.dirty);
-  const newFile = useForgeStore((s) => s.newFile);
+  const newProject = useForgeStore((s) => s.newProject);
   const saveFile = useForgeStore((s) => s.saveFile);
   const saveFileAs = useForgeStore((s) => s.saveFileAs);
   const measureMode = useForgeStore((s) => s.measureMode);
@@ -40,46 +40,24 @@ function Toolbar() {
       : null;
 
   return (
-    <div
-      style={{
-        padding: '6px 12px',
-        background: '#2d2d2d',
-        borderBottom: '1px solid #333',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-      }}
-    >
+    <div style={{ padding: '6px 12px', background: '#2d2d2d', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ fontSize: 16 }}>⚒</span>
       <span style={{ fontSize: 14, fontWeight: 600, color: '#4a9eff' }}>ForgeCAD</span>
       <span style={{ color: '#888', fontSize: 12, marginLeft: 4 }}>
-        {fileName}
-        {dirty ? ' •' : ''}
+        {activeFile}{dirty ? ' •' : ''}
       </span>
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
-        <button style={btnStyle(fileExplorerOpen)} onClick={toggleFileExplorer}>
-          📁 Files
-        </button>
-
+        <button style={btnStyle(fileExplorerOpen)} onClick={toggleFileExplorer}>📁 Files</button>
         <div style={{ width: 1, height: 20, background: '#444', margin: '0 4px' }} />
-
-        <button style={btnStyle()} onClick={newFile}>New</button>
+        <button style={btnStyle()} onClick={newProject}>New Project</button>
         <button style={btnStyle()} onClick={saveFile}>Save</button>
         <button style={btnStyle()} onClick={saveFileAs}>Save As</button>
-
         <div style={{ width: 1, height: 20, background: '#444', margin: '0 4px' }} />
-
-        <button style={btnStyle(measureMode)} onClick={toggleMeasure}>
-          📏 Measure
-        </button>
-        {measureMode && (
-          <button style={btnStyle()} onClick={clearMeasure}>Clear</button>
-        )}
+        <button style={btnStyle(measureMode)} onClick={toggleMeasure}>📏 Measure</button>
+        {measureMode && <button style={btnStyle()} onClick={clearMeasure}>Clear</button>}
         {dist !== null && (
-          <span style={{ color: '#ffcc00', fontSize: 12, fontFamily: 'monospace' }}>
-            {dist.toFixed(2)} mm
-          </span>
+          <span style={{ color: '#ffcc00', fontSize: 12, fontFamily: 'monospace' }}>{dist.toFixed(2)} mm</span>
         )}
       </div>
     </div>
@@ -115,8 +93,6 @@ export function App() {
       <Toolbar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {fileExplorerOpen && <FileExplorer />}
-        
-        {/* Left panel: editor + params */}
         <div style={{ width: '45%', minWidth: 300, display: 'flex', flexDirection: 'column', borderRight: '1px solid #333' }}>
           <div style={{ flex: 1, minHeight: 0 }}>
             <CodeEditor />
@@ -124,8 +100,6 @@ export function App() {
           <ParamPanel />
           <ExportPanel />
         </div>
-
-        {/* Right panel: 3D viewport */}
         <div style={{ flex: 1 }}>
           <Viewport />
         </div>
