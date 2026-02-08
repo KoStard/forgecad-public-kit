@@ -5,6 +5,7 @@ import { CodeEditor } from './components/CodeEditor';
 import { Viewport } from './components/Viewport';
 import { ParamPanel } from './components/ParamPanel';
 import { ExportPanel } from './components/ExportPanel';
+import { FileExplorer } from './components/FileExplorer';
 
 const btnStyle = (active = false): React.CSSProperties => ({
   padding: '4px 10px',
@@ -27,6 +28,8 @@ function Toolbar() {
   const toggleMeasure = useForgeStore((s) => s.toggleMeasure);
   const clearMeasure = useForgeStore((s) => s.clearMeasure);
   const measurePoints = useForgeStore((s) => s.measurePoints);
+  const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
+  const toggleFileExplorer = useForgeStore((s) => s.toggleFileExplorer);
 
   const dist =
     measurePoints.length === 2
@@ -56,6 +59,12 @@ function Toolbar() {
       </span>
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
+        <button style={btnStyle(fileExplorerOpen)} onClick={toggleFileExplorer}>
+          📁 Files
+        </button>
+
+        <div style={{ width: 1, height: 20, background: '#444', margin: '0 4px' }} />
+
         <button style={btnStyle()} onClick={newFile}>New</button>
         <button style={btnStyle()} onClick={openFile}>Open</button>
         <button style={btnStyle()} onClick={saveFile}>Save</button>
@@ -83,6 +92,7 @@ export function App() {
   const kernelReady = useForgeStore((s) => s.kernelReady);
   const setKernelReady = useForgeStore((s) => s.setKernelReady);
   const execute = useForgeStore((s) => s.execute);
+  const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
 
   useEffect(() => {
     initKernel().then(() => {
@@ -106,6 +116,8 @@ export function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }}>
       <Toolbar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {fileExplorerOpen && <FileExplorer />}
+        
         {/* Left panel: editor + params */}
         <div style={{ width: '45%', minWidth: 300, display: 'flex', flexDirection: 'column', borderRight: '1px solid #333' }}>
           <div style={{ flex: 1, minHeight: 0 }}>

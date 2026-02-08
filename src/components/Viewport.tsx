@@ -2,6 +2,7 @@ import { useMemo, useState, useCallback, useRef } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment } from '@react-three/drei';
 import { useForgeStore } from '../store/forgeStore';
+import { Sketch } from '@forge/sketch';
 import * as THREE from 'three';
 
 /**
@@ -93,6 +94,60 @@ function ForgeBody() {
           <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={0.6} />
         </lineSegments>
       )}
+    </group>
+  );
+}
+
+/** Renders a 2D sketch as filled shape + outline on the XY plane */
+function SketchView() {
+  const result = useForgeStore((s) => s.result);
+
+  const { fillGeo, lineGeos } = useMemo(() => {
+    if (!result?.sketch) return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[] };
+    try {
+      const polys = result.sketch.toPolygons();
+      const lines: THREE.BufferGeometry[] = [];
+
+      // Build line geometries for each contour
+      for (const contour of polys) {
+        if (contour.length < 2) continue;
+        const pts = contour.map((p: number[]) => new THREE.Vector3(p[0], p[1], 0));
+        pts.push(pts[0]); // close the loop
+        lines.push(new THREE.BufferGeometry().setFromPoints(pts));
+      }
+
+      // Build filled shape using THREE.ShapeGeometry
+      const shapes: THREE.Shape[] = [];
+      for (const contour of polys) {
+        if (contour.length < 3) continue;
+        const shape = new THREE.Shape();
+        shape.moveTo(contour[0][0], contour[0][1]);
+        for (let i = 1; i < contour.length; i++) {
+          shape.lineTo(contour[i][0], contour[i][1]);
+        }
+        shape.closePath();
+        shapes.push(shape);
+      }
+      const fill = shapes.length > 0 ? new THREE.ShapeGeometry(shapes) : null;
+
+      return { fillGeo: fill, lineGeos: lines };
+    } catch {
+      return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[] };
+    }
+  }, [result]);
+
+  if (lineGeos.length === 0) return null;
+
+  return (
+    <group>
+      {fillGeo && (
+        <mesh geometry={fillGeo}>
+          <meshBasicMaterial color="#5b9bd5" transparent opacity={0.15} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+      {lineGeos.map((geo, i) => (
+        <primitive key={i} object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffffff', linewidth: 1 }))} />
+      ))}
     </group>
   );
 }
@@ -198,6 +253,12 @@ export function Viewport() {
       <Canvas
         camera={{ position: [120, 80, 120], fov: 45, near: 0.1, far: 10000 }}
         style={{ background: '#252526', cursor: measureMode ? 'crosshair' : 'default' }}
+        dpr={[1, 2]}
+        gl={{
+          antialias: true,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.0,
+        }}
         raycaster={{ params: { Line: { threshold: 0.5 } } } as any}
       >
         {/* Environment map for realistic reflections */}
@@ -208,6 +269,7 @@ export function Viewport() {
         <hemisphereLight args={['#b1e1ff', '#444444', 0.4]} />
 
         <ForgeBody />
+        <SketchView />
         <MeasureTool />
 
         <Grid

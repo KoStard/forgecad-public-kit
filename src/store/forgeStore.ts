@@ -41,6 +41,8 @@ interface ForgeStore {
   // UI state
   kernelReady: boolean;
   setKernelReady: (v: boolean) => void;
+  fileExplorerOpen: boolean;
+  toggleFileExplorer: () => void;
 }
 
 export const useForgeStore = create<ForgeStore>((set, get) => ({
@@ -210,4 +212,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   kernelReady: false,
   setKernelReady: (v) => set({ kernelReady: v }),
+
+  fileExplorerOpen: false,
+  toggleFileExplorer: () => set((s) => ({ fileExplorerOpen: !s.fileExplorerOpen })),
 }));

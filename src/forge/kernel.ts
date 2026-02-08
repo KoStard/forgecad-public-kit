@@ -14,7 +14,8 @@ export async function initKernel(): Promise<ManifoldToplevel> {
   const Module = (await import('manifold-3d')).default;
   _wasm = await Module();
   _wasm.setup();
-  _wasm.setMinCircularAngle(3);
+  _wasm.setMinCircularAngle(2);
+  _wasm.setMinCircularEdgeLength(0.5);
   return _wasm;
 }
 

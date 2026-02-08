@@ -24,3 +24,21 @@ const hole = cylinder(thick + 2, 8)
 
 return union(base, back, lip).subtract(hole);
 `;
+
+export const EXAMPLE_SKETCH_VASE = `// ForgeCAD — Sketch → 3D: Twisted Vase
+// Draw a 2D profile, then revolve or extrude it into 3D.
+
+const sides = param("Sides", 6, { min: 3, max: 12 });
+const radius = param("Radius", 25, { min: 10, max: 50, unit: "mm" });
+const height = param("Height", 60, { min: 20, max: 120, unit: "mm" });
+const twist = param("Twist", 45, { min: 0, max: 180, unit: "°" });
+const wall = param("Wall", 3, { min: 1, max: 8, unit: "mm" });
+
+// 2D sketch: a polygon with offset for wall thickness
+const outer = ngon(sides, radius);
+const inner = ngon(sides, radius - wall);
+const profile = outer.subtract(inner);
+
+// Extrude with twist
+return profile.extrude(height, { twist, divisions: 32 });
+`;
