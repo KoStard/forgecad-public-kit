@@ -11,30 +11,24 @@ declare function difference(...shapes: Shape[]): Shape;
 declare function intersection(...shapes: Shape[]): Shape;
 declare function param(name: string, defaultValue: number, opts?: { min?: number; max?: number; step?: number; unit?: string }): number;
 
+// --- Cross-file imports ---
+/** Import a 2D sketch from another file. The file must return a Sketch. */
+declare function importSketch(fileName: string): Sketch;
+/** Import a 3D part from another file. The file must return a Shape. */
+declare function importPart(fileName: string): Shape;
+
 // --- 2D Sketch Primitives ---
-/** Rectangle. Returns a 2D sketch. */
 declare function rect(width: number, height: number, center?: boolean): Sketch;
-/** Circle (2D). Returns a 2D sketch. */
 declare function circle2d(radius: number, segments?: number): Sketch;
-/** Rounded rectangle with corner radius. */
 declare function roundedRect(width: number, height: number, radius: number, center?: boolean): Sketch;
-/** Polygon from array of [x,y] points. */
 declare function polygon(points: [number, number][]): Sketch;
-/** Regular polygon (triangle=3, hexagon=6, etc.) */
 declare function ngon(sides: number, radius: number): Sketch;
-/** Ellipse with separate X and Y radii. */
 declare function ellipse(rx: number, ry: number, segments?: number): Sketch;
-/** Slot shape — rectangle with semicircle ends. */
 declare function slot(length: number, width: number): Sketch;
-/** Star with alternating outer/inner radii. */
 declare function star(points: number, outerR: number, innerR: number): Sketch;
-/** 2D boolean union. */
 declare function union2d(...sketches: Sketch[]): Sketch;
-/** 2D boolean difference. */
 declare function difference2d(...sketches: Sketch[]): Sketch;
-/** 2D boolean intersection. */
 declare function intersection2d(...sketches: Sketch[]): Sketch;
-/** Convex hull of multiple 2D sketches. */
 declare function hull2d(...sketches: Sketch[]): Sketch;
 
 declare class Shape {
@@ -48,27 +42,19 @@ declare class Shape {
 }
 
 declare class Sketch {
-  // Transforms
   translate(x: number, y?: number): Sketch;
   rotate(degrees: number): Sketch;
   scale(v: number | [number, number]): Sketch;
   mirror(ax: [number, number]): Sketch;
-  // Booleans
   add(other: Sketch): Sketch;
   subtract(other: Sketch): Sketch;
   intersect(other: Sketch): Sketch;
-  // 2D operations
-  /** Offset (inflate/deflate) contour. Positive = outward. join: 'Round' | 'Square' | 'Miter' */
   offset(delta: number, join?: 'Square' | 'Round' | 'Miter'): Sketch;
   hull(): Sketch;
   simplify(epsilon?: number): Sketch;
   warp(fn: (vert: [number, number]) => void): Sketch;
-  // 2D → 3D
-  /** Extrude along Z. Supports twist, taper, divisions. */
   extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean }): Shape;
-  /** Revolve around Y axis. Default 360°. */
   revolve(degrees?: number, segments?: number): Shape;
-  // Query
   area(): number;
   bounds(): { min: [number, number]; max: [number, number] };
   isEmpty(): boolean;
@@ -88,14 +74,15 @@ declare const lib: {
 `;
 
 export function CodeEditor() {
-  const code = useForgeStore((s) => s.code);
-  const setCode = useForgeStore((s) => s.setCode);
+  const files = useForgeStore((s) => s.files);
+  const activeFile = useForgeStore((s) => s.activeFile);
+  const updateFileCode = useForgeStore((s) => s.updateFileCode);
   const execute = useForgeStore((s) => s.execute);
   const result = useForgeStore((s) => s.result);
-  const fileName = useForgeStore((s) => s.fileName);
-  const dirty = useForgeStore((s) => s.dirty);
   const loadFromText = useForgeStore((s) => s.loadFromText);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const code = files[activeFile] ?? '';
 
   const handleMount: OnMount = (editor, monaco) => {
     monaco.languages.typescript.javascriptDefaults.addExtraLib(FORGE_TYPES, 'forge.d.ts');
@@ -104,7 +91,6 @@ export function CodeEditor() {
       noSyntaxValidation: false,
     });
 
-    // Ctrl+S / Cmd+S to save
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       useForgeStore.getState().saveFile();
     });
@@ -113,14 +99,13 @@ export function CodeEditor() {
   const handleChange = useCallback(
     (value: string | undefined) => {
       if (!value) return;
-      setCode(value);
+      updateFileCode(activeFile, value);
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => execute(), 400);
     },
-    [setCode, execute],
+    [activeFile, updateFileCode, execute],
   );
 
-  // Drag-and-drop file loading
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -131,8 +116,6 @@ export function CodeEditor() {
     [loadFromText],
   );
 
-  useEffect(() => { execute(); }, [execute]);
-
   return (
     <div
       style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
@@ -141,6 +124,7 @@ export function CodeEditor() {
     >
       <div style={{ flex: 1, minHeight: 0 }}>
         <Editor
+          key={activeFile}
           defaultLanguage="javascript"
           theme="vs-dark"
           value={code}
