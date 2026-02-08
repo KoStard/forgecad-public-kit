@@ -239,7 +239,16 @@ export class PathBuilder {
 
   close(): Sketch {
     if (this.points.length < 3) throw new Error('Path needs at least 3 points');
-    return polygon(this.points);
+    // Manifold requires CCW winding — compute signed area and reverse if CW
+    const pts = this.points;
+    let signedArea = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const [x1, y1] = pts[i];
+      const [x2, y2] = pts[(i + 1) % pts.length];
+      signedArea += (x2 - x1) * (y2 + y1);
+    }
+    if (signedArea > 0) pts.reverse(); // CW → CCW
+    return polygon(pts);
   }
 }
 
