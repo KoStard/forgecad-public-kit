@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "render": "node cli/forge-render.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -23,6 +24,7 @@
     "@types/react-dom": "^19.1.6",
     "@types/three": "^0.175.0",
     "@vitejs/plugin-react": "^4.5.2",
+    "puppeteer-core": "^24.37.2",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
   }

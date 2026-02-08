@@ -13,4 +13,10 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['manifold-3d'],
   },
+  // Allow serving cli/ directory during dev for headless rendering
+  server: {
+    fs: {
+      allow: ['.'],
+    },
+  },
 });

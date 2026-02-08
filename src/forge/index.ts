@@ -3,5 +3,8 @@ export { Sketch, rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star
 export { param } from './params';
 export { runScript } from './runner';
 export { partLibrary } from './library';
+export { shapeToGeometry } from './meshToGeometry';
+export { buildScene } from './sceneBuilder';
 export type { ParamDef } from './params';
 export type { RunResult } from './runner';
+export type { ForgeGeometry } from './meshToGeometry';
