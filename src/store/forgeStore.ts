@@ -157,6 +157,23 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   saveFile: async () => {
     const { fileHandle, files, activeFile } = get();
+    
+    // Try API endpoint first (for project directories)
+    try {
+      const response = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: activeFile, content: files[activeFile] }),
+      });
+      if (response.ok) {
+        set({ dirty: false });
+        return;
+      }
+    } catch (e) {
+      // Fall through to file handle
+    }
+    
+    // Fall back to File System Access API
     if (!fileHandle) return;
     try {
       const writable = await (fileHandle as any).createWritable();
