@@ -66,12 +66,12 @@ async function init() {
 
 (window as any).__forgeRender = function (
   code: string,
-  opts?: { angles?: string[]; size?: number },
+  opts?: { angles?: string[]; size?: number; allFiles?: Record<string, string>; fileName?: string },
 ) {
   const angles = opts?.angles || ['front', 'side', 'top', 'iso'];
   const size = opts?.size || 1024;
 
-  const result = runScript(code);
+  const result = runScript(code, opts?.fileName || 'main.forge.js', opts?.allFiles || {});
 
   if (result.error || !result.shape) {
     return { ok: false, error: result.error || 'No shape returned' };
