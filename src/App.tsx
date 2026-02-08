@@ -21,7 +21,6 @@ function Toolbar() {
   const fileName = useForgeStore((s) => s.fileName);
   const dirty = useForgeStore((s) => s.dirty);
   const newFile = useForgeStore((s) => s.newFile);
-  const openFile = useForgeStore((s) => s.openFile);
   const saveFile = useForgeStore((s) => s.saveFile);
   const saveFileAs = useForgeStore((s) => s.saveFileAs);
   const measureMode = useForgeStore((s) => s.measureMode);
@@ -66,7 +65,6 @@ function Toolbar() {
         <div style={{ width: 1, height: 20, background: '#444', margin: '0 4px' }} />
 
         <button style={btnStyle()} onClick={newFile}>New</button>
-        <button style={btnStyle()} onClick={openFile}>Open</button>
         <button style={btnStyle()} onClick={saveFile}>Save</button>
         <button style={btnStyle()} onClick={saveFileAs}>Save As</button>
 

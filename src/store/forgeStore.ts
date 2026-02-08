@@ -33,7 +33,6 @@ interface ForgeStore {
 
   // File operations
   newFile: () => void;
-  openFile: () => Promise<void>;
   saveFile: () => Promise<void>;
   saveFileAs: () => Promise<void>;
   loadFromText: (text: string, name: string) => void;
@@ -104,66 +103,19 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     get().execute();
   },
 
-  openFile: async () => {
-    try {
-      if ('showOpenFilePicker' in window) {
-        const [handle] = await (window as any).showOpenFilePicker({
-          types: [
-            {
-              description: 'ForgeCAD files',
-              accept: { 'text/javascript': ['.forge.js', '.js'] },
-            },
-          ],
-        });
-        const file = await handle.getFile();
-        const text = await file.text();
-        set({
-          code: text,
-          fileName: file.name,
-          fileHandle: handle,
-          dirty: false,
-          paramOverrides: {},
-        });
-        get().execute();
-      } else {
-        // Fallback: file input
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.js,.forge.js';
-        input.onchange = async () => {
-          const file = input.files?.[0];
-          if (!file) return;
-          const text = await file.text();
-          set({
-            code: text,
-            fileName: file.name,
-            fileHandle: null,
-            dirty: false,
-            paramOverrides: {},
-          });
-          get().execute();
-        };
-        input.click();
-      }
-    } catch (e: any) {
-      if (e.name !== 'AbortError') console.error('Open failed:', e);
-    }
-  },
-
   saveFile: async () => {
-    const { fileHandle, code, fileName } = get();
-    if (fileHandle) {
-      try {
-        const writable = await (fileHandle as any).createWritable();
-        await writable.write(code);
-        await writable.close();
-        set({ dirty: false });
-        return;
-      } catch {
-        // Fall through to saveAs
-      }
+    const { fileHandle, code } = get();
+    // Only save if we have a file handle (opened via Save As before)
+    if (!fileHandle) return;
+    
+    try {
+      const writable = await (fileHandle as any).createWritable();
+      await writable.write(code);
+      await writable.close();
+      set({ dirty: false });
+    } catch (e) {
+      console.error('Save failed:', e);
     }
-    get().saveFileAs();
   },
 
   saveFileAs: async () => {
