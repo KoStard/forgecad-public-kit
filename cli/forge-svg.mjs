@@ -149,18 +149,43 @@ class PathBuilder {
   }
   stroke(width, join = 'Square') {
     if (this.points.length < 2) throw new Error('Stroke needs at least 2 points');
-    const segments = [];
-    for (let i = 0; i < this.points.length - 1; i++) {
-      const [x1, y1] = this.points[i];
-      const [x2, y2] = this.points[i + 1];
-      const dx = x2 - x1, dy = y2 - y1;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      if (len < 1e-9) continue;
-      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-      segments.push(new Sketch(CrossSection.square([len, width]).translate(0, -width / 2).rotate(angle).translate(x1, y1)));
+    const hw = width / 2;
+    const pts = this.points;
+    const n = pts.length;
+    const normals = [];
+    for (let i = 0; i < n - 1; i++) {
+      const dx = pts[i+1][0] - pts[i][0], dy = pts[i+1][1] - pts[i][1];
+      const len = Math.sqrt(dx*dx + dy*dy);
+      normals.push([-dy/len, dx/len]);
     }
-    let result = union2d(...segments);
-    if (join === 'Round') result = result.offset(width / 4, 'Round').offset(-width / 4, 'Round');
+    const left = [], right = [];
+    for (let i = 0; i < n; i++) {
+      const [px, py] = pts[i];
+      if (i === 0 || i === n - 1) {
+        const ni = normals[i === 0 ? 0 : n - 2];
+        left.push([px + ni[0]*hw, py + ni[1]*hw]);
+        right.push([px - ni[0]*hw, py - ni[1]*hw]);
+      } else {
+        const n1 = normals[i-1], n2 = normals[i];
+        let mx = n1[0] + n2[0], my = n1[1] + n2[1];
+        let mlen = Math.sqrt(mx*mx + my*my);
+        if (mlen < 1e-9) { mx = n1[0]; my = n1[1]; mlen = 1; }
+        mx /= mlen; my /= mlen;
+        const scale = hw / (mx * n1[0] + my * n1[1]);
+        left.push([px + mx*scale, py + my*scale]);
+        right.push([px - mx*scale, py - my*scale]);
+      }
+    }
+    const poly = [...left, ...right.reverse()];
+    let sa = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const [x1, y1] = poly[i];
+      const [x2, y2] = poly[(i + 1) % poly.length];
+      sa += (x2 - x1) * (y2 + y1);
+    }
+    if (sa > 0) poly.reverse();
+    let result = polygon(poly);
+    if (join === 'Round') result = result.offset(-hw/2, 'Round').offset(hw/2, 'Round');
     return result;
   }
 }

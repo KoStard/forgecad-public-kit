@@ -251,23 +251,56 @@ export class PathBuilder {
     return polygon(pts);
   }
 
-  /** Thicken the path into a solid profile. Creates a rectangle per segment and unions them. */
-  stroke(width: number, join: 'Square' | 'Round' | 'Miter' = 'Square'): Sketch {
+  /** Thicken the path into a solid profile with proper miter joins at vertices. */
+  stroke(width: number, join: 'Round' | 'Square' = 'Square'): Sketch {
     if (this.points.length < 2) throw new Error('Stroke needs at least 2 points');
-    const w = getWasm();
-    const segments: Sketch[] = [];
-    for (let i = 0; i < this.points.length - 1; i++) {
-      const [x1, y1] = this.points[i];
-      const [x2, y2] = this.points[i + 1];
-      const dx = x2 - x1, dy = y2 - y1;
+    const hw = width / 2;
+    const pts = this.points;
+    const n = pts.length;
+
+    // Segment normals (perpendicular left)
+    const normals: [number, number][] = [];
+    for (let i = 0; i < n - 1; i++) {
+      const dx = pts[i + 1][0] - pts[i][0], dy = pts[i + 1][1] - pts[i][1];
       const len = Math.sqrt(dx * dx + dy * dy);
-      if (len < 1e-9) continue;
-      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-      const seg = new Sketch(w.CrossSection.square([len, width]).translate(0, -width / 2).rotate(angle).translate(x1, y1));
-      segments.push(seg);
+      normals.push([-dy / len, dx / len]);
     }
-    let result = union2d(...segments);
-    if (join === 'Round') result = result.offset(width / 4, 'Round').offset(-width / 4, 'Round');
+
+    // Offset points on each side
+    const left: [number, number][] = [], right: [number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      const [px, py] = pts[i];
+      if (i === 0 || i === n - 1) {
+        // End caps: offset by adjacent segment normal
+        const ni = normals[i === 0 ? 0 : n - 2];
+        left.push([px + ni[0] * hw, py + ni[1] * hw]);
+        right.push([px - ni[0] * hw, py - ni[1] * hw]);
+      } else {
+        // Miter join: bisect adjacent normals, scale to maintain width
+        const n1 = normals[i - 1], n2 = normals[i];
+        let mx = n1[0] + n2[0], my = n1[1] + n2[1];
+        let mlen = Math.sqrt(mx * mx + my * my);
+        if (mlen < 1e-9) { mx = n1[0]; my = n1[1]; mlen = 1; }
+        mx /= mlen; my /= mlen;
+        const scale = hw / (mx * n1[0] + my * n1[1]);
+        left.push([px + mx * scale, py + my * scale]);
+        right.push([px - mx * scale, py - my * scale]);
+      }
+    }
+
+    // Build polygon: left forward, right backward
+    const poly: [number, number][] = [...left, ...right.reverse()];
+    // Ensure CCW for Manifold
+    let sa = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const [x1, y1] = poly[i];
+      const [x2, y2] = poly[(i + 1) % poly.length];
+      sa += (x2 - x1) * (y2 + y1);
+    }
+    if (sa > 0) poly.reverse();
+
+    let result = polygon(poly);
+    if (join === 'Round') result = result.offset(-hw / 2, 'Round').offset(hw / 2, 'Round');
     return result;
   }
 }
@@ -277,7 +310,7 @@ export function path(): PathBuilder {
 }
 
 /** Thicken a polyline into a solid profile */
-export function stroke(points: [number, number][], width: number, join: 'Square' | 'Round' | 'Miter' = 'Square'): Sketch {
+export function stroke(points: [number, number][], width: number, join: 'Round' | 'Square' = 'Square'): Sketch {
   const builder = new PathBuilder();
   builder.moveTo(points[0][0], points[0][1]);
   for (let i = 1; i < points.length; i++) builder.lineTo(points[i][0], points[i][1]);
