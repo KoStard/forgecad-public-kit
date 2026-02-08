@@ -340,6 +340,59 @@ const vase = profile.revolve();
 const partial = rect(5, 40).translate(20, 0).revolve(270);
 ```
 
+## Multi-File Projects
+
+ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.js`, return a `Sketch`) or **parts** (`.forge.js`, return a `Shape`).
+
+### File Types
+- `*.sketch.js` — 2D sketch file, must return a `Sketch`
+- `*.forge.js` — 3D part file, must return a `Shape`
+
+### `importSketch(fileName)`
+Executes another file and returns its result as a `Sketch`. The target file must return a `Sketch`.
+
+**Parameters:**
+- `fileName` (string) — Name of the file to import (e.g. `"profile.sketch.js"`)
+
+**Returns:** `Sketch`
+
+```javascript
+// In a .forge.js file:
+const profile = importSketch("bracket-profile.sketch.js");
+return profile.extrude(50);
+```
+
+### `importPart(fileName)`
+Executes another file and returns its result as a `Shape`. The target file must return a `Shape`.
+
+**Parameters:**
+- `fileName` (string) — Name of the file to import (e.g. `"bracket.forge.js"`)
+
+**Returns:** `Shape`
+
+```javascript
+// Assembly: import parts and position them
+const bracket = importPart("bracket.forge.js");
+const bracket2 = importPart("bracket.forge.js")
+  .translate(100, 0, 0)
+  .rotate(0, 0, 180);
+
+return union(bracket, bracket2);
+```
+
+### Import Rules
+- Circular imports are detected and throw an error
+- Imported files execute with their own `param()` calls (parameters appear in the UI when that file is active)
+- The returned `Shape` or `Sketch` is fully chainable — use `.translate()`, `.rotate()`, `.subtract()`, etc.
+
+### Typical Project Structure
+```
+my-project/
+├── base-profile.sketch.js    ← 2D cross-section
+├── bracket.forge.js           ← extrudes the sketch, adds holes
+└── assembly.forge.js          ← imports multiple parts, positions them
+```
+
 ## Common Patterns
 
 ### Parametric Box with Holes
