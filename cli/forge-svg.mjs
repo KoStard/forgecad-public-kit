@@ -147,8 +147,31 @@ class PathBuilder {
     if (signedArea > 0) pts.reverse();
     return polygon(pts);
   }
+  stroke(width, join = 'Square') {
+    if (this.points.length < 2) throw new Error('Stroke needs at least 2 points');
+    const segments = [];
+    for (let i = 0; i < this.points.length - 1; i++) {
+      const [x1, y1] = this.points[i];
+      const [x2, y2] = this.points[i + 1];
+      const dx = x2 - x1, dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1e-9) continue;
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      segments.push(new Sketch(CrossSection.square([len, width]).translate(0, -width / 2).rotate(angle).translate(x1, y1)));
+    }
+    let result = union2d(...segments);
+    if (join === 'Round') result = result.offset(width / 4, 'Round').offset(-width / 4, 'Round');
+    return result;
+  }
 }
 const path = () => new PathBuilder();
+
+const stroke = (points, width, join = 'Square') => {
+  const b = new PathBuilder();
+  b.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length; i++) b.lineTo(points[i][0], points[i][1]);
+  return b.stroke(width, join);
+};
 
 // Params
 const params = [];
@@ -160,14 +183,14 @@ const param = (name, def, opts = {}) => {
 // Execute
 const wrapped = `"use strict";\n${code}`;
 const fn = new Function(
-  'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path',
+  'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path', 'stroke',
   'union2d', 'difference2d', 'intersection2d', 'hull2d',
   'param', 'Sketch',
   wrapped,
 );
 
 const result = fn(
-  rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path,
+  rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke,
   union2d, difference2d, intersection2d, hull2d,
   param, Sketch,
 );
