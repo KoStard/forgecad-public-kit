@@ -250,10 +250,38 @@ export class PathBuilder {
     if (signedArea > 0) pts.reverse(); // CW → CCW
     return polygon(pts);
   }
+
+  /** Thicken the path into a solid profile. Creates a rectangle per segment and unions them. */
+  stroke(width: number, join: 'Square' | 'Round' | 'Miter' = 'Square'): Sketch {
+    if (this.points.length < 2) throw new Error('Stroke needs at least 2 points');
+    const w = getWasm();
+    const segments: Sketch[] = [];
+    for (let i = 0; i < this.points.length - 1; i++) {
+      const [x1, y1] = this.points[i];
+      const [x2, y2] = this.points[i + 1];
+      const dx = x2 - x1, dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1e-9) continue;
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      const seg = new Sketch(w.CrossSection.square([len, width]).translate(0, -width / 2).rotate(angle).translate(x1, y1));
+      segments.push(seg);
+    }
+    let result = union2d(...segments);
+    if (join === 'Round') result = result.offset(width / 4, 'Round').offset(-width / 4, 'Round');
+    return result;
+  }
 }
 
 export function path(): PathBuilder {
   return new PathBuilder();
+}
+
+/** Thicken a polyline into a solid profile */
+export function stroke(points: [number, number][], width: number, join: 'Square' | 'Round' | 'Miter' = 'Square'): Sketch {
+  const builder = new PathBuilder();
+  builder.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length; i++) builder.lineTo(points[i][0], points[i][1]);
+  return builder.stroke(width, join);
 }
 
 // --- Anchor-based positioning ---
