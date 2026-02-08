@@ -59,18 +59,25 @@ function ForgeBody() {
 function SketchView() {
   const result = useForgeStore((s) => s.result);
 
-  const { fillGeo, lineGeos } = useMemo(() => {
-    if (!result?.sketch) return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[] };
+  const { fillGeo, lineGeos, pointGeos } = useMemo(() => {
+    if (!result?.sketch) return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
     try {
       const polys = result.sketch.toPolygons();
       const lines: THREE.BufferGeometry[] = [];
+      const points: THREE.BufferGeometry[] = [];
 
-      // Build line geometries for each contour
+      // Build geometries for each contour
       for (const contour of polys) {
-        if (contour.length < 2) continue;
-        const pts = contour.map((p: number[]) => new THREE.Vector3(p[0], p[1], 0));
-        pts.push(pts[0]); // close the loop
-        lines.push(new THREE.BufferGeometry().setFromPoints(pts));
+        if (contour.length === 1) {
+          // Single point - render as dot
+          const pt = new THREE.Vector3(contour[0][0], contour[0][1], 0);
+          points.push(new THREE.BufferGeometry().setFromPoints([pt]));
+        } else if (contour.length >= 2) {
+          // Line or polygon
+          const pts = contour.map((p: number[]) => new THREE.Vector3(p[0], p[1], 0));
+          pts.push(pts[0]); // close the loop
+          lines.push(new THREE.BufferGeometry().setFromPoints(pts));
+        }
       }
 
       // Build filled shape using THREE.ShapeGeometry
@@ -87,13 +94,13 @@ function SketchView() {
       }
       const fill = shapes.length > 0 ? new THREE.ShapeGeometry(shapes) : null;
 
-      return { fillGeo: fill, lineGeos: lines };
+      return { fillGeo: fill, lineGeos: lines, pointGeos: points };
     } catch {
-      return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[] };
+      return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
     }
   }, [result]);
 
-  if (lineGeos.length === 0) return null;
+  if (lineGeos.length === 0 && pointGeos.length === 0) return null;
 
   return (
     <group>
@@ -104,6 +111,9 @@ function SketchView() {
       )}
       {lineGeos.map((geo, i) => (
         <primitive key={i} object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffffff', linewidth: 1 }))} />
+      ))}
+      {pointGeos.map((geo, i) => (
+        <primitive key={`pt-${i}`} object={new THREE.Points(geo, new THREE.PointsMaterial({ color: '#ffffff', size: 5 }))} />
       ))}
     </group>
   );
