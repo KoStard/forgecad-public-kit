@@ -40,6 +40,9 @@ import {
   Constraint,
   degrees,
   radians,
+  linearPattern,
+  circularPattern,
+  mirrorCopy,
 } from './sketch';
 import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
 import { partLibrary } from './library';
@@ -114,6 +117,8 @@ function executeFile(
     'union2d', 'difference2d', 'intersection2d', 'hull2d',
     // Entities
     'Point2D', 'Line2D', 'Circle2D', 'Rectangle2D', 'TrackedShape', 'point', 'line', 'circle', 'rectangle', 'Constraint', 'degrees', 'radians',
+    // Patterns
+    'linearPattern', 'circularPattern', 'mirrorCopy',
     // Params & classes
     'param', 'Shape', 'Sketch', 'lib',
     // Plane ops
@@ -129,6 +134,7 @@ function executeFile(
     rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
     union2d, difference2d, intersection2d, hull2d,
     Point2D, Line2D, Circle2D, Rectangle2D, TrackedShape, point, line, circle, rectangle, Constraint, degrees, radians,
+    linearPattern, circularPattern, mirrorCopy,
     param, Shape, Sketch, partLibrary,
     intersectWithPlane, projectToPlane,
     importSketch, importPart,

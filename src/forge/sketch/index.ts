@@ -9,3 +9,4 @@ export * from './anchor';
 export * from './constraints';
 export * from './entities';
 export * from './topology';
+export * from './patterns';
