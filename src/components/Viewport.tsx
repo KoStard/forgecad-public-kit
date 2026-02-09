@@ -883,6 +883,8 @@ export function Viewport() {
           enableDamping
           dampingFactor={0.1}
           enableRotate={!isSketchOnly}
+          mouseButtons={isSketchOnly ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN } : undefined}
+          touches={isSketchOnly ? { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN } : undefined}
         />
         {!isSketchOnly && (
           <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
