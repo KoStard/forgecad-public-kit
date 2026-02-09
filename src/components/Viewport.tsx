@@ -779,7 +779,7 @@ function ViewManager({
       // Switch to straight-on 2D view
       camera.position.set(0, 0, 200);
       camera.lookAt(0, 0, 0);
-      camera.up.set(0, 1, 0);
+      camera.up.set(0, 0, 1);
       if (controlsRef.current) {
         controlsRef.current.target.set(0, 0, 0);
         controlsRef.current.update();
@@ -825,9 +825,9 @@ export function Viewport() {
         camera={{ up: [0, 0, 1] }}
       >
         {projectionMode === 'orthographic' ? (
-          <OrthographicCamera makeDefault position={[120, 80, 120]} zoom={2} near={0.1} far={10000} />
+          <OrthographicCamera makeDefault position={[120, 80, 120]} zoom={2} near={0.1} far={10000} up={[0, 0, 1]} />
         ) : (
-          <PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={10000} />
+          <PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={10000} up={[0, 0, 1]} />
         )}
 
         {/* Environment map for realistic reflections */}
