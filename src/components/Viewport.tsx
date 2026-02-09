@@ -82,6 +82,12 @@ function ForgeObject({
 }
 
 /** Renders a 2D sketch as filled shape + outline on the XY plane */
+const formatConstraintValue = (value: number): string => {
+  if (Number.isNaN(value)) return '';
+  const rounded = Math.abs(value) >= 100 ? value.toFixed(0) : value.toFixed(2);
+  return rounded.replace(/\\.00$/, '');
+};
+
 function SketchObject({
   obj,
   settings,
@@ -128,6 +134,85 @@ function SketchObject({
     }
   }, [obj.sketch]);
 
+  const constraintColor = obj.sketchMeta?.status === 'over'
+    ? '#ff4d4f'
+    : obj.sketchMeta?.status === 'fully'
+      ? '#35c759'
+      : obj.sketchMeta?.status === 'under'
+        ? '#4aa3ff'
+        : settings.color;
+
+  const constraintSprites = useMemo(() => {
+    if (!obj.sketchMeta) return [] as { id: string; texture: THREE.Texture; position: [number, number, number]; scale: [number, number, number]; }[];
+    return obj.sketchMeta.constraints.map((constraint) => {
+      const unit = constraint.type === 'angle' ? 'deg' : 'mm';
+      const label = constraint.isDimension && constraint.value !== undefined
+        ? `${constraint.label} ${formatConstraintValue(constraint.value)}${unit}`
+        : constraint.label;
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = constraint.isConflicting ? '#5b1d1d' : '#111111cc';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = constraint.isConflicting ? '#ff4d4f' : '#4aa3ff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+        ctx.fillStyle = '#f1f1f1';
+        ctx.font = 'bold 28px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, canvas.width / 2, canvas.height / 2 + 2);
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      return {
+        id: constraint.id,
+        texture,
+        position: [constraint.position[0], constraint.position[1], 0.1],
+        scale: [20, 5, 1],
+      };
+    });
+  }, [obj.sketchMeta]);
+
+  const constructionLines = useMemo(() => {
+    const meta = obj.sketchMeta?.construction;
+    if (!meta) return [] as THREE.Line[];
+    return meta.lines.map((line) => {
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(line.a[0], line.a[1], 0),
+        new THREE.Vector3(line.b[0], line.b[1], 0),
+      ]);
+      const mat = new THREE.LineDashedMaterial({ color: '#888', dashSize: 2, gapSize: 1, transparent: true, opacity: 0.6 });
+      const dashed = new THREE.Line(geo, mat);
+      dashed.computeLineDistances();
+      return dashed;
+    });
+  }, [obj.sketchMeta]);
+
+  const constructionCircles = useMemo(() => {
+    const meta = obj.sketchMeta?.construction;
+    if (!meta) return [] as THREE.Line[];
+    const segments = 64;
+    return meta.circles.map((circle) => {
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= segments; i += 1) {
+        const angle = (i / segments) * Math.PI * 2;
+        pts.push(new THREE.Vector3(
+          circle.center[0] + Math.cos(angle) * circle.radius,
+          circle.center[1] + Math.sin(angle) * circle.radius,
+          0,
+        ));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineDashedMaterial({ color: '#888', dashSize: 2, gapSize: 1, transparent: true, opacity: 0.6 });
+      const dashed = new THREE.Line(geo, mat);
+      dashed.computeLineDistances();
+      return dashed;
+    });
+  }, [obj.sketchMeta]);
+
   if (!settings.visible) return null;
 
   const showFill = renderMode !== 'wireframe';
@@ -136,20 +221,31 @@ function SketchObject({
     <group>
       {fillGeo && showFill && (
         <mesh geometry={fillGeo}>
-          <meshBasicMaterial color={settings.color} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
+          <meshBasicMaterial color={constraintColor} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
         </mesh>
       )}
       {lineGeos.map((geo, i) => (
         <primitive
           key={i}
-          object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: settings.color, linewidth: 1, transparent: true, opacity: settings.opacity }))}
+          object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: constraintColor, linewidth: 1, transparent: true, opacity: settings.opacity }))}
         />
       ))}
       {pointGeos.map((geo, i) => (
         <primitive
           key={`pt-${i}`}
-          object={new THREE.Points(geo, new THREE.PointsMaterial({ color: settings.color, size: 5 }))}
+          object={new THREE.Points(geo, new THREE.PointsMaterial({ color: constraintColor, size: 5 }))}
         />
+      ))}
+      {constructionLines.map((line, i) => (
+        <primitive key={`cl-${i}`} object={line} />
+      ))}
+      {constructionCircles.map((circle, i) => (
+        <primitive key={`cc-${i}`} object={circle} />
+      ))}
+      {constraintSprites.map((sprite) => (
+        <sprite key={sprite.id} position={sprite.position} scale={sprite.scale}>
+          <spriteMaterial map={sprite.texture} transparent />
+        </sprite>
       ))}
     </group>
   );

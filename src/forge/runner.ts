@@ -9,7 +9,26 @@
 
 import { Shape, box, cylinder, sphere, union, difference, intersection } from './kernel';
 import { intersectWithPlane, projectToPlane } from './section';
-import { Sketch, rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, union2d, difference2d, intersection2d, hull2d, path, stroke } from './sketch';
+import {
+  Sketch,
+  rect,
+  circle2d,
+  roundedRect,
+  polygon,
+  ngon,
+  ellipse,
+  slot,
+  star,
+  union2d,
+  difference2d,
+  intersection2d,
+  hull2d,
+  path,
+  stroke,
+  constrainedSketch,
+  ConstraintSketch,
+  type SketchConstraintMeta,
+} from './sketch';
 import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
 import { partLibrary } from './library';
 
@@ -18,6 +37,8 @@ export interface SceneObject {
   name: string;
   shape: Shape | null;
   sketch: Sketch | null;
+  color?: string;
+  sketchMeta?: SketchConstraintMeta;
   color?: string;
 }
 
@@ -71,7 +92,7 @@ function executeFile(
     'box', 'cylinder', 'sphere',
     'union', 'difference', 'intersection',
     // 2D
-    'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path', 'stroke',
+    'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path', 'stroke', 'constrainedSketch',
     'union2d', 'difference2d', 'intersection2d', 'hull2d',
     // Params & classes
     'param', 'Shape', 'Sketch', 'lib',
@@ -85,7 +106,7 @@ function executeFile(
   return fn(
     box, cylinder, sphere,
     union, difference, intersection,
-    rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke,
+    rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
     union2d, difference2d, intersection2d, hull2d,
     param, Shape, Sketch, partLibrary,
     intersectWithPlane, projectToPlane,
@@ -109,7 +130,15 @@ export function runScript(
       objects.push({ id: `obj-${objects.length + 1}`, name, shape, sketch: null, color: shape.colorHex });
     };
     const pushSketch = (sketch: Sketch, name: string) => {
-      objects.push({ id: `obj-${objects.length + 1}`, name, shape: null, sketch, color: sketch.colorHex });
+      const meta = sketch instanceof ConstraintSketch ? sketch.constraintMeta : undefined;
+      objects.push({
+        id: `obj-${objects.length + 1}`,
+        name,
+        shape: null,
+        sketch,
+        sketchMeta: meta,
+        color: sketch.colorHex,
+      });
     };
 
     const isNamedObject = (item: unknown): item is { name: string; shape?: Shape; sketch?: Sketch; color?: string } => {
@@ -134,7 +163,15 @@ export function runScript(
             return;
           }
           if (item.sketch instanceof Sketch) {
-            objects.push({ id: `obj-${objects.length + 1}`, name, shape: null, sketch: item.sketch, color: item.color || item.sketch.colorHex });
+            const meta = item.sketch instanceof ConstraintSketch ? item.sketch.constraintMeta : undefined;
+            objects.push({
+              id: `obj-${objects.length + 1}`,
+              name,
+              shape: null,
+              sketch: item.sketch,
+              sketchMeta: meta,
+              color: item.color || item.sketch.colorHex,
+            });
             return;
           }
         }
