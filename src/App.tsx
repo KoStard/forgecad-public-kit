@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { initKernel } from '@forge/kernel';
 import { useForgeStore } from './store/forgeStore';
 import { CodeEditor } from './components/CodeEditor';
@@ -30,6 +30,8 @@ function Toolbar() {
   const measurePoints = useForgeStore((s) => s.measurePoints);
   const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
   const toggleFileExplorer = useForgeStore((s) => s.toggleFileExplorer);
+  const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
+  const toggleViewPanel = useForgeStore((s) => s.toggleViewPanel);
 
   const dist =
     measurePoints.length === 2
@@ -50,6 +52,7 @@ function Toolbar() {
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
         <button style={btnStyle(fileExplorerOpen)} onClick={toggleFileExplorer}>📁 Files</button>
+        <button style={btnStyle(viewPanelOpen)} onClick={toggleViewPanel}>🧭 View</button>
         <div style={{ width: 1, height: 20, background: '#444', margin: '0 4px' }} />
         <button style={btnStyle()} onClick={newProject}>New Project</button>
         <button style={btnStyle()} onClick={saveFile}>Save</button>
@@ -70,12 +73,44 @@ export function App() {
   const setKernelReady = useForgeStore((s) => s.setKernelReady);
   const execute = useForgeStore((s) => s.execute);
   const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
+  const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
+  const [codePanelWidth, setCodePanelWidth] = useState(520);
+  const [viewPanelWidth, setViewPanelWidth] = useState(280);
+  const dragStateRef = useRef<{ type: 'code' | 'view'; startX: number; startWidth: number } | null>(null);
+  const minCodePanelWidth = 320;
+  const maxCodePanelWidth = 860;
+  const minViewPanelWidth = 220;
+  const maxViewPanelWidth = 460;
 
   useEffect(() => {
     initKernel().then(() => {
       setKernelReady(true);
       execute();
     });
+  }, []);
+
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      const state = dragStateRef.current;
+      if (!state) return;
+      const delta = e.clientX - state.startX;
+      if (state.type === 'code') {
+        const next = Math.min(maxCodePanelWidth, Math.max(minCodePanelWidth, state.startWidth + delta));
+        setCodePanelWidth(next);
+      } else {
+        const next = Math.min(maxViewPanelWidth, Math.max(minViewPanelWidth, state.startWidth - delta));
+        setViewPanelWidth(next);
+      }
+    };
+    const handleUp = () => {
+      dragStateRef.current = null;
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
   }, []);
 
   if (!kernelReady) {
@@ -94,18 +129,46 @@ export function App() {
       <Toolbar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {fileExplorerOpen && <FileExplorer />}
-        <div style={{ width: '45%', minWidth: 300, display: 'flex', flexDirection: 'column', borderRight: '1px solid #333' }}>
+        <div style={{ width: codePanelWidth, minWidth: minCodePanelWidth, display: 'flex', flexDirection: 'column', borderRight: '1px solid #333' }}>
           <div style={{ flex: 1, minHeight: 0 }}>
             <CodeEditor />
           </div>
           <ParamPanel />
           <ExportPanel />
         </div>
+        <div
+          onMouseDown={(e) => {
+            dragStateRef.current = { type: 'code', startX: e.clientX, startWidth: codePanelWidth };
+          }}
+          style={{
+            width: 6,
+            cursor: 'col-resize',
+            background: '#202020',
+            borderRight: '1px solid #333',
+          }}
+        />
         <div style={{ flex: 1, display: 'flex', minWidth: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <Viewport />
           </div>
-          <ViewPanel />
+          {viewPanelOpen && (
+            <>
+              <div
+                onMouseDown={(e) => {
+                  dragStateRef.current = { type: 'view', startX: e.clientX, startWidth: viewPanelWidth };
+                }}
+                style={{
+                  width: 6,
+                  cursor: 'col-resize',
+                  background: '#202020',
+                  borderLeft: '1px solid #333',
+                }}
+              />
+              <div style={{ width: viewPanelWidth, minWidth: minViewPanelWidth, maxWidth: maxViewPanelWidth }}>
+                <ViewPanel />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

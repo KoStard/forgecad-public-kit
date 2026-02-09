@@ -91,6 +91,8 @@ interface ForgeStore {
   setKernelReady: (v: boolean) => void;
   fileExplorerOpen: boolean;
   toggleFileExplorer: () => void;
+  viewPanelOpen: boolean;
+  toggleViewPanel: () => void;
 }
 
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
@@ -315,4 +317,6 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   fileExplorerOpen: true,
   toggleFileExplorer: () => set((s) => ({ fileExplorerOpen: !s.fileExplorerOpen })),
+  viewPanelOpen: true,
+  toggleViewPanel: () => set((s) => ({ viewPanelOpen: !s.viewPanelOpen })),
 }));
