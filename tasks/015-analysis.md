@@ -76,11 +76,15 @@ Add `Point`, `Line`, `Rectangle` as first-class objects that:
 - Can be used with the constraint system
 - Still produce `Sketch` objects for rendering/extrusion
 
+✅ DONE
+
 ### Phase 2: Constraint Integration
 Make constraints work naturally with the entity layer:
 - `Constraint.makeParallel(rect.side(2), line)` 
 - Constraints auto-solve when building the sketch
 - Visual feedback in the viewport
+
+✅ DONE — Constraint namespace accepts Point2D/Line2D directly, ConstrainedSketchBuilder has importPoint/importLine/importRectangle
 
 ### Phase 3: 3D Topology Tracking
 Add topology awareness to extruded shapes:
@@ -88,10 +92,14 @@ Add topology awareness to extruded shapes:
 - `shape.getSurface("side-0")` returns a face reference
 - `shape.getEdge("top-side-0")` returns an edge reference
 
+✅ DONE — Proper axis-angle rotation via Rodrigues formula, Circle2D with extrusion topology, Shape.transform() exposed
+
 ### Phase 4: Algorithm Catalog
 - `ArcFiller` / loft between faces
 - Fillet/chamfer on edges (approximate via mesh operations)
 - Pattern operations (linear, circular, mirror)
+
+✅ DONE (partial) — linearPattern, circularPattern, mirrorCopy, filletEdge, chamferEdge. ArcFiller deferred (needs loft/sweep which Manifold doesn't support natively).
 
 ## Cool Improvements Beyond the Ideal API
 
