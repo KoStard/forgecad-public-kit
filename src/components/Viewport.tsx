@@ -721,13 +721,13 @@ function ViewController({
     const camDir = new THREE.Vector3();
     if (command.type === 'snap') {
       const viewMap: Record<string, THREE.Vector3> = {
-        front: new THREE.Vector3(0, 0, 1),
-        back: new THREE.Vector3(0, 0, -1),
+        front: new THREE.Vector3(0, -1, 0),
+        back: new THREE.Vector3(0, 1, 0),
         left: new THREE.Vector3(-1, 0, 0),
         right: new THREE.Vector3(1, 0, 0),
-        top: new THREE.Vector3(0, 1, 0),
-        bottom: new THREE.Vector3(0, -1, 0),
-        iso: new THREE.Vector3(1, 1, 1),
+        top: new THREE.Vector3(0, 0, 1),
+        bottom: new THREE.Vector3(0, 0, -1),
+        iso: new THREE.Vector3(1, -1, 1),
       };
       camDir.copy(viewMap[command.view ?? 'iso']).normalize();
     } else if (controls) {
@@ -822,6 +822,7 @@ export function Viewport() {
           toneMappingExposure: 1.0,
         }}
         raycaster={{ params: { Line: { threshold: 0.5 } } } as any}
+        camera={{ up: [0, 0, 1] }}
       >
         {projectionMode === 'orthographic' ? (
           <OrthographicCamera makeDefault position={[120, 80, 120]} zoom={2} near={0.1} far={10000} />
@@ -851,6 +852,7 @@ export function Viewport() {
         {gridEnabled && !isSketchOnly && (
           <Grid
             args={[500, 500]}
+            rotation-x={Math.PI / 2}
             cellSize={gridSize}
             cellThickness={0.5}
             cellColor="#404040"

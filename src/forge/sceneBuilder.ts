@@ -67,6 +67,7 @@ export function buildScene(geo: ForgeGeometry): {
   const dist = maxDim / (2 * Math.tan((fov * Math.PI) / 360)) * 1.6;
 
   const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, dist * 10);
+  camera.up.set(0, 0, 1);
   // Isometric-ish view angle
   camera.position.set(
     center.x + dist * 0.6,
