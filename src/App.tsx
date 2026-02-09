@@ -114,6 +114,7 @@ export function App() {
   const execute = useForgeStore((s) => s.execute);
   const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
+  const refreshFiles = useForgeStore((s) => s.refreshFiles);
   const [codePanelWidth, setCodePanelWidth] = useState(520);
   const [viewPanelWidth, setViewPanelWidth] = useState(280);
   const dragStateRef = useRef<{ type: 'code' | 'view'; startX: number; startWidth: number } | null>(null);
@@ -128,6 +129,22 @@ export function App() {
       execute();
     });
   }, []);
+
+  // Refresh files on mount and when tab becomes visible
+  useEffect(() => {
+    refreshFiles();
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshFiles();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshFiles]);
 
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {

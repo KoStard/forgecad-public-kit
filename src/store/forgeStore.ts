@@ -27,7 +27,16 @@ const collectInitialFolders = (files: Record<string, string>): string[] => {
 
 const INITIAL_FOLDERS = collectInitialFolders(INITIAL_FILES);
 
+const getActiveFileFromHash = (): string | null => {
+  const hash = window.location.hash.slice(1); // Remove the #
+  return hash || null;
+};
+
 const initialActive = (() => {
+  const hashFile = getActiveFileFromHash();
+  if (hashFile && INITIAL_FILES[hashFile]) {
+    return hashFile;
+  }
   const names = Object.keys(INITIAL_FILES);
   return names.find((n) => n.endsWith('.forge.js')) || names[0];
 })();
@@ -160,6 +169,8 @@ interface ForgeStore {
   toggleViewPanel: () => void;
 
   updateSketchConstraint: (objectId: string, constraintId: string, value: number) => void;
+
+  refreshFiles: () => Promise<void>;
 }
 
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
@@ -196,6 +207,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   folders: [...INITIAL_FOLDERS],
   activeFile: initialActive,
   setActiveFile: (name) => {
+    // Update URL hash when active file changes
+    if (name) {
+      window.history.replaceState(null, '', `#${name}`);
+    }
     set({ activeFile: name, paramOverrides: {} });
     setTimeout(() => get().execute(), 0);
   },
@@ -555,5 +570,45 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       return { ...obj, sketch: updated, sketchMeta: updated.constraintMeta };
     });
     set({ result: { ...current, objects } });
+  },
+
+  refreshFiles: async () => {
+    try {
+      const response = await fetch('/api/files');
+      if (!response.ok) {
+        console.error('Failed to refresh files:', response.statusText);
+        return;
+      }
+      const serverFiles: Record<string, string> = await response.json();
+      const { files, activeFile } = get();
+      
+      // Merge server files with current files
+      // Preserve any unsaved changes in current files
+      const mergedFiles: Record<string, string> = { ...files };
+      const newFolders = new Set<string>();
+      
+      Object.keys(serverFiles).forEach((path) => {
+        // Only add new files from server, don't overwrite existing unsaved changes
+        if (!(path in mergedFiles)) {
+          mergedFiles[path] = serverFiles[path];
+        }
+        // Collect folder paths
+        collectParentPaths(path).forEach((folder) => newFolders.add(folder));
+      });
+      
+      // Check if active file still exists
+      const availableFiles = Object.keys(mergedFiles);
+      const newActiveFile = activeFile && mergedFiles[activeFile] 
+        ? activeFile 
+        : (availableFiles.find((n) => n.endsWith('.forge.js')) || availableFiles[0]);
+      
+      set({ 
+        files: mergedFiles, 
+        folders: Array.from(newFolders).sort(),
+        activeFile: newActiveFile 
+      });
+    } catch (e) {
+      console.error('Error refreshing files:', e);
+    }
   },
 }));

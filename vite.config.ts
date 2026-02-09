@@ -16,6 +16,35 @@ function resolveProjectDir(): string | null {
 
 const projectDir = resolveProjectDir();
 
+// Helper to scan project directory for forge/sketch files
+function scanProjectFiles(projectPath: string | null): Record<string, string> {
+  if (!projectPath) return {};
+  const abs = path.resolve(projectPath);
+  const entries: Record<string, string> = {};
+  
+  function scanDir(dirPath: string, prefix: string = '') {
+    const items = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const item of items) {
+      const fullPath = path.join(dirPath, item.name);
+      const relativePath = prefix ? `${prefix}/${item.name}` : item.name;
+      
+      if (item.isDirectory()) {
+        scanDir(fullPath, relativePath);
+      } else if (item.isFile() && (item.name.endsWith('.forge.js') || item.name.endsWith('.sketch.js'))) {
+        entries[relativePath] = fs.readFileSync(fullPath, 'utf-8');
+      }
+    }
+  }
+  
+  try {
+    scanDir(abs);
+  } catch (e) {
+    // Directory might not exist
+  }
+  
+  return entries;
+}
+
 function forgeProjectPlugin() {
   const virtualId = 'virtual:forge-project';
   const resolvedId = '\0' + virtualId;
@@ -28,13 +57,7 @@ function forgeProjectPlugin() {
     load(id: string) {
       if (id !== resolvedId) return;
       if (!projectDir) return 'export default null;';
-      const abs = path.resolve(projectDir);
-      const entries: Record<string, string> = {};
-      for (const f of fs.readdirSync(abs)) {
-        if (f.endsWith('.forge.js') || f.endsWith('.sketch.js')) {
-          entries[f] = fs.readFileSync(path.join(abs, f), 'utf-8');
-        }
-      }
+      const entries = scanProjectFiles(projectDir);
       return `export default ${JSON.stringify(entries)};`;
     },
     handleHotUpdate({ file, server }: any) {
@@ -47,6 +70,20 @@ function forgeProjectPlugin() {
     },
     configureServer(server: any) {
       server.middlewares.use((req: any, res: any, next: any) => {
+        // Handle /api/files - dynamically fetch all project files
+        if (req.method === 'GET' && req.url === '/api/files') {
+          try {
+            const entries = scanProjectFiles(projectDir);
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(entries));
+          } catch (e: any) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: e.message }));
+          }
+          return;
+        }
+        
+        // Handle /api/save - save a file
         if (req.method === 'POST' && req.url === '/api/save') {
           let body = '';
           req.on('data', (chunk: any) => body += chunk);
@@ -83,9 +120,10 @@ function forgeProjectPlugin() {
               res.end(JSON.stringify({ error: e.message }));
             }
           });
-        } else {
-          next();
+          return;
         }
+        
+        next();
       });
     },
   };
