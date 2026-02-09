@@ -42,8 +42,18 @@ export function ViewPanel() {
   const selectedObjectId = useForgeStore((s) => s.selectedObjectId);
   const selectObject = useForgeStore((s) => s.selectObject);
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
+  const updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
 
   const objects = result?.objects ?? [];
+  const selectedObject = objects.find((obj) => obj.id === selectedObjectId) ?? null;
+  const constraintMeta = selectedObject?.sketchMeta ?? null;
+  const constraintStatusColor = constraintMeta?.status === 'over'
+    ? '#ff4d4f'
+    : constraintMeta?.status === 'fully'
+      ? '#35c759'
+      : constraintMeta?.status === 'under'
+        ? '#4aa3ff'
+        : '#777';
 
   return (
     <div
@@ -158,6 +168,69 @@ export function ViewPanel() {
           );
         })}
       </div>
+
+      {constraintMeta && (
+        <div style={sectionStyle}>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Constraints</span>
+            <span style={{ fontSize: 11, color: constraintStatusColor }}>{constraintMeta.status}</span>
+          </div>
+          {constraintMeta.constraints.length === 0 && (
+            <div style={{ fontSize: 12, color: '#666', padding: '6px 0' }}>No constraints in this sketch</div>
+          )}
+          {constraintMeta.constraints.map((constraint) => (
+            <div
+              key={constraint.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 8px',
+                border: '1px solid #2a2a2a',
+                borderRadius: 6,
+                marginBottom: 6,
+                background: constraint.isConflicting ? '#3a1d1d' : '#202020',
+              }}
+            >
+              <span style={{ fontSize: 11, color: constraint.isConflicting ? '#ff4d4f' : '#cfcfcf', width: 48 }}>
+                {constraint.label}
+              </span>
+              {constraint.isDimension && constraint.value !== undefined ? (
+                <input
+                  type="number"
+                  value={constraint.value}
+                  onChange={(e) => {
+                    const nextValue = Number(e.target.value);
+                    if (Number.isNaN(nextValue) || !selectedObject) return;
+                    updateSketchConstraint(selectedObject.id, constraint.id, nextValue);
+                  }}
+                  style={{
+                    flex: 1,
+                    background: '#111',
+                    border: '1px solid #333',
+                    borderRadius: 4,
+                    padding: '4px 6px',
+                    color: '#ddd',
+                    fontSize: 12,
+                  }}
+                />
+              ) : (
+                <span style={{ fontSize: 12, color: '#888' }}>{constraint.type}</span>
+              )}
+            </div>
+          ))}
+          {constraintMeta.rejected.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: '#ff4d4f', marginBottom: 4 }}>Rejected constraints</div>
+              {constraintMeta.rejected.map((constraint) => (
+                <div key={constraint.id} style={{ fontSize: 11, color: '#ff4d4f' }}>
+                  {constraint.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={sectionStyle}>
         <div style={labelStyle}>Grid</div>

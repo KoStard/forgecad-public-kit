@@ -30,6 +30,7 @@ declare function union2d(...sketches: Sketch[]): Sketch;
 declare function difference2d(...sketches: Sketch[]): Sketch;
 declare function intersection2d(...sketches: Sketch[]): Sketch;
 declare function hull2d(...sketches: Sketch[]): Sketch;
+declare function constrainedSketch(): ConstrainedSketchBuilder;
 
 declare class Shape {
   translate(x: number, y: number, z: number): Shape;
@@ -59,6 +60,30 @@ declare class Sketch {
   bounds(): { min: [number, number]; max: [number, number] };
   isEmpty(): boolean;
   numVert(): number;
+}
+
+declare class ConstraintSketch extends Sketch {
+  constraintMeta: {
+    status: 'under' | 'fully' | 'over';
+  };
+}
+
+declare class ConstrainedSketchBuilder {
+  moveTo(x: number, y: number): ConstrainedSketchBuilder;
+  lineTo(x: number, y: number): ConstrainedSketchBuilder;
+  lineH(dx: number): ConstrainedSketchBuilder;
+  lineV(dy: number): ConstrainedSketchBuilder;
+  lineAngled(length: number, degrees: number): ConstrainedSketchBuilder;
+  close(): ConstrainedSketchBuilder;
+  point(x: number, y: number, fixed?: boolean): string;
+  pointAt(index: number): string;
+  line(a: string, b: string, construction?: boolean): string;
+  lineAt(index: number): string;
+  circle(center: string, radius: number, construction?: boolean, segments?: number): string;
+  circleAt(index: number): string;
+  addLoopCircle(center: string, radius: number, segments?: number): ConstrainedSketchBuilder;
+  constrain(constraint: { type: string; [key: string]: unknown }): ConstrainedSketchBuilder;
+  solve(options?: { iterations?: number; tolerance?: number }): ConstraintSketch;
 }
 
 declare const lib: {

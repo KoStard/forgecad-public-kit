@@ -6,3 +6,4 @@ export * from './operations';
 export * from './extrude';
 export * from './path';
 export * from './anchor';
+export * from './constraints';

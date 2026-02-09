@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { runScript, type ParamDef, type RunResult, type SceneObject } from '@forge/index';
+import { runScript, type ParamDef, type RunResult, type SceneObject, isConstraintSketch, updateConstraintValue } from '@forge/index';
 import { setParamOverrides } from '@forge/params';
 import projectFiles from 'virtual:forge-project';
 
@@ -93,6 +93,8 @@ interface ForgeStore {
   toggleFileExplorer: () => void;
   viewPanelOpen: boolean;
   toggleViewPanel: () => void;
+
+  updateSketchConstraint: (objectId: string, constraintId: string, value: number) => void;
 }
 
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
@@ -319,4 +321,15 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   toggleFileExplorer: () => set((s) => ({ fileExplorerOpen: !s.fileExplorerOpen })),
   viewPanelOpen: true,
   toggleViewPanel: () => set((s) => ({ viewPanelOpen: !s.viewPanelOpen })),
+
+  updateSketchConstraint: (objectId, constraintId, value) => {
+    const current = get().result;
+    if (!current) return;
+    const objects = current.objects.map((obj) => {
+      if (obj.id !== objectId || !obj.sketch || !isConstraintSketch(obj.sketch)) return obj;
+      const updated = updateConstraintValue(obj.sketch, constraintId, value);
+      return { ...obj, sketch: updated, sketchMeta: updated.constraintMeta };
+    });
+    set({ result: { ...current, objects } });
+  },
 }));
