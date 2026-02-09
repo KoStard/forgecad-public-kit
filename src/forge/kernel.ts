@@ -26,38 +26,52 @@ export function getWasm(): ManifoldToplevel {
 
 /** Thin wrapper around Manifold with chainable API */
 export class Shape {
-  constructor(public readonly manifold: Manifold) {}
+  public colorHex: string | undefined;
+
+  constructor(public readonly manifold: Manifold, color?: string) {
+    this.colorHex = color;
+  }
+
+  /** Set the color of this shape (hex string, e.g. "#ff0000") */
+  setColor(value: string | undefined): Shape {
+    return new Shape(this.manifold, value);
+  }
+
+  /** Alias for setColor */
+  color(value: string | undefined): Shape {
+    return this.setColor(value);
+  }
 
   // --- Transforms (all return new Shape, immutable) ---
 
   translate(x: number, y: number, z: number): Shape {
-    return new Shape(this.manifold.translate(x, y, z));
+    return new Shape(this.manifold.translate(x, y, z), this.colorHex);
   }
 
   rotate(x: number, y: number, z: number): Shape {
-    return new Shape(this.manifold.rotate(x, y, z));
+    return new Shape(this.manifold.rotate(x, y, z), this.colorHex);
   }
 
   scale(v: number | [number, number, number]): Shape {
-    return new Shape(this.manifold.scale(v as any));
+    return new Shape(this.manifold.scale(v as any), this.colorHex);
   }
 
   mirror(normal: [number, number, number]): Shape {
-    return new Shape(this.manifold.mirror(normal));
+    return new Shape(this.manifold.mirror(normal), this.colorHex);
   }
 
   // --- Booleans ---
 
   add(other: Shape): Shape {
-    return new Shape(this.manifold.add(other.manifold));
+    return new Shape(this.manifold.add(other.manifold), this.colorHex);
   }
 
   subtract(other: Shape): Shape {
-    return new Shape(this.manifold.subtract(other.manifold));
+    return new Shape(this.manifold.subtract(other.manifold), this.colorHex);
   }
 
   intersect(other: Shape): Shape {
-    return new Shape(this.manifold.intersect(other.manifold));
+    return new Shape(this.manifold.intersect(other.manifold), this.colorHex);
   }
 
   // --- Query ---

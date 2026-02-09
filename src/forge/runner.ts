@@ -18,6 +18,7 @@ export interface SceneObject {
   name: string;
   shape: Shape | null;
   sketch: Sketch | null;
+  color?: string;
 }
 
 export interface RunResult {
@@ -105,13 +106,13 @@ export function runScript(
 
     const objects: SceneObject[] = [];
     const pushShape = (shape: Shape, name: string) => {
-      objects.push({ id: `obj-${objects.length + 1}`, name, shape, sketch: null });
+      objects.push({ id: `obj-${objects.length + 1}`, name, shape, sketch: null, color: shape.colorHex });
     };
     const pushSketch = (sketch: Sketch, name: string) => {
-      objects.push({ id: `obj-${objects.length + 1}`, name, shape: null, sketch });
+      objects.push({ id: `obj-${objects.length + 1}`, name, shape: null, sketch, color: sketch.colorHex });
     };
 
-    const isNamedObject = (item: unknown): item is { name: string; shape?: Shape; sketch?: Sketch } => {
+    const isNamedObject = (item: unknown): item is { name: string; shape?: Shape; sketch?: Sketch; color?: string } => {
       return !!item && typeof item === 'object' && 'name' in item;
     };
 
@@ -129,11 +130,11 @@ export function runScript(
         if (isNamedObject(item)) {
           const name = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : label;
           if (item.shape instanceof Shape) {
-            pushShape(item.shape, name);
+            objects.push({ id: `obj-${objects.length + 1}`, name, shape: item.shape, sketch: null, color: item.color || item.shape.colorHex });
             return;
           }
           if (item.sketch instanceof Sketch) {
-            pushSketch(item.sketch, name);
+            objects.push({ id: `obj-${objects.length + 1}`, name, shape: null, sketch: item.sketch, color: item.color || item.sketch.colorHex });
             return;
           }
         }

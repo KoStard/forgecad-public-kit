@@ -14,18 +14,18 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
     opts?.scaleTop as any,
     opts?.center ?? false,
   );
-  return new Shape(m);
+  return new Shape(m, sketch.colorHex);
 }
 
 export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number): Shape {
-  return new Shape(sketch.cross.revolve(segments ?? 0, degrees));
+  return new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex);
 }
 
-Sketch.prototype.extrude = function(height: number, opts?: {
+Sketch.prototype.extrude = function (height: number, opts?: {
   twist?: number;
   divisions?: number;
   scaleTop?: number | [number, number];
   center?: boolean;
 }) { return sketchExtrude(this, height, opts); };
 
-Sketch.prototype.revolve = function(degrees = 360, segments?: number) { return sketchRevolve(this, degrees, segments); };
+Sketch.prototype.revolve = function (degrees = 360, segments?: number) { return sketchRevolve(this, degrees, segments); };
