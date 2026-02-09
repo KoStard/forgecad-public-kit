@@ -82,16 +82,7 @@ export function ViewPanel() {
 
       <div style={sectionStyle}>
         <div style={labelStyle}>Views</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: 'front' })}>Front</button>
-          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: 'back' })}>Back</button>
-          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: 'left' })}>Left</button>
-          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: 'right' })}>Right</button>
-          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: 'top' })}>Top</button>
-          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: 'bottom' })}>Bottom</button>
-          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: 'iso' })}>Iso</button>
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
           <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'fit' })}>Fit View</button>
           <button
             style={btnStyle()}
