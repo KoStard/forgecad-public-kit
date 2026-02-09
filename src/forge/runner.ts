@@ -94,6 +94,13 @@ function executeFile(
 
   const wrapped = `"use strict";\n${code}`;
 
+  // Wrappers that auto-unwrap TrackedShape for boolean ops
+  const unwrap = (s: Shape | TrackedShape): Shape =>
+    s instanceof TrackedShape ? s.toShape() : s;
+  const wrappedUnion = (...shapes: (Shape | TrackedShape)[]) => union(...shapes.map(unwrap));
+  const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => difference(...shapes.map(unwrap));
+  const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => intersection(...shapes.map(unwrap));
+
   const fn = new Function(
     // 3D
     'box', 'cylinder', 'sphere',
@@ -114,7 +121,7 @@ function executeFile(
 
   return fn(
     box, cylinder, sphere,
-    union, difference, intersection,
+    wrappedUnion, wrappedDifference, wrappedIntersection,
     rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
     union2d, difference2d, intersection2d, hull2d,
     Point2D, Line2D, Rectangle2D, TrackedShape, point, line, rectangle, Constraint,

@@ -1,5 +1,5 @@
 // Laptop — Entity-based API demo
-// Uses Rectangle2D with named sides, TrackedShape with rotateAroundEdge
+// Rectangle2D with named sides, TrackedShape with rotateAroundEdge
 
 const bottomW = param("Width", 300, { min: 200, max: 400, unit: "mm" });
 const bottomD = param("Depth", 200, { min: 150, max: 300, unit: "mm" });
@@ -14,11 +14,9 @@ const base = baseRect.extrude(bottomH);
 
 // Screen — same width as base, thinner
 const screenRect = Rectangle2D.fromCenterAndDimensions(point(0, 0), bottomW, screenTall);
-const screenPanel = screenRect.extrude(topH);
-
-// Position screen on top of base at the back edge, then rotate open
-const screen = screenPanel
+const screen = screenRect.extrude(topH)
   .moveBy(0, bottomD / 2, bottomH)
   .rotateAroundEdge('top-top', -(180 - openAngle));
 
-return union(base.toShape(), screen.toShape());
+// union() accepts TrackedShape directly
+return union(base, screen);
