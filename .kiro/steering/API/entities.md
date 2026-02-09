@@ -32,6 +32,26 @@ Line2D.fromPointAndAngle(point(0, 0), 45, 100);
 Line2D.fromPointAndDirection(point(0, 0), [1, 1], 50);
 ```
 
+### `circle(cx, cy, radius)` / `Circle2D`
+A named 2D circle.
+
+```javascript
+const c = circle(0, 0, 25);
+c.diameter;        // 50
+c.circumference;   // ~157
+c.area;            // ~1963
+c.pointAtAngle(90); // Point2D at top
+
+// Extrude to cylinder with topology
+const cyl = c.extrude(30);
+cyl.face('top');    // FaceRef
+cyl.face('side');   // FaceRef
+
+// Construction methods
+Circle2D.fromCenterAndRadius(point(0, 0), 25);
+Circle2D.fromDiameter(point(0, 0), 50);
+```
+
 ### `rectangle(x, y, w, h)` / `Rectangle2D`
 A rectangle with named sides and vertices.
 
@@ -116,4 +136,76 @@ Constraint.length(sketch, l1, 50);
 Constraint.perpendicular(sketch, l1, l2);
 
 const result = sketch.close().solve();
+```
+
+### Entity-aware constraints
+
+Constraint functions accept `Point2D`/`Line2D` directly — they auto-import into the builder:
+
+```javascript
+const sketch = constrainedSketch();
+const myLine = line(0, 0, 50, 0);
+const myRect = rectangle(10, 10, 40, 30);
+
+// Pass Line2D directly — auto-imported
+Constraint.makeParallel(sketch, myLine, myRect.side('top'));
+Constraint.horizontal(sketch, myLine);
+```
+
+### Importing entities into a constrained sketch
+
+```javascript
+const sketch = constrainedSketch();
+const r = rectangle(0, 0, 100, 60);
+const sides = sketch.importRectangle(r);
+// sides.bottom, sides.right, sides.top, sides.left are LineIds
+// sides.points is [bl, br, tr, tl] PointIds
+
+Constraint.horizontal(sketch, sides.bottom);
+Constraint.length(sketch, sides.bottom, 100);
+```
+
+
+## Patterns
+
+### `linearPattern(shape, count, dx, dy, dz?)`
+Repeat a shape along a direction vector, returning the union.
+
+```javascript
+const bolt = cylinder(10, 3);
+const row = linearPattern(bolt, 5, 20, 0);  // 5 bolts, 20mm apart along X
+```
+
+### `circularPattern(shape, count, centerX?, centerY?)`
+Repeat a shape around the Z axis, returning the union.
+
+```javascript
+const hole = cylinder(12, 4).translate(30, 0, -1);
+const holes = circularPattern(hole, 8);  // 8 holes evenly spaced
+```
+
+### `mirrorCopy(shape, normal)`
+Mirror a shape and union with the original.
+
+```javascript
+const half = box(50, 30, 10);
+const full = mirrorCopy(half, [1, 0, 0]);  // Mirror across YZ plane
+```
+
+## Fillets & Chamfers
+
+### `filletEdge(shape, edge, radius, quadrant?, segments?)`
+Fillet a vertical edge (subtract corner, add quarter-cylinder).
+
+```javascript
+const b = rectangle(0, 0, 50, 50).extrude(20);
+const filleted = filletEdge(b, b.edge('vert-br'), 5, [-1, -1]);
+```
+
+### `chamferEdge(shape, edge, size, quadrant?)`
+Chamfer a vertical edge (subtract triangular prism).
+
+```javascript
+const b = rectangle(0, 0, 50, 50).extrude(20);
+const chamfered = chamferEdge(b, b.edge('vert-br'), 3, [-1, -1]);
 ```
