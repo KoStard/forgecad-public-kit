@@ -1,0 +1,1 @@
+Check all files in docs/permanent/ to know about project guidelines and APIs.
