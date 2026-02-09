@@ -6,6 +6,7 @@ import { Viewport } from './components/Viewport';
 import { ParamPanel } from './components/ParamPanel';
 import { ExportPanel } from './components/ExportPanel';
 import { FileExplorer } from './components/FileExplorer';
+import { ViewPanel } from './components/ViewPanel';
 
 const btnStyle = (active = false): React.CSSProperties => ({
   padding: '4px 10px',
@@ -100,8 +101,11 @@ export function App() {
           <ParamPanel />
           <ExportPanel />
         </div>
-        <div style={{ flex: 1 }}>
-          <Viewport />
+        <div style={{ flex: 1, display: 'flex', minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Viewport />
+          </div>
+          <ViewPanel />
         </div>
       </div>
     </div>

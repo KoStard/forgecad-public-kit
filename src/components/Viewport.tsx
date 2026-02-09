@@ -1,10 +1,11 @@
-import { useMemo, useState, useCallback, useRef } from 'react';
+import { useMemo, useCallback, useRef, useEffect, type MutableRefObject } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment } from '@react-three/drei';
-import { useForgeStore } from '../store/forgeStore';
-import { Sketch } from '@forge/sketch';
+import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
+import { useForgeStore, type ObjectSettings, type RenderMode, type ViewCommand } from '../store/forgeStore';
+import type { SceneObject } from '@forge/index';
 import { shapeToGeometry } from '@forge/meshToGeometry';
 import * as THREE from 'three';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 /**
  * Renders the solid body with proper CAD-style shading.
@@ -18,37 +19,62 @@ import * as THREE from 'three';
  * the box corners. For CAD we need non-indexed geometry so each face has
  * independent flat normals.
  */
-function ForgeBody() {
-  const result = useForgeStore((s) => s.result);
-
+function ForgeObject({
+  obj,
+  settings,
+  renderMode,
+}: {
+  obj: SceneObject;
+  settings: ObjectSettings;
+  renderMode: RenderMode;
+}) {
   const { solidGeo, edgesGeo } = useMemo(() => {
-    if (!result?.shape) return { solidGeo: null, edgesGeo: null };
+    if (!obj.shape) return { solidGeo: null, edgesGeo: null };
     try {
-      const { solid, edges } = shapeToGeometry(result.shape);
+      const { solid, edges } = shapeToGeometry(obj.shape);
       return { solidGeo: solid, edgesGeo: edges };
     } catch {
       return { solidGeo: null, edgesGeo: null };
     }
-  }, [result]);
+  }, [obj.shape]);
 
-  if (!solidGeo) return null;
+  if (!solidGeo || !settings.visible) return null;
+
+  const meshOpacity = settings.opacity;
+  const showSolid = renderMode !== 'wireframe';
+  const showEdges = renderMode === 'overlay';
+  const showWire = renderMode === 'wireframe';
 
   return (
     <group>
-      <mesh geometry={solidGeo}>
-        <meshPhysicalMaterial
-          color="#5b9bd5"
-          metalness={0.05}
-          roughness={0.35}
-          clearcoat={0.1}
-          clearcoatRoughness={0.4}
-          flatShading
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      {edgesGeo && (
+      {showSolid && (
+        <mesh geometry={solidGeo}>
+          <meshPhysicalMaterial
+            color={settings.color}
+            metalness={0.05}
+            roughness={0.35}
+            clearcoat={0.1}
+            clearcoatRoughness={0.4}
+            flatShading
+            side={THREE.DoubleSide}
+            transparent={meshOpacity < 1}
+            opacity={meshOpacity}
+          />
+        </mesh>
+      )}
+      {showWire && (
+        <mesh geometry={solidGeo}>
+          <meshBasicMaterial
+            color={settings.color}
+            wireframe
+            transparent={meshOpacity < 1}
+            opacity={meshOpacity}
+          />
+        </mesh>
+      )}
+      {showEdges && edgesGeo && (
         <lineSegments geometry={edgesGeo}>
-          <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={0.6} />
+          <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={Math.min(1, meshOpacity + 0.1)} />
         </lineSegments>
       )}
     </group>
@@ -56,31 +82,33 @@ function ForgeBody() {
 }
 
 /** Renders a 2D sketch as filled shape + outline on the XY plane */
-function SketchView() {
-  const result = useForgeStore((s) => s.result);
-
+function SketchObject({
+  obj,
+  settings,
+  renderMode,
+}: {
+  obj: SceneObject;
+  settings: ObjectSettings;
+  renderMode: RenderMode;
+}) {
   const { fillGeo, lineGeos, pointGeos } = useMemo(() => {
-    if (!result?.sketch) return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
+    if (!obj.sketch) return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
     try {
-      const polys = result.sketch.toPolygons();
+      const polys = obj.sketch.toPolygons();
       const lines: THREE.BufferGeometry[] = [];
       const points: THREE.BufferGeometry[] = [];
 
-      // Build geometries for each contour
       for (const contour of polys) {
         if (contour.length === 1) {
-          // Single point - render as dot
           const pt = new THREE.Vector3(contour[0][0], contour[0][1], 0);
           points.push(new THREE.BufferGeometry().setFromPoints([pt]));
         } else if (contour.length >= 2) {
-          // Line or polygon
           const pts = contour.map((p: number[]) => new THREE.Vector3(p[0], p[1], 0));
-          pts.push(pts[0]); // close the loop
+          pts.push(pts[0]);
           lines.push(new THREE.BufferGeometry().setFromPoints(pts));
         }
       }
 
-      // Build filled shape using THREE.ShapeGeometry
       const shapes: THREE.Shape[] = [];
       for (const contour of polys) {
         if (contour.length < 3) continue;
@@ -98,22 +126,30 @@ function SketchView() {
     } catch {
       return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
     }
-  }, [result]);
+  }, [obj.sketch]);
 
-  if (lineGeos.length === 0 && pointGeos.length === 0) return null;
+  if (!settings.visible) return null;
+
+  const showFill = renderMode !== 'wireframe';
 
   return (
     <group>
-      {fillGeo && (
+      {fillGeo && showFill && (
         <mesh geometry={fillGeo}>
-          <meshBasicMaterial color="#5b9bd5" transparent opacity={0.15} side={THREE.DoubleSide} />
+          <meshBasicMaterial color={settings.color} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
         </mesh>
       )}
       {lineGeos.map((geo, i) => (
-        <primitive key={i} object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffffff', linewidth: 1 }))} />
+        <primitive
+          key={i}
+          object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: settings.color, linewidth: 1, transparent: true, opacity: settings.opacity }))}
+        />
       ))}
       {pointGeos.map((geo, i) => (
-        <primitive key={`pt-${i}`} object={new THREE.Points(geo, new THREE.PointsMaterial({ color: '#ffffff', size: 5 }))} />
+        <primitive
+          key={`pt-${i}`}
+          object={new THREE.Points(geo, new THREE.PointsMaterial({ color: settings.color, size: 5 }))}
+        />
       ))}
     </group>
   );
@@ -212,15 +248,144 @@ function MeasureLine({ a, b }: { a: number[]; b: number[] }) {
   );
 }
 
+function ViewController({
+  controlsRef,
+  command,
+  objects,
+  settings,
+  clearCommand,
+}: {
+  controlsRef: MutableRefObject<OrbitControlsImpl | null>;
+  command: ViewCommand | null;
+  objects: SceneObject[];
+  settings: Record<string, ObjectSettings>;
+  clearCommand: () => void;
+}) {
+  const { camera, size } = useThree();
+
+  useEffect(() => {
+    if (!command) return;
+    const visibleObjects = objects.filter((obj) => settings[obj.id]?.visible);
+    const targetObjects = command.targetId
+      ? visibleObjects.filter((obj) => obj.id === command.targetId)
+      : visibleObjects;
+
+    const computeBounds = (obj: SceneObject): THREE.Box3 | null => {
+      if (obj.shape) {
+        try {
+          const { solid } = shapeToGeometry(obj.shape);
+          solid.computeBoundingBox();
+          return solid.boundingBox ?? null;
+        } catch {
+          return null;
+        }
+      }
+      if (obj.sketch) {
+        try {
+          const polys = obj.sketch.toPolygons();
+          const box = new THREE.Box3();
+          let hasPoint = false;
+          polys.forEach((contour) => {
+            contour.forEach((p) => {
+              box.expandByPoint(new THREE.Vector3(p[0], p[1], 0));
+              hasPoint = true;
+            });
+          });
+          return hasPoint ? box : null;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
+
+    const bounds = new THREE.Box3();
+    let hasBounds = false;
+    targetObjects.forEach((obj) => {
+      const box = computeBounds(obj);
+      if (box) {
+        if (!hasBounds) bounds.copy(box);
+        else bounds.union(box);
+        hasBounds = true;
+      }
+    });
+
+    if (!hasBounds) {
+      clearCommand();
+      return;
+    }
+
+    const center = new THREE.Vector3();
+    bounds.getCenter(center);
+    const sizeVec = new THREE.Vector3();
+    bounds.getSize(sizeVec);
+    const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z, 1);
+
+    const controls = controlsRef.current;
+    const camDir = new THREE.Vector3();
+    if (command.type === 'snap') {
+      const viewMap: Record<string, THREE.Vector3> = {
+        front: new THREE.Vector3(0, 0, 1),
+        back: new THREE.Vector3(0, 0, -1),
+        left: new THREE.Vector3(-1, 0, 0),
+        right: new THREE.Vector3(1, 0, 0),
+        top: new THREE.Vector3(0, 1, 0),
+        bottom: new THREE.Vector3(0, -1, 0),
+        iso: new THREE.Vector3(1, 1, 1),
+      };
+      camDir.copy(viewMap[command.view ?? 'iso']).normalize();
+    } else if (controls) {
+      camDir.subVectors(camera.position, controls.target).normalize();
+      if (camDir.lengthSq() === 0) camDir.set(1, 1, 1).normalize();
+    } else {
+      camDir.set(1, 1, 1).normalize();
+    }
+
+    const isOrtho = (camera as THREE.OrthographicCamera).isOrthographicCamera;
+    if (isOrtho) {
+      const ortho = camera as THREE.OrthographicCamera;
+      const zoom = Math.min(size.width, size.height) / maxDim / 2.2;
+      ortho.zoom = Math.max(0.1, zoom);
+      ortho.position.copy(center.clone().add(camDir.multiplyScalar(maxDim * 2)));
+      ortho.updateProjectionMatrix();
+    } else {
+      const persp = camera as THREE.PerspectiveCamera;
+      const dist = maxDim / (2 * Math.tan((persp.fov * Math.PI) / 360)) * 1.4;
+      persp.position.copy(center.clone().add(camDir.multiplyScalar(dist)));
+      persp.updateProjectionMatrix();
+    }
+
+    if (controls) {
+      controls.target.copy(center);
+      controls.update();
+    } else {
+      camera.lookAt(center);
+    }
+
+    clearCommand();
+  }, [camera, clearCommand, command, controlsRef, objects, settings, size.height, size.width]);
+
+  return null;
+}
+
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const result = useForgeStore((s) => s.result);
-  const isSketch = result?.sketch && !result?.shape;
+  const renderMode = useForgeStore((s) => s.renderMode);
+  const projectionMode = useForgeStore((s) => s.projectionMode);
+  const gridEnabled = useForgeStore((s) => s.gridEnabled);
+  const gridSize = useForgeStore((s) => s.gridSize);
+  const objectSettings = useForgeStore((s) => s.objectSettings);
+  const viewCommand = useForgeStore((s) => s.viewCommand);
+  const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
+  const objects = result?.objects ?? [];
+  const hasShape = objects.some((obj) => obj.shape);
+  const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
-        camera={{ position: [120, 80, 120], fov: 45, near: 0.1, far: 10000 }}
         style={{ background: '#252526', cursor: measureMode ? 'crosshair' : 'default' }}
         dpr={[1, 2]}
         gl={{
@@ -230,6 +395,12 @@ export function Viewport() {
         }}
         raycaster={{ params: { Line: { threshold: 0.5 } } } as any}
       >
+        {projectionMode === 'orthographic' ? (
+          <OrthographicCamera makeDefault position={[120, 80, 120]} zoom={2} near={0.1} far={10000} />
+        ) : (
+          <PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={10000} />
+        )}
+
         {/* Environment map for realistic reflections */}
         <Environment preset="studio" />
         <ambientLight intensity={0.3} />
@@ -237,23 +408,40 @@ export function Viewport() {
         <directionalLight position={[-60, -40, -80]} intensity={0.3} />
         <hemisphereLight args={['#b1e1ff', '#444444', 0.4]} />
 
-        <ForgeBody />
-        <SketchView />
+        {objects.map((obj) => {
+          const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
+          if (obj.shape) {
+            return <ForgeObject key={obj.id} obj={obj} settings={settings} renderMode={renderMode} />;
+          }
+          if (obj.sketch) {
+            return <SketchObject key={obj.id} obj={obj} settings={settings} renderMode={renderMode} />;
+          }
+          return null;
+        })}
         <MeasureTool />
 
-        <Grid
-          args={[500, 500]}
-          cellSize={10}
-          cellThickness={0.5}
-          cellColor="#404040"
-          sectionSize={50}
-          sectionThickness={1}
-          sectionColor="#555"
-          fadeDistance={400}
-          infiniteGrid
-          rotation={isSketch ? [Math.PI / 2, 0, 0] : undefined}
+        {gridEnabled && (
+          <Grid
+            args={[500, 500]}
+            cellSize={gridSize}
+            cellThickness={0.5}
+            cellColor="#404040"
+            sectionSize={gridSize * 5}
+            sectionThickness={1}
+            sectionColor="#555"
+            fadeDistance={400}
+            infiniteGrid
+            rotation={isSketchOnly ? [Math.PI / 2, 0, 0] : undefined}
+          />
+        )}
+        <OrbitControls ref={controlsRef} makeDefault enableDamping dampingFactor={0.1} />
+        <ViewController
+          controlsRef={controlsRef}
+          command={viewCommand}
+          objects={objects}
+          settings={objectSettings}
+          clearCommand={clearViewCommand}
         />
-        <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
       </Canvas>
 
       {/* Measure mode indicator */}

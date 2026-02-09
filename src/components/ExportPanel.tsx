@@ -2,10 +2,15 @@ import { useForgeStore } from '../store/forgeStore';
 
 export function ExportPanel() {
   const result = useForgeStore((s) => s.result);
+  const selectedObjectId = useForgeStore((s) => s.selectedObjectId);
+
+  const exportTarget = result?.objects?.find((obj) => obj.id === selectedObjectId && obj.shape)
+    ?? result?.objects?.find((obj) => obj.shape)
+    ?? null;
 
   const exportSTL = () => {
-    if (!result?.shape) return;
-    const mesh = result.shape.getMesh();
+    if (!exportTarget?.shape) return;
+    const mesh = exportTarget.shape.getMesh();
     const numTri = mesh.numTri;
     const numProp = mesh.numProp;
 
@@ -59,24 +64,24 @@ export function ExportPanel() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'forge-export.stl';
-    a.click();
-    URL.revokeObjectURL(url);
+      a.download = 'forge-export.stl';
+      a.click();
+      URL.revokeObjectURL(url);
   };
 
   return (
     <div style={{ padding: '8px 12px', borderTop: '1px solid #333' }}>
       <button
         onClick={exportSTL}
-        disabled={!result?.shape}
+        disabled={!exportTarget?.shape}
         style={{
           width: '100%',
           padding: '6px',
-          background: result?.shape ? '#4a9eff' : '#333',
-          color: result?.shape ? '#fff' : '#666',
+          background: exportTarget?.shape ? '#4a9eff' : '#333',
+          color: exportTarget?.shape ? '#fff' : '#666',
           border: 'none',
           borderRadius: 4,
-          cursor: result?.shape ? 'pointer' : 'default',
+          cursor: exportTarget?.shape ? 'pointer' : 'default',
           fontSize: 13,
         }}
       >

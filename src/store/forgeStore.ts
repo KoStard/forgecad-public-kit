@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { runScript, type ParamDef, type RunResult } from '@forge/index';
+import { runScript, type ParamDef, type RunResult, type SceneObject } from '@forge/index';
 import { setParamOverrides } from '@forge/params';
 import projectFiles from 'virtual:forge-project';
 
@@ -19,6 +19,22 @@ const initialActive = (() => {
 export interface ProjectFile {
   name: string;
   code: string;
+}
+
+export type RenderMode = 'solid' | 'wireframe' | 'overlay';
+export type ProjectionMode = 'perspective' | 'orthographic';
+
+export interface ObjectSettings {
+  visible: boolean;
+  opacity: number;
+  color: string;
+}
+
+export interface ViewCommand {
+  id: number;
+  type: 'fit' | 'zoom' | 'snap';
+  view?: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso';
+  targetId?: string | null;
 }
 
 interface ForgeStore {
@@ -42,6 +58,24 @@ interface ForgeStore {
   execute: () => void;
   setParam: (name: string, value: number) => void;
 
+  renderMode: RenderMode;
+  setRenderMode: (mode: RenderMode) => void;
+  projectionMode: ProjectionMode;
+  setProjectionMode: (mode: ProjectionMode) => void;
+  gridEnabled: boolean;
+  gridSize: number;
+  setGridEnabled: (enabled: boolean) => void;
+  setGridSize: (size: number) => void;
+  objectSettings: Record<string, ObjectSettings>;
+  setObjectVisibility: (id: string, visible: boolean) => void;
+  setObjectOpacity: (id: string, opacity: number) => void;
+  setObjectColor: (id: string, color: string) => void;
+  selectedObjectId: string | null;
+  selectObject: (id: string | null) => void;
+  viewCommand: ViewCommand | null;
+  requestViewCommand: (command: Omit<ViewCommand, 'id'>) => void;
+  clearViewCommand: () => void;
+
   measureMode: boolean;
   toggleMeasure: () => void;
   measurePoints: number[][];
@@ -58,6 +92,29 @@ interface ForgeStore {
   fileExplorerOpen: boolean;
   toggleFileExplorer: () => void;
 }
+
+const DEFAULT_OBJECT_COLOR = '#5b9bd5';
+
+const syncObjectSettings = (
+  objects: SceneObject[],
+  prevSettings: Record<string, ObjectSettings>,
+  selectedObjectId: string | null,
+): { settings: Record<string, ObjectSettings>; selectedObjectId: string | null } => {
+  const nextSettings: Record<string, ObjectSettings> = { ...prevSettings };
+  const ids = new Set(objects.map((obj) => obj.id));
+  Object.keys(nextSettings).forEach((id) => {
+    if (!ids.has(id)) delete nextSettings[id];
+  });
+  objects.forEach((obj) => {
+    if (!nextSettings[obj.id]) {
+      nextSettings[obj.id] = { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
+    }
+  });
+  const nextSelected = objects.length === 0
+    ? null
+    : (selectedObjectId && ids.has(selectedObjectId) ? selectedObjectId : objects[0].id);
+  return { settings: nextSettings, selectedObjectId: nextSelected };
+};
 
 export const useForgeStore = create<ForgeStore>((set, get) => ({
   files: { ...INITIAL_FILES },
@@ -119,7 +176,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (!code) return;
     setParamOverrides(paramOverrides);
     const result = runScript(code, activeFile, files);
-    set({ result, params: result.params });
+    const synced = syncObjectSettings(result.objects, get().objectSettings, get().selectedObjectId);
+    set({ result, params: result.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
   },
 
   setParam: (name, value) => {
@@ -130,8 +188,36 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const code = files[activeFile];
     if (!code) return;
     const result = runScript(code, activeFile, files);
-    set({ result, params: result.params });
+    const synced = syncObjectSettings(result.objects, get().objectSettings, get().selectedObjectId);
+    set({ result, params: result.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
   },
+
+  renderMode: 'overlay',
+  setRenderMode: (mode) => set({ renderMode: mode }),
+  projectionMode: 'perspective',
+  setProjectionMode: (mode) => set({ projectionMode: mode }),
+  gridEnabled: true,
+  gridSize: 10,
+  setGridEnabled: (enabled) => set({ gridEnabled: enabled }),
+  setGridSize: (size) => set({ gridSize: size }),
+  objectSettings: {},
+  setObjectVisibility: (id, visible) => set((s) => {
+    const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
+    return { objectSettings: { ...s.objectSettings, [id]: { ...current, visible } } };
+  }),
+  setObjectOpacity: (id, opacity) => set((s) => {
+    const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
+    return { objectSettings: { ...s.objectSettings, [id]: { ...current, opacity } } };
+  }),
+  setObjectColor: (id, color) => set((s) => {
+    const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
+    return { objectSettings: { ...s.objectSettings, [id]: { ...current, color } } };
+  }),
+  selectedObjectId: null,
+  selectObject: (id) => set({ selectedObjectId: id }),
+  viewCommand: null,
+  requestViewCommand: (command) => set({ viewCommand: { ...command, id: Date.now() } }),
+  clearViewCommand: () => set({ viewCommand: null }),
 
   measureMode: false,
   toggleMeasure: () => {

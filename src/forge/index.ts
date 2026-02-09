@@ -6,5 +6,5 @@ export { partLibrary } from './library';
 export { shapeToGeometry } from './meshToGeometry';
 export { buildScene } from './sceneBuilder';
 export type { ParamDef } from './params';
-export type { RunResult } from './runner';
+export type { RunResult, SceneObject } from './runner';
 export type { ForgeGeometry } from './meshToGeometry';
