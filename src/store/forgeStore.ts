@@ -16,6 +16,10 @@ const initialActive = (() => {
   return names.find((n) => n.endsWith('.forge.js')) || names[0];
 })();
 
+const INITIAL_SAVED = projectFiles && Object.keys(projectFiles).length > 0
+  ? projectFiles as Record<string, string>
+  : {};
+
 export interface ProjectFile {
   name: string;
   code: string;
@@ -44,6 +48,7 @@ export interface Measurement {
 
 interface ForgeStore {
   files: Record<string, string>;
+  savedFiles: Record<string, string>;
   activeFile: string;
   setActiveFile: (name: string) => void;
   updateFileCode: (name: string, code: string) => void;
@@ -134,6 +139,7 @@ const syncObjectSettings = (
 
 export const useForgeStore = create<ForgeStore>((set, get) => ({
   files: { ...INITIAL_FILES },
+  savedFiles: { ...INITIAL_SAVED },
   activeFile: initialActive,
   setActiveFile: (name) => {
     set({ activeFile: name, paramOverrides: {} });
@@ -155,24 +161,33 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     setTimeout(() => get().execute(), 0);
   },
   deleteFile: (name) => {
-    const { files, activeFile } = get();
+    const { files, savedFiles, activeFile } = get();
     const remaining = { ...files };
     delete remaining[name];
+    const remainingSaved = { ...savedFiles };
+    delete remainingSaved[name];
     const names = Object.keys(remaining);
     if (names.length === 0) return;
     const newActive = name === activeFile ? names[0] : activeFile;
-    set({ files: remaining, activeFile: newActive, paramOverrides: {} });
+    set({ files: remaining, savedFiles: remainingSaved, activeFile: newActive, paramOverrides: {} });
     setTimeout(() => get().execute(), 0);
   },
   renameFile: (oldName, newName) => {
-    const { files, activeFile } = get();
+    const { files, savedFiles, activeFile } = get();
     const code = files[oldName];
     if (!code) return;
     const remaining = { ...files };
     delete remaining[oldName];
     remaining[newName] = code;
+    
+    // Note: We do NOT update savedFiles with the new name because it hasn't been saved to disk yet
+    // But we should remove the old name from savedFiles
+    const remainingSaved = { ...savedFiles };
+    delete remainingSaved[oldName];
+
     set({
       files: remaining,
+      savedFiles: remainingSaved,
       activeFile: oldName === activeFile ? newName : activeFile,
     });
   },
@@ -191,9 +206,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const code = files[activeFile];
     if (!code) return;
     setParamOverrides(paramOverrides);
-    const result = runScript(code, activeFile, files);
-    const synced = syncObjectSettings(result.objects, get().objectSettings, get().selectedObjectId);
-    set({ result, params: result.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
+    const runResult = runScript(code, activeFile, files);
+    const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
+    set({ result: runResult, params: runResult.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
   },
 
   setParam: (name, value) => {
@@ -203,9 +218,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const { files, activeFile } = get();
     const code = files[activeFile];
     if (!code) return;
-    const result = runScript(code, activeFile, files);
-    const synced = syncObjectSettings(result.objects, get().objectSettings, get().selectedObjectId);
-    set({ result, params: result.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
+    const runResult = runScript(code, activeFile, files);
+    const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
+    set({ result: runResult, params: runResult.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
   },
 
   renderMode: 'overlay',
@@ -264,6 +279,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   newProject: () => {
     set({
       files: { ...INITIAL_FILES },
+      savedFiles: { ...INITIAL_SAVED },
       activeFile: initialActive,
       fileHandle: null,
       dirty: false,
@@ -283,7 +299,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         body: JSON.stringify({ filename: activeFile, content: files[activeFile] }),
       });
       if (response.ok) {
-        set({ dirty: false });
+        set((s) => ({ 
+          dirty: false,
+          savedFiles: { ...s.savedFiles, [activeFile]: files[activeFile] }
+        }));
         return;
       }
     } catch (e) {
@@ -296,7 +315,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       const writable = await (fileHandle as any).createWritable();
       await writable.write(files[activeFile]);
       await writable.close();
-      set({ dirty: false });
+      set((s) => ({ 
+        dirty: false,
+        savedFiles: { ...s.savedFiles, [activeFile]: files[activeFile] }
+      }));
     } catch (e) {
       console.error('Save failed:', e);
     }
@@ -314,7 +336,24 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         const writable = await handle.createWritable();
         await writable.write(code);
         await writable.close();
-        set({ fileHandle: handle, dirty: false });
+        // Since we saved as a "new" file (potentially), or same file, we should update savedFiles?
+        // Actually saveAs usually implies the current editor content is now associated with this new file.
+        // But activeFile name in the store might remain the same unless we update it?
+        // The current implementation of saveAs DOES NOT update activeFile name or file handle in a persistent way
+        // EXCEPT it sets fileHandle. 
+        // Wait, if I saveAs "foo.js" and activeFile was "untitled.js", does the editor rename it?
+        // In the previous code:
+        // set({ fileHandle: handle, dirty: false });
+        // It didn't rename the active file in `files` map!
+        // This seems like a potential existing bug or limitation.
+        // However, for the purpose of THIS task, I should just mark the CURRENT buffer as saved.
+        // If the user saves as a DIFFERENT name, usually the editor switches to that file.
+        // I will assume for now we just verify the content is clean.
+        set((s) => ({ 
+          fileHandle: handle, 
+          dirty: false,
+          savedFiles: { ...s.savedFiles, [activeFile]: code } // This assumes we are satisfied with current content being "saved"
+        }));
       } else {
         const blob = new Blob([code], { type: 'text/javascript' });
         const url = URL.createObjectURL(blob);
@@ -323,7 +362,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         a.download = activeFile;
         a.click();
         URL.revokeObjectURL(url);
-        set({ dirty: false });
+        set((s) => ({ 
+          dirty: false,
+          savedFiles: { ...s.savedFiles, [activeFile]: code }
+        }));
       }
     } catch (e: any) {
       if (e.name !== 'AbortError') console.error('Save failed:', e);
@@ -333,6 +375,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   loadFromText: (text, name) => {
     set((s) => ({
       files: { ...s.files, [name]: text },
+      // When loading from text, we assume it's like opening a file, so it's "saved" state initially?
+      // Or is it a drop?
+      // If it's a drop, it's like opening.
+      // So we should update savedFiles.
+      savedFiles: { ...s.savedFiles, [name]: text },
       activeFile: name,
       fileHandle: null,
       dirty: false,

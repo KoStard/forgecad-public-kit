@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, DragEvent } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 
 export function FileExplorer() {
   const files = useForgeStore((s) => s.files);
+  const savedFiles = useForgeStore((s) => s.savedFiles);
   const activeFile = useForgeStore((s) => s.activeFile);
   const setActiveFile = useForgeStore((s) => s.setActiveFile);
   const createFile = useForgeStore((s) => s.createFile);
@@ -40,7 +41,7 @@ export function FileExplorer() {
     setRenamingFile(null);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file) return;
@@ -52,47 +53,62 @@ export function FileExplorer() {
       <div style={{ padding: '6px 12px', fontSize: 10, color: '#666', textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid #2a2a2a' }}>
         {icon} {label}
       </div>
-      {names.map((name) => (
-        <div
-          key={name}
-          onClick={() => setActiveFile(name)}
-          onDoubleClick={() => { setRenamingFile(name); setRenameValue(name); }}
-          style={{
-            padding: '5px 12px',
-            cursor: 'pointer',
-            color: name === activeFile ? '#fff' : '#aaa',
-            background: name === activeFile ? '#37373d' : 'transparent',
-            fontSize: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-          onMouseEnter={(e) => { if (name !== activeFile) e.currentTarget.style.background = '#2d2d2d'; }}
-          onMouseLeave={(e) => { if (name !== activeFile) e.currentTarget.style.background = 'transparent'; }}
-        >
-          {renamingFile === name ? (
-            <input
-              autoFocus
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onBlur={() => handleRename(name)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleRename(name); if (e.key === 'Escape') setRenamingFile(null); }}
-              onClick={(e) => e.stopPropagation()}
-              style={{ flex: 1, background: '#1e1e1e', border: '1px solid #4a9eff', color: '#fff', fontSize: 12, padding: '1px 4px', outline: 'none' }}
-            />
-          ) : (
-            <>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
-              <span
-                onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${name}"?`)) deleteFile(name); }}
-                style={{ color: '#666', fontSize: 10, visibility: fileNames.length > 1 ? 'visible' : 'hidden' }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#f44')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#666')}
-              >✕</span>
-            </>
-          )}
-        </div>
-      ))}
+      {names.map((name) => {
+        const isModified = files[name] !== savedFiles[name];
+        return (
+          <div
+            key={name}
+            onClick={() => setActiveFile(name)}
+            onDoubleClick={() => { setRenamingFile(name); setRenameValue(name); }}
+            style={{
+              padding: '5px 12px',
+              cursor: 'pointer',
+              color: name === activeFile ? '#fff' : '#aaa',
+              background: name === activeFile ? '#37373d' : 'transparent',
+              fontSize: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+            onMouseEnter={(e) => { if (name !== activeFile) e.currentTarget.style.background = '#2d2d2d'; }}
+            onMouseLeave={(e) => { if (name !== activeFile) e.currentTarget.style.background = 'transparent'; }}
+          >
+            {renamingFile === name ? (
+              <input
+                autoFocus
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={() => handleRename(name)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleRename(name); if (e.key === 'Escape') setRenamingFile(null); }}
+                onClick={(e) => e.stopPropagation()}
+                style={{ flex: 1, background: '#1e1e1e', border: '1px solid #4a9eff', color: '#fff', fontSize: 12, padding: '1px 4px', outline: 'none' }}
+              />
+            ) : (
+              <>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                {isModified && (
+                  <div
+                    title="Unsaved changes"
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: '#888',
+                      flexShrink: 0
+                    }}
+                  />
+                )}
+                <span
+                  onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${name}"?`)) deleteFile(name); }}
+                  style={{ color: '#666', fontSize: 10, visibility: fileNames.length > 1 ? 'visible' : 'hidden' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#f44')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = '#666')}
+                >✕</span>
+              </>
+            )}
+          </div>
+        );
+      })}
     </>
   );
 
