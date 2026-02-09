@@ -863,6 +863,7 @@ export function Viewport() {
             infiniteGrid
           />
         )}
+        {!isSketchOnly && <axesHelper args={[50]} />}
         {gridEnabled && isSketchOnly && (
           <Grid
             args={[500, 500]}
