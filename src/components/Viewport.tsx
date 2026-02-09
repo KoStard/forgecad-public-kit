@@ -1,11 +1,32 @@
 import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObject } from 'react';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera, GizmoHelper, GizmoViewcube } from '@react-three/drei';
+import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera, GizmoHelper, GizmoViewcube, Html } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type RenderMode, type ViewCommand } from '../store/forgeStore';
 import type { SceneObject } from '@forge/index';
 import { shapeToGeometry } from '@forge/meshToGeometry';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+
+/** Labeled axes helper — draws X/Y/Z arrows with text labels */
+function LabeledAxes({ size = 50 }: { size?: number }) {
+  const labelStyle = (color: string): React.CSSProperties => ({
+    color,
+    fontSize: 13,
+    fontWeight: 700,
+    fontFamily: 'monospace',
+    userSelect: 'none',
+    pointerEvents: 'none',
+    textShadow: '0 0 3px #000, 0 0 6px #000',
+  });
+  return (
+    <group>
+      <axesHelper args={[size]} />
+      <Html position={[size + 3, 0, 0]} center style={labelStyle('#ff4444')}>X</Html>
+      <Html position={[0, size + 3, 0]} center style={labelStyle('#44ff44')}>Y</Html>
+      <Html position={[0, 0, size + 3]} center style={labelStyle('#4488ff')}>Z</Html>
+    </group>
+  );
+}
 
 /**
  * Renders the solid body with proper CAD-style shading.
@@ -720,16 +741,24 @@ function ViewController({
     const controls = controlsRef.current;
     const camDir = new THREE.Vector3();
     if (command.type === 'snap') {
+      // Camera position direction (Z-up convention, see coordinate-system.md)
       const viewMap: Record<string, THREE.Vector3> = {
         front: new THREE.Vector3(0, -1, 0),
         back: new THREE.Vector3(0, 1, 0),
-        left: new THREE.Vector3(-1, 0, 0),
         right: new THREE.Vector3(1, 0, 0),
+        left: new THREE.Vector3(-1, 0, 0),
         top: new THREE.Vector3(0, 0, 1),
         bottom: new THREE.Vector3(0, 0, -1),
         iso: new THREE.Vector3(1, -1, 1),
       };
+      // Camera up vector — top/bottom views need special up to avoid gimbal lock
+      const upMap: Record<string, THREE.Vector3> = {
+        top: new THREE.Vector3(0, -1, 0),
+        bottom: new THREE.Vector3(0, 1, 0),
+      };
       camDir.copy(viewMap[command.view ?? 'iso']).normalize();
+      const up = upMap[command.view ?? ''] ?? new THREE.Vector3(0, 0, 1);
+      camera.up.copy(up);
     } else if (controls) {
       camDir.subVectors(camera.position, controls.target).normalize();
       if (camDir.lengthSq() === 0) camDir.set(1, 1, 1).normalize();
@@ -863,7 +892,7 @@ export function Viewport() {
             infiniteGrid
           />
         )}
-        {!isSketchOnly && <axesHelper args={[50]} />}
+        {!isSketchOnly && <LabeledAxes />}
         {gridEnabled && isSketchOnly && (
           <Grid
             args={[500, 500]}
@@ -885,13 +914,15 @@ export function Viewport() {
           makeDefault
           enableDamping
           dampingFactor={0.1}
+          minPolarAngle={0}
+          maxPolarAngle={Math.PI}
           enableRotate={!isSketchOnly}
           mouseButtons={isSketchOnly ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN } : undefined}
           touches={isSketchOnly ? { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN } : undefined}
         />
         {!isSketchOnly && (
           <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
-            <GizmoViewcube />
+            <GizmoViewcube faces={['Right', 'Left', 'Front', 'Back', 'Top', 'Bottom']} />
           </GizmoHelper>
         )}
 

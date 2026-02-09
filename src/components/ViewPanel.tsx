@@ -92,7 +92,8 @@ export function ViewPanel() {
 
       <div style={sectionStyle}>
         <div style={labelStyle}>Views</div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: 'iso' })}>⌂ Home</button>
           <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'fit' })}>Fit View</button>
           <button
             style={btnStyle()}
