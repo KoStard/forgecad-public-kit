@@ -92,16 +92,23 @@ export function ViewPanel() {
 
       <div style={sectionStyle}>
         <div style={labelStyle}>Views</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: 'iso' })}>⌂ Home</button>
-          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'fit' })}>Fit View</button>
+          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'fit' })}>Fit</button>
           <button
             style={btnStyle()}
             onClick={() => requestViewCommand({ type: 'zoom', targetId: selectedObjectId })}
             disabled={!selectedObjectId}
           >
-            Zoom Selection
+            Zoom Sel
           </button>
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+          {(['front', 'back', 'left', 'right', 'top', 'bottom'] as const).map((v) => (
+            <button key={v} style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: v })}>
+              {v[0].toUpperCase() + v.slice(1)}
+            </button>
+          ))}
         </div>
       </div>
 
