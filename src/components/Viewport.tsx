@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObject } from 'react';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera, GizmoHelper, GizmoViewcube } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type RenderMode, type ViewCommand } from '../store/forgeStore';
 import type { SceneObject } from '@forge/index';
 import { shapeToGeometry } from '@forge/meshToGeometry';
@@ -668,6 +668,38 @@ function ViewController({
   return null;
 }
 
+function ViewManager({
+  isSketchOnly,
+  controlsRef,
+}: {
+  isSketchOnly: boolean;
+  controlsRef: MutableRefObject<OrbitControlsImpl | null>;
+}) {
+  const { camera } = useThree();
+  const setProjectionMode = useForgeStore((s) => s.setProjectionMode);
+
+  useEffect(() => {
+    if (isSketchOnly) {
+      // Switch to straight-on 2D view
+      camera.position.set(0, 0, 200);
+      camera.lookAt(0, 0, 0);
+      camera.up.set(0, 1, 0);
+      if (controlsRef.current) {
+        controlsRef.current.target.set(0, 0, 0);
+        controlsRef.current.update();
+      }
+      setProjectionMode('orthographic');
+    } else {
+      // When switching back to 3D, we might want to ensure perspective
+      // But maybe user wants orthographic 3D. Let's just default to Perspective for now
+      // to avoid confusion if they were forced into Ortho by 2D view.
+      setProjectionMode('perspective');
+    }
+  }, [camera, controlsRef, isSketchOnly, setProjectionMode]);
+
+  return null;
+}
+
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const result = useForgeStore((s) => s.result);
@@ -720,7 +752,7 @@ export function Viewport() {
         })}
         <MeasureTool />
 
-        {gridEnabled && (
+        {gridEnabled && !isSketchOnly && (
           <Grid
             args={[500, 500]}
             cellSize={gridSize}
@@ -731,10 +763,42 @@ export function Viewport() {
             sectionColor="#555"
             fadeDistance={400}
             infiniteGrid
-            rotation={isSketchOnly ? [Math.PI / 2, 0, 0] : undefined}
           />
         )}
-        <OrbitControls ref={controlsRef} makeDefault enableDamping dampingFactor={0.1} />
+        {gridEnabled && isSketchOnly && (
+          <Grid
+            args={[500, 500]}
+            cellSize={gridSize}
+            cellThickness={0.5}
+            cellColor="#404040"
+            sectionSize={gridSize * 5}
+            sectionThickness={1}
+            sectionColor="#555"
+            fadeDistance={400}
+            infiniteGrid
+            rotation={[Math.PI / 2, 0, 0]}
+            side={THREE.DoubleSide}
+          />
+        )}
+
+        <OrbitControls
+          ref={controlsRef}
+          makeDefault
+          enableDamping
+          dampingFactor={0.1}
+          enableRotate={!isSketchOnly}
+        />
+        {!isSketchOnly && (
+          <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
+            <GizmoViewcube />
+          </GizmoHelper>
+        )}
+
+        <ViewManager
+          isSketchOnly={isSketchOnly}
+          controlsRef={controlsRef}
+        />
+
         <ViewController
           controlsRef={controlsRef}
           command={viewCommand}
@@ -754,14 +818,14 @@ export function Viewport() {
             transform: 'translateX(-50%)',
             background: '#ffcc00',
             color: '#000',
-          padding: '4px 12px',
-          borderRadius: 4,
-          fontSize: 12,
-          fontWeight: 600,
-        }}
-      >
+            padding: '4px 12px',
+            borderRadius: 4,
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
           📏 Click to place points, drag markers to adjust
-      </div>
+        </div>
       )}
     </div>
   );
