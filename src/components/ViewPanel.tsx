@@ -42,6 +42,8 @@ export function ViewPanel() {
   const selectedObjectId = useForgeStore((s) => s.selectedObjectId);
   const selectObject = useForgeStore((s) => s.selectObject);
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
+  const measureSnapPx = useForgeStore((s) => s.measureSnapPx);
+  const setMeasureSnapPx = useForgeStore((s) => s.setMeasureSnapPx);
 
   const objects = result?.objects ?? [];
 
@@ -179,6 +181,29 @@ export function ViewPanel() {
             max={200}
             value={gridSize}
             onChange={(e) => setGridSize(Math.max(1, Number(e.target.value) || 1))}
+            style={{
+              flex: 1,
+              background: '#111',
+              border: '1px solid #333',
+              borderRadius: 4,
+              padding: '4px 6px',
+              color: '#ddd',
+              fontSize: 12,
+            }}
+          />
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={labelStyle}>Measure</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, color: '#888' }}>Snap radius (px)</span>
+          <input
+            type="number"
+            min={4}
+            max={40}
+            value={measureSnapPx}
+            onChange={(e) => setMeasureSnapPx(Math.max(4, Math.min(40, Number(e.target.value) || 4)))}
             style={{
               flex: 1,
               background: '#111',

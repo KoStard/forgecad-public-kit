@@ -1,5 +1,5 @@
-import { useMemo, useCallback, useRef, useEffect, type MutableRefObject } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObject } from 'react';
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type RenderMode, type ViewCommand } from '../store/forgeStore';
 import type { SceneObject } from '@forge/index';
@@ -156,56 +156,343 @@ function SketchObject({
 }
 
 /** Measurement tool — click two points on the model surface to measure distance */
+type SnapKind = 'vertex' | 'edge' | 'edge-mid' | 'face-center' | 'free';
+
+type SnapResult = {
+  point: THREE.Vector3;
+  type: SnapKind;
+  edge?: [THREE.Vector3, THREE.Vector3];
+};
+
+type DragInfo = {
+  id: string;
+  index: number;
+};
+
+const SNAP_COLORS: Record<SnapKind, string> = {
+  vertex: '#4a9eff',
+  edge: '#ffcc00',
+  'edge-mid': '#ff8a00',
+  'face-center': '#7bd88f',
+  free: '#ff4444',
+};
+
+const distance2D = (ax: number, ay: number, bx: number, by: number): number => {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+const closestPointOnSegment = (p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3 => {
+  const ab = b.clone().sub(a);
+  const denom = ab.lengthSq();
+  if (denom === 0) return a.clone();
+  const t = THREE.MathUtils.clamp(p.clone().sub(a).dot(ab) / denom, 0, 1);
+  return a.clone().add(ab.multiplyScalar(t));
+};
+
+const distancePointToSegment2D = (
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number => {
+  const dx = bx - ax;
+  const dy = by - ay;
+  if (dx === 0 && dy === 0) return distance2D(px, py, ax, ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+  const cx = ax + t * dx;
+  const cy = ay + t * dy;
+  return distance2D(px, py, cx, cy);
+};
+
 function MeasureTool() {
   const measureMode = useForgeStore((s) => s.measureMode);
+  const measurements = useForgeStore((s) => s.measurements);
   const addMeasurePoint = useForgeStore((s) => s.addMeasurePoint);
-  const measurePoints = useForgeStore((s) => s.measurePoints);
-  const { camera, raycaster, scene } = useThree();
+  const updateMeasurePoint = useForgeStore((s) => s.updateMeasurePoint);
+  const measureSnapPx = useForgeStore((s) => s.measureSnapPx);
+  const { camera, raycaster, scene, gl, controls } = useThree();
+  const [snap, setSnap] = useState<SnapResult | null>(null);
+  const [hoveredMarker, setHoveredMarker] = useState<DragInfo | null>(null);
+  const [draggingMarker, setDraggingMarker] = useState<DragInfo | null>(null);
+  const dragRef = useRef<DragInfo | null>(null);
+  const pointerDownRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const snapEdgeGeometry = useRef<THREE.BufferGeometry | null>(null);
 
-  const handleClick = useCallback(
-    (e: any) => {
-      if (!measureMode) return;
-      e.stopPropagation();
+  useEffect(() => {
+    if (!snapEdgeGeometry.current) return;
+    if (snap?.type === 'edge' && snap.edge) {
+      snapEdgeGeometry.current.setFromPoints([snap.edge[0], snap.edge[1]]);
+      const position = snapEdgeGeometry.current.getAttribute('position');
+      if (position) position.needsUpdate = true;
+    }
+  }, [snap]);
 
-      // Raycast against mesh children in the scene
-      const meshes: THREE.Mesh[] = [];
-      scene.traverse((obj) => {
-        if ((obj as THREE.Mesh).isMesh) meshes.push(obj as THREE.Mesh);
-      });
+  const setCursor = useCallback((value: string) => {
+    gl.domElement.style.cursor = value;
+  }, [gl]);
 
-      const intersects = raycaster.intersectObjects(meshes, false);
-      if (intersects.length > 0) {
-        const p = intersects[0].point;
-        addMeasurePoint([p.x, p.y, p.z]);
+  useEffect(() => {
+    if (!measureMode) {
+      setCursor('default');
+      return;
+    }
+    if (draggingMarker) {
+      setCursor('grabbing');
+      return;
+    }
+    if (hoveredMarker) {
+      setCursor('grab');
+      return;
+    }
+    setCursor('crosshair');
+  }, [draggingMarker, hoveredMarker, measureMode, setCursor]);
+
+  useEffect(() => {
+    if (!controls) return;
+    const orbit = controls as OrbitControlsImpl;
+    orbit.enabled = !draggingMarker;
+    return () => {
+      orbit.enabled = true;
+    };
+  }, [controls, draggingMarker]);
+
+  const getMeshes = useCallback((): THREE.Mesh[] => {
+    const meshes: THREE.Mesh[] = [];
+    scene.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.isMesh && !mesh.userData?.measureHelper) meshes.push(mesh);
+    });
+    return meshes;
+  }, [scene]);
+
+  const getPointerNDC = useCallback((event: PointerEvent | React.PointerEvent): { x: number; y: number } => {
+    const rect = gl.domElement.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    return { x, y };
+  }, [gl.domElement]);
+
+  const worldToScreen = useCallback((point: THREE.Vector3): { x: number; y: number } => {
+    const rect = gl.domElement.getBoundingClientRect();
+    const projected = point.clone().project(camera);
+    return {
+      x: (projected.x * 0.5 + 0.5) * rect.width + rect.left,
+      y: (-projected.y * 0.5 + 0.5) * rect.height + rect.top,
+    };
+  }, [camera, gl.domElement]);
+
+  const computeSnap = useCallback((event: PointerEvent | React.PointerEvent): SnapResult | null => {
+    if (!measureMode) return null;
+    const pointer = getPointerNDC(event);
+    raycaster.setFromCamera(pointer, camera);
+
+    const meshes = getMeshes();
+    const intersects = raycaster.intersectObjects(meshes, false);
+    if (intersects.length === 0) {
+      return null;
+    }
+
+    const hit = intersects[0];
+    const hitPoint = hit.point.clone();
+    if (!hit.face || !(hit.object as THREE.Mesh).geometry) {
+      return { point: hitPoint, type: 'free' };
+    }
+
+    const mesh = hit.object as THREE.Mesh;
+    const geometry = mesh.geometry as THREE.BufferGeometry;
+    const position = geometry.getAttribute('position');
+    const { a, b, c } = hit.face;
+    if (!position || a == null || b == null || c == null) {
+      return { point: hitPoint, type: 'free' };
+    }
+
+    const vA = new THREE.Vector3().fromBufferAttribute(position, a).applyMatrix4(mesh.matrixWorld);
+    const vB = new THREE.Vector3().fromBufferAttribute(position, b).applyMatrix4(mesh.matrixWorld);
+    const vC = new THREE.Vector3().fromBufferAttribute(position, c).applyMatrix4(mesh.matrixWorld);
+
+    const edgeAB: [THREE.Vector3, THREE.Vector3] = [vA, vB];
+    const edgeBC: [THREE.Vector3, THREE.Vector3] = [vB, vC];
+    const edgeCA: [THREE.Vector3, THREE.Vector3] = [vC, vA];
+    const midAB = vA.clone().add(vB).multiplyScalar(0.5);
+    const midBC = vB.clone().add(vC).multiplyScalar(0.5);
+    const midCA = vC.clone().add(vA).multiplyScalar(0.5);
+    const faceCenter = vA.clone().add(vB).add(vC).multiplyScalar(1 / 3);
+
+    const pointerScreen = { x: event.clientX, y: event.clientY };
+    let best: SnapResult | null = null;
+    let bestDist = Number.POSITIVE_INFINITY;
+
+    const considerPoint = (type: SnapKind, point: THREE.Vector3) => {
+      const screen = worldToScreen(point);
+      const dist = distance2D(pointerScreen.x, pointerScreen.y, screen.x, screen.y);
+      if (dist < bestDist && dist <= measureSnapPx) {
+        bestDist = dist;
+        best = { point, type };
       }
-    },
-    [measureMode, addMeasurePoint, scene, raycaster],
-  );
+    };
+
+    const considerEdge = (edge: [THREE.Vector3, THREE.Vector3]) => {
+      const sA = worldToScreen(edge[0]);
+      const sB = worldToScreen(edge[1]);
+      const dist = distancePointToSegment2D(pointerScreen.x, pointerScreen.y, sA.x, sA.y, sB.x, sB.y);
+      if (dist < bestDist && dist <= measureSnapPx) {
+        bestDist = dist;
+        const point = closestPointOnSegment(hitPoint, edge[0], edge[1]);
+        best = { point, type: 'edge', edge };
+      }
+    };
+
+    considerPoint('vertex', vA);
+    considerPoint('vertex', vB);
+    considerPoint('vertex', vC);
+    considerPoint('edge-mid', midAB);
+    considerPoint('edge-mid', midBC);
+    considerPoint('edge-mid', midCA);
+    considerPoint('face-center', faceCenter);
+    considerEdge(edgeAB);
+    considerEdge(edgeBC);
+    considerEdge(edgeCA);
+
+    return best ?? { point: hitPoint, type: 'free' };
+  }, [camera, getMeshes, getPointerNDC, measureMode, measureSnapPx, raycaster, worldToScreen]);
+
+  const updateSnap = useCallback((event: PointerEvent | React.PointerEvent): SnapResult | null => {
+    const next = computeSnap(event);
+    setSnap(next && next.type !== 'free' ? next : null);
+    return next;
+  }, [computeSnap]);
+
+  const handlePointerDown = useCallback((event: ThreeEvent<PointerEvent>) => {
+    if (!measureMode || event.button !== 0) return;
+    pointerDownRef.current = { x: event.clientX, y: event.clientY, moved: false };
+  }, [measureMode]);
+
+  const handlePointerMove = useCallback((event: ThreeEvent<PointerEvent>) => {
+    if (!measureMode) return;
+    if (pointerDownRef.current) {
+      const dx = event.clientX - pointerDownRef.current.x;
+      const dy = event.clientY - pointerDownRef.current.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 4) {
+        pointerDownRef.current.moved = true;
+      }
+    }
+    const nextSnap = updateSnap(event);
+    if (dragRef.current && nextSnap) {
+      updateMeasurePoint(dragRef.current.id, dragRef.current.index, [nextSnap.point.x, nextSnap.point.y, nextSnap.point.z]);
+    }
+  }, [measureMode, updateMeasurePoint, updateSnap]);
+
+  const handlePointerUp = useCallback((event: ThreeEvent<PointerEvent>) => {
+    if (!measureMode || event.button !== 0) return;
+    if (dragRef.current) {
+      dragRef.current = null;
+      setDraggingMarker(null);
+      return;
+    }
+    const down = pointerDownRef.current;
+    pointerDownRef.current = null;
+    if (!down || down.moved) return;
+    const nextSnap = updateSnap(event);
+    if (!nextSnap) return;
+    addMeasurePoint([nextSnap.point.x, nextSnap.point.y, nextSnap.point.z]);
+  }, [addMeasurePoint, measureMode, updateSnap]);
 
   return (
     <>
       {/* Invisible click-catcher plane when in measure mode */}
       {measureMode && (
-        <mesh visible={false} onClick={handleClick}>
+        <mesh
+          visible={false}
+          userData={{ measureHelper: true }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerOut={() => setSnap(null)}
+        >
           <sphereGeometry args={[10000]} />
           <meshBasicMaterial side={THREE.DoubleSide} />
         </mesh>
       )}
 
       {/* Render measurement points and lines */}
-      {measurePoints.map((pt, i) => (
-        <mesh key={i} position={pt as [number, number, number]}>
-          <sphereGeometry args={[1.2, 16, 16]} />
-          <meshBasicMaterial color="#ff4444" />
-        </mesh>
+      {measurements.flatMap((measurement) => (
+        measurement.points.map((pt, index) => {
+          const isHovered = hoveredMarker?.id === measurement.id && hoveredMarker.index === index;
+          const isDragging = draggingMarker?.id === measurement.id && draggingMarker.index === index;
+          const color = isDragging ? '#ffe38a' : (isHovered ? '#ff8888' : '#ff4444');
+          return (
+            <mesh
+              key={`${measurement.id}-${index}`}
+              position={pt as [number, number, number]}
+              userData={{ measureHelper: true }}
+              onPointerOver={(event) => {
+                event.stopPropagation();
+                if (!dragRef.current) setHoveredMarker({ id: measurement.id, index });
+              }}
+              onPointerOut={(event) => {
+                event.stopPropagation();
+                if (!dragRef.current) setHoveredMarker(null);
+              }}
+              onPointerDown={(event) => {
+                if (!measureMode || event.button !== 0) return;
+                event.stopPropagation();
+                pointerDownRef.current = null;
+                const target = event.target as HTMLElement | null;
+                target?.setPointerCapture?.(event.pointerId);
+                dragRef.current = { id: measurement.id, index };
+                setDraggingMarker({ id: measurement.id, index });
+              }}
+              onPointerMove={(event) => {
+                if (!measureMode || !dragRef.current) return;
+                event.stopPropagation();
+                const nextSnap = updateSnap(event);
+                if (nextSnap) {
+                  updateMeasurePoint(measurement.id, index, [nextSnap.point.x, nextSnap.point.y, nextSnap.point.z]);
+                }
+              }}
+              onPointerUp={(event) => {
+                if (!measureMode || event.button !== 0) return;
+                event.stopPropagation();
+                const target = event.target as HTMLElement | null;
+                target?.releasePointerCapture?.(event.pointerId);
+                dragRef.current = null;
+                setDraggingMarker(null);
+              }}
+            >
+              <sphereGeometry args={[1.2, 16, 16]} />
+              <meshBasicMaterial color={color} />
+            </mesh>
+          );
+        })
       ))}
 
-      {measurePoints.length === 2 && <MeasureLine a={measurePoints[0]} b={measurePoints[1]} />}
+      {measurements.filter((m) => m.points.length === 2).map((measurement) => (
+        <MeasureLine key={measurement.id} a={measurement.points[0]} b={measurement.points[1]} />
+      ))}
+
+      {measureMode && snap && snap.type !== 'edge' && (
+        <mesh position={snap.point} userData={{ measureHelper: true }}>
+          <sphereGeometry args={[1.6, 16, 16]} />
+          <meshBasicMaterial color={SNAP_COLORS[snap.type]} />
+        </mesh>
+      )}
+
+      {measureMode && snap && snap.type === 'edge' && snap.edge && (
+        <line userData={{ measureHelper: true }}>
+          <bufferGeometry ref={snapEdgeGeometry} />
+          <lineBasicMaterial color={SNAP_COLORS.edge} linewidth={2} />
+        </line>
+      )}
     </>
   );
 }
 
 function MeasureLine({ a, b }: { a: number[]; b: number[] }) {
+  const { camera } = useThree();
   const points = useMemo(
     () => [new THREE.Vector3(...a), new THREE.Vector3(...b)],
     [a, b],
@@ -219,30 +506,43 @@ function MeasureLine({ a, b }: { a: number[]; b: number[] }) {
     () => new THREE.Vector3((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2),
     [a, b],
   );
+  const labelPos = useMemo(() => {
+    const pos = mid.clone();
+    const dir = camera.position.clone().sub(mid);
+    if (dir.lengthSq() > 0) {
+      dir.normalize();
+      pos.add(dir.multiplyScalar(2));
+    }
+    return pos;
+  }, [camera.position, mid]);
+  const labelTexture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    return new THREE.CanvasTexture(canvas);
+  }, []);
+
+  useEffect(() => {
+    const canvas = labelTexture.image as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000000cc';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffcc00';
+    ctx.font = 'bold 32px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${dist.toFixed(2)} mm`, canvas.width / 2, canvas.height / 2);
+    labelTexture.needsUpdate = true;
+  }, [dist, labelTexture]);
 
   return (
     <group>
       <primitive object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffcc00' }))} />
       {/* Distance label as a sprite */}
-      <sprite position={mid} scale={[30, 10, 1]}>
-        <spriteMaterial>
-          <canvasTexture
-            attach="map"
-            image={(() => {
-              const canvas = document.createElement('canvas');
-              canvas.width = 256;
-              canvas.height = 64;
-              const ctx = canvas.getContext('2d')!;
-              ctx.fillStyle = '#000000cc';
-              ctx.fillRect(0, 0, 256, 64);
-              ctx.fillStyle = '#ffcc00';
-              ctx.font = 'bold 32px monospace';
-              ctx.textAlign = 'center';
-              ctx.fillText(`${dist.toFixed(2)} mm`, 128, 42);
-              return canvas;
-            })()}
-          />
-        </spriteMaterial>
+      <sprite position={labelPos} scale={[30, 10, 1]}>
+        <spriteMaterial map={labelTexture} depthTest={false} />
       </sprite>
     </group>
   );
@@ -454,14 +754,14 @@ export function Viewport() {
             transform: 'translateX(-50%)',
             background: '#ffcc00',
             color: '#000',
-            padding: '4px 12px',
-            borderRadius: 4,
-            fontSize: 12,
-            fontWeight: 600,
-          }}
-        >
-          📏 Click two points on the model to measure
-        </div>
+          padding: '4px 12px',
+          borderRadius: 4,
+          fontSize: 12,
+          fontWeight: 600,
+        }}
+      >
+          📏 Click to place points, drag markers to adjust
+      </div>
       )}
     </div>
   );

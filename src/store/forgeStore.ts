@@ -37,6 +37,11 @@ export interface ViewCommand {
   targetId?: string | null;
 }
 
+export interface Measurement {
+  id: string;
+  points: number[][];
+}
+
 interface ForgeStore {
   files: Record<string, string>;
   activeFile: string;
@@ -78,9 +83,13 @@ interface ForgeStore {
 
   measureMode: boolean;
   toggleMeasure: () => void;
-  measurePoints: number[][];
+  measurements: Measurement[];
   addMeasurePoint: (pt: number[]) => void;
+  updateMeasurePoint: (id: string, index: number, pt: number[]) => void;
+  removeMeasurement: (id: string) => void;
   clearMeasure: () => void;
+  measureSnapPx: number;
+  setMeasureSnapPx: (value: number) => void;
 
   newProject: () => void;
   saveFile: () => Promise<void>;
@@ -223,14 +232,29 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   measureMode: false,
   toggleMeasure: () => {
-    set((s) => ({ measureMode: !s.measureMode, measurePoints: [] }));
+    set((s) => ({ measureMode: !s.measureMode }));
   },
-  measurePoints: [],
+  measurements: [],
   addMeasurePoint: (pt) => {
-    const pts = get().measurePoints;
-    set({ measurePoints: pts.length >= 2 ? [pt] : [...pts, pt] });
+    const measurements = get().measurements;
+    const last = measurements[measurements.length - 1];
+    if (!last || last.points.length >= 2) {
+      const id = `m_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`;
+      set({ measurements: [...measurements, { id, points: [pt] }] });
+      return;
+    }
+    const next = measurements.map((m, i) => (i === measurements.length - 1 ? { ...m, points: [...m.points, pt] } : m));
+    set({ measurements: next });
   },
-  clearMeasure: () => set({ measurePoints: [], measureMode: false }),
+  updateMeasurePoint: (id, index, pt) => set((s) => ({
+    measurements: s.measurements.map((m) => (
+      m.id === id ? { ...m, points: m.points.map((p, i) => (i === index ? pt : p)) } : m
+    )),
+  })),
+  removeMeasurement: (id) => set((s) => ({ measurements: s.measurements.filter((m) => m.id !== id) })),
+  clearMeasure: () => set({ measurements: [] }),
+  measureSnapPx: 12,
+  setMeasureSnapPx: (value) => set({ measureSnapPx: value }),
 
   newProject: () => {
     set({

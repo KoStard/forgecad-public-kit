@@ -27,20 +27,27 @@ function Toolbar() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const toggleMeasure = useForgeStore((s) => s.toggleMeasure);
   const clearMeasure = useForgeStore((s) => s.clearMeasure);
-  const measurePoints = useForgeStore((s) => s.measurePoints);
+  const measurements = useForgeStore((s) => s.measurements);
+  const removeMeasurement = useForgeStore((s) => s.removeMeasurement);
   const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
   const toggleFileExplorer = useForgeStore((s) => s.toggleFileExplorer);
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
   const toggleViewPanel = useForgeStore((s) => s.toggleViewPanel);
 
-  const dist =
-    measurePoints.length === 2
-      ? Math.sqrt(
-          (measurePoints[1][0] - measurePoints[0][0]) ** 2 +
-            (measurePoints[1][1] - measurePoints[0][1]) ** 2 +
-            (measurePoints[1][2] - measurePoints[0][2]) ** 2,
-        )
-      : null;
+  const measureDistances = measurements.map((measurement, index) => {
+    if (measurement.points.length !== 2) return null;
+    const [a, b] = measurement.points;
+    const dist = Math.sqrt(
+      (b[0] - a[0]) ** 2 +
+        (b[1] - a[1]) ** 2 +
+        (b[2] - a[2]) ** 2,
+    );
+    return {
+      id: measurement.id,
+      label: `M${index + 1}`,
+      dist,
+    };
+  }).filter((entry): entry is { id: string; label: string; dist: number } => entry !== null);
 
   return (
     <div style={{ padding: '6px 12px', background: '#2d2d2d', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -59,9 +66,42 @@ function Toolbar() {
         <button style={btnStyle()} onClick={saveFileAs}>Save As</button>
         <div style={{ width: 1, height: 20, background: '#444', margin: '0 4px' }} />
         <button style={btnStyle(measureMode)} onClick={toggleMeasure}>📏 Measure</button>
-        {measureMode && <button style={btnStyle()} onClick={clearMeasure}>Clear</button>}
-        {dist !== null && (
-          <span style={{ color: '#ffcc00', fontSize: 12, fontFamily: 'monospace' }}>{dist.toFixed(2)} mm</span>
+        {measureMode && <button style={btnStyle()} onClick={clearMeasure}>Clear All</button>}
+        {measureDistances.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            {measureDistances.map((measurement) => (
+              <span
+                key={measurement.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '2px 6px',
+                  border: '1px solid #4a4a4a',
+                  borderRadius: 4,
+                  fontSize: 11,
+                  color: '#ffcc00',
+                  fontFamily: 'monospace',
+                }}
+              >
+                {measurement.label} {measurement.dist.toFixed(2)} mm
+                <button
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#ffcc00',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    lineHeight: 1,
+                  }}
+                  onClick={() => removeMeasurement(measurement.id)}
+                  title={`Remove ${measurement.label}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
         )}
       </div>
     </div>
