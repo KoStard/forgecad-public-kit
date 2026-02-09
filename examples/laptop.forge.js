@@ -1,5 +1,5 @@
 // Laptop — Entity-based API demo
-// Rectangle2D with named sides, TrackedShape with rotateAroundEdge, arcBridge
+// Rectangle2D with named sides, TrackedShape with rotateAroundEdge
 
 const bottomW = param("Width", 300, { min: 200, max: 400, unit: "mm" });
 const bottomD = param("Depth", 200, { min: 150, max: 300, unit: "mm" });
@@ -15,22 +15,8 @@ const base = baseRect.extrude(bottomH);
 // Screen — same width as base, thinner
 const screenRect = Rectangle2D.fromCenterAndDimensions(point(0, 0), bottomW, screenTall);
 const screen = screenRect.extrude(topH)
-  .moveBy(0, bottomD / 2, bottomH)
-  .rotateAroundEdge('bottom-top', -(180 - openAngle));
+  .moveBy(0, 0, bottomH)
+  .rotateAroundEdge('top-top', -openAngle);
 
-// Hinge arc — connects the back-top edge of base to the back-bottom edge of screen
-// Base hinge edge: top-top (back edge of top face)
-const hingeBase = base.edge('top-top');
-
-// Screen hinge edge: after rotation topology is cleared, but we know where it is
-// It's at the same position as hingeBase but offset by topH in the screen's rotated direction
-const rad = -(180 - openAngle) * Math.PI / 180;
-const hingeScreen = {
-  name: 'screen-hinge',
-  start: [hingeBase.start[0], hingeBase.start[1] + Math.cos(rad) * topH, hingeBase.start[2] + Math.sin(rad) * topH],
-  end: [hingeBase.end[0], hingeBase.end[1] + Math.cos(rad) * topH, hingeBase.end[2] + Math.sin(rad) * topH],
-};
-
-const hinge = arcBridgeBetweenEdges(hingeBase, hingeScreen, 16);
-
-return union(base, screen, hinge);
+// union() accepts TrackedShape directly
+return union(base, screen);

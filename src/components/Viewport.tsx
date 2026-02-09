@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObject } from 'react';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
-import { useForgeStore, type ObjectSettings, type RenderMode, type ViewCommand } from '../store/forgeStore';
+import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
 import type { SceneObject } from '@forge/index';
 import { shapeToGeometry } from '@forge/meshToGeometry';
 import * as THREE from 'three';
@@ -803,9 +803,16 @@ function ViewManager({
   controlsRef: MutableRefObject<OrbitControlsImpl | null>;
 }) {
   const { camera } = useThree();
+  const projectionMode = useForgeStore((s) => s.projectionMode);
   const setProjectionMode = useForgeStore((s) => s.setProjectionMode);
+  const wasSketchOnlyRef = useRef(false);
+  const savedProjectionRef = useRef<ProjectionMode>('perspective');
 
   useEffect(() => {
+    if (isSketchOnly && !wasSketchOnlyRef.current) {
+      savedProjectionRef.current = projectionMode;
+    }
+
     if (isSketchOnly) {
       // Switch to straight-on 2D view
       camera.position.set(0, 0, 200);
@@ -815,14 +822,18 @@ function ViewManager({
         controlsRef.current.target.set(0, 0, 0);
         controlsRef.current.update();
       }
-      setProjectionMode('orthographic');
-    } else {
-      // When switching back to 3D, we might want to ensure perspective
-      // But maybe user wants orthographic 3D. Let's just default to Perspective for now
-      // to avoid confusion if they were forced into Ortho by 2D view.
-      setProjectionMode('perspective');
+      if (projectionMode !== 'orthographic') {
+        setProjectionMode('orthographic');
+      }
+    } else if (wasSketchOnlyRef.current) {
+      const restoreMode = savedProjectionRef.current ?? 'perspective';
+      if (projectionMode !== restoreMode) {
+        setProjectionMode(restoreMode);
+      }
     }
-  }, [camera, controlsRef, isSketchOnly, setProjectionMode]);
+
+    wasSketchOnlyRef.current = isSketchOnly;
+  }, [camera, controlsRef, isSketchOnly, projectionMode, setProjectionMode]);
 
   return null;
 }
