@@ -249,3 +249,24 @@ export function buildRectExtrusionTopology(
 
   return { faces, edges };
 }
+
+/** Build topology for an extruded circle. Faces: top, bottom, side */
+export function buildCircleExtrusionTopology(
+  circ: { center: Point2D; radius: number },
+  height: number,
+): Topology {
+  const faces = new Map<FaceName, FaceRef>();
+  const edges = new Map<EdgeName, EdgeRef>();
+  const cx = circ.center.x, cy = circ.center.y;
+  const zBot = 0, zTop = height;
+
+  faces.set('top', { name: 'top', normal: [0, 0, 1], center: [cx, cy, zTop] });
+  faces.set('bottom', { name: 'bottom', normal: [0, 0, -1], center: [cx, cy, zBot] });
+  faces.set('side', { name: 'side', normal: [1, 0, 0], center: [cx + circ.radius, cy, (zTop + zBot) / 2] });
+
+  // Top and bottom rim edges (represented as a single named reference at 0°)
+  edges.set('top-rim', { name: 'top-rim', start: [cx + circ.radius, cy, zTop], end: [cx, cy + circ.radius, zTop] });
+  edges.set('bottom-rim', { name: 'bottom-rim', start: [cx + circ.radius, cy, zBot], end: [cx, cy + circ.radius, zBot] });
+
+  return { faces, edges };
+}

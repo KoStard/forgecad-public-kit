@@ -30,10 +30,12 @@ import {
   type SketchConstraintMeta,
   Point2D,
   Line2D,
+  Circle2D,
   Rectangle2D,
   TrackedShape,
   point,
   line,
+  circle,
   rectangle,
   Constraint,
   degrees,
@@ -111,7 +113,7 @@ function executeFile(
     'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path', 'stroke', 'constrainedSketch',
     'union2d', 'difference2d', 'intersection2d', 'hull2d',
     // Entities
-    'Point2D', 'Line2D', 'Rectangle2D', 'TrackedShape', 'point', 'line', 'rectangle', 'Constraint', 'degrees', 'radians',
+    'Point2D', 'Line2D', 'Circle2D', 'Rectangle2D', 'TrackedShape', 'point', 'line', 'circle', 'rectangle', 'Constraint', 'degrees', 'radians',
     // Params & classes
     'param', 'Shape', 'Sketch', 'lib',
     // Plane ops
@@ -126,7 +128,7 @@ function executeFile(
     wrappedUnion, wrappedDifference, wrappedIntersection,
     rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
     union2d, difference2d, intersection2d, hull2d,
-    Point2D, Line2D, Rectangle2D, TrackedShape, point, line, rectangle, Constraint, degrees, radians,
+    Point2D, Line2D, Circle2D, Rectangle2D, TrackedShape, point, line, circle, rectangle, Constraint, degrees, radians,
     param, Shape, Sketch, partLibrary,
     intersectWithPlane, projectToPlane,
     importSketch, importPart,

@@ -10,7 +10,8 @@ import { Sketch } from './core';
 import { polygon } from './primitives';
 import { sketchExtrude } from './extrude';
 import { ConstrainedSketchBuilder, type PointId, type LineId } from './constraints';
-import { TrackedShape, buildRectExtrusionTopology } from './topology';
+import { TrackedShape, buildRectExtrusionTopology, buildCircleExtrusionTopology } from './topology';
+import { getWasm } from '../kernel';
 
 // ─── Point ───────────────────────────────────────────────────────
 
@@ -99,6 +100,59 @@ export class Line2D {
 
 export function line(x1: number, y1: number, x2: number, y2: number): Line2D {
   return Line2D.fromCoordinates(x1, y1, x2, y2);
+}
+
+// ─── Circle ──────────────────────────────────────────────────────
+
+export class Circle2D {
+  constructor(
+    public readonly center: Point2D,
+    public readonly radius: number,
+  ) {}
+
+  get diameter(): number { return this.radius * 2; }
+  get circumference(): number { return 2 * Math.PI * this.radius; }
+  get area(): number { return Math.PI * this.radius * this.radius; }
+
+  /** Point on the circle at given angle (degrees, 0=right, CCW) */
+  pointAtAngle(angleDeg: number): Point2D {
+    const rad = angleDeg * Math.PI / 180;
+    return new Point2D(
+      this.center.x + Math.cos(rad) * this.radius,
+      this.center.y + Math.sin(rad) * this.radius,
+    );
+  }
+
+  translate(dx: number, dy: number): Circle2D {
+    return new Circle2D(this.center.translate(dx, dy), this.radius);
+  }
+
+  toSketch(segments?: number): Sketch {
+    const wasm = getWasm();
+    const cross = wasm.CrossSection.circle(this.radius, segments ?? 0)
+      .translate([this.center.x, this.center.y]);
+    return new Sketch(cross);
+  }
+
+  /** Extrude to TrackedShape with top/bottom/side faces */
+  extrude(height: number, segments?: number): TrackedShape {
+    const sketch = this.toSketch(segments);
+    const shape = sketchExtrude(sketch, height);
+    const topology = buildCircleExtrusionTopology(this, height);
+    return new TrackedShape(shape, topology, height, true);
+  }
+
+  static fromCenterAndRadius(center: Point2D, radius: number): Circle2D {
+    return new Circle2D(center, radius);
+  }
+
+  static fromDiameter(center: Point2D, diameter: number): Circle2D {
+    return new Circle2D(center, diameter / 2);
+  }
+}
+
+export function circle(cx: number, cy: number, radius: number): Circle2D {
+  return new Circle2D(new Point2D(cx, cy), radius);
 }
 
 // ─── Rectangle ───────────────────────────────────────────────────
