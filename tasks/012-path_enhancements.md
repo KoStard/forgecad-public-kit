@@ -1,1 +1,1 @@
-path() should allow adding arcs
+path() should allow adding arcs and more proper tools.
