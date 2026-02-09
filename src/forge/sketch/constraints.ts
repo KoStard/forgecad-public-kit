@@ -1106,6 +1106,32 @@ export class ConstrainedSketchBuilder {
     if (!id) return null;
     return this.points.find((p) => p.id === id) ?? null;
   }
+
+  /** Import a Point2D, returning its PointId */
+  importPoint(pt: { x: number; y: number }, fixed = false): PointId {
+    return this.point(pt.x, pt.y, fixed);
+  }
+
+  /** Import a Line2D (two points + line), returning its LineId */
+  importLine(l: { start: { x: number; y: number }; end: { x: number; y: number } }, fixed = false): LineId {
+    const a = this.importPoint(l.start, fixed);
+    const b = this.importPoint(l.end, fixed);
+    return this.line(a, b);
+  }
+
+  /** Import a Rectangle2D as 4 points + 4 lines, returning side LineIds keyed by name */
+  importRectangle(r: {
+    vertices: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
+  }, fixed = false): { bottom: LineId; right: LineId; top: LineId; left: LineId; points: [PointId, PointId, PointId, PointId] } {
+    const [bl, br, tr, tl] = r.vertices.map(v => this.importPoint(v, fixed)) as [PointId, PointId, PointId, PointId];
+    return {
+      bottom: this.line(bl, br),
+      right: this.line(br, tr),
+      top: this.line(tr, tl),
+      left: this.line(tl, bl),
+      points: [bl, br, tr, tl],
+    };
+  }
 }
 
 export function constrainedSketch(): ConstrainedSketchBuilder {
