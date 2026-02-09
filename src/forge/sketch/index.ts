@@ -11,3 +11,4 @@ export * from './entities';
 export * from './topology';
 export * from './patterns';
 export * from './fillets';
+export * from './arcBridge';
