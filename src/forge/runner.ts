@@ -28,6 +28,14 @@ import {
   constrainedSketch,
   ConstraintSketch,
   type SketchConstraintMeta,
+  Point2D,
+  Line2D,
+  Rectangle2D,
+  TrackedShape,
+  point,
+  line,
+  rectangle,
+  Constraint,
 } from './sketch';
 import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
 import { partLibrary } from './library';
@@ -39,7 +47,6 @@ export interface SceneObject {
   sketch: Sketch | null;
   color?: string;
   sketchMeta?: SketchConstraintMeta;
-  color?: string;
 }
 
 export interface RunResult {
@@ -61,7 +68,7 @@ function executeFile(
   fileName: string,
   allFiles: Record<string, string>,
   visited: Set<string>,
-): Shape | Sketch | null {
+): Shape | Sketch | TrackedShape | null {
   if (visited.has(fileName)) {
     throw new Error(`Circular import detected: ${fileName}`);
   }
@@ -94,6 +101,8 @@ function executeFile(
     // 2D
     'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path', 'stroke', 'constrainedSketch',
     'union2d', 'difference2d', 'intersection2d', 'hull2d',
+    // Entities
+    'Point2D', 'Line2D', 'Rectangle2D', 'TrackedShape', 'point', 'line', 'rectangle', 'Constraint',
     // Params & classes
     'param', 'Shape', 'Sketch', 'lib',
     // Plane ops
@@ -108,6 +117,7 @@ function executeFile(
     union, difference, intersection,
     rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
     union2d, difference2d, intersection2d, hull2d,
+    Point2D, Line2D, Rectangle2D, TrackedShape, point, line, rectangle, Constraint,
     param, Shape, Sketch, partLibrary,
     intersectWithPlane, projectToPlane,
     importSketch, importPart,
@@ -148,6 +158,10 @@ export function runScript(
     if (Array.isArray(result)) {
       result.forEach((item, index) => {
         const label = `Object ${index + 1}`;
+        if (item instanceof TrackedShape) {
+          pushShape(item.toShape(), label);
+          return;
+        }
         if (item instanceof Shape) {
           pushShape(item, label);
           return;
@@ -158,6 +172,10 @@ export function runScript(
         }
         if (isNamedObject(item)) {
           const name = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : label;
+          if (item.shape instanceof TrackedShape) {
+            objects.push({ id: `obj-${objects.length + 1}`, name, shape: item.shape.toShape(), sketch: null, color: item.color || item.shape.toShape().colorHex });
+            return;
+          }
           if (item.shape instanceof Shape) {
             objects.push({ id: `obj-${objects.length + 1}`, name, shape: item.shape, sketch: null, color: item.color || item.shape.colorHex });
             return;
@@ -177,6 +195,8 @@ export function runScript(
         }
         throw new Error('Array results must contain Shape/Sketch items');
       });
+    } else if (result instanceof TrackedShape) {
+      pushShape(result.toShape(), fileName);
     } else if (result instanceof Shape) {
       pushShape(result, fileName);
     } else if (result instanceof Sketch) {
