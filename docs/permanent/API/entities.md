@@ -212,22 +212,36 @@ const chamfered = chamferEdge(b, b.edge('vert-br'), 3, [-1, -1]);
 
 ## Arc Bridge
 
-### `arcBridgeBetweenEdges(edgeA, edgeB, segments?)`
-Build a smooth arc surface connecting two parallel edges. The cross-section is a semicircular arc from one edge to the other, extruded along the edge direction.
+### `arcBridgeBetweenRects(rectA, rectB, segments?)`
+Build a smooth arc surface connecting two rectangular areas. The function finds the closest pair of parallel edges (the "inner" edges) and bridges them with a semicircular arc, extruded along their overlapping direction.
 
-Typical use: laptop hinge, box lid connection, any smooth transition between two parallel edges.
+Both inputs can be:
+- A 2D `Rectangle2D` (assumed to lie on `z = 0`), or
+- A 3D rectangle area with explicit corners:
+  - `{ corners: [bl, br, tr, tl] }` where each corner is `[x, y, z]`
 
 ```javascript
-// Laptop hinge example
-const base = rectangle(0, 0, 300, 200).extrude(15);
-const screen = rectangle(0, 0, 300, 200).extrude(5)
-  .moveBy(0, 200, 15)
-  .rotateAroundEdge('bottom-top', -70);
+// Laptop hinge example (2D rectangles at z=0)
+const baseArea = rectangle(0, 0, 300, 200);
+const screenArea = rectangle(0, 200, 300, 200);
 
-const hingeEdge = base.edge('top-top');
-// Screen edge computed manually (topology cleared after rotation)
-const screenEdge = { name: 'h', start: [...], end: [...] };
+const hinge = arcBridgeBetweenRects(baseArea, screenArea, 16);
+```
 
-const hinge = arcBridgeBetweenEdges(hingeEdge, screenEdge, 16);
-return union(base, screen, hinge);
+```javascript
+// 3D rectangle areas with explicit corners
+const baseArea = {
+  corners: [
+    [0, 0, 0],   [300, 0, 0],
+    [300, 200, 0], [0, 200, 0],
+  ],
+};
+const screenArea = {
+  corners: [
+    [0, 200, 15], [300, 200, 15],
+    [300, 400, 15], [0, 400, 15],
+  ],
+};
+
+const hinge = arcBridgeBetweenRects(baseArea, screenArea, 16);
 ```

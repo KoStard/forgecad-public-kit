@@ -45,7 +45,7 @@ import {
   mirrorCopy,
   filletEdge,
   chamferEdge,
-  arcBridgeBetweenEdges,
+  arcBridgeBetweenRects,
 } from './sketch';
 import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
 import { partLibrary } from './library';
@@ -125,7 +125,7 @@ function executeFile(
     // Fillets
     'filletEdge', 'chamferEdge',
     // Arc bridge
-    'arcBridgeBetweenEdges',
+    'arcBridgeBetweenRects',
     // Params & classes
     'param', 'Shape', 'Sketch', 'lib',
     // Plane ops
@@ -143,7 +143,7 @@ function executeFile(
     Point2D, Line2D, Circle2D, Rectangle2D, TrackedShape, point, line, circle, rectangle, Constraint, degrees, radians,
     linearPattern, circularPattern, mirrorCopy,
     filletEdge, chamferEdge,
-    arcBridgeBetweenEdges,
+    arcBridgeBetweenRects,
     param, Shape, Sketch, partLibrary,
     intersectWithPlane, projectToPlane,
     importSketch, importPart,
