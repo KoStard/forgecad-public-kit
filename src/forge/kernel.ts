@@ -52,6 +52,11 @@ export class Shape {
     return new Shape(this.manifold.rotate(x, y, z), this.colorHex);
   }
 
+  /** Apply a 4x4 affine transform matrix (row-major, 16 elements) */
+  transform(m: [number,number,number,number,number,number,number,number,number,number,number,number,number,number,number,number]): Shape {
+    return new Shape(this.manifold.transform(m), this.colorHex);
+  }
+
   scale(v: number | [number, number, number]): Shape {
     return new Shape(this.manifold.scale(v as any), this.colorHex);
   }

@@ -91,40 +91,37 @@ export class TrackedShape {
   /** Rotate around a named edge by angle in degrees */
   rotateAroundEdge(edgeName: EdgeName, angleDeg: number): TrackedShape {
     const edge = this.edge(edgeName);
-    // Translate so edge start is at origin, rotate around edge direction, translate back
     const [ox, oy, oz] = edge.start;
     const dx = edge.end[0] - ox;
     const dy = edge.end[1] - oy;
     const dz = edge.end[2] - oz;
     const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+    const ax = dx / len, ay = dy / len, az = dz / len;
 
-    // For axis-aligned edges, use simple Euler rotation
-    // General case: translate to origin, rotate, translate back
-    const moved = this.shape.translate(-ox, -oy, -oz);
+    // Rodrigues' rotation: build 4x3 affine matrix for rotation around arbitrary axis through origin
+    const rad = angleDeg * Math.PI / 180;
+    const c = Math.cos(rad), s = Math.sin(rad), t = 1 - c;
+    // Rotation matrix R
+    const r00 = t * ax * ax + c,      r01 = t * ax * ay - s * az, r02 = t * ax * az + s * ay;
+    const r10 = t * ax * ay + s * az,  r11 = t * ay * ay + c,     r12 = t * ay * az - s * ax;
+    const r20 = t * ax * az - s * ay,  r21 = t * ay * az + s * ax, r22 = t * az * az + c;
 
-    // Determine rotation axis and apply
-    // Normalize direction
-    const ax = dx / len;
-    const ay = dy / len;
-    const az = dz / len;
+    // Full transform: translate(-origin) → rotate → translate(+origin)
+    // Combined into a single 4x3 matrix [R | R*(-o) + o]
+    const tx = -r00 * ox - r01 * oy - r02 * oz + ox;
+    const ty = -r10 * ox - r11 * oy - r12 * oz + oy;
+    const tz = -r20 * ox - r21 * oy - r22 * oz + oz;
 
-    // For common cases (axis-aligned edges), use Euler angles
-    let rotated: Shape;
-    if (Math.abs(ax) > 0.99) {
-      rotated = moved.rotate(angleDeg, 0, 0);
-    } else if (Math.abs(ay) > 0.99) {
-      rotated = moved.rotate(0, angleDeg, 0);
-    } else if (Math.abs(az) > 0.99) {
-      rotated = moved.rotate(0, 0, angleDeg);
-    } else {
-      // General case: approximate with sequential rotations
-      // TODO: implement proper axis-angle rotation via Manifold transform
-      rotated = moved.rotate(angleDeg * ax, angleDeg * ay, angleDeg * az);
-    }
+    // Manifold transform() takes 4x4 row-major
+    const m: [number,number,number,number,number,number,number,number,number,number,number,number,number,number,number,number] = [
+      r00, r01, r02, tx,
+      r10, r11, r12, ty,
+      r20, r21, r22, tz,
+      0,   0,   0,   1,
+    ];
+    const final = this.shape.transform(m);
 
-    const final = rotated.translate(ox, oy, oz);
-    // Topology is invalidated after rotation — rebuild would need full tracking
-    // For now, return with cleared topology
+    // Topology is invalidated after rotation
     return new TrackedShape(final, { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
