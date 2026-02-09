@@ -16,7 +16,7 @@ const base = baseRect.extrude(bottomH);
 const screenRect = Rectangle2D.fromCenterAndDimensions(point(0, 0), bottomW, screenTall);
 const screen = screenRect.extrude(topH)
   .moveBy(0, 0, bottomH)
-  .rotateAroundEdge('top-top', -openAngle);
+  .rotateAroundEdge('bottom-top', openAngle);
 
 // union() accepts TrackedShape directly
 return union(base, screen);

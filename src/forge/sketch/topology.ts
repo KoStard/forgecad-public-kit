@@ -112,12 +112,12 @@ export class TrackedShape {
     const ty = -r10 * ox - r11 * oy - r12 * oz + oy;
     const tz = -r20 * ox - r21 * oy - r22 * oz + oz;
 
-    // Manifold transform() takes 4x4 row-major
+    // Manifold transform() takes 4x4 column-major
     const m: [number,number,number,number,number,number,number,number,number,number,number,number,number,number,number,number] = [
-      r00, r01, r02, tx,
-      r10, r11, r12, ty,
-      r20, r21, r22, tz,
-      0,   0,   0,   1,
+      r00, r10, r20, 0,
+      r01, r11, r21, 0,
+      r02, r12, r22, 0,
+      tx,  ty,  tz,  1,
     ];
     const final = this.shape.transform(m);
 

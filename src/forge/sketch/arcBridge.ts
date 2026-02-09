@@ -115,11 +115,12 @@ export function arcBridgeBetweenEdges(
   // Origin at edgeA.start (projected to remove along-edge offset from midA)
   const origin = edgeA.start;
 
+  // Manifold transform() takes 4x4 column-major
   const m: Mat16 = [
-    U[0], V[0], edgeDir[0], origin[0],
-    U[1], V[1], edgeDir[1], origin[1],
-    U[2], V[2], edgeDir[2], origin[2],
-    0,    0,    0,          1,
+    U[0], U[1], U[2], 0,
+    V[0], V[1], V[2], 0,
+    edgeDir[0], edgeDir[1], edgeDir[2], 0,
+    origin[0], origin[1], origin[2], 1,
   ];
 
   return solid.transform(m);
