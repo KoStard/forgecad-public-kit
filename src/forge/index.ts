@@ -1,4 +1,6 @@
 export { Shape, box, cylinder, sphere, union, difference, intersection, initKernel } from './kernel';
+export { intersectWithPlane, projectToPlane } from './section';
+export type { PlaneSpec } from './section';
 export * from './sketch';
 export { param } from './params';
 export { runScript } from './runner';

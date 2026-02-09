@@ -8,6 +8,7 @@
  */
 
 import { Shape, box, cylinder, sphere, union, difference, intersection } from './kernel';
+import { intersectWithPlane, projectToPlane } from './section';
 import { Sketch, rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, union2d, difference2d, intersection2d, hull2d, path, stroke } from './sketch';
 import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
 import { partLibrary } from './library';
@@ -73,6 +74,8 @@ function executeFile(
     'union2d', 'difference2d', 'intersection2d', 'hull2d',
     // Params & classes
     'param', 'Shape', 'Sketch', 'lib',
+    // Plane ops
+    'intersectWithPlane', 'projectToPlane',
     // Cross-file imports
     'importSketch', 'importPart',
     wrapped,
@@ -84,6 +87,7 @@ function executeFile(
     rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke,
     union2d, difference2d, intersection2d, hull2d,
     param, Shape, Sketch, partLibrary,
+    intersectWithPlane, projectToPlane,
     importSketch, importPart,
   );
 }

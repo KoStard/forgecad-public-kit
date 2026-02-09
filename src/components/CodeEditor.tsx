@@ -10,6 +10,9 @@ declare function union(...shapes: Shape[]): Shape;
 declare function difference(...shapes: Shape[]): Shape;
 declare function intersection(...shapes: Shape[]): Shape;
 declare function param(name: string, defaultValue: number, opts?: { min?: number; max?: number; step?: number; unit?: string }): number;
+type PlaneSpec = { origin: [number, number, number]; normal: [number, number, number] } | { plane: 'XY' | 'XZ' | 'YZ'; offset?: number };
+declare function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch;
+declare function projectToPlane(shape: Shape, plane: PlaneSpec): Sketch;
 
 // --- Cross-file imports ---
 /** Import a 2D sketch from another file. The file must return a Sketch. */
