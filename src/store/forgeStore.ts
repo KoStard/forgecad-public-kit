@@ -11,6 +11,22 @@ const INITIAL_FILES = projectFiles && Object.keys(projectFiles).length > 0
   ? projectFiles as Record<string, string>
   : EMPTY_FILE;
 
+const collectInitialFolders = (files: Record<string, string>): string[] => {
+  const folders = new Set<string>();
+  Object.keys(files).forEach((name) => {
+    const parts = name.replace(/\\/g, '/').split('/');
+    if (parts.length <= 1) return;
+    let current = '';
+    for (let i = 0; i < parts.length - 1; i += 1) {
+      current = current ? `${current}/${parts[i]}` : parts[i];
+      folders.add(current);
+    }
+  });
+  return Array.from(folders).sort();
+};
+
+const INITIAL_FOLDERS = collectInitialFolders(INITIAL_FILES);
+
 const initialActive = (() => {
   const names = Object.keys(INITIAL_FILES);
   return names.find((n) => n.endsWith('.forge.js')) || names[0];
@@ -24,6 +40,36 @@ export interface ProjectFile {
   name: string;
   code: string;
 }
+
+const normalizePath = (value: string): string => value
+  .replace(/\\/g, '/')
+  .replace(/\/+/g, '/')
+  .replace(/^\/+|\/+$/g, '');
+
+const getParentPath = (value: string): string => {
+  const normalized = normalizePath(value);
+  const idx = normalized.lastIndexOf('/');
+  return idx === -1 ? '' : normalized.slice(0, idx);
+};
+
+const collectParentPaths = (value: string): string[] => {
+  const normalized = normalizePath(value);
+  const parts = normalized.split('/');
+  if (parts.length <= 1) return [];
+  const parents: string[] = [];
+  let current = '';
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    current = current ? `${current}/${parts[i]}` : parts[i];
+    parents.push(current);
+  }
+  return parents;
+};
+
+const movePath = (value: string, from: string, to: string): string => {
+  if (value === from) return to;
+  if (value.startsWith(`${from}/`)) return `${to}${value.slice(from.length)}`;
+  return value;
+};
 
 export type RenderMode = 'solid' | 'wireframe' | 'overlay';
 export type ProjectionMode = 'perspective' | 'orthographic';
@@ -49,12 +95,17 @@ export interface Measurement {
 interface ForgeStore {
   files: Record<string, string>;
   savedFiles: Record<string, string>;
+  folders: string[];
   activeFile: string;
   setActiveFile: (name: string) => void;
   updateFileCode: (name: string, code: string) => void;
   createFile: (name: string) => void;
+  createFolder: (name: string) => void;
   deleteFile: (name: string) => void;
   renameFile: (oldName: string, newName: string) => void;
+  renameFolder: (oldPath: string, newPath: string) => void;
+  deleteFolder: (path: string) => void;
+  moveEntry: (oldPath: string, newPath: string) => void;
 
   dirty: boolean;
 
@@ -142,6 +193,7 @@ const syncObjectSettings = (
 export const useForgeStore = create<ForgeStore>((set, get) => ({
   files: { ...INITIAL_FILES },
   savedFiles: { ...INITIAL_SAVED },
+  folders: [...INITIAL_FOLDERS],
   activeFile: initialActive,
   setActiveFile: (name) => {
     set({ activeFile: name, paramOverrides: {} });
@@ -151,16 +203,31 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set((s) => ({ files: { ...s.files, [name]: code }, dirty: true }));
   },
   createFile: (name) => {
-    const isSketch = name.endsWith('.sketch.js');
+    const normalized = normalizePath(name);
+    if (!normalized) return;
+    if (get().files[normalized]) return;
+    if (get().folders.includes(normalized)) return;
+    const isSketch = normalized.endsWith('.sketch.js');
     const template = isSketch
       ? '// 2D Sketch\n\nreturn rect(50, 30, true);\n'
       : '// 3D Part\n\nreturn box(50, 30, 10);\n';
+    const newFolders = Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort();
     set((s) => ({
-      files: { ...s.files, [name]: template },
-      activeFile: name,
+      files: { ...s.files, [normalized]: template },
+      activeFile: normalized,
       paramOverrides: {},
+      folders: newFolders,
     }));
     setTimeout(() => get().execute(), 0);
+  },
+  createFolder: (name) => {
+    const normalized = normalizePath(name);
+    if (!normalized) return;
+    const { files, folders } = get();
+    if (files[normalized]) return;
+    if (folders.includes(normalized)) return;
+    const next = Array.from(new Set([...folders, normalized, ...collectParentPaths(normalized)])).sort();
+    set({ folders: next });
   },
   deleteFile: (name) => {
     const { files, savedFiles, activeFile } = get();
@@ -175,12 +242,16 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     setTimeout(() => get().execute(), 0);
   },
   renameFile: (oldName, newName) => {
+    const normalized = normalizePath(newName);
+    if (!normalized || normalized === oldName) return;
     const { files, savedFiles, activeFile } = get();
     const code = files[oldName];
     if (!code) return;
+    if (files[normalized]) return;
+    if (get().folders.includes(normalized)) return;
     const remaining = { ...files };
     delete remaining[oldName];
-    remaining[newName] = code;
+    remaining[normalized] = code;
     
     // Note: We do NOT update savedFiles with the new name because it hasn't been saved to disk yet
     // But we should remove the old name from savedFiles
@@ -190,8 +261,81 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set({
       files: remaining,
       savedFiles: remainingSaved,
-      activeFile: oldName === activeFile ? newName : activeFile,
+      activeFile: oldName === activeFile ? normalized : activeFile,
+      folders: Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort(),
     });
+  },
+  renameFolder: (oldPath, newPath) => {
+    const normalizedOld = normalizePath(oldPath);
+    const normalizedNew = normalizePath(newPath);
+    if (!normalizedOld || !normalizedNew) return;
+    if (normalizedOld === normalizedNew) return;
+    const { files, savedFiles, activeFile, folders } = get();
+    if (!folders.includes(normalizedOld)) return;
+    if (files[normalizedNew]) return;
+    if (folders.includes(normalizedNew)) return;
+    if (normalizedNew.startsWith(`${normalizedOld}/`)) return;
+
+    const conflict = Object.keys(files).some((key) => {
+      if (key === normalizedOld || key.startsWith(`${normalizedOld}/`)) return false;
+      return key === normalizedNew || key.startsWith(`${normalizedNew}/`);
+    });
+    if (conflict) return;
+
+    const updatedFiles: Record<string, string> = {};
+    Object.keys(files).forEach((key) => {
+      const next = movePath(key, normalizedOld, normalizedNew);
+      updatedFiles[next] = files[key];
+    });
+
+    const updatedSaved: Record<string, string> = {};
+    Object.keys(savedFiles).forEach((key) => {
+      if (key === normalizedOld || key.startsWith(`${normalizedOld}/`)) return;
+      updatedSaved[key] = savedFiles[key];
+    });
+
+    const updatedFolders = Array.from(new Set(
+      folders
+        .map((folder) => movePath(folder, normalizedOld, normalizedNew))
+        .concat(collectParentPaths(normalizedNew)),
+    )).sort();
+
+    const nextActive = activeFile && activeFile.startsWith(`${normalizedOld}/`)
+      ? movePath(activeFile, normalizedOld, normalizedNew)
+      : activeFile;
+
+    set({
+      files: updatedFiles,
+      savedFiles: updatedSaved,
+      folders: updatedFolders,
+      activeFile: nextActive,
+      paramOverrides: {},
+    });
+    setTimeout(() => get().execute(), 0);
+  },
+  deleteFolder: (path) => {
+    const normalized = normalizePath(path);
+    if (!normalized) return;
+    const { folders, files } = get();
+    if (!folders.includes(normalized)) return;
+    const hasFileContents = Object.keys(files).some((file) => file.startsWith(`${normalized}/`));
+    if (hasFileContents) return;
+    const hasChildFolder = folders.some((folder) => folder.startsWith(`${normalized}/`));
+    if (hasChildFolder) return;
+    set({ folders: folders.filter((folder) => folder !== normalized) });
+  },
+  moveEntry: (oldPath, newPath) => {
+    const normalizedOld = normalizePath(oldPath);
+    const normalizedNew = normalizePath(newPath);
+    if (!normalizedOld || !normalizedNew) return;
+    const { files, folders } = get();
+    if (files[normalizedOld]) {
+      get().renameFile(normalizedOld, normalizedNew);
+      return;
+    }
+    if (folders.includes(normalizedOld)) {
+      get().renameFolder(normalizedOld, normalizedNew);
+    }
   },
 
   dirty: false,
@@ -282,6 +426,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set({
       files: { ...INITIAL_FILES },
       savedFiles: { ...INITIAL_SAVED },
+      folders: [],
       activeFile: initialActive,
       fileHandle: null,
       dirty: false,
@@ -375,17 +520,20 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 
   loadFromText: (text, name) => {
+    const normalized = normalizePath(name);
+    const newFolders = Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort();
     set((s) => ({
-      files: { ...s.files, [name]: text },
+      files: { ...s.files, [normalized]: text },
       // When loading from text, we assume it's like opening a file, so it's "saved" state initially?
       // Or is it a drop?
       // If it's a drop, it's like opening.
       // So we should update savedFiles.
-      savedFiles: { ...s.savedFiles, [name]: text },
-      activeFile: name,
+      savedFiles: { ...s.savedFiles, [normalized]: text },
+      activeFile: normalized,
       fileHandle: null,
       dirty: false,
       paramOverrides: {},
+      folders: newFolders,
     }));
     setTimeout(() => get().execute(), 0);
   },
