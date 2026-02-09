@@ -1,0 +1,3 @@
+If a file gets created in the examples/ directory after I start the web app with npm run open examples, it doesn't automatically add it even after I refresh the page, it's somehow cached in the backed.
+Make this go away. Content changes should be reflected in the web app as well.
+Then, if I refresh the page, it goes to the first file or something. It doesn't keep which file I am on. Using #url track which file I am on and come to that.
