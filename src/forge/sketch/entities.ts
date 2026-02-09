@@ -235,6 +235,16 @@ export function rectangle(x: number, y: number, width: number, height: number): 
   return Rectangle2D.fromDimensions(x, y, width, height);
 }
 
+/** Convert degrees to degrees (identity — for readability in scripts) */
+export function degrees(deg: number): number {
+  return deg;
+}
+
+/** Convert radians to degrees */
+export function radians(rad: number): number {
+  return rad * (180 / Math.PI);
+}
+
 // ─── Constraint helpers (global functions) ───────────────────────
 
 /**
