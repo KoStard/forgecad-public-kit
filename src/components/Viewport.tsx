@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObject } from 'react';
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useThree, useFrame, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera, GizmoHelper, GizmoViewcube, Html } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type RenderMode, type ViewCommand } from '../store/forgeStore';
 import type { SceneObject } from '@forge/index';
@@ -26,6 +26,31 @@ function LabeledAxes({ size = 50 }: { size?: number }) {
       <Html position={[0, 0, size + 3]} center style={labelStyle('#4488ff')}>Z</Html>
     </group>
   );
+}
+
+/**
+ * Fixes camera up vector when looking along Z axis.
+ *
+ * GizmoHelper resets camera.up to (0,0,1) after animation, which is degenerate
+ * when looking straight down/up Z. This detects that case each frame and
+ * substitutes a proper up vector so OrbitControls doesn't pick a random orientation.
+ */
+function UpVectorFixer({ controlsRef }: { controlsRef: MutableRefObject<OrbitControlsImpl | null> }) {
+  const { camera } = useThree();
+  useFrame(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+    const dot = Math.abs(dir.dot(camera.up));
+    // If view direction is nearly parallel to up vector, fix it
+    if (dot > 0.99) {
+      // Looking down (+Z direction): up = (0, 1, 0)
+      // Looking up (-Z direction): up = (0, -1, 0)
+      camera.up.set(0, dir.z > 0 ? 1 : -1, 0);
+      controls.update();
+    }
+  });
+  return null;
 }
 
 /**
@@ -922,6 +947,7 @@ export function Viewport() {
           mouseButtons={isSketchOnly ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN } : undefined}
           touches={isSketchOnly ? { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN } : undefined}
         />
+        {!isSketchOnly && <UpVectorFixer controlsRef={controlsRef} />}
         {!isSketchOnly && (
           <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
             <GizmoViewcube faces={['Right', 'Left', 'Front', 'Back', 'Top', 'Bottom']} />
