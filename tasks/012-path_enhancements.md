@@ -1,0 +1,1 @@
+path() should allow adding arcs
