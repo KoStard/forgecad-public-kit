@@ -83,9 +83,76 @@ export class TrackedShape {
     return new TrackedShape(this.shape.translate(x, y, z), newTopo, this.baseHeight, this.extrudeUp);
   }
 
+  /** Alias for translate — matches ideal API's moveBy */
+  moveBy(x: number, y: number, z: number): TrackedShape {
+    return this.translate(x, y, z);
+  }
+
+  /** Rotate around a named edge by angle in degrees */
+  rotateAroundEdge(edgeName: EdgeName, angleDeg: number): TrackedShape {
+    const edge = this.edge(edgeName);
+    // Translate so edge start is at origin, rotate around edge direction, translate back
+    const [ox, oy, oz] = edge.start;
+    const dx = edge.end[0] - ox;
+    const dy = edge.end[1] - oy;
+    const dz = edge.end[2] - oz;
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+
+    // For axis-aligned edges, use simple Euler rotation
+    // General case: translate to origin, rotate, translate back
+    const moved = this.shape.translate(-ox, -oy, -oz);
+
+    // Determine rotation axis and apply
+    // Normalize direction
+    const ax = dx / len;
+    const ay = dy / len;
+    const az = dz / len;
+
+    // For common cases (axis-aligned edges), use Euler angles
+    let rotated: Shape;
+    if (Math.abs(ax) > 0.99) {
+      rotated = moved.rotate(angleDeg, 0, 0);
+    } else if (Math.abs(ay) > 0.99) {
+      rotated = moved.rotate(0, angleDeg, 0);
+    } else if (Math.abs(az) > 0.99) {
+      rotated = moved.rotate(0, 0, angleDeg);
+    } else {
+      // General case: approximate with sequential rotations
+      // TODO: implement proper axis-angle rotation via Manifold transform
+      rotated = moved.rotate(angleDeg * ax, angleDeg * ay, angleDeg * az);
+    }
+
+    const final = rotated.translate(ox, oy, oz);
+    // Topology is invalidated after rotation — rebuild would need full tracking
+    // For now, return with cleared topology
+    return new TrackedShape(final, { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
+  }
+
+  /** Rotate using Euler angles (degrees), topology is cleared */
+  rotate(x: number, y: number, z: number): TrackedShape {
+    return new TrackedShape(
+      this.shape.rotate(x, y, z),
+      { faces: new Map(), edges: new Map() },
+      this.baseHeight,
+      this.extrudeUp,
+    );
+  }
+
   /** Access the underlying Shape for boolean ops etc */
   toShape(): Shape {
     return this.shape;
+  }
+
+  /** Boolean subtract — returns plain Shape (topology lost) */
+  subtract(other: Shape | TrackedShape): Shape {
+    const otherShape = other instanceof TrackedShape ? other.toShape() : other;
+    return this.shape.subtract(otherShape);
+  }
+
+  /** Boolean add — returns plain Shape (topology lost) */
+  add(other: Shape | TrackedShape): Shape {
+    const otherShape = other instanceof TrackedShape ? other.toShape() : other;
+    return this.shape.add(otherShape);
   }
 
   get boundingBox() {
