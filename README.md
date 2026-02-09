@@ -74,6 +74,14 @@ return base.subtract(hole);
 - `difference(...shapes)` — subtract shapes[1..n] from shapes[0]
 - `intersection(...shapes)` — keep only overlapping volume
 
+### Sections / Projections
+- `intersectWithPlane(shape, plane)` — slice a 3D shape with a plane and return a 2D Sketch
+- `projectToPlane(shape, plane)` — project a 3D shape onto a plane and return a 2D Sketch
+
+Plane spec (either form):
+- `{ origin: [x, y, z], normal: [nx, ny, nz] }`
+- `{ plane: 'XY' | 'XZ' | 'YZ', offset?: number }`
+
 ### Transforms (chainable)
 - `.translate(x, y, z)`
 - `.rotate(x, y, z)` — Euler angles in degrees
