@@ -752,9 +752,11 @@ function ViewController({
         iso: new THREE.Vector3(1, -1, 1),
       };
       // Camera up vector — top/bottom views need special up to avoid gimbal lock
+      // Top: up=(0,1,0) so screen-right=X, screen-up=Y
+      // Bottom: up=(0,-1,0) so screen-right=X, screen-up=-Y
       const upMap: Record<string, THREE.Vector3> = {
-        top: new THREE.Vector3(0, -1, 0),
-        bottom: new THREE.Vector3(0, 1, 0),
+        top: new THREE.Vector3(0, 1, 0),
+        bottom: new THREE.Vector3(0, -1, 0),
       };
       camDir.copy(viewMap[command.view ?? 'iso']).normalize();
       const up = upMap[command.view ?? ''] ?? new THREE.Vector3(0, 0, 1);

@@ -18,8 +18,8 @@ ForgeCAD uses a **Z-up** right-handed coordinate system.
 | Back   | +Y (camera at +Y)        | XZ         | Z         |
 | Right  | +X (camera at +X)        | YZ         | Z         |
 | Left   | −X (camera at −X)        | YZ         | Z         |
-| Top    | +Z (camera at +Z)        | XY         | −Y        |
-| Bottom | −Z (camera at −Z)        | XY         | +Y        |
+| Top    | +Z (camera at +Z)        | XY         | +Y        |
+| Bottom | −Z (camera at −Z)        | XY         | −Y        |
 | Iso    | +X −Y +Z (diagonal)      | —          | Z         |
 
 ## GizmoViewcube Face Mapping
