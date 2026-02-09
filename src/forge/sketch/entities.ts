@@ -249,56 +249,65 @@ export function radians(rad: number): number {
 
 /**
  * Constraint namespace — declarative constraint functions.
- * These work with the ConstrainedSketchBuilder under the hood.
+ *
+ * Two usage modes:
+ * 1. Explicit builder: Constraint.horizontal(builder, lineId)
+ * 2. Entity-aware (auto-imports into builder): Constraint.horizontal(builder, line2d)
+ *
+ * When passing entity objects (Point2D, Line2D), they are auto-imported into the builder.
  */
+
+type LineArg = LineId | Line2D;
+type PointArg = PointId | Point2D;
+
+function resolveLineId(builder: ConstrainedSketchBuilder, arg: LineArg): LineId {
+  if (typeof arg === 'string') return arg;
+  return builder.importLine(arg);
+}
+
+function resolvePointId(builder: ConstrainedSketchBuilder, arg: PointArg): PointId {
+  if (typeof arg === 'string') return arg;
+  return builder.importPoint(arg);
+}
+
 export const Constraint = {
-  /** Make two lines parallel */
-  makeParallel(builder: ConstrainedSketchBuilder, lineA: LineId, lineB: LineId) {
-    return builder.constrain({ type: 'parallel', a: lineA, b: lineB } as any);
+  makeParallel(builder: ConstrainedSketchBuilder, a: LineArg, b: LineArg) {
+    return builder.constrain({ type: 'parallel', a: resolveLineId(builder, a), b: resolveLineId(builder, b) } as any);
   },
 
-  /** Enforce a specific angle between two lines */
-  enforceAngle(builder: ConstrainedSketchBuilder, lineA: LineId, lineB: LineId, angleDeg: number) {
-    return builder.constrain({ type: 'angle', a: lineA, b: lineB, value: angleDeg } as any);
+  enforceAngle(builder: ConstrainedSketchBuilder, a: LineArg, b: LineArg, angleDeg: number) {
+    return builder.constrain({ type: 'angle', a: resolveLineId(builder, a), b: resolveLineId(builder, b), value: angleDeg } as any);
   },
 
-  /** Make a line horizontal */
-  horizontal(builder: ConstrainedSketchBuilder, lineId: LineId) {
-    return builder.constrain({ type: 'horizontal', line: lineId } as any);
+  horizontal(builder: ConstrainedSketchBuilder, line: LineArg) {
+    return builder.constrain({ type: 'horizontal', line: resolveLineId(builder, line) } as any);
   },
 
-  /** Make a line vertical */
-  vertical(builder: ConstrainedSketchBuilder, lineId: LineId) {
-    return builder.constrain({ type: 'vertical', line: lineId } as any);
+  vertical(builder: ConstrainedSketchBuilder, line: LineArg) {
+    return builder.constrain({ type: 'vertical', line: resolveLineId(builder, line) } as any);
   },
 
-  /** Make two lines equal length */
-  equalLength(builder: ConstrainedSketchBuilder, lineA: LineId, lineB: LineId) {
-    return builder.constrain({ type: 'equal', a: lineA, b: lineB } as any);
+  equalLength(builder: ConstrainedSketchBuilder, a: LineArg, b: LineArg) {
+    return builder.constrain({ type: 'equal', a: resolveLineId(builder, a), b: resolveLineId(builder, b) } as any);
   },
 
-  /** Set distance between two points */
-  distance(builder: ConstrainedSketchBuilder, ptA: PointId, ptB: PointId, value: number) {
-    return builder.constrain({ type: 'distance', a: ptA, b: ptB, value } as any);
+  distance(builder: ConstrainedSketchBuilder, a: PointArg, b: PointArg, value: number) {
+    return builder.constrain({ type: 'distance', a: resolvePointId(builder, a), b: resolvePointId(builder, b), value } as any);
   },
 
-  /** Fix a point at coordinates */
-  fix(builder: ConstrainedSketchBuilder, ptId: PointId, x: number, y: number) {
-    return builder.constrain({ type: 'fixed', point: ptId, x, y } as any);
+  fix(builder: ConstrainedSketchBuilder, pt: PointArg, x: number, y: number) {
+    return builder.constrain({ type: 'fixed', point: resolvePointId(builder, pt), x, y } as any);
   },
 
-  /** Make two points coincident */
-  coincident(builder: ConstrainedSketchBuilder, ptA: PointId, ptB: PointId) {
-    return builder.constrain({ type: 'coincident', a: ptA, b: ptB } as any);
+  coincident(builder: ConstrainedSketchBuilder, a: PointArg, b: PointArg) {
+    return builder.constrain({ type: 'coincident', a: resolvePointId(builder, a), b: resolvePointId(builder, b) } as any);
   },
 
-  /** Make two lines perpendicular */
-  perpendicular(builder: ConstrainedSketchBuilder, lineA: LineId, lineB: LineId) {
-    return builder.constrain({ type: 'perpendicular', a: lineA, b: lineB } as any);
+  perpendicular(builder: ConstrainedSketchBuilder, a: LineArg, b: LineArg) {
+    return builder.constrain({ type: 'perpendicular', a: resolveLineId(builder, a), b: resolveLineId(builder, b) } as any);
   },
 
-  /** Set line length */
-  length(builder: ConstrainedSketchBuilder, lineId: LineId, value: number) {
-    return builder.constrain({ type: 'length', line: lineId, value } as any);
+  length(builder: ConstrainedSketchBuilder, line: LineArg, value: number) {
+    return builder.constrain({ type: 'length', line: resolveLineId(builder, line), value } as any);
   },
 };
