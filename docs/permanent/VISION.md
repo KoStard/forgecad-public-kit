@@ -53,7 +53,7 @@ The kernel is not the product. The modeling layer on top is.
 ### What we deliberately skip
 - **History tree / timeline** — code IS the history. You read it top to bottom. No need for a separate feature tree when the script is the tree.
 - **Direct modeling** — push/pull faces interactively. Not relevant for code-first CAD.
-- **Assembly constraints** — mates, joints. Could add later but not core to the code-first approach.
+- **Assembly constraints** — mates, joints. Revolute joints are supported via `joint()`. Full constraint-based assembly (face-to-face mating, kinematic chains) could add later but not core to the code-first approach.
 - **Photorealistic rendering** — not a rendering tool. Basic viewport materials are sufficient. Export to STL for slicing or external renderers.
 
 ## The Code-First Bet
