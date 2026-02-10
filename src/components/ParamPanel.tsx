@@ -25,7 +25,10 @@ export function ParamPanel() {
             max={p.max}
             step={p.step}
             value={p.value}
-            onChange={(e) => setParam(p.name, parseFloat(e.target.value))}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              setParam(p.name, p.integer ? Math.round(v) : v);
+            }}
             style={{ width: '100%', accentColor: '#4a9eff' }}
           />
         </div>

@@ -5,8 +5,8 @@ const shelfW = param("Shelf Width", 800, { min: 400, max: 1200, unit: "mm" });
 const shelfD = param("Shelf Depth", 200, { min: 150, max: 350, unit: "mm" });
 const totalH = param("Total Height", 1200, { min: 600, max: 1800, unit: "mm" });
 const boardT = param("Board Thickness", 18, { min: 12, max: 25, unit: "mm" });
-const rows = param("Shelf Rows", 4, { min: 2, max: 6 });
-const cols = param("Containers/Row", 3, { min: 1, max: 6 });
+const rows = param("Shelf Rows", 4, { min: 2, max: 6, integer: true });
+const cols = param("Containers/Row", 3, { min: 1, max: 6, integer: true });
 
 // Container dimensions (must match container.forge.js defaults or be close)
 const containerW = 120;
@@ -40,10 +40,7 @@ const frame = union(leftPanel, rightPanel, backPanel, ...shelfBoards);
 const container = importPart("container.forge.js");
 
 const containers = [];
-const totalContainerW = cols * (containerW + lipH * 2);
-const gapX = totalContainerW < innerW
-  ? (innerW - totalContainerW) / (cols + 1)
-  : 2; // tight fit fallback
+const gapX = (innerW - cols * (containerW + lipH * 2)) / (cols + 1);
 const gapY = 5; // small gap from front edge
 
 for (let row = 0; row < rows; row++) {

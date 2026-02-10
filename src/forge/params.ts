@@ -14,6 +14,7 @@ export interface ParamDef {
   max: number;
   step: number;
   unit?: string;
+  integer?: boolean;
 }
 
 let _params: ParamDef[] = [];
@@ -41,13 +42,15 @@ export function getCollectedParams(): ParamDef[] {
 export function param(
   name: string,
   defaultValue: number,
-  opts: { min?: number; max?: number; step?: number; unit?: string } = {},
+  opts: { min?: number; max?: number; step?: number; unit?: string; integer?: boolean } = {},
 ): number {
-  const value = _overrides[name] ?? defaultValue;
+  const raw = _overrides[name] ?? defaultValue;
+  const integer = opts.integer ?? false;
+  const value = integer ? Math.round(raw) : raw;
   const min = opts.min ?? 0;
   const max = opts.max ?? defaultValue * 4;
-  const step = opts.step ?? (max - min > 100 ? 1 : 0.1);
+  const step = opts.step ?? (integer ? 1 : (max - min > 100 ? 1 : 0.1));
 
-  _params.push({ name, value, min, max, step, unit: opts.unit });
+  _params.push({ name, value, min, max, step, unit: opts.unit, integer });
   return value;
 }

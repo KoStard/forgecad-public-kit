@@ -9,7 +9,7 @@ declare function sphere(radius: number, segments?: number): Shape;
 declare function union(...shapes: Shape[]): Shape;
 declare function difference(...shapes: Shape[]): Shape;
 declare function intersection(...shapes: Shape[]): Shape;
-declare function param(name: string, defaultValue: number, opts?: { min?: number; max?: number; step?: number; unit?: string }): number;
+declare function param(name: string, defaultValue: number, opts?: { min?: number; max?: number; step?: number; unit?: string; integer?: boolean }): number;
 type PlaneSpec = { origin: [number, number, number]; normal: [number, number, number] } | { plane: 'XY' | 'XZ' | 'YZ'; offset?: number };
 declare function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch;
 declare function projectToPlane(shape: Shape, plane: PlaneSpec): Sketch;
