@@ -1,8 +1,41 @@
 # ⚒ ForgeCAD
 
-Code-native parametric CAD for the LLM era.
+Parametric CAD that brings Fusion360-level modeling to code.
 
 **TypeScript IS the file format. The browser IS the CAD system.**
+
+## Vision
+
+ForgeCAD is a parametric modeling environment built on top of [Manifold](https://github.com/elalish/manifold), a fast WASM geometry kernel. Manifold handles the hard part — boolean operations, mesh math, extrusion. ForgeCAD adds everything above that:
+
+- **Constraint-driven sketches** — declare geometric relationships (parallel, tangent, equal length, fixed distance), and a solver figures out the positions. Same paradigm as Fusion360's sketch environment.
+- **Named entities and topology** — rectangles know their sides, extruded shapes know their faces and edges. You write `shape.face('top')` or `rect.side('left')`, not raw coordinates.
+- **Code-as-format** — scripts are plain JS/TS files. Version control, diffing, LLM generation all work naturally. Every `param()` call becomes a live slider.
+- **Multi-file composition** — split sketches and parts across files, import and assemble them.
+
+The goal is not to reimplement Manifold. It's to build the parametric modeling layer that Manifold doesn't provide — the same layer that makes Fusion360 productive for real design work. Constraints, sketch fillets, shell operations, patterns, sketch-on-face — all the things that turn a geometry kernel into a CAD system.
+
+### Architecture
+
+```
+User Script (.forge.js / .sketch.js)
+        ↓
+ForgeCAD Modeling Layer
+  ├── Constraint solver (2D sketch constraints)
+  ├── Named entities (Rectangle2D, Circle2D, Line2D)
+  ├── Topology tracking (TrackedShape with face/edge names)
+  ├── Patterns (linear, circular, mirror)
+  ├── Sketch operations (fillet, offset, hull, boolean)
+  └── 3D operations (smooth, shell, chamfer)
+        ↓
+Manifold WASM (geometry kernel)
+  ├── Boolean ops (union, subtract, intersect)
+  ├── Extrude, revolve
+  ├── Mesh smoothing (smoothOut + refine)
+  └── SDF level sets
+        ↓
+Three.js (rendering) + Monaco (editor)
+```
 
 ## Quick Start
 

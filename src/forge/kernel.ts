@@ -65,6 +65,33 @@ export class Shape {
     return new Shape(this.manifold.mirror(normal), this.colorHex);
   }
 
+  // --- Smoothing ---
+
+  /** Mark edges for smoothing based on angle. Call refine() after to apply. */
+  smoothOut(minSharpAngle = 60, minSmoothness = 0): Shape {
+    return new Shape(this.manifold.smoothOut(minSharpAngle, minSmoothness), this.colorHex);
+  }
+
+  /** Subdivide mesh, interpolating smooth surfaces set by smoothOut(). */
+  refine(n: number): Shape {
+    return new Shape(this.manifold.refine(n), this.colorHex);
+  }
+
+  /** Subdivide until edges are shorter than length. */
+  refineToLength(length: number): Shape {
+    return new Shape(this.manifold.refineToLength(length), this.colorHex);
+  }
+
+  /** Subdivide until surface is within tolerance of smooth surface. */
+  refineToTolerance(tolerance: number): Shape {
+    return new Shape(this.manifold.refineToTolerance(tolerance), this.colorHex);
+  }
+
+  /** Warp vertices with a function. */
+  warp(fn: (vert: [number, number, number]) => void): Shape {
+    return new Shape(this.manifold.warp(fn as any), this.colorHex);
+  }
+
   // --- Booleans ---
 
   add(other: Shape): Shape {
