@@ -1,8 +1,6 @@
 // Foldable iPhone Stand — two-piece with hinge
 // A base plate and a back support that folds flat for travel.
 
-const phoneW = param("Phone Width", 75, { min: 60, max: 90, unit: "mm" });
-const phoneD = param("Phone Depth", 10, { min: 6, max: 15, unit: "mm" });
 const standW = param("Stand Width", 85, { min: 70, max: 120, unit: "mm" });
 const thick = param("Thickness", 4, { min: 2, max: 8, unit: "mm" });
 const baseLen = param("Base Length", 80, { min: 50, max: 120, unit: "mm" });
@@ -14,60 +12,57 @@ const hingeR = param("Hinge Radius", 3, { min: 2, max: 6, unit: "mm" });
 const cableHoleD = param("Cable Hole", 12, { min: 0, max: 20, unit: "mm" });
 const gripSlots = param("Grip Slots", 3, { min: 0, max: 5 });
 
-// --- Base plate ---
-const baseProfile = roundedRect(standW, baseLen, 3, true);
-const base = baseProfile.extrude(thick);
+// --- Base plate (centered on XY, bottom at Z=0) ---
+const base = roundedRect(standW, baseLen, 3, true).extrude(thick);
 
-// Front lip to hold the phone — angled slightly back
-const lip = box(standW - 10, thick, lipH)
-  .translate(-(standW - 10) / 2, -baseLen / 2, thick)
-  .rotate(90 - lipAngle, 0, 0);
+// --- Front lip (holds the phone) ---
+// Build at origin: sits on XZ plane, thick in Y, lipH tall in Z
+// Then tilt backward, then move to front edge
+const lipRaw = box(standW - 10, thick, lipH, true)
+  .translate(0, 0, lipH / 2);                  // lift so bottom edge is at Z=0
+const lipTilted = lipRaw.rotate(-(90 - lipAngle), 0, 0);  // tilt back
+const lip = lipTilted.translate(0, -baseLen / 2, thick);   // move to front edge, on top of base
 
-// Grip slots on the base (so phone doesn't slide)
+// --- Grip slots (cross-wise along X to prevent phone sliding forward) ---
 const slotParts = [];
 if (gripSlots > 0) {
-  const slotW = (standW - 20) / (gripSlots * 2 + 1);
+  const slotSpacing = (baseLen * 0.5) / (gripSlots + 1);
   for (let i = 0; i < gripSlots; i++) {
-    const sx = -(standW - 20) / 2 + slotW * (2 * i + 1);
+    const sy = -baseLen / 4 + slotSpacing * (i + 1);
     slotParts.push(
-      box(slotW, baseLen * 0.6, thick + 1)
-        .translate(sx, -baseLen * 0.3, -0.5)
+      box(standW * 0.6, 2, thick + 2, true)
+        .translate(0, sy, thick / 2)
     );
   }
 }
 
-// Cable hole in the base
+// --- Cable hole (near front lip where phone bottom rests) ---
 let baseFinal = union(base, lip);
 if (slotParts.length > 0) {
   baseFinal = baseFinal.subtract(union(...slotParts));
 }
 if (cableHoleD > 0) {
   const cableHole = cylinder(thick + 2, cableHoleD / 2)
-    .translate(0, baseLen / 4, -1);
+    .translate(0, -baseLen / 4, -1);
   baseFinal = baseFinal.subtract(cableHole);
 }
 
 // --- Back support (foldable) ---
-// Hinge axis sits at the back edge of the base
-const hingeY = baseLen / 2;
-const hingeZ = thick;
-
-// Back panel
-const backPanel = box(standW - 6, thick, backH)
-  .translate(-(standW - 6) / 2, 0, 0);
-
-// Rotate around hinge point
+// Build panel at origin standing up in Z, then rotate around its bottom edge, then translate to hinge
+const backPanel = box(standW - 6, thick, backH, true)
+  .translate(0, 0, backH / 2);                    // bottom edge at Z=0
 const backRotated = backPanel
-  .translate(0, hingeY, hingeZ)
-  .rotate(-foldAngle, 0, 0);
+  .rotate(-foldAngle, 0, 0)                        // fold: 0°=vertical, 90°=flat
+  .translate(0, baseLen / 2, thick);               // move to back edge of base
 
-// Hinge cylinders (decorative, show the pivot)
-const hingeLeft = cylinder(thick * 2, hingeR, undefined, 24)
+// --- Hinge cylinders (decorative pivots along X axis) ---
+const hingeLen = 10;
+const hingeLeft = cylinder(hingeLen, hingeR, hingeR, 24)
   .rotate(0, 90, 0)
-  .translate(-standW / 2 + 5, hingeY, hingeZ);
-const hingeRight = cylinder(thick * 2, hingeR, undefined, 24)
+  .translate(-standW / 2 + 8, baseLen / 2, thick);
+const hingeRight = cylinder(hingeLen, hingeR, hingeR, 24)
   .rotate(0, 90, 0)
-  .translate(standW / 2 - 5 - thick * 2, hingeY, hingeZ);
+  .translate(standW / 2 - 8 - hingeLen, baseLen / 2, thick);
 
 return [
   { name: "Base", shape: baseFinal, color: "#556677" },
