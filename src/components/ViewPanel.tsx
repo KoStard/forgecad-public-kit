@@ -44,6 +44,8 @@ export function ViewPanel() {
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
   const measureSnapPx = useForgeStore((s) => s.measureSnapPx);
   const setMeasureSnapPx = useForgeStore((s) => s.setMeasureSnapPx);
+  const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
+  const toggleDimensions = useForgeStore((s) => s.toggleDimensions);
   const updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
 
   const objects = result?.objects ?? [];
@@ -234,7 +236,7 @@ export function ViewPanel() {
       )}
 
       <div style={sectionStyle}>
-        <div style={labelStyle}>Grid</div>
+        <div style={labelStyle}>Display</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#ccc' }}>
             <input
@@ -243,6 +245,16 @@ export function ViewPanel() {
               onChange={(e) => setGridEnabled(e.target.checked)}
             />
             Show grid
+          </label>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#ccc' }}>
+            <input
+              type="checkbox"
+              checked={dimensionsVisible}
+              onChange={toggleDimensions}
+            />
+            Show dimensions
           </label>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>

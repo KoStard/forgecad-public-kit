@@ -156,6 +156,9 @@ interface ForgeStore {
   measureSnapPx: number;
   setMeasureSnapPx: (value: number) => void;
 
+  dimensionsVisible: boolean;
+  toggleDimensions: () => void;
+
   newProject: () => void;
   saveFile: () => Promise<void>;
   saveFileAs: () => Promise<void>;
@@ -433,6 +436,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   clearMeasure: () => set({ measurements: [] }),
   measureSnapPx: 12,
   setMeasureSnapPx: (value) => set({ measureSnapPx: value }),
+
+  dimensionsVisible: true,
+  toggleDimensions: () => set((s) => ({ dimensionsVisible: !s.dimensionsVisible })),
 
   newProject: () => {
     set({

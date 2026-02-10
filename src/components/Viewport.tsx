@@ -968,6 +968,7 @@ export function Viewport() {
   const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
   const objects = result?.objects ?? [];
   const dimensions = result?.dimensions ?? [];
+  const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
@@ -1008,7 +1009,7 @@ export function Viewport() {
           }
           return null;
         })}
-        {dimensions.map((d) => (
+        {dimensionsVisible && dimensions.map((d) => (
           <DimensionAnnotation key={d.id} def={d} />
         ))}
         <MeasureTool />
