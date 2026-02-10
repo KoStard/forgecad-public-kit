@@ -9,7 +9,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "render": "node cli/forge-render.mjs",
-    "svg": "npx tsx cli/forge-svg.ts"
+    "svg": "npx tsx cli/forge-svg.ts",
+    "test-run": "npx tsx cli/test-run.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
