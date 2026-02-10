@@ -294,18 +294,28 @@ function DimensionAnnotation({ def }: { def: DimensionDef }) {
   const color = def.color ?? '#e0e0e0';
 
   // Stable perpendicular offset (camera-independent).
-  // Cross dimension direction with Z-up; fallback to X if parallel.
+  // Convention: positive offset pushes "outward" (−Y for X/Z lines, −X for Y lines).
   const { dimStart, dimEnd, mid, dist } = useMemo(() => {
     const dir = to.clone().sub(from);
     const len = dir.length();
     if (len < 1e-6) return { dimStart: from, dimEnd: to, mid: from, dist: 0 };
     const dirN = dir.clone().normalize();
+    const ax = Math.abs(dirN.x), ay = Math.abs(dirN.y), az = Math.abs(dirN.z);
 
-    let perp = new THREE.Vector3().crossVectors(dirN, new THREE.Vector3(0, 0, 1));
-    if (perp.lengthSq() < 1e-6) {
-      perp = new THREE.Vector3().crossVectors(dirN, new THREE.Vector3(1, 0, 0));
+    // Pick a perpendicular axis that pushes "outward" for typical geometry at origin:
+    // X-aligned → −Y, Y-aligned → −X, Z-aligned → −Y, diagonal → cross with Z then fallback
+    let perp: THREE.Vector3;
+    if (az > ax && az > ay) {
+      // Mostly Z-aligned → offset in −Y
+      perp = new THREE.Vector3(0, -1, 0);
+    } else if (ay > ax) {
+      // Mostly Y-aligned → offset in −X
+      perp = new THREE.Vector3(-1, 0, 0);
+    } else {
+      // Mostly X-aligned → offset in −Y
+      perp = new THREE.Vector3(0, -1, 0);
     }
-    perp.normalize().multiplyScalar(def.offset);
+    perp.multiplyScalar(def.offset);
 
     const dS = from.clone().add(perp);
     const dE = to.clone().add(perp);
