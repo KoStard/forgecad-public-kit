@@ -17,7 +17,16 @@ export function roundedRect(width: number, height: number, radius: number, cente
 }
 
 export function polygon(points: [number, number][]): Sketch {
-  return new Sketch(new (getWasm().CrossSection)([points]));
+  // Auto-fix winding: Manifold needs CCW, so reverse if CW (positive signed area)
+  const pts = [...points];
+  let signedArea = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const [x1, y1] = pts[i];
+    const [x2, y2] = pts[(i + 1) % pts.length];
+    signedArea += (x2 - x1) * (y2 + y1);
+  }
+  if (signedArea > 0) pts.reverse();
+  return new Sketch(new (getWasm().CrossSection)([pts]));
 }
 
 export function ngon(sides: number, radius: number): Sketch {
