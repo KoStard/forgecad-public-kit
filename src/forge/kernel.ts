@@ -65,6 +65,45 @@ export class Shape {
     return new Shape(this.manifold.mirror(normal), this.colorHex);
   }
 
+  /**
+   * Rotate around an arbitrary axis through a pivot point.
+   * Equivalent to: translate(-pivot) → rotate around axis → translate(+pivot)
+   */
+  rotateAround(
+    axis: [number, number, number],
+    angleDeg: number,
+    pivot: [number, number, number] = [0, 0, 0],
+  ): Shape {
+    const [px, py, pz] = pivot;
+    const rad = angleDeg * Math.PI / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    // Normalize axis
+    const len = Math.sqrt(axis[0] ** 2 + axis[1] ** 2 + axis[2] ** 2) || 1;
+    const ux = axis[0] / len, uy = axis[1] / len, uz = axis[2] / len;
+    // Rodrigues' rotation matrix + translation for pivot
+    const m00 = cos + ux * ux * (1 - cos);
+    const m01 = ux * uy * (1 - cos) - uz * sin;
+    const m02 = ux * uz * (1 - cos) + uy * sin;
+    const m10 = uy * ux * (1 - cos) + uz * sin;
+    const m11 = cos + uy * uy * (1 - cos);
+    const m12 = uy * uz * (1 - cos) - ux * sin;
+    const m20 = uz * ux * (1 - cos) - uy * sin;
+    const m21 = uz * uy * (1 - cos) + ux * sin;
+    const m22 = cos + uz * uz * (1 - cos);
+    // Translation: pivot + R * (-pivot)
+    const tx = px - (m00 * px + m01 * py + m02 * pz);
+    const ty = py - (m10 * px + m11 * py + m12 * pz);
+    const tz = pz - (m20 * px + m21 * py + m22 * pz);
+    // Manifold.transform takes column-major 4x3 (first 12 of 4x4)
+    return new Shape(this.manifold.transform([
+      m00, m10, m20, 0,
+      m01, m11, m21, 0,
+      m02, m12, m22, 0,
+      tx,  ty,  tz,  1,
+    ] as any), this.colorHex);
+  }
+
   // --- Smoothing ---
 
   /** Mark edges for smoothing based on angle. Call refine() after to apply. */

@@ -23,6 +23,8 @@ export type { PlaneSpec } from './section';
 export * from './sketch';
 export { param, resetParams, getCollectedParams, setParamOverrides } from './params';
 export type { ParamDef } from './params';
+export { joint } from './joint';
+export type { RevoluteJointOpts } from './joint';
 export { runScript } from './runner';
 export type { RunResult, SceneObject } from './runner';
 export { partLibrary } from './library';

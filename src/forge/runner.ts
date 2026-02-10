@@ -48,6 +48,7 @@ import {
   arcBridgeBetweenRects,
 } from './sketch';
 import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
+import { joint } from './joint';
 import { partLibrary } from './library';
 
 export interface SceneObject {
@@ -132,6 +133,8 @@ function executeFile(
     'arcBridgeBetweenRects',
     // Params & classes
     'param', 'Shape', 'Sketch', 'lib',
+    // Joints
+    'joint',
     // Plane ops
     'intersectWithPlane', 'projectToPlane',
     // Cross-file imports
@@ -150,6 +153,7 @@ function executeFile(
     filletEdge, chamferEdge,
     arcBridgeBetweenRects,
     param, Shape, Sketch, partLibrary,
+    joint,
     intersectWithPlane, projectToPlane,
     importSketch, importPart,
   );

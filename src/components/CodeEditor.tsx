@@ -42,6 +42,8 @@ declare class Shape {
   scale(v: number | [number, number, number]): Shape;
   mirror(normal: [number, number, number]): Shape;
   transform(m: number[]): Shape;  // 4x4 column-major matrix
+  /** Rotate around an arbitrary axis through a pivot point */
+  rotateAround(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): Shape;
 
   // Booleans
   add(other: Shape): Shape;
@@ -213,6 +215,16 @@ declare function chamferEdge(shape: TrackedShape, edge: any, size: number, quadr
 
 // --- Arc Bridge ---
 declare function arcBridgeBetweenRects(rectA: any, rectB: any, segments?: number): Shape;
+
+// --- Joints ---
+/** Create a revolute (hinge) joint. Auto-creates a param slider and rotates the shape around the pivot. */
+declare function joint(name: string, shape: Shape, pivot: [number, number, number], opts?: {
+  axis?: [number, number, number];
+  min?: number;
+  max?: number;
+  default?: number;
+  unit?: string;
+}): Shape;
 
 // --- 3D Advanced ---
 declare function hull3d(...args: (Shape | [number, number, number])[]): Shape;
