@@ -70,14 +70,21 @@ async function setup() {
 
   const result = runScript(code, opts?.fileName || 'main.forge.js', opts?.allFiles || {});
 
-  const primary = result.objects.find((obj) => obj.shape || obj.sketch) ?? null;
-
-  if (result.error || (!primary?.shape && !primary?.sketch)) {
-    return { ok: false, error: result.error || 'No shape returned' };
+  if (result.error) {
+    return { ok: false, error: result.error };
   }
 
-  // Auto-extrude sketches into a thin 3D shape for rendering
-  const shape = primary.shape || primary.sketch!.extrude(1);
+  // Collect all shapes (auto-extrude sketches)
+  const shapes = result.objects
+    .map((obj) => obj.shape || (obj.sketch ? obj.sketch.extrude(1) : null))
+    .filter((s): s is NonNullable<typeof s> => s != null);
+
+  if (shapes.length === 0) {
+    return { ok: false, error: 'No shape returned' };
+  }
+
+  // Union all objects for rendering
+  const shape = shapes.reduce((a, b) => a.add(b));
   const geo = shapeToGeometry(shape);
   const { scene, camera } = buildScene(geo);
 
