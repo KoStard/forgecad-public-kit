@@ -37,7 +37,7 @@ const backPanel = box(innerW, boardT / 2, totalH)
 const frame = union(leftPanel, rightPanel, backPanel, ...shelfBoards);
 
 // --- Import and place containers ---
-const container = importPart("container.forge.js");
+const container = importPart("shelf/container.forge.js");
 
 const containers = [];
 const gapX = (innerW - cols * (containerW + lipH * 2)) / (cols + 1);

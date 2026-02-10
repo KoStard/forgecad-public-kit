@@ -49,6 +49,7 @@ Declares a parameter and creates a UI slider.
   - `max` (number) - Maximum value (default: default * 4)
   - `step` (number) - Slider increment (auto-calculated if not provided)
   - `unit` (string) - Display unit like "mm", "°", "%"
+  - `integer` (boolean) - If true, value is always rounded to whole number. Step defaults to 1. Use for counts, quantities, sides, etc.
 
 **Returns:** Current parameter value (number)
 
@@ -57,6 +58,7 @@ Declares a parameter and creates a UI slider.
 const width = param("Width", 50);
 const angle = param("Angle", 45, { min: 0, max: 180, unit: "°" });
 const thick = param("Thickness", 2, { min: 0.5, max: 10, step: 0.5, unit: "mm" });
+const count = param("Count", 5, { min: 1, max: 20, integer: true });
 ```
 
 ## Colors
