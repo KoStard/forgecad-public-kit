@@ -7,7 +7,7 @@
  * Supports cross-file imports via importSketch() and importPart().
  */
 
-import { Shape, box, cylinder, sphere, union, difference, intersection } from './kernel';
+import { Shape, box, cylinder, sphere, union, difference, intersection, hull3d, levelSet } from './kernel';
 import { intersectWithPlane, projectToPlane } from './section';
 import {
   Sketch,
@@ -111,10 +111,14 @@ function executeFile(
   const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => difference(...shapes.map(unwrap));
   const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => intersection(...shapes.map(unwrap));
 
+  const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) =>
+    hull3d(...args.map(a => a instanceof TrackedShape ? a.toShape() : a));
+
   const fn = new Function(
     // 3D
     'box', 'cylinder', 'sphere',
     'union', 'difference', 'intersection',
+    'hull3d', 'levelSet',
     // 2D
     'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path', 'stroke', 'constrainedSketch',
     'union2d', 'difference2d', 'intersection2d', 'hull2d',
@@ -138,6 +142,7 @@ function executeFile(
   return fn(
     box, cylinder, sphere,
     wrappedUnion, wrappedDifference, wrappedIntersection,
+    wrappedHull3d, levelSet,
     rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
     union2d, difference2d, intersection2d, hull2d,
     Point2D, Line2D, Circle2D, Rectangle2D, TrackedShape, point, line, circle, rectangle, Constraint, degrees, radians,

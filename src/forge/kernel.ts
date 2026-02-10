@@ -106,6 +106,39 @@ export class Shape {
     return new Shape(this.manifold.intersect(other.manifold), this.colorHex);
   }
 
+  // --- Cutting ---
+
+  /** Split into [inside, outside] by another shape. */
+  split(cutter: Shape): [Shape, Shape] {
+    const [a, b] = this.manifold.split(cutter.manifold);
+    return [new Shape(a, this.colorHex), new Shape(b, this.colorHex)];
+  }
+
+  /** Split by infinite plane. Returns [below/inside, above/outside]. */
+  splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
+    const [a, b] = this.manifold.splitByPlane(normal, originOffset);
+    return [new Shape(a, this.colorHex), new Shape(b, this.colorHex)];
+  }
+
+  /** Cut away everything on the positive side of the plane. */
+  trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
+    return new Shape(this.manifold.trimByPlane(normal, originOffset), this.colorHex);
+  }
+
+  // --- Hull ---
+
+  /** Convex hull of this shape. */
+  hull(): Shape {
+    return new Shape(this.manifold.hull(), this.colorHex);
+  }
+
+  // --- Simplification ---
+
+  /** Reduce mesh complexity. Vertices closer than tolerance are merged. */
+  simplify(tolerance?: number): Shape {
+    return new Shape(this.manifold.simplify(tolerance), this.colorHex);
+  }
+
   // --- Query ---
 
   boundingBox() {
@@ -114,6 +147,23 @@ export class Shape {
 
   volume(): number {
     return this.manifold.volume();
+  }
+
+  surfaceArea(): number {
+    return this.manifold.surfaceArea();
+  }
+
+  /** Minimum distance between this shape and another. */
+  minGap(other: Shape, searchLength: number): number {
+    return this.manifold.minGap(other.manifold, searchLength);
+  }
+
+  isEmpty(): boolean {
+    return this.manifold.isEmpty();
+  }
+
+  numTri(): number {
+    return this.manifold.numTri();
   }
 
   /** Extract triangle mesh for Three.js rendering */
@@ -160,4 +210,25 @@ export function difference(...shapes: Shape[]): Shape {
 export function intersection(...shapes: Shape[]): Shape {
   if (shapes.length < 2) throw new Error('intersection requires at least two shapes');
   return new Shape(getWasm().Manifold.intersection(shapes.map((s) => s.manifold)));
+}
+
+/** Convex hull of multiple shapes and/or points. */
+export function hull3d(...args: (Shape | [number, number, number])[]): Shape {
+  const items = args.map(a => a instanceof Shape ? a.manifold : a);
+  return new Shape(getWasm().Manifold.hull(items));
+}
+
+/** Create shape from a signed distance function. Positive = inside. */
+export function levelSet(
+  sdf: (point: [number, number, number]) => number,
+  bounds: { min: [number, number, number]; max: [number, number, number] },
+  edgeLength: number,
+  level = 0,
+): Shape {
+  return new Shape(getWasm().Manifold.levelSet(
+    sdf as any,
+    { min: bounds.min, max: bounds.max },
+    edgeLength,
+    level,
+  ));
 }
