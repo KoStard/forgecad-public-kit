@@ -77,6 +77,38 @@ export class Line2D {
     );
   }
 
+  /**
+   * Intersection point of two lines (treating them as infinite lines).
+   * Returns null if lines are parallel.
+   */
+  intersect(other: Line2D): Point2D | null {
+    const x1 = this.start.x, y1 = this.start.y;
+    const x2 = this.end.x, y2 = this.end.y;
+    const x3 = other.start.x, y3 = other.start.y;
+    const x4 = other.end.x, y4 = other.end.y;
+    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (Math.abs(denom) < 1e-12) return null; // parallel
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+    return new Point2D(x1 + t * (x2 - x1), y1 + t * (y2 - y1));
+  }
+
+  /**
+   * Intersection point within both line segments only.
+   * Returns null if segments don't cross.
+   */
+  intersectSegment(other: Line2D): Point2D | null {
+    const x1 = this.start.x, y1 = this.start.y;
+    const x2 = this.end.x, y2 = this.end.y;
+    const x3 = other.start.x, y3 = other.start.y;
+    const x4 = other.end.x, y4 = other.end.y;
+    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (Math.abs(denom) < 1e-12) return null;
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+    if (t < -1e-12 || t > 1 + 1e-12 || u < -1e-12 || u > 1 + 1e-12) return null;
+    return new Point2D(x1 + t * (x2 - x1), y1 + t * (y2 - y1));
+  }
+
   static fromCoordinates(x1: number, y1: number, x2: number, y2: number): Line2D {
     return new Line2D(new Point2D(x1, y1), new Point2D(x2, y2));
   }
@@ -209,6 +241,12 @@ export class Rectangle2D {
       case 'top-right': return tr;
       case 'top-left': return tl;
     }
+  }
+
+  /** Get the two diagonals of this rectangle */
+  diagonals(): [Line2D, Line2D] {
+    const [bl, br, tr, tl] = this.vertices;
+    return [new Line2D(bl, tr), new Line2D(br, tl)];
   }
 
   toSketch(): Sketch {

@@ -545,6 +545,11 @@ l.midpoint;     // Point2D
 l.angle;        // degrees
 l.direction;    // [1, 0]
 l.parallel(10); // offset line
+
+// Line-line intersection (infinite lines)
+const l2 = line(25, -10, 25, 40);
+l.intersect(l2);        // Point2D(25, 0) — treats as infinite lines
+l.intersectSegment(l2); // Point2D or null — only if segments actually cross
 ```
 
 ### Circle2D
@@ -562,6 +567,11 @@ const r = rectangle(0, 0, 100, 60);
 r.side('top');              // Line2D
 r.vertex('bottom-left');    // Point2D
 r.width; r.height; r.center;
+
+// Diagonals — returns [bl-tr, br-tl] as Line2D pair
+const [d1, d2] = r.diagonals();
+const center = d1.intersect(d2);  // Point2D at center
+
 r.toSketch();               // convert to Sketch
 r.extrude(20);              // TrackedShape with named faces/edges
 ```

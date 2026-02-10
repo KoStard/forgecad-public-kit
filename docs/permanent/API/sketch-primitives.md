@@ -43,13 +43,17 @@ const rounded = roundedRect(60, 40, 5);
 ```
 
 ### `polygon(points)`
-Creates a polygon from an array of [x, y] points.
+Creates a polygon from an array of [x, y] points or Point2D objects.
 
 **Parameters:**
-- `points` ([number, number][]) - Array of vertex coordinates
+- `points` (([number, number] | Point2D)[]) - Array of vertex coordinates or Point2D objects
 
 ```javascript
 const triangle = polygon([[0, 0], [50, 0], [25, 40]]);
+
+// Also accepts Point2D objects
+const p1 = point(0, 0), p2 = point(50, 0), p3 = point(25, 40);
+const triangle2 = polygon([p1, p2, p3]);
 ```
 
 ### `ngon(sides, radius)`

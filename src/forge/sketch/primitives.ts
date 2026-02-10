@@ -1,5 +1,6 @@
 import { Sketch } from './core';
 import { getWasm } from '../kernel';
+import type { Point2D } from './entities';
 
 export function rect(width: number, height: number, center = false): Sketch {
   return new Sketch(getWasm().CrossSection.square([width, height], center));
@@ -16,9 +17,13 @@ export function roundedRect(width: number, height: number, radius: number, cente
   return new Sketch(inner.offset(r, 'Round'));
 }
 
-export function polygon(points: [number, number][]): Sketch {
+export function polygon(points: ([number, number] | Point2D)[]): Sketch {
+  // Normalize: accept Point2D or [x, y] tuples
+  const raw: [number, number][] = points.map(p =>
+    Array.isArray(p) ? p : [p.x, p.y] as [number, number]
+  );
   // Auto-fix winding: Manifold needs CCW, so reverse if CW (positive signed area)
-  const pts = [...points];
+  const pts = [...raw];
   let signedArea = 0;
   for (let i = 0; i < pts.length; i++) {
     const [x1, y1] = pts[i];

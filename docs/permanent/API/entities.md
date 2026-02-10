@@ -26,6 +26,11 @@ l.angle;       // degrees
 l.direction;   // [1, 0]
 l.parallel(10); // parallel line offset by 10
 
+// Line-line intersection (infinite lines)
+const l2 = line(25, -10, 25, 40);
+l.intersect(l2);        // Point2D(25, 0) — treats as infinite lines
+l.intersectSegment(l2); // Point2D or null — only if segments actually cross
+
 // Construction methods
 Line2D.fromCoordinates(0, 0, 50, 0);
 Line2D.fromPointAndAngle(point(0, 0), 45, 100);
@@ -73,6 +78,10 @@ r.vertex('bottom-right');  // Point2D
 r.width;   // 100
 r.height;  // 60
 r.center;  // Point2D
+
+// Diagonals — returns [bl-tr, br-tl] as Line2D pair
+const [d1, d2] = r.diagonals();
+const center = d1.intersect(d2);  // Point2D at center
 
 // Convert to Sketch for rendering
 r.toSketch();

@@ -24,7 +24,7 @@ declare function importPart(fileName: string): Shape;
 declare function rect(width: number, height: number, center?: boolean): Sketch;
 declare function circle2d(radius: number, segments?: number): Sketch;
 declare function roundedRect(width: number, height: number, radius: number, center?: boolean): Sketch;
-declare function polygon(points: [number, number][]): Sketch;
+declare function polygon(points: ([number, number] | Point2D)[]): Sketch;
 declare function ngon(sides: number, radius: number): Sketch;
 declare function ellipse(rx: number, ry: number, segments?: number): Sketch;
 declare function slot(length: number, width: number): Sketch;
@@ -119,6 +119,104 @@ declare class ConstrainedSketchBuilder {
   constrain(constraint: { type: string; [key: string]: unknown }): ConstrainedSketchBuilder;
   solve(options?: { iterations?: number; tolerance?: number }): ConstraintSketch;
 }
+
+// --- 2D Entities ---
+declare function point(x: number, y: number): Point2D;
+declare function line(x1: number, y1: number, x2: number, y2: number): Line2D;
+declare function circle(cx: number, cy: number, radius: number): Circle2D;
+declare function rectangle(x: number, y: number, width: number, height: number): Rectangle2D;
+declare function degrees(deg: number): number;
+declare function radians(rad: number): number;
+
+declare class Point2D {
+  readonly x: number;
+  readonly y: number;
+  constructor(x: number, y: number);
+  distanceTo(other: Point2D): number;
+  midpointTo(other: Point2D): Point2D;
+  translate(dx: number, dy: number): Point2D;
+  toTuple(): [number, number];
+}
+
+declare class Line2D {
+  readonly start: Point2D;
+  readonly end: Point2D;
+  constructor(start: Point2D, end: Point2D);
+  readonly length: number;
+  readonly midpoint: Point2D;
+  readonly angle: number;
+  readonly direction: [number, number];
+  parallel(distance: number): Line2D;
+  /** Intersection point treating both as infinite lines. null if parallel. */
+  intersect(other: Line2D): Point2D | null;
+  /** Intersection point within both segments only. null if no crossing. */
+  intersectSegment(other: Line2D): Point2D | null;
+  static fromCoordinates(x1: number, y1: number, x2: number, y2: number): Line2D;
+  static fromPointAndAngle(origin: Point2D, angleDeg: number, length: number): Line2D;
+  static fromPointAndDirection(origin: Point2D, dir: [number, number], length: number): Line2D;
+}
+
+declare class Circle2D {
+  readonly center: Point2D;
+  readonly radius: number;
+  readonly diameter: number;
+  readonly circumference: number;
+  readonly area: number;
+  pointAtAngle(angleDeg: number): Point2D;
+  translate(dx: number, dy: number): Circle2D;
+  toSketch(segments?: number): Sketch;
+  extrude(height: number, segments?: number): TrackedShape;
+  static fromCenterAndRadius(center: Point2D, radius: number): Circle2D;
+  static fromDiameter(center: Point2D, diameter: number): Circle2D;
+}
+
+type RectSide = 'top' | 'bottom' | 'left' | 'right';
+type RectVertex = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+declare class Rectangle2D {
+  readonly vertices: [Point2D, Point2D, Point2D, Point2D];
+  readonly width: number;
+  readonly height: number;
+  readonly center: Point2D;
+  side(name: RectSide): Line2D;
+  sideAt(index: number): Line2D;
+  vertex(name: RectVertex): Point2D;
+  /** Get the two diagonals: [bl-tr, br-tl] */
+  diagonals(): [Line2D, Line2D];
+  toSketch(): Sketch;
+  translate(dx: number, dy: number): Rectangle2D;
+  extrude(height: number, up?: boolean): TrackedShape;
+  static fromDimensions(x: number, y: number, width: number, height: number): Rectangle2D;
+  static fromCenterAndDimensions(center: Point2D, width: number, height: number): Rectangle2D;
+  static from2Corners(p1: Point2D, p2: Point2D): Rectangle2D;
+  static from3Points(p1: Point2D, p2: Point2D, p3: Point2D): Rectangle2D;
+}
+
+declare class TrackedShape {
+  face(name: string): { normal: [number, number, number]; center: [number, number, number] };
+  edge(name: string): { start: [number, number, number]; end: [number, number, number] };
+  faceNames(): string[];
+  edgeNames(): string[];
+  translate(dx: number, dy: number, dz: number): TrackedShape;
+  rotateAroundEdge(edgeName: string, angleDeg: number): TrackedShape;
+  toShape(): Shape;
+}
+
+// --- Patterns ---
+declare function linearPattern(shape: Shape, count: number, dx: number, dy: number, dz?: number): Shape;
+declare function circularPattern(shape: Shape, count: number, centerX?: number, centerY?: number): Shape;
+declare function mirrorCopy(shape: Shape, normal: [number, number, number]): Shape;
+
+// --- Fillets & Chamfers ---
+declare function filletEdge(shape: TrackedShape, edge: any, radius: number, quadrant?: [number, number], segments?: number): TrackedShape;
+declare function chamferEdge(shape: TrackedShape, edge: any, size: number, quadrant?: [number, number]): TrackedShape;
+
+// --- Arc Bridge ---
+declare function arcBridgeBetweenRects(rectA: any, rectB: any, segments?: number): Shape;
+
+// --- 3D Advanced ---
+declare function hull3d(...args: (Shape | [number, number, number])[]): Shape;
+declare function levelSet(sdf: (p: [number, number, number]) => number, bounds: { min: [number, number, number]; max: [number, number, number] }, edgeLength: number, level?: number): Shape;
 
 declare const lib: {
   boltHole(diameter: number, depth: number): Shape;
