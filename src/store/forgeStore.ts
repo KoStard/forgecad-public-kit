@@ -577,33 +577,61 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         return;
       }
       const serverFiles: Record<string, string> = await response.json();
-      const { files, activeFile } = get();
-      
-      // Merge server files with current files
-      // Preserve any unsaved changes in current files
-      const mergedFiles: Record<string, string> = { ...files };
-      const newFolders = new Set<string>();
-      
-      Object.keys(serverFiles).forEach((path) => {
-        // Only add new files from server, don't overwrite existing unsaved changes
-        if (!(path in mergedFiles)) {
-          mergedFiles[path] = serverFiles[path];
+      const { files, savedFiles, activeFile } = get();
+
+      const dirtyFiles = new Set<string>();
+      Object.keys(files).forEach((path) => {
+        if (!(path in savedFiles) || savedFiles[path] !== files[path]) {
+          dirtyFiles.add(path);
         }
-        // Collect folder paths
+      });
+
+      const nextFiles: Record<string, string> = {};
+      const nextSaved: Record<string, string> = {};
+      const newFolders = new Set<string>();
+
+      Object.keys(serverFiles).forEach((path) => {
+        if (dirtyFiles.has(path)) {
+          nextFiles[path] = files[path];
+          if (path in savedFiles) nextSaved[path] = savedFiles[path];
+        } else {
+          nextFiles[path] = serverFiles[path];
+          nextSaved[path] = serverFiles[path];
+        }
         collectParentPaths(path).forEach((folder) => newFolders.add(folder));
       });
-      
-      // Check if active file still exists
-      const availableFiles = Object.keys(mergedFiles);
-      const newActiveFile = activeFile && mergedFiles[activeFile] 
-        ? activeFile 
-        : (availableFiles.find((n) => n.endsWith('.forge.js')) || availableFiles[0]);
-      
-      set({ 
-        files: mergedFiles, 
-        folders: Array.from(newFolders).sort(),
-        activeFile: newActiveFile 
+
+      // Keep locally modified files that no longer exist on disk
+      Object.keys(files).forEach((path) => {
+        if (path in nextFiles) return;
+        if (!dirtyFiles.has(path)) return;
+        nextFiles[path] = files[path];
+        if (path in savedFiles) nextSaved[path] = savedFiles[path];
+        collectParentPaths(path).forEach((folder) => newFolders.add(folder));
       });
+
+      const hashFile = getActiveFileFromHash();
+      const availableFiles = Object.keys(nextFiles);
+      const newActiveFile = (hashFile && nextFiles[hashFile])
+        ? hashFile
+        : (activeFile && nextFiles[activeFile]
+          ? activeFile
+          : (availableFiles.find((n) => n.endsWith('.forge.js')) || availableFiles[0]));
+
+      const nextDirty = Object.keys(nextFiles).some((path) => nextSaved[path] !== nextFiles[path]);
+
+      set({
+        files: nextFiles,
+        savedFiles: nextSaved,
+        folders: Array.from(newFolders).sort(),
+        activeFile: newActiveFile,
+        dirty: nextDirty,
+      });
+
+      if (newActiveFile && newActiveFile !== activeFile) {
+        window.history.replaceState(null, '', `#${newActiveFile}`);
+        setTimeout(() => get().execute(), 0);
+      }
     } catch (e) {
       console.error('Error refreshing files:', e);
     }
