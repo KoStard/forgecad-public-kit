@@ -37,37 +37,24 @@ const arm = box(width, thick, hookDrop)
   .translate(0, clampDepth * 0.6 - thick, armTop - hookDrop);
 
 // --- Hook (curved part at bottom) ---
-// Approximate the curve with a few angled segments
+// Use revolve to make a clean quarter-torus for the curve
 const hookZ = armTop - hookDrop;
-const hookSegments = 8;
-const hookParts = [];
+const armY = clampDepth * 0.6 - thick;
 
-// Curved section — quarter circle going from vertical to horizontal
-for (let i = 0; i < hookSegments; i++) {
-  const a0 = (i / hookSegments) * Math.PI / 2;
-  const a1 = ((i + 1) / hookSegments) * Math.PI / 2;
-  const x0 = Math.sin(a0) * hookCurveR;
-  const z0 = -Math.cos(a0) * hookCurveR;
-  const x1 = Math.sin(a1) * hookCurveR;
-  const z1 = -Math.cos(a1) * hookCurveR;
-
-  // Each segment is a small box rotated to follow the arc
-  const segLen = Math.sqrt((x1 - x0) ** 2 + (z1 - z0) ** 2);
-  const segAngle = Math.atan2(x1 - x0, -(z1 - z0)) * 180 / Math.PI;
-  const seg = box(width, thick, segLen + 0.5)
-    .translate(-width / 2, -thick / 2, 0)
-    .rotate(segAngle, 0, 0)
-    .translate(
-      width / 2,
-      clampDepth * 0.6 - thick + thick / 2 + x0,
-      hookZ + z0
-    );
-  hookParts.push(seg);
-}
+// Quarter-torus: revolve a rect(width x thick) around an axis at hookCurveR distance
+// The profile sits at X = hookCurveR (distance from revolution axis = Y)
+// revolve() goes around Y axis, so profile X = radial, profile Y = height
+const curveProfile = rect(thick, width).translate(hookCurveR, 0);
+const curvePiece = curveProfile.revolve(90, 24)
+  // revolve produces shape around Y axis; rotate to align:
+  // we need the arc to go from -Z (down) to +Y (forward)
+  .rotate(90, 0, 90)   // align width along X
+  .rotate(180, 0, 0)  // flip so arc opens downward-to-forward
+  .translate(0, clampDepth * 0.6 + hookCurveR, hookZ);
 
 // Straight hook tip extending forward
-const tipY = clampDepth * 0.6 - thick + thick / 2 + hookCurveR;
-const tipZ = hookZ - hookCurveR;
+const tipY = armY + thick + hookCurveR;
+const tipZ = hookZ - hookCurveR - thick;
 const hookTip = box(width, hookLen - hookCurveR, thick)
   .translate(0, tipY, tipZ);
 
@@ -90,7 +77,7 @@ if (boltHoleD > 0) {
 }
 
 // --- Assembly ---
-let clamp = union(topJaw, backWall, bottomJaw, arm, ...hookParts, hookTip, hookLip);
+let clamp = union(topJaw, backWall, bottomJaw, arm, curvePiece, hookTip, hookLip);
 if (boltHoles.length > 0) {
   clamp = clamp.subtract(union(...boltHoles));
 }
