@@ -719,6 +719,75 @@ my-project/
 └── assembly.forge.js          ← imports multiple parts, positions them
 ```
 
+## Part Library
+
+Pre-built parametric parts available via `lib.xxx()`. No imports needed.
+
+### `lib.boltHole(diameter, depth)`
+Through-hole cylinder (centered).
+
+### `lib.counterbore(holeDia, boreDia, boreDepth, totalDepth)`
+Through-hole with wider recess at top.
+
+### `lib.tube(outerX, outerY, outerZ, wall)`
+Rectangular hollow tube.
+
+### `lib.pipe(height, outerRadius, wall, segments?)`
+Hollow cylinder.
+
+### `lib.hexNut(acrossFlats, height, holeDia)`
+Hex nut via intersection of 3 rotated slabs, with center bore.
+
+### `lib.roundedBox(x, y, z, radius)`
+Approximate rounded box via union of axis-aligned slabs.
+
+### `lib.bracket(width, height, depth, thick, holeDia?)`
+L-shaped mounting bracket with optional holes.
+
+### `lib.holePattern(rows, cols, spacingX, spacingY, holeDia, depth)`
+Grid of cylindrical holes.
+
+### `lib.thread(diameter, pitch, length, options?)`
+External thread (helical ridge) via SDF levelSet. Returns a threaded cylinder along +Z.
+
+**Options:**
+- `depth` (number) - Thread depth. Default: `pitch * 0.35`
+- `edgeLength` (number) - Mesh resolution. Default: `pitch * 0.4`
+
+```javascript
+const m8thread = lib.thread(8, 1.25, 30);
+const fine = lib.thread(8, 1.0, 30, { edgeLength: 0.3 });
+```
+
+### `lib.bolt(diameter, length, options?)`
+Hex bolt with real helical threads. Head at z=0, shaft extends along −Z.
+
+**Options:**
+- `pitch` (number) - Thread pitch. Default: `diameter * 0.15`
+- `headHeight` (number) - Default: `diameter * 0.65`
+- `headAcrossFlats` (number) - Default: `diameter * 1.6`
+- `threadLength` (number) - Threaded portion. Default: full length
+- `edgeLength` (number) - Mesh resolution. Default: `pitch * 0.4`
+
+```javascript
+const m8bolt = lib.bolt(8, 30);
+const custom = lib.bolt(10, 40, { pitch: 1.5, headHeight: 7 });
+```
+
+### `lib.nut(diameter, options?)`
+Hex nut with bore, centered at origin.
+
+**Options:**
+- `pitch` (number) - Default: `diameter * 0.15`
+- `height` (number) - Default: `diameter * 0.8`
+- `acrossFlats` (number) - Default: `diameter * 1.6`
+- `edgeLength` (number) - Mesh resolution
+
+```javascript
+const m8nut = lib.nut(8);
+const m8nut2 = lib.nut(8, { height: 6.5, acrossFlats: 13 });
+```
+
 ## Common Patterns
 
 ### Parametric Box with Holes
