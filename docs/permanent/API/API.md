@@ -170,6 +170,46 @@ Mirrors across a plane defined by its normal vector.
 const mirrored = shape.mirror([1, 0, 0]);  // Mirror across YZ plane
 ```
 
+### `.rotateAround(axis, angleDeg, pivot?)`
+Rotates around an arbitrary axis through a pivot point.
+
+**Parameters:**
+- `axis` ([number, number, number]) - Rotation axis direction
+- `angleDeg` (number) - Rotation angle in degrees
+- `pivot` ([number, number, number], optional) - Pivot point. Default: origin
+
+```javascript
+// Rotate a door 45° around Z axis at the hinge position
+const opened = door.rotateAround([0, 0, 1], 45, [hingeX, hingeY, 0]);
+```
+
+## Joints
+
+### `joint(name, shape, pivot, opts?)`
+Create a revolute (hinge) joint. Auto-creates a param slider and rotates the shape.
+
+**Parameters:**
+- `name` (string) - Display name for the angle parameter
+- `shape` (Shape) - The shape to rotate
+- `pivot` ([number, number, number]) - The pivot point
+- `opts` (object, optional):
+  - `axis` ([number, number, number]) - Rotation axis. Default: [0, 0, 1] (Z axis)
+  - `min` (number) - Minimum angle. Default: 0
+  - `max` (number) - Maximum angle. Default: 180
+  - `default` (number) - Initial angle. Default: 0
+  - `unit` (string) - Display unit. Default: "°"
+
+**Returns:** `Shape` (rotated by the current slider value)
+
+```javascript
+// One line: creates a "Lid Angle" slider and rotates the lid around the hinge
+const openLid = joint("Lid Angle", lid, [0, boxDepth, boxHeight], {
+  axis: [1, 0, 0],
+  max: 120,
+  default: 45,
+});
+```
+
 ## 3D Boolean Operations
 
 ### `union(...shapes)`
