@@ -9,7 +9,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "render": "node cli/forge-render.mjs",
-    "svg": "node cli/forge-svg.mjs"
+    "svg": "npx tsx cli/forge-svg.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -27,6 +27,7 @@
     "@types/three": "^0.175.0",
     "@vitejs/plugin-react": "^4.5.2",
     "puppeteer-core": "^24.37.2",
+    "tsx": "^4.19.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
   }

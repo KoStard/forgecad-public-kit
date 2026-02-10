@@ -36,13 +36,44 @@ declare function hull2d(...sketches: Sketch[]): Sketch;
 declare function constrainedSketch(): ConstrainedSketchBuilder;
 
 declare class Shape {
+  // Transforms
   translate(x: number, y: number, z: number): Shape;
   rotate(x: number, y: number, z: number): Shape;
   scale(v: number | [number, number, number]): Shape;
   mirror(normal: [number, number, number]): Shape;
+  transform(m: number[]): Shape;  // 4x4 column-major matrix
+
+  // Booleans
   add(other: Shape): Shape;
   subtract(other: Shape): Shape;
   intersect(other: Shape): Shape;
+
+  // Smoothing
+  smoothOut(minSharpAngle?: number, minSmoothness?: number): Shape;
+  refine(n: number): Shape;
+  refineToLength(length: number): Shape;
+  refineToTolerance(tolerance: number): Shape;
+
+  // Cutting
+  split(cutter: Shape): [Shape, Shape];
+  splitByPlane(normal: [number, number, number], offset?: number): [Shape, Shape];
+  trimByPlane(normal: [number, number, number], offset?: number): Shape;
+  hull(): Shape;
+
+  // Deformation
+  warp(fn: (vert: [number, number, number]) => void): Shape;
+  simplify(tolerance?: number): Shape;
+
+  // Color
+  color(hex: string): Shape;
+
+  // Query
+  volume(): number;
+  surfaceArea(): number;
+  boundingBox(): { min: number[]; max: number[] };
+  isEmpty(): boolean;
+  numTri(): number;
+  minGap(other: Shape, searchLength: number): number;
 }
 
 declare class Sketch {

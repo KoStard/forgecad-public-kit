@@ -4,6 +4,8 @@
 
 ## Methods
 
+All operations preserve the sketch's color.
+
 ### `.offset(delta, join?)`
 Inflate (positive) or deflate (negative) the contour.
 

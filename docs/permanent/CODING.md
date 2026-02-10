@@ -10,14 +10,65 @@ npm run build        # Production build
 npm run preview      # Preview production build
 ```
 
+### CLI Tools
+```bash
+npm run svg -- examples/frame.sketch.js          # Export sketch to SVG (Node, no browser)
+npm run render -- examples/cup.forge.js           # Render to PNG (Puppeteer + Chrome)
+```
+
+See [CLI.md](CLI.md) for full CLI documentation.
+
 ### Project Structure
 ```
 src/
-├── forge/           # Core geometry kernel & API
-├── components/      # React UI components
-├── store/           # Zustand state management
-├── examples/        # Example CAD scripts
-└── App.tsx          # Main application
+├── forge/                # Core geometry engine (shared by browser + CLI)
+│   ├── kernel.ts         # Manifold WASM wrapper, Shape class, primitives
+│   ├── headless.ts       # Single entry point for all contexts (browser + Node CLI)
+│   ├── index.ts          # Browser entry point (re-exports from headless.ts)
+│   ├── runner.ts         # Script sandbox — executes user .forge.js/.sketch.js
+│   ├── params.ts         # Parameter system (param() → UI sliders)
+│   ├── library.ts        # Part library (lib.boltHole, lib.pipe, etc.)
+│   ├── section.ts        # Plane intersection / projection
+│   ├── meshToGeometry.ts # Manifold mesh → Three.js BufferGeometry
+│   ├── sceneBuilder.ts   # Three.js scene setup (shared with CLI renderer)
+│   └── sketch/           # 2D sketch system
+│       ├── core.ts       # Sketch class
+│       ├── primitives.ts # rect, circle2d, polygon, ngon, etc.
+│       ├── transforms.ts # translate, rotate, scale, mirror
+│       ├── booleans.ts   # add, subtract, intersect, union2d, hull2d
+│       ├── operations.ts # offset, hull, simplify, warp
+│       ├── extrude.ts    # extrude, revolve (2D → 3D)
+│       ├── path.ts       # PathBuilder, stroke
+│       ├── anchor.ts     # attachTo positioning
+│       ├── constraints.ts # Constraint solver (18 types)
+│       ├── entities.ts   # Point2D, Line2D, Circle2D, Rectangle2D, Constraint helpers
+│       ├── topology.ts   # TrackedShape, face/edge naming
+│       ├── patterns.ts   # linearPattern, circularPattern, mirrorCopy
+│       ├── fillets.ts    # filletEdge, chamferEdge
+│       ├── arcBridge.ts  # arcBridgeBetweenRects
+│       └── index.ts      # Re-exports everything
+├── components/           # React UI components
+│   ├── Viewport.tsx      # 3D viewport (Three.js + R3F)
+│   ├── CodeEditor.tsx    # Monaco editor with ForgeCAD types
+│   ├── FileExplorer.tsx  # Project file tree
+│   ├── ViewPanel.tsx     # Render mode, views, object settings
+│   ├── ParamPanel.tsx    # Parameter sliders
+│   └── ExportPanel.tsx   # STL export
+├── store/
+│   └── forgeStore.ts     # Zustand global state
+├── App.tsx               # Main application shell
+└── main.tsx              # React entry point
+
+cli/
+├── forge-svg.ts          # SVG export (uses real engine via headless.ts)
+├── forge-svg.mjs         # Legacy wrapper (redirects to .ts version)
+├── forge-render.mjs      # PNG render launcher (Puppeteer)
+├── render.ts             # Headless render entry (loaded in browser by Puppeteer)
+└── render.html           # HTML shell for headless render
+
+examples/                 # Example scripts
+├── *.forge.js            # 3D part examples
+└── *.sketch.js           # 2D sketch examples
 ```
 
 ## Coding Standards
@@ -133,19 +184,42 @@ Before committing UI changes:
 
 ## Common Patterns
 
-### Adding a New Primitive
-1. Add function to `forge/primitives.ts`
-2. Export from `forge/index.ts`
-3. Update examples if useful
-4. Commit: "Add [primitive] geometry primitive"
+### Adding a New Sketch Primitive
+1. Add function to `src/forge/sketch/primitives.ts`
+2. It's auto-exported via `sketch/index.ts` → `headless.ts` → `index.ts`
+3. Add it to the sandbox in `src/forge/runner.ts` (both the `new Function()` args and the call)
+4. Add TypeScript hints in `src/components/CodeEditor.tsx` (`FORGE_TYPES`)
+5. Update `docs/permanent/API/sketch-primitives.md`
+6. Commit: "Add [primitive] sketch primitive"
+
+### Adding a New 3D Primitive
+1. Add function to `src/forge/kernel.ts`
+2. Export from `headless.ts`
+3. Add to runner sandbox in `src/forge/runner.ts`
+4. Add TypeScript hints in `src/components/CodeEditor.tsx`
+5. Update `docs/permanent/API/API.md`
+6. Commit: "Add [primitive] 3D primitive"
+
+### Adding a New CLI Command
+1. Create `cli/your-command.ts`
+2. Import from `../src/forge/headless`
+3. Call `await init()` then use `runScript()`
+4. Add script to `package.json`
+5. Update `docs/permanent/CLI.md`
+6. Commit: "Add [command] CLI command"
 
 ### Adding UI State
-1. Add to `forgeStore.ts` interface
+1. Add to `src/store/forgeStore.ts` interface
 2. Add initial value and actions
 3. Wire up to component
 4. Commit: "Add [feature] UI state"
 
 ### Adding a Component
-1. Create in `components/`
+1. Create in `src/components/`
 2. Import and use in `App.tsx` or parent
 3. Commit: "Add [Component] component"
+
+### Key Architecture Rule: Single Source of Truth
+All geometry logic lives in `src/forge/`. CLI tools import from `src/forge/headless.ts`.
+**Never** duplicate forge logic in CLI scripts. If you need something in CLI, make sure
+it's exported from `headless.ts` and import it.

@@ -70,3 +70,15 @@ const hull = hull2d(
   circle2d(10).translate(25, 40)
 );
 ```
+
+## Performance Note
+
+The multi-argument functions (`union2d`, `difference2d`, `intersection2d`) use Manifold's batch operations internally, which are faster than chaining `.add()` / `.subtract()` calls one by one. Prefer them when combining many sketches.
+
+```javascript
+// Fast — single batch operation
+const combined = union2d(s1, s2, s3, s4, s5);
+
+// Slower — sequential pairwise operations
+const combined = s1.add(s2).add(s3).add(s4).add(s5);
+```

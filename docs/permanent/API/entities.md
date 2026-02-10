@@ -192,6 +192,16 @@ const half = box(50, 30, 10);
 const full = mirrorCopy(half, [1, 0, 0]);  // Mirror across YZ plane
 ```
 
+## Utility Functions
+
+### `degrees(deg)` / `radians(rad)`
+Angle conversion helpers for readability:
+
+```javascript
+degrees(45);              // 45 (identity — just for clarity)
+radians(Math.PI / 4);    // 45 (converts radians to degrees)
+```
+
 ## Fillets & Chamfers
 
 ### `filletEdge(shape, edge, radius, quadrant?, segments?)`
@@ -213,35 +223,27 @@ const chamfered = chamferEdge(b, b.edge('vert-br'), 3, [-1, -1]);
 ## Arc Bridge
 
 ### `arcBridgeBetweenRects(rectA, rectB, segments?)`
-Build a smooth arc surface connecting two rectangular areas. The function finds the closest pair of parallel edges (the "inner" edges) and bridges them with a semicircular arc, extruded along their overlapping direction.
+Build a smooth arc surface connecting two rectangular areas. Automatically finds the closest pair of parallel edges and bridges them with a semicircular arc.
 
-Both inputs can be:
-- A 2D `Rectangle2D` (assumed to lie on `z = 0`), or
-- A 3D rectangle area with explicit corners:
-  - `{ corners: [bl, br, tr, tl] }` where each corner is `[x, y, z]`
+**Parameters:**
+- `rectA` — `Rectangle2D` or `{ corners: [[x,y,z], [x,y,z], [x,y,z], [x,y,z]] }`
+- `rectB` — same format as rectA
+- `segments` (number, optional) — Arc smoothness. Default: 12
+
+**Returns:** `Shape` — thin arc solid
 
 ```javascript
-// Laptop hinge example (2D rectangles at z=0)
-const baseArea = rectangle(0, 0, 300, 200);
-const screenArea = rectangle(0, 200, 300, 200);
-
-const hinge = arcBridgeBetweenRects(baseArea, screenArea, 16);
+// 2D rectangles (z=0)
+const base = rectangle(0, 0, 300, 200);
+const screen = rectangle(0, 200, 300, 200);
+const hinge = arcBridgeBetweenRects(base, screen, 16);
 ```
 
 ```javascript
-// 3D rectangle areas with explicit corners
-const baseArea = {
-  corners: [
-    [0, 0, 0],   [300, 0, 0],
-    [300, 200, 0], [0, 200, 0],
-  ],
-};
-const screenArea = {
-  corners: [
-    [0, 200, 15], [300, 200, 15],
-    [300, 400, 15], [0, 400, 15],
-  ],
-};
-
-const hinge = arcBridgeBetweenRects(baseArea, screenArea, 16);
+// 3D corners for non-planar rectangles
+const hinge = arcBridgeBetweenRects(
+  { corners: [[0,0,0], [300,0,0], [300,200,0], [0,200,0]] },
+  { corners: [[0,200,15], [300,200,15], [300,400,15], [0,400,15]] },
+  16,
+);
 ```

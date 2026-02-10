@@ -1,6 +1,6 @@
 # Sketch Extrude & Revolve
 
-Convert 2D sketches into 3D shapes through extrusion or revolution.
+Convert 2D sketches into 3D shapes through extrusion or revolution. The sketch's color (if set) is carried over to the resulting Shape.
 
 ## Methods
 

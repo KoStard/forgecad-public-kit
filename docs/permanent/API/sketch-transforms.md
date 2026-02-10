@@ -1,6 +1,6 @@
 # Sketch Transforms
 
-2D transformations for sketches. All transforms are **chainable** and **immutable** (return new sketches).
+2D transformations for sketches. All transforms are **chainable** and **immutable** (return new sketches). Colors are preserved through all transforms.
 
 ## Methods
 

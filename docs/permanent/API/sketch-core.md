@@ -6,6 +6,18 @@ The `Sketch` class is an immutable wrapper around Manifold's `CrossSection` that
 
 Represents a 2D profile that can be transformed, combined with other sketches, or converted to 3D.
 
+### Color
+
+#### `.color(hex: string): Sketch`
+Set the display color of this sketch. Returns a new Sketch.
+
+```javascript
+const red = rect(50, 30).color('#ff0000');
+const blue = circle2d(25).color('#0066ff');
+```
+
+Colors are preserved through transforms and boolean operations.
+
 ### Query Methods
 
 #### `.area(): number`

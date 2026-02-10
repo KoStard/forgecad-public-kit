@@ -7,10 +7,7 @@
  */
 
 import * as THREE from 'three';
-import { initKernel } from '../src/forge/kernel';
-import { runScript } from '../src/forge/runner';
-import { shapeToGeometry } from '../src/forge/meshToGeometry';
-import { buildScene } from '../src/forge/sceneBuilder';
+import { init, runScript, shapeToGeometry, buildScene } from '../src/forge/headless';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
@@ -59,8 +56,8 @@ function renderFromAngle(
   return canvas.toDataURL('image/png');
 }
 
-async function init() {
-  await initKernel();
+async function setup() {
+  await init();
   (window as any).__forgeReady = true;
 }
 
@@ -127,4 +124,4 @@ async function init() {
   };
 };
 
-init();
+setup();

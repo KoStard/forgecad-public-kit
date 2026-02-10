@@ -4,7 +4,7 @@
 
 ## Core Concepts
 
-ForgeCAD scripts are JavaScript/TypeScript code that returns a 3D shape. The forge API is globally available.
+ForgeCAD scripts are JavaScript code that returns geometry. The forge API is globally available — no imports needed.
 
 ### Basic Structure
 ```javascript
@@ -20,9 +20,21 @@ return shape;
 
 ### Execution Model
 - Scripts execute on every parameter change (400ms debounce)
-- All operations are **immutable** - they return new shapes
-- The returned shape is rendered in the 3D viewport
-- Must return a `Shape` object (3D) or `Sketch` (2D that gets auto-extruded)
+- All operations are **immutable** — they return new shapes, never modify in place
+- Must return one of:
+  - A `Shape` (3D solid)
+  - A `Sketch` (2D profile — rendered flat on XY plane)
+  - A `TrackedShape` (3D solid with named faces/edges — auto-unwrapped)
+  - An `Array` of shapes/sketches (multi-object scene)
+  - An `Array` of `{ name, shape?, sketch?, color? }` objects (named multi-object scene)
+
+### Coordinate System
+ForgeCAD uses **Z-up** right-handed coordinates:
+- **X** = left/right
+- **Y** = forward/back
+- **Z** = up/down
+
+See [coordinate-system.md](coordinate-system.md) for view mapping details.
 
 ## Parameters
 
@@ -45,6 +57,26 @@ Declares a parameter and creates a UI slider.
 const width = param("Width", 50);
 const angle = param("Angle", 45, { min: 0, max: 180, unit: "°" });
 const thick = param("Thickness", 2, { min: 0.5, max: 10, step: 0.5, unit: "mm" });
+```
+
+## Colors
+
+Both Shape and Sketch support colors via `.color()`:
+
+```javascript
+const red = box(50, 50, 50).color('#ff0000');
+const blue = circle2d(25).color('#0066ff');
+```
+
+Colors are preserved through transforms and boolean operations (the first operand's color wins).
+
+When returning multiple objects, colors can also be set per-object:
+
+```javascript
+return [
+  { name: "Base", shape: box(100, 100, 5), color: "#888888" },
+  { name: "Column", shape: cylinder(50, 10).translate(50, 50, 5), color: "#4488cc" },
+];
 ```
 
 ## 3D Primitives
@@ -179,6 +211,80 @@ Shapes also have boolean methods:
 shape.add(other)       // Same as union(shape, other)
 shape.subtract(other)  // Same as difference(shape, other)
 shape.intersect(other) // Same as intersection(shape, other)
+```
+
+## Advanced 3D Operations
+
+### `hull3d(...args)`
+Convex hull of multiple shapes and/or points.
+
+```javascript
+const hull = hull3d(
+  sphere(10),
+  sphere(10).translate(50, 0, 0),
+  [25, 0, 30],  // bare point
+);
+```
+
+### `levelSet(sdf, bounds, edgeLength, level?)`
+Create a shape from a signed distance function (SDF). Positive = inside.
+
+```javascript
+const gyroid = levelSet(
+  ([x, y, z]) => Math.sin(x) * Math.cos(y) + Math.sin(y) * Math.cos(z) + Math.sin(z) * Math.cos(x),
+  { min: [-10, -10, -10], max: [10, 10, 10] },
+  0.5,  // edge length (resolution)
+);
+```
+
+### Smoothing
+
+```javascript
+// Mark edges for smoothing, then subdivide
+const smooth = box(50, 50, 50, true)
+  .smoothOut(60)     // edges sharper than 60° get smoothed
+  .refine(4);        // subdivide 4 times
+
+// Or refine by edge length / tolerance
+shape.refineToLength(2);      // max edge length 2mm
+shape.refineToTolerance(0.1); // max deviation 0.1mm from smooth surface
+```
+
+### Cutting
+
+```javascript
+// Split by another shape → [inside, outside]
+const [inside, outside] = shape.split(cutter);
+
+// Split by infinite plane → [below, above]
+const [below, above] = shape.splitByPlane([0, 0, 1], 10);  // Z=10 plane
+
+// Trim: keep only one side
+const trimmed = shape.trimByPlane([0, 0, 1], 10);
+```
+
+### Warping
+
+```javascript
+// Deform vertices with arbitrary function
+const warped = box(50, 50, 50, true).warp(([x, y, z]) => {
+  // Twist around Z axis
+  const angle = z * 0.05;
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const nx = x * cos - y * sin;
+  const ny = x * sin + y * cos;
+  return [nx, ny, z];
+});
+```
+
+### Plane Operations
+
+```javascript
+// Cross-section: intersect shape with a plane → Sketch
+const section = intersectWithPlane(shape, { plane: 'XY', offset: 10 });
+
+// Project: flatten shape onto a plane → Sketch
+const shadow = projectToPlane(shape, { origin: [0, 0, 0], normal: [0, 0, 1] });
 ```
 
 ## 2D Sketches
@@ -418,6 +524,148 @@ const vase = profile.revolve();
 const partial = rect(5, 40).translate(20, 0).revolve(270);
 ```
 
+## Named Entities & Topology
+
+ForgeCAD provides first-class geometric entities with stable identity and named parts.
+
+### Point2D
+```javascript
+const p = point(10, 20);
+p.distanceTo(point(30, 40));
+p.midpointTo(point(30, 40));
+p.translate(5, 5);
+p.toTuple();  // [10, 20]
+```
+
+### Line2D
+```javascript
+const l = line(0, 0, 50, 0);
+l.length;       // 50
+l.midpoint;     // Point2D
+l.angle;        // degrees
+l.direction;    // [1, 0]
+l.parallel(10); // offset line
+```
+
+### Circle2D
+```javascript
+const c = circle(0, 0, 25);
+c.diameter;          // 50
+c.pointAtAngle(90);  // Point2D at top
+c.toSketch();        // convert to Sketch
+c.extrude(30);       // TrackedShape with top/bottom/side faces
+```
+
+### Rectangle2D
+```javascript
+const r = rectangle(0, 0, 100, 60);
+r.side('top');              // Line2D
+r.vertex('bottom-left');    // Point2D
+r.width; r.height; r.center;
+r.toSketch();               // convert to Sketch
+r.extrude(20);              // TrackedShape with named faces/edges
+```
+
+### TrackedShape (3D with topology)
+```javascript
+const box = rectangle(0, 0, 100, 60).extrude(20);
+
+box.face('top');           // FaceRef { normal, center }
+box.face('side-left');     // side face from rect's left edge
+box.edge('vert-bl');       // vertical edge at bottom-left corner
+box.faceNames();           // all face names
+box.edgeNames();           // all edge names
+
+box.translate(50, 0, 0);  // preserves topology
+box.rotateAroundEdge('top-bottom', 90);  // rotate around named edge
+box.toShape();             // unwrap to plain Shape for booleans
+```
+
+### Utility Functions
+```javascript
+degrees(45);    // 45 (identity — for readability)
+radians(Math.PI / 4);  // 45 (converts radians to degrees)
+```
+
+## Patterns
+
+### `linearPattern(shape, count, dx, dy, dz?)`
+Repeat a shape along a direction vector.
+
+```javascript
+const row = linearPattern(cylinder(10, 3), 5, 20, 0);
+```
+
+### `circularPattern(shape, count, centerX?, centerY?)`
+Repeat a shape around the Z axis.
+
+```javascript
+const holes = circularPattern(cylinder(12, 4).translate(30, 0, -1), 8);
+```
+
+### `mirrorCopy(shape, normal)`
+Mirror and union with original.
+
+```javascript
+const full = mirrorCopy(box(50, 30, 10), [1, 0, 0]);
+```
+
+## Fillets & Chamfers
+
+Approximate fillets and chamfers for vertical edges using topology references.
+
+### `filletEdge(shape, edge, radius, quadrant?, segments?)`
+```javascript
+const b = rectangle(0, 0, 50, 50).extrude(20);
+const filleted = filletEdge(b, b.edge('vert-br'), 5, [-1, -1]);
+```
+
+### `chamferEdge(shape, edge, size, quadrant?)`
+```javascript
+const chamfered = chamferEdge(b, b.edge('vert-br'), 3, [-1, -1]);
+```
+
+The `quadrant` parameter `[signX, signY]` indicates which direction the material is relative to the edge. `[-1, -1]` means material is in the −X, −Y direction.
+
+## Arc Bridge
+
+### `arcBridgeBetweenRects(rectA, rectB, segments?)`
+Build a smooth arc surface connecting two rectangular areas via their closest parallel edges.
+
+```javascript
+const base = rectangle(0, 0, 300, 200);
+const screen = rectangle(0, 200, 300, 200);
+const hinge = arcBridgeBetweenRects(base, screen, 16);
+```
+
+## Constrained Sketches
+
+Declarative constraint-based 2D sketching with automatic solving.
+
+```javascript
+const sketch = constrainedSketch();
+const p1 = sketch.point(0, 0, true);  // fixed point
+const p2 = sketch.point(50, 0);
+const p3 = sketch.point(50, 30);
+const l1 = sketch.line(p1, p2);
+const l2 = sketch.line(p2, p3);
+
+sketch.close();
+
+Constraint.horizontal(sketch, l1);
+Constraint.vertical(sketch, l2);
+Constraint.length(sketch, l1, 50);
+
+const result = sketch.solve();
+// result is a ConstraintSketch (extends Sketch)
+// result.constraintMeta.status → 'under' | 'fully' | 'over'
+```
+
+### Available Constraints
+`Constraint.horizontal`, `Constraint.vertical`, `Constraint.makeParallel`, `Constraint.perpendicular`, `Constraint.equalLength`, `Constraint.distance`, `Constraint.length`, `Constraint.enforceAngle`, `Constraint.fix`, `Constraint.coincident`
+
+Constraints accept both string IDs and entity objects (Point2D, Line2D) — entities are auto-imported into the builder.
+
 ## Multi-File Projects
 
 ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.js`, return a `Sketch`) or **parts** (`.forge.js`, return a `Shape`).
@@ -546,17 +794,42 @@ return part.subtract(chamfer);
 
 ### 3D Shape Queries
 ```javascript
-shape.volume()        // Returns volume in mm³
-shape.boundingBox()   // Returns { min: [x,y,z], max: [x,y,z] }
+shape.volume()           // Volume in mm³
+shape.surfaceArea()      // Surface area in mm²
+shape.boundingBox()      // { min: [x,y,z], max: [x,y,z] }
+shape.isEmpty()          // true if no geometry
+shape.numTri()           // Triangle count
+shape.minGap(other, 50)  // Minimum distance to another shape (within search radius)
 ```
 
 ### 2D Sketch Queries
 ```javascript
-sketch.area()         // Returns area
-sketch.bounds()       // Returns bounding box
-sketch.isEmpty()      // Returns boolean
-sketch.numVert()      // Returns vertex count
+sketch.area()         // Area in mm²
+sketch.bounds()       // { min: [x,y], max: [x,y] }
+sketch.isEmpty()      // true if no area
+sketch.numVert()      // Vertex count
 ```
+
+## Returning Multiple Objects
+
+Scripts can return arrays to display multiple objects in the viewport:
+
+```javascript
+// Simple array — auto-named "Object 1", "Object 2", etc.
+return [
+  box(50, 50, 10),
+  cylinder(20, 8).translate(25, 25, 10),
+];
+
+// Named objects with colors
+return [
+  { name: "Base Plate", shape: box(100, 100, 5), color: "#888888" },
+  { name: "Column", shape: cylinder(50, 10).translate(50, 50, 5), color: "#4488cc" },
+  { name: "Profile", sketch: circle2d(20), color: "#ff6600" },
+];
+```
+
+Each object gets its own visibility toggle, opacity slider, and color picker in the View Panel.
 
 ## Best Practices
 
@@ -619,37 +892,57 @@ Common errors:
 - **Invalid geometry** - Usually from degenerate shapes (zero dimensions, self-intersecting sketches)
 - **Script execution error** - Check console for JavaScript errors
 
-## Complete Example
+## Complete Examples
 
+### Parametric Phone Stand
 ```javascript
-// Parametric Phone Stand with Cable Management
-
-// Parameters
 const width = param("Width", 80, { min: 40, max: 150, unit: "mm" });
 const depth = param("Depth", 60, { min: 30, max: 100, unit: "mm" });
 const thick = param("Thickness", 5, { min: 2, max: 15, unit: "mm" });
 const backH = param("Back Height", 40, { min: 20, max: 80, unit: "mm" });
 const cableD = param("Cable Hole", 8, { min: 4, max: 15, unit: "mm" });
 
-// Base plate
 const base = box(width, depth, thick);
-
-// Back support
-const back = box(width, thick, backH)
-  .translate(0, depth - thick, thick);
-
-// Phone lip (prevents sliding)
-const lip = box(width, 10, 8)
-  .translate(0, 0, thick);
-
-// Cable management hole
+const back = box(width, thick, backH).translate(0, depth - thick, thick);
+const lip = box(width, 10, 8).translate(0, 0, thick);
 const hole = cylinder(thick + 2, cableD / 2)
   .rotate(90, 0, 0)
   .translate(width / 2, depth / 2, -1);
 
-// Combine everything
-const stand = union(base, back, lip);
-const final = stand.subtract(hole);
+return union(base, back, lip).subtract(hole);
+```
 
-return final;
+### Multi-Object Scene with Colors
+```javascript
+const base = box(100, 100, 5).color('#888888');
+const col1 = cylinder(40, 5).translate(20, 20, 5).color('#cc4444');
+const col2 = cylinder(40, 5).translate(80, 20, 5).color('#4444cc');
+const col3 = cylinder(40, 5).translate(50, 80, 5).color('#44cc44');
+const top = box(100, 100, 3).translate(0, 0, 45).color('#888888');
+
+return [
+  { name: "Base", shape: base },
+  { name: "Column A", shape: col1 },
+  { name: "Column B", shape: col2 },
+  { name: "Column C", shape: col3 },
+  { name: "Top", shape: top },
+];
+```
+
+### Entity-Based Design with Topology
+```javascript
+const baseRect = rectangle(0, 0, 80, 60);
+const base = baseRect.extrude(20);
+
+// Fillet two corners
+let result = filletEdge(base, base.edge('vert-br'), 8, [-1, -1]);
+result = filletEdge(result, base.edge('vert-bl'), 8, [1, -1]);
+
+// Subtract hole pattern
+const holes = circularPattern(
+  cylinder(25, 4).translate(40, 30, -1),
+  4, 40, 30,
+);
+
+return result.toShape().subtract(holes);
 ```
