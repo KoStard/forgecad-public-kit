@@ -84,15 +84,21 @@ async function init() {
   const geo = shapeToGeometry(shape);
   const { scene, camera } = buildScene(geo);
 
-  // Compute framing
+  // Compute framing — camera looks at origin, distance based on model extent
   geo.solid.computeBoundingBox();
   const bb = geo.solid.boundingBox!;
-  const center = new THREE.Vector3();
-  bb.getCenter(center);
+  const origin = new THREE.Vector3(0, 0, 0);
   const bsize = new THREE.Vector3();
   bb.getSize(bsize);
-  const maxDim = Math.max(bsize.x, bsize.y, bsize.z);
-  const dist = maxDim / (2 * Math.tan((45 * Math.PI) / 360)) * 1.6;
+  // Distance must cover both the model extent and its offset from origin
+  const bbCenter = new THREE.Vector3();
+  bb.getCenter(bbCenter);
+  const maxReach = Math.max(
+    bsize.x / 2 + Math.abs(bbCenter.x),
+    bsize.y / 2 + Math.abs(bbCenter.y),
+    bsize.z / 2 + Math.abs(bbCenter.z),
+  );
+  const dist = (maxReach * 2) / (2 * Math.tan((45 * Math.PI) / 360)) * 1.6;
 
   camera.aspect = 1;
   camera.updateProjectionMatrix();
@@ -104,7 +110,7 @@ async function init() {
   for (const angle of angles) {
     const dir = ANGLE_DIRS[angle];
     if (!dir) continue;
-    renders[angle] = renderFromAngle(scene, camera, center, dist, dir, r);
+    renders[angle] = renderFromAngle(scene, camera, origin, dist, dir, r);
   }
 
   const shapeBB = shape.boundingBox();

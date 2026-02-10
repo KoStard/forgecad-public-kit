@@ -96,8 +96,8 @@ const btnThick = 1.6;
 const sideBtn = (bw, bx, by, side) => {
   const profile = roundedRect(bw, btnThick, 0.5, true);
   const btn = profile.extrude(btnInset);
-  if (side === 'left') return btn.rotate(0, 90, 0).translate(-w / 2 - btnInset, by, 0);
-  return btn.rotate(0, -90, 0).translate(w / 2 + btnInset, by, 0);
+  if (side === 'left') return btn.rotate(90, 0, 90).translate(-w / 2 - edgeR - btnInset, by, 0);
+  return btn.rotate(90, 0, 90).translate(w / 2 + edgeR + btnInset, by, 0);
 };
 
 const volUp = sideBtn(14, 0, h / 2 - 35, 'left');

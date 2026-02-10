@@ -738,6 +738,17 @@ function ViewController({
     bounds.getSize(sizeVec);
     const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z, 1);
 
+    // "snap" (Home) targets origin; "fit"/"zoom" target model center
+    const target = command.type === 'snap' ? new THREE.Vector3(0, 0, 0) : center;
+    // Distance must cover model extent + offset from target
+    const maxReach = command.type === 'snap'
+      ? Math.max(
+          sizeVec.x / 2 + Math.abs(center.x),
+          sizeVec.y / 2 + Math.abs(center.y),
+          sizeVec.z / 2 + Math.abs(center.z),
+        ) * 2
+      : maxDim;
+
     const controls = controlsRef.current;
     const camDir = new THREE.Vector3();
     if (command.type === 'snap') {
@@ -771,22 +782,22 @@ function ViewController({
     const isOrtho = (camera as THREE.OrthographicCamera).isOrthographicCamera;
     if (isOrtho) {
       const ortho = camera as THREE.OrthographicCamera;
-      const zoom = Math.min(size.width, size.height) / maxDim / 2.2;
+      const zoom = Math.min(size.width, size.height) / maxReach / 2.2;
       ortho.zoom = Math.max(0.1, zoom);
-      ortho.position.copy(center.clone().add(camDir.multiplyScalar(maxDim * 2)));
+      ortho.position.copy(target.clone().add(camDir.multiplyScalar(maxReach * 2)));
       ortho.updateProjectionMatrix();
     } else {
       const persp = camera as THREE.PerspectiveCamera;
-      const dist = maxDim / (2 * Math.tan((persp.fov * Math.PI) / 360)) * 1.4;
-      persp.position.copy(center.clone().add(camDir.multiplyScalar(dist)));
+      const dist = maxReach / (2 * Math.tan((persp.fov * Math.PI) / 360)) * 1.4;
+      persp.position.copy(target.clone().add(camDir.multiplyScalar(dist)));
       persp.updateProjectionMatrix();
     }
 
     if (controls) {
-      controls.target.copy(center);
+      controls.target.copy(target);
       controls.update();
     } else {
-      camera.lookAt(center);
+      camera.lookAt(target);
     }
 
     clearCommand();
