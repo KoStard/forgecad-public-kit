@@ -12,3 +12,4 @@ export * from './topology';
 export * from './patterns';
 export * from './fillets';
 export * from './arcBridge';
+export * from './dimensions';

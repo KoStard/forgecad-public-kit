@@ -3,6 +3,7 @@ import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
 import type { SceneObject } from '@forge/index';
+import type { DimensionDef } from '@forge/sketch/dimensions';
 import { shapeToGeometry } from '@forge/meshToGeometry';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -282,6 +283,98 @@ function SketchObject({
           <spriteMaterial map={sprite.texture} transparent />
         </sprite>
       ))}
+    </group>
+  );
+}
+
+/** Renders a single dimension annotation — Fusion360-style with extension lines, arrows, and label */
+function DimensionAnnotation({ def }: { def: DimensionDef }) {
+  const from = useMemo(() => new THREE.Vector3(...def.from), [def.from]);
+  const to = useMemo(() => new THREE.Vector3(...def.to), [def.to]);
+  const color = def.color ?? '#e0e0e0';
+
+  // Stable perpendicular offset (camera-independent).
+  // Cross dimension direction with Z-up; fallback to X if parallel.
+  const { dimStart, dimEnd, mid, dist } = useMemo(() => {
+    const dir = to.clone().sub(from);
+    const len = dir.length();
+    if (len < 1e-6) return { dimStart: from, dimEnd: to, mid: from, dist: 0 };
+    const dirN = dir.clone().normalize();
+
+    let perp = new THREE.Vector3().crossVectors(dirN, new THREE.Vector3(0, 0, 1));
+    if (perp.lengthSq() < 1e-6) {
+      perp = new THREE.Vector3().crossVectors(dirN, new THREE.Vector3(1, 0, 0));
+    }
+    perp.normalize().multiplyScalar(def.offset);
+
+    const dS = from.clone().add(perp);
+    const dE = to.clone().add(perp);
+    return { dimStart: dS, dimEnd: dE, mid: dS.clone().add(dE).multiplyScalar(0.5), dist: len };
+  }, [from, to, def.offset]);
+
+  const label = def.label ? `${def.label}: ${dist.toFixed(1)}` : dist.toFixed(1);
+
+  // Extension lines with gap near geometry and overshoot past dimension line
+  const extDir = useMemo(() => dimStart.clone().sub(from).normalize(), [dimStart, from]);
+  const extGap = Math.max(Math.abs(def.offset) * 0.15, 0.8);
+  const extOver = Math.max(Math.abs(def.offset) * 0.15, 0.8);
+  const extAGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
+    from.clone().add(extDir.clone().multiplyScalar(extGap)),
+    dimStart.clone().add(extDir.clone().multiplyScalar(extOver)),
+  ]), [from, dimStart, extDir, extGap, extOver]);
+  const extBGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
+    to.clone().add(extDir.clone().multiplyScalar(extGap)),
+    dimEnd.clone().add(extDir.clone().multiplyScalar(extOver)),
+  ]), [to, dimEnd, extDir, extGap, extOver]);
+  const dimLineGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([dimStart, dimEnd]), [dimStart, dimEnd]);
+
+  const arrowSize = Math.min(dist * 0.06, 2.5);
+  const dimDir = useMemo(() => dimEnd.clone().sub(dimStart).normalize(), [dimStart, dimEnd]);
+
+  const labelTexture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 80;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#1a1a1acc';
+    ctx.beginPath();
+    ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 12);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.font = 'bold 36px -apple-system, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, canvas.width / 2, canvas.height / 2);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, [label, color]);
+
+  if (dist < 1e-6) return null;
+
+  return (
+    <group>
+      <lineSegments geometry={extAGeo}>
+        <lineBasicMaterial color={color} transparent opacity={0.4} />
+      </lineSegments>
+      <lineSegments geometry={extBGeo}>
+        <lineBasicMaterial color={color} transparent opacity={0.4} />
+      </lineSegments>
+      <lineSegments geometry={dimLineGeo}>
+        <lineBasicMaterial color={color} transparent opacity={0.8} />
+      </lineSegments>
+      <mesh position={dimStart} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dimDir)}>
+        <coneGeometry args={[arrowSize * 0.5, arrowSize, 8]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      <mesh position={dimEnd} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dimDir.clone().negate())}>
+        <coneGeometry args={[arrowSize * 0.5, arrowSize, 8]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      <sprite position={mid} scale={[Math.max(dist * 0.6, 25), Math.max(dist * 0.1, 5), 1]}>
+        <spriteMaterial map={labelTexture} depthTest={false} transparent />
+      </sprite>
     </group>
   );
 }
@@ -874,6 +967,7 @@ export function Viewport() {
   const viewCommand = useForgeStore((s) => s.viewCommand);
   const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
   const objects = result?.objects ?? [];
+  const dimensions = result?.dimensions ?? [];
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
@@ -914,6 +1008,9 @@ export function Viewport() {
           }
           return null;
         })}
+        {dimensions.map((d) => (
+          <DimensionAnnotation key={d.id} def={d} />
+        ))}
         <MeasureTool />
 
         {gridEnabled && !isSketchOnly && (

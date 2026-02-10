@@ -46,6 +46,11 @@ import {
   filletEdge,
   chamferEdge,
   arcBridgeBetweenRects,
+  dim,
+  dimLine,
+  resetDimensions,
+  getCollectedDimensions,
+  type DimensionDef,
 } from './sketch';
 import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
 import { joint } from './joint';
@@ -65,6 +70,7 @@ export interface RunResult {
   sketch: Sketch | null;
   objects: SceneObject[];
   params: ParamDef[];
+  dimensions: DimensionDef[];
   error: string | null;
   timeMs: number;
 }
@@ -139,6 +145,8 @@ function executeFile(
     'intersectWithPlane', 'projectToPlane',
     // Cross-file imports
     'importSketch', 'importPart',
+    // Dimensions
+    'dim', 'dimLine',
     wrapped,
   );
 
@@ -156,6 +164,7 @@ function executeFile(
     joint,
     intersectWithPlane, projectToPlane,
     importSketch, importPart,
+    dim, dimLine,
   );
 }
 
@@ -165,6 +174,7 @@ export function runScript(
   allFiles: Record<string, string> = {},
 ): RunResult {
   resetParams();
+  resetDimensions();
   const t0 = performance.now();
 
   try {
@@ -246,6 +256,7 @@ export function runScript(
       sketch,
       objects,
       params: getCollectedParams(),
+      dimensions: getCollectedDimensions(),
       error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
       timeMs: performance.now() - t0,
     };
@@ -255,6 +266,7 @@ export function runScript(
       sketch: null,
       objects: [],
       params: getCollectedParams(),
+      dimensions: getCollectedDimensions(),
       error: e.message || String(e),
       timeMs: performance.now() - t0,
     };

@@ -240,6 +240,12 @@ declare const lib: {
   bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape;
   holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape;
 };
+
+// --- Dimensions (visual annotations) ---
+/** Add a dimension annotation between two points. Purely visual, not a constraint. */
+declare function dim(from: [number, number] | [number, number, number] | Point2D, to: [number, number] | [number, number, number] | Point2D, opts?: { offset?: number; label?: string; color?: string }): void;
+/** Add a dimension annotation along a Line2D. */
+declare function dimLine(line: Line2D, opts?: { offset?: number; label?: string; color?: string }): void;
 `;
 
 export function CodeEditor() {
