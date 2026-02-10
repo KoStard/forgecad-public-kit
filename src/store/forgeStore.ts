@@ -188,11 +188,8 @@ const syncObjectSettings = (
   objects.forEach((obj) => {
     if (!nextSettings[obj.id]) {
       nextSettings[obj.id] = { visible: true, opacity: 1, color: obj.color || DEFAULT_OBJECT_COLOR };
-    } else if (obj.color && nextSettings[obj.id].color !== obj.color) {
-      // If script provides a color, it overrides the default or previous script color.
-      // We might want to decide if it overrides MANUAL user changes, 
-      // but for now, script is king for initial/updated state.
-      nextSettings[obj.id].color = obj.color;
+    } else {
+      nextSettings[obj.id].color = obj.color || DEFAULT_OBJECT_COLOR;
     }
   });
   const nextSelected = objects.length === 0
