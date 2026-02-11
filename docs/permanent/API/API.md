@@ -1,3 +1,5 @@
+**Important**: See [colors-and-unions.md](colors-and-unions.md) for a crucial guide on preserving colors when returning multiple objects vs. using `union()`.
+
 # ForgeCAD API Reference
 
 **For AI Agents**: This document contains everything needed to write parametric CAD code in ForgeCAD.
@@ -28,6 +30,35 @@ return shape;
   - A `ShapeGroup` (multiple shapes/sketches grouped for joint transforms)
   - An `Array` of shapes/sketches/groups (multi-object scene)
   - An `Array` of `{ name, shape?, sketch?, color? }` objects (named multi-object scene)
+
+### ⚠️ Important: Unions Remove Colors
+
+When you use `union()` to combine shapes, the result becomes a single solid mesh with only one color. Individual colors assigned to the original shapes are lost:
+
+```javascript
+// ❌ BAD: Colors are lost after union!
+const red = box(30, 30, 30).color('#ff0000');
+const blue = box(20, 20, 20).translate(30, 0, 0).color('#0066ff');
+return union(red, blue);  // Result is all one color (red)
+```
+
+**Solution**: Return objects as a composite response instead:
+
+```javascript
+// ✅ GOOD: Each object keeps its color
+const red = box(30, 30, 30).color('#ff0000');
+const blue = box(20, 20, 20).translate(30, 0, 0).color('#0066ff');
+
+// Return as named objects to preserve individual colors and materials
+return [
+  { "label": red },    // Each gets its own color, toggle, and controls
+  { "label": blue }
+];
+```
+
+Each object in the array gets its own visibility toggle, opacity control, and color picker in the View Panel.
+
+See [colors-and-unions.md](colors-and-unions.md) for complete details on when to union vs. return separate objects.
 
 ### Coordinate System
 ForgeCAD uses **Z-up** right-handed coordinates:
