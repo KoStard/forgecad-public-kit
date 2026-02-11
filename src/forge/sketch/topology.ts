@@ -8,7 +8,7 @@
  * Arbitrary boolean results lose topology (mesh kernel limitation).
  */
 
-import { Shape, getAnchorPoint3D } from '../kernel';
+import { Shape, getAnchorPoint3D, resolveAnchor3D } from '../kernel';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
 
 export type FaceName = string;
@@ -190,13 +190,19 @@ export class TrackedShape {
 
   /** Position this tracked shape relative to another using named 3D anchor points */
   attachTo(
-    target: Shape | TrackedShape,
+    target: Shape | TrackedShape | { _bbox(): { min: number[]; max: number[] } },
     targetAnchor: string,
     selfAnchor: string = 'center',
     offset?: [number, number, number],
   ): TrackedShape {
-    const targetShape = target instanceof TrackedShape ? target.toShape() : target;
-    const tp = getAnchorPoint3D(targetShape, targetAnchor as any);
+    let tp: [number, number, number];
+    if (typeof (target as any)._bbox === 'function' && !(target instanceof TrackedShape) && !(target instanceof Shape)) {
+      const bb = (target as any)._bbox();
+      tp = resolveAnchor3D(bb.min, bb.max, targetAnchor as any);
+    } else {
+      const targetShape = target instanceof TrackedShape ? target.toShape() : target as Shape;
+      tp = getAnchorPoint3D(targetShape, targetAnchor as any);
+    }
     const sp = getAnchorPoint3D(this.toShape(), selfAnchor as any);
     let dx = tp[0] - sp[0], dy = tp[1] - sp[1], dz = tp[2] - sp[2];
     if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }

@@ -249,12 +249,18 @@ export class Shape {
 
   /** Position this shape relative to another using named 3D anchor points */
   attachTo(
-    target: Shape,
+    target: Shape | { _bbox(): { min: number[]; max: number[] } },
     targetAnchor: Anchor3D,
     selfAnchor: Anchor3D = 'center',
     offset?: [number, number, number],
   ): Shape {
-    const tp = getAnchorPoint3D(target, targetAnchor);
+    let tp: [number, number, number];
+    if (typeof (target as any)._bbox === 'function') {
+      const bb = (target as any)._bbox();
+      tp = resolveAnchor3D(bb.min, bb.max, targetAnchor);
+    } else {
+      tp = getAnchorPoint3D(target as Shape, targetAnchor);
+    }
     const sp = getAnchorPoint3D(this, selfAnchor);
     let dx = tp[0] - sp[0], dy = tp[1] - sp[1], dz = tp[2] - sp[2];
     if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }
@@ -273,12 +279,11 @@ export type Anchor3D = 'center' | 'front' | 'back' | 'left' | 'right' | 'top' | 
   | 'top-front-left' | 'top-front-right' | 'top-back-left' | 'top-back-right'
   | 'bottom-front-left' | 'bottom-front-right' | 'bottom-back-left' | 'bottom-back-right';
 
-export function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, number, number] {
-  // Handle TrackedShape (has .toShape()) without importing it (avoids circular dep)
-  const s: Shape = typeof (shape as any).toShape === 'function' ? (shape as any).toShape() : shape;
-  const bb = s.boundingBox();
-  const min = bb.min as [number, number, number];
-  const max = bb.max as [number, number, number];
+export function resolveAnchor3D(
+  min: [number, number, number],
+  max: [number, number, number],
+  anchor: Anchor3D,
+): [number, number, number] {
   const cx = (min[0] + max[0]) / 2;
   const cy = (min[1] + max[1]) / 2;
   const cz = (min[2] + max[2]) / 2;
@@ -315,6 +320,12 @@ export function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, numbe
     case 'bottom-back-left': return [min[0], max[1], min[2]];
     case 'bottom-back-right': return [max[0], max[1], min[2]];
   }
+}
+
+export function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, number, number] {
+  const s: Shape = typeof (shape as any).toShape === 'function' ? (shape as any).toShape() : shape;
+  const bb = s.boundingBox();
+  return resolveAnchor3D(bb.min as [number, number, number], bb.max as [number, number, number], anchor);
 }
 
 // --- Primitive constructors ---

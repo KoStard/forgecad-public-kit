@@ -4,7 +4,7 @@
  * Colors, individual identities are preserved.
  */
 
-import { Shape } from './kernel';
+import { Shape, Anchor3D, resolveAnchor3D } from './kernel';
 import { Sketch } from './sketch/core';
 import { TrackedShape } from './sketch/topology';
 
@@ -54,6 +54,23 @@ export class ShapeGroup {
       tbb = { min: bb.min as number[] };
     }
     return this.moveTo(tbb.min[0] + x, tbb.min[1] + y, tbb.min[2] + z);
+  }
+
+  attachTo(
+    target: Shape | TrackedShape | ShapeGroup,
+    targetAnchor: Anchor3D,
+    selfAnchor: Anchor3D = 'center',
+    offset?: [number, number, number],
+  ): ShapeGroup {
+    const tbb = target instanceof ShapeGroup
+      ? target._bbox()
+      : (() => { const s = target instanceof TrackedShape ? target.toShape() : target; const b = s.boundingBox(); return { min: b.min as [number, number, number], max: b.max as [number, number, number] }; })();
+    const sbb = this._bbox();
+    const tp = resolveAnchor3D(tbb.min as [number, number, number], tbb.max as [number, number, number], targetAnchor);
+    const sp = resolveAnchor3D(sbb.min as [number, number, number], sbb.max as [number, number, number], selfAnchor);
+    let dx = tp[0] - sp[0], dy = tp[1] - sp[1], dz = tp[2] - sp[2];
+    if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }
+    return this.translate(dx, dy, dz);
   }
 
   rotate(x: number, y: number, z: number): ShapeGroup {
