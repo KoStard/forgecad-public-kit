@@ -185,6 +185,21 @@ Rotates around an arbitrary axis through a pivot point.
 const opened = door.rotateAround([0, 0, 1], 45, [hingeX, hingeY, 0]);
 ```
 
+### `.pointAlong(direction)`
+Reorients a shape so its primary axis (Z) points along the given direction. Useful for laying cylinders and extrusions along X or Y without thinking about Euler angles.
+
+**Parameters:**
+- `direction` ([number, number, number]) - Target direction vector
+
+```javascript
+// Lay a cylinder along the X axis
+const axle = cylinder(100, 5).pointAlong([1, 0, 0]);
+
+// Symmetric hinges pointing outward from center
+const hingeL = cylinder(40, 5).pointAlong([-1, 0, 0]).translate(-50, 0, 0);
+const hingeR = cylinder(40, 5).pointAlong([1, 0, 0]).translate(50, 0, 0);
+```
+
 ## Joints
 
 ### `joint(name, shape, pivot, opts?)`
