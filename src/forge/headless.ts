@@ -18,6 +18,7 @@ import { initKernel } from './kernel';
 
 // Re-export everything from the public API
 export { Shape, box, cylinder, sphere, union, difference, intersection, hull3d, levelSet, getWasm } from './kernel';
+export type { Anchor3D } from './kernel';
 export { intersectWithPlane, projectToPlane } from './section';
 export type { PlaneSpec } from './section';
 export * from './sketch';
@@ -31,6 +32,7 @@ export { partLibrary } from './library';
 export { shapeToGeometry } from './meshToGeometry';
 export { buildScene, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from './sceneBuilder';
 export type { ForgeGeometry } from './meshToGeometry';
+export { ShapeGroup, group } from './group';
 
 /**
  * Initialize the geometry kernel. Must be called once before using any forge API.

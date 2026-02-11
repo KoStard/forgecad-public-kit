@@ -140,7 +140,7 @@ function arcBridgeBetweenParallelEdges(
   }
 
   const profile = polygon([...pts, ...innerPts]);
-  const solid = sketchExtrude(profile, overlapLen);
+  const solid = sketchExtrude(profile, overlapLen).toShape();
 
   // Build transform: local XY → world UV plane, local Z → edge direction
   // The profile is in XY, extrusion is along Z.

@@ -3,8 +3,8 @@ import Editor, { type OnMount } from '@monaco-editor/react';
 import { useForgeStore } from '../store/forgeStore';
 
 const FORGE_TYPES = `
-declare function box(x: number, y: number, z: number, center?: boolean): Shape;
-declare function cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): Shape;
+declare function box(x: number, y: number, z: number, center?: boolean): TrackedShape;
+declare function cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape;
 declare function sphere(radius: number, segments?: number): Shape;
 declare function union(...shapes: Shape[]): Shape;
 declare function difference(...shapes: Shape[]): Shape;
@@ -71,6 +71,10 @@ declare class Shape {
   // Color
   color(hex: string): Shape;
 
+  // 3D Anchor positioning
+  /** Position this shape relative to another using named 3D anchor points */
+  attachTo(target: Shape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D): Shape;
+
   // Query
   volume(): number;
   surfaceArea(): number;
@@ -92,7 +96,7 @@ declare class Sketch {
   hull(): Sketch;
   simplify(epsilon?: number): Sketch;
   warp(fn: (vert: [number, number]) => void): Sketch;
-  extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean }): Shape;
+  extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean }): TrackedShape;
   revolve(degrees?: number, segments?: number): Shape;
   area(): number;
   bounds(): { min: [number, number]; max: [number, number] };
@@ -203,6 +207,8 @@ declare class TrackedShape {
   edgeNames(): string[];
   translate(dx: number, dy: number, dz: number): TrackedShape;
   rotateAroundEdge(edgeName: string, angleDeg: number): TrackedShape;
+  /** Position this shape relative to another using named 3D anchor points */
+  attachTo(target: Shape | TrackedShape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D): TrackedShape;
   toShape(): Shape;
 }
 
@@ -249,6 +255,25 @@ declare const lib: {
 declare function dim(from: [number, number] | [number, number, number] | Point2D, to: [number, number] | [number, number, number] | Point2D, opts?: { offset?: number; label?: string; color?: string }): void;
 /** Add a dimension annotation along a Line2D. */
 declare function dimLine(line: Line2D, opts?: { offset?: number; label?: string; color?: string }): void;
+
+// --- 3D Anchor Types ---
+type Anchor3D = 'center' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'
+  | 'front-left' | 'front-right' | 'back-left' | 'back-right'
+  | 'top-front' | 'top-back' | 'top-left' | 'top-right'
+  | 'bottom-front' | 'bottom-back' | 'bottom-left' | 'bottom-right';
+
+// --- Group ---
+/** Group multiple shapes/sketches for joint transforms without merging meshes. Colors preserved. */
+declare function group(...items: (Shape | Sketch | TrackedShape)[]): ShapeGroup;
+
+declare class ShapeGroup {
+  readonly children: (Shape | Sketch | TrackedShape)[];
+  translate(x: number, y: number, z: number): ShapeGroup;
+  rotate(x: number, y: number, z: number): ShapeGroup;
+  scale(v: number | [number, number, number]): ShapeGroup;
+  mirror(normal: [number, number, number]): ShapeGroup;
+  color(hex: string): ShapeGroup;
+}
 `;
 
 export function CodeEditor() {

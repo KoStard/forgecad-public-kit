@@ -234,6 +234,55 @@ export class Shape {
   getMesh() {
     return this.manifold.getMesh();
   }
+
+  /** Position this shape relative to another using named 3D anchor points */
+  attachTo(
+    target: Shape,
+    targetAnchor: Anchor3D,
+    selfAnchor: Anchor3D = 'center',
+  ): Shape {
+    const tp = getAnchorPoint3D(target, targetAnchor);
+    const sp = getAnchorPoint3D(this, selfAnchor);
+    return this.translate(tp[0] - sp[0], tp[1] - sp[1], tp[2] - sp[2]);
+  }
+}
+
+// --- 3D Anchor positioning ---
+
+export type Anchor3D = 'center' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'
+  | 'front-left' | 'front-right' | 'back-left' | 'back-right'
+  | 'top-front' | 'top-back' | 'top-left' | 'top-right'
+  | 'bottom-front' | 'bottom-back' | 'bottom-left' | 'bottom-right';
+
+function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, number, number] {
+  const bb = shape.boundingBox();
+  const min = bb.min as [number, number, number];
+  const max = bb.max as [number, number, number];
+  const cx = (min[0] + max[0]) / 2;
+  const cy = (min[1] + max[1]) / 2;
+  const cz = (min[2] + max[2]) / 2;
+
+  switch (anchor) {
+    case 'center': return [cx, cy, cz];
+    case 'front': return [cx, min[1], cz];
+    case 'back': return [cx, max[1], cz];
+    case 'left': return [min[0], cy, cz];
+    case 'right': return [max[0], cy, cz];
+    case 'top': return [cx, cy, max[2]];
+    case 'bottom': return [cx, cy, min[2]];
+    case 'front-left': return [min[0], min[1], cz];
+    case 'front-right': return [max[0], min[1], cz];
+    case 'back-left': return [min[0], max[1], cz];
+    case 'back-right': return [max[0], max[1], cz];
+    case 'top-front': return [cx, min[1], max[2]];
+    case 'top-back': return [cx, max[1], max[2]];
+    case 'top-left': return [min[0], cy, max[2]];
+    case 'top-right': return [max[0], cy, max[2]];
+    case 'bottom-front': return [cx, min[1], min[2]];
+    case 'bottom-back': return [cx, max[1], min[2]];
+    case 'bottom-left': return [min[0], cy, min[2]];
+    case 'bottom-right': return [max[0], cy, min[2]];
+  }
 }
 
 // --- Primitive constructors ---

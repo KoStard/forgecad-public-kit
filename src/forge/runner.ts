@@ -8,6 +8,7 @@
  */
 
 import { Shape, box, cylinder, sphere, union, difference, intersection, hull3d, levelSet } from './kernel';
+import type { Anchor3D } from './kernel';
 import { intersectWithPlane, projectToPlane } from './section';
 import {
   Sketch,
@@ -33,6 +34,8 @@ import {
   Circle2D,
   Rectangle2D,
   TrackedShape,
+  buildRectExtrusionTopology,
+  buildCircleExtrusionTopology,
   point,
   line,
   circle,
@@ -55,6 +58,7 @@ import {
 import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
 import { joint } from './joint';
 import { partLibrary } from './library';
+import { ShapeGroup, group } from './group';
 
 export interface SceneObject {
   id: string;
@@ -85,7 +89,7 @@ function executeFile(
   fileName: string,
   allFiles: Record<string, string>,
   visited: Set<string>,
-): Shape | Sketch | TrackedShape | null {
+): Shape | Sketch | TrackedShape | ShapeGroup | null {
   if (visited.has(fileName)) {
     throw new Error(`Circular import detected: ${fileName}`);
   }
@@ -121,6 +125,36 @@ function executeFile(
   const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) =>
     hull3d(...args.map(a => a instanceof TrackedShape ? a.toShape() : a));
 
+  // Tracked wrappers for primitives — user scripts get TrackedShape with named faces/edges
+  const trackedBox = (x: number, y: number, z: number, center = false): TrackedShape => {
+    const shape = box(x, y, z, center);
+    const ox = center ? -x / 2 : 0;
+    const oy = center ? -y / 2 : 0;
+    const r = Rectangle2D.fromDimensions(ox, oy, x, y);
+    const topo = buildRectExtrusionTopology(r, z);
+    return new TrackedShape(shape, topo, 0, true);
+  };
+
+  const trackedCylinder = (
+    height: number, radius: number, radiusTop?: number, segments?: number, center = false,
+  ): TrackedShape => {
+    const shape = cylinder(height, radius, radiusTop, segments, center);
+    const cz = center ? -height / 2 : 0;
+    const c = { center: new Point2D(0, 0), radius };
+    const topo = buildCircleExtrusionTopology(c, height);
+    if (center) {
+      // offset topology down by half height
+      for (const f of topo.faces.values()) {
+        f.center = [f.center[0], f.center[1], f.center[2] - height / 2];
+      }
+      for (const e of topo.edges.values()) {
+        e.start = [e.start[0], e.start[1], e.start[2] - height / 2];
+        e.end = [e.end[0], e.end[1], e.end[2] - height / 2];
+      }
+    }
+    return new TrackedShape(shape, topo, 0, true);
+  };
+
   const fn = new Function(
     // 3D
     'box', 'cylinder', 'sphere',
@@ -147,11 +181,13 @@ function executeFile(
     'importSketch', 'importPart',
     // Dimensions
     'dim', 'dimLine',
+    // Group
+    'group', 'ShapeGroup',
     wrapped,
   );
 
   return fn(
-    box, cylinder, sphere,
+    trackedBox, trackedCylinder, sphere,
     wrappedUnion, wrappedDifference, wrappedIntersection,
     wrappedHull3d, levelSet,
     rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
@@ -165,6 +201,7 @@ function executeFile(
     intersectWithPlane, projectToPlane,
     importSketch, importPart,
     dim, dimLine,
+    group, ShapeGroup,
   );
 }
 
@@ -200,9 +237,25 @@ export function runScript(
       return !!item && typeof item === 'object' && 'name' in item;
     };
 
-    if (Array.isArray(result)) {
+    const flattenGroupChild = (child: Shape | Sketch | TrackedShape, label: string) => {
+      if (child instanceof TrackedShape) {
+        pushShape(child.toShape(), label);
+      } else if (child instanceof Shape) {
+        pushShape(child, label);
+      } else if (child instanceof Sketch) {
+        pushSketch(child, label);
+      }
+    };
+
+    if (result instanceof ShapeGroup) {
+      result.children.forEach((child, i) => flattenGroupChild(child, `Object ${i + 1}`));
+    } else if (Array.isArray(result)) {
       result.forEach((item, index) => {
         const label = `Object ${index + 1}`;
+        if (item instanceof ShapeGroup) {
+          item.children.forEach((child, i) => flattenGroupChild(child, `${label}.${i + 1}`));
+          return;
+        }
         if (item instanceof TrackedShape) {
           pushShape(item.toShape(), label);
           return;

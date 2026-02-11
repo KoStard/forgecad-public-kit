@@ -25,7 +25,8 @@ return shape;
   - A `Shape` (3D solid)
   - A `Sketch` (2D profile — rendered flat on XY plane)
   - A `TrackedShape` (3D solid with named faces/edges — auto-unwrapped)
-  - An `Array` of shapes/sketches (multi-object scene)
+  - A `ShapeGroup` (multiple shapes/sketches grouped for joint transforms)
+  - An `Array` of shapes/sketches/groups (multi-object scene)
   - An `Array` of `{ name, shape?, sketch?, color? }` objects (named multi-object scene)
 
 ### Coordinate System
@@ -84,21 +85,23 @@ return [
 ## 3D Primitives
 
 ### `box(x, y, z, center?)`
-Creates a rectangular box.
+Creates a rectangular box with named faces and edges.
 
 **Parameters:**
 - `x, y, z` (number) - Dimensions
 - `center` (boolean, optional) - If true, centers at origin. Default: false (corner at origin)
 
-**Returns:** `Shape`
+**Returns:** `TrackedShape` (with faces: top, bottom, side-left, side-right, side-top, side-bottom; edges: vert-bl, vert-br, vert-tr, vert-tl, etc.)
 
 ```javascript
 const cube = box(50, 50, 50, true);  // Centered cube
 const plate = box(100, 80, 5);        // Corner at origin
+plate.face('top');                     // FaceRef { normal, center }
+plate.edge('vert-bl');                 // EdgeRef { start, end }
 ```
 
 ### `cylinder(height, radius, radiusTop?, segments?, center?)`
-Creates a cylinder or cone.
+Creates a cylinder or cone with named faces and edges.
 
 **Parameters:**
 - `height` (number) - Height along Z axis
@@ -107,12 +110,14 @@ Creates a cylinder or cone.
 - `segments` (number, optional) - Number of sides. Default: auto (smooth circle)
 - `center` (boolean, optional) - If true, centers along Z. Default: false
 
-**Returns:** `Shape`
+**Returns:** `TrackedShape` (with faces: top, bottom, side; edges: top-rim, bottom-rim)
 
 ```javascript
 const cyl = cylinder(50, 10);              // Cylinder
 const cone = cylinder(50, 20, 5);          // Cone (tapered)
 const hex = cylinder(10, 15, 15, 6);       // Hexagonal prism
+cyl.face('top');                            // FaceRef
+cyl.face('side');                           // FaceRef
 ```
 
 ### `sphere(radius, segments?)`
@@ -268,6 +273,72 @@ Shapes also have boolean methods:
 shape.add(other)       // Same as union(shape, other)
 shape.subtract(other)  // Same as difference(shape, other)
 shape.intersect(other) // Same as intersection(shape, other)
+```
+
+## Group
+
+### `group(...items)`
+Groups multiple shapes/sketches for joint transforms without merging them into a single mesh. Unlike `union`, colors and individual identities are preserved.
+
+**Parameters:**
+- `...items` (Shape | Sketch | TrackedShape) - Items to group
+
+**Returns:** `ShapeGroup`
+
+```javascript
+const base = box(100, 100, 5).color('#888888');
+const column = cylinder(40, 5).translate(50, 50, 5).color('#4488cc');
+
+// Group them — they stay separate but transform together
+const assembly = group(base, column).translate(200, 0, 0);
+return assembly;
+```
+
+### ShapeGroup Methods
+All transforms are chainable and return a new ShapeGroup:
+
+```javascript
+group.translate(x, y, z)
+group.rotate(x, y, z)
+group.scale(v)
+group.mirror(normal)
+group.color(hex)  // applies to all children
+```
+
+When a ShapeGroup is returned from a script, each child becomes a separate viewport object with its own visibility/color controls.
+
+## 3D Anchor Positioning
+
+### `.attachTo(target, targetAnchor, selfAnchor?)`
+Position a shape relative to another using named 3D anchor points based on bounding boxes.
+
+Available on both `Shape` and `TrackedShape`.
+
+**Parameters:**
+- `target` (Shape | TrackedShape) — The shape to attach to
+- `targetAnchor` (Anchor3D) — Point on target
+- `selfAnchor` (Anchor3D, optional) — Point on this shape to align. Default: 'center'
+
+**Anchor3D values:**
+- `'center'` — bounding box center
+- `'front'` (−Y), `'back'` (+Y), `'left'` (−X), `'right'` (+X), `'top'` (+Z), `'bottom'` (−Z)
+- Compound: `'front-left'`, `'front-right'`, `'back-left'`, `'back-right'`
+- Compound: `'top-front'`, `'top-back'`, `'top-left'`, `'top-right'`
+- Compound: `'bottom-front'`, `'bottom-back'`, `'bottom-left'`, `'bottom-right'`
+
+**Returns:** Same type as caller (Shape or TrackedShape)
+
+```javascript
+const base = box(100, 100, 10);
+const column = cylinder(50, 8);
+
+// Place column on top of base, centered
+const placed = column.attachTo(base, 'top', 'bottom');
+
+// Stack boxes: place b on top of a, aligned at back-left
+const a = box(50, 50, 20);
+const b = box(30, 30, 10);
+const stacked = b.attachTo(a, 'top-back', 'bottom-back');
 ```
 
 ## Advanced 3D Operations
@@ -548,7 +619,7 @@ Extrudes sketch along Z axis.
   - `scaleTop` (number | [number, number]) - Scale factor at top
   - `center` (boolean) - Center along Z axis
 
-**Returns:** `Shape`
+**Returns:** `TrackedShape` (with faces: top, bottom, side)
 
 ```javascript
 const simple = rect(50, 30).extrude(10);

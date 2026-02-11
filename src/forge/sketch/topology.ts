@@ -140,6 +140,22 @@ export class TrackedShape {
     return this.shape;
   }
 
+  /** Position this tracked shape relative to another using named 3D anchor points */
+  attachTo(
+    target: Shape | TrackedShape,
+    targetAnchor: string,
+    selfAnchor: string = 'center',
+  ): TrackedShape {
+    const targetShape = target instanceof TrackedShape ? target.toShape() : target;
+    const moved = this.toShape().attachTo(targetShape, targetAnchor as any, selfAnchor as any);
+    const bb1 = this.toShape().boundingBox();
+    const bb2 = moved.boundingBox();
+    const dx = (bb2.min as number[])[0] - (bb1.min as number[])[0];
+    const dy = (bb2.min as number[])[1] - (bb1.min as number[])[1];
+    const dz = (bb2.min as number[])[2] - (bb1.min as number[])[2];
+    return this.translate(dx, dy, dz);
+  }
+
   /** Boolean subtract — returns plain Shape (topology lost) */
   subtract(other: Shape | TrackedShape): Shape {
     const otherShape = other instanceof TrackedShape ? other.toShape() : other;

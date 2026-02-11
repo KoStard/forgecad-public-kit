@@ -36,10 +36,10 @@ export function filletEdge(
   const [qx, qy] = quadrant;
   // Square to subtract (the corner)
   const cornerBox = sketchExtrude(rect(radius, radius), height + 0.02)
-    .translate(qx > 0 ? sx : sx - radius, qy > 0 ? sy : sy - radius, zMin - 0.01);
+    .translate(qx > 0 ? sx : sx - radius, qy > 0 ? sy : sy - radius, zMin - 0.01).toShape();
   // Cylinder to add (the fillet)
   const filletCyl = sketchExtrude(circle2d(radius, segments), height + 0.02)
-    .translate(sx, sy, zMin - 0.01);
+    .translate(sx, sy, zMin - 0.01).toShape();
 
   return union(difference(base, cornerBox), filletCyl);
 }
@@ -69,7 +69,7 @@ export function chamferEdge(
   ];
   const tri = polygon(pts);
   const prism = sketchExtrude(tri, height + 0.02)
-    .translate(sx, sy, zMin - 0.01);
+    .translate(sx, sy, zMin - 0.01).toShape();
 
   return difference(base, prism);
 }

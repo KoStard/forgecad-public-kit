@@ -169,9 +169,9 @@ export class Circle2D {
   /** Extrude to TrackedShape with top/bottom/side faces */
   extrude(height: number, segments?: number): TrackedShape {
     const sketch = this.toSketch(segments);
-    const shape = sketchExtrude(sketch, height);
+    const extruded = sketchExtrude(sketch, height);
     const topology = buildCircleExtrusionTopology(this, height);
-    return new TrackedShape(shape, topology, height, true);
+    return new TrackedShape(extruded.shape, topology, height, true);
   }
 
   static fromCenterAndRadius(center: Point2D, radius: number): Circle2D {
@@ -317,9 +317,9 @@ export class Rectangle2D {
   /** Extrude this rectangle into a 3D TrackedShape with named faces and edges */
   extrude(height: number, up = true): TrackedShape {
     const sketch = this.toSketch();
-    const shape = sketchExtrude(sketch, height);
+    const extruded = sketchExtrude(sketch, height);
     const topology = buildRectExtrusionTopology(this, height, up);
-    return new TrackedShape(shape, topology, height, up);
+    return new TrackedShape(extruded.shape, topology, height, up);
   }
 }
 

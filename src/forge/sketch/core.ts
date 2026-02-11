@@ -42,7 +42,7 @@ export class Sketch {
   warp(fn: (vert: [number, number]) => void): Sketch {
     return new Sketch(this.cross.warp(fn as any), this.colorHex);
   }
-  extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean; }): Shape { throw new Error('Not implemented'); }
+  extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean; }): Shape | any { throw new Error('Not implemented'); }
   revolve(degrees?: number, segments?: number): Shape { throw new Error('Not implemented'); }
   attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor): Sketch { throw new Error('Not implemented'); }
 }

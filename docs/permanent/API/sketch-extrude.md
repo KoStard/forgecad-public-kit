@@ -15,7 +15,7 @@ Extrudes sketch along Z axis.
   - `scaleTop` (number | [number, number]) - Scale factor at top
   - `center` (boolean) - Center along Z axis
 
-**Returns:** `Shape`
+**Returns:** `TrackedShape` (with faces: top, bottom, side)
 
 ```javascript
 const simple = rect(50, 30).extrude(10);
