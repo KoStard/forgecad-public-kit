@@ -69,7 +69,7 @@ const fanCenter = cylinder(2, grilleR * 0.4).color('#505050')
 // Cooling fins — protrude from left and right sides
 const finCount = 8;
 const fins = [];
-const outdoorBB = outdoorBody.boundingBox;
+const outdoorBB = outdoorBody.boundingBox();
 const finSpacing = (outH - 40) / finCount;
 for (let i = 0; i < finCount; i++) {
   const zOff = -outH / 2 + 20 + i * finSpacing;
@@ -85,7 +85,7 @@ for (let i = 0; i < finCount; i++) {
 // === Refrigerant Pipes ===
 // Connect from back of indoor unit through wall to front of outdoor unit.
 // Pipe runs along Y axis.
-const indoorBB = indoorBody.boundingBox;
+const indoorBB = indoorBody.boundingBox();
 const pipeStartY = indoorBB.max[1]; // back of indoor (wall side)
 const pipeEndY = outdoorBB.min[1];  // front of outdoor (wall side)
 const pipeLen = pipeEndY - pipeStartY;

@@ -215,7 +215,7 @@ export class TrackedShape {
     return this.shape.add(otherShape);
   }
 
-  get boundingBox() {
+  boundingBox() {
     return this.shape.boundingBox();
   }
 

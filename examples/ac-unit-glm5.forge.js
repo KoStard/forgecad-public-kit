@@ -38,7 +38,7 @@ const indoorBody = box(indoorWidth, indoorDepth, indoorHeight, true)
   .translate(0, indoorCenterY, indoorCenterZ)
   .color(indoorColor);
 
-const indoorBounds = indoorBody.boundingBox;
+const indoorBounds = indoorBody.boundingBox();
 
 // Control panel
 const controlWidth = 35;
@@ -83,7 +83,7 @@ const outdoorBody = box(outdoorWidth, outdoorDepth, outdoorHeight, true)
   .translate(0, outdoorCenterY, outdoorCenterZ)
   .color(outdoorColor);
 
-const outdoorBounds = outdoorBody.boundingBox;
+const outdoorBounds = outdoorBody.boundingBox();
 
 // Fan grille - CENTERED vertically on the front face, not above the unit
 const grilleRadius = outdoorWidth * 0.35;
