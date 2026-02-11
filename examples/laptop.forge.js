@@ -119,28 +119,19 @@ const screenAtHinge = screenPanel.translate(0, -hingeY, 0)
   .rotate(180, 0, 0)
   .translate(0, hingeY, hingeZ);
 
-const openLid = joint("Lid Angle", lidAtHinge, [0, hingeY, hingeZ], {
-  axis: [1, 0, 0],
-  min: 0,
-  max: 135,
-  default: 110,
-});
+const lidAngle = param("Lid Angle", 110, { min: 0, max: 135, unit: "°" });
 
-const openScreen = joint("Screen Angle", screenAtHinge, [0, hingeY, hingeZ], {
-  axis: [1, 0, 0],
-  min: 0,
-  max: 135,
-  default: 110,
-});
+const openLid = lidAtHinge.rotateAround([1, 0, 0], lidAngle, [0, hingeY, hingeZ]);
+const openScreen = screenAtHinge.rotateAround([1, 0, 0], lidAngle, [0, hingeY, hingeZ]);
 
-// Hinge cylinders (cosmetic)
+// Hinge cylinders (cosmetic) — rotate around Y to lay along X
 const hingeR = baseH * 0.35;
 const hingeLen = 40;
 const hingeL = cylinder(hingeLen, hingeR, undefined, 16)
-  .rotate(-90, 0, 0)
+  .rotate(0, 90, 0)
   .translate(-w * 0.25, hingeY, hingeZ);
 const hingeR2 = cylinder(hingeLen, hingeR, undefined, 16)
-  .rotate(-90, 0, 0)
+  .rotate(0, 90, 0)
   .translate(w * 0.25, hingeY, hingeZ);
 
 return [
