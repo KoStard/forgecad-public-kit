@@ -44,6 +44,8 @@ declare class Shape {
   transform(m: number[]): Shape;  // 4x4 column-major matrix
   /** Rotate around an arbitrary axis through a pivot point */
   rotateAround(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): Shape;
+  /** Reorient so primary axis (Z) points along given direction. E.g. cylinder(h,r).pointAlong([1,0,0]) lays it along X */
+  pointAlong(direction: [number, number, number]): Shape;
 
   // Booleans
   add(other: Shape): Shape;

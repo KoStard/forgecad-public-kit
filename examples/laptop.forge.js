@@ -124,15 +124,15 @@ const lidAngle = param("Lid Angle", 110, { min: 0, max: 135, unit: "°" });
 const openLid = lidAtHinge.rotateAround([1, 0, 0], lidAngle, [0, hingeY, hingeZ]);
 const openScreen = screenAtHinge.rotateAround([1, 0, 0], lidAngle, [0, hingeY, hingeZ]);
 
-// Hinge cylinders (cosmetic) — rotate around Y to lay along X
+// Hinge cylinders (cosmetic)
 const hingeR = baseH * 0.35;
 const hingeLen = 40;
 const hingeL = cylinder(hingeLen, hingeR, undefined, 16)
-  .rotate(0, 90, 0)
-  .translate(-w * 0.25, hingeY, hingeZ);
+  .pointAlong([-1, 0, 0])
+  .translate(-w * 0.25 + hingeLen / 2, hingeY, hingeZ);
 const hingeR2 = cylinder(hingeLen, hingeR, undefined, 16)
-  .rotate(0, 90, 0)
-  .translate(w * 0.25, hingeY, hingeZ);
+  .pointAlong([1, 0, 0])
+  .translate(w * 0.25 - hingeLen / 2, hingeY, hingeZ);
 
 return [
   { name: "Base", shape: base, color: "#2a2a2a" },

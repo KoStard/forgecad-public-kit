@@ -66,6 +66,31 @@ export class Shape {
   }
 
   /**
+   * Reorient a shape so its primary axis (Z) points along the given direction.
+   * Useful for laying cylinders/extrusions along X or Y without thinking about Euler angles.
+   *
+   * Example: cylinder(40, 5).pointAlong([1, 0, 0]) — lays cylinder along X
+   */
+  pointAlong(direction: [number, number, number]): Shape {
+    const [dx, dy, dz] = direction;
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+    const nx = dx / len, ny = dy / len, nz = dz / len;
+    // From [0,0,1] to [nx,ny,nz] via cross product (rotation axis) and dot product (angle)
+    // cross([0,0,1], [nx,ny,nz]) = [-ny, nx, 0]
+    const cx = -ny, cy = nx, cz = 0;
+    const sinA = Math.sqrt(cx * cx + cy * cy + cz * cz);
+    const cosA = nz; // dot([0,0,1], [nx,ny,nz])
+    if (sinA < 1e-10) {
+      // Parallel or anti-parallel to Z
+      return cosA > 0 ? this : this.rotate(180, 0, 0);
+    }
+    const angleDeg = Math.atan2(sinA, cosA) * 180 / Math.PI;
+    // Normalize cross product to get rotation axis
+    const ax = cx / sinA, ay = cy / sinA, az = cz / sinA;
+    return this.rotateAround([ax, ay, az], angleDeg);
+  }
+
+  /**
    * Rotate around an arbitrary axis through a pivot point.
    * Equivalent to: translate(-pivot) → rotate around axis → translate(+pivot)
    */
