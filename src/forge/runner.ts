@@ -347,13 +347,16 @@ export function runScript(
       logs: _collectedLogs.slice(),
     };
   } catch (e: any) {
+    const msg = e.message || String(e);
+    const stack = e.stack || '';
+    _collectedLogs.push({ level: 'error', args: [msg, ...(stack ? [stack] : [])], timestamp: Date.now() });
     return {
       shape: null,
       sketch: null,
       objects: [],
       params: getCollectedParams(),
       dimensions: getCollectedDimensions(),
-      error: e.message || String(e),
+      error: msg,
       timeMs: performance.now() - t0,
       logs: _collectedLogs.slice(),
     };

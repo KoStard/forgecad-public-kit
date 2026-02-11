@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 
 const levelColors: Record<string, string> = {
@@ -9,6 +9,13 @@ const levelColors: Record<string, string> = {
 export function ConsolePanel() {
   const logs = useForgeStore((s) => s.consoleLogs);
   const [collapsed, setCollapsed] = useState(true);
+  const hasErrors = logs.some((l) => l.level === 'error');
+  const prevHadErrors = useRef(false);
+
+  useEffect(() => {
+    if (hasErrors && !prevHadErrors.current) setCollapsed(false);
+    prevHadErrors.current = hasErrors;
+  }, [hasErrors]);
 
   if (logs.length === 0) return null;
 
