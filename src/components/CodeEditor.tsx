@@ -77,7 +77,7 @@ declare class Shape {
 
   // 3D Anchor positioning
   /** Position this shape relative to another using named 3D anchor points */
-  attachTo(target: Shape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D): Shape;
+  attachTo(target: Shape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D, offset?: [number, number, number]): Shape;
 
   // Query
   volume(): number;
@@ -100,6 +100,9 @@ declare class Sketch {
   hull(): Sketch;
   simplify(epsilon?: number): Sketch;
   warp(fn: (vert: [number, number]) => void): Sketch;
+  attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: [number, number]): Sketch;
+  rotateAround(degrees: number, pivot: [number, number]): Sketch;
+  color(hex: string): Sketch;
   extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean }): TrackedShape;
   revolve(degrees?: number, segments?: number): Shape;
   area(): number;
@@ -216,7 +219,7 @@ declare class TrackedShape {
   moveToLocal(target: Shape | TrackedShape, x: number, y: number, z: number): TrackedShape;
   rotateAroundEdge(edgeName: string, angleDeg: number): TrackedShape;
   /** Position this shape relative to another using named 3D anchor points */
-  attachTo(target: Shape | TrackedShape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D): TrackedShape;
+  attachTo(target: Shape | TrackedShape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D, offset?: [number, number, number]): TrackedShape;
   toShape(): Shape;
 }
 
@@ -264,11 +267,16 @@ declare function dim(from: [number, number] | [number, number, number] | Point2D
 /** Add a dimension annotation along a Line2D. */
 declare function dimLine(line: Line2D, opts?: { offset?: number; label?: string; color?: string }): void;
 
+// --- 2D Anchor Types ---
+type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
+
 // --- 3D Anchor Types ---
 type Anchor3D = 'center' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'
   | 'front-left' | 'front-right' | 'back-left' | 'back-right'
   | 'top-front' | 'top-back' | 'top-left' | 'top-right'
-  | 'bottom-front' | 'bottom-back' | 'bottom-left' | 'bottom-right';
+  | 'bottom-front' | 'bottom-back' | 'bottom-left' | 'bottom-right'
+  | 'top-front-left' | 'top-front-right' | 'top-back-left' | 'top-back-right'
+  | 'bottom-front-left' | 'bottom-front-right' | 'bottom-back-left' | 'bottom-back-right';
 
 // --- Group ---
 /** Group multiple shapes/sketches for joint transforms without merging meshes. Colors preserved. */

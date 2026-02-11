@@ -252,21 +252,28 @@ export class Shape {
     target: Shape,
     targetAnchor: Anchor3D,
     selfAnchor: Anchor3D = 'center',
+    offset?: [number, number, number],
   ): Shape {
     const tp = getAnchorPoint3D(target, targetAnchor);
     const sp = getAnchorPoint3D(this, selfAnchor);
-    return this.translate(tp[0] - sp[0], tp[1] - sp[1], tp[2] - sp[2]);
+    let dx = tp[0] - sp[0], dy = tp[1] - sp[1], dz = tp[2] - sp[2];
+    if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }
+    return this.translate(dx, dy, dz);
   }
 }
 
 // --- 3D Anchor positioning ---
 
 export type Anchor3D = 'center' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'
+  // edge midpoints (2 axes specified)
   | 'front-left' | 'front-right' | 'back-left' | 'back-right'
   | 'top-front' | 'top-back' | 'top-left' | 'top-right'
-  | 'bottom-front' | 'bottom-back' | 'bottom-left' | 'bottom-right';
+  | 'bottom-front' | 'bottom-back' | 'bottom-left' | 'bottom-right'
+  // true corners (3 axes specified)
+  | 'top-front-left' | 'top-front-right' | 'top-back-left' | 'top-back-right'
+  | 'bottom-front-left' | 'bottom-front-right' | 'bottom-back-left' | 'bottom-back-right';
 
-function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, number, number] {
+export function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, number, number] {
   const bb = shape.boundingBox();
   const min = bb.min as [number, number, number];
   const max = bb.max as [number, number, number];
@@ -276,12 +283,14 @@ function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, number, numb
 
   switch (anchor) {
     case 'center': return [cx, cy, cz];
+    // face centers (1 axis pinned)
     case 'front': return [cx, min[1], cz];
     case 'back': return [cx, max[1], cz];
     case 'left': return [min[0], cy, cz];
     case 'right': return [max[0], cy, cz];
     case 'top': return [cx, cy, max[2]];
     case 'bottom': return [cx, cy, min[2]];
+    // edge midpoints (2 axes pinned)
     case 'front-left': return [min[0], min[1], cz];
     case 'front-right': return [max[0], min[1], cz];
     case 'back-left': return [min[0], max[1], cz];
@@ -294,6 +303,15 @@ function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, number, numb
     case 'bottom-back': return [cx, max[1], min[2]];
     case 'bottom-left': return [min[0], cy, min[2]];
     case 'bottom-right': return [max[0], cy, min[2]];
+    // true corners (3 axes pinned)
+    case 'top-front-left': return [min[0], min[1], max[2]];
+    case 'top-front-right': return [max[0], min[1], max[2]];
+    case 'top-back-left': return [min[0], max[1], max[2]];
+    case 'top-back-right': return [max[0], max[1], max[2]];
+    case 'bottom-front-left': return [min[0], min[1], min[2]];
+    case 'bottom-front-right': return [max[0], min[1], min[2]];
+    case 'bottom-back-left': return [min[0], max[1], min[2]];
+    case 'bottom-back-right': return [max[0], max[1], min[2]];
   }
 }
 

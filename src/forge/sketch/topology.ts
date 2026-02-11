@@ -8,7 +8,7 @@
  * Arbitrary boolean results lose topology (mesh kernel limitation).
  */
 
-import { Shape } from '../kernel';
+import { Shape, getAnchorPoint3D } from '../kernel';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
 
 export type FaceName = string;
@@ -163,14 +163,13 @@ export class TrackedShape {
     target: Shape | TrackedShape,
     targetAnchor: string,
     selfAnchor: string = 'center',
+    offset?: [number, number, number],
   ): TrackedShape {
     const targetShape = target instanceof TrackedShape ? target.toShape() : target;
-    const moved = this.toShape().attachTo(targetShape, targetAnchor as any, selfAnchor as any);
-    const bb1 = this.toShape().boundingBox();
-    const bb2 = moved.boundingBox();
-    const dx = (bb2.min as number[])[0] - (bb1.min as number[])[0];
-    const dy = (bb2.min as number[])[1] - (bb1.min as number[])[1];
-    const dz = (bb2.min as number[])[2] - (bb1.min as number[])[2];
+    const tp = getAnchorPoint3D(targetShape, targetAnchor as any);
+    const sp = getAnchorPoint3D(this.toShape(), selfAnchor as any);
+    let dx = tp[0] - sp[0], dy = tp[1] - sp[1], dz = tp[2] - sp[2];
+    if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }
     return this.translate(dx, dy, dz);
   }
 

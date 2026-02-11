@@ -20,14 +20,15 @@ function getAnchorPoint(sketch: Sketch, anchor: Anchor): [number, number] {
   }
 }
 
-export function sketchAttachTo(sketch: Sketch, target: Sketch, targetAnchor: Anchor, selfAnchor: Anchor = 'center'): Sketch {
+export function sketchAttachTo(sketch: Sketch, target: Sketch, targetAnchor: Anchor, selfAnchor: Anchor = 'center', offset?: [number, number]): Sketch {
   const targetPt = getAnchorPoint(target, targetAnchor);
   const selfPt = getAnchorPoint(sketch, selfAnchor);
-  const dx = targetPt[0] - selfPt[0];
-  const dy = targetPt[1] - selfPt[1];
+  let dx = targetPt[0] - selfPt[0];
+  let dy = targetPt[1] - selfPt[1];
+  if (offset) { dx += offset[0]; dy += offset[1]; }
   return sketch.translate(dx, dy);
 }
 
-Sketch.prototype.attachTo = function(target: Sketch, targetAnchor: Anchor, selfAnchor: Anchor = 'center') {
-  return sketchAttachTo(this, target, targetAnchor, selfAnchor);
+Sketch.prototype.attachTo = function(target: Sketch, targetAnchor: Anchor, selfAnchor: Anchor = 'center', offset?: [number, number]) {
+  return sketchAttachTo(this, target, targetAnchor, selfAnchor, offset);
 };

@@ -44,7 +44,7 @@ export class Sketch {
   }
   extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean; }): Shape | any { throw new Error('Not implemented'); }
   revolve(degrees?: number, segments?: number): Shape { throw new Error('Not implemented'); }
-  attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor): Sketch { throw new Error('Not implemented'); }
+  attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: [number, number]): Sketch { throw new Error('Not implemented'); }
 }
 
 export type { Anchor };

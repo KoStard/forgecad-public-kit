@@ -363,7 +363,7 @@ When a ShapeGroup is returned from a script, each child becomes a separate viewp
 
 ## 3D Anchor Positioning
 
-### `.attachTo(target, targetAnchor, selfAnchor?)`
+### `.attachTo(target, targetAnchor, selfAnchor?, offset?)`
 Position a shape relative to another using named 3D anchor points based on bounding boxes.
 
 Available on both `Shape` and `TrackedShape`.
@@ -372,13 +372,13 @@ Available on both `Shape` and `TrackedShape`.
 - `target` (Shape | TrackedShape) — The shape to attach to
 - `targetAnchor` (Anchor3D) — Point on target
 - `selfAnchor` (Anchor3D, optional) — Point on this shape to align. Default: 'center'
+- `offset` ([number, number, number], optional) — Additional offset after alignment
 
 **Anchor3D values:**
 - `'center'` — bounding box center
-- `'front'` (−Y), `'back'` (+Y), `'left'` (−X), `'right'` (+X), `'top'` (+Z), `'bottom'` (−Z)
-- Compound: `'front-left'`, `'front-right'`, `'back-left'`, `'back-right'`
-- Compound: `'top-front'`, `'top-back'`, `'top-left'`, `'top-right'`
-- Compound: `'bottom-front'`, `'bottom-back'`, `'bottom-left'`, `'bottom-right'`
+- Face centers (1 axis pinned): `'front'` (−Y), `'back'` (+Y), `'left'` (−X), `'right'` (+X), `'top'` (+Z), `'bottom'` (−Z)
+- Edge midpoints (2 axes pinned): `'front-left'`, `'front-right'`, `'back-left'`, `'back-right'`, `'top-front'`, `'top-back'`, `'top-left'`, `'top-right'`, `'bottom-front'`, `'bottom-back'`, `'bottom-left'`, `'bottom-right'`
+- True corners (3 axes pinned): `'top-front-left'`, `'top-front-right'`, `'top-back-left'`, `'top-back-right'`, `'bottom-front-left'`, `'bottom-front-right'`, `'bottom-back-left'`, `'bottom-back-right'`
 
 **Returns:** Same type as caller (Shape or TrackedShape)
 
@@ -389,10 +389,13 @@ const column = cylinder(50, 8);
 // Place column on top of base, centered
 const placed = column.attachTo(base, 'top', 'bottom');
 
-// Stack boxes: place b on top of a, aligned at back-left
+// Stack boxes: place b on top of a, aligned at back-left corner
 const a = box(50, 50, 20);
 const b = box(30, 30, 10);
-const stacked = b.attachTo(a, 'top-back', 'bottom-back');
+const stacked = b.attachTo(a, 'top-back-left', 'bottom-back-left');
+
+// Place with offset: center on top, then shift 10mm right
+const shifted = column.attachTo(base, 'top', 'bottom', [10, 0, 0]);
 ```
 
 ## Advanced 3D Operations
@@ -589,13 +592,14 @@ const rounded = stroke([[0, 0], [50, 0], [50, -50]], 4, 'Round');
 
 ### Anchor Positioning
 
-#### `.attachTo(target, targetAnchor, selfAnchor?)`
+#### `.attachTo(target, targetAnchor, selfAnchor?, offset?)`
 Position a sketch relative to another using named anchor points.
 
 **Parameters:**
 - `target` (Sketch) — The sketch to attach to
 - `targetAnchor` (Anchor) — Point on target: 'center', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'top', 'bottom', 'left', 'right'
 - `selfAnchor` (Anchor, optional) — Point on this sketch to align. Default: 'center'
+- `offset` ([number, number], optional) — Additional offset after alignment
 
 **Returns:** `Sketch`
 
@@ -603,6 +607,9 @@ Position a sketch relative to another using named anchor points.
 const plate = rect(50, 4);
 const arm = rect(4, 70).attachTo(plate, 'bottom-left', 'top-left');
 return union2d(plate, arm);
+
+// With offset: attach then shift 5mm right
+const shifted = rect(4, 70).attachTo(plate, 'bottom-left', 'top-left', [5, 0]);
 ```
 
 #### `.rotateAround(degrees, pivot)`
