@@ -135,6 +135,11 @@ export class TrackedShape {
     );
   }
 
+  /** Set the display color. Returns a new TrackedShape. */
+  color(value: string | undefined): TrackedShape {
+    return new TrackedShape(this.shape.color(value), this.topology, this.baseHeight, this.extrudeUp);
+  }
+
   /** Access the underlying Shape for boolean ops etc */
   toShape(): Shape {
     return this.shape;

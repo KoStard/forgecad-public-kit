@@ -51,9 +51,7 @@ export class ShapeGroup {
 
   color(hex: string): ShapeGroup {
     return new ShapeGroup(this.children.map(c => {
-      if (c instanceof TrackedShape) return new TrackedShape(
-        c.toShape().color(hex), c.topology, 0, true,
-      );
+      if (c instanceof TrackedShape) return c.color(hex);
       if (c instanceof Shape) return c.color(hex);
       return c.color(hex);
     }));
