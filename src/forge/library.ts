@@ -5,7 +5,7 @@
  * Each part is a function that returns a Shape, taking parameters.
  */
 
-import { box, cylinder, sphere, union, difference, intersection, Shape, getWasm, levelSet } from './kernel';
+import { box, cylinder, sphere, union, difference, intersection, Shape, getWasm } from './kernel';
 
 /** M-series bolt hole (through-hole) */
 export function boltHole(diameter: number, depth: number): Shape {
@@ -146,34 +146,65 @@ export const partLibrary = {
 // --- Thread / Fastener library ---
 
 /**
- * External thread (helical ridge on a cylinder) via SDF levelSet.
+ * External thread via twisted extrusion — no SDF grid artifacts.
+ * 
+ * The idea: build a cross-section that's a circle at the root diameter
+ * with one trapezoidal bump out to the crest diameter. Then twist-extrude
+ * it so the bump traces a helix. Manifold's extrude+twist produces clean
+ * structured geometry — quads split into triangles that follow the thread.
+ * 
  * Returns a threaded cylinder along +Z from z=0 to z=length.
  */
 export function thread(
   diameter: number,
   pitch: number,
   length: number,
-  options?: { depth?: number; edgeLength?: number },
+  options?: { depth?: number; segments?: number },
 ): Shape {
   const r = diameter / 2;
   const depth = options?.depth ?? pitch * 0.35;
-  const edgeLen = options?.edgeLength ?? Math.max(0.3, pitch * 0.4);
-  const pad = depth + 1;
+  const segs = options?.segments ?? 36;
+  const rRoot = r - depth;
+  const rCrest = r;
+  const turns = length / pitch;
+  const divisions = Math.max(4, Math.ceil(turns * segs));
 
-  return levelSet(
-    ([x, y, z]) => {
-      const dist = Math.sqrt(x * x + y * y);
-      const angle = Math.atan2(y, x);
-      const phase = angle + (z / pitch) * Math.PI * 2;
-      const t = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      // Triangle wave: thread crest at peak, root at valley
-      const wave = t < Math.PI ? (2 * t / Math.PI - 1) : (1 - 2 * (t - Math.PI) / Math.PI);
-      const threadR = r - depth + depth * (1 + wave);
-      return threadR - dist;
-    },
-    { min: [-r - pad, -r - pad, 0], max: [r + pad, r + pad, length] },
-    edgeLen,
-  );
+  // The tooth angular width at the root radius.
+  // Standard metric: tooth occupies ~50% of pitch circumferentially.
+  // One pitch spans (pitch / rRoot) radians at the root circle.
+  const toothHalfWidth = (pitch * 0.5) / (2 * rRoot);  // half-width in radians
+  const flankWidth = toothHalfWidth * 0.4;  // transition zone
+
+  const pts: [number, number][] = [];
+  for (let i = 0; i < segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+
+    // Distance from the tooth center (at angle=0), wrapped to [-π, π]
+    let da = a;
+    if (da > Math.PI) da -= Math.PI * 2;
+    const absDA = Math.abs(da);
+
+    let radius: number;
+    if (absDA < toothHalfWidth - flankWidth) {
+      // Crest flat
+      radius = rCrest;
+    } else if (absDA < toothHalfWidth) {
+      // Flank — linear blend from crest to root
+      const t = (absDA - (toothHalfWidth - flankWidth)) / flankWidth;
+      radius = rCrest + (rRoot - rCrest) * t;
+    } else {
+      // Root
+      radius = rRoot;
+    }
+
+    pts.push([radius * Math.cos(a), radius * Math.sin(a)]);
+  }
+
+  const wasm = getWasm();
+  const cross = wasm.CrossSection.ofPolygons([pts]);
+  const m = wasm.Manifold.extrude(cross, length, divisions, turns * 360);
+  cross.delete();
+  return new Shape(m);
 }
 
 /**
@@ -188,7 +219,7 @@ export function bolt(
     headHeight?: number;
     headAcrossFlats?: number;
     threadLength?: number;
-    edgeLength?: number;
+    segments?: number;
   },
 ): Shape {
   const r = diameter / 2;
@@ -196,7 +227,7 @@ export function bolt(
   const headH = options?.headHeight ?? diameter * 0.65;
   const headAF = options?.headAcrossFlats ?? diameter * 1.6;
   const threadLen = options?.threadLength ?? length;
-  const edgeLen = options?.edgeLength ?? Math.max(0.3, pitch * 0.4);
+  const segs = options?.segments ?? 36;
 
   // Hex head
   const slab = box(headAF * 1.2, headAF, headH, true).translate(0, 0, headH / 2);
@@ -210,21 +241,17 @@ export function bolt(
 
   if (unthreadedLen > 0.1) {
     parts.push(
-      cylinder(unthreadedLen, r, undefined, 32).translate(0, 0, -unthreadedLen),
+      cylinder(unthreadedLen, r, undefined, segs).translate(0, 0, -unthreadedLen),
     );
   }
 
   // Threaded portion
-  const threaded = thread(diameter, pitch, threadLen, { edgeLength: edgeLen })
+  const threaded = thread(diameter, pitch, threadLen, { segments: segs })
     .translate(0, 0, -length);
   parts.push(threaded);
 
-  // Tip chamfer (cone at the end)
-  const depth = pitch * 0.35;
-  const tipChamfer = cylinder(depth * 3, r + depth + 0.1, 0, 32)
-    .translate(0, 0, -length - 0.01);
-
-  return union(...parts).subtract(tipChamfer);
+  // TODO: Tip chamfer (cone at the end)
+  return union(...parts);
 }
 
 /**
@@ -237,14 +264,14 @@ export function nut(
     pitch?: number;
     height?: number;
     acrossFlats?: number;
-    edgeLength?: number;
+    segments?: number;
   },
 ): Shape {
   const r = diameter / 2;
   const pitch = options?.pitch ?? diameter * 0.15;
   const nutH = options?.height ?? diameter * 0.8;
   const nutAF = options?.acrossFlats ?? diameter * 1.6;
-  const edgeLen = options?.edgeLength ?? Math.max(0.3, pitch * 0.4);
+  const segs = options?.segments ?? 36;
 
   // Hex body
   const slab = box(nutAF * 1.2, nutAF, nutH, true);
@@ -257,13 +284,7 @@ export function nut(
   const bore = cylinder(nutH + 1, r + 0.1, undefined, 48, true);
   hexBody = hexBody.subtract(bore);
 
-  // Chamfer top and bottom edges
-  const chamferH = Math.min(1.2, nutH * 0.15);
-  const nutOuterR = nutAF / (2 * Math.cos(Math.PI / 6));
-  const topChamfer = cylinder(chamferH, nutOuterR + 0.5, nutOuterR - chamferH, 6)
-    .translate(0, 0, nutH / 2 - chamferH + 0.01);
-  const botChamfer = cylinder(chamferH, nutOuterR - chamferH, nutOuterR + 0.5, 6)
-    .translate(0, 0, -nutH / 2 - 0.01);
+  // TODO: Chamfer top and bottom edges
 
-  return hexBody.subtract(topChamfer).subtract(botChamfer);
+  return hexBody;
 }

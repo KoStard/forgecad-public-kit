@@ -800,15 +800,15 @@ L-shaped mounting bracket with optional holes.
 Grid of cylindrical holes.
 
 ### `lib.thread(diameter, pitch, length, options?)`
-External thread (helical ridge) via SDF levelSet. Returns a threaded cylinder along +Z.
+External thread (helical ridge) via twisted extrusion. Returns a threaded cylinder along +Z.
 
 **Options:**
 - `depth` (number) - Thread depth. Default: `pitch * 0.35`
-- `edgeLength` (number) - Mesh resolution. Default: `pitch * 0.4`
+- `segments` (number) - Circumferential segments. Default: 36
 
 ```javascript
 const m8thread = lib.thread(8, 1.25, 30);
-const fine = lib.thread(8, 1.0, 30, { edgeLength: 0.3 });
+const smooth = lib.thread(8, 1.0, 30, { segments: 48 });
 ```
 
 ### `lib.bolt(diameter, length, options?)`
@@ -819,7 +819,7 @@ Hex bolt with real helical threads. Head at z=0, shaft extends along −Z.
 - `headHeight` (number) - Default: `diameter * 0.65`
 - `headAcrossFlats` (number) - Default: `diameter * 1.6`
 - `threadLength` (number) - Threaded portion. Default: full length
-- `edgeLength` (number) - Mesh resolution. Default: `pitch * 0.4`
+- `segments` (number) - Circumferential segments. Default: 36
 
 ```javascript
 const m8bolt = lib.bolt(8, 30);
@@ -833,7 +833,7 @@ Hex nut with bore, centered at origin.
 - `pitch` (number) - Default: `diameter * 0.15`
 - `height` (number) - Default: `diameter * 0.8`
 - `acrossFlats` (number) - Default: `diameter * 1.6`
-- `edgeLength` (number) - Mesh resolution
+- `segments` (number) - Circumferential segments. Default: 36
 
 ```javascript
 const m8nut = lib.nut(8);
