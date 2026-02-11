@@ -1,183 +1,171 @@
-// ============================================
-// Home AC Unit v3 - Indoor and Outdoor Components
-// Fixed: fan grille position, pipe length and placement
-// ============================================
+// Home AC Unit V3 - Fixed cylinder orientation and positioning
 
-// Wall Parameters
-const wallThickness = param("Wall Thickness", 20, { min: 10, max: 50, unit: "mm" });
-const wallWidth = param("Wall Width", 400, { min: 200, max: 600, unit: "mm" });
-const wallHeight = param("Wall Height", 300, { min: 200, max: 500, unit: "mm" });
+// Parameters
+const wallThick = param("Wall Thickness", 20, { min: 10, max: 40, unit: "mm" });
+const indoorWidth = param("Indoor Width", 80, { min: 60, max: 120, unit: "mm" });
+const indoorHeight = param("Indoor Height", 30, { min: 20, max: 50, unit: "mm" });
+const indoorDepth = param("Indoor Depth", 20, { min: 15, max: 35, unit: "mm" });
+const outdoorWidth = param("Outdoor Width", 70, { min: 50, max: 100, unit: "mm" });
+const outdoorHeight = param("Outdoor Height", 55, { min: 40, max: 80, unit: "mm" });
+const outdoorDepth = param("Outdoor Depth", 30, { min: 20, max: 50, unit: "mm" });
 
-// Indoor Unit Parameters
-const indoorWidth = param("Indoor Width", 200, { min: 100, max: 400, unit: "mm" });
-const indoorHeight = param("Indoor Height", 80, { min: 40, max: 150, unit: "mm" });
-const indoorDepth = param("Indoor Depth", 25, { min: 15, max: 60, unit: "mm" });
+// --- Wall (reference) ---
+// Centered on Y=0: front at Y=-wallThick/2, back at Y=+wallThick/2
+const wall = box(120, wallThick, 100, true).color('#d4c4a8');
 
-// Outdoor Unit Parameters
-const outdoorWidth = param("Outdoor Width", 180, { min: 100, max: 400, unit: "mm" });
-const outdoorHeight = param("Outdoor Height", 150, { min: 80, max: 300, unit: "mm" });
-const outdoorDepth = param("Outdoor Depth", 50, { min: 30, max: 100, unit: "mm" });
-
-// Colors
-const wallColor = '#D4C4A8';
-const indoorColor = '#FFFFFF';
-const indoorAccent = '#E8E8E8';
-const outdoorColor = '#F5F5F5';
-const outdoorGrill = '#404040';
-const pipeColor = '#A0A0A0';
-
-// ---- WALL (centered at origin) ----
-const wall = box(wallWidth, wallThickness, wallHeight, true)
-  .color(wallColor);
-
-// ---- INDOOR UNIT ----
-const indoorCenterY = -wallThickness/2 - indoorDepth/2 - 5;
-const indoorCenterZ = wallHeight/2 - indoorHeight/2 - 20;
-
+// --- INDOOR UNIT (on FRONT of wall, -Y side) ---
 const indoorBody = box(indoorWidth, indoorDepth, indoorHeight, true)
-  .translate(0, indoorCenterY, indoorCenterZ)
-  .color(indoorColor);
+  .color('#f5f5f5')
+  .attachTo(wall, 'front', 'back', [0, 0, 20]); // Raised 20mm above center
 
-const indoorBounds = indoorBody.boundingBox();
+// Front panel (flush with indoor body front)
+const frontPanel = roundedRect(indoorWidth - 4, indoorHeight - 4, 3, true)
+  .extrude(2)
+  .color('#ffffff')
+  .attachTo(indoorBody, 'front', 'back');
 
-// Control panel
-const controlWidth = 35;
-const controlHeight = 18;
-const controlDepth = 4;
-const controlPanel = box(controlWidth, controlDepth, controlHeight)
-  .translate(
-    indoorBounds.max[0] - controlWidth - 15,
-    indoorBounds.min[1] - controlDepth,
-    indoorBounds.max[2] - controlHeight - 15
-  )
-  .color('#1A1A1A');
+// Air outlet vents
+const ventCount = 5;
+const ventSpacing = indoorHeight / (ventCount + 1);
+const vents = [];
+for (let i = 1; i <= ventCount; i++) {
+  const z = -indoorHeight/2 + i * ventSpacing;
+  const vent = box(indoorWidth - 20, 2, 3, true)
+    .color('#333333')
+    .attachTo(frontPanel, 'front', 'center', [0, -1, z]);
+  vents.push(vent);
+}
+
+// Display panel
+const display = box(15, 1, 6, true)
+  .color('#1a1a2e')
+  .attachTo(frontPanel, 'front', 'center', [indoorWidth/4, -1, indoorHeight/4]);
 
 // LED indicator
-const led = sphere(2.5)
-  .translate(
-    indoorBounds.max[0] - controlWidth/2 - 15,
-    indoorBounds.min[1] - controlDepth - 3,
-    indoorBounds.max[2] - 25
-  )
-  .color('#00FF00');
+const led = sphere(1.5).color('#00ff00')
+  .attachTo(display, 'front', 'front', [0, -1, -2]);
 
-// Vent slats
-const slatCount = 4;
-const slatWidth = indoorWidth - 30;
-const slatThickness = 3;
-const slatDepth = 8;
-const slats = [];
-for (let i = 0; i < slatCount; i++) {
-  const slatZ = indoorBounds.min[2] + 10 + i * 12;
-  const slat = box(slatWidth, slatDepth, slatThickness)
-    .translate(-slatWidth/2, indoorBounds.min[1] - slatDepth, slatZ)
-    .color(indoorAccent);
-  slats.push(slat);
-}
+// Mounting bracket
+const bracket = box(indoorWidth - 10, 3, 5)
+  .color('#888888')
+  .attachTo(indoorBody, 'back', 'front');
 
-// ---- OUTDOOR UNIT ----
-const outdoorCenterY = wallThickness/2 + outdoorDepth/2 + 10;
-const outdoorCenterZ = outdoorHeight/2 + 30;
-
+// --- OUTDOOR UNIT (on BACK of wall, +Y side) ---
 const outdoorBody = box(outdoorWidth, outdoorDepth, outdoorHeight, true)
-  .translate(0, outdoorCenterY, outdoorCenterZ)
-  .color(outdoorColor);
+  .color('#e8e8e8')
+  .attachTo(wall, 'back', 'front', [0, 0, 10]); // Raised slightly
 
-const outdoorBounds = outdoorBody.boundingBox();
+// Big fan housing - CYLINDER MUST BE ORIENTED ALONG Y FIRST!
+const fanRadius = outdoorHeight * 0.35;
+const fanDepth = outdoorDepth - 8;
+const fanHousing = cylinder(fanDepth, fanRadius)
+  .pointAlong([0, 1, 0])  // Orient along Y axis (perpendicular to wall)
+  .color('#555555')
+  .attachTo(outdoorBody, 'front', 'back'); // Cylinder's back face at outdoor body's front
 
-// Fan grille - CENTERED vertically on the front face, not above the unit
-const grilleRadius = outdoorWidth * 0.35;
-const grilleCenterZ = (outdoorBounds.min[2] + outdoorBounds.max[2]) / 2; // exact center
+// Fan blades
+const fanBlade = cylinder(3, fanRadius - 3)
+  .pointAlong([0, 1, 0])
+  .color('#222222')
+  .attachTo(fanHousing, 'front', 'front');
 
-const fanGrilleRim = cylinder(4, grilleRadius)
-  .rotate(90, 0, 0)
-  .translate(
-    0,
-    outdoorBounds.max[1] + 2, // on front face
-    grilleCenterZ             // centered vertically
-  )
-  .color(outdoorGrill);
+// Fan grille (concentric rings)
+const grilleInner = circle2d(fanRadius * 0.4).color('#666666');
+const grilleMiddle = circle2d(fanRadius * 0.7)
+  .subtract(circle2d(fanRadius * 0.6))
+  .color('#666666');
+const grilleOuter = circle2d(fanRadius * 0.9)
+  .subtract(circle2d(fanRadius * 0.85))
+  .color('#666666');
+const grille = union2d(grilleInner, grilleMiddle, grilleOuter)
+  .extrude(0.5)
+  .attachTo(fanBlade, 'front', 'front');
 
-const fanGrilleCenter = cylinder(2, grilleRadius * 0.4)
-  .rotate(90, 0, 0)
-  .translate(0, outdoorBounds.max[1] + 3, grilleCenterZ)
-  .color('#505050');
-
-// Cooling fins - on sides
+// Heat exchanger fins (on side, vertical)
 const finCount = 8;
-const finWidth = 5;
-const finDepth = 12;
-const finHeight = 3;
 const fins = [];
-
 for (let i = 0; i < finCount; i++) {
-  const finZ = outdoorBounds.min[2] + 20 + i * ((outdoorHeight - 40) / finCount);
-  
-  const leftFin = box(finWidth, finDepth, finHeight)
-    .translate(outdoorBounds.min[0] - finWidth, outdoorBounds.min[1] + 5, finZ)
-    .color(outdoorGrill);
-  fins.push(leftFin);
-  
-  const rightFin = box(finWidth, finDepth, finHeight)
-    .translate(outdoorBounds.max[0], outdoorBounds.min[1] + 5, finZ)
-    .color(outdoorGrill);
-  fins.push(rightFin);
+  const fin = box(0.5, outdoorDepth - 8, outdoorHeight - 10, true)
+    .color('#cc8844')
+    .attachTo(outdoorBody, 'right', 'center', [outdoorWidth/2 - 3 + i * 3, 0, 0]);
+  fins.push(fin);
 }
 
-// ---- REFRIGERANT PIPES ----
-// Pipes go from back of indoor unit (near wall), through wall, to side of outdoor unit
-const pipeRadius = 5;
-const pipeX = 50;
+// Outdoor unit legs
+const legH = 8;
+const leg1 = box(8, 8, legH).color('#444444')
+  .attachTo(outdoorBody, 'bottom', 'top', [outdoorWidth/3, outdoorDepth/3, -legH/2]);
+const leg2 = box(8, 8, legH).color('#444444')
+  .attachTo(outdoorBody, 'bottom', 'top', [-outdoorWidth/3, outdoorDepth/3, -legH/2]);
 
-// Pipe Z: at the bottom of indoor unit where connections typically are
-const pipeZ = indoorBounds.min[2] + 20;
+// --- CONNECTING PIPES ---
+const pipeR = 4;
 
-// Pipe endpoints in Y:
-// - Indoor side: back of indoor unit (the part nearest the wall)
-// - Outdoor side: back of outdoor unit (the part nearest the wall)
-const pipeY_start = indoorBounds.max[1]; // back of indoor (near wall, +Y side)
-const pipeY_end = outdoorBounds.min[1];  // back of outdoor (near wall, -Y side)
+// Get bounding boxes for precise pipe routing
+const indoorBB = indoorBody.boundingBox();
+const outdoorBB = outdoorBody.boundingBox();
 
-// Cylinder height (length along Y after rotation)
-const pipeLength = pipeY_end - pipeY_start;
+// Pipe exit point: bottom-back of indoor unit
+const exitX = -indoorWidth/3;
+const exitY = indoorBB.min[1]; // Back of indoor unit (most negative Y)
+const exitZ = indoorBB.min[2] + 8; // Near bottom
 
-// Pipe center Y position
-const pipeCenterY = (pipeY_start + pipeY_end) / 2;
+// Pipe entry point: bottom-front of outdoor unit  
+const entryX = outdoorWidth/3;
+const entryY = outdoorBB.max[1]; // Front of outdoor unit (most positive Y)
+const entryZ = outdoorBB.min[2] + 12;
 
-// Liquid line (smaller)
-const liquidPipe = cylinder(pipeLength, pipeRadius * 0.7)
-  .rotate(90, 0, 0) // height now along Y
-  .translate(pipeX, pipeCenterY, pipeZ)
-  .color(pipeColor);
+// Segment 1: Drop down from indoor unit
+const dropH = 20;
+const pipe1 = cylinder(dropH, pipeR)
+  .pointAlong([0, 0, -1])  // Pointing down
+  .translate(exitX, exitY + 2, exitZ)
+  .color('#c4a066');
 
-// Gas line (larger)
-const gasPipe = cylinder(pipeLength, pipeRadius)
-  .rotate(90, 0, 0)
-  .translate(pipeX + 15, pipeCenterY, pipeZ)
-  .color(pipeColor);
+// Segment 2: Horizontal through wall
+const midZ = exitZ - dropH;
+const pipe2Len = entryY - exitY + 4; // From indoor exit to outdoor entry
+const pipe2 = cylinder(pipe2Len, pipeR)
+  .pointAlong([0, 1, 0])  // Pointing toward outdoor (positive Y)
+  .translate(exitX, exitY + pipe2Len/2, midZ)
+  .color('#c4a066');
 
-// Insulation at outdoor connection point
-const insulationLiquid = cylinder(12, pipeRadius * 1.8)
-  .rotate(90, 0, 0)
-  .translate(pipeX, pipeY_end - 6, pipeZ)
-  .color('#333333');
+// Segment 3: Rise up to outdoor unit
+const riseH = entryZ - midZ;
+const pipe3 = cylinder(riseH, pipeR)
+  .pointAlong([0, 0, 1])  // Pointing up
+  .translate(entryX, entryY - 2, midZ)
+  .color('#c4a066');
 
-const insulationGas = cylinder(12, pipeRadius * 2.2)
-  .rotate(90, 0, 0)
-  .translate(pipeX + 15, pipeY_end - 6, pipeZ)
-  .color('#333333');
+// Segment 4: Connect into outdoor unit
+const pipe4 = cylinder(12, pipeR)
+  .pointAlong([0, -1, 0])  // Pointing toward outdoor unit
+  .translate(entryX, entryY + 6, entryZ)
+  .color('#c4a066');
 
-// ---- RETURN ----
+// --- Return as named objects ---
 return [
   { name: "Wall", shape: wall },
-  { name: "Indoor Unit", shape: indoorBody },
-  { name: "Control Panel", shape: controlPanel },
+  
+  // Indoor unit
+  { name: "Indoor Body", shape: indoorBody },
+  { name: "Front Panel", shape: frontPanel },
+  { name: "Vents", shape: group(...vents) },
+  { name: "Display", shape: display },
   { name: "LED", shape: led },
-  { name: "Vent Slats", shape: union(...slats) },
-  { name: "Outdoor Unit", shape: outdoorBody },
-  { name: "Fan Grille", shape: union(fanGrilleRim, fanGrilleCenter) },
-  { name: "Cooling Fins", shape: union(...fins) },
-  { name: "Liquid Pipe", shape: liquidPipe },
-  { name: "Gas Pipe", shape: gasPipe },
-  { name: "Pipe Insulation", shape: union(insulationLiquid, insulationGas) },
+  { name: "Mounting Bracket", shape: bracket },
+  
+  // Outdoor unit  
+  { name: "Outdoor Body", shape: outdoorBody },
+  { name: "Fan Housing", shape: fanHousing },
+  { name: "Fan Blades", shape: fanBlade },
+  { name: "Fan Grille", shape: grille },
+  { name: "Heat Fins", shape: group(...fins) },
+  { name: "Legs", shape: group(leg1, leg2) },
+  
+  // Pipes
+  { name: "Pipe 1 (drop)", shape: pipe1 },
+  { name: "Pipe 2 (horizontal)", shape: pipe2 },
+  { name: "Pipe 3 (rise)", shape: pipe3 },
+  { name: "Pipe 4 (connect)", shape: pipe4 },
 ];
