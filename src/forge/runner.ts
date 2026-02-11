@@ -349,14 +349,21 @@ export function runScript(
   } catch (e: any) {
     const msg = e.message || String(e);
     const stack = e.stack || '';
-    _collectedLogs.push({ level: 'error', args: [msg, ...(stack ? [stack] : [])], timestamp: Date.now() });
+    // Extract script line number from stack: "<anonymous>:LINE:COL" — offset by 2 (Function wrapper + "use strict")
+    let lineInfo = '';
+    const m = stack.match(/<anonymous>:(\d+):(\d+)/);
+    if (m) {
+      const scriptLine = Math.max(1, parseInt(m[1], 10) - 2);
+      lineInfo = ` (line ${scriptLine})`;
+    }
+    _collectedLogs.push({ level: 'error', args: [`${msg}${lineInfo}`, ...(stack ? [stack] : [])], timestamp: Date.now() });
     return {
       shape: null,
       sketch: null,
       objects: [],
       params: getCollectedParams(),
       dimensions: getCollectedDimensions(),
-      error: msg,
+      error: `${msg}${lineInfo}`,
       timeMs: performance.now() - t0,
       logs: _collectedLogs.slice(),
     };
