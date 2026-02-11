@@ -94,6 +94,7 @@ for (const d of doorDefs) {
     min: minA,
     max: maxA,
     default: defA,
+    reverse: d.sign === -1,
   });
 
   doorParts.push({ name: `${label} ${side} Door`, shape: opened, color: "#a07850" });

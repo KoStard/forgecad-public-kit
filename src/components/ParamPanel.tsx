@@ -48,7 +48,7 @@ export function ParamPanel() {
                   const v = parseFloat(e.target.value);
                   setParam(p.name, p.integer ? Math.round(v) : v);
                 }}
-                style={{ width: '100%', accentColor: '#4a9eff' }}
+                style={{ width: '100%', accentColor: '#4a9eff', direction: p.reverse ? 'rtl' : undefined }}
               />
             </div>
           ))}

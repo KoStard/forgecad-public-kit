@@ -14,6 +14,7 @@ export interface RevoluteJointOpts {
   max?: number;
   default?: number;
   unit?: string;
+  reverse?: boolean;
 }
 
 /**
@@ -35,6 +36,6 @@ export function joint(
   const min = opts.min ?? 0;
   const max = opts.max ?? 180;
   const def = opts.default ?? 0;
-  const angle = param(name, def, { min, max, unit: opts.unit ?? '°' });
+  const angle = param(name, def, { min, max, unit: opts.unit ?? '°', reverse: opts.reverse });
   return shape.rotateAround(axis, angle, pivot);
 }
