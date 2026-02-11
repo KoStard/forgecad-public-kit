@@ -37,6 +37,11 @@ export class ShapeGroup {
     return { min, max };
   }
 
+  boundingBox(): { min: [number, number, number]; max: [number, number, number] } {
+    const bb = this._bbox();
+    return { min: bb.min as [number, number, number], max: bb.max as [number, number, number] };
+  }
+
   /** Move so combined bounding box min corner is at the given global coordinate */
   moveTo(x: number, y: number, z: number): ShapeGroup {
     const bb = this._bbox();
