@@ -18,6 +18,7 @@ function getRenderer(size: number): THREE.WebGLRenderer {
     renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
+      logarithmicDepthBuffer: true,
       preserveDrawingBuffer: true,
     });
     renderer.toneMapping = THREE.ACESFilmicToneMapping;

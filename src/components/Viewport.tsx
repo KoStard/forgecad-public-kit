@@ -990,6 +990,7 @@ export function Viewport() {
         dpr={[1, 2]}
         gl={{
           antialias: true,
+          logarithmicDepthBuffer: true,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.0,
         }}
