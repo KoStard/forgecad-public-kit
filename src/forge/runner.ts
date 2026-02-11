@@ -270,6 +270,10 @@ export function runScript(
         }
         if (isNamedObject(item)) {
           const name = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : label;
+          if (item.shape instanceof ShapeGroup) {
+            item.shape.children.forEach((child, i) => flattenGroupChild(child, `${name}.${i + 1}`));
+            return;
+          }
           if (item.shape instanceof TrackedShape) {
             objects.push({ id: `obj-${objects.length + 1}`, name, shape: item.shape.toShape(), sketch: null, color: item.color || item.shape.toShape().colorHex });
             return;
