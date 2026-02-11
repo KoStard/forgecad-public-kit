@@ -182,6 +182,10 @@ interface ForgeStore {
   commandPaletteOpen: boolean;
   openCommandPalette: () => void;
   closeCommandPalette: () => void;
+
+  fileSwitcherOpen: boolean;
+  openFileSwitcher: () => void;
+  closeFileSwitcher: () => void;
 }
 
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
@@ -661,4 +665,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   commandPaletteOpen: false,
   openCommandPalette: () => set({ commandPaletteOpen: true }),
   closeCommandPalette: () => set({ commandPaletteOpen: false }),
+
+  fileSwitcherOpen: false,
+  openFileSwitcher: () => set({ fileSwitcherOpen: true }),
+  closeFileSwitcher: () => set({ fileSwitcherOpen: false }),
 }));

@@ -273,6 +273,11 @@ export function CodeEditor() {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       useForgeStore.getState().saveFile();
     });
+
+    // Free Cmd+K so it reaches the window-level FileSwitcher handler
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => {
+      useForgeStore.getState().openFileSwitcher();
+    });
   };
 
   const handleChange = useCallback(

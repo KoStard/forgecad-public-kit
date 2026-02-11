@@ -8,6 +8,7 @@ import { ExportPanel } from './components/ExportPanel';
 import { FileExplorer } from './components/FileExplorer';
 import { ViewPanel } from './components/ViewPanel';
 import { CommandPalette } from './components/CommandPalette';
+import { FileSwitcher } from './components/FileSwitcher';
 
 const btnStyle = (active = false): React.CSSProperties => ({
   padding: '4px 10px',
@@ -147,6 +148,19 @@ export function App() {
     };
   }, [refreshFiles]);
 
+  // Warn before closing/refreshing with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      const { files, savedFiles } = useForgeStore.getState();
+      const hasUnsaved = Object.keys(files).some((k) => files[k] !== savedFiles[k]);
+      if (hasUnsaved) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
+
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
       const state = dragStateRef.current;
@@ -230,6 +244,7 @@ export function App() {
         </div>
       </div>
       <CommandPalette />
+      <FileSwitcher />
     </div>
   );
 }
