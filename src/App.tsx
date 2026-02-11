@@ -221,7 +221,7 @@ export function App() {
                   borderLeft: '1px solid #333',
                 }}
               />
-              <div style={{ width: viewPanelWidth, minWidth: minViewPanelWidth, maxWidth: maxViewPanelWidth }}>
+              <div style={{ width: viewPanelWidth, minWidth: minViewPanelWidth, maxWidth: maxViewPanelWidth, overflowY: 'auto' }}>
                 <ViewPanel />
               </div>
             </>

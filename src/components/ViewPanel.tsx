@@ -67,7 +67,7 @@ export function ViewPanel() {
         borderLeft: '1px solid #333',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
+        overflowY: 'auto',
       }}
     >
       <div style={{ padding: '10px 12px', borderBottom: '1px solid #2b2b2b' }}>

@@ -167,7 +167,7 @@ const bracketL = box(70, bracketSize, bracketSize)
 const bracketR = box(70, bracketSize, bracketSize)
   .translate(wallT, rackY + rackLen / 2 - bracketSize, wallT + rackZ);
 const towelBar = cylinder(rackLen - bracketSize * 2, barR)
-  .rotate(90, 0, 0)
+  .rotate(-90, 0, 0)
   .translate(wallT + 50, rackY - rackLen / 2 + bracketSize, wallT + rackZ + bracketSize / 2);
 
 const towelRack = union(bracketL, bracketR, towelBar);
