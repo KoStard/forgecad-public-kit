@@ -69,7 +69,7 @@ const fanCenter = cylinder(2, grilleR * 0.4).color('#505050')
 // Cooling fins — protrude from left and right sides
 const finCount = 8;
 const fins = [];
-const outdoorBB = outdoorBody.boundingBox();
+const outdoorBB = outdoorBody.boundingBox;
 const finSpacing = (outH - 40) / finCount;
 for (let i = 0; i < finCount; i++) {
   const zOff = -outH / 2 + 20 + i * finSpacing;
@@ -85,30 +85,30 @@ for (let i = 0; i < finCount; i++) {
 // === Refrigerant Pipes ===
 // Connect from back of indoor unit through wall to front of outdoor unit.
 // Pipe runs along Y axis.
-const indoorBB = indoorBody.boundingBox();
+const indoorBB = indoorBody.boundingBox;
 const pipeStartY = indoorBB.max[1]; // back of indoor (wall side)
 const pipeEndY = outdoorBB.min[1];  // front of outdoor (wall side)
 const pipeLen = pipeEndY - pipeStartY;
-const pipeCenterY = (pipeStartY + pipeEndY) / 2;
 const pipeZ = indoorBB.min[2] + 15; // near bottom of indoor unit
 const pipeX = 40;
 
+// cylinder after pointAlong([0,1,0]) spans Y=0..pipeLen, so translate to pipeStartY
 const liquidPipe = cylinder(pipeLen, 3.5).color(C_PIPE)
   .pointAlong([0, 1, 0])
-  .translate(pipeX, pipeCenterY, pipeZ);
+  .translate(pipeX, pipeStartY, pipeZ);
 
 const gasPipe = cylinder(pipeLen, 5).color(C_PIPE)
   .pointAlong([0, 1, 0])
-  .translate(pipeX + 15, pipeCenterY, pipeZ);
+  .translate(pipeX + 15, pipeStartY, pipeZ);
 
 // Insulation at outdoor connection
 const insLiquid = cylinder(12, 7).color('#333333')
   .pointAlong([0, 1, 0])
-  .translate(pipeX, pipeEndY - 6, pipeZ);
+  .translate(pipeX, pipeEndY - 12, pipeZ);
 
 const insGas = cylinder(12, 10).color('#333333')
   .pointAlong([0, 1, 0])
-  .translate(pipeX + 15, pipeEndY - 6, pipeZ);
+  .translate(pipeX + 15, pipeEndY - 12, pipeZ);
 
 // === Return ===
 return [
