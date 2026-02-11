@@ -1,4 +1,4 @@
-export type ThemeName = 'dark' | 'light';
+export type ThemeName = 'dark' | 'light' | 'gruvbox' | 'tokyo-night' | 'kanagawa-lotus';
 
 export interface Theme {
   // Surfaces
@@ -96,7 +96,82 @@ const light: Theme = {
   gridSection: '#a0a0a0',
 };
 
-export const themes: Record<ThemeName, Theme> = { dark, light };
+const gruvbox: Theme = {
+  bg: '#282828',
+  bgPanel: '#1d2021',
+  bgSurface: '#3c3836',
+  bgHover: '#504945',
+  bgActive: '#665c54',
+  bgInput: '#1d2021',
+  bgOverlay: '#282828',
+  text: '#ebdbb2',
+  textMuted: '#a89984',
+  textDim: '#928374',
+  border: '#504945',
+  borderLight: '#3c3836',
+  accent: '#fe8019',
+  accentText: '#282828',
+  error: '#fb4934',
+  errorBg: '#3c1f1e',
+  success: '#b8bb26',
+  successBg: '#1d2a1d',
+  warning: '#fabd2f',
+  viewportBg: '#1d2021',
+  gridCell: '#504945',
+  gridSection: '#7c6f64',
+};
+
+const tokyoNight: Theme = {
+  bg: '#1a1b26',
+  bgPanel: '#16161e',
+  bgSurface: '#24283b',
+  bgHover: '#292e42',
+  bgActive: '#33467c',
+  bgInput: '#16161e',
+  bgOverlay: '#1a1b26',
+  text: '#c0caf5',
+  textMuted: '#9aa5ce',
+  textDim: '#565f89',
+  border: '#292e42',
+  borderLight: '#24283b',
+  accent: '#7aa2f7',
+  accentText: '#1a1b26',
+  error: '#f7768e',
+  errorBg: '#2d1520',
+  success: '#9ece6a',
+  successBg: '#1a2a1a',
+  warning: '#e0af68',
+  viewportBg: '#16161e',
+  gridCell: '#292e42',
+  gridSection: '#3b4261',
+};
+
+const kanagawaLotus: Theme = {
+  bg: '#f2ecbc',
+  bgPanel: '#f7f3d7',
+  bgSurface: '#e7dba0',
+  bgHover: '#d9d08e',
+  bgActive: '#c9b97a',
+  bgInput: '#f7f3d7',
+  bgOverlay: '#f2ecbc',
+  text: '#545464',
+  textMuted: '#766b6b',
+  textDim: '#8a8980',
+  border: '#d7d194',
+  borderLight: '#e0daa0',
+  accent: '#c84053',
+  accentText: '#f7f3d7',
+  error: '#c84053',
+  errorBg: '#f5d5d5',
+  success: '#6f894e',
+  successBg: '#e0ecd0',
+  warning: '#cc6d00',
+  viewportBg: '#e7dba0',
+  gridCell: '#c9c08a',
+  gridSection: '#a8a070',
+};
+
+export const themes: Record<ThemeName, Theme> = { dark, light, gruvbox, 'tokyo-night': tokyoNight, 'kanagawa-lotus': kanagawaLotus };
 
 export function applyTheme(name: ThemeName) {
   const t = themes[name];

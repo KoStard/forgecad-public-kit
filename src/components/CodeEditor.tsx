@@ -305,7 +305,7 @@ export function CodeEditor() {
         <Editor
           key={activeFile}
           defaultLanguage="javascript"
-          theme={theme === 'dark' ? 'vs-dark' : 'light'}
+          theme={theme === 'light' || theme === 'kanagawa-lotus' ? 'light' : 'vs-dark'}
           value={code}
           onChange={handleChange}
           onMount={handleMount}

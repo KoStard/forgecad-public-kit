@@ -22,10 +22,11 @@ export function CommandPalette() {
   const [subCommands, setSubCommands] = useState<Command[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const themeChoices: Command[] = [
-    { id: 'theme-dark', label: `Dark${theme === 'dark' ? '  ✓' : ''}`, action: () => { setTheme('dark'); close(); } },
-    { id: 'theme-light', label: `Light${theme === 'light' ? '  ✓' : ''}`, action: () => { setTheme('light'); close(); } },
-  ];
+  const themeChoices: Command[] = (['dark', 'light', 'gruvbox', 'tokyo-night', 'kanagawa-lotus'] as const).map((t) => ({
+    id: `theme-${t}`,
+    label: `${t.charAt(0).toUpperCase() + t.slice(1)}${theme === t ? '  ✓' : ''}`,
+    action: () => { setTheme(t); close(); },
+  }));
 
   const rootCommands: Command[] = [
     { id: 'theme', label: 'Change Theme', children: themeChoices, action: () => {} },
