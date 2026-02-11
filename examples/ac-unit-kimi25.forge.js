@@ -5,7 +5,6 @@
 const wallThick = param("Wall Thickness", 200, { min: 100, max: 400, unit: "mm" });
 const wallW = param("Wall Width", 400, { min: 300, max: 600, unit: "mm" });
 const wallH = param("Wall Height", 300, { min: 200, max: 500, unit: "mm" });
-const pipeOffsetY = param("Pipe Height", 150, { min: 50, max: 250, unit: "mm" });
 
 // === Indoor Unit Parameters ===
 const indoorW = param("Indoor Width", 800, { min: 600, max: 1000, unit: "mm" });
@@ -39,13 +38,19 @@ const COLOR_DISPLAY = "#1A1A2E";
 const wallBase = box(wallW, wallThick, wallH, true)
   .translate(0, 0, wallH / 2);
 
-// Pipe holes through wall (along Y axis)
-const pipeHole1 = cylinder(wallThick + 10, pipeDia / 2, undefined, 16, true)
+// Calculate pipe heights
+// Indoor pipes exit at bottom of indoor unit
+const indoorPipeZ = indoorZ - indoorH / 2 - 20;
+// Outdoor pipes enter at side of outdoor unit (60% up from bottom)
+const outdoorPipeZ = outdoorH * 0.6;
+
+// Pipe holes through wall (along Y axis) at indoor pipe height
+const pipeHole1 = cylinder(wallThick + 10, pipeDia / 2 + 8, undefined, 16, true)
   .rotate(90, 0, 0)
-  .translate(0, 0, pipeOffsetY);
-const pipeHole2 = cylinder(wallThick + 10, pipeDia / 2, undefined, 16, true)
+  .translate(0, 0, indoorPipeZ);
+const pipeHole2 = cylinder(wallThick + 10, pipeDia / 2 + 8, undefined, 16, true)
   .rotate(90, 0, 0)
-  .translate(0, 0, pipeOffsetY + pipeSpacing);
+  .translate(0, 0, indoorPipeZ + pipeSpacing);
 
 const wall = wallBase.subtract(pipeHole1).subtract(pipeHole2).color(COLOR_WALL);
 
@@ -157,40 +162,50 @@ if (sideGrilleHoles.length > 0) {
 }
 
 // === Refrigerant Pipes ===
-// Two pipes running through the wall along Y axis
-// Large pipe (suction line, insulated) - runs from indoor to outdoor
-const pipeLength = Math.abs(indoorY) + wallThick + outdoorY;
-const pipeLarge = cylinder(pipeLength, pipeDia / 2 + 6, undefined, 16, true)
+// Horizontal pipes through the wall at indoor unit height
+const wallPassageLength = wallThick + 20;
+const pipeThroughWall1 = cylinder(wallPassageLength, pipeDia / 2 + 6, undefined, 16, true)
   .rotate(90, 0, 0)
-  .translate(0, (indoorY + outdoorY) / 2, pipeOffsetY)
+  .translate(0, 0, indoorPipeZ)
   .color(COLOR_PIPE_INSULATION);
 
-// Small pipe (liquid line, bare copper)
-const pipeSmall = cylinder(pipeLength, pipeDia / 2, undefined, 16, true)
+const pipeThroughWall2 = cylinder(wallPassageLength, pipeDia / 2, undefined, 16, true)
   .rotate(90, 0, 0)
-  .translate(0, (indoorY + outdoorY) / 2, pipeOffsetY + pipeSpacing)
+  .translate(0, 0, indoorPipeZ + pipeSpacing)
   .color(COLOR_PIPE_COPPER);
 
-// Pipe connections at indoor unit
-const indoorPipeConn1 = cylinder(50, pipeDia / 2 + 6, undefined, 16, true)
-  .rotate(0, 90, 0)
-  .translate(0, indoorY + indoorD / 2, pipeOffsetY)
+// Vertical drops from wall to outdoor unit height
+const dropLength = indoorPipeZ - outdoorPipeZ;
+const pipeDrop1 = cylinder(dropLength, pipeDia / 2 + 6, undefined, 16, true)
+  .translate(0, outdoorY - outdoorD / 2 - 20, indoorPipeZ - dropLength / 2)
   .color(COLOR_PIPE_INSULATION);
 
-const indoorPipeConn2 = cylinder(50, pipeDia / 2, undefined, 16, true)
-  .rotate(0, 90, 0)
-  .translate(0, indoorY + indoorD / 2, pipeOffsetY + pipeSpacing)
+const pipeDrop2 = cylinder(dropLength, pipeDia / 2, undefined, 16, true)
+  .translate(0, outdoorY - outdoorD / 2 - 20, indoorPipeZ + pipeSpacing - dropLength / 2)
   .color(COLOR_PIPE_COPPER);
 
-// Pipe connections at outdoor unit  
-const outdoorPipeConn1 = cylinder(80, pipeDia / 2 + 6, undefined, 16, true)
+// Horizontal connections into outdoor unit
+const outdoorConnLength = 60;
+const outdoorPipeConn1 = cylinder(outdoorConnLength, pipeDia / 2 + 6, undefined, 16, true)
   .rotate(0, 90, 0)
-  .translate(0, outdoorY - outdoorD / 2, pipeOffsetY)
+  .translate(0, outdoorY - outdoorD / 2 - 20, outdoorPipeZ)
   .color(COLOR_PIPE_INSULATION);
 
-const outdoorPipeConn2 = cylinder(80, pipeDia / 2, undefined, 16, true)
+const outdoorPipeConn2 = cylinder(outdoorConnLength, pipeDia / 2, undefined, 16, true)
   .rotate(0, 90, 0)
-  .translate(0, outdoorY - outdoorD / 2, pipeOffsetY + pipeSpacing)
+  .translate(0, outdoorY - outdoorD / 2 - 20, outdoorPipeZ + pipeSpacing)
+  .color(COLOR_PIPE_COPPER);
+
+// Indoor connections (short stubs out the back)
+const indoorConnLength = 40;
+const indoorPipeConn1 = cylinder(indoorConnLength, pipeDia / 2 + 6, undefined, 16, true)
+  .rotate(0, 90, 0)
+  .translate(0, indoorY + indoorD / 2 + 10, indoorPipeZ)
+  .color(COLOR_PIPE_INSULATION);
+
+const indoorPipeConn2 = cylinder(indoorConnLength, pipeDia / 2, undefined, 16, true)
+  .rotate(0, 90, 0)
+  .translate(0, indoorY + indoorD / 2 + 10, indoorPipeZ + pipeSpacing)
   .color(COLOR_PIPE_COPPER);
 
 // === Assembly ===
@@ -203,8 +218,10 @@ return [
   { name: "Mounting Bracket", shape: bracket },
   { name: "Outdoor Body", shape: outdoorWithGrille },
   { name: "Fan Blades", shape: fanBlade },
-  { name: "Suction Pipe (Insulated)", shape: pipeLarge },
-  { name: "Liquid Pipe (Copper)", shape: pipeSmall },
+  { name: "Pipe Through Wall 1", shape: pipeThroughWall1 },
+  { name: "Pipe Through Wall 2", shape: pipeThroughWall2 },
+  { name: "Pipe Drop 1", shape: pipeDrop1 },
+  { name: "Pipe Drop 2", shape: pipeDrop2 },
   { name: "Indoor Pipe Conn 1", shape: indoorPipeConn1 },
   { name: "Indoor Pipe Conn 2", shape: indoorPipeConn2 },
   { name: "Outdoor Pipe Conn 1", shape: outdoorPipeConn1 },
