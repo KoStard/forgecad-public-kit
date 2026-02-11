@@ -224,20 +224,20 @@ export function FileExplorer() {
             padding: '5px 8px',
             paddingLeft,
             cursor: 'pointer',
-            color: isActive ? '#fff' : '#aaa',
-            background: isActive ? '#37373d' : (isFocused ? '#2a2a2a' : 'transparent'),
+            color: isActive ? 'var(--fc-accentText)' : 'var(--fc-textMuted)',
+            background: isActive ? 'var(--fc-bgActive)' : (isFocused ? 'var(--fc-bgHover)' : 'transparent'),
             fontSize: 12,
             display: 'flex',
             alignItems: 'center',
             gap: 6,
           }}
-          onMouseEnter={(e) => { if (!isActive && !isFocused) e.currentTarget.style.background = '#2d2d2d'; }}
+          onMouseEnter={(e) => { if (!isActive && !isFocused) e.currentTarget.style.background = 'var(--fc-bgHover)'; }}
           onMouseLeave={(e) => { if (!isActive && !isFocused) e.currentTarget.style.background = 'transparent'; }}
         >
           {isFolder && (
             <span
               onClick={(e) => { e.stopPropagation(); toggleFolder(node.path); }}
-              style={{ width: 14, textAlign: 'center', color: '#888' }}
+              style={{ width: 14, textAlign: 'center', color: 'var(--fc-textDim)' }}
             >
               {isExpanded ? '▾' : '▸'}
             </span>
@@ -251,7 +251,7 @@ export function FileExplorer() {
               onBlur={() => handleRename(node.path)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleRename(node.path); if (e.key === 'Escape') setRenamingPath(null); }}
               onClick={(e) => e.stopPropagation()}
-              style={{ flex: 1, background: '#1e1e1e', border: '1px solid #4a9eff', color: '#fff', fontSize: 12, padding: '1px 4px', outline: 'none' }}
+              style={{ flex: 1, background: 'var(--fc-bg)', border: '1px solid var(--fc-accent)', color: 'var(--fc-text)', fontSize: 12, padding: '1px 4px', outline: 'none' }}
             />
           ) : (
             <>
@@ -263,7 +263,7 @@ export function FileExplorer() {
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    background: '#888',
+                    background: 'var(--fc-textDim)',
                     flexShrink: 0,
                   }}
                 />
@@ -278,12 +278,12 @@ export function FileExplorer() {
                   }
                 }}
                 style={{
-                  color: '#666',
+                  color: 'var(--fc-textDim)',
                   fontSize: 10,
                   visibility: node.type === 'file' || canDeleteFolder ? 'visible' : 'hidden',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#f44')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#666')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--fc-error)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--fc-textDim)')}
               >✕</span>
             </>
           )}
@@ -295,28 +295,28 @@ export function FileExplorer() {
 
   return (
     <div
-      style={{ width: 220, background: '#252525', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column', fontSize: 13 }}
+      style={{ width: 220, background: 'var(--fc-bgSurface)', borderRight: '1px solid var(--fc-border)', display: 'flex', flexDirection: 'column', fontSize: 13 }}
       onDrop={(e) => handleDropToFolder(e, '')}
       onDragOver={(e) => e.preventDefault()}
     >
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontWeight: 600, color: '#aaa', fontSize: 12 }}>Project Files</span>
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--fc-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontWeight: 600, color: 'var(--fc-textMuted)', fontSize: 12 }}>Project Files</span>
         <div style={{ display: 'flex', gap: 6 }}>
           <span
             onClick={() => setCreating('file')}
-            style={{ cursor: 'pointer', color: '#4a9eff', fontSize: 12 }}
+            style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }}
             title="New file"
           >+ File</span>
           <span
             onClick={() => setCreating('folder')}
-            style={{ cursor: 'pointer', color: '#4a9eff', fontSize: 12 }}
+            style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }}
             title="New folder"
           >+ Folder</span>
         </div>
       </div>
 
       {creating && (
-        <div style={{ padding: '4px 12px', borderBottom: '1px solid #2a2a2a' }}>
+        <div style={{ padding: '4px 12px', borderBottom: '1px solid var(--fc-borderLight)' }}>
           <input
             autoFocus
             placeholder={creating === 'folder' ? 'Folder name' : 'name.forge.js or name.sketch.js'}
@@ -324,14 +324,14 @@ export function FileExplorer() {
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreating(null); }}
             onBlur={() => { if (!newName.trim()) setCreating(null); }}
-            style={{ width: '100%', background: '#1e1e1e', border: '1px solid #4a9eff', color: '#fff', fontSize: 11, padding: '3px 6px', outline: 'none', boxSizing: 'border-box' }}
+            style={{ width: '100%', background: 'var(--fc-bg)', border: '1px solid var(--fc-accent)', color: 'var(--fc-text)', fontSize: 11, padding: '3px 6px', outline: 'none', boxSizing: 'border-box' }}
           />
         </div>
       )}
 
       <div style={{ flex: 1, overflow: 'auto' }}>
         {tree.length === 0 && (
-          <div style={{ padding: '10px 12px', color: '#777', fontSize: 12 }}>
+          <div style={{ padding: '10px 12px', color: 'var(--fc-textDim)', fontSize: 12 }}>
             No files yet. Create a file or drop one here.
           </div>
         )}

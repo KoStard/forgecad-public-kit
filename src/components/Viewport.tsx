@@ -5,6 +5,7 @@ import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMod
 import type { SceneObject } from '@forge/index';
 import type { DimensionDef } from '@forge/sketch/dimensions';
 import { shapeToGeometry } from '@forge/meshToGeometry';
+import { themes } from '../theme';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
@@ -977,11 +978,13 @@ export function Viewport() {
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
+  const themeName = useForgeStore((s) => s.theme);
+  const t = themes[themeName];
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
-        style={{ background: '#252526', cursor: measureMode ? 'crosshair' : 'default' }}
+        style={{ background: t.viewportBg, cursor: measureMode ? 'crosshair' : 'default' }}
         dpr={[1, 2]}
         gl={{
           antialias: true,
@@ -1026,10 +1029,10 @@ export function Viewport() {
             rotation-x={Math.PI / 2}
             cellSize={gridSize}
             cellThickness={0.5}
-            cellColor="#404040"
+            cellColor={t.gridCell}
             sectionSize={gridSize * 5}
             sectionThickness={1}
-            sectionColor="#555"
+            sectionColor={t.gridSection}
             fadeDistance={400}
             infiniteGrid
           />
@@ -1040,10 +1043,10 @@ export function Viewport() {
             args={[500, 500]}
             cellSize={gridSize}
             cellThickness={0.5}
-            cellColor="#404040"
+            cellColor={t.gridCell}
             sectionSize={gridSize * 5}
             sectionThickness={1}
-            sectionColor="#555"
+            sectionColor={t.gridSection}
             fadeDistance={400}
             infiniteGrid
             rotation={[Math.PI / 2, 0, 0]}
@@ -1085,7 +1088,7 @@ export function Viewport() {
             top: 8,
             left: '50%',
             transform: 'translateX(-50%)',
-            background: '#ffcc00',
+            background: 'var(--fc-warning)',
             color: '#000',
             padding: '4px 12px',
             borderRadius: 4,

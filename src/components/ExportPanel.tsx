@@ -81,15 +81,15 @@ export function ExportPanel() {
   };
 
   return (
-    <div style={{ padding: '8px 12px', borderTop: '1px solid #333' }}>
+    <div style={{ padding: '8px 12px', borderTop: '1px solid var(--fc-border)' }}>
       <button
         onClick={exportSTL}
         disabled={!hasShapes}
         style={{
           width: '100%',
           padding: '6px',
-          background: hasShapes ? '#4a9eff' : '#333',
-          color: hasShapes ? '#fff' : '#666',
+          background: hasShapes ? 'var(--fc-accent)' : 'var(--fc-border)',
+          color: hasShapes ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
           border: 'none',
           borderRadius: 4,
           cursor: hasShapes ? 'pointer' : 'default',

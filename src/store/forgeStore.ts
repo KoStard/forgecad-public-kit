@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { runScript, type ParamDef, type RunResult, type SceneObject, isConstraintSketch, updateConstraintValue } from '@forge/index';
 import { setParamOverrides } from '@forge/params';
 import projectFiles from 'virtual:forge-project';
+import { type ThemeName, applyTheme } from '../theme';
 
 const EMPTY_FILE: Record<string, string> = {
   'untitled.forge.js': '// New part\n\nreturn box(50, 30, 10);\n',
@@ -174,6 +175,13 @@ interface ForgeStore {
   updateSketchConstraint: (objectId: string, constraintId: string, value: number) => void;
 
   refreshFiles: () => Promise<void>;
+
+  theme: ThemeName;
+  setTheme: (name: ThemeName) => void;
+
+  commandPaletteOpen: boolean;
+  openCommandPalette: () => void;
+  closeCommandPalette: () => void;
 }
 
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
@@ -642,4 +650,15 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       console.error('Error refreshing files:', e);
     }
   },
+
+  theme: (localStorage.getItem('fc-theme') as ThemeName) || 'dark',
+  setTheme: (name) => {
+    applyTheme(name);
+    localStorage.setItem('fc-theme', name);
+    set({ theme: name });
+  },
+
+  commandPaletteOpen: false,
+  openCommandPalette: () => set({ commandPaletteOpen: true }),
+  closeCommandPalette: () => set({ commandPaletteOpen: false }),
 }));

@@ -3,26 +3,36 @@ import type { CSSProperties } from 'react';
 
 const btnStyle = (active = false): CSSProperties => ({
   padding: '4px 8px',
-  background: active ? '#4a9eff' : 'transparent',
-  color: active ? '#fff' : '#bbb',
-  border: '1px solid #444',
+  background: active ? 'var(--fc-accent)' : 'transparent',
+  color: active ? 'var(--fc-accentText)' : 'var(--fc-textMuted)',
+  border: '1px solid var(--fc-border)',
   borderRadius: 3,
   cursor: 'pointer',
   fontSize: 12,
 });
 
 const sectionStyle: CSSProperties = {
-  borderTop: '1px solid #2b2b2b',
+  borderTop: '1px solid var(--fc-borderLight)',
   padding: '10px 12px',
 };
 
 const labelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
-  color: '#9aa0a6',
+  color: 'var(--fc-textDim)',
   marginBottom: 6,
   textTransform: 'uppercase',
   letterSpacing: 0.6,
+};
+
+const inputStyle: CSSProperties = {
+  flex: 1,
+  background: 'var(--fc-bgInput)',
+  border: '1px solid var(--fc-border)',
+  borderRadius: 4,
+  padding: '4px 6px',
+  color: 'var(--fc-text)',
+  fontSize: 12,
 };
 
 export function ViewPanel() {
@@ -57,22 +67,22 @@ export function ViewPanel() {
       ? '#35c759'
       : constraintMeta?.status === 'under'
         ? '#4aa3ff'
-        : '#777';
+        : 'var(--fc-textDim)';
 
   return (
     <div
       style={{
         width: 280,
-        background: '#1f1f1f',
-        borderLeft: '1px solid #333',
+        background: 'var(--fc-bgPanel)',
+        borderLeft: '1px solid var(--fc-border)',
         display: 'flex',
         flexDirection: 'column',
         overflowY: 'auto',
       }}
     >
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid #2b2b2b' }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#e1e1e1' }}>View Panel</div>
-        <div style={{ fontSize: 11, color: '#777' }}>Viewport control center</div>
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--fc-borderLight)' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fc-text)' }}>View Panel</div>
+        <div style={{ fontSize: 11, color: 'var(--fc-textDim)' }}>Viewport control center</div>
       </div>
 
       <div style={{ ...sectionStyle, borderTop: 'none' }}>
@@ -119,7 +129,7 @@ export function ViewPanel() {
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px' }}>
         {objects.length === 0 && (
-          <div style={{ fontSize: 12, color: '#666', padding: '6px 0' }}>No objects loaded</div>
+          <div style={{ fontSize: 12, color: 'var(--fc-textDim)', padding: '6px 0' }}>No objects loaded</div>
         )}
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
@@ -130,10 +140,10 @@ export function ViewPanel() {
               onClick={() => selectObject(obj.id)}
               style={{
                 padding: '8px 8px',
-                border: '1px solid #2d2d2d',
+                border: '1px solid var(--fc-borderLight)',
                 borderRadius: 6,
                 marginBottom: 8,
-                background: isSelected ? '#2a3440' : '#202020',
+                background: isSelected ? 'var(--fc-bgActive)' : 'var(--fc-bgOverlay)',
                 cursor: 'pointer',
               }}
             >
@@ -144,7 +154,7 @@ export function ViewPanel() {
                   onChange={(e) => setObjectVisibility(obj.id, e.target.checked)}
                   onClick={(e) => e.stopPropagation()}
                 />
-                <span style={{ fontSize: 12, color: '#e3e3e3', flex: 1 }}>{obj.name}</span>
+                <span style={{ fontSize: 12, color: 'var(--fc-text)', flex: 1 }}>{obj.name}</span>
                 <input
                   type="color"
                   value={settings.color}
@@ -154,7 +164,7 @@ export function ViewPanel() {
                 />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, color: '#777' }}>Opacity</span>
+                <span style={{ fontSize: 11, color: 'var(--fc-textDim)' }}>Opacity</span>
                 <input
                   type="range"
                   min={0.1}
@@ -165,7 +175,7 @@ export function ViewPanel() {
                   onClick={(e) => e.stopPropagation()}
                   style={{ flex: 1 }}
                 />
-                <span style={{ fontSize: 11, color: '#777', width: 32, textAlign: 'right' }}>{Math.round(settings.opacity * 100)}%</span>
+                <span style={{ fontSize: 11, color: 'var(--fc-textDim)', width: 32, textAlign: 'right' }}>{Math.round(settings.opacity * 100)}%</span>
               </div>
             </div>
           );
@@ -179,7 +189,7 @@ export function ViewPanel() {
             <span style={{ fontSize: 11, color: constraintStatusColor }}>{constraintMeta.status}</span>
           </div>
           {constraintMeta.constraints.length === 0 && (
-            <div style={{ fontSize: 12, color: '#666', padding: '6px 0' }}>No constraints in this sketch</div>
+            <div style={{ fontSize: 12, color: 'var(--fc-textDim)', padding: '6px 0' }}>No constraints in this sketch</div>
           )}
           {constraintMeta.constraints.map((constraint) => (
             <div
@@ -189,13 +199,13 @@ export function ViewPanel() {
                 alignItems: 'center',
                 gap: 8,
                 padding: '6px 8px',
-                border: '1px solid #2a2a2a',
+                border: '1px solid var(--fc-borderLight)',
                 borderRadius: 6,
                 marginBottom: 6,
-                background: constraint.isConflicting ? '#3a1d1d' : '#202020',
+                background: constraint.isConflicting ? 'var(--fc-errorBg)' : 'var(--fc-bgOverlay)',
               }}
             >
-              <span style={{ fontSize: 11, color: constraint.isConflicting ? '#ff4d4f' : '#cfcfcf', width: 48 }}>
+              <span style={{ fontSize: 11, color: constraint.isConflicting ? 'var(--fc-error)' : 'var(--fc-text)', width: 48 }}>
                 {constraint.label}
               </span>
               {constraint.isDimension && constraint.value !== undefined ? (
@@ -207,26 +217,18 @@ export function ViewPanel() {
                     if (Number.isNaN(nextValue) || !selectedObject) return;
                     updateSketchConstraint(selectedObject.id, constraint.id, nextValue);
                   }}
-                  style={{
-                    flex: 1,
-                    background: '#111',
-                    border: '1px solid #333',
-                    borderRadius: 4,
-                    padding: '4px 6px',
-                    color: '#ddd',
-                    fontSize: 12,
-                  }}
+                  style={inputStyle}
                 />
               ) : (
-                <span style={{ fontSize: 12, color: '#888' }}>{constraint.type}</span>
+                <span style={{ fontSize: 12, color: 'var(--fc-textDim)' }}>{constraint.type}</span>
               )}
             </div>
           ))}
           {constraintMeta.rejected.length > 0 && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, color: '#ff4d4f', marginBottom: 4 }}>Rejected constraints</div>
+              <div style={{ fontSize: 11, color: 'var(--fc-error)', marginBottom: 4 }}>Rejected constraints</div>
               {constraintMeta.rejected.map((constraint) => (
-                <div key={constraint.id} style={{ fontSize: 11, color: '#ff4d4f' }}>
+                <div key={constraint.id} style={{ fontSize: 11, color: 'var(--fc-error)' }}>
                   {constraint.label}
                 </div>
               ))}
@@ -238,7 +240,7 @@ export function ViewPanel() {
       <div style={sectionStyle}>
         <div style={labelStyle}>Display</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#ccc' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
             <input
               type="checkbox"
               checked={gridEnabled}
@@ -248,7 +250,7 @@ export function ViewPanel() {
           </label>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#ccc' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
             <input
               type="checkbox"
               checked={dimensionsVisible}
@@ -258,22 +260,14 @@ export function ViewPanel() {
           </label>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 12, color: '#888' }}>Grid size</span>
+          <span style={{ fontSize: 12, color: 'var(--fc-textDim)' }}>Grid size</span>
           <input
             type="number"
             min={1}
             max={200}
             value={gridSize}
             onChange={(e) => setGridSize(Math.max(1, Number(e.target.value) || 1))}
-            style={{
-              flex: 1,
-              background: '#111',
-              border: '1px solid #333',
-              borderRadius: 4,
-              padding: '4px 6px',
-              color: '#ddd',
-              fontSize: 12,
-            }}
+            style={inputStyle}
           />
         </div>
       </div>
@@ -281,22 +275,14 @@ export function ViewPanel() {
       <div style={sectionStyle}>
         <div style={labelStyle}>Measure</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: '#888' }}>Snap radius (px)</span>
+          <span style={{ fontSize: 12, color: 'var(--fc-textDim)' }}>Snap radius (px)</span>
           <input
             type="number"
             min={4}
             max={40}
             value={measureSnapPx}
             onChange={(e) => setMeasureSnapPx(Math.max(4, Math.min(40, Number(e.target.value) || 4)))}
-            style={{
-              flex: 1,
-              background: '#111',
-              border: '1px solid #333',
-              borderRadius: 4,
-              padding: '4px 6px',
-              color: '#ddd',
-              fontSize: 12,
-            }}
+            style={inputStyle}
           />
         </div>
       </div>

@@ -258,6 +258,7 @@ export function CodeEditor() {
   const execute = useForgeStore((s) => s.execute);
   const result = useForgeStore((s) => s.result);
   const loadFromText = useForgeStore((s) => s.loadFromText);
+  const theme = useForgeStore((s) => s.theme);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const code = files[activeFile] ?? '';
@@ -304,7 +305,7 @@ export function CodeEditor() {
         <Editor
           key={activeFile}
           defaultLanguage="javascript"
-          theme="vs-dark"
+          theme={theme === 'dark' ? 'vs-dark' : 'light'}
           value={code}
           onChange={handleChange}
           onMount={handleMount}
@@ -320,12 +321,12 @@ export function CodeEditor() {
         />
       </div>
       {result?.error && (
-        <div style={{ padding: '8px 12px', background: '#3a1d1d', color: '#f48771', fontSize: 13, fontFamily: 'monospace', maxHeight: 80, overflow: 'auto' }}>
+        <div style={{ padding: '8px 12px', background: 'var(--fc-errorBg)', color: 'var(--fc-error)', fontSize: 13, fontFamily: 'monospace', maxHeight: 80, overflow: 'auto' }}>
           {result.error}
         </div>
       )}
       {result && !result.error && (
-        <div style={{ padding: '4px 12px', background: '#1a2a1a', color: '#6a9955', fontSize: 12, fontFamily: 'monospace' }}>
+        <div style={{ padding: '4px 12px', background: 'var(--fc-successBg)', color: 'var(--fc-success)', fontSize: 12, fontFamily: 'monospace' }}>
           ✓ {result.timeMs.toFixed(1)}ms
         </div>
       )}

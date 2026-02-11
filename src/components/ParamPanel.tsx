@@ -9,13 +9,13 @@ export function ParamPanel() {
   if (params.length === 0) return null;
 
   return (
-    <div style={{ maxHeight: '50%', display: 'flex', flexDirection: 'column', borderTop: '1px solid #333', background: '#1e1e1e' }}>
+    <div style={{ maxHeight: '50%', display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--fc-border)', background: 'var(--fc-bg)' }}>
       <div
         onClick={() => setCollapsed(!collapsed)}
         style={{
           padding: '6px 12px',
           fontSize: 11,
-          color: '#888',
+          color: 'var(--fc-textDim)',
           textTransform: 'uppercase',
           letterSpacing: 1,
           cursor: 'pointer',
@@ -33,8 +33,8 @@ export function ParamPanel() {
           {params.map((p) => (
             <div key={p.name} style={{ marginBottom: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
-                <span style={{ color: '#ccc' }}>{p.name}</span>
-                <span style={{ color: '#4a9eff', fontFamily: 'monospace' }}>
+                <span style={{ color: 'var(--fc-text)' }}>{p.name}</span>
+                <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
                   {p.value}{p.unit ? ` ${p.unit}` : ''}
                 </span>
               </div>
@@ -48,7 +48,7 @@ export function ParamPanel() {
                   const v = parseFloat(e.target.value);
                   setParam(p.name, p.integer ? Math.round(v) : v);
                 }}
-                style={{ width: '100%', accentColor: '#4a9eff', direction: p.reverse ? 'rtl' : undefined }}
+                style={{ width: '100%', accentColor: 'var(--fc-accent)', direction: p.reverse ? 'rtl' : undefined }}
               />
             </div>
           ))}

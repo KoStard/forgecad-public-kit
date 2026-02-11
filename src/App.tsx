@@ -7,12 +7,13 @@ import { ParamPanel } from './components/ParamPanel';
 import { ExportPanel } from './components/ExportPanel';
 import { FileExplorer } from './components/FileExplorer';
 import { ViewPanel } from './components/ViewPanel';
+import { CommandPalette } from './components/CommandPalette';
 
 const btnStyle = (active = false): React.CSSProperties => ({
   padding: '4px 10px',
-  background: active ? '#4a9eff' : 'transparent',
-  color: active ? '#fff' : '#aaa',
-  border: '1px solid #444',
+  background: active ? 'var(--fc-accent)' : 'transparent',
+  color: active ? 'var(--fc-accentText)' : 'var(--fc-textMuted)',
+  border: '1px solid var(--fc-border)',
   borderRadius: 3,
   cursor: 'pointer',
   fontSize: 12,
@@ -50,21 +51,21 @@ function Toolbar() {
   }).filter((entry): entry is { id: string; label: string; dist: number } => entry !== null);
 
   return (
-    <div style={{ padding: '6px 12px', background: '#2d2d2d', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={{ padding: '6px 12px', background: 'var(--fc-bgHover)', borderBottom: '1px solid var(--fc-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ fontSize: 16 }}>⚒</span>
-      <span style={{ fontSize: 14, fontWeight: 600, color: '#4a9eff' }}>ForgeCAD</span>
-      <span style={{ color: '#888', fontSize: 12, marginLeft: 4 }}>
+      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--fc-accent)' }}>ForgeCAD</span>
+      <span style={{ color: 'var(--fc-textDim)', fontSize: 12, marginLeft: 4 }}>
         {activeFile}{dirty ? ' •' : ''}
       </span>
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
         <button style={btnStyle(fileExplorerOpen)} onClick={toggleFileExplorer}>📁 Files</button>
         <button style={btnStyle(viewPanelOpen)} onClick={toggleViewPanel}>🧭 View</button>
-        <div style={{ width: 1, height: 20, background: '#444', margin: '0 4px' }} />
+        <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
         <button style={btnStyle()} onClick={newProject}>New Project</button>
         <button style={btnStyle()} onClick={saveFile}>Save</button>
         <button style={btnStyle()} onClick={saveFileAs}>Save As</button>
-        <div style={{ width: 1, height: 20, background: '#444', margin: '0 4px' }} />
+        <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
         <button style={btnStyle(measureMode)} onClick={toggleMeasure}>📏 Measure</button>
         {measureMode && <button style={btnStyle()} onClick={clearMeasure}>Clear All</button>}
         {measureDistances.length > 0 && (
@@ -77,10 +78,10 @@ function Toolbar() {
                   alignItems: 'center',
                   gap: 6,
                   padding: '2px 6px',
-                  border: '1px solid #4a4a4a',
+                  border: '1px solid var(--fc-border)',
                   borderRadius: 4,
                   fontSize: 11,
-                  color: '#ffcc00',
+                  color: 'var(--fc-warning)',
                   fontFamily: 'monospace',
                 }}
               >
@@ -89,7 +90,7 @@ function Toolbar() {
                   style={{
                     border: 'none',
                     background: 'transparent',
-                    color: '#ffcc00',
+                    color: 'var(--fc-warning)',
                     cursor: 'pointer',
                     fontSize: 12,
                     lineHeight: 1,
@@ -172,7 +173,7 @@ export function App() {
 
   if (!kernelReady) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#888' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--fc-textDim)' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 24, marginBottom: 8 }}>⚒ ForgeCAD</div>
           <div style={{ fontSize: 14 }}>Loading geometry kernel...</div>
@@ -186,7 +187,7 @@ export function App() {
       <Toolbar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {fileExplorerOpen && <FileExplorer />}
-        <div style={{ width: codePanelWidth, minWidth: minCodePanelWidth, display: 'flex', flexDirection: 'column', borderRight: '1px solid #333' }}>
+        <div style={{ width: codePanelWidth, minWidth: minCodePanelWidth, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--fc-border)' }}>
           <div style={{ flex: 1, minHeight: 0 }}>
             <CodeEditor />
           </div>
@@ -200,8 +201,8 @@ export function App() {
           style={{
             width: 6,
             cursor: 'col-resize',
-            background: '#202020',
-            borderRight: '1px solid #333',
+            background: 'var(--fc-bgOverlay)',
+            borderRight: '1px solid var(--fc-border)',
           }}
         />
         <div style={{ flex: 1, display: 'flex', minWidth: 0 }}>
@@ -217,8 +218,8 @@ export function App() {
                 style={{
                   width: 6,
                   cursor: 'col-resize',
-                  background: '#202020',
-                  borderLeft: '1px solid #333',
+                  background: 'var(--fc-bgOverlay)',
+                  borderLeft: '1px solid var(--fc-border)',
                 }}
               />
               <div style={{ width: viewPanelWidth, minWidth: minViewPanelWidth, maxWidth: maxViewPanelWidth, overflowY: 'auto' }}>
@@ -228,6 +229,7 @@ export function App() {
           )}
         </div>
       </div>
+      <CommandPalette />
     </div>
   );
 }
