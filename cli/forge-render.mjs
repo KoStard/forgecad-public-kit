@@ -63,15 +63,51 @@ Environment variables:
 const outputBase = process.argv[3] || scriptPath.replace(/\.(forge\.)?js$/, '.png');
 const code = await readFile(resolve(scriptPath), 'utf-8');
 
-// Collect all sibling .forge.js and .sketch.js files for cross-file imports
-const scriptDir = dirname(resolve(scriptPath));
-const { readdirSync } = await import('fs');
-const allFiles = {};
-for (const f of readdirSync(scriptDir)) {
-  if (f.endsWith('.forge.js') || f.endsWith('.sketch.js')) {
-    allFiles[f] = await readFile(join(scriptDir, f), 'utf-8');
+// Collect all project files recursively with correct relative paths
+// (mirrors collect-files.ts logic for plain Node)
+import { readdirSync, readFileSync, statSync } from 'fs';
+
+const FORGE_EXTS = ['.forge.js', '.sketch.js'];
+const isForgeFile = (f) => FORGE_EXTS.some(ext => f.endsWith(ext));
+
+function collectRec(dir, root) {
+  const result = {};
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    const stat = statSync(full);
+    if (stat.isDirectory() && !entry.startsWith('.') && entry !== 'node_modules') {
+      Object.assign(result, collectRec(full, root));
+    } else if (stat.isFile() && isForgeFile(entry)) {
+      const rel = full.slice(root.length + 1); // relative path
+      result[rel] = readFileSync(full, 'utf-8');
+    }
   }
+  return result;
 }
+
+function findProjectRoot(sp) {
+  const absScript = resolve(sp);
+  const scriptDir = dirname(absScript);
+  let root = scriptDir;
+  let candidate = dirname(scriptDir);
+  for (let i = 0; i < 2; i++) {
+    if (candidate === root) break;
+    try {
+      const entries = readdirSync(candidate);
+      const hasDirectForge = entries.some(e => {
+        try { return statSync(join(candidate, e)).isFile() && isForgeFile(e); }
+        catch { return false; }
+      });
+      if (hasDirectForge) { root = candidate; candidate = dirname(candidate); }
+      else break;
+    } catch { break; }
+  }
+  return root;
+}
+
+const projectRoot = findProjectRoot(scriptPath);
+const allFiles = collectRec(projectRoot, projectRoot);
+const scriptFileName = resolve(scriptPath).slice(projectRoot.length + 1);
 
 // --- Dev server management ---
 
@@ -139,7 +175,7 @@ try {
     // Execute script and get renders for all angles
     const result = await page.evaluate((scriptCode, files, scriptName, angles, size) => {
       return window.__forgeRender(scriptCode, { angles, size, allFiles: files, fileName: scriptName });
-    }, code, allFiles, basename(scriptPath), ANGLES, SIZE);
+    }, code, allFiles, scriptFileName, ANGLES, SIZE);
 
     if (!result.ok) {
       console.error('Script error:', result.error);

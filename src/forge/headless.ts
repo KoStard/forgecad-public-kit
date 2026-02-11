@@ -29,7 +29,7 @@ export { runScript } from './runner';
 export type { RunResult, SceneObject } from './runner';
 export { partLibrary } from './library';
 export { shapeToGeometry } from './meshToGeometry';
-export { buildScene } from './sceneBuilder';
+export { buildScene, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from './sceneBuilder';
 export type { ForgeGeometry } from './meshToGeometry';
 
 /**

@@ -12,6 +12,7 @@ import { readFileSync, readdirSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { resolve, basename, dirname, join } from 'path';
 import { init, runScript, Sketch } from '../src/forge/headless';
+import { collectProjectFiles } from './collect-files';
 
 const scriptPath = process.argv[2];
 if (!scriptPath) {
@@ -25,20 +26,14 @@ async function main() {
   // Read script
   const code = await readFile(resolve(scriptPath), 'utf-8');
 
-  // Collect sibling files for cross-file imports
-  const scriptDir = dirname(resolve(scriptPath));
-  const allFiles: Record<string, string> = {};
-  for (const f of readdirSync(scriptDir)) {
-    if (f.endsWith('.forge.js') || f.endsWith('.sketch.js')) {
-      allFiles[f] = readFileSync(join(scriptDir, f), 'utf-8');
-    }
-  }
+  // Collect project files with correct relative paths
+  const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
   // Initialize the real forge kernel
   await init();
 
   // Run the script through the real runner
-  const result = runScript(code, basename(scriptPath), allFiles);
+  const result = runScript(code, fileName, allFiles);
 
   if (result.error) {
     console.error('Script error:', result.error);

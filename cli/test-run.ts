@@ -3,9 +3,10 @@
  * ForgeCAD CLI — Validate a .forge.js script (no browser needed)
  * Usage: npx tsx cli/test-run.ts <script.forge.js>
  */
-import { readFileSync, readdirSync } from "fs";
-import { resolve, basename, dirname, join } from "path";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import { init, runScript } from "../src/forge/headless";
+import { collectProjectFiles } from "./collect-files";
 
 const scriptPath = process.argv[2];
 if (!scriptPath) {
@@ -15,16 +16,10 @@ if (!scriptPath) {
 
 async function main() {
   const code = readFileSync(resolve(scriptPath), "utf-8");
-  const scriptDir = dirname(resolve(scriptPath));
-  const allFiles: Record<string, string> = {};
-  for (const f of readdirSync(scriptDir)) {
-    if (f.endsWith(".forge.js") || f.endsWith(".sketch.js")) {
-      allFiles[f] = readFileSync(join(scriptDir, f), "utf-8");
-    }
-  }
+  const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
   await init();
-  const result = runScript(code, basename(scriptPath), allFiles);
+  const result = runScript(code, fileName, allFiles);
 
   if (result.error) {
     console.error("ERROR:", result.error);

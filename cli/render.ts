@@ -7,7 +7,7 @@
  */
 
 import * as THREE from 'three';
-import { init, runScript, shapeToGeometry, buildScene } from '../src/forge/headless';
+import { init, runScript, shapeToGeometry, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from '../src/forge/headless';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
@@ -75,49 +75,68 @@ async function setup() {
   }
 
   // Collect all shapes (auto-extrude sketches)
-  const shapes = result.objects
-    .map((obj) => obj.shape || (obj.sketch ? obj.sketch.extrude(1) : null))
-    .filter((s): s is NonNullable<typeof s> => s != null);
+  const objs = result.objects
+    .map((obj) => ({
+      shape: obj.shape || (obj.sketch ? obj.sketch.extrude(1) : null),
+      color: obj.color,
+    }))
+    .filter((o): o is { shape: NonNullable<typeof o.shape>; color?: string } => o.shape != null);
 
-  if (shapes.length === 0) {
+  if (objs.length === 0) {
     return { ok: false, error: 'No shape returned' };
   }
 
-  // Union all objects for rendering
-  const shape = shapes.reduce((a, b) => a.add(b));
-  const geo = shapeToGeometry(shape);
-  const { scene, camera } = buildScene(geo);
+  // Build scene with per-object colors
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x252526);
 
-  // Compute framing — camera looks at origin, distance based on model extent
-  geo.solid.computeBoundingBox();
-  const bb = geo.solid.boundingBox!;
-  const origin = new THREE.Vector3(0, 0, 0);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+  const dir1 = new THREE.DirectionalLight(0xffffff, 1.2);
+  dir1.position.set(100, 150, 80);
+  scene.add(dir1);
+  const dir2 = new THREE.DirectionalLight(0xffffff, 0.3);
+  dir2.position.set(-60, -40, -80);
+  scene.add(dir2);
+  scene.add(new THREE.HemisphereLight(0xb1e1ff, 0x444444, 0.4));
+
+  // Add each object as a separate mesh with its own color
+  for (const obj of objs) {
+    const geo = shapeToGeometry(obj.shape);
+    const matProps = { ...CAD_MATERIAL_PROPS };
+    if (obj.color) (matProps as any).color = new THREE.Color(obj.color);
+    scene.add(new THREE.Mesh(geo.solid, new THREE.MeshPhysicalMaterial(matProps)));
+    scene.add(new THREE.LineSegments(geo.edges, new THREE.LineBasicMaterial(EDGE_MATERIAL_PROPS)));
+  }
+
+  // Union all for bounding box / volume stats
+  const allShape = objs.map(o => o.shape).reduce((a, b) => a.add(b));
+  const allGeo = shapeToGeometry(allShape);
+  allGeo.solid.computeBoundingBox();
+  const bb = allGeo.solid.boundingBox!;
+  const center = new THREE.Vector3();
+  bb.getCenter(center);
   const bsize = new THREE.Vector3();
   bb.getSize(bsize);
-  // Distance must cover both the model extent and its offset from origin
-  const bbCenter = new THREE.Vector3();
-  bb.getCenter(bbCenter);
-  const maxReach = Math.max(
-    bsize.x / 2 + Math.abs(bbCenter.x),
-    bsize.y / 2 + Math.abs(bbCenter.y),
-    bsize.z / 2 + Math.abs(bbCenter.z),
-  );
-  const dist = (maxReach * 2) / (2 * Math.tan((45 * Math.PI) / 360)) * 1.6;
+  const maxDim = Math.max(bsize.x, bsize.y, bsize.z);
+  const fov = 45;
+  const dist = maxDim / (2 * Math.tan((fov * Math.PI) / 360)) * 1.6;
 
+  const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, dist * 10);
+  camera.up.set(0, 0, 1);
   camera.aspect = 1;
   camera.updateProjectionMatrix();
 
   const r = getRenderer(size);
 
-  // Render each angle
+  // Render each angle, looking at bounding box center
   const renders: Record<string, string> = {};
   for (const angle of angles) {
-    const dir = ANGLE_DIRS[angle];
-    if (!dir) continue;
-    renders[angle] = renderFromAngle(scene, camera, origin, dist, dir, r);
+    const d = ANGLE_DIRS[angle];
+    if (!d) continue;
+    renders[angle] = renderFromAngle(scene, camera, center, dist, d, r);
   }
 
-  const shapeBB = shape.boundingBox();
+  const shapeBB = allShape.boundingBox();
 
   return {
     ok: true,
@@ -126,7 +145,7 @@ async function setup() {
       min: [shapeBB.min[0], shapeBB.min[1], shapeBB.min[2]],
       max: [shapeBB.max[0], shapeBB.max[1], shapeBB.max[2]],
     },
-    volume: shape.volume(),
+    volume: allShape.volume(),
     params: result.params,
   };
 };
