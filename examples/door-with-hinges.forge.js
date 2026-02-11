@@ -34,9 +34,10 @@ const doorPanel = box(doorW, doorT, doorH)
 // joint() auto-creates the "Door Angle" slider and rotates around the pivot
 const rotatedDoor = joint("Door Angle", doorPanel, [frameW, 0, 0], {
   axis: [0, 0, 1],
-  min: 0,
-  max: 170,
-  default: 45,
+  min: -170,
+  max: 0,
+  default: -45,
+  reverse: true
 });
 
 // ── Phase 1 demo: diagonal intersection to find door center ──
