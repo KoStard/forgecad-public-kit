@@ -274,7 +274,9 @@ export type Anchor3D = 'center' | 'front' | 'back' | 'left' | 'right' | 'top' | 
   | 'bottom-front-left' | 'bottom-front-right' | 'bottom-back-left' | 'bottom-back-right';
 
 export function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, number, number] {
-  const bb = shape.boundingBox();
+  // Handle TrackedShape (has .toShape()) without importing it (avoids circular dep)
+  const s: Shape = typeof (shape as any).toShape === 'function' ? (shape as any).toShape() : shape;
+  const bb = s.boundingBox();
   const min = bb.min as [number, number, number];
   const max = bb.max as [number, number, number];
   const cx = (min[0] + max[0]) / 2;

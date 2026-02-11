@@ -148,6 +148,36 @@ export class TrackedShape {
     );
   }
 
+  /** Reorient so primary axis (Z) points along direction. Topology is cleared. */
+  pointAlong(direction: [number, number, number]): TrackedShape {
+    return new TrackedShape(
+      this.shape.pointAlong(direction),
+      { faces: new Map(), edges: new Map() },
+      this.baseHeight,
+      this.extrudeUp,
+    );
+  }
+
+  /** Scale the shape. Topology is cleared for non-uniform scale. */
+  scale(v: number | [number, number, number]): TrackedShape {
+    return new TrackedShape(
+      this.shape.scale(v),
+      { faces: new Map(), edges: new Map() },
+      this.baseHeight,
+      this.extrudeUp,
+    );
+  }
+
+  /** Mirror across a plane. Topology is cleared. */
+  mirror(normal: [number, number, number]): TrackedShape {
+    return new TrackedShape(
+      this.shape.mirror(normal),
+      { faces: new Map(), edges: new Map() },
+      this.baseHeight,
+      this.extrudeUp,
+    );
+  }
+
   /** Set the display color. Returns a new TrackedShape. */
   color(value: string | undefined): TrackedShape {
     return new TrackedShape(this.shape.color(value), this.topology, this.baseHeight, this.extrudeUp);
