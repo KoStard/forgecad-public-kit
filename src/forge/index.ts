@@ -18,6 +18,6 @@ export {
 } from './headless';
 export type { PlaneSpec } from './headless';
 export type { ParamDef } from './headless';
-export type { RunResult, SceneObject } from './headless';
+export type { RunResult, SceneObject, LogEntry } from './headless';
 export type { ForgeGeometry } from './headless';
 export * from './sketch';

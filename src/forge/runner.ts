@@ -69,6 +69,12 @@ export interface SceneObject {
   sketchMeta?: SketchConstraintMeta;
 }
 
+export interface LogEntry {
+  level: 'log' | 'warn' | 'error' | 'info';
+  args: string[];
+  timestamp: number;
+}
+
 export interface RunResult {
   shape: Shape | null;
   sketch: Sketch | null;
@@ -77,6 +83,24 @@ export interface RunResult {
   dimensions: DimensionDef[];
   error: string | null;
   timeMs: number;
+  logs: LogEntry[];
+}
+
+// Collected logs from the current script execution
+let _collectedLogs: LogEntry[] = [];
+
+function makeSandboxConsole(): Record<string, (...args: unknown[]) => void> {
+  const capture = (level: LogEntry['level']) => (...args: unknown[]) => {
+    _collectedLogs.push({
+      level,
+      args: args.map(a => {
+        try { return typeof a === 'string' ? a : JSON.stringify(a); }
+        catch { return String(a); }
+      }),
+      timestamp: Date.now(),
+    });
+  };
+  return { log: capture('log'), warn: capture('warn'), error: capture('error'), info: capture('info') };
 }
 
 /**
@@ -183,6 +207,8 @@ function executeFile(
     'dim', 'dimLine',
     // Group
     'group', 'ShapeGroup',
+    // Console
+    'console',
     wrapped,
   );
 
@@ -202,6 +228,7 @@ function executeFile(
     importSketch, importPart,
     dim, dimLine,
     group, ShapeGroup,
+    makeSandboxConsole(),
   );
 }
 
@@ -212,6 +239,7 @@ export function runScript(
 ): RunResult {
   resetParams();
   resetDimensions();
+  _collectedLogs = [];
   const t0 = performance.now();
 
   try {
@@ -316,6 +344,7 @@ export function runScript(
       dimensions: getCollectedDimensions(),
       error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
       timeMs: performance.now() - t0,
+      logs: _collectedLogs.slice(),
     };
   } catch (e: any) {
     return {
@@ -326,6 +355,7 @@ export function runScript(
       dimensions: getCollectedDimensions(),
       error: e.message || String(e),
       timeMs: performance.now() - t0,
+      logs: _collectedLogs.slice(),
     };
   }
 }

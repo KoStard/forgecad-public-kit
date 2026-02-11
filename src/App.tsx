@@ -9,6 +9,7 @@ import { FileExplorer } from './components/FileExplorer';
 import { ViewPanel } from './components/ViewPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { FileSwitcher } from './components/FileSwitcher';
+import { ConsolePanel } from './components/ConsolePanel';
 
 const btnStyle = (active = false): React.CSSProperties => ({
   padding: '4px 10px',
@@ -206,6 +207,7 @@ export function App() {
             <CodeEditor />
           </div>
           <ParamPanel />
+          <ConsolePanel />
           <ExportPanel />
         </div>
         <div

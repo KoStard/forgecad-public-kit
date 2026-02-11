@@ -27,7 +27,7 @@ export type { ParamDef } from './params';
 export { joint } from './joint';
 export type { RevoluteJointOpts } from './joint';
 export { runScript } from './runner';
-export type { RunResult, SceneObject } from './runner';
+export type { RunResult, SceneObject, LogEntry } from './runner';
 export { partLibrary } from './library';
 export { shapeToGeometry } from './meshToGeometry';
 export { buildScene, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from './sceneBuilder';

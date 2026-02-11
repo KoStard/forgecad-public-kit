@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { runScript, type ParamDef, type RunResult, type SceneObject, isConstraintSketch, updateConstraintValue } from '@forge/index';
+import { runScript, type ParamDef, type RunResult, type SceneObject, type LogEntry, isConstraintSketch, updateConstraintValue } from '@forge/index';
 import { setParamOverrides } from '@forge/params';
 import projectFiles from 'virtual:forge-project';
 import { type ThemeName, applyTheme } from '../theme';
@@ -123,6 +123,7 @@ interface ForgeStore {
   setFileHandle: (h: FileSystemFileHandle | null) => void;
 
   result: RunResult | null;
+  consoleLogs: LogEntry[];
   params: ParamDef[];
   paramOverrides: Record<string, number>;
 
@@ -371,6 +372,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   setFileHandle: (fileHandle) => set({ fileHandle }),
 
   result: null,
+  consoleLogs: [],
   params: [],
   paramOverrides: {},
 
@@ -381,7 +383,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     setParamOverrides(paramOverrides);
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
-    set({ result: runResult, params: runResult.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
+    set({ result: runResult, consoleLogs: runResult.logs, params: runResult.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
   },
 
   setParam: (name, value) => {
@@ -393,7 +395,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (!code) return;
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
-    set({ result: runResult, params: runResult.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
+    set({ result: runResult, consoleLogs: runResult.logs, params: runResult.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
   },
 
   renderMode: 'overlay',
