@@ -162,50 +162,65 @@ if (sideGrilleHoles.length > 0) {
 }
 
 // === Refrigerant Pipes ===
-// Horizontal pipes through the wall at indoor unit height
-const wallPassageLength = wallThick + 20;
+// Position for vertical drops (behind outdoor unit)
+const dropY = outdoorY - outdoorD / 2 - 20;
+
+// 1. Indoor connections: from indoor unit back to wall
+const indoorConnLength = indoorGap + 20;
+const indoorPipeConn1 = cylinder(indoorConnLength, pipeDia / 2 + 6, undefined, 16, true)
+  .rotate(90, 0, 0)  // Along Y axis
+  .translate(0, indoorY + indoorD / 2 + indoorConnLength / 2 - 10, indoorPipeZ)
+  .color(COLOR_PIPE_INSULATION);
+
+const indoorPipeConn2 = cylinder(indoorConnLength, pipeDia / 2, undefined, 16, true)
+  .rotate(90, 0, 0)  // Along Y axis
+  .translate(0, indoorY + indoorD / 2 + indoorConnLength / 2 - 10, indoorPipeZ + pipeSpacing)
+  .color(COLOR_PIPE_COPPER);
+
+// 2. Through wall: from back of wall to front of wall
+const wallPassageLength = wallThick + 10;
 const pipeThroughWall1 = cylinder(wallPassageLength, pipeDia / 2 + 6, undefined, 16, true)
-  .rotate(90, 0, 0)
+  .rotate(90, 0, 0)  // Along Y axis
   .translate(0, 0, indoorPipeZ)
   .color(COLOR_PIPE_INSULATION);
 
 const pipeThroughWall2 = cylinder(wallPassageLength, pipeDia / 2, undefined, 16, true)
-  .rotate(90, 0, 0)
+  .rotate(90, 0, 0)  // Along Y axis
   .translate(0, 0, indoorPipeZ + pipeSpacing)
   .color(COLOR_PIPE_COPPER);
 
-// Vertical drops from wall to outdoor unit height
+// 3. Horizontal from wall to drop position (at high Z - indoor unit height)
+const horizLength = dropY - wallThick / 2;
+const pipeHoriz1 = cylinder(horizLength, pipeDia / 2 + 6, undefined, 16, true)
+  .rotate(90, 0, 0)  // Along Y axis
+  .translate(0, wallThick / 2 + horizLength / 2, indoorPipeZ)
+  .color(COLOR_PIPE_INSULATION);
+
+const pipeHoriz2 = cylinder(horizLength, pipeDia / 2, undefined, 16, true)
+  .rotate(90, 0, 0)  // Along Y axis
+  .translate(0, wallThick / 2 + horizLength / 2, indoorPipeZ + pipeSpacing)
+  .color(COLOR_PIPE_COPPER);
+
+// 4. Vertical drops: from indoor height down to outdoor height
 const dropLength = indoorPipeZ - outdoorPipeZ;
 const pipeDrop1 = cylinder(dropLength, pipeDia / 2 + 6, undefined, 16, true)
-  .translate(0, outdoorY - outdoorD / 2 - 20, indoorPipeZ - dropLength / 2)
+  .translate(0, dropY, indoorPipeZ - dropLength / 2)
   .color(COLOR_PIPE_INSULATION);
 
 const pipeDrop2 = cylinder(dropLength, pipeDia / 2, undefined, 16, true)
-  .translate(0, outdoorY - outdoorD / 2 - 20, indoorPipeZ + pipeSpacing - dropLength / 2)
+  .translate(0, dropY, indoorPipeZ + pipeSpacing - dropLength / 2)
   .color(COLOR_PIPE_COPPER);
 
-// Horizontal connections into outdoor unit
-const outdoorConnLength = 60;
+// 5. Outdoor connections: from drop position into outdoor unit
+const outdoorConnLength = 40;
 const outdoorPipeConn1 = cylinder(outdoorConnLength, pipeDia / 2 + 6, undefined, 16, true)
-  .rotate(0, 90, 0)
-  .translate(0, outdoorY - outdoorD / 2 - 20, outdoorPipeZ)
+  .rotate(90, 0, 0)  // Along Y axis
+  .translate(0, dropY + outdoorConnLength / 2 - 10, outdoorPipeZ)
   .color(COLOR_PIPE_INSULATION);
 
 const outdoorPipeConn2 = cylinder(outdoorConnLength, pipeDia / 2, undefined, 16, true)
-  .rotate(0, 90, 0)
-  .translate(0, outdoorY - outdoorD / 2 - 20, outdoorPipeZ + pipeSpacing)
-  .color(COLOR_PIPE_COPPER);
-
-// Indoor connections (short stubs out the back)
-const indoorConnLength = 40;
-const indoorPipeConn1 = cylinder(indoorConnLength, pipeDia / 2 + 6, undefined, 16, true)
-  .rotate(0, 90, 0)
-  .translate(0, indoorY + indoorD / 2 + 10, indoorPipeZ)
-  .color(COLOR_PIPE_INSULATION);
-
-const indoorPipeConn2 = cylinder(indoorConnLength, pipeDia / 2, undefined, 16, true)
-  .rotate(0, 90, 0)
-  .translate(0, indoorY + indoorD / 2 + 10, indoorPipeZ + pipeSpacing)
+  .rotate(90, 0, 0)  // Along Y axis
+  .translate(0, dropY + outdoorConnLength / 2 - 10, outdoorPipeZ + pipeSpacing)
   .color(COLOR_PIPE_COPPER);
 
 // === Assembly ===
@@ -218,12 +233,14 @@ return [
   { name: "Mounting Bracket", shape: bracket },
   { name: "Outdoor Body", shape: outdoorWithGrille },
   { name: "Fan Blades", shape: fanBlade },
-  { name: "Pipe Through Wall 1", shape: pipeThroughWall1 },
-  { name: "Pipe Through Wall 2", shape: pipeThroughWall2 },
-  { name: "Pipe Drop 1", shape: pipeDrop1 },
-  { name: "Pipe Drop 2", shape: pipeDrop2 },
   { name: "Indoor Pipe Conn 1", shape: indoorPipeConn1 },
   { name: "Indoor Pipe Conn 2", shape: indoorPipeConn2 },
+  { name: "Pipe Through Wall 1", shape: pipeThroughWall1 },
+  { name: "Pipe Through Wall 2", shape: pipeThroughWall2 },
+  { name: "Pipe Horizontal 1", shape: pipeHoriz1 },
+  { name: "Pipe Horizontal 2", shape: pipeHoriz2 },
+  { name: "Pipe Drop 1", shape: pipeDrop1 },
+  { name: "Pipe Drop 2", shape: pipeDrop2 },
   { name: "Outdoor Pipe Conn 1", shape: outdoorPipeConn1 },
   { name: "Outdoor Pipe Conn 2", shape: outdoorPipeConn2 },
 ];
