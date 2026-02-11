@@ -98,15 +98,10 @@ function ForgeObject({
           />
         </mesh>
       )}
-      {showWire && (
-        <mesh geometry={solidGeo}>
-          <meshBasicMaterial
-            color={settings.color}
-            wireframe
-            transparent={meshOpacity < 1}
-            opacity={meshOpacity}
-          />
-        </mesh>
+      {showWire && edgesGeo && (
+        <lineSegments geometry={edgesGeo}>
+          <lineBasicMaterial color={settings.color} transparent={meshOpacity < 1} opacity={meshOpacity} />
+        </lineSegments>
       )}
       {showEdges && edgesGeo && (
         <lineSegments geometry={edgesGeo}>
@@ -998,9 +993,9 @@ export function Viewport() {
         camera={{ up: [0, 0, 1] }}
       >
         {projectionMode === 'orthographic' ? (
-          <OrthographicCamera makeDefault position={[120, 80, 120]} zoom={2} near={0.1} far={10000} up={[0, 0, 1]} />
+          <OrthographicCamera makeDefault position={[120, 80, 120]} zoom={2} near={-50000} far={50000} up={[0, 0, 1]} />
         ) : (
-          <PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={10000} up={[0, 0, 1]} />
+          <PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={100000} up={[0, 0, 1]} />
         )}
 
         {/* Environment map for realistic reflections */}
