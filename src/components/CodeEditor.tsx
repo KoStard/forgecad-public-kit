@@ -38,6 +38,10 @@ declare function constrainedSketch(): ConstrainedSketchBuilder;
 declare class Shape {
   // Transforms
   translate(x: number, y: number, z: number): Shape;
+  /** Move so bounding box min corner is at the given global coordinate */
+  moveTo(x: number, y: number, z: number): Shape;
+  /** Move so bounding box min corner is at target's bounding box min + (x, y, z) offset */
+  moveToLocal(target: Shape, x: number, y: number, z: number): Shape;
   rotate(x: number, y: number, z: number): Shape;
   scale(v: number | [number, number, number]): Shape;
   mirror(normal: [number, number, number]): Shape;
@@ -206,6 +210,10 @@ declare class TrackedShape {
   faceNames(): string[];
   edgeNames(): string[];
   translate(dx: number, dy: number, dz: number): TrackedShape;
+  /** Move so bounding box min corner is at the given global coordinate */
+  moveTo(x: number, y: number, z: number): TrackedShape;
+  /** Move so bounding box min corner is at target's bounding box min + (x, y, z) offset */
+  moveToLocal(target: Shape | TrackedShape, x: number, y: number, z: number): TrackedShape;
   rotateAroundEdge(edgeName: string, angleDeg: number): TrackedShape;
   /** Position this shape relative to another using named 3D anchor points */
   attachTo(target: Shape | TrackedShape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D): TrackedShape;
@@ -269,6 +277,10 @@ declare function group(...items: (Shape | Sketch | TrackedShape)[]): ShapeGroup;
 declare class ShapeGroup {
   readonly children: (Shape | Sketch | TrackedShape)[];
   translate(x: number, y: number, z: number): ShapeGroup;
+  /** Move so combined bounding box min corner is at the given global coordinate */
+  moveTo(x: number, y: number, z: number): ShapeGroup;
+  /** Move so combined bounding box min corner is at target's bounding box min + (x, y, z) offset */
+  moveToLocal(target: Shape | TrackedShape | ShapeGroup, x: number, y: number, z: number): ShapeGroup;
   rotate(x: number, y: number, z: number): ShapeGroup;
   scale(v: number | [number, number, number]): ShapeGroup;
   mirror(normal: [number, number, number]): ShapeGroup;

@@ -48,6 +48,18 @@ export class Shape {
     return new Shape(this.manifold.translate(x, y, z), this.colorHex);
   }
 
+  /** Move so bounding box min corner is at the given global coordinate */
+  moveTo(x: number, y: number, z: number): Shape {
+    const bb = this.boundingBox();
+    return this.translate(x - (bb.min as number[])[0], y - (bb.min as number[])[1], z - (bb.min as number[])[2]);
+  }
+
+  /** Move so bounding box min corner is at target's bounding box min + (x, y, z) offset */
+  moveToLocal(target: Shape, x: number, y: number, z: number): Shape {
+    const tbb = target.boundingBox();
+    return this.moveTo((tbb.min as number[])[0] + x, (tbb.min as number[])[1] + y, (tbb.min as number[])[2] + z);
+  }
+
   rotate(x: number, y: number, z: number): Shape {
     return new Shape(this.manifold.rotate(x, y, z), this.colorHex);
   }

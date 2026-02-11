@@ -83,6 +83,19 @@ export class TrackedShape {
     return new TrackedShape(this.shape.translate(x, y, z), newTopo, this.baseHeight, this.extrudeUp);
   }
 
+  /** Move so bounding box min corner is at the given global coordinate */
+  moveTo(x: number, y: number, z: number): TrackedShape {
+    const bb = this.shape.boundingBox();
+    return this.translate(x - (bb.min as number[])[0], y - (bb.min as number[])[1], z - (bb.min as number[])[2]);
+  }
+
+  /** Move so bounding box min corner is at target's bounding box min + (x, y, z) offset */
+  moveToLocal(target: Shape | TrackedShape, x: number, y: number, z: number): TrackedShape {
+    const ts = target instanceof TrackedShape ? target.toShape() : target;
+    const tbb = ts.boundingBox();
+    return this.moveTo((tbb.min as number[])[0] + x, (tbb.min as number[])[1] + y, (tbb.min as number[])[2] + z);
+  }
+
   /** Alias for translate — matches ideal API's moveBy */
   moveBy(x: number, y: number, z: number): TrackedShape {
     return this.translate(x, y, z);

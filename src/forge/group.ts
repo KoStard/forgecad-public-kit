@@ -21,6 +21,41 @@ export class ShapeGroup {
     }));
   }
 
+  /** Compute combined bounding box of all 3D children */
+  private _bbox(): { min: number[]; max: number[] } {
+    let min = [Infinity, Infinity, Infinity];
+    let max = [-Infinity, -Infinity, -Infinity];
+    for (const c of this.children) {
+      const s = c instanceof TrackedShape ? c.toShape() : c instanceof Shape ? c : null;
+      if (!s) continue;
+      const bb = s.boundingBox();
+      for (let i = 0; i < 3; i++) {
+        if ((bb.min as number[])[i] < min[i]) min[i] = (bb.min as number[])[i];
+        if ((bb.max as number[])[i] > max[i]) max[i] = (bb.max as number[])[i];
+      }
+    }
+    return { min, max };
+  }
+
+  /** Move so combined bounding box min corner is at the given global coordinate */
+  moveTo(x: number, y: number, z: number): ShapeGroup {
+    const bb = this._bbox();
+    return this.translate(x - bb.min[0], y - bb.min[1], z - bb.min[2]);
+  }
+
+  /** Move so combined bounding box min corner is at target's bounding box min + (x, y, z) offset */
+  moveToLocal(target: Shape | TrackedShape | ShapeGroup, x: number, y: number, z: number): ShapeGroup {
+    let tbb: { min: number[] };
+    if (target instanceof ShapeGroup) {
+      tbb = target._bbox();
+    } else {
+      const ts = target instanceof TrackedShape ? target.toShape() : target;
+      const bb = ts.boundingBox();
+      tbb = { min: bb.min as number[] };
+    }
+    return this.moveTo(tbb.min[0] + x, tbb.min[1] + y, tbb.min[2] + z);
+  }
+
   rotate(x: number, y: number, z: number): ShapeGroup {
     return new ShapeGroup(this.children.map(c => {
       if (c instanceof TrackedShape) return c.rotate(x, y, z);

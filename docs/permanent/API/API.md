@@ -170,10 +170,33 @@ const lowPoly = sphere(25, 8);  // Octahedron-like
 All transforms are **chainable** and **immutable** (return new shapes).
 
 ### `.translate(x, y, z)`
-Moves the shape.
+Moves the shape relative to its current position.
 
 ```javascript
 const moved = box(10, 10, 10).translate(50, 0, 0);
+```
+
+### `.moveTo(x, y, z)`
+Positions the shape so its bounding box min corner is at the given global coordinate.
+
+```javascript
+// Place a box at exactly (100, 50, 0) in world space
+const placed = box(30, 30, 10).moveTo(100, 50, 0);
+```
+
+### `.moveToLocal(target, x, y, z)`
+Positions the shape relative to another shape's local coordinate system (bounding box min corner).
+
+**Parameters:**
+- `target` (Shape | TrackedShape) — The reference shape
+- `x, y, z` (number) — Offset from target's bounding box min corner
+
+```javascript
+const base = box(100, 100, 10);
+const part = box(20, 20, 30);
+
+// Place part at (10, 10, 10) relative to base's origin corner
+const placed = part.moveToLocal(base, 10, 10, 10);
 ```
 
 ### `.rotate(x, y, z)`
