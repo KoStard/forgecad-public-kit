@@ -183,8 +183,8 @@ try {
     }
 
     // Save images
-    const ext = extname(outputBase);
-    const base = outputBase.slice(0, -ext.length);
+    const ext = extname(outputBase) || '.png';
+    const base = outputBase.endsWith(ext) ? outputBase.slice(0, -ext.length) : outputBase;
 
     const savedFiles = [];
     for (const [angle, png] of Object.entries(result.renders)) {

@@ -23,6 +23,11 @@ async function main() {
 
   if (result.error) {
     console.error("ERROR:", result.error);
+    if (result.logs?.length) {
+      for (const log of result.logs) {
+        console.error(`  [${log.level}]`, ...log.args);
+      }
+    }
     process.exit(1);
   }
 

@@ -89,7 +89,7 @@ async function setup() {
 
   // Build scene with per-object colors
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x252526);
+  scene.background = new THREE.Color(0x4a4a50);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.3));
   const dir1 = new THREE.DirectionalLight(0xffffff, 1.2);

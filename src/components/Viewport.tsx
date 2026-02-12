@@ -60,10 +60,12 @@ function ForgeObject({
   obj,
   settings,
   renderMode,
+  isHovered,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
   renderMode: RenderMode;
+  isHovered?: boolean;
 }) {
   const { solidGeo, edgesGeo } = useMemo(() => {
     if (!obj.shape) return { solidGeo: null, edgesGeo: null };
@@ -96,6 +98,8 @@ function ForgeObject({
             side={THREE.DoubleSide}
             transparent={meshOpacity < 1}
             opacity={meshOpacity}
+            emissive={isHovered ? settings.color : '#000000'}
+            emissiveIntensity={isHovered ? 0.3 : 0}
           />
         </mesh>
       )}
@@ -970,6 +974,7 @@ export function Viewport() {
   const gridEnabled = useForgeStore((s) => s.gridEnabled);
   const gridSize = useForgeStore((s) => s.gridSize);
   const objectSettings = useForgeStore((s) => s.objectSettings);
+  const hoveredObjectId = useForgeStore((s) => s.hoveredObjectId);
   const viewCommand = useForgeStore((s) => s.viewCommand);
   const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
   const objects = result?.objects ?? [];
@@ -1010,8 +1015,9 @@ export function Viewport() {
 
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
+          const isHovered = hoveredObjectId === obj.id;
           if (obj.shape) {
-            return <ForgeObject key={obj.id} obj={obj} settings={settings} renderMode={renderMode} />;
+            return <ForgeObject key={obj.id} obj={obj} settings={settings} renderMode={renderMode} isHovered={isHovered} />;
           }
           if (obj.sketch) {
             return <SketchObject key={obj.id} obj={obj} settings={settings} renderMode={renderMode} />;

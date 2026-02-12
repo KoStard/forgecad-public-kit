@@ -51,6 +51,7 @@ export function ViewPanel() {
   const setObjectColor = useForgeStore((s) => s.setObjectColor);
   const selectedObjectId = useForgeStore((s) => s.selectedObjectId);
   const selectObject = useForgeStore((s) => s.selectObject);
+  const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
   const measureSnapPx = useForgeStore((s) => s.measureSnapPx);
   const setMeasureSnapPx = useForgeStore((s) => s.setMeasureSnapPx);
@@ -138,6 +139,8 @@ export function ViewPanel() {
             <div
               key={obj.id}
               onClick={() => selectObject(obj.id)}
+              onMouseEnter={() => setHoveredObjectId(obj.id)}
+              onMouseLeave={() => setHoveredObjectId(null)}
               style={{
                 padding: '8px 8px',
                 border: '1px solid var(--fc-borderLight)',

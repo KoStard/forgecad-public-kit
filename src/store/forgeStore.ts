@@ -144,6 +144,8 @@ interface ForgeStore {
   setObjectColor: (id: string, color: string) => void;
   selectedObjectId: string | null;
   selectObject: (id: string | null) => void;
+  hoveredObjectId: string | null;
+  setHoveredObjectId: (id: string | null) => void;
   viewCommand: ViewCommand | null;
   requestViewCommand: (command: Omit<ViewCommand, 'id'>) => void;
   clearViewCommand: () => void;
@@ -421,6 +423,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   }),
   selectedObjectId: null,
   selectObject: (id) => set({ selectedObjectId: id }),
+  hoveredObjectId: null,
+  setHoveredObjectId: (id) => set({ hoveredObjectId: id }),
   viewCommand: null,
   requestViewCommand: (command) => set({ viewCommand: { ...command, id: Date.now() } }),
   clearViewCommand: () => set({ viewCommand: null }),

@@ -171,27 +171,33 @@ export class Shape {
 
   // --- Booleans ---
 
+  /** Unwrap TrackedShape (or any object with toShape()) without circular import. */
+  private static _unwrap(s: any): Shape {
+    return typeof s.toShape === 'function' ? s.toShape() : s;
+  }
+
   add(other: Shape | { toShape(): Shape }): Shape {
-    const s = 'toShape' in other ? other.toShape() : other;
-    return new Shape(this.manifold.add(s.manifold), this.colorHex);
+    const o = Shape._unwrap(other);
+    return new Shape(this.manifold.add(o.manifold), this.colorHex);
   }
 
   subtract(other: Shape | { toShape(): Shape }): Shape {
-    const s = 'toShape' in other ? other.toShape() : other;
-    return new Shape(this.manifold.subtract(s.manifold), this.colorHex);
+    const o = Shape._unwrap(other);
+    return new Shape(this.manifold.subtract(o.manifold), this.colorHex);
   }
 
   intersect(other: Shape | { toShape(): Shape }): Shape {
-    const s = 'toShape' in other ? other.toShape() : other;
-    return new Shape(this.manifold.intersect(s.manifold), this.colorHex);
+    const o = Shape._unwrap(other);
+    return new Shape(this.manifold.intersect(o.manifold), this.colorHex);
+  }
   }
 
   // --- Cutting ---
 
   /** Split into [inside, outside] by another shape. */
   split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
-    const s = 'toShape' in cutter ? cutter.toShape() : cutter;
-    const [a, b] = this.manifold.split(s.manifold);
+    const c = Shape._unwrap(cutter);
+    const [a, b] = this.manifold.split(c.manifold);
     return [new Shape(a, this.colorHex), new Shape(b, this.colorHex)];
   }
 
@@ -366,6 +372,7 @@ export function resolveAnchor3D(
     case 'bottom-front-right': return [max[0], min[1], min[2]];
     case 'bottom-back-left': return [min[0], max[1], min[2]];
     case 'bottom-back-right': return [max[0], max[1], min[2]];
+    default: throw new Error(`Unknown anchor "${anchor}". Valid anchors: center, front, back, left, right, top, bottom, front-left, front-right, back-left, back-right, top-front, top-back, top-left, top-right, bottom-front, bottom-back, bottom-left, bottom-right, top-front-left, top-front-right, top-back-left, top-back-right, bottom-front-left, bottom-front-right, bottom-back-left, bottom-back-right`);
   }
 }
 
