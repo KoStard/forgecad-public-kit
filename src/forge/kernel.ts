@@ -190,7 +190,6 @@ export class Shape {
     const o = Shape._unwrap(other);
     return new Shape(this.manifold.intersect(o.manifold), this.colorHex);
   }
-  }
 
   // --- Cutting ---
 
