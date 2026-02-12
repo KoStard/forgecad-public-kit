@@ -23,6 +23,7 @@ function getRenderer(size: number): THREE.WebGLRenderer {
     });
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
   }
   renderer.setSize(size, size);
   return renderer;
@@ -89,7 +90,7 @@ async function setup() {
 
   // Build scene with per-object colors
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x4a4a50);
+  scene.background = new THREE.Color(0x252526);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.3));
   const dir1 = new THREE.DirectionalLight(0xffffff, 1.2);
