@@ -55,8 +55,9 @@ export class Shape {
   }
 
   /** Move so bounding box min corner is at target's bounding box min + (x, y, z) offset */
-  moveToLocal(target: Shape, x: number, y: number, z: number): Shape {
-    const tbb = target.boundingBox();
+  moveToLocal(target: Shape | { toShape(): Shape }, x: number, y: number, z: number): Shape {
+    const s = 'toShape' in target ? target.toShape() : target;
+    const tbb = s.boundingBox();
     return this.moveTo((tbb.min as number[])[0] + x, (tbb.min as number[])[1] + y, (tbb.min as number[])[2] + z);
   }
 
@@ -170,23 +171,27 @@ export class Shape {
 
   // --- Booleans ---
 
-  add(other: Shape): Shape {
-    return new Shape(this.manifold.add(other.manifold), this.colorHex);
+  add(other: Shape | { toShape(): Shape }): Shape {
+    const s = 'toShape' in other ? other.toShape() : other;
+    return new Shape(this.manifold.add(s.manifold), this.colorHex);
   }
 
-  subtract(other: Shape): Shape {
-    return new Shape(this.manifold.subtract(other.manifold), this.colorHex);
+  subtract(other: Shape | { toShape(): Shape }): Shape {
+    const s = 'toShape' in other ? other.toShape() : other;
+    return new Shape(this.manifold.subtract(s.manifold), this.colorHex);
   }
 
-  intersect(other: Shape): Shape {
-    return new Shape(this.manifold.intersect(other.manifold), this.colorHex);
+  intersect(other: Shape | { toShape(): Shape }): Shape {
+    const s = 'toShape' in other ? other.toShape() : other;
+    return new Shape(this.manifold.intersect(s.manifold), this.colorHex);
   }
 
   // --- Cutting ---
 
   /** Split into [inside, outside] by another shape. */
-  split(cutter: Shape): [Shape, Shape] {
-    const [a, b] = this.manifold.split(cutter.manifold);
+  split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
+    const s = 'toShape' in cutter ? cutter.toShape() : cutter;
+    const [a, b] = this.manifold.split(s.manifold);
     return [new Shape(a, this.colorHex), new Shape(b, this.colorHex)];
   }
 
@@ -230,8 +235,9 @@ export class Shape {
   }
 
   /** Minimum distance between this shape and another. */
-  minGap(other: Shape, searchLength: number): number {
-    return this.manifold.minGap(other.manifold, searchLength);
+  minGap(other: Shape | { toShape(): Shape }, searchLength: number): number {
+    const s = 'toShape' in other ? other.toShape() : other;
+    return this.manifold.minGap(s.manifold, searchLength);
   }
 
   isEmpty(): boolean {
