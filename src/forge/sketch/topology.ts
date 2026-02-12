@@ -209,6 +209,26 @@ export class TrackedShape {
     return this.translate(dx, dy, dz);
   }
 
+  /**
+   * Place this shape on a face of a parent shape.
+   * See Shape.onFace() for full documentation.
+   */
+  onFace(
+    parent: Shape | TrackedShape | { _bbox(): { min: number[]; max: number[] } },
+    face: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom',
+    opts: { u?: number; v?: number; protrude?: number } = {},
+  ): TrackedShape {
+    const u = opts.u ?? 0, v = opts.v ?? 0, p = opts.protrude ?? 0;
+    type F = typeof face;
+    const opp: Record<F, F> = { front: 'back', back: 'front', left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+    const uvMap: Record<F, (u: number, v: number, p: number) => [number, number, number]> = {
+      front: (u, v, p) => [u, -p, v], back: (u, v, p) => [u, p, v],
+      left: (u, v, p) => [-p, u, v], right: (u, v, p) => [p, u, v],
+      top: (u, v, p) => [u, v, p], bottom: (u, v, p) => [u, v, -p],
+    };
+    return this.attachTo(parent, face, opp[face], uvMap[face](u, v, p));
+  }
+
   /** Boolean subtract — returns plain Shape (topology lost) */
   subtract(other: Shape | TrackedShape): Shape {
     const otherShape = other instanceof TrackedShape ? other.toShape() : other;

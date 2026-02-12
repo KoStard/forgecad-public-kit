@@ -38,6 +38,57 @@ async function main() {
       console.log(`  ${obj.name}: area=${obj.sketch.area().toFixed(1)}mm²`);
     }
   }
+
+  // Spatial relationship analysis
+  const shapes3d = result.objects
+    .filter((o: any) => o.shape)
+    .map((o: any) => {
+      const bb = o.shape.boundingBox();
+      return { name: o.name, min: bb.min as number[], max: bb.max as number[] };
+    });
+
+  if (shapes3d.length > 1) {
+    console.log(`\n✓ Spatial relationships:`);
+    const axisLabel = ['X', 'Y', 'Z'];
+    const dirLabels: Record<number, [string, string]> = {
+      0: ['LEFT of', 'RIGHT of'],
+      1: ['IN FRONT of', 'BEHIND'],
+      2: ['BELOW', 'ABOVE'],
+    };
+
+    for (let i = 0; i < shapes3d.length; i++) {
+      for (let j = i + 1; j < shapes3d.length; j++) {
+        const a = shapes3d[i], b = shapes3d[j];
+        for (let ax = 0; ax < 3; ax++) {
+          // Check if a is entirely before b on this axis
+          if (a.max[ax] < b.min[ax]) {
+            console.log(`  ${a.name} is ${dirLabels[ax][0]} ${b.name} (${axisLabel[ax]}: ${a.min[ax].toFixed(0)}..${a.max[ax].toFixed(0)} vs ${b.min[ax].toFixed(0)}..${b.max[ax].toFixed(0)})`);
+          } else if (b.max[ax] < a.min[ax]) {
+            console.log(`  ${a.name} is ${dirLabels[ax][1]} ${b.name} (${axisLabel[ax]}: ${a.min[ax].toFixed(0)}..${a.max[ax].toFixed(0)} vs ${b.min[ax].toFixed(0)}..${b.max[ax].toFixed(0)})`);
+          }
+          // Check if one is entirely inside the other (potential "inside" issue)
+          else {
+            // Check if a is inside b
+            const aInB = [0, 1, 2].every(
+              k => a.min[k] >= b.min[k] - 0.1 && a.max[k] <= b.max[k] + 0.1
+            );
+            // Check if b is inside a
+            const bInA = [0, 1, 2].every(
+              k => b.min[k] >= a.min[k] - 0.1 && b.max[k] <= a.max[k] + 0.1
+            );
+            if (aInB) {
+              console.log(`  ⚠ ${a.name} is INSIDE ${b.name} (may be unintentional)`);
+              break;
+            }
+            if (bInA) {
+              console.log(`  ⚠ ${b.name} is INSIDE ${a.name} (may be unintentional)`);
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
   console.log(`✓ Params: ${result.params.map((p) => p.name).join(", ")}`);
   console.log(`✓ Time: ${result.timeMs.toFixed(0)}ms`);
 }

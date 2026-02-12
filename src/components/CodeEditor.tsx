@@ -78,6 +78,8 @@ declare class Shape {
   // 3D Anchor positioning
   /** Position this shape relative to another using named 3D anchor points */
   attachTo(target: Shape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D, offset?: [number, number, number]): Shape;
+  /** Place on a face of a parent shape. u/v = position within face, protrude = outward distance */
+  onFace(parent: Shape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number }): Shape;
 
   // Query
   volume(): number;
@@ -220,6 +222,8 @@ declare class TrackedShape {
   rotateAroundEdge(edgeName: string, angleDeg: number): TrackedShape;
   /** Position this shape relative to another using named 3D anchor points */
   attachTo(target: Shape | TrackedShape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D, offset?: [number, number, number]): TrackedShape;
+  /** Place on a face of a parent shape. u/v = position within face, protrude = outward distance */
+  onFace(parent: Shape | TrackedShape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number }): TrackedShape;
   toShape(): Shape;
 }
 

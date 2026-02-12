@@ -78,6 +78,26 @@ export class ShapeGroup {
     return this.translate(dx, dy, dz);
   }
 
+  /**
+   * Place this group on a face of a parent shape.
+   * See Shape.onFace() for full documentation.
+   */
+  onFace(
+    parent: Shape | TrackedShape | ShapeGroup,
+    face: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom',
+    opts: { u?: number; v?: number; protrude?: number } = {},
+  ): ShapeGroup {
+    const u = opts.u ?? 0, v = opts.v ?? 0, p = opts.protrude ?? 0;
+    type F = typeof face;
+    const opp: Record<F, F> = { front: 'back', back: 'front', left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+    const uvMap: Record<F, (u: number, v: number, p: number) => [number, number, number]> = {
+      front: (u, v, p) => [u, -p, v], back: (u, v, p) => [u, p, v],
+      left: (u, v, p) => [-p, u, v], right: (u, v, p) => [p, u, v],
+      top: (u, v, p) => [u, v, p], bottom: (u, v, p) => [u, v, -p],
+    };
+    return this.attachTo(parent, face as Anchor3D, opp[face] as Anchor3D, uvMap[face](u, v, p));
+  }
+
   rotate(x: number, y: number, z: number): ShapeGroup {
     return new ShapeGroup(this.children.map(c => {
       if (c instanceof TrackedShape) return c.rotate(x, y, z);

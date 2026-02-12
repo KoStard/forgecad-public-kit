@@ -398,6 +398,48 @@ const stacked = b.attachTo(a, 'top-back-left', 'bottom-back-left');
 const shifted = column.attachTo(base, 'top', 'bottom', [10, 0, 0]);
 ```
 
+### `.onFace(parent, face, opts?)`
+Place a shape on a specific face of a parent shape. Think of it like sticking a label on a box surface.
+
+**Parameters:**
+- `parent` (Shape | TrackedShape) — The parent shape
+- `face` ('front' | 'back' | 'left' | 'right' | 'top' | 'bottom') — Which face to place on
+- `opts` (object, optional):
+  - `u` (number) — Horizontal offset within the face (from center). Default: 0
+  - `v` (number) — Vertical offset within the face (from center). Default: 0
+  - `protrude` (number) — How far the child sticks out from the face. Default: 0
+
+**Face coordinate mapping (u, v):**
+- front/back: u = left/right (X), v = up/down (Z)
+- left/right: u = forward/back (Y), v = up/down (Z)
+- top/bottom: u = left/right (X), v = forward/back (Y)
+
+**Returns:** Same type as caller
+
+```javascript
+const body = box(100, 40, 60, true);
+
+// Vent on front face, centered, 15mm below center, protruding 2mm
+const vent = box(80, 2, 12, true).color('#333')
+  .onFace(body, 'front', { v: -15, protrude: 2 });
+
+// Display near top-right of front face
+const display = box(35, 1.5, 8, true).color('#00ddee')
+  .onFace(body, 'front', { u: 20, v: 15, protrude: 1 });
+
+// Fan on top, protruding 5mm
+const fan = cylinder(10, 40).color('#333')
+  .onFace(body, 'top', { protrude: 5 });
+
+// Side vent on left face
+const sideVent = box(2, 30, 40, true).color('#666')
+  .onFace(body, 'left', { protrude: 1 });
+```
+
+**When to use `onFace()` vs `attachTo()`:**
+- `onFace()` — placing surface details (vents, displays, buttons, labels) on a parent body
+- `attachTo()` — stacking independent parts (column on base, unit on wall)
+
 ## Advanced 3D Operations
 
 ### `hull3d(...args)`

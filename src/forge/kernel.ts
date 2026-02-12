@@ -272,6 +272,47 @@ export class Shape {
     if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }
     return this.translate(dx, dy, dz);
   }
+
+  /**
+   * Place this shape on a face of a parent shape.
+   *
+   * Think of it like sticking a label on a box surface:
+   * - `face` picks which surface ('front', 'back', 'top', etc.)
+   * - `u, v` position within that face's 2D plane (from center)
+   *   - front/back: u = left/right (X), v = up/down (Z)
+   *   - left/right: u = forward/back (Y), v = up/down (Z)
+   *   - top/bottom: u = left/right (X), v = forward/back (Y)
+   * - `protrude` = how far the child sticks out (positive = outward from face)
+   */
+  onFace(
+    parent: Shape | { _bbox(): { min: number[]; max: number[] } },
+    face: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom',
+    opts: { u?: number; v?: number; protrude?: number } = {},
+  ): Shape {
+    const u = opts.u ?? 0;
+    const v = opts.v ?? 0;
+    const p = opts.protrude ?? 0;
+
+    // Map face → which attachTo anchors + how u,v,protrude map to x,y,z offset
+    // The child's "inward" face attaches to the parent's face, then protrude pushes outward
+    type FaceAnchor = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom';
+    const opposite: Record<FaceAnchor, FaceAnchor> = {
+      front: 'back', back: 'front', left: 'right', right: 'left', top: 'bottom', bottom: 'top',
+    };
+    // For each parent face, map (u, v, protrude) → (dx, dy, dz)
+    const uvMap: Record<FaceAnchor, (u: number, v: number, p: number) => [number, number, number]> = {
+      front:  (u, v, p) => [u, -p, v],   // front = −Y face, outward = −Y
+      back:   (u, v, p) => [u, p, v],     // back = +Y face, outward = +Y
+      left:   (u, v, p) => [-p, u, v],    // left = −X face, outward = −X
+      right:  (u, v, p) => [p, u, v],     // right = +X face, outward = +X
+      top:    (u, v, p) => [u, v, p],     // top = +Z face, outward = +Z
+      bottom: (u, v, p) => [u, v, -p],    // bottom = −Z face, outward = −Z
+    };
+
+    const selfAnchor = opposite[face]; // child's inward face
+    const offset = uvMap[face](u, v, p);
+    return this.attachTo(parent, face, selfAnchor, offset);
+  }
 }
 
 // --- 3D Anchor positioning ---

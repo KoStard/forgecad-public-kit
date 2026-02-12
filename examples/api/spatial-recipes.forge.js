@@ -9,7 +9,7 @@
 // "back"  anchor = +Y face
 //
 // These recipes show how to position parts relative to each other
-// using attachTo() so you never need manual coordinate math.
+// using attachTo() and onFace() so you never need manual coordinate math.
 
 const recipe = param("Recipe", 1, { min: 1, max: 3, integer: true });
 
@@ -44,27 +44,37 @@ if (recipe === 1) {
 }
 
 if (recipe === 2) {
-  // ─── Recipe 2: Surface details on a box ───
-  // Place vents, displays, buttons ON the surface of a parent body.
-  // Key: use attachTo(parent, 'front', 'back') — child's back meets parent's front.
+  // ─── Recipe 2: Surface details using onFace() ───
+  // onFace(parent, face, {u, v, protrude}) places a child on a parent's face.
+  //   u, v = position within the face (from center)
+  //   protrude = how far it sticks out (positive = outward)
+  //
+  // Face coordinate mapping:
+  //   front/back: u = left/right (X), v = up/down (Z)
+  //   left/right: u = forward/back (Y), v = up/down (Z)
+  //   top/bottom: u = left/right (X), v = forward/back (Y)
 
   const body = box(100, 40, 60, true).color('#F5F5F5');
 
   // Vent slits on front face, near bottom
   const vent = box(80, 2, 12, true).color('#333333')
-    .attachTo(body, 'front', 'back', [0, -1, -15]);
+    .onFace(body, 'front', { v: -15, protrude: 2 });
 
   // Display panel on front face, near top-right
   const display = box(35, 1.5, 8, true).color('#00ddee')
-    .attachTo(body, 'top-front', 'top-back', [15, -1, -8]);
+    .onFace(body, 'front', { u: 20, v: 15, protrude: 1 });
 
-  // Button on front face
-  const button = cylinder(2, 4).pointAlong([0, -1, 0]).color('#44cc44')
-    .attachTo(body, 'front', 'back', [-30, -2, 10]);
+  // Button on front face, top-left area
+  const button = box(6, 2, 6, true).color('#44cc44')
+    .onFace(body, 'front', { u: -30, v: 18, protrude: 2 });
 
-  // Side vent on left face: child's right meets parent's left
+  // Side vent on left face
   const sideVent = box(2, 30, 40, true).color('#666666')
-    .attachTo(body, 'left', 'right', [1, 0, 0]);
+    .onFace(body, 'left', { protrude: 1 });
+
+  // Fan on top, protruding 5mm
+  const fan = cylinder(10, 40).color('#333333')
+    .onFace(body, 'top', { protrude: 5 });
 
   return [
     { name: "Body", shape: body },
@@ -72,18 +82,19 @@ if (recipe === 2) {
     { name: "Display", shape: display },
     { name: "Button", shape: button },
     { name: "Side Vent", shape: sideVent },
+    { name: "Top Fan", shape: fan },
   ];
 }
 
 if (recipe === 3) {
-  // ─── Recipe 3: Stacking and penetration ───
-  // Outdoor AC condenser: box body + fan on top + pipes from front
+  // ─── Recipe 3: Full AC outdoor condenser ───
+  // Combines attachTo() for stacking and onFace() for surface details
 
   const body = box(140, 50, 70, true).color('#888888');
 
-  // Fan housing on top — cylinder defaults to Z-up, which is correct here
+  // Fan housing on top — cylinder defaults to Z-up, correct for top placement
   const fan = cylinder(10, 50).color('#333333')
-    .attachTo(body, 'top', 'bottom', [0, 0, 2]);
+    .onFace(body, 'top', { protrude: 2 });
 
   // Fan grill (flat disc on top of fan)
   const grill = cylinder(2, 52).color('#777777')
@@ -91,10 +102,14 @@ if (recipe === 3) {
 
   // Pipe ports on front face — orient along Y (pointing outward from front)
   const pipe1 = cylinder(20, 5).pointAlong([0, -1, 0]).color('#B87333')
-    .attachTo(body, 'front', 'back', [-15, -2, -10]);
+    .onFace(body, 'front', { u: -15, v: -10, protrude: 2 });
 
   const pipe2 = cylinder(20, 3).pointAlong([0, -1, 0]).color('#B87333')
-    .attachTo(body, 'front', 'back', [15, -2, -10]);
+    .onFace(body, 'front', { u: 15, v: -10, protrude: 2 });
+
+  // Side louvers on right face
+  const louver = box(2, 3, 50, true).color('#666666')
+    .onFace(body, 'right', { protrude: 1 });
 
   // Feet on bottom
   const foot = box(20, 15, 5, true).color('#222222');
@@ -107,6 +122,7 @@ if (recipe === 3) {
     { name: "Grill", shape: grill },
     { name: "Pipe 1", shape: pipe1 },
     { name: "Pipe 2", shape: pipe2 },
+    { name: "Louver", shape: louver },
     { name: "Foot L", shape: footL },
     { name: "Foot R", shape: footR },
   ];
