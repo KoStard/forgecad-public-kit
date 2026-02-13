@@ -158,6 +158,20 @@ export class TrackedShape {
     );
   }
 
+  /** Rotate around an arbitrary axis through a pivot point. Topology is cleared. */
+  rotateAround(
+    axis: [number, number, number],
+    angleDeg: number,
+    pivot: [number, number, number] = [0, 0, 0],
+  ): TrackedShape {
+    return new TrackedShape(
+      this.shape.rotateAround(axis, angleDeg, pivot),
+      { faces: new Map(), edges: new Map() },
+      this.baseHeight,
+      this.extrudeUp,
+    );
+  }
+
   /** Scale the shape. Topology is cleared for non-uniform scale. */
   scale(v: number | [number, number, number]): TrackedShape {
     return new TrackedShape(
