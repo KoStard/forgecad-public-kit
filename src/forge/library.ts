@@ -223,9 +223,9 @@ export function pipeRoute(
 
   // Helper: create a torus bend section
   const makeBend = (info: BendInfo) => {
-    // Create a circle cross-section at (bendR, 0) in XY, revolve around Y axis
-    // Manifold revolve: revolves around Y axis. Profile X = radial distance, Y = height.
-    // We want a torus: circle at distance bendR from Y axis.
+    // Create a circle cross-section at (bendR, 0) in XY, revolve around Z axis.
+    // Manifold revolve() revolves around Z. Cross-section X = radial distance, Y = Z height.
+    // At angle=0: centerline at (bendR, 0, 0). Tangent = +Y (sweeping X→Y around Z).
     const wasm = getWasm();
     const circlePts: [number, number][] = [];
     for (let i = 0; i < segs; i++) {
@@ -259,63 +259,35 @@ export function pipeRoute(
     }
 
     // Now orient the bend into world space.
-    // After revolve around Y: the torus arc starts at +X direction (radial) and sweeps in XY plane.
-    // We need to map this so:
-    //   - The torus center is at info.center
-    //   - The arc starts pointing from center toward info.startPt (incoming tangent direction)
-    //   - The rotation axis is info.axis
-
-    // In local space after revolve:
-    //   - Center of torus is at origin
-    //   - Arc starts along +X (the radial direction at angle=0)
-    //   - Arc sweeps around Y axis
-    //   - So the start tangent direction is +Z (the revolve starts sweeping from X toward... let's think)
+    // After revolve around Z:
+    //   - At angle=0: centerline at (bendR, 0, 0). Radial dir = +X.
+    //   - Tangent at angle=0 = +Y (sweeping from +X toward +Y around Z).
+    //   - Revolve axis = +Z.
     //
-    // Actually, Manifold revolve() revolves around Y axis. At angle=0, the cross-section is at +X.
-    // The sweep goes from angle=0 to angleDeg around Y.
-    // The start point of the centerline is at (bendR, 0, 0) — that's the center of the cross-section circle.
-    // The tangent at start is along +Z (since revolving around Y from +X goes toward +Z).
-    //
-    // We need:
-    //   - Local +X (radial at start) → direction from center to startPt = -perpDir (from center toward startPt)
-    //   - Local +Z (tangent at start) → -dIn (the incoming direction, reversed because the straight comes IN)
-    //     Actually the tangent at the start of the bend should be along dIn (continuing the incoming direction)
-    //   - Local +Y (revolve axis) → info.axis (or -info.axis depending on convention)
+    // We need to map:
+    //   - Local +X (radial) → radialDir (center → startPt)
+    //   - Local +Y (tangent) → incoming pipe direction at startPt
+    //   - Local +Z (revolve axis) → info.axis
 
     // Direction from bend center to startPt
     const radialDir = normalize(sub(info.startPt, info.center)) as [number, number, number];
-    // Tangent at start = dIn direction (the pipe continues in the same direction as the incoming straight)
-    // But we need to figure out the sign. The revolve goes from angle 0 upward.
-    // At angle=0, the centerline point is at (bendR, 0, 0). Tangent = d/dθ of (bendR*cos(θ), 0, bendR*sin(θ)) at θ=0 = (0, 0, bendR) → +Z direction.
-    // So local +Z maps to the tangent at start.
 
-    // We need to find what the incoming tangent direction is at the start of the bend.
-    // The startPt is where the straight segment ends. The straight goes from prev toward cur.
-    // So the tangent at startPt continuing into the bend is dIn (the incoming direction).
-
-    // Build rotation matrix: local [+X, +Y, +Z] → world [radialDir, axis, tangentDir]
-    // tangentDir = cross(radialDir, axis) ... let's verify:
-    // We want the revolve to sweep from startPt toward endPt.
-    // The revolve axis in local space is +Y. In world space it should be info.axis.
-    // But we need to check the sign: does the revolve go from startPt toward endPt with +axis or -axis?
-
-    // The cross product of dIn × dOut gives the axis. The revolve around this axis from startPt should reach endPt.
-    // Let's just compute the tangent as cross(axis, radialDir) and check if it aligns with dIn.
-
+    // Tangent at start = the incoming pipe direction.
+    // cross(axis, radialDir) gives a vector perpendicular to both, in the bend plane.
+    // Since radialDir points outward from center and axis is the revolve axis,
+    // this cross product gives the tangent direction at the start of the arc.
     const tangentDir = cross(info.axis, radialDir) as [number, number, number];
-    // tangentDir should be roughly aligned with the incoming direction at startPt
-    // (the direction the pipe was going before the bend)
 
     // Build 4x4 column-major transform:
-    // col0 = radialDir (local X → world)
-    // col1 = axis (local Y → world)
-    // col2 = tangentDir (local Z → world)
-    // col3 = center (translation)
+    // col0 = radialDir  (local X → world)
+    // col1 = tangentDir (local Y → world)
+    // col2 = axis        (local Z → world)
+    // col3 = center      (translation)
     const c = info.center;
     bendShape = bendShape.transform([
       radialDir[0], radialDir[1], radialDir[2], 0,
-      info.axis[0], info.axis[1], info.axis[2], 0,
       tangentDir[0], tangentDir[1], tangentDir[2], 0,
+      info.axis[0], info.axis[1], info.axis[2], 0,
       c[0], c[1], c[2], 1,
     ] as any);
 
@@ -428,7 +400,7 @@ export function elbow(
   const angleRad = angleDeg * Math.PI / 180;
   const wasm = getWasm();
 
-  // Build torus cross-section: circle at distance bendRadius from Y axis
+  // Build torus cross-section: circle at distance bendRadius from Z axis
   const circlePts: [number, number][] = [];
   for (let i = 0; i < segs; i++) {
     const a = (i / segs) * Math.PI * 2;
@@ -463,16 +435,16 @@ export function elbow(
 
     const axis = normalize(crossVec) as [number, number, number];
 
-    // In local space after revolve around Y:
-    //   - Arc starts at +X (radial), tangent at start is +Z
-    //   - Revolve axis is +Y
-    // We want: local +Z → fromDir, local +Y → axis, local +X → perpendicular
+    // In local space after revolve around Z:
+    //   - Arc starts at +X (radial), tangent at start is +Y
+    //   - Revolve axis is +Z
+    // We want: local +Y → fromDir (tangent), local +Z → axis (revolve), local +X → perpendicular (radial)
     const perpDir = cross(axis, nFrom) as [number, number, number];
 
     bendShape = bendShape.transform([
       perpDir[0], perpDir[1], perpDir[2], 0,
-      axis[0], axis[1], axis[2], 0,
       nFrom[0], nFrom[1], nFrom[2], 0,
+      axis[0], axis[1], axis[2], 0,
       0, 0, 0, 1,
     ] as any);
   }
