@@ -1,5 +1,6 @@
 import { useForgeStore } from '../store/forgeStore';
 import type { CSSProperties } from 'react';
+import type { CutPlaneDef } from '@forge/cutPlane';
 
 const btnStyle = (active = false): CSSProperties => ({
   padding: '4px 8px',
@@ -58,6 +59,9 @@ export function ViewPanel() {
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
   const toggleDimensions = useForgeStore((s) => s.toggleDimensions);
   const updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
+  const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
+  const setCutPlaneEnabled = useForgeStore((s) => s.setCutPlaneEnabled);
+  const cutPlanes: CutPlaneDef[] = result?.cutPlanes ?? [];
 
   const objects = result?.objects ?? [];
   const selectedObject = objects.find((obj) => obj.id === selectedObjectId) ?? null;
@@ -274,6 +278,24 @@ export function ViewPanel() {
           />
         </div>
       </div>
+
+      {cutPlanes.length > 0 && (
+        <div style={sectionStyle}>
+          <div style={labelStyle}>Cut Planes</div>
+          {cutPlanes.map((cp) => (
+            <div key={cp.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
+                <input
+                  type="checkbox"
+                  checked={cutPlaneEnabled[cp.name] ?? false}
+                  onChange={(e) => setCutPlaneEnabled(cp.name, e.target.checked)}
+                />
+                ✂ {cp.name}
+              </label>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={sectionStyle}>
         <div style={labelStyle}>Measure</div>

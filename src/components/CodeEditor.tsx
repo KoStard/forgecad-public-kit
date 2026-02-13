@@ -300,6 +300,9 @@ declare class ShapeGroup {
   mirror(normal: [number, number, number]): ShapeGroup;
   color(hex: string): ShapeGroup;
 }
+
+/** Define a named section/cut plane. Appears as a toggle in the View Panel. When enabled, geometry on the normal side is clipped away. */
+declare function cutPlane(name: string, normal: [number, number, number], offset?: number): void;
 `;
 
 export function CodeEditor() {

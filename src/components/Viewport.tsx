@@ -4,10 +4,20 @@ import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera
 import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
 import type { SceneObject } from '@forge/index';
 import type { DimensionDef } from '@forge/sketch/dimensions';
+import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
 import { themes } from '../theme';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+
+/** Enable local clipping on the WebGL renderer when any cut planes are active */
+function ClippingManager({ active }: { active: boolean }) {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.localClippingEnabled = active;
+  }, [gl, active]);
+  return null;
+}
 
 /** Labeled axes helper — draws X/Y/Z arrows with text labels */
 function LabeledAxes({ size = 50 }: { size?: number }) {
@@ -61,11 +71,13 @@ function ForgeObject({
   settings,
   renderMode,
   isHovered,
+  clippingPlanes,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
   renderMode: RenderMode;
   isHovered?: boolean;
+  clippingPlanes?: THREE.Plane[];
 }) {
   const { solidGeo, edgesGeo } = useMemo(() => {
     if (!obj.shape) return { solidGeo: null, edgesGeo: null };
@@ -100,17 +112,18 @@ function ForgeObject({
             opacity={meshOpacity}
             emissive={isHovered ? settings.color : '#000000'}
             emissiveIntensity={isHovered ? 0.3 : 0}
+            clippingPlanes={clippingPlanes ?? []}
           />
         </mesh>
       )}
       {showWire && edgesGeo && (
         <lineSegments geometry={edgesGeo}>
-          <lineBasicMaterial color={settings.color} transparent={meshOpacity < 1} opacity={meshOpacity} />
+          <lineBasicMaterial color={settings.color} transparent={meshOpacity < 1} opacity={meshOpacity} clippingPlanes={clippingPlanes ?? []} />
         </lineSegments>
       )}
       {showEdges && edgesGeo && (
         <lineSegments geometry={edgesGeo}>
-          <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={Math.min(1, meshOpacity + 0.1)} />
+          <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={Math.min(1, meshOpacity + 0.1)} clippingPlanes={clippingPlanes ?? []} />
         </lineSegments>
       )}
     </group>
@@ -980,6 +993,20 @@ export function Viewport() {
   const objects = result?.objects ?? [];
   const dimensions = result?.dimensions ?? [];
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
+  const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
+  const cutPlaneDefs: CutPlaneDef[] = result?.cutPlanes ?? [];
+
+  const activeClippingPlanes = useMemo(() => {
+    return cutPlaneDefs
+      .filter((cp) => cutPlaneEnabled[cp.name])
+      .map((cp) => {
+        const n = new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).normalize();
+        // THREE.Plane convention: clips geometry on the positive side of the plane.
+        // We negate the normal so that geometry on the normal side is removed.
+        return new THREE.Plane(n.negate(), cp.offset);
+      });
+  }, [cutPlaneDefs, cutPlaneEnabled]);
+
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
@@ -1013,11 +1040,13 @@ export function Viewport() {
         <directionalLight position={[-60, -40, -80]} intensity={0.3} />
         <hemisphereLight args={['#b1e1ff', '#444444', 0.4]} />
 
+        <ClippingManager active={activeClippingPlanes.length > 0} />
+
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
           const isHovered = hoveredObjectId === obj.id;
           if (obj.shape) {
-            return <ForgeObject key={obj.id} obj={obj} settings={settings} renderMode={renderMode} isHovered={isHovered} />;
+            return <ForgeObject key={obj.id} obj={obj} settings={settings} renderMode={renderMode} isHovered={isHovered} clippingPlanes={activeClippingPlanes} />;
           }
           if (obj.sketch) {
             return <SketchObject key={obj.id} obj={obj} settings={settings} renderMode={renderMode} />;

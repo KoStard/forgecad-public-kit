@@ -59,6 +59,7 @@ import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDe
 import { joint } from './joint';
 import { partLibrary } from './library';
 import { ShapeGroup, group } from './group';
+import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
 
 export interface SceneObject {
   id: string;
@@ -81,6 +82,7 @@ export interface RunResult {
   objects: SceneObject[];
   params: ParamDef[];
   dimensions: DimensionDef[];
+  cutPlanes: CutPlaneDef[];
   error: string | null;
   timeMs: number;
   logs: LogEntry[];
@@ -209,6 +211,8 @@ function executeFile(
     'group', 'ShapeGroup',
     // Console
     'console',
+    // Cut planes
+    'cutPlane',
     wrapped,
   );
 
@@ -229,6 +233,7 @@ function executeFile(
     dim, dimLine,
     group, ShapeGroup,
     makeSandboxConsole(),
+    cutPlane,
   );
 }
 
@@ -239,6 +244,7 @@ export function runScript(
 ): RunResult {
   resetParams();
   resetDimensions();
+  resetCutPlanes();
   _collectedLogs = [];
   const t0 = performance.now();
 
@@ -342,6 +348,7 @@ export function runScript(
       objects,
       params: getCollectedParams(),
       dimensions: getCollectedDimensions(),
+      cutPlanes: getCollectedCutPlanes(),
       error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
       timeMs: performance.now() - t0,
       logs: _collectedLogs.slice(),
@@ -363,6 +370,7 @@ export function runScript(
       objects: [],
       params: getCollectedParams(),
       dimensions: getCollectedDimensions(),
+      cutPlanes: getCollectedCutPlanes(),
       error: `${msg}${lineInfo}`,
       timeMs: performance.now() - t0,
       logs: _collectedLogs.slice(),

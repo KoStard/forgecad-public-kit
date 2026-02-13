@@ -113,6 +113,46 @@ return [
 ];
 ```
 
+## Cut Planes
+
+### `cutPlane(name, normal, offset?)`
+Defines a named section plane for inspection. Appears as a toggle in the View Panel. When enabled, geometry on one side of the plane is clipped away, revealing the interior.
+
+**Parameters:**
+- `name` (string) - Display name in View Panel
+- `normal` ([number, number, number]) - Direction vector pointing toward the side that gets removed
+- `offset` (number, optional) - Distance from origin along the normal where the cut happens. Default: 0
+
+**Returns:** void (side effect: registers the plane for UI toggle)
+
+**Examples:**
+```javascript
+// Horizontal section at Z=30 — removes everything above
+cutPlane("Top Section", [0, 0, 1], 30);
+
+// Vertical section at Y=0 — removes the front half
+cutPlane("Front Section", [0, -1, 0], 0);
+
+// Diagonal cut
+cutPlane("Diagonal", [1, 1, 0], 20);
+
+// Parametric cut position
+const cutZ = param("Cut Height", 10, { min: -50, max: 50, unit: "mm" });
+cutPlane("Horizontal", [0, 0, 1], cutZ);
+```
+
+**How it works:**
+- Cut planes are GPU-accelerated (Three.js clipping planes) — instant on any geometry complexity
+- Multiple planes can be defined and toggled independently
+- Planes are per-script — they reset on each execution
+- Toggle state persists in the UI across parameter changes
+
+**Use cases:**
+- Inspect internal features (holes, cavities, wall thickness)
+- Verify alignment of hidden parts
+- Create section views for documentation
+- Debug boolean operation results
+
 ## 3D Primitives
 
 ### `box(x, y, z, center?)`

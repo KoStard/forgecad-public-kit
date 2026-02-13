@@ -163,6 +163,9 @@ interface ForgeStore {
   dimensionsVisible: boolean;
   toggleDimensions: () => void;
 
+  cutPlaneEnabled: Record<string, boolean>;
+  setCutPlaneEnabled: (name: string, enabled: boolean) => void;
+
   newProject: () => void;
   saveFile: () => Promise<void>;
   saveFileAs: () => Promise<void>;
@@ -457,6 +460,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   dimensionsVisible: true,
   toggleDimensions: () => set((s) => ({ dimensionsVisible: !s.dimensionsVisible })),
+
+  cutPlaneEnabled: {},
+  setCutPlaneEnabled: (name, enabled) => set((s) => ({ cutPlaneEnabled: { ...s.cutPlaneEnabled, [name]: enabled } })),
 
   newProject: () => {
     set({

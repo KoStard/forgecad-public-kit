@@ -33,6 +33,8 @@ export { shapeToGeometry } from './meshToGeometry';
 export { buildScene, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from './sceneBuilder';
 export type { ForgeGeometry } from './meshToGeometry';
 export { ShapeGroup, group } from './group';
+export { cutPlane, resetCutPlanes, getCollectedCutPlanes } from './cutPlane';
+export type { CutPlaneDef } from './cutPlane';
 
 /**
  * Initialize the geometry kernel. Must be called once before using any forge API.

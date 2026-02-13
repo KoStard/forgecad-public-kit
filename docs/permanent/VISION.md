@@ -35,6 +35,7 @@ The kernel is not the product. The modeling layer on top is.
 - **File management** — File explorer with folders, drag-and-drop, rename, create/delete, unsaved change indicators
 - **View controls** — Render modes (solid/wireframe/overlay), projection (perspective/orthographic), named views (front/back/left/right/top/bottom/iso), fit-to-view, zoom-to-selection
 - **STL export** — Binary STL export from the browser UI
+- **Cut planes** — `cutPlane()` defines named section planes for inspection. GPU-accelerated clipping reveals internal features without modifying geometry
 
 ### Gaps to close (Fusion360 parity)
 
