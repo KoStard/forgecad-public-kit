@@ -7,11 +7,109 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { init, runScript } from "../src/forge/headless";
 import { collectProjectFiles } from "./collect-files";
+import type { Shape } from "../src/forge/kernel";
 
 const scriptPath = process.argv[2];
 if (!scriptPath) {
   console.error("Usage: npx tsx cli/test-run.ts <script.forge.js>");
   process.exit(1);
+}
+
+type ShapeEntry = { name: string; shape: Shape; min: number[]; max: number[] };
+
+function bboxOverlap(a: ShapeEntry, b: ShapeEntry): boolean {
+  return [0, 1, 2].every(k => a.min[k] < b.max[k] + 0.1 && a.max[k] > b.min[k] - 0.1);
+}
+
+function analyzeSpatial(entries: ShapeEntry[]): string[] {
+  const lines: string[] = [];
+  const axisLabel = ['X', 'Y', 'Z'];
+  const dirLabels: Record<number, [string, string]> = {
+    0: ['LEFT of', 'RIGHT of'],
+    1: ['IN FRONT of', 'BEHIND'],
+    2: ['BELOW', 'ABOVE'],
+  };
+
+  // Scene scale for proximity threshold
+  const allMin = [Infinity, Infinity, Infinity];
+  const allMax = [-Infinity, -Infinity, -Infinity];
+  for (const s of entries) {
+    for (let ax = 0; ax < 3; ax++) {
+      allMin[ax] = Math.min(allMin[ax], s.min[ax]);
+      allMax[ax] = Math.max(allMax[ax], s.max[ax]);
+    }
+  }
+  const sceneSize = Math.max(...allMax.map((v, i) => v - allMin[i]));
+  const proximityThreshold = sceneSize * 0.15;
+
+  // 1. Check collisions: bbox overlap → real intersection check
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      const a = entries[i], b = entries[j];
+      if (!bboxOverlap(a, b)) continue;
+      try {
+        const hit = a.shape.intersect(b.shape);
+        if (!hit.isEmpty()) {
+          const vol = hit.volume();
+          if (vol > 0.1) {
+            lines.push(`  ⚠ COLLISION: ${a.name} ∩ ${b.name} (shared vol: ${vol.toFixed(1)}mm³)`);
+          }
+        }
+      } catch {
+        // intersection can fail on degenerate geometry — skip
+      }
+    }
+  }
+
+  // 2. Nearest-neighbor directional relationships (within proximity)
+  for (let i = 0; i < entries.length; i++) {
+    const a = entries[i];
+    const nearest: { idx: number; gap: number }[] = Array.from({ length: 6 }, () => ({ idx: -1, gap: Infinity }));
+
+    for (let j = 0; j < entries.length; j++) {
+      if (i === j) continue;
+      const b = entries[j];
+      for (let ax = 0; ax < 3; ax++) {
+        if (a.max[ax] < b.min[ax]) {
+          const gap = b.min[ax] - a.max[ax];
+          const d = ax * 2;
+          if (gap < nearest[d].gap) nearest[d] = { idx: j, gap };
+        } else if (b.max[ax] < a.min[ax]) {
+          const gap = a.min[ax] - b.max[ax];
+          const d = ax * 2 + 1;
+          if (gap < nearest[d].gap) nearest[d] = { idx: j, gap };
+        }
+      }
+    }
+
+    for (let d = 0; d < 6; d++) {
+      const n = nearest[d];
+      if (n.idx === -1 || n.gap > proximityThreshold) continue;
+      const b = entries[n.idx];
+      const ax = Math.floor(d / 2);
+      const isPositive = d % 2 === 0;
+      const label = isPositive ? dirLabels[ax][0] : dirLabels[ax][1];
+      lines.push(`  ${a.name} is ${label} ${b.name} (gap: ${n.gap.toFixed(0)}mm)`);
+    }
+  }
+
+  // Deduplicate symmetric directional pairs
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const line of lines) {
+    if (line.includes('COLLISION')) {
+      deduped.push(line);
+      continue;
+    }
+    const match = line.match(/^\s+(.+?) is (?:LEFT of|RIGHT of|IN FRONT of|BEHIND|BELOW|ABOVE) (.+?) \(gap: (\d+)mm\)/);
+    if (match) {
+      const key = [match[1], match[2]].sort().join('|') + '|' + match[3];
+      if (!seen.has(key)) { seen.add(key); deduped.push(line); }
+    } else {
+      deduped.push(line);
+    }
+  }
+  return deduped;
 }
 
 async function main() {
@@ -44,56 +142,23 @@ async function main() {
     }
   }
 
-  // Spatial relationship analysis
-  const shapes3d = result.objects
+  // Spatial analysis
+  const entries: ShapeEntry[] = result.objects
     .filter((o: any) => o.shape)
     .map((o: any) => {
       const bb = o.shape.boundingBox();
-      return { name: o.name, min: bb.min as number[], max: bb.max as number[] };
+      return { name: o.name, shape: o.shape, min: bb.min as number[], max: bb.max as number[] };
     });
 
-  if (shapes3d.length > 1) {
-    console.log(`\n✓ Spatial relationships:`);
-    const axisLabel = ['X', 'Y', 'Z'];
-    const dirLabels: Record<number, [string, string]> = {
-      0: ['LEFT of', 'RIGHT of'],
-      1: ['IN FRONT of', 'BEHIND'],
-      2: ['BELOW', 'ABOVE'],
-    };
-
-    for (let i = 0; i < shapes3d.length; i++) {
-      for (let j = i + 1; j < shapes3d.length; j++) {
-        const a = shapes3d[i], b = shapes3d[j];
-        for (let ax = 0; ax < 3; ax++) {
-          // Check if a is entirely before b on this axis
-          if (a.max[ax] < b.min[ax]) {
-            console.log(`  ${a.name} is ${dirLabels[ax][0]} ${b.name} (${axisLabel[ax]}: ${a.min[ax].toFixed(0)}..${a.max[ax].toFixed(0)} vs ${b.min[ax].toFixed(0)}..${b.max[ax].toFixed(0)})`);
-          } else if (b.max[ax] < a.min[ax]) {
-            console.log(`  ${a.name} is ${dirLabels[ax][1]} ${b.name} (${axisLabel[ax]}: ${a.min[ax].toFixed(0)}..${a.max[ax].toFixed(0)} vs ${b.min[ax].toFixed(0)}..${b.max[ax].toFixed(0)})`);
-          }
-          // Check if one is entirely inside the other (potential "inside" issue)
-          else {
-            // Check if a is inside b
-            const aInB = [0, 1, 2].every(
-              k => a.min[k] >= b.min[k] - 0.1 && a.max[k] <= b.max[k] + 0.1
-            );
-            // Check if b is inside a
-            const bInA = [0, 1, 2].every(
-              k => b.min[k] >= a.min[k] - 0.1 && b.max[k] <= a.max[k] + 0.1
-            );
-            if (aInB) {
-              console.log(`  ⚠ ${a.name} is INSIDE ${b.name} (may be unintentional)`);
-              break;
-            }
-            if (bInA) {
-              console.log(`  ⚠ ${b.name} is INSIDE ${a.name} (may be unintentional)`);
-              break;
-            }
-          }
-        }
-      }
+  if (entries.length > 1) {
+    console.log(`\n✓ Spatial analysis:`);
+    const spatialLines = analyzeSpatial(entries);
+    for (const line of spatialLines) console.log(line);
+    if (spatialLines.length === 0) {
+      console.log(`  (no collisions, all objects well-separated)`);
     }
   }
+
   console.log(`✓ Params: ${result.params.map((p) => p.name).join(", ")}`);
   console.log(`✓ Time: ${result.timeMs.toFixed(0)}ms`);
 }
