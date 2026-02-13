@@ -1057,6 +1057,33 @@ const drainPipe = lib.pipeRoute(
 ).color('#CCCCCC');
 ```
 
+### `lib.elbow(pipeRadius, bendRadius, angle?, options?)`
+Curved pipe section (torus arc) for connecting two pipe directions. Creates a bend at the origin.
+
+**Parameters:**
+- `pipeRadius` (number) - Pipe outer radius
+- `bendRadius` (number) - Centerline bend radius
+- `angle` (number, optional) - Bend angle in degrees. Default: 90
+
+**Options:**
+- `wall` (number) - Wall thickness for hollow pipe
+- `segments` (number) - Circumferential segments. Default: 32
+- `from` ([number, number, number]) - Incoming direction vector
+- `to` ([number, number, number]) - Outgoing direction vector (overrides angle)
+
+**Alternative call:** `lib.elbow(pipeRadius, bendRadius, { from, to, wall, segments })`
+
+```javascript
+// Simple 90° elbow
+const bend = lib.elbow(5, 20, 90);
+
+// 45° hollow elbow
+const bend45 = lib.elbow(5, 20, 45, { wall: 1.5 });
+
+// Direction-based: connect Z-up pipe to X-right pipe
+const bend = lib.elbow(5, 20, { from: [0, 0, 1], to: [1, 0, 0] });
+```
+
 ### `lib.thread(diameter, pitch, length, options?)`
 External thread (helical ridge) via twisted extrusion. Returns a threaded cylinder along +Z.
 

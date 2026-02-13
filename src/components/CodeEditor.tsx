@@ -265,6 +265,9 @@ declare const lib: {
   holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape;
   /** Route a pipe through 3D waypoints with smooth bends */
   pipeRoute(points: [number, number, number][], radius: number, options?: { bendRadius?: number; wall?: number; segments?: number }): Shape;
+  /** Curved pipe section (torus arc) for connecting two pipe directions */
+  elbow(pipeRadius: number, bendRadius: number, angle?: number, options?: { wall?: number; segments?: number; from?: [number, number, number]; to?: [number, number, number] }): Shape;
+  elbow(pipeRadius: number, bendRadius: number, options: { from?: [number, number, number]; to?: [number, number, number]; wall?: number; segments?: number }): Shape;
 };
 
 // --- Dimensions (visual annotations) ---
