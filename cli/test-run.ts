@@ -15,7 +15,7 @@ if (!scriptPath) {
   process.exit(1);
 }
 
-type ShapeEntry = { name: string; shape: Shape; min: number[]; max: number[] };
+type ShapeEntry = { name: string; shape: Shape; min: number[]; max: number[]; groupName?: string };
 
 function bboxOverlap(a: ShapeEntry, b: ShapeEntry): boolean {
   return [0, 1, 2].every(k => a.min[k] < b.max[k] + 0.1 && a.max[k] > b.min[k] - 0.1);
@@ -43,9 +43,11 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
   const proximityThreshold = sceneSize * 0.15;
 
   // 1. Check collisions: bbox overlap → real intersection check
+  // Skip intra-group collisions (objects in the same assembly group are intentionally overlapping)
   for (let i = 0; i < entries.length; i++) {
     for (let j = i + 1; j < entries.length; j++) {
       const a = entries[i], b = entries[j];
+      if (a.groupName && a.groupName === b.groupName) continue; // same group — skip
       if (!bboxOverlap(a, b)) continue;
       try {
         const hit = a.shape.intersect(b.shape);
@@ -131,14 +133,15 @@ async function main() {
 
   console.log(`✓ Objects: ${result.objects.length}`);
   for (const obj of result.objects) {
+    const grpTag = obj.groupName ? ` [${obj.groupName}]` : '';
     if (obj.shape) {
       const bb = obj.shape.boundingBox();
       console.log(
-        `  ${obj.name}: vol=${obj.shape.volume().toFixed(1)}mm³  bbox=[${bb.min.map((v: number) => v.toFixed(1))}] → [${bb.max.map((v: number) => v.toFixed(1))}]`
+        `  ${obj.name}${grpTag}: vol=${obj.shape.volume().toFixed(1)}mm³  bbox=[${bb.min.map((v: number) => v.toFixed(1))}] → [${bb.max.map((v: number) => v.toFixed(1))}]`
       );
     }
     if (obj.sketch) {
-      console.log(`  ${obj.name}: area=${obj.sketch.area().toFixed(1)}mm²`);
+      console.log(`  ${obj.name}${grpTag}: area=${obj.sketch.area().toFixed(1)}mm²`);
     }
   }
 
@@ -147,7 +150,7 @@ async function main() {
     .filter((o: any) => o.shape)
     .map((o: any) => {
       const bb = o.shape.boundingBox();
-      return { name: o.name, shape: o.shape, min: bb.min as number[], max: bb.max as number[] };
+      return { name: o.name, shape: o.shape, min: bb.min as number[], max: bb.max as number[], groupName: o.groupName };
     });
 
   if (entries.length > 1) {

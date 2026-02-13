@@ -33,14 +33,14 @@ interface Issue {
   detail: string;
 }
 
-type ShapeEntry = { name: string; shape: Shape; min: number[]; max: number[] };
+type ShapeEntry = { name: string; shape: Shape; min: number[]; max: number[]; groupName?: string };
 
 function getShapeEntries(result: RunResult): ShapeEntry[] {
   return result.objects
     .filter((o: SceneObject) => o.shape)
     .map((o: SceneObject) => {
       const bb = o.shape!.boundingBox();
-      return { name: o.name, shape: o.shape!, min: bb.min as number[], max: bb.max as number[] };
+      return { name: o.name, shape: o.shape!, min: bb.min as number[], max: bb.max as number[], groupName: o.groupName };
     });
 }
 
@@ -48,12 +48,13 @@ function bboxOverlap(a: ShapeEntry, b: ShapeEntry): boolean {
   return [0, 1, 2].every(k => a.min[k] < b.max[k] + 0.1 && a.max[k] > b.min[k] - 0.1);
 }
 
-/** Find collision pairs → set of "nameA|nameB" strings */
+/** Find collision pairs → set of "nameA|nameB" strings, skipping intra-group */
 function findCollisions(entries: ShapeEntry[]): Map<string, number> {
   const collisions = new Map<string, number>();
   for (let i = 0; i < entries.length; i++) {
     for (let j = i + 1; j < entries.length; j++) {
       const a = entries[i], b = entries[j];
+      if (a.groupName && a.groupName === b.groupName) continue; // same group — skip
       if (!bboxOverlap(a, b)) continue;
       try {
         const hit = a.shape.intersect(b.shape);

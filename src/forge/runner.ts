@@ -68,6 +68,8 @@ export interface SceneObject {
   sketch: Sketch | null;
   color?: string;
   sketchMeta?: SketchConstraintMeta;
+  /** If this object belongs to a named group (assembly), the group name */
+  groupName?: string;
 }
 
 export interface LogEntry {
@@ -252,10 +254,10 @@ export function runScript(
     const result = executeFile(code, fileName, allFiles, new Set());
 
     const objects: SceneObject[] = [];
-    const pushShape = (shape: Shape, name: string) => {
-      objects.push({ id: `obj-${objects.length + 1}`, name, shape, sketch: null, color: shape.colorHex });
+    const pushShape = (shape: Shape, name: string, groupName?: string) => {
+      objects.push({ id: `obj-${objects.length + 1}`, name, shape, sketch: null, color: shape.colorHex, groupName });
     };
-    const pushSketch = (sketch: Sketch, name: string) => {
+    const pushSketch = (sketch: Sketch, name: string, groupName?: string) => {
       const meta = sketch instanceof ConstraintSketch ? sketch.constraintMeta : undefined;
       objects.push({
         id: `obj-${objects.length + 1}`,
@@ -264,20 +266,70 @@ export function runScript(
         sketch,
         sketchMeta: meta,
         color: sketch.colorHex,
+        groupName,
       });
     };
 
-    const isNamedObject = (item: unknown): item is { name: string; shape?: Shape; sketch?: Sketch; color?: string } => {
+    const isNamedObject = (item: unknown): item is { name: string; shape?: Shape; sketch?: Sketch; color?: string; group?: unknown[] } => {
       return !!item && typeof item === 'object' && 'name' in item;
     };
 
-    const flattenGroupChild = (child: Shape | Sketch | TrackedShape, label: string) => {
+    const flattenGroupChild = (child: Shape | Sketch | TrackedShape, label: string, groupName?: string) => {
       if (child instanceof TrackedShape) {
-        pushShape(child.toShape(), label);
+        pushShape(child.toShape(), label, groupName);
       } else if (child instanceof Shape) {
-        pushShape(child, label);
+        pushShape(child, label, groupName);
       } else if (child instanceof Sketch) {
-        pushSketch(child, label);
+        pushSketch(child, label, groupName);
+      }
+    };
+
+    /** Process a named object item (from array return format), optionally within a parent group */
+    const processNamedItem = (item: any, fallbackLabel: string, parentGroup?: string) => {
+      const name = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : fallbackLabel;
+      const grp = parentGroup;
+
+      // Handle { name, group: [...] } — nested assembly group
+      if (Array.isArray(item.group)) {
+        item.group.forEach((child: any, i: number) => {
+          const childLabel = `${name}.${i + 1}`;
+          if (child instanceof TrackedShape) {
+            pushShape(child.toShape(), childLabel, name);
+          } else if (child instanceof Shape) {
+            pushShape(child, childLabel, name);
+          } else if (child instanceof Sketch) {
+            pushSketch(child, childLabel, name);
+          } else if (isNamedObject(child)) {
+            processNamedItem(child, childLabel, name);
+          }
+        });
+        return;
+      }
+
+      if (item.shape instanceof ShapeGroup) {
+        item.shape.children.forEach((child: any, i: number) => flattenGroupChild(child, `${name}.${i + 1}`, grp));
+        return;
+      }
+      if (item.shape instanceof TrackedShape) {
+        objects.push({ id: `obj-${objects.length + 1}`, name, shape: item.shape.toShape(), sketch: null, color: item.color || item.shape.toShape().colorHex, groupName: grp });
+        return;
+      }
+      if (item.shape instanceof Shape) {
+        objects.push({ id: `obj-${objects.length + 1}`, name, shape: item.shape, sketch: null, color: item.color || item.shape.colorHex, groupName: grp });
+        return;
+      }
+      if (item.sketch instanceof Sketch) {
+        const meta = item.sketch instanceof ConstraintSketch ? item.sketch.constraintMeta : undefined;
+        objects.push({
+          id: `obj-${objects.length + 1}`,
+          name,
+          shape: null,
+          sketch: item.sketch,
+          sketchMeta: meta,
+          color: item.color || item.sketch.colorHex,
+          groupName: grp,
+        });
+        return;
       }
     };
 
@@ -303,31 +355,8 @@ export function runScript(
           return;
         }
         if (isNamedObject(item)) {
-          const name = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : label;
-          if (item.shape instanceof ShapeGroup) {
-            item.shape.children.forEach((child, i) => flattenGroupChild(child, `${name}.${i + 1}`));
-            return;
-          }
-          if (item.shape instanceof TrackedShape) {
-            objects.push({ id: `obj-${objects.length + 1}`, name, shape: item.shape.toShape(), sketch: null, color: item.color || item.shape.toShape().colorHex });
-            return;
-          }
-          if (item.shape instanceof Shape) {
-            objects.push({ id: `obj-${objects.length + 1}`, name, shape: item.shape, sketch: null, color: item.color || item.shape.colorHex });
-            return;
-          }
-          if (item.sketch instanceof Sketch) {
-            const meta = item.sketch instanceof ConstraintSketch ? item.sketch.constraintMeta : undefined;
-            objects.push({
-              id: `obj-${objects.length + 1}`,
-              name,
-              shape: null,
-              sketch: item.sketch,
-              sketchMeta: meta,
-              color: item.color || item.sketch.colorHex,
-            });
-            return;
-          }
+          processNamedItem(item, label);
+          return;
         }
         throw new Error('Array results must contain Shape/Sketch items');
       });
