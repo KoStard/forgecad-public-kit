@@ -111,6 +111,46 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
       deduped.push(line);
     }
   }
+
+  // 3. Group-level summary (when groups exist)
+  const groups = new Map<string, { min: number[]; max: number[] }>();
+  for (const e of entries) {
+    if (!e.groupName) continue;
+    const g = groups.get(e.groupName) || { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
+    for (let ax = 0; ax < 3; ax++) {
+      g.min[ax] = Math.min(g.min[ax], e.min[ax]);
+      g.max[ax] = Math.max(g.max[ax], e.max[ax]);
+    }
+    groups.set(e.groupName, g);
+  }
+
+  if (groups.size > 1) {
+    deduped.push('');
+    deduped.push('  Groups:');
+    const groupNames = [...groups.keys()];
+    for (let i = 0; i < groupNames.length; i++) {
+      const aName = groupNames[i], a = groups.get(aName)!;
+      for (let j = i + 1; j < groupNames.length; j++) {
+        const bName = groupNames[j], b = groups.get(bName)!;
+        for (let ax = 0; ax < 3; ax++) {
+          if (a.max[ax] < b.min[ax]) {
+            const gap = b.min[ax] - a.max[ax];
+            if (gap <= proximityThreshold) {
+              const label = dirLabels[ax][0];
+              deduped.push(`  ${aName} is ${label} ${bName} (gap: ${gap.toFixed(0)}mm)`);
+            }
+          } else if (b.max[ax] < a.min[ax]) {
+            const gap = a.min[ax] - b.max[ax];
+            if (gap <= proximityThreshold) {
+              const label = dirLabels[ax][1];
+              deduped.push(`  ${aName} is ${label} ${bName} (gap: ${gap.toFixed(0)}mm)`);
+            }
+          }
+        }
+      }
+    }
+  }
+
   return deduped;
 }
 
