@@ -373,6 +373,113 @@ function clampDot(d: number): number {
   return Math.max(-1, Math.min(1, d));
 }
 
+/**
+ * Pipe elbow — a curved pipe section (torus arc) for connecting two pipe directions.
+ *
+ * By default creates a bend in the XZ plane: incoming along +Z, outgoing rotated by `angle`.
+ * The bend starts at the origin, curving away from it.
+ *
+ * @param pipeRadius  - Pipe outer radius
+ * @param bendRadius  - Centerline bend radius (distance from arc center to pipe center)
+ * @param angle       - Bend angle in degrees (e.g. 90 for a right-angle bend)
+ * @param options.wall     - Wall thickness for hollow pipe
+ * @param options.segments - Circumferential segments (default 32)
+ * @param options.from     - Incoming direction vector (default [0,0,1])
+ * @param options.to       - Outgoing direction vector (overrides angle if both from/to given)
+ */
+export function elbow(
+  pipeRadius: number,
+  bendRadius: number,
+  angle?: number | { from?: [number, number, number]; to?: [number, number, number]; wall?: number; segments?: number },
+  options?: { wall?: number; segments?: number; from?: [number, number, number]; to?: [number, number, number] },
+): Shape {
+  // Normalize overloaded args
+  let angleDeg: number;
+  let wall: number | undefined;
+  let segs: number;
+  let fromDir: [number, number, number] | undefined;
+  let toDir: [number, number, number] | undefined;
+
+  if (typeof angle === 'object' && angle !== null) {
+    // elbow(pipeRadius, bendRadius, { from, to, wall, segments })
+    angleDeg = 90; // default, may be overridden by from/to
+    wall = angle.wall;
+    segs = angle.segments ?? 32;
+    fromDir = angle.from;
+    toDir = angle.to;
+  } else {
+    angleDeg = angle ?? 90;
+    wall = options?.wall;
+    segs = options?.segments ?? 32;
+    fromDir = options?.from;
+    toDir = options?.to;
+  }
+
+  // If from/to are given, compute angle from them
+  if (fromDir && toDir) {
+    const nFrom = normalize(fromDir);
+    const nTo = normalize(toDir);
+    const d = clampDot(dot(nFrom, nTo));
+    angleDeg = Math.acos(d) * 180 / Math.PI;
+  }
+
+  if (angleDeg < 0.01) throw new Error('elbow: angle too small');
+
+  const angleRad = angleDeg * Math.PI / 180;
+  const wasm = getWasm();
+
+  // Build torus cross-section: circle at distance bendRadius from Y axis
+  const circlePts: [number, number][] = [];
+  for (let i = 0; i < segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    circlePts.push([bendRadius + pipeRadius * Math.cos(a), pipeRadius * Math.sin(a)]);
+  }
+
+  const bendSegs = Math.max(4, Math.ceil(segs * angleDeg / 360));
+  const outerCross = wasm.CrossSection.ofPolygons([circlePts]);
+  let bendShape = new Shape(wasm.Manifold.revolve(outerCross, bendSegs, angleDeg), undefined);
+  outerCross.delete();
+
+  if (wall != null && wall > 0) {
+    const innerPts: [number, number][] = [];
+    const innerR = pipeRadius - wall;
+    for (let i = 0; i < segs; i++) {
+      const a = (i / segs) * Math.PI * 2;
+      innerPts.push([bendRadius + innerR * Math.cos(a), innerR * Math.sin(a)]);
+    }
+    const innerCross = wasm.CrossSection.ofPolygons([innerPts]);
+    const innerBend = new Shape(wasm.Manifold.revolve(innerCross, bendSegs, angleDeg), undefined);
+    innerCross.delete();
+    bendShape = bendShape.subtract(innerBend);
+  }
+
+  // Orient if from/to directions are given
+  if (fromDir && toDir) {
+    const nFrom = normalize(fromDir) as [number, number, number];
+    const nTo = normalize(toDir) as [number, number, number];
+    const crossVec = cross(nFrom, nTo);
+    const crossLen = vecLen(crossVec);
+    if (crossLen < 1e-10) return bendShape; // collinear, no rotation needed
+
+    const axis = normalize(crossVec) as [number, number, number];
+
+    // In local space after revolve around Y:
+    //   - Arc starts at +X (radial), tangent at start is +Z
+    //   - Revolve axis is +Y
+    // We want: local +Z → fromDir, local +Y → axis, local +X → perpendicular
+    const perpDir = cross(axis, nFrom) as [number, number, number];
+
+    bendShape = bendShape.transform([
+      perpDir[0], perpDir[1], perpDir[2], 0,
+      axis[0], axis[1], axis[2], 0,
+      nFrom[0], nFrom[1], nFrom[2], 0,
+      0, 0, 0, 1,
+    ] as any);
+  }
+
+  return bendShape;
+}
+
 /** All library parts, keyed by name */
 export const partLibrary = {
   boltHole,
@@ -387,6 +494,7 @@ export const partLibrary = {
   bolt,
   nut,
   pipeRoute,
+  elbow,
 };
 
 // --- Thread / Fastener library ---
