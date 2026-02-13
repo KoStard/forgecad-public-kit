@@ -66,6 +66,29 @@ Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to l
 
 STL export is available in the browser UI via the Export panel. Binary STL format.
 
+### Parameter Validation
+
+```bash
+npm run param-check -- examples/shoe-rack-doors.forge.js [--samples 10]
+```
+
+Samples each parameter across its range and checks for runtime errors, degenerate geometry (volume ≈ 0), and new collisions between parts. Skips intra-group collisions when assembly groups are used.
+
+**Options:**
+- `--samples N` — Number of sample points per parameter (default: 8)
+
+**Output example:**
+```
+✓ Baseline: 6 objects, 12 params
+✓ Checked 91 parameter samples (8 per param)
+
+⚠ Found 8 issues across 4 parameters:
+
+  Parameter "Bottom Left Door":
+    💥 New collision at values: -120.0, -102.9
+       Bottom Left Door ∩ Frame (shared vol: 2561.9mm³)
+```
+
 ## Adding New CLI Commands
 
 1. Create `cli/your-command.ts`

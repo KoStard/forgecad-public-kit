@@ -14,91 +14,90 @@ Result: 1294 → 263 lines, every line actionable. Time impact: 14ms → 21ms.
 
 ---
 
-## Backlog
+## ✅ Done: `lib.elbow()` — Pipe-to-pipe joint primitive
 
-### 1. `lib.elbow()` — Pipe-to-pipe joint primitive
+Extracted the torus-section bend math from `pipeRoute`'s internal `makeBend()` into a standalone `lib.elbow()` function.
 
-**Problem:** AI models consistently fail to create correct joints between two pipes/cylinders at angles. The 3D printer benchmark showed filament guide tubes with wrong orientation, not connecting to the endpoints. The math for creating a torus section at the right angle, oriented correctly in 3D space, is too complex for models to get right from scratch.
-
-**What's needed:** A high-level `lib.elbow(radius, pipeRadius, angle, options?)` that creates a curved pipe section connecting two directions. Should work naturally with `lib.pipeRoute()` but also be usable standalone.
-
-**API sketch:**
+**API:**
 ```javascript
-// Standalone elbow: 90° bend, pipe radius 5, bend radius 20
-const bend = lib.elbow(5, 20, 90);
-
-// With orientation: connect two directions
-const bend = lib.elbow(5, 20, { from: [0, 0, 1], to: [1, 0, 0] });
+lib.elbow(pipeRadius, bendRadius, angle?)                    // angle in degrees, default 90
+lib.elbow(pipeRadius, bendRadius, angle, { wall, segments })  // hollow, custom segments
+lib.elbow(pipeRadius, bendRadius, { from, to, wall })         // direction-based orientation
 ```
 
-**Difficulty:** Medium — the math already exists inside `pipeRoute`'s `makeBend()`. Extract and expose it.
+Supports solid and hollow pipes, angle-based and direction-based orientation. Added type hints in CodeEditor and API docs.
 
 ---
 
-### 2. Parameter Collision Detection (Static Analysis)
+## ✅ Done: Parameter Collision Detection (Static Analysis)
 
-**Problem:** AI-generated scripts create parameters (sliders) that can produce impossible geometry when moved. Examples:
-- Two parts collide at certain parameter values
-- Parts move through each other
-- Geometry becomes degenerate (zero-thickness walls, inverted shapes)
+New CLI tool: `npm run param-check -- script.forge.js [--samples N]`
 
-The user moves a slider and the model breaks — bad experience.
+Samples each parameter at N evenly-spaced values across its range (default 8) and checks for:
+1. Runtime errors at certain values
+2. Degenerate geometry (volume ≈ 0 when it was non-zero at defaults)
+3. New collisions between parts that didn't collide at default values
 
-**Proposed approach (low-hanging fruit):**
-1. After script execution, sample each parameter at ~10 evenly-spaced values across its range
-2. For each sample, re-execute the script and check:
-   - Any runtime errors?
-   - Any empty/degenerate shapes (volume ≈ 0)?
-   - Any new collisions between parts that didn't collide at default values?
-3. Report problematic parameter ranges
+Skips intra-group collisions (objects in the same assembly group).
 
-**Output example:**
+**Example output:**
 ```
-⚠ Param "Bed Z Pos" causes collision at values > 250:
-  Bed Plate ∩ Extruder Carriage (at value=280: shared vol 1200mm³)
-⚠ Param "Wall Thickness" causes degenerate geometry at values > 45:
-  Inner Box has volume 0mm³ (wall exceeds half of outer dimension)
+⚠ Found 8 issues across 4 parameters:
+
+  Parameter "Bottom Left Door":
+    💥 New collision at values: -120.0, -102.9
+       Bottom Left Door ∩ Frame (shared vol: 2561.9mm³)
+
+  Parameter "Top Right Door":
+    💥 New collision at values: 102.9, 120.0
+       Frame ∩ Top Right Door (shared vol: 1012.8mm³)
 ```
-
-**Difficulty:** Medium — main cost is re-executing the script ~10× per parameter. For 10 params = 100 executions. At 20ms each = 2 seconds. Acceptable for a validation tool.
-
-**Optimization:** Only check parameters that affect geometry near other geometry (use bbox proximity from the default run to filter).
 
 ---
 
-### 3. Spatial Feedback: Further Compression
+## ✅ Done: Assembly Grouping in Scripts
 
-**Status:** Already improved (1294 → 263 lines). Could go further:
+Scripts can now return nested groups:
 
-**Ideas:**
-- Group related objects and report group-level relationships ("Spool Assembly is ABOVE Gantry Assembly")
-- Only report relationships between objects that the script explicitly positions relative to each other (parse the AST for `attachTo`, `translate`, `onFace` calls)
-- Add a `--verbose` flag for the full output, keep default compact
-
-**Difficulty:** Low-Medium
-
----
-
-### 4. Assembly Grouping in Scripts
-
-**Problem:** Complex assemblies (3D printer = 41 objects) have logical groups (bed assembly, gantry, extruder, spool holder, electronics). The AI creates these groups implicitly via naming conventions and code structure, but ForgeCAD doesn't know about them.
-
-**Benefit:** If the engine knew about groups, spatial feedback could report at group level, collision detection could skip intra-group checks (e.g., spool hub inside spool shell is intentional), and the UI could collapse/expand groups.
-
-**Possible API:**
 ```javascript
-// Declare a group with a name
-const bedAssembly = group(bedPlate, glass, carriage, springs)
-  .name("Bed Assembly");
-
-// Or via return format
 return [
   { name: "Bed Assembly", group: [
     { name: "Bed Plate", shape: bedPlate },
-    { name: "Glass", shape: glass },
+    { name: "Glass Bed", shape: glass },
   ]},
   { name: "Gantry", group: [...] },
 ];
 ```
 
-**Difficulty:** Medium — needs changes to SceneObject, runner, ViewPanel, and spatial analysis.
+Each object gets a `groupName` field in `SceneObject`. Benefits:
+- **Spatial analysis** skips intra-group collision checks (intentional overlaps)
+- **Group-level summary** reports relationships between assembly groups
+- **Object listing** shows group tags: `Bed Plate [Bed Assembly]`
+
+---
+
+## ✅ Done: Spatial Feedback Further Compression
+
+Added group-level spatial summary. When groups exist, computes group bounding boxes and reports group-to-group relationships:
+
+```
+Groups:
+  Bed Assembly is LEFT of Gantry (gap: 20mm)
+  Bed Assembly is BELOW Extruder (gap: 3mm)
+```
+
+---
+
+## Backlog (remaining)
+
+### AST-based relationship filtering
+
+**Idea:** Only report spatial relationships between objects that the script explicitly positions relative to each other (parse the AST for `attachTo`, `translate`, `onFace` calls). Would further reduce noise in spatial feedback.
+
+**Difficulty:** Medium — requires lightweight AST parsing of user scripts.
+
+### UI group collapse/expand
+
+**Idea:** When groups exist, the ViewPanel could show collapsible group headers with child objects underneath. Currently groups are flattened in the UI.
+
+**Difficulty:** Medium — needs changes to ViewPanel component.
