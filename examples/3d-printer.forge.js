@@ -26,7 +26,7 @@ const nozzleZ = gantryZ - nozzleToRail;
 
 // Bed starts near nozzle tip and lowers during printing.
 const bedTopMax = nozzleZ - 1;
-const bedTopMin = beam + bedThick + 10;
+const bedTopMin = beam + bedThick + 80;
 const bedZ = param("Bed Z (print progress)", bedTopMax, {
   min: bedTopMin, max: bedTopMax, unit: "mm",
 });
@@ -44,7 +44,7 @@ const C = {
   belt: "#222222", motor: "#444444", electronics: "#666666",
   screen: "#00ccff", nozzle: "#b87333", hotend: "#999999",
   fan: "#333333", spool: "#dddddd", filament: "#cc4444",
-  bowden: "#cccccc", buildVol: "#33ccff",
+  buildVol: "#33ccff",
 };
 
 const parts = [];
@@ -156,9 +156,9 @@ const xRailLen = yRailX * 2 - 30;
 add("X Rail", cylinder(xRailLen, railR).pointAlong([1, 0, 0])
   .translate(-xRailLen / 2, gantryY, gantryZ), C.rail);
 
-// X beam above the gantry plane — clears the extruder motor
+// X beam at gantry level — supports the X rail from behind
 add("X Beam", box(xRailLen, beam, beam, true)
-  .translate(0, gantryY, gantryZ + 30), C.frame);
+  .translate(0, gantryY, gantryZ), C.frame);
 
 // ─── CoreXY Belts ───
 const beltZ = gantryZ + 22;
@@ -227,41 +227,22 @@ add("Spool Supports", union(
 ), C.frame);
 
 // ─── Filament Path ───
-// Fixed portion: spool → high arc above frame → down into frame interior.
-// Waypoints spaced far apart (>2× bendRadius) to avoid disconnected arcs.
-const filBendR = 30;
+// Simple path: spool → over rear frame beam → down into extruder
 const filR = 1.5;
+const filBendR = 30;
 
-// Entry point into frame interior — above gantry, center of frame
-const filEntryY = 0;
-const filEntryZ = frameH - beam - 5;
-
+// Guide tube: spool to top of frame (fixed portion)
 const filFixedPath = lib.pipeRoute(
   [
     [0, spoolY, spoolZ],                     // spool center
-    [0, frameD / 2 - beam, frameH + 40],     // up+forward above rear beam (~100mm segment)
-    [0, filEntryY, frameH + 40],             // across top to center (~130mm segment)
-    [0, filEntryY, filEntryZ],               // straight down into frame (~25mm)
-  ],
-  filR,
-  { bendRadius: filBendR, wall: 0.4, segments: 16 }
-);
-add("Filament Guide Tube", filFixedPath, C.bowden);
-
-// Flexible Bowden: from frame interior entry down to extruder (moves with head)
-// Route to the side of the X beam (at gantryZ+30) to avoid collision
-const xBeamTopZ = gantryZ + 30 + beam / 2;
-const bowdenTube = lib.pipeRoute(
-  [
-    [0, filEntryY, filEntryZ],                // entry point
-    [hx, filEntryY, filEntryZ - 10],          // move toward head X, slight drop
-    [hx, hy + beam, xBeamTopZ + 15],          // above X beam, offset in Y
-    [hx, hy, extruderMotorZ + 10 + 2],        // down to extruder motor top
+    [0, frameD / 2 - beam, frameH + 20],     // up and forward over rear beam
+    [0, 0, frameH + 20],                     // across top to center
+    [hx, hy, extruderMotorZ + 12],           // straight to extruder motor top
   ],
   filR,
   { bendRadius: 25, wall: 0.4, segments: 16 }
 );
-add("Bowden Tube", bowdenTube, C.bowden);
+add("Filament Guide Tube", filFixedPath, C.bowden);
 
 // ─── Electronics ───
 add("PSU", box(100, 60, 40, true)
@@ -339,7 +320,6 @@ return [
     parts.find(p => p.name === "Filament Roll"),
     parts.find(p => p.name === "Spool Hub"),
     parts.find(p => p.name === "Filament Guide Tube"),
-    parts.find(p => p.name === "Bowden Tube"),
   ]},
   parts.find(p => p.name === "Build Volume"),
 ];
