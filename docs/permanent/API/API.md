@@ -1237,6 +1237,31 @@ return [
 
 Each object gets its own visibility toggle, opacity slider, and color picker in the View Panel.
 
+### Assembly Groups
+
+For complex assemblies, use nested groups to organize related parts:
+
+```javascript
+return [
+  { name: "Bed Assembly", group: [
+    { name: "Bed Plate", shape: bedPlate },
+    { name: "Glass Bed", shape: glass },
+    { name: "Heater", shape: heater },
+  ]},
+  { name: "Gantry", group: [
+    { name: "Left Rail", shape: leftRail },
+    { name: "Right Rail", shape: rightRail },
+    { name: "Cross Bar", shape: crossBar },
+  ]},
+];
+```
+
+**Benefits:**
+- **Spatial analysis** skips intra-group collision checks (intentional overlaps)
+- **Group-level summary** reports relationships between assemblies
+- **Object listing** shows group tags: `Bed Plate [Bed Assembly]`
+- **Parameter validation** (`param-check` CLI) ignores collisions within groups
+
 ## Best Practices
 
 ### Performance
