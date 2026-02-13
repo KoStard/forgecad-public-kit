@@ -988,6 +988,35 @@ L-shaped mounting bracket with optional holes.
 ### `lib.holePattern(rows, cols, spacingX, spacingY, holeDia, depth)`
 Grid of cylindrical holes.
 
+### `lib.pipeRoute(points, radius, options?)`
+Route a pipe through 3D waypoints with smooth torus bends at corners.
+
+**Parameters:**
+- `points` ([number, number, number][]) - Array of 3D waypoints
+- `radius` (number) - Pipe outer radius
+- `options` (object, optional):
+  - `bendRadius` (number) - Radius of bends at corners. Default: `radius * 4`
+  - `wall` (number) - Wall thickness for hollow pipe. If omitted, pipe is solid
+  - `segments` (number) - Circumferential segments. Default: 32
+
+**Returns:** `Shape`
+
+```javascript
+// Solid copper pipe with 90° bends
+const refrigPipe = lib.pipeRoute(
+  [[0, 0, 0], [100, 0, 0], [100, 80, 0], [100, 80, 60]],
+  4,
+  { bendRadius: 20 }
+).color('#B87333');
+
+// Hollow drain pipe
+const drainPipe = lib.pipeRoute(
+  [[0, 0, 20], [60, 0, 20], [60, 80, 20]],
+  3,
+  { bendRadius: 15, wall: 1 }
+).color('#CCCCCC');
+```
+
 ### `lib.thread(diameter, pitch, length, options?)`
 External thread (helical ridge) via twisted extrusion. Returns a threaded cylinder along +Z.
 
