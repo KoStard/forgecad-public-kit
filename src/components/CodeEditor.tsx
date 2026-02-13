@@ -263,6 +263,8 @@ declare const lib: {
   roundedBox(x: number, y: number, z: number, radius: number): Shape;
   bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape;
   holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape;
+  /** Route a pipe through 3D waypoints with smooth bends */
+  pipeRoute(points: [number, number, number][], radius: number, options?: { bendRadius?: number; wall?: number; segments?: number }): Shape;
 };
 
 // --- Dimensions (visual annotations) ---

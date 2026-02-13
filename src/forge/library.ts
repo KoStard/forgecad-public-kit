@@ -128,6 +128,251 @@ export function holePattern(
   return union(...holes);
 }
 
+/**
+ * Route a pipe (solid or hollow) through 3D waypoints with smooth bends.
+ *
+ * Each interior waypoint gets a torus-section bend. Straight segments connect them.
+ * Returns a single unioned Shape.
+ */
+export function pipeRoute(
+  points: [number, number, number][],
+  radius: number,
+  options?: { bendRadius?: number; wall?: number; segments?: number },
+): Shape {
+  if (points.length < 2) throw new Error('pipeRoute needs at least 2 points');
+
+  const bendR = options?.bendRadius ?? radius * 4;
+  const wall = options?.wall;
+  const segs = options?.segments ?? 32;
+
+  // Precompute directions and bend info for each interior point
+  type BendInfo = {
+    axis: [number, number, number];   // rotation axis (cross of incoming/outgoing)
+    center: [number, number, number]; // bend arc center
+    angle: number;                    // bend angle in radians
+    trimLen: number;                  // how much to shorten adjacent straights
+    startPt: [number, number, number]; // where straight ends / bend starts
+    endPt: [number, number, number];   // where bend ends / next straight starts
+  };
+
+  const bends: (BendInfo | null)[] = new Array(points.length).fill(null);
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1], cur = points[i], next = points[i + 1];
+    // Incoming direction (toward cur)
+    const dIn = normalize(sub(cur, prev));
+    // Outgoing direction (away from cur)
+    const dOut = normalize(sub(next, cur));
+
+    const dotVal = clampDot(dot(dIn, dOut));
+    // Angle between the two directions
+    const bendAngle = Math.acos(dotVal); // 0 = straight, PI = U-turn
+
+    if (bendAngle < 1e-6) {
+      // Nearly straight — no bend needed
+      continue;
+    }
+
+    const crossVec = cross(dIn, dOut);
+    const crossLen = vecLen(crossVec);
+    if (crossLen < 1e-10) continue; // collinear (U-turn) — skip
+
+    const axis = normalize(crossVec) as [number, number, number];
+
+    // The bend center is offset from the waypoint perpendicular to the bisector
+    // trimLen = bendR * tan(bendAngle/2)
+    const halfAngle = bendAngle / 2;
+    const trimLen = bendR * Math.tan(halfAngle);
+
+    // Start of bend: back along incoming direction by trimLen from cur
+    const startPt = addVec(cur, scale(dIn, -trimLen));
+    // End of bend: along outgoing direction by trimLen from cur
+    const endPt = addVec(cur, scale(dOut, trimLen));
+
+    // Bend center: from startPt, perpendicular to dIn toward the inside of the bend
+    // The perpendicular direction in the bend plane pointing toward center:
+    // It's the component of -dOut perpendicular to dIn, normalized, scaled by bendR
+    // Simpler: center = startPt + normalize(cross(axis, dIn)) * bendR
+    const perpDir = normalize(cross(axis, dIn)) as [number, number, number];
+    const center = addVec(startPt, scale(perpDir, bendR));
+
+    bends[i] = { axis, center, angle: bendAngle, trimLen, startPt, endPt };
+  }
+
+  const parts: Shape[] = [];
+
+  // Helper: create a cylinder from point A to point B
+  const makeSeg = (a: [number, number, number], b: [number, number, number]) => {
+    const d = sub(b, a);
+    const len = vecLen(d);
+    if (len < 0.01) return null;
+    const dir = normalize(d) as [number, number, number];
+    // Build cylinder along Z, then orient and translate
+    let seg = cylinder(len, radius, undefined, segs);
+    if (wall != null && wall > 0) {
+      const inner = cylinder(len + 0.1, radius - wall, undefined, segs).translate(0, 0, -0.05);
+      seg = seg.subtract(inner);
+    }
+    // pointAlong + translate to midpoint
+    seg = seg.pointAlong(dir);
+    // After pointAlong, cylinder base is at origin. We need base at point a.
+    // pointAlong maps [0,0,1] → dir. The base (z=0) stays at origin.
+    seg = seg.translate(a[0], a[1], a[2]);
+    return seg;
+  };
+
+  // Helper: create a torus bend section
+  const makeBend = (info: BendInfo) => {
+    // Create a circle cross-section at (bendR, 0) in XY, revolve around Y axis
+    // Manifold revolve: revolves around Y axis. Profile X = radial distance, Y = height.
+    // We want a torus: circle at distance bendR from Y axis.
+    const wasm = getWasm();
+    const circlePts: [number, number][] = [];
+    for (let i = 0; i < segs; i++) {
+      const a = (i / segs) * Math.PI * 2;
+      const cx = bendR + radius * Math.cos(a);
+      const cy = radius * Math.sin(a);
+      circlePts.push([cx, cy]);
+    }
+
+    let innerPts: [number, number][] | null = null;
+    if (wall != null && wall > 0) {
+      innerPts = [];
+      for (let i = 0; i < segs; i++) {
+        const a = (i / segs) * Math.PI * 2;
+        innerPts.push([bendR + (radius - wall) * Math.cos(a), (radius - wall) * Math.sin(a)]);
+      }
+    }
+
+    const angleDeg = info.angle * 180 / Math.PI;
+    const bendSegs = Math.max(4, Math.ceil(segs * angleDeg / 360));
+
+    const outerCross = wasm.CrossSection.ofPolygons([circlePts]);
+    let bendShape = new Shape(wasm.Manifold.revolve(outerCross, bendSegs, angleDeg), undefined);
+    outerCross.delete();
+
+    if (innerPts) {
+      const innerCross = wasm.CrossSection.ofPolygons([innerPts]);
+      const innerBend = new Shape(wasm.Manifold.revolve(innerCross, bendSegs, angleDeg), undefined);
+      innerCross.delete();
+      bendShape = bendShape.subtract(innerBend);
+    }
+
+    // Now orient the bend into world space.
+    // After revolve around Y: the torus arc starts at +X direction (radial) and sweeps in XY plane.
+    // We need to map this so:
+    //   - The torus center is at info.center
+    //   - The arc starts pointing from center toward info.startPt (incoming tangent direction)
+    //   - The rotation axis is info.axis
+
+    // In local space after revolve:
+    //   - Center of torus is at origin
+    //   - Arc starts along +X (the radial direction at angle=0)
+    //   - Arc sweeps around Y axis
+    //   - So the start tangent direction is +Z (the revolve starts sweeping from X toward... let's think)
+    //
+    // Actually, Manifold revolve() revolves around Y axis. At angle=0, the cross-section is at +X.
+    // The sweep goes from angle=0 to angleDeg around Y.
+    // The start point of the centerline is at (bendR, 0, 0) — that's the center of the cross-section circle.
+    // The tangent at start is along +Z (since revolving around Y from +X goes toward +Z).
+    //
+    // We need:
+    //   - Local +X (radial at start) → direction from center to startPt = -perpDir (from center toward startPt)
+    //   - Local +Z (tangent at start) → -dIn (the incoming direction, reversed because the straight comes IN)
+    //     Actually the tangent at the start of the bend should be along dIn (continuing the incoming direction)
+    //   - Local +Y (revolve axis) → info.axis (or -info.axis depending on convention)
+
+    // Direction from bend center to startPt
+    const radialDir = normalize(sub(info.startPt, info.center)) as [number, number, number];
+    // Tangent at start = dIn direction (the pipe continues in the same direction as the incoming straight)
+    // But we need to figure out the sign. The revolve goes from angle 0 upward.
+    // At angle=0, the centerline point is at (bendR, 0, 0). Tangent = d/dθ of (bendR*cos(θ), 0, bendR*sin(θ)) at θ=0 = (0, 0, bendR) → +Z direction.
+    // So local +Z maps to the tangent at start.
+
+    // We need to find what the incoming tangent direction is at the start of the bend.
+    // The startPt is where the straight segment ends. The straight goes from prev toward cur.
+    // So the tangent at startPt continuing into the bend is dIn (the incoming direction).
+
+    // Build rotation matrix: local [+X, +Y, +Z] → world [radialDir, axis, tangentDir]
+    // tangentDir = cross(radialDir, axis) ... let's verify:
+    // We want the revolve to sweep from startPt toward endPt.
+    // The revolve axis in local space is +Y. In world space it should be info.axis.
+    // But we need to check the sign: does the revolve go from startPt toward endPt with +axis or -axis?
+
+    // The cross product of dIn × dOut gives the axis. The revolve around this axis from startPt should reach endPt.
+    // Let's just compute the tangent as cross(axis, radialDir) and check if it aligns with dIn.
+
+    const tangentDir = cross(info.axis, radialDir) as [number, number, number];
+    // tangentDir should be roughly aligned with the incoming direction at startPt
+    // (the direction the pipe was going before the bend)
+
+    // Build 4x4 column-major transform:
+    // col0 = radialDir (local X → world)
+    // col1 = axis (local Y → world)
+    // col2 = tangentDir (local Z → world)
+    // col3 = center (translation)
+    const c = info.center;
+    bendShape = bendShape.transform([
+      radialDir[0], radialDir[1], radialDir[2], 0,
+      info.axis[0], info.axis[1], info.axis[2], 0,
+      tangentDir[0], tangentDir[1], tangentDir[2], 0,
+      c[0], c[1], c[2], 1,
+    ] as any);
+
+    return bendShape;
+  };
+
+  // Build segments
+  for (let i = 0; i < points.length - 1; i++) {
+    // Effective start/end of this straight segment, trimmed by bends
+    let segStart = points[i] as [number, number, number];
+    let segEnd = points[i + 1] as [number, number, number];
+
+    if (bends[i]) segStart = bends[i]!.endPt;
+    if (bends[i + 1]) segEnd = bends[i + 1]!.startPt;
+
+    const seg = makeSeg(segStart, segEnd);
+    if (seg) parts.push(seg);
+  }
+
+  // Build bends
+  for (let i = 1; i < points.length - 1; i++) {
+    if (bends[i]) {
+      parts.push(makeBend(bends[i]!));
+    }
+  }
+
+  if (parts.length === 0) throw new Error('pipeRoute produced no geometry');
+  return parts.length === 1 ? parts[0] : union(...parts);
+}
+
+// --- Vector math helpers ---
+function sub(a: number[], b: number[]): [number, number, number] {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+function addVec(a: number[], b: number[]): [number, number, number] {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+function scale(v: number[], s: number): [number, number, number] {
+  return [v[0] * s, v[1] * s, v[2] * s];
+}
+function dot(a: number[], b: number[]): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+function cross(a: number[], b: number[]): [number, number, number] {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+function vecLen(v: number[]): number {
+  return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+}
+function normalize(v: number[]): [number, number, number] {
+  const l = vecLen(v) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+}
+function clampDot(d: number): number {
+  return Math.max(-1, Math.min(1, d));
+}
+
 /** All library parts, keyed by name */
 export const partLibrary = {
   boltHole,
@@ -141,6 +386,7 @@ export const partLibrary = {
   thread,
   bolt,
   nut,
+  pipeRoute,
 };
 
 // --- Thread / Fastener library ---
