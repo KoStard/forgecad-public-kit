@@ -5,6 +5,7 @@
  */
 
 import { Shape, Anchor3D, resolveAnchor3D } from './kernel';
+import { Transform, type Mat4 } from './transform';
 import { Sketch } from './sketch/core';
 import { TrackedShape } from './sketch/topology';
 
@@ -103,6 +104,15 @@ export class ShapeGroup {
       if (c instanceof TrackedShape) return c.rotate(x, y, z);
       if (c instanceof Shape) return c.rotate(x, y, z);
       return c.rotate(x); // 2D rotation only uses first arg
+    }));
+  }
+
+  /** Apply a 4x4 transform matrix or Transform object to all 3D children. */
+  transform(m: Mat4 | Transform): ShapeGroup {
+    return new ShapeGroup(this.children.map(c => {
+      if (c instanceof TrackedShape) return c.transform(m);
+      if (c instanceof Shape) return c.transform(m);
+      throw new Error('ShapeGroup.transform only supports 3D children (Shape/TrackedShape)');
     }));
   }
 

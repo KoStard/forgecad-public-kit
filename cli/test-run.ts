@@ -185,6 +185,14 @@ async function main() {
     }
   }
 
+  const diagnostics = (result.logs || []).filter((log: any) => log.level === 'warn' || log.level === 'error');
+  if (diagnostics.length > 0) {
+    console.log(`\n⚠ Script diagnostics:`);
+    for (const log of diagnostics) {
+      console.log(`  [${log.level}] ${log.args.join(' ')}`);
+    }
+  }
+
   // Spatial analysis
   const entries: ShapeEntry[] = result.objects
     .filter((o: any) => o.shape)

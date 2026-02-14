@@ -9,6 +9,7 @@
  */
 
 import { Shape, getAnchorPoint3D, resolveAnchor3D } from '../kernel';
+import { Transform, type Mat4 } from '../transform';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
 
 export type FaceName = string;
@@ -142,6 +143,16 @@ export class TrackedShape {
   rotate(x: number, y: number, z: number): TrackedShape {
     return new TrackedShape(
       this.shape.rotate(x, y, z),
+      { faces: new Map(), edges: new Map() },
+      this.baseHeight,
+      this.extrudeUp,
+    );
+  }
+
+  /** Apply a 4x4 transform matrix or Transform object. Topology is cleared. */
+  transform(m: Mat4 | Transform): TrackedShape {
+    return new TrackedShape(
+      this.shape.transform(m),
       { faces: new Map(), edges: new Map() },
       this.baseHeight,
       this.extrudeUp,

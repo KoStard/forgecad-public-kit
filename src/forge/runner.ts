@@ -57,6 +57,8 @@ import {
 } from './sketch';
 import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
 import { joint } from './joint';
+import { Assembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
+import { Transform, composeChain } from './transform';
 import { partLibrary } from './library';
 import { ShapeGroup, group } from './group';
 import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
@@ -203,6 +205,8 @@ function executeFile(
     'param', 'Shape', 'Sketch', 'lib',
     // Joints
     'joint',
+    // Transform + Assembly
+    'Transform', 'composeChain', 'assembly', 'Assembly', 'SolvedAssembly', 'bomToCsv',
     // Plane ops
     'intersectWithPlane', 'projectToPlane',
     // Cross-file imports
@@ -230,6 +234,7 @@ function executeFile(
     arcBridgeBetweenRects,
     param, Shape, Sketch, partLibrary,
     joint,
+    Transform, composeChain, assembly, Assembly, SolvedAssembly, bomToCsv,
     intersectWithPlane, projectToPlane,
     importSketch, importPart,
     dim, dimLine,
@@ -256,6 +261,13 @@ export function runScript(
     const objects: SceneObject[] = [];
     const pushShape = (shape: Shape, name: string, groupName?: string) => {
       objects.push({ id: `obj-${objects.length + 1}`, name, shape, sketch: null, color: shape.colorHex, groupName });
+      if (shape.isEmpty()) {
+        _collectedLogs.push({
+          level: 'warn',
+          args: [`Object "${name}" is empty. This usually means full clipping, full subtraction, or invalid geometry.`],
+          timestamp: Date.now(),
+        });
+      }
     };
     const pushSketch = (sketch: Sketch, name: string, groupName?: string) => {
       const meta = sketch instanceof ConstraintSketch ? sketch.constraintMeta : undefined;

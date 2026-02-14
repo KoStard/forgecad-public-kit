@@ -19,6 +19,8 @@ import { initKernel } from './kernel';
 // Re-export everything from the public API
 export { Shape, box, cylinder, sphere, union, difference, intersection, hull3d, levelSet, getWasm } from './kernel';
 export type { Anchor3D } from './kernel';
+export { Transform, composeChain } from './transform';
+export type { Mat4, Vec3, TransformInput } from './transform';
 export { intersectWithPlane, projectToPlane } from './section';
 export type { PlaneSpec } from './section';
 export * from './sketch';
@@ -26,6 +28,19 @@ export { param, resetParams, getCollectedParams, setParamOverrides } from './par
 export type { ParamDef } from './params';
 export { joint } from './joint';
 export type { RevoluteJointOpts } from './joint';
+export { Assembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
+export type {
+  AssemblyPart,
+  JointType,
+  JointState,
+  PartMetadata,
+  PartOptions,
+  JointOptions,
+  BomRow,
+  CollisionOptions,
+  CollisionFinding,
+  JointSweepFrame,
+} from './assembly';
 export { runScript } from './runner';
 export type { RunResult, SceneObject, LogEntry } from './runner';
 export { partLibrary } from './library';
