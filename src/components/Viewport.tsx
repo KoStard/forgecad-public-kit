@@ -72,12 +72,20 @@ function ForgeObject({
   renderMode,
   isHovered,
   clippingPlanes,
+  onPointerEnter,
+  onPointerMove,
+  onPointerLeave,
+  onClick,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
   renderMode: RenderMode;
   isHovered?: boolean;
   clippingPlanes?: THREE.Plane[];
+  onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
+  onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
+  onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
+  onClick?: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const { solidGeo, edgesGeo } = useMemo(() => {
     if (!obj.shape) return { solidGeo: null, edgesGeo: null };
@@ -97,7 +105,7 @@ function ForgeObject({
   const showWire = renderMode === 'wireframe';
 
   return (
-    <group>
+    <group onPointerEnter={onPointerEnter} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} onClick={onClick}>
       {showSolid && (
         <mesh geometry={solidGeo}>
           <meshPhysicalMaterial
@@ -141,10 +149,18 @@ function SketchObject({
   obj,
   settings,
   renderMode,
+  onPointerEnter,
+  onPointerMove,
+  onPointerLeave,
+  onClick,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
   renderMode: RenderMode;
+  onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
+  onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
+  onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
+  onClick?: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const { fillGeo, lineGeos, pointGeos } = useMemo(() => {
     if (!obj.sketch) return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
@@ -219,8 +235,8 @@ function SketchObject({
       return {
         id: constraint.id,
         texture,
-        position: [constraint.position[0], constraint.position[1], 0.1],
-        scale: [20, 5, 1],
+        position: [constraint.position[0], constraint.position[1], 0.1] as [number, number, number],
+        scale: [20, 5, 1] as [number, number, number],
       };
     });
   }, [obj.sketchMeta]);
@@ -267,7 +283,7 @@ function SketchObject({
   const showFill = renderMode !== 'wireframe';
 
   return (
-    <group>
+    <group onPointerEnter={onPointerEnter} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} onClick={onClick}>
       {fillGeo && showFill && (
         <mesh geometry={fillGeo}>
           <meshBasicMaterial color={constraintColor} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
@@ -415,6 +431,7 @@ type DragInfo = {
   id: string;
   index: number;
 };
+type PointerLike = { clientX: number; clientY: number };
 
 const SNAP_COLORS: Record<SnapKind, string> = {
   vertex: '#4a9eff',
@@ -467,15 +484,12 @@ function MeasureTool() {
   const [draggingMarker, setDraggingMarker] = useState<DragInfo | null>(null);
   const dragRef = useRef<DragInfo | null>(null);
   const pointerDownRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
-  const snapEdgeGeometry = useRef<THREE.BufferGeometry | null>(null);
-
-  useEffect(() => {
-    if (!snapEdgeGeometry.current) return;
-    if (snap?.type === 'edge' && snap.edge) {
-      snapEdgeGeometry.current.setFromPoints([snap.edge[0], snap.edge[1]]);
-      const position = snapEdgeGeometry.current.getAttribute('position');
-      if (position) position.needsUpdate = true;
-    }
+  const snapEdgeLine = useMemo(() => {
+    if (!snap || snap.type !== 'edge' || !snap.edge) return null;
+    const geo = new THREE.BufferGeometry().setFromPoints([snap.edge[0], snap.edge[1]]);
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: SNAP_COLORS.edge, linewidth: 2 }));
+    line.userData.measureHelper = true;
+    return line;
   }, [snap]);
 
   const setCursor = useCallback((value: string) => {
@@ -516,7 +530,7 @@ function MeasureTool() {
     return meshes;
   }, [scene]);
 
-  const getPointerNDC = useCallback((event: PointerEvent | React.PointerEvent): { x: number; y: number } => {
+  const getPointerNDC = useCallback((event: PointerLike): { x: number; y: number } => {
     const rect = gl.domElement.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -532,10 +546,10 @@ function MeasureTool() {
     };
   }, [camera, gl.domElement]);
 
-  const computeSnap = useCallback((event: PointerEvent | React.PointerEvent): SnapResult | null => {
+  const computeSnap = useCallback((event: PointerLike): SnapResult | null => {
     if (!measureMode) return null;
     const pointer = getPointerNDC(event);
-    raycaster.setFromCamera(pointer, camera);
+    raycaster.setFromCamera(new THREE.Vector2(pointer.x, pointer.y), camera);
 
     const meshes = getMeshes();
     const intersects = raycaster.intersectObjects(meshes, false);
@@ -607,7 +621,7 @@ function MeasureTool() {
     return best ?? { point: hitPoint, type: 'free' };
   }, [camera, getMeshes, getPointerNDC, measureMode, measureSnapPx, raycaster, worldToScreen]);
 
-  const updateSnap = useCallback((event: PointerEvent | React.PointerEvent): SnapResult | null => {
+  const updateSnap = useCallback((event: PointerLike): SnapResult | null => {
     const next = computeSnap(event);
     setSnap(next && next.type !== 'free' ? next : null);
     return next;
@@ -728,11 +742,8 @@ function MeasureTool() {
         </mesh>
       )}
 
-      {measureMode && snap && snap.type === 'edge' && snap.edge && (
-        <line userData={{ measureHelper: true }}>
-          <bufferGeometry ref={snapEdgeGeometry} />
-          <lineBasicMaterial color={SNAP_COLORS.edge} linewidth={2} />
-        </line>
+      {measureMode && snap && snap.type === 'edge' && snap.edge && snapEdgeLine && (
+        <primitive object={snapEdgeLine} />
       )}
     </>
   );
@@ -988,6 +999,9 @@ export function Viewport() {
   const gridSize = useForgeStore((s) => s.gridSize);
   const objectSettings = useForgeStore((s) => s.objectSettings);
   const hoveredObjectId = useForgeStore((s) => s.hoveredObjectId);
+  const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
+  const selectObject = useForgeStore((s) => s.selectObject);
+  const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
   const viewCommand = useForgeStore((s) => s.viewCommand);
   const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
   const objects = result?.objects ?? [];
@@ -1010,11 +1024,46 @@ export function Viewport() {
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [hoverLabel, setHoverLabel] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
   const themeName = useForgeStore((s) => s.theme);
   const t = themes[themeName];
 
+  useEffect(() => {
+    if (objectPickSyncEnabled) return;
+    setHoverLabel(null);
+    setHoveredObjectId(null);
+  }, [objectPickSyncEnabled, setHoveredObjectId]);
+
+  const updateHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
+    if (!objectPickSyncEnabled || measureMode) return;
+    event.stopPropagation();
+    setHoveredObjectId(obj.id);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setHoverLabel({
+      id: obj.id,
+      name: obj.name,
+      x: event.clientX - rect.left + 10,
+      y: event.clientY - rect.top + 12,
+    });
+  }, [measureMode, objectPickSyncEnabled, setHoveredObjectId]);
+
+  const clearHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
+    if (!objectPickSyncEnabled || measureMode) return;
+    event.stopPropagation();
+    if (hoveredObjectId === obj.id) setHoveredObjectId(null);
+    setHoverLabel((prev) => (prev?.id === obj.id ? null : prev));
+  }, [hoveredObjectId, measureMode, objectPickSyncEnabled, setHoveredObjectId]);
+
+  const handleObjectClick = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
+    if (!objectPickSyncEnabled || measureMode) return;
+    event.stopPropagation();
+    selectObject(obj.id);
+  }, [measureMode, objectPickSyncEnabled, selectObject]);
+
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
         style={{ background: t.viewportBg, cursor: measureMode ? 'crosshair' : 'default' }}
         dpr={[1, 2]}
@@ -1046,10 +1095,34 @@ export function Viewport() {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
           const isHovered = hoveredObjectId === obj.id;
           if (obj.shape) {
-            return <ForgeObject key={obj.id} obj={obj} settings={settings} renderMode={renderMode} isHovered={isHovered} clippingPlanes={activeClippingPlanes} />;
+            return (
+              <ForgeObject
+                key={obj.id}
+                obj={obj}
+                settings={settings}
+                renderMode={renderMode}
+                isHovered={isHovered}
+                clippingPlanes={activeClippingPlanes}
+                onPointerEnter={(event) => updateHoverLabel(obj, event)}
+                onPointerMove={(event) => updateHoverLabel(obj, event)}
+                onPointerLeave={(event) => clearHoverLabel(obj, event)}
+                onClick={(event) => handleObjectClick(obj, event)}
+              />
+            );
           }
           if (obj.sketch) {
-            return <SketchObject key={obj.id} obj={obj} settings={settings} renderMode={renderMode} />;
+            return (
+              <SketchObject
+                key={obj.id}
+                obj={obj}
+                settings={settings}
+                renderMode={renderMode}
+                onPointerEnter={(event) => updateHoverLabel(obj, event)}
+                onPointerMove={(event) => updateHoverLabel(obj, event)}
+                onPointerLeave={(event) => clearHoverLabel(obj, event)}
+                onClick={(event) => handleObjectClick(obj, event)}
+              />
+            );
           }
           return null;
         })}
@@ -1132,6 +1205,28 @@ export function Viewport() {
           }}
         >
           📏 Click to place points, drag markers to adjust
+        </div>
+      )}
+
+      {objectPickSyncEnabled && hoverLabel && !measureMode && (
+        <div
+          style={{
+            position: 'absolute',
+            left: hoverLabel.x,
+            top: hoverLabel.y,
+            background: '#111111d9',
+            color: '#f2f2f2',
+            padding: '3px 7px',
+            borderRadius: 4,
+            border: '1px solid #2a2a2a',
+            fontSize: 11,
+            fontWeight: 600,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            transform: 'translate(0, -100%)',
+          }}
+        >
+          {hoverLabel.name}
         </div>
       )}
     </div>

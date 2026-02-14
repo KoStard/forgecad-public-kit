@@ -146,6 +146,8 @@ interface ForgeStore {
   selectObject: (id: string | null) => void;
   hoveredObjectId: string | null;
   setHoveredObjectId: (id: string | null) => void;
+  objectPickSyncEnabled: boolean;
+  setObjectPickSyncEnabled: (enabled: boolean) => void;
   viewCommand: ViewCommand | null;
   requestViewCommand: (command: Omit<ViewCommand, 'id'>) => void;
   clearViewCommand: () => void;
@@ -428,6 +430,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   selectObject: (id) => set({ selectedObjectId: id }),
   hoveredObjectId: null,
   setHoveredObjectId: (id) => set({ hoveredObjectId: id }),
+  objectPickSyncEnabled: true,
+  setObjectPickSyncEnabled: (enabled) => set({ objectPickSyncEnabled: enabled }),
   viewCommand: null,
   requestViewCommand: (command) => set({ viewCommand: { ...command, id: Date.now() } }),
   clearViewCommand: () => set({ viewCommand: null }),

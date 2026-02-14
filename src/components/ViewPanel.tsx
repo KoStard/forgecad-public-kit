@@ -1,5 +1,5 @@
 import { useForgeStore } from '../store/forgeStore';
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import type { CutPlaneDef } from '@forge/cutPlane';
 
 const btnStyle = (active = false): CSSProperties => ({
@@ -53,6 +53,8 @@ export function ViewPanel() {
   const selectedObjectId = useForgeStore((s) => s.selectedObjectId);
   const selectObject = useForgeStore((s) => s.selectObject);
   const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
+  const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
+  const setObjectPickSyncEnabled = useForgeStore((s) => s.setObjectPickSyncEnabled);
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
   const measureSnapPx = useForgeStore((s) => s.measureSnapPx);
   const setMeasureSnapPx = useForgeStore((s) => s.setMeasureSnapPx);
@@ -65,6 +67,7 @@ export function ViewPanel() {
 
   const objects = result?.objects ?? [];
   const selectedObject = objects.find((obj) => obj.id === selectedObjectId) ?? null;
+  const objectItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const constraintMeta = selectedObject?.sketchMeta ?? null;
   const constraintStatusColor = constraintMeta?.status === 'over'
     ? '#ff4d4f'
@@ -73,6 +76,14 @@ export function ViewPanel() {
       : constraintMeta?.status === 'under'
         ? '#4aa3ff'
         : 'var(--fc-textDim)';
+
+  useEffect(() => {
+    if (!objectPickSyncEnabled || !selectedObjectId) return;
+    const target = objectItemRefs.current[selectedObjectId];
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [objectPickSyncEnabled, selectedObjectId]);
 
   return (
     <div
@@ -142,6 +153,8 @@ export function ViewPanel() {
           return (
             <div
               key={obj.id}
+              ref={(node) => { objectItemRefs.current[obj.id] = node; }}
+              tabIndex={-1}
               onClick={() => selectObject(obj.id)}
               onMouseEnter={() => setHoveredObjectId(obj.id)}
               onMouseLeave={() => setHoveredObjectId(null)}
@@ -264,6 +277,16 @@ export function ViewPanel() {
               onChange={toggleDimensions}
             />
             Show dimensions
+          </label>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
+            <input
+              type="checkbox"
+              checked={objectPickSyncEnabled}
+              onChange={(e) => setObjectPickSyncEnabled(e.target.checked)}
+            />
+            Scene pick sync + labels
           </label>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
