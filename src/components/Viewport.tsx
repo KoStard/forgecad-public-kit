@@ -1003,6 +1003,7 @@ export function Viewport() {
   const selectObject = useForgeStore((s) => s.selectObject);
   const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
   const viewCommand = useForgeStore((s) => s.viewCommand);
+  const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
   const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
   const objects = result?.objects ?? [];
   const dimensions = result?.dimensions ?? [];
@@ -1024,10 +1025,19 @@ export function Viewport() {
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
+  const initialFitRequestedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [hoverLabel, setHoverLabel] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
   const themeName = useForgeStore((s) => s.theme);
   const t = themes[themeName];
+
+  useEffect(() => {
+    if (initialFitRequestedRef.current) return;
+    if (viewCommand) return;
+    if (objects.length === 0) return;
+    initialFitRequestedRef.current = true;
+    requestViewCommand({ type: 'fit' });
+  }, [objects.length, requestViewCommand, viewCommand]);
 
   useEffect(() => {
     if (objectPickSyncEnabled) return;
