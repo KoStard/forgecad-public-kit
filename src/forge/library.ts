@@ -15,6 +15,77 @@ export function boltHole(diameter: number, depth: number): Shape {
   return cylinder(depth, diameter / 2, undefined, 32, true);
 }
 
+type MetricSize = 'M2' | 'M2.5' | 'M3' | 'M4' | 'M5' | 'M6' | 'M8' | 'M10';
+type FastenerFit = 'close' | 'normal' | 'loose' | 'tap';
+
+export interface FastenerHoleOptions {
+  standard?: 'iso-metric';
+  size: MetricSize;
+  fit?: FastenerFit;
+  depth: number;
+  counterbore?: { depth: number; diameter?: number };
+  countersink?: { diameter: number; angleDeg?: number };
+  center?: boolean;
+  segments?: number;
+}
+
+const METRIC_HOLE_TABLE: Record<MetricSize, { close: number; normal: number; loose: number; tap: number; head: number }> = {
+  M2: { close: 2.2, normal: 2.4, loose: 2.6, tap: 1.6, head: 4.0 },
+  'M2.5': { close: 2.7, normal: 2.9, loose: 3.1, tap: 2.05, head: 5.0 },
+  M3: { close: 3.2, normal: 3.4, loose: 3.6, tap: 2.5, head: 5.6 },
+  M4: { close: 4.3, normal: 4.5, loose: 4.8, tap: 3.3, head: 7.5 },
+  M5: { close: 5.3, normal: 5.5, loose: 5.8, tap: 4.2, head: 9.2 },
+  M6: { close: 6.4, normal: 6.6, loose: 7.0, tap: 5.0, head: 11.0 },
+  M8: { close: 8.4, normal: 9.0, loose: 10.0, tap: 6.8, head: 14.0 },
+  M10: { close: 10.5, normal: 11.0, loose: 12.0, tap: 8.5, head: 18.0 },
+};
+
+/**
+ * Standardized metric fastener hole (through-hole/tap drill + optional counterbore/countersink).
+ * Returns hole geometry intended as a cutter (subtract from part).
+ */
+export function fastenerHole(opts: FastenerHoleOptions): Shape {
+  const standard = opts.standard ?? 'iso-metric';
+  if (standard !== 'iso-metric') {
+    throw new Error(`Unsupported fastener standard "${standard}"`);
+  }
+
+  const sizeData = METRIC_HOLE_TABLE[opts.size];
+  if (!sizeData) throw new Error(`Unsupported fastener size "${opts.size}"`);
+
+  const fit = opts.fit ?? 'normal';
+  const holeDia = sizeData[fit];
+  const depth = opts.depth;
+  const segs = opts.segments ?? 48;
+  const centered = opts.center ?? true;
+
+  let hole = cylinder(depth, holeDia / 2, undefined, segs, true);
+
+  if (opts.counterbore) {
+    const boreDepth = Math.max(0.01, opts.counterbore.depth);
+    const boreDia = Math.max(holeDia, opts.counterbore.diameter ?? sizeData.head);
+    const bore = cylinder(boreDepth, boreDia / 2, undefined, segs, true)
+      .translate(0, 0, depth / 2 - boreDepth / 2);
+    hole = union(hole, bore);
+  }
+
+  if (opts.countersink) {
+    const sinkDia = Math.max(holeDia, opts.countersink.diameter);
+    const angleDeg = opts.countersink.angleDeg ?? 90;
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const sinkDepth = ((sinkDia - holeDia) * 0.5) / Math.tan(angleRad * 0.5);
+    const sink = cylinder(Math.max(0.01, sinkDepth), sinkDia / 2, holeDia / 2, segs, true)
+      .translate(0, 0, depth / 2 - sinkDepth / 2);
+    hole = union(hole, sink);
+  }
+
+  if (!centered) {
+    hole = hole.translate(0, 0, depth / 2);
+  }
+
+  return hole;
+}
+
 /** Counterbore hole — through-hole with a wider recess at the top */
 export function counterbore(
   holeDia: number,
@@ -799,6 +870,7 @@ export function elbow(
 /** All library parts, keyed by name */
 export const partLibrary = {
   boltHole,
+  fastenerHole,
   counterbore,
   tube,
   pipe,

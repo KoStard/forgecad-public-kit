@@ -6,6 +6,7 @@
  */
 
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
+import { Transform, type Mat4 } from './transform';
 
 let _wasm: ManifoldToplevel | null = null;
 
@@ -65,9 +66,10 @@ export class Shape {
     return new Shape(this.manifold.rotate(x, y, z), this.colorHex);
   }
 
-  /** Apply a 4x4 affine transform matrix (column-major, 16 elements) */
-  transform(m: [number,number,number,number,number,number,number,number,number,number,number,number,number,number,number,number]): Shape {
-    return new Shape(this.manifold.transform(m), this.colorHex);
+  /** Apply a 4x4 affine transform matrix (column-major) or a Transform object. */
+  transform(m: Mat4 | Transform): Shape {
+    const mat = m instanceof Transform ? m.toArray() : m;
+    return new Shape(this.manifold.transform(mat), this.colorHex);
   }
 
   scale(v: number | [number, number, number]): Shape {

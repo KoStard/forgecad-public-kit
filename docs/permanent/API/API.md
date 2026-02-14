@@ -306,6 +306,28 @@ const hingeL = cylinder(40, 5).pointAlong([-1, 0, 0]).translate(-50, 0, 0);
 const hingeR = cylinder(40, 5).pointAlong([1, 0, 0]).translate(50, 0, 0);
 ```
 
+### `Transform` primitives (for kinematic chains)
+Use `Transform` when manual pivot math becomes hard to maintain.
+
+```javascript
+const T = Transform.identity()
+  .translate(0, 0, 120)
+  .rotateAxis([0, 0, 1], 35);
+
+const p = T.point([10, 0, 0]);   // transform a point
+const v = T.vector([1, 0, 0]);   // transform a direction (no translation)
+```
+
+Core methods:
+- `Transform.identity()`
+- `Transform.translation(x, y, z)`
+- `Transform.rotationAxis(axis, angleDeg, pivot?)`
+- `Transform.scale(v)`
+- `T.mul(other)` (chain-composition order)
+- `composeChain(a, b, c, ...)` explicit left-to-right chain composition
+- `T.inverse()`
+- `shape.transform(T)` / `trackedShape.transform(T)` / `group.transform(T)`
+
 ## Joints
 
 ### `joint(name, shape, pivot, opts?)`
@@ -332,6 +354,48 @@ const openLid = joint("Lid Angle", lid, [0, boxDepth, boxHeight], {
   default: 45,
 });
 ```
+
+## Assembly Graph (Mechanisms)
+
+See also: `assembly.md`.
+
+### `assembly(name?)`
+Creates an assembly container with named parts + joints.
+
+```javascript
+const mech = assembly("Two-Link Arm")
+  .addPart("base", box(80, 80, 20, true))
+  .addPart("link1", box(120, 24, 24).translate(0, -12, -12))
+  .addPart("link2", box(100, 20, 20).translate(0, -10, -10))
+  .addJoint("shoulder", "revolute", "base", "link1", {
+    axis: [0, 1, 0],
+    min: -30, max: 120, default: 20,
+    frame: Transform.identity().translate(0, 0, 20),
+  })
+  .addJoint("elbow", "revolute", "link1", "link2", {
+    axis: [0, 1, 0],
+    min: -20, max: 140, default: 40,
+    frame: Transform.identity().translate(120, 0, 0),
+  });
+
+const solved = mech.solve();
+return solved.toScene();
+```
+
+Key methods:
+- `addPart(name, shape, { transform?, metadata? })`
+- `addFrame(name, { transform? })` for virtual mechanism frames
+- `addJoint(name, type, parent, child, opts)` where `type` is `'fixed' | 'revolute' | 'prismatic'`
+- `addRevolute(...)`, `addPrismatic(...)`, `addFixed(...)` shorthand helpers
+- `solve(state?)` with per-joint value overrides
+- `sweepJoint(jointName, from, to, steps, baseState?, collisionOptions?)`
+
+Solved assembly helpers:
+- `solved.toScene()` for rendering
+- `solved.collisionReport()` for interference checks
+- `solved.minClearance(partA, partB, searchLength?)`
+- `solved.bom()` / `solved.bomCsv()`
+- `bomToCsv(rows)` (standalone helper)
 
 ## 3D Boolean Operations
 
@@ -1013,6 +1077,18 @@ Pre-built parametric parts available via `lib.xxx()`. No imports needed.
 
 ### `lib.boltHole(diameter, depth)`
 Through-hole cylinder (centered).
+
+### `lib.fastenerHole(opts)`
+Standardized metric hole helper with fits and optional counterbore/countersink.
+
+```javascript
+const m4 = lib.fastenerHole({
+  size: "M4",
+  fit: "normal",   // close | normal | loose | tap
+  depth: 12,
+  counterbore: { depth: 3.5 }, // diameter auto from size unless provided
+});
+```
 
 ### `lib.counterbore(holeDia, boreDia, boreDepth, totalDepth)`
 Through-hole with wider recess at top.

@@ -20,7 +20,7 @@ const payloadSize = param("Payload Size", 36, { min: 20, max: 65, unit: "mm" });
 const carryPayload = param("Carry Payload", 1, { min: 0, max: 1, integer: true });
 
 const exploded = param("Exploded", 0, { min: 0, max: 140, unit: "mm" });
-const sectionEnabled = param("Section Enabled", 1, { min: 0, max: 1, integer: true });
+const sectionEnabled = param("Section Enabled", 0, { min: 0, max: 1, integer: true });
 
 // ---- 2) Math + transform helpers ----
 function rad(deg) {
@@ -40,15 +40,6 @@ function rotateXPoint(p, deg) {
   const c = Math.cos(r);
   const s = Math.sin(r);
   return [p[0], p[1] * c - p[2] * s, p[1] * s + p[2] * c];
-}
-
-function pitchVector(length, deg) {
-  const r = rad(deg);
-  return [length * Math.cos(r), 0, length * Math.sin(r)];
-}
-
-function yawAll(shape) {
-  return shape.rotateAround([0, 0, 1], baseYaw, [0, 0, 0]);
 }
 
 function explodeShape(shape, v, stage) {
@@ -248,29 +239,77 @@ const shoulderTower = box(42, 58, towerH, true)
 const yawServoLocal = makeServoLocal(44, 21, 39, 11)
   .translate(-34, 0, mountT + statorH + 8);
 
-// ---- 4) Arm kinematics (iterative chain solve) ----
-const shoulderPivot = [0, 0, mountT + statorH + rotorH + towerH * 0.62 - 4];
-const forearmAngle = shoulderPitch + elbowPitch;
-const handAngle = forearmAngle + wristPitch;
+// ---- 4) Arm kinematics (assembly graph solve) ----
+const shoulderPivotZ = mountT + statorH + rotorH + towerH * 0.62 - 4;
+const forearmReach = foreLen + foreExtension;
 
-const elbowPivot = add3(shoulderPivot, pitchVector(upperLen, shoulderPitch));
-const wristPivot = add3(elbowPivot, pitchVector(foreLen + foreExtension, forearmAngle));
+const kinematics = assembly("Robot Hand 2 Kinematics")
+  .addFrame("Base Frame")
+  .addFrame("Yaw Frame")
+  .addFrame("Shoulder Frame")
+  .addFrame("Elbow Frame")
+  .addFrame("Wrist Pitch Frame")
+  .addFrame("Wrist Roll Frame")
+  .addRevolute("Base Yaw", "Base Frame", "Yaw Frame", {
+    axis: [0, 0, 1],
+    min: -170,
+    max: 170,
+  })
+  .addRevolute("Shoulder Pitch", "Yaw Frame", "Shoulder Frame", {
+    axis: [0, -1, 0],
+    min: -25,
+    max: 105,
+    frame: Transform.identity().translate(0, 0, shoulderPivotZ),
+  })
+  .addRevolute("Elbow Pitch", "Shoulder Frame", "Elbow Frame", {
+    axis: [0, -1, 0],
+    min: -15,
+    max: 135,
+    frame: Transform.identity().translate(upperLen, 0, 0),
+  })
+  .addRevolute("Wrist Pitch", "Elbow Frame", "Wrist Pitch Frame", {
+    axis: [0, -1, 0],
+    min: -100,
+    max: 100,
+    frame: Transform.identity().translate(forearmReach, 0, 0),
+  })
+  .addRevolute("Wrist Roll", "Wrist Pitch Frame", "Wrist Roll Frame", {
+    axis: [1, 0, 0],
+    min: -180,
+    max: 180,
+  });
+
+const solvedKinematics = kinematics.solve({
+  "Base Yaw": baseYaw,
+  "Shoulder Pitch": shoulderPitch,
+  "Elbow Pitch": elbowPitch,
+  "Wrist Pitch": wristPitch,
+  "Wrist Roll": wristRoll,
+});
+
+const yawFrameT = solvedKinematics.getTransform("Yaw Frame");
+const shoulderFrameT = solvedKinematics.getTransform("Shoulder Frame");
+const elbowFrameT = solvedKinematics.getTransform("Elbow Frame");
+const handFrameT = solvedKinematics.getTransform("Wrist Roll Frame");
+
+const shoulderPivot = shoulderFrameT.point([0, 0, 0]);
+const elbowPivot = elbowFrameT.point([0, 0, 0]);
+const wristPivot = handFrameT.point([0, 0, 0]);
+
+function placeAtYaw(shape) {
+  return shape.transform(yawFrameT);
+}
 
 function placeAtShoulder(shape) {
-  return yawAll(shape.rotateAround([0, -1, 0], shoulderPitch, [0, 0, 0]).translate(shoulderPivot[0], 0, shoulderPivot[2]));
+  return shape.transform(shoulderFrameT);
 }
 
 function placeAtElbow(shape) {
-  return yawAll(shape.rotateAround([0, -1, 0], forearmAngle, [0, 0, 0]).translate(elbowPivot[0], 0, elbowPivot[2]));
+  return shape.transform(elbowFrameT);
 }
 
 function placeInHandFrame(shape) {
-  return yawAll(
-    shape
-      .rotateAround([1, 0, 0], wristRoll, [0, 0, 0])
-      .rotateAround([0, -1, 0], handAngle, [0, 0, 0])
-      .translate(wristPivot[0], 0, wristPivot[2])
-  );
+  return shape.transform(handFrameT);
 }
 
 // ---- 5) Arm mechanics modules ----
@@ -399,9 +438,9 @@ const mountGroup = [
 
 const yawGroup = [
   { name: "Yaw Stator", shape: explodeShape(baseStator.color("#4a5259"), [0, 0, 0.1], 0.4) },
-  { name: "Yaw Rotor", shape: explodeShape(yawAll(baseRotor).color("#768391"), [0, 0, 1], 0.9) },
-  { name: "Shoulder Tower", shape: explodeShape(yawAll(shoulderTower).color("#8e9bab"), [0, 0.15, 1], 1.2) },
-  { name: "Yaw Servo", shape: explodeShape(yawAll(yawServoLocal).color("#23272b"), [-0.6, 0.6, 0.5], 1.4) },
+  { name: "Yaw Rotor", shape: explodeShape(placeAtYaw(baseRotor).color("#768391"), [0, 0, 1], 0.9) },
+  { name: "Shoulder Tower", shape: explodeShape(placeAtYaw(shoulderTower).color("#8e9bab"), [0, 0.15, 1], 1.2) },
+  { name: "Yaw Servo", shape: explodeShape(placeAtYaw(yawServoLocal).color("#23272b"), [-0.6, 0.6, 0.5], 1.4) },
 ];
 
 const armGroup = [
@@ -533,14 +572,14 @@ for (let i = 0; i < fingerShells.length; i++) {
   });
 }
 
-const wristPivotMarker = sphere(4).translate(wristPivot[0], 0, wristPivot[2]).color("#e34f4f");
-const elbowPivotMarker = sphere(4).translate(elbowPivot[0], 0, elbowPivot[2]).color("#e3944f");
-const shoulderPivotMarker = sphere(4).translate(shoulderPivot[0], 0, shoulderPivot[2]).color("#f0d04f");
+const wristPivotMarker = sphere(4).translate(wristPivot[0], wristPivot[1], wristPivot[2]).color("#e34f4f");
+const elbowPivotMarker = sphere(4).translate(elbowPivot[0], elbowPivot[1], elbowPivot[2]).color("#e3944f");
+const shoulderPivotMarker = sphere(4).translate(shoulderPivot[0], shoulderPivot[1], shoulderPivot[2]).color("#f0d04f");
 
 const kinematicsMarkers = [
-  { name: "Shoulder Pivot", shape: yawAll(shoulderPivotMarker) },
-  { name: "Elbow Pivot", shape: yawAll(elbowPivotMarker) },
-  { name: "Wrist Pivot", shape: yawAll(wristPivotMarker) },
+  { name: "Shoulder Pivot", shape: shoulderPivotMarker },
+  { name: "Elbow Pivot", shape: elbowPivotMarker },
+  { name: "Wrist Pivot", shape: wristPivotMarker },
 ];
 
 const payloadShape = placeInHandFrame(payloadLocal.translate(rollTubeLen + 12, 0, 0)).color("#d98bc7");

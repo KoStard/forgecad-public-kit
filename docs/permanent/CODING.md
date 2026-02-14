@@ -91,6 +91,39 @@ Write only the code needed to solve the problem. No verbose implementations, no 
 - Use Zustand selectors to prevent unnecessary re-renders
 - Keep actions pure and synchronous where possible
 
+## Frame Composition Standard (Required)
+
+This standard is package-wide for any code that composes transforms (`Transform`, joints, assemblies, kinematic helpers).
+
+### Contract
+- `A.mul(B)` means **apply A, then B**
+- Use `composeChain(...)` for 3+ composed transforms instead of manual `.mul()` chains
+- In assembly/kinematics, always express composition in this canonical order:
+  - `local -> childBase -> jointMotion -> jointFrame -> parentWorld`
+
+### Why this is mandatory
+Transform order bugs can produce geometry that "looks valid" but is globally wrong (detached mechanism segments, drifting pivots, mirrored motion paths) and often pass casual visual checks.
+
+### 5-Why (2026-02 Assembly disconnect incident)
+1. Why were arm segments disconnected?  
+Because child world transforms were composed in the wrong order in `assembly.solve()`.
+2. Why was order wrong?  
+Because `.mul()` chain semantics (apply self, then other) were interpreted inconsistently with matrix notation.
+3. Why was that ambiguity possible?  
+Because there was no single canonical frame equation documented and enforced in code review.
+4. Why didn’t tests catch it immediately?  
+Because there was no invariant test comparing assembly-solved frame origins against an analytic kinematic oracle.
+5. Why no invariant test existed?  
+Because we had feature-level example checks, but no package-wide transform convention gate.
+
+Root cause: **missing, enforced transform/frame composition contract across code + tests.**
+
+### Enforcement
+- Any change touching transforms, joints, or assembly solving must run:
+  - `npm run check:transforms`
+- If the change affects user-facing geometry behavior, also run:
+  - `npm run test-run -- <affected-example>`
+
 ## Git Workflow
 
 ### Commit Every Major Change

@@ -89,6 +89,14 @@ Samples each parameter across its range and checks for runtime errors, degenerat
        Bottom Left Door ∩ Frame (shared vol: 2561.9mm³)
 ```
 
+### Transform/Assembly Invariant Check
+
+```bash
+npm run check:transforms
+```
+
+Runs fast math-level invariants to catch transform order and frame composition regressions before they leak into examples.
+
 ## Adding New CLI Commands
 
 1. Create `cli/your-command.ts`

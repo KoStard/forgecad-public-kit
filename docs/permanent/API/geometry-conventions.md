@@ -64,7 +64,30 @@ If `signedArea > 0` → CW → reverse to make CCW.
 
 **Convention:** This matches the standard "post-multiply" convention. No surprises here, but worth noting because some systems (OpenSCAD) apply transforms in reverse order.
 
-**Rule for new code:** Keep post-multiply order. Document any operation that deviates.
+For explicit transform objects:
+- `A.mul(B)` means **apply A, then B**.
+- `composeChain(A, B, C)` means **A -> B -> C**.
+
+**Rule for new code:** Keep this chain order everywhere. Document any operation that deviates.
+
+## Assembly Frame Composition
+
+This is where regressions are most likely if convention is unclear.
+
+For a point in child geometry-local coordinates:
+- local -> `childBase` -> `jointMotion(value)` -> `jointFrame` -> `parentWorld`
+
+In Forge chain notation:
+```ts
+childWorld = composeChain(childBase, jointMotion, jointFrame, parentWorld)
+```
+
+Equivalent matrix-style equation (for reference):
+```txt
+T_world_child = T_parent_world * T_joint_frame * T_joint_motion * T_child_base
+```
+
+**Rule for new code:** In kinematics/assembly code, prefer `composeChain(...)` over manual `.mul(...).mul(...)` sequences to avoid order mistakes.
 
 ## Summary of Shield Points
 
