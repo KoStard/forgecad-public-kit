@@ -254,11 +254,39 @@ declare function joint(name: string, shape: Shape, pivot: [number, number, numbe
 declare function hull3d(...args: (Shape | [number, number, number])[]): Shape;
 declare function levelSet(sdf: (p: [number, number, number]) => number, bounds: { min: [number, number, number]; max: [number, number, number] }, edgeLength: number, level?: number): Shape;
 
+type ExplodeAxis = 'x' | 'y' | 'z';
+type ExplodeDirection = 'radial' | ExplodeAxis | [number, number, number];
+type ExplodeDirective = {
+  stage?: number;
+  direction?: ExplodeDirection;
+  axisLock?: ExplodeAxis;
+};
+type ExplodeNamedItem = {
+  name: string;
+  shape?: Shape | TrackedShape | ShapeGroup;
+  sketch?: Sketch;
+  color?: string;
+  group?: ExplodeItem[];
+  explode?: ExplodeDirective;
+};
+type ExplodeItem = Shape | Sketch | TrackedShape | ShapeGroup | ExplodeNamedItem;
+
 declare const lib: {
   boltHole(diameter: number, depth: number): Shape;
   counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: number): Shape;
   tube(outerX: number, outerY: number, outerZ: number, wall: number): Shape;
   pipe(height: number, outerRadius: number, wall: number, segments?: number): Shape;
+  explode<T extends ExplodeItem[] | ShapeGroup>(
+    items: T,
+    options?: {
+      amount?: number;
+      stages?: number[];
+      mode?: ExplodeDirection;
+      axisLock?: ExplodeAxis;
+      byName?: Record<string, ExplodeDirective>;
+      byPath?: Record<string, ExplodeDirective>;
+    },
+  ): T;
   hexNut(acrossFlats: number, height: number, holeDia: number): Shape;
   roundedBox(x: number, y: number, z: number, radius: number): Shape;
   bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape;
@@ -289,10 +317,10 @@ type Anchor3D = 'center' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom
 
 // --- Group ---
 /** Group multiple shapes/sketches for joint transforms without merging meshes. Colors preserved. */
-declare function group(...items: (Shape | Sketch | TrackedShape)[]): ShapeGroup;
+declare function group(...items: (Shape | Sketch | TrackedShape | ShapeGroup)[]): ShapeGroup;
 
 declare class ShapeGroup {
-  readonly children: (Shape | Sketch | TrackedShape)[];
+  readonly children: (Shape | Sketch | TrackedShape | ShapeGroup)[];
   translate(x: number, y: number, z: number): ShapeGroup;
   /** Move so combined bounding box min corner is at the given global coordinate */
   moveTo(x: number, y: number, z: number): ShapeGroup;

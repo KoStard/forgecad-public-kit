@@ -274,7 +274,13 @@ export function runScript(
       return !!item && typeof item === 'object' && 'name' in item;
     };
 
-    const flattenGroupChild = (child: Shape | Sketch | TrackedShape, label: string, groupName?: string) => {
+    const flattenGroupChild = (child: Shape | Sketch | TrackedShape | ShapeGroup, label: string, groupName?: string) => {
+      if (child instanceof ShapeGroup) {
+        child.children.forEach((nested, i) => {
+          flattenGroupChild(nested, `${label}.${i + 1}`, groupName);
+        });
+        return;
+      }
       if (child instanceof TrackedShape) {
         pushShape(child.toShape(), label, groupName);
       } else if (child instanceof Shape) {
@@ -293,7 +299,9 @@ export function runScript(
       if (Array.isArray(item.group)) {
         item.group.forEach((child: any, i: number) => {
           const childLabel = `${name}.${i + 1}`;
-          if (child instanceof TrackedShape) {
+          if (child instanceof ShapeGroup) {
+            flattenGroupChild(child, childLabel, name);
+          } else if (child instanceof TrackedShape) {
             pushShape(child.toShape(), childLabel, name);
           } else if (child instanceof Shape) {
             pushShape(child, childLabel, name);
@@ -307,7 +315,7 @@ export function runScript(
       }
 
       if (item.shape instanceof ShapeGroup) {
-        item.shape.children.forEach((child: any, i: number) => flattenGroupChild(child, `${name}.${i + 1}`, grp));
+        item.shape.children.forEach((child: any, i: number) => flattenGroupChild(child, `${name}.${i + 1}`, name));
         return;
       }
       if (item.shape instanceof TrackedShape) {

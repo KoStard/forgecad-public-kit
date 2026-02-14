@@ -8,17 +8,22 @@ import { Shape, Anchor3D, resolveAnchor3D } from './kernel';
 import { Sketch } from './sketch/core';
 import { TrackedShape } from './sketch/topology';
 
-export type GroupChild = Shape | Sketch | TrackedShape;
+export type GroupChild = Shape | Sketch | TrackedShape | ShapeGroup;
 
 export class ShapeGroup {
   constructor(public readonly children: GroupChild[]) {}
 
+  private mapChildren(fn: (child: GroupChild) => GroupChild): ShapeGroup {
+    return new ShapeGroup(this.children.map(fn));
+  }
+
   translate(x: number, y: number, z: number): ShapeGroup {
-    return new ShapeGroup(this.children.map(c => {
+    return this.mapChildren(c => {
+      if (c instanceof ShapeGroup) return c.translate(x, y, z);
       if (c instanceof TrackedShape) return c.translate(x, y, z);
       if (c instanceof Shape) return c.translate(x, y, z);
       return c.translate(x, y);
-    }));
+    });
   }
 
   /** Compute combined bounding box of all 3D children */
@@ -26,6 +31,14 @@ export class ShapeGroup {
     let min = [Infinity, Infinity, Infinity];
     let max = [-Infinity, -Infinity, -Infinity];
     for (const c of this.children) {
+      if (c instanceof ShapeGroup) {
+        const bb = c._bbox();
+        for (let i = 0; i < 3; i++) {
+          if (bb.min[i] < min[i]) min[i] = bb.min[i];
+          if (bb.max[i] > max[i]) max[i] = bb.max[i];
+        }
+        continue;
+      }
       const s = c instanceof TrackedShape ? c.toShape() : c instanceof Shape ? c : null;
       if (!s) continue;
       const bb = s.boundingBox();
@@ -99,39 +112,43 @@ export class ShapeGroup {
   }
 
   rotate(x: number, y: number, z: number): ShapeGroup {
-    return new ShapeGroup(this.children.map(c => {
+    return this.mapChildren(c => {
+      if (c instanceof ShapeGroup) return c.rotate(x, y, z);
       if (c instanceof TrackedShape) return c.rotate(x, y, z);
       if (c instanceof Shape) return c.rotate(x, y, z);
       return c.rotate(x); // 2D rotation only uses first arg
-    }));
+    });
   }
 
   scale(v: number | [number, number, number]): ShapeGroup {
-    return new ShapeGroup(this.children.map(c => {
+    return this.mapChildren(c => {
+      if (c instanceof ShapeGroup) return c.scale(v);
       if (c instanceof TrackedShape) return new TrackedShape(
         c.toShape().scale(v), c.topology, 0, true,
       );
       if (c instanceof Shape) return c.scale(v);
       return c.scale(typeof v === 'number' ? v : [v[0], v[1]]);
-    }));
+    });
   }
 
   mirror(normal: [number, number, number]): ShapeGroup {
-    return new ShapeGroup(this.children.map(c => {
+    return this.mapChildren(c => {
+      if (c instanceof ShapeGroup) return c.mirror(normal);
       if (c instanceof TrackedShape) return new TrackedShape(
         c.toShape().mirror(normal), c.topology, 0, true,
       );
       if (c instanceof Shape) return c.mirror(normal);
       return c.mirror([normal[0], normal[1]]);
-    }));
+    });
   }
 
   color(hex: string): ShapeGroup {
-    return new ShapeGroup(this.children.map(c => {
+    return this.mapChildren(c => {
+      if (c instanceof ShapeGroup) return c.color(hex);
       if (c instanceof TrackedShape) return c.color(hex);
       if (c instanceof Shape) return c.color(hex);
       return c.color(hex);
-    }));
+    });
   }
 }
 

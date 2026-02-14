@@ -1028,6 +1028,50 @@ L-shaped mounting bracket with optional holes.
 ### `lib.holePattern(rows, cols, spacingX, spacingY, holeDia, depth)`
 Grid of cylindrical holes.
 
+### `lib.explode(items, options?)`
+Apply deterministic exploded-view offsets to assembly structures while preserving names, colors, and nesting.
+
+Works with:
+- arrays of shapes/sketches/named items
+- named nested `{ name, group: [...] }` assembly trees
+- `ShapeGroup` outputs (including nested `group(...)`)
+
+**Parameters:**
+- `items` (`ExplodeItem[] | ShapeGroup`) - Assembly structure to explode
+- `options` (object, optional):
+  - `amount` (number) - Base explode distance. Default: `10`
+  - `stages` (number[]) - Per-depth multipliers (`depth 1 = stages[0]`). If depth exceeds list, last value is reused
+  - `mode` (`'radial' | 'x' | 'y' | 'z' | [x, y, z]`) - Default direction mode. Default: `'radial'`
+  - `axisLock` (`'x' | 'y' | 'z'`) - Optional global axis lock
+  - `byName` (`Record<string, { stage?, direction?, axisLock? }>`)- Per-part/group overrides by item name
+  - `byPath` (`Record<string, { stage?, direction?, axisLock? }>`)- Low-level overrides by traversal path
+
+Named items may also include an inline override:
+`{ name: "Bolt A", shape: bolt, explode: { stage: 1.5, direction: [1, 0, 0] } }`
+
+**Returns:** Same structure type as input, with translated geometry.
+
+```javascript
+const explodeAmt = param("Explode", 0, { min: 0, max: 40, unit: "mm" });
+
+const assembly = [
+  { name: "Body", shape: box(80, 50, 30, true).color('#6c7a89') },
+  { name: "Drive", group: [
+    { name: "Shaft", shape: cylinder(60, 4, undefined, undefined, true).pointAlong([1, 0, 0]).color('#c7d0d8') },
+    { name: "Rotor", shape: cylinder(20, 12, undefined, undefined, true).color('#8897a8') },
+  ]},
+];
+
+return lib.explode(assembly, {
+  amount: explodeAmt,
+  stages: [0.4, 0.8],
+  mode: 'radial',
+  byName: {
+    "Shaft": { direction: [1, 0, 0], stage: 1.4 },
+  },
+});
+```
+
 ### `lib.pipeRoute(points, radius, options?)`
 Route a pipe through 3D waypoints with smooth torus bends at corners.
 
