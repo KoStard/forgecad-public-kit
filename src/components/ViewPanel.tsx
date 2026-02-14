@@ -63,6 +63,16 @@ export function ViewPanel() {
   const updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
   const setCutPlaneEnabled = useForgeStore((s) => s.setCutPlaneEnabled);
+  const sectionPlaneGuidesEnabled = useForgeStore((s) => s.sectionPlaneGuidesEnabled);
+  const setSectionPlaneGuidesEnabled = useForgeStore((s) => s.setSectionPlaneGuidesEnabled);
+  const sectionPlaneFillEnabled = useForgeStore((s) => s.sectionPlaneFillEnabled);
+  const setSectionPlaneFillEnabled = useForgeStore((s) => s.setSectionPlaneFillEnabled);
+  const sectionPlaneFillOpacity = useForgeStore((s) => s.sectionPlaneFillOpacity);
+  const setSectionPlaneFillOpacity = useForgeStore((s) => s.setSectionPlaneFillOpacity);
+  const sectionPlaneBorderEnabled = useForgeStore((s) => s.sectionPlaneBorderEnabled);
+  const setSectionPlaneBorderEnabled = useForgeStore((s) => s.setSectionPlaneBorderEnabled);
+  const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
+  const setSectionPlaneAxisEnabled = useForgeStore((s) => s.setSectionPlaneAxisEnabled);
   const cutPlanes: CutPlaneDef[] = result?.cutPlanes ?? [];
 
   const objects = result?.objects ?? [];
@@ -317,6 +327,64 @@ export function ViewPanel() {
               </label>
             </div>
           ))}
+          <div style={{ borderTop: '1px solid var(--fc-borderLight)', margin: '8px 0 6px' }} />
+          <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Section Visuals
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
+              <input
+                type="checkbox"
+                checked={sectionPlaneGuidesEnabled}
+                onChange={(e) => setSectionPlaneGuidesEnabled(e.target.checked)}
+              />
+              Show guides
+            </label>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
+              <input
+                type="checkbox"
+                checked={sectionPlaneFillEnabled}
+                onChange={(e) => setSectionPlaneFillEnabled(e.target.checked)}
+                disabled={!sectionPlaneGuidesEnabled}
+              />
+              Fill
+            </label>
+            <span style={{ fontSize: 11, color: 'var(--fc-textDim)', marginLeft: 'auto' }}>Opacity</span>
+            <input
+              type="range"
+              min={0.05}
+              max={0.9}
+              step={0.05}
+              value={sectionPlaneFillOpacity}
+              onChange={(e) => setSectionPlaneFillOpacity(Number(e.target.value))}
+              disabled={!sectionPlaneGuidesEnabled || !sectionPlaneFillEnabled}
+              style={{ flex: 1, maxWidth: 90 }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
+              <input
+                type="checkbox"
+                checked={sectionPlaneBorderEnabled}
+                onChange={(e) => setSectionPlaneBorderEnabled(e.target.checked)}
+                disabled={!sectionPlaneGuidesEnabled}
+              />
+              Border
+            </label>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
+              <input
+                type="checkbox"
+                checked={sectionPlaneAxisEnabled}
+                onChange={(e) => setSectionPlaneAxisEnabled(e.target.checked)}
+                disabled={!sectionPlaneGuidesEnabled}
+              />
+              Normal axis
+            </label>
+          </div>
         </div>
       )}
 

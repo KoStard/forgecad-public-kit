@@ -18,4 +18,9 @@ Design a standard way to visualize active section planes with transparency and c
 ## Status and log
 - 2026-02-14: Requested after testing `examples/robot_hand_2.forge.js`.
 - Temporary manual guide meshes were removed.
-- Next: propose renderer-side implementation options and pick one.
+- 2026-02-14: Implemented renderer-side section guides:
+  - Viewport-only visualization (no scene/model geometry pollution).
+  - Multi-plane support with per-plane color, translucent fill, optional border, and normal-axis cue.
+  - View Panel controls added for guide visibility and style toggles.
+  - Guide size auto-scales from scene bounds and tracks param updates in real time.
+  - API docs updated and focused example added at `examples/api/section-plane-visualization.forge.js`.
