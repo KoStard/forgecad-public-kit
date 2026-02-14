@@ -138,6 +138,121 @@ function ForgeObject({
   );
 }
 
+interface SectionPlaneGuideStyle {
+  showFill: boolean;
+  fillOpacity: number;
+  showBorder: boolean;
+  showAxis: boolean;
+}
+
+const colorFromName = (name: string): string => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 72%, 58%)`;
+};
+
+function SectionPlaneGuide({
+  def,
+  sectionSize,
+  style,
+}: {
+  def: CutPlaneDef;
+  sectionSize: number;
+  style: SectionPlaneGuideStyle;
+}) {
+  const transform = useMemo(() => {
+    const normal = new THREE.Vector3(def.normal[0], def.normal[1], def.normal[2]);
+    if (normal.lengthSq() < 1e-8) return null;
+    normal.normalize();
+
+    const center = normal.clone().multiplyScalar(def.offset);
+    const ref = Math.abs(normal.z) < 0.95 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
+    const tangent = new THREE.Vector3().crossVectors(ref, normal).normalize();
+    if (tangent.lengthSq() < 1e-8) tangent.set(1, 0, 0);
+    const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
+    const quaternion = new THREE.Quaternion().setFromRotationMatrix(
+      new THREE.Matrix4().makeBasis(tangent, bitangent, normal),
+    );
+
+    return { center, quaternion };
+  }, [def.normal, def.offset]);
+
+  const borderGeometry = useMemo(() => {
+    const half = sectionSize / 2;
+    return new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-half, -half, 0),
+      new THREE.Vector3(half, -half, 0),
+      new THREE.Vector3(half, half, 0),
+      new THREE.Vector3(-half, half, 0),
+    ]);
+  }, [sectionSize]);
+
+  const guideColor = useMemo(() => colorFromName(def.name), [def.name]);
+  const axisLength = Math.max(8, sectionSize * 0.2);
+  const axisRadius = Math.max(0.2, sectionSize * 0.0045);
+  const coneRadius = Math.max(0.45, sectionSize * 0.008);
+  const coneHeight = Math.max(1.8, sectionSize * 0.03);
+
+  if (!transform) return null;
+
+  return (
+    <group position={[transform.center.x, transform.center.y, transform.center.z]} quaternion={transform.quaternion}>
+      {style.showFill && (
+        <mesh userData={{ measureHelper: true }} renderOrder={20}>
+          <planeGeometry args={[sectionSize, sectionSize]} />
+          <meshBasicMaterial
+            color={guideColor}
+            transparent
+            opacity={style.fillOpacity}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+      {style.showBorder && (
+        <lineLoop geometry={borderGeometry} renderOrder={21}>
+          <lineBasicMaterial color={guideColor} transparent opacity={0.9} depthTest={false} />
+        </lineLoop>
+      )}
+      {style.showAxis && (
+        <group renderOrder={22}>
+          <mesh userData={{ measureHelper: true }} position={[0, 0, axisLength * 0.5]}>
+            <cylinderGeometry args={[axisRadius, axisRadius, axisLength, 12]} />
+            <meshBasicMaterial color={guideColor} depthTest={false} />
+          </mesh>
+          <mesh userData={{ measureHelper: true }} position={[0, 0, axisLength + coneHeight * 0.5]}>
+            <coneGeometry args={[coneRadius, coneHeight, 14]} />
+            <meshBasicMaterial color={guideColor} depthTest={false} />
+          </mesh>
+        </group>
+      )}
+    </group>
+  );
+}
+
+function SectionPlaneGuides({
+  cutPlanes,
+  sectionSize,
+  style,
+}: {
+  cutPlanes: CutPlaneDef[];
+  sectionSize: number;
+  style: SectionPlaneGuideStyle;
+}) {
+  if (cutPlanes.length === 0 || sectionSize <= 0) return null;
+
+  return (
+    <group>
+      {cutPlanes.map((def) => (
+        <SectionPlaneGuide key={def.name} def={def} sectionSize={sectionSize} style={style} />
+      ))}
+    </group>
+  );
+}
+
 /** Renders a 2D sketch as filled shape + outline on the XY plane */
 const formatConstraintValue = (value: number): string => {
   if (Number.isNaN(value)) return '';
@@ -1009,18 +1124,63 @@ export function Viewport() {
   const dimensions = result?.dimensions ?? [];
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
+  const sectionPlaneGuidesEnabled = useForgeStore((s) => s.sectionPlaneGuidesEnabled);
+  const sectionPlaneFillEnabled = useForgeStore((s) => s.sectionPlaneFillEnabled);
+  const sectionPlaneFillOpacity = useForgeStore((s) => s.sectionPlaneFillOpacity);
+  const sectionPlaneBorderEnabled = useForgeStore((s) => s.sectionPlaneBorderEnabled);
+  const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
   const cutPlaneDefs: CutPlaneDef[] = result?.cutPlanes ?? [];
 
-  const activeClippingPlanes = useMemo(() => {
+  const activeCutPlaneDefs = useMemo(() => {
     return cutPlaneDefs
       .filter((cp) => cutPlaneEnabled[cp.name])
-      .map((cp) => {
-        const n = new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).normalize();
-        // THREE.Plane convention: clips geometry on the positive side of the plane.
-        // We negate the normal so that geometry on the normal side is removed.
-        return new THREE.Plane(n.negate(), cp.offset);
-      });
+      .filter((cp) => new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).lengthSq() > 1e-8);
   }, [cutPlaneDefs, cutPlaneEnabled]);
+
+  const activeClippingPlanes = useMemo(() => {
+    return activeCutPlaneDefs.map((cp) => {
+      const n = new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).normalize();
+      // THREE.Plane convention: clips geometry on the positive side of the plane.
+      // We negate the normal so that geometry on the normal side is removed.
+      return new THREE.Plane(n.negate(), cp.offset);
+    });
+  }, [activeCutPlaneDefs]);
+
+  const sectionGuideSize = useMemo(() => {
+    const bounds = new THREE.Box3();
+    let hasBounds = false;
+
+    objects.forEach((obj) => {
+      if (obj.shape) {
+        try {
+          const bb = obj.shape.boundingBox();
+          bounds.expandByPoint(new THREE.Vector3(bb.min[0], bb.min[1], bb.min[2]));
+          bounds.expandByPoint(new THREE.Vector3(bb.max[0], bb.max[1], bb.max[2]));
+          hasBounds = true;
+        } catch {
+          // Ignore bad shape bounds from partial execution failures.
+        }
+        return;
+      }
+      if (obj.sketch) {
+        try {
+          const bb = obj.sketch.bounds();
+          bounds.expandByPoint(new THREE.Vector3(bb.min[0], bb.min[1], 0));
+          bounds.expandByPoint(new THREE.Vector3(bb.max[0], bb.max[1], 0));
+          hasBounds = true;
+        } catch {
+          // Ignore bad sketch bounds from partial execution failures.
+        }
+      }
+    });
+
+    if (!hasBounds) return Math.max(60, gridSize * 8);
+
+    const size = new THREE.Vector3();
+    bounds.getSize(size);
+    const diagonal = Math.max(1, size.length());
+    return Math.max(60, diagonal * 1.35, gridSize * 6);
+  }, [gridSize, objects]);
 
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
@@ -1100,6 +1260,18 @@ export function Viewport() {
         <hemisphereLight args={['#b1e1ff', '#444444', 0.4]} />
 
         <ClippingManager active={activeClippingPlanes.length > 0} />
+        {sectionPlaneGuidesEnabled && activeCutPlaneDefs.length > 0 && (
+          <SectionPlaneGuides
+            cutPlanes={activeCutPlaneDefs}
+            sectionSize={sectionGuideSize}
+            style={{
+              showFill: sectionPlaneFillEnabled,
+              fillOpacity: sectionPlaneFillOpacity,
+              showBorder: sectionPlaneBorderEnabled,
+              showAxis: sectionPlaneAxisEnabled,
+            }}
+          />
+        )}
 
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };

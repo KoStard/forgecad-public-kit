@@ -167,6 +167,16 @@ interface ForgeStore {
 
   cutPlaneEnabled: Record<string, boolean>;
   setCutPlaneEnabled: (name: string, enabled: boolean) => void;
+  sectionPlaneGuidesEnabled: boolean;
+  sectionPlaneFillEnabled: boolean;
+  sectionPlaneFillOpacity: number;
+  sectionPlaneBorderEnabled: boolean;
+  sectionPlaneAxisEnabled: boolean;
+  setSectionPlaneGuidesEnabled: (enabled: boolean) => void;
+  setSectionPlaneFillEnabled: (enabled: boolean) => void;
+  setSectionPlaneFillOpacity: (opacity: number) => void;
+  setSectionPlaneBorderEnabled: (enabled: boolean) => void;
+  setSectionPlaneAxisEnabled: (enabled: boolean) => void;
 
   newProject: () => void;
   saveFile: () => Promise<void>;
@@ -219,6 +229,17 @@ const syncObjectSettings = (
     ? null
     : (selectedObjectId && ids.has(selectedObjectId) ? selectedObjectId : objects[0].id);
   return { settings: nextSettings, selectedObjectId: nextSelected };
+};
+
+const syncCutPlaneEnabled = (
+  cutPlanes: { name: string }[],
+  prevEnabled: Record<string, boolean>,
+): Record<string, boolean> => {
+  const next: Record<string, boolean> = {};
+  cutPlanes.forEach((cp) => {
+    next[cp.name] = prevEnabled[cp.name] ?? true;
+  });
+  return next;
 };
 
 export const useForgeStore = create<ForgeStore>((set, get) => ({
@@ -390,7 +411,14 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     setParamOverrides(paramOverrides);
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
-    set({ result: runResult, consoleLogs: runResult.logs, params: runResult.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
+    set({
+      result: runResult,
+      consoleLogs: runResult.logs,
+      params: runResult.params,
+      objectSettings: synced.settings,
+      selectedObjectId: synced.selectedObjectId,
+      cutPlaneEnabled: syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled),
+    });
   },
 
   setParam: (name, value) => {
@@ -402,7 +430,14 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (!code) return;
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
-    set({ result: runResult, consoleLogs: runResult.logs, params: runResult.params, objectSettings: synced.settings, selectedObjectId: synced.selectedObjectId });
+    set({
+      result: runResult,
+      consoleLogs: runResult.logs,
+      params: runResult.params,
+      objectSettings: synced.settings,
+      selectedObjectId: synced.selectedObjectId,
+      cutPlaneEnabled: syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled),
+    });
   },
 
   renderMode: 'overlay',
@@ -467,6 +502,16 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   cutPlaneEnabled: {},
   setCutPlaneEnabled: (name, enabled) => set((s) => ({ cutPlaneEnabled: { ...s.cutPlaneEnabled, [name]: enabled } })),
+  sectionPlaneGuidesEnabled: true,
+  sectionPlaneFillEnabled: true,
+  sectionPlaneFillOpacity: 0.2,
+  sectionPlaneBorderEnabled: true,
+  sectionPlaneAxisEnabled: true,
+  setSectionPlaneGuidesEnabled: (enabled) => set({ sectionPlaneGuidesEnabled: enabled }),
+  setSectionPlaneFillEnabled: (enabled) => set({ sectionPlaneFillEnabled: enabled }),
+  setSectionPlaneFillOpacity: (opacity) => set({ sectionPlaneFillOpacity: Math.max(0, Math.min(1, opacity)) }),
+  setSectionPlaneBorderEnabled: (enabled) => set({ sectionPlaneBorderEnabled: enabled }),
+  setSectionPlaneAxisEnabled: (enabled) => set({ sectionPlaneAxisEnabled: enabled }),
 
   newProject: () => {
     set({

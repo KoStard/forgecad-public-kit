@@ -146,12 +146,19 @@ cutPlane("Horizontal", [0, 0, 1], cutZ);
 - Multiple planes can be defined and toggled independently
 - Planes are per-script — they reset on each execution
 - Toggle state persists in the UI across parameter changes
+- Active planes can be visualized with built-in viewport guides (no model geometry required)
+  - `Show guides` toggles renderer-side plane visuals
+  - `Fill` + `Opacity` controls translucent section fill
+  - `Border` toggles plane outline
+  - `Normal axis` shows orientation direction (the clipped side points along the plane normal)
 
 **Use cases:**
 - Inspect internal features (holes, cavities, wall thickness)
 - Verify alignment of hidden parts
 - Create section views for documentation
 - Debug boolean operation results
+
+See `examples/api/section-plane-visualization.forge.js` for a focused multi-plane setup.
 
 ## 3D Primitives
 

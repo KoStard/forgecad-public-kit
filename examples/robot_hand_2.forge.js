@@ -56,32 +56,6 @@ function explodeShape(shape, v, stage) {
   return shape.translate(v[0] * k, v[1] * k, v[2] * k);
 }
 
-function applySectionCuts(shape, sectionX, sectionZ, bounds) {
-  if (sectionEnabled === 0) {
-    return shape;
-  }
-  const xSpan = Math.max(200, bounds.max[0] - bounds.min[0] + 240);
-  const ySpan = Math.max(200, bounds.max[1] - bounds.min[1] + 240);
-  const zSpan = Math.max(200, bounds.max[2] - bounds.min[2] + 240);
-  const yCenter = (bounds.min[1] + bounds.max[1]) * 0.5;
-  const zCenter = (bounds.min[2] + bounds.max[2]) * 0.5;
-  const xCenter = (bounds.min[0] + bounds.max[0]) * 0.5;
-
-  const cutX = box(xSpan * 2, ySpan, zSpan, true).translate(sectionX + xSpan, yCenter, zCenter);
-  const cutZ = box(xSpan, ySpan, zSpan * 2, true).translate(xCenter, yCenter, sectionZ + zSpan);
-  return shape.subtract(cutX).subtract(cutZ);
-}
-
-function applySectionToItem(item, sectionX, sectionZ, bounds) {
-  if (item.shape) {
-    return { ...item, shape: applySectionCuts(item.shape, sectionX, sectionZ, bounds) };
-  }
-  if (item.group) {
-    return { ...item, group: item.group.map((entry) => applySectionToItem(entry, sectionX, sectionZ, bounds)) };
-  }
-  return item;
-}
-
 function mergeBounds(a, b) {
   return {
     min: [
@@ -600,9 +574,10 @@ const sectionZ = param("Section Z", sectionDefaultZ, {
   unit: "mm",
 });
 
-// UI section toggles (visual clip planes)
-cutPlane("Internal X", [1, 0, 0], sectionX);
-cutPlane("Internal Z", [0, 0, 1], sectionZ);
+// Renderer-side section planes (no model subtraction / no geometry pollution).
+if (sectionEnabled === 1) {
+  cutPlane("Internal X", [1, 0, 0], sectionX);
+  cutPlane("Internal Z", [0, 0, 1], sectionZ);
+}
 
-const cutScene = scene.map((item) => applySectionToItem(item, sectionX, sectionZ, sceneBounds));
-return cutScene;
+return scene;
