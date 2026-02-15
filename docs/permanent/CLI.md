@@ -83,6 +83,7 @@ npm run report -- examples/cup.forge.js [output.pdf] --dim-angle-tol 18
 Generates a searchable-text PDF report with multiple projected drawing views:
 - Combined model page (front/right/top/isometric)
 - Disassembled component pages (same view set per returned component)
+- Auto-generated detail continuation pages for elongated/high-detail views (separate pages, not overlayed)
 - `dim()` annotations included per view only when their axis aligns with that view's projection plane axes
 
 Component dimension ownership for disassembled pages:

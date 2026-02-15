@@ -42,18 +42,8 @@ type ColorRgb = [number, number, number];
 interface ProjectedEdge {
   modelA: Vec2;
   modelB: Vec2;
-  screenA: Vec2;
-  screenB: Vec2;
   mid: Vec2;
   lenModel: number;
-}
-
-interface DetailInset {
-  label: string;
-  source: Bounds2;
-  sourceScreen: CellRect;
-  box: CellRect;
-  edges: ProjectedEdge[];
 }
 
 interface ReportTriangle {
@@ -100,12 +90,25 @@ interface CellRect {
   h: number;
 }
 
-interface PageSpec {
+interface StandardPageSpec {
+  kind: 'standard';
   title: string;
   subtitle: string;
   objects: ReportObject[];
   dimensions: DimensionDef[];
 }
+
+interface DetailPageSpec {
+  kind: 'detail';
+  title: string;
+  subtitle: string;
+  objects: ReportObject[];
+  dimensions: DimensionDef[];
+  view: ViewFrame;
+  source: Bounds2;
+}
+
+type PageSpec = StandardPageSpec | DetailPageSpec;
 
 const DEFAULT_VIEWS: ReportViewId[] = ['front', 'right', 'top', 'iso'];
 const DEFAULT_COLOR_HEX = '#5b9bd5';
@@ -552,12 +555,39 @@ function makeMapperForRect(bounds: Bounds2, rect: CellRect, padding = CELL_PADDI
   };
 }
 
-function buildDetailInsets(
+interface DetailRegion {
+  label: string;
+  source: Bounds2;
+  edges: ProjectedEdge[];
+}
+
+function collectProjectedEdges(
+  frame: ViewFrame,
+  center: Vec3,
+  objects: ReportObject[],
+): ProjectedEdge[] {
+  const out: ProjectedEdge[] = [];
+  objects.forEach((obj) => {
+    obj.edges.forEach((edge) => {
+      const a = projectPoint(edge.a, center, frame);
+      const b = projectPoint(edge.b, center, frame);
+      const modelA: Vec2 = [a.x, a.y];
+      const modelB: Vec2 = [b.x, b.y];
+      out.push({
+        modelA,
+        modelB,
+        mid: [(modelA[0] + modelB[0]) * 0.5, (modelA[1] + modelB[1]) * 0.5],
+        lenModel: Math.hypot(modelB[0] - modelA[0], modelB[1] - modelA[1]),
+      });
+    });
+  });
+  return out;
+}
+
+function selectDetailRegions(
   projectedEdges: ProjectedEdge[],
   modelBounds: Bounds2,
-  cell: CellRect,
-  mapMain: (p: Vec2) => Vec2,
-): DetailInset[] {
+): DetailRegion[] {
   const spanX = modelBounds.maxX - modelBounds.minX;
   const spanY = modelBounds.maxY - modelBounds.minY;
   const majorIsX = spanX >= spanY;
@@ -567,7 +597,6 @@ function buildDetailInsets(
 
   if (aspect < 2.8) return [];
   if (projectedEdges.length < 90 || projectedEdges.length > 14000) return [];
-  if (cell.w < 180 || cell.h < 130) return [];
 
   const gridMajor = 14;
   const gridMinor = 6;
@@ -616,15 +645,9 @@ function buildDetailInsets(
   }
   if (picked.length === 0) return [];
 
-  const insetW = clamp(cell.w * 0.34, 120, cell.w * 0.46);
-  const insetH = clamp(cell.h * 0.31, 86, cell.h * 0.44);
-  const insetGap = 8;
-  const maxInsetsByHeight = Math.max(0, Math.floor((cell.h - 12 + insetGap) / (insetH + insetGap)));
-  const maxInsets = Math.max(1, Math.min(2, maxInsetsByHeight));
-
-  const insets: DetailInset[] = [];
+  const regions: DetailRegion[] = [];
   const detailLabels = ['Detail A', 'Detail B'];
-  for (let i = 0; i < Math.min(picked.length, maxInsets); i += 1) {
+  for (let i = 0; i < Math.min(picked.length, 2); i += 1) {
     const pick = picked[i];
     const u = (pick.major + 0.5) / gridMajor;
     const v = (pick.minor + 0.5) / gridMinor;
@@ -648,32 +671,14 @@ function buildDetailInsets(
     ));
     if (insetEdges.length < 18) continue;
 
-    const box: CellRect = {
-      w: insetW,
-      h: insetH,
-      x: cell.x + cell.w - insetW - 6,
-      y: cell.y + cell.h - insetH - 6 - i * (insetH + insetGap),
-    };
-
-    const c0 = mapMain([source.minX, source.minY]);
-    const c1 = mapMain([source.maxX, source.maxY]);
-    const sourceScreen: CellRect = {
-      x: Math.min(c0[0], c1[0]),
-      y: Math.min(c0[1], c1[1]),
-      w: Math.abs(c1[0] - c0[0]),
-      h: Math.abs(c1[1] - c0[1]),
-    };
-
-    insets.push({
+    regions.push({
       label: detailLabels[i] ?? `Detail ${i + 1}`,
       source,
-      sourceScreen,
-      box,
       edges: insetEdges,
     });
   }
 
-  return insets;
+  return regions;
 }
 
 type LabelBox = { minX: number; minY: number; maxX: number; maxY: number };
@@ -1002,6 +1007,12 @@ function drawDimension(
   };
 }
 
+interface RenderViewCellOptions {
+  boundsOverride?: Bounds2;
+  drawFrame?: boolean;
+  viewLabelOverride?: string;
+}
+
 function renderViewCell(
   cell: CellRect,
   frame: ViewFrame,
@@ -1009,11 +1020,12 @@ function renderViewCell(
   objects: ReportObject[],
   dimensions: DimensionDef[],
   dimDirectionToleranceDeg: number,
+  options: RenderViewCellOptions = {},
 ): string {
   const viewDims = dimensions.filter((d) => isDimensionVisibleInView(d, frame, dimDirectionToleranceDeg));
   const baseBounds = projectedBounds(center, frame, objects, viewDims);
   const zoomOut = 1 + (viewDims.length > 0 ? Math.min(0.24, 0.08 + Math.sqrt(viewDims.length) * 0.03) : 0);
-  const bounds = scaleBounds2(baseBounds, zoomOut);
+  const bounds = options.boundsOverride ?? scaleBounds2(baseBounds, zoomOut);
   const mapper = makeCellMapper(bounds, cell);
 
   const cmd: string[] = [];
@@ -1062,40 +1074,13 @@ function renderViewCell(
   });
   cmd.push('Q\n');
 
-  const projectedEdges: ProjectedEdge[] = [];
-  objects.forEach((obj) => {
-    obj.edges.forEach((edge) => {
-      const a = projectPoint(edge.a, center, frame);
-      const b = projectPoint(edge.b, center, frame);
-      const modelA: Vec2 = [a.x, a.y];
-      const modelB: Vec2 = [b.x, b.y];
-      const screenA = mapper.map(modelA);
-      const screenB = mapper.map(modelB);
-      projectedEdges.push({
-        modelA,
-        modelB,
-        screenA,
-        screenB,
-        mid: [(modelA[0] + modelB[0]) * 0.5, (modelA[1] + modelB[1]) * 0.5],
-        lenModel: Math.hypot(modelB[0] - modelA[0], modelB[1] - modelA[1]),
-      });
-    });
-  });
+  const projectedEdges = collectProjectedEdges(frame, center, objects);
 
   cmd.push(commandSetStroke([0.1, 0.1, 0.12]));
   cmd.push('0.45 w\n');
   projectedEdges.forEach((edge) => {
-    cmd.push(commandLine(edge.screenA, edge.screenB));
+    cmd.push(commandLine(mapper.map(edge.modelA), mapper.map(edge.modelB)));
   });
-
-  const detailInsets = buildDetailInsets(projectedEdges, bounds, cell, mapper.map);
-  if (detailInsets.length > 0) {
-    cmd.push(commandSetStroke([0.83, 0.22, 0.22]));
-    cmd.push('0.6 w\n');
-    detailInsets.forEach((inset) => {
-      cmd.push(`${formatNumber(inset.sourceScreen.x)} ${formatNumber(inset.sourceScreen.y)} ${formatNumber(inset.sourceScreen.w)} ${formatNumber(inset.sourceScreen.h)} re S\n`);
-    });
-  }
 
   const labelPlans: DimensionLabelPlan[] = [];
   const blockedLabelSegments: Segment2[] = [];
@@ -1108,13 +1093,7 @@ function renderViewCell(
     blockedLabelSegments.push(...result.lineSegments);
   });
 
-  const insetAvoidBoxes: LabelBox[] = detailInsets.map((inset) => ({
-    minX: inset.box.x,
-    minY: inset.box.y,
-    maxX: inset.box.x + inset.box.w,
-    maxY: inset.box.y + inset.box.h,
-  }));
-  const placedLabels = layoutDimensionLabels(labelPlans, cell, blockedLabelSegments, insetAvoidBoxes);
+  const placedLabels = layoutDimensionLabels(labelPlans, cell, blockedLabelSegments);
   placedLabels.forEach(({ plan, pos, box }) => {
     const leaderStart = plan.anchor;
     const leaderEnd = closestPointOnBox(box, leaderStart);
@@ -1128,61 +1107,15 @@ function renderViewCell(
     cmd.push(commandText(plan.label, pos[0] + 2, pos[1] - 3, plan.fontSize));
   });
 
-  detailInsets.forEach((inset, i) => {
-    const sourceCenter: Vec2 = [
-      inset.sourceScreen.x + inset.sourceScreen.w * 0.5,
-      inset.sourceScreen.y + inset.sourceScreen.h * 0.5,
-    ];
-    const insetCenter: Vec2 = [
-      inset.box.x + inset.box.w * 0.5,
-      inset.box.y + inset.box.h * 0.5,
-    ];
-
-    cmd.push(commandSetStroke([0.7, 0.18, 0.18]));
-    cmd.push('0.45 w\n');
-    cmd.push(commandLine(sourceCenter, insetCenter));
-
-    cmd.push(commandSetFill([0.98, 0.98, 0.985]));
-    cmd.push(`${formatNumber(inset.box.x)} ${formatNumber(inset.box.y)} ${formatNumber(inset.box.w)} ${formatNumber(inset.box.h)} re f\n`);
-    cmd.push(commandSetStroke([0.55, 0.55, 0.58]));
-    cmd.push('0.7 w\n');
-    cmd.push(`${formatNumber(inset.box.x)} ${formatNumber(inset.box.y)} ${formatNumber(inset.box.w)} ${formatNumber(inset.box.h)} re S\n`);
-    cmd.push(commandSetFill([0.18, 0.18, 0.2]));
-    cmd.push(commandText(inset.label, inset.box.x + 6, inset.box.y + inset.box.h - 12, 8));
-
-    const inner: CellRect = {
-      x: inset.box.x + 5,
-      y: inset.box.y + 4,
-      w: inset.box.w - 10,
-      h: inset.box.h - 20,
-    };
-    const insetMapper = makeMapperForRect(inset.source, inner, 5);
-    cmd.push('q\n');
-    cmd.push(`${formatNumber(inner.x)} ${formatNumber(inner.y)} ${formatNumber(inner.w)} ${formatNumber(inner.h)} re W n\n`);
-    cmd.push(commandSetStroke([0.08, 0.08, 0.1]));
-    cmd.push('0.52 w\n');
-    const maxInsetEdges = 1500;
-    const step = inset.edges.length > maxInsetEdges ? Math.ceil(inset.edges.length / maxInsetEdges) : 1;
-    for (let e = 0; e < inset.edges.length; e += step) {
-      const edge = inset.edges[e];
-      cmd.push(commandLine(insetMapper.map(edge.modelA), insetMapper.map(edge.modelB)));
-    }
-    cmd.push('Q\n');
-
-    cmd.push(commandSetStroke([0.83, 0.22, 0.22]));
-    cmd.push('0.55 w\n');
-    cmd.push(`${formatNumber(inner.x)} ${formatNumber(inner.y)} ${formatNumber(inner.w)} ${formatNumber(inner.h)} re S\n`);
-    cmd.push(commandSetFill([0.28, 0.28, 0.3]));
-    cmd.push(commandText(`x${(inset.box.w / Math.max(1, inset.sourceScreen.w)).toFixed(1)}`, inset.box.x + inset.box.w - 26, inset.box.y + inset.box.h - 12, 7));
-  });
-
   cmd.push('Q\n');
 
-  cmd.push(commandSetStroke([0.72, 0.72, 0.76]));
-  cmd.push('0.7 w\n');
-  cmd.push(`${formatNumber(cell.x)} ${formatNumber(cell.y)} ${formatNumber(cell.w)} ${formatNumber(cell.h)} re S\n`);
-  cmd.push(commandSetFill([0.2, 0.2, 0.22]));
-  cmd.push(commandText(frame.label, cell.x + 6, cell.y + cell.h - 16, 10));
+  if (options.drawFrame !== false) {
+    cmd.push(commandSetStroke([0.72, 0.72, 0.76]));
+    cmd.push('0.7 w\n');
+    cmd.push(`${formatNumber(cell.x)} ${formatNumber(cell.y)} ${formatNumber(cell.w)} ${formatNumber(cell.h)} re S\n`);
+    cmd.push(commandSetFill([0.2, 0.2, 0.22]));
+    cmd.push(commandText(options.viewLabelOverride ?? frame.label, cell.x + 6, cell.y + cell.h - 16, 10));
+  }
 
   return cmd.join('');
 }
@@ -1199,10 +1132,32 @@ function buildPageContent(
   cmd.push(commandSetFill([0.4, 0.4, 0.44]));
   cmd.push(commandText(page.subtitle, PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN - 14, 9));
 
-  const cells = buildGridCells(views.length);
   const merged = mergeBounds3(page.objects.map((o) => o.bbox));
   const center = merged ? bboxCenter(merged) : [0, 0, 0] as Vec3;
 
+  if (page.kind === 'detail') {
+    const cell: CellRect = {
+      x: PAGE_MARGIN,
+      y: PAGE_MARGIN,
+      w: PAGE_WIDTH - PAGE_MARGIN * 2,
+      h: PAGE_HEIGHT - PAGE_MARGIN * 2 - HEADER_HEIGHT,
+    };
+    cmd.push(renderViewCell(
+      cell,
+      page.view,
+      center,
+      page.objects,
+      page.dimensions,
+      dimDirectionToleranceDeg,
+      {
+        boundsOverride: page.source,
+        viewLabelOverride: `${page.view.label} - Zoom`,
+      },
+    ));
+    return cmd.join('');
+  }
+
+  const cells = buildGridCells(views.length);
   views.forEach((view, i) => {
     const cell = cells[i];
     if (!cell) return;
@@ -1210,6 +1165,73 @@ function buildPageContent(
   });
 
   return cmd.join('');
+}
+
+function pointInBounds2(p: Vec2, b: Bounds2): boolean {
+  return p[0] >= b.minX && p[0] <= b.maxX && p[1] >= b.minY && p[1] <= b.maxY;
+}
+
+function segmentIntersectsBounds2(a: Vec2, b: Vec2, bounds: Bounds2): boolean {
+  if (pointInBounds2(a, bounds) || pointInBounds2(b, bounds)) return true;
+  const corners: Vec2[] = [
+    [bounds.minX, bounds.minY],
+    [bounds.maxX, bounds.minY],
+    [bounds.maxX, bounds.maxY],
+    [bounds.minX, bounds.maxY],
+  ];
+  const edges: Segment2[] = [
+    { a: corners[0], b: corners[1] },
+    { a: corners[1], b: corners[2] },
+    { a: corners[2], b: corners[3] },
+    { a: corners[3], b: corners[0] },
+  ];
+  return edges.some((edge) => segmentsIntersect2(a, b, edge.a, edge.b));
+}
+
+function dimensionTouchesBounds(
+  dim: DimensionDef,
+  frame: ViewFrame,
+  center: Vec3,
+  bounds: Bounds2,
+): boolean {
+  const p0 = projectPoint(dim.from, center, frame);
+  const p1 = projectPoint(dim.to, center, frame);
+  return segmentIntersectsBounds2([p0.x, p0.y], [p1.x, p1.y], bounds);
+}
+
+function collectDetailPagesFor(
+  page: StandardPageSpec,
+  views: ViewFrame[],
+  dimDirectionToleranceDeg: number,
+): DetailPageSpec[] {
+  const out: DetailPageSpec[] = [];
+  const merged = mergeBounds3(page.objects.map((o) => o.bbox));
+  const center = merged ? bboxCenter(merged) : [0, 0, 0] as Vec3;
+
+  views.forEach((view) => {
+    const viewDims = page.dimensions.filter((d) => isDimensionVisibleInView(d, view, dimDirectionToleranceDeg));
+    const baseBounds = projectedBounds(center, view, page.objects, viewDims);
+    const zoomOut = 1 + (viewDims.length > 0 ? Math.min(0.24, 0.08 + Math.sqrt(viewDims.length) * 0.03) : 0);
+    const drawBounds = scaleBounds2(baseBounds, zoomOut);
+    const regions = selectDetailRegions(collectProjectedEdges(view, center, page.objects), drawBounds);
+    regions.forEach((region) => {
+      const dims = page.dimensions.filter((d) => (
+        isDimensionVisibleInView(d, view, dimDirectionToleranceDeg)
+        && dimensionTouchesBounds(d, view, center, region.source)
+      ));
+      out.push({
+        kind: 'detail',
+        title: `${page.title} - ${view.label} ${region.label}`,
+        subtitle: 'Detail continuation page',
+        objects: page.objects,
+        dimensions: dims,
+        view,
+        source: scaleBounds2(region.source, 1.08),
+      });
+    });
+  });
+
+  return out;
 }
 
 function byteLength(text: string): number {
@@ -1267,11 +1289,14 @@ function buildPages(
   views: ViewFrame[],
   title: string,
   includeDisassembled: boolean,
+  dimDirectionToleranceDeg: number,
 ): PageSpec[] {
   const pages: PageSpec[] = [];
+  const basePages: StandardPageSpec[] = [];
   const generated = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-  pages.push({
+  basePages.push({
+    kind: 'standard',
     title: `${title} - Combined`,
     subtitle: `Combined model views | ${objects.length} components | ${generated} UTC`,
     objects,
@@ -1282,7 +1307,8 @@ function buildPages(
     const owners = mapDimensionsToOwners(dimensions, objects);
     objects.forEach((obj) => {
       const dims = dimensions.filter((d) => (owners.get(d.id) || []).includes(obj.id));
-      pages.push({
+      basePages.push({
+        kind: 'standard',
         title: `${title} - Component`,
         subtitle: `${obj.name}${obj.groupName ? ` (group: ${obj.groupName})` : ''} | ${dims.length} associated dimensions`,
         objects: [obj],
@@ -1294,6 +1320,11 @@ function buildPages(
   if (views.length === 0) {
     throw new Error('Report requires at least one view');
   }
+
+  basePages.forEach((base) => {
+    pages.push(base);
+    pages.push(...collectDetailPagesFor(base, views, dimDirectionToleranceDeg));
+  });
 
   return pages;
 }
@@ -1315,7 +1346,7 @@ export function generateReportPdf(
   const includeDisassembled = options.includeDisassembled !== false;
   const dimDirectionToleranceDeg = normalizeToleranceDeg(options.dimensionDirectionToleranceDeg);
 
-  const pages = buildPages(reportObjects, dimensions, views, title, includeDisassembled);
+  const pages = buildPages(reportObjects, dimensions, views, title, includeDisassembled, dimDirectionToleranceDeg);
 
   const pdf = new PdfBuilder();
 

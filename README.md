@@ -89,6 +89,7 @@ npm run report -- path/to/file.forge.js [output.pdf] --dim-angle-tol 18
 ```
 
 The report includes combined multi-angle views and per-component disassembled pages, with searchable text labels for dimensions.
+For elongated or dense edge-detail parts, the report automatically adds separate detail continuation pages with zoomed views.
 
 ## How It Works
 
