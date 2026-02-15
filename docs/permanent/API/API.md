@@ -1026,32 +1026,37 @@ ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.j
 - `*.sketch.js` — 2D sketch file, must return a `Sketch`
 - `*.forge.js` — 3D part file, must return a `Shape`
 
-### `˝(fileName)`
+### `importSketch(fileName, paramOverrides?)`
 Executes another file and returns its result as a `Sketch`. The target file must return a `Sketch`.
 
 **Parameters:**
 - `fileName` (string) — Name of the file to import (e.g. `"profile.sketch.js"`)
+- `paramOverrides` (optional object) — Import-time parameter overrides by param name
 
 **Returns:** `Sketch`
 
 ```javascript
 // In a .forge.js file:
-const profile = importSketch("bracket-profile.sketch.js");
+const profile = importSketch("bracket-profile.sketch.js", {
+  "Width": 42,
+  "Height": 18,
+});
 return profile.extrude(50);
 ```
 
-### `importPart(fileName)`
+### `importPart(fileName, paramOverrides?)`
 Executes another file and returns its result as a `Shape`. The target file must return a `Shape`.
 
 **Parameters:**
 - `fileName` (string) — Name of the file to import (e.g. `"bracket.forge.js"`)
+- `paramOverrides` (optional object) — Import-time parameter overrides by param name
 
 **Returns:** `Shape`
 
 ```javascript
 // Assembly: import parts and position them
-const bracket = importPart("bracket.forge.js");
-const bracket2 = importPart("bracket.forge.js")
+const bracket = importPart("bracket.forge.js", { "Thickness": 4 });
+const bracket2 = importPart("bracket.forge.js", { "Thickness": 8 })
   .translate(100, 0, 0)
   .rotate(0, 0, 180);
 
@@ -1060,7 +1065,9 @@ return union(bracket, bracket2);
 
 ### Import Rules
 - Circular imports are detected and throw an error
-- Imported files execute with their own `param()` calls (parameters appear in the UI when that file is active)
+- Imported files can be instantiated multiple times
+- `paramOverrides` only affects that import call (other imports are independent)
+- Params supplied through `paramOverrides` are treated as fixed arguments for that import call
 - The returned `Shape` or `Sketch` is fully chainable — use `.translate()`, `.rotate()`, `.subtract()`, etc.
 
 ### Typical Project Structure

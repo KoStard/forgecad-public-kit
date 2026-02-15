@@ -55,7 +55,7 @@ import {
   getCollectedDimensions,
   type DimensionDef,
 } from './sketch';
-import { param, resetParams, getCollectedParams, setParamOverrides, type ParamDef } from './params';
+import { param, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, type ParamDef } from './params';
 import { joint } from './joint';
 import { Assembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
 import { Transform, composeChain } from './transform';
@@ -95,6 +95,11 @@ export interface RunResult {
 // Collected logs from the current script execution
 let _collectedLogs: LogEntry[] = [];
 
+interface ImportScope {
+  namePrefix?: string;
+  localOverrides?: Record<string, number>;
+}
+
 function makeSandboxConsole(): Record<string, (...args: unknown[]) => void> {
   const capture = (level: LogEntry['level']) => (...args: unknown[]) => {
     _collectedLogs.push({
@@ -109,6 +114,26 @@ function makeSandboxConsole(): Record<string, (...args: unknown[]) => void> {
   return { log: capture('log'), warn: capture('warn'), error: capture('error'), info: capture('info') };
 }
 
+function parseImportParamArgs(
+  importKind: 'importSketch' | 'importPart',
+  fileName: string,
+  args: unknown,
+): Record<string, number> {
+  if (args == null) return {};
+  if (typeof args !== 'object' || Array.isArray(args)) {
+    throw new Error(`${importKind}("${fileName}") overrides must be an object: { "Param Name": number }`);
+  }
+
+  const normalized: Record<string, number> = {};
+  for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new Error(`${importKind}("${fileName}") override "${key}" must be a finite number`);
+    }
+    normalized[key] = value;
+  }
+  return normalized;
+}
+
 /**
  * Execute a single file's code with the forge sandbox.
  * `allFiles` enables cross-file imports.
@@ -119,129 +144,144 @@ function executeFile(
   fileName: string,
   allFiles: Record<string, string>,
   visited: Set<string>,
+  scope: ImportScope = {},
 ): Shape | Sketch | TrackedShape | ShapeGroup | null {
   if (visited.has(fileName)) {
     throw new Error(`Circular import detected: ${fileName}`);
   }
   visited.add(fileName);
+  try {
+    let importCallCount = 0;
+    const makeChildScopePrefix = (name: string) => {
+      importCallCount += 1;
+      const local = `${name}#${importCallCount}`;
+      return scope.namePrefix ? `${scope.namePrefix} > ${local}` : local;
+    };
 
-  // importSketch("name") — executes another file, expects a Sketch result
-  const importSketch = (name: string): Sketch => {
-    const src = allFiles[name];
-    if (!src) throw new Error(`File not found: "${name}"`);
-    const result = executeFile(src, name, allFiles, visited);
-    if (result instanceof Sketch) return result;
-    throw new Error(`"${name}" did not return a Sketch`);
-  };
+    // importSketch("name", { ...paramOverrides }) — executes another file, expects a Sketch result
+    const importSketch = (name: string, paramOverrides?: Record<string, number>): Sketch => {
+      const src = allFiles[name];
+      if (!src) throw new Error(`File not found: "${name}"`);
+      const localOverrides = parseImportParamArgs('importSketch', name, paramOverrides);
+      const childScope = { namePrefix: makeChildScopePrefix(name), localOverrides };
+      const result = executeFile(src, name, allFiles, visited, childScope);
+      if (result instanceof Sketch) return result;
+      throw new Error(`"${name}" did not return a Sketch`);
+    };
 
-  // importPart("name") — executes another file, expects a Shape result
-  const importPart = (name: string): Shape => {
-    const src = allFiles[name];
-    if (!src) throw new Error(`File not found: "${name}"`);
-    const result = executeFile(src, name, allFiles, visited);
-    if (result instanceof Shape) return result;
-    throw new Error(`"${name}" did not return a Shape`);
-  };
+    // importPart("name", { ...paramOverrides }) — executes another file, expects a Shape result
+    const importPart = (name: string, paramOverrides?: Record<string, number>): Shape => {
+      const src = allFiles[name];
+      if (!src) throw new Error(`File not found: "${name}"`);
+      const localOverrides = parseImportParamArgs('importPart', name, paramOverrides);
+      const childScope = { namePrefix: makeChildScopePrefix(name), localOverrides };
+      const result = executeFile(src, name, allFiles, visited, childScope);
+      if (result instanceof Shape) return result;
+      throw new Error(`"${name}" did not return a Shape`);
+    };
 
-  const wrapped = `"use strict";\n${code}`;
+    const wrapped = `"use strict";\n${code}`;
 
-  // Wrappers that auto-unwrap TrackedShape for boolean ops
-  const unwrap = (s: Shape | TrackedShape): Shape =>
-    s instanceof TrackedShape ? s.toShape() : s;
-  const wrappedUnion = (...shapes: (Shape | TrackedShape)[]) => union(...shapes.map(unwrap));
-  const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => difference(...shapes.map(unwrap));
-  const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => intersection(...shapes.map(unwrap));
+    // Wrappers that auto-unwrap TrackedShape for boolean ops
+    const unwrap = (s: Shape | TrackedShape): Shape =>
+      s instanceof TrackedShape ? s.toShape() : s;
+    const wrappedUnion = (...shapes: (Shape | TrackedShape)[]) => union(...shapes.map(unwrap));
+    const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => difference(...shapes.map(unwrap));
+    const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => intersection(...shapes.map(unwrap));
 
-  const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) =>
-    hull3d(...args.map(a => a instanceof TrackedShape ? a.toShape() : a));
+    const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) =>
+      hull3d(...args.map(a => a instanceof TrackedShape ? a.toShape() : a));
 
-  // Tracked wrappers for primitives — user scripts get TrackedShape with named faces/edges
-  const trackedBox = (x: number, y: number, z: number, center = false): TrackedShape => {
-    const shape = box(x, y, z, center);
-    const ox = center ? -x / 2 : 0;
-    const oy = center ? -y / 2 : 0;
-    const r = Rectangle2D.fromDimensions(ox, oy, x, y);
-    const topo = buildRectExtrusionTopology(r, z);
-    return new TrackedShape(shape, topo, 0, true);
-  };
+    // Tracked wrappers for primitives — user scripts get TrackedShape with named faces/edges
+    const trackedBox = (x: number, y: number, z: number, center = false): TrackedShape => {
+      const shape = box(x, y, z, center);
+      const ox = center ? -x / 2 : 0;
+      const oy = center ? -y / 2 : 0;
+      const r = Rectangle2D.fromDimensions(ox, oy, x, y);
+      const topo = buildRectExtrusionTopology(r, z);
+      return new TrackedShape(shape, topo, 0, true);
+    };
 
-  const trackedCylinder = (
-    height: number, radius: number, radiusTop?: number, segments?: number, center = false,
-  ): TrackedShape => {
-    const shape = cylinder(height, radius, radiusTop, segments, center);
-    const cz = center ? -height / 2 : 0;
-    const c = { center: new Point2D(0, 0), radius };
-    const topo = buildCircleExtrusionTopology(c, height);
-    if (center) {
-      // offset topology down by half height
-      for (const f of topo.faces.values()) {
-        f.center = [f.center[0], f.center[1], f.center[2] - height / 2];
+    const trackedCylinder = (
+      height: number, radius: number, radiusTop?: number, segments?: number, center = false,
+    ): TrackedShape => {
+      const shape = cylinder(height, radius, radiusTop, segments, center);
+      const cz = center ? -height / 2 : 0;
+      const c = { center: new Point2D(0, 0), radius };
+      const topo = buildCircleExtrusionTopology(c, height);
+      if (center) {
+        // offset topology down by half height
+        for (const f of topo.faces.values()) {
+          f.center = [f.center[0], f.center[1], f.center[2] - height / 2];
+        }
+        for (const e of topo.edges.values()) {
+          e.start = [e.start[0], e.start[1], e.start[2] - height / 2];
+          e.end = [e.end[0], e.end[1], e.end[2] - height / 2];
+        }
       }
-      for (const e of topo.edges.values()) {
-        e.start = [e.start[0], e.start[1], e.start[2] - height / 2];
-        e.end = [e.end[0], e.end[1], e.end[2] - height / 2];
-      }
-    }
-    return new TrackedShape(shape, topo, 0, true);
-  };
+      return new TrackedShape(shape, topo, 0, true);
+    };
 
-  const fn = new Function(
-    // 3D
-    'box', 'cylinder', 'sphere',
-    'union', 'difference', 'intersection',
-    'hull3d', 'levelSet',
-    // 2D
-    'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path', 'stroke', 'constrainedSketch',
-    'union2d', 'difference2d', 'intersection2d', 'hull2d',
-    // Entities
-    'Point2D', 'Line2D', 'Circle2D', 'Rectangle2D', 'TrackedShape', 'point', 'line', 'circle', 'rectangle', 'Constraint', 'degrees', 'radians',
-    // Patterns
-    'linearPattern', 'circularPattern', 'mirrorCopy',
-    // Fillets
-    'filletEdge', 'chamferEdge',
-    // Arc bridge
-    'arcBridgeBetweenRects',
-    // Params & classes
-    'param', 'Shape', 'Sketch', 'lib',
-    // Joints
-    'joint',
-    // Transform + Assembly
-    'Transform', 'composeChain', 'assembly', 'Assembly', 'SolvedAssembly', 'bomToCsv',
-    // Plane ops
-    'intersectWithPlane', 'projectToPlane',
-    // Cross-file imports
-    'importSketch', 'importPart',
-    // Dimensions
-    'dim', 'dimLine',
-    // Group
-    'group', 'ShapeGroup',
-    // Console
-    'console',
-    // Cut planes
-    'cutPlane',
-    wrapped,
-  );
+    const fn = new Function(
+      // 3D
+      'box', 'cylinder', 'sphere',
+      'union', 'difference', 'intersection',
+      'hull3d', 'levelSet',
+      // 2D
+      'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path', 'stroke', 'constrainedSketch',
+      'union2d', 'difference2d', 'intersection2d', 'hull2d',
+      // Entities
+      'Point2D', 'Line2D', 'Circle2D', 'Rectangle2D', 'TrackedShape', 'point', 'line', 'circle', 'rectangle', 'Constraint', 'degrees', 'radians',
+      // Patterns
+      'linearPattern', 'circularPattern', 'mirrorCopy',
+      // Fillets
+      'filletEdge', 'chamferEdge',
+      // Arc bridge
+      'arcBridgeBetweenRects',
+      // Params & classes
+      'param', 'Shape', 'Sketch', 'lib',
+      // Joints
+      'joint',
+      // Transform + Assembly
+      'Transform', 'composeChain', 'assembly', 'Assembly', 'SolvedAssembly', 'bomToCsv',
+      // Plane ops
+      'intersectWithPlane', 'projectToPlane',
+      // Cross-file imports
+      'importSketch', 'importPart',
+      // Dimensions
+      'dim', 'dimLine',
+      // Group
+      'group', 'ShapeGroup',
+      // Console
+      'console',
+      // Cut planes
+      'cutPlane',
+      wrapped,
+    );
 
-  return fn(
-    trackedBox, trackedCylinder, sphere,
-    wrappedUnion, wrappedDifference, wrappedIntersection,
-    wrappedHull3d, levelSet,
-    rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
-    union2d, difference2d, intersection2d, hull2d,
-    Point2D, Line2D, Circle2D, Rectangle2D, TrackedShape, point, line, circle, rectangle, Constraint, degrees, radians,
-    linearPattern, circularPattern, mirrorCopy,
-    filletEdge, chamferEdge,
-    arcBridgeBetweenRects,
-    param, Shape, Sketch, partLibrary,
-    joint,
-    Transform, composeChain, assembly, Assembly, SolvedAssembly, bomToCsv,
-    intersectWithPlane, projectToPlane,
-    importSketch, importPart,
-    dim, dimLine,
-    group, ShapeGroup,
-    makeSandboxConsole(),
-    cutPlane,
-  );
+    return runWithParamScope(scope, () => fn(
+      trackedBox, trackedCylinder, sphere,
+      wrappedUnion, wrappedDifference, wrappedIntersection,
+      wrappedHull3d, levelSet,
+      rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
+      union2d, difference2d, intersection2d, hull2d,
+      Point2D, Line2D, Circle2D, Rectangle2D, TrackedShape, point, line, circle, rectangle, Constraint, degrees, radians,
+      linearPattern, circularPattern, mirrorCopy,
+      filletEdge, chamferEdge,
+      arcBridgeBetweenRects,
+      param, Shape, Sketch, partLibrary,
+      joint,
+      Transform, composeChain, assembly, Assembly, SolvedAssembly, bomToCsv,
+      intersectWithPlane, projectToPlane,
+      importSketch, importPart,
+      dim, dimLine,
+      group, ShapeGroup,
+      makeSandboxConsole(),
+      cutPlane,
+    ));
+  } finally {
+    visited.delete(fileName);
+  }
 }
 
 export function runScript(

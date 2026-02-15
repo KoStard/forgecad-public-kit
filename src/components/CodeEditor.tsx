@@ -16,9 +16,9 @@ declare function projectToPlane(shape: Shape, plane: PlaneSpec): Sketch;
 
 // --- Cross-file imports ---
 /** Import a 2D sketch from another file. The file must return a Sketch. */
-declare function importSketch(fileName: string): Sketch;
+declare function importSketch(fileName: string, paramOverrides?: Record<string, number>): Sketch;
 /** Import a 3D part from another file. The file must return a Shape. */
-declare function importPart(fileName: string): Shape;
+declare function importPart(fileName: string, paramOverrides?: Record<string, number>): Shape;
 
 // --- 2D Sketch Primitives ---
 declare function rect(width: number, height: number, center?: boolean): Sketch;
