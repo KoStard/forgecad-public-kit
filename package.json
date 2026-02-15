@@ -14,6 +14,7 @@
     "test-run": "npx tsx cli/test-run.ts",
     "param-check": "npx tsx cli/param-check.ts",
     "check:transforms": "npx tsx cli/check-transforms.ts",
+    "check:dimensions": "npx tsx cli/check-dimensions.ts",
     "debug:dimensions": "npx tsx cli/debug-dimensions.ts"
   },
   "dependencies": {

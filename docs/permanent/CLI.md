@@ -117,6 +117,18 @@ npm run check:transforms
 
 Runs fast math-level invariants to catch transform order and frame composition regressions before they leak into examples.
 
+### Dimension Propagation Invariant Check
+
+```bash
+npm run check:dimensions
+```
+
+Runs shape-level invariants for dimension metadata propagation across:
+- transform APIs (`translate`, `rotate`, `transform`, `scale`, `mirror`, `rotateAround`)
+- copy/style APIs (`clone`, `color`, `setColor`, `smooth/refine/simplify`)
+- boolean APIs (`add/subtract/intersect`, plus `union/difference/intersection/hull3d`)
+- import runtime path (`importPart(...).color(...).translate(...)`)
+
 ### Dimension Debugger
 
 ```bash

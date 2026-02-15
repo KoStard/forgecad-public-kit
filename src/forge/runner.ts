@@ -7,7 +7,20 @@
  * Supports cross-file imports via importSketch() and importPart().
  */
 
-import { Shape, box, cylinder, sphere, union, difference, intersection, hull3d, levelSet } from './kernel';
+import {
+  Shape,
+  box,
+  cylinder,
+  sphere,
+  union,
+  difference,
+  intersection,
+  hull3d,
+  levelSet,
+  setShapeDimensions,
+  getShapeDimensions,
+  type ShapeDimension,
+} from './kernel';
 import type { Anchor3D } from './kernel';
 import { intersectWithPlane, projectToPlane } from './section';
 import {
@@ -59,7 +72,7 @@ import {
 import { param, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, type ParamDef } from './params';
 import { joint } from './joint';
 import { Assembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
-import { Transform, composeChain, type Mat4 } from './transform';
+import { Transform, composeChain } from './transform';
 import { partLibrary } from './library';
 import { ShapeGroup, group } from './group';
 import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
@@ -337,198 +350,6 @@ function parseImportParamArgs(
   return normalized;
 }
 
-const shapeBoundDimensions = new WeakMap<Shape, DimensionDef[]>();
-let boundDimensionIdCounter = 0;
-let shapeDimensionHooksInstalled = false;
-
-function nextBoundDimensionId(): string {
-  boundDimensionIdCounter += 1;
-  return `dim-bound-${boundDimensionIdCounter}`;
-}
-
-function cloneDimensionDef(def: DimensionDef): DimensionDef {
-  return {
-    id: nextBoundDimensionId(),
-    from: [def.from[0], def.from[1], def.from[2]],
-    to: [def.to[0], def.to[1], def.to[2]],
-    offset: def.offset,
-    label: def.label,
-    color: def.color,
-    components: def.components ? [...def.components] : undefined,
-  };
-}
-
-function cloneDimensionDefs(defs: DimensionDef[]): DimensionDef[] {
-  return defs.map(cloneDimensionDef);
-}
-
-function transformPoint3(m: Mat4, p: [number, number, number]): [number, number, number] {
-  const x = p[0], y = p[1], z = p[2];
-  return [
-    m[0] * x + m[4] * y + m[8] * z + m[12],
-    m[1] * x + m[5] * y + m[9] * z + m[13],
-    m[2] * x + m[6] * y + m[10] * z + m[14],
-  ];
-}
-
-function transformDimensionDefs(defs: DimensionDef[], m: Mat4): DimensionDef[] {
-  return defs.map((def) => ({
-    id: nextBoundDimensionId(),
-    from: transformPoint3(m, def.from),
-    to: transformPoint3(m, def.to),
-    offset: def.offset,
-    label: def.label,
-    color: def.color,
-    components: def.components ? [...def.components] : undefined,
-  }));
-}
-
-function bindDimensionsToShape(shape: Shape, defs: DimensionDef[]): Shape {
-  if (defs.length === 0) {
-    shapeBoundDimensions.delete(shape);
-    return shape;
-  }
-  shapeBoundDimensions.set(shape, defs);
-  return shape;
-}
-
-function getBoundDimensions(shape: Shape): DimensionDef[] {
-  return shapeBoundDimensions.get(shape) ?? [];
-}
-
-function shapeFromUnknown(value: unknown): Shape | null {
-  if (value instanceof Shape) return value;
-  if (value && typeof (value as { toShape?: unknown }).toShape === 'function') {
-    const converted = (value as { toShape: () => unknown }).toShape();
-    return converted instanceof Shape ? converted : null;
-  }
-  return null;
-}
-
-function rebindTransformedDimensions(source: Shape, result: Shape, matrix: Mat4): Shape {
-  const defs = getBoundDimensions(source);
-  if (defs.length === 0) return result;
-  return bindDimensionsToShape(result, transformDimensionDefs(defs, matrix));
-}
-
-function rotationEulerMatrix(xDeg: number, yDeg: number, zDeg: number): Mat4 {
-  return composeChain(
-    Transform.rotationAxis([1, 0, 0], xDeg),
-    Transform.rotationAxis([0, 1, 0], yDeg),
-    Transform.rotationAxis([0, 0, 1], zDeg),
-  ).toArray();
-}
-
-function mirrorMatrix(normal: [number, number, number]): Mat4 {
-  const [nx0, ny0, nz0] = normal;
-  const len = Math.hypot(nx0, ny0, nz0);
-  if (len < 1e-12) return Transform.identity().toArray();
-  const nx = nx0 / len;
-  const ny = ny0 / len;
-  const nz = nz0 / len;
-
-  const m00 = 1 - 2 * nx * nx;
-  const m01 = -2 * nx * ny;
-  const m02 = -2 * nx * nz;
-  const m10 = -2 * ny * nx;
-  const m11 = 1 - 2 * ny * ny;
-  const m12 = -2 * ny * nz;
-  const m20 = -2 * nz * nx;
-  const m21 = -2 * nz * ny;
-  const m22 = 1 - 2 * nz * nz;
-
-  return [
-    m00, m10, m20, 0,
-    m01, m11, m21, 0,
-    m02, m12, m22, 0,
-    0, 0, 0, 1,
-  ];
-}
-
-function installShapeDimensionHooks(): void {
-  if (shapeDimensionHooksInstalled) return;
-  shapeDimensionHooksInstalled = true;
-
-  const proto = Shape.prototype as any;
-
-  const originalTranslate = proto.translate;
-  proto.translate = function translateWithDimensions(this: Shape, x: number, y: number, z: number): Shape {
-    const result = originalTranslate.call(this, x, y, z) as Shape;
-    return rebindTransformedDimensions(this, result, Transform.translation(x, y, z).toArray());
-  };
-
-  const originalRotate = proto.rotate;
-  proto.rotate = function rotateWithDimensions(this: Shape, x: number, y: number, z: number): Shape {
-    const result = originalRotate.call(this, x, y, z) as Shape;
-    return rebindTransformedDimensions(this, result, rotationEulerMatrix(x, y, z));
-  };
-
-  const originalTransform = proto.transform;
-  proto.transform = function transformWithDimensions(this: Shape, m: Mat4 | Transform): Shape {
-    const result = originalTransform.call(this, m) as Shape;
-    const matrix = m instanceof Transform ? m.toArray() : m;
-    return rebindTransformedDimensions(this, result, matrix);
-  };
-
-  const originalScale = proto.scale;
-  proto.scale = function scaleWithDimensions(this: Shape, v: number | [number, number, number]): Shape {
-    const result = originalScale.call(this, v) as Shape;
-    return rebindTransformedDimensions(this, result, Transform.scale(v).toArray());
-  };
-
-  const originalMirror = proto.mirror;
-  proto.mirror = function mirrorWithDimensions(this: Shape, normal: [number, number, number]): Shape {
-    const result = originalMirror.call(this, normal) as Shape;
-    return rebindTransformedDimensions(this, result, mirrorMatrix(normal));
-  };
-
-  const originalRotateAround = proto.rotateAround;
-  proto.rotateAround = function rotateAroundWithDimensions(
-    this: Shape,
-    axis: [number, number, number],
-    angleDeg: number,
-    pivot?: [number, number, number],
-  ): Shape {
-    const result = originalRotateAround.call(this, axis, angleDeg, pivot) as Shape;
-    const matrix = Transform.rotationAxis(axis, angleDeg, pivot ?? [0, 0, 0]).toArray();
-    return rebindTransformedDimensions(this, result, matrix);
-  };
-
-  const originalSetColor = proto.setColor;
-  proto.setColor = function setColorWithDimensions(this: Shape, value: string | undefined): Shape {
-    const result = originalSetColor.call(this, value) as Shape;
-    return bindDimensionsToShape(result, cloneDimensionDefs(getBoundDimensions(this)));
-  };
-
-  const originalColor = proto.color;
-  proto.color = function colorWithDimensions(this: Shape, value: string | undefined): Shape {
-    const result = originalColor.call(this, value) as Shape;
-    return bindDimensionsToShape(result, cloneDimensionDefs(getBoundDimensions(this)));
-  };
-
-  const originalAdd = proto.add;
-  proto.add = function addWithDimensions(this: Shape, other: unknown): Shape {
-    const result = originalAdd.call(this, other) as Shape;
-    const otherShape = shapeFromUnknown(other);
-    const merged = [...getBoundDimensions(this), ...(otherShape ? getBoundDimensions(otherShape) : [])];
-    return bindDimensionsToShape(result, cloneDimensionDefs(merged));
-  };
-
-  const originalSubtract = proto.subtract;
-  proto.subtract = function subtractWithDimensions(this: Shape, other: unknown): Shape {
-    const result = originalSubtract.call(this, other) as Shape;
-    return bindDimensionsToShape(result, cloneDimensionDefs(getBoundDimensions(this)));
-  };
-
-  const originalIntersect = proto.intersect;
-  proto.intersect = function intersectWithDimensions(this: Shape, other: unknown): Shape {
-    const result = originalIntersect.call(this, other) as Shape;
-    const otherShape = shapeFromUnknown(other);
-    const merged = [...getBoundDimensions(this), ...(otherShape ? getBoundDimensions(otherShape) : [])];
-    return bindDimensionsToShape(result, cloneDimensionDefs(merged));
-  };
-}
-
 /**
  * Execute a single file's code with the forge sandbox.
  * `allFiles` enables cross-file imports.
@@ -574,7 +395,7 @@ function executeFile(
       const result = executeFile(src, name, allFiles, visited, childScope);
       const importedDims = takeCollectedDimensions(dimStart);
       if (result instanceof Shape) {
-        return bindDimensionsToShape(result, cloneDimensionDefs(importedDims));
+        return setShapeDimensions(result, importedDims as ShapeDimension[]);
       }
       throw new Error(`"${name}" did not return a Shape`);
     };
@@ -584,33 +405,12 @@ function executeFile(
     // Wrappers that auto-unwrap TrackedShape for boolean ops
     const unwrap = (s: Shape | TrackedShape): Shape =>
       s instanceof TrackedShape ? s.toShape() : s;
-    const wrappedUnion = (...shapes: (Shape | TrackedShape)[]) => {
-      const resolved = shapes.map(unwrap);
-      const out = union(...resolved);
-      const mergedDims = resolved.flatMap((s) => getBoundDimensions(s));
-      return bindDimensionsToShape(out, cloneDimensionDefs(mergedDims));
-    };
-    const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => {
-      const resolved = shapes.map(unwrap);
-      const out = difference(...resolved);
-      const baseDims = resolved.length > 0 ? getBoundDimensions(resolved[0]) : [];
-      return bindDimensionsToShape(out, cloneDimensionDefs(baseDims));
-    };
-    const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => {
-      const resolved = shapes.map(unwrap);
-      const out = intersection(...resolved);
-      const mergedDims = resolved.flatMap((s) => getBoundDimensions(s));
-      return bindDimensionsToShape(out, cloneDimensionDefs(mergedDims));
-    };
+    const wrappedUnion = (...shapes: (Shape | TrackedShape)[]) => union(...shapes.map(unwrap));
+    const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => difference(...shapes.map(unwrap));
+    const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => intersection(...shapes.map(unwrap));
 
-    const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) => {
-      const resolved = args.map(a => a instanceof TrackedShape ? a.toShape() : a);
-      const out = hull3d(...resolved);
-      const mergedDims = resolved
-        .filter((a): a is Shape => a instanceof Shape)
-        .flatMap((s) => getBoundDimensions(s));
-      return bindDimensionsToShape(out, cloneDimensionDefs(mergedDims));
-    };
+    const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) =>
+      hull3d(...args.map(a => a instanceof TrackedShape ? a.toShape() : a));
 
     // Tracked wrappers for primitives — user scripts get TrackedShape with named faces/edges
     const trackedBox = (x: number, y: number, z: number, center = false): TrackedShape => {
@@ -709,7 +509,6 @@ export function runScript(
   fileName = 'main.forge.js',
   allFiles: Record<string, string> = {},
 ): RunResult {
-  installShapeDimensionHooks();
   resetParams();
   resetDimensions();
   resetCutPlanes();
@@ -720,10 +519,10 @@ export function runScript(
     const result = executeFile(code, fileName, allFiles, new Set());
 
     const objects: SceneObject[] = [];
-    const boundDimensions: DimensionDef[] = [];
+    const shapeDimensions: DimensionDef[] = [];
     const pushShape = (shape: Shape, name: string, groupName?: string, color?: string) => {
       objects.push({ id: `obj-${objects.length + 1}`, name, shape, sketch: null, color: color || shape.colorHex, groupName });
-      boundDimensions.push(...cloneDimensionDefs(getBoundDimensions(shape)));
+      shapeDimensions.push(...(getShapeDimensions(shape) as unknown as DimensionDef[]));
       if (shape.isEmpty()) {
         _collectedLogs.push({
           level: 'warn',
@@ -859,7 +658,7 @@ export function runScript(
       sketch,
       objects,
       params: getCollectedParams(),
-      dimensions: [...getCollectedDimensions(), ...boundDimensions],
+      dimensions: [...getCollectedDimensions(), ...shapeDimensions],
       cutPlanes: getCollectedCutPlanes(),
       error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
       timeMs: performance.now() - t0,

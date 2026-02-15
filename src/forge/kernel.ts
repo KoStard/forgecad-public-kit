@@ -25,6 +25,145 @@ export function getWasm(): ManifoldToplevel {
   return _wasm;
 }
 
+export interface ShapeDimension {
+  id: string;
+  from: [number, number, number];
+  to: [number, number, number];
+  offset: number;
+  label?: string;
+  color?: string;
+  components?: string[];
+}
+
+const _shapeDimensions = new WeakMap<Shape, ShapeDimension[]>();
+let _shapeDimensionCounter = 0;
+
+function nextShapeDimensionId(): string {
+  _shapeDimensionCounter += 1;
+  return `shape-dim-${_shapeDimensionCounter}`;
+}
+
+function cloneDimension(def: ShapeDimension, regenerateId = false): ShapeDimension {
+  return {
+    id: regenerateId ? nextShapeDimensionId() : def.id,
+    from: [def.from[0], def.from[1], def.from[2]],
+    to: [def.to[0], def.to[1], def.to[2]],
+    offset: def.offset,
+    label: def.label,
+    color: def.color,
+    components: def.components ? [...def.components] : undefined,
+  };
+}
+
+function cloneDimensions(defs: ShapeDimension[], regenerateIds = false): ShapeDimension[] {
+  return defs.map((def) => cloneDimension(def, regenerateIds));
+}
+
+function setShapeDimensionsInternal(shape: Shape, dims: ShapeDimension[]): Shape {
+  if (dims.length === 0) {
+    _shapeDimensions.delete(shape);
+  } else {
+    _shapeDimensions.set(shape, dims);
+  }
+  return shape;
+}
+
+function getShapeDimensionsInternal(shape: Shape): ShapeDimension[] {
+  return _shapeDimensions.get(shape) ?? [];
+}
+
+function transformPointByMat4(m: Mat4, p: [number, number, number]): [number, number, number] {
+  const x = p[0], y = p[1], z = p[2];
+  return [
+    m[0] * x + m[4] * y + m[8] * z + m[12],
+    m[1] * x + m[5] * y + m[9] * z + m[13],
+    m[2] * x + m[6] * y + m[10] * z + m[14],
+  ];
+}
+
+function transformDimensions(defs: ShapeDimension[], m: Mat4): ShapeDimension[] {
+  return defs.map((def) => ({
+    id: nextShapeDimensionId(),
+    from: transformPointByMat4(m, def.from),
+    to: transformPointByMat4(m, def.to),
+    offset: def.offset,
+    label: def.label,
+    color: def.color,
+    components: def.components ? [...def.components] : undefined,
+  }));
+}
+
+function rotationEulerMatrix(xDeg: number, yDeg: number, zDeg: number): Mat4 {
+  return Transform.identity()
+    .rotateAxis([1, 0, 0], xDeg)
+    .rotateAxis([0, 1, 0], yDeg)
+    .rotateAxis([0, 0, 1], zDeg)
+    .toArray();
+}
+
+function mirrorMatrix(normal: [number, number, number]): Mat4 {
+  const [nx0, ny0, nz0] = normal;
+  const len = Math.hypot(nx0, ny0, nz0);
+  if (len < 1e-12) return Transform.identity().toArray();
+  const nx = nx0 / len;
+  const ny = ny0 / len;
+  const nz = nz0 / len;
+
+  const m00 = 1 - 2 * nx * nx;
+  const m01 = -2 * nx * ny;
+  const m02 = -2 * nx * nz;
+  const m10 = -2 * ny * nx;
+  const m11 = 1 - 2 * ny * ny;
+  const m12 = -2 * ny * nz;
+  const m20 = -2 * nz * nx;
+  const m21 = -2 * nz * ny;
+  const m22 = 1 - 2 * nz * nz;
+
+  return [
+    m00, m10, m20, 0,
+    m01, m11, m21, 0,
+    m02, m12, m22, 0,
+    0, 0, 0, 1,
+  ];
+}
+
+function withCopiedDimensions(source: Shape, out: Shape): Shape {
+  return setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(source), true));
+}
+
+function withTransformedDimensions(source: Shape, out: Shape, m: Mat4): Shape {
+  const dims = getShapeDimensionsInternal(source);
+  if (dims.length === 0) return setShapeDimensionsInternal(out, []);
+  return setShapeDimensionsInternal(out, transformDimensions(dims, m));
+}
+
+function withMergedDimensions(sources: Shape[], out: Shape): Shape {
+  const merged = sources.flatMap((s) => getShapeDimensionsInternal(s));
+  return setShapeDimensionsInternal(out, cloneDimensions(merged, true));
+}
+
+function withBaseDimensions(base: Shape, out: Shape): Shape {
+  return setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(base), true));
+}
+
+/**
+ * Bind dimensions to a shape instance. Used for importPart-scoped dimensions.
+ * By default IDs are regenerated so multiple instances never collide.
+ */
+export function setShapeDimensions(
+  shape: Shape,
+  dims: ShapeDimension[],
+  options: { regenerateIds?: boolean } = {},
+): Shape {
+  const regenerateIds = options.regenerateIds ?? true;
+  return setShapeDimensionsInternal(shape, cloneDimensions(dims, regenerateIds));
+}
+
+/** Read dimensions bound to this shape instance (defensive copy). */
+export function getShapeDimensions(shape: Shape): ShapeDimension[] {
+  return cloneDimensions(getShapeDimensionsInternal(shape), false);
+}
+
 /** Thin wrapper around Manifold with chainable API */
 export class Shape {
   public colorHex: string | undefined;
@@ -35,7 +174,7 @@ export class Shape {
 
   /** Set the color of this shape (hex string, e.g. "#ff0000") */
   setColor(value: string | undefined): Shape {
-    return new Shape(this.manifold, value);
+    return withCopiedDimensions(this, new Shape(this.manifold, value));
   }
 
   /** Alias for setColor */
@@ -45,7 +184,7 @@ export class Shape {
 
   /** Return a new Shape wrapper for explicit duplication in scripts. */
   clone(): Shape {
-    return new Shape(this.manifold, this.colorHex);
+    return withCopiedDimensions(this, new Shape(this.manifold, this.colorHex));
   }
 
   /** Alias for clone() */
@@ -56,7 +195,11 @@ export class Shape {
   // --- Transforms (all return new Shape, immutable) ---
 
   translate(x: number, y: number, z: number): Shape {
-    return new Shape(this.manifold.translate(x, y, z), this.colorHex);
+    return withTransformedDimensions(
+      this,
+      new Shape(this.manifold.translate(x, y, z), this.colorHex),
+      Transform.translation(x, y, z).toArray(),
+    );
   }
 
   /** Move so bounding box min corner is at the given global coordinate */
@@ -73,21 +216,33 @@ export class Shape {
   }
 
   rotate(x: number, y: number, z: number): Shape {
-    return new Shape(this.manifold.rotate(x, y, z), this.colorHex);
+    return withTransformedDimensions(
+      this,
+      new Shape(this.manifold.rotate(x, y, z), this.colorHex),
+      rotationEulerMatrix(x, y, z),
+    );
   }
 
   /** Apply a 4x4 affine transform matrix (column-major) or a Transform object. */
   transform(m: Mat4 | Transform): Shape {
     const mat = m instanceof Transform ? m.toArray() : m;
-    return new Shape(this.manifold.transform(mat), this.colorHex);
+    return withTransformedDimensions(this, new Shape(this.manifold.transform(mat), this.colorHex), mat);
   }
 
   scale(v: number | [number, number, number]): Shape {
-    return new Shape(this.manifold.scale(v as any), this.colorHex);
+    return withTransformedDimensions(
+      this,
+      new Shape(this.manifold.scale(v as any), this.colorHex),
+      Transform.scale(v).toArray(),
+    );
   }
 
   mirror(normal: [number, number, number]): Shape {
-    return new Shape(this.manifold.mirror(normal), this.colorHex);
+    return withTransformedDimensions(
+      this,
+      new Shape(this.manifold.mirror(normal), this.colorHex),
+      mirrorMatrix(normal),
+    );
   }
 
   /**
@@ -146,39 +301,40 @@ export class Shape {
     const ty = py - (m10 * px + m11 * py + m12 * pz);
     const tz = pz - (m20 * px + m21 * py + m22 * pz);
     // Manifold.transform takes column-major 4x3 (first 12 of 4x4)
-    return new Shape(this.manifold.transform([
+    const matrix = [
       m00, m10, m20, 0,
       m01, m11, m21, 0,
       m02, m12, m22, 0,
       tx,  ty,  tz,  1,
-    ] as any), this.colorHex);
+    ] as Mat4;
+    return withTransformedDimensions(this, new Shape(this.manifold.transform(matrix as any), this.colorHex), matrix);
   }
 
   // --- Smoothing ---
 
   /** Mark edges for smoothing based on angle. Call refine() after to apply. */
   smoothOut(minSharpAngle = 60, minSmoothness = 0): Shape {
-    return new Shape(this.manifold.smoothOut(minSharpAngle, minSmoothness), this.colorHex);
+    return withCopiedDimensions(this, new Shape(this.manifold.smoothOut(minSharpAngle, minSmoothness), this.colorHex));
   }
 
   /** Subdivide mesh, interpolating smooth surfaces set by smoothOut(). */
   refine(n: number): Shape {
-    return new Shape(this.manifold.refine(n), this.colorHex);
+    return withCopiedDimensions(this, new Shape(this.manifold.refine(n), this.colorHex));
   }
 
   /** Subdivide until edges are shorter than length. */
   refineToLength(length: number): Shape {
-    return new Shape(this.manifold.refineToLength(length), this.colorHex);
+    return withCopiedDimensions(this, new Shape(this.manifold.refineToLength(length), this.colorHex));
   }
 
   /** Subdivide until surface is within tolerance of smooth surface. */
   refineToTolerance(tolerance: number): Shape {
-    return new Shape(this.manifold.refineToTolerance(tolerance), this.colorHex);
+    return withCopiedDimensions(this, new Shape(this.manifold.refineToTolerance(tolerance), this.colorHex));
   }
 
   /** Warp vertices with a function. */
   warp(fn: (vert: [number, number, number]) => void): Shape {
-    return new Shape(this.manifold.warp(fn as any), this.colorHex);
+    return withCopiedDimensions(this, new Shape(this.manifold.warp(fn as any), this.colorHex));
   }
 
   // --- Booleans ---
@@ -190,17 +346,17 @@ export class Shape {
 
   add(other: Shape | { toShape(): Shape }): Shape {
     const o = Shape._unwrap(other);
-    return new Shape(this.manifold.add(o.manifold), this.colorHex);
+    return withMergedDimensions([this, o], new Shape(this.manifold.add(o.manifold), this.colorHex));
   }
 
   subtract(other: Shape | { toShape(): Shape }): Shape {
     const o = Shape._unwrap(other);
-    return new Shape(this.manifold.subtract(o.manifold), this.colorHex);
+    return withBaseDimensions(this, new Shape(this.manifold.subtract(o.manifold), this.colorHex));
   }
 
   intersect(other: Shape | { toShape(): Shape }): Shape {
     const o = Shape._unwrap(other);
-    return new Shape(this.manifold.intersect(o.manifold), this.colorHex);
+    return withMergedDimensions([this, o], new Shape(this.manifold.intersect(o.manifold), this.colorHex));
   }
 
   // --- Cutting ---
@@ -209,32 +365,38 @@ export class Shape {
   split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
     const c = Shape._unwrap(cutter);
     const [a, b] = this.manifold.split(c.manifold);
-    return [new Shape(a, this.colorHex), new Shape(b, this.colorHex)];
+    return [
+      withBaseDimensions(this, new Shape(a, this.colorHex)),
+      withBaseDimensions(this, new Shape(b, this.colorHex)),
+    ];
   }
 
   /** Split by infinite plane. Returns [below/inside, above/outside]. */
   splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
     const [a, b] = this.manifold.splitByPlane(normal, originOffset);
-    return [new Shape(a, this.colorHex), new Shape(b, this.colorHex)];
+    return [
+      withBaseDimensions(this, new Shape(a, this.colorHex)),
+      withBaseDimensions(this, new Shape(b, this.colorHex)),
+    ];
   }
 
   /** Cut away everything on the positive side of the plane. */
   trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
-    return new Shape(this.manifold.trimByPlane(normal, originOffset), this.colorHex);
+    return withBaseDimensions(this, new Shape(this.manifold.trimByPlane(normal, originOffset), this.colorHex));
   }
 
   // --- Hull ---
 
   /** Convex hull of this shape. */
   hull(): Shape {
-    return new Shape(this.manifold.hull(), this.colorHex);
+    return withBaseDimensions(this, new Shape(this.manifold.hull(), this.colorHex));
   }
 
   // --- Simplification ---
 
   /** Reduce mesh complexity. Vertices closer than tolerance are merged. */
   simplify(tolerance?: number): Shape {
-    return new Shape(this.manifold.simplify(tolerance), this.colorHex);
+    return withBaseDimensions(this, new Shape(this.manifold.simplify(tolerance), this.colorHex));
   }
 
   // --- Query ---
@@ -420,23 +582,25 @@ export function sphere(radius: number, segments?: number): Shape {
 export function union(...shapes: Shape[]): Shape {
   if (shapes.length === 0) throw new Error('union requires at least one shape');
   if (shapes.length === 1) return shapes[0];
-  return new Shape(getWasm().Manifold.union(shapes.map((s) => s.manifold)));
+  return withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(shapes.map((s) => s.manifold))));
 }
 
 export function difference(...shapes: Shape[]): Shape {
   if (shapes.length < 2) throw new Error('difference requires at least two shapes');
-  return new Shape(getWasm().Manifold.difference(shapes.map((s) => s.manifold)));
+  return withBaseDimensions(shapes[0], new Shape(getWasm().Manifold.difference(shapes.map((s) => s.manifold))));
 }
 
 export function intersection(...shapes: Shape[]): Shape {
   if (shapes.length < 2) throw new Error('intersection requires at least two shapes');
-  return new Shape(getWasm().Manifold.intersection(shapes.map((s) => s.manifold)));
+  return withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(shapes.map((s) => s.manifold))));
 }
 
 /** Convex hull of multiple shapes and/or points. */
 export function hull3d(...args: (Shape | [number, number, number])[]): Shape {
   const items = args.map(a => a instanceof Shape ? a.manifold : a);
-  return new Shape(getWasm().Manifold.hull(items));
+  const out = new Shape(getWasm().Manifold.hull(items));
+  const shapeArgs = args.filter((a): a is Shape => a instanceof Shape);
+  return withMergedDimensions(shapeArgs, out);
 }
 
 /** Create shape from a signed distance function. Positive = inside. */
