@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObject } from 'react';
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
 import type { SceneObject } from '@forge/index';
@@ -436,6 +436,9 @@ function DimensionAnnotation({ def }: { def: DimensionDef }) {
   const from = useMemo(() => new THREE.Vector3(...def.from), [def.from]);
   const to = useMemo(() => new THREE.Vector3(...def.to), [def.to]);
   const color = def.color ?? '#e0e0e0';
+  const labelSpriteRef = useRef<THREE.Sprite>(null);
+  const arrowStartRef = useRef<THREE.Mesh>(null);
+  const arrowEndRef = useRef<THREE.Mesh>(null);
 
   // Stable perpendicular offset (camera-independent).
   // Convention: positive offset pushes "outward" (−Y for X/Z lines, −X for Y lines).
@@ -482,28 +485,85 @@ function DimensionAnnotation({ def }: { def: DimensionDef }) {
   ]), [to, dimEnd, extDir, extGap, extOver]);
   const dimLineGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([dimStart, dimEnd]), [dimStart, dimEnd]);
 
-  const arrowSize = Math.min(dist * 0.06, 2.5);
   const dimDir = useMemo(() => dimEnd.clone().sub(dimStart).normalize(), [dimStart, dimEnd]);
+  const labelTextureData = useMemo(() => {
+    const fontPx = 36;
+    const padX = 28;
+    const logicalHeight = 80;
+    const dpr = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 3);
 
-  const labelTexture = useMemo(() => {
+    const measureCanvas = document.createElement('canvas');
+    const measureCtx = measureCanvas.getContext('2d')!;
+    measureCtx.font = `bold ${fontPx}px -apple-system, "Segoe UI", sans-serif`;
+    const textWidth = measureCtx.measureText(label).width;
+    const logicalWidth = THREE.MathUtils.clamp(Math.ceil(textWidth + padX * 2), 220, 720);
+
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 80;
+    canvas.width = Math.max(1, Math.round(logicalWidth * dpr));
+    canvas.height = Math.max(1, Math.round(logicalHeight * dpr));
     const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
     ctx.fillStyle = '#1a1a1acc';
     ctx.beginPath();
-    ctx.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 12);
+    ctx.roundRect(8, 8, logicalWidth - 16, logicalHeight - 16, 12);
     ctx.fill();
     ctx.fillStyle = color;
-    ctx.font = 'bold 36px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = `bold ${fontPx}px -apple-system, "Segoe UI", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(label, canvas.width / 2, canvas.height / 2);
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.needsUpdate = true;
-    return tex;
+    ctx.fillText(label, logicalWidth / 2, logicalHeight / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return {
+      texture,
+      aspect: logicalWidth / logicalHeight,
+    };
   }, [label, color]);
+
+  useEffect(() => {
+    return () => {
+      labelTextureData.texture.dispose();
+    };
+  }, [labelTextureData]);
+
+  useFrame(({ camera, size }) => {
+    if (dist < 1e-6 || size.height <= 0) return;
+
+    const isOrtho = (camera as THREE.OrthographicCamera).isOrthographicCamera;
+    const worldUnitsPerPixel = isOrtho
+      ? (
+          (((camera as THREE.OrthographicCamera).top - (camera as THREE.OrthographicCamera).bottom)
+            / Math.max(1e-6, (camera as THREE.OrthographicCamera).zoom))
+          / size.height
+        )
+      : (
+          (2
+            * Math.tan(THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov * 0.5))
+            * camera.position.distanceTo(mid))
+          / (size.height * Math.max(1e-6, (camera as THREE.PerspectiveCamera).zoom))
+        );
+
+    // Camera-aware on-screen sizing: stable across tiny/huge models and zoom levels.
+    const labelHeightPx = 28;
+    const labelWidthPx = labelHeightPx * labelTextureData.aspect;
+    labelSpriteRef.current?.scale.set(
+      labelWidthPx * worldUnitsPerPixel,
+      labelHeightPx * worldUnitsPerPixel,
+      1,
+    );
+
+    const arrowHeightPx = 12;
+    const desiredArrowHeight = arrowHeightPx * worldUnitsPerPixel;
+    const maxArrowHeight = Math.max(dist * 0.3, worldUnitsPerPixel * 2);
+    const arrowHeight = Math.min(desiredArrowHeight, maxArrowHeight);
+    arrowStartRef.current?.scale.set(arrowHeight, arrowHeight, arrowHeight);
+    arrowEndRef.current?.scale.set(arrowHeight, arrowHeight, arrowHeight);
+  });
 
   if (dist < 1e-6) return null;
 
@@ -518,16 +578,16 @@ function DimensionAnnotation({ def }: { def: DimensionDef }) {
       <lineSegments geometry={dimLineGeo}>
         <lineBasicMaterial color={color} transparent opacity={0.8} />
       </lineSegments>
-      <mesh position={dimStart} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dimDir)}>
-        <coneGeometry args={[arrowSize * 0.5, arrowSize, 8]} />
+      <mesh ref={arrowStartRef} position={dimStart} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dimDir)}>
+        <coneGeometry args={[0.5, 1, 8]} />
         <meshBasicMaterial color={color} />
       </mesh>
-      <mesh position={dimEnd} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dimDir.clone().negate())}>
-        <coneGeometry args={[arrowSize * 0.5, arrowSize, 8]} />
+      <mesh ref={arrowEndRef} position={dimEnd} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dimDir.clone().negate())}>
+        <coneGeometry args={[0.5, 1, 8]} />
         <meshBasicMaterial color={color} />
       </mesh>
-      <sprite position={mid} scale={[Math.max(dist * 0.6, 25), Math.max(dist * 0.1, 5), 1]}>
-        <spriteMaterial map={labelTexture} depthTest={false} transparent />
+      <sprite ref={labelSpriteRef} position={mid}>
+        <spriteMaterial map={labelTextureData.texture} depthTest={false} transparent />
       </sprite>
     </group>
   );

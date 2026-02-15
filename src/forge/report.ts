@@ -97,7 +97,7 @@ const PAGE_MARGIN = 36;
 const HEADER_HEIGHT = 44;
 const CELL_GAP = 14;
 const CELL_PADDING = 14;
-const DEFAULT_DIM_DIRECTION_TOLERANCE_DEG = 12;
+const DEFAULT_DIM_DIRECTION_TOLERANCE_DEG = 60;
 const MAX_FILL_TRIANGLES_PER_OBJECT = 12000;
 const MAX_EDGE_SEGMENTS_PER_OBJECT = 45000;
 
@@ -489,19 +489,111 @@ function buildGridCells(viewCount: number): CellRect[] {
   return out;
 }
 
+type LabelBox = { minX: number; minY: number; maxX: number; maxY: number };
+
+interface DimensionLabelPlan {
+  label: string;
+  color: ColorRgb;
+  preferred: Vec2;
+  anchor: Vec2;
+  tangent: Vec2;
+  textHalfW: number;
+  textHalfH: number;
+  candidates: Vec2[];
+}
+
+interface DrawDimensionResult {
+  graphicsCmd: string;
+  labelPlan: DimensionLabelPlan | null;
+}
+
+function makeLabelBox(center: Vec2, textHalfW: number, textHalfH: number): LabelBox {
+  return {
+    minX: center[0] - textHalfW,
+    minY: center[1] - textHalfH,
+    maxX: center[0] + textHalfW,
+    maxY: center[1] + textHalfH,
+  };
+}
+
+function overlapArea(a: LabelBox, b: LabelBox): number {
+  const x = Math.max(0, Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX));
+  const y = Math.max(0, Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY));
+  return x * y;
+}
+
+function clampLabelCenter(center: Vec2, textHalfW: number, textHalfH: number, cell: CellRect): Vec2 {
+  const inset = 4;
+  const minX = cell.x + inset + textHalfW;
+  const maxX = cell.x + cell.w - inset - textHalfW;
+  const minY = cell.y + inset + textHalfH;
+  const maxY = cell.y + cell.h - inset - textHalfH;
+  return [
+    clamp(center[0], minX, maxX),
+    clamp(center[1], minY, maxY),
+  ];
+}
+
+function closestPointOnBox(box: LabelBox, point: Vec2): Vec2 {
+  return [
+    clamp(point[0], box.minX, box.maxX),
+    clamp(point[1], box.minY, box.maxY),
+  ];
+}
+
+function layoutDimensionLabels(
+  plans: DimensionLabelPlan[],
+  cell: CellRect,
+): Array<{ plan: DimensionLabelPlan; pos: Vec2; box: LabelBox }> {
+  const placed: Array<{ plan: DimensionLabelPlan; pos: Vec2; box: LabelBox }> = [];
+  const order = plans
+    .map((plan, idx) => ({ plan, idx }))
+    .sort((a, b) => {
+      const aw = a.plan.textHalfW * 2;
+      const bw = b.plan.textHalfW * 2;
+      if (bw !== aw) return bw - aw;
+      return a.idx - b.idx;
+    });
+
+  for (const entry of order) {
+    const plan = entry.plan;
+    let bestPos = clampLabelCenter(plan.preferred, plan.textHalfW, plan.textHalfH, cell);
+    let bestBox = makeLabelBox(bestPos, plan.textHalfW, plan.textHalfH);
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    const tested = plan.candidates.length > 0 ? plan.candidates : [plan.preferred];
+    tested.forEach((candidate, ci) => {
+      const pos = clampLabelCenter(candidate, plan.textHalfW, plan.textHalfH, cell);
+      const box = makeLabelBox(pos, plan.textHalfW, plan.textHalfH);
+      const overlap = placed.reduce((sum, p) => sum + overlapArea(box, p.box), 0);
+      const distFromPreferred = Math.hypot(pos[0] - plan.preferred[0], pos[1] - plan.preferred[1]);
+      const axisBias = Math.abs((pos[0] - plan.preferred[0]) * plan.tangent[0] + (pos[1] - plan.preferred[1]) * plan.tangent[1]);
+      const score = overlap * 1000 + distFromPreferred * 0.3 + axisBias * 0.05 + ci * 0.01;
+      if (score < bestScore) {
+        bestScore = score;
+        bestPos = pos;
+        bestBox = box;
+      }
+    });
+
+    placed.push({ plan, pos: bestPos, box: bestBox });
+  }
+
+  return placed;
+}
+
 function drawDimension(
   dim: DimensionDef,
   mapPoint: (p: Vec2) => Vec2,
   mapScale: number,
   color: ColorRgb,
-  cell: CellRect,
   fromProjected: Vec2,
   toProjected: Vec2,
-): string {
+): DrawDimensionResult {
   const dx = toProjected[0] - fromProjected[0];
   const dy = toProjected[1] - fromProjected[1];
   const len = Math.hypot(dx, dy);
-  if (len < 1e-8) return '';
+  if (len < 1e-8) return { graphicsCmd: '', labelPlan: null };
 
   const ux = dx / len;
   const uy = dy / len;
@@ -550,32 +642,39 @@ function drawDimension(
   cmd.push(commandTriangleFill(pb1, leftB, rightB));
 
   const mid: Vec2 = [(pa1[0] + pb1[0]) * 0.5, (pa1[1] + pb1[1]) * 0.5];
-  const candidateA: Vec2 = [mid[0] + pxS * 6, mid[1] + pyS * 6];
-  const candidateB: Vec2 = [mid[0] - pxS * 6, mid[1] - pyS * 6];
-
   const textHalfW = Math.max(12, label.length * 2.15);
   const textHalfH = 5;
-  const inset = 4;
-  const minX = cell.x + inset + textHalfW;
-  const maxX = cell.x + cell.w - inset - textHalfW;
-  const minY = cell.y + inset + textHalfH;
-  const maxY = cell.y + cell.h - inset - textHalfH;
+  const base = 6;
+  const normalSteps = [0, 6, 12, 18, 26];
+  const tangentSteps = [0, -12, 12, -22, 22, -34, 34];
 
-  const scoreCandidate = (p: Vec2): number => {
-    const dx = Math.max(0, minX - p[0], p[0] - maxX);
-    const dy = Math.max(0, minY - p[1], p[1] - maxY);
-    return dx + dy;
+  const candidates: Vec2[] = [];
+  [1, -1].forEach((side) => {
+    normalSteps.forEach((n) => {
+      tangentSteps.forEach((t) => {
+        candidates.push([
+          mid[0] + pxS * side * (base + n) + uxS * t,
+          mid[1] + pyS * side * (base + n) + uyS * t,
+        ]);
+      });
+    });
+  });
+
+  const preferred: Vec2 = [mid[0] + pxS * base, mid[1] + pyS * base];
+
+  return {
+    graphicsCmd: cmd.join(''),
+    labelPlan: {
+      label,
+      color,
+      preferred,
+      anchor: mid,
+      tangent: [uxS, uyS],
+      textHalfW,
+      textHalfH,
+      candidates,
+    },
   };
-
-  const preferred = scoreCandidate(candidateA) <= scoreCandidate(candidateB) ? candidateA : candidateB;
-  const labelPos: Vec2 = [
-    clamp(preferred[0], minX, maxX),
-    clamp(preferred[1], minY, maxY),
-  ];
-
-  cmd.push(commandText(label, labelPos[0] + 2, labelPos[1] - 3, 8));
-
-  return cmd.join('');
 }
 
 function renderViewCell(
@@ -648,10 +747,27 @@ function renderViewCell(
     });
   });
 
+  const labelPlans: DimensionLabelPlan[] = [];
   viewDims.forEach((dim) => {
     const pFrom = projectPoint(dim.from, center, frame);
     const pTo = projectPoint(dim.to, center, frame);
-    cmd.push(drawDimension(dim, mapper.map, mapper.scale, hexToRgb01(dim.color || '#2b2b2b'), cell, [pFrom.x, pFrom.y], [pTo.x, pTo.y]));
+    const result = drawDimension(dim, mapper.map, mapper.scale, hexToRgb01(dim.color || '#2b2b2b'), [pFrom.x, pFrom.y], [pTo.x, pTo.y]);
+    cmd.push(result.graphicsCmd);
+    if (result.labelPlan) labelPlans.push(result.labelPlan);
+  });
+
+  const placedLabels = layoutDimensionLabels(labelPlans, cell);
+  placedLabels.forEach(({ plan, pos, box }) => {
+    const leaderStart = plan.anchor;
+    const leaderEnd = closestPointOnBox(box, leaderStart);
+    const leaderDist = Math.hypot(leaderEnd[0] - leaderStart[0], leaderEnd[1] - leaderStart[1]);
+    cmd.push(commandSetStroke(plan.color));
+    cmd.push(commandSetFill(plan.color));
+    if (leaderDist > 10) {
+      cmd.push('0.35 w\n');
+      cmd.push(commandLine(leaderStart, leaderEnd));
+    }
+    cmd.push(commandText(plan.label, pos[0] + 2, pos[1] - 3, 8));
   });
 
   cmd.push('Q\n');
