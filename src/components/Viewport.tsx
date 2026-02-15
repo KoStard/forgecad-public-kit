@@ -10,6 +10,59 @@ import { themes } from '../theme';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
+interface PersistedViewportCameraState {
+  projectionMode: ProjectionMode;
+  position: [number, number, number];
+  target: [number, number, number];
+  up: [number, number, number];
+  orthoZoom?: number;
+}
+
+const VIEWPORT_CAMERA_STORAGE_KEY = 'fc-viewport-camera-v1';
+
+const isVector3Tuple = (value: unknown): value is [number, number, number] => {
+  return Array.isArray(value)
+    && value.length === 3
+    && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry));
+};
+
+const parsePersistedViewportCameraState = (value: unknown): PersistedViewportCameraState | null => {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<PersistedViewportCameraState>;
+  if (candidate.projectionMode !== 'perspective' && candidate.projectionMode !== 'orthographic') return null;
+  if (!isVector3Tuple(candidate.position)) return null;
+  if (!isVector3Tuple(candidate.target)) return null;
+  if (!isVector3Tuple(candidate.up)) return null;
+  if (candidate.orthoZoom !== undefined && (!Number.isFinite(candidate.orthoZoom) || candidate.orthoZoom <= 0)) return null;
+  return {
+    projectionMode: candidate.projectionMode,
+    position: candidate.position,
+    target: candidate.target,
+    up: candidate.up,
+    orthoZoom: candidate.orthoZoom,
+  };
+};
+
+const readPersistedViewportCameraState = (): PersistedViewportCameraState | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(VIEWPORT_CAMERA_STORAGE_KEY);
+    if (!raw) return null;
+    return parsePersistedViewportCameraState(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+};
+
+const writePersistedViewportCameraState = (state: PersistedViewportCameraState): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(VIEWPORT_CAMERA_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage failures (private mode, quota, etc.)
+  }
+};
+
 /** Enable local clipping on the WebGL renderer when any cut planes are active */
 function ClippingManager({ active }: { active: boolean }) {
   const gl = useThree((s) => s.gl);
@@ -1165,6 +1218,99 @@ function ViewManager({
   return null;
 }
 
+function ViewPersistence({
+  controlsRef,
+  isSketchOnly,
+  onResolved,
+}: {
+  controlsRef: MutableRefObject<OrbitControlsImpl | null>;
+  isSketchOnly: boolean;
+  onResolved: (restored: boolean) => void;
+}) {
+  const { camera } = useThree();
+  const projectionMode = useForgeStore((s) => s.projectionMode);
+  const setProjectionMode = useForgeStore((s) => s.setProjectionMode);
+  const restoreStatusRef = useRef<'pending' | 'done'>('pending');
+  const didResolveRef = useRef(false);
+  const savedStateRef = useRef<PersistedViewportCameraState | null>(readPersistedViewportCameraState());
+
+  const resolve = useCallback((restored: boolean) => {
+    if (didResolveRef.current) return;
+    didResolveRef.current = true;
+    onResolved(restored);
+  }, [onResolved]);
+
+  useEffect(() => {
+    if (isSketchOnly) {
+      restoreStatusRef.current = 'done';
+      resolve(false);
+    }
+  }, [isSketchOnly, resolve]);
+
+  useEffect(() => {
+    if (isSketchOnly) return;
+    if (restoreStatusRef.current === 'done') return;
+
+    const saved = savedStateRef.current;
+    if (!saved) {
+      restoreStatusRef.current = 'done';
+      resolve(false);
+      return;
+    }
+
+    if (saved.projectionMode !== projectionMode) {
+      setProjectionMode(saved.projectionMode);
+      return;
+    }
+
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    camera.position.set(saved.position[0], saved.position[1], saved.position[2]);
+    camera.up.set(saved.up[0], saved.up[1], saved.up[2]);
+
+    if ((camera as THREE.OrthographicCamera).isOrthographicCamera && saved.orthoZoom !== undefined) {
+      const ortho = camera as THREE.OrthographicCamera;
+      ortho.zoom = Math.max(0.1, saved.orthoZoom);
+      ortho.updateProjectionMatrix();
+    } else {
+      camera.updateProjectionMatrix();
+    }
+
+    controls.target.set(saved.target[0], saved.target[1], saved.target[2]);
+    controls.update();
+
+    restoreStatusRef.current = 'done';
+    resolve(true);
+  }, [camera, controlsRef, isSketchOnly, projectionMode, resolve, setProjectionMode]);
+
+  useEffect(() => {
+    if (restoreStatusRef.current !== 'done') return;
+    if (isSketchOnly) return;
+
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    const persistCamera = () => {
+      const isOrtho = (camera as THREE.OrthographicCamera).isOrthographicCamera;
+      const nextState: PersistedViewportCameraState = {
+        projectionMode,
+        position: [camera.position.x, camera.position.y, camera.position.z],
+        target: [controls.target.x, controls.target.y, controls.target.z],
+        up: [camera.up.x, camera.up.y, camera.up.z],
+        orthoZoom: isOrtho ? Math.max(0.1, (camera as THREE.OrthographicCamera).zoom) : undefined,
+      };
+      writePersistedViewportCameraState(nextState);
+    };
+
+    persistCamera();
+    controls.addEventListener('change', persistCamera);
+    return () => controls.removeEventListener('change', persistCamera);
+  }, [camera, controlsRef, isSketchOnly, projectionMode]);
+
+  return null;
+}
+
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const result = useForgeStore((s) => s.result);
@@ -1247,17 +1393,26 @@ export function Viewport() {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const initialFitRequestedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
   const [hoverLabel, setHoverLabel] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
   const themeName = useForgeStore((s) => s.theme);
   const t = themes[themeName];
 
+  const handleViewPersistenceResolved = useCallback((restored: boolean) => {
+    if (restored) {
+      initialFitRequestedRef.current = true;
+    }
+    setViewPersistenceResolved(true);
+  }, []);
+
   useEffect(() => {
+    if (!viewPersistenceResolved) return;
     if (initialFitRequestedRef.current) return;
     if (viewCommand) return;
     if (objects.length === 0) return;
     initialFitRequestedRef.current = true;
     requestViewCommand({ type: 'fit' });
-  }, [objects.length, requestViewCommand, viewCommand]);
+  }, [objects.length, requestViewCommand, viewCommand, viewPersistenceResolved]);
 
   useEffect(() => {
     if (objectPickSyncEnabled) return;
@@ -1419,6 +1574,12 @@ export function Viewport() {
         <ViewManager
           isSketchOnly={isSketchOnly}
           controlsRef={controlsRef}
+        />
+
+        <ViewPersistence
+          controlsRef={controlsRef}
+          isSketchOnly={isSketchOnly}
+          onResolved={handleViewPersistenceResolved}
         />
 
         <ViewController

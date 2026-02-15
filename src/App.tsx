@@ -21,6 +21,30 @@ const btnStyle = (active = false): React.CSSProperties => ({
   fontSize: 12,
 });
 
+const CODE_PANEL_WIDTH_KEY = 'fc-layout-code-panel-width-v1';
+const VIEW_PANEL_WIDTH_KEY = 'fc-layout-view-panel-width-v1';
+
+const readPanelWidth = (key: string, fallback: number, min: number, max: number): number => {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? Number(raw) : NaN;
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+  } catch {
+    return fallback;
+  }
+};
+
+const persistPanelWidth = (key: string, value: number): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    // Ignore storage failures (private mode, quota, etc.)
+  }
+};
+
 function Toolbar() {
   const activeFile = useForgeStore((s) => s.activeFile);
   const dirty = useForgeStore((s) => s.dirty);
@@ -118,13 +142,17 @@ export function App() {
   const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
   const refreshFiles = useForgeStore((s) => s.refreshFiles);
-  const [codePanelWidth, setCodePanelWidth] = useState(520);
-  const [viewPanelWidth, setViewPanelWidth] = useState(280);
-  const dragStateRef = useRef<{ type: 'code' | 'view'; startX: number; startWidth: number } | null>(null);
   const minCodePanelWidth = 320;
   const maxCodePanelWidth = 860;
   const minViewPanelWidth = 220;
   const maxViewPanelWidth = 460;
+  const [codePanelWidth, setCodePanelWidth] = useState(() => (
+    readPanelWidth(CODE_PANEL_WIDTH_KEY, 520, minCodePanelWidth, maxCodePanelWidth)
+  ));
+  const [viewPanelWidth, setViewPanelWidth] = useState(() => (
+    readPanelWidth(VIEW_PANEL_WIDTH_KEY, 280, minViewPanelWidth, maxViewPanelWidth)
+  ));
+  const dragStateRef = useRef<{ type: 'code' | 'view'; startX: number; startWidth: number } | null>(null);
 
   useEffect(() => {
     initKernel().then(() => {
@@ -185,6 +213,14 @@ export function App() {
       window.removeEventListener('mouseup', handleUp);
     };
   }, []);
+
+  useEffect(() => {
+    persistPanelWidth(CODE_PANEL_WIDTH_KEY, codePanelWidth);
+  }, [codePanelWidth]);
+
+  useEffect(() => {
+    persistPanelWidth(VIEW_PANEL_WIDTH_KEY, viewPanelWidth);
+  }, [viewPanelWidth]);
 
   if (!kernelReady) {
     return (

@@ -206,7 +206,27 @@ interface ForgeStore {
   closeFileSwitcher: () => void;
 }
 
+interface ViewPreferencesState {
+  renderMode: RenderMode;
+  projectionMode: ProjectionMode;
+  gridEnabled: boolean;
+  gridSize: number;
+  objectSettings: Record<string, ObjectSettings>;
+  objectPickSyncEnabled: boolean;
+  measureSnapPx: number;
+  dimensionsVisible: boolean;
+  cutPlaneEnabled: Record<string, boolean>;
+  sectionPlaneGuidesEnabled: boolean;
+  sectionPlaneFillEnabled: boolean;
+  sectionPlaneFillOpacity: number;
+  sectionPlaneBorderEnabled: boolean;
+  sectionPlaneAxisEnabled: boolean;
+  fileExplorerOpen: boolean;
+  viewPanelOpen: boolean;
+}
+
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
+const VIEW_PREFERENCES_KEY = 'fc-view-preferences-v1';
 
 const syncObjectSettings = (
   objects: SceneObject[],
@@ -241,6 +261,31 @@ const syncCutPlaneEnabled = (
   });
   return next;
 };
+
+const readViewPreferences = (): Partial<ViewPreferencesState> => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(VIEW_PREFERENCES_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return {};
+    return parsed as Partial<ViewPreferencesState>;
+  } catch {
+    return {};
+  }
+};
+
+const writeViewPreferences = (patch: Partial<ViewPreferencesState>): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    const next = { ...readViewPreferences(), ...patch };
+    localStorage.setItem(VIEW_PREFERENCES_KEY, JSON.stringify(next));
+  } catch {
+    // Ignore storage failures (private mode, quota, etc.)
+  }
+};
+
+const initialViewPreferences = readViewPreferences();
 
 export const useForgeStore = create<ForgeStore>((set, get) => ({
   files: { ...INITIAL_FILES },
@@ -411,14 +456,16 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     setParamOverrides(paramOverrides);
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
+    const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
     set({
       result: runResult,
       consoleLogs: runResult.logs,
       params: runResult.params,
       objectSettings: synced.settings,
       selectedObjectId: synced.selectedObjectId,
-      cutPlaneEnabled: syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled),
+      cutPlaneEnabled: nextCutPlaneEnabled,
     });
+    writeViewPreferences({ objectSettings: synced.settings, cutPlaneEnabled: nextCutPlaneEnabled });
   },
 
   setParam: (name, value) => {
@@ -430,43 +477,66 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (!code) return;
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
+    const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
     set({
       result: runResult,
       consoleLogs: runResult.logs,
       params: runResult.params,
       objectSettings: synced.settings,
       selectedObjectId: synced.selectedObjectId,
-      cutPlaneEnabled: syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled),
+      cutPlaneEnabled: nextCutPlaneEnabled,
     });
+    writeViewPreferences({ objectSettings: synced.settings, cutPlaneEnabled: nextCutPlaneEnabled });
   },
 
-  renderMode: 'overlay',
-  setRenderMode: (mode) => set({ renderMode: mode }),
-  projectionMode: 'perspective',
-  setProjectionMode: (mode) => set({ projectionMode: mode }),
-  gridEnabled: true,
-  gridSize: 10,
-  setGridEnabled: (enabled) => set({ gridEnabled: enabled }),
-  setGridSize: (size) => set({ gridSize: size }),
-  objectSettings: {},
+  renderMode: initialViewPreferences.renderMode ?? 'overlay',
+  setRenderMode: (mode) => {
+    writeViewPreferences({ renderMode: mode });
+    set({ renderMode: mode });
+  },
+  projectionMode: initialViewPreferences.projectionMode ?? 'perspective',
+  setProjectionMode: (mode) => {
+    writeViewPreferences({ projectionMode: mode });
+    set({ projectionMode: mode });
+  },
+  gridEnabled: initialViewPreferences.gridEnabled ?? true,
+  gridSize: initialViewPreferences.gridSize ?? 10,
+  setGridEnabled: (enabled) => {
+    writeViewPreferences({ gridEnabled: enabled });
+    set({ gridEnabled: enabled });
+  },
+  setGridSize: (size) => {
+    writeViewPreferences({ gridSize: size });
+    set({ gridSize: size });
+  },
+  objectSettings: initialViewPreferences.objectSettings ?? {},
   setObjectVisibility: (id, visible) => set((s) => {
     const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
-    return { objectSettings: { ...s.objectSettings, [id]: { ...current, visible } } };
+    const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, visible } };
+    writeViewPreferences({ objectSettings: nextObjectSettings });
+    return { objectSettings: nextObjectSettings };
   }),
   setObjectOpacity: (id, opacity) => set((s) => {
     const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
-    return { objectSettings: { ...s.objectSettings, [id]: { ...current, opacity } } };
+    const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, opacity } };
+    writeViewPreferences({ objectSettings: nextObjectSettings });
+    return { objectSettings: nextObjectSettings };
   }),
   setObjectColor: (id, color) => set((s) => {
     const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
-    return { objectSettings: { ...s.objectSettings, [id]: { ...current, color } } };
+    const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, color } };
+    writeViewPreferences({ objectSettings: nextObjectSettings });
+    return { objectSettings: nextObjectSettings };
   }),
   selectedObjectId: null,
   selectObject: (id) => set({ selectedObjectId: id }),
   hoveredObjectId: null,
   setHoveredObjectId: (id) => set({ hoveredObjectId: id }),
-  objectPickSyncEnabled: true,
-  setObjectPickSyncEnabled: (enabled) => set({ objectPickSyncEnabled: enabled }),
+  objectPickSyncEnabled: initialViewPreferences.objectPickSyncEnabled ?? true,
+  setObjectPickSyncEnabled: (enabled) => {
+    writeViewPreferences({ objectPickSyncEnabled: enabled });
+    set({ objectPickSyncEnabled: enabled });
+  },
   viewCommand: null,
   requestViewCommand: (command) => set({ viewCommand: { ...command, id: Date.now() } }),
   clearViewCommand: () => set({ viewCommand: null }),
@@ -494,24 +564,51 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   })),
   removeMeasurement: (id) => set((s) => ({ measurements: s.measurements.filter((m) => m.id !== id) })),
   clearMeasure: () => set({ measurements: [] }),
-  measureSnapPx: 12,
-  setMeasureSnapPx: (value) => set({ measureSnapPx: value }),
+  measureSnapPx: initialViewPreferences.measureSnapPx ?? 12,
+  setMeasureSnapPx: (value) => {
+    writeViewPreferences({ measureSnapPx: value });
+    set({ measureSnapPx: value });
+  },
 
-  dimensionsVisible: true,
-  toggleDimensions: () => set((s) => ({ dimensionsVisible: !s.dimensionsVisible })),
+  dimensionsVisible: initialViewPreferences.dimensionsVisible ?? true,
+  toggleDimensions: () => set((s) => {
+    const nextDimensionsVisible = !s.dimensionsVisible;
+    writeViewPreferences({ dimensionsVisible: nextDimensionsVisible });
+    return { dimensionsVisible: nextDimensionsVisible };
+  }),
 
-  cutPlaneEnabled: {},
-  setCutPlaneEnabled: (name, enabled) => set((s) => ({ cutPlaneEnabled: { ...s.cutPlaneEnabled, [name]: enabled } })),
-  sectionPlaneGuidesEnabled: true,
-  sectionPlaneFillEnabled: true,
-  sectionPlaneFillOpacity: 0.2,
-  sectionPlaneBorderEnabled: true,
-  sectionPlaneAxisEnabled: true,
-  setSectionPlaneGuidesEnabled: (enabled) => set({ sectionPlaneGuidesEnabled: enabled }),
-  setSectionPlaneFillEnabled: (enabled) => set({ sectionPlaneFillEnabled: enabled }),
-  setSectionPlaneFillOpacity: (opacity) => set({ sectionPlaneFillOpacity: Math.max(0, Math.min(1, opacity)) }),
-  setSectionPlaneBorderEnabled: (enabled) => set({ sectionPlaneBorderEnabled: enabled }),
-  setSectionPlaneAxisEnabled: (enabled) => set({ sectionPlaneAxisEnabled: enabled }),
+  cutPlaneEnabled: initialViewPreferences.cutPlaneEnabled ?? {},
+  setCutPlaneEnabled: (name, enabled) => set((s) => {
+    const nextCutPlaneEnabled = { ...s.cutPlaneEnabled, [name]: enabled };
+    writeViewPreferences({ cutPlaneEnabled: nextCutPlaneEnabled });
+    return { cutPlaneEnabled: nextCutPlaneEnabled };
+  }),
+  sectionPlaneGuidesEnabled: initialViewPreferences.sectionPlaneGuidesEnabled ?? true,
+  sectionPlaneFillEnabled: initialViewPreferences.sectionPlaneFillEnabled ?? true,
+  sectionPlaneFillOpacity: initialViewPreferences.sectionPlaneFillOpacity ?? 0.2,
+  sectionPlaneBorderEnabled: initialViewPreferences.sectionPlaneBorderEnabled ?? true,
+  sectionPlaneAxisEnabled: initialViewPreferences.sectionPlaneAxisEnabled ?? true,
+  setSectionPlaneGuidesEnabled: (enabled) => {
+    writeViewPreferences({ sectionPlaneGuidesEnabled: enabled });
+    set({ sectionPlaneGuidesEnabled: enabled });
+  },
+  setSectionPlaneFillEnabled: (enabled) => {
+    writeViewPreferences({ sectionPlaneFillEnabled: enabled });
+    set({ sectionPlaneFillEnabled: enabled });
+  },
+  setSectionPlaneFillOpacity: (opacity) => {
+    const safeOpacity = Math.max(0, Math.min(1, opacity));
+    writeViewPreferences({ sectionPlaneFillOpacity: safeOpacity });
+    set({ sectionPlaneFillOpacity: safeOpacity });
+  },
+  setSectionPlaneBorderEnabled: (enabled) => {
+    writeViewPreferences({ sectionPlaneBorderEnabled: enabled });
+    set({ sectionPlaneBorderEnabled: enabled });
+  },
+  setSectionPlaneAxisEnabled: (enabled) => {
+    writeViewPreferences({ sectionPlaneAxisEnabled: enabled });
+    set({ sectionPlaneAxisEnabled: enabled });
+  },
 
   newProject: () => {
     set({
@@ -632,10 +729,18 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   kernelReady: false,
   setKernelReady: (v) => set({ kernelReady: v }),
 
-  fileExplorerOpen: true,
-  toggleFileExplorer: () => set((s) => ({ fileExplorerOpen: !s.fileExplorerOpen })),
-  viewPanelOpen: true,
-  toggleViewPanel: () => set((s) => ({ viewPanelOpen: !s.viewPanelOpen })),
+  fileExplorerOpen: initialViewPreferences.fileExplorerOpen ?? true,
+  toggleFileExplorer: () => set((s) => {
+    const nextFileExplorerOpen = !s.fileExplorerOpen;
+    writeViewPreferences({ fileExplorerOpen: nextFileExplorerOpen });
+    return { fileExplorerOpen: nextFileExplorerOpen };
+  }),
+  viewPanelOpen: initialViewPreferences.viewPanelOpen ?? true,
+  toggleViewPanel: () => set((s) => {
+    const nextViewPanelOpen = !s.viewPanelOpen;
+    writeViewPreferences({ viewPanelOpen: nextViewPanelOpen });
+    return { viewPanelOpen: nextViewPanelOpen };
+  }),
 
   updateSketchConstraint: (objectId, constraintId, value) => {
     const current = get().result;
