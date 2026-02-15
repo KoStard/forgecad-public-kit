@@ -110,6 +110,12 @@ interface DetailPageSpec {
 
 type PageSpec = StandardPageSpec | DetailPageSpec;
 
+interface DimensionOwnership {
+  byId: Map<string, string[]>;
+  combined: DimensionDef[];
+  byComponent: Map<string, DimensionDef[]>;
+}
+
 const DEFAULT_VIEWS: ReportViewId[] = ['front', 'right', 'top', 'iso'];
 const DEFAULT_COLOR_HEX = '#5b9bd5';
 const PAGE_WIDTH = 842;
@@ -404,6 +410,29 @@ function mapDimensionsToOwners(
   }
 
   return out;
+}
+
+function buildDimensionOwnership(
+  dimensions: DimensionDef[],
+  objects: ReportObject[],
+): DimensionOwnership {
+  const byId = mapDimensionsToOwners(dimensions, objects);
+  const combined: DimensionDef[] = [];
+  const byComponent = new Map<string, DimensionDef[]>();
+  objects.forEach((obj) => byComponent.set(obj.id, []));
+
+  dimensions.forEach((dim) => {
+    const owners = byId.get(dim.id) || [];
+    if (owners.length === 1) {
+      const list = byComponent.get(owners[0]);
+      if (list) list.push(dim);
+      else combined.push(dim);
+      return;
+    }
+    combined.push(dim);
+  });
+
+  return { byId, combined, byComponent };
 }
 
 function projectedBounds(
@@ -1098,13 +1127,19 @@ function renderViewCell(
     const leaderStart = plan.anchor;
     const leaderEnd = closestPointOnBox(box, leaderStart);
     const leaderDist = Math.hypot(leaderEnd[0] - leaderStart[0], leaderEnd[1] - leaderStart[1]);
+    const textW = estimateTextWidth(plan.label, plan.fontSize);
+    const leftEdge = cell.x + 4;
+    const rightEdge = cell.x + cell.w - 4;
+    let textX = pos[0] - textW * 0.5 + 1.5; // centered baseline by default
+    if (textX + textW > rightEdge) textX = rightEdge - textW; // right-aligned near right edge
+    if (textX < leftEdge) textX = leftEdge; // left-aligned near left edge
     cmd.push(commandSetStroke(plan.color));
     cmd.push(commandSetFill(plan.color));
     if (leaderDist > 10) {
       cmd.push('0.35 w\n');
       cmd.push(commandLine(leaderStart, leaderEnd));
     }
-    cmd.push(commandText(plan.label, pos[0] + 2, pos[1] - 3, plan.fontSize));
+    cmd.push(commandText(plan.label, textX, pos[1] - 3, plan.fontSize));
   });
 
   cmd.push('Q\n');
@@ -1221,8 +1256,8 @@ function collectDetailPagesFor(
       ));
       out.push({
         kind: 'detail',
-        title: `${page.title} - ${view.label} ${region.label}`,
-        subtitle: 'Detail continuation page',
+        title: `${page.title} | ${view.label.toUpperCase()} ${region.label.toUpperCase()}`,
+        subtitle: 'Zoom continuation',
         objects: page.objects,
         dimensions: dims,
         view,
@@ -1294,23 +1329,23 @@ function buildPages(
   const pages: PageSpec[] = [];
   const basePages: StandardPageSpec[] = [];
   const generated = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const ownership = buildDimensionOwnership(dimensions, objects);
 
   basePages.push({
     kind: 'standard',
-    title: `${title} - Combined`,
-    subtitle: `Combined model views | ${objects.length} components | ${generated} UTC`,
+    title: 'ASSEMBLY OVERVIEW',
+    subtitle: `${objects.length} components | ${ownership.combined.length} shared dimensions | ${generated} UTC`,
     objects,
-    dimensions,
+    dimensions: ownership.combined,
   });
 
   if (includeDisassembled) {
-    const owners = mapDimensionsToOwners(dimensions, objects);
     objects.forEach((obj) => {
-      const dims = dimensions.filter((d) => (owners.get(d.id) || []).includes(obj.id));
+      const dims = ownership.byComponent.get(obj.id) || [];
       basePages.push({
         kind: 'standard',
-        title: `${title} - Component`,
-        subtitle: `${obj.name}${obj.groupName ? ` (group: ${obj.groupName})` : ''} | ${dims.length} associated dimensions`,
+        title: `COMPONENT: ${obj.name}`,
+        subtitle: `${obj.groupName ? `Group ${obj.groupName} | ` : ''}${dims.length} component dimensions`,
         objects: [obj],
         dimensions: dims,
       });
