@@ -127,6 +127,10 @@ const result = box.toShape().subtract(cylinder(25, 10));
 // Translate preserves topology
 const moved = box.translate(50, 0, 0);
 moved.face('top').center;  // shifted by [50, 0, 0]
+
+// Duplicate preserves topology metadata too
+const copy = box.clone();
+copy.face('side-left');
 ```
 
 ## Constraint Helpers

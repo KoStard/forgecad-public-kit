@@ -18,6 +18,21 @@ export class ShapeGroup {
     return new ShapeGroup(this.children.map(fn));
   }
 
+  /** Return a deep-cloned ShapeGroup tree. */
+  clone(): ShapeGroup {
+    return this.mapChildren((c) => {
+      if (c instanceof ShapeGroup) return c.clone();
+      if (c instanceof TrackedShape) return c.clone();
+      if (c instanceof Shape) return c.clone();
+      return c.clone();
+    });
+  }
+
+  /** Alias for clone() */
+  duplicate(): ShapeGroup {
+    return this.clone();
+  }
+
   translate(x: number, y: number, z: number): ShapeGroup {
     return this.mapChildren(c => {
       if (c instanceof ShapeGroup) return c.translate(x, y, z);

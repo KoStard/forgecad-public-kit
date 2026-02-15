@@ -43,6 +43,16 @@ export class Shape {
     return this.setColor(value);
   }
 
+  /** Return a new Shape wrapper for explicit duplication in scripts. */
+  clone(): Shape {
+    return new Shape(this.manifold, this.colorHex);
+  }
+
+  /** Alias for clone() */
+  duplicate(): Shape {
+    return this.clone();
+  }
+
   // --- Transforms (all return new Shape, immutable) ---
 
   translate(x: number, y: number, z: number): Shape {

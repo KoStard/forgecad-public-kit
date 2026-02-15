@@ -4,6 +4,15 @@
 
 ## Methods
 
+### `.clone()` / `.duplicate()`
+Create an explicit copy handle of a sketch (same profile/color) so variants are easy to branch.
+
+```javascript
+const profile = rect(40, 20);
+const left = profile.clone().translate(-30, 0);
+const right = profile.duplicate().translate(30, 0);
+```
+
 ### `.translate(x, y?)`
 Moves the sketch.
 

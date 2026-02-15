@@ -78,6 +78,21 @@ export class TrackedShape {
     return [...this.topology.edges.keys()];
   }
 
+  /** Return a new TrackedShape wrapper with copied topology metadata. */
+  clone(): TrackedShape {
+    return new TrackedShape(
+      this.shape.clone(),
+      cloneTopology(this.topology),
+      this.baseHeight,
+      this.extrudeUp,
+    );
+  }
+
+  /** Alias for clone() */
+  duplicate(): TrackedShape {
+    return this.clone();
+  }
+
   // Delegate Shape methods, preserving topology with offset transforms
   translate(x: number, y: number, z: number): TrackedShape {
     const newTopo = offsetTopology(this.topology, x, y, z);
@@ -289,6 +304,26 @@ function offsetTopology(topo: Topology, dx: number, dy: number, dz: number): Top
       ...edge,
       start: [edge.start[0] + dx, edge.start[1] + dy, edge.start[2] + dz],
       end: [edge.end[0] + dx, edge.end[1] + dy, edge.end[2] + dz],
+    });
+  }
+  return { faces, edges };
+}
+
+function cloneTopology(topo: Topology): Topology {
+  const faces = new Map<FaceName, FaceRef>();
+  for (const [name, face] of topo.faces) {
+    faces.set(name, {
+      ...face,
+      normal: [face.normal[0], face.normal[1], face.normal[2]],
+      center: [face.center[0], face.center[1], face.center[2]],
+    });
+  }
+  const edges = new Map<EdgeName, EdgeRef>();
+  for (const [name, edge] of topo.edges) {
+    edges.set(name, {
+      ...edge,
+      start: [edge.start[0], edge.start[1], edge.start[2]],
+      end: [edge.end[0], edge.end[1], edge.end[2]],
     });
   }
   return { faces, edges };

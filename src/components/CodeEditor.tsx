@@ -36,6 +36,8 @@ declare function hull2d(...sketches: Sketch[]): Sketch;
 declare function constrainedSketch(): ConstrainedSketchBuilder;
 
 declare class Shape {
+  clone(): Shape;
+  duplicate(): Shape;
   // Transforms
   translate(x: number, y: number, z: number): Shape;
   /** Move so bounding box min corner is at the given global coordinate */
@@ -91,6 +93,8 @@ declare class Shape {
 }
 
 declare class Sketch {
+  clone(): Sketch;
+  duplicate(): Sketch;
   translate(x: number, y?: number): Sketch;
   rotate(degrees: number): Sketch;
   scale(v: number | [number, number]): Sketch;
@@ -210,6 +214,8 @@ declare class Rectangle2D {
 }
 
 declare class TrackedShape {
+  clone(): TrackedShape;
+  duplicate(): TrackedShape;
   face(name: string): { normal: [number, number, number]; center: [number, number, number] };
   edge(name: string): { start: [number, number, number]; end: [number, number, number] };
   faceNames(): string[];
@@ -321,6 +327,8 @@ declare function group(...items: (Shape | Sketch | TrackedShape | ShapeGroup)[])
 
 declare class ShapeGroup {
   readonly children: (Shape | Sketch | TrackedShape | ShapeGroup)[];
+  clone(): ShapeGroup;
+  duplicate(): ShapeGroup;
   translate(x: number, y: number, z: number): ShapeGroup;
   /** Move so combined bounding box min corner is at the given global coordinate */
   moveTo(x: number, y: number, z: number): ShapeGroup;

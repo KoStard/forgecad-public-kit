@@ -18,6 +18,15 @@ const blue = circle2d(25).color('#0066ff');
 
 Colors are preserved through transforms and boolean operations.
 
+#### `.clone()` / `.duplicate()`
+Create an explicit duplicate of a sketch wrapper.
+
+```javascript
+const base = rect(50, 30);
+const a = base.clone();
+const b = base.duplicate().translate(60, 0);
+```
+
 ### Query Methods
 
 #### `.area(): number`

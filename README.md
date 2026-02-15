@@ -131,6 +131,7 @@ Plane spec (either form):
 - `.rotate(x, y, z)` — Euler angles in degrees
 - `.scale(v)` — uniform or `[x, y, z]`
 - `.mirror([nx, ny, nz])` — mirror over plane
+- `.clone()` / `.duplicate()` — explicit copy before branching variants
 
 ### Parameters
 - `param(name, default, { min?, max?, step?, unit? })` — declares a slider

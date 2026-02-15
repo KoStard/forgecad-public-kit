@@ -15,6 +15,16 @@ export class Sketch {
     return new Sketch(this.cross, value);
   }
 
+  /** Return a new Sketch wrapper for explicit duplication in scripts. */
+  clone(): Sketch {
+    return new Sketch(this.cross, this.colorHex);
+  }
+
+  /** Alias for clone() */
+  duplicate(): Sketch {
+    return this.clone();
+  }
+
   area(): number { return this.cross.area(); }
   bounds() { return this.cross.bounds(); }
   isEmpty(): boolean { return this.cross.isEmpty(); }

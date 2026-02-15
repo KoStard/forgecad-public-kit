@@ -216,6 +216,15 @@ const lowPoly = sphere(25, 8);  // Octahedron-like
 
 All transforms are **chainable** and **immutable** (return new shapes).
 
+### `.clone()` / `.duplicate()`
+Create an explicit copy handle of a shape (same geometry/color) so you can branch variants clearly.
+
+```javascript
+const bracket = box(60, 20, 8);
+const left = bracket.clone().translate(-40, 0, 0);
+const right = bracket.duplicate().translate(40, 0, 0);
+```
+
 ### `.translate(x, y, z)`
 Moves the shape relative to its current position.
 
@@ -468,6 +477,8 @@ group.rotate(x, y, z)
 group.scale(v)
 group.mirror(normal)
 group.color(hex)  // applies to all children
+group.clone()
+group.duplicate() // alias
 ```
 
 When a ShapeGroup is returned from a script, each child becomes a separate viewport object with its own visibility/color controls.
@@ -781,6 +792,8 @@ sketch.translate(x, y?)
 sketch.rotate(degrees)
 sketch.scale(v)  // v can be number or [x, y]
 sketch.mirror([nx, ny])
+sketch.clone()
+sketch.duplicate() // alias
 ```
 
 ### 2D Boolean Operations
@@ -931,6 +944,7 @@ box.edgeNames();           // all edge names
 box.translate(50, 0, 0);  // preserves topology
 box.rotateAroundEdge('top-bottom', 90);  // rotate around named edge
 box.toShape();             // unwrap to plain Shape for booleans
+box.clone();               // explicit duplicate with topology
 ```
 
 ### Utility Functions
