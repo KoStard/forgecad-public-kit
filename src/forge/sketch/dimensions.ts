@@ -39,6 +39,17 @@ export function getCollectedDimensions(): DimensionDef[] {
   return collectedDimensions;
 }
 
+/**
+ * Remove and return dimensions collected since `startIndex`.
+ * Useful for scoping dimensions to imported components.
+ */
+export function takeCollectedDimensions(startIndex: number): DimensionDef[] {
+  const idx = Math.max(0, Math.min(startIndex, collectedDimensions.length));
+  const taken = collectedDimensions.slice(idx);
+  collectedDimensions = collectedDimensions.slice(0, idx);
+  return taken;
+}
+
 type PointArg = [number, number] | [number, number, number] | Point2D;
 
 function toVec3(p: PointArg): [number, number, number] {

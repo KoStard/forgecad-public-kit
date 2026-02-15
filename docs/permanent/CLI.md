@@ -117,6 +117,21 @@ npm run check:transforms
 
 Runs fast math-level invariants to catch transform order and frame composition regressions before they leak into examples.
 
+### Dimension Debugger
+
+```bash
+npm run debug:dimensions -- /path/to/file.forge.js [--all]
+
+# Fallback runner (if npx/registry access is unavailable)
+bun cli/debug-dimensions.ts /path/to/file.forge.js [--all]
+```
+
+Prints:
+- total object count
+- total dimension count
+- per-object approximate dimension ownership (both endpoints inside object bbox)
+- a dimension coordinate list (first 20 by default, `--all` for full dump)
+
 ## Adding New CLI Commands
 
 1. Create `cli/your-command.ts`

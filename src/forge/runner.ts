@@ -53,12 +53,13 @@ import {
   dimLine,
   resetDimensions,
   getCollectedDimensions,
+  takeCollectedDimensions,
   type DimensionDef,
 } from './sketch';
 import { param, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, type ParamDef } from './params';
 import { joint } from './joint';
 import { Assembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
-import { Transform, composeChain } from './transform';
+import { Transform, composeChain, type Mat4 } from './transform';
 import { partLibrary } from './library';
 import { ShapeGroup, group } from './group';
 import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
@@ -100,14 +101,216 @@ interface ImportScope {
   localOverrides?: Record<string, number>;
 }
 
+const LOG_MAX_DEPTH = 4;
+const LOG_MAX_ARRAY_ITEMS = 24;
+const LOG_MAX_OBJECT_KEYS = 32;
+const LOG_NUMBER_PRECISION = 4;
+
+function formatLogError(error: unknown): string {
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  return String(error);
+}
+
+function roundLogNumber(value: number): number {
+  return Number(value.toFixed(LOG_NUMBER_PRECISION));
+}
+
+function toRoundedNumberArray(value: unknown): number[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry): entry is number => typeof entry === 'number' && Number.isFinite(entry))
+      .map(roundLogNumber);
+  }
+  if (
+    ArrayBuffer.isView(value) &&
+    'length' in value &&
+    typeof (value as { length: unknown }).length === 'number'
+  ) {
+    return Array.from(value as unknown as ArrayLike<number>)
+      .filter((entry) => Number.isFinite(entry))
+      .map(roundLogNumber);
+  }
+  return [];
+}
+
+function summarizeShapeForLog(shape: Shape): Record<string, unknown> {
+  const summary: Record<string, unknown> = { type: 'Shape' };
+  if (shape.colorHex != null) summary.color = shape.colorHex;
+
+  try {
+    const bbox = shape.boundingBox();
+    const min = toRoundedNumberArray(bbox.min);
+    const max = toRoundedNumberArray(bbox.max);
+    summary.bbox = { min, max };
+    if (min.length === max.length && min.length > 0) {
+      summary.size = min.map((value, index) => roundLogNumber(max[index] - value));
+    }
+  } catch (error) {
+    summary.bboxError = formatLogError(error);
+  }
+
+  try { summary.volume = roundLogNumber(shape.volume()); } catch (error) { summary.volumeError = formatLogError(error); }
+  try { summary.surfaceArea = roundLogNumber(shape.surfaceArea()); } catch (error) { summary.surfaceAreaError = formatLogError(error); }
+  try { summary.triangles = shape.numTri(); } catch (error) { summary.triangleError = formatLogError(error); }
+  try { summary.isEmpty = shape.isEmpty(); } catch (error) { summary.isEmptyError = formatLogError(error); }
+  return summary;
+}
+
+function summarizeTrackedShapeForLog(shape: TrackedShape): Record<string, unknown> {
+  const faceNames = shape.faceNames();
+  const edgeNames = shape.edgeNames();
+  const limitedFaceNames = faceNames.slice(0, LOG_MAX_ARRAY_ITEMS);
+  const limitedEdgeNames = edgeNames.slice(0, LOG_MAX_ARRAY_ITEMS);
+
+  const faceDetails: Record<string, unknown> = {};
+  for (const name of limitedFaceNames) {
+    try {
+      const face = shape.face(name);
+      faceDetails[name] = {
+        normal: toRoundedNumberArray(face.normal),
+        center: toRoundedNumberArray(face.center),
+      };
+    } catch (error) {
+      faceDetails[name] = { error: formatLogError(error) };
+    }
+  }
+
+  const edgeDetails: Record<string, unknown> = {};
+  for (const name of limitedEdgeNames) {
+    try {
+      const edge = shape.edge(name);
+      edgeDetails[name] = {
+        start: toRoundedNumberArray(edge.start),
+        end: toRoundedNumberArray(edge.end),
+      };
+    } catch (error) {
+      edgeDetails[name] = { error: formatLogError(error) };
+    }
+  }
+
+  return {
+    type: 'TrackedShape',
+    shape: summarizeShapeForLog(shape.toShape()),
+    topology: {
+      faceCount: faceNames.length,
+      edgeCount: edgeNames.length,
+      faceNames: limitedFaceNames,
+      edgeNames: limitedEdgeNames,
+      truncatedFaces: Math.max(0, faceNames.length - limitedFaceNames.length),
+      truncatedEdges: Math.max(0, edgeNames.length - limitedEdgeNames.length),
+      faces: faceDetails,
+      edges: edgeDetails,
+    },
+  };
+}
+
+function inspectForLog(value: unknown, depth = 0, seen: WeakSet<object> = new WeakSet()): unknown {
+  if (value == null) return value;
+  if (typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? roundLogNumber(value) : String(value);
+  if (typeof value === 'bigint') return `${value}n`;
+  if (typeof value === 'symbol') return value.toString();
+  if (typeof value === 'function') {
+    const name = value.name || 'anonymous';
+    return `[Function ${name}]`;
+  }
+
+  if (value instanceof Shape) return summarizeShapeForLog(value);
+  if (value instanceof TrackedShape) return summarizeTrackedShapeForLog(value);
+  if (value instanceof Error) return { type: value.name, message: value.message, stack: value.stack };
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof RegExp) return value.toString();
+
+  if (depth >= LOG_MAX_DEPTH) return `[MaxDepth ${LOG_MAX_DEPTH}]`;
+
+  if (Array.isArray(value)) {
+    const items = value.slice(0, LOG_MAX_ARRAY_ITEMS).map((item) => inspectForLog(item, depth + 1, seen));
+    if (value.length > LOG_MAX_ARRAY_ITEMS) {
+      items.push(`[+${value.length - LOG_MAX_ARRAY_ITEMS} more items]`);
+    }
+    return items;
+  }
+
+  if (value instanceof Map) {
+    const entries: Array<[string, unknown]> = [];
+    let index = 0;
+    for (const [key, entryValue] of value.entries()) {
+      if (index >= LOG_MAX_ARRAY_ITEMS) break;
+      entries.push([String(key), inspectForLog(entryValue, depth + 1, seen)]);
+      index += 1;
+    }
+    return {
+      type: 'Map',
+      size: value.size,
+      entries,
+      truncatedEntries: Math.max(0, value.size - entries.length),
+    };
+  }
+
+  if (value instanceof Set) {
+    const setValues = Array.from(value.values());
+    return {
+      type: 'Set',
+      size: value.size,
+      values: setValues.slice(0, LOG_MAX_ARRAY_ITEMS).map((entry) => inspectForLog(entry, depth + 1, seen)),
+      truncatedValues: Math.max(0, setValues.length - LOG_MAX_ARRAY_ITEMS),
+    };
+  }
+
+  if (typeof value === 'object') {
+    if (typeof (value as { toShape?: unknown }).toShape === 'function') {
+      try {
+        const resolved = (value as { toShape: () => unknown }).toShape();
+        if (resolved instanceof Shape) {
+          return {
+            type: (value as { constructor?: { name?: string } }).constructor?.name ?? 'ShapeLike',
+            shape: summarizeShapeForLog(resolved),
+          };
+        }
+      } catch (error) {
+        return { type: 'ShapeLike', error: formatLogError(error) };
+      }
+    }
+
+    if (seen.has(value as object)) return '[Circular]';
+    seen.add(value as object);
+
+    const constructorName = (value as { constructor?: { name?: string } }).constructor?.name;
+    const out: Record<string, unknown> = {};
+    if (constructorName && constructorName !== 'Object') out.type = constructorName;
+
+    const entries = Object.entries(value as Record<string, unknown>);
+    const limitedEntries = entries.slice(0, LOG_MAX_OBJECT_KEYS);
+    for (const [key, entryValue] of limitedEntries) {
+      out[key] = inspectForLog(entryValue, depth + 1, seen);
+    }
+    if (entries.length > LOG_MAX_OBJECT_KEYS) {
+      out.truncatedKeys = entries.length - LOG_MAX_OBJECT_KEYS;
+    }
+
+    seen.delete(value as object);
+    return out;
+  }
+
+  return String(value);
+}
+
+function formatLogArg(value: unknown): string {
+  if (typeof value === 'string') return value;
+  try {
+    const inspected = inspectForLog(value);
+    if (typeof inspected === 'string') return inspected;
+    return JSON.stringify(inspected, null, 2);
+  } catch (error) {
+    return `[Log serialization failed: ${formatLogError(error)}]`;
+  }
+}
+
 function makeSandboxConsole(): Record<string, (...args: unknown[]) => void> {
   const capture = (level: LogEntry['level']) => (...args: unknown[]) => {
     _collectedLogs.push({
       level,
-      args: args.map(a => {
-        try { return typeof a === 'string' ? a : JSON.stringify(a); }
-        catch { return String(a); }
-      }),
+      args: args.map(formatLogArg),
       timestamp: Date.now(),
     });
   };
@@ -132,6 +335,198 @@ function parseImportParamArgs(
     normalized[key] = value;
   }
   return normalized;
+}
+
+const shapeBoundDimensions = new WeakMap<Shape, DimensionDef[]>();
+let boundDimensionIdCounter = 0;
+let shapeDimensionHooksInstalled = false;
+
+function nextBoundDimensionId(): string {
+  boundDimensionIdCounter += 1;
+  return `dim-bound-${boundDimensionIdCounter}`;
+}
+
+function cloneDimensionDef(def: DimensionDef): DimensionDef {
+  return {
+    id: nextBoundDimensionId(),
+    from: [def.from[0], def.from[1], def.from[2]],
+    to: [def.to[0], def.to[1], def.to[2]],
+    offset: def.offset,
+    label: def.label,
+    color: def.color,
+    components: def.components ? [...def.components] : undefined,
+  };
+}
+
+function cloneDimensionDefs(defs: DimensionDef[]): DimensionDef[] {
+  return defs.map(cloneDimensionDef);
+}
+
+function transformPoint3(m: Mat4, p: [number, number, number]): [number, number, number] {
+  const x = p[0], y = p[1], z = p[2];
+  return [
+    m[0] * x + m[4] * y + m[8] * z + m[12],
+    m[1] * x + m[5] * y + m[9] * z + m[13],
+    m[2] * x + m[6] * y + m[10] * z + m[14],
+  ];
+}
+
+function transformDimensionDefs(defs: DimensionDef[], m: Mat4): DimensionDef[] {
+  return defs.map((def) => ({
+    id: nextBoundDimensionId(),
+    from: transformPoint3(m, def.from),
+    to: transformPoint3(m, def.to),
+    offset: def.offset,
+    label: def.label,
+    color: def.color,
+    components: def.components ? [...def.components] : undefined,
+  }));
+}
+
+function bindDimensionsToShape(shape: Shape, defs: DimensionDef[]): Shape {
+  if (defs.length === 0) {
+    shapeBoundDimensions.delete(shape);
+    return shape;
+  }
+  shapeBoundDimensions.set(shape, defs);
+  return shape;
+}
+
+function getBoundDimensions(shape: Shape): DimensionDef[] {
+  return shapeBoundDimensions.get(shape) ?? [];
+}
+
+function shapeFromUnknown(value: unknown): Shape | null {
+  if (value instanceof Shape) return value;
+  if (value && typeof (value as { toShape?: unknown }).toShape === 'function') {
+    const converted = (value as { toShape: () => unknown }).toShape();
+    return converted instanceof Shape ? converted : null;
+  }
+  return null;
+}
+
+function rebindTransformedDimensions(source: Shape, result: Shape, matrix: Mat4): Shape {
+  const defs = getBoundDimensions(source);
+  if (defs.length === 0) return result;
+  return bindDimensionsToShape(result, transformDimensionDefs(defs, matrix));
+}
+
+function rotationEulerMatrix(xDeg: number, yDeg: number, zDeg: number): Mat4 {
+  return composeChain(
+    Transform.rotationAxis([1, 0, 0], xDeg),
+    Transform.rotationAxis([0, 1, 0], yDeg),
+    Transform.rotationAxis([0, 0, 1], zDeg),
+  ).toArray();
+}
+
+function mirrorMatrix(normal: [number, number, number]): Mat4 {
+  const [nx0, ny0, nz0] = normal;
+  const len = Math.hypot(nx0, ny0, nz0);
+  if (len < 1e-12) return Transform.identity().toArray();
+  const nx = nx0 / len;
+  const ny = ny0 / len;
+  const nz = nz0 / len;
+
+  const m00 = 1 - 2 * nx * nx;
+  const m01 = -2 * nx * ny;
+  const m02 = -2 * nx * nz;
+  const m10 = -2 * ny * nx;
+  const m11 = 1 - 2 * ny * ny;
+  const m12 = -2 * ny * nz;
+  const m20 = -2 * nz * nx;
+  const m21 = -2 * nz * ny;
+  const m22 = 1 - 2 * nz * nz;
+
+  return [
+    m00, m10, m20, 0,
+    m01, m11, m21, 0,
+    m02, m12, m22, 0,
+    0, 0, 0, 1,
+  ];
+}
+
+function installShapeDimensionHooks(): void {
+  if (shapeDimensionHooksInstalled) return;
+  shapeDimensionHooksInstalled = true;
+
+  const proto = Shape.prototype as any;
+
+  const originalTranslate = proto.translate;
+  proto.translate = function translateWithDimensions(this: Shape, x: number, y: number, z: number): Shape {
+    const result = originalTranslate.call(this, x, y, z) as Shape;
+    return rebindTransformedDimensions(this, result, Transform.translation(x, y, z).toArray());
+  };
+
+  const originalRotate = proto.rotate;
+  proto.rotate = function rotateWithDimensions(this: Shape, x: number, y: number, z: number): Shape {
+    const result = originalRotate.call(this, x, y, z) as Shape;
+    return rebindTransformedDimensions(this, result, rotationEulerMatrix(x, y, z));
+  };
+
+  const originalTransform = proto.transform;
+  proto.transform = function transformWithDimensions(this: Shape, m: Mat4 | Transform): Shape {
+    const result = originalTransform.call(this, m) as Shape;
+    const matrix = m instanceof Transform ? m.toArray() : m;
+    return rebindTransformedDimensions(this, result, matrix);
+  };
+
+  const originalScale = proto.scale;
+  proto.scale = function scaleWithDimensions(this: Shape, v: number | [number, number, number]): Shape {
+    const result = originalScale.call(this, v) as Shape;
+    return rebindTransformedDimensions(this, result, Transform.scale(v).toArray());
+  };
+
+  const originalMirror = proto.mirror;
+  proto.mirror = function mirrorWithDimensions(this: Shape, normal: [number, number, number]): Shape {
+    const result = originalMirror.call(this, normal) as Shape;
+    return rebindTransformedDimensions(this, result, mirrorMatrix(normal));
+  };
+
+  const originalRotateAround = proto.rotateAround;
+  proto.rotateAround = function rotateAroundWithDimensions(
+    this: Shape,
+    axis: [number, number, number],
+    angleDeg: number,
+    pivot?: [number, number, number],
+  ): Shape {
+    const result = originalRotateAround.call(this, axis, angleDeg, pivot) as Shape;
+    const matrix = Transform.rotationAxis(axis, angleDeg, pivot ?? [0, 0, 0]).toArray();
+    return rebindTransformedDimensions(this, result, matrix);
+  };
+
+  const originalSetColor = proto.setColor;
+  proto.setColor = function setColorWithDimensions(this: Shape, value: string | undefined): Shape {
+    const result = originalSetColor.call(this, value) as Shape;
+    return bindDimensionsToShape(result, cloneDimensionDefs(getBoundDimensions(this)));
+  };
+
+  const originalColor = proto.color;
+  proto.color = function colorWithDimensions(this: Shape, value: string | undefined): Shape {
+    const result = originalColor.call(this, value) as Shape;
+    return bindDimensionsToShape(result, cloneDimensionDefs(getBoundDimensions(this)));
+  };
+
+  const originalAdd = proto.add;
+  proto.add = function addWithDimensions(this: Shape, other: unknown): Shape {
+    const result = originalAdd.call(this, other) as Shape;
+    const otherShape = shapeFromUnknown(other);
+    const merged = [...getBoundDimensions(this), ...(otherShape ? getBoundDimensions(otherShape) : [])];
+    return bindDimensionsToShape(result, cloneDimensionDefs(merged));
+  };
+
+  const originalSubtract = proto.subtract;
+  proto.subtract = function subtractWithDimensions(this: Shape, other: unknown): Shape {
+    const result = originalSubtract.call(this, other) as Shape;
+    return bindDimensionsToShape(result, cloneDimensionDefs(getBoundDimensions(this)));
+  };
+
+  const originalIntersect = proto.intersect;
+  proto.intersect = function intersectWithDimensions(this: Shape, other: unknown): Shape {
+    const result = originalIntersect.call(this, other) as Shape;
+    const otherShape = shapeFromUnknown(other);
+    const merged = [...getBoundDimensions(this), ...(otherShape ? getBoundDimensions(otherShape) : [])];
+    return bindDimensionsToShape(result, cloneDimensionDefs(merged));
+  };
 }
 
 /**
@@ -175,8 +570,12 @@ function executeFile(
       if (!src) throw new Error(`File not found: "${name}"`);
       const localOverrides = parseImportParamArgs('importPart', name, paramOverrides);
       const childScope = { namePrefix: makeChildScopePrefix(name), localOverrides };
+      const dimStart = getCollectedDimensions().length;
       const result = executeFile(src, name, allFiles, visited, childScope);
-      if (result instanceof Shape) return result;
+      const importedDims = takeCollectedDimensions(dimStart);
+      if (result instanceof Shape) {
+        return bindDimensionsToShape(result, cloneDimensionDefs(importedDims));
+      }
       throw new Error(`"${name}" did not return a Shape`);
     };
 
@@ -185,12 +584,33 @@ function executeFile(
     // Wrappers that auto-unwrap TrackedShape for boolean ops
     const unwrap = (s: Shape | TrackedShape): Shape =>
       s instanceof TrackedShape ? s.toShape() : s;
-    const wrappedUnion = (...shapes: (Shape | TrackedShape)[]) => union(...shapes.map(unwrap));
-    const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => difference(...shapes.map(unwrap));
-    const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => intersection(...shapes.map(unwrap));
+    const wrappedUnion = (...shapes: (Shape | TrackedShape)[]) => {
+      const resolved = shapes.map(unwrap);
+      const out = union(...resolved);
+      const mergedDims = resolved.flatMap((s) => getBoundDimensions(s));
+      return bindDimensionsToShape(out, cloneDimensionDefs(mergedDims));
+    };
+    const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => {
+      const resolved = shapes.map(unwrap);
+      const out = difference(...resolved);
+      const baseDims = resolved.length > 0 ? getBoundDimensions(resolved[0]) : [];
+      return bindDimensionsToShape(out, cloneDimensionDefs(baseDims));
+    };
+    const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => {
+      const resolved = shapes.map(unwrap);
+      const out = intersection(...resolved);
+      const mergedDims = resolved.flatMap((s) => getBoundDimensions(s));
+      return bindDimensionsToShape(out, cloneDimensionDefs(mergedDims));
+    };
 
-    const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) =>
-      hull3d(...args.map(a => a instanceof TrackedShape ? a.toShape() : a));
+    const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) => {
+      const resolved = args.map(a => a instanceof TrackedShape ? a.toShape() : a);
+      const out = hull3d(...resolved);
+      const mergedDims = resolved
+        .filter((a): a is Shape => a instanceof Shape)
+        .flatMap((s) => getBoundDimensions(s));
+      return bindDimensionsToShape(out, cloneDimensionDefs(mergedDims));
+    };
 
     // Tracked wrappers for primitives — user scripts get TrackedShape with named faces/edges
     const trackedBox = (x: number, y: number, z: number, center = false): TrackedShape => {
@@ -289,6 +709,7 @@ export function runScript(
   fileName = 'main.forge.js',
   allFiles: Record<string, string> = {},
 ): RunResult {
+  installShapeDimensionHooks();
   resetParams();
   resetDimensions();
   resetCutPlanes();
@@ -299,8 +720,10 @@ export function runScript(
     const result = executeFile(code, fileName, allFiles, new Set());
 
     const objects: SceneObject[] = [];
-    const pushShape = (shape: Shape, name: string, groupName?: string) => {
-      objects.push({ id: `obj-${objects.length + 1}`, name, shape, sketch: null, color: shape.colorHex, groupName });
+    const boundDimensions: DimensionDef[] = [];
+    const pushShape = (shape: Shape, name: string, groupName?: string, color?: string) => {
+      objects.push({ id: `obj-${objects.length + 1}`, name, shape, sketch: null, color: color || shape.colorHex, groupName });
+      boundDimensions.push(...cloneDimensionDefs(getBoundDimensions(shape)));
       if (shape.isEmpty()) {
         _collectedLogs.push({
           level: 'warn',
@@ -371,11 +794,11 @@ export function runScript(
         return;
       }
       if (item.shape instanceof TrackedShape) {
-        objects.push({ id: `obj-${objects.length + 1}`, name, shape: item.shape.toShape(), sketch: null, color: item.color || item.shape.toShape().colorHex, groupName: grp });
+        pushShape(item.shape.toShape(), name, grp, item.color);
         return;
       }
       if (item.shape instanceof Shape) {
-        objects.push({ id: `obj-${objects.length + 1}`, name, shape: item.shape, sketch: null, color: item.color || item.shape.colorHex, groupName: grp });
+        pushShape(item.shape, name, grp, item.color);
         return;
       }
       if (item.sketch instanceof Sketch) {
@@ -436,7 +859,7 @@ export function runScript(
       sketch,
       objects,
       params: getCollectedParams(),
-      dimensions: getCollectedDimensions(),
+      dimensions: [...getCollectedDimensions(), ...boundDimensions],
       cutPlanes: getCollectedCutPlanes(),
       error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
       timeMs: performance.now() - t0,
