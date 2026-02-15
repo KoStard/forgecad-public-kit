@@ -85,6 +85,7 @@ Generate a drawing/report PDF from `.forge.js` scripts:
 
 ```bash
 npm run report -- path/to/file.forge.js [output.pdf]
+npm run report -- path/to/file.forge.js [output.pdf] --dim-angle-tol 18
 ```
 
 The report includes combined multi-angle views and per-component disassembled pages, with searchable text labels for dimensions.

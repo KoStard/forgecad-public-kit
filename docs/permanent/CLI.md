@@ -66,6 +66,7 @@ Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to l
 
 ```bash
 npm run report -- examples/cup.forge.js [output.pdf]
+npm run report -- examples/cup.forge.js [output.pdf] --dim-angle-tol 18
 ```
 
 Generates a searchable-text PDF report with multiple projected drawing views:
@@ -77,6 +78,9 @@ Component dimension ownership for disassembled pages:
 - Preferred: explicit binding via `dim(..., { component: \"Part Name\" })`
 - Fallback: automatic ownership only when both dimension endpoints are unambiguously inside exactly one returned component bounding box
 - Ambiguous dimensions are intentionally skipped for disassembled pages
+
+Optional report flag:
+- `--dim-angle-tol <degrees>`: include dimensions whose projected direction is within this many degrees of the nearest view axis (default: `12`)
 
 ### STL Export (from browser)
 

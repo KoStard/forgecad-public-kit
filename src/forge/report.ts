@@ -16,6 +16,11 @@ export interface ReportOptions {
   views?: ReportViewId[];
   includeDisassembled?: boolean;
   objectVisuals?: Record<string, ReportObjectVisual>;
+  /**
+   * Max angular difference (degrees) from nearest projected view axis
+   * for a dimension to be included in that view.
+   */
+  dimensionDirectionToleranceDeg?: number;
   generatedAt?: Date;
 }
 
@@ -92,7 +97,7 @@ const PAGE_MARGIN = 36;
 const HEADER_HEIGHT = 44;
 const CELL_GAP = 14;
 const CELL_PADDING = 14;
-const AXIS_ALIGNMENT_COS_THRESHOLD = Math.cos((12 * Math.PI) / 180);
+const DEFAULT_DIM_DIRECTION_TOLERANCE_DEG = 12;
 const MAX_FILL_TRIANGLES_PER_OBJECT = 12000;
 const MAX_EDGE_SEGMENTS_PER_OBJECT = 45000;
 
@@ -176,6 +181,11 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+function normalizeToleranceDeg(v: number | undefined): number {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return DEFAULT_DIM_DIRECTION_TOLERANCE_DEG;
+  return clamp(v, 0, 90);
+}
+
 function escapePdfText(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
@@ -224,17 +234,22 @@ function pointInBounds(point: Vec3, bounds: Bounds3, tolerance: number): boolean
     && point[2] >= bounds.min[2] - tolerance && point[2] <= bounds.max[2] + tolerance;
 }
 
-function isDimensionVisibleInView(dim: DimensionDef, frame: ViewFrame): boolean {
+function isDimensionVisibleInView(
+  dim: DimensionDef,
+  frame: ViewFrame,
+  toleranceDeg: number,
+): boolean {
   const dir = sub3(dim.to, dim.from);
   const len = Math.hypot(dir[0], dir[1], dir[2]);
   if (len < 1e-9) return false;
 
   const d = [dir[0] / len, dir[1] / len, dir[2] / len] as Vec3;
-  const alignRight = Math.abs(dot3(d, frame.right));
-  const alignUp = Math.abs(dot3(d, frame.up));
-  const align = Math.max(alignRight, alignUp);
-
-  return align >= AXIS_ALIGNMENT_COS_THRESHOLD;
+  const alignRight = clamp(Math.abs(dot3(d, frame.right)), 0, 1);
+  const alignUp = clamp(Math.abs(dot3(d, frame.up)), 0, 1);
+  const angleRight = Math.acos(alignRight) * 180 / Math.PI;
+  const angleUp = Math.acos(alignUp) * 180 / Math.PI;
+  const minAngle = Math.min(angleRight, angleUp);
+  return minAngle <= toleranceDeg;
 }
 
 function collectShapeTriangles(shape: Shape): ReportTriangle[] {
@@ -569,8 +584,9 @@ function renderViewCell(
   center: Vec3,
   objects: ReportObject[],
   dimensions: DimensionDef[],
+  dimDirectionToleranceDeg: number,
 ): string {
-  const viewDims = dimensions.filter((d) => isDimensionVisibleInView(d, frame));
+  const viewDims = dimensions.filter((d) => isDimensionVisibleInView(d, frame, dimDirectionToleranceDeg));
   const bounds = projectedBounds(center, frame, objects, viewDims);
   const mapper = makeCellMapper(bounds, cell);
 
@@ -652,6 +668,7 @@ function renderViewCell(
 function buildPageContent(
   page: PageSpec,
   views: ViewFrame[],
+  dimDirectionToleranceDeg: number,
 ): string {
   const cmd: string[] = [];
 
@@ -667,7 +684,7 @@ function buildPageContent(
   views.forEach((view, i) => {
     const cell = cells[i];
     if (!cell) return;
-    cmd.push(renderViewCell(cell, view, center, page.objects, page.dimensions));
+    cmd.push(renderViewCell(cell, view, center, page.objects, page.dimensions, dimDirectionToleranceDeg));
   });
 
   return cmd.join('');
@@ -774,6 +791,7 @@ export function generateReportPdf(
   const dimensions = result.dimensions || [];
   const title = (options.title || 'ForgeCAD Report').trim() || 'ForgeCAD Report';
   const includeDisassembled = options.includeDisassembled !== false;
+  const dimDirectionToleranceDeg = normalizeToleranceDeg(options.dimensionDirectionToleranceDeg);
 
   const pages = buildPages(reportObjects, dimensions, views, title, includeDisassembled);
 
@@ -787,7 +805,7 @@ export function generateReportPdf(
   const pageIds: number[] = [];
 
   pages.forEach((page) => {
-    const content = buildPageContent(page, views);
+    const content = buildPageContent(page, views, dimDirectionToleranceDeg);
     const contentId = pdf.addStreamObject('', content);
     const pageId = pdf.addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources ${resourcesId} 0 R /Contents ${contentId} 0 R >>`);
     pageIds.push(pageId);

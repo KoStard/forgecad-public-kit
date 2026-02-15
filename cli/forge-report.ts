@@ -4,7 +4,7 @@
  * ForgeCAD CLI — Export a multi-view 2D drawing report PDF.
  *
  * Usage:
- *   npx tsx cli/forge-report.ts <script.forge.js> [output.pdf]
+ *   npx tsx cli/forge-report.ts <script.forge.js> [output.pdf] [--dim-angle-tol <deg>]
  */
 
 import { readFile, writeFile } from 'fs/promises';
@@ -14,12 +14,23 @@ import { collectProjectFiles } from './collect-files';
 
 const scriptPath = process.argv[2];
 if (!scriptPath) {
-  console.error('Usage: npx tsx cli/forge-report.ts <script.forge.js> [output.pdf]');
+  console.error('Usage: npx tsx cli/forge-report.ts <script.forge.js> [output.pdf] [--dim-angle-tol <deg>]');
   process.exit(1);
 }
 
 const defaultOut = scriptPath.replace(/\.(forge\.)?js$/, '.report.pdf');
-const outputPath = process.argv[3] || defaultOut;
+const outputPath = process.argv[3] && !process.argv[3].startsWith('--')
+  ? process.argv[3]
+  : defaultOut;
+
+const argValue = (name: string): string | undefined => {
+  const idx = process.argv.indexOf(name);
+  if (idx === -1) return undefined;
+  return process.argv[idx + 1];
+};
+
+const toleranceArg = argValue('--dim-angle-tol');
+const dimAngleToleranceDeg = toleranceArg != null ? Number(toleranceArg) : undefined;
 
 async function main() {
   const source = await readFile(resolve(scriptPath), 'utf-8');
@@ -37,6 +48,7 @@ async function main() {
   const report = generateReportPdf(result, {
     title,
     includeDisassembled: true,
+    dimensionDirectionToleranceDeg: dimAngleToleranceDeg,
   });
 
   await writeFile(resolve(outputPath), report.pdf);
@@ -45,6 +57,9 @@ async function main() {
   console.log(`  Pages: ${report.pageCount}`);
   console.log(`  Components: ${report.componentCount}`);
   console.log(`  Views per page: ${report.viewCount}`);
+  if (dimAngleToleranceDeg != null && Number.isFinite(dimAngleToleranceDeg)) {
+    console.log(`  Dimension angle tolerance: ${dimAngleToleranceDeg}°`);
+  }
 }
 
 main().catch((err) => {
