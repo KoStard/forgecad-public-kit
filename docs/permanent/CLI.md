@@ -24,6 +24,17 @@ The key function is `runScript(code, fileName, allFiles)` — it wraps user code
 
 ## Available Commands
 
+### Script Validation
+
+```bash
+npm run test-run -- examples/cup.forge.js
+npm run test-run -- --debug-imports examples/cup.forge.js
+```
+
+Runs a `.forge.js` or `.sketch.js` file in the real runtime and prints object stats, diagnostics, and execution time.
+
+`--debug-imports` adds an import trace (source file, target file, overrides, return type, success/error phase), useful when debugging `importPart()`/`importSketch()` behavior.
+
 ### SVG Export (no browser needed)
 
 ```bash

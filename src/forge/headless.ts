@@ -42,7 +42,7 @@ export type {
   JointSweepFrame,
 } from './assembly';
 export { runScript } from './runner';
-export type { RunResult, SceneObject, LogEntry } from './runner';
+export type { RunResult, SceneObject, LogEntry, RunScriptOptions } from './runner';
 export { partLibrary } from './library';
 export { shapeToGeometry } from './meshToGeometry';
 export { buildScene, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from './sceneBuilder';

@@ -106,12 +106,21 @@ export interface RunResult {
   logs: LogEntry[];
 }
 
+export interface RunScriptOptions {
+  /** Emit structured import trace logs into result.logs (CLI-friendly debugging). */
+  debugImports?: boolean;
+}
+
 // Collected logs from the current script execution
 let _collectedLogs: LogEntry[] = [];
 
 interface ImportScope {
   namePrefix?: string;
   localOverrides?: Record<string, number>;
+}
+
+interface RunnerExecutionOptions {
+  debugImports: boolean;
 }
 
 const LOG_MAX_DEPTH = 4;
@@ -350,6 +359,36 @@ function parseImportParamArgs(
   return normalized;
 }
 
+function describeScriptResultType(value: unknown): string {
+  if (value == null) return String(value);
+  if (value instanceof Shape) return 'Shape';
+  if (value instanceof Sketch) return 'Sketch';
+  if (value instanceof TrackedShape) return 'TrackedShape';
+  if (value instanceof ShapeGroup) return 'ShapeGroup';
+  if (Array.isArray(value)) return 'Array';
+  if (typeof value === 'object' && typeof (value as { toShape?: unknown }).toShape === 'function') {
+    try {
+      const resolved = (value as { toShape: () => unknown }).toShape();
+      if (resolved instanceof Shape) {
+        const ctorName = (value as { constructor?: { name?: string } }).constructor?.name ?? 'Object';
+        return `${ctorName}(toShape()->Shape)`;
+      }
+    } catch {
+      // Ignore toShape probing failures and fall back to constructor/type.
+    }
+  }
+  const ctorName = (value as { constructor?: { name?: string } }).constructor?.name;
+  if (ctorName && ctorName !== 'Object') return ctorName;
+  return typeof value;
+}
+
+function envFlagEnabled(name: string): boolean {
+  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[name];
+  if (typeof raw !== 'string') return false;
+  const normalized = raw.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
 /**
  * Execute a single file's code with the forge sandbox.
  * `allFiles` enables cross-file imports.
@@ -361,6 +400,7 @@ function executeFile(
   allFiles: Record<string, string>,
   visited: Set<string>,
   scope: ImportScope = {},
+  options: RunnerExecutionOptions,
 ): Shape | Sketch | TrackedShape | ShapeGroup | null {
   if (visited.has(fileName)) {
     throw new Error(`Circular import detected: ${fileName}`);
@@ -374,15 +414,49 @@ function executeFile(
       return scope.namePrefix ? `${scope.namePrefix} > ${local}` : local;
     };
 
+    const logImportTrace = (
+      kind: 'importSketch' | 'importPart',
+      target: string,
+      phase: 'start' | 'success' | 'error',
+      details: Record<string, unknown> = {},
+    ) => {
+      if (!options.debugImports) return;
+      const payload = {
+        kind,
+        from: fileName,
+        to: target,
+        scope: scope.namePrefix ?? fileName,
+        phase,
+        ...details,
+      };
+      _collectedLogs.push({
+        level: 'info',
+        args: [`[import] ${kind} ${phase}`, formatLogArg(payload)],
+        timestamp: Date.now(),
+      });
+    };
+
     // importSketch("name", { ...paramOverrides }) — executes another file, expects a Sketch result
     const importSketch = (name: string, paramOverrides?: Record<string, number>): Sketch => {
       const src = allFiles[name];
       if (!src) throw new Error(`File not found: "${name}"`);
       const localOverrides = parseImportParamArgs('importSketch', name, paramOverrides);
       const childScope = { namePrefix: makeChildScopePrefix(name), localOverrides };
-      const result = executeFile(src, name, allFiles, visited, childScope);
-      if (result instanceof Sketch) return result;
-      throw new Error(`"${name}" did not return a Sketch`);
+      logImportTrace('importSketch', name, 'start', { overrides: localOverrides });
+      let result: ReturnType<typeof executeFile>;
+      try {
+        result = executeFile(src, name, allFiles, visited, childScope, options);
+      } catch (error) {
+        logImportTrace('importSketch', name, 'error', { error: formatLogError(error) });
+        throw error;
+      }
+      if (result instanceof Sketch) {
+        logImportTrace('importSketch', name, 'success', { got: 'Sketch' });
+        return result;
+      }
+      const got = describeScriptResultType(result);
+      logImportTrace('importSketch', name, 'error', { got });
+      throw new Error(`"${name}" did not return a Sketch (got ${got})`);
     };
 
     // importPart("name", { ...paramOverrides }) — executes another file, expects a Shape result
@@ -392,12 +466,26 @@ function executeFile(
       const localOverrides = parseImportParamArgs('importPart', name, paramOverrides);
       const childScope = { namePrefix: makeChildScopePrefix(name), localOverrides };
       const dimStart = getCollectedDimensions().length;
-      const result = executeFile(src, name, allFiles, visited, childScope);
+      logImportTrace('importPart', name, 'start', { overrides: localOverrides });
+      let result: ReturnType<typeof executeFile>;
+      try {
+        result = executeFile(src, name, allFiles, visited, childScope, options);
+      } catch (error) {
+        logImportTrace('importPart', name, 'error', { error: formatLogError(error) });
+        throw error;
+      }
       const importedDims = takeCollectedDimensions(dimStart);
       if (result instanceof Shape) {
+        logImportTrace('importPart', name, 'success', { got: 'Shape', importedDims: importedDims.length });
         return setShapeDimensions(result, importedDims as ShapeDimension[]);
       }
-      throw new Error(`"${name}" did not return a Shape`);
+      if (result instanceof TrackedShape) {
+        logImportTrace('importPart', name, 'success', { got: 'TrackedShape', importedDims: importedDims.length, unwrapped: true });
+        return setShapeDimensions(result.toShape(), importedDims as ShapeDimension[]);
+      }
+      const got = describeScriptResultType(result);
+      logImportTrace('importPart', name, 'error', { got });
+      throw new Error(`"${name}" did not return a Shape (got ${got})`);
     };
 
     const wrapped = `"use strict";\n${code}`;
@@ -508,15 +596,19 @@ export function runScript(
   code: string,
   fileName = 'main.forge.js',
   allFiles: Record<string, string> = {},
+  options: RunScriptOptions = {},
 ): RunResult {
   resetParams();
   resetDimensions();
   resetCutPlanes();
   _collectedLogs = [];
   const t0 = performance.now();
+  const execOptions: RunnerExecutionOptions = {
+    debugImports: options.debugImports ?? envFlagEnabled('FORGECAD_DEBUG_IMPORTS'),
+  };
 
   try {
-    const result = executeFile(code, fileName, allFiles, new Set());
+    const result = executeFile(code, fileName, allFiles, new Set(), {}, execOptions);
 
     const objects: SceneObject[] = [];
     const shapeDimensions: DimensionDef[] = [];

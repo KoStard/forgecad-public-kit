@@ -137,7 +137,7 @@ const p = importPart("child.forge.js").color("#222").translate(10, 0, 0);
 return p;
 `,
     'child.forge.js': `
-const part = box(20, 10, 5, true).toShape();
+const part = box(20, 10, 5, true).color("#555");
 dim([1, 2, 3], [7, 2, 3], { label: "Imported" });
 return part;
 `,

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * ForgeCAD CLI — Validate a .forge.js script (no browser needed)
- * Usage: npx tsx cli/test-run.ts <script.forge.js>
+ * Usage: npx tsx cli/test-run.ts [--debug-imports] <script.forge.js>
  */
 import { readFileSync } from "fs";
 import { resolve } from "path";
@@ -9,9 +9,12 @@ import { init, runScript } from "../src/forge/headless";
 import { collectProjectFiles } from "./collect-files";
 import type { Shape } from "../src/forge/kernel";
 
-const scriptPath = process.argv[2];
+const args = process.argv.slice(2);
+const debugImports = args.includes('--debug-imports');
+const positional = args.filter((arg) => arg !== '--debug-imports');
+const scriptPath = positional[0];
 if (!scriptPath) {
-  console.error("Usage: npx tsx cli/test-run.ts <script.forge.js>");
+  console.error("Usage: npx tsx cli/test-run.ts [--debug-imports] <script.forge.js>");
   process.exit(1);
 }
 
@@ -159,7 +162,7 @@ async function main() {
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
   await init();
-  const result = runScript(code, fileName, allFiles);
+  const result = runScript(code, fileName, allFiles, { debugImports });
 
   if (result.error) {
     console.error("ERROR:", result.error);
@@ -190,6 +193,14 @@ async function main() {
     console.log(`\n⚠ Script diagnostics:`);
     for (const log of diagnostics) {
       console.log(`  [${log.level}] ${log.args.join(' ')}`);
+    }
+  }
+
+  if (debugImports) {
+    const importLogs = (result.logs || []).filter((log: any) => log.level === 'info' && log.args[0]?.startsWith('[import]'));
+    console.log(`\n✓ Import trace: ${importLogs.length} event(s)`);
+    for (const log of importLogs) {
+      console.log(`  ${log.args.join(' ')}`);
     }
   }
 
