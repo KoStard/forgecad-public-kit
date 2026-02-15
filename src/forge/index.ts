@@ -16,6 +16,7 @@ export {
   partLibrary,
   shapeToGeometry,
   buildScene,
+  generateReportPdf,
   init,
 } from './headless';
 export type { PlaneSpec } from './headless';
@@ -35,4 +36,10 @@ export type {
 } from './headless';
 export type { RunResult, SceneObject, LogEntry } from './headless';
 export type { ForgeGeometry } from './headless';
+export type {
+  ReportViewId,
+  ReportObjectVisual,
+  ReportOptions,
+  ReportGenerationResult,
+} from './headless';
 export * from './sketch';

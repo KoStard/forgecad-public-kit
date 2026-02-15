@@ -300,9 +300,9 @@ declare const lib: {
 
 // --- Dimensions (visual annotations) ---
 /** Add a dimension annotation between two points. Purely visual, not a constraint. */
-declare function dim(from: [number, number] | [number, number, number] | Point2D, to: [number, number] | [number, number, number] | Point2D, opts?: { offset?: number; label?: string; color?: string }): void;
+declare function dim(from: [number, number] | [number, number, number] | Point2D, to: [number, number] | [number, number, number] | Point2D, opts?: { offset?: number; label?: string; color?: string; component?: string | string[] }): void;
 /** Add a dimension annotation along a Line2D. */
-declare function dimLine(line: Line2D, opts?: { offset?: number; label?: string; color?: string }): void;
+declare function dimLine(line: Line2D, opts?: { offset?: number; label?: string; color?: string; component?: string | string[] }): void;
 
 // --- 2D Anchor Types ---
 type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';

@@ -79,6 +79,16 @@ Export a 2D sketch to SVG (no browser needed, runs in Node directly):
 npm run svg path/to/file.sketch.js [output.svg]
 ```
 
+### PDF Report Export
+
+Generate a drawing/report PDF from `.forge.js` scripts:
+
+```bash
+npm run report -- path/to/file.forge.js [output.pdf]
+```
+
+The report includes combined multi-angle views and per-component disassembled pages, with searchable text labels for dimensions.
+
 ## How It Works
 
 Write JavaScript/TypeScript in the left panel. The forge API is available globally:

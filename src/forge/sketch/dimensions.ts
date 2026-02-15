@@ -8,6 +8,7 @@
  *   dim([0,0,0], [100,0,0]);                    // basic 2-point dimension
  *   dim([0,0,0], [100,0,0], { offset: 15 });    // with offset
  *   dim([0,0,0], [100,0,0], { label: "Width" });
+ *   dim([0,0,0], [100,0,0], { component: "Base" }); // bind for disassembled reports
  */
 
 import { Point2D, Line2D } from './entities';
@@ -19,6 +20,11 @@ export interface DimensionDef {
   offset: number;
   label?: string;
   color?: string;
+  /**
+   * Optional component binding for report exports.
+   * Names should match returned object names.
+   */
+  components?: string[];
 }
 
 let collectedDimensions: DimensionDef[] = [];
@@ -45,6 +51,7 @@ interface DimOpts {
   offset?: number;
   label?: string;
   color?: string;
+  component?: string | string[];
 }
 
 /**
@@ -52,6 +59,20 @@ interface DimOpts {
  */
 export function dim(from: PointArg, to: PointArg, opts?: DimOpts): void {
   dimCounter++;
+  const components = (() => {
+    if (typeof opts?.component === 'string') {
+      const v = opts.component.trim();
+      return v ? [v] : undefined;
+    }
+    if (Array.isArray(opts?.component)) {
+      const unique = Array.from(new Set(
+        opts.component.map((v) => (typeof v === 'string' ? v.trim() : '')).filter(Boolean),
+      ));
+      return unique.length > 0 ? unique : undefined;
+    }
+    return undefined;
+  })();
+
   collectedDimensions.push({
     id: `dim-${dimCounter}`,
     from: toVec3(from),
@@ -59,6 +80,7 @@ export function dim(from: PointArg, to: PointArg, opts?: DimOpts): void {
     offset: opts?.offset ?? 10,
     label: opts?.label,
     color: opts?.color,
+    components,
   });
 }
 

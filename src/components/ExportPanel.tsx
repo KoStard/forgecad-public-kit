@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { generateReportPdf } from '@forge/index';
 import { useForgeStore } from '../store/forgeStore';
 
 function hexToRGB555(hex: string): number {
@@ -58,6 +60,8 @@ function buildSTL(entries: MeshEntry[]): ArrayBuffer {
 export function ExportPanel() {
   const result = useForgeStore((s) => s.result);
   const objectSettings = useForgeStore((s) => s.objectSettings);
+  const activeFile = useForgeStore((s) => s.activeFile);
+  const [reportBusy, setReportBusy] = useState(false);
 
   const shapeObjects = result?.objects?.filter((obj) => obj.shape) ?? [];
   const hasShapes = shapeObjects.length > 0;
@@ -80,6 +84,38 @@ export function ExportPanel() {
     URL.revokeObjectURL(url);
   };
 
+  const exportReport = async () => {
+    if (!result || !hasShapes || reportBusy) return;
+    setReportBusy(true);
+    try {
+      const title = activeFile
+        .replace(/^.*[\\/]/, '')
+        .replace(/\.(forge\.)?js$/i, '')
+        || 'ForgeCAD Report';
+
+      const report = generateReportPdf(result, {
+        title,
+        includeDisassembled: true,
+        objectVisuals: objectSettings,
+      });
+
+      const bytes = new Uint8Array(report.pdf);
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title}.report.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Report export failed:', err);
+      alert(`Report export failed: ${message}`);
+    } finally {
+      setReportBusy(false);
+    }
+  };
+
   return (
     <div style={{ padding: '8px 12px', borderTop: '1px solid var(--fc-border)' }}>
       <button
@@ -97,6 +133,23 @@ export function ExportPanel() {
         }}
       >
         Export STL{shapeObjects.length > 1 ? ` (${shapeObjects.length} objects)` : ''}
+      </button>
+      <button
+        onClick={exportReport}
+        disabled={!hasShapes || reportBusy}
+        style={{
+          width: '100%',
+          marginTop: 8,
+          padding: '6px',
+          background: hasShapes && !reportBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
+          color: hasShapes && !reportBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
+          border: 'none',
+          borderRadius: 4,
+          cursor: hasShapes && !reportBusy ? 'pointer' : 'default',
+          fontSize: 13,
+        }}
+      >
+        {reportBusy ? 'Generating Report...' : `Export Report PDF${shapeObjects.length > 1 ? ` (${shapeObjects.length} components)` : ''}`}
       </button>
     </div>
   );

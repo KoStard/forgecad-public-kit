@@ -62,6 +62,22 @@ Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to l
 
 **Camera angles:** `front` (−Y), `back` (+Y), `side` (+X), `top` (+Z), `iso` (diagonal)
 
+### PDF Report (2D drawing pack)
+
+```bash
+npm run report -- examples/cup.forge.js [output.pdf]
+```
+
+Generates a searchable-text PDF report with multiple projected drawing views:
+- Combined model page (front/right/top/isometric)
+- Disassembled component pages (same view set per returned component)
+- `dim()` annotations included per view only when their axis aligns with that view's projection plane axes
+
+Component dimension ownership for disassembled pages:
+- Preferred: explicit binding via `dim(..., { component: \"Part Name\" })`
+- Fallback: automatic ownership only when both dimension endpoints are unambiguously inside exactly one returned component bounding box
+- Ambiguous dimensions are intentionally skipped for disassembled pages
+
 ### STL Export (from browser)
 
 STL export is available in the browser UI via the Export panel. Binary STL format.

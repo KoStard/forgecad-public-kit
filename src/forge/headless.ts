@@ -50,6 +50,13 @@ export type { ForgeGeometry } from './meshToGeometry';
 export { ShapeGroup, group } from './group';
 export { cutPlane, resetCutPlanes, getCollectedCutPlanes } from './cutPlane';
 export type { CutPlaneDef } from './cutPlane';
+export { generateReportPdf } from './report';
+export type {
+  ReportViewId,
+  ReportObjectVisual,
+  ReportOptions,
+  ReportGenerationResult,
+} from './report';
 
 /**
  * Initialize the geometry kernel. Must be called once before using any forge API.

@@ -1,0 +1,810 @@
+import type { Shape } from './kernel';
+import { shapeToGeometry } from './meshToGeometry';
+import type { RunResult, SceneObject } from './runner';
+import type { DimensionDef } from './sketch/dimensions';
+
+export type ReportViewId = 'front' | 'right' | 'top' | 'iso';
+
+export interface ReportObjectVisual {
+  visible?: boolean;
+  color?: string;
+  opacity?: number;
+}
+
+export interface ReportOptions {
+  title?: string;
+  views?: ReportViewId[];
+  includeDisassembled?: boolean;
+  objectVisuals?: Record<string, ReportObjectVisual>;
+  generatedAt?: Date;
+}
+
+export interface ReportGenerationResult {
+  pdf: Uint8Array;
+  pageCount: number;
+  componentCount: number;
+  viewCount: number;
+}
+
+type Vec2 = [number, number];
+type Vec3 = [number, number, number];
+
+type Bounds2 = { minX: number; minY: number; maxX: number; maxY: number };
+type Bounds3 = { min: Vec3; max: Vec3 };
+type ColorRgb = [number, number, number];
+
+interface ReportTriangle {
+  a: Vec3;
+  b: Vec3;
+  c: Vec3;
+  normal: Vec3;
+}
+
+interface ReportEdge {
+  a: Vec3;
+  b: Vec3;
+}
+
+interface ReportObject {
+  id: string;
+  name: string;
+  groupName?: string;
+  bbox: Bounds3;
+  color: ColorRgb;
+  opacity: number;
+  triangles: ReportTriangle[];
+  edges: ReportEdge[];
+}
+
+interface ViewFrame {
+  id: ReportViewId;
+  label: string;
+  right: Vec3;
+  up: Vec3;
+  forward: Vec3;
+}
+
+interface ViewProjection {
+  x: number;
+  y: number;
+  depth: number;
+}
+
+interface CellRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+interface PageSpec {
+  title: string;
+  subtitle: string;
+  objects: ReportObject[];
+  dimensions: DimensionDef[];
+}
+
+const DEFAULT_VIEWS: ReportViewId[] = ['front', 'right', 'top', 'iso'];
+const DEFAULT_COLOR_HEX = '#5b9bd5';
+const PAGE_WIDTH = 842;
+const PAGE_HEIGHT = 595;
+const PAGE_MARGIN = 36;
+const HEADER_HEIGHT = 44;
+const CELL_GAP = 14;
+const CELL_PADDING = 14;
+const AXIS_ALIGNMENT_COS_THRESHOLD = Math.cos((12 * Math.PI) / 180);
+const MAX_FILL_TRIANGLES_PER_OBJECT = 12000;
+const MAX_EDGE_SEGMENTS_PER_OBJECT = 45000;
+
+const encoder = new TextEncoder();
+
+function norm(v: Vec3): Vec3 {
+  const len = Math.hypot(v[0], v[1], v[2]);
+  if (len < 1e-12) return [0, 0, 1];
+  return [v[0] / len, v[1] / len, v[2] / len];
+}
+
+function sub3(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function add3(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function mul3(a: Vec3, s: number): Vec3 {
+  return [a[0] * s, a[1] * s, a[2] * s];
+}
+
+function dot3(a: Vec3, b: Vec3): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function cross3(a: Vec3, b: Vec3): Vec3 {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+
+function distance3(a: Vec3, b: Vec3): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+function bboxCenter(b: Bounds3): Vec3 {
+  return [
+    (b.min[0] + b.max[0]) * 0.5,
+    (b.min[1] + b.max[1]) * 0.5,
+    (b.min[2] + b.max[2]) * 0.5,
+  ];
+}
+
+function mergeBounds3(bounds: Bounds3[]): Bounds3 | null {
+  if (bounds.length === 0) return null;
+  const out: Bounds3 = {
+    min: [Infinity, Infinity, Infinity],
+    max: [-Infinity, -Infinity, -Infinity],
+  };
+  bounds.forEach((b) => {
+    out.min[0] = Math.min(out.min[0], b.min[0]);
+    out.min[1] = Math.min(out.min[1], b.min[1]);
+    out.min[2] = Math.min(out.min[2], b.min[2]);
+    out.max[0] = Math.max(out.max[0], b.max[0]);
+    out.max[1] = Math.max(out.max[1], b.max[1]);
+    out.max[2] = Math.max(out.max[2], b.max[2]);
+  });
+  return out;
+}
+
+function bboxCorners(bounds: Bounds3): Vec3[] {
+  const [x0, y0, z0] = bounds.min;
+  const [x1, y1, z1] = bounds.max;
+  return [
+    [x0, y0, z0], [x1, y0, z0], [x0, y1, z0], [x1, y1, z0],
+    [x0, y0, z1], [x1, y0, z1], [x0, y1, z1], [x1, y1, z1],
+  ];
+}
+
+function formatNumber(v: number): string {
+  if (!Number.isFinite(v)) return '0';
+  const s = v.toFixed(3);
+  return s.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function escapePdfText(text: string): string {
+  return text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function hexToRgb01(hex: string | undefined): ColorRgb {
+  const input = (hex || DEFAULT_COLOR_HEX).trim();
+  const m = input.match(/^#?([0-9a-f]{6})$/i);
+  if (!m) {
+    return [0x5b / 255, 0x9b / 255, 0xd5 / 255];
+  }
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 0xff;
+  const g = (n >> 8) & 0xff;
+  const b = n & 0xff;
+  return [r / 255, g / 255, b / 255];
+}
+
+function makeViewFrame(view: ReportViewId): ViewFrame {
+  const cfg: Record<ReportViewId, { label: string; camDir: Vec3; up: Vec3 }> = {
+    front: { label: 'Front', camDir: [0, -1, 0], up: [0, 0, 1] },
+    right: { label: 'Right', camDir: [1, 0, 0], up: [0, 0, 1] },
+    top: { label: 'Top', camDir: [0, 0, 1], up: [0, 1, 0] },
+    iso: { label: 'Isometric', camDir: [1, -1, 1], up: [0, 0, 1] },
+  };
+
+  const c = cfg[view];
+  const forward = norm(mul3(c.camDir, -1));
+  const right = norm(cross3(forward, c.up));
+  const up = norm(cross3(right, forward));
+
+  return { id: view, label: c.label, right, up, forward };
+}
+
+function projectPoint(point: Vec3, center: Vec3, frame: ViewFrame): ViewProjection {
+  const rel = sub3(point, center);
+  return {
+    x: dot3(rel, frame.right),
+    y: dot3(rel, frame.up),
+    depth: dot3(rel, frame.forward),
+  };
+}
+
+function pointInBounds(point: Vec3, bounds: Bounds3, tolerance: number): boolean {
+  return point[0] >= bounds.min[0] - tolerance && point[0] <= bounds.max[0] + tolerance
+    && point[1] >= bounds.min[1] - tolerance && point[1] <= bounds.max[1] + tolerance
+    && point[2] >= bounds.min[2] - tolerance && point[2] <= bounds.max[2] + tolerance;
+}
+
+function isDimensionVisibleInView(dim: DimensionDef, frame: ViewFrame): boolean {
+  const dir = sub3(dim.to, dim.from);
+  const len = Math.hypot(dir[0], dir[1], dir[2]);
+  if (len < 1e-9) return false;
+
+  const d = [dir[0] / len, dir[1] / len, dir[2] / len] as Vec3;
+  const alignRight = Math.abs(dot3(d, frame.right));
+  const alignUp = Math.abs(dot3(d, frame.up));
+  const align = Math.max(alignRight, alignUp);
+
+  return align >= AXIS_ALIGNMENT_COS_THRESHOLD;
+}
+
+function collectShapeTriangles(shape: Shape): ReportTriangle[] {
+  const mesh = shape.getMesh();
+  const triCount = mesh.numTri;
+  if (triCount <= 0 || triCount > MAX_FILL_TRIANGLES_PER_OBJECT) return [];
+
+  const tris: ReportTriangle[] = [];
+  const numProp = mesh.numProp;
+  for (let t = 0; t < triCount; t += 1) {
+    const i0 = mesh.triVerts[t * 3];
+    const i1 = mesh.triVerts[t * 3 + 1];
+    const i2 = mesh.triVerts[t * 3 + 2];
+
+    const a: Vec3 = [
+      mesh.vertProperties[i0 * numProp],
+      mesh.vertProperties[i0 * numProp + 1],
+      mesh.vertProperties[i0 * numProp + 2],
+    ];
+    const b: Vec3 = [
+      mesh.vertProperties[i1 * numProp],
+      mesh.vertProperties[i1 * numProp + 1],
+      mesh.vertProperties[i1 * numProp + 2],
+    ];
+    const c: Vec3 = [
+      mesh.vertProperties[i2 * numProp],
+      mesh.vertProperties[i2 * numProp + 1],
+      mesh.vertProperties[i2 * numProp + 2],
+    ];
+
+    const n = norm(cross3(sub3(b, a), sub3(c, a)));
+    tris.push({ a, b, c, normal: n });
+  }
+  return tris;
+}
+
+function collectShapeEdges(shape: Shape): ReportEdge[] {
+  const { solid, edges: edgesGeo } = shapeToGeometry(shape);
+  const attr = edgesGeo.getAttribute('position');
+  const count = Math.floor(attr.count / 2);
+  const stride = count > MAX_EDGE_SEGMENTS_PER_OBJECT ? Math.ceil(count / MAX_EDGE_SEGMENTS_PER_OBJECT) : 1;
+
+  const edges: ReportEdge[] = [];
+  for (let i = 0; i < count; i += stride) {
+    const i0 = i * 2;
+    const i1 = i0 + 1;
+    const a: Vec3 = [attr.getX(i0), attr.getY(i0), attr.getZ(i0)];
+    const b: Vec3 = [attr.getX(i1), attr.getY(i1), attr.getZ(i1)];
+    edges.push({ a, b });
+  }
+
+  edgesGeo.dispose();
+  solid.dispose();
+  return edges;
+}
+
+function collectReportObjects(
+  objects: SceneObject[],
+  visuals: Record<string, ReportObjectVisual> | undefined,
+): ReportObject[] {
+  const out: ReportObject[] = [];
+
+  for (const obj of objects) {
+    if (!obj.shape) continue;
+
+    const visual = visuals?.[obj.id];
+    if (visual?.visible === false) continue;
+
+    const bb = obj.shape.boundingBox();
+    const bbox: Bounds3 = {
+      min: [bb.min[0], bb.min[1], bb.min[2]],
+      max: [bb.max[0], bb.max[1], bb.max[2]],
+    };
+
+    const triangles = collectShapeTriangles(obj.shape);
+    const edges = collectShapeEdges(obj.shape);
+    const opacity = clamp(visual?.opacity ?? 1, 0.08, 1);
+    const baseColor = hexToRgb01(visual?.color || obj.color || DEFAULT_COLOR_HEX);
+    const color: ColorRgb = [
+      1 - (1 - baseColor[0]) * opacity,
+      1 - (1 - baseColor[1]) * opacity,
+      1 - (1 - baseColor[2]) * opacity,
+    ];
+
+    out.push({
+      id: obj.id,
+      name: obj.name,
+      groupName: obj.groupName,
+      bbox,
+      color,
+      opacity,
+      triangles,
+      edges,
+    });
+  }
+
+  return out;
+}
+
+function mapDimensionsToOwners(
+  dimensions: DimensionDef[],
+  objects: ReportObject[],
+): Map<string, string[]> {
+  const byName = new Map<string, ReportObject[]>();
+  objects.forEach((obj) => {
+    const list = byName.get(obj.name) || [];
+    list.push(obj);
+    byName.set(obj.name, list);
+  });
+
+  const out = new Map<string, string[]>();
+
+  for (const dim of dimensions) {
+    const explicitNames = dim.components ?? [];
+    if (explicitNames.length > 0) {
+      const ids = Array.from(new Set(explicitNames.flatMap((name) => {
+        const hit = byName.get(name);
+        if (!hit || hit.length !== 1) return [];
+        return [hit[0].id];
+      })));
+      out.set(dim.id, ids);
+      continue;
+    }
+
+    const tolerance = 1e-3;
+    const candidates = objects
+      .filter((obj) => pointInBounds(dim.from, obj.bbox, tolerance) && pointInBounds(dim.to, obj.bbox, tolerance))
+      .map((obj) => obj.id);
+
+    out.set(dim.id, candidates.length === 1 ? candidates : []);
+  }
+
+  return out;
+}
+
+function projectedBounds(
+  center: Vec3,
+  frame: ViewFrame,
+  objects: ReportObject[],
+  dimensions: DimensionDef[],
+): Bounds2 {
+  const bounds: Bounds2 = {
+    minX: Infinity,
+    minY: Infinity,
+    maxX: -Infinity,
+    maxY: -Infinity,
+  };
+
+  const include = (p: Vec3) => {
+    const pr = projectPoint(p, center, frame);
+    bounds.minX = Math.min(bounds.minX, pr.x);
+    bounds.minY = Math.min(bounds.minY, pr.y);
+    bounds.maxX = Math.max(bounds.maxX, pr.x);
+    bounds.maxY = Math.max(bounds.maxY, pr.y);
+  };
+
+  objects.forEach((obj) => {
+    bboxCorners(obj.bbox).forEach(include);
+  });
+
+  dimensions.forEach((d) => {
+    include(d.from);
+    include(d.to);
+  });
+
+  if (!Number.isFinite(bounds.minX)) {
+    return { minX: -1, minY: -1, maxX: 1, maxY: 1 };
+  }
+
+  if (Math.abs(bounds.maxX - bounds.minX) < 1e-6) {
+    bounds.minX -= 1;
+    bounds.maxX += 1;
+  }
+  if (Math.abs(bounds.maxY - bounds.minY) < 1e-6) {
+    bounds.minY -= 1;
+    bounds.maxY += 1;
+  }
+
+  return bounds;
+}
+
+function makeCellMapper(bounds: Bounds2, cell: CellRect): { map: (p: Vec2) => Vec2; scale: number } {
+  const spanX = bounds.maxX - bounds.minX;
+  const spanY = bounds.maxY - bounds.minY;
+  const scale = Math.min((cell.w - CELL_PADDING * 2) / spanX, (cell.h - CELL_PADDING * 2) / spanY);
+  const cx = (bounds.minX + bounds.maxX) * 0.5;
+  const cy = (bounds.minY + bounds.maxY) * 0.5;
+  const ox = cell.x + cell.w * 0.5;
+  const oy = cell.y + cell.h * 0.5;
+
+  return {
+    map: ([x, y]) => [ox + (x - cx) * scale, oy + (y - cy) * scale],
+    scale,
+  };
+}
+
+function commandSetFill(color: ColorRgb): string {
+  return `${formatNumber(color[0])} ${formatNumber(color[1])} ${formatNumber(color[2])} rg\n`;
+}
+
+function commandSetStroke(color: ColorRgb): string {
+  return `${formatNumber(color[0])} ${formatNumber(color[1])} ${formatNumber(color[2])} RG\n`;
+}
+
+function commandText(text: string, x: number, y: number, size: number): string {
+  return `BT /F1 ${formatNumber(size)} Tf 1 0 0 1 ${formatNumber(x)} ${formatNumber(y)} Tm (${escapePdfText(text)}) Tj ET\n`;
+}
+
+function commandLine(a: Vec2, b: Vec2): string {
+  return `${formatNumber(a[0])} ${formatNumber(a[1])} m ${formatNumber(b[0])} ${formatNumber(b[1])} l S\n`;
+}
+
+function commandTriangleFill(a: Vec2, b: Vec2, c: Vec2): string {
+  return `${formatNumber(a[0])} ${formatNumber(a[1])} m ${formatNumber(b[0])} ${formatNumber(b[1])} l ${formatNumber(c[0])} ${formatNumber(c[1])} l h f\n`;
+}
+
+function buildGridCells(viewCount: number): CellRect[] {
+  const cols = viewCount === 1 ? 1 : 2;
+  const rows = Math.ceil(viewCount / cols);
+  const contentWidth = PAGE_WIDTH - PAGE_MARGIN * 2;
+  const contentHeight = PAGE_HEIGHT - PAGE_MARGIN * 2 - HEADER_HEIGHT;
+  const totalGapX = CELL_GAP * Math.max(0, cols - 1);
+  const totalGapY = CELL_GAP * Math.max(0, rows - 1);
+  const cellW = (contentWidth - totalGapX) / cols;
+  const cellH = (contentHeight - totalGapY) / rows;
+
+  const topY = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT;
+
+  const out: CellRect[] = [];
+  for (let i = 0; i < viewCount; i += 1) {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const x = PAGE_MARGIN + col * (cellW + CELL_GAP);
+    const y = topY - (row + 1) * cellH - row * CELL_GAP;
+    out.push({ x, y, w: cellW, h: cellH });
+  }
+  return out;
+}
+
+function drawDimension(
+  dim: DimensionDef,
+  mapPoint: (p: Vec2) => Vec2,
+  mapScale: number,
+  color: ColorRgb,
+  cell: CellRect,
+  fromProjected: Vec2,
+  toProjected: Vec2,
+): string {
+  const dx = toProjected[0] - fromProjected[0];
+  const dy = toProjected[1] - fromProjected[1];
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-8) return '';
+
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+  const offset = dim.offset;
+
+  const a0: Vec2 = fromProjected;
+  const b0: Vec2 = toProjected;
+  const a1: Vec2 = [fromProjected[0] + px * offset, fromProjected[1] + py * offset];
+  const b1: Vec2 = [toProjected[0] + px * offset, toProjected[1] + py * offset];
+
+  const pa0 = mapPoint(a0);
+  const pb0 = mapPoint(b0);
+  const pa1 = mapPoint(a1);
+  const pb1 = mapPoint(b1);
+
+  const arrowSize = clamp((len * mapScale) * 0.045, 3, 7.5);
+  const extGap = clamp(Math.abs(offset) * mapScale * 0.1, 0.8, 2.5);
+  const dmm = distance3(dim.from, dim.to);
+  const label = dim.label ? `${dim.label}: ${dmm.toFixed(1)} mm` : `${dmm.toFixed(1)} mm`;
+
+  const cmd: string[] = [];
+  cmd.push(commandSetStroke(color));
+  cmd.push(commandSetFill(color));
+  cmd.push('0.8 w\n');
+
+  const extAFrom: Vec2 = [pa0[0] + (pa1[0] - pa0[0]) * (extGap / Math.max(1e-6, Math.hypot(pa1[0] - pa0[0], pa1[1] - pa0[1]))), pa0[1] + (pa1[1] - pa0[1]) * (extGap / Math.max(1e-6, Math.hypot(pa1[0] - pa0[0], pa1[1] - pa0[1])))];
+  const extBFrom: Vec2 = [pb0[0] + (pb1[0] - pb0[0]) * (extGap / Math.max(1e-6, Math.hypot(pb1[0] - pb0[0], pb1[1] - pb0[1]))), pb0[1] + (pb1[1] - pb0[1]) * (extGap / Math.max(1e-6, Math.hypot(pb1[0] - pb0[0], pb1[1] - pb0[1])))];
+
+  cmd.push(commandLine(extAFrom, pa1));
+  cmd.push(commandLine(extBFrom, pb1));
+  cmd.push(commandLine(pa1, pb1));
+
+  const uxS = (pb1[0] - pa1[0]) / Math.max(1e-6, Math.hypot(pb1[0] - pa1[0], pb1[1] - pa1[1]));
+  const uyS = (pb1[1] - pa1[1]) / Math.max(1e-6, Math.hypot(pb1[0] - pa1[0], pb1[1] - pa1[1]));
+  const pxS = -uyS;
+  const pyS = uxS;
+
+  const leftA: Vec2 = [pa1[0] + uxS * arrowSize + pxS * arrowSize * 0.45, pa1[1] + uyS * arrowSize + pyS * arrowSize * 0.45];
+  const rightA: Vec2 = [pa1[0] + uxS * arrowSize - pxS * arrowSize * 0.45, pa1[1] + uyS * arrowSize - pyS * arrowSize * 0.45];
+  const leftB: Vec2 = [pb1[0] - uxS * arrowSize + pxS * arrowSize * 0.45, pb1[1] - uyS * arrowSize + pyS * arrowSize * 0.45];
+  const rightB: Vec2 = [pb1[0] - uxS * arrowSize - pxS * arrowSize * 0.45, pb1[1] - uyS * arrowSize - pyS * arrowSize * 0.45];
+
+  cmd.push(commandTriangleFill(pa1, leftA, rightA));
+  cmd.push(commandTriangleFill(pb1, leftB, rightB));
+
+  const mid: Vec2 = [(pa1[0] + pb1[0]) * 0.5, (pa1[1] + pb1[1]) * 0.5];
+  const candidateA: Vec2 = [mid[0] + pxS * 6, mid[1] + pyS * 6];
+  const candidateB: Vec2 = [mid[0] - pxS * 6, mid[1] - pyS * 6];
+
+  const textHalfW = Math.max(12, label.length * 2.15);
+  const textHalfH = 5;
+  const inset = 4;
+  const minX = cell.x + inset + textHalfW;
+  const maxX = cell.x + cell.w - inset - textHalfW;
+  const minY = cell.y + inset + textHalfH;
+  const maxY = cell.y + cell.h - inset - textHalfH;
+
+  const scoreCandidate = (p: Vec2): number => {
+    const dx = Math.max(0, minX - p[0], p[0] - maxX);
+    const dy = Math.max(0, minY - p[1], p[1] - maxY);
+    return dx + dy;
+  };
+
+  const preferred = scoreCandidate(candidateA) <= scoreCandidate(candidateB) ? candidateA : candidateB;
+  const labelPos: Vec2 = [
+    clamp(preferred[0], minX, maxX),
+    clamp(preferred[1], minY, maxY),
+  ];
+
+  cmd.push(commandText(label, labelPos[0] + 2, labelPos[1] - 3, 8));
+
+  return cmd.join('');
+}
+
+function renderViewCell(
+  cell: CellRect,
+  frame: ViewFrame,
+  center: Vec3,
+  objects: ReportObject[],
+  dimensions: DimensionDef[],
+): string {
+  const viewDims = dimensions.filter((d) => isDimensionVisibleInView(d, frame));
+  const bounds = projectedBounds(center, frame, objects, viewDims);
+  const mapper = makeCellMapper(bounds, cell);
+
+  const cmd: string[] = [];
+
+  cmd.push('q\n');
+  cmd.push(`${formatNumber(cell.x)} ${formatNumber(cell.y)} ${formatNumber(cell.w)} ${formatNumber(cell.h)} re W n\n`);
+
+  type TriDraw = {
+    a: Vec2;
+    b: Vec2;
+    c: Vec2;
+    depth: number;
+    color: ColorRgb;
+    opacity: number;
+  };
+
+  const triangles: TriDraw[] = [];
+
+  objects.forEach((obj) => {
+    obj.triangles.forEach((tri) => {
+      if (dot3(tri.normal, frame.forward) >= 0) return;
+      const pa = projectPoint(tri.a, center, frame);
+      const pb = projectPoint(tri.b, center, frame);
+      const pc = projectPoint(tri.c, center, frame);
+      const a = mapper.map([pa.x, pa.y]);
+      const b = mapper.map([pb.x, pb.y]);
+      const c = mapper.map([pc.x, pc.y]);
+      triangles.push({
+        a,
+        b,
+        c,
+        depth: (pa.depth + pb.depth + pc.depth) / 3,
+        color: obj.color,
+        opacity: obj.opacity,
+      });
+    });
+  });
+
+  triangles.sort((lhs, rhs) => rhs.depth - lhs.depth);
+
+  cmd.push('q\n');
+  cmd.push('/GSfill gs\n');
+  triangles.forEach((tri) => {
+    cmd.push(commandSetFill(tri.color));
+    cmd.push(commandTriangleFill(tri.a, tri.b, tri.c));
+  });
+  cmd.push('Q\n');
+
+  cmd.push(commandSetStroke([0.1, 0.1, 0.12]));
+  cmd.push('0.45 w\n');
+  objects.forEach((obj) => {
+    obj.edges.forEach((edge) => {
+      const a = projectPoint(edge.a, center, frame);
+      const b = projectPoint(edge.b, center, frame);
+      const a2 = mapper.map([a.x, a.y]);
+      const b2 = mapper.map([b.x, b.y]);
+      cmd.push(commandLine(a2, b2));
+    });
+  });
+
+  viewDims.forEach((dim) => {
+    const pFrom = projectPoint(dim.from, center, frame);
+    const pTo = projectPoint(dim.to, center, frame);
+    cmd.push(drawDimension(dim, mapper.map, mapper.scale, hexToRgb01(dim.color || '#2b2b2b'), cell, [pFrom.x, pFrom.y], [pTo.x, pTo.y]));
+  });
+
+  cmd.push('Q\n');
+
+  cmd.push(commandSetStroke([0.72, 0.72, 0.76]));
+  cmd.push('0.7 w\n');
+  cmd.push(`${formatNumber(cell.x)} ${formatNumber(cell.y)} ${formatNumber(cell.w)} ${formatNumber(cell.h)} re S\n`);
+  cmd.push(commandSetFill([0.2, 0.2, 0.22]));
+  cmd.push(commandText(frame.label, cell.x + 6, cell.y + cell.h - 16, 10));
+
+  return cmd.join('');
+}
+
+function buildPageContent(
+  page: PageSpec,
+  views: ViewFrame[],
+): string {
+  const cmd: string[] = [];
+
+  cmd.push(commandSetFill([0.12, 0.12, 0.14]));
+  cmd.push(commandText(page.title, PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN + 2, 15));
+  cmd.push(commandSetFill([0.4, 0.4, 0.44]));
+  cmd.push(commandText(page.subtitle, PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN - 14, 9));
+
+  const cells = buildGridCells(views.length);
+  const merged = mergeBounds3(page.objects.map((o) => o.bbox));
+  const center = merged ? bboxCenter(merged) : [0, 0, 0] as Vec3;
+
+  views.forEach((view, i) => {
+    const cell = cells[i];
+    if (!cell) return;
+    cmd.push(renderViewCell(cell, view, center, page.objects, page.dimensions));
+  });
+
+  return cmd.join('');
+}
+
+function byteLength(text: string): number {
+  return encoder.encode(text).length;
+}
+
+class PdfBuilder {
+  private objects: string[] = [];
+
+  addObject(content: string): number {
+    this.objects.push(content);
+    return this.objects.length;
+  }
+
+  addStreamObject(dictBody: string, streamContent: string): number {
+    const data = streamContent.endsWith('\n') ? streamContent : `${streamContent}\n`;
+    const length = byteLength(data);
+    return this.addObject(`<< ${dictBody} /Length ${length} >>\nstream\n${data}endstream`);
+  }
+
+  build(rootId: number): Uint8Array {
+    const parts: string[] = [];
+    const offsets: number[] = [0];
+    let cursor = 0;
+
+    const push = (chunk: string) => {
+      parts.push(chunk);
+      cursor += byteLength(chunk);
+    };
+
+    push('%PDF-1.4\n%\u00a0\u00a1\u00a2\u00a3\n');
+
+    for (let i = 0; i < this.objects.length; i += 1) {
+      offsets.push(cursor);
+      push(`${i + 1} 0 obj\n${this.objects[i]}\nendobj\n`);
+    }
+
+    const xrefPos = cursor;
+    push(`xref\n0 ${this.objects.length + 1}\n`);
+    push('0000000000 65535 f \n');
+    for (let i = 1; i <= this.objects.length; i += 1) {
+      push(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
+    }
+
+    push(`trailer\n<< /Size ${this.objects.length + 1} /Root ${rootId} 0 R >>\n`);
+    push(`startxref\n${xrefPos}\n%%EOF\n`);
+
+    return encoder.encode(parts.join(''));
+  }
+}
+
+function buildPages(
+  objects: ReportObject[],
+  dimensions: DimensionDef[],
+  views: ViewFrame[],
+  title: string,
+  includeDisassembled: boolean,
+): PageSpec[] {
+  const pages: PageSpec[] = [];
+  const generated = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+  pages.push({
+    title: `${title} - Combined`,
+    subtitle: `Combined model views | ${objects.length} components | ${generated} UTC`,
+    objects,
+    dimensions,
+  });
+
+  if (includeDisassembled) {
+    const owners = mapDimensionsToOwners(dimensions, objects);
+    objects.forEach((obj) => {
+      const dims = dimensions.filter((d) => (owners.get(d.id) || []).includes(obj.id));
+      pages.push({
+        title: `${title} - Component`,
+        subtitle: `${obj.name}${obj.groupName ? ` (group: ${obj.groupName})` : ''} | ${dims.length} associated dimensions`,
+        objects: [obj],
+        dimensions: dims,
+      });
+    });
+  }
+
+  if (views.length === 0) {
+    throw new Error('Report requires at least one view');
+  }
+
+  return pages;
+}
+
+export function generateReportPdf(
+  result: RunResult,
+  options: ReportOptions = {},
+): ReportGenerationResult {
+  const views = (options.views && options.views.length > 0 ? options.views : DEFAULT_VIEWS)
+    .map(makeViewFrame);
+
+  const reportObjects = collectReportObjects(result.objects, options.objectVisuals);
+  if (reportObjects.length === 0) {
+    throw new Error('No 3D objects available for report export.');
+  }
+
+  const dimensions = result.dimensions || [];
+  const title = (options.title || 'ForgeCAD Report').trim() || 'ForgeCAD Report';
+  const includeDisassembled = options.includeDisassembled !== false;
+
+  const pages = buildPages(reportObjects, dimensions, views, title, includeDisassembled);
+
+  const pdf = new PdfBuilder();
+
+  const fontId = pdf.addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  const gsFillId = pdf.addObject('<< /Type /ExtGState /CA 0.28 /ca 0.28 >>');
+  const resourcesId = pdf.addObject(`<< /Font << /F1 ${fontId} 0 R >> /ExtGState << /GSfill ${gsFillId} 0 R >> >>`);
+
+  const pagesId = 3 + pages.length * 2 + 1;
+  const pageIds: number[] = [];
+
+  pages.forEach((page) => {
+    const content = buildPageContent(page, views);
+    const contentId = pdf.addStreamObject('', content);
+    const pageId = pdf.addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources ${resourcesId} 0 R /Contents ${contentId} 0 R >>`);
+    pageIds.push(pageId);
+  });
+
+  const kids = pageIds.map((id) => `${id} 0 R`).join(' ');
+  const actualPagesId = pdf.addObject(`<< /Type /Pages /Kids [${kids}] /Count ${pageIds.length} >>`);
+  if (actualPagesId !== pagesId) {
+    throw new Error('Internal report PDF generation error (page tree mismatch).');
+  }
+
+  const catalogId = pdf.addObject(`<< /Type /Catalog /Pages ${actualPagesId} 0 R >>`);
+
+  return {
+    pdf: pdf.build(catalogId),
+    pageCount: pages.length,
+    componentCount: reportObjects.length,
+    viewCount: views.length,
+  };
+}
