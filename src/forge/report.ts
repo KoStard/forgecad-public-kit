@@ -33,10 +33,28 @@ export interface ReportGenerationResult {
 
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
+type Segment2 = { a: Vec2; b: Vec2 };
 
 type Bounds2 = { minX: number; minY: number; maxX: number; maxY: number };
 type Bounds3 = { min: Vec3; max: Vec3 };
 type ColorRgb = [number, number, number];
+
+interface ProjectedEdge {
+  modelA: Vec2;
+  modelB: Vec2;
+  screenA: Vec2;
+  screenB: Vec2;
+  mid: Vec2;
+  lenModel: number;
+}
+
+interface DetailInset {
+  label: string;
+  source: Bounds2;
+  sourceScreen: CellRect;
+  box: CellRect;
+  edges: ProjectedEdge[];
+}
 
 interface ReportTriangle {
   a: Vec3;
@@ -431,6 +449,37 @@ function projectedBounds(
   return bounds;
 }
 
+function scaleBounds2(bounds: Bounds2, factor: number): Bounds2 {
+  if (!Number.isFinite(factor) || factor <= 1) return bounds;
+  const cx = (bounds.minX + bounds.maxX) * 0.5;
+  const cy = (bounds.minY + bounds.maxY) * 0.5;
+  const hx = (bounds.maxX - bounds.minX) * 0.5 * factor;
+  const hy = (bounds.maxY - bounds.minY) * 0.5 * factor;
+  return {
+    minX: cx - hx,
+    minY: cy - hy,
+    maxX: cx + hx,
+    maxY: cy + hy,
+  };
+}
+
+function clampBounds2(bounds: Bounds2, limit: Bounds2): Bounds2 {
+  const spanX = bounds.maxX - bounds.minX;
+  const spanY = bounds.maxY - bounds.minY;
+  const cx = clamp((bounds.minX + bounds.maxX) * 0.5, limit.minX + spanX * 0.5, limit.maxX - spanX * 0.5);
+  const cy = clamp((bounds.minY + bounds.maxY) * 0.5, limit.minY + spanY * 0.5, limit.maxY - spanY * 0.5);
+  return {
+    minX: cx - spanX * 0.5,
+    maxX: cx + spanX * 0.5,
+    minY: cy - spanY * 0.5,
+    maxY: cy + spanY * 0.5,
+  };
+}
+
+function boundsCenter2(b: Bounds2): Vec2 {
+  return [(b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5];
+}
+
 function makeCellMapper(bounds: Bounds2, cell: CellRect): { map: (p: Vec2) => Vec2; scale: number } {
   const spanX = bounds.maxX - bounds.minX;
   const spanY = bounds.maxY - bounds.minY;
@@ -489,11 +538,150 @@ function buildGridCells(viewCount: number): CellRect[] {
   return out;
 }
 
+function makeMapperForRect(bounds: Bounds2, rect: CellRect, padding = CELL_PADDING): { map: (p: Vec2) => Vec2; scale: number } {
+  const spanX = Math.max(1e-6, bounds.maxX - bounds.minX);
+  const spanY = Math.max(1e-6, bounds.maxY - bounds.minY);
+  const scale = Math.min((rect.w - padding * 2) / spanX, (rect.h - padding * 2) / spanY);
+  const cx = (bounds.minX + bounds.maxX) * 0.5;
+  const cy = (bounds.minY + bounds.maxY) * 0.5;
+  const ox = rect.x + rect.w * 0.5;
+  const oy = rect.y + rect.h * 0.5;
+  return {
+    map: ([x, y]) => [ox + (x - cx) * scale, oy + (y - cy) * scale],
+    scale,
+  };
+}
+
+function buildDetailInsets(
+  projectedEdges: ProjectedEdge[],
+  modelBounds: Bounds2,
+  cell: CellRect,
+  mapMain: (p: Vec2) => Vec2,
+): DetailInset[] {
+  const spanX = modelBounds.maxX - modelBounds.minX;
+  const spanY = modelBounds.maxY - modelBounds.minY;
+  const majorIsX = spanX >= spanY;
+  const longSpan = Math.max(spanX, spanY);
+  const shortSpan = Math.max(1e-6, Math.min(spanX, spanY));
+  const aspect = longSpan / shortSpan;
+
+  if (aspect < 2.8) return [];
+  if (projectedEdges.length < 90 || projectedEdges.length > 14000) return [];
+  if (cell.w < 180 || cell.h < 130) return [];
+
+  const gridMajor = 14;
+  const gridMinor = 6;
+  const bins = Array.from({ length: gridMajor * gridMinor }, () => ({
+    score: 0,
+    count: 0,
+    major: 0,
+    minor: 0,
+  }));
+
+  const normMajor = (p: Vec2): number => {
+    if (majorIsX) return clamp((p[0] - modelBounds.minX) / Math.max(1e-6, spanX), 0, 1);
+    return clamp((p[1] - modelBounds.minY) / Math.max(1e-6, spanY), 0, 1);
+  };
+  const normMinor = (p: Vec2): number => {
+    if (majorIsX) return clamp((p[1] - modelBounds.minY) / Math.max(1e-6, spanY), 0, 1);
+    return clamp((p[0] - modelBounds.minX) / Math.max(1e-6, spanX), 0, 1);
+  };
+
+  projectedEdges.forEach((edge) => {
+    const u = normMajor(edge.mid);
+    const v = normMinor(edge.mid);
+    const iMaj = Math.min(gridMajor - 1, Math.floor(u * gridMajor));
+    const iMin = Math.min(gridMinor - 1, Math.floor(v * gridMinor));
+    const idx = iMin * gridMajor + iMaj;
+    const bin = bins[idx];
+    const shortBoost = edge.lenModel < longSpan * 0.03 ? 1.7 : 0;
+    bin.score += 1 + shortBoost;
+    bin.count += 1;
+    bin.major = iMaj;
+    bin.minor = iMin;
+  });
+
+  const denseBins = bins
+    .filter((b) => b.count >= 6)
+    .sort((a, b) => b.score - a.score);
+
+  if (denseBins.length === 0) return [];
+
+  const picked: Array<{ major: number; minor: number; score: number }> = [];
+  for (const bin of denseBins) {
+    const tooClose = picked.some((p) => Math.abs(p.major - bin.major) <= 2 && Math.abs(p.minor - bin.minor) <= 1);
+    if (tooClose) continue;
+    picked.push({ major: bin.major, minor: bin.minor, score: bin.score });
+    if (picked.length >= 2) break;
+  }
+  if (picked.length === 0) return [];
+
+  const insetW = clamp(cell.w * 0.34, 120, cell.w * 0.46);
+  const insetH = clamp(cell.h * 0.31, 86, cell.h * 0.44);
+  const insetGap = 8;
+  const maxInsetsByHeight = Math.max(0, Math.floor((cell.h - 12 + insetGap) / (insetH + insetGap)));
+  const maxInsets = Math.max(1, Math.min(2, maxInsetsByHeight));
+
+  const insets: DetailInset[] = [];
+  const detailLabels = ['Detail A', 'Detail B'];
+  for (let i = 0; i < Math.min(picked.length, maxInsets); i += 1) {
+    const pick = picked[i];
+    const u = (pick.major + 0.5) / gridMajor;
+    const v = (pick.minor + 0.5) / gridMinor;
+    const cx = majorIsX
+      ? modelBounds.minX + u * spanX
+      : modelBounds.minX + v * spanX;
+    const cy = majorIsX
+      ? modelBounds.minY + v * spanY
+      : modelBounds.minY + u * spanY;
+
+    const source = clampBounds2({
+      minX: cx - (majorIsX ? spanX * 0.18 : Math.max(spanX * 0.55, longSpan * 0.04)) * 0.5,
+      maxX: cx + (majorIsX ? spanX * 0.18 : Math.max(spanX * 0.55, longSpan * 0.04)) * 0.5,
+      minY: cy - (majorIsX ? Math.max(spanY * 0.55, longSpan * 0.04) : spanY * 0.18) * 0.5,
+      maxY: cy + (majorIsX ? Math.max(spanY * 0.55, longSpan * 0.04) : spanY * 0.18) * 0.5,
+    }, modelBounds);
+
+    const insetEdges = projectedEdges.filter((edge) => (
+      edge.mid[0] >= source.minX && edge.mid[0] <= source.maxX
+      && edge.mid[1] >= source.minY && edge.mid[1] <= source.maxY
+    ));
+    if (insetEdges.length < 18) continue;
+
+    const box: CellRect = {
+      w: insetW,
+      h: insetH,
+      x: cell.x + cell.w - insetW - 6,
+      y: cell.y + cell.h - insetH - 6 - i * (insetH + insetGap),
+    };
+
+    const c0 = mapMain([source.minX, source.minY]);
+    const c1 = mapMain([source.maxX, source.maxY]);
+    const sourceScreen: CellRect = {
+      x: Math.min(c0[0], c1[0]),
+      y: Math.min(c0[1], c1[1]),
+      w: Math.abs(c1[0] - c0[0]),
+      h: Math.abs(c1[1] - c0[1]),
+    };
+
+    insets.push({
+      label: detailLabels[i] ?? `Detail ${i + 1}`,
+      source,
+      sourceScreen,
+      box,
+      edges: insetEdges,
+    });
+  }
+
+  return insets;
+}
+
 type LabelBox = { minX: number; minY: number; maxX: number; maxY: number };
 
 interface DimensionLabelPlan {
   label: string;
   color: ColorRgb;
+  fontSize: number;
   preferred: Vec2;
   anchor: Vec2;
   tangent: Vec2;
@@ -505,6 +693,7 @@ interface DimensionLabelPlan {
 interface DrawDimensionResult {
   graphicsCmd: string;
   labelPlan: DimensionLabelPlan | null;
+  lineSegments: Segment2[];
 }
 
 function makeLabelBox(center: Vec2, textHalfW: number, textHalfH: number): LabelBox {
@@ -522,12 +711,28 @@ function overlapArea(a: LabelBox, b: LabelBox): number {
   return x * y;
 }
 
+function boxDistance(a: LabelBox, b: LabelBox): number {
+  const dx = Math.max(0, a.minX - b.maxX, b.minX - a.maxX);
+  const dy = Math.max(0, a.minY - b.maxY, b.minY - a.maxY);
+  return Math.hypot(dx, dy);
+}
+
+function expandBox(box: LabelBox, pad: number): LabelBox {
+  return {
+    minX: box.minX - pad,
+    minY: box.minY - pad,
+    maxX: box.maxX + pad,
+    maxY: box.maxY + pad,
+  };
+}
+
 function clampLabelCenter(center: Vec2, textHalfW: number, textHalfH: number, cell: CellRect): Vec2 {
   const inset = 4;
   const minX = cell.x + inset + textHalfW;
   const maxX = cell.x + cell.w - inset - textHalfW;
   const minY = cell.y + inset + textHalfH;
   const maxY = cell.y + cell.h - inset - textHalfH;
+  if (minX > maxX || minY > maxY) return [cell.x + cell.w * 0.5, cell.y + cell.h * 0.5];
   return [
     clamp(center[0], minX, maxX),
     clamp(center[1], minY, maxY),
@@ -541,9 +746,89 @@ function closestPointOnBox(box: LabelBox, point: Vec2): Vec2 {
   ];
 }
 
+function pointInBox(point: Vec2, box: LabelBox): boolean {
+  return point[0] >= box.minX && point[0] <= box.maxX && point[1] >= box.minY && point[1] <= box.maxY;
+}
+
+function orientation2(a: Vec2, b: Vec2, c: Vec2): number {
+  return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+}
+
+function onSegment2(a: Vec2, b: Vec2, p: Vec2): boolean {
+  return p[0] >= Math.min(a[0], b[0]) - 1e-6
+    && p[0] <= Math.max(a[0], b[0]) + 1e-6
+    && p[1] >= Math.min(a[1], b[1]) - 1e-6
+    && p[1] <= Math.max(a[1], b[1]) + 1e-6;
+}
+
+function segmentsIntersect2(a1: Vec2, a2: Vec2, b1: Vec2, b2: Vec2): boolean {
+  const o1 = orientation2(a1, a2, b1);
+  const o2 = orientation2(a1, a2, b2);
+  const o3 = orientation2(b1, b2, a1);
+  const o4 = orientation2(b1, b2, a2);
+
+  if ((o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0)) return true;
+  if (Math.abs(o1) <= 1e-6 && onSegment2(a1, a2, b1)) return true;
+  if (Math.abs(o2) <= 1e-6 && onSegment2(a1, a2, b2)) return true;
+  if (Math.abs(o3) <= 1e-6 && onSegment2(b1, b2, a1)) return true;
+  if (Math.abs(o4) <= 1e-6 && onSegment2(b1, b2, a2)) return true;
+  return false;
+}
+
+function pointToSegmentDistance(point: Vec2, seg: Segment2): number {
+  const vx = seg.b[0] - seg.a[0];
+  const vy = seg.b[1] - seg.a[1];
+  const len2 = vx * vx + vy * vy;
+  if (len2 < 1e-8) return Math.hypot(point[0] - seg.a[0], point[1] - seg.a[1]);
+  const t = clamp(((point[0] - seg.a[0]) * vx + (point[1] - seg.a[1]) * vy) / len2, 0, 1);
+  const px = seg.a[0] + vx * t;
+  const py = seg.a[1] + vy * t;
+  return Math.hypot(point[0] - px, point[1] - py);
+}
+
+function pointToBoxDistance(point: Vec2, box: LabelBox): number {
+  const dx = Math.max(box.minX - point[0], 0, point[0] - box.maxX);
+  const dy = Math.max(box.minY - point[1], 0, point[1] - box.maxY);
+  return Math.hypot(dx, dy);
+}
+
+function segmentIntersectsBox(seg: Segment2, box: LabelBox): boolean {
+  if (pointInBox(seg.a, box) || pointInBox(seg.b, box)) return true;
+  const edges: Segment2[] = [
+    { a: [box.minX, box.minY], b: [box.maxX, box.minY] },
+    { a: [box.maxX, box.minY], b: [box.maxX, box.maxY] },
+    { a: [box.maxX, box.maxY], b: [box.minX, box.maxY] },
+    { a: [box.minX, box.maxY], b: [box.minX, box.minY] },
+  ];
+  return edges.some((edge) => segmentsIntersect2(seg.a, seg.b, edge.a, edge.b));
+}
+
+function segmentToBoxDistance(seg: Segment2, box: LabelBox): number {
+  if (segmentIntersectsBox(seg, box)) return 0;
+  const corners: Vec2[] = [
+    [box.minX, box.minY],
+    [box.maxX, box.minY],
+    [box.maxX, box.maxY],
+    [box.minX, box.maxY],
+  ];
+  let best = Infinity;
+  best = Math.min(best, pointToBoxDistance(seg.a, box));
+  best = Math.min(best, pointToBoxDistance(seg.b, box));
+  corners.forEach((corner) => {
+    best = Math.min(best, pointToSegmentDistance(corner, seg));
+  });
+  return best;
+}
+
+function estimateTextWidth(text: string, fontSize: number): number {
+  return Math.max(8, text.length * fontSize * 0.52);
+}
+
 function layoutDimensionLabels(
   plans: DimensionLabelPlan[],
   cell: CellRect,
+  blockedSegments: Segment2[],
+  avoidBoxes: LabelBox[] = [],
 ): Array<{ plan: DimensionLabelPlan; pos: Vec2; box: LabelBox }> {
   const placed: Array<{ plan: DimensionLabelPlan; pos: Vec2; box: LabelBox }> = [];
   const order = plans
@@ -565,10 +850,24 @@ function layoutDimensionLabels(
     tested.forEach((candidate, ci) => {
       const pos = clampLabelCenter(candidate, plan.textHalfW, plan.textHalfH, cell);
       const box = makeLabelBox(pos, plan.textHalfW, plan.textHalfH);
-      const overlap = placed.reduce((sum, p) => sum + overlapArea(box, p.box), 0);
+      const overlap = placed.reduce((sum, p) => sum + overlapArea(expandBox(box, 2), expandBox(p.box, 2)), 0);
+      const avoidPenalty = avoidBoxes.reduce((sum, b) => {
+        const ov = overlapArea(box, b);
+        if (ov > 0) return sum + ov * 1200;
+        const d = boxDistance(box, b);
+        if (d < 2) return sum + (2 - d) * 40;
+        return sum;
+      }, 0);
+      const linePenalty = blockedSegments.reduce((sum, seg) => {
+        const dist = segmentToBoxDistance(seg, box);
+        if (dist <= 0.1) return sum + 1500;
+        if (dist < 2) return sum + (2 - dist) * 220;
+        if (dist < 6) return sum + (6 - dist) * 20;
+        return sum;
+      }, 0);
       const distFromPreferred = Math.hypot(pos[0] - plan.preferred[0], pos[1] - plan.preferred[1]);
       const axisBias = Math.abs((pos[0] - plan.preferred[0]) * plan.tangent[0] + (pos[1] - plan.preferred[1]) * plan.tangent[1]);
-      const score = overlap * 1000 + distFromPreferred * 0.3 + axisBias * 0.05 + ci * 0.01;
+      const score = overlap * 1000 + avoidPenalty + linePenalty + distFromPreferred * 0.3 + axisBias * 0.05 + ci * 0.01;
       if (score < bestScore) {
         bestScore = score;
         bestPos = pos;
@@ -587,13 +886,14 @@ function drawDimension(
   mapPoint: (p: Vec2) => Vec2,
   mapScale: number,
   color: ColorRgb,
+  cell: CellRect,
   fromProjected: Vec2,
   toProjected: Vec2,
 ): DrawDimensionResult {
   const dx = toProjected[0] - fromProjected[0];
   const dy = toProjected[1] - fromProjected[1];
   const len = Math.hypot(dx, dy);
-  if (len < 1e-8) return { graphicsCmd: '', labelPlan: null };
+  if (len < 1e-8) return { graphicsCmd: '', labelPlan: null, lineSegments: [] };
 
   const ux = dx / len;
   const uy = dy / len;
@@ -614,7 +914,7 @@ function drawDimension(
   const arrowSize = clamp((len * mapScale) * 0.045, 3, 7.5);
   const extGap = clamp(Math.abs(offset) * mapScale * 0.1, 0.8, 2.5);
   const dmm = distance3(dim.from, dim.to);
-  const label = dim.label ? `${dim.label}: ${dmm.toFixed(1)} mm` : `${dmm.toFixed(1)} mm`;
+  const baseLabel = dim.label ? `${dim.label}: ${dmm.toFixed(1)} mm` : `${dmm.toFixed(1)} mm`;
 
   const cmd: string[] = [];
   cmd.push(commandSetStroke(color));
@@ -623,6 +923,11 @@ function drawDimension(
 
   const extAFrom: Vec2 = [pa0[0] + (pa1[0] - pa0[0]) * (extGap / Math.max(1e-6, Math.hypot(pa1[0] - pa0[0], pa1[1] - pa0[1]))), pa0[1] + (pa1[1] - pa0[1]) * (extGap / Math.max(1e-6, Math.hypot(pa1[0] - pa0[0], pa1[1] - pa0[1])))];
   const extBFrom: Vec2 = [pb0[0] + (pb1[0] - pb0[0]) * (extGap / Math.max(1e-6, Math.hypot(pb1[0] - pb0[0], pb1[1] - pb0[1]))), pb0[1] + (pb1[1] - pb0[1]) * (extGap / Math.max(1e-6, Math.hypot(pb1[0] - pb0[0], pb1[1] - pb0[1])))];
+  const lineSegments: Segment2[] = [
+    { a: extAFrom, b: pa1 },
+    { a: extBFrom, b: pb1 },
+    { a: pa1, b: pb1 },
+  ];
 
   cmd.push(commandLine(extAFrom, pa1));
   cmd.push(commandLine(extBFrom, pb1));
@@ -642,8 +947,26 @@ function drawDimension(
   cmd.push(commandTriangleFill(pb1, leftB, rightB));
 
   const mid: Vec2 = [(pa1[0] + pb1[0]) * 0.5, (pa1[1] + pb1[1]) * 0.5];
-  const textHalfW = Math.max(12, label.length * 2.15);
-  const textHalfH = 5;
+  let fontSize = 8;
+  const maxLabelWidth = Math.max(28, cell.w - 12);
+  const maxLabelHeight = Math.max(7, cell.h - 12);
+  let label = baseLabel;
+  let textWidth = estimateTextWidth(label, fontSize);
+  if (textWidth > maxLabelWidth) {
+    fontSize = Math.max(5, fontSize * (maxLabelWidth / textWidth));
+    textWidth = estimateTextWidth(label, fontSize);
+  }
+  if (fontSize > maxLabelHeight) {
+    fontSize = maxLabelHeight;
+    textWidth = estimateTextWidth(label, fontSize);
+  }
+  if (textWidth > maxLabelWidth) {
+    const maxChars = Math.max(4, Math.floor(maxLabelWidth / Math.max(1, fontSize * 0.52)) - 1);
+    if (label.length > maxChars) label = `${label.slice(0, Math.max(1, maxChars - 1))}…`;
+    textWidth = estimateTextWidth(label, fontSize);
+  }
+  const textHalfW = Math.max(8, textWidth * 0.5 + 2);
+  const textHalfH = Math.max(3.5, fontSize * 0.62);
   const base = 6;
   const normalSteps = [0, 6, 12, 18, 26];
   const tangentSteps = [0, -12, 12, -22, 22, -34, 34];
@@ -667,6 +990,7 @@ function drawDimension(
     labelPlan: {
       label,
       color,
+      fontSize,
       preferred,
       anchor: mid,
       tangent: [uxS, uyS],
@@ -674,6 +998,7 @@ function drawDimension(
       textHalfH,
       candidates,
     },
+    lineSegments,
   };
 }
 
@@ -686,7 +1011,9 @@ function renderViewCell(
   dimDirectionToleranceDeg: number,
 ): string {
   const viewDims = dimensions.filter((d) => isDimensionVisibleInView(d, frame, dimDirectionToleranceDeg));
-  const bounds = projectedBounds(center, frame, objects, viewDims);
+  const baseBounds = projectedBounds(center, frame, objects, viewDims);
+  const zoomOut = 1 + (viewDims.length > 0 ? Math.min(0.24, 0.08 + Math.sqrt(viewDims.length) * 0.03) : 0);
+  const bounds = scaleBounds2(baseBounds, zoomOut);
   const mapper = makeCellMapper(bounds, cell);
 
   const cmd: string[] = [];
@@ -735,28 +1062,59 @@ function renderViewCell(
   });
   cmd.push('Q\n');
 
-  cmd.push(commandSetStroke([0.1, 0.1, 0.12]));
-  cmd.push('0.45 w\n');
+  const projectedEdges: ProjectedEdge[] = [];
   objects.forEach((obj) => {
     obj.edges.forEach((edge) => {
       const a = projectPoint(edge.a, center, frame);
       const b = projectPoint(edge.b, center, frame);
-      const a2 = mapper.map([a.x, a.y]);
-      const b2 = mapper.map([b.x, b.y]);
-      cmd.push(commandLine(a2, b2));
+      const modelA: Vec2 = [a.x, a.y];
+      const modelB: Vec2 = [b.x, b.y];
+      const screenA = mapper.map(modelA);
+      const screenB = mapper.map(modelB);
+      projectedEdges.push({
+        modelA,
+        modelB,
+        screenA,
+        screenB,
+        mid: [(modelA[0] + modelB[0]) * 0.5, (modelA[1] + modelB[1]) * 0.5],
+        lenModel: Math.hypot(modelB[0] - modelA[0], modelB[1] - modelA[1]),
+      });
     });
   });
 
+  cmd.push(commandSetStroke([0.1, 0.1, 0.12]));
+  cmd.push('0.45 w\n');
+  projectedEdges.forEach((edge) => {
+    cmd.push(commandLine(edge.screenA, edge.screenB));
+  });
+
+  const detailInsets = buildDetailInsets(projectedEdges, bounds, cell, mapper.map);
+  if (detailInsets.length > 0) {
+    cmd.push(commandSetStroke([0.83, 0.22, 0.22]));
+    cmd.push('0.6 w\n');
+    detailInsets.forEach((inset) => {
+      cmd.push(`${formatNumber(inset.sourceScreen.x)} ${formatNumber(inset.sourceScreen.y)} ${formatNumber(inset.sourceScreen.w)} ${formatNumber(inset.sourceScreen.h)} re S\n`);
+    });
+  }
+
   const labelPlans: DimensionLabelPlan[] = [];
+  const blockedLabelSegments: Segment2[] = [];
   viewDims.forEach((dim) => {
     const pFrom = projectPoint(dim.from, center, frame);
     const pTo = projectPoint(dim.to, center, frame);
-    const result = drawDimension(dim, mapper.map, mapper.scale, hexToRgb01(dim.color || '#2b2b2b'), [pFrom.x, pFrom.y], [pTo.x, pTo.y]);
+    const result = drawDimension(dim, mapper.map, mapper.scale, hexToRgb01(dim.color || '#2b2b2b'), cell, [pFrom.x, pFrom.y], [pTo.x, pTo.y]);
     cmd.push(result.graphicsCmd);
     if (result.labelPlan) labelPlans.push(result.labelPlan);
+    blockedLabelSegments.push(...result.lineSegments);
   });
 
-  const placedLabels = layoutDimensionLabels(labelPlans, cell);
+  const insetAvoidBoxes: LabelBox[] = detailInsets.map((inset) => ({
+    minX: inset.box.x,
+    minY: inset.box.y,
+    maxX: inset.box.x + inset.box.w,
+    maxY: inset.box.y + inset.box.h,
+  }));
+  const placedLabels = layoutDimensionLabels(labelPlans, cell, blockedLabelSegments, insetAvoidBoxes);
   placedLabels.forEach(({ plan, pos, box }) => {
     const leaderStart = plan.anchor;
     const leaderEnd = closestPointOnBox(box, leaderStart);
@@ -767,7 +1125,55 @@ function renderViewCell(
       cmd.push('0.35 w\n');
       cmd.push(commandLine(leaderStart, leaderEnd));
     }
-    cmd.push(commandText(plan.label, pos[0] + 2, pos[1] - 3, 8));
+    cmd.push(commandText(plan.label, pos[0] + 2, pos[1] - 3, plan.fontSize));
+  });
+
+  detailInsets.forEach((inset, i) => {
+    const sourceCenter: Vec2 = [
+      inset.sourceScreen.x + inset.sourceScreen.w * 0.5,
+      inset.sourceScreen.y + inset.sourceScreen.h * 0.5,
+    ];
+    const insetCenter: Vec2 = [
+      inset.box.x + inset.box.w * 0.5,
+      inset.box.y + inset.box.h * 0.5,
+    ];
+
+    cmd.push(commandSetStroke([0.7, 0.18, 0.18]));
+    cmd.push('0.45 w\n');
+    cmd.push(commandLine(sourceCenter, insetCenter));
+
+    cmd.push(commandSetFill([0.98, 0.98, 0.985]));
+    cmd.push(`${formatNumber(inset.box.x)} ${formatNumber(inset.box.y)} ${formatNumber(inset.box.w)} ${formatNumber(inset.box.h)} re f\n`);
+    cmd.push(commandSetStroke([0.55, 0.55, 0.58]));
+    cmd.push('0.7 w\n');
+    cmd.push(`${formatNumber(inset.box.x)} ${formatNumber(inset.box.y)} ${formatNumber(inset.box.w)} ${formatNumber(inset.box.h)} re S\n`);
+    cmd.push(commandSetFill([0.18, 0.18, 0.2]));
+    cmd.push(commandText(inset.label, inset.box.x + 6, inset.box.y + inset.box.h - 12, 8));
+
+    const inner: CellRect = {
+      x: inset.box.x + 5,
+      y: inset.box.y + 4,
+      w: inset.box.w - 10,
+      h: inset.box.h - 20,
+    };
+    const insetMapper = makeMapperForRect(inset.source, inner, 5);
+    cmd.push('q\n');
+    cmd.push(`${formatNumber(inner.x)} ${formatNumber(inner.y)} ${formatNumber(inner.w)} ${formatNumber(inner.h)} re W n\n`);
+    cmd.push(commandSetStroke([0.08, 0.08, 0.1]));
+    cmd.push('0.52 w\n');
+    const maxInsetEdges = 1500;
+    const step = inset.edges.length > maxInsetEdges ? Math.ceil(inset.edges.length / maxInsetEdges) : 1;
+    for (let e = 0; e < inset.edges.length; e += step) {
+      const edge = inset.edges[e];
+      cmd.push(commandLine(insetMapper.map(edge.modelA), insetMapper.map(edge.modelB)));
+    }
+    cmd.push('Q\n');
+
+    cmd.push(commandSetStroke([0.83, 0.22, 0.22]));
+    cmd.push('0.55 w\n');
+    cmd.push(`${formatNumber(inner.x)} ${formatNumber(inner.y)} ${formatNumber(inner.w)} ${formatNumber(inner.h)} re S\n`);
+    cmd.push(commandSetFill([0.28, 0.28, 0.3]));
+    cmd.push(commandText(`x${(inset.box.w / Math.max(1, inset.sourceScreen.w)).toFixed(1)}`, inset.box.x + inset.box.w - 26, inset.box.y + inset.box.h - 12, 7));
   });
 
   cmd.push('Q\n');
