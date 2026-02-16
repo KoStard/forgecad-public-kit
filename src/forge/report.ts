@@ -148,6 +148,9 @@ const BOM_TABLE_HEADER_HEIGHT = 22;
 const BOM_TABLE_BOTTOM_PAD = 10;
 const BOM_MAX_ROWS_PER_PAGE = 22;
 const DEFAULT_DIM_DIRECTION_TOLERANCE_DEG = 60;
+const MIN_DIM_OFFSET_PX = 10;
+const DIM_CLEARANCE_PX = 6;
+const MAX_LABEL_GEOMETRY_SEGMENTS = 2200;
 const MAX_FILL_TRIANGLES_PER_OBJECT = 12000;
 const MAX_EDGE_SEGMENTS_PER_OBJECT = 45000;
 
@@ -366,6 +369,11 @@ function isDimensionVisibleInView(
   return minAngle <= toleranceDeg;
 }
 
+function dimensionZoomOutFactor(dimensionCount: number): number {
+  if (dimensionCount <= 0) return 1;
+  return 1 + Math.min(0.58, 0.3 + Math.sqrt(dimensionCount) * 0.07);
+}
+
 function collectShapeTriangles(shape: Shape): ReportTriangle[] {
   const mesh = shape.getMesh();
   const triCount = mesh.numTri;
@@ -582,6 +590,16 @@ function scaleBounds2(bounds: Bounds2, factor: number): Bounds2 {
   };
 }
 
+function expandBounds2(bounds: Bounds2, pad: number): Bounds2 {
+  if (!Number.isFinite(pad) || pad <= 0) return bounds;
+  return {
+    minX: bounds.minX - pad,
+    minY: bounds.minY - pad,
+    maxX: bounds.maxX + pad,
+    maxY: bounds.maxY + pad,
+  };
+}
+
 function clampBounds2(bounds: Bounds2, limit: Bounds2): Bounds2 {
   const spanX = bounds.maxX - bounds.minX;
   const spanY = bounds.maxY - bounds.minY;
@@ -700,6 +718,30 @@ function collectProjectedEdges(
   return out;
 }
 
+function projectedObjectBounds(
+  object: ReportObject,
+  center: Vec3,
+  frame: ViewFrame,
+): Bounds2 {
+  const bounds: Bounds2 = {
+    minX: Infinity,
+    minY: Infinity,
+    maxX: -Infinity,
+    maxY: -Infinity,
+  };
+  bboxCorners(object.bbox).forEach((corner) => {
+    const p = projectPoint(corner, center, frame);
+    bounds.minX = Math.min(bounds.minX, p.x);
+    bounds.minY = Math.min(bounds.minY, p.y);
+    bounds.maxX = Math.max(bounds.maxX, p.x);
+    bounds.maxY = Math.max(bounds.maxY, p.y);
+  });
+  if (!Number.isFinite(bounds.minX)) {
+    return { minX: -1, minY: -1, maxX: 1, maxY: 1 };
+  }
+  return bounds;
+}
+
 function selectDetailRegions(
   projectedEdges: ProjectedEdge[],
   modelBounds: Bounds2,
@@ -798,6 +840,20 @@ function selectDetailRegions(
 }
 
 type LabelBox = { minX: number; minY: number; maxX: number; maxY: number };
+
+function mapBoundsToLabelBox(
+  bounds: Bounds2,
+  mapPoint: (p: Vec2) => Vec2,
+): LabelBox {
+  const p0 = mapPoint([bounds.minX, bounds.minY]);
+  const p1 = mapPoint([bounds.maxX, bounds.maxY]);
+  return {
+    minX: Math.min(p0[0], p1[0]),
+    minY: Math.min(p0[1], p1[1]),
+    maxX: Math.max(p0[0], p1[0]),
+    maxY: Math.max(p0[1], p1[1]),
+  };
+}
 
 interface DimensionLabelPlan {
   label: string;
@@ -955,6 +1011,16 @@ function truncateToWidth(text: string, maxWidth: number, fontSize: number): stri
   return `${text.slice(0, maxChars - 3)}...`;
 }
 
+function sampleSegments(segments: Segment2[], maxCount: number): Segment2[] {
+  if (!Number.isFinite(maxCount) || maxCount <= 0 || segments.length <= maxCount) return segments;
+  const out: Segment2[] = [];
+  const step = segments.length / maxCount;
+  for (let i = 0; i < maxCount; i += 1) {
+    out.push(segments[Math.floor(i * step)]);
+  }
+  return out;
+}
+
 function layoutDimensionLabels(
   plans: DimensionLabelPlan[],
   cell: CellRect,
@@ -1020,6 +1086,8 @@ function drawDimension(
   cell: CellRect,
   fromProjected: Vec2,
   toProjected: Vec2,
+  placementBounds: Bounds2 | null,
+  placementCenter: Vec2,
 ): DrawDimensionResult {
   const dx = toProjected[0] - fromProjected[0];
   const dy = toProjected[1] - fromProjected[1];
@@ -1030,7 +1098,66 @@ function drawDimension(
   const uy = dy / len;
   const px = -uy;
   const py = ux;
-  const offset = dim.offset;
+
+  const requestedOffset = Number.isFinite(dim.offset) ? dim.offset : 0;
+  const requestedSign = requestedOffset < 0 ? -1 : 1;
+  const minReadableOffset = MIN_DIM_OFFSET_PX / Math.max(1e-6, mapScale);
+  const baseOffsetAbs = Math.max(Math.abs(requestedOffset), minReadableOffset);
+  const boundsForPlacement = placementBounds
+    ? expandBounds2(placementBounds, DIM_CLEARANCE_PX / Math.max(1e-6, mapScale))
+    : null;
+  const placementSpan = boundsForPlacement
+    ? Math.max(1e-6, Math.max(boundsForPlacement.maxX - boundsForPlacement.minX, boundsForPlacement.maxY - boundsForPlacement.minY))
+    : 1;
+  const midProjected: Vec2 = [(fromProjected[0] + toProjected[0]) * 0.5, (fromProjected[1] + toProjected[1]) * 0.5];
+  const centerPref = (
+    (midProjected[0] - placementCenter[0]) * px
+    + (midProjected[1] - placementCenter[1]) * py
+  );
+  const centerSign = Math.abs(centerPref) > 1e-6 ? (centerPref >= 0 ? 1 : -1) : 0;
+  const candidateSides = Array.from(new Set([
+    centerSign || requestedSign,
+    requestedSign,
+    -(centerSign || requestedSign),
+  ]));
+  const stepOffset = Math.max(minReadableOffset * 0.8, placementSpan * 0.015);
+  const maxBoostSteps = 14;
+
+  const solveForSide = (side: number): { side: number; offsetAbs: number; intersects: boolean; outwardScore: number } => {
+    let offsetAbs = baseOffsetAbs;
+    let intersects = false;
+    for (let i = 0; i < maxBoostSteps; i += 1) {
+      const a1: Vec2 = [fromProjected[0] + px * side * offsetAbs, fromProjected[1] + py * side * offsetAbs];
+      const b1: Vec2 = [toProjected[0] + px * side * offsetAbs, toProjected[1] + py * side * offsetAbs];
+      intersects = boundsForPlacement ? segmentIntersectsBounds2(a1, b1, boundsForPlacement) : false;
+      if (!intersects) break;
+      offsetAbs += stepOffset;
+    }
+
+    const shiftedMid: Vec2 = [
+      midProjected[0] + px * side * offsetAbs,
+      midProjected[1] + py * side * offsetAbs,
+    ];
+    const outwardScore = (
+      (shiftedMid[0] - placementCenter[0]) * (px * side)
+      + (shiftedMid[1] - placementCenter[1]) * (py * side)
+    );
+    return { side, offsetAbs, intersects, outwardScore };
+  };
+
+  const solved = candidateSides
+    .map((side) => solveForSide(side))
+    .map((entry) => {
+      const inwardPenalty = entry.outwardScore < 0 ? (-entry.outwardScore / placementSpan) * 1800 : 0;
+      const growthPenalty = ((entry.offsetAbs - baseOffsetAbs) / placementSpan) * 140;
+      const signPenalty = entry.side === requestedSign ? 0 : 8;
+      const intersectPenalty = entry.intersects ? 250000 : 0;
+      return { ...entry, score: inwardPenalty + growthPenalty + signPenalty + intersectPenalty };
+    })
+    .sort((a, b) => a.score - b.score);
+
+  const winner = solved[0];
+  const offset = (winner?.side ?? requestedSign) * (winner?.offsetAbs ?? baseOffsetAbs);
 
   const a0: Vec2 = fromProjected;
   const b0: Vec2 = toProjected;
@@ -1099,8 +1226,11 @@ function drawDimension(
   const textHalfW = Math.max(8, textWidth * 0.5 + 2);
   const textHalfH = Math.max(3.5, fontSize * 0.62);
   const base = 6;
-  const normalSteps = [0, 6, 12, 18, 26];
-  const tangentSteps = [0, -12, 12, -22, 22, -34, 34];
+  const lineLenPx = Math.hypot(pb1[0] - pa1[0], pb1[1] - pa1[1]);
+  const tangentMax = clamp(lineLenPx * 0.48, 34, 120);
+  const tangentMid = Math.max(22, tangentMax * 0.6);
+  const normalSteps = [0, 6, 12, 18, 26, 36];
+  const tangentSteps = [0, -12, 12, -22, 22, -34, 34, -tangentMid, tangentMid, -tangentMax, tangentMax];
 
   const candidates: Vec2[] = [];
   [1, -1].forEach((side) => {
@@ -1150,7 +1280,10 @@ function renderViewCell(
 ): string {
   const viewDims = dimensions.filter((d) => isDimensionVisibleInView(d, frame, dimDirectionToleranceDeg));
   const baseBounds = projectedBounds(center, frame, objects, viewDims);
-  const zoomOut = 1 + (viewDims.length > 0 ? Math.min(0.24, 0.08 + Math.sqrt(viewDims.length) * 0.03) : 0);
+  const objectBounds = projectedBounds(center, frame, objects, []);
+  const placementBounds = options.boundsOverride ?? objectBounds;
+  const placementCenter = boundsCenter2(placementBounds);
+  const zoomOut = dimensionZoomOutFactor(viewDims.length);
   const bounds = options.boundsOverride ?? scaleBounds2(baseBounds, zoomOut);
   const mapper = makeCellMapper(bounds, cell);
 
@@ -1201,6 +1334,13 @@ function renderViewCell(
   cmd.push('Q\n');
 
   const projectedEdges = collectProjectedEdges(frame, center, objects);
+  const geometryLabelSegments = sampleSegments(
+    projectedEdges.map((edge) => ({ a: mapper.map(edge.modelA), b: mapper.map(edge.modelB) })),
+    MAX_LABEL_GEOMETRY_SEGMENTS,
+  );
+  const geometryAvoidBoxes = objects.map((obj) => (
+    mapBoundsToLabelBox(projectedObjectBounds(obj, center, frame), mapper.map)
+  ));
 
   cmd.push(commandSetStroke([0.1, 0.1, 0.12]));
   cmd.push('0.45 w\n');
@@ -1209,17 +1349,27 @@ function renderViewCell(
   });
 
   const labelPlans: DimensionLabelPlan[] = [];
-  const blockedLabelSegments: Segment2[] = [];
+  const blockedLabelSegments: Segment2[] = [...geometryLabelSegments];
   viewDims.forEach((dim) => {
     const pFrom = projectPoint(dim.from, center, frame);
     const pTo = projectPoint(dim.to, center, frame);
-    const result = drawDimension(dim, mapper.map, mapper.scale, hexToRgb01(dim.color || '#2b2b2b'), cell, [pFrom.x, pFrom.y], [pTo.x, pTo.y]);
+    const result = drawDimension(
+      dim,
+      mapper.map,
+      mapper.scale,
+      hexToRgb01(dim.color || '#2b2b2b'),
+      cell,
+      [pFrom.x, pFrom.y],
+      [pTo.x, pTo.y],
+      placementBounds,
+      placementCenter,
+    );
     cmd.push(result.graphicsCmd);
     if (result.labelPlan) labelPlans.push(result.labelPlan);
     blockedLabelSegments.push(...result.lineSegments);
   });
 
-  const placedLabels = layoutDimensionLabels(labelPlans, cell, blockedLabelSegments);
+  const placedLabels = layoutDimensionLabels(labelPlans, cell, blockedLabelSegments, geometryAvoidBoxes);
   placedLabels.forEach(({ plan, pos, box }) => {
     const leaderStart = plan.anchor;
     const leaderEnd = closestPointOnBox(box, leaderStart);
@@ -1414,7 +1564,7 @@ function collectDetailPagesFor(
   views.forEach((view) => {
     const viewDims = page.dimensions.filter((d) => isDimensionVisibleInView(d, view, dimDirectionToleranceDeg));
     const baseBounds = projectedBounds(center, view, page.objects, viewDims);
-    const zoomOut = 1 + (viewDims.length > 0 ? Math.min(0.24, 0.08 + Math.sqrt(viewDims.length) * 0.03) : 0);
+    const zoomOut = dimensionZoomOutFactor(viewDims.length);
     const drawBounds = scaleBounds2(baseBounds, zoomOut);
     const regions = selectDetailRegions(collectProjectedEdges(view, center, page.objects), drawBounds);
     regions.forEach((region) => {
