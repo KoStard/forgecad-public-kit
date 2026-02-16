@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 import type { ThemeName } from '../theme';
+import { exportMeshFromStore, exportReportFromStore } from './exportActions';
 
 interface Command {
   id: string;
@@ -10,17 +11,25 @@ interface Command {
   children?: Command[];
 }
 
+function handleCommandError(err: unknown): void {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error('Command failed:', err);
+  alert(message);
+}
+
 export function CommandPalette() {
   const open = useForgeStore((s) => s.commandPaletteOpen);
   const close = useForgeStore((s) => s.closeCommandPalette);
   const openPalette = useForgeStore((s) => s.openCommandPalette);
   const setTheme = useForgeStore((s) => s.setTheme);
   const theme = useForgeStore((s) => s.theme);
+  const result = useForgeStore((s) => s.result);
 
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const [subCommands, setSubCommands] = useState<Command[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const hasShapes = (result?.objects?.some((obj) => Boolean(obj.shape)) ?? false);
 
   const themeChoices: Command[] = (['dark', 'light', 'gruvbox', 'tokyo-night', 'kanagawa-lotus'] as const).map((t) => ({
     id: `theme-${t}`,
@@ -28,7 +37,35 @@ export function CommandPalette() {
     action: () => { setTheme(t); close(); },
   }));
 
+  const exportChoices: Command[] = [
+    {
+      id: 'export-3mf',
+      label: `Export 3MF${hasShapes ? '' : ' (no geometry)'}`,
+      action: () => {
+        close();
+        void exportMeshFromStore('3mf').catch(handleCommandError);
+      },
+    },
+    {
+      id: 'export-stl',
+      label: `Export STL (legacy)${hasShapes ? '' : ' (no geometry)'}`,
+      action: () => {
+        close();
+        void exportMeshFromStore('stl').catch(handleCommandError);
+      },
+    },
+    {
+      id: 'export-report',
+      label: `Export Report PDF${hasShapes ? '' : ' (no geometry)'}`,
+      action: () => {
+        close();
+        void exportReportFromStore().catch(handleCommandError);
+      },
+    },
+  ];
+
   const rootCommands: Command[] = [
+    { id: 'export', label: 'Export', children: exportChoices, action: () => {} },
     { id: 'theme', label: 'Change Theme', children: themeChoices, action: () => {} },
   ];
 
@@ -39,7 +76,7 @@ export function CommandPalette() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
         e.preventDefault();
         if (open) { close(); } else { openPalette(); }
       }
