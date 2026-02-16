@@ -2,6 +2,7 @@ import type { Shape } from './kernel';
 import { shapeToGeometry } from './meshToGeometry';
 import type { RunResult, SceneObject } from './runner';
 import type { DimensionDef } from './sketch/dimensions';
+import type { BomDef } from './bom';
 
 export type ReportViewId = 'front' | 'right' | 'top' | 'iso';
 
@@ -29,6 +30,7 @@ export interface ReportGenerationResult {
   pageCount: number;
   componentCount: number;
   viewCount: number;
+  bomItemCount: number;
 }
 
 type Vec2 = [number, number];
@@ -108,7 +110,24 @@ interface DetailPageSpec {
   source: Bounds2;
 }
 
-type PageSpec = StandardPageSpec | DetailPageSpec;
+interface BomReportRow {
+  key: string;
+  description: string;
+  unit: string;
+  quantity: number;
+}
+
+interface BomPageSpec {
+  kind: 'bom';
+  title: string;
+  subtitle: string;
+  rows: BomReportRow[];
+  rowOffset: number;
+  pageIndex: number;
+  pageCount: number;
+}
+
+type PageSpec = StandardPageSpec | DetailPageSpec | BomPageSpec;
 
 interface DimensionOwnership {
   byId: Map<string, string[]>;
@@ -124,6 +143,10 @@ const PAGE_MARGIN = 36;
 const HEADER_HEIGHT = 44;
 const CELL_GAP = 14;
 const CELL_PADDING = 14;
+const BOM_TABLE_ROW_HEIGHT = 18;
+const BOM_TABLE_HEADER_HEIGHT = 22;
+const BOM_TABLE_BOTTOM_PAD = 10;
+const BOM_MAX_ROWS_PER_PAGE = 22;
 const DEFAULT_DIM_DIRECTION_TOLERANCE_DEG = 60;
 const MAX_FILL_TRIANGLES_PER_OBJECT = 12000;
 const MAX_EDGE_SEGMENTS_PER_OBJECT = 45000;
@@ -211,6 +234,70 @@ function clamp(v: number, lo: number, hi: number): number {
 function normalizeToleranceDeg(v: number | undefined): number {
   if (typeof v !== 'number' || !Number.isFinite(v)) return DEFAULT_DIM_DIRECTION_TOLERANCE_DEG;
   return clamp(v, 0, 90);
+}
+
+function normalizeBomUnit(unit: string | undefined): string {
+  const value = typeof unit === 'string' ? unit.trim() : '';
+  return value.length > 0 ? value : 'pieces';
+}
+
+function normalizeBomDescription(description: string | undefined): string {
+  const value = typeof description === 'string' ? description.trim() : '';
+  return value.length > 0 ? value : 'Unspecified item';
+}
+
+function normalizeBomKey(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const key = value.trim();
+  return key.length > 0 ? key : undefined;
+}
+
+function collectBomRows(entries: BomDef[]): BomReportRow[] {
+  const byKey = new Map<string, BomReportRow>();
+  for (const entry of entries) {
+    const qty = Number(entry.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+
+    const description = normalizeBomDescription(entry.description);
+    const unit = normalizeBomUnit(entry.unit);
+    const normalizedKey = normalizeBomKey(entry.key);
+    const key = normalizedKey ?? `${description.toLowerCase()}|${unit.toLowerCase()}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.quantity += qty;
+      continue;
+    }
+    byKey.set(key, {
+      key,
+      description,
+      unit,
+      quantity: qty,
+    });
+  }
+  return Array.from(byKey.values());
+}
+
+function splitBomRowsIntoPages(rows: BomReportRow[]): BomReportRow[][] {
+  if (rows.length === 0) return [];
+
+  const maxRowsByGeometry = Math.max(
+    1,
+    Math.floor(
+      (
+        PAGE_HEIGHT
+        - PAGE_MARGIN * 2
+        - HEADER_HEIGHT
+        - BOM_TABLE_BOTTOM_PAD * 2
+        - BOM_TABLE_HEADER_HEIGHT
+      ) / BOM_TABLE_ROW_HEIGHT,
+    ),
+  );
+  const perPage = Math.max(1, Math.min(BOM_MAX_ROWS_PER_PAGE, maxRowsByGeometry));
+  const out: BomReportRow[][] = [];
+  for (let i = 0; i < rows.length; i += perPage) {
+    out.push(rows.slice(i, i + perPage));
+  }
+  return out;
 }
 
 function escapePdfText(text: string): string {
@@ -858,6 +945,16 @@ function estimateTextWidth(text: string, fontSize: number): number {
   return Math.max(8, text.length * fontSize * 0.52);
 }
 
+function truncateToWidth(text: string, maxWidth: number, fontSize: number): string {
+  if (estimateTextWidth(text, fontSize) <= maxWidth) return text;
+  const safeWidth = Math.max(4, maxWidth);
+  const perChar = Math.max(1, fontSize * 0.52);
+  const maxChars = Math.max(3, Math.floor(safeWidth / perChar));
+  if (maxChars <= 3) return '...';
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars - 3)}...`;
+}
+
 function layoutDimensionLabels(
   plans: DimensionLabelPlan[],
   cell: CellRect,
@@ -1155,6 +1252,72 @@ function renderViewCell(
   return cmd.join('');
 }
 
+function renderBomPage(page: BomPageSpec): string {
+  const cmd: string[] = [];
+
+  const tableX = PAGE_MARGIN;
+  const tableW = PAGE_WIDTH - PAGE_MARGIN * 2;
+  const tableTop = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT - BOM_TABLE_BOTTOM_PAD;
+  const tableBottom = PAGE_MARGIN + BOM_TABLE_BOTTOM_PAD;
+  const tableH = Math.max(40, tableTop - tableBottom);
+
+  const indexW = 34;
+  const qtyW = 92;
+  const unitW = 74;
+  const descW = Math.max(120, tableW - indexW - qtyW - unitW);
+
+  const xIndex = tableX;
+  const xDesc = xIndex + indexW;
+  const xQty = xDesc + descW;
+  const xUnit = xQty + qtyW;
+
+  const headerTop = tableTop;
+  const headerBottom = headerTop - BOM_TABLE_HEADER_HEIGHT;
+
+  cmd.push(commandSetStroke([0.7, 0.7, 0.74]));
+  cmd.push('0.8 w\n');
+  cmd.push(`${formatNumber(tableX)} ${formatNumber(tableBottom)} ${formatNumber(tableW)} ${formatNumber(tableH)} re S\n`);
+  cmd.push(commandLine([tableX, headerBottom], [tableX + tableW, headerBottom]));
+  cmd.push(commandLine([xDesc, tableBottom], [xDesc, tableTop]));
+  cmd.push(commandLine([xQty, tableBottom], [xQty, tableTop]));
+  cmd.push(commandLine([xUnit, tableBottom], [xUnit, tableTop]));
+
+  cmd.push(commandSetFill([0.22, 0.22, 0.24]));
+  cmd.push(commandText('#', xIndex + 6, headerBottom + 6, 9));
+  cmd.push(commandText('Item', xDesc + 6, headerBottom + 6, 9));
+  cmd.push(commandText('Quantity', xQty + 6, headerBottom + 6, 9));
+  cmd.push(commandText('Unit', xUnit + 6, headerBottom + 6, 9));
+
+  page.rows.forEach((row, i) => {
+    const rowTop = headerBottom - i * BOM_TABLE_ROW_HEIGHT;
+    const rowBottom = rowTop - BOM_TABLE_ROW_HEIGHT;
+    if (rowBottom < tableBottom) return;
+
+    cmd.push(commandSetStroke([0.86, 0.86, 0.88]));
+    cmd.push('0.45 w\n');
+    cmd.push(commandLine([tableX, rowBottom], [tableX + tableW, rowBottom]));
+
+    const textY = rowBottom + 5;
+    const indexText = String(page.rowOffset + i + 1);
+    const descText = truncateToWidth(row.description, descW - 12, 9);
+    const qtyText = formatNumber(row.quantity);
+    const qtyX = xUnit - 6 - estimateTextWidth(qtyText, 9);
+
+    cmd.push(commandSetFill([0.14, 0.14, 0.16]));
+    cmd.push(commandText(indexText, xIndex + 6, textY, 9));
+    cmd.push(commandText(descText, xDesc + 6, textY, 9));
+    cmd.push(commandText(qtyText, qtyX, textY, 9));
+    cmd.push(commandText(row.unit, xUnit + 6, textY, 9));
+  });
+
+  if (page.pageCount > 1) {
+    cmd.push(commandSetFill([0.42, 0.42, 0.45]));
+    cmd.push(commandText(`Page ${page.pageIndex}/${page.pageCount}`, PAGE_WIDTH - PAGE_MARGIN - 66, PAGE_MARGIN - 2, 8));
+  }
+
+  return cmd.join('');
+}
+
 function buildPageContent(
   page: PageSpec,
   views: ViewFrame[],
@@ -1166,6 +1329,11 @@ function buildPageContent(
   cmd.push(commandText(page.title, PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN + 2, 15));
   cmd.push(commandSetFill([0.4, 0.4, 0.44]));
   cmd.push(commandText(page.subtitle, PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN - 14, 9));
+
+  if (page.kind === 'bom') {
+    cmd.push(renderBomPage(page));
+    return cmd.join('');
+  }
 
   const merged = mergeBounds3(page.objects.map((o) => o.bbox));
   const center = merged ? bboxCenter(merged) : [0, 0, 0] as Vec3;
@@ -1321,6 +1489,7 @@ class PdfBuilder {
 function buildPages(
   objects: ReportObject[],
   dimensions: DimensionDef[],
+  bomEntries: BomDef[],
   views: ViewFrame[],
   title: string,
   includeDisassembled: boolean,
@@ -1328,8 +1497,26 @@ function buildPages(
 ): PageSpec[] {
   const pages: PageSpec[] = [];
   const basePages: StandardPageSpec[] = [];
+  const bomRows = collectBomRows(bomEntries);
+  const bomChunks = splitBomRowsIntoPages(bomRows);
   const generated = new Date().toISOString().replace('T', ' ').slice(0, 19);
   const ownership = buildDimensionOwnership(dimensions, objects);
+
+  if (bomRows.length > 0) {
+    let rowOffset = 0;
+    bomChunks.forEach((rows, pageIndex) => {
+      pages.push({
+        kind: 'bom',
+        title: `${title.toUpperCase()} | BILL OF MATERIALS`,
+        subtitle: `${bomRows.length} unique items | Summed from ${bomEntries.length} bom() entries`,
+        rows,
+        rowOffset,
+        pageIndex: pageIndex + 1,
+        pageCount: bomChunks.length,
+      });
+      rowOffset += rows.length;
+    });
+  }
 
   basePages.push({
     kind: 'standard',
@@ -1377,11 +1564,20 @@ export function generateReportPdf(
   }
 
   const dimensions = result.dimensions || [];
+  const bomEntries = result.bom || [];
   const title = (options.title || 'ForgeCAD Report').trim() || 'ForgeCAD Report';
   const includeDisassembled = options.includeDisassembled !== false;
   const dimDirectionToleranceDeg = normalizeToleranceDeg(options.dimensionDirectionToleranceDeg);
 
-  const pages = buildPages(reportObjects, dimensions, views, title, includeDisassembled, dimDirectionToleranceDeg);
+  const pages = buildPages(
+    reportObjects,
+    dimensions,
+    bomEntries,
+    views,
+    title,
+    includeDisassembled,
+    dimDirectionToleranceDeg,
+  );
 
   const pdf = new PdfBuilder();
 
@@ -1412,5 +1608,6 @@ export function generateReportPdf(
     pageCount: pages.length,
     componentCount: reportObjects.length,
     viewCount: views.length,
+    bomItemCount: collectBomRows(bomEntries).length,
   };
 }

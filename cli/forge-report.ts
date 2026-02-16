@@ -57,6 +57,9 @@ async function main() {
   console.log(`  Pages: ${report.pageCount}`);
   console.log(`  Components: ${report.componentCount}`);
   console.log(`  Views per page: ${report.viewCount}`);
+  if (report.bomItemCount > 0) {
+    console.log(`  BOM line items: ${report.bomItemCount}`);
+  }
   if (dimAngleToleranceDeg != null && Number.isFinite(dimAngleToleranceDeg)) {
     console.log(`  Dimension angle tolerance: ${dimAngleToleranceDeg}°`);
   }
