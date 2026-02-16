@@ -1,158 +1,182 @@
-# ⚒ ForgeCAD
+# ForgeCAD
 
-Parametric CAD that brings Fusion360-level modeling to code.
+Code-first parametric CAD for the browser and CLI.
 
-**TypeScript IS the file format. The browser IS the CAD system.**
+ForgeCAD combines a JavaScript/TypeScript modeling API, live parameters, constraints, and assembly tooling on top of the [Manifold](https://github.com/elalish/manifold) WASM geometry kernel.
 
-## Vision
+TypeScript is the file format. The browser is the CAD system.
 
-ForgeCAD is a parametric modeling environment built on top of [Manifold](https://github.com/elalish/manifold), a fast WASM geometry kernel. Manifold handles the hard part — boolean operations, mesh math, extrusion. ForgeCAD adds everything above that:
+[API Reference](docs/permanent/API/API.md) • [CLI Docs](docs/permanent/CLI.md) • [Vision](docs/permanent/VISION.md) • [Examples](examples)
 
-- **Constraint-driven sketches** — declare geometric relationships (parallel, tangent, equal length, fixed distance), and a solver figures out the positions. Same paradigm as Fusion360's sketch environment.
-- **Named entities and topology** — rectangles know their sides, extruded shapes know their faces and edges. You write `shape.face('top')` or `rect.side('left')`, not raw coordinates.
-- **Code-as-format** — scripts are plain JS/TS files. Version control, diffing, LLM generation all work naturally. Every `param()` call becomes a live slider.
-- **Multi-file composition** — split sketches and parts across files, import and assemble them.
+## Why ForgeCAD
 
-The goal is not to reimplement Manifold. It's to build the parametric modeling layer that Manifold doesn't provide — the same layer that makes Fusion360 productive for real design work. Constraints, sketch fillets, shell operations, patterns, sketch-on-face — all the things that turn a geometry kernel into a CAD system.
+Most geometry kernels are powerful but low-level. ForgeCAD adds the missing CAD layer:
 
-### Architecture
+- Constraint-driven sketch workflows
+- Named entities and topology-aware operations
+- Parametric design via `param(...)` sliders
+- Multi-file composition with `importPart(...)` and `importSketch(...)`
+- Assembly + mechanism modeling with joints, sweeps, and collision checks
+- Script-authored BOM + dimension annotations for report export
 
-```
-User Script (.forge.js / .sketch.js)
-        ↓
-ForgeCAD Modeling Layer
-  ├── Constraint solver (2D sketch constraints)
-  ├── Named entities (Rectangle2D, Circle2D, Line2D)
-  ├── Topology tracking (TrackedShape with face/edge names)
-  ├── Patterns (linear, circular, mirror)
-  ├── Sketch operations (fillet, offset, hull, boolean)
-  └── 3D operations (smooth, shell, chamfer)
-        ↓
-Manifold WASM (geometry kernel)
-  ├── Boolean ops (union, subtract, intersect)
-  ├── Extrude, revolve
-  ├── Mesh smoothing (smoothOut + refine)
-  └── SDF level sets
-        ↓
-Three.js (rendering) + Monaco (editor)
-```
+The result is a CAD workflow that is version-control friendly, AI-editable, and still practical for real mechanical modeling.
+
+## Highlights
+
+- Browser CAD IDE with Monaco editor + real-time 3D viewport
+- 2D sketch API: primitives, path builder, booleans, transforms, offsets, constraints
+- 3D API: booleans, transforms, hull, level set/SDF workflows, cut planes
+- Named shapes, face/edge references, fillet/chamfer helpers
+- Reusable part library (`lib`) with fasteners, tubes, brackets, threads, patterns, exploded-view helpers
+- Assembly graph API with revolute/prismatic/fixed joints
+- Drawing/report pipeline: dimensions, BOM, multi-view PDF generation
+- CLI tools that run the same engine as the browser runtime
 
 ## Quick Start
+
+### Prerequisites
+
+- Node.js 20+ (recommended)
+- npm
+- Chrome/Chromium installed (only required for PNG rendering CLI)
+
+### Install and run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` — you'll see a split-pane editor + 3D viewport.
+Open `http://localhost:5173`.
 
-### Open a project folder
-
-```bash
-npm run open ./examples
-```
-
-Loads all `.forge.js` and `.sketch.js` files from the given directory into the editor. Without a path, opens with a blank file.
-
-### CLI Render
-
-Render a script to PNG without opening the browser:
+### Open a folder of Forge files
 
 ```bash
-npm run render path/to/file.forge.js [output.png]
+npm run open -- ./examples
 ```
 
-Renders front, side, top, and isometric views. Output filenames are auto-suffixed (`_front.png`, `_side.png`, etc.). Works with both `.forge.js` (3D) and `.sketch.js` (2D, auto-extruded) files.
+ForgeCAD loads `.forge.js` and `.sketch.js` files from that folder.
 
-Environment variables:
-- `FORGE_ANGLES=front,side,top,iso` — which angles to render (default: all four)
-- `FORGE_SIZE=1024` — image size in pixels
-- `FORGE_PORT=5173` — dev server port
+## Your first script
 
-Requires Chrome/Chromium installed (uses Puppeteer for headless rendering).
-
-### SVG Export
-
-Export a 2D sketch to SVG (no browser needed, runs in Node directly):
-
-```bash
-npm run svg path/to/file.sketch.js [output.svg]
-```
-
-### PDF Report Export
-
-Generate a drawing/report PDF from `.forge.js` scripts:
-
-```bash
-npm run report -- path/to/file.forge.js [output.pdf]
-npm run report -- path/to/file.forge.js [output.pdf] --dim-angle-tol 18
-```
-
-The report includes combined multi-angle views and per-component disassembled pages, with searchable text labels for dimensions.
-For elongated or dense edge-detail parts, the report automatically adds separate detail continuation pages with zoomed views.
-
-## How It Works
-
-Write JavaScript/TypeScript in the left panel. The forge API is available globally:
+Drop this into a `.forge.js` file:
 
 ```javascript
-const width = param("Width", 80, { min: 40, max: 150, unit: "mm" });
-const base = box(width, 60, 5);
-const hole = cylinder(10, 8).translate(width / 2, 30, 0);
-return base.subtract(hole);
+const width = param("Width", 120, { min: 60, max: 220, unit: "mm" });
+const depth = param("Depth", 80, { min: 40, max: 160, unit: "mm" });
+const height = param("Height", 12, { min: 6, max: 40, unit: "mm" });
+
+const base = roundedRect(width, depth, 10).extrude(height).color("#5f87c6");
+const pocket = roundedRect(width - 24, depth - 24, 8)
+  .extrude(height - 3)
+  .translate(12, 12, 3);
+
+const part = base.subtract(pocket);
+
+dim([0, 0, 0], [width, 0, 0], { label: "Width" });
+dim([0, 0, 0], [0, depth, 0], { label: "Depth", offset: 14 });
+cutPlane("Center Section", [1, 0, 0], width / 2);
+
+return part;
 ```
 
-- Every `param()` call creates a live slider
-- Code auto-executes on change (400ms debounce)
-- The 3D view updates in real-time
-- Export to STL for 3D printing
+Notes:
 
-## API Reference
+- The Forge API is globally available inside scripts (no imports required).
+- `param(...)` values become live sliders in the UI.
+- Return a `Shape`, `Sketch`, `ShapeGroup`, array of objects, or assembly scene.
 
-### Primitives
-- `box(x, y, z, center?)` — rectangular box
-- `cylinder(height, radius, radiusTop?, segments?, center?)` — cylinder/cone
-- `sphere(radius, segments?)` — geodesic sphere
+## CLI Workflows
 
-### Booleans
-- `union(...shapes)` — combine shapes
-- `difference(...shapes)` — subtract shapes[1..n] from shapes[0]
-- `intersection(...shapes)` — keep only overlapping volume
+All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so behavior is consistent across environments.
 
-### Sections / Projections
-- `intersectWithPlane(shape, plane)` — slice a 3D shape with a plane and return a 2D Sketch
-- `projectToPlane(shape, plane)` — project a 3D shape onto a plane and return a 2D Sketch
+| Task | Command |
+| --- | --- |
+| Validate a script | `npm run test-run -- examples/cup.forge.js` |
+| Render PNG views | `npm run render -- examples/cup.forge.js` |
+| Export sketch SVG | `npm run svg -- examples/frame.sketch.js` |
+| Generate report PDF | `npm run report -- examples/cup.forge.js` |
+| Parameter robustness scan | `npm run param-check -- examples/shoe-rack-doors.forge.js --samples 10` |
+| Transform invariants | `npm run check:transforms` |
+| Dimension propagation invariants | `npm run check:dimensions` |
 
-Plane spec (either form):
-- `{ origin: [x, y, z], normal: [nx, ny, nz] }`
-- `{ plane: 'XY' | 'XZ' | 'YZ', offset?: number }`
+### CLI details
 
-### Transforms (chainable)
-- `.translate(x, y, z)`
-- `.rotate(x, y, z)` — Euler angles in degrees
-- `.scale(v)` — uniform or `[x, y, z]`
-- `.mirror([nx, ny, nz])` — mirror over plane
-- `.clone()` / `.duplicate()` — explicit copy before branching variants
+- `render` outputs multi-angle PNGs (`front`, `side`, `top`, `iso`) by default.
+- `svg` runs fully in Node (no browser/Puppeteer).
+- `report` generates searchable-text PDF pages (overview, components, BOM, dimensions).
+- `param-check` samples parameter ranges and reports runtime errors, degenerates, and new collisions.
 
-### Parameters
-- `param(name, default, { min?, max?, step?, unit? })` — declares a slider
+## Start with these examples
 
-## Architecture
+- `examples/api/sketch-basics.forge.js`: sketch primitives, offset, path, extrude
+- `examples/api/boolean-operations.forge.js`: union/difference/intersection behavior
+- `examples/api/assembly-mechanism.forge.js`: joints, sweeps, collisions, BOM
+- `examples/api/dimensioned-bracket.forge.js`: dimension annotations
+- `examples/api/bill-of-materials.forge.js`: script-authored BOM aggregation
+- `examples/api/exploded-view.forge.js`: exploded layouts + cut-plane visualization
 
+## Core architecture
+
+```text
+User script (.forge.js / .sketch.js)
+        |
+        v
+ForgeCAD modeling layer
+  - params, constraints, sketch entities
+  - topology-aware operations
+  - assembly + reporting helpers
+        |
+        v
+Manifold WASM geometry kernel
+  - booleans, extrusion, mesh operations
+        |
+        +--> Browser app (Monaco + Three.js)
+        +--> CLI tools (headless runtime)
 ```
-Monaco Editor  ←→  Forge Runtime  ←→  Three.js Viewport
-                       ↓
-               Manifold (WASM)
-              geometry kernel
+
+## Project status
+
+ForgeCAD is under active development. The API is usable today, but some advanced CAD features are still being built for deeper parity with mature desktop CAD tooling.
+
+Planned/ongoing areas include:
+
+- richer sketch editing primitives (fillets, arc-first workflows, trim/extend)
+- shell and advanced feature operations
+- sketch-on-face and higher-level surfacing/transition tools
+- broader mechanical modeling ergonomics
+
+See [Vision](docs/permanent/VISION.md) for the longer-term direction.
+
+## Contributing
+
+Contributions are welcome. Good first contributions:
+
+- API docs improvements in `docs/permanent/API/`
+- focused examples in `examples/api/`
+- runtime and CLI correctness checks
+
+Suggested local validation before opening a PR:
+
+```bash
+npm run test-run -- examples/cup.forge.js
+npm run check:transforms
+npm run check:dimensions
 ```
 
-~5 source files, ~500 lines of actual application code. Everything else is off-the-shelf:
-Monaco, Three.js, Manifold WASM, React, Zustand.
+If your change is parametric-heavy, also run:
 
-## Tech Stack
+```bash
+npm run param-check -- path/to/your-example.forge.js --samples 10
+```
 
-- **Geometry**: [Manifold](https://github.com/elalish/manifold) (WASM) — fast boolean ops
-- **Rendering**: Three.js via @react-three/fiber
-- **Editor**: Monaco (VS Code's editor)
-- **State**: Zustand
-- **Build**: Vite
+## Additional docs
+
+- API: [`docs/permanent/API/API.md`](docs/permanent/API/API.md)
+- CLI: [`docs/permanent/CLI.md`](docs/permanent/CLI.md)
+- Vision: [`docs/permanent/VISION.md`](docs/permanent/VISION.md)
+- Coding notes: [`docs/permanent/CODING.md`](docs/permanent/CODING.md)
+
+## License
+
+No license file is currently published in this repository.
