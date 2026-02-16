@@ -76,6 +76,7 @@ import { Transform, composeChain } from './transform';
 import { partLibrary } from './library';
 import { ShapeGroup, group } from './group';
 import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
+import { bom, resetBom, getCollectedBom, type BomDef } from './bom';
 
 export interface SceneObject {
   id: string;
@@ -100,6 +101,7 @@ export interface RunResult {
   objects: SceneObject[];
   params: ParamDef[];
   dimensions: DimensionDef[];
+  bom: BomDef[];
   cutPlanes: CutPlaneDef[];
   error: string | null;
   timeMs: number;
@@ -558,6 +560,8 @@ function executeFile(
       'importSketch', 'importPart',
       // Dimensions
       'dim', 'dimLine',
+      // Bill of materials
+      'bom',
       // Group
       'group', 'ShapeGroup',
       // Console
@@ -583,6 +587,7 @@ function executeFile(
       intersectWithPlane, projectToPlane,
       importSketch, importPart,
       dim, dimLine,
+      bom,
       group, ShapeGroup,
       makeSandboxConsole(),
       cutPlane,
@@ -600,6 +605,7 @@ export function runScript(
 ): RunResult {
   resetParams();
   resetDimensions();
+  resetBom();
   resetCutPlanes();
   _collectedLogs = [];
   const t0 = performance.now();
@@ -751,6 +757,7 @@ export function runScript(
       objects,
       params: getCollectedParams(),
       dimensions: [...getCollectedDimensions(), ...shapeDimensions],
+      bom: getCollectedBom(),
       cutPlanes: getCollectedCutPlanes(),
       error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
       timeMs: performance.now() - t0,
@@ -773,6 +780,7 @@ export function runScript(
       objects: [],
       params: getCollectedParams(),
       dimensions: getCollectedDimensions(),
+      bom: getCollectedBom(),
       cutPlanes: getCollectedCutPlanes(),
       error: `${msg}${lineInfo}`,
       timeMs: performance.now() - t0,

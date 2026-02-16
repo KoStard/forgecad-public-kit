@@ -12,6 +12,7 @@ export {
   intersectWithPlane, projectToPlane,
   param, resetParams, getCollectedParams, setParamOverrides,
   Assembly, SolvedAssembly, assembly, bomToCsv,
+  bom, resetBom, getCollectedBom,
   runScript,
   partLibrary,
   shapeToGeometry,
@@ -34,6 +35,7 @@ export type {
   CollisionFinding,
   JointSweepFrame,
 } from './headless';
+export type { BomDef, BomOpts } from './headless';
 export type { RunResult, SceneObject, LogEntry } from './headless';
 export type { ForgeGeometry } from './headless';
 export type {

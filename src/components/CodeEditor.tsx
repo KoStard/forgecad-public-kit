@@ -309,6 +309,8 @@ declare const lib: {
 declare function dim(from: [number, number] | [number, number, number] | Point2D, to: [number, number] | [number, number, number] | Point2D, opts?: { offset?: number; label?: string; color?: string; component?: string | string[] }): void;
 /** Add a dimension annotation along a Line2D. */
 declare function dimLine(line: Line2D, opts?: { offset?: number; label?: string; color?: string; component?: string | string[] }): void;
+/** Add a bill-of-materials entry for report generation. */
+declare function bom(quantity: number, description: string, opts?: { unit?: string; key?: string }): void;
 
 // --- 2D Anchor Types ---
 type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
