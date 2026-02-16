@@ -5,6 +5,7 @@ import {
   cleanup as cleanupSceneBuilder,
   setMaterial,
 } from 'manifold-3d/lib/scene-builder.js';
+import { strToU8, strFromU8, unzipSync, zipSync } from 'fflate';
 import type { Shape } from './kernel';
 
 export interface MeshExportObject {
@@ -60,6 +61,26 @@ function toRGB555(colorHex: string): number {
   if (!rgb) return 0;
   // VisCAM/SolidView color STL: bit15=1, then RGB555
   return 0x8000 | ((rgb.r >> 3) << 10) | ((rgb.g >> 3) << 5) | (rgb.b >> 3);
+}
+
+async function normalize3mfRelationshipTargets(blob: Blob): Promise<Blob> {
+  const archiveBytes = new Uint8Array(await blob.arrayBuffer());
+  const files = unzipSync(archiveBytes);
+  const relPath = '_rels/.rels';
+  const relXml = files[relPath];
+  if (!relXml) return blob;
+
+  const relText = strFromU8(relXml);
+  const normalizedRelText = relText.replace(
+    /Target="3D\/3dmodel\.model"/g,
+    'Target="/3D/3dmodel.model"',
+  );
+  if (normalizedRelText === relText) return blob;
+
+  files[relPath] = strToU8(normalizedRelText);
+  const normalizedArchive = zipSync(files);
+  const normalizedBytes = Uint8Array.from(normalizedArchive);
+  return new Blob([normalizedBytes], { type: blob.type });
 }
 
 export function buildBinaryStl(objects: MeshExportObject[]): ArrayBuffer {
@@ -169,7 +190,8 @@ export async function build3mfBlob(
     exporter.title = escapeXml(options.title ?? exporter.title ?? 'ForgeCAD model');
     exporter.application = escapeXml(options.application ?? 'ForgeCAD');
     exporter.description = escapeXml(options.description ?? exporter.description ?? exporter.title);
-    return exporter.asBlob(doc);
+    const rawBlob = await exporter.asBlob(doc);
+    return normalize3mfRelationshipTargets(rawBlob);
   } finally {
     cleanupSceneBuilder();
   }
