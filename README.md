@@ -8,6 +8,17 @@ TypeScript is the file format. The browser is the CAD system.
 
 [API Reference](docs/permanent/API/API.md) • [CLI Docs](docs/permanent/CLI.md) • [Vision](docs/permanent/VISION.md) • [Examples](examples)
 
+## Start Here
+
+```bash
+npm install
+npm run dev
+```
+
+Then open `http://localhost:5173`.
+
+`npm run dev` opens the `./examples` project by default, so you can edit and save files immediately.
+
 ## Why ForgeCAD
 
 Most geometry kernels are powerful but low-level. ForgeCAD adds the missing CAD layer:
@@ -49,13 +60,23 @@ npm run dev
 
 Open `http://localhost:5173`.
 
-### Open a folder of Forge files
+This starts ForgeCAD with the `./examples` folder loaded.
+
+### Open your own project folder
 
 ```bash
-npm run open -- ./examples
+npm run open -- /path/to/your/project
 ```
 
-ForgeCAD loads `.forge.js` and `.sketch.js` files from that folder.
+Use `--` before the path. ForgeCAD loads `.forge.js` and `.sketch.js` files from that folder, with disk-backed save.
+
+### Blank scratch mode (optional)
+
+```bash
+npm run dev:blank
+```
+
+Starts ForgeCAD without a project folder (single in-memory scratch file).
 
 ## Your first script
 
