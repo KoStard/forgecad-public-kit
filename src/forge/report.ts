@@ -150,7 +150,6 @@ const BOM_MAX_ROWS_PER_PAGE = 22;
 const DEFAULT_DIM_DIRECTION_TOLERANCE_DEG = 60;
 const MIN_DIM_OFFSET_PX = 10;
 const DIM_CLEARANCE_PX = 6;
-const ISO_AXIS_SNAP_MIN_DOMINANCE = 0.997;
 const MAX_LABEL_GEOMETRY_SEGMENTS = 2200;
 const MAX_FILL_TRIANGLES_PER_OBJECT = 12000;
 const MAX_EDGE_SEGMENTS_PER_OBJECT = 45000;
@@ -653,58 +652,52 @@ function commandTriangleFill(a: Vec2, b: Vec2, c: Vec2): string {
   return `${formatNumber(a[0])} ${formatNumber(a[1])} m ${formatNumber(b[0])} ${formatNumber(b[1])} l ${formatNumber(c[0])} ${formatNumber(c[1])} l h f\n`;
 }
 
-function maybeSnapIsoDimensionProjection(
-  dim: DimensionDef,
-  frame: ViewFrame,
-  fromProjected: Vec2,
-  toProjected: Vec2,
-): { from: Vec2; to: Vec2 } {
-  if (frame.id !== 'iso') return { from: fromProjected, to: toProjected };
+interface DimensionOffsetBasis {
+  dir3: Vec3;
+  proj: Vec2;
+  projDir: Vec2;
+  projLen: number;
+}
 
-  const modelDir = sub3(dim.to, dim.from);
-  const modelLen = Math.hypot(modelDir[0], modelDir[1], modelDir[2]);
-  if (modelLen < 1e-9) return { from: fromProjected, to: toProjected };
+function projectVectorToView(v: Vec3, frame: ViewFrame): Vec2 {
+  return [dot3(v, frame.right), dot3(v, frame.up)];
+}
 
-  const absDir = [Math.abs(modelDir[0]), Math.abs(modelDir[1]), Math.abs(modelDir[2])] as const;
-  let axisIdx = 0;
-  if (absDir[1] > absDir[axisIdx]) axisIdx = 1;
-  if (absDir[2] > absDir[axisIdx]) axisIdx = 2;
-  if (absDir[axisIdx] / modelLen < ISO_AXIS_SNAP_MIN_DOMINANCE) {
-    return { from: fromProjected, to: toProjected };
+function pickDimensionOffsetBasis(dirModel: Vec3, frame: ViewFrame): DimensionOffsetBasis {
+  const worldAxes: Vec3[] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  const candidates: DimensionOffsetBasis[] = [];
+
+  const pushCandidate = (candidate: Vec3) => {
+    const len3 = Math.hypot(candidate[0], candidate[1], candidate[2]);
+    if (len3 < 1e-8) return;
+    const dir3: Vec3 = [candidate[0] / len3, candidate[1] / len3, candidate[2] / len3];
+    const proj = projectVectorToView(dir3, frame);
+    const projLen = Math.hypot(proj[0], proj[1]);
+    if (projLen < 1e-6) return;
+    const projDir: Vec2 = [proj[0] / projLen, proj[1] / projLen];
+    candidates.push({ dir3, proj, projDir, projLen });
+  };
+
+  worldAxes.forEach((axis) => {
+    const axisPerp = sub3(axis, mul3(dirModel, dot3(axis, dirModel)));
+    pushCandidate(axisPerp);
+  });
+
+  if (candidates.length === 0) {
+    pushCandidate(cross3(dirModel, frame.forward));
+    pushCandidate(cross3(dirModel, frame.up));
+    pushCandidate(cross3(dirModel, frame.right));
   }
 
-  const axisSign = modelDir[axisIdx] < 0 ? -1 : 1;
-  const axisDir: Vec3 = [0, 0, 0];
-  axisDir[axisIdx] = axisSign;
-
-  let tx = dot3(axisDir, frame.right);
-  let ty = dot3(axisDir, frame.up);
-  const tLen = Math.hypot(tx, ty);
-  if (tLen < 1e-9) return { from: fromProjected, to: toProjected };
-  tx /= tLen;
-  ty /= tLen;
-
-  const rawDx = toProjected[0] - fromProjected[0];
-  const rawDy = toProjected[1] - fromProjected[1];
-  const rawLen = Math.hypot(rawDx, rawDy);
-  if (rawLen < 1e-9) return { from: fromProjected, to: toProjected };
-
-  const along = rawDx * tx + rawDy * ty;
-  if (Math.abs(along) < rawLen * 0.75) {
-    return { from: fromProjected, to: toProjected };
+  if (candidates.length === 0) {
+    return { dir3: [0, 0, 1], proj: [0, 1], projDir: [0, 1], projLen: 1 };
   }
 
-  const halfSpan = Math.max(1e-6, Math.abs(along) * 0.5);
-  const mid: Vec2 = [
-    (fromProjected[0] + toProjected[0]) * 0.5,
-    (fromProjected[1] + toProjected[1]) * 0.5,
-  ];
-  const snappedFrom: Vec2 = [mid[0] - tx * halfSpan, mid[1] - ty * halfSpan];
-  const snappedTo: Vec2 = [mid[0] + tx * halfSpan, mid[1] + ty * halfSpan];
-  if (along < 0) {
-    return { from: snappedTo, to: snappedFrom };
-  }
-  return { from: snappedFrom, to: snappedTo };
+  candidates.sort((a, b) => (
+    (b.projLen + Math.abs(b.projDir[1]) * 0.18)
+    - (a.projLen + Math.abs(a.projDir[1]) * 0.18)
+  ));
+  return candidates[0];
 }
 
 function buildGridCells(viewCount: number): CellRect[] {
@@ -1595,25 +1588,30 @@ function drawDimension(
   placementCenter: Vec2,
   autoLaneNudgeModel = 0,
 ): DrawDimensionResult {
-  const snapped = maybeSnapIsoDimensionProjection(dim, frame, fromProjected, toProjected);
-  const from = snapped.from;
-  const to = snapped.to;
+  const from = fromProjected;
+  const to = toProjected;
 
-  const dx = to[0] - from[0];
-  const dy = to[1] - from[1];
+  const dx = toProjected[0] - fromProjected[0];
+  const dy = toProjected[1] - fromProjected[1];
   const len = Math.hypot(dx, dy);
   if (len < 1e-8) return { graphicsCmd: '', labelPlan: null, lineSegments: [] };
 
+  const modelDirRaw = sub3(dim.to, dim.from);
+  const modelLen = Math.hypot(modelDirRaw[0], modelDirRaw[1], modelDirRaw[2]);
+  if (modelLen < 1e-9) return { graphicsCmd: '', labelPlan: null, lineSegments: [] };
+  const modelDir: Vec3 = [modelDirRaw[0] / modelLen, modelDirRaw[1] / modelLen, modelDirRaw[2] / modelLen];
+  const offsetBasis = pickDimensionOffsetBasis(modelDir, frame);
+
   const ux = dx / len;
   const uy = dy / len;
-  const px = -uy;
-  const py = ux;
   const isIsoView = frame.id === 'iso';
 
   const requestedOffset = Number.isFinite(dim.offset) ? dim.offset : 0;
   const requestedSign = requestedOffset < 0 ? -1 : 1;
-  const minReadableOffset = MIN_DIM_OFFSET_PX / Math.max(1e-6, mapScale);
-  const baseOffsetAbs = Math.max(Math.abs(requestedOffset), minReadableOffset) + Math.max(0, autoLaneNudgeModel);
+  const projectedModelScale = Math.max(1e-6, mapScale * offsetBasis.projLen);
+  const minReadableOffset = MIN_DIM_OFFSET_PX / projectedModelScale;
+  const autoLaneOffsetModel = Math.max(0, autoLaneNudgeModel / Math.max(1e-6, offsetBasis.projLen));
+  const baseOffsetAbs = Math.max(Math.abs(requestedOffset), minReadableOffset) + autoLaneOffsetModel;
   const boundsForPlacement = placementBounds
     ? expandBounds2(placementBounds, DIM_CLEARANCE_PX / Math.max(1e-6, mapScale))
     : null;
@@ -1622,8 +1620,8 @@ function drawDimension(
     : 1;
   const midProjected: Vec2 = [(fromProjected[0] + toProjected[0]) * 0.5, (fromProjected[1] + toProjected[1]) * 0.5];
   const centerPref = (
-    (midProjected[0] - placementCenter[0]) * px
-    + (midProjected[1] - placementCenter[1]) * py
+    (midProjected[0] - placementCenter[0]) * offsetBasis.projDir[0]
+    + (midProjected[1] - placementCenter[1]) * offsetBasis.projDir[1]
   );
   const centerSign = Math.abs(centerPref) > 1e-6 ? (centerPref >= 0 ? 1 : -1) : 0;
   const candidateSides = Array.from(new Set([
@@ -1631,20 +1629,27 @@ function drawDimension(
     requestedSign,
     -(centerSign || requestedSign),
   ]));
-  const stepOffset = Math.max(minReadableOffset * (isIsoView ? 0.55 : 0.8), placementSpan * (isIsoView ? 0.008 : 0.015));
+  const stepOffset = Math.max(
+    minReadableOffset * (isIsoView ? 0.55 : 0.8),
+    placementSpan * (isIsoView ? 0.008 : 0.015) / Math.max(1e-6, offsetBasis.projLen),
+  );
   const maxBoostSteps = isIsoView ? 5 : 12;
-  const maxOffsetAbs = baseOffsetAbs + (isIsoView ? 14 : 28) / Math.max(1e-6, mapScale);
+  const maxOffsetAbs = baseOffsetAbs + (isIsoView ? 14 : 28) / projectedModelScale;
   const fullSegmentClear = !isIsoView;
 
   const solveForSide = (side: number): { side: number; offsetAbs: number; intersects: boolean; outwardScore: number } => {
     let offsetAbs = baseOffsetAbs;
     let intersects = false;
     for (let i = 0; i < maxBoostSteps; i += 1) {
-      const a1: Vec2 = [from[0] + px * side * offsetAbs, from[1] + py * side * offsetAbs];
-      const b1: Vec2 = [to[0] + px * side * offsetAbs, to[1] + py * side * offsetAbs];
+      const shift: Vec2 = [
+        offsetBasis.proj[0] * side * offsetAbs,
+        offsetBasis.proj[1] * side * offsetAbs,
+      ];
+      const a1: Vec2 = [from[0] + shift[0], from[1] + shift[1]];
+      const b1: Vec2 = [to[0] + shift[0], to[1] + shift[1]];
       const shiftedMid: Vec2 = [
-        midProjected[0] + px * side * offsetAbs,
-        midProjected[1] + py * side * offsetAbs,
+        midProjected[0] + shift[0],
+        midProjected[1] + shift[1],
       ];
       intersects = boundsForPlacement
         ? (fullSegmentClear
@@ -1657,13 +1662,18 @@ function drawDimension(
       offsetAbs = nextOffset;
     }
 
-    const shiftedMid: Vec2 = [
-      midProjected[0] + px * side * offsetAbs,
-      midProjected[1] + py * side * offsetAbs,
+    const shift: Vec2 = [
+      offsetBasis.proj[0] * side * offsetAbs,
+      offsetBasis.proj[1] * side * offsetAbs,
     ];
+    const shiftedMid: Vec2 = [
+      midProjected[0] + shift[0],
+      midProjected[1] + shift[1],
+    ];
+    const outwardDir: Vec2 = [offsetBasis.projDir[0] * side, offsetBasis.projDir[1] * side];
     const outwardScore = (
-      (shiftedMid[0] - placementCenter[0]) * (px * side)
-      + (shiftedMid[1] - placementCenter[1]) * (py * side)
+      (shiftedMid[0] - placementCenter[0]) * outwardDir[0]
+      + (shiftedMid[1] - placementCenter[1]) * outwardDir[1]
     );
     return { side, offsetAbs, intersects, outwardScore };
   };
@@ -1672,7 +1682,7 @@ function drawDimension(
     .map((side) => solveForSide(side))
     .map((entry) => {
       const inwardPenalty = entry.outwardScore < 0 ? (-entry.outwardScore / placementSpan) * 1800 : 0;
-      const growthPenalty = ((entry.offsetAbs - baseOffsetAbs) / placementSpan) * 140;
+      const growthPenalty = (((entry.offsetAbs - baseOffsetAbs) * offsetBasis.projLen) / placementSpan) * 140;
       const signPenalty = entry.side === requestedSign ? 0 : 8;
       const intersectPenalty = entry.intersects ? 250000 : 0;
       return { ...entry, score: inwardPenalty + growthPenalty + signPenalty + intersectPenalty };
@@ -1681,11 +1691,12 @@ function drawDimension(
 
   const winner = solved[0];
   const offset = (winner?.side ?? requestedSign) * (winner?.offsetAbs ?? baseOffsetAbs);
+  const winShift: Vec2 = [offsetBasis.proj[0] * offset, offsetBasis.proj[1] * offset];
 
   const a0: Vec2 = from;
   const b0: Vec2 = to;
-  const a1: Vec2 = [from[0] + px * offset, from[1] + py * offset];
-  const b1: Vec2 = [to[0] + px * offset, to[1] + py * offset];
+  const a1: Vec2 = [from[0] + winShift[0], from[1] + winShift[1]];
+  const b1: Vec2 = [to[0] + winShift[0], to[1] + winShift[1]];
 
   const pa0 = mapPoint(a0);
   const pb0 = mapPoint(b0);
@@ -1693,7 +1704,7 @@ function drawDimension(
   const pb1 = mapPoint(b1);
 
   const arrowSize = clamp((len * mapScale) * 0.045, 3, 7.5);
-  const extGap = clamp(Math.abs(offset) * mapScale * 0.1, 0.8, 2.5);
+  const extGap = clamp(Math.abs(offset) * projectedModelScale * 0.1, 0.8, 2.5);
   const dmm = distance3(dim.from, dim.to);
   const baseLabel = dim.label ? `${dim.label}: ${dmm.toFixed(1)} mm` : `${dmm.toFixed(1)} mm`;
 
