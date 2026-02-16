@@ -205,7 +205,7 @@ for (const obj of result.objects) {
 
 ### Cross-file imports
 
-When running scripts that use `importSketch()` or `importPart()`, pass all sibling files:
+When running scripts that use `importSketch()` or `importPart()`, pass all project files (or at least all files reachable by imports), keyed by project-relative path. This supports both root-relative imports (`api/part.forge.js`) and relative imports (`./part.forge.js`, `../shared/profile.sketch.js`):
 
 ```typescript
 import { readdirSync, readFileSync } from 'fs';

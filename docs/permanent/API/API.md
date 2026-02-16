@@ -1130,11 +1130,16 @@ ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.j
 - `*.sketch.js` — 2D sketch file, must return a `Sketch`
 - `*.forge.js` — 3D part file, must return a `Shape` or `TrackedShape`
 
+### Import Path Resolution
+- `./file.forge.js` and `../file.forge.js` resolve relative to the file that calls `importSketch()` / `importPart()`
+- Bare paths like `api/bracket.forge.js` resolve from the opened project root
+- Leading `/` is treated as project-root relative
+
 ### `importSketch(fileName, paramOverrides?)`
 Executes another file and returns its result as a `Sketch`. The target file must return a `Sketch`.
 
 **Parameters:**
-- `fileName` (string) — Name of the file to import (e.g. `"profile.sketch.js"`)
+- `fileName` (string) — Import path (e.g. `"./profile.sketch.js"` or `"api/profile.sketch.js"`)
 - `paramOverrides` (optional object) — Import-time parameter overrides by param name
 
 **Returns:** `Sketch`
@@ -1152,7 +1157,7 @@ return profile.extrude(50);
 Executes another file and returns its result as a `Shape`. The target file may return either `Shape` or `TrackedShape` (tracked results are auto-unwrapped to `Shape`).
 
 **Parameters:**
-- `fileName` (string) — Name of the file to import (e.g. `"bracket.forge.js"`)
+- `fileName` (string) — Import path (e.g. `"./bracket.forge.js"` or `"api/bracket.forge.js"`)
 - `paramOverrides` (optional object) — Import-time parameter overrides by param name
 
 **Returns:** `Shape` (chainable)
@@ -1172,6 +1177,7 @@ return union(bracket, bracket2);
 - Imported files can be instantiated multiple times
 - `paramOverrides` only affects that import call (other imports are independent)
 - Params supplied through `paramOverrides` are treated as fixed arguments for that import call
+- Relative imports (`./` / `../`) are resolved from the current file path
 - `importPart()` accepts imported `Shape` or `TrackedShape` results and always returns a chainable `Shape`
 - The returned `Shape` or `Sketch` is fully chainable — use `.translate()`, `.rotate()`, `.subtract()`, etc.
 
