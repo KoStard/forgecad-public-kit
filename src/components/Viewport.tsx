@@ -63,6 +63,14 @@ const writePersistedViewportCameraState = (state: PersistedViewportCameraState):
   }
 };
 
+const resolveHoverObjectName = (name: string, knownFileNames: Set<string>): string | null => {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  // Unnamed returns fall back to source filenames; skip those in hover tooltips.
+  if (knownFileNames.has(trimmed)) return null;
+  return trimmed;
+};
+
 /** Enable local clipping on the WebGL renderer when any cut planes are active */
 function ClippingManager({ active }: { active: boolean }) {
   const gl = useThree((s) => s.gl);
@@ -1354,6 +1362,7 @@ function ViewPersistence({
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const result = useForgeStore((s) => s.result);
+  const files = useForgeStore((s) => s.files);
   const renderMode = useForgeStore((s) => s.renderMode);
   const projectionMode = useForgeStore((s) => s.projectionMode);
   const gridEnabled = useForgeStore((s) => s.gridEnabled);
@@ -1430,6 +1439,7 @@ export function Viewport() {
 
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
+  const knownFileNames = useMemo(() => new Set(Object.keys(files)), [files]);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const initialFitRequestedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1464,15 +1474,20 @@ export function Viewport() {
     if (!objectPickSyncEnabled || measureMode) return;
     event.stopPropagation();
     setHoveredObjectId(obj.id);
+    const hoverName = resolveHoverObjectName(obj.name, knownFileNames);
+    if (!hoverName) {
+      setHoverLabel(null);
+      return;
+    }
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     setHoverLabel({
       id: obj.id,
-      name: obj.name,
+      name: hoverName,
       x: event.clientX - rect.left + 10,
       y: event.clientY - rect.top + 12,
     });
-  }, [measureMode, objectPickSyncEnabled, setHoveredObjectId]);
+  }, [knownFileNames, measureMode, objectPickSyncEnabled, setHoveredObjectId]);
 
   const clearHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
     if (!objectPickSyncEnabled || measureMode) return;
