@@ -1,19 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { build3mfBlob, buildBinaryStl, type MeshExportObject } from '@forge/exportMesh';
 import { useForgeStore } from '../store/forgeStore';
 import { generateReportInWorker } from '../workers/reportWorkerClient';
 
-function hexToRGB555(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  // VisCAM/SolidView color STL: bit15=1, then RGB555
-  return 0x8000 | ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
-}
-
-interface MeshEntry {
-  mesh: { numTri: number; numProp: number; triVerts: Uint32Array; vertProperties: Float32Array };
-  color: number; // RGB555 with bit15 set, or 0
-}
+type MeshExportFormat = '3mf' | 'stl';
 
 function waitForNextPaint(): Promise<void> {
   return new Promise((resolve) => {
@@ -23,73 +13,104 @@ function waitForNextPaint(): Promise<void> {
   });
 }
 
-function buildSTL(entries: MeshEntry[]): ArrayBuffer {
-  const totalTri = entries.reduce((sum, e) => sum + e.mesh.numTri, 0);
-  const buffer = new ArrayBuffer(84 + totalTri * 50);
-  const view = new DataView(buffer);
+function deriveExportStem(path: string): string {
+  const fromPath = path
+    .replace(/^.*[\\/]/, '')
+    .replace(/\.(forge|sketch)\.js$/i, '')
+    .replace(/\.js$/i, '')
+    .trim();
+  return fromPath || 'forge-export';
+}
 
-  const header = 'ForgeCAD STL Export (color)';
-  for (let i = 0; i < 80; i++)
-    view.setUint8(i, i < header.length ? header.charCodeAt(i) : 0);
-  view.setUint32(80, totalTri, true);
+function sanitizeExportStem(value: string): string {
+  const sanitized = value
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
+    .replace(/\.+$/, '')
+    .slice(0, 96);
+  return sanitized || 'forge-export';
+}
 
-  let offset = 84;
-  for (const { mesh, color } of entries) {
-    const { numTri, numProp, triVerts, vertProperties } = mesh;
-    for (let t = 0; t < numTri; t++) {
-      const i0 = triVerts[t * 3], i1 = triVerts[t * 3 + 1], i2 = triVerts[t * 3 + 2];
-      const v0x = vertProperties[i0 * numProp], v0y = vertProperties[i0 * numProp + 1], v0z = vertProperties[i0 * numProp + 2];
-      const v1x = vertProperties[i1 * numProp], v1y = vertProperties[i1 * numProp + 1], v1z = vertProperties[i1 * numProp + 2];
-      const v2x = vertProperties[i2 * numProp], v2y = vertProperties[i2 * numProp + 1], v2z = vertProperties[i2 * numProp + 2];
+function triggerDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
-      const e1x = v1x - v0x, e1y = v1y - v0y, e1z = v1z - v0z;
-      const e2x = v2x - v0x, e2y = v2y - v0y, e2z = v2z - v0z;
-      const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
-      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-
-      view.setFloat32(offset, nx / len, true); offset += 4;
-      view.setFloat32(offset, ny / len, true); offset += 4;
-      view.setFloat32(offset, nz / len, true); offset += 4;
-      view.setFloat32(offset, v0x, true); offset += 4;
-      view.setFloat32(offset, v0y, true); offset += 4;
-      view.setFloat32(offset, v0z, true); offset += 4;
-      view.setFloat32(offset, v1x, true); offset += 4;
-      view.setFloat32(offset, v1y, true); offset += 4;
-      view.setFloat32(offset, v1z, true); offset += 4;
-      view.setFloat32(offset, v2x, true); offset += 4;
-      view.setFloat32(offset, v2y, true); offset += 4;
-      view.setFloat32(offset, v2z, true); offset += 4;
-      view.setUint16(offset, color, true); offset += 2;
-    }
-  }
-  return buffer;
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
 }
 
 export function ExportPanel() {
   const result = useForgeStore((s) => s.result);
   const objectSettings = useForgeStore((s) => s.objectSettings);
+  const activeFile = useForgeStore((s) => s.activeFile);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [meshFormat, setMeshFormat] = useState<MeshExportFormat>('3mf');
+  const [meshBusy, setMeshBusy] = useState(false);
+  const [meshFileStem, setMeshFileStem] = useState('forge-export');
   const [reportBusy, setReportBusy] = useState(false);
 
   const shapeObjects = result?.objects?.filter((obj) => obj.shape) ?? [];
   const hasShapes = shapeObjects.length > 0;
+  const defaultMeshStem = useMemo(() => deriveExportStem(activeFile), [activeFile]);
 
-  const exportSTL = () => {
+  const meshObjects = useMemo<MeshExportObject[]>(() => (
+    shapeObjects.map((obj) => ({
+      name: obj.name,
+      shape: obj.shape!,
+      color: objectSettings[obj.id]?.color || obj.color,
+    }))
+  ), [shapeObjects, objectSettings]);
+
+  const totalTriangles = useMemo(
+    () => meshObjects.reduce((sum, obj) => sum + obj.shape.numTri(), 0),
+    [meshObjects],
+  );
+
+  const openDialog = () => {
     if (!hasShapes) return;
-
-    const entries: MeshEntry[] = shapeObjects.map((obj) => {
-      const color = objectSettings[obj.id]?.color || obj.color;
-      return { mesh: obj.shape!.getMesh(), color: color ? hexToRGB555(color) : 0 };
-    });
-
-    const buffer = buildSTL(entries);
-    const blob = new Blob([buffer], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'forge-export.stl';
-    a.click();
-    URL.revokeObjectURL(url);
+    setMeshFormat('3mf');
+    setMeshFileStem(defaultMeshStem);
+    setDialogOpen(true);
   };
+
+  const closeDialog = () => {
+    if (meshBusy) return;
+    setDialogOpen(false);
+  };
+
+  const exportMesh = async () => {
+    if (!hasShapes || meshBusy) return;
+    setMeshBusy(true);
+    try {
+      const stem = sanitizeExportStem(meshFileStem || defaultMeshStem);
+      if (meshFormat === '3mf') {
+        const blob = await build3mfBlob(meshObjects, {
+          title: stem,
+          application: 'ForgeCAD',
+          description: 'ForgeCAD manifold 3MF export',
+        });
+        triggerDownload(blob, `${stem}.3mf`);
+      } else {
+        const buffer = buildBinaryStl(meshObjects);
+        const blob = new Blob([buffer], { type: 'model/stl' });
+        triggerDownload(blob, `${stem}.stl`);
+      }
+      setDialogOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Mesh export failed:', err);
+      alert(`Mesh export failed: ${message}`);
+    } finally {
+      setMeshBusy(false);
+    }
+  };
+
+  const reportTitle = deriveExportStem(activeFile);
 
   const exportReport = async () => {
     if (!hasShapes || reportBusy) return;
@@ -101,10 +122,7 @@ export function ExportPanel() {
       // before worker startup and message handoff.
       await waitForNextPaint();
 
-      const title = currentActiveFile
-        .replace(/^.*[\\/]/, '')
-        .replace(/\.(forge\.)?js$/i, '')
-        || 'ForgeCAD Report';
+      const title = deriveExportStem(currentActiveFile) || reportTitle;
 
       const report = await generateReportInWorker({
         files,
@@ -117,12 +135,7 @@ export function ExportPanel() {
 
       const bytes = new Uint8Array(report.pdf);
       const blob = new Blob([bytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${title}.report.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerDownload(blob, `${title}.report.pdf`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Report export failed:', err);
@@ -135,61 +148,246 @@ export function ExportPanel() {
   return (
     <div style={{ padding: '8px 12px', borderTop: '1px solid var(--fc-border)' }}>
       <button
-        onClick={exportSTL}
+        onClick={openDialog}
         disabled={!hasShapes}
         style={{
           width: '100%',
-          padding: '6px',
+          padding: '7px 8px',
           background: hasShapes ? 'var(--fc-accent)' : 'var(--fc-border)',
           color: hasShapes ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
           border: 'none',
           borderRadius: 4,
           cursor: hasShapes ? 'pointer' : 'default',
           fontSize: 13,
+          fontWeight: 600,
         }}
       >
-        Export STL{shapeObjects.length > 1 ? ` (${shapeObjects.length} objects)` : ''}
+        Export...
       </button>
-      <button
-        onClick={exportReport}
-        disabled={!hasShapes || reportBusy}
+      <div
         style={{
-          width: '100%',
-          marginTop: 8,
-          padding: '6px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 6,
-          background: hasShapes && !reportBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
-          color: hasShapes && !reportBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
-          border: 'none',
-          borderRadius: 4,
-          cursor: hasShapes && !reportBusy ? 'pointer' : 'default',
-          fontSize: 13,
+          marginTop: 6,
+          fontSize: 11,
+          color: 'var(--fc-textDim)',
+          lineHeight: 1.35,
         }}
       >
-        {reportBusy ? (
-          <>
-            <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
-              <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
-              <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2">
-                <animateTransform
-                  attributeName="transform"
-                  type="rotate"
-                  from="0 8 8"
-                  to="360 8 8"
-                  dur="0.75s"
-                  repeatCount="indefinite"
+        3MF is recommended for manifold CAD solids. STL is kept as a legacy option.
+      </div>
+
+      {dialogOpen && (
+        <div
+          role="presentation"
+          onMouseDown={closeDialog}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            padding: 18,
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Export options"
+            onMouseDown={(event) => event.stopPropagation()}
+            style={{
+              width: 'min(540px, calc(100vw - 32px))',
+              background: 'var(--fc-bgPanel)',
+              border: '1px solid var(--fc-border)',
+              borderRadius: 8,
+              boxShadow: '0 18px 48px rgba(0, 0, 0, 0.35)',
+              padding: 14,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fc-text)' }}>Export</div>
+                <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginTop: 2 }}>
+                  {pluralize(shapeObjects.length, 'object')} • {pluralize(totalTriangles, 'triangle')}
+                </div>
+              </div>
+              <button
+                onClick={closeDialog}
+                disabled={meshBusy}
+                style={{
+                  border: '1px solid var(--fc-border)',
+                  background: 'transparent',
+                  color: 'var(--fc-textMuted)',
+                  borderRadius: 4,
+                  width: 28,
+                  height: 28,
+                  cursor: meshBusy ? 'default' : 'pointer',
+                  fontSize: 17,
+                  lineHeight: 1,
+                }}
+                title="Close export dialog"
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--fc-textDim)' }}>Mesh format</div>
+            <div style={{ marginTop: 6, display: 'grid', gap: 8 }}>
+              <button
+                onClick={() => setMeshFormat('3mf')}
+                style={{
+                  textAlign: 'left',
+                  border: `1px solid ${meshFormat === '3mf' ? 'var(--fc-accent)' : 'var(--fc-border)'}`,
+                  background: meshFormat === '3mf' ? 'var(--fc-bgActive)' : 'var(--fc-bgOverlay)',
+                  color: 'var(--fc-text)',
+                  borderRadius: 6,
+                  padding: '9px 10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600 }}>3MF (recommended)</div>
+                <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
+                  Preserves manifold topology and object structure.
+                </div>
+              </button>
+              <button
+                onClick={() => setMeshFormat('stl')}
+                style={{
+                  textAlign: 'left',
+                  border: `1px solid ${meshFormat === 'stl' ? 'var(--fc-warning)' : 'var(--fc-border)'}`,
+                  background: meshFormat === 'stl' ? 'var(--fc-bgActive)' : 'var(--fc-bgOverlay)',
+                  color: 'var(--fc-text)',
+                  borderRadius: 6,
+                  padding: '9px 10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600 }}>STL (legacy)</div>
+                <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
+                  Triangle-only export, may not preserve manifold topology on re-import.
+                </div>
+              </button>
+            </div>
+
+            {meshFormat === 'stl' && (
+              <div
+                style={{
+                  marginTop: 8,
+                  border: '1px solid var(--fc-warning)',
+                  background: 'color-mix(in srgb, var(--fc-warning) 12%, transparent)',
+                  color: 'var(--fc-text)',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  fontSize: 11,
+                  lineHeight: 1.4,
+                }}
+              >
+                STL is lossy for solid models. Use 3MF for reliable manifold round-trips.
+              </div>
+            )}
+
+            <label style={{ display: 'block', marginTop: 12, fontSize: 12, color: 'var(--fc-textDim)' }}>
+              Filename
+              <div style={{ display: 'flex', alignItems: 'center', marginTop: 5, gap: 6 }}>
+                <input
+                  type="text"
+                  value={meshFileStem}
+                  onChange={(event) => setMeshFileStem(event.target.value)}
+                  spellCheck={false}
+                  style={{
+                    flex: 1,
+                    background: 'var(--fc-bgInput)',
+                    border: '1px solid var(--fc-border)',
+                    borderRadius: 4,
+                    padding: '6px 8px',
+                    color: 'var(--fc-text)',
+                    fontSize: 12,
+                  }}
                 />
-              </path>
-            </svg>
-            <span>Generating Report...</span>
-          </>
-        ) : (
-          `Export Report PDF${shapeObjects.length > 1 ? ` (${shapeObjects.length} components)` : ''}`
-        )}
-      </button>
+                <span style={{ fontSize: 12, color: 'var(--fc-textDim)', width: 44, textAlign: 'left' }}>
+                  .{meshFormat}
+                </span>
+              </div>
+            </label>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button
+                onClick={closeDialog}
+                disabled={meshBusy}
+                style={{
+                  border: '1px solid var(--fc-border)',
+                  background: 'transparent',
+                  color: 'var(--fc-textMuted)',
+                  borderRadius: 4,
+                  padding: '6px 10px',
+                  fontSize: 12,
+                  cursor: meshBusy ? 'default' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={exportMesh}
+                disabled={meshBusy}
+                style={{
+                  border: 'none',
+                  background: 'var(--fc-accent)',
+                  color: 'var(--fc-accentText)',
+                  borderRadius: 4,
+                  padding: '6px 10px',
+                  fontSize: 12,
+                  cursor: meshBusy ? 'default' : 'pointer',
+                }}
+              >
+                {meshBusy ? `Exporting ${meshFormat.toUpperCase()}...` : `Export ${meshFormat.toUpperCase()}`}
+              </button>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--fc-borderLight)', marginTop: 12, paddingTop: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginBottom: 6 }}>Report</div>
+              <button
+                onClick={exportReport}
+                disabled={reportBusy}
+                style={{
+                  width: '100%',
+                  padding: '7px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  background: !reportBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
+                  color: !reportBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: !reportBusy ? 'pointer' : 'default',
+                  fontSize: 12,
+                }}
+              >
+                {reportBusy ? (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+                      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+                      <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2">
+                        <animateTransform
+                          attributeName="transform"
+                          type="rotate"
+                          from="0 8 8"
+                          to="360 8 8"
+                          dur="0.75s"
+                          repeatCount="indefinite"
+                        />
+                      </path>
+                    </svg>
+                    <span>Generating Report...</span>
+                  </>
+                ) : (
+                  `Export Report PDF${shapeObjects.length > 1 ? ` (${shapeObjects.length} components)` : ''}`
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
