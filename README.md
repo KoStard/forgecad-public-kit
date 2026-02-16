@@ -1,5 +1,7 @@
 # ForgeCAD
 
+![Robot Hand V2](<Robot Hand V2.gif>)
+
 Code-first parametric CAD for the browser and CLI.
 
 ForgeCAD combines a JavaScript/TypeScript modeling API, live parameters, constraints, and assembly tooling on top of the [Manifold](https://github.com/elalish/manifold) WASM geometry kernel.
