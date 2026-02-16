@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { generateReportPdf } from '@forge/index';
 import { useForgeStore } from '../store/forgeStore';
+import { generateReportInWorker } from '../workers/reportWorkerClient';
 
 function hexToRGB555(hex: string): number {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -68,7 +68,6 @@ function buildSTL(entries: MeshEntry[]): ArrayBuffer {
 export function ExportPanel() {
   const result = useForgeStore((s) => s.result);
   const objectSettings = useForgeStore((s) => s.objectSettings);
-  const activeFile = useForgeStore((s) => s.activeFile);
   const [reportBusy, setReportBusy] = useState(false);
 
   const shapeObjects = result?.objects?.filter((obj) => obj.shape) ?? [];
@@ -93,19 +92,24 @@ export function ExportPanel() {
   };
 
   const exportReport = async () => {
-    if (!result || !hasShapes || reportBusy) return;
+    if (!hasShapes || reportBusy) return;
     setReportBusy(true);
     try {
+      const { files, activeFile: currentActiveFile, paramOverrides } = useForgeStore.getState();
+
       // Let React commit `reportBusy` so the loading indicator is visible
-      // before synchronous report generation blocks the main thread.
+      // before worker startup and message handoff.
       await waitForNextPaint();
 
-      const title = activeFile
+      const title = currentActiveFile
         .replace(/^.*[\\/]/, '')
         .replace(/\.(forge\.)?js$/i, '')
         || 'ForgeCAD Report';
 
-      const report = generateReportPdf(result, {
+      const report = await generateReportInWorker({
+        files,
+        activeFile: currentActiveFile,
+        paramOverrides,
         title,
         includeDisassembled: true,
         objectVisuals: objectSettings,
