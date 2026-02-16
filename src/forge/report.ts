@@ -1755,16 +1755,19 @@ function renderViewCell(
 
   const labelLayout = layoutDimensionLabels(labelPlans, cell, blockedLabelSegments, geometryAvoidBoxes);
   const placedLabels = labelLayout.placements;
-  placedLabels.forEach(({ plan, pos, box, text, fallback }) => {
+  placedLabels.forEach(({ plan, pos, text, fallback }) => {
     const leaderStart = plan.anchor;
-    const leaderEnd = closestPointOnBox(box, leaderStart);
-    const leaderDist = Math.hypot(leaderEnd[0] - leaderStart[0], leaderEnd[1] - leaderStart[1]);
     const textW = estimateTextWidth(text, plan.fontSize);
+    const textHalfW = Math.max(8, textW * 0.5 + 2);
     const leftEdge = cell.x + 4;
     const rightEdge = cell.x + cell.w - 4;
     let textX = pos[0] - textW * 0.5 + 1.5; // centered baseline by default
     if (textX + textW > rightEdge) textX = rightEdge - textW; // right-aligned near right edge
     if (textX < leftEdge) textX = leftEdge; // left-aligned near left edge
+    const renderedCenter: Vec2 = [textX + textW * 0.5 - 1.5, pos[1]];
+    const renderedBox = makeLabelBox(renderedCenter, textHalfW, plan.textHalfH);
+    const leaderEnd = closestPointOnBox(renderedBox, leaderStart);
+    const leaderDist = Math.hypot(leaderEnd[0] - leaderStart[0], leaderEnd[1] - leaderStart[1]);
     cmd.push(commandSetStroke(plan.color));
     cmd.push(commandSetFill(plan.color));
     if (leaderDist > plan.leaderMinLength) {
