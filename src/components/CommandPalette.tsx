@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForgeStore } from '../store/forgeStore';
-import type { ThemeName } from '../theme';
 import { exportMeshFromStore, exportReportFromStore } from './exportActions';
 
 interface Command {
