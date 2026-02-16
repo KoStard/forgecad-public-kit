@@ -141,6 +141,10 @@ export function ExportPanel() {
           width: '100%',
           marginTop: 8,
           padding: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
           background: hasShapes && !reportBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
           color: hasShapes && !reportBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
           border: 'none',
@@ -149,7 +153,26 @@ export function ExportPanel() {
           fontSize: 13,
         }}
       >
-        {reportBusy ? 'Generating Report...' : `Export Report PDF${shapeObjects.length > 1 ? ` (${shapeObjects.length} components)` : ''}`}
+        {reportBusy ? (
+          <>
+            <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+              <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2">
+                <animateTransform
+                  attributeName="transform"
+                  type="rotate"
+                  from="0 8 8"
+                  to="360 8 8"
+                  dur="0.75s"
+                  repeatCount="indefinite"
+                />
+              </path>
+            </svg>
+            <span>Generating Report...</span>
+          </>
+        ) : (
+          `Export Report PDF${shapeObjects.length > 1 ? ` (${shapeObjects.length} components)` : ''}`
+        )}
       </button>
     </div>
   );
