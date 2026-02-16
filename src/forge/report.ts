@@ -856,6 +856,7 @@ function mapBoundsToLabelBox(
 }
 
 interface DimensionLabelPlan {
+  dimId: string;
   label: string;
   color: ColorRgb;
   fontSize: number;
@@ -866,6 +867,26 @@ interface DimensionLabelPlan {
   textHalfW: number;
   textHalfH: number;
   candidates: Vec2[];
+  ownLineSegments: Segment2[];
+}
+
+interface PlacedLabel {
+  plan: DimensionLabelPlan;
+  pos: Vec2;
+  box: LabelBox;
+  text: string;
+  fallback: boolean;
+}
+
+interface LabelLegendEntry {
+  index: number;
+  text: string;
+  color: ColorRgb;
+}
+
+interface DimensionLabelLayout {
+  placements: PlacedLabel[];
+  legend: LabelLegendEntry[];
 }
 
 interface DrawDimensionResult {
@@ -1225,13 +1246,85 @@ function assignAutoOffsetLanes(
   return out;
 }
 
+function candidateOrderFromCenter(
+  center: number,
+  min: number,
+  max: number,
+  step: number,
+): number[] {
+  const out: number[] = [];
+  const clampedCenter = clamp(center, min, max);
+  out.push(clampedCenter);
+  const n = Math.max(2, Math.ceil((max - min) / Math.max(1, step)));
+  for (let i = 1; i <= n; i += 1) {
+    const up = clampedCenter + i * step;
+    const down = clampedCenter - i * step;
+    if (up <= max) out.push(up);
+    if (down >= min) out.push(down);
+  }
+  return out;
+}
+
+function buildFallbackCandidates(plan: DimensionLabelPlan, cell: CellRect): Vec2[] {
+  const inset = 6;
+  const minX = cell.x + inset + plan.textHalfW;
+  const maxX = cell.x + cell.w - inset - plan.textHalfW;
+  const minY = cell.y + inset + plan.textHalfH;
+  const maxY = cell.y + cell.h - inset - plan.textHalfH;
+  if (minX > maxX || minY > maxY) return [clampLabelCenter(plan.preferred, plan.textHalfW, plan.textHalfH, cell)];
+
+  const centerX = cell.x + cell.w * 0.5;
+  const centerY = cell.y + cell.h * 0.5;
+  const preferRight = plan.preferred[0] >= centerX;
+  const preferTop = plan.preferred[1] >= centerY;
+  const xEdges = preferRight ? [maxX, minX] : [minX, maxX];
+  const yEdges = preferTop ? [maxY, minY] : [minY, maxY];
+
+  const stepY = Math.max(10, plan.textHalfH * 2 + 3);
+  const stepX = Math.max(10, plan.textHalfW * 0.8 + 4);
+  const yOrder = candidateOrderFromCenter(plan.anchor[1], minY, maxY, stepY);
+  const xOrder = candidateOrderFromCenter(plan.anchor[0], minX, maxX, stepX);
+
+  const out: Vec2[] = [];
+  xEdges.forEach((x) => {
+    yOrder.forEach((y) => out.push([x, y]));
+  });
+  yEdges.forEach((y) => {
+    xOrder.forEach((x) => out.push([x, y]));
+  });
+  return out;
+}
+
+function hasHardLabelConflict(
+  ownLineSegments: Segment2[],
+  box: LabelBox,
+  placed: PlacedLabel[],
+  blockedSegments: Segment2[],
+  avoidBoxes: LabelBox[],
+): boolean {
+  const selfSegs = new Set(ownLineSegments);
+  for (const p of placed) {
+    if (overlapArea(expandBox(box, 2.2), expandBox(p.box, 2.2)) > 0) return true;
+  }
+  for (const b of avoidBoxes) {
+    if (overlapArea(box, b) > 0) return true;
+  }
+  for (const seg of blockedSegments) {
+    if (selfSegs.has(seg)) continue;
+    const dist = segmentToBoxDistance(seg, box);
+    if (dist < 2.6) return true;
+  }
+  return false;
+}
+
 function layoutDimensionLabels(
   plans: DimensionLabelPlan[],
   cell: CellRect,
   blockedSegments: Segment2[],
   avoidBoxes: LabelBox[] = [],
-): Array<{ plan: DimensionLabelPlan; pos: Vec2; box: LabelBox }> {
-  const placed: Array<{ plan: DimensionLabelPlan; pos: Vec2; box: LabelBox }> = [];
+): DimensionLabelLayout {
+  const placed: PlacedLabel[] = [];
+  const unresolved: DimensionLabelPlan[] = [];
   const order = plans
     .map((plan, idx) => ({ plan, idx }))
     .sort((a, b) => {
@@ -1243,32 +1336,32 @@ function layoutDimensionLabels(
 
   for (const entry of order) {
     const plan = entry.plan;
-    let bestPos = clampLabelCenter(plan.preferred, plan.textHalfW, plan.textHalfH, cell);
-    let bestBox = makeLabelBox(bestPos, plan.textHalfW, plan.textHalfH);
+    let bestPos: Vec2 | null = null;
+    let bestBox: LabelBox | null = null;
     let bestScore = Number.POSITIVE_INFINITY;
 
     const tested = plan.candidates.length > 0 ? plan.candidates : [plan.preferred];
     tested.forEach((candidate, ci) => {
       const pos = clampLabelCenter(candidate, plan.textHalfW, plan.textHalfH, cell);
       const box = makeLabelBox(pos, plan.textHalfW, plan.textHalfH);
-      const overlap = placed.reduce((sum, p) => sum + overlapArea(expandBox(box, 2), expandBox(p.box, 2)), 0);
-      const avoidPenalty = avoidBoxes.reduce((sum, b) => {
-        const ov = overlapArea(box, b);
-        if (ov > 0) return sum + ov * 1200;
-        const d = boxDistance(box, b);
-        if (d < 2) return sum + (2 - d) * 40;
-        return sum;
-      }, 0);
+      if (hasHardLabelConflict(plan.ownLineSegments, box, placed, blockedSegments, avoidBoxes)) return;
+
       const linePenalty = blockedSegments.reduce((sum, seg) => {
+        if (plan.ownLineSegments.includes(seg)) return sum;
         const dist = segmentToBoxDistance(seg, box);
-        if (dist <= 0.1) return sum + 1500;
-        if (dist < 2) return sum + (2 - dist) * 220;
-        if (dist < 6) return sum + (6 - dist) * 20;
+        if (dist < 3) return sum + (3 - dist) * 18;
         return sum;
       }, 0);
       const distFromPreferred = Math.hypot(pos[0] - plan.preferred[0], pos[1] - plan.preferred[1]);
       const axisBias = Math.abs((pos[0] - plan.preferred[0]) * plan.tangent[0] + (pos[1] - plan.preferred[1]) * plan.tangent[1]);
-      const score = overlap * 1000 + avoidPenalty + linePenalty + distFromPreferred * 0.55 + axisBias * 0.42 + ci * 0.02;
+      const leaderEnd = closestPointOnBox(box, plan.anchor);
+      const leaderLen = Math.hypot(leaderEnd[0] - plan.anchor[0], leaderEnd[1] - plan.anchor[1]);
+      const leaderPenalty = blockedSegments.reduce((sum, seg) => {
+        if (plan.ownLineSegments.includes(seg)) return sum;
+        if (segmentsIntersect2(plan.anchor, leaderEnd, seg.a, seg.b)) return sum + 10;
+        return sum;
+      }, 0);
+      const score = linePenalty + distFromPreferred * 0.9 + axisBias * 0.7 + leaderLen * 0.1 + leaderPenalty + ci * 0.03;
       if (score < bestScore) {
         bestScore = score;
         bestPos = pos;
@@ -1276,10 +1369,72 @@ function layoutDimensionLabels(
       }
     });
 
-    placed.push({ plan, pos: bestPos, box: bestBox });
+    if (bestPos && bestBox) {
+      placed.push({ plan, pos: bestPos, box: bestBox, text: plan.label, fallback: false });
+    } else {
+      unresolved.push(plan);
+    }
   }
 
-  return placed;
+  unresolved.forEach((plan) => {
+    const fallbackCandidates = buildFallbackCandidates(plan, cell);
+    let bestPos: Vec2 | null = null;
+    let bestBox: LabelBox | null = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+    const textW = estimateTextWidth(plan.label, plan.fontSize);
+    const textHalfW = Math.max(8, textW * 0.5 + 2);
+    const textHalfH = plan.textHalfH;
+
+    fallbackCandidates.forEach((candidate, ci) => {
+      const pos = clampLabelCenter(candidate, textHalfW, textHalfH, cell);
+      const box = makeLabelBox(pos, textHalfW, textHalfH);
+      if (hasHardLabelConflict(plan.ownLineSegments, box, placed, blockedSegments, avoidBoxes)) return;
+      const leaderEnd = closestPointOnBox(box, plan.anchor);
+      const leaderLen = Math.hypot(leaderEnd[0] - plan.anchor[0], leaderEnd[1] - plan.anchor[1]);
+      const leaderPenalty = blockedSegments.reduce((sum, seg) => (
+        plan.ownLineSegments.includes(seg) ? sum : (segmentsIntersect2(plan.anchor, leaderEnd, seg.a, seg.b) ? sum + 5 : sum)
+      ), 0);
+      const score = leaderLen * 0.35 + leaderPenalty * 6 + ci * 0.1;
+      if (score < bestScore) {
+        bestScore = score;
+        bestPos = pos;
+        bestBox = box;
+      }
+    });
+
+    if (!bestPos || !bestBox) {
+      const fallbackPos = clampLabelCenter([cell.x + cell.w - 8 - textHalfW, cell.y + cell.h - 8 - textHalfH], textHalfW, textHalfH, cell);
+      const fallbackBox = makeLabelBox(fallbackPos, textHalfW, textHalfH);
+      placed.push({ plan, pos: fallbackPos, box: fallbackBox, text: plan.label, fallback: true });
+    } else {
+      placed.push({ plan, pos: bestPos, box: bestBox, text: plan.label, fallback: true });
+    }
+  });
+
+  const legend: LabelLegendEntry[] = [];
+  const denseMode = unresolved.length > Math.max(2, Math.floor(plans.length * 0.25)) || plans.length >= 10;
+  const shouldIndex = denseMode || placed.some((p) => p.fallback);
+
+  if (shouldIndex) {
+    const indexed = [...placed].sort((lhs, rhs) => (
+      rhs.plan.anchor[1] - lhs.plan.anchor[1]
+      || lhs.plan.anchor[0] - rhs.plan.anchor[0]
+      || lhs.plan.dimId.localeCompare(rhs.plan.dimId)
+    ));
+    let counter = 1;
+    indexed.forEach((p) => {
+      if (!denseMode && !p.fallback) return;
+      p.text = `[${counter}]`;
+      legend.push({
+        index: counter,
+        text: p.plan.label,
+        color: p.plan.color,
+      });
+      counter += 1;
+    });
+  }
+
+  return { placements: placed, legend };
 }
 
 function drawDimension(
@@ -1472,6 +1627,7 @@ function drawDimension(
   return {
     graphicsCmd: cmd.join(''),
     labelPlan: {
+      dimId: dim.id,
       label,
       color,
       fontSize,
@@ -1482,6 +1638,7 @@ function drawDimension(
       textHalfW,
       textHalfH,
       candidates,
+      ownLineSegments: lineSegments,
     },
     lineSegments,
   };
@@ -1596,12 +1753,13 @@ function renderViewCell(
     blockedLabelSegments.push(...result.lineSegments);
   });
 
-  const placedLabels = layoutDimensionLabels(labelPlans, cell, blockedLabelSegments, geometryAvoidBoxes);
-  placedLabels.forEach(({ plan, pos, box }) => {
+  const labelLayout = layoutDimensionLabels(labelPlans, cell, blockedLabelSegments, geometryAvoidBoxes);
+  const placedLabels = labelLayout.placements;
+  placedLabels.forEach(({ plan, pos, box, text, fallback }) => {
     const leaderStart = plan.anchor;
     const leaderEnd = closestPointOnBox(box, leaderStart);
     const leaderDist = Math.hypot(leaderEnd[0] - leaderStart[0], leaderEnd[1] - leaderStart[1]);
-    const textW = estimateTextWidth(plan.label, plan.fontSize);
+    const textW = estimateTextWidth(text, plan.fontSize);
     const leftEdge = cell.x + 4;
     const rightEdge = cell.x + cell.w - 4;
     let textX = pos[0] - textW * 0.5 + 1.5; // centered baseline by default
@@ -1610,11 +1768,37 @@ function renderViewCell(
     cmd.push(commandSetStroke(plan.color));
     cmd.push(commandSetFill(plan.color));
     if (leaderDist > plan.leaderMinLength) {
-      cmd.push('0.35 w\n');
+      cmd.push(fallback ? '0.45 w\n' : '0.35 w\n');
       cmd.push(commandLine(leaderStart, leaderEnd));
     }
-    cmd.push(commandText(plan.label, textX, pos[1] - 3, plan.fontSize));
+    cmd.push(commandText(text, textX, pos[1] - 3, plan.fontSize));
   });
+
+  if (labelLayout.legend.length > 0) {
+    const legendFont = 6.2;
+    const legendLineH = 7.2;
+    const legendInset = 6;
+    const legendMaxW = Math.min(190, cell.w * 0.52);
+    const maxRows = Math.max(3, Math.floor((cell.h * 0.34) / legendLineH));
+    const shown = labelLayout.legend.slice(0, maxRows);
+    const hidden = Math.max(0, labelLayout.legend.length - shown.length);
+    const rows = hidden > 0 ? [...shown, { index: 0, text: `+${hidden} more`, color: [0.45, 0.45, 0.48] as ColorRgb }] : shown;
+    const legendH = rows.length * legendLineH + 6;
+    const legendX = cell.x + legendInset;
+    const legendY = cell.y + legendInset;
+
+    cmd.push(commandSetStroke([0.42, 0.42, 0.46]));
+    cmd.push('0.35 w\n');
+    cmd.push(`${formatNumber(legendX)} ${formatNumber(legendY)} ${formatNumber(legendMaxW)} ${formatNumber(legendH)} re S\n`);
+
+    rows.forEach((row, i) => {
+      const y = legendY + legendH - 3 - (i + 1) * legendLineH;
+      const prefix = row.index > 0 ? `[${row.index}] ` : '';
+      const text = truncateToWidth(`${prefix}${row.text}`, legendMaxW - 8, legendFont);
+      cmd.push(commandSetFill(row.color));
+      cmd.push(commandText(text, legendX + 4, y, legendFont));
+    });
+  }
 
   cmd.push('Q\n');
 
