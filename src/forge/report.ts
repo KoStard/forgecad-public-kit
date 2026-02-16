@@ -876,13 +876,13 @@ interface DrawDimensionResult {
 
 interface AutoLaneEntry {
   dimId: string;
+  angle: number;
   tangent: Vec2;
   spanMin: number;
   spanMax: number;
   normalCoord: number;
   preferredSide: number;
   lenPx: number;
-  neighbors: Set<number>;
 }
 
 function makeLabelBox(center: Vec2, textHalfW: number, textHalfH: number): LabelBox {
@@ -1040,6 +1040,14 @@ function autoLaneOffsetPx(colorIndex: number, isIso: boolean): number {
   return compressedIndex * step;
 }
 
+function intervalOverlap1D(a0: number, a1: number, b0: number, b1: number, pad: number): boolean {
+  return Math.min(a1, b1) - Math.max(a0, b0) >= -pad;
+}
+
+function intervalContains1D(container0: number, container1: number, inner0: number, inner1: number, tol: number): boolean {
+  return container0 <= inner0 + tol && container1 >= inner1 - tol;
+}
+
 function assignAutoOffsetLanes(
   dims: DimensionDef[],
   frame: ViewFrame,
@@ -1054,7 +1062,9 @@ function assignAutoOffsetLanes(
   const laneStepPx = frame.id === 'iso' ? 7.5 : 10;
   const overlapPadPx = frame.id === 'iso' ? 8 : 10;
   const alignThreshold = frame.id === 'iso' ? 0.98 : 0.985;
-  const normalBandPx = laneStepPx * 1.45;
+  const normalBandPx = laneStepPx * 1.35;
+  const angleBucketRad = frame.id === 'iso' ? (Math.PI / 42) : (Math.PI / 54);
+  const containTolPx = frame.id === 'iso' ? 4 : 5;
 
   const entries: AutoLaneEntry[] = [];
 
@@ -1077,6 +1087,7 @@ function assignAutoOffsetLanes(
       tx = -tx;
       ty = -ty;
     }
+    const angle = Math.atan2(ty, tx);
     const nx = -ty;
     const ny = tx;
     const t0 = p0[0] * tx + p0[1] * ty;
@@ -1092,54 +1103,124 @@ function assignAutoOffsetLanes(
 
     entries.push({
       dimId: dim.id,
+      angle,
       tangent: [tx, ty],
       spanMin,
       spanMax,
       normalCoord,
       preferredSide,
       lenPx: len,
-      neighbors: new Set<number>(),
     });
   });
 
   if (entries.length <= 1) return out;
 
-  for (let i = 0; i < entries.length; i += 1) {
-    const a = entries[i];
-    for (let j = i + 1; j < entries.length; j += 1) {
-      const b = entries[j];
-      if (a.preferredSide !== b.preferredSide) continue;
-      const align = Math.abs(a.tangent[0] * b.tangent[0] + a.tangent[1] * b.tangent[1]);
-      if (align < alignThreshold) continue;
-      if (Math.abs(a.normalCoord - b.normalCoord) > normalBandPx) continue;
-      const overlap = Math.min(a.spanMax, b.spanMax) - Math.max(a.spanMin, b.spanMin);
-      if (overlap < -overlapPadPx) continue;
-      a.neighbors.add(j);
-      b.neighbors.add(i);
+  const familyMap = new Map<string, number[]>();
+  entries.forEach((entry, idx) => {
+    const bucket = Math.round(entry.angle / angleBucketRad);
+    const key = `${entry.preferredSide}:${bucket}`;
+    const list = familyMap.get(key) || [];
+    list.push(idx);
+    familyMap.set(key, list);
+  });
+
+  const laneByEntry = new Array(entries.length).fill(0);
+
+  const assignFamilyGroup = (groupIdxs: number[]) => {
+    if (groupIdxs.length <= 1) return;
+
+    const neighbors = new Map<number, Set<number>>();
+    groupIdxs.forEach((idx) => neighbors.set(idx, new Set<number>()));
+
+    for (let i = 0; i < groupIdxs.length; i += 1) {
+      const ia = groupIdxs[i];
+      const a = entries[ia];
+      for (let j = i + 1; j < groupIdxs.length; j += 1) {
+        const ib = groupIdxs[j];
+        const b = entries[ib];
+        const align = Math.abs(a.tangent[0] * b.tangent[0] + a.tangent[1] * b.tangent[1]);
+        if (align < alignThreshold) continue;
+        if (Math.abs(a.normalCoord - b.normalCoord) > normalBandPx) continue;
+        if (!intervalOverlap1D(a.spanMin, a.spanMax, b.spanMin, b.spanMax, overlapPadPx)) continue;
+        neighbors.get(ia)?.add(ib);
+        neighbors.get(ib)?.add(ia);
+      }
     }
-  }
 
-  const colorByEntry = new Array(entries.length).fill(-1);
-  const order = entries
-    .map((entry, idx) => ({ idx, degree: entry.neighbors.size, len: entry.lenPx }))
-    .sort((lhs, rhs) => (rhs.degree - lhs.degree) || (rhs.len - lhs.len) || (lhs.idx - rhs.idx));
+    const order = groupIdxs
+      .map((idx) => ({
+        idx,
+        span: entries[idx].spanMax - entries[idx].spanMin,
+        degree: neighbors.get(idx)?.size ?? 0,
+      }))
+      .sort((lhs, rhs) => lhs.span - rhs.span || rhs.degree - lhs.degree || lhs.idx - rhs.idx);
 
-  order.forEach(({ idx }) => {
-    const used = new Set<number>();
-    entries[idx].neighbors.forEach((nei) => {
-      const c = colorByEntry[nei];
-      if (c >= 0) used.add(c);
+    order.forEach(({ idx }) => {
+      const used = new Set<number>();
+      const nset = neighbors.get(idx) || new Set<number>();
+      nset.forEach((nei) => {
+        used.add(laneByEntry[nei]);
+      });
+      let lane = 0;
+      while (used.has(lane)) lane += 1;
+      laneByEntry[idx] = lane;
     });
-    let c = 0;
-    while (used.has(c)) c += 1;
-    colorByEntry[idx] = c;
+
+    let adjusted = true;
+    for (let guard = 0; guard < 6 && adjusted; guard += 1) {
+      adjusted = false;
+      for (let i = 0; i < groupIdxs.length; i += 1) {
+        const ia = groupIdxs[i];
+        const a = entries[ia];
+        for (let j = 0; j < groupIdxs.length; j += 1) {
+          if (i === j) continue;
+          const ib = groupIdxs[j];
+          const b = entries[ib];
+          if (!intervalContains1D(a.spanMin, a.spanMax, b.spanMin, b.spanMax, containTolPx)) continue;
+          if (Math.abs(a.normalCoord - b.normalCoord) > normalBandPx) continue;
+          if (laneByEntry[ia] <= laneByEntry[ib]) {
+            laneByEntry[ia] = laneByEntry[ib] + 1;
+            adjusted = true;
+          }
+        }
+      }
+    }
+  };
+
+  familyMap.forEach((familyIdxs) => {
+    if (familyIdxs.length <= 1) return;
+    const sorted = [...familyIdxs].sort((lhs, rhs) => entries[lhs].normalCoord - entries[rhs].normalCoord);
+    let cluster: number[] = [];
+    let lastNormal = 0;
+    sorted.forEach((idx, i) => {
+      const n = entries[idx].normalCoord;
+      if (i === 0 || Math.abs(n - lastNormal) <= normalBandPx) {
+        cluster.push(idx);
+      } else {
+        assignFamilyGroup(cluster);
+        cluster = [idx];
+      }
+      lastNormal = n;
+    });
+    assignFamilyGroup(cluster);
   });
 
   entries.forEach((entry, idx) => {
-    const extraPx = autoLaneOffsetPx(colorByEntry[idx], frame.id === 'iso');
+    const extraPx = autoLaneOffsetPx(laneByEntry[idx], frame.id === 'iso');
     if (extraPx <= 0) return;
     out.set(entry.dimId, extraPx / Math.max(1e-6, mapper.scale));
   });
+
+  if (out.size === 0 && entries.length > 2) {
+    const order = entries
+      .map((entry, idx) => ({ entry, idx }))
+      .sort((lhs, rhs) => lhs.entry.lenPx - rhs.entry.lenPx || lhs.idx - rhs.idx);
+    order.forEach(({ entry, idx }) => {
+      const extraPx = autoLaneOffsetPx(idx, frame.id === 'iso');
+      if (extraPx <= 0) return;
+      out.set(entry.dimId, extraPx / Math.max(1e-6, mapper.scale));
+    });
+  }
 
   return out;
 }
