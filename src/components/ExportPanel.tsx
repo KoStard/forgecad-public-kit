@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
-import { build3mfBlob, buildBinaryStl, type MeshExportObject } from '@forge/exportMesh';
 import { useForgeStore } from '../store/forgeStore';
-import { generateReportInWorker } from '../workers/reportWorkerClient';
-
-type MeshExportFormat = '3mf' | 'stl';
+import {
+  deriveExportStem,
+  exportMeshFromStore,
+  exportReportFromStore,
+  type MeshExportFormat,
+} from './exportActions';
 
 function waitForNextPaint(): Promise<void> {
   return new Promise((resolve) => {
@@ -11,33 +13,6 @@ function waitForNextPaint(): Promise<void> {
       requestAnimationFrame(() => resolve());
     });
   });
-}
-
-function deriveExportStem(path: string): string {
-  const fromPath = path
-    .replace(/^.*[\\/]/, '')
-    .replace(/\.(forge|sketch)\.js$/i, '')
-    .replace(/\.js$/i, '')
-    .trim();
-  return fromPath || 'forge-export';
-}
-
-function sanitizeExportStem(value: string): string {
-  const sanitized = value
-    .trim()
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
-    .replace(/\.+$/, '')
-    .slice(0, 96);
-  return sanitized || 'forge-export';
-}
-
-function triggerDownload(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
@@ -58,7 +33,7 @@ export function ExportPanel() {
   const hasShapes = shapeObjects.length > 0;
   const defaultMeshStem = useMemo(() => deriveExportStem(activeFile), [activeFile]);
 
-  const meshObjects = useMemo<MeshExportObject[]>(() => (
+  const meshObjects = useMemo(() => (
     shapeObjects.map((obj) => ({
       name: obj.name,
       shape: obj.shape!,
@@ -87,19 +62,7 @@ export function ExportPanel() {
     if (!hasShapes || meshBusy) return;
     setMeshBusy(true);
     try {
-      const stem = sanitizeExportStem(meshFileStem || defaultMeshStem);
-      if (meshFormat === '3mf') {
-        const blob = await build3mfBlob(meshObjects, {
-          title: stem,
-          application: 'ForgeCAD',
-          description: 'ForgeCAD manifold 3MF export',
-        });
-        triggerDownload(blob, `${stem}.3mf`);
-      } else {
-        const buffer = buildBinaryStl(meshObjects);
-        const blob = new Blob([buffer], { type: 'model/stl' });
-        triggerDownload(blob, `${stem}.stl`);
-      }
+      await exportMeshFromStore(meshFormat, meshFileStem || defaultMeshStem);
       setDialogOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -110,32 +73,14 @@ export function ExportPanel() {
     }
   };
 
-  const reportTitle = deriveExportStem(activeFile);
-
   const exportReport = async () => {
     if (!hasShapes || reportBusy) return;
     setReportBusy(true);
     try {
-      const { files, activeFile: currentActiveFile, paramOverrides } = useForgeStore.getState();
-
       // Let React commit `reportBusy` so the loading indicator is visible
       // before worker startup and message handoff.
       await waitForNextPaint();
-
-      const title = deriveExportStem(currentActiveFile) || reportTitle;
-
-      const report = await generateReportInWorker({
-        files,
-        activeFile: currentActiveFile,
-        paramOverrides,
-        title,
-        includeDisassembled: true,
-        objectVisuals: objectSettings,
-      });
-
-      const bytes = new Uint8Array(report.pdf);
-      const blob = new Blob([bytes], { type: 'application/pdf' });
-      triggerDownload(blob, `${title}.report.pdf`);
+      await exportReportFromStore();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Report export failed:', err);
