@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
+import { OrbitControls, Grid, Environment, Lightformer, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
 import type { SceneObject } from '@forge/index';
 import type { DimensionDef } from '@forge/sketch/dimensions';
@@ -104,6 +104,46 @@ function LabeledAxes({ size = 50 }: { size?: number }) {
       <Html position={[0, size + 3, 0]} center style={labelStyle('#44ff44')}>Y</Html>
       <Html position={[0, 0, size + 3]} center style={labelStyle('#4488ff')}>Z</Html>
     </group>
+  );
+}
+
+/** Local studio lights for PBR reflections without remote HDR fetches. */
+function LocalStudioEnvironment() {
+  return (
+    <Environment resolution={128}>
+      <Lightformer
+        form="rect"
+        intensity={4}
+        color="#ffffff"
+        rotation-x={Math.PI / 2}
+        position={[0, 40, 0]}
+        scale={[120, 120, 1]}
+      />
+      <Lightformer
+        form="rect"
+        intensity={3}
+        color="#f8fbff"
+        rotation-y={Math.PI / 2}
+        position={[40, 10, 20]}
+        scale={[80, 80, 1]}
+      />
+      <Lightformer
+        form="rect"
+        intensity={2}
+        color="#f4f6ff"
+        rotation-y={-Math.PI / 2}
+        position={[-35, -8, 16]}
+        scale={[70, 60, 1]}
+      />
+      <Lightformer
+        form="ring"
+        intensity={1.25}
+        color="#dbe8ff"
+        rotation-x={Math.PI / 2}
+        position={[0, -20, 0]}
+        scale={[35, 35, 1]}
+      />
+    </Environment>
   );
 }
 
@@ -1467,8 +1507,8 @@ export function Viewport() {
           <PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={100000} up={[0, 0, 1]} />
         )}
 
-        {/* Environment map for realistic reflections */}
-        <Environment preset="studio" />
+        {/* Local environment map (offline-safe) */}
+        <LocalStudioEnvironment />
         <ambientLight intensity={0.3} />
         <directionalLight position={[100, 150, 80]} intensity={1.2} castShadow />
         <directionalLight position={[-60, -40, -80]} intensity={0.3} />
