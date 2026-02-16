@@ -73,6 +73,46 @@ Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to l
 
 **Camera angles:** `front` (−Y), `back` (+Y), `side` (+X), `top` (+Z), `iso` (diagonal)
 
+### Orbit GIF Render (requires Chrome)
+
+```bash
+npm run gif -- examples/cup.forge.js [output.gif]
+
+# Or directly:
+npx tsx cli/forge-gif.ts examples/cup.forge.js
+npx tsx cli/forge-gif.ts examples/cup.forge.js output.gif --size 768 --fps 20 --frames-per-turn 72
+```
+
+Creates one animated GIF with two full 360° passes:
+1. Solid pass (regular shaded view)
+2. Wireframe pass (same orbit path)
+
+**How it works:**
+1. Auto-starts (or reuses) the Vite dev server.
+2. Loads `cli/render.html` in headless Chrome.
+3. Runs the script once, then captures orbit frames from the same scene for both render modes.
+4. Encodes all frames into a single GIF file (pure JS encoder, no ffmpeg/ImageMagick required).
+
+**Options:**
+- `--size <px>` — frame resolution (default `720`)
+- `--fps <n>` — GIF frame rate (default `18`)
+- `--frames-per-turn <n>` — frames per full orbit pass (default `54`)
+- `--hold-frames <n>` — freeze frames before each pass (default `4`)
+- `--pitch <deg>` — camera elevation angle (default `18`)
+- `--background <color>` — background color (default `#252526`)
+- `--port <n>` — Vite port (default `5173`)
+- `--chrome-path <path>` — Chrome executable path override
+
+**Environment variables:**
+- `FORGE_GIF_SIZE`
+- `FORGE_GIF_FPS`
+- `FORGE_GIF_FRAMES_PER_TURN`
+- `FORGE_GIF_HOLD_FRAMES`
+- `FORGE_GIF_PITCH_DEG`
+- `FORGE_GIF_BACKGROUND`
+- `FORGE_PORT`
+- `CHROME_PATH`
+
 ### PDF Report (2D drawing pack)
 
 ```bash

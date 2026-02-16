@@ -135,6 +135,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 | --- | --- |
 | Validate a script | `npm run test-run -- examples/cup.forge.js` |
 | Render PNG views | `npm run render -- examples/cup.forge.js` |
+| Render orbit GIF (solid + wireframe) | `npm run gif -- examples/cup.forge.js` |
 | Export sketch SVG | `npm run svg -- examples/frame.sketch.js` |
 | Generate report PDF | `npm run report -- examples/cup.forge.js` |
 | Parameter robustness scan | `npm run param-check -- examples/shoe-rack-doors.forge.js --samples 10` |
@@ -144,6 +145,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 ### CLI details
 
 - `render` outputs multi-angle PNGs (`front`, `side`, `top`, `iso`) by default.
+- `gif` outputs a single orbit animation with a full solid pass, then full wireframe pass.
 - `svg` runs fully in Node (no browser/Puppeteer).
 - `report` generates searchable-text PDF pages (overview, components, BOM, dimensions).
 - `param-check` samples parameter ranges and reports runtime errors, degenerates, and new collisions.
