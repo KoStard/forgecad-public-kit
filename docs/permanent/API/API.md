@@ -160,6 +160,39 @@ cutPlane("Horizontal", [0, 0, 1], cutZ);
 
 See `examples/api/section-plane-visualization.forge.js` for a focused multi-plane setup.
 
+## Bill of Materials
+
+### `bom(quantity, description, opts?)`
+Registers a bill-of-materials entry for report export. Use this for real-world parts/materials that cannot be inferred from geometry alone.
+
+**Parameters:**
+- `quantity` (number) - Amount to add (must be finite and `>= 0`). `0` is ignored.
+- `description` (string) - Human-readable item description.
+- `opts` (object, optional):
+  - `unit` (string) - Unit label such as `"mm"`, `"pieces"`, `"kg"` (default: `"pieces"`)
+  - `key` (string) - Explicit aggregation key. Use this when descriptions vary but should still sum to one line item.
+
+**Returns:** `void` (side effect: registers BOM item for report generation)
+
+**Examples:**
+```javascript
+const tubeLen = param("Tube Length", 1200, { min: 300, max: 4000, unit: "mm" });
+const tubeW = param("Tube Width", 30, { min: 10, max: 100, unit: "mm" });
+const tubeH = param("Tube Height", 20, { min: 10, max: 100, unit: "mm" });
+const boltCount = param("Bolt Count", 16, { min: 0, max: 200, integer: true });
+const boltLength = param("Bolt Length", 16, { min: 6, max: 80, unit: "mm" });
+
+bom(tubeLen, `iron tube with dimensions ${tubeW} x ${tubeH}`, { unit: "mm" });
+bom(boltCount, `M4 bolt of ${boltLength} mm length`, { unit: "pieces" });
+```
+
+**Auto-summing behavior in report export:**
+- Entries with the same normalized `description + unit` are summed into one row
+- `key` overrides default grouping when you need custom merge behavior
+- Summed rows are rendered on a dedicated **Bill of Materials** page in the generated PDF report
+
+See `examples/api/bill-of-materials.forge.js` for a complete parametric example.
+
 ## 3D Primitives
 
 ### `box(x, y, z, center?)`

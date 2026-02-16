@@ -81,10 +81,16 @@ npm run report -- examples/cup.forge.js [output.pdf] --dim-angle-tol 18
 ```
 
 Generates a searchable-text PDF report with multiple projected drawing views:
+- Bill of Materials page (auto-summed from script `bom()` entries)
 - Combined model page (front/right/top/isometric)
 - Disassembled component pages (same view set per returned component)
 - Auto-generated detail continuation pages for elongated/high-detail views (separate pages, not overlayed)
 - `dim()` annotations included per view only when their axis aligns with that view's projection plane axes
+
+BOM aggregation rules:
+- Each `bom(quantity, description, { unit })` call contributes one raw entry
+- Report export groups by `key` (if provided) else by normalized `description + unit`
+- Quantities are summed per group and rendered as line items in the BOM table
 
 Component dimension ownership for disassembled pages:
 - Preferred: explicit binding via `dim(..., { component: \"Part Name\" })`
@@ -145,14 +151,17 @@ Runs shape-level invariants for dimension metadata propagation across:
 
 ```bash
 npm run debug:dimensions -- /path/to/file.forge.js [--all]
+npm run debug:dimensions -- /path/to/file.forge.js [--all] [--dim-angle-tol 12]
 
 # Fallback runner (if npx/registry access is unavailable)
-bun cli/debug-dimensions.ts /path/to/file.forge.js [--all]
+bun cli/debug-dimensions.ts /path/to/file.forge.js [--all] [--dim-angle-tol 12]
 ```
 
 Prints:
 - total object count
 - total dimension count
+- per-view visibility counts (`front/right/top/iso`) using report angle tolerance
+- report ownership routing (`combined` vs `component:<name>`) per dimension
 - per-object approximate dimension ownership (both endpoints inside object bbox)
 - a dimension coordinate list (first 20 by default, `--all` for full dump)
 
