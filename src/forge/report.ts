@@ -150,6 +150,15 @@ const BOM_MAX_ROWS_PER_PAGE = 22;
 const DEFAULT_DIM_DIRECTION_TOLERANCE_DEG = 60;
 const MIN_DIM_OFFSET_PX = 10;
 const DIM_CLEARANCE_PX = 6;
+const DENSE_DIM_COLOR_PALETTE: ColorRgb[] = [
+  [0.91, 0.38, 0.27], // warm red
+  [0.16, 0.62, 0.86], // cyan blue
+  [0.96, 0.72, 0.2], // amber
+  [0.34, 0.76, 0.43], // green
+  [0.77, 0.52, 0.92], // violet
+  [0.93, 0.45, 0.65], // rose
+  [0.44, 0.83, 0.78], // teal
+];
 const MAX_LABEL_GEOMETRY_SEGMENTS = 2200;
 const MAX_FILL_TRIANGLES_PER_OBJECT = 12000;
 const MAX_EDGE_SEGMENTS_PER_OBJECT = 45000;
@@ -965,6 +974,18 @@ interface AutoLaneEntry {
   lenPx: number;
 }
 
+interface DenseColorEntry {
+  dimId: string;
+  p0: Vec2;
+  p1: Vec2;
+  mid: Vec2;
+  tangent: Vec2;
+  spanMin: number;
+  spanMax: number;
+  normalCoord: number;
+  lenPx: number;
+}
+
 function makeLabelBox(center: Vec2, textHalfW: number, textHalfH: number): LabelBox {
   return {
     minX: center[0] - textHalfW,
@@ -1126,6 +1147,163 @@ function intervalOverlap1D(a0: number, a1: number, b0: number, b1: number, pad: 
 
 function intervalContains1D(container0: number, container1: number, inner0: number, inner1: number, tol: number): boolean {
   return container0 <= inner0 + tol && container1 >= inner1 - tol;
+}
+
+function hasExplicitDimensionColor(dim: DimensionDef): boolean {
+  return typeof dim.color === 'string' && dim.color.trim().length > 0;
+}
+
+function assignCrowdedDimensionColors(
+  dims: DimensionDef[],
+  frame: ViewFrame,
+  center: Vec3,
+  mapper: { map: (p: Vec2) => Vec2 },
+): Map<string, ColorRgb> {
+  const out = new Map<string, ColorRgb>();
+  if (dims.length < 5) return out;
+
+  const entries: DenseColorEntry[] = [];
+  dims.forEach((dim) => {
+    if (hasExplicitDimensionColor(dim)) return;
+    const pFrom = projectPoint(dim.from, center, frame);
+    const pTo = projectPoint(dim.to, center, frame);
+    const p0 = mapper.map([pFrom.x, pFrom.y]);
+    const p1 = mapper.map([pTo.x, pTo.y]);
+    const dx = p1[0] - p0[0];
+    const dy = p1[1] - p0[1];
+    const len = Math.hypot(dx, dy);
+    if (len < 8) return;
+
+    let tx = dx / len;
+    let ty = dy / len;
+    if (tx < -1e-6 || (Math.abs(tx) <= 1e-6 && ty < 0)) {
+      tx = -tx;
+      ty = -ty;
+    }
+    const nx = -ty;
+    const ny = tx;
+    const t0 = p0[0] * tx + p0[1] * ty;
+    const t1 = p1[0] * tx + p1[1] * ty;
+    const mid: Vec2 = [(p0[0] + p1[0]) * 0.5, (p0[1] + p1[1]) * 0.5];
+    entries.push({
+      dimId: dim.id,
+      p0,
+      p1,
+      mid,
+      tangent: [tx, ty],
+      spanMin: Math.min(t0, t1),
+      spanMax: Math.max(t0, t1),
+      normalCoord: mid[0] * nx + mid[1] * ny,
+      lenPx: len,
+    });
+  });
+
+  if (entries.length < 5) return out;
+
+  const alignThreshold = frame.id === 'iso' ? 0.952 : 0.968;
+  const overlapPadPx = frame.id === 'iso' ? 10 : 12;
+  const normalBandPx = frame.id === 'iso' ? 20 : 18;
+  const nearMidPx = frame.id === 'iso' ? 30 : 26;
+
+  const neighbors = new Map<number, Set<number>>();
+  entries.forEach((_, idx) => neighbors.set(idx, new Set<number>()));
+
+  for (let i = 0; i < entries.length; i += 1) {
+    const a = entries[i];
+    for (let j = i + 1; j < entries.length; j += 1) {
+      const b = entries[j];
+      const align = Math.abs(a.tangent[0] * b.tangent[0] + a.tangent[1] * b.tangent[1]);
+      const overlap = intervalOverlap1D(a.spanMin, a.spanMax, b.spanMin, b.spanMax, overlapPadPx);
+      const normalClose = Math.abs(a.normalCoord - b.normalCoord) <= normalBandPx;
+      const midDist = Math.hypot(a.mid[0] - b.mid[0], a.mid[1] - b.mid[1]);
+      const intersects = segmentsIntersect2(a.p0, a.p1, b.p0, b.p1);
+      const closeParallel = align >= alignThreshold && overlap && normalClose;
+      const closeCross = intersects && midDist <= nearMidPx * 2.2;
+      const nearBundle = align >= 0.88 && overlap && midDist <= nearMidPx;
+      if (!closeParallel && !closeCross && !nearBundle) continue;
+      neighbors.get(i)?.add(j);
+      neighbors.get(j)?.add(i);
+    }
+  }
+
+  const crowdedIdxs = entries
+    .map((_, idx) => idx)
+    .filter((idx) => (neighbors.get(idx)?.size ?? 0) > 0);
+  if (crowdedIdxs.length < 4) return out;
+
+  const inCrowd = new Set(crowdedIdxs);
+  const components: number[][] = [];
+  const seen = new Set<number>();
+  crowdedIdxs.forEach((start) => {
+    if (seen.has(start)) return;
+    const comp: number[] = [];
+    const queue = [start];
+    seen.add(start);
+    while (queue.length > 0) {
+      const cur = queue.shift() as number;
+      comp.push(cur);
+      const nset = neighbors.get(cur);
+      if (!nset) continue;
+      nset.forEach((nei) => {
+        if (!inCrowd.has(nei) || seen.has(nei)) return;
+        seen.add(nei);
+        queue.push(nei);
+      });
+    }
+    if (comp.length >= 3) components.push(comp);
+  });
+
+  if (components.length === 0) return out;
+
+  const colorByEntry = new Array(entries.length).fill(-1);
+  const paletteLen = DENSE_DIM_COLOR_PALETTE.length;
+
+  components.forEach((comp) => {
+    const order = [...comp].sort((lhs, rhs) => {
+      const lDeg = neighbors.get(lhs)?.size ?? 0;
+      const rDeg = neighbors.get(rhs)?.size ?? 0;
+      if (rDeg !== lDeg) return rDeg - lDeg;
+      if (entries[lhs].lenPx !== entries[rhs].lenPx) return entries[lhs].lenPx - entries[rhs].lenPx;
+      return entries[lhs].dimId.localeCompare(entries[rhs].dimId);
+    });
+
+    order.forEach((idx) => {
+      const used = new Set<number>();
+      neighbors.get(idx)?.forEach((nei) => {
+        const c = colorByEntry[nei];
+        if (c >= 0) used.add(c);
+      });
+
+      let picked = -1;
+      for (let c = 0; c < paletteLen; c += 1) {
+        if (!used.has(c)) {
+          picked = c;
+          break;
+        }
+      }
+      if (picked < 0) {
+        // If palette is exhausted in a dense cluster, pick the color with least immediate neighbor collisions.
+        let bestColor = 0;
+        let bestConflicts = Number.POSITIVE_INFINITY;
+        for (let c = 0; c < paletteLen; c += 1) {
+          let conflicts = 0;
+          neighbors.get(idx)?.forEach((nei) => {
+            if (colorByEntry[nei] === c) conflicts += 1;
+          });
+          if (conflicts < bestConflicts) {
+            bestConflicts = conflicts;
+            bestColor = c;
+          }
+        }
+        picked = bestColor;
+      }
+
+      colorByEntry[idx] = picked;
+      out.set(entries[idx].dimId, DENSE_DIM_COLOR_PALETTE[picked % paletteLen]);
+    });
+  });
+
+  return out;
 }
 
 function assignAutoOffsetLanes(
@@ -1892,15 +2070,19 @@ function renderViewCell(
   const labelPlans: DimensionLabelPlan[] = [];
   const blockedLabelSegments: Segment2[] = [...geometryLabelSegments];
   const autoLaneNudges = assignAutoOffsetLanes(viewDims, frame, center, mapper, placementCenter);
+  const crowdedColorOverrides = assignCrowdedDimensionColors(viewDims, frame, center, mapper);
   viewDims.forEach((dim) => {
     const pFrom = projectPoint(dim.from, center, frame);
     const pTo = projectPoint(dim.to, center, frame);
+    const dimColor = hasExplicitDimensionColor(dim)
+      ? hexToRgb01(dim.color)
+      : (crowdedColorOverrides.get(dim.id) || hexToRgb01('#2b2b2b'));
     const result = drawDimension(
       dim,
       frame,
       mapper.map,
       mapper.scale,
-      hexToRgb01(dim.color || '#2b2b2b'),
+      dimColor,
       cell,
       [pFrom.x, pFrom.y],
       [pTo.x, pTo.y],
