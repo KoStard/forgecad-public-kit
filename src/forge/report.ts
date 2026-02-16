@@ -859,6 +859,7 @@ interface DimensionLabelPlan {
   label: string;
   color: ColorRgb;
   fontSize: number;
+  leaderMinLength: number;
   preferred: Vec2;
   anchor: Vec2;
   tangent: Vec2;
@@ -1064,7 +1065,7 @@ function layoutDimensionLabels(
       }, 0);
       const distFromPreferred = Math.hypot(pos[0] - plan.preferred[0], pos[1] - plan.preferred[1]);
       const axisBias = Math.abs((pos[0] - plan.preferred[0]) * plan.tangent[0] + (pos[1] - plan.preferred[1]) * plan.tangent[1]);
-      const score = overlap * 1000 + avoidPenalty + linePenalty + distFromPreferred * 0.3 + axisBias * 0.05 + ci * 0.01;
+      const score = overlap * 1000 + avoidPenalty + linePenalty + distFromPreferred * 0.55 + axisBias * 0.42 + ci * 0.02;
       if (score < bestScore) {
         bestScore = score;
         bestPos = pos;
@@ -1080,6 +1081,7 @@ function layoutDimensionLabels(
 
 function drawDimension(
   dim: DimensionDef,
+  viewId: ReportViewId,
   mapPoint: (p: Vec2) => Vec2,
   mapScale: number,
   color: ColorRgb,
@@ -1098,6 +1100,7 @@ function drawDimension(
   const uy = dy / len;
   const px = -uy;
   const py = ux;
+  const isIsoView = viewId === 'iso';
 
   const requestedOffset = Number.isFinite(dim.offset) ? dim.offset : 0;
   const requestedSign = requestedOffset < 0 ? -1 : 1;
@@ -1120,8 +1123,10 @@ function drawDimension(
     requestedSign,
     -(centerSign || requestedSign),
   ]));
-  const stepOffset = Math.max(minReadableOffset * 0.8, placementSpan * 0.015);
-  const maxBoostSteps = 14;
+  const stepOffset = Math.max(minReadableOffset * (isIsoView ? 0.55 : 0.8), placementSpan * (isIsoView ? 0.008 : 0.015));
+  const maxBoostSteps = isIsoView ? 5 : 12;
+  const maxOffsetAbs = baseOffsetAbs + (isIsoView ? 14 : 28) / Math.max(1e-6, mapScale);
+  const fullSegmentClear = !isIsoView;
 
   const solveForSide = (side: number): { side: number; offsetAbs: number; intersects: boolean; outwardScore: number } => {
     let offsetAbs = baseOffsetAbs;
@@ -1129,9 +1134,19 @@ function drawDimension(
     for (let i = 0; i < maxBoostSteps; i += 1) {
       const a1: Vec2 = [fromProjected[0] + px * side * offsetAbs, fromProjected[1] + py * side * offsetAbs];
       const b1: Vec2 = [toProjected[0] + px * side * offsetAbs, toProjected[1] + py * side * offsetAbs];
-      intersects = boundsForPlacement ? segmentIntersectsBounds2(a1, b1, boundsForPlacement) : false;
+      const shiftedMid: Vec2 = [
+        midProjected[0] + px * side * offsetAbs,
+        midProjected[1] + py * side * offsetAbs,
+      ];
+      intersects = boundsForPlacement
+        ? (fullSegmentClear
+          ? segmentIntersectsBounds2(a1, b1, boundsForPlacement)
+          : pointInBounds2(shiftedMid, boundsForPlacement))
+        : false;
       if (!intersects) break;
-      offsetAbs += stepOffset;
+      const nextOffset = Math.min(maxOffsetAbs, offsetAbs + stepOffset);
+      if (nextOffset <= offsetAbs + 1e-6) break;
+      offsetAbs = nextOffset;
     }
 
     const shiftedMid: Vec2 = [
@@ -1227,10 +1242,14 @@ function drawDimension(
   const textHalfH = Math.max(3.5, fontSize * 0.62);
   const base = 6;
   const lineLenPx = Math.hypot(pb1[0] - pa1[0], pb1[1] - pa1[1]);
-  const tangentMax = clamp(lineLenPx * 0.48, 34, 120);
-  const tangentMid = Math.max(22, tangentMax * 0.6);
-  const normalSteps = [0, 6, 12, 18, 26, 36];
-  const tangentSteps = [0, -12, 12, -22, 22, -34, 34, -tangentMid, tangentMid, -tangentMax, tangentMax];
+  const tangentMax = isIsoView
+    ? clamp(lineLenPx * 0.2, 16, 38)
+    : clamp(lineLenPx * 0.32, 20, 72);
+  const tangentMid = Math.max(isIsoView ? 12 : 16, tangentMax * 0.55);
+  const normalSteps = isIsoView ? [0, 5, 10, 16, 22] : [0, 6, 12, 18, 26, 34];
+  const tangentSteps = isIsoView
+    ? [0, -8, 8, -14, 14, -tangentMid, tangentMid, -tangentMax, tangentMax]
+    : [0, -10, 10, -18, 18, -28, 28, -tangentMid, tangentMid, -tangentMax, tangentMax];
 
   const candidates: Vec2[] = [];
   [1, -1].forEach((side) => {
@@ -1252,6 +1271,7 @@ function drawDimension(
       label,
       color,
       fontSize,
+      leaderMinLength: isIsoView ? 14 : 10,
       preferred,
       anchor: mid,
       tangent: [uxS, uyS],
@@ -1355,6 +1375,7 @@ function renderViewCell(
     const pTo = projectPoint(dim.to, center, frame);
     const result = drawDimension(
       dim,
+      frame.id,
       mapper.map,
       mapper.scale,
       hexToRgb01(dim.color || '#2b2b2b'),
@@ -1382,7 +1403,7 @@ function renderViewCell(
     if (textX < leftEdge) textX = leftEdge; // left-aligned near left edge
     cmd.push(commandSetStroke(plan.color));
     cmd.push(commandSetFill(plan.color));
-    if (leaderDist > 10) {
+    if (leaderDist > plan.leaderMinLength) {
       cmd.push('0.35 w\n');
       cmd.push(commandLine(leaderStart, leaderEnd));
     }
