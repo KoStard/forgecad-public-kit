@@ -15,6 +15,14 @@ interface MeshEntry {
   color: number; // RGB555 with bit15 set, or 0
 }
 
+function waitForNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
 function buildSTL(entries: MeshEntry[]): ArrayBuffer {
   const totalTri = entries.reduce((sum, e) => sum + e.mesh.numTri, 0);
   const buffer = new ArrayBuffer(84 + totalTri * 50);
@@ -88,6 +96,10 @@ export function ExportPanel() {
     if (!result || !hasShapes || reportBusy) return;
     setReportBusy(true);
     try {
+      // Let React commit `reportBusy` so the loading indicator is visible
+      // before synchronous report generation blocks the main thread.
+      await waitForNextPaint();
+
       const title = activeFile
         .replace(/^.*[\\/]/, '')
         .replace(/\.(forge\.)?js$/i, '')
