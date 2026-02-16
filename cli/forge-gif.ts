@@ -506,8 +506,24 @@ async function main(): Promise<void> {
   try {
     if (!forgeAlreadyRunning) {
       console.log(`Starting Vite on :${activePort} ...`);
+      try {
+        viteProc = await ensureDevServer(activePort);
+      } catch (err) {
+        const message = String(err);
+        const isPortConflict = message.includes('already in use') || message.includes('EADDRINUSE');
+        if (!isPortConflict) throw err;
+
+        const fallbackPort = await findFreePort(activePort + 1);
+        if (fallbackPort == null) throw err;
+
+        console.log(`Port ${activePort} failed to start due to a port conflict. Retrying on ${fallbackPort} ...`);
+        activePort = fallbackPort;
+        viteProc = await ensureDevServer(activePort);
+      }
     }
-    viteProc = await ensureDevServer(activePort);
+    if (forgeAlreadyRunning) {
+      viteProc = await ensureDevServer(activePort);
+    }
 
     browser = await puppeteer.launch({
       headless: true,
