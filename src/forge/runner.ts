@@ -123,6 +123,7 @@ interface ImportScope {
 
 interface RunnerExecutionOptions {
   debugImports: boolean;
+  fileIndex: Map<string, string>;
 }
 
 const LOG_MAX_DEPTH = 4;
@@ -391,6 +392,79 @@ function envFlagEnabled(name: string): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
+function normalizePathSeparators(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
+function collapsePathSegments(path: string): string {
+  const normalized = normalizePathSeparators(path);
+  const isAbsolute = normalized.startsWith('/');
+  const segments = normalized.split('/');
+  const stack: string[] = [];
+
+  for (const segment of segments) {
+    if (!segment || segment === '.') continue;
+    if (segment === '..') {
+      if (stack.length > 0 && stack[stack.length - 1] !== '..') {
+        stack.pop();
+      } else if (!isAbsolute) {
+        stack.push('..');
+      }
+      continue;
+    }
+    stack.push(segment);
+  }
+
+  const joined = stack.join('/');
+  if (isAbsolute) return joined ? `/${joined}` : '/';
+  return joined;
+}
+
+function dirnamePath(path: string): string {
+  const collapsed = collapsePathSegments(path);
+  if (collapsed === '/' || collapsed === '') return '';
+  const trimmed = collapsed.endsWith('/') ? collapsed.slice(0, -1) : collapsed;
+  const slash = trimmed.lastIndexOf('/');
+  if (slash < 0) return '';
+  return trimmed.slice(0, slash);
+}
+
+function isRelativeImportSpecifier(specifier: string): boolean {
+  return (
+    specifier === '.' ||
+    specifier === '..' ||
+    specifier.startsWith('./') ||
+    specifier.startsWith('../')
+  );
+}
+
+function normalizeLookupPath(path: string): string {
+  return collapsePathSegments(path).replace(/^\/+/, '');
+}
+
+function resolveImportPath(fromFile: string, requestedPath: string): string {
+  const normalizedRequest = requestedPath.trim();
+  if (!normalizedRequest) return '';
+
+  if (isRelativeImportSpecifier(normalizedRequest)) {
+    const fromDir = dirnamePath(fromFile);
+    const combined = fromDir ? `${fromDir}/${normalizedRequest}` : normalizedRequest;
+    return normalizeLookupPath(combined);
+  }
+
+  return normalizeLookupPath(normalizedRequest);
+}
+
+function buildFileIndex(allFiles: Record<string, string>): Map<string, string> {
+  const fileIndex = new Map<string, string>();
+  for (const key of Object.keys(allFiles)) {
+    const normalized = normalizeLookupPath(key);
+    if (!normalized) continue;
+    if (!fileIndex.has(normalized)) fileIndex.set(normalized, key);
+  }
+  return fileIndex;
+}
+
 /**
  * Execute a single file's code with the forge sandbox.
  * `allFiles` enables cross-file imports.
@@ -414,6 +488,25 @@ function executeFile(
       importCallCount += 1;
       const local = `${name}#${importCallCount}`;
       return scope.namePrefix ? `${scope.namePrefix} > ${local}` : local;
+    };
+
+    const resolveImportSource = (requestedName: string) => {
+      if (typeof requestedName !== 'string' || requestedName.trim().length === 0) {
+        throw new Error('Import path must be a non-empty string');
+      }
+      const resolvedPath = resolveImportPath(fileName, requestedName);
+      const lookupKey = options.fileIndex.get(resolvedPath);
+      if (!lookupKey) {
+        const suffix = resolvedPath && resolvedPath !== requestedName
+          ? ` (resolved to "${resolvedPath}" from "${fileName}")`
+          : ` (from "${fileName}")`;
+        throw new Error(`File not found: "${requestedName}"${suffix}`);
+      }
+      const source = allFiles[lookupKey];
+      if (typeof source !== 'string') {
+        throw new Error(`File not found: "${requestedName}" (resolved to "${resolvedPath}")`);
+      }
+      return { source, lookupKey, resolvedPath };
     };
 
     const logImportTrace = (
@@ -440,54 +533,57 @@ function executeFile(
 
     // importSketch("name", { ...paramOverrides }) — executes another file, expects a Sketch result
     const importSketch = (name: string, paramOverrides?: Record<string, number>): Sketch => {
-      const src = allFiles[name];
-      if (!src) throw new Error(`File not found: "${name}"`);
+      const { source: src, lookupKey, resolvedPath } = resolveImportSource(name);
       const localOverrides = parseImportParamArgs('importSketch', name, paramOverrides);
-      const childScope = { namePrefix: makeChildScopePrefix(name), localOverrides };
-      logImportTrace('importSketch', name, 'start', { overrides: localOverrides });
+      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      logImportTrace('importSketch', resolvedPath, 'start', { requested: name, overrides: localOverrides });
       let result: ReturnType<typeof executeFile>;
       try {
-        result = executeFile(src, name, allFiles, visited, childScope, options);
+        result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
       } catch (error) {
-        logImportTrace('importSketch', name, 'error', { error: formatLogError(error) });
+        logImportTrace('importSketch', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
         throw error;
       }
       if (result instanceof Sketch) {
-        logImportTrace('importSketch', name, 'success', { got: 'Sketch' });
+        logImportTrace('importSketch', resolvedPath, 'success', { requested: name, got: 'Sketch' });
         return result;
       }
       const got = describeScriptResultType(result);
-      logImportTrace('importSketch', name, 'error', { got });
-      throw new Error(`"${name}" did not return a Sketch (got ${got})`);
+      logImportTrace('importSketch', resolvedPath, 'error', { requested: name, got });
+      throw new Error(`"${resolvedPath}" did not return a Sketch (got ${got})`);
     };
 
     // importPart("name", { ...paramOverrides }) — executes another file, expects a Shape result
     const importPart = (name: string, paramOverrides?: Record<string, number>): Shape => {
-      const src = allFiles[name];
-      if (!src) throw new Error(`File not found: "${name}"`);
+      const { source: src, lookupKey, resolvedPath } = resolveImportSource(name);
       const localOverrides = parseImportParamArgs('importPart', name, paramOverrides);
-      const childScope = { namePrefix: makeChildScopePrefix(name), localOverrides };
+      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
       const dimStart = getCollectedDimensions().length;
-      logImportTrace('importPart', name, 'start', { overrides: localOverrides });
+      logImportTrace('importPart', resolvedPath, 'start', { requested: name, overrides: localOverrides });
       let result: ReturnType<typeof executeFile>;
       try {
-        result = executeFile(src, name, allFiles, visited, childScope, options);
+        result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
       } catch (error) {
-        logImportTrace('importPart', name, 'error', { error: formatLogError(error) });
+        logImportTrace('importPart', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
         throw error;
       }
       const importedDims = takeCollectedDimensions(dimStart);
       if (result instanceof Shape) {
-        logImportTrace('importPart', name, 'success', { got: 'Shape', importedDims: importedDims.length });
+        logImportTrace('importPart', resolvedPath, 'success', { requested: name, got: 'Shape', importedDims: importedDims.length });
         return setShapeDimensions(result, importedDims as ShapeDimension[]);
       }
       if (result instanceof TrackedShape) {
-        logImportTrace('importPart', name, 'success', { got: 'TrackedShape', importedDims: importedDims.length, unwrapped: true });
+        logImportTrace('importPart', resolvedPath, 'success', {
+          requested: name,
+          got: 'TrackedShape',
+          importedDims: importedDims.length,
+          unwrapped: true,
+        });
         return setShapeDimensions(result.toShape(), importedDims as ShapeDimension[]);
       }
       const got = describeScriptResultType(result);
-      logImportTrace('importPart', name, 'error', { got });
-      throw new Error(`"${name}" did not return a Shape (got ${got})`);
+      logImportTrace('importPart', resolvedPath, 'error', { requested: name, got });
+      throw new Error(`"${resolvedPath}" did not return a Shape (got ${got})`);
     };
 
     const wrapped = `"use strict";\n${code}`;
@@ -611,6 +707,7 @@ export function runScript(
   const t0 = performance.now();
   const execOptions: RunnerExecutionOptions = {
     debugImports: options.debugImports ?? envFlagEnabled('FORGECAD_DEBUG_IMPORTS'),
+    fileIndex: buildFileIndex(allFiles),
   };
 
   try {
