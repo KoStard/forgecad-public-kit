@@ -50,6 +50,8 @@ export type { ForgeGeometry } from './meshToGeometry';
 export { ShapeGroup, group } from './group';
 export { cutPlane, resetCutPlanes, getCollectedCutPlanes } from './cutPlane';
 export type { CutPlaneDef } from './cutPlane';
+export { explodeView, resetExplodeView, getCollectedExplodeView } from './explodeView';
+export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './explodeView';
 export { bom, resetBom, getCollectedBom } from './bom';
 export type { BomDef, BomOpts } from './bom';
 export { generateReportPdf } from './report';

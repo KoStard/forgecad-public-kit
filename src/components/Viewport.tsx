@@ -2,7 +2,7 @@ import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObjec
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, Lightformer, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
-import type { SceneObject } from '@forge/index';
+import type { SceneObject, ExplodeViewDirection, ExplodeViewOptions } from '@forge/index';
 import type { DimensionDef } from '@forge/sketch/dimensions';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
@@ -69,6 +69,101 @@ const resolveHoverObjectName = (name: string, knownFileNames: Set<string>): stri
   // Unnamed returns fall back to source filenames; skip those in hover tooltips.
   if (knownFileNames.has(trimmed)) return null;
   return trimmed;
+};
+
+const ZERO_OFFSET: [number, number, number] = [0, 0, 0];
+
+const explodeHash = (value: string): number => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const explodeFallbackVector = (seed: string): [number, number, number] => {
+  const x = ((explodeHash(`${seed}|x`) % 2001) - 1000) / 1000;
+  const y = ((explodeHash(`${seed}|y`) % 2001) - 1000) / 1000;
+  const z = ((explodeHash(`${seed}|z`) % 2001) - 1000) / 1000;
+  return [x, y, z];
+};
+
+const explodeLength = (v: [number, number, number]): number =>
+  Math.hypot(v[0], v[1], v[2]);
+
+const explodeNormalize = (
+  v: [number, number, number],
+  fallback: [number, number, number],
+): [number, number, number] => {
+  const len = explodeLength(v);
+  if (len > 1e-8) return [v[0] / len, v[1] / len, v[2] / len];
+  const fbLen = explodeLength(fallback);
+  if (fbLen > 1e-8) return [fallback[0] / fbLen, fallback[1] / fbLen, fallback[2] / fbLen];
+  return [1, 0, 0];
+};
+
+const resolveObjectCenter = (obj: SceneObject): [number, number, number] | null => {
+  if (obj.shape) {
+    try {
+      const bb = obj.shape.boundingBox();
+      return [
+        (bb.min[0] + bb.max[0]) / 2,
+        (bb.min[1] + bb.max[1]) / 2,
+        (bb.min[2] + bb.max[2]) / 2,
+      ];
+    } catch {
+      return null;
+    }
+  }
+  if (obj.sketch) {
+    try {
+      const bb = obj.sketch.bounds();
+      return [
+        (bb.min[0] + bb.max[0]) / 2,
+        (bb.min[1] + bb.max[1]) / 2,
+        0,
+      ];
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const resolveExplodeDirection = (
+  mode: ExplodeViewDirection,
+  center: [number, number, number],
+  rootCenter: [number, number, number],
+  seed: string,
+): [number, number, number] => {
+  if (Array.isArray(mode)) {
+    return explodeNormalize(mode, explodeFallbackVector(`${seed}|vec`));
+  }
+  if (mode === 'radial') {
+    return explodeNormalize(
+      [center[0] - rootCenter[0], center[1] - rootCenter[1], center[2] - rootCenter[2]],
+      explodeFallbackVector(`${seed}|radial`),
+    );
+  }
+  if (mode === 'x') return [1, 0, 0];
+  if (mode === 'y') return [0, 1, 0];
+  return [0, 0, 1];
+};
+
+const applyExplodeAxisLock = (
+  vec: [number, number, number],
+  axis: 'x' | 'y' | 'z' | undefined,
+  seed: string,
+): [number, number, number] => {
+  if (!axis) return vec;
+  const idx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+  const fallback = explodeFallbackVector(`${seed}|axis`);
+  const comp = Math.abs(vec[idx]) > 1e-8 ? vec[idx] : fallback[idx];
+  const sign = comp >= 0 ? 1 : -1;
+  if (idx === 0) return [sign, 0, 0];
+  if (idx === 1) return [0, sign, 0];
+  return [0, 0, sign];
 };
 
 /** Enable local clipping on the WebGL renderer when any cut planes are active */
@@ -171,6 +266,7 @@ function ForgeObject({
   obj,
   settings,
   renderMode,
+  position = ZERO_OFFSET,
   isHovered,
   clippingPlanes,
   onPointerEnter,
@@ -181,6 +277,7 @@ function ForgeObject({
   obj: SceneObject;
   settings: ObjectSettings;
   renderMode: RenderMode;
+  position?: [number, number, number];
   isHovered?: boolean;
   clippingPlanes?: THREE.Plane[];
   onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
@@ -206,7 +303,13 @@ function ForgeObject({
   const showWire = renderMode === 'wireframe';
 
   return (
-    <group onPointerEnter={onPointerEnter} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} onClick={onClick}>
+    <group
+      position={position}
+      onPointerEnter={onPointerEnter}
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
+      onClick={onClick}
+    >
       {showSolid && (
         <mesh geometry={solidGeo}>
           <meshPhysicalMaterial
@@ -365,6 +468,7 @@ function SketchObject({
   obj,
   settings,
   renderMode,
+  position = ZERO_OFFSET,
   onPointerEnter,
   onPointerMove,
   onPointerLeave,
@@ -373,6 +477,7 @@ function SketchObject({
   obj: SceneObject;
   settings: ObjectSettings;
   renderMode: RenderMode;
+  position?: [number, number, number];
   onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
@@ -499,7 +604,13 @@ function SketchObject({
   const showFill = renderMode !== 'wireframe';
 
   return (
-    <group onPointerEnter={onPointerEnter} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} onClick={onClick}>
+    <group
+      position={position}
+      onPointerEnter={onPointerEnter}
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
+      onClick={onClick}
+    >
       {fillGeo && showFill && (
         <mesh geometry={fillGeo}>
           <meshBasicMaterial color={constraintColor} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
@@ -1086,12 +1197,14 @@ function ViewController({
   controlsRef,
   command,
   objects,
+  explodeOffsets,
   settings,
   clearCommand,
 }: {
   controlsRef: MutableRefObject<OrbitControlsImpl | null>;
   command: ViewCommand | null;
   objects: SceneObject[];
+  explodeOffsets: Record<string, [number, number, number]>;
   settings: Record<string, ObjectSettings>;
   clearCommand: () => void;
 }) {
@@ -1105,11 +1218,14 @@ function ViewController({
       : visibleObjects;
 
     const computeBounds = (obj: SceneObject): THREE.Box3 | null => {
+      const offset = explodeOffsets[obj.id] ?? ZERO_OFFSET;
+      const shift = new THREE.Vector3(offset[0], offset[1], offset[2]);
       if (obj.shape) {
         try {
           const { solid } = shapeToGeometry(obj.shape);
           solid.computeBoundingBox();
-          return solid.boundingBox ?? null;
+          const bounds = solid.boundingBox ?? null;
+          return bounds ? bounds.clone().translate(shift) : null;
         } catch {
           return null;
         }
@@ -1125,7 +1241,7 @@ function ViewController({
               hasPoint = true;
             });
           });
-          return hasPoint ? box : null;
+          return hasPoint ? box.translate(shift) : null;
         } catch {
           return null;
         }
@@ -1218,7 +1334,7 @@ function ViewController({
     }
 
     clearCommand();
-  }, [camera, clearCommand, command, controlsRef, objects, settings, size.height, size.width]);
+  }, [camera, clearCommand, command, controlsRef, explodeOffsets, objects, settings, size.height, size.width]);
 
   return null;
 }
@@ -1372,6 +1488,7 @@ export function Viewport() {
   const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
   const selectObject = useForgeStore((s) => s.selectObject);
   const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
+  const explodeAmount = useForgeStore((s) => s.explodeAmount);
   const viewCommand = useForgeStore((s) => s.viewCommand);
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
   const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
@@ -1385,6 +1502,7 @@ export function Viewport() {
   const sectionPlaneBorderEnabled = useForgeStore((s) => s.sectionPlaneBorderEnabled);
   const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
   const cutPlaneDefs: CutPlaneDef[] = result?.cutPlanes ?? [];
+  const explodeConfig: ExplodeViewOptions | null = result?.explodeView ?? null;
 
   const activeCutPlaneDefs = useMemo(() => {
     return cutPlaneDefs
@@ -1401,16 +1519,61 @@ export function Viewport() {
     });
   }, [activeCutPlaneDefs]);
 
+  const explodeOffsets = useMemo(() => {
+    if (explodeAmount <= 1e-8) return {} as Record<string, [number, number, number]>;
+    if (explodeConfig?.enabled === false) return {} as Record<string, [number, number, number]>;
+    if (objects.length === 0) return {} as Record<string, [number, number, number]>;
+
+    const centersById: Record<string, [number, number, number]> = {};
+    const centers: [number, number, number][] = [];
+    objects.forEach((obj) => {
+      const center = resolveObjectCenter(obj);
+      if (!center) return;
+      centersById[obj.id] = center;
+      centers.push(center);
+    });
+    if (centers.length === 0) return {} as Record<string, [number, number, number]>;
+
+    const rootCenter: [number, number, number] = [
+      centers.reduce((sum, c) => sum + c[0], 0) / centers.length,
+      centers.reduce((sum, c) => sum + c[1], 0) / centers.length,
+      centers.reduce((sum, c) => sum + c[2], 0) / centers.length,
+    ];
+
+    const globalMode = explodeConfig?.mode ?? 'radial';
+    const globalAxis = explodeConfig?.axisLock;
+    const globalScale = explodeConfig?.amountScale ?? 1;
+    const byName = explodeConfig?.byName ?? {};
+
+    const offsets: Record<string, [number, number, number]> = {};
+    objects.forEach((obj) => {
+      const center = centersById[obj.id] ?? rootCenter;
+      const directive = byName[obj.name];
+      const mode = directive?.direction ?? globalMode;
+      const axisLock = directive?.axisLock ?? globalAxis;
+      const stage = directive?.stage ?? 1;
+      const amount = explodeAmount * globalScale * stage;
+      if (Math.abs(amount) <= 1e-8) return;
+      const seed = `${obj.id}|${obj.name}`;
+      const direction = resolveExplodeDirection(mode, center, rootCenter, seed);
+      const locked = applyExplodeAxisLock(direction, axisLock, seed);
+      offsets[obj.id] = [locked[0] * amount, locked[1] * amount, locked[2] * amount];
+    });
+
+    return offsets;
+  }, [explodeAmount, explodeConfig, objects]);
+
   const sectionGuideSize = useMemo(() => {
     const bounds = new THREE.Box3();
     let hasBounds = false;
 
     objects.forEach((obj) => {
+      const offset = explodeOffsets[obj.id] ?? ZERO_OFFSET;
       if (obj.shape) {
         try {
           const bb = obj.shape.boundingBox();
-          bounds.expandByPoint(new THREE.Vector3(bb.min[0], bb.min[1], bb.min[2]));
-          bounds.expandByPoint(new THREE.Vector3(bb.max[0], bb.max[1], bb.max[2]));
+          bounds.expandByPoint(new THREE.Vector3(bb.min[0] + offset[0], bb.min[1] + offset[1], bb.min[2] + offset[2]));
+          bounds.expandByPoint(new THREE.Vector3(bb.max[0] + offset[0], bb.max[1] + offset[1], bb.max[2] + offset[2]));
           hasBounds = true;
         } catch {
           // Ignore bad shape bounds from partial execution failures.
@@ -1420,8 +1583,8 @@ export function Viewport() {
       if (obj.sketch) {
         try {
           const bb = obj.sketch.bounds();
-          bounds.expandByPoint(new THREE.Vector3(bb.min[0], bb.min[1], 0));
-          bounds.expandByPoint(new THREE.Vector3(bb.max[0], bb.max[1], 0));
+          bounds.expandByPoint(new THREE.Vector3(bb.min[0] + offset[0], bb.min[1] + offset[1], offset[2]));
+          bounds.expandByPoint(new THREE.Vector3(bb.max[0] + offset[0], bb.max[1] + offset[1], offset[2]));
           hasBounds = true;
         } catch {
           // Ignore bad sketch bounds from partial execution failures.
@@ -1435,7 +1598,7 @@ export function Viewport() {
     bounds.getSize(size);
     const diagonal = Math.max(1, size.length());
     return Math.max(60, diagonal * 1.35, gridSize * 6);
-  }, [gridSize, objects]);
+  }, [explodeOffsets, gridSize, objects]);
 
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
@@ -1546,6 +1709,7 @@ export function Viewport() {
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
           const isHovered = hoveredObjectId === obj.id;
+          const position = explodeOffsets[obj.id] ?? ZERO_OFFSET;
           if (obj.shape) {
             return (
               <ForgeObject
@@ -1553,6 +1717,7 @@ export function Viewport() {
                 obj={obj}
                 settings={settings}
                 renderMode={renderMode}
+                position={position}
                 isHovered={isHovered}
                 clippingPlanes={activeClippingPlanes}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
@@ -1569,6 +1734,7 @@ export function Viewport() {
                 obj={obj}
                 settings={settings}
                 renderMode={renderMode}
+                position={position}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
                 onPointerMove={(event) => updateHoverLabel(obj, event)}
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
@@ -1641,6 +1807,7 @@ export function Viewport() {
           controlsRef={controlsRef}
           command={viewCommand}
           objects={objects}
+          explodeOffsets={explodeOffsets}
           settings={objectSettings}
           clearCommand={clearViewCommand}
         />

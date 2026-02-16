@@ -60,6 +60,8 @@ export function ViewPanel() {
   const setMeasureSnapPx = useForgeStore((s) => s.setMeasureSnapPx);
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
   const toggleDimensions = useForgeStore((s) => s.toggleDimensions);
+  const explodeAmount = useForgeStore((s) => s.explodeAmount);
+  const setExplodeAmount = useForgeStore((s) => s.setExplodeAmount);
   const updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
   const setCutPlaneEnabled = useForgeStore((s) => s.setCutPlaneEnabled);
@@ -147,6 +149,33 @@ export function ViewPanel() {
               {v[0].toUpperCase() + v.slice(1)}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={labelStyle}>Explode</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="range"
+            min={0}
+            max={120}
+            step={0.5}
+            value={explodeAmount}
+            onChange={(e) => setExplodeAmount(Number(e.target.value))}
+            style={{ flex: 1 }}
+          />
+          <input
+            type="number"
+            min={0}
+            max={500}
+            step={0.5}
+            value={Number(explodeAmount.toFixed(2))}
+            onChange={(e) => setExplodeAmount(Number(e.target.value))}
+            style={{ ...inputStyle, width: 70, flex: '0 0 70px' }}
+          />
+        </div>
+        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
+          Always on. Set to 0 for assembled view.
         </div>
       </div>
 

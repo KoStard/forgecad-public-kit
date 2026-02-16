@@ -160,6 +160,37 @@ cutPlane("Horizontal", [0, 0, 1], cutZ);
 
 See `examples/api/section-plane-visualization.forge.js` for a focused multi-plane setup.
 
+## View Explode Overrides
+
+### `explodeView(options?)`
+Overrides default viewport exploded-view behavior. The View Panel explode slider is always available; this API only changes how the slider is interpreted for the current script.
+
+**Parameters:**
+- `options` (object, optional):
+  - `enabled` (boolean) - Set `false` to disable viewport explode offsets for this script.
+  - `amountScale` (number) - Multiplies the UI explode amount.
+  - `mode` (`'radial' | 'x' | 'y' | 'z' | [x, y, z]`) - Global default direction.
+  - `axisLock` (`'x' | 'y' | 'z'`) - Global axis lock.
+  - `byName` (`Record<string, { stage?, direction?, axisLock? }>`)- Per-object overrides by final object name.
+
+**Returns:** `void` (side effect: registers view behavior for this run)
+
+```javascript
+explodeView({
+  amountScale: 1.2,
+  mode: 'radial',
+  byName: {
+    "Shaft": { direction: [1, 0, 0], stage: 1.6 },
+    "Housing": { stage: 0.4 },
+  },
+});
+```
+
+```javascript
+// Disable global explode offsets for this model
+explodeView({ enabled: false });
+```
+
 ## Bill of Materials
 
 ### `bom(quantity, description, opts?)`

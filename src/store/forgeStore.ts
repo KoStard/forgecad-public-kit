@@ -165,6 +165,9 @@ interface ForgeStore {
   dimensionsVisible: boolean;
   toggleDimensions: () => void;
 
+  explodeAmount: number;
+  setExplodeAmount: (amount: number) => void;
+
   cutPlaneEnabled: Record<string, boolean>;
   setCutPlaneEnabled: (name: string, enabled: boolean) => void;
   sectionPlaneGuidesEnabled: boolean;
@@ -215,6 +218,7 @@ interface ViewPreferencesState {
   objectPickSyncEnabled: boolean;
   measureSnapPx: number;
   dimensionsVisible: boolean;
+  explodeAmount: number;
   cutPlaneEnabled: Record<string, boolean>;
   sectionPlaneGuidesEnabled: boolean;
   sectionPlaneFillEnabled: boolean;
@@ -576,6 +580,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     writeViewPreferences({ dimensionsVisible: nextDimensionsVisible });
     return { dimensionsVisible: nextDimensionsVisible };
   }),
+
+  explodeAmount: initialViewPreferences.explodeAmount ?? 0,
+  setExplodeAmount: (amount) => {
+    const safeAmount = Math.max(0, Math.min(500, Number.isFinite(amount) ? amount : 0));
+    writeViewPreferences({ explodeAmount: safeAmount });
+    set({ explodeAmount: safeAmount });
+  },
 
   cutPlaneEnabled: initialViewPreferences.cutPlaneEnabled ?? {},
   setCutPlaneEnabled: (name, enabled) => set((s) => {

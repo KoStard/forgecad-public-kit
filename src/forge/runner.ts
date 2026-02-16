@@ -77,6 +77,12 @@ import { partLibrary } from './library';
 import { ShapeGroup, group } from './group';
 import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
 import { bom, resetBom, getCollectedBom, type BomDef } from './bom';
+import {
+  explodeView,
+  resetExplodeView,
+  getCollectedExplodeView,
+  type ExplodeViewOptions,
+} from './explodeView';
 
 export interface SceneObject {
   id: string;
@@ -103,6 +109,7 @@ export interface RunResult {
   dimensions: DimensionDef[];
   bom: BomDef[];
   cutPlanes: CutPlaneDef[];
+  explodeView: ExplodeViewOptions | null;
   error: string | null;
   timeMs: number;
   logs: LogEntry[];
@@ -664,6 +671,8 @@ function executeFile(
       'console',
       // Cut planes
       'cutPlane',
+      // View explode override
+      'explodeView',
       wrapped,
     );
 
@@ -687,6 +696,7 @@ function executeFile(
       group, ShapeGroup,
       makeSandboxConsole(),
       cutPlane,
+      explodeView,
     ));
   } finally {
     visited.delete(fileName);
@@ -703,6 +713,7 @@ export function runScript(
   resetDimensions();
   resetBom();
   resetCutPlanes();
+  resetExplodeView();
   _collectedLogs = [];
   const t0 = performance.now();
   const execOptions: RunnerExecutionOptions = {
@@ -871,6 +882,7 @@ export function runScript(
       dimensions: [...getCollectedDimensions(), ...shapeDimensions],
       bom: getCollectedBom(),
       cutPlanes: getCollectedCutPlanes(),
+      explodeView: getCollectedExplodeView(),
       error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
       timeMs: performance.now() - t0,
       logs: _collectedLogs.slice(),
@@ -894,6 +906,7 @@ export function runScript(
       dimensions: getCollectedDimensions(),
       bom: getCollectedBom(),
       cutPlanes: getCollectedCutPlanes(),
+      explodeView: getCollectedExplodeView(),
       error: `${msg}${lineInfo}`,
       timeMs: performance.now() - t0,
       logs: _collectedLogs.slice(),

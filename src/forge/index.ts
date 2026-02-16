@@ -13,6 +13,7 @@ export {
   param, resetParams, getCollectedParams, setParamOverrides,
   Assembly, SolvedAssembly, assembly, bomToCsv,
   bom, resetBom, getCollectedBom,
+  explodeView, resetExplodeView, getCollectedExplodeView,
   runScript,
   partLibrary,
   shapeToGeometry,
@@ -36,6 +37,7 @@ export type {
   JointSweepFrame,
 } from './headless';
 export type { BomDef, BomOpts } from './headless';
+export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './headless';
 export type { RunResult, SceneObject, LogEntry } from './headless';
 export type { ForgeGeometry } from './headless';
 export type {
