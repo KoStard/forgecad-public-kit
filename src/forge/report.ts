@@ -889,6 +889,17 @@ interface DimensionLabelLayout {
   legend: LabelLegendEntry[];
 }
 
+interface LegendPlacement {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  fontSize: number;
+  lineHeight: number;
+  rows: LabelLegendEntry[];
+  hiddenCount: number;
+}
+
 interface DrawDimensionResult {
   graphicsCmd: string;
   labelPlan: DimensionLabelPlan | null;
@@ -1315,6 +1326,85 @@ function hasHardLabelConflict(
     if (dist < 2.6) return true;
   }
   return false;
+}
+
+function chooseLegendPlacement(
+  legendEntries: LabelLegendEntry[],
+  cell: CellRect,
+  renderedLabelBoxes: LabelBox[],
+  blockedSegments: Segment2[],
+  avoidBoxes: LabelBox[],
+): LegendPlacement | null {
+  if (legendEntries.length === 0) return null;
+
+  const fontSize = 6.2;
+  const lineHeight = 7.2;
+  const inset = 6;
+  const width = Math.min(190, cell.w * 0.52);
+  const maxRows = Math.max(3, Math.floor((cell.h * 0.34) / lineHeight));
+  const shown = legendEntries.slice(0, maxRows);
+  const hiddenCount = Math.max(0, legendEntries.length - shown.length);
+  const rows = shown;
+  const height = rows.length * lineHeight + 6 + (hiddenCount > 0 ? lineHeight : 0);
+
+  const minX = cell.x + inset;
+  const maxX = cell.x + cell.w - inset - width;
+  const minY = cell.y + inset;
+  const maxY = cell.y + cell.h - inset - height;
+  if (maxX < minX || maxY < minY) return null;
+
+  const midY = clamp(cell.y + (cell.h - height) * 0.5, minY, maxY);
+  const midX = clamp(cell.x + (cell.w - width) * 0.5, minX, maxX);
+  const candidates: Array<{ x: number; y: number }> = [
+    { x: minX, y: minY },
+    { x: maxX, y: minY },
+    { x: minX, y: maxY },
+    { x: maxX, y: maxY },
+    { x: minX, y: midY },
+    { x: maxX, y: midY },
+    { x: midX, y: minY },
+    { x: midX, y: maxY },
+  ];
+
+  let best: { x: number; y: number; score: number } | null = null;
+  for (let idx = 0; idx < candidates.length; idx += 1) {
+    const c = candidates[idx];
+    const box: LabelBox = {
+      minX: c.x,
+      minY: c.y,
+      maxX: c.x + width,
+      maxY: c.y + height,
+    };
+    const labelPenalty = renderedLabelBoxes.reduce((sum, b) => (
+      sum + overlapArea(expandBox(box, 2.2), expandBox(b, 2.2)) * 700
+    ), 0);
+    const avoidPenalty = avoidBoxes.reduce((sum, b) => (
+      sum + overlapArea(box, b) * 120
+    ), 0);
+    const segPenalty = blockedSegments.reduce((sum, seg) => {
+      const d = segmentToBoxDistance(seg, box);
+      if (d <= 0.1) return sum + 80;
+      if (d < 2.8) return sum + (2.8 - d) * 22;
+      return sum;
+    }, 0);
+    const edgePref = idx < 4 ? 0 : 4;
+    const score = labelPenalty + avoidPenalty + segPenalty + edgePref;
+    if (!best || score < best.score) {
+      best = { x: c.x, y: c.y, score };
+    }
+  }
+
+  if (!best) return null;
+  return {
+    x: best.x,
+    y: best.y,
+    w: width,
+    h: height,
+    fontSize,
+    lineHeight,
+    rows,
+    hiddenCount,
+  };
 }
 
 function layoutDimensionLabels(
@@ -1755,6 +1845,7 @@ function renderViewCell(
 
   const labelLayout = layoutDimensionLabels(labelPlans, cell, blockedLabelSegments, geometryAvoidBoxes);
   const placedLabels = labelLayout.placements;
+  const renderedLabelBoxes: LabelBox[] = [];
   placedLabels.forEach(({ plan, pos, text, fallback }) => {
     const leaderStart = plan.anchor;
     const textW = estimateTextWidth(text, plan.fontSize);
@@ -1766,6 +1857,7 @@ function renderViewCell(
     if (textX < leftEdge) textX = leftEdge; // left-aligned near left edge
     const renderedCenter: Vec2 = [textX + textW * 0.5 - 1.5, pos[1]];
     const renderedBox = makeLabelBox(renderedCenter, textHalfW, plan.textHalfH);
+    renderedLabelBoxes.push(renderedBox);
     const leaderEnd = closestPointOnBox(renderedBox, leaderStart);
     const leaderDist = Math.hypot(leaderEnd[0] - leaderStart[0], leaderEnd[1] - leaderStart[1]);
     cmd.push(commandSetStroke(plan.color));
@@ -1777,29 +1869,27 @@ function renderViewCell(
     cmd.push(commandText(text, textX, pos[1] - 3, plan.fontSize));
   });
 
-  if (labelLayout.legend.length > 0) {
-    const legendFont = 6.2;
-    const legendLineH = 7.2;
-    const legendInset = 6;
-    const legendMaxW = Math.min(190, cell.w * 0.52);
-    const maxRows = Math.max(3, Math.floor((cell.h * 0.34) / legendLineH));
-    const shown = labelLayout.legend.slice(0, maxRows);
-    const hidden = Math.max(0, labelLayout.legend.length - shown.length);
-    const rows = hidden > 0 ? [...shown, { index: 0, text: `+${hidden} more`, color: [0.45, 0.45, 0.48] as ColorRgb }] : shown;
-    const legendH = rows.length * legendLineH + 6;
-    const legendX = cell.x + legendInset;
-    const legendY = cell.y + legendInset;
-
+  const legendPlacement = chooseLegendPlacement(
+    labelLayout.legend,
+    cell,
+    renderedLabelBoxes,
+    blockedLabelSegments,
+    geometryAvoidBoxes,
+  );
+  if (legendPlacement) {
+    const rows = legendPlacement.hiddenCount > 0
+      ? [...legendPlacement.rows, { index: 0, text: `+${legendPlacement.hiddenCount} more`, color: [0.45, 0.45, 0.48] as ColorRgb }]
+      : legendPlacement.rows;
     cmd.push(commandSetStroke([0.42, 0.42, 0.46]));
     cmd.push('0.35 w\n');
-    cmd.push(`${formatNumber(legendX)} ${formatNumber(legendY)} ${formatNumber(legendMaxW)} ${formatNumber(legendH)} re S\n`);
+    cmd.push(`${formatNumber(legendPlacement.x)} ${formatNumber(legendPlacement.y)} ${formatNumber(legendPlacement.w)} ${formatNumber(legendPlacement.h)} re S\n`);
 
     rows.forEach((row, i) => {
-      const y = legendY + legendH - 3 - (i + 1) * legendLineH;
+      const y = legendPlacement.y + legendPlacement.h - 3 - (i + 1) * legendPlacement.lineHeight;
       const prefix = row.index > 0 ? `[${row.index}] ` : '';
-      const text = truncateToWidth(`${prefix}${row.text}`, legendMaxW - 8, legendFont);
+      const text = truncateToWidth(`${prefix}${row.text}`, legendPlacement.w - 8, legendPlacement.fontSize);
       cmd.push(commandSetFill(row.color));
-      cmd.push(commandText(text, legendX + 4, y, legendFont));
+      cmd.push(commandText(text, legendPlacement.x + 4, y, legendPlacement.fontSize));
     });
   }
 
