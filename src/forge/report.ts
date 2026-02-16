@@ -150,6 +150,7 @@ const BOM_MAX_ROWS_PER_PAGE = 22;
 const DEFAULT_DIM_DIRECTION_TOLERANCE_DEG = 60;
 const MIN_DIM_OFFSET_PX = 10;
 const DIM_CLEARANCE_PX = 6;
+const ISO_AXIS_SNAP_MIN_DOMINANCE = 0.997;
 const MAX_LABEL_GEOMETRY_SEGMENTS = 2200;
 const MAX_FILL_TRIANGLES_PER_OBJECT = 12000;
 const MAX_EDGE_SEGMENTS_PER_OBJECT = 45000;
@@ -650,6 +651,60 @@ function commandLine(a: Vec2, b: Vec2): string {
 
 function commandTriangleFill(a: Vec2, b: Vec2, c: Vec2): string {
   return `${formatNumber(a[0])} ${formatNumber(a[1])} m ${formatNumber(b[0])} ${formatNumber(b[1])} l ${formatNumber(c[0])} ${formatNumber(c[1])} l h f\n`;
+}
+
+function maybeSnapIsoDimensionProjection(
+  dim: DimensionDef,
+  frame: ViewFrame,
+  fromProjected: Vec2,
+  toProjected: Vec2,
+): { from: Vec2; to: Vec2 } {
+  if (frame.id !== 'iso') return { from: fromProjected, to: toProjected };
+
+  const modelDir = sub3(dim.to, dim.from);
+  const modelLen = Math.hypot(modelDir[0], modelDir[1], modelDir[2]);
+  if (modelLen < 1e-9) return { from: fromProjected, to: toProjected };
+
+  const absDir = [Math.abs(modelDir[0]), Math.abs(modelDir[1]), Math.abs(modelDir[2])] as const;
+  let axisIdx = 0;
+  if (absDir[1] > absDir[axisIdx]) axisIdx = 1;
+  if (absDir[2] > absDir[axisIdx]) axisIdx = 2;
+  if (absDir[axisIdx] / modelLen < ISO_AXIS_SNAP_MIN_DOMINANCE) {
+    return { from: fromProjected, to: toProjected };
+  }
+
+  const axisSign = modelDir[axisIdx] < 0 ? -1 : 1;
+  const axisDir: Vec3 = [0, 0, 0];
+  axisDir[axisIdx] = axisSign;
+
+  let tx = dot3(axisDir, frame.right);
+  let ty = dot3(axisDir, frame.up);
+  const tLen = Math.hypot(tx, ty);
+  if (tLen < 1e-9) return { from: fromProjected, to: toProjected };
+  tx /= tLen;
+  ty /= tLen;
+
+  const rawDx = toProjected[0] - fromProjected[0];
+  const rawDy = toProjected[1] - fromProjected[1];
+  const rawLen = Math.hypot(rawDx, rawDy);
+  if (rawLen < 1e-9) return { from: fromProjected, to: toProjected };
+
+  const along = rawDx * tx + rawDy * ty;
+  if (Math.abs(along) < rawLen * 0.75) {
+    return { from: fromProjected, to: toProjected };
+  }
+
+  const halfSpan = Math.max(1e-6, Math.abs(along) * 0.5);
+  const mid: Vec2 = [
+    (fromProjected[0] + toProjected[0]) * 0.5,
+    (fromProjected[1] + toProjected[1]) * 0.5,
+  ];
+  const snappedFrom: Vec2 = [mid[0] - tx * halfSpan, mid[1] - ty * halfSpan];
+  const snappedTo: Vec2 = [mid[0] + tx * halfSpan, mid[1] + ty * halfSpan];
+  if (along < 0) {
+    return { from: snappedTo, to: snappedFrom };
+  }
+  return { from: snappedFrom, to: snappedTo };
 }
 
 function buildGridCells(viewCount: number): CellRect[] {
@@ -1529,7 +1584,7 @@ function layoutDimensionLabels(
 
 function drawDimension(
   dim: DimensionDef,
-  viewId: ReportViewId,
+  frame: ViewFrame,
   mapPoint: (p: Vec2) => Vec2,
   mapScale: number,
   color: ColorRgb,
@@ -1540,8 +1595,12 @@ function drawDimension(
   placementCenter: Vec2,
   autoLaneNudgeModel = 0,
 ): DrawDimensionResult {
-  const dx = toProjected[0] - fromProjected[0];
-  const dy = toProjected[1] - fromProjected[1];
+  const snapped = maybeSnapIsoDimensionProjection(dim, frame, fromProjected, toProjected);
+  const from = snapped.from;
+  const to = snapped.to;
+
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
   const len = Math.hypot(dx, dy);
   if (len < 1e-8) return { graphicsCmd: '', labelPlan: null, lineSegments: [] };
 
@@ -1549,7 +1608,7 @@ function drawDimension(
   const uy = dy / len;
   const px = -uy;
   const py = ux;
-  const isIsoView = viewId === 'iso';
+  const isIsoView = frame.id === 'iso';
 
   const requestedOffset = Number.isFinite(dim.offset) ? dim.offset : 0;
   const requestedSign = requestedOffset < 0 ? -1 : 1;
@@ -1623,10 +1682,10 @@ function drawDimension(
   const winner = solved[0];
   const offset = (winner?.side ?? requestedSign) * (winner?.offsetAbs ?? baseOffsetAbs);
 
-  const a0: Vec2 = fromProjected;
-  const b0: Vec2 = toProjected;
-  const a1: Vec2 = [fromProjected[0] + px * offset, fromProjected[1] + py * offset];
-  const b1: Vec2 = [toProjected[0] + px * offset, toProjected[1] + py * offset];
+  const a0: Vec2 = from;
+  const b0: Vec2 = to;
+  const a1: Vec2 = [from[0] + px * offset, from[1] + py * offset];
+  const b1: Vec2 = [to[0] + px * offset, to[1] + py * offset];
 
   const pa0 = mapPoint(a0);
   const pb0 = mapPoint(b0);
@@ -1827,7 +1886,7 @@ function renderViewCell(
     const pTo = projectPoint(dim.to, center, frame);
     const result = drawDimension(
       dim,
-      frame.id,
+      frame,
       mapper.map,
       mapper.scale,
       hexToRgb01(dim.color || '#2b2b2b'),
