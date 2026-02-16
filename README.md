@@ -256,6 +256,7 @@ npm run param-check -- path/to/your-example.forge.js --samples 10
 - CLI: [`docs/permanent/CLI.md`](docs/permanent/CLI.md)
 - Vision: [`docs/permanent/VISION.md`](docs/permanent/VISION.md)
 - Coding notes: [`docs/permanent/CODING.md`](docs/permanent/CODING.md)
+- Benchmark maintenance SOP: [`docs/processes/README_BENCHMARK_SOP.md`](docs/processes/README_BENCHMARK_SOP.md)
 
 ## License
 
