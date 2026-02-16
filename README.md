@@ -34,6 +34,24 @@ Most geometry kernels are powerful but low-level. ForgeCAD adds the missing CAD 
 
 The result is a CAD workflow that is version-control friendly, AI-editable, and still practical for real mechanical modeling.
 
+## Seamless AI integration
+
+ForgeCAD is built to work cleanly with coding agents. Your CAD models are plain code, and the repository already includes the context agents need to be useful immediately:
+
+- `docs/permanent/` explains the modeling API and workflows
+- `examples/api/` provides concrete model patterns to copy and adapt
+- browser + CLI run the same engine, so AI-generated scripts behave consistently
+
+Example AI workflows:
+
+```bash
+aider --read docs/permanent/ --read examples/api/ --model openrouter/google/gemini-3-flash-preview --reasoning-effort xhigh
+kiro-cli chat
+codex
+```
+
+This lets you iterate with AI on real `.forge.js` model files without custom glue code or one-off prompt scaffolding.
+
 ## Highlights
 
 - Browser CAD IDE with Monaco editor + real-time 3D viewport
