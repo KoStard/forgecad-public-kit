@@ -94,6 +94,9 @@ BOM aggregation rules:
 
 Component dimension ownership for disassembled pages:
 - Preferred: explicit binding via `dim(..., { component: \"Part Name\" })`
+- Imported-part ownership: `dim(..., { currentComponent: true })` to pin to the owning returned component instance (no bbox heuristic)
+- Other-component ownership: `dim(..., { component: \"Tabletop\" })`
+- If multiple owners are bound (e.g. `currentComponent: true` plus another component), it is treated as shared and stays on the overview page
 - Fallback: automatic ownership only when both dimension endpoints are unambiguously inside exactly one returned component bounding box
 - Ambiguous dimensions are intentionally skipped for disassembled pages
 

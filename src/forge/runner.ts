@@ -619,8 +619,23 @@ export function runScript(
     const objects: SceneObject[] = [];
     const shapeDimensions: DimensionDef[] = [];
     const pushShape = (shape: Shape, name: string, groupName?: string, color?: string) => {
-      objects.push({ id: `obj-${objects.length + 1}`, name, shape, sketch: null, color: color || shape.colorHex, groupName });
-      shapeDimensions.push(...(getShapeDimensions(shape) as unknown as DimensionDef[]));
+      const objectId = `obj-${objects.length + 1}`;
+      objects.push({ id: objectId, name, shape, sketch: null, color: color || shape.colorHex, groupName });
+
+      const dims = getShapeDimensions(shape) as unknown as DimensionDef[];
+      dims.forEach((dim) => {
+        if (dim.currentComponent) {
+          const ownerNames = new Set<string>(dim.components ?? []);
+          ownerNames.add(name);
+          shapeDimensions.push({
+            ...dim,
+            components: Array.from(ownerNames),
+            currentComponent: undefined,
+          });
+          return;
+        }
+        shapeDimensions.push(dim);
+      });
       if (shape.isEmpty()) {
         _collectedLogs.push({
           level: 'warn',

@@ -61,3 +61,8 @@ Anchor points for positioning sketches:
 - `'center'` — geometric center
 - `'top-left'`, `'top-right'`, `'bottom-left'`, `'bottom-right'` — corners
 - `'top'`, `'bottom'`, `'left'`, `'right'` — edge midpoints
+
+## Dimensions
+
+Use `dim()` / `dimLine()` for visual measurement callouts and report annotations.
+See [sketch-dimensions.md](sketch-dimensions.md) for options and ownership behavior.

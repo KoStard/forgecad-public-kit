@@ -193,6 +193,63 @@ bom(boltCount, `M4 bolt of ${boltLength} mm length`, { unit: "pieces" });
 
 See `examples/api/bill-of-materials.forge.js` for a complete parametric example.
 
+## Dimension Annotations
+
+Dimension annotations are visual callouts for measurement/reporting.
+They are **not constraints** and do not drive geometry.
+
+### `dim(from, to, opts?)`
+Adds a dimension annotation between two points.
+
+**Parameters:**
+- `from` (`[number, number] | [number, number, number] | Point2D`) - Start point
+- `to` (`[number, number] | [number, number, number] | Point2D`) - End point
+- `opts` (object, optional):
+  - `offset` (number) - Visual offset from geometry (default: `10`)
+  - `label` (string) - Override label text
+  - `color` (string) - Annotation color (hex)
+  - `component` (`string | string[]`) - Explicit report ownership target(s) by returned object name
+  - `currentComponent` (boolean) - Bind ownership to the current returned component instance (especially useful inside `importPart()` files)
+
+**Returns:** `void` (side effect: registers dimension annotation)
+
+```javascript
+dim([0, 0, 0], [200, 0, 0], { label: "Width" });
+dim([0, 0, 0], [0, 0, 50], { label: "Height", offset: 15, color: "#ffaa44" });
+```
+
+Ownership examples:
+```javascript
+// Own the dimension by the current imported instance (deterministic)
+dim([0, 0, 0], [0, 80, 0], { label: "Leg Width", currentComponent: true });
+
+// Route dimension to another named component page
+dim([0, 0, 0], [0, 0, 18], { label: "Top Gap", component: "Tabletop" });
+```
+
+### `dimLine(line, opts?)`
+Adds a dimension annotation along a `Line2D`.
+
+**Parameters:**
+- `line` (`Line2D`) - Source line
+- `opts` (same as `dim`)
+
+**Returns:** `void`
+
+```javascript
+const a = point(0, 0);
+const b = point(120, 0);
+dimLine(line(a, b), { label: "Span", offset: -12 });
+```
+
+### Report Ownership Behavior
+- `component: "Name"` assigns to that returned object when the name resolves uniquely
+- `currentComponent: true` assigns to the owning returned component instance
+- If multiple owners are bound (for example `currentComponent: true` plus another component), the dimension is treated as shared and stays on the assembly overview page
+- Without explicit ownership, report export falls back to automatic bbox-based inference
+
+See `examples/api/dimensioned-bracket.forge.js` for baseline dimension usage.
+
 ## 3D Primitives
 
 ### `box(x, y, z, center?)`
