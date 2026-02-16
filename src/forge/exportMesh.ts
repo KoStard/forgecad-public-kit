@@ -25,6 +25,16 @@ interface RGB {
   b: number;
 }
 
+function escapeXml(value: string): string {
+  return value
+    .replace(/[^\u0009\u000A\u000D\u0020-\uD7FF\uE000-\uFFFD]/g, ' ')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function parseHexColor(hex: string): RGB | null {
   const value = hex.trim();
   if (!value.startsWith('#')) return null;
@@ -140,7 +150,7 @@ export async function build3mfBlob(
   try {
     const nodes = objects.map((obj, index) => {
       const node = new GLTFNode();
-      node.name = obj.name || `Object ${index + 1}`;
+      node.name = escapeXml(obj.name || `Object ${index + 1}`);
 
       const rgb = obj.color ? parseHexColor(obj.color) : null;
       if (rgb) {
@@ -156,9 +166,9 @@ export async function build3mfBlob(
 
     const doc = GLTFNodesToGLTFDoc(nodes);
     const exporter = new Export3MF();
-    exporter.title = options.title ?? exporter.title;
-    exporter.application = options.application ?? 'ForgeCAD';
-    exporter.description = options.description ?? exporter.description;
+    exporter.title = escapeXml(options.title ?? exporter.title ?? 'ForgeCAD model');
+    exporter.application = escapeXml(options.application ?? 'ForgeCAD');
+    exporter.description = escapeXml(options.description ?? exporter.description ?? exporter.title);
     return exporter.asBlob(doc);
   } finally {
     cleanupSceneBuilder();
