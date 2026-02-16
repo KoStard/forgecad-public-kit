@@ -1640,8 +1640,8 @@ function drawDimension(
     let offsetAbs = baseOffsetAbs;
     let intersects = false;
     for (let i = 0; i < maxBoostSteps; i += 1) {
-      const a1: Vec2 = [fromProjected[0] + px * side * offsetAbs, fromProjected[1] + py * side * offsetAbs];
-      const b1: Vec2 = [toProjected[0] + px * side * offsetAbs, toProjected[1] + py * side * offsetAbs];
+      const a1: Vec2 = [from[0] + px * side * offsetAbs, from[1] + py * side * offsetAbs];
+      const b1: Vec2 = [to[0] + px * side * offsetAbs, to[1] + py * side * offsetAbs];
       const shiftedMid: Vec2 = [
         midProjected[0] + px * side * offsetAbs,
         midProjected[1] + py * side * offsetAbs,
