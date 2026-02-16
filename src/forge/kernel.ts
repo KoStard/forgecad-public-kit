@@ -30,9 +30,11 @@ export interface ShapeDimension {
   from: [number, number, number];
   to: [number, number, number];
   offset: number;
+  autoOffset?: boolean;
   label?: string;
   color?: string;
   components?: string[];
+  currentComponent?: boolean;
 }
 
 const _shapeDimensions = new WeakMap<Shape, ShapeDimension[]>();
@@ -49,9 +51,11 @@ function cloneDimension(def: ShapeDimension, regenerateId = false): ShapeDimensi
     from: [def.from[0], def.from[1], def.from[2]],
     to: [def.to[0], def.to[1], def.to[2]],
     offset: def.offset,
+    autoOffset: def.autoOffset,
     label: def.label,
     color: def.color,
     components: def.components ? [...def.components] : undefined,
+    currentComponent: def.currentComponent,
   };
 }
 
@@ -87,9 +91,11 @@ function transformDimensions(defs: ShapeDimension[], m: Mat4): ShapeDimension[] 
     from: transformPointByMat4(m, def.from),
     to: transformPointByMat4(m, def.to),
     offset: def.offset,
+    autoOffset: def.autoOffset,
     label: def.label,
     color: def.color,
     components: def.components ? [...def.components] : undefined,
+    currentComponent: def.currentComponent,
   }));
 }
 

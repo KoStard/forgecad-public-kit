@@ -874,6 +874,17 @@ interface DrawDimensionResult {
   lineSegments: Segment2[];
 }
 
+interface AutoLaneEntry {
+  dimId: string;
+  tangent: Vec2;
+  spanMin: number;
+  spanMax: number;
+  normalCoord: number;
+  preferredSide: number;
+  lenPx: number;
+  neighbors: Set<number>;
+}
+
 function makeLabelBox(center: Vec2, textHalfW: number, textHalfH: number): LabelBox {
   return {
     minX: center[0] - textHalfW,
@@ -1022,6 +1033,117 @@ function sampleSegments(segments: Segment2[], maxCount: number): Segment2[] {
   return out;
 }
 
+function autoLaneOffsetPx(colorIndex: number, isIso: boolean): number {
+  if (colorIndex <= 0) return 0;
+  const step = isIso ? 7.5 : 10;
+  const compressedIndex = colorIndex <= 3 ? colorIndex : 3 + (colorIndex - 3) * (isIso ? 0.45 : 0.55);
+  return compressedIndex * step;
+}
+
+function assignAutoOffsetLanes(
+  dims: DimensionDef[],
+  frame: ViewFrame,
+  center: Vec3,
+  mapper: { map: (p: Vec2) => Vec2; scale: number },
+  placementCenter: Vec2,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  if (dims.length <= 1) return out;
+
+  const centerPx = mapper.map(placementCenter);
+  const laneStepPx = frame.id === 'iso' ? 7.5 : 10;
+  const overlapPadPx = frame.id === 'iso' ? 8 : 10;
+  const alignThreshold = frame.id === 'iso' ? 0.98 : 0.985;
+  const normalBandPx = laneStepPx * 1.45;
+
+  const entries: AutoLaneEntry[] = [];
+
+  dims.forEach((dim) => {
+    const autoOffset = dim.autoOffset ?? Math.abs(dim.offset - 10) < 1e-6;
+    if (!autoOffset) return;
+
+    const pFromModel = projectPoint(dim.from, center, frame);
+    const pToModel = projectPoint(dim.to, center, frame);
+    const p0 = mapper.map([pFromModel.x, pFromModel.y]);
+    const p1 = mapper.map([pToModel.x, pToModel.y]);
+    const dx = p1[0] - p0[0];
+    const dy = p1[1] - p0[1];
+    const len = Math.hypot(dx, dy);
+    if (len < 6) return;
+
+    let tx = dx / len;
+    let ty = dy / len;
+    if (tx < -1e-6 || (Math.abs(tx) <= 1e-6 && ty < 0)) {
+      tx = -tx;
+      ty = -ty;
+    }
+    const nx = -ty;
+    const ny = tx;
+    const t0 = p0[0] * tx + p0[1] * ty;
+    const t1 = p1[0] * tx + p1[1] * ty;
+    const spanMin = Math.min(t0, t1);
+    const spanMax = Math.max(t0, t1);
+    const mid: Vec2 = [(p0[0] + p1[0]) * 0.5, (p0[1] + p1[1]) * 0.5];
+    const normalCoord = mid[0] * nx + mid[1] * ny;
+    const requestedSign = dim.offset < 0 ? -1 : 1;
+    const centerPref = (mid[0] - centerPx[0]) * nx + (mid[1] - centerPx[1]) * ny;
+    const centerSign = Math.abs(centerPref) > 0.8 ? (centerPref >= 0 ? 1 : -1) : 0;
+    const preferredSide = centerSign || requestedSign;
+
+    entries.push({
+      dimId: dim.id,
+      tangent: [tx, ty],
+      spanMin,
+      spanMax,
+      normalCoord,
+      preferredSide,
+      lenPx: len,
+      neighbors: new Set<number>(),
+    });
+  });
+
+  if (entries.length <= 1) return out;
+
+  for (let i = 0; i < entries.length; i += 1) {
+    const a = entries[i];
+    for (let j = i + 1; j < entries.length; j += 1) {
+      const b = entries[j];
+      if (a.preferredSide !== b.preferredSide) continue;
+      const align = Math.abs(a.tangent[0] * b.tangent[0] + a.tangent[1] * b.tangent[1]);
+      if (align < alignThreshold) continue;
+      if (Math.abs(a.normalCoord - b.normalCoord) > normalBandPx) continue;
+      const overlap = Math.min(a.spanMax, b.spanMax) - Math.max(a.spanMin, b.spanMin);
+      if (overlap < -overlapPadPx) continue;
+      a.neighbors.add(j);
+      b.neighbors.add(i);
+    }
+  }
+
+  const colorByEntry = new Array(entries.length).fill(-1);
+  const order = entries
+    .map((entry, idx) => ({ idx, degree: entry.neighbors.size, len: entry.lenPx }))
+    .sort((lhs, rhs) => (rhs.degree - lhs.degree) || (rhs.len - lhs.len) || (lhs.idx - rhs.idx));
+
+  order.forEach(({ idx }) => {
+    const used = new Set<number>();
+    entries[idx].neighbors.forEach((nei) => {
+      const c = colorByEntry[nei];
+      if (c >= 0) used.add(c);
+    });
+    let c = 0;
+    while (used.has(c)) c += 1;
+    colorByEntry[idx] = c;
+  });
+
+  entries.forEach((entry, idx) => {
+    const extraPx = autoLaneOffsetPx(colorByEntry[idx], frame.id === 'iso');
+    if (extraPx <= 0) return;
+    out.set(entry.dimId, extraPx / Math.max(1e-6, mapper.scale));
+  });
+
+  return out;
+}
+
 function layoutDimensionLabels(
   plans: DimensionLabelPlan[],
   cell: CellRect,
@@ -1090,6 +1212,7 @@ function drawDimension(
   toProjected: Vec2,
   placementBounds: Bounds2 | null,
   placementCenter: Vec2,
+  autoLaneNudgeModel = 0,
 ): DrawDimensionResult {
   const dx = toProjected[0] - fromProjected[0];
   const dy = toProjected[1] - fromProjected[1];
@@ -1105,7 +1228,7 @@ function drawDimension(
   const requestedOffset = Number.isFinite(dim.offset) ? dim.offset : 0;
   const requestedSign = requestedOffset < 0 ? -1 : 1;
   const minReadableOffset = MIN_DIM_OFFSET_PX / Math.max(1e-6, mapScale);
-  const baseOffsetAbs = Math.max(Math.abs(requestedOffset), minReadableOffset);
+  const baseOffsetAbs = Math.max(Math.abs(requestedOffset), minReadableOffset) + Math.max(0, autoLaneNudgeModel);
   const boundsForPlacement = placementBounds
     ? expandBounds2(placementBounds, DIM_CLEARANCE_PX / Math.max(1e-6, mapScale))
     : null;
@@ -1370,6 +1493,7 @@ function renderViewCell(
 
   const labelPlans: DimensionLabelPlan[] = [];
   const blockedLabelSegments: Segment2[] = [...geometryLabelSegments];
+  const autoLaneNudges = assignAutoOffsetLanes(viewDims, frame, center, mapper, placementCenter);
   viewDims.forEach((dim) => {
     const pFrom = projectPoint(dim.from, center, frame);
     const pTo = projectPoint(dim.to, center, frame);
@@ -1384,6 +1508,7 @@ function renderViewCell(
       [pTo.x, pTo.y],
       placementBounds,
       placementCenter,
+      autoLaneNudges.get(dim.id) ?? 0,
     );
     cmd.push(result.graphicsCmd);
     if (result.labelPlan) labelPlans.push(result.labelPlan);

@@ -9,6 +9,7 @@
  *   dim([0,0,0], [100,0,0], { offset: 15 });    // with offset
  *   dim([0,0,0], [100,0,0], { label: "Width" });
  *   dim([0,0,0], [100,0,0], { component: "Base" }); // bind for disassembled reports
+ *   dim([0,0,0], [100,0,0], { currentComponent: true }); // bind to owning imported instance
  */
 
 import { Point2D, Line2D } from './entities';
@@ -18,6 +19,8 @@ export interface DimensionDef {
   from: [number, number, number];
   to: [number, number, number];
   offset: number;
+  /** True when offset was not explicitly provided by the script author. */
+  autoOffset?: boolean;
   label?: string;
   color?: string;
   /**
@@ -25,6 +28,11 @@ export interface DimensionDef {
    * Names should match returned object names.
    */
   components?: string[];
+  /**
+   * If true, bind ownership to the current returned component instance.
+   * This is resolved during script flattening (after imported-part transforms).
+   */
+  currentComponent?: boolean;
 }
 
 let collectedDimensions: DimensionDef[] = [];
@@ -63,6 +71,7 @@ interface DimOpts {
   label?: string;
   color?: string;
   component?: string | string[];
+  currentComponent?: boolean;
 }
 
 /**
@@ -89,9 +98,11 @@ export function dim(from: PointArg, to: PointArg, opts?: DimOpts): void {
     from: toVec3(from),
     to: toVec3(to),
     offset: opts?.offset ?? 10,
+    autoOffset: opts?.offset === undefined,
     label: opts?.label,
     color: opts?.color,
     components,
+    currentComponent: !!opts?.currentComponent,
   });
 }
 
