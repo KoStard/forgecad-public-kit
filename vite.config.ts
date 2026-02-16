@@ -129,8 +129,27 @@ function forgeProjectPlugin() {
   };
 }
 
+function stripBrokenManifoldSourceMaps() {
+  const manifoldLibPattern = /[\\/]node_modules[\\/]manifold-3d[\\/]lib[\\/].+\.js(?:\?.*)?$/;
+  const sourceMapTrailerPattern = /\n\/\/# sourceMappingURL=.*?\.map\s*$/gm;
+
+  return {
+    name: 'strip-broken-manifold-sourcemaps',
+    enforce: 'pre' as const,
+    transform(code: string, id: string) {
+      if (!manifoldLibPattern.test(id)) return null;
+      if (!code.includes('sourceMappingURL=')) return null;
+      const sanitized = code.replace(sourceMapTrailerPattern, '');
+      return {
+        code: sanitized,
+        map: null,
+      };
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [forgeProjectPlugin(), react()],
+  plugins: [forgeProjectPlugin(), stripBrokenManifoldSourceMaps(), react()],
   resolve: {
     alias: {
       '@forge': path.resolve(__dirname, './src/forge'),
