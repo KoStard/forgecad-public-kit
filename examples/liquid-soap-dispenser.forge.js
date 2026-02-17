@@ -39,8 +39,9 @@ const nozzleTipX = nozzleRootX + nozzleL;
 const nozzleZ = headZ + 1;
 
 // Bottle shell + neck.
-const bottleOuter = cylinder(bodyH, bodyR, bodyR, 64).translate(0, 0, bodyH * 0.5);
-const bottleInner = cylinder(bodyH - wall * 1.4, bodyR - wall, bodyR - wall, 64)
+const bottleOuter = cylinder(bodyH, bodyR, bodyR, 64, true)
+  .translate(0, 0, bodyH * 0.5);
+const bottleInner = cylinder(bodyH - wall * 1.4, bodyR - wall, bodyR - wall, 64, true)
   .translate(0, 0, wall + (bodyH - wall * 1.4) * 0.5);
 const bottleShell = bottleOuter.subtract(bottleInner);
 
@@ -102,8 +103,9 @@ const dipTube = tubeOuter.subtract(tubeInner);
 // Check valves: inlet opens during release, outlet opens during press.
 const inletSeatZ = chamberBottomZ + 3;
 const outletSeatZ = chamberTopZ - 7;
+const outletSeatX = chamberR - 2.8;
 const inletValve = sphere(2.7).translate(0, 0, inletSeatZ + release * 2.4);
-const outletValve = sphere(2.4).translate(3.2 + press * 1.4, 0, outletSeatZ + press * 1.4);
+const outletValve = sphere(2.4).translate(outletSeatX + press * 1.4, 0, outletSeatZ + 0.6);
 
 // Stylized liquid storyboarding (no simulation).
 const drawPhase = clamp01(progress / 0.55);
