@@ -317,9 +317,11 @@ export class Rectangle2D {
   /** Extrude this rectangle into a 3D TrackedShape with named faces and edges */
   extrude(height: number, up = true): TrackedShape {
     const sketch = this.toSketch();
-    const extruded = sketchExtrude(sketch, height);
-    const topology = buildRectExtrusionTopology(this, height, up);
-    return new TrackedShape(extruded.shape, topology, height, up);
+    const h = Math.abs(height);
+    const extruded = sketchExtrude(sketch, h);
+    const shape = up ? extruded.shape : extruded.shape.translate(0, 0, -h);
+    const topology = buildRectExtrusionTopology(this, h, up);
+    return new TrackedShape(shape, topology, h, up);
   }
 }
 

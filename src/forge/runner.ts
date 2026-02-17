@@ -619,19 +619,8 @@ function executeFile(
       height: number, radius: number, radiusTop?: number, segments?: number, center = false,
     ): TrackedShape => {
       const shape = cylinder(height, radius, radiusTop, segments, center);
-      const cz = center ? -height / 2 : 0;
-      const c = { center: new Point2D(0, 0), radius };
-      const topo = buildCircleExtrusionTopology(c, height);
-      if (center) {
-        // offset topology down by half height
-        for (const f of topo.faces.values()) {
-          f.center = [f.center[0], f.center[1], f.center[2] - height / 2];
-        }
-        for (const e of topo.edges.values()) {
-          e.start = [e.start[0], e.start[1], e.start[2] - height / 2];
-          e.end = [e.end[0], e.end[1], e.end[2] - height / 2];
-        }
-      }
+      const c = { center: new Point2D(0, 0), radius, radiusTop };
+      const topo = buildCircleExtrusionTopology(c, height, center);
       return new TrackedShape(shape, topo, 0, true);
     };
 

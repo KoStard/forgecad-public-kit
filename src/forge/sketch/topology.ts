@@ -401,20 +401,26 @@ export function buildRectExtrusionTopology(
 
 /** Build topology for an extruded circle. Faces: top, bottom, side */
 export function buildCircleExtrusionTopology(
-  circ: { center: Point2D; radius: number },
+  circ: { center: Point2D; radius: number; radiusTop?: number },
   height: number,
+  center = false,
 ): Topology {
   const faces = new Map<FaceName, FaceRef>();
   const edges = new Map<EdgeName, EdgeRef>();
   const cx = circ.center.x, cy = circ.center.y;
-  const zBot = 0, zTop = height;
+  const z0 = center ? -height / 2 : 0;
+  const z1 = center ? height / 2 : height;
+  const zBot = Math.min(z0, z1);
+  const zTop = Math.max(z0, z1);
+  const topRadius = circ.radiusTop ?? circ.radius;
+  const midRadius = (Math.abs(circ.radius) + Math.abs(topRadius)) / 2;
 
   faces.set('top', { name: 'top', normal: [0, 0, 1], center: [cx, cy, zTop] });
   faces.set('bottom', { name: 'bottom', normal: [0, 0, -1], center: [cx, cy, zBot] });
-  faces.set('side', { name: 'side', normal: [1, 0, 0], center: [cx + circ.radius, cy, (zTop + zBot) / 2] });
+  faces.set('side', { name: 'side', normal: [1, 0, 0], center: [cx + midRadius, cy, (zTop + zBot) / 2] });
 
   // Top and bottom rim edges (represented as a single named reference at 0°)
-  edges.set('top-rim', { name: 'top-rim', start: [cx + circ.radius, cy, zTop], end: [cx, cy + circ.radius, zTop] });
+  edges.set('top-rim', { name: 'top-rim', start: [cx + topRadius, cy, zTop], end: [cx, cy + topRadius, zTop] });
   edges.set('bottom-rim', { name: 'bottom-rim', start: [cx + circ.radius, cy, zBot], end: [cx, cy + circ.radius, zBot] });
 
   return { faces, edges };
