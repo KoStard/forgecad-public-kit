@@ -2,3 +2,6 @@ node_modules
 dist
 .DS_Store
 .aider*
+
+# Keep benchmark GIFs out of core repo history
+docs/attachments/benchmarks/*.gif
