@@ -22,6 +22,8 @@ const neckH = 16;
 const neckR = bodyR * 0.36;
 const chamberH = 48;
 const chamberR = neckR * 0.9;
+const chamberWall = 2.4;
+const chamberInnerR = chamberR - chamberWall;
 const chamberBottomZ = bodyH + 4;
 const chamberTopZ = chamberBottomZ + chamberH;
 
@@ -53,7 +55,7 @@ const bottle = union(bottleShell, neckOuter).subtract(neckHole);
 // Pump chamber.
 const chamberOuter = cylinder(chamberH, chamberR, chamberR, 48, true)
   .translate(0, 0, chamberBottomZ + chamberH * 0.5);
-const chamberInner = cylinder(chamberH - 4, chamberR - 2.4, chamberR - 2.4, 48, true)
+const chamberInner = cylinder(chamberH - 4, chamberInnerR, chamberInnerR, 48, true)
   .translate(0, 0, chamberBottomZ + chamberH * 0.5 + 1.2);
 const chamberShell = chamberOuter.subtract(chamberInner);
 
@@ -103,9 +105,11 @@ const dipTube = tubeOuter.subtract(tubeInner);
 // Check valves: inlet opens during release, outlet opens during press.
 const inletSeatZ = chamberBottomZ + 3;
 const outletSeatZ = chamberTopZ - 7;
-const outletSeatX = chamberR - 2.8;
 const inletValve = sphere(2.7).translate(0, 0, inletSeatZ + release * 2.4);
-const outletValve = sphere(2.4).translate(outletSeatX + press * 1.4, 0, outletSeatZ + 0.6);
+const outletValveR = 2.2;
+const outletSeatClearance = 0.35;
+const outletSeatX = chamberInnerR - outletValveR - outletSeatClearance;
+const outletValve = sphere(outletValveR).translate(outletSeatX - press * 0.9, 0, outletSeatZ + 0.6 + press * 0.9);
 
 // Stylized liquid storyboarding (no simulation).
 const drawPhase = clamp01(progress / 0.55);
