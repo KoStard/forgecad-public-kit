@@ -260,4 +260,4 @@ npm run param-check -- path/to/your-example.forge.js --samples 10
 
 ## License
 
-No license file is currently published in this repository.
+[Business Source License 1.1](LICENSE) — free for non-production use. Converts to MIT on 2030-02-18.
