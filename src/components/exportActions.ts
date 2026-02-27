@@ -3,6 +3,20 @@ import { useForgeStore } from '../store/forgeStore';
 import { generateReportInWorker } from '../workers/reportWorkerClient';
 
 export type MeshExportFormat = '3mf' | 'stl';
+export type OrbitGifMode = 'solid' | 'wireframe';
+
+export interface OrbitGifExportOptions {
+  size?: number;
+  fps?: number;
+  framesPerTurn?: number;
+  holdFrames?: number;
+  pitchDeg?: number;
+  includeWireframePass?: boolean;
+}
+
+type OrbitGifExporter = (options?: OrbitGifExportOptions) => Promise<Blob>;
+
+let orbitGifExporter: OrbitGifExporter | null = null;
 
 export function deriveExportStem(path: string): string {
   const fromPath = path
@@ -20,6 +34,10 @@ export function sanitizeExportStem(value: string): string {
     .replace(/\.+$/, '')
     .slice(0, 96);
   return sanitized || 'forge-export';
+}
+
+export function registerOrbitGifExporter(exporter: OrbitGifExporter | null): void {
+  orbitGifExporter = exporter;
 }
 
 function triggerDownload(blob: Blob, filename: string): void {
@@ -83,4 +101,23 @@ export async function exportReportFromStore(preferredStem?: string): Promise<voi
   const bytes = new Uint8Array(report.pdf);
   const blob = new Blob([bytes], { type: 'application/pdf' });
   triggerDownload(blob, `${title}.report.pdf`);
+}
+
+export async function exportOrbitGifFromStore(
+  preferredStem?: string,
+  options?: OrbitGifExportOptions,
+): Promise<void> {
+  if (!orbitGifExporter) {
+    throw new Error('Viewport is not ready for GIF export. Try again in a moment.');
+  }
+
+  const { result, activeFile } = useForgeStore.getState();
+  const hasShapes = (result?.objects?.some((obj) => Boolean(obj.shape)) ?? false);
+  if (!hasShapes) {
+    throw new Error('No 3D objects available for GIF export.');
+  }
+
+  const stem = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
+  const blob = await orbitGifExporter(options);
+  triggerDownload(blob, `${stem}.orbit.gif`);
 }

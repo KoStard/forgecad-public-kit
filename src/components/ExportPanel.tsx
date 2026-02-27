@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 import {
   deriveExportStem,
+  exportOrbitGifFromStore,
   exportMeshFromStore,
   exportReportFromStore,
   type MeshExportFormat,
@@ -27,6 +28,7 @@ export function ExportPanel() {
   const [meshFormat, setMeshFormat] = useState<MeshExportFormat>('3mf');
   const [meshBusy, setMeshBusy] = useState(false);
   const [meshFileStem, setMeshFileStem] = useState('forge-export');
+  const [gifBusy, setGifBusy] = useState(false);
   const [reportBusy, setReportBusy] = useState(false);
 
   const shapeObjects = result?.objects?.filter((obj) => obj.shape) ?? [];
@@ -54,7 +56,7 @@ export function ExportPanel() {
   };
 
   const closeDialog = () => {
-    if (meshBusy) return;
+    if (meshBusy || gifBusy) return;
     setDialogOpen(false);
   };
 
@@ -87,6 +89,22 @@ export function ExportPanel() {
       alert(`Report export failed: ${message}`);
     } finally {
       setReportBusy(false);
+    }
+  };
+
+  const exportGif = async () => {
+    if (!hasShapes || gifBusy) return;
+    setGifBusy(true);
+    try {
+      await waitForNextPaint();
+      await exportOrbitGifFromStore(meshFileStem || defaultMeshStem);
+      setDialogOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('GIF export failed:', err);
+      alert(`GIF export failed: ${message}`);
+    } finally {
+      setGifBusy(false);
     }
   };
 
@@ -158,7 +176,7 @@ export function ExportPanel() {
               </div>
               <button
                 onClick={closeDialog}
-                disabled={meshBusy}
+                disabled={meshBusy || gifBusy}
                 style={{
                   border: '1px solid var(--fc-border)',
                   background: 'transparent',
@@ -166,7 +184,7 @@ export function ExportPanel() {
                   borderRadius: 4,
                   width: 28,
                   height: 28,
-                  cursor: meshBusy ? 'default' : 'pointer',
+                  cursor: (meshBusy || gifBusy) ? 'default' : 'pointer',
                   fontSize: 17,
                   lineHeight: 1,
                 }}
@@ -258,7 +276,7 @@ export function ExportPanel() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <button
                 onClick={closeDialog}
-                disabled={meshBusy}
+                disabled={meshBusy || gifBusy}
                 style={{
                   border: '1px solid var(--fc-border)',
                   background: 'transparent',
@@ -266,7 +284,7 @@ export function ExportPanel() {
                   borderRadius: 4,
                   padding: '6px 10px',
                   fontSize: 12,
-                  cursor: meshBusy ? 'default' : 'pointer',
+                  cursor: (meshBusy || gifBusy) ? 'default' : 'pointer',
                 }}
               >
                 Cancel
@@ -285,6 +303,33 @@ export function ExportPanel() {
                 }}
               >
                 {meshBusy ? `Exporting ${meshFormat.toUpperCase()}...` : `Export ${meshFormat.toUpperCase()}`}
+              </button>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--fc-borderLight)', marginTop: 12, paddingTop: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginBottom: 6 }}>Animation</div>
+              <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 7 }}>
+                Renders a full 360 orbit in solid, then wireframe.
+              </div>
+              <button
+                onClick={exportGif}
+                disabled={gifBusy}
+                style={{
+                  width: '100%',
+                  padding: '7px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  background: !gifBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
+                  color: !gifBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: !gifBusy ? 'pointer' : 'default',
+                  fontSize: 12,
+                }}
+              >
+                {gifBusy ? 'Rendering Orbit GIF...' : 'Export Orbit GIF'}
               </button>
             </div>
 

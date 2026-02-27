@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForgeStore } from '../store/forgeStore';
-import { exportMeshFromStore, exportReportFromStore } from './exportActions';
+import { exportMeshFromStore, exportOrbitGifFromStore, exportReportFromStore } from './exportActions';
 
 interface Command {
   id: string;
@@ -59,6 +59,14 @@ export function CommandPalette() {
       action: () => {
         close();
         void exportReportFromStore().catch(handleCommandError);
+      },
+    },
+    {
+      id: 'export-gif',
+      label: `Export Orbit GIF${hasShapes ? '' : ' (no geometry)'}`,
+      action: () => {
+        close();
+        void exportOrbitGifFromStore().catch(handleCommandError);
       },
     },
   ];
