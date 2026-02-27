@@ -14,6 +14,23 @@ type PlaneSpec = { origin: [number, number, number]; normal: [number, number, nu
 declare function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch;
 declare function projectToPlane(shape: Shape, plane: PlaneSpec): Sketch;
 
+declare class Transform {
+  static identity(): Transform;
+  static translation(x: number, y: number, z: number): Transform;
+  static rotationAxis(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): Transform;
+  static scale(v: number | [number, number, number]): Transform;
+  translate(x: number, y: number, z: number): Transform;
+  rotateAxis(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): Transform;
+  scale(v: number | [number, number, number]): Transform;
+  mul(other: Transform): Transform;
+  inverse(): Transform;
+  point(p: [number, number, number]): [number, number, number];
+  vector(v: [number, number, number]): [number, number, number];
+  toArray(): number[];
+}
+
+declare function composeChain(...parts: Transform[]): Transform;
+
 // --- Cross-file imports ---
 /** Import a 2D sketch from another file. The file must return a Sketch. */
 declare function importSketch(fileName: string, paramOverrides?: Record<string, number>): Sketch;
@@ -47,7 +64,7 @@ declare class Shape {
   rotate(x: number, y: number, z: number): Shape;
   scale(v: number | [number, number, number]): Shape;
   mirror(normal: [number, number, number]): Shape;
-  transform(m: number[]): Shape;  // 4x4 column-major matrix
+  transform(m: number[] | Transform): Shape;  // 4x4 column-major matrix or Transform
   /** Rotate around an arbitrary axis through a pivot point */
   rotateAround(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): Shape;
   /** Reorient so primary axis (Z) points along given direction. E.g. cylinder(h,r).pointAlong([1,0,0]) lays it along X */
@@ -344,6 +361,10 @@ declare class ShapeGroup {
   /** Move so combined bounding box min corner is at target's bounding box min + (x, y, z) offset */
   moveToLocal(target: Shape | TrackedShape | ShapeGroup, x: number, y: number, z: number): ShapeGroup;
   rotate(x: number, y: number, z: number): ShapeGroup;
+  /** Rotate around an arbitrary axis through a pivot point */
+  rotateAround(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): ShapeGroup;
+  /** Apply a 4x4 transform matrix or Transform to all 3D children */
+  transform(m: number[] | Transform): ShapeGroup;
   scale(v: number | [number, number, number]): ShapeGroup;
   mirror(normal: [number, number, number]): ShapeGroup;
   color(hex: string): ShapeGroup;

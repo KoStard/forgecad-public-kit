@@ -136,12 +136,25 @@ export class ShapeGroup {
     });
   }
 
+  /**
+   * Rotate around an arbitrary axis through a pivot point.
+   * Sugar for: group.transform(Transform.rotationAxis(axis, angleDeg, pivot))
+   */
+  rotateAround(
+    axis: [number, number, number],
+    angleDeg: number,
+    pivot: [number, number, number] = [0, 0, 0],
+  ): ShapeGroup {
+    return this.transform(Transform.rotationAxis(axis, angleDeg, pivot));
+  }
+
   /** Apply a 4x4 transform matrix or Transform object to all 3D children. */
   transform(m: Mat4 | Transform): ShapeGroup {
     return new ShapeGroup(this.children.map(c => {
+      if (c instanceof ShapeGroup) return c.transform(m);
       if (c instanceof TrackedShape) return c.transform(m);
       if (c instanceof Shape) return c.transform(m);
-      throw new Error('ShapeGroup.transform only supports 3D children (Shape/TrackedShape)');
+      throw new Error('ShapeGroup.transform only supports 3D children (Shape/TrackedShape/ShapeGroup)');
     }));
   }
 

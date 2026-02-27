@@ -6,6 +6,8 @@
 
 import assert from 'node:assert/strict';
 import { assembly } from '../src/forge/assembly';
+import { box, initKernel } from '../src/forge/kernel';
+import { group } from '../src/forge/group';
 import { Transform } from '../src/forge/transform';
 
 const EPS = 1e-6;
@@ -120,10 +122,36 @@ function testAssemblyChainAgainstAnalytic() {
   assertVec(w as [number, number, number], wristExpected, 'wrist origin');
 }
 
-function main() {
+function testShapeGroupRotateAroundSugar() {
+  const hingeY = 18;
+  const lid = group(
+    box(60, 40, 4, true).translate(0, 0, 2),
+    box(18, 8, 2, true).translate(0, 10, 5),
+  );
+
+  const aroundSugar = lid
+    .translate(0, 0, 1.5)
+    .rotateAround([1, 0, 0], 35, [0, hingeY, 0])
+    .boundingBox();
+
+  const aroundTransform = lid
+    .translate(0, 0, 1.5)
+    .transform(Transform.rotationAxis([1, 0, 0], 35, [0, hingeY, 0]))
+    .boundingBox();
+
+  assertVec(aroundSugar.min, aroundTransform.min, 'group.rotateAround min');
+  assertVec(aroundSugar.max, aroundTransform.max, 'group.rotateAround max');
+}
+
+async function main() {
+  await initKernel();
   testTransformMulOrder();
   testAssemblyChainAgainstAnalytic();
+  testShapeGroupRotateAroundSugar();
   console.log('✓ Transform and assembly invariants passed');
 }
 
-main();
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});
