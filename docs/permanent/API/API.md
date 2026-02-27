@@ -408,6 +408,20 @@ Mirrors across a plane defined by its normal vector.
 const mirrored = shape.mirror([1, 0, 0]);  // Mirror across YZ plane
 ```
 
+### `.transform(m)`
+Applies a custom 4x4 transform matrix or `Transform` object.
+
+**Parameters:**
+- `m` (`number[] | Transform`) - 4x4 column-major matrix (`number[16]`) or a `Transform`
+
+```javascript
+const T = Transform.identity()
+  .translate(0, 0, 1.5)
+  .rotateAxis([1, 0, 0], 35, [0, hingeY, 0]);
+
+const moved = lid.transform(T);
+```
+
 ### `.rotateAround(axis, angleDeg, pivot?)`
 Rotates around an arbitrary axis through a pivot point.
 
@@ -594,12 +608,26 @@ All transforms are chainable and return a new ShapeGroup:
 
 ```javascript
 group.translate(x, y, z)
+group.moveTo(x, y, z)
+group.moveToLocal(target, x, y, z)
 group.rotate(x, y, z)
+group.rotateAround(axis, angleDeg, pivot?)
+group.transform(m)
 group.scale(v)
 group.mirror(normal)
 group.color(hex)  // applies to all children
 group.clone()
 group.duplicate() // alias
+```
+
+`group.rotateAround(...)` is convenience sugar for `group.transform(Transform.rotationAxis(...))`.
+
+```javascript
+const hingeY = 40;
+const lid = group(shell, logo);
+
+const openedA = lid.rotateAround([1, 0, 0], 35, [0, hingeY, 0]); // sugar
+const openedB = lid.transform(Transform.rotationAxis([1, 0, 0], 35, [0, hingeY, 0])); // equivalent
 ```
 
 When a ShapeGroup is returned from a script, each child becomes a separate viewport object with its own visibility/color controls.
