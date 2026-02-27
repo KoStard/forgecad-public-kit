@@ -219,6 +219,75 @@ const clampJointValue = (joint: JointViewDef, value: number): number => {
   return clamped;
 };
 
+const resolveJointRange = (joint: JointViewDef): { min: number; max: number } => ({
+  min: joint.min ?? (joint.type === 'prismatic' ? -100 : -180),
+  max: joint.max ?? (joint.type === 'prismatic' ? 100 : 180),
+});
+
+const formatSignedValue = (value: number, digits = 2): string => {
+  const safe = Math.abs(value) < 1e-6 ? 0 : value;
+  const fixed = safe.toFixed(digits);
+  return safe >= 0 ? `+${fixed}` : fixed;
+};
+
+const computeJointNodeMatrices = (
+  joints: JointViewDef[],
+  jointValues: Record<string, number>,
+): Map<string, THREE.Matrix4> => {
+  const byChild = new Map<string, JointViewDef>();
+  joints.forEach((joint) => {
+    byChild.set(joint.child, joint);
+  });
+
+  const cache = new Map<string, THREE.Matrix4>();
+  const resolving = new Set<string>();
+
+  const solveNodeMatrix = (nodeName: string): THREE.Matrix4 => {
+    const cached = cache.get(nodeName);
+    if (cached) return cached.clone();
+    if (resolving.has(nodeName)) return new THREE.Matrix4();
+    resolving.add(nodeName);
+
+    const joint = byChild.get(nodeName);
+    if (!joint) {
+      const identity = new THREE.Matrix4();
+      cache.set(nodeName, identity);
+      resolving.delete(nodeName);
+      return identity.clone();
+    }
+
+    let parentMatrix = new THREE.Matrix4();
+    if (joint.parent) {
+      parentMatrix = solveNodeMatrix(joint.parent);
+    }
+
+    const axis = new THREE.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]).normalize();
+    const axisWorld = axis.clone().transformDirection(parentMatrix);
+    if (axisWorld.lengthSq() <= 1e-8) axisWorld.copy(axis);
+    axisWorld.normalize();
+
+    const value = clampJointValue(joint, jointValues[joint.name] ?? joint.defaultValue);
+    let motion = new THREE.Matrix4();
+    if (joint.type === 'prismatic') {
+      motion.makeTranslation(axisWorld.x * value, axisWorld.y * value, axisWorld.z * value);
+    } else {
+      const pivotWorld = new THREE.Vector3(joint.pivot[0], joint.pivot[1], joint.pivot[2]).applyMatrix4(parentMatrix);
+      motion = buildRevoluteMatrix(axisWorld, pivotWorld, value);
+    }
+
+    const solved = motion.multiply(parentMatrix);
+    cache.set(nodeName, solved.clone());
+    resolving.delete(nodeName);
+    return solved;
+  };
+
+  joints.forEach((joint) => {
+    solveNodeMatrix(joint.child);
+  });
+
+  return cache;
+};
+
 const buildRevoluteMatrix = (
   axisWorld: THREE.Vector3,
   pivotWorld: THREE.Vector3,
@@ -539,6 +608,105 @@ function SectionPlaneGuides({
       {cutPlanes.map((def) => (
         <SectionPlaneGuide key={def.name} def={def} sectionSize={sectionSize} style={style} />
       ))}
+    </group>
+  );
+}
+
+interface HoveredJointOverlayState {
+  joint: JointViewDef;
+  value: number;
+  min: number;
+  max: number;
+  pivotWorld: THREE.Vector3;
+  axisWorld: THREE.Vector3;
+  axisLength: number;
+}
+
+function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
+  const axisStart = useMemo(
+    () => state.pivotWorld.clone().addScaledVector(state.axisWorld, -state.axisLength * 0.5),
+    [state.axisLength, state.axisWorld, state.pivotWorld],
+  );
+  const axisEnd = useMemo(
+    () => state.pivotWorld.clone().addScaledVector(state.axisWorld, state.axisLength * 0.5),
+    [state.axisLength, state.axisWorld, state.pivotWorld],
+  );
+  const labelPosition = useMemo(
+    () => state.pivotWorld.clone().addScaledVector(state.axisWorld, state.axisLength * 0.65),
+    [state.axisLength, state.axisWorld, state.pivotWorld],
+  );
+  const axisGeometry = useMemo(
+    () => new THREE.BufferGeometry().setFromPoints([axisStart, axisEnd]),
+    [axisEnd, axisStart],
+  );
+  const axisDotRadius = Math.max(0.7, state.axisLength * 0.02);
+  const arrowRadius = Math.max(0.6, state.axisLength * 0.03);
+  const arrowLength = Math.max(2.4, state.axisLength * 0.09);
+  const arrowPosition = useMemo(
+    () => axisEnd.clone().addScaledVector(state.axisWorld, arrowLength * 0.4),
+    [arrowLength, axisEnd, state.axisWorld],
+  );
+  const arrowQuaternion = useMemo(
+    () => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), state.axisWorld),
+    [state.axisWorld],
+  );
+  const unit = state.joint.unit ? ` ${state.joint.unit}` : '';
+  const valueLabel = state.joint.type === 'prismatic' ? 'Offset' : 'Angle';
+
+  useEffect(() => () => axisGeometry.dispose(), [axisGeometry]);
+
+  return (
+    <group>
+      <lineSegments geometry={axisGeometry} renderOrder={95} userData={{ measureHelper: true }}>
+        <lineBasicMaterial color="#67d7ff" depthTest={false} transparent opacity={0.98} toneMapped={false} />
+      </lineSegments>
+      <mesh
+        position={[state.pivotWorld.x, state.pivotWorld.y, state.pivotWorld.z]}
+        renderOrder={96}
+        userData={{ measureHelper: true }}
+      >
+        <sphereGeometry args={[axisDotRadius, 18, 18]} />
+        <meshBasicMaterial color="#d9f6ff" depthTest={false} toneMapped={false} />
+      </mesh>
+      <mesh
+        position={[arrowPosition.x, arrowPosition.y, arrowPosition.z]}
+        quaternion={arrowQuaternion}
+        renderOrder={96}
+        userData={{ measureHelper: true }}
+      >
+        <coneGeometry args={[arrowRadius, arrowLength, 18]} />
+        <meshBasicMaterial color="#4fc7ff" depthTest={false} toneMapped={false} />
+      </mesh>
+
+      <Html
+        position={[labelPosition.x, labelPosition.y, labelPosition.z]}
+        style={{ pointerEvents: 'none' }}
+        distanceFactor={10}
+        center
+      >
+        <div
+          style={{
+            minWidth: 160,
+            borderRadius: 8,
+            border: '1px solid rgba(93, 198, 255, 0.6)',
+            background: 'linear-gradient(148deg, rgba(6, 15, 24, 0.94) 0%, rgba(8, 22, 36, 0.9) 100%)',
+            boxShadow: '0 8px 18px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(134, 220, 255, 0.2)',
+            color: '#dbf4ff',
+            fontFamily: 'monospace',
+            fontSize: 10,
+            letterSpacing: 0.2,
+            padding: '8px 9px',
+            lineHeight: 1.35,
+          }}
+        >
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#8fdaff', marginBottom: 5 }}>
+            {state.joint.name}
+          </div>
+          <div>Axis {formatSignedValue(state.axisWorld.x, 3)}, {formatSignedValue(state.axisWorld.y, 3)}, {formatSignedValue(state.axisWorld.z, 3)}</div>
+          <div>{valueLabel} {formatSignedValue(state.value, 2)}{unit}</div>
+          <div>Range {formatSignedValue(state.min, 2)}..{formatSignedValue(state.max, 2)}{unit}</div>
+        </div>
+      </Html>
     </group>
   );
 }
@@ -1724,6 +1892,7 @@ export function Viewport() {
   const jointAnimationClip = useForgeStore((s) => s.jointAnimationClip);
   const jointAnimationProgress = useForgeStore((s) => s.jointAnimationProgress);
   const jointAnimationPlaying = useForgeStore((s) => s.jointAnimationPlaying);
+  const hoveredJointName = useForgeStore((s) => s.hoveredJointName);
   const setJointAnimationProgress = useForgeStore((s) => s.setJointAnimationProgress);
   const setJointAnimationPlaying = useForgeStore((s) => s.setJointAnimationPlaying);
   const objects = result?.objects ?? [];
@@ -1738,6 +1907,7 @@ export function Viewport() {
   const cutPlaneDefs: CutPlaneDef[] = result?.cutPlanes ?? [];
   const explodeConfig: ExplodeViewOptions | null = result?.explodeView ?? null;
   const jointsConfig = result?.jointsView ?? null;
+  const joints = jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? []);
   const jointAnimations = jointsConfig?.enabled === false ? [] : (jointsConfig?.animations ?? []);
   const activeJointAnimation = useMemo(
     () => findJointAnimationClip(jointAnimations, jointAnimationClip),
@@ -1807,61 +1977,23 @@ export function Viewport() {
     return offsets;
   }, [explodeAmount, explodeConfig, objects]);
 
+  const jointNodeMatrices = useMemo(
+    () => computeJointNodeMatrices(joints, effectiveJointValues),
+    [effectiveJointValues, joints],
+  );
+
   const jointMatrices = useMemo(() => {
     const out: Record<string, THREE.Matrix4> = {};
     objects.forEach((obj) => {
       out[obj.id] = new THREE.Matrix4();
     });
 
-    const joints = jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? []);
     if (joints.length === 0 || objects.length === 0) return out;
 
     const jointByChild = new Map<string, JointViewDef>();
     joints.forEach((joint) => {
       jointByChild.set(joint.child, joint);
     });
-
-    const cache = new Map<string, THREE.Matrix4>();
-    const resolving = new Set<string>();
-
-    const solveNodeMatrix = (nodeName: string): THREE.Matrix4 => {
-      const cached = cache.get(nodeName);
-      if (cached) return cached.clone();
-      if (resolving.has(nodeName)) return new THREE.Matrix4();
-      resolving.add(nodeName);
-
-      const joint = jointByChild.get(nodeName);
-      if (!joint) {
-        const identity = new THREE.Matrix4();
-        cache.set(nodeName, identity);
-        resolving.delete(nodeName);
-        return identity.clone();
-      }
-
-      let parentMatrix = new THREE.Matrix4();
-      if (joint.parent) {
-        parentMatrix = solveNodeMatrix(joint.parent);
-      }
-
-      const axis = new THREE.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]).normalize();
-      const axisWorld = axis.clone().transformDirection(parentMatrix);
-      if (axisWorld.lengthSq() <= 1e-8) axisWorld.copy(axis);
-      axisWorld.normalize();
-
-      const value = clampJointValue(joint, effectiveJointValues[joint.name] ?? joint.defaultValue);
-      let motion = new THREE.Matrix4();
-      if (joint.type === 'prismatic') {
-        motion.makeTranslation(axisWorld.x * value, axisWorld.y * value, axisWorld.z * value);
-      } else {
-        const pivotWorld = new THREE.Vector3(joint.pivot[0], joint.pivot[1], joint.pivot[2]).applyMatrix4(parentMatrix);
-        motion = buildRevoluteMatrix(axisWorld, pivotWorld, value);
-      }
-
-      const solved = motion.multiply(parentMatrix);
-      cache.set(nodeName, solved.clone());
-      resolving.delete(nodeName);
-      return solved;
-    };
 
     objects.forEach((obj) => {
       let nodeName: string | null = null;
@@ -1873,11 +2005,11 @@ export function Viewport() {
         nodeName = obj.groupName;
       }
       if (!nodeName) return;
-      out[obj.id] = solveNodeMatrix(nodeName);
+      out[obj.id] = jointNodeMatrices.get(nodeName)?.clone() ?? new THREE.Matrix4();
     });
 
     return out;
-  }, [effectiveJointValues, jointsConfig, objects]);
+  }, [jointNodeMatrices, joints, objects]);
 
   const objectMatrices = useMemo(() => {
     const out: Record<string, THREE.Matrix4> = {};
@@ -1964,6 +2096,48 @@ export function Viewport() {
     const diagonal = Math.max(1, size.length());
     return Math.max(60, diagonal * 1.35, gridSize * 6);
   }, [gridSize, objectMatrices, objects]);
+
+  const hoveredJointOverlay = useMemo((): HoveredJointOverlayState | null => {
+    if (!hoveredJointName) return null;
+    const joint = joints.find((entry) => entry.name === hoveredJointName);
+    if (!joint) return null;
+
+    const parentMatrix = joint.parent
+      ? (jointNodeMatrices.get(joint.parent)?.clone() ?? new THREE.Matrix4())
+      : new THREE.Matrix4();
+    const axisLocal = new THREE.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]).normalize();
+    const axisWorld = axisLocal.clone().transformDirection(parentMatrix);
+    if (axisWorld.lengthSq() <= 1e-8) axisWorld.copy(axisLocal);
+    axisWorld.normalize();
+
+    const pivotWorld = new THREE.Vector3(joint.pivot[0], joint.pivot[1], joint.pivot[2]).applyMatrix4(parentMatrix);
+    const childObject = objects.find((obj) => obj.name === joint.child || obj.groupName === joint.child);
+    if (childObject) {
+      const offset = explodeOffsets[childObject.id] ?? ZERO_OFFSET;
+      pivotWorld.add(new THREE.Vector3(offset[0], offset[1], offset[2]));
+    }
+
+    const { min, max } = resolveJointRange(joint);
+    const value = clampJointValue(joint, effectiveJointValues[joint.name] ?? joint.defaultValue);
+    const axisLength = Math.max(24, sectionGuideSize * 0.16);
+    return {
+      joint,
+      value,
+      min,
+      max,
+      pivotWorld,
+      axisWorld,
+      axisLength,
+    };
+  }, [
+    effectiveJointValues,
+    explodeOffsets,
+    hoveredJointName,
+    jointNodeMatrices,
+    joints,
+    objects,
+    sectionGuideSize,
+  ]);
 
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
@@ -2109,6 +2283,7 @@ export function Viewport() {
           }
           return null;
         })}
+        {hoveredJointOverlay && <HoveredJointOverlay state={hoveredJointOverlay} />}
         {dimensionsVisible && dimensions.map((d) => (
           <DimensionAnnotation key={d.id} def={d} />
         ))}

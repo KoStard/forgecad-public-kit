@@ -155,6 +155,8 @@ interface ForgeStore {
   selectObject: (id: string | null) => void;
   hoveredObjectId: string | null;
   setHoveredObjectId: (id: string | null) => void;
+  hoveredJointName: string | null;
+  setHoveredJointName: (name: string | null) => void;
   objectPickSyncEnabled: boolean;
   setObjectPickSyncEnabled: (enabled: boolean) => void;
   viewCommand: ViewCommand | null;
@@ -304,6 +306,15 @@ const syncJointValues = (
   return next;
 };
 
+const syncHoveredJointName = (
+  result: RunResult,
+  hoveredJointName: string | null,
+): string | null => {
+  if (!hoveredJointName) return null;
+  const joints = result.jointsView?.enabled === false ? [] : (result.jointsView?.joints ?? []);
+  return joints.some((joint) => joint.name === hoveredJointName) ? hoveredJointName : null;
+};
+
 interface JointAnimationState {
   clip: string | null;
   progress: number;
@@ -375,6 +386,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationClip: null,
       jointAnimationProgress: 0,
       jointAnimationPlaying: false,
+      hoveredJointName: null,
     });
     setTimeout(() => get().execute(), 0);
   },
@@ -399,6 +411,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationClip: null,
       jointAnimationProgress: 0,
       jointAnimationPlaying: false,
+      hoveredJointName: null,
       folders: newFolders,
     }));
     setTimeout(() => get().execute(), 0);
@@ -430,6 +443,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationClip: null,
       jointAnimationProgress: 0,
       jointAnimationPlaying: false,
+      hoveredJointName: null,
     });
     setTimeout(() => get().execute(), 0);
   },
@@ -506,6 +520,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationClip: null,
       jointAnimationProgress: 0,
       jointAnimationPlaying: false,
+      hoveredJointName: null,
     });
     setTimeout(() => get().execute(), 0);
   },
@@ -557,6 +572,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationClip,
       jointAnimationProgress,
       jointAnimationPlaying,
+      hoveredJointName,
     } = get();
     const code = files[activeFile];
     if (!code) return;
@@ -579,6 +595,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationClip: nextAnimationState.clip,
       jointAnimationProgress: nextAnimationState.progress,
       jointAnimationPlaying: nextAnimationState.playing,
+      hoveredJointName: syncHoveredJointName(runResult, hoveredJointName),
       objectSettings: synced.settings,
       selectedObjectId: synced.selectedObjectId,
       cutPlaneEnabled: nextCutPlaneEnabled,
@@ -597,6 +614,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationClip,
       jointAnimationProgress,
       jointAnimationPlaying,
+      hoveredJointName,
     } = get();
     const code = files[activeFile];
     if (!code) return;
@@ -618,6 +636,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationClip: nextAnimationState.clip,
       jointAnimationProgress: nextAnimationState.progress,
       jointAnimationPlaying: nextAnimationState.playing,
+      hoveredJointName: syncHoveredJointName(runResult, hoveredJointName),
       objectSettings: synced.settings,
       selectedObjectId: synced.selectedObjectId,
       cutPlaneEnabled: nextCutPlaneEnabled,
@@ -731,6 +750,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   selectObject: (id) => set({ selectedObjectId: id }),
   hoveredObjectId: null,
   setHoveredObjectId: (id) => set({ hoveredObjectId: id }),
+  hoveredJointName: null,
+  setHoveredJointName: (name) => set({ hoveredJointName: name }),
   objectPickSyncEnabled: initialViewPreferences.objectPickSyncEnabled ?? true,
   setObjectPickSyncEnabled: (enabled) => {
     writeViewPreferences({ objectPickSyncEnabled: enabled });
@@ -829,6 +850,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationClip: null,
       jointAnimationProgress: 0,
       jointAnimationPlaying: false,
+      hoveredJointName: null,
     });
     setTimeout(() => get().execute(), 0);
   },
@@ -935,6 +957,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationClip: null,
       jointAnimationProgress: 0,
       jointAnimationPlaying: false,
+      hoveredJointName: null,
       folders: newFolders,
     }));
     setTimeout(() => get().execute(), 0);

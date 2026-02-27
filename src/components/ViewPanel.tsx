@@ -1,5 +1,5 @@
 import { useForgeStore } from '../store/forgeStore';
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
 
@@ -101,6 +101,8 @@ export function ViewPanel() {
   const setJointAnimationClip = useForgeStore((s) => s.setJointAnimationClip);
   const setJointAnimationProgress = useForgeStore((s) => s.setJointAnimationProgress);
   const toggleJointAnimationPlayback = useForgeStore((s) => s.toggleJointAnimationPlayback);
+  const hoveredJointName = useForgeStore((s) => s.hoveredJointName);
+  const setHoveredJointName = useForgeStore((s) => s.setHoveredJointName);
   const updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
   const setCutPlaneEnabled = useForgeStore((s) => s.setCutPlaneEnabled);
@@ -114,7 +116,6 @@ export function ViewPanel() {
   const setSectionPlaneBorderEnabled = useForgeStore((s) => s.setSectionPlaneBorderEnabled);
   const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
   const setSectionPlaneAxisEnabled = useForgeStore((s) => s.setSectionPlaneAxisEnabled);
-  const [hoveredJointName, setHoveredJointName] = useState<string | null>(null);
   const cutPlanes: CutPlaneDef[] = result?.cutPlanes ?? [];
   const joints = result?.jointsView?.enabled === false ? [] : (result?.jointsView?.joints ?? []);
   const animationClips = result?.jointsView?.enabled === false ? [] : (result?.jointsView?.animations ?? []);
@@ -135,6 +136,12 @@ export function ViewPanel() {
     const value = Math.max(min, Math.min(max, rawValue));
     return { joint, min, max, value };
   }, [displayedJointValues, hoveredJointName, joints]);
+
+  useEffect(() => {
+    if (!hoveredJointName) return;
+    if (joints.some((joint) => joint.name === hoveredJointName)) return;
+    setHoveredJointName(null);
+  }, [hoveredJointName, joints, setHoveredJointName]);
 
   const objects = result?.objects ?? [];
   const selectedObject = objects.find((obj) => obj.id === selectedObjectId) ?? null;
@@ -298,7 +305,9 @@ export function ViewPanel() {
                 key={joint.name}
                 style={{ marginBottom: 8 }}
                 onMouseEnter={() => setHoveredJointName(joint.name)}
-                onMouseLeave={() => setHoveredJointName((current) => (current === joint.name ? null : current))}
+                onMouseLeave={() => {
+                  if (hoveredJointName === joint.name) setHoveredJointName(null);
+                }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
                   <span style={{ color: 'var(--fc-text)' }}>{joint.name}</span>
@@ -314,7 +323,9 @@ export function ViewPanel() {
                   value={value}
                   disabled={!!activeAnimationClip}
                   onFocus={() => setHoveredJointName(joint.name)}
-                  onBlur={() => setHoveredJointName((current) => (current === joint.name ? null : current))}
+                  onBlur={() => {
+                    if (hoveredJointName === joint.name) setHoveredJointName(null);
+                  }}
                   onChange={(event) => setJointValue(joint.name, Number(event.target.value))}
                   style={{ width: '100%' }}
                 />
