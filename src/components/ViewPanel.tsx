@@ -62,6 +62,8 @@ export function ViewPanel() {
   const toggleDimensions = useForgeStore((s) => s.toggleDimensions);
   const explodeAmount = useForgeStore((s) => s.explodeAmount);
   const setExplodeAmount = useForgeStore((s) => s.setExplodeAmount);
+  const jointValues = useForgeStore((s) => s.jointValues);
+  const setJointValue = useForgeStore((s) => s.setJointValue);
   const updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
   const setCutPlaneEnabled = useForgeStore((s) => s.setCutPlaneEnabled);
@@ -76,6 +78,7 @@ export function ViewPanel() {
   const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
   const setSectionPlaneAxisEnabled = useForgeStore((s) => s.setSectionPlaneAxisEnabled);
   const cutPlanes: CutPlaneDef[] = result?.cutPlanes ?? [];
+  const joints = result?.jointsView?.enabled === false ? [] : (result?.jointsView?.joints ?? []);
 
   const objects = result?.objects ?? [];
   const selectedObject = objects.find((obj) => obj.id === selectedObjectId) ?? null;
@@ -178,6 +181,42 @@ export function ViewPanel() {
           Always on. Set to 0 for assembled view.
         </div>
       </div>
+
+      {joints.length > 0 && (
+        <div style={sectionStyle}>
+          <div style={labelStyle}>Joints</div>
+          {joints.map((joint) => {
+            const min = joint.min ?? (joint.type === 'prismatic' ? -100 : -180);
+            const max = joint.max ?? (joint.type === 'prismatic' ? 100 : 180);
+            const rawValue = jointValues[joint.name] ?? joint.defaultValue;
+            const value = Math.max(min, Math.min(max, rawValue));
+            const step = joint.type === 'prismatic' ? 0.1 : 1;
+
+            return (
+              <div key={joint.name} style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
+                  <span style={{ color: 'var(--fc-text)' }}>{joint.name}</span>
+                  <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
+                    {Number(value.toFixed(2))}{joint.unit ? ` ${joint.unit}` : ''}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={min}
+                  max={max}
+                  step={step}
+                  value={value}
+                  onChange={(event) => setJointValue(joint.name, Number(event.target.value))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            );
+          })}
+          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
+            Viewport-only motion. Geometry does not recompute.
+          </div>
+        </div>
+      )}
 
       <div style={{ ...sectionStyle, paddingBottom: 0 }}>
         <div style={labelStyle}>Objects</div>

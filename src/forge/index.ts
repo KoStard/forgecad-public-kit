@@ -14,6 +14,7 @@ export {
   Assembly, SolvedAssembly, assembly, bomToCsv,
   bom, resetBom, getCollectedBom,
   explodeView, resetExplodeView, getCollectedExplodeView,
+  jointsView, resetJointsView, getCollectedJointsView,
   runScript,
   partLibrary,
   shapeToGeometry,
@@ -38,6 +39,7 @@ export type {
 } from './headless';
 export type { BomDef, BomOpts } from './headless';
 export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './headless';
+export type { JointViewType, JointViewInput, JointViewDef, JointsViewOptions, CollectedJointsView } from './headless';
 export type { RunResult, SceneObject, LogEntry } from './headless';
 export type { ForgeGeometry } from './headless';
 export type {

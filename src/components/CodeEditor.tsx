@@ -311,6 +311,23 @@ type ExplodeViewOptions = {
   axisLock?: ExplodeAxis;
   byName?: Record<string, ExplodeDirective>;
 };
+type JointViewType = 'revolute' | 'prismatic';
+type JointViewDef = {
+  name: string;
+  child: string;
+  parent?: string;
+  type?: JointViewType;
+  axis?: [number, number, number];
+  pivot?: [number, number, number];
+  min?: number;
+  max?: number;
+  default?: number;
+  unit?: string;
+};
+type JointsViewOptions = {
+  enabled?: boolean;
+  joints?: JointViewDef[];
+};
 
 declare const lib: {
   boltHole(diameter: number, depth: number): Shape;
@@ -387,6 +404,8 @@ declare class ShapeGroup {
 declare function cutPlane(name: string, normal: [number, number, number], offset?: number): void;
 /** Override default viewport explode behavior (global slider still controls amount). */
 declare function explodeView(options?: ExplodeViewOptions): void;
+/** Register viewport-only runtime joint sliders (no script rerun). */
+declare function jointsView(options?: JointsViewOptions): void;
 `;
 
 export function CodeEditor() {

@@ -2,7 +2,7 @@ import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObjec
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, Lightformer, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
-import type { SceneObject, ExplodeViewDirection, ExplodeViewOptions } from '@forge/index';
+import type { SceneObject, ExplodeViewDirection, ExplodeViewOptions, JointViewDef } from '@forge/index';
 import type { DimensionDef } from '@forge/sketch/dimensions';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
@@ -166,6 +166,45 @@ const applyExplodeAxisLock = (
   return [0, 0, sign];
 };
 
+const clampJointValue = (joint: JointViewDef, value: number): number => {
+  let clamped = Number.isFinite(value) ? value : joint.defaultValue;
+  if (joint.min !== undefined) clamped = Math.max(joint.min, clamped);
+  if (joint.max !== undefined) clamped = Math.min(joint.max, clamped);
+  return clamped;
+};
+
+const buildRevoluteMatrix = (
+  axisWorld: THREE.Vector3,
+  pivotWorld: THREE.Vector3,
+  angleDeg: number,
+): THREE.Matrix4 => {
+  const rotation = new THREE.Matrix4().makeRotationAxis(axisWorld, THREE.MathUtils.degToRad(angleDeg));
+  const toPivot = new THREE.Matrix4().makeTranslation(pivotWorld.x, pivotWorld.y, pivotWorld.z);
+  const fromPivot = new THREE.Matrix4().makeTranslation(-pivotWorld.x, -pivotWorld.y, -pivotWorld.z);
+  return toPivot.multiply(rotation).multiply(fromPivot);
+};
+
+const expandBoundsByTransformedAabb = (
+  target: THREE.Box3,
+  min: [number, number, number],
+  max: [number, number, number],
+  matrix: THREE.Matrix4,
+): void => {
+  const corners: [number, number, number][] = [
+    [min[0], min[1], min[2]],
+    [min[0], min[1], max[2]],
+    [min[0], max[1], min[2]],
+    [min[0], max[1], max[2]],
+    [max[0], min[1], min[2]],
+    [max[0], min[1], max[2]],
+    [max[0], max[1], min[2]],
+    [max[0], max[1], max[2]],
+  ];
+  corners.forEach((corner) => {
+    target.expandByPoint(new THREE.Vector3(corner[0], corner[1], corner[2]).applyMatrix4(matrix));
+  });
+};
+
 /** Enable local clipping on the WebGL renderer when any cut planes are active */
 function ClippingManager({ active }: { active: boolean }) {
   const gl = useThree((s) => s.gl);
@@ -266,7 +305,7 @@ function ForgeObject({
   obj,
   settings,
   renderMode,
-  position = ZERO_OFFSET,
+  matrix,
   isHovered,
   clippingPlanes,
   onPointerEnter,
@@ -277,7 +316,7 @@ function ForgeObject({
   obj: SceneObject;
   settings: ObjectSettings;
   renderMode: RenderMode;
-  position?: [number, number, number];
+  matrix: THREE.Matrix4;
   isHovered?: boolean;
   clippingPlanes?: THREE.Plane[];
   onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
@@ -304,7 +343,8 @@ function ForgeObject({
 
   return (
     <group
-      position={position}
+      matrixAutoUpdate={false}
+      matrix={matrix}
       onPointerEnter={onPointerEnter}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
@@ -468,7 +508,7 @@ function SketchObject({
   obj,
   settings,
   renderMode,
-  position = ZERO_OFFSET,
+  matrix,
   onPointerEnter,
   onPointerMove,
   onPointerLeave,
@@ -477,7 +517,7 @@ function SketchObject({
   obj: SceneObject;
   settings: ObjectSettings;
   renderMode: RenderMode;
-  position?: [number, number, number];
+  matrix: THREE.Matrix4;
   onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
@@ -605,7 +645,8 @@ function SketchObject({
 
   return (
     <group
-      position={position}
+      matrixAutoUpdate={false}
+      matrix={matrix}
       onPointerEnter={onPointerEnter}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
@@ -1197,14 +1238,14 @@ function ViewController({
   controlsRef,
   command,
   objects,
-  explodeOffsets,
+  objectMatrices,
   settings,
   clearCommand,
 }: {
   controlsRef: MutableRefObject<OrbitControlsImpl | null>;
   command: ViewCommand | null;
   objects: SceneObject[];
-  explodeOffsets: Record<string, [number, number, number]>;
+  objectMatrices: Record<string, THREE.Matrix4>;
   settings: Record<string, ObjectSettings>;
   clearCommand: () => void;
 }) {
@@ -1218,14 +1259,21 @@ function ViewController({
       : visibleObjects;
 
     const computeBounds = (obj: SceneObject): THREE.Box3 | null => {
-      const offset = explodeOffsets[obj.id] ?? ZERO_OFFSET;
-      const shift = new THREE.Vector3(offset[0], offset[1], offset[2]);
+      const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
       if (obj.shape) {
         try {
           const { solid } = shapeToGeometry(obj.shape);
           solid.computeBoundingBox();
           const bounds = solid.boundingBox ?? null;
-          return bounds ? bounds.clone().translate(shift) : null;
+          if (!bounds) return null;
+          const out = new THREE.Box3();
+          expandBoundsByTransformedAabb(
+            out,
+            [bounds.min.x, bounds.min.y, bounds.min.z],
+            [bounds.max.x, bounds.max.y, bounds.max.z],
+            matrix,
+          );
+          return out;
         } catch {
           return null;
         }
@@ -1241,7 +1289,15 @@ function ViewController({
               hasPoint = true;
             });
           });
-          return hasPoint ? box.translate(shift) : null;
+          if (!hasPoint) return null;
+          const out = new THREE.Box3();
+          expandBoundsByTransformedAabb(
+            out,
+            [box.min.x, box.min.y, box.min.z],
+            [box.max.x, box.max.y, box.max.z],
+            matrix,
+          );
+          return out;
         } catch {
           return null;
         }
@@ -1334,7 +1390,7 @@ function ViewController({
     }
 
     clearCommand();
-  }, [camera, clearCommand, command, controlsRef, explodeOffsets, objects, settings, size.height, size.width]);
+  }, [camera, clearCommand, command, controlsRef, objectMatrices, objects, settings, size.height, size.width]);
 
   return null;
 }
@@ -1492,6 +1548,7 @@ export function Viewport() {
   const viewCommand = useForgeStore((s) => s.viewCommand);
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
   const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
+  const jointValues = useForgeStore((s) => s.jointValues);
   const objects = result?.objects ?? [];
   const dimensions = result?.dimensions ?? [];
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
@@ -1503,6 +1560,7 @@ export function Viewport() {
   const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
   const cutPlaneDefs: CutPlaneDef[] = result?.cutPlanes ?? [];
   const explodeConfig: ExplodeViewOptions | null = result?.explodeView ?? null;
+  const jointsConfig = result?.jointsView ?? null;
 
   const activeCutPlaneDefs = useMemo(() => {
     return cutPlaneDefs
@@ -1563,17 +1621,98 @@ export function Viewport() {
     return offsets;
   }, [explodeAmount, explodeConfig, objects]);
 
+  const jointMatrices = useMemo(() => {
+    const out: Record<string, THREE.Matrix4> = {};
+    objects.forEach((obj) => {
+      out[obj.id] = new THREE.Matrix4();
+    });
+
+    const joints = jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? []);
+    if (joints.length === 0 || objects.length === 0) return out;
+
+    const objectByName = new Map<string, SceneObject>();
+    objects.forEach((obj) => {
+      if (!objectByName.has(obj.name)) objectByName.set(obj.name, obj);
+    });
+
+    const jointByChild = new Map<string, JointViewDef>();
+    joints.forEach((joint) => {
+      jointByChild.set(joint.child, joint);
+    });
+
+    const cache = new Map<string, THREE.Matrix4>();
+    const resolving = new Set<string>();
+
+    const solveObjectMatrix = (obj: SceneObject): THREE.Matrix4 => {
+      const cached = cache.get(obj.id);
+      if (cached) return cached.clone();
+      if (resolving.has(obj.id)) return new THREE.Matrix4();
+      resolving.add(obj.id);
+
+      const joint = jointByChild.get(obj.name);
+      if (!joint) {
+        const identity = new THREE.Matrix4();
+        cache.set(obj.id, identity);
+        resolving.delete(obj.id);
+        return identity.clone();
+      }
+
+      let parentMatrix = new THREE.Matrix4();
+      if (joint.parent) {
+        const parentObject = objectByName.get(joint.parent);
+        if (parentObject) {
+          parentMatrix = solveObjectMatrix(parentObject);
+        }
+      }
+
+      const axis = new THREE.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]).normalize();
+      const axisWorld = axis.clone().transformDirection(parentMatrix);
+      if (axisWorld.lengthSq() <= 1e-8) axisWorld.copy(axis);
+      axisWorld.normalize();
+
+      const value = clampJointValue(joint, jointValues[joint.name] ?? joint.defaultValue);
+      let motion = new THREE.Matrix4();
+      if (joint.type === 'prismatic') {
+        motion.makeTranslation(axisWorld.x * value, axisWorld.y * value, axisWorld.z * value);
+      } else {
+        const pivotWorld = new THREE.Vector3(joint.pivot[0], joint.pivot[1], joint.pivot[2]).applyMatrix4(parentMatrix);
+        motion = buildRevoluteMatrix(axisWorld, pivotWorld, value);
+      }
+
+      const solved = motion.multiply(parentMatrix);
+      cache.set(obj.id, solved.clone());
+      resolving.delete(obj.id);
+      return solved;
+    };
+
+    objects.forEach((obj) => {
+      out[obj.id] = solveObjectMatrix(obj);
+    });
+
+    return out;
+  }, [jointValues, jointsConfig, objects]);
+
+  const objectMatrices = useMemo(() => {
+    const out: Record<string, THREE.Matrix4> = {};
+    objects.forEach((obj) => {
+      const jointMatrix = jointMatrices[obj.id] ?? new THREE.Matrix4();
+      const offset = explodeOffsets[obj.id] ?? ZERO_OFFSET;
+      const explodeMatrix = new THREE.Matrix4().makeTranslation(offset[0], offset[1], offset[2]);
+      out[obj.id] = explodeMatrix.multiply(jointMatrix);
+    });
+    return out;
+  }, [explodeOffsets, jointMatrices, objects]);
+
   const sectionGuideSize = useMemo(() => {
     const bounds = new THREE.Box3();
     let hasBounds = false;
 
     objects.forEach((obj) => {
-      const offset = explodeOffsets[obj.id] ?? ZERO_OFFSET;
+      const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
       if (obj.shape) {
         try {
           const bb = obj.shape.boundingBox();
-          bounds.expandByPoint(new THREE.Vector3(bb.min[0] + offset[0], bb.min[1] + offset[1], bb.min[2] + offset[2]));
-          bounds.expandByPoint(new THREE.Vector3(bb.max[0] + offset[0], bb.max[1] + offset[1], bb.max[2] + offset[2]));
+          expandBoundsByTransformedAabb(bounds, bb.min, bb.max, matrix);
           hasBounds = true;
         } catch {
           // Ignore bad shape bounds from partial execution failures.
@@ -1583,8 +1722,12 @@ export function Viewport() {
       if (obj.sketch) {
         try {
           const bb = obj.sketch.bounds();
-          bounds.expandByPoint(new THREE.Vector3(bb.min[0] + offset[0], bb.min[1] + offset[1], offset[2]));
-          bounds.expandByPoint(new THREE.Vector3(bb.max[0] + offset[0], bb.max[1] + offset[1], offset[2]));
+          expandBoundsByTransformedAabb(
+            bounds,
+            [bb.min[0], bb.min[1], 0],
+            [bb.max[0], bb.max[1], 0],
+            matrix,
+          );
           hasBounds = true;
         } catch {
           // Ignore bad sketch bounds from partial execution failures.
@@ -1598,7 +1741,7 @@ export function Viewport() {
     bounds.getSize(size);
     const diagonal = Math.max(1, size.length());
     return Math.max(60, diagonal * 1.35, gridSize * 6);
-  }, [explodeOffsets, gridSize, objects]);
+  }, [gridSize, objectMatrices, objects]);
 
   const hasShape = objects.some((obj) => obj.shape);
   const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
@@ -1709,7 +1852,7 @@ export function Viewport() {
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
           const isHovered = hoveredObjectId === obj.id;
-          const position = explodeOffsets[obj.id] ?? ZERO_OFFSET;
+          const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
           if (obj.shape) {
             return (
               <ForgeObject
@@ -1717,7 +1860,7 @@ export function Viewport() {
                 obj={obj}
                 settings={settings}
                 renderMode={renderMode}
-                position={position}
+                matrix={matrix}
                 isHovered={isHovered}
                 clippingPlanes={activeClippingPlanes}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
@@ -1734,7 +1877,7 @@ export function Viewport() {
                 obj={obj}
                 settings={settings}
                 renderMode={renderMode}
-                position={position}
+                matrix={matrix}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
                 onPointerMove={(event) => updateHoverLabel(obj, event)}
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
@@ -1807,7 +1950,7 @@ export function Viewport() {
           controlsRef={controlsRef}
           command={viewCommand}
           objects={objects}
-          explodeOffsets={explodeOffsets}
+          objectMatrices={objectMatrices}
           settings={objectSettings}
           clearCommand={clearViewCommand}
         />

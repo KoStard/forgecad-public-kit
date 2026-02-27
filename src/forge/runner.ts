@@ -83,6 +83,12 @@ import {
   getCollectedExplodeView,
   type ExplodeViewOptions,
 } from './explodeView';
+import {
+  jointsView,
+  resetJointsView,
+  getCollectedJointsView,
+  type CollectedJointsView,
+} from './jointsView';
 
 export interface SceneObject {
   id: string;
@@ -110,6 +116,7 @@ export interface RunResult {
   bom: BomDef[];
   cutPlanes: CutPlaneDef[];
   explodeView: ExplodeViewOptions | null;
+  jointsView: CollectedJointsView | null;
   error: string | null;
   timeMs: number;
   logs: LogEntry[];
@@ -662,6 +669,8 @@ function executeFile(
       'cutPlane',
       // View explode override
       'explodeView',
+      // Runtime joints (viewport-only)
+      'jointsView',
       wrapped,
     );
 
@@ -686,6 +695,7 @@ function executeFile(
       makeSandboxConsole(),
       cutPlane,
       explodeView,
+      jointsView,
     ));
   } finally {
     visited.delete(fileName);
@@ -703,6 +713,7 @@ export function runScript(
   resetBom();
   resetCutPlanes();
   resetExplodeView();
+  resetJointsView();
   _collectedLogs = [];
   const t0 = performance.now();
   const execOptions: RunnerExecutionOptions = {
@@ -872,6 +883,7 @@ export function runScript(
       bom: getCollectedBom(),
       cutPlanes: getCollectedCutPlanes(),
       explodeView: getCollectedExplodeView(),
+      jointsView: getCollectedJointsView(),
       error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
       timeMs: performance.now() - t0,
       logs: _collectedLogs.slice(),
@@ -896,6 +908,7 @@ export function runScript(
       bom: getCollectedBom(),
       cutPlanes: getCollectedCutPlanes(),
       explodeView: getCollectedExplodeView(),
+      jointsView: getCollectedJointsView(),
       error: `${msg}${lineInfo}`,
       timeMs: performance.now() - t0,
       logs: _collectedLogs.slice(),

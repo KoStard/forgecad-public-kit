@@ -126,9 +126,11 @@ interface ForgeStore {
   consoleLogs: LogEntry[];
   params: ParamDef[];
   paramOverrides: Record<string, number>;
+  jointValues: Record<string, number>;
 
   execute: () => void;
   setParam: (name: string, value: number) => void;
+  setJointValue: (name: string, value: number) => void;
 
   renderMode: RenderMode;
   setRenderMode: (mode: RenderMode) => void;
@@ -266,6 +268,30 @@ const syncCutPlaneEnabled = (
   return next;
 };
 
+const clampJointValue = (
+  value: number,
+  min?: number,
+  max?: number,
+): number => {
+  let next = Number.isFinite(value) ? value : 0;
+  if (min !== undefined) next = Math.max(min, next);
+  if (max !== undefined) next = Math.min(max, next);
+  return next;
+};
+
+const syncJointValues = (
+  result: RunResult,
+  prev: Record<string, number>,
+): Record<string, number> => {
+  const joints = result.jointsView?.enabled === false ? [] : (result.jointsView?.joints ?? []);
+  const next: Record<string, number> = {};
+  joints.forEach((joint) => {
+    const raw = prev[joint.name] ?? joint.defaultValue;
+    next[joint.name] = clampJointValue(raw, joint.min, joint.max);
+  });
+  return next;
+};
+
 const readViewPreferences = (): Partial<ViewPreferencesState> => {
   if (typeof window === 'undefined') return {};
   try {
@@ -301,7 +327,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (name) {
       window.history.replaceState(null, '', `#${name}`);
     }
-    set({ activeFile: name, paramOverrides: {} });
+    set({ activeFile: name, paramOverrides: {}, jointValues: {} });
     setTimeout(() => get().execute(), 0);
   },
   updateFileCode: (name, code) => {
@@ -321,6 +347,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       files: { ...s.files, [normalized]: template },
       activeFile: normalized,
       paramOverrides: {},
+      jointValues: {},
       folders: newFolders,
     }));
     setTimeout(() => get().execute(), 0);
@@ -343,7 +370,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const names = Object.keys(remaining);
     if (names.length === 0) return;
     const newActive = name === activeFile ? names[0] : activeFile;
-    set({ files: remaining, savedFiles: remainingSaved, activeFile: newActive, paramOverrides: {} });
+    set({ files: remaining, savedFiles: remainingSaved, activeFile: newActive, paramOverrides: {}, jointValues: {} });
     setTimeout(() => get().execute(), 0);
   },
   renameFile: (oldName, newName) => {
@@ -415,6 +442,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       folders: updatedFolders,
       activeFile: nextActive,
       paramOverrides: {},
+      jointValues: {},
     });
     setTimeout(() => get().execute(), 0);
   },
@@ -452,6 +480,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   consoleLogs: [],
   params: [],
   paramOverrides: {},
+  jointValues: {},
 
   execute: () => {
     const { files, activeFile, paramOverrides } = get();
@@ -461,10 +490,12 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
     const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
+    const nextJointValues = syncJointValues(runResult, get().jointValues);
     set({
       result: runResult,
       consoleLogs: runResult.logs,
       params: runResult.params,
+      jointValues: nextJointValues,
       objectSettings: synced.settings,
       selectedObjectId: synced.selectedObjectId,
       cutPlaneEnabled: nextCutPlaneEnabled,
@@ -482,16 +513,28 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
     const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
+    const nextJointValues = syncJointValues(runResult, get().jointValues);
     set({
       result: runResult,
       consoleLogs: runResult.logs,
       params: runResult.params,
+      jointValues: nextJointValues,
       objectSettings: synced.settings,
       selectedObjectId: synced.selectedObjectId,
       cutPlaneEnabled: nextCutPlaneEnabled,
     });
     writeViewPreferences({ objectSettings: synced.settings, cutPlaneEnabled: nextCutPlaneEnabled });
   },
+
+  setJointValue: (name, value) => set((state) => {
+    const joints = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.joints ?? []);
+    const joint = joints.find((entry) => entry.name === name);
+    if (!joint) return {};
+    const clamped = clampJointValue(value, joint.min, joint.max);
+    return {
+      jointValues: { ...state.jointValues, [name]: clamped },
+    };
+  }),
 
   renderMode: initialViewPreferences.renderMode ?? 'overlay',
   setRenderMode: (mode) => {
@@ -630,6 +673,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       fileHandle: null,
       dirty: false,
       paramOverrides: {},
+      jointValues: {},
     });
     setTimeout(() => get().execute(), 0);
   },
@@ -732,6 +776,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       fileHandle: null,
       dirty: false,
       paramOverrides: {},
+      jointValues: {},
       folders: newFolders,
     }));
     setTimeout(() => get().execute(), 0);
