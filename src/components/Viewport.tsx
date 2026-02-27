@@ -1801,11 +1801,6 @@ export function Viewport() {
     const joints = jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? []);
     if (joints.length === 0 || objects.length === 0) return out;
 
-    const objectByName = new Map<string, SceneObject>();
-    objects.forEach((obj) => {
-      if (!objectByName.has(obj.name)) objectByName.set(obj.name, obj);
-    });
-
     const jointByChild = new Map<string, JointViewDef>();
     joints.forEach((joint) => {
       jointByChild.set(joint.child, joint);
@@ -1814,26 +1809,23 @@ export function Viewport() {
     const cache = new Map<string, THREE.Matrix4>();
     const resolving = new Set<string>();
 
-    const solveObjectMatrix = (obj: SceneObject): THREE.Matrix4 => {
-      const cached = cache.get(obj.id);
+    const solveNodeMatrix = (nodeName: string): THREE.Matrix4 => {
+      const cached = cache.get(nodeName);
       if (cached) return cached.clone();
-      if (resolving.has(obj.id)) return new THREE.Matrix4();
-      resolving.add(obj.id);
+      if (resolving.has(nodeName)) return new THREE.Matrix4();
+      resolving.add(nodeName);
 
-      const joint = jointByChild.get(obj.name);
+      const joint = jointByChild.get(nodeName);
       if (!joint) {
         const identity = new THREE.Matrix4();
-        cache.set(obj.id, identity);
-        resolving.delete(obj.id);
+        cache.set(nodeName, identity);
+        resolving.delete(nodeName);
         return identity.clone();
       }
 
       let parentMatrix = new THREE.Matrix4();
       if (joint.parent) {
-        const parentObject = objectByName.get(joint.parent);
-        if (parentObject) {
-          parentMatrix = solveObjectMatrix(parentObject);
-        }
+        parentMatrix = solveNodeMatrix(joint.parent);
       }
 
       const axis = new THREE.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]).normalize();
@@ -1851,13 +1843,22 @@ export function Viewport() {
       }
 
       const solved = motion.multiply(parentMatrix);
-      cache.set(obj.id, solved.clone());
-      resolving.delete(obj.id);
+      cache.set(nodeName, solved.clone());
+      resolving.delete(nodeName);
       return solved;
     };
 
     objects.forEach((obj) => {
-      out[obj.id] = solveObjectMatrix(obj);
+      let nodeName: string | null = null;
+      if (jointByChild.has(obj.name)) {
+        nodeName = obj.name;
+      } else if (obj.groupName && jointByChild.has(obj.groupName)) {
+        // ShapeGroup returns are flattened as "Group.1", "Group.2", ...
+        // Resolve joints against the parent group name when exact object name is absent.
+        nodeName = obj.groupName;
+      }
+      if (!nodeName) return;
+      out[obj.id] = solveNodeMatrix(nodeName);
     });
 
     return out;
