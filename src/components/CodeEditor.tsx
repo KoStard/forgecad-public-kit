@@ -238,15 +238,26 @@ declare class TrackedShape {
   faceNames(): string[];
   edgeNames(): string[];
   translate(dx: number, dy: number, dz: number): TrackedShape;
+  /** Alias for translate */
+  moveBy(dx: number, dy: number, dz: number): TrackedShape;
   /** Move so bounding box min corner is at the given global coordinate */
   moveTo(x: number, y: number, z: number): TrackedShape;
   /** Move so bounding box min corner is at target's bounding box min + (x, y, z) offset */
   moveToLocal(target: Shape | TrackedShape, x: number, y: number, z: number): TrackedShape;
+  rotate(x: number, y: number, z: number): TrackedShape;
+  transform(m: number[] | Transform): TrackedShape;
+  /** Rotate around an arbitrary axis through a pivot point */
+  rotateAround(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): TrackedShape;
+  /** Reorient so primary axis (Z) points along given direction */
+  pointAlong(direction: [number, number, number]): TrackedShape;
+  scale(v: number | [number, number, number]): TrackedShape;
+  mirror(normal: [number, number, number]): TrackedShape;
   rotateAroundEdge(edgeName: string, angleDeg: number): TrackedShape;
   /** Position this shape relative to another using named 3D anchor points */
   attachTo(target: Shape | TrackedShape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D, offset?: [number, number, number]): TrackedShape;
   /** Place on a face of a parent shape. u/v = position within face, protrude = outward distance */
   onFace(parent: Shape | TrackedShape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number }): TrackedShape;
+  color(hex: string): TrackedShape;
   toShape(): Shape;
 }
 
@@ -363,6 +374,8 @@ declare class ShapeGroup {
   rotate(x: number, y: number, z: number): ShapeGroup;
   /** Rotate around an arbitrary axis through a pivot point */
   rotateAround(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): ShapeGroup;
+  /** Reorient all 3D children so primary axis (Z) points along given direction */
+  pointAlong(direction: [number, number, number]): ShapeGroup;
   /** Apply a 4x4 transform matrix or Transform to all 3D children */
   transform(m: number[] | Transform): ShapeGroup;
   scale(v: number | [number, number, number]): ShapeGroup;

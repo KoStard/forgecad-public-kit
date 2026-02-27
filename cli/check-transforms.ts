@@ -143,11 +143,25 @@ function testShapeGroupRotateAroundSugar() {
   assertVec(aroundSugar.max, aroundTransform.max, 'group.rotateAround max');
 }
 
+function testShapeGroupPointAlongSugar() {
+  const g = group(
+    box(30, 12, 8, true).translate(0, 0, 2),
+    box(10, 6, 4, true).translate(0, 10, 6),
+  );
+
+  const bySugar = g.pointAlong([1, 0, 0]).boundingBox();
+  const byTransform = g.transform(Transform.rotationAxis([0, 1, 0], 90)).boundingBox();
+
+  assertVec(bySugar.min, byTransform.min, 'group.pointAlong min');
+  assertVec(bySugar.max, byTransform.max, 'group.pointAlong max');
+}
+
 async function main() {
   await initKernel();
   testTransformMulOrder();
   testAssemblyChainAgainstAnalytic();
   testShapeGroupRotateAroundSugar();
+  testShapeGroupPointAlongSugar();
   console.log('✓ Transform and assembly invariants passed');
 }
 

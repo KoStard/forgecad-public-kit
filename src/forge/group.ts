@@ -148,22 +148,40 @@ export class ShapeGroup {
     return this.transform(Transform.rotationAxis(axis, angleDeg, pivot));
   }
 
+  /**
+   * Reorient all 3D children so their primary axis (Z) points along direction.
+   * Sugar for a single group-wide axis rotation via Transform.rotationAxis(...).
+   */
+  pointAlong(direction: [number, number, number]): ShapeGroup {
+    const [dx, dy, dz] = direction;
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+    const nx = dx / len, ny = dy / len, nz = dz / len;
+    // cross([0,0,1], [nx,ny,nz]) = [-ny, nx, 0]
+    const cx = -ny, cy = nx, cz = 0;
+    const sinA = Math.sqrt(cx * cx + cy * cy + cz * cz);
+    const cosA = nz;
+    if (sinA < 1e-10) {
+      return cosA > 0 ? this : this.rotate(180, 0, 0);
+    }
+    const angleDeg = Math.atan2(sinA, cosA) * 180 / Math.PI;
+    const ax: [number, number, number] = [cx / sinA, cy / sinA, cz / sinA];
+    return this.rotateAround(ax, angleDeg);
+  }
+
   /** Apply a 4x4 transform matrix or Transform object to all 3D children. */
   transform(m: Mat4 | Transform): ShapeGroup {
     return new ShapeGroup(this.children.map(c => {
       if (c instanceof ShapeGroup) return c.transform(m);
       if (c instanceof TrackedShape) return c.transform(m);
       if (c instanceof Shape) return c.transform(m);
-      throw new Error('ShapeGroup.transform only supports 3D children (Shape/TrackedShape/ShapeGroup)');
+      throw new Error('ShapeGroup.transform only supports 3D children (Shape/TrackedShape/ShapeGroup). For Sketch children, use 2D transforms (translate/rotate/scale/mirror).');
     }));
   }
 
   scale(v: number | [number, number, number]): ShapeGroup {
     return this.mapChildren(c => {
       if (c instanceof ShapeGroup) return c.scale(v);
-      if (c instanceof TrackedShape) return new TrackedShape(
-        c.toShape().scale(v), c.topology, 0, true,
-      );
+      if (c instanceof TrackedShape) return c.scale(v);
       if (c instanceof Shape) return c.scale(v);
       return c.scale(typeof v === 'number' ? v : [v[0], v[1]]);
     });
@@ -172,9 +190,7 @@ export class ShapeGroup {
   mirror(normal: [number, number, number]): ShapeGroup {
     return this.mapChildren(c => {
       if (c instanceof ShapeGroup) return c.mirror(normal);
-      if (c instanceof TrackedShape) return new TrackedShape(
-        c.toShape().mirror(normal), c.topology, 0, true,
-      );
+      if (c instanceof TrackedShape) return c.mirror(normal);
       if (c instanceof Shape) return c.mirror(normal);
       return c.mirror([normal[0], normal[1]]);
     });
