@@ -324,9 +324,21 @@ type JointViewDef = {
   default?: number;
   unit?: string;
 };
+type JointAnimationKeyframe = {
+  at: number;
+  values: Record<string, number>;
+};
+type JointAnimationClip = {
+  name: string;
+  duration?: number;
+  loop?: boolean;
+  keyframes: JointAnimationKeyframe[];
+};
 type JointsViewOptions = {
   enabled?: boolean;
   joints?: JointViewDef[];
+  animations?: JointAnimationClip[];
+  defaultAnimation?: string;
 };
 
 declare const lib: {

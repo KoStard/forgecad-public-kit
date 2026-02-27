@@ -6,6 +6,7 @@ import type { SceneObject, ExplodeViewDirection, ExplodeViewOptions, JointViewDe
 import type { DimensionDef } from '@forge/sketch/dimensions';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
+import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
 import {
   registerOrbitGifExporter,
   type OrbitGifExportOptions,
@@ -1720,6 +1721,11 @@ export function Viewport() {
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
   const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
   const jointValues = useForgeStore((s) => s.jointValues);
+  const jointAnimationClip = useForgeStore((s) => s.jointAnimationClip);
+  const jointAnimationProgress = useForgeStore((s) => s.jointAnimationProgress);
+  const jointAnimationPlaying = useForgeStore((s) => s.jointAnimationPlaying);
+  const setJointAnimationProgress = useForgeStore((s) => s.setJointAnimationProgress);
+  const setJointAnimationPlaying = useForgeStore((s) => s.setJointAnimationPlaying);
   const objects = result?.objects ?? [];
   const dimensions = result?.dimensions ?? [];
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
@@ -1732,6 +1738,15 @@ export function Viewport() {
   const cutPlaneDefs: CutPlaneDef[] = result?.cutPlanes ?? [];
   const explodeConfig: ExplodeViewOptions | null = result?.explodeView ?? null;
   const jointsConfig = result?.jointsView ?? null;
+  const jointAnimations = jointsConfig?.enabled === false ? [] : (jointsConfig?.animations ?? []);
+  const activeJointAnimation = useMemo(
+    () => findJointAnimationClip(jointAnimations, jointAnimationClip),
+    [jointAnimationClip, jointAnimations],
+  );
+  const effectiveJointValues = useMemo(
+    () => resolveJointAnimation(activeJointAnimation, jointAnimationProgress, jointValues),
+    [activeJointAnimation, jointAnimationProgress, jointValues],
+  );
 
   const activeCutPlaneDefs = useMemo(() => {
     return cutPlaneDefs
@@ -1833,7 +1848,7 @@ export function Viewport() {
       if (axisWorld.lengthSq() <= 1e-8) axisWorld.copy(axis);
       axisWorld.normalize();
 
-      const value = clampJointValue(joint, jointValues[joint.name] ?? joint.defaultValue);
+      const value = clampJointValue(joint, effectiveJointValues[joint.name] ?? joint.defaultValue);
       let motion = new THREE.Matrix4();
       if (joint.type === 'prismatic') {
         motion.makeTranslation(axisWorld.x * value, axisWorld.y * value, axisWorld.z * value);
@@ -1862,7 +1877,7 @@ export function Viewport() {
     });
 
     return out;
-  }, [jointValues, jointsConfig, objects]);
+  }, [effectiveJointValues, jointsConfig, objects]);
 
   const objectMatrices = useMemo(() => {
     const out: Record<string, THREE.Matrix4> = {};
@@ -1874,6 +1889,41 @@ export function Viewport() {
     });
     return out;
   }, [explodeOffsets, jointMatrices, objects]);
+
+  useEffect(() => {
+    if (!jointAnimationPlaying || !activeJointAnimation) return;
+
+    let raf = 0;
+    let lastTs = performance.now();
+    let cancelled = false;
+
+    const tick = (now: number) => {
+      if (cancelled) return;
+      const dtSec = Math.max(0, (now - lastTs) / 1000);
+      lastTs = now;
+
+      const step = dtSec / Math.max(1e-6, activeJointAnimation.duration);
+      let next = useForgeStore.getState().jointAnimationProgress + step;
+      if (next >= 1) {
+        if (activeJointAnimation.loop) next = next % 1;
+        else {
+          next = 1;
+          setJointAnimationPlaying(false);
+        }
+      }
+      setJointAnimationProgress(next);
+
+      if (useForgeStore.getState().jointAnimationPlaying) {
+        raf = requestAnimationFrame(tick);
+      }
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [activeJointAnimation, jointAnimationPlaying, setJointAnimationPlaying, setJointAnimationProgress]);
 
   const sectionGuideSize = useMemo(() => {
     const bounds = new THREE.Box3();

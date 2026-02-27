@@ -14,6 +14,18 @@ export interface JointViewInput {
   unit?: string;
 }
 
+export interface JointViewAnimationKeyframeInput {
+  at: number;
+  values: Record<string, number>;
+}
+
+export interface JointViewAnimationInput {
+  name: string;
+  duration?: number;
+  loop?: boolean;
+  keyframes: JointViewAnimationKeyframeInput[];
+}
+
 export interface JointViewDef {
   name: string;
   child: string;
@@ -27,14 +39,30 @@ export interface JointViewDef {
   unit?: string;
 }
 
+export interface JointViewAnimationKeyframeDef {
+  at: number;
+  values: Record<string, number>;
+}
+
+export interface JointViewAnimationDef {
+  name: string;
+  duration: number;
+  loop: boolean;
+  keyframes: JointViewAnimationKeyframeDef[];
+}
+
 export interface JointsViewOptions {
   enabled?: boolean;
   joints?: JointViewInput[];
+  animations?: JointViewAnimationInput[];
+  defaultAnimation?: string;
 }
 
 export interface CollectedJointsView {
   enabled?: boolean;
   joints: JointViewDef[];
+  animations: JointViewAnimationDef[];
+  defaultAnimation?: string;
 }
 
 let _collected: CollectedJointsView | null = null;
@@ -136,15 +164,77 @@ const normalizeJoint = (joint: JointViewInput): JointViewDef => {
   };
 };
 
+const normalizeAnimation = (animation: JointViewAnimationInput): JointViewAnimationDef => {
+  if (!animation || typeof animation !== 'object') {
+    throw new Error('jointsView animations entries must be objects');
+  }
+
+  const name = typeof animation.name === 'string' ? animation.name.trim() : '';
+  if (!name) throw new Error('jointsView animation.name is required');
+
+  if (animation.duration !== undefined && (!isFiniteNumber(animation.duration) || animation.duration <= 0)) {
+    throw new Error(`jointsView animation "${name}" duration must be a positive number`);
+  }
+  const duration = animation.duration ?? 2;
+  const loop = animation.loop ?? true;
+
+  if (!Array.isArray(animation.keyframes) || animation.keyframes.length === 0) {
+    throw new Error(`jointsView animation "${name}" keyframes must be a non-empty array`);
+  }
+
+  const keyframes = animation.keyframes.map((keyframe, index): JointViewAnimationKeyframeDef => {
+    if (!keyframe || typeof keyframe !== 'object') {
+      throw new Error(`jointsView animation "${name}" keyframes[${index}] must be an object`);
+    }
+    if (!isFiniteNumber(keyframe.at)) {
+      throw new Error(`jointsView animation "${name}" keyframes[${index}].at must be a finite number`);
+    }
+    if (keyframe.at < 0 || keyframe.at > 1) {
+      throw new Error(`jointsView animation "${name}" keyframes[${index}].at must be within [0, 1]`);
+    }
+    if (!keyframe.values || typeof keyframe.values !== 'object') {
+      throw new Error(`jointsView animation "${name}" keyframes[${index}].values must be an object map`);
+    }
+    const values: Record<string, number> = {};
+    Object.entries(keyframe.values).forEach(([jointName, value]) => {
+      if (!isFiniteNumber(value)) {
+        throw new Error(`jointsView animation "${name}" keyframes[${index}].values["${jointName}"] must be finite`);
+      }
+      values[jointName] = value;
+    });
+    if (Object.keys(values).length === 0) {
+      throw new Error(`jointsView animation "${name}" keyframes[${index}] must animate at least one joint`);
+    }
+    return { at: keyframe.at, values };
+  }).sort((a, b) => a.at - b.at);
+
+  return {
+    name,
+    duration,
+    loop,
+    keyframes,
+  };
+};
+
 const cloneJoint = (joint: JointViewDef): JointViewDef => ({
   ...joint,
   axis: [joint.axis[0], joint.axis[1], joint.axis[2]],
   pivot: [joint.pivot[0], joint.pivot[1], joint.pivot[2]],
 });
 
+const cloneAnimation = (animation: JointViewAnimationDef): JointViewAnimationDef => ({
+  ...animation,
+  keyframes: animation.keyframes.map((keyframe) => ({
+    at: keyframe.at,
+    values: { ...keyframe.values },
+  })),
+});
+
 const cloneCollected = (value: CollectedJointsView): CollectedJointsView => ({
   enabled: value.enabled,
   joints: value.joints.map(cloneJoint),
+  animations: (value.animations ?? []).map(cloneAnimation),
+  defaultAnimation: value.defaultAnimation,
 });
 
 export function resetJointsView(): void {
@@ -164,7 +254,9 @@ export function jointsView(options: JointsViewOptions = {}): void {
     throw new Error('jointsView(options) expects an options object');
   }
 
-  const next: CollectedJointsView = _collected ? cloneCollected(_collected) : { joints: [] };
+  const next: CollectedJointsView = _collected
+    ? cloneCollected(_collected)
+    : { joints: [], animations: [] };
 
   if (options.enabled !== undefined) {
     if (typeof options.enabled !== 'boolean') {
@@ -186,6 +278,33 @@ export function jointsView(options: JointsViewOptions = {}): void {
     });
 
     next.joints = Array.from(byName.values()).map(cloneJoint);
+  }
+
+  if (options.animations !== undefined) {
+    if (!Array.isArray(options.animations)) {
+      throw new Error('jointsView.animations must be an array');
+    }
+    const byName = new Map<string, JointViewAnimationDef>();
+    next.animations.forEach((animation) => byName.set(animation.name, animation));
+
+    options.animations.forEach((animationInput) => {
+      const normalized = normalizeAnimation(animationInput);
+      byName.set(normalized.name, normalized);
+    });
+
+    next.animations = Array.from(byName.values()).map(cloneAnimation);
+  }
+
+  if (options.defaultAnimation !== undefined) {
+    if (typeof options.defaultAnimation !== 'string') {
+      throw new Error('jointsView.defaultAnimation must be a string');
+    }
+    const trimmed = options.defaultAnimation.trim();
+    next.defaultAnimation = trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  if (next.defaultAnimation && !next.animations.some((animation) => animation.name === next.defaultAnimation)) {
+    throw new Error(`jointsView defaultAnimation "${next.defaultAnimation}" does not exist in animations`);
   }
 
   _collected = next;

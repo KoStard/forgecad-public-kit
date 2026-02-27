@@ -53,7 +53,18 @@ export type { CutPlaneDef } from './cutPlane';
 export { explodeView, resetExplodeView, getCollectedExplodeView } from './explodeView';
 export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './explodeView';
 export { jointsView, resetJointsView, getCollectedJointsView } from './jointsView';
-export type { JointViewType, JointViewInput, JointViewDef, JointsViewOptions, CollectedJointsView } from './jointsView';
+export type {
+  JointViewType,
+  JointViewInput,
+  JointViewDef,
+  JointViewAnimationInput,
+  JointViewAnimationDef,
+  JointViewAnimationKeyframeInput,
+  JointViewAnimationKeyframeDef,
+  JointsViewOptions,
+  CollectedJointsView,
+} from './jointsView';
+export { clampAnimationProgress, findJointAnimationClip, resolveJointAnimation } from './jointAnimation';
 export { bom, resetBom, getCollectedBom } from './bom';
 export type { BomDef, BomOpts } from './bom';
 export { generateReportPdf } from './report';

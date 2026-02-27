@@ -127,10 +127,17 @@ interface ForgeStore {
   params: ParamDef[];
   paramOverrides: Record<string, number>;
   jointValues: Record<string, number>;
+  jointAnimationClip: string | null;
+  jointAnimationProgress: number;
+  jointAnimationPlaying: boolean;
 
   execute: () => void;
   setParam: (name: string, value: number) => void;
   setJointValue: (name: string, value: number) => void;
+  setJointAnimationClip: (name: string | null) => void;
+  setJointAnimationProgress: (value: number) => void;
+  setJointAnimationPlaying: (playing: boolean) => void;
+  toggleJointAnimationPlayback: () => void;
 
   renderMode: RenderMode;
   setRenderMode: (mode: RenderMode) => void;
@@ -279,6 +286,11 @@ const clampJointValue = (
   return next;
 };
 
+const clampAnimationProgress = (value: number): number => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+};
+
 const syncJointValues = (
   result: RunResult,
   prev: Record<string, number>,
@@ -290,6 +302,35 @@ const syncJointValues = (
     next[joint.name] = clampJointValue(raw, joint.min, joint.max);
   });
   return next;
+};
+
+interface JointAnimationState {
+  clip: string | null;
+  progress: number;
+  playing: boolean;
+}
+
+const syncJointAnimationState = (
+  result: RunResult,
+  prevClip: string | null,
+  prevProgress: number,
+  prevPlaying: boolean,
+): JointAnimationState => {
+  const clips = result.jointsView?.enabled === false ? [] : (result.jointsView?.animations ?? []);
+  if (clips.length === 0) return { clip: null, progress: 0, playing: false };
+
+  const clipNames = new Set(clips.map((clip) => clip.name));
+  const previousStillValid = !!prevClip && clipNames.has(prevClip);
+  let clip = previousStillValid ? prevClip : null;
+
+  if (!clip) {
+    const preferred = result.jointsView?.defaultAnimation;
+    if (preferred && clipNames.has(preferred)) clip = preferred;
+  }
+
+  const progress = previousStillValid ? clampAnimationProgress(prevProgress) : 0;
+  const playing = clip ? prevPlaying : false;
+  return { clip, progress, playing };
 };
 
 const readViewPreferences = (): Partial<ViewPreferencesState> => {
@@ -327,7 +368,14 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (name) {
       window.history.replaceState(null, '', `#${name}`);
     }
-    set({ activeFile: name, paramOverrides: {}, jointValues: {} });
+    set({
+      activeFile: name,
+      paramOverrides: {},
+      jointValues: {},
+      jointAnimationClip: null,
+      jointAnimationProgress: 0,
+      jointAnimationPlaying: false,
+    });
     setTimeout(() => get().execute(), 0);
   },
   updateFileCode: (name, code) => {
@@ -348,6 +396,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       activeFile: normalized,
       paramOverrides: {},
       jointValues: {},
+      jointAnimationClip: null,
+      jointAnimationProgress: 0,
+      jointAnimationPlaying: false,
       folders: newFolders,
     }));
     setTimeout(() => get().execute(), 0);
@@ -370,7 +421,16 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const names = Object.keys(remaining);
     if (names.length === 0) return;
     const newActive = name === activeFile ? names[0] : activeFile;
-    set({ files: remaining, savedFiles: remainingSaved, activeFile: newActive, paramOverrides: {}, jointValues: {} });
+    set({
+      files: remaining,
+      savedFiles: remainingSaved,
+      activeFile: newActive,
+      paramOverrides: {},
+      jointValues: {},
+      jointAnimationClip: null,
+      jointAnimationProgress: 0,
+      jointAnimationPlaying: false,
+    });
     setTimeout(() => get().execute(), 0);
   },
   renameFile: (oldName, newName) => {
@@ -443,6 +503,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       activeFile: nextActive,
       paramOverrides: {},
       jointValues: {},
+      jointAnimationClip: null,
+      jointAnimationProgress: 0,
+      jointAnimationPlaying: false,
     });
     setTimeout(() => get().execute(), 0);
   },
@@ -481,21 +544,41 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   params: [],
   paramOverrides: {},
   jointValues: {},
+  jointAnimationClip: null,
+  jointAnimationProgress: 0,
+  jointAnimationPlaying: false,
 
   execute: () => {
-    const { files, activeFile, paramOverrides } = get();
+    const {
+      files,
+      activeFile,
+      paramOverrides,
+      jointValues,
+      jointAnimationClip,
+      jointAnimationProgress,
+      jointAnimationPlaying,
+    } = get();
     const code = files[activeFile];
     if (!code) return;
     setParamOverrides(paramOverrides);
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
     const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
-    const nextJointValues = syncJointValues(runResult, get().jointValues);
+    const nextJointValues = syncJointValues(runResult, jointValues);
+    const nextAnimationState = syncJointAnimationState(
+      runResult,
+      jointAnimationClip,
+      jointAnimationProgress,
+      jointAnimationPlaying,
+    );
     set({
       result: runResult,
       consoleLogs: runResult.logs,
       params: runResult.params,
       jointValues: nextJointValues,
+      jointAnimationClip: nextAnimationState.clip,
+      jointAnimationProgress: nextAnimationState.progress,
+      jointAnimationPlaying: nextAnimationState.playing,
       objectSettings: synced.settings,
       selectedObjectId: synced.selectedObjectId,
       cutPlaneEnabled: nextCutPlaneEnabled,
@@ -507,18 +590,34 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const overrides = { ...get().paramOverrides, [name]: value };
     set({ paramOverrides: overrides });
     setParamOverrides(overrides);
-    const { files, activeFile } = get();
+    const {
+      files,
+      activeFile,
+      jointValues,
+      jointAnimationClip,
+      jointAnimationProgress,
+      jointAnimationPlaying,
+    } = get();
     const code = files[activeFile];
     if (!code) return;
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
     const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
-    const nextJointValues = syncJointValues(runResult, get().jointValues);
+    const nextJointValues = syncJointValues(runResult, jointValues);
+    const nextAnimationState = syncJointAnimationState(
+      runResult,
+      jointAnimationClip,
+      jointAnimationProgress,
+      jointAnimationPlaying,
+    );
     set({
       result: runResult,
       consoleLogs: runResult.logs,
       params: runResult.params,
       jointValues: nextJointValues,
+      jointAnimationClip: nextAnimationState.clip,
+      jointAnimationProgress: nextAnimationState.progress,
+      jointAnimationPlaying: nextAnimationState.playing,
       objectSettings: synced.settings,
       selectedObjectId: synced.selectedObjectId,
       cutPlaneEnabled: nextCutPlaneEnabled,
@@ -533,6 +632,59 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const clamped = clampJointValue(value, joint.min, joint.max);
     return {
       jointValues: { ...state.jointValues, [name]: clamped },
+      jointAnimationPlaying: false,
+    };
+  }),
+
+  setJointAnimationClip: (name) => set((state) => {
+    const clips = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.animations ?? []);
+    if (!name) {
+      return {
+        jointAnimationClip: null,
+        jointAnimationPlaying: false,
+      };
+    }
+    if (!clips.some((clip) => clip.name === name)) return {};
+    return {
+      jointAnimationClip: name,
+      jointAnimationProgress: 0,
+      jointAnimationPlaying: false,
+    };
+  }),
+
+  setJointAnimationProgress: (value) => set({
+    jointAnimationProgress: clampAnimationProgress(value),
+  }),
+
+  setJointAnimationPlaying: (playing) => set((state) => {
+    if (!playing) return { jointAnimationPlaying: false };
+    const clips = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.animations ?? []);
+    if (clips.length === 0) return { jointAnimationPlaying: false };
+    const clipName = state.jointAnimationClip
+      && clips.some((clip) => clip.name === state.jointAnimationClip)
+      ? state.jointAnimationClip
+      : (state.result?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.result?.jointsView?.defaultAnimation)
+        ? state.result?.jointsView?.defaultAnimation
+        : clips[0].name);
+    return {
+      jointAnimationClip: clipName,
+      jointAnimationPlaying: true,
+    };
+  }),
+
+  toggleJointAnimationPlayback: () => set((state) => {
+    if (state.jointAnimationPlaying) return { jointAnimationPlaying: false };
+    const clips = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.animations ?? []);
+    if (clips.length === 0) return {};
+    const clipName = state.jointAnimationClip
+      && clips.some((clip) => clip.name === state.jointAnimationClip)
+      ? state.jointAnimationClip
+      : (state.result?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.result?.jointsView?.defaultAnimation)
+        ? state.result?.jointsView?.defaultAnimation
+        : clips[0].name);
+    return {
+      jointAnimationClip: clipName,
+      jointAnimationPlaying: true,
     };
   }),
 
@@ -674,6 +826,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       dirty: false,
       paramOverrides: {},
       jointValues: {},
+      jointAnimationClip: null,
+      jointAnimationProgress: 0,
+      jointAnimationPlaying: false,
     });
     setTimeout(() => get().execute(), 0);
   },
@@ -777,6 +932,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       dirty: false,
       paramOverrides: {},
       jointValues: {},
+      jointAnimationClip: null,
+      jointAnimationProgress: 0,
+      jointAnimationPlaying: false,
       folders: newFolders,
     }));
     setTimeout(() => get().execute(), 0);

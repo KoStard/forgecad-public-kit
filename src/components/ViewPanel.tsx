@@ -1,6 +1,7 @@
 import { useForgeStore } from '../store/forgeStore';
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import type { CutPlaneDef } from '@forge/cutPlane';
+import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
 
 const btnStyle = (active = false): CSSProperties => ({
   padding: '4px 8px',
@@ -64,6 +65,12 @@ export function ViewPanel() {
   const setExplodeAmount = useForgeStore((s) => s.setExplodeAmount);
   const jointValues = useForgeStore((s) => s.jointValues);
   const setJointValue = useForgeStore((s) => s.setJointValue);
+  const jointAnimationClip = useForgeStore((s) => s.jointAnimationClip);
+  const jointAnimationProgress = useForgeStore((s) => s.jointAnimationProgress);
+  const jointAnimationPlaying = useForgeStore((s) => s.jointAnimationPlaying);
+  const setJointAnimationClip = useForgeStore((s) => s.setJointAnimationClip);
+  const setJointAnimationProgress = useForgeStore((s) => s.setJointAnimationProgress);
+  const toggleJointAnimationPlayback = useForgeStore((s) => s.toggleJointAnimationPlayback);
   const updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
   const setCutPlaneEnabled = useForgeStore((s) => s.setCutPlaneEnabled);
@@ -79,6 +86,15 @@ export function ViewPanel() {
   const setSectionPlaneAxisEnabled = useForgeStore((s) => s.setSectionPlaneAxisEnabled);
   const cutPlanes: CutPlaneDef[] = result?.cutPlanes ?? [];
   const joints = result?.jointsView?.enabled === false ? [] : (result?.jointsView?.joints ?? []);
+  const animationClips = result?.jointsView?.enabled === false ? [] : (result?.jointsView?.animations ?? []);
+  const activeAnimationClip = useMemo(
+    () => findJointAnimationClip(animationClips, jointAnimationClip),
+    [animationClips, jointAnimationClip],
+  );
+  const displayedJointValues = useMemo(
+    () => resolveJointAnimation(activeAnimationClip, jointAnimationProgress, jointValues),
+    [activeAnimationClip, jointAnimationProgress, jointValues],
+  );
 
   const objects = result?.objects ?? [];
   const selectedObject = objects.find((obj) => obj.id === selectedObjectId) ?? null;
@@ -182,13 +198,59 @@ export function ViewPanel() {
         </div>
       </div>
 
+      {animationClips.length > 0 && (
+        <div style={sectionStyle}>
+          <div style={labelStyle}>Animation</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <select
+              value={jointAnimationClip ?? ''}
+              onChange={(event) => setJointAnimationClip(event.target.value || null)}
+              style={inputStyle}
+            >
+              <option value="">Manual</option>
+              {animationClips.map((clip) => (
+                <option key={clip.name} value={clip.name}>{clip.name}</option>
+              ))}
+            </select>
+            <button
+              style={btnStyle(jointAnimationPlaying)}
+              onClick={toggleJointAnimationPlayback}
+              disabled={!activeAnimationClip}
+              title={activeAnimationClip ? 'Play or pause clip playback' : 'Select a clip first'}
+            >
+              {jointAnimationPlaying ? 'Pause' : 'Play'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.001}
+              value={jointAnimationProgress}
+              disabled={!activeAnimationClip}
+              onChange={(event) => setJointAnimationProgress(Number(event.target.value))}
+              style={{ flex: 1 }}
+            />
+            <span style={{ fontSize: 11, color: 'var(--fc-textDim)', width: 36, textAlign: 'right' }}>
+              {Math.round(jointAnimationProgress * 100)}%
+            </span>
+          </div>
+          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
+            {activeAnimationClip
+              ? `Duration ${activeAnimationClip.duration.toFixed(2)}s${activeAnimationClip.loop ? ' • Loop' : ''}`
+              : 'Select a clip for coordinated joint motion.'}
+          </div>
+        </div>
+      )}
+
       {joints.length > 0 && (
         <div style={sectionStyle}>
           <div style={labelStyle}>Joints</div>
           {joints.map((joint) => {
             const min = joint.min ?? (joint.type === 'prismatic' ? -100 : -180);
             const max = joint.max ?? (joint.type === 'prismatic' ? 100 : 180);
-            const rawValue = jointValues[joint.name] ?? joint.defaultValue;
+            const rawValue = displayedJointValues[joint.name] ?? joint.defaultValue;
             const value = Math.max(min, Math.min(max, rawValue));
             const step = joint.type === 'prismatic' ? 0.1 : 1;
 
@@ -206,6 +268,7 @@ export function ViewPanel() {
                   max={max}
                   step={step}
                   value={value}
+                  disabled={!!activeAnimationClip}
                   onChange={(event) => setJointValue(joint.name, Number(event.target.value))}
                   style={{ width: '100%' }}
                 />
@@ -213,7 +276,9 @@ export function ViewPanel() {
             );
           })}
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
-            Viewport-only motion. Geometry does not recompute.
+            {activeAnimationClip
+              ? 'Animation clip currently drives joint values.'
+              : 'Viewport-only motion. Geometry does not recompute.'}
           </div>
         </div>
       )}
