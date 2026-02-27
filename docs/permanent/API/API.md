@@ -191,6 +191,56 @@ explodeView({
 explodeView({ enabled: false });
 ```
 
+## Runtime Joint View
+
+### `jointsView(options?)`
+Registers viewport-only mechanism joints. Unlike `param()`-driven geometry edits, these controls animate object transforms in the View Panel without re-running the script.
+
+**Parameters:**
+- `options` (object, optional):
+  - `enabled` (boolean) - Set `false` to hide/disable runtime joint controls.
+  - `joints` (array) - Joint definitions keyed by `name`:
+    - `name` (string) - Control label shown in the View Panel.
+    - `child` (string) - Object name to move (must match returned object `name`).
+    - `parent` (string, optional) - Parent object name for chained kinematics.
+    - `type` (`'revolute' | 'prismatic'`) - Default: `'revolute'`.
+    - `axis` (`[x, y, z]`) - Motion axis (default `[0, 0, 1]`).
+    - `pivot` (`[x, y, z]`) - Revolute pivot in model coordinates (default `[0, 0, 0]`).
+    - `min`, `max` (number, optional) - UI clamp limits.
+    - `default` (number, optional) - Initial slider value (clamped to limits).
+    - `unit` (string, optional) - Display unit. Defaults to `°` for revolute, `mm` for prismatic.
+
+**Returns:** `void` (side effect: registers runtime view controls for this run)
+
+```javascript
+jointsView({
+  joints: [
+    {
+      name: "Shoulder",
+      child: "Upper Arm",
+      parent: "Base",
+      type: "revolute",
+      axis: [0, -1, 0],
+      pivot: [0, 0, 46],
+      min: -30,
+      max: 110,
+      default: 15,
+    },
+    {
+      name: "Slide",
+      child: "Forearm",
+      parent: "Upper Arm",
+      type: "prismatic",
+      axis: [1, 0, 0],
+      min: 0,
+      max: 80,
+      default: 20,
+      unit: "mm",
+    },
+  ],
+});
+```
+
 ## Bill of Materials
 
 ### `bom(quantity, description, opts?)`
