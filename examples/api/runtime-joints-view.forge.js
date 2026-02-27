@@ -1,6 +1,6 @@
 // Runtime joints demo
-// Move the "Joints" sliders in the View Panel for smooth articulation
-// without re-running script geometry.
+// Move the "Joints" sliders in the View Panel for smooth articulation,
+// or use the Animation controls (play/pause + scrub), all without recompute.
 
 const body = box(150, 70, 36, true).translate(0, 0, 40).color('#6e7b88');
 
@@ -72,6 +72,21 @@ jointsView({
       default: -10,
     },
   ],
+  animations: [
+    {
+      name: 'Step',
+      duration: 1.8,
+      loop: true,
+      keyframes: [
+        { at: 0.0, values: { Hip: 18, Knee: 42, Ankle: -8 } },
+        { at: 0.25, values: { Hip: -20, Knee: 22, Ankle: 16 } },
+        { at: 0.5, values: { Hip: 8, Knee: 86, Ankle: -20 } },
+        { at: 0.75, values: { Hip: 24, Knee: 34, Ankle: 6 } },
+        { at: 1.0, values: { Hip: 18, Knee: 42, Ankle: -8 } },
+      ],
+    },
+  ],
+  defaultAnimation: 'Step',
 });
 
 return solved.toScene();

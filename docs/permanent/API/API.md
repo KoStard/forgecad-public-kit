@@ -199,6 +199,14 @@ Registers viewport-only mechanism joints. Unlike `param()`-driven geometry edits
 **Parameters:**
 - `options` (object, optional):
   - `enabled` (boolean) - Set `false` to hide/disable runtime joint controls.
+  - `animations` (array, optional) - Named joint animation clips for play/pause and scrub:
+    - `name` (string) - Clip label in View Panel.
+    - `duration` (number, optional) - Clip duration in seconds. Default: `2`.
+    - `loop` (boolean, optional) - Loop playback. Default: `true`.
+    - `keyframes` (array) - Keyframes with normalized time:
+      - `at` (number) - Position in clip range `[0, 1]`.
+      - `values` (`Record<string, number>`) - Joint values keyed by joint control name.
+  - `defaultAnimation` (string, optional) - Clip name to auto-select on load.
   - `joints` (array) - Joint definitions keyed by `name`:
     - `name` (string) - Control label shown in the View Panel.
     - `child` (string) - Object name to move (must match returned object `name`).
@@ -238,6 +246,19 @@ jointsView({
       unit: "mm",
     },
   ],
+  animations: [
+    {
+      name: "Walk Cycle",
+      duration: 1.6,
+      loop: true,
+      keyframes: [
+        { at: 0.0, values: { "Shoulder": 20, "Slide": 10 } },
+        { at: 0.5, values: { "Shoulder": -10, "Slide": 50 } },
+        { at: 1.0, values: { "Shoulder": 20, "Slide": 10 } },
+      ],
+    },
+  ],
+  defaultAnimation: "Walk Cycle",
 });
 ```
 
