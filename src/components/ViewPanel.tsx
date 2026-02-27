@@ -42,31 +42,6 @@ const resolveJointRange = (type: 'revolute' | 'prismatic', min?: number, max?: n
   max: max ?? (type === 'prismatic' ? 100 : 180),
 });
 
-const formatTelemetryNumber = (value: number, digits = 2): string => {
-  const rounded = Math.abs(value) < 1e-6 ? 0 : value;
-  const fixed = rounded.toFixed(digits);
-  return rounded >= 0 ? `+${fixed}` : fixed;
-};
-
-const telemetryCardStyle: CSSProperties = {
-  marginTop: 10,
-  padding: '10px 10px 9px',
-  borderRadius: 8,
-  border: '1px solid rgba(84, 180, 255, 0.42)',
-  background: 'linear-gradient(156deg, rgba(18, 27, 40, 0.86) 0%, rgba(7, 14, 24, 0.96) 100%)',
-  boxShadow: 'inset 0 0 0 1px rgba(89, 174, 255, 0.18), 0 10px 20px rgba(2, 6, 12, 0.4)',
-};
-
-const telemetryChipStyle: CSSProperties = {
-  border: '1px solid rgba(110, 191, 255, 0.35)',
-  borderRadius: 5,
-  padding: '4px 6px',
-  background: 'rgba(7, 18, 31, 0.45)',
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 8,
-};
-
 export function ViewPanel() {
   const renderMode = useForgeStore((s) => s.renderMode);
   const setRenderMode = useForgeStore((s) => s.setRenderMode);
@@ -127,15 +102,6 @@ export function ViewPanel() {
     () => resolveJointAnimation(activeAnimationClip, jointAnimationProgress, jointValues),
     [activeAnimationClip, jointAnimationProgress, jointValues],
   );
-  const hoveredJointTelemetry = useMemo(() => {
-    if (!hoveredJointName) return null;
-    const joint = joints.find((entry) => entry.name === hoveredJointName);
-    if (!joint) return null;
-    const { min, max } = resolveJointRange(joint.type, joint.min, joint.max);
-    const rawValue = displayedJointValues[joint.name] ?? joint.defaultValue;
-    const value = Math.max(min, Math.min(max, rawValue));
-    return { joint, min, max, value };
-  }, [displayedJointValues, hoveredJointName, joints]);
 
   useEffect(() => {
     if (!hoveredJointName) return;
@@ -332,61 +298,6 @@ export function ViewPanel() {
               </div>
             );
           })}
-          {hoveredJointTelemetry && (
-            <div style={telemetryCardStyle}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, color: '#9ad9ff', fontWeight: 600 }}>{hoveredJointTelemetry.joint.name}</span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: '#8bc6ec',
-                    letterSpacing: 0.6,
-                    textTransform: 'uppercase',
-                    fontFamily: 'monospace',
-                  }}
-                >
-                  {hoveredJointTelemetry.joint.type}
-                </span>
-              </div>
-
-              <div style={{ fontSize: 10, color: 'rgba(171, 219, 255, 0.78)', letterSpacing: 0.7, marginBottom: 4 }}>
-                AXIS VECTOR
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6, marginBottom: 8 }}>
-                {(['X', 'Y', 'Z'] as const).map((label, index) => (
-                  <div key={label} style={telemetryChipStyle}>
-                    <span style={{ fontSize: 10, color: 'rgba(166, 214, 255, 0.72)', fontFamily: 'monospace' }}>{label}</span>
-                    <span style={{ fontSize: 11, color: '#d9f0ff', fontFamily: 'monospace' }}>
-                      {formatTelemetryNumber(hoveredJointTelemetry.joint.axis[index], 3)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
-                <div style={telemetryChipStyle}>
-                  <span style={{ fontSize: 10, color: 'rgba(166, 214, 255, 0.72)' }}>
-                    {hoveredJointTelemetry.joint.type === 'prismatic' ? 'Offset' : 'Angle'}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#d9f0ff', fontFamily: 'monospace' }}>
-                    {formatTelemetryNumber(hoveredJointTelemetry.value, 2)}{hoveredJointTelemetry.joint.unit ? ` ${hoveredJointTelemetry.joint.unit}` : ''}
-                  </span>
-                </div>
-                <div style={telemetryChipStyle}>
-                  <span style={{ fontSize: 10, color: 'rgba(166, 214, 255, 0.72)' }}>Min</span>
-                  <span style={{ fontSize: 11, color: '#d9f0ff', fontFamily: 'monospace' }}>
-                    {formatTelemetryNumber(hoveredJointTelemetry.min, 2)}{hoveredJointTelemetry.joint.unit ? ` ${hoveredJointTelemetry.joint.unit}` : ''}
-                  </span>
-                </div>
-                <div style={telemetryChipStyle}>
-                  <span style={{ fontSize: 10, color: 'rgba(166, 214, 255, 0.72)' }}>Max</span>
-                  <span style={{ fontSize: 11, color: '#d9f0ff', fontFamily: 'monospace' }}>
-                    {formatTelemetryNumber(hoveredJointTelemetry.max, 2)}{hoveredJointTelemetry.joint.unit ? ` ${hoveredJointTelemetry.joint.unit}` : ''}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
             {activeAnimationClip
               ? 'Animation clip currently drives joint values.'
