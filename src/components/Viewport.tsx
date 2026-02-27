@@ -6,9 +6,15 @@ import type { SceneObject, ExplodeViewDirection, ExplodeViewOptions } from '@for
 import type { DimensionDef } from '@forge/sketch/dimensions';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
+import {
+  registerOrbitGifExporter,
+  type OrbitGifExportOptions,
+  type OrbitGifMode,
+} from './exportActions';
 import { themes } from '../theme';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import gifenc from 'gifenc';
 
 interface PersistedViewportCameraState {
   projectionMode: ProjectionMode;
@@ -19,6 +25,45 @@ interface PersistedViewportCameraState {
 }
 
 const VIEWPORT_CAMERA_STORAGE_KEY = 'fc-viewport-camera-v1';
+const GIF_DEFAULT_SIZE = 720;
+const GIF_DEFAULT_FPS = 18;
+const GIF_DEFAULT_FRAMES_PER_TURN = 54;
+const GIF_DEFAULT_HOLD_FRAMES = 4;
+const GIF_DEFAULT_PITCH_DEG = 18;
+
+const { GIFEncoder, quantize, applyPalette } = gifenc;
+
+const waitForAnimationFrame = (): Promise<void> => (
+  new Promise((resolve) => {
+    requestAnimationFrame(() => resolve());
+  })
+);
+
+const applyOrbitPose = (
+  camera: THREE.Camera,
+  target: THREE.Vector3,
+  radius: number,
+  turn: number,
+  pitchDeg: number,
+): void => {
+  const normalizedTurn = ((turn % 1) + 1) % 1;
+  const clampedPitch = THREE.MathUtils.clamp(pitchDeg, -80, 80);
+  const yaw = normalizedTurn * Math.PI * 2;
+  const pitch = THREE.MathUtils.degToRad(clampedPitch);
+  const cosPitch = Math.cos(pitch);
+  const direction = new THREE.Vector3(
+    Math.sin(yaw) * cosPitch,
+    -Math.cos(yaw) * cosPitch,
+    Math.sin(pitch),
+  ).normalize();
+
+  camera.position.copy(target).addScaledVector(direction, radius);
+  camera.up.set(0, 0, 1);
+  camera.lookAt(target);
+  if ('updateProjectionMatrix' in camera && typeof camera.updateProjectionMatrix === 'function') {
+    camera.updateProjectionMatrix();
+  }
+};
 
 const isVector3Tuple = (value: unknown): value is [number, number, number] => {
   return Array.isArray(value)
@@ -1475,6 +1520,132 @@ function ViewPersistence({
   return null;
 }
 
+function OrbitGifExporterBridge({
+  controlsRef,
+}: {
+  controlsRef: MutableRefObject<OrbitControlsImpl | null>;
+}) {
+  const { camera, gl, scene } = useThree();
+  const setRenderMode = useForgeStore((s) => s.setRenderMode);
+
+  const exportOrbitGif = useCallback(async (options?: OrbitGifExportOptions): Promise<Blob> => {
+    const size = Math.max(64, Math.min(2048, Math.round(options?.size ?? GIF_DEFAULT_SIZE)));
+    const fps = Math.max(1, Math.round(options?.fps ?? GIF_DEFAULT_FPS));
+    const framesPerTurn = Math.max(1, Math.round(options?.framesPerTurn ?? GIF_DEFAULT_FRAMES_PER_TURN));
+    const holdFrames = Math.max(0, Math.round(options?.holdFrames ?? GIF_DEFAULT_HOLD_FRAMES));
+    const pitchDeg = options?.pitchDeg ?? GIF_DEFAULT_PITCH_DEG;
+    const includeWireframePass = options?.includeWireframePass ?? true;
+    const delayMs = Math.max(20, Math.round(1000 / fps));
+    const modePlan: OrbitGifMode[] = includeWireframePass ? ['solid', 'wireframe'] : ['solid'];
+    const encoder = GIFEncoder();
+
+    const captureCanvas = document.createElement('canvas');
+    captureCanvas.width = size;
+    captureCanvas.height = size;
+    const captureCtx = captureCanvas.getContext('2d', { willReadFrequently: true });
+    if (!captureCtx) {
+      throw new Error('Could not create GIF capture context.');
+    }
+
+    const controls = controlsRef.current;
+    const orbitTarget = controls?.target.clone() ?? new THREE.Vector3(0, 0, 0);
+    let orbitRadius = camera.position.distanceTo(orbitTarget);
+    if (!Number.isFinite(orbitRadius) || orbitRadius <= 1e-3) {
+      orbitRadius = 160;
+    }
+
+    const prevCameraPos = camera.position.clone();
+    const prevCameraQuat = camera.quaternion.clone();
+    const prevCameraUp = camera.up.clone();
+    const prevRenderMode = useForgeStore.getState().renderMode;
+    const prevControlsTarget = controls?.target.clone() ?? null;
+    const prevDamping = controls?.enableDamping ?? null;
+    const prevSize = gl.getSize(new THREE.Vector2());
+    const prevPixelRatio = gl.getPixelRatio();
+
+    let frameIndex = 0;
+    const writeFrame = async (mode: OrbitGifMode, turn: number): Promise<void> => {
+      setRenderMode(mode);
+      await waitForAnimationFrame();
+      applyOrbitPose(camera, orbitTarget, orbitRadius, turn, pitchDeg);
+      if (controls) {
+        controls.target.copy(orbitTarget);
+        controls.update();
+      }
+      gl.render(scene, camera);
+
+      captureCtx.clearRect(0, 0, size, size);
+      captureCtx.drawImage(gl.domElement, 0, 0, size, size);
+      const image = captureCtx.getImageData(0, 0, size, size);
+      const palette = quantize(image.data, 256);
+      const indexed = applyPalette(image.data, palette);
+
+      if (frameIndex === 0) {
+        encoder.writeFrame(indexed, size, size, {
+          palette,
+          delay: delayMs,
+          repeat: 0,
+        });
+      } else {
+        encoder.writeFrame(indexed, size, size, {
+          palette,
+          delay: delayMs,
+        });
+      }
+
+      frameIndex += 1;
+    };
+
+    try {
+      if (controls) controls.enableDamping = false;
+      gl.setPixelRatio(1);
+      gl.setSize(size, size, false);
+
+      for (const mode of modePlan) {
+        for (let i = 0; i < holdFrames; i += 1) {
+          await writeFrame(mode, 0);
+        }
+        for (let i = 0; i < framesPerTurn; i += 1) {
+          await writeFrame(mode, i / framesPerTurn);
+        }
+      }
+
+      encoder.finish();
+      const bytes = new Uint8Array(encoder.bytes());
+      return new Blob([bytes], { type: 'image/gif' });
+    } finally {
+      setRenderMode(prevRenderMode);
+      await waitForAnimationFrame();
+
+      camera.position.copy(prevCameraPos);
+      camera.quaternion.copy(prevCameraQuat);
+      camera.up.copy(prevCameraUp);
+      if (controls && prevControlsTarget) {
+        controls.target.copy(prevControlsTarget);
+      }
+      if (controls && prevDamping !== null) {
+        controls.enableDamping = prevDamping;
+        controls.update();
+      } else if (!controls && prevControlsTarget) {
+        camera.lookAt(prevControlsTarget);
+      }
+
+      gl.setPixelRatio(prevPixelRatio);
+      gl.setSize(prevSize.x, prevSize.y, false);
+      gl.render(scene, camera);
+    }
+  }, [camera, controlsRef, gl, scene, setRenderMode]);
+
+  useEffect(() => {
+    registerOrbitGifExporter(exportOrbitGif);
+    return () => {
+      registerOrbitGifExporter(null);
+    };
+  }, [exportOrbitGif]);
+
+  return null;
+}
+
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const result = useForgeStore((s) => s.result);
@@ -1802,6 +1973,8 @@ export function Viewport() {
           isSketchOnly={isSketchOnly}
           onResolved={handleViewPersistenceResolved}
         />
+
+        <OrbitGifExporterBridge controlsRef={controlsRef} />
 
         <ViewController
           controlsRef={controlsRef}
