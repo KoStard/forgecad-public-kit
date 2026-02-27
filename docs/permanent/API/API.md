@@ -336,6 +336,8 @@ const lowPoly = sphere(25, 8);  // Octahedron-like
 ## 3D Transforms
 
 All transforms are **chainable** and **immutable** (return new shapes).
+The core 3D transform set uses the same names/signatures on `Shape`, `TrackedShape`, and `ShapeGroup`.
+For mixed groups that include `Sketch` children, `transform` / `rotateAround` / `pointAlong` are 3D-only.
 
 ### `.clone()` / `.duplicate()`
 Create an explicit copy handle of a shape (same geometry/color) so you can branch variants clearly.
@@ -590,7 +592,7 @@ shape.intersect(other) // Same as intersection(shape, other)
 Groups multiple shapes/sketches for joint transforms without merging them into a single mesh. Unlike `union`, colors and individual identities are preserved.
 
 **Parameters:**
-- `...items` (Shape | Sketch | TrackedShape) - Items to group
+- `...items` (Shape | Sketch | TrackedShape | ShapeGroup) - Items to group (nested groups allowed)
 
 **Returns:** `ShapeGroup`
 
@@ -612,6 +614,7 @@ group.moveTo(x, y, z)
 group.moveToLocal(target, x, y, z)
 group.rotate(x, y, z)
 group.rotateAround(axis, angleDeg, pivot?)
+group.pointAlong(direction)
 group.transform(m)
 group.scale(v)
 group.mirror(normal)
@@ -621,6 +624,7 @@ group.duplicate() // alias
 ```
 
 `group.rotateAround(...)` is convenience sugar for `group.transform(Transform.rotationAxis(...))`.
+`group.pointAlong(...)` is convenience sugar for a group-wide axis rotation from Z to `direction`.
 
 ```javascript
 const hingeY = 40;
@@ -628,6 +632,8 @@ const lid = group(shell, logo);
 
 const openedA = lid.rotateAround([1, 0, 0], 35, [0, hingeY, 0]); // sugar
 const openedB = lid.transform(Transform.rotationAxis([1, 0, 0], 35, [0, hingeY, 0])); // equivalent
+
+const laidDown = lid.pointAlong([1, 0, 0]); // same intent as Shape/TrackedShape.pointAlong
 ```
 
 When a ShapeGroup is returned from a script, each child becomes a separate viewport object with its own visibility/color controls.
@@ -1091,6 +1097,12 @@ box.faceNames();           // all face names
 box.edgeNames();           // all edge names
 
 box.translate(50, 0, 0);  // preserves topology
+box.rotate(0, 0, 15);     // same 3D transform surface as Shape
+box.rotateAround([0, 0, 1], 45, [0, 0, 0]);
+box.pointAlong([1, 0, 0]);
+box.transform(Transform.translation(10, 0, 0));
+box.scale([1.2, 1, 1]);
+box.mirror([1, 0, 0]);
 box.rotateAroundEdge('top-bottom', 90);  // rotate around named edge
 box.toShape();             // unwrap to plain Shape for booleans
 box.clone();               // explicit duplicate with topology
