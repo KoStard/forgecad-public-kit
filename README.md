@@ -42,6 +42,20 @@ ForgeCAD is built to work cleanly with coding agents. Your CAD models are plain 
 - `examples/api/` provides concrete model patterns to copy and adapt
 - browser + CLI run the same engine, so AI-generated scripts behave consistently
 
+### Instructions for AI model generation
+
+When an AI model is asked to generate ForgeCAD models, require this workflow:
+
+1. Read **all files** in `docs/permanent/API/` first.
+2. Read **all files** in `examples/api/` next.
+3. Only then generate or modify `.forge.js` / `.sketch.js` models.
+
+Use this instruction in prompts to avoid missing API capabilities or producing invalid model code:
+
+```text
+Before generating any ForgeCAD model code, read every file in docs/permanent/API/ and examples/api/ for full context. Then generate a runnable model using only documented ForgeCAD APIs and patterns from those files.
+```
+
 Example AI workflows:
 
 ```bash
