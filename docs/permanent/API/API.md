@@ -980,6 +980,77 @@ const bracket = stroke([[0, 0], [50, 0], [50, -70]], 4);
 const rounded = stroke([[0, 0], [50, 0], [50, -50]], 4, 'Round');
 ```
 
+### Curves & Surfacing
+
+#### `spline2d(points, options?)`
+Build a smooth Catmull-Rom spline sketch from 2D control points.
+
+**Options:**
+- `closed` (boolean) - Default: `true`
+- `tension` (number, 0..1) - Default: `0.5`
+- `samplesPerSegment` (number) - Default: `16`
+- `strokeWidth` (number) - Required when `closed: false` (creates a stroked solid)
+- `join` (`'Round' | 'Square'`) - Stroke corner style for open splines. Default: `'Round'`
+
+```javascript
+const closed = spline2d([[20,0],[12,10],[0,12],[-12,10],[-20,0],[0,-14]]);
+const openRail = spline2d([[0,0],[30,20],[70,10]], { closed: false, strokeWidth: 3 });
+```
+
+#### `spline3d(points, options?)` / `Curve3D`
+Create a reusable 3D spline curve object.
+
+`Curve3D` methods:
+- `.sample(count?)`
+- `.sampleBySegment(samplesPerSegment?)`
+- `.pointAt(t)` where `t` is `[0..1]`
+- `.tangentAt(t)`
+- `.length(samples?)`
+
+```javascript
+const rail = spline3d(
+  [[0,0,0], [20,10,30], [40,0,60]],
+  { tension: 0.45 }
+);
+```
+
+#### `loft(profiles, heights, options?)`
+Loft between multiple sketches along Z stations.
+
+This implementation interpolates signed-distance fields and meshes via level-set extraction, so profiles can differ in vertex count/topology.
+
+**Parameters:**
+- `profiles` (`Sketch[]`) - At least 2
+- `heights` (`number[]`) - Same length as `profiles`, strictly increasing
+- `options`:
+  - `edgeLength` (number) - Mesh resolution
+  - `boundsPadding` (number) - Extra level-set bounds padding
+
+```javascript
+const body = loft(
+  [circle2d(20), roundedRect(30, 24, 6, true), circle2d(10)],
+  [0, 40, 70],
+  { edgeLength: 1.0 }
+);
+```
+
+#### `sweep(profile, path, options?)`
+Sweep a 2D profile along a 3D path (`Curve3D` or point polyline).
+
+**Parameters:**
+- `profile` (`Sketch`) - Local cross-section in XY plane
+- `path` (`Curve3D | [x,y,z][]`)
+- `options`:
+  - `samples` (number) - Sampling count for `Curve3D` paths (default `48`)
+  - `edgeLength` (number) - Mesh resolution
+  - `boundsPadding` (number) - Extra level-set bounds padding
+  - `up` (`[x,y,z]`) - Preferred frame-up vector
+
+```javascript
+const tubePath = spline3d([[0,0,0], [20,0,20], [40,10,30]]);
+const tube = sweep(circle2d(3), tubePath, { samples: 36, edgeLength: 0.7 });
+```
+
 ### Anchor Positioning
 
 #### `.attachTo(target, targetAnchor, selfAnchor?, offset?)`
