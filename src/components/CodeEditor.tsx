@@ -51,6 +51,38 @@ declare function difference2d(...sketches: Sketch[]): Sketch;
 declare function intersection2d(...sketches: Sketch[]): Sketch;
 declare function hull2d(...sketches: Sketch[]): Sketch;
 declare function constrainedSketch(): ConstrainedSketchBuilder;
+declare function spline2d(
+  points: [number, number][],
+  options?: {
+    closed?: boolean;
+    tension?: number;
+    samplesPerSegment?: number;
+    strokeWidth?: number;
+    join?: 'Round' | 'Square';
+  }
+): Sketch;
+
+declare class Curve3D {
+  readonly points: [number, number, number][];
+  readonly closed: boolean;
+  readonly tension: number;
+  sample(count?: number): [number, number, number][];
+  sampleBySegment(samplesPerSegment?: number): [number, number, number][];
+  pointAt(t: number): [number, number, number];
+  tangentAt(t: number): [number, number, number];
+  length(samples?: number): number;
+}
+
+declare function spline3d(
+  points: [number, number, number][],
+  options?: { closed?: boolean; tension?: number }
+): Curve3D;
+declare function loft(profiles: Sketch[], heights: number[], options?: { edgeLength?: number; boundsPadding?: number }): Shape;
+declare function sweep(
+  profile: Sketch,
+  path: Curve3D | [number, number, number][],
+  options?: { samples?: number; edgeLength?: number; boundsPadding?: number; up?: [number, number, number] }
+): Shape;
 
 declare class Shape {
   clone(): Shape;

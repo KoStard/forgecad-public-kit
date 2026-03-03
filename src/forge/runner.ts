@@ -62,6 +62,11 @@ import {
   filletEdge,
   chamferEdge,
   arcBridgeBetweenRects,
+  Curve3D,
+  spline2d,
+  spline3d,
+  loft,
+  sweep,
   dim,
   dimLine,
   resetDimensions,
@@ -647,6 +652,8 @@ function executeFile(
       'filletEdge', 'chamferEdge',
       // Arc bridge
       'arcBridgeBetweenRects',
+      // Curves & surfacing
+      'Curve3D', 'spline2d', 'spline3d', 'loft', 'sweep',
       // Params & classes
       'param', 'Shape', 'Sketch', 'lib',
       // Joints
@@ -684,6 +691,7 @@ function executeFile(
       linearPattern, circularPattern, mirrorCopy,
       filletEdge, chamferEdge,
       arcBridgeBetweenRects,
+      Curve3D, spline2d, spline3d, loft, sweep,
       param, Shape, Sketch, partLibrary,
       joint,
       Transform, composeChain, assembly, Assembly, SolvedAssembly, bomToCsv,
