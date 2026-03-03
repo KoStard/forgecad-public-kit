@@ -1371,6 +1371,54 @@ L-shaped mounting bracket with optional holes.
 ### `lib.holePattern(rows, cols, spacingX, spacingY, holeDia, depth)`
 Grid of cylindrical holes.
 
+### `lib.tSlotProfile(options?)`
+Build a 2D T-slot cross-section sketch.
+
+Default options describe a 20x20 B-type profile with slot 6.
+
+**Options:**
+- `size` (number) - Outer profile size. Default: `20`
+- `slotWidth` (number) - Slot mouth width. Default: `6`
+- `slotInnerWidth` (number) - Wider interior slot cavity width. Default: `10.4`
+- `slotDepth` (number) - Slot depth from outer face. Default: `6`
+- `slotNeckDepth` (number) - Narrow mouth depth before widening. Default: `1.6`
+- `wall` (number) - Outer shell thickness. Default: `1.4`
+- `web` (number) - Central cross-web thickness. Default: `2.1`
+- `centerBossDia` (number) - Center boss diameter. Default: `8.2`
+- `centerBoreDia` (number) - Center bore diameter. Default: `4.2`
+- `outerCornerRadius` (number) - Outer corner radius. Default: `1`
+- `segments` (number) - Circle smoothness for 2D bores/bosses. Default: `36`
+
+**Returns:** `Sketch`
+
+```javascript
+const profile = lib.tSlotProfile();
+return profile; // 2D drawing-ready cross-section
+```
+
+### `lib.tSlotExtrusion(length, options?)`
+Build a 3D extrusion from `lib.tSlotProfile(...)`.
+
+**Parameters:**
+- `length` (number) - Extrusion length along Z
+- `options` - Same options as `lib.tSlotProfile(...)` plus:
+  - `center` (boolean) - Center the length around Z=0. Default: `false`
+
+**Returns:** `Shape`
+
+```javascript
+const rail = lib.tSlotExtrusion(300, { center: true });
+```
+
+### `lib.profile2020BSlot6(length, options?)`
+Convenience helper for a 20x20 B-type slot 6 extrusion with practical defaults.
+
+Use `options` only to override supplier-specific tolerances.
+
+```javascript
+const profile = lib.profile2020BSlot6(500, { center: true });
+```
+
 ### `lib.explode(items, options?)`
 Apply deterministic exploded-view offsets to assembly structures while preserving names, colors, and nesting.
 
