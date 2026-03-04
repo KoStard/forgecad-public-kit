@@ -404,6 +404,29 @@ const resolveArcReferenceDirection = (axisWorld: THREE.Vector3): THREE.Vector3 =
   return fallback.normalize();
 };
 
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+
+interface SegmentMeshTransform {
+  midpoint: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+  length: number;
+}
+
+const resolveSegmentMeshTransform = (
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+): SegmentMeshTransform | null => {
+  const direction = end.clone().sub(start);
+  const length = direction.length();
+  if (length <= 1e-6) return null;
+  direction.multiplyScalar(1 / length);
+  return {
+    midpoint: start.clone().add(end).multiplyScalar(0.5),
+    quaternion: new THREE.Quaternion().setFromUnitVectors(WORLD_UP, direction),
+    length,
+  };
+};
+
 const computeJointNodeMatrices = (
   joints: JointViewDef[],
   jointValues: Record<string, number>,
@@ -803,8 +826,8 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
     () => state.pivotWorld.clone().addScaledVector(state.axisWorld, state.axisLength * 0.5),
     [state.axisLength, state.axisWorld, state.pivotWorld],
   );
-  const axisGeometry = useMemo(
-    () => new THREE.BufferGeometry().setFromPoints([axisStart, axisEnd]),
+  const axisSegment = useMemo(
+    () => resolveSegmentMeshTransform(axisStart, axisEnd),
     [axisEnd, axisStart],
   );
   const isRevolute = state.joint.type === 'revolute';
@@ -814,6 +837,9 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
   );
   const arcAngleRad = useMemo(() => THREE.MathUtils.degToRad(clampedVisualAngleDeg), [clampedVisualAngleDeg]);
 
+  const axisLineRadius = THREE.MathUtils.clamp(state.axisLength * 0.024, 0.7, 2.2);
+  const spokeLineRadius = THREE.MathUtils.clamp(state.axisLength * 0.016, 0.5, 1.5);
+  const arcLineRadius = THREE.MathUtils.clamp(state.axisLength * 0.018, 0.52, 1.7);
   const axisDotRadius = Math.max(0.75, state.axisLength * 0.02);
   const axisArrowRadius = Math.max(0.7, state.axisLength * 0.03);
   const axisArrowLength = Math.max(2.6, state.axisLength * 0.09);
@@ -844,29 +870,24 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
     () => state.pivotWorld.clone().addScaledVector(arcEndDirection, arcRadius),
     [arcEndDirection, arcRadius, state.pivotWorld],
   );
-  const arcStartArmGeometry = useMemo(
-    () => new THREE.BufferGeometry().setFromPoints([state.pivotWorld, arcStartPoint]),
+  const arcStartArmSegment = useMemo(
+    () => resolveSegmentMeshTransform(state.pivotWorld, arcStartPoint),
     [arcStartPoint, state.pivotWorld],
   );
-  const arcCurrentArmGeometry = useMemo(
-    () => new THREE.BufferGeometry().setFromPoints([state.pivotWorld, arcEndPoint]),
+  const arcCurrentArmSegment = useMemo(
+    () => resolveSegmentMeshTransform(state.pivotWorld, arcEndPoint),
     [arcEndPoint, state.pivotWorld],
   );
-  const arcGeometry = useMemo(() => {
+  const arcCurvePoints = useMemo(() => {
     if (!isRevolute || Math.abs(arcAngleRad) <= 1e-4) return null;
-    const steps = Math.max(18, Math.ceil(Math.abs(clampedVisualAngleDeg) / 6));
+    const steps = Math.max(24, Math.ceil(Math.abs(clampedVisualAngleDeg) / 4));
     const points: THREE.Vector3[] = [];
-    for (let i = 0; i < steps; i += 1) {
-      const thetaA = arcAngleRad * (i / steps);
-      const thetaB = arcAngleRad * ((i + 1) / steps);
-      const dirA = arcStartDirection.clone().applyAxisAngle(state.axisWorld, thetaA);
-      const dirB = arcStartDirection.clone().applyAxisAngle(state.axisWorld, thetaB);
-      points.push(
-        state.pivotWorld.clone().addScaledVector(dirA, arcRadius),
-        state.pivotWorld.clone().addScaledVector(dirB, arcRadius),
-      );
+    for (let i = 0; i <= steps; i += 1) {
+      const theta = arcAngleRad * (i / steps);
+      const direction = arcStartDirection.clone().applyAxisAngle(state.axisWorld, theta);
+      points.push(state.pivotWorld.clone().addScaledVector(direction, arcRadius));
     }
-    return new THREE.BufferGeometry().setFromPoints(points);
+    return points;
   }, [
     arcAngleRad,
     arcRadius,
@@ -876,6 +897,12 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
     state.axisWorld,
     state.pivotWorld,
   ]);
+  const arcTubeGeometry = useMemo(() => {
+    if (!arcCurvePoints || arcCurvePoints.length < 2) return null;
+    const segments = Math.max(32, arcCurvePoints.length * 2);
+    const curve = new THREE.CatmullRomCurve3(arcCurvePoints, false, 'centripetal');
+    return new THREE.TubeGeometry(curve, segments, arcLineRadius, 12, false);
+  }, [arcCurvePoints, arcLineRadius]);
   const arcArrowLength = Math.max(1.8, state.axisLength * 0.065);
   const arcArrowRadius = Math.max(0.45, state.axisLength * 0.02);
   const arcTangent = useMemo(() => {
@@ -887,26 +914,31 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
     return tangent;
   }, [arcAngleRad, arcEndDirection, isRevolute, state.axisWorld]);
   const arcArrowPosition = useMemo(() => {
-    if (!arcTangent || !arcGeometry) return null;
+    if (!arcTangent || !arcCurvePoints) return null;
     return arcEndPoint.clone().addScaledVector(arcTangent, arcArrowLength * 0.38);
-  }, [arcArrowLength, arcEndPoint, arcGeometry, arcTangent]);
+  }, [arcArrowLength, arcCurvePoints, arcEndPoint, arcTangent]);
   const arcArrowQuaternion = useMemo(() => {
-    if (!arcTangent || !arcGeometry) return null;
+    if (!arcTangent || !arcCurvePoints) return null;
     return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), arcTangent);
-  }, [arcGeometry, arcTangent]);
+  }, [arcCurvePoints, arcTangent]);
 
   useEffect(() => () => {
-    axisGeometry.dispose();
-    arcStartArmGeometry.dispose();
-    arcCurrentArmGeometry.dispose();
-    arcGeometry?.dispose();
-  }, [arcCurrentArmGeometry, arcGeometry, arcStartArmGeometry, axisGeometry]);
+    arcTubeGeometry?.dispose();
+  }, [arcTubeGeometry]);
 
   return (
     <group>
-      <lineSegments geometry={axisGeometry} renderOrder={95} userData={{ measureHelper: true }}>
-        <lineBasicMaterial color={JOINT_AXIS_COLOR} depthTest={false} transparent opacity={0.98} toneMapped={false} />
-      </lineSegments>
+      {axisSegment && (
+        <mesh
+          position={[axisSegment.midpoint.x, axisSegment.midpoint.y, axisSegment.midpoint.z]}
+          quaternion={axisSegment.quaternion}
+          renderOrder={95}
+          userData={{ measureHelper: true }}
+        >
+          <cylinderGeometry args={[axisLineRadius, axisLineRadius, axisSegment.length, 18]} />
+          <meshBasicMaterial color={JOINT_AXIS_COLOR} depthTest={false} transparent opacity={0.98} toneMapped={false} />
+        </mesh>
+      )}
       <mesh
         position={[state.pivotWorld.x, state.pivotWorld.y, state.pivotWorld.z]}
         renderOrder={96}
@@ -926,16 +958,32 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
       </mesh>
       {isRevolute && (
         <>
-          <lineSegments geometry={arcStartArmGeometry} renderOrder={97} userData={{ measureHelper: true }}>
-            <lineBasicMaterial color={JOINT_ZERO_COLOR} depthTest={false} transparent opacity={0.95} toneMapped={false} />
-          </lineSegments>
-          <lineSegments geometry={arcCurrentArmGeometry} renderOrder={97} userData={{ measureHelper: true }}>
-            <lineBasicMaterial color={JOINT_ARC_COLOR} depthTest={false} transparent opacity={0.98} toneMapped={false} />
-          </lineSegments>
-          {arcGeometry && (
-            <lineSegments geometry={arcGeometry} renderOrder={98} userData={{ measureHelper: true }}>
-              <lineBasicMaterial color={JOINT_ARC_COLOR} depthTest={false} transparent opacity={0.98} toneMapped={false} />
-            </lineSegments>
+          {arcStartArmSegment && (
+            <mesh
+              position={[arcStartArmSegment.midpoint.x, arcStartArmSegment.midpoint.y, arcStartArmSegment.midpoint.z]}
+              quaternion={arcStartArmSegment.quaternion}
+              renderOrder={97}
+              userData={{ measureHelper: true }}
+            >
+              <cylinderGeometry args={[spokeLineRadius, spokeLineRadius, arcStartArmSegment.length, 14]} />
+              <meshBasicMaterial color={JOINT_ZERO_COLOR} depthTest={false} transparent opacity={0.95} toneMapped={false} />
+            </mesh>
+          )}
+          {arcCurrentArmSegment && (
+            <mesh
+              position={[arcCurrentArmSegment.midpoint.x, arcCurrentArmSegment.midpoint.y, arcCurrentArmSegment.midpoint.z]}
+              quaternion={arcCurrentArmSegment.quaternion}
+              renderOrder={97}
+              userData={{ measureHelper: true }}
+            >
+              <cylinderGeometry args={[spokeLineRadius, spokeLineRadius, arcCurrentArmSegment.length, 14]} />
+              <meshBasicMaterial color={JOINT_ARC_COLOR} depthTest={false} transparent opacity={0.98} toneMapped={false} />
+            </mesh>
+          )}
+          {arcTubeGeometry && (
+            <mesh geometry={arcTubeGeometry} renderOrder={98} userData={{ measureHelper: true }}>
+              <meshBasicMaterial color={JOINT_ARC_COLOR} depthTest={false} transparent opacity={0.98} toneMapped={false} />
+            </mesh>
           )}
           <mesh
             position={[arcStartPoint.x, arcStartPoint.y, arcStartPoint.z]}
