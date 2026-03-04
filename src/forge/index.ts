@@ -17,6 +17,9 @@ export {
   jointsView, resetJointsView, getCollectedJointsView,
   clampAnimationProgress, findJointAnimationClip, resolveJointAnimation,
   runScript,
+  FORGE_QUALITY_PRESETS,
+  FORGE_QUALITY_PROFILES,
+  resolveForgeQualityPreset,
   partLibrary,
   shapeToGeometry,
   buildScene,
@@ -53,6 +56,7 @@ export type {
 } from './headless';
 export type { RunResult, SceneObject, LogEntry } from './headless';
 export type { ForgeGeometry } from './headless';
+export type { ForgeQualityPreset, ForgeQualityProfile } from './headless';
 export type {
   ReportViewId,
   ReportObjectVisual,

@@ -1,5 +1,15 @@
 import { create } from 'zustand';
-import { runScript, type ParamDef, type RunResult, type SceneObject, type LogEntry, isConstraintSketch, updateConstraintValue } from '@forge/index';
+import {
+  runScript,
+  type ParamDef,
+  type RunResult,
+  type SceneObject,
+  type LogEntry,
+  type ForgeQualityPreset,
+  resolveForgeQualityPreset,
+  isConstraintSketch,
+  updateConstraintValue,
+} from '@forge/index';
 import { setParamOverrides } from '@forge/params';
 import projectFiles from 'virtual:forge-project';
 import { type ThemeName, applyTheme } from '../theme';
@@ -125,6 +135,8 @@ interface ForgeStore {
   result: RunResult | null;
   consoleLogs: LogEntry[];
   params: ParamDef[];
+  runQuality: ForgeQualityPreset;
+  setRunQuality: (quality: ForgeQualityPreset) => void;
   paramOverrides: Record<string, number>;
   jointValues: Record<string, number>;
   jointAnimationClip: string | null;
@@ -221,6 +233,7 @@ interface ForgeStore {
 }
 
 interface ViewPreferencesState {
+  runQuality: ForgeQualityPreset;
   renderMode: RenderMode;
   projectionMode: ProjectionMode;
   gridEnabled: boolean;
@@ -557,6 +570,12 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   result: null,
   consoleLogs: [],
   params: [],
+  runQuality: resolveForgeQualityPreset(initialViewPreferences.runQuality ?? 'live'),
+  setRunQuality: (quality) => {
+    const next = resolveForgeQualityPreset(quality);
+    writeViewPreferences({ runQuality: next });
+    set({ runQuality: next });
+  },
   paramOverrides: {},
   jointValues: {},
   jointAnimationClip: null,
@@ -573,11 +592,12 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationProgress,
       jointAnimationPlaying,
       hoveredJointName,
+      runQuality,
     } = get();
     const code = files[activeFile];
     if (!code) return;
     setParamOverrides(paramOverrides);
-    const runResult = runScript(code, activeFile, files);
+    const runResult = runScript(code, activeFile, files, { quality: runQuality });
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
     const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
     const nextJointValues = syncJointValues(runResult, jointValues);
@@ -615,10 +635,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationProgress,
       jointAnimationPlaying,
       hoveredJointName,
+      runQuality,
     } = get();
     const code = files[activeFile];
     if (!code) return;
-    const runResult = runScript(code, activeFile, files);
+    const runResult = runScript(code, activeFile, files, { quality: runQuality });
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
     const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
     const nextJointValues = syncJointValues(runResult, jointValues);

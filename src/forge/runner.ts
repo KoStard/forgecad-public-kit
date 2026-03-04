@@ -94,6 +94,11 @@ import {
   getCollectedJointsView,
   type CollectedJointsView,
 } from './jointsView';
+import {
+  resolveForgeQualityPreset,
+  runWithForgeQuality,
+  type ForgeQualityPreset,
+} from './quality';
 
 export interface SceneObject {
   id: string;
@@ -122,6 +127,7 @@ export interface RunResult {
   cutPlanes: CutPlaneDef[];
   explodeView: ExplodeViewOptions | null;
   jointsView: CollectedJointsView | null;
+  quality: ForgeQualityPreset;
   error: string | null;
   timeMs: number;
   logs: LogEntry[];
@@ -130,6 +136,8 @@ export interface RunResult {
 export interface RunScriptOptions {
   /** Emit structured import trace logs into result.logs (CLI-friendly debugging). */
   debugImports?: boolean;
+  /** Geometry quality profile for this execution. */
+  quality?: ForgeQualityPreset;
 }
 
 // Collected logs from the current script execution
@@ -728,9 +736,11 @@ export function runScript(
     debugImports: options.debugImports ?? envFlagEnabled('FORGECAD_DEBUG_IMPORTS'),
     fileIndex: buildFileIndex(allFiles),
   };
+  const quality = resolveForgeQualityPreset(options.quality);
 
   try {
-    const result = executeFile(code, fileName, allFiles, new Set(), {}, execOptions);
+    return runWithForgeQuality(quality, () => {
+      const result = executeFile(code, fileName, allFiles, new Set(), {}, execOptions);
 
     const objects: SceneObject[] = [];
     const shapeDimensions: DimensionDef[] = [];
@@ -882,20 +892,22 @@ export function runScript(
     const shape = objects.length === 1 ? objects[0].shape : null;
     const sketch = objects.length === 1 ? objects[0].sketch : null;
 
-    return {
-      shape,
-      sketch,
-      objects,
-      params: getCollectedParams(),
-      dimensions: [...getCollectedDimensions(), ...shapeDimensions],
-      bom: getCollectedBom(),
-      cutPlanes: getCollectedCutPlanes(),
-      explodeView: getCollectedExplodeView(),
-      jointsView: getCollectedJointsView(),
-      error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
-      timeMs: performance.now() - t0,
-      logs: _collectedLogs.slice(),
-    };
+      return {
+        shape,
+        sketch,
+        objects,
+        params: getCollectedParams(),
+        dimensions: [...getCollectedDimensions(), ...shapeDimensions],
+        bom: getCollectedBom(),
+        cutPlanes: getCollectedCutPlanes(),
+        explodeView: getCollectedExplodeView(),
+        jointsView: getCollectedJointsView(),
+        quality,
+        error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
+        timeMs: performance.now() - t0,
+        logs: _collectedLogs.slice(),
+      };
+    });
   } catch (e: any) {
     const msg = e.message || String(e);
     const stack = e.stack || '';
@@ -917,6 +929,7 @@ export function runScript(
       cutPlanes: getCollectedCutPlanes(),
       explodeView: getCollectedExplodeView(),
       jointsView: getCollectedJointsView(),
+      quality,
       error: `${msg}${lineInfo}`,
       timeMs: performance.now() - t0,
       logs: _collectedLogs.slice(),

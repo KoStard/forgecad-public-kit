@@ -43,6 +43,12 @@ export type {
 } from './assembly';
 export { runScript } from './runner';
 export type { RunResult, SceneObject, LogEntry, RunScriptOptions } from './runner';
+export {
+  FORGE_QUALITY_PRESETS,
+  FORGE_QUALITY_PROFILES,
+  resolveForgeQualityPreset,
+} from './quality';
+export type { ForgeQualityPreset, ForgeQualityProfile } from './quality';
 export { partLibrary } from './library';
 export { shapeToGeometry } from './meshToGeometry';
 export { buildScene, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from './sceneBuilder';

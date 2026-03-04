@@ -7,6 +7,7 @@
 
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import { Transform, type Mat4 } from './transform';
+import { scaleRefineSteps, scaleRefineToLength, scaleRefineToTolerance } from './quality';
 
 let _wasm: ManifoldToplevel | null = null;
 
@@ -325,17 +326,21 @@ export class Shape {
 
   /** Subdivide mesh, interpolating smooth surfaces set by smoothOut(). */
   refine(n: number): Shape {
-    return withCopiedDimensions(this, new Shape(this.manifold.refine(n), this.colorHex));
+    const steps = scaleRefineSteps(n);
+    if (steps <= 0) return this.clone();
+    return withCopiedDimensions(this, new Shape(this.manifold.refine(steps), this.colorHex));
   }
 
   /** Subdivide until edges are shorter than length. */
   refineToLength(length: number): Shape {
-    return withCopiedDimensions(this, new Shape(this.manifold.refineToLength(length), this.colorHex));
+    const effectiveLength = scaleRefineToLength(length);
+    return withCopiedDimensions(this, new Shape(this.manifold.refineToLength(effectiveLength), this.colorHex));
   }
 
   /** Subdivide until surface is within tolerance of smooth surface. */
   refineToTolerance(tolerance: number): Shape {
-    return withCopiedDimensions(this, new Shape(this.manifold.refineToTolerance(tolerance), this.colorHex));
+    const effectiveTolerance = scaleRefineToTolerance(tolerance);
+    return withCopiedDimensions(this, new Shape(this.manifold.refineToTolerance(effectiveTolerance), this.colorHex));
   }
 
   /** Warp vertices with a function. */

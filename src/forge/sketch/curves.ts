@@ -2,6 +2,12 @@ import { Sketch } from './core';
 import { polygon } from './primitives';
 import { stroke } from './path';
 import { levelSet, type Shape } from '../kernel';
+import {
+  scaleLevelSetBoundsPadding,
+  scaleLevelSetEdgeLength,
+  scaleSplineSamples,
+  scaleSweepPathSamples,
+} from '../quality';
 
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
@@ -338,7 +344,7 @@ export class Curve3D {
 export function spline2d(points: Vec2[], options: Spline2DOptions = {}): Sketch {
   const closed = options.closed ?? true;
   const tension = clamp(options.tension ?? 0.5, 0, 1);
-  const spp = Math.max(3, Math.floor(options.samplesPerSegment ?? 16));
+  const spp = scaleSplineSamples(options.samplesPerSegment ?? 16);
   const sampled = sampleCatmullRom2D(points, closed, spp, tension);
 
   if (closed) return polygon(sampled);
@@ -396,8 +402,10 @@ export function loft(
   const zMin = zs[0];
   const zMax = zs[zs.length - 1];
   const span = Math.max(maxX - minX, maxY - minY, zMax - zMin, 1);
-  const edgeLength = options.edgeLength ?? Math.max(0.35, span / 90);
-  const pad = options.boundsPadding ?? Math.max(edgeLength * 3, span * 0.06, 1.5);
+  const requestedEdgeLength = options.edgeLength ?? Math.max(0.35, span / 90);
+  const edgeLength = scaleLevelSetEdgeLength(requestedEdgeLength);
+  const requestedPad = options.boundsPadding ?? Math.max(edgeLength * 3, span * 0.06, 1.5);
+  const pad = scaleLevelSetBoundsPadding(requestedPad);
 
   const sdfAt = (x: number, y: number, z: number): number => {
     let crossField: number;
@@ -467,9 +475,11 @@ export function sweep(
   path: Curve3D | Vec3[],
   options: SweepOptions = {},
 ): Shape {
+  const requestedPathSamples = Math.max(4, options.samples ?? 48);
+  const effectivePathSamples = scaleSweepPathSamples(requestedPathSamples);
   const pathPts = Array.isArray(path)
     ? path
-    : path.sample(Math.max(4, options.samples ?? 48));
+    : path.sample(effectivePathSamples);
 
   if (pathPts.length < 2) throw new Error('sweep requires a path with at least two points');
 
@@ -515,8 +525,10 @@ export function sweep(
     pathLen += vec3Len(vec3Sub(pathPts[i], pathPts[i - 1]));
   }
   const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ, pathLen, 1);
-  const edgeLength = options.edgeLength ?? Math.max(0.3, span / 110);
-  const pad = options.boundsPadding ?? Math.max(pr + edgeLength * 2, span * 0.04, 2);
+  const requestedEdgeLength = options.edgeLength ?? Math.max(0.3, span / 110);
+  const edgeLength = scaleLevelSetEdgeLength(requestedEdgeLength);
+  const requestedPad = options.boundsPadding ?? Math.max(pr + edgeLength * 2, span * 0.04, 2);
+  const pad = scaleLevelSetBoundsPadding(requestedPad);
 
   const sweepSdf = (p: Vec3): number => {
     let field = -Infinity;
