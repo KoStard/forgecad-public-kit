@@ -36,6 +36,8 @@ export type {
   PartMetadata,
   PartOptions,
   JointOptions,
+  JointCouplingTerm,
+  JointCouplingOptions,
   BomRow,
   CollisionOptions,
   CollisionFinding,
@@ -58,11 +60,15 @@ export { cutPlane, resetCutPlanes, getCollectedCutPlanes } from './cutPlane';
 export type { CutPlaneDef } from './cutPlane';
 export { explodeView, resetExplodeView, getCollectedExplodeView } from './explodeView';
 export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './explodeView';
-export { jointsView, resetJointsView, getCollectedJointsView } from './jointsView';
+export { jointsView, resetJointsView, getCollectedJointsView, resolveJointViewValues } from './jointsView';
 export type {
   JointViewType,
   JointViewInput,
   JointViewDef,
+  JointViewCouplingInput,
+  JointViewCouplingDef,
+  JointViewCouplingTermInput,
+  JointViewCouplingTermDef,
   JointViewAnimationInput,
   JointViewAnimationDef,
   JointViewAnimationKeyframeInput,

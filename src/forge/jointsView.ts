@@ -26,6 +26,17 @@ export interface JointViewAnimationInput {
   keyframes: JointViewAnimationKeyframeInput[];
 }
 
+export interface JointViewCouplingTermInput {
+  joint: string;
+  ratio?: number;
+}
+
+export interface JointViewCouplingInput {
+  joint: string;
+  terms: JointViewCouplingTermInput[];
+  offset?: number;
+}
+
 export interface JointViewDef {
   name: string;
   child: string;
@@ -51,9 +62,21 @@ export interface JointViewAnimationDef {
   keyframes: JointViewAnimationKeyframeDef[];
 }
 
+export interface JointViewCouplingTermDef {
+  joint: string;
+  ratio: number;
+}
+
+export interface JointViewCouplingDef {
+  joint: string;
+  terms: JointViewCouplingTermDef[];
+  offset: number;
+}
+
 export interface JointsViewOptions {
   enabled?: boolean;
   joints?: JointViewInput[];
+  couplings?: JointViewCouplingInput[];
   animations?: JointViewAnimationInput[];
   defaultAnimation?: string;
 }
@@ -61,6 +84,7 @@ export interface JointsViewOptions {
 export interface CollectedJointsView {
   enabled?: boolean;
   joints: JointViewDef[];
+  couplings: JointViewCouplingDef[];
   animations: JointViewAnimationDef[];
   defaultAnimation?: string;
 }
@@ -216,6 +240,49 @@ const normalizeAnimation = (animation: JointViewAnimationInput): JointViewAnimat
   };
 };
 
+const normalizeCoupling = (coupling: JointViewCouplingInput): JointViewCouplingDef => {
+  if (!coupling || typeof coupling !== 'object') {
+    throw new Error('jointsView couplings entries must be objects');
+  }
+
+  const joint = typeof coupling.joint === 'string' ? coupling.joint.trim() : '';
+  if (!joint) throw new Error('jointsView coupling.joint is required');
+
+  if (!Array.isArray(coupling.terms) || coupling.terms.length === 0) {
+    throw new Error(`jointsView coupling "${joint}" terms must be a non-empty array`);
+  }
+
+  const seen = new Set<string>();
+  const terms = coupling.terms.map((term, index): JointViewCouplingTermDef => {
+    if (!term || typeof term !== 'object') {
+      throw new Error(`jointsView coupling "${joint}" terms[${index}] must be an object`);
+    }
+    const source = typeof term.joint === 'string' ? term.joint.trim() : '';
+    if (!source) {
+      throw new Error(`jointsView coupling "${joint}" terms[${index}].joint is required`);
+    }
+    if (seen.has(source)) {
+      throw new Error(`jointsView coupling "${joint}" has duplicate source "${source}"`);
+    }
+    seen.add(source);
+    const ratio = term.ratio ?? 1;
+    if (!isFiniteNumber(ratio)) {
+      throw new Error(`jointsView coupling "${joint}" terms[${index}].ratio must be finite`);
+    }
+    return { joint: source, ratio };
+  });
+
+  if (coupling.offset !== undefined && !isFiniteNumber(coupling.offset)) {
+    throw new Error(`jointsView coupling "${joint}" offset must be finite`);
+  }
+
+  return {
+    joint,
+    terms,
+    offset: coupling.offset ?? 0,
+  };
+};
+
 const cloneJoint = (joint: JointViewDef): JointViewDef => ({
   ...joint,
   axis: [joint.axis[0], joint.axis[1], joint.axis[2]],
@@ -230,9 +297,130 @@ const cloneAnimation = (animation: JointViewAnimationDef): JointViewAnimationDef
   })),
 });
 
+const cloneCoupling = (coupling: JointViewCouplingDef): JointViewCouplingDef => ({
+  joint: coupling.joint,
+  terms: coupling.terms.map((term) => ({ joint: term.joint, ratio: term.ratio })),
+  offset: coupling.offset,
+});
+
+const validateCouplings = (joints: JointViewDef[], couplings: JointViewCouplingDef[]): void => {
+  const jointNames = new Set(joints.map((joint) => joint.name));
+  const couplingByJoint = new Map<string, JointViewCouplingDef>();
+
+  couplings.forEach((coupling) => {
+    if (!jointNames.has(coupling.joint)) {
+      throw new Error(`jointsView coupling target "${coupling.joint}" does not exist`);
+    }
+    if (couplingByJoint.has(coupling.joint)) {
+      throw new Error(`jointsView has duplicate coupling for "${coupling.joint}"`);
+    }
+    coupling.terms.forEach((term) => {
+      if (!jointNames.has(term.joint)) {
+        throw new Error(`jointsView coupling "${coupling.joint}" references unknown joint "${term.joint}"`);
+      }
+      if (term.joint === coupling.joint) {
+        throw new Error(`jointsView coupling "${coupling.joint}" cannot reference itself`);
+      }
+    });
+    couplingByJoint.set(coupling.joint, coupling);
+  });
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const walk = (jointName: string): void => {
+    if (visited.has(jointName)) return;
+    if (visiting.has(jointName)) {
+      throw new Error(`jointsView coupling cycle detected at "${jointName}"`);
+    }
+    visiting.add(jointName);
+    const coupling = couplingByJoint.get(jointName);
+    if (coupling) {
+      coupling.terms.forEach((term) => walk(term.joint));
+    }
+    visiting.delete(jointName);
+    visited.add(jointName);
+  };
+
+  couplingByJoint.forEach((_, jointName) => walk(jointName));
+};
+
+const validateAnimationsAgainstCouplings = (
+  animations: JointViewAnimationDef[],
+  couplings: JointViewCouplingDef[],
+): void => {
+  const coupledJointNames = new Set(couplings.map((coupling) => coupling.joint));
+  if (coupledJointNames.size === 0) return;
+
+  animations.forEach((animation) => {
+    animation.keyframes.forEach((keyframe, index) => {
+      Object.keys(keyframe.values).forEach((jointName) => {
+        if (coupledJointNames.has(jointName)) {
+          throw new Error(
+            `jointsView animation "${animation.name}" keyframes[${index}] cannot set coupled joint "${jointName}"`,
+          );
+        }
+      });
+    });
+  });
+};
+
+const clampJointValue = (joint: JointViewDef, value: number): number => {
+  let clamped = Number.isFinite(value) ? value : joint.defaultValue;
+  if (joint.min !== undefined) clamped = Math.max(joint.min, clamped);
+  if (joint.max !== undefined) clamped = Math.min(joint.max, clamped);
+  return clamped;
+};
+
+export function resolveJointViewValues(
+  joints: JointViewDef[],
+  couplings: JointViewCouplingDef[] = [],
+  baseValues: Record<string, number> = {},
+): Record<string, number> {
+  const jointByName = new Map<string, JointViewDef>();
+  joints.forEach((joint) => jointByName.set(joint.name, joint));
+  const couplingByJoint = new Map<string, JointViewCouplingDef>();
+  couplings.forEach((coupling) => couplingByJoint.set(coupling.joint, coupling));
+
+  const cache = new Map<string, number>();
+  const resolving = new Set<string>();
+  const resolveValue = (jointName: string): number => {
+    const cached = cache.get(jointName);
+    if (cached !== undefined) return cached;
+
+    const joint = jointByName.get(jointName);
+    if (!joint) return 0;
+
+    if (resolving.has(jointName)) {
+      return clampJointValue(joint, baseValues[jointName] ?? joint.defaultValue);
+    }
+    resolving.add(jointName);
+
+    let raw = baseValues[jointName] ?? joint.defaultValue;
+    const coupling = couplingByJoint.get(jointName);
+    if (coupling) {
+      raw = coupling.offset;
+      coupling.terms.forEach((term) => {
+        raw += term.ratio * resolveValue(term.joint);
+      });
+    }
+
+    const resolved = clampJointValue(joint, raw);
+    cache.set(jointName, resolved);
+    resolving.delete(jointName);
+    return resolved;
+  };
+
+  const out: Record<string, number> = {};
+  joints.forEach((joint) => {
+    out[joint.name] = resolveValue(joint.name);
+  });
+  return out;
+};
+
 const cloneCollected = (value: CollectedJointsView): CollectedJointsView => ({
   enabled: value.enabled,
   joints: value.joints.map(cloneJoint),
+  couplings: (value.couplings ?? []).map(cloneCoupling),
   animations: (value.animations ?? []).map(cloneAnimation),
   defaultAnimation: value.defaultAnimation,
 });
@@ -256,7 +444,7 @@ export function jointsView(options: JointsViewOptions = {}): void {
 
   const next: CollectedJointsView = _collected
     ? cloneCollected(_collected)
-    : { joints: [], animations: [] };
+    : { joints: [], couplings: [], animations: [] };
 
   if (options.enabled !== undefined) {
     if (typeof options.enabled !== 'boolean') {
@@ -278,6 +466,21 @@ export function jointsView(options: JointsViewOptions = {}): void {
     });
 
     next.joints = Array.from(byName.values()).map(cloneJoint);
+  }
+
+  if (options.couplings !== undefined) {
+    if (!Array.isArray(options.couplings)) {
+      throw new Error('jointsView.couplings must be an array');
+    }
+    const byJoint = new Map<string, JointViewCouplingDef>();
+    next.couplings.forEach((coupling) => byJoint.set(coupling.joint, coupling));
+
+    options.couplings.forEach((couplingInput) => {
+      const normalized = normalizeCoupling(couplingInput);
+      byJoint.set(normalized.joint, normalized);
+    });
+
+    next.couplings = Array.from(byJoint.values()).map(cloneCoupling);
   }
 
   if (options.animations !== undefined) {
@@ -302,6 +505,9 @@ export function jointsView(options: JointsViewOptions = {}): void {
     const trimmed = options.defaultAnimation.trim();
     next.defaultAnimation = trimmed.length > 0 ? trimmed : undefined;
   }
+
+  validateCouplings(next.joints, next.couplings);
+  validateAnimationsAgainstCouplings(next.animations, next.couplings);
 
   if (next.defaultAnimation && !next.animations.some((animation) => animation.name === next.defaultAnimation)) {
     throw new Error(`jointsView defaultAnimation "${next.defaultAnimation}" does not exist in animations`);

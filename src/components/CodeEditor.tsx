@@ -383,9 +383,19 @@ type JointAnimationClip = {
   loop?: boolean;
   keyframes: JointAnimationKeyframe[];
 };
+type JointCouplingTerm = {
+  joint: string;
+  ratio?: number;
+};
+type JointCoupling = {
+  joint: string;
+  terms: JointCouplingTerm[];
+  offset?: number;
+};
 type JointsViewOptions = {
   enabled?: boolean;
   joints?: JointViewDef[];
+  couplings?: JointCoupling[];
   animations?: JointAnimationClip[];
   defaultAnimation?: string;
 };
