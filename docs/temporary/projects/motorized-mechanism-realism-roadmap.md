@@ -48,6 +48,27 @@ This is solvable without replacing the core architecture.
 4. Existing realism initiative
 - `docs/temporary/projects/physical-realism-and-validation-system.md` already outlines a validation gatekeeper concept that can be extended for mechanisms.
 
+## Current state snapshot (checked 2026-03-04)
+
+This file was rechecked against the current code before extending the roadmap.
+
+1. No first-class gears in the public `lib` API yet
+- `src/forge/library.ts` exports fastener/pipe/thread/T-slot/explode helpers.
+- `partLibrary` has no `spurGear`, `helicalGear`, `gearPair`, `rack`, `ringGear`, or `planetary` helpers.
+- Editor typings in `src/components/CodeEditor.tsx` mirror this and expose no gear primitives.
+
+2. Assembly remains joint-only (no couplings)
+- `src/forge/assembly.ts` joint types are still `fixed | revolute | prismatic`.
+- There is no coupling graph API (`addCoupling`, ratio propagation, dependent-joint solve pass).
+
+3. Validation is still pre-gate state
+- No `src/forge/validate/*` engine exists yet.
+- `cli/test-run.ts` and `cli/param-check.ts` provide useful collision/degeneracy scans, but no drivetrain or torque plausibility checks.
+
+4. Example behavior still encourages visual-only gearing
+- `examples/robot_hand_2.forge.js` still uses `gearDisc(...)` faceted cylinders as placeholders.
+- This remains a likely pattern copied by AI scripts.
+
 ## Root problem statement
 
 Current ForgeCAD can answer:
@@ -93,12 +114,43 @@ const pair = lib.gearPair({
 });
 ```
 
-Minimum set for v1:
-- involute spur gear
-- simple helical gear
-- GT2 timing pulley + belt path helper
-- bearing seats (608, 625, 688, etc.)
-- keyed/D-shaft and coupler primitives
+### Gear support priorities (value-first)
+
+The highest-value path is to ship gear families in tiers, not all at once.
+
+Tier 1 (must ship first, highest ROI):
+- involute spur gear (external)
+- involute internal spur gear (ring gear)
+- rack profile + rack body helper
+- `lib.gearPair(...)` with center-distance, backlash, ratio, and mesh diagnostics
+
+Why Tier 1 first:
+- Covers the largest share of practical mechanisms (reducers, idlers, rack drives, planetary building blocks).
+- Geometry can be generated robustly with current sketch/extrude stack.
+- Validation math is well understood and deterministic.
+
+Tier 2 (ship after Tier 1 is stable):
+- helical gear (single-helical, opposite-hand pairing)
+- herringbone gear helper (composed from mirrored helicals)
+- planetary helper (`sun + ring + N planets + carrier` layout and ratio checks)
+
+Why Tier 2 second:
+- Strong user value for quieter/high-load reducers.
+- Reuses Tier 1 involute machinery and coupling infrastructure.
+- More complex collision/backlash checks, but still manageable.
+
+Tier 3 (only after validator and benchmark maturity):
+- straight bevel gear pair (basic cone approximation + geometry checks)
+- miter gear convenience preset (1:1 bevel pair)
+
+Why Tier 3 later:
+- Much harder geometry generation and meshing tolerance behavior in current kernel constraints.
+- Lower frequency than spur/helical/rack for immediate AI quality wins.
+
+Not recommended in near-term roadmap (high complexity, lower short-term payoff):
+- worm/worm wheel (requires different contact and efficiency model)
+- spiral bevel/hypoid
+- harmonic/cycloidal drives
 
 ### Pillar B: Coupled-joint mechanics in assembly solver
 
@@ -268,6 +320,16 @@ Impact: mechanism motion and power path become physically interpretable.
 3. Tune thresholds per process profile (`fdm`, `sla`, `cnc`)
 
 Impact: stable quality improvement over time, fewer regressions.
+
+## Practical value ceiling (where to pause before overbuilding)
+
+A strong "good value" stopping point is:
+
+1. Full Tier 1 gears + coupling graph + strict drivetrain validation
+2. Tier 2 helical + planetary helper
+3. Benchmarks showing reduced fake mechanism pass rate and reduced regeneration loops
+
+At that point ForgeCAD should already produce materially better motorized outputs for most robotics/product-concept prompts. Pushing beyond that (worm/hypoid/harmonic) is likely diminishing returns until the benchmark corpus proves demand.
 
 ## Design principles to keep
 
