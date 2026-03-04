@@ -124,6 +124,23 @@ Root cause: **missing, enforced transform/frame composition contract across code
 - If the change affects user-facing geometry behavior, also run:
   - `npm run test-run -- <affected-example>`
 
+## Editor Declaration Parity Standard (Required)
+
+This standard is package-wide for any user-facing API exposed to scripts.
+
+### Contract
+- Runtime API and editor declarations must ship together:
+  - Runtime surface: `src/forge/*` exports + `src/forge/runner.ts` sandbox bindings
+  - Editor surface: `src/components/CodeEditor.tsx` `FORGE_TYPES`
+  - Docs surface: `docs/permanent/API/*.md`
+- If an important feature is missing from editor declarations, you must either:
+  - implement declarations in the same change, or
+  - create a tracked task in `tasks/` that explicitly names the missing surface and scope.
+
+### Enforcement
+- Before merge, verify new/changed script APIs are present in all three surfaces above.
+- Do not ship runtime-only features without either declaration parity or a tracking task.
+
 ## Git Workflow
 
 ### Commit Every Major Change

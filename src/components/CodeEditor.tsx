@@ -333,6 +333,115 @@ declare function joint(name: string, shape: Shape, pivot: [number, number, numbe
   reverse?: boolean;
 }): Shape;
 
+// --- Assembly Graph (Mechanisms) ---
+type AssemblyPart = Shape | TrackedShape | ShapeGroup;
+type AssemblyJointType = 'fixed' | 'revolute' | 'prismatic';
+type AssemblyJointState = Record<string, number | undefined>;
+type AssemblyPartMetadata = {
+  material?: string;
+  process?: string;
+  tolerance?: string;
+  qty?: number;
+  notes?: string;
+  [key: string]: unknown;
+};
+type AssemblyPartOptions = {
+  transform?: Transform | number[];
+  metadata?: AssemblyPartMetadata;
+};
+type AssemblyJointOptions = {
+  frame?: Transform | number[];
+  axis?: [number, number, number];
+  min?: number;
+  max?: number;
+  default?: number;
+  unit?: string;
+};
+type AssemblyJointCouplingOptions = {
+  terms: JointCouplingTerm[];
+  offset?: number;
+};
+type GearRatioLike = { jointRatio: number };
+type GearCouplingOptions = {
+  ratio?: number;
+  pair?: GearRatioLike;
+  driverTeeth?: number;
+  drivenTeeth?: number;
+  mesh?: 'external' | 'internal';
+  offset?: number;
+};
+type BomRow = {
+  part: string;
+  qty: number;
+  material?: string;
+  process?: string;
+  tolerance?: string;
+  notes?: string;
+  metadata?: AssemblyPartMetadata;
+};
+type CollisionOptions = {
+  parts?: string[];
+  ignorePairs?: Array<[string, string]>;
+  minOverlapVolume?: number;
+};
+type CollisionFinding = {
+  partA: string;
+  partB: string;
+  overlapVolume: number;
+};
+type JointSweepFrame = {
+  value: number;
+  collisions: CollisionFinding[];
+  warnings: string[];
+};
+type AssemblySceneItem = {
+  name: string;
+  shape?: Shape;
+  group?: Array<{ name: string; shape: Shape }>;
+  metadata?: AssemblyPartMetadata;
+};
+declare function bomToCsv(rows: BomRow[]): string;
+declare class SolvedAssembly {
+  readonly name: string;
+  warnings(): string[];
+  getJointState(): AssemblyJointState;
+  getTransform(partName: string): Transform;
+  getPart(partName: string): AssemblyPart;
+  toScene(): AssemblySceneItem[];
+  bom(): BomRow[];
+  bomCsv(): string;
+  collisionReport(options?: CollisionOptions): CollisionFinding[];
+  minClearance(partA: string, partB: string, searchLength?: number): number;
+}
+declare class Assembly {
+  readonly name: string;
+  constructor(name?: string);
+  addFrame(name: string, options?: AssemblyPartOptions): Assembly;
+  addPart(name: string, part: AssemblyPart, options?: AssemblyPartOptions): Assembly;
+  addJoint(
+    name: string,
+    type: AssemblyJointType,
+    parent: string,
+    child: string,
+    options?: AssemblyJointOptions,
+  ): Assembly;
+  addRevolute(name: string, parent: string, child: string, options?: AssemblyJointOptions): Assembly;
+  addPrismatic(name: string, parent: string, child: string, options?: AssemblyJointOptions): Assembly;
+  addFixed(name: string, parent: string, child: string, options?: AssemblyJointOptions): Assembly;
+  addJointCoupling(jointName: string, options: AssemblyJointCouplingOptions): Assembly;
+  addGearCoupling(drivenJointName: string, driverJointName: string, options?: GearCouplingOptions): Assembly;
+  solve(state?: AssemblyJointState): SolvedAssembly;
+  sweepJoint(
+    jointName: string,
+    from: number,
+    to: number,
+    steps: number,
+    baseState?: AssemblyJointState,
+    collisionOptions?: CollisionOptions,
+  ): JointSweepFrame[];
+}
+declare function assembly(name?: string): Assembly;
+
 // --- 3D Advanced ---
 declare function hull3d(...args: (Shape | [number, number, number])[]): Shape;
 declare function levelSet(sdf: (p: [number, number, number]) => number, bounds: { min: [number, number, number]; max: [number, number, number] }, edgeLength: number, level?: number): Shape;
