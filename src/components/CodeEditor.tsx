@@ -444,6 +444,33 @@ type GearPairResult = {
   status: 'ok' | 'warn' | 'error';
 };
 
+type TSlotProfileOptions = {
+  size?: number;
+  slotWidth?: number;
+  slotInnerWidth?: number;
+  slotDepth?: number;
+  slotNeckDepth?: number;
+  wall?: number;
+  web?: number;
+  centerBossDia?: number;
+  centerBoreDia?: number;
+  outerCornerRadius?: number;
+  segments?: number;
+};
+type TSlotExtrusionOptions = TSlotProfileOptions & { center?: boolean };
+type Profile2020BSlot6ProfileOptions = {
+  slotWidth?: number;
+  slotInnerWidth?: number;
+  slotDepth?: number;
+  slotNeckDepth?: number;
+  centerBoreDia?: number;
+  cornerPocketDia?: number;
+  cornerPocketOffset?: number;
+  outerCornerRadius?: number;
+  segments?: number;
+};
+type Profile2020BSlot6Options = Profile2020BSlot6ProfileOptions & { center?: boolean };
+
 declare const lib: {
   boltHole(diameter: number, depth: number): Shape;
   counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: number): Shape;
@@ -464,6 +491,10 @@ declare const lib: {
   roundedBox(x: number, y: number, z: number, radius: number): Shape;
   bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape;
   holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape;
+  tSlotProfile(options?: TSlotProfileOptions): Sketch;
+  tSlotExtrusion(length: number, options?: TSlotExtrusionOptions): Shape;
+  profile2020BSlot6Profile(options?: Profile2020BSlot6ProfileOptions): Sketch;
+  profile2020BSlot6(length: number, options?: Profile2020BSlot6Options): Shape;
   /** Route a pipe through 3D waypoints with smooth bends */
   pipeRoute(points: [number, number, number][], radius: number, options?: { bendRadius?: number; wall?: number; segments?: number }): Shape;
   /** Curved pipe section (torus arc) for connecting two pipe directions */

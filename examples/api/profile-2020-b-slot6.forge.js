@@ -5,16 +5,16 @@
 // - parameterized technical dimensions
 
 const length = param("Length", 220, { min: 40, max: 800, unit: "mm" });
-const slotDepth = param("Slot Depth", 6, { min: 4, max: 8, step: 0.1, unit: "mm" });
-const slotInner = param("Slot Inner Width", 10.4, { min: 8.5, max: 12, step: 0.1, unit: "mm" });
-const centerBore = param("Center Bore", 4.2, { min: 0, max: 6, step: 0.1, unit: "mm" });
+const slotDepth = param("Slot Depth", 5.5, { min: 4.6, max: 6.6, step: 0.1, unit: "mm" });
+const slotInner = param("Slot Inner Width", 8.2, { min: 7, max: 10.5, step: 0.1, unit: "mm" });
+const centerBore = param("Center Bore", 5.5, { min: 0, max: 6.5, step: 0.1, unit: "mm" });
+const pocketDia = param("Pocket Dia", 4.0, { min: 0, max: 6, step: 0.1, unit: "mm" });
 
-const profile2d = lib.tSlotProfile({
-  size: 20,
-  slotWidth: 6,
+const profile2d = lib.profile2020BSlot6Profile({
   slotInnerWidth: slotInner,
   slotDepth,
   centerBoreDia: centerBore,
+  cornerPocketDia: pocketDia,
 });
 
 const extrusion = lib.profile2020BSlot6(length, {
@@ -22,6 +22,7 @@ const extrusion = lib.profile2020BSlot6(length, {
   slotDepth,
   slotInnerWidth: slotInner,
   centerBoreDia: centerBore,
+  cornerPocketDia: pocketDia,
 }).color('#98a7b8');
 
 // Visual dimensions

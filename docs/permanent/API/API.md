@@ -1556,7 +1556,7 @@ return [pair.pinion, pair.gear];
 ### `lib.tSlotProfile(options?)`
 Build a 2D T-slot cross-section sketch.
 
-Default options describe a 20x20 B-type profile with slot 6.
+This is a generic, tunable T-slot generator.
 
 **Options:**
 - `size` (number) - Outer profile size. Default: `20`
@@ -1592,10 +1592,36 @@ Build a 3D extrusion from `lib.tSlotProfile(...)`.
 const rail = lib.tSlotExtrusion(300, { center: true });
 ```
 
-### `lib.profile2020BSlot6(length, options?)`
-Convenience helper for a 20x20 B-type slot 6 extrusion with practical defaults.
+### `lib.profile2020BSlot6Profile(options?)`
+Profile-accurate 2D helper for a 20x20 B-type slot 6 section.
 
-Use `options` only to override supplier-specific tolerances.
+Defaults target common B-type 20x20 conventions:
+- slot width `6.0`
+- slot depth `5.5`
+- center bore `5.5`
+- four internal relief pockets
+
+**Options:**
+- `slotWidth` (number) - Default: `6.0`
+- `slotInnerWidth` (number) - Default: `8.2`
+- `slotDepth` (number) - Default: `5.5`
+- `slotNeckDepth` (number) - Default: `1.8`
+- `centerBoreDia` (number) - Default: `5.5` (set `0` to disable)
+- `cornerPocketDia` (number) - Default: `4.0` (set `0` to disable)
+- `cornerPocketOffset` (number) - Default: `5.6`
+- `outerCornerRadius` (number) - Default: `1.0`
+- `segments` (number) - Default: `40`
+
+```javascript
+const profile2d = lib.profile2020BSlot6Profile();
+```
+
+### `lib.profile2020BSlot6(length, options?)`
+3D extrusion helper built from `lib.profile2020BSlot6Profile(...)`.
+
+Use `options` to override supplier-specific tolerances.
+- Supports all profile options above
+- Plus `center` (boolean) to center length about Z=0
 
 ```javascript
 const profile = lib.profile2020BSlot6(500, { center: true });
