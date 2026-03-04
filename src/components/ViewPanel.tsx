@@ -74,8 +74,10 @@ export function ViewPanel() {
   const jointAnimationClip = useForgeStore((s) => s.jointAnimationClip);
   const jointAnimationProgress = useForgeStore((s) => s.jointAnimationProgress);
   const jointAnimationPlaying = useForgeStore((s) => s.jointAnimationPlaying);
+  const jointAnimationSpeed = useForgeStore((s) => s.jointAnimationSpeed);
   const setJointAnimationClip = useForgeStore((s) => s.setJointAnimationClip);
   const setJointAnimationProgress = useForgeStore((s) => s.setJointAnimationProgress);
+  const setJointAnimationSpeed = useForgeStore((s) => s.setJointAnimationSpeed);
   const toggleJointAnimationPlayback = useForgeStore((s) => s.toggleJointAnimationPlayback);
   const hoveredJointName = useForgeStore((s) => s.hoveredJointName);
   const setHoveredJointName = useForgeStore((s) => s.setHoveredJointName);
@@ -257,6 +259,21 @@ export function ViewPanel() {
             />
             <span style={{ fontSize: 11, color: 'var(--fc-textDim)', width: 36, textAlign: 'right' }}>
               {Math.round(jointAnimationProgress * 100)}%
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <input
+              type="range"
+              min={0.1}
+              max={4}
+              step={0.05}
+              value={jointAnimationSpeed}
+              onChange={(event) => setJointAnimationSpeed(Number(event.target.value))}
+              style={{ flex: 1 }}
+              title="Playback speed multiplier"
+            />
+            <span style={{ fontSize: 11, color: 'var(--fc-textDim)', width: 36, textAlign: 'right' }}>
+              {jointAnimationSpeed.toFixed(2)}x
             </span>
           </div>
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>

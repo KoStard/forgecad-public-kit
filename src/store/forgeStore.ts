@@ -150,6 +150,7 @@ interface ForgeStore {
   jointAnimationClip: string | null;
   jointAnimationProgress: number;
   jointAnimationPlaying: boolean;
+  jointAnimationSpeed: number;
 
   execute: () => void;
   setParam: (name: string, value: number) => void;
@@ -157,6 +158,7 @@ interface ForgeStore {
   setJointAnimationClip: (name: string | null) => void;
   setJointAnimationProgress: (value: number) => void;
   setJointAnimationPlaying: (playing: boolean) => void;
+  setJointAnimationSpeed: (value: number) => void;
   toggleJointAnimationPlayback: () => void;
 
   renderMode: RenderMode;
@@ -251,6 +253,7 @@ interface ViewPreferencesState {
   measureSnapPx: number;
   dimensionsVisible: boolean;
   explodeAmount: number;
+  jointAnimationSpeed: number;
   cutPlaneEnabled: Record<string, boolean>;
   sectionPlaneGuidesEnabled: boolean;
   sectionPlaneFillEnabled: boolean;
@@ -312,6 +315,11 @@ const clampJointValue = (
 const clampAnimationProgress = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
+};
+
+const clampAnimationSpeed = (value: number): number => {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(0.1, Math.min(4, value));
 };
 
 const syncJointValues = (
@@ -593,6 +601,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   jointAnimationClip: null,
   jointAnimationProgress: 0,
   jointAnimationPlaying: false,
+  jointAnimationSpeed: clampAnimationSpeed(initialViewPreferences.jointAnimationSpeed ?? 1),
 
   execute: () => {
     const {
@@ -728,6 +737,12 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationPlaying: true,
     };
   }),
+
+  setJointAnimationSpeed: (value) => {
+    const safeSpeed = clampAnimationSpeed(value);
+    writeViewPreferences({ jointAnimationSpeed: safeSpeed });
+    set({ jointAnimationSpeed: safeSpeed });
+  },
 
   toggleJointAnimationPlayback: () => set((state) => {
     if (state.jointAnimationPlaying) return { jointAnimationPlaying: false };

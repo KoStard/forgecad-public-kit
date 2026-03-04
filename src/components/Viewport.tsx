@@ -2297,6 +2297,7 @@ export function Viewport() {
   const jointAnimationClip = useForgeStore((s) => s.jointAnimationClip);
   const jointAnimationProgress = useForgeStore((s) => s.jointAnimationProgress);
   const jointAnimationPlaying = useForgeStore((s) => s.jointAnimationPlaying);
+  const jointAnimationSpeed = useForgeStore((s) => s.jointAnimationSpeed);
   const hoveredJointName = useForgeStore((s) => s.hoveredJointName);
   const setJointAnimationProgress = useForgeStore((s) => s.setJointAnimationProgress);
   const setJointAnimationPlaying = useForgeStore((s) => s.setJointAnimationPlaying);
@@ -2445,7 +2446,7 @@ export function Viewport() {
       const dtSec = Math.max(0, (now - lastTs) / 1000);
       lastTs = now;
 
-      const step = dtSec / Math.max(1e-6, activeJointAnimation.duration);
+      const step = (dtSec * jointAnimationSpeed) / Math.max(1e-6, activeJointAnimation.duration);
       let next = useForgeStore.getState().jointAnimationProgress + step;
       if (next >= 1) {
         if (activeJointAnimation.loop) next = next % 1;
@@ -2466,7 +2467,7 @@ export function Viewport() {
       cancelled = true;
       cancelAnimationFrame(raf);
     };
-  }, [activeJointAnimation, jointAnimationPlaying, setJointAnimationPlaying, setJointAnimationProgress]);
+  }, [activeJointAnimation, jointAnimationPlaying, jointAnimationSpeed, setJointAnimationPlaying, setJointAnimationProgress]);
 
   const sectionGuideSize = useMemo(() => {
     const bounds = new THREE.Box3();
