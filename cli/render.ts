@@ -11,6 +11,7 @@
  */
 
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { init, runScript, shapeToGeometry, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from '../src/forge/headless';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -18,6 +19,7 @@ const DEFAULT_BACKGROUND = 0x252526;
 
 let renderer: THREE.WebGLRenderer;
 let orbitSession: OrbitSession | null = null;
+let studioEnvTexture: THREE.Texture | null = null;
 
 type OrbitMode = 'solid' | 'wireframe';
 
@@ -64,6 +66,17 @@ function getRenderer(size: number): THREE.WebGLRenderer {
   }
   renderer.setSize(size, size);
   return renderer;
+}
+
+/** Build a local, offline-safe environment map for physically based materials. */
+function getStudioEnvironment(r: THREE.WebGLRenderer): THREE.Texture {
+  if (studioEnvTexture) return studioEnvTexture;
+  const pmrem = new THREE.PMREMGenerator(r);
+  const room = new RoomEnvironment();
+  studioEnvTexture = pmrem.fromScene(room).texture;
+  room.dispose();
+  pmrem.dispose();
+  return studioEnvTexture;
 }
 
 /** Camera positions for each named angle, as a direction vector from center. */
@@ -189,6 +202,7 @@ function destroyOrbitSession(): void {
 
 function createSession(code: string, opts?: OrbitInitOptions): { ok: true; session: OrbitSession } | { ok: false; error: string } {
   const size = opts?.size ?? 1024;
+  const r = getRenderer(size);
   const result = runScript(code, opts?.fileName || 'main.forge.js', opts?.allFiles || {});
 
   if (result.error) {
@@ -208,6 +222,7 @@ function createSession(code: string, opts?: OrbitInitOptions): { ok: true; sessi
 
   const scene = new THREE.Scene();
   scene.background = parseColor(opts?.background, DEFAULT_BACKGROUND);
+  scene.environment = getStudioEnvironment(r);
   addDefaultLights(scene);
 
   const solids: THREE.Object3D[] = [];
