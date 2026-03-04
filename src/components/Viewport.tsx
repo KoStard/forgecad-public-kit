@@ -391,6 +391,23 @@ const clampJointValue = (joint: JointViewDef, value: number): number => {
   return clamped;
 };
 
+const resolveVisualArcAngleDeg = (
+  valueDeg: number,
+  visualLimitDeg: number,
+): number => {
+  if (!Number.isFinite(valueDeg)) return 0;
+  const limit = THREE.MathUtils.clamp(visualLimitDeg, 0, 360);
+  if (limit <= 1e-8) return 0;
+
+  // Preserve exact one-turn visuals; wrap only when value goes beyond +/-360.
+  if (Math.abs(valueDeg) <= 360) {
+    return THREE.MathUtils.clamp(valueDeg, -limit, limit);
+  }
+
+  const wrapped = valueDeg % 360;
+  return THREE.MathUtils.clamp(wrapped, -limit, limit);
+};
+
 const resolveArcReferenceDirection = (axisWorld: THREE.Vector3): THREE.Vector3 => {
   const candidates = [
     new THREE.Vector3(0, 0, 1),
@@ -897,11 +914,11 @@ function HoveredJointOverlay({
     [axisEnd, axisStart],
   );
   const isRevolute = state.joint.type === 'revolute';
-  const clampedVisualAngleDeg = useMemo(
-    () => THREE.MathUtils.clamp(state.value, -config.arcVisualLimitDeg, config.arcVisualLimitDeg),
+  const visualArcAngleDeg = useMemo(
+    () => resolveVisualArcAngleDeg(state.value, config.arcVisualLimitDeg),
     [config.arcVisualLimitDeg, state.value],
   );
-  const arcAngleRad = useMemo(() => THREE.MathUtils.degToRad(clampedVisualAngleDeg), [clampedVisualAngleDeg]);
+  const arcAngleRad = useMemo(() => THREE.MathUtils.degToRad(visualArcAngleDeg), [visualArcAngleDeg]);
 
   const axisLineRadius = THREE.MathUtils.clamp(
     state.axisLength * config.axisLineRadiusScale,
@@ -958,7 +975,7 @@ function HoveredJointOverlay({
   );
   const arcCurvePoints = useMemo(() => {
     if (!isRevolute || Math.abs(arcAngleRad) <= 1e-4) return null;
-    const steps = Math.max(config.arcMinSteps, Math.ceil(Math.abs(clampedVisualAngleDeg) / config.arcStepDeg));
+    const steps = Math.max(config.arcMinSteps, Math.ceil(Math.abs(visualArcAngleDeg) / config.arcStepDeg));
     const points: THREE.Vector3[] = [];
     for (let i = 0; i <= steps; i += 1) {
       const theta = arcAngleRad * (i / steps);
@@ -972,7 +989,7 @@ function HoveredJointOverlay({
     config.arcStepDeg,
     arcRadius,
     arcStartDirection,
-    clampedVisualAngleDeg,
+    visualArcAngleDeg,
     isRevolute,
     state.axisWorld,
     state.pivotWorld,
