@@ -13,6 +13,7 @@ import {
 import { setParamOverrides } from '@forge/params';
 import projectFiles from 'virtual:forge-project';
 import { type ThemeName, applyTheme } from '../theme';
+import { clampAnimationSpeed } from '../animationSpeed';
 
 const EMPTY_FILE: Record<string, string> = {
   'untitled.forge.js': '// New part\n\nreturn box(50, 30, 10);\n',
@@ -320,11 +321,6 @@ const clampJointValue = (
 const clampAnimationProgress = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
-};
-
-const clampAnimationSpeed = (value: number): number => {
-  if (!Number.isFinite(value)) return 1;
-  return Math.max(0.1, Math.min(4, value));
 };
 
 const syncJointValues = (

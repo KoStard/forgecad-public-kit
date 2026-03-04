@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
 import { resolveJointViewValues } from '@forge/jointsView';
+import { animationSpeedToSlider, formatAnimationSpeed, sliderToAnimationSpeed } from '../animationSpeed';
 
 const btnStyle = (active = false): CSSProperties => ({
   padding: '4px 8px',
@@ -267,16 +268,16 @@ export function ViewPanel() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
             <input
               type="range"
-              min={0.1}
-              max={4}
-              step={0.05}
-              value={jointAnimationSpeed}
-              onChange={(event) => setJointAnimationSpeed(Number(event.target.value))}
+              min={0}
+              max={1}
+              step={0.001}
+              value={animationSpeedToSlider(jointAnimationSpeed)}
+              onChange={(event) => setJointAnimationSpeed(sliderToAnimationSpeed(Number(event.target.value)))}
               style={{ flex: 1 }}
-              title="Playback speed multiplier"
+              title="Playback speed multiplier (log scale: 0.01x to 4x)"
             />
-            <span style={{ fontSize: 11, color: 'var(--fc-textDim)', width: 36, textAlign: 'right' }}>
-              {jointAnimationSpeed.toFixed(2)}x
+            <span style={{ fontSize: 11, color: 'var(--fc-textDim)', width: 42, textAlign: 'right' }}>
+              {formatAnimationSpeed(jointAnimationSpeed)}x
             </span>
           </div>
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
