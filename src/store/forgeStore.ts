@@ -302,7 +302,7 @@ const syncCutPlaneEnabled = (
 ): Record<string, boolean> => {
   const next: Record<string, boolean> = {};
   cutPlanes.forEach((cp) => {
-    next[cp.name] = prevEnabled[cp.name] ?? true;
+    next[cp.name] = prevEnabled[cp.name] ?? false;
   });
   return next;
 };
