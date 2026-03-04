@@ -1,6 +1,14 @@
 declare module 'gifenc' {
+  export interface GIFEncoderOptions {
+    initialCapacity?: number;
+    auto?: boolean;
+  }
+
+  export type GIFPaletteColor = [number, number, number] | [number, number, number, number];
+  export type GIFPalette = ReadonlyArray<GIFPaletteColor>;
+
   export interface GIFFrameOptions {
-    palette: ArrayLike<number>;
+    palette: GIFPalette;
     delay?: number;
     repeat?: number;
   }
@@ -12,16 +20,15 @@ declare module 'gifenc' {
       height: number,
       options: GIFFrameOptions,
     ): void;
+    bytesView(): Uint8Array;
     finish(): void;
     bytes(): Uint8Array;
   }
 
-  export interface GifencModule {
-    GIFEncoder(): GIFEncoderInstance;
-    quantize(pixels: ArrayLike<number>, maxColors: number): Uint8Array;
-    applyPalette(pixels: ArrayLike<number>, palette: ArrayLike<number>): Uint8Array;
-  }
+  export function GIFEncoder(options?: GIFEncoderOptions): GIFEncoderInstance;
+  export function quantize(pixels: ArrayLike<number>, maxColors: number): GIFPalette;
+  export function applyPalette(pixels: ArrayLike<number>, palette: GIFPalette): Uint8Array;
 
-  const gifenc: GifencModule;
-  export default gifenc;
+  const defaultExport: typeof GIFEncoder;
+  export default defaultExport;
 }

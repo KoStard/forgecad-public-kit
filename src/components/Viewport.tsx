@@ -15,7 +15,7 @@ import {
 import { themes } from '../theme';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import gifenc from 'gifenc';
+import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 interface PersistedViewportCameraState {
   projectionMode: ProjectionMode;
@@ -31,8 +31,6 @@ const GIF_DEFAULT_FPS = 18;
 const GIF_DEFAULT_FRAMES_PER_TURN = 54;
 const GIF_DEFAULT_HOLD_FRAMES = 4;
 const GIF_DEFAULT_PITCH_DEG = 18;
-
-const { GIFEncoder, quantize, applyPalette } = gifenc;
 
 const waitForAnimationFrame = (): Promise<void> => (
   new Promise((resolve) => {
