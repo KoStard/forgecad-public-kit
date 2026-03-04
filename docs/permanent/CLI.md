@@ -245,14 +245,14 @@ for (const obj of result.objects) {
 
 ### Cross-file imports
 
-When running scripts that use `importSketch()` or `importPart()`, pass all project files (or at least all files reachable by imports), keyed by project-relative path. This supports both root-relative imports (`api/part.forge.js`) and relative imports (`./part.forge.js`, `../shared/profile.sketch.js`):
+When running scripts that use `importSketch()` / `importSvgSketch()` / `importPart()`, pass all project files (or at least all files reachable by imports), keyed by project-relative path. This supports root-relative and relative imports, including `.svg` assets (`./assets/logo.svg`):
 
 ```typescript
 import { readdirSync, readFileSync } from 'fs';
 
 const allFiles: Record<string, string> = {};
 for (const f of readdirSync(scriptDir)) {
-  if (f.endsWith('.forge.js') || f.endsWith('.sketch.js')) {
+  if (f.endsWith('.forge.js') || f.endsWith('.sketch.js') || f.endsWith('.svg')) {
     allFiles[f] = readFileSync(join(scriptDir, f), 'utf-8');
   }
 }

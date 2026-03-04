@@ -25,7 +25,7 @@ src/
 │   ├── kernel.ts         # Manifold WASM wrapper, Shape class, primitives
 │   ├── headless.ts       # Single entry point for all contexts (browser + Node CLI)
 │   ├── index.ts          # Browser entry point (re-exports from headless.ts)
-│   ├── runner.ts         # Script sandbox — executes user .forge.js/.sketch.js
+│   ├── runner.ts         # Script sandbox — executes user scripts and resolves imported .svg assets
 │   ├── params.ts         # Parameter system (param() → UI sliders)
 │   ├── library.ts        # Part library (lib.boltHole, lib.pipe, etc.)
 │   ├── section.ts        # Plane intersection / projection

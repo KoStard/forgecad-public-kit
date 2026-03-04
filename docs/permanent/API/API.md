@@ -1337,23 +1337,29 @@ Constraints accept both string IDs and entity objects (Point2D, Line2D) — enti
 
 ## Multi-File Projects
 
-ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.js`, return a `Sketch`) or **parts** (`.forge.js`, return a `Shape` or `TrackedShape`).
+ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.js`, return a `Sketch`), **parts** (`.forge.js`, return a `Shape` or `TrackedShape`), or **SVG assets** (`.svg`, parsed into a `Sketch`).
 
 ### File Types
 - `*.sketch.js` — 2D sketch file, must return a `Sketch`
 - `*.forge.js` — 3D part file, must return a `Shape` or `TrackedShape`
+- `*.svg` — vector artwork file, imported as sketch geometry
 
 ### Import Path Resolution
-- `./file.forge.js` and `../file.forge.js` resolve relative to the file that calls `importSketch()` / `importPart()`
+- `./file.forge.js`, `./file.sketch.js`, `./asset.svg` (and `../...`) resolve relative to the file that calls imports
 - Bare paths like `api/bracket.forge.js` resolve from the opened project root
 - Leading `/` is treated as project-root relative
 
-### `importSketch(fileName, paramOverrides?)`
-Executes another file and returns its result as a `Sketch`. The target file must return a `Sketch`.
+### `importSketch(fileName, paramOverridesOrSvgOptions?)`
+Imports a sketch and returns `Sketch`.
+
+- For `*.sketch.js`: executes the file (must return `Sketch`)
+- For `*.svg`: parses vector geometry into a `Sketch`
 
 **Parameters:**
 - `fileName` (string) — Import path (e.g. `"./profile.sketch.js"` or `"api/profile.sketch.js"`)
-- `paramOverrides` (optional object) — Import-time parameter overrides by param name
+- `paramOverridesOrSvgOptions` (optional object)
+  - For `*.sketch.js`: import-time param overrides by param name
+  - For `*.svg`: SVG import options (see `importSvgSketch`)
 
 **Returns:** `Sketch`
 
@@ -1364,6 +1370,44 @@ const profile = importSketch("bracket-profile.sketch.js", {
   "Height": 18,
 });
 return profile.extrude(50);
+```
+
+```javascript
+// Import SVG and keep only the largest connected region
+const logo = importSketch("assets/logo.svg", {
+  include: "auto",
+  regionSelection: "largest",
+  flattenTolerance: 0.25,
+});
+return logo.extrude(2);
+```
+
+### `importSvgSketch(fileName, options?)`
+Parses an SVG file and returns a `Sketch`.
+
+**Parameters:**
+- `fileName` (string) — Import path to an `.svg`
+- `options` (optional object):
+  - `include`: `'auto' | 'fill' | 'stroke' | 'fill-and-stroke'` (default: `'auto'`)
+  - `regionSelection`: `'all' | 'largest'` (default: `'all'`)
+  - `maxRegions`: number (largest-first cap)
+  - `minRegionArea`: number
+  - `minRegionAreaRatio`: number (fraction of largest region area)
+  - `flattenTolerance`: number (curve discretization tolerance)
+  - `arcSegments`: number (minimum arc segment count)
+  - `scale`: number (uniform scale factor)
+  - `simplify`: number (final simplify tolerance)
+  - `invertY`: boolean (default: `true`, converts SVG Y-down to CAD Y-up)
+
+**Returns:** `Sketch`
+
+```javascript
+const badge = importSvgSketch("assets/badge.svg", {
+  include: "fill-and-stroke",
+  minRegionAreaRatio: 0.001,
+  maxRegions: 8,
+});
+return badge;
 ```
 
 ### `importPart(fileName, paramOverrides?)`
@@ -1392,6 +1436,7 @@ return union(bracket, bracket2);
 - Params supplied through `paramOverrides` are treated as fixed arguments for that import call
 - Relative imports (`./` / `../`) are resolved from the current file path
 - `importPart()` accepts imported `Shape` or `TrackedShape` results and always returns a chainable `Shape`
+- SVG import supports deterministic region filtering (`regionSelection`, `maxRegions`, area thresholds)
 - The returned `Shape` or `Sketch` is fully chainable — use `.translate()`, `.rotate()`, `.subtract()`, etc.
 
 ### Typical Project Structure
