@@ -8,7 +8,7 @@ const length = param("Length", 220, { min: 40, max: 800, unit: "mm" });
 const slotDepth = param("Slot Depth", 5.5, { min: 4.6, max: 6.6, step: 0.1, unit: "mm" });
 const slotInner = param("Slot Inner Width", 8.2, { min: 7, max: 10.5, step: 0.1, unit: "mm" });
 const centerBore = param("Center Bore", 5.5, { min: 0, max: 6.5, step: 0.1, unit: "mm" });
-const pocketDia = param("Pocket Dia", 4.0, { min: 0, max: 6, step: 0.1, unit: "mm" });
+const pocketDia = param("Pocket Dia", 4.4, { min: 0, max: 6, step: 0.1, unit: "mm" });
 
 const profile2d = lib.profile2020BSlot6Profile({
   slotInnerWidth: slotInner,

@@ -464,6 +464,8 @@ type Profile2020BSlot6ProfileOptions = {
   slotDepth?: number;
   slotNeckDepth?: number;
   centerBoreDia?: number;
+  centerBossDia?: number;
+  diagonalWebWidth?: number;
   cornerPocketDia?: number;
   cornerPocketOffset?: number;
   outerCornerRadius?: number;

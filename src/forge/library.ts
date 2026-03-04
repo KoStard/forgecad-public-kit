@@ -418,6 +418,10 @@ export interface Profile2020BSlot6ProfileOptions {
   slotNeckDepth?: number;
   /** Center core bore diameter (set 0 to disable). */
   centerBoreDia?: number;
+  /** Solid boss diameter around center bore (must exceed centerBoreDia when bore is enabled). */
+  centerBossDia?: number;
+  /** Width of diagonal ribs connecting center boss to corner regions. */
+  diagonalWebWidth?: number;
   /** Corner relief pocket diameter (set 0 to disable). */
   cornerPocketDia?: number;
   /** Corner relief pocket center offset from profile center. */
@@ -439,7 +443,9 @@ const DEFAULT_2020_B_SLOT6_PROFILE: Required<Profile2020BSlot6ProfileOptions> = 
   slotDepth: 5.5,
   slotNeckDepth: 1.8,
   centerBoreDia: 5.5,
-  cornerPocketDia: 4.0,
+  centerBossDia: 8.4,
+  diagonalWebWidth: 4.4,
+  cornerPocketDia: 4.4,
   cornerPocketOffset: 5.6,
   outerCornerRadius: 1.0,
   segments: 40,
@@ -465,6 +471,15 @@ function normalized2020BSlot6ProfileOptions(
   }
   if (opts.centerBoreDia < 0) {
     throw new Error('profile2020BSlot6Profile: centerBoreDia must be >= 0');
+  }
+  if (opts.centerBossDia < 0) {
+    throw new Error('profile2020BSlot6Profile: centerBossDia must be >= 0');
+  }
+  if (opts.centerBoreDia > 0 && opts.centerBossDia <= opts.centerBoreDia) {
+    throw new Error('profile2020BSlot6Profile: centerBossDia must be > centerBoreDia');
+  }
+  if (opts.diagonalWebWidth <= 0 || opts.diagonalWebWidth >= 12) {
+    throw new Error('profile2020BSlot6Profile: diagonalWebWidth must be > 0 and < 12');
   }
   if (opts.cornerPocketDia < 0) {
     throw new Error('profile2020BSlot6Profile: cornerPocketDia must be >= 0');
@@ -522,6 +537,20 @@ export function profile2020BSlot6Profile(
   );
 
   let profile = difference2d(outer, slots);
+
+  // Internal skeleton: center boss + X-webs for monolithic connectivity.
+  const centerBoss = opts.centerBossDia > 0 ? circle2d(opts.centerBossDia / 2, opts.segments) : null;
+  const webLen = size * 1.15;
+  const xWeb = rect(webLen, opts.diagonalWebWidth, true);
+  const webs = union2d(
+    sketchRotate(xWeb, 45),
+    sketchRotate(xWeb, -45),
+  );
+
+  profile = union2d(profile, webs);
+  if (centerBoss) {
+    profile = union2d(profile, centerBoss);
+  }
 
   if (opts.centerBoreDia > 0) {
     profile = difference2d(profile, circle2d(opts.centerBoreDia / 2, opts.segments));

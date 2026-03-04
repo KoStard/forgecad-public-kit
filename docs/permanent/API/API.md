@@ -1599,7 +1599,9 @@ Defaults target common B-type 20x20 conventions:
 - slot width `6.0`
 - slot depth `5.5`
 - center bore `5.5`
-- four internal relief pockets
+- center boss `8.4`
+- diagonal web width `4.4`
+- four internal relief pockets (`4.4` dia)
 
 **Options:**
 - `slotWidth` (number) - Default: `6.0`
@@ -1607,7 +1609,9 @@ Defaults target common B-type 20x20 conventions:
 - `slotDepth` (number) - Default: `5.5`
 - `slotNeckDepth` (number) - Default: `1.8`
 - `centerBoreDia` (number) - Default: `5.5` (set `0` to disable)
-- `cornerPocketDia` (number) - Default: `4.0` (set `0` to disable)
+- `centerBossDia` (number) - Default: `8.4`
+- `diagonalWebWidth` (number) - Default: `4.4`
+- `cornerPocketDia` (number) - Default: `4.4` (set `0` to disable)
 - `cornerPocketOffset` (number) - Default: `5.6`
 - `outerCornerRadius` (number) - Default: `1.0`
 - `segments` (number) - Default: `40`
