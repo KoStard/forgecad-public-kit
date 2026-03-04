@@ -367,7 +367,7 @@ type GearCouplingOptions = {
   pair?: GearRatioLike;
   driverTeeth?: number;
   drivenTeeth?: number;
-  mesh?: 'external' | 'internal';
+  mesh?: 'external' | 'internal' | 'bevel' | 'face';
   offset?: number;
 };
 type BomRow = {
@@ -591,6 +591,37 @@ type RackGearOptions = {
   baseHeight?: number;
   center?: boolean;
 };
+type BevelGearOptions = {
+  module: number;
+  teeth: number;
+  pressureAngleDeg?: number;
+  faceWidth: number;
+  backlash?: number;
+  clearance?: number;
+  addendum?: number;
+  dedendum?: number;
+  boreDiameter?: number;
+  pitchAngleDeg?: number;
+  mateTeeth?: number;
+  shaftAngleDeg?: number;
+  center?: boolean;
+  segmentsPerTooth?: number;
+};
+type FaceGearOptions = {
+  module: number;
+  teeth: number;
+  pressureAngleDeg?: number;
+  faceWidth: number;
+  backlash?: number;
+  clearance?: number;
+  addendum?: number;
+  dedendum?: number;
+  toothHeight?: number;
+  rimWidth?: number;
+  boreDiameter?: number;
+  center?: boolean;
+  segmentsPerTooth?: number;
+};
 type GearPairSpec = {
   module: number;
   teeth: number;
@@ -617,6 +648,50 @@ type GearPairResult = {
   pressureAngleDeg: number;
   workingPressureAngleDeg: number;
   contactRatio: number;
+  jointRatio: number;
+  speedReduction: number;
+  diagnostics: GearPairDiagnostic[];
+  status: 'ok' | 'warn' | 'error';
+};
+type GearMeshPlacement = {
+  pinionAxis: [number, number, number];
+  gearAxis: [number, number, number];
+  pinionCenter: [number, number, number];
+  gearCenter: [number, number, number];
+};
+type BevelGearPairResult = GearMeshPlacement & {
+  pinion: Shape;
+  gear: Shape;
+  shaftAngleDeg: number;
+  pinionPitchAngleDeg: number;
+  gearPitchAngleDeg: number;
+  coneDistance: number;
+  backlash: number;
+  jointRatio: number;
+  speedReduction: number;
+  diagnostics: GearPairDiagnostic[];
+  status: 'ok' | 'warn' | 'error';
+};
+type FaceGearPairSpec = {
+  module: number;
+  teeth: number;
+  pressureAngleDeg?: number;
+  faceWidth?: number;
+  backlash?: number;
+  clearance?: number;
+  addendum?: number;
+  dedendum?: number;
+  toothHeight?: number;
+  rimWidth?: number;
+  boreDiameter?: number;
+  segmentsPerTooth?: number;
+};
+type FaceGearPairResult = GearMeshPlacement & {
+  pinion: Shape;
+  gear: Shape;
+  shaftAngleDeg: number;
+  meshRadius: number;
+  backlash: number;
   jointRatio: number;
   speedReduction: number;
   diagnostics: GearPairDiagnostic[];
@@ -685,8 +760,16 @@ declare const lib: {
   ringGear(options: RingGearOptions): Shape;
   /** Linear rack gear with parametric pressure-angle flanks. */
   rackGear(options: RackGearOptions): Shape;
+  /** Bevel gear from a tapered involute extrusion (conical approximation). */
+  bevelGear(options: BevelGearOptions): Shape;
+  /** Face/crown-style gear with radial teeth on the top face. */
+  faceGear(options: FaceGearOptions): Shape;
   /** Pair-level ratio/backlash/contact diagnostics with optional auto-placement. */
   gearPair(options: { pinion: Shape | GearPairSpec; gear: Shape | GearPairSpec; backlash?: number; centerDistance?: number; place?: boolean; phaseDeg?: number }): GearPairResult;
+  /** Bevel gear pair helper with ratio diagnostics and recommended joint placement axes/centers. */
+  bevelGearPair(options: { pinion: Shape | GearPairSpec; gear: Shape | GearPairSpec; shaftAngleDeg?: number; backlash?: number; place?: boolean; phaseDeg?: number }): BevelGearPairResult;
+  /** Face gear + pinion helper with ratio diagnostics and recommended joint placement axes/centers. */
+  faceGearPair(options: { pinion: Shape | GearPairSpec; gear: Shape | FaceGearPairSpec; shaftAngleDeg?: number; backlash?: number; place?: boolean; phaseDeg?: number }): FaceGearPairResult;
 };
 
 // --- Dimensions (visual annotations) ---
