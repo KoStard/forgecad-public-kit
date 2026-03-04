@@ -59,7 +59,7 @@ export function ViewPanel() {
   const setObjectColor = useForgeStore((s) => s.setObjectColor);
   const selectedObjectId = useForgeStore((s) => s.selectedObjectId);
   const selectObject = useForgeStore((s) => s.selectObject);
-  const focusedObjectId = useForgeStore((s) => s.focusedObjectId);
+  const focusedObjectIds = useForgeStore((s) => s.focusedObjectIds);
   const focusObject = useForgeStore((s) => s.focusObject);
   const clearFocusedObject = useForgeStore((s) => s.clearFocusedObject);
   const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
@@ -115,6 +115,7 @@ export function ViewPanel() {
     () => new Set(jointCouplings.map((coupling) => coupling.joint)),
     [jointCouplings],
   );
+  const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
 
   useEffect(() => {
     if (!hoveredJointName) return;
@@ -323,9 +324,9 @@ export function ViewPanel() {
 
       <div style={{ ...sectionStyle, paddingBottom: 0 }}>
         <div style={labelStyle}>Objects</div>
-        {focusedObjectId && (
+        {focusedObjectIds.length > 0 && (
           <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 8 }}>
-            Focus mode on. Double-click empty space or press Esc to exit.
+            Focus mode on. Shift/Cmd/Ctrl + double-click adds objects.
           </div>
         )}
       </div>
@@ -342,8 +343,8 @@ export function ViewPanel() {
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
           const isSelected = selectedObjectId === obj.id;
-          const isFocused = focusedObjectId === obj.id;
-          const isDimmedByFocus = !!focusedObjectId && !isFocused;
+          const isFocused = focusedObjectIdSet.has(obj.id);
+          const isDimmedByFocus = focusedObjectIdSet.size > 0 && !isFocused;
           return (
             <div
               key={obj.id}
@@ -352,7 +353,8 @@ export function ViewPanel() {
               onClick={() => selectObject(obj.id)}
               onDoubleClick={(event) => {
                 event.stopPropagation();
-                focusObject(obj.id);
+                const additive = event.shiftKey || event.metaKey || event.ctrlKey;
+                focusObject(obj.id, { additive });
               }}
               onMouseEnter={() => setHoveredObjectId(obj.id)}
               onMouseLeave={() => setHoveredObjectId(null)}
