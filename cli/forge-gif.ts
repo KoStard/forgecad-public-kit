@@ -19,10 +19,8 @@ import { resolve, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'net';
 import { PNG } from 'pngjs';
-import gifenc from 'gifenc';
+import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 import { collectProjectFiles } from './collect-files';
-
-const { GIFEncoder, quantize, applyPalette } = gifenc;
 
 type OrbitMode = 'solid' | 'wireframe';
 
