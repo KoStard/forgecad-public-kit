@@ -115,13 +115,17 @@ return [
 
 ## Cut Planes
 
-### `cutPlane(name, normal, offset?)`
+### `cutPlane(name, normal, offsetOrOptions?, options?)`
 Defines a named section plane for inspection. Appears as a toggle in the View Panel. When enabled, geometry on one side of the plane is clipped away, revealing the interior.
 
 **Parameters:**
 - `name` (string) - Display name in View Panel
 - `normal` ([number, number, number]) - Direction vector pointing toward the side that gets removed
-- `offset` (number, optional) - Distance from origin along the normal where the cut happens. Default: 0
+- `offsetOrOptions` (number or object, optional):
+  - number: Distance from origin along the normal where the cut happens. Default: `0`
+  - object: `{ offset?: number, exclude?: string | string[] }`
+- `options` (object, optional; used with numeric offset):
+  - `exclude` (`string | string[]`) - Object `name` values to keep uncut for this plane
 
 **Returns:** void (side effect: registers the plane for UI toggle)
 
@@ -139,12 +143,22 @@ cutPlane("Diagonal", [1, 1, 0], 20);
 // Parametric cut position
 const cutZ = param("Cut Height", 10, { min: -50, max: 50, unit: "mm" });
 cutPlane("Horizontal", [0, 0, 1], cutZ);
+
+// Keep selected objects uncut by name
+cutPlane("Inspection", [0, 0, 1], cutZ, { exclude: ["Probe", "Fasteners"] });
+
+return [
+  { name: "Housing", shape: housing },
+  { name: "Probe", shape: probe },
+  { name: "Fasteners", shape: bolts },
+];
 ```
 
 **How it works:**
 - Cut planes trim viewport solids with `trimByPlane()` so section faces are capped (solid, not hollow)
 - If a trim fails on pathological mesh state, the renderer falls back to GPU clipping for that object
 - Multiple planes can be defined and toggled independently
+- Exclusions apply per plane: matching object names stay intact, everything else is cut
 - Planes are per-script — they reset on each execution
 - Toggle state persists in the UI across parameter changes
 - Active planes can be visualized with built-in viewport guides (no model geometry required)

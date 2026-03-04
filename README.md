@@ -176,6 +176,7 @@ Notes:
 
 - The Forge API is globally available inside scripts (no imports required).
 - `param(...)` values become live sliders in the UI.
+- `cutPlane(...)` supports exclusions: `cutPlane("Section", [0,0,1], z, { exclude: ["Probe"] })`.
 - Return a `Shape`, `Sketch`, `ShapeGroup`, array of objects, or assembly scene.
 
 ## CLI Workflows
