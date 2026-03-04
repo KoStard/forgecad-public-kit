@@ -2312,7 +2312,7 @@ export function Viewport() {
   const hoveredObjectId = useForgeStore((s) => s.hoveredObjectId);
   const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
   const selectObject = useForgeStore((s) => s.selectObject);
-  const focusedObjectId = useForgeStore((s) => s.focusedObjectId);
+  const focusedObjectIds = useForgeStore((s) => s.focusedObjectIds);
   const focusObject = useForgeStore((s) => s.focusObject);
   const clearFocusedObject = useForgeStore((s) => s.clearFocusedObject);
   const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
@@ -2626,6 +2626,7 @@ export function Viewport() {
   const [hoverLabel, setHoverLabel] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
   const themeName = useForgeStore((s) => s.theme);
   const t = themes[themeName];
+  const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
 
   const handleViewPersistenceResolved = useCallback((restored: boolean) => {
     if (restored) {
@@ -2652,7 +2653,7 @@ export function Viewport() {
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (!useForgeStore.getState().focusedObjectId) return;
+      if (useForgeStore.getState().focusedObjectIds.length === 0) return;
       clearFocusedObject();
     };
     window.addEventListener('keydown', handleEscape);
@@ -2694,7 +2695,8 @@ export function Viewport() {
   const handleObjectDoubleClick = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
     if (measureMode) return;
     event.stopPropagation();
-    focusObject(obj.id);
+    const additive = event.shiftKey || event.metaKey || event.ctrlKey;
+    focusObject(obj.id, { additive });
   }, [focusObject, measureMode]);
 
   const handleViewportPointerMissed = useCallback((event: MouseEvent) => {
@@ -2747,7 +2749,7 @@ export function Viewport() {
 
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
-          const isDimmedByFocus = !!focusedObjectId && focusedObjectId !== obj.id;
+          const isDimmedByFocus = focusedObjectIdSet.size > 0 && !focusedObjectIdSet.has(obj.id);
           const effectiveSettings = isDimmedByFocus
             ? { ...settings, opacity: Math.min(settings.opacity, FOCUS_MODE_DIM_OPACITY) }
             : settings;
