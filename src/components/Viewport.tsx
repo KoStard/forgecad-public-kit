@@ -623,7 +623,8 @@ function ForgeObject({
   renderMode,
   matrix,
   isHovered,
-  clippingPlanes,
+  cutPlanes,
+  fallbackClippingPlanes,
   onPointerEnter,
   onPointerMove,
   onPointerLeave,
@@ -634,21 +635,75 @@ function ForgeObject({
   renderMode: RenderMode;
   matrix: THREE.Matrix4;
   isHovered?: boolean;
-  clippingPlanes?: THREE.Plane[];
+  cutPlanes?: CutPlaneDef[];
+  fallbackClippingPlanes?: THREE.Plane[];
   onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
   onClick?: (event: ThreeEvent<MouseEvent>) => void;
 }) {
-  const { solidGeo, edgesGeo } = useMemo(() => {
-    if (!obj.shape) return { solidGeo: null, edgesGeo: null };
-    try {
-      const { solid, edges } = shapeToGeometry(obj.shape);
-      return { solidGeo: solid, edgesGeo: edges };
-    } catch {
-      return { solidGeo: null, edgesGeo: null };
+  const { solidGeo, edgesGeo, useFallbackClipping } = useMemo(() => {
+    if (!obj.shape) return { solidGeo: null, edgesGeo: null, useFallbackClipping: false };
+    let shapeForRender = obj.shape;
+    let fallbackToGpuClip = false;
+
+    if ((cutPlanes?.length ?? 0) > 0) {
+      try {
+        // Cut planes are defined in world space, so convert each plane into this object's
+        // local coordinates before trimming to keep sectioning aligned with animated transforms.
+        const inverseMatrix = matrix.clone().invert();
+        cutPlanes?.forEach((cutPlaneDef) => {
+          const worldNormal = new THREE.Vector3(
+            cutPlaneDef.normal[0],
+            cutPlaneDef.normal[1],
+            cutPlaneDef.normal[2],
+          );
+          if (worldNormal.lengthSq() <= 1e-8) return;
+          worldNormal.normalize();
+
+          const worldPlane = new THREE.Plane(worldNormal, -cutPlaneDef.offset);
+          const localPlane = worldPlane.clone().applyMatrix4(inverseMatrix);
+          const normalLength = localPlane.normal.length();
+          if (!Number.isFinite(normalLength) || normalLength <= 1e-8) return;
+
+          const invNormalLength = 1 / normalLength;
+          const localNormal: [number, number, number] = [
+            localPlane.normal.x * invNormalLength,
+            localPlane.normal.y * invNormalLength,
+            localPlane.normal.z * invNormalLength,
+          ];
+          const localOffset = -localPlane.constant * invNormalLength;
+          shapeForRender = shapeForRender.trimByPlane(localNormal, localOffset);
+        });
+      } catch {
+        // If boolean trimming fails on pathological geometry, fall back to GPU clipping.
+        shapeForRender = obj.shape;
+        fallbackToGpuClip = true;
+      }
     }
-  }, [obj.shape]);
+
+    try {
+      const { solid, edges } = shapeToGeometry(shapeForRender);
+      return { solidGeo: solid, edgesGeo: edges, useFallbackClipping: fallbackToGpuClip };
+    } catch {
+      if (!fallbackToGpuClip && (cutPlanes?.length ?? 0) > 0) {
+        try {
+          const { solid, edges } = shapeToGeometry(obj.shape);
+          return { solidGeo: solid, edgesGeo: edges, useFallbackClipping: true };
+        } catch {
+          return { solidGeo: null, edgesGeo: null, useFallbackClipping: false };
+        }
+      }
+      return { solidGeo: null, edgesGeo: null, useFallbackClipping: false };
+    }
+  }, [cutPlanes, matrix, obj.shape]);
+
+  useEffect(() => {
+    return () => {
+      solidGeo?.dispose();
+      edgesGeo?.dispose();
+    };
+  }, [edgesGeo, solidGeo]);
 
   if (!solidGeo || !settings.visible) return null;
 
@@ -656,6 +711,7 @@ function ForgeObject({
   const showSolid = renderMode !== 'wireframe';
   const showEdges = renderMode === 'overlay';
   const showWire = renderMode === 'wireframe';
+  const activeClippingPlanes = useFallbackClipping ? (fallbackClippingPlanes ?? []) : [];
 
   return (
     <group
@@ -680,18 +736,18 @@ function ForgeObject({
             opacity={meshOpacity}
             emissive={isHovered ? settings.color : '#000000'}
             emissiveIntensity={isHovered ? 0.3 : 0}
-            clippingPlanes={clippingPlanes ?? []}
+            clippingPlanes={activeClippingPlanes}
           />
         </mesh>
       )}
       {showWire && edgesGeo && (
         <lineSegments geometry={edgesGeo}>
-          <lineBasicMaterial color={settings.color} transparent={meshOpacity < 1} opacity={meshOpacity} clippingPlanes={clippingPlanes ?? []} />
+          <lineBasicMaterial color={settings.color} transparent={meshOpacity < 1} opacity={meshOpacity} clippingPlanes={activeClippingPlanes} />
         </lineSegments>
       )}
       {showEdges && edgesGeo && (
         <lineSegments geometry={edgesGeo}>
-          <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={Math.min(1, meshOpacity + 0.1)} clippingPlanes={clippingPlanes ?? []} />
+          <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={Math.min(1, meshOpacity + 0.1)} clippingPlanes={activeClippingPlanes} />
         </lineSegments>
       )}
     </group>
@@ -2651,7 +2707,8 @@ export function Viewport() {
                 renderMode={renderMode}
                 matrix={matrix}
                 isHovered={isHovered}
-                clippingPlanes={activeClippingPlanes}
+                cutPlanes={activeCutPlaneDefs}
+                fallbackClippingPlanes={activeClippingPlanes}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
                 onPointerMove={(event) => updateHoverLabel(obj, event)}
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
