@@ -1402,6 +1402,8 @@ Parses an SVG file and returns a `Sketch`.
   - `flattenTolerance`: number (curve discretization tolerance)
   - `arcSegments`: number (minimum arc segment count)
   - `scale`: number (uniform scale factor)
+  - `maxWidth`: number (uniformly downscale to keep final sketch width within this limit)
+  - `maxHeight`: number (uniformly downscale to keep final sketch height within this limit)
   - `simplify`: number (final simplify tolerance)
   - `invertY`: boolean (default: `true`, converts SVG Y-down to CAD Y-up)
 
@@ -1412,6 +1414,8 @@ const badge = importSvgSketch("assets/badge.svg", {
   include: "fill-and-stroke",
   minRegionAreaRatio: 0.001,
   maxRegions: 8,
+  maxWidth: 120,
+  maxHeight: 80,
 });
 return badge;
 ```

@@ -38,6 +38,16 @@ export interface SvgImportOptions {
   arcSegments?: number;
   /** Global scale applied after SVG parsing. */
   scale?: number;
+  /**
+   * Maximum imported sketch width.
+   * If exceeded, geometry is uniformly downscaled to fit.
+   */
+  maxWidth?: number;
+  /**
+   * Maximum imported sketch height.
+   * If exceeded, geometry is uniformly downscaled to fit.
+   */
+  maxHeight?: number;
   /** Simplification tolerance for final sketch cleanup. */
   simplify?: number;
   /**
@@ -56,6 +66,8 @@ interface NormalizedSvgImportOptions {
   flattenTolerance: number;
   arcSegments: number;
   scale: number;
+  maxWidth: number;
+  maxHeight: number;
   simplify: number;
   invertY: boolean;
 }
@@ -1164,6 +1176,31 @@ function filterRegions(sketch: Sketch, options: NormalizedSvgImportOptions): Ske
   return union2d(...kept.map((region) => region.sketch));
 }
 
+function fitSketchToMaxDimensions(sketch: Sketch, options: NormalizedSvgImportOptions): Sketch {
+  const constrainWidth = Number.isFinite(options.maxWidth);
+  const constrainHeight = Number.isFinite(options.maxHeight);
+  if (!constrainWidth && !constrainHeight) return sketch;
+
+  const bounds = sketch.bounds();
+  const min = bounds.min as ArrayLike<number>;
+  const max = bounds.max as ArrayLike<number>;
+  const width = Math.max(0, (max[0] ?? 0) - (min[0] ?? 0));
+  const height = Math.max(0, (max[1] ?? 0) - (min[1] ?? 0));
+
+  let fitScale = Number.POSITIVE_INFINITY;
+  if (constrainWidth && width > EPS) {
+    fitScale = Math.min(fitScale, options.maxWidth / width);
+  }
+  if (constrainHeight && height > EPS) {
+    fitScale = Math.min(fitScale, options.maxHeight / height);
+  }
+
+  if (!Number.isFinite(fitScale) || fitScale <= 0 || fitScale >= (1 - EPS)) {
+    return sketch;
+  }
+  return sketch.scale(fitScale);
+}
+
 function computeRootNormalizeMatrix(
   attrs: Record<string, string>,
   options: NormalizedSvgImportOptions,
@@ -1289,6 +1326,12 @@ function normalizeSvgImportOptions(options: SvgImportOptions = {}): NormalizedSv
   const scale = Number.isFinite(options.scale)
     ? Math.max(1e-6, options.scale as number)
     : 1;
+  const maxWidth = Number.isFinite(options.maxWidth)
+    ? Math.max(1e-6, options.maxWidth as number)
+    : Number.POSITIVE_INFINITY;
+  const maxHeight = Number.isFinite(options.maxHeight)
+    ? Math.max(1e-6, options.maxHeight as number)
+    : Number.POSITIVE_INFINITY;
   const simplify = Number.isFinite(options.simplify)
     ? Math.max(0, options.simplify as number)
     : 1e-5;
@@ -1303,6 +1346,8 @@ function normalizeSvgImportOptions(options: SvgImportOptions = {}): NormalizedSv
     flattenTolerance,
     arcSegments,
     scale,
+    maxWidth,
+    maxHeight,
     simplify,
     invertY,
   };
@@ -1331,6 +1376,8 @@ function validateSvgImportOptions(options: SvgImportOptions = {}): void {
   checkNumber(options.flattenTolerance, 'flattenTolerance', false);
   checkNumber(options.arcSegments, 'arcSegments', false);
   checkNumber(options.scale, 'scale', false);
+  checkNumber(options.maxWidth, 'maxWidth', false);
+  checkNumber(options.maxHeight, 'maxHeight', false);
   checkNumber(options.simplify, 'simplify');
   if (options.invertY != null && typeof options.invertY !== 'boolean') {
     throw new Error('SVG import option "invertY" must be a boolean');
@@ -1385,6 +1432,7 @@ export function sketchFromSvg(svgText: string, options: SvgImportOptions = {}): 
 
   let sketch = selected.length === 1 ? selected[0] : union2d(...selected);
   sketch = filterRegions(sketch, normalized);
+  sketch = fitSketchToMaxDimensions(sketch, normalized);
   if (normalized.simplify > 0) {
     sketch = sketch.simplify(normalized.simplify);
   }

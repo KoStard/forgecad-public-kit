@@ -41,6 +41,8 @@ type SvgImportOptions = {
   flattenTolerance?: number;
   arcSegments?: number;
   scale?: number;
+  maxWidth?: number;
+  maxHeight?: number;
   simplify?: number;
   invertY?: boolean;
 };

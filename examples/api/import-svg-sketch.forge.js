@@ -11,6 +11,8 @@ const allFill = importSvgSketch("api/import-svg-sketch-shape.svg", {
 const largestFill = importSketch("api/import-svg-sketch-shape.svg", {
   include: "fill",
   regionSelection: "largest",
+  maxWidth: 35,
+  maxHeight: 35,
 });
 
 const strokeOnly = importSvgSketch("api/import-svg-sketch-shape.svg", {

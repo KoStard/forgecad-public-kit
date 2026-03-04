@@ -400,6 +400,8 @@ const SVG_IMPORT_OPTION_KEYS = new Set([
   'flattenTolerance',
   'arcSegments',
   'scale',
+  'maxWidth',
+  'maxHeight',
   'simplify',
   'invertY',
 ]);
