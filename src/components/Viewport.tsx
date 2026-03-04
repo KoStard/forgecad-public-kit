@@ -280,6 +280,12 @@ const resolveHoverObjectName = (name: string, knownFileNames: Set<string>): stri
 };
 
 const ZERO_OFFSET: [number, number, number] = [0, 0, 0];
+const IDENTITY_MATRIX = new THREE.Matrix4();
+const JOINT_AXIS_COLOR = '#18dcff';
+const JOINT_AXIS_CORE_COLOR = '#f0fdff';
+const JOINT_ARC_COLOR = '#ff7a1a';
+const JOINT_ZERO_COLOR = '#ffe26a';
+const JOINT_ARC_VISUAL_LIMIT_DEG = 330;
 
 const explodeHash = (value: string): number => {
   let hash = 2166136261;
@@ -390,6 +396,23 @@ const formatSignedValue = (value: number, digits = 2): string => {
   const safe = Math.abs(value) < 1e-6 ? 0 : value;
   const fixed = safe.toFixed(digits);
   return safe >= 0 ? `+${fixed}` : fixed;
+};
+
+const resolveArcReferenceDirection = (axisWorld: THREE.Vector3): THREE.Vector3 => {
+  const candidates = [
+    new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(1, 0, 0),
+  ];
+  for (const candidate of candidates) {
+    const projected = candidate.clone().addScaledVector(axisWorld, -candidate.dot(axisWorld));
+    if (projected.lengthSq() > 1e-8) return projected.normalize();
+  }
+
+  const fallback = new THREE.Vector3(1, 0, 0).cross(axisWorld);
+  if (fallback.lengthSq() <= 1e-8) fallback.set(0, 1, 0).cross(axisWorld);
+  if (fallback.lengthSq() <= 1e-8) fallback.set(0, 0, 1);
+  return fallback.normalize();
 };
 
 const computeJointNodeMatrices = (
@@ -801,26 +824,108 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
     () => new THREE.BufferGeometry().setFromPoints([axisStart, axisEnd]),
     [axisEnd, axisStart],
   );
-  const axisDotRadius = Math.max(0.7, state.axisLength * 0.02);
-  const arrowRadius = Math.max(0.6, state.axisLength * 0.03);
-  const arrowLength = Math.max(2.4, state.axisLength * 0.09);
+  const isRevolute = state.joint.type === 'revolute';
+  const clampedVisualAngleDeg = useMemo(
+    () => THREE.MathUtils.clamp(state.value, -JOINT_ARC_VISUAL_LIMIT_DEG, JOINT_ARC_VISUAL_LIMIT_DEG),
+    [state.value],
+  );
+  const arcAngleRad = useMemo(() => THREE.MathUtils.degToRad(clampedVisualAngleDeg), [clampedVisualAngleDeg]);
+
+  const axisDotRadius = Math.max(0.75, state.axisLength * 0.02);
+  const axisArrowRadius = Math.max(0.7, state.axisLength * 0.03);
+  const axisArrowLength = Math.max(2.6, state.axisLength * 0.09);
   const arrowPosition = useMemo(
-    () => axisEnd.clone().addScaledVector(state.axisWorld, arrowLength * 0.4),
-    [arrowLength, axisEnd, state.axisWorld],
+    () => axisEnd.clone().addScaledVector(state.axisWorld, axisArrowLength * 0.4),
+    [axisArrowLength, axisEnd, state.axisWorld],
   );
   const arrowQuaternion = useMemo(
     () => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), state.axisWorld),
     [state.axisWorld],
   );
+
+  const arcRadius = Math.max(4.2, state.axisLength * 0.34);
+  const arcDotRadius = Math.max(0.6, state.axisLength * 0.016);
+  const arcStartDirection = useMemo(
+    () => resolveArcReferenceDirection(state.axisWorld),
+    [state.axisWorld],
+  );
+  const arcStartPoint = useMemo(
+    () => state.pivotWorld.clone().addScaledVector(arcStartDirection, arcRadius),
+    [arcRadius, arcStartDirection, state.pivotWorld],
+  );
+  const arcEndDirection = useMemo(
+    () => arcStartDirection.clone().applyAxisAngle(state.axisWorld, arcAngleRad),
+    [arcAngleRad, arcStartDirection, state.axisWorld],
+  );
+  const arcEndPoint = useMemo(
+    () => state.pivotWorld.clone().addScaledVector(arcEndDirection, arcRadius),
+    [arcEndDirection, arcRadius, state.pivotWorld],
+  );
+  const arcStartArmGeometry = useMemo(
+    () => new THREE.BufferGeometry().setFromPoints([state.pivotWorld, arcStartPoint]),
+    [arcStartPoint, state.pivotWorld],
+  );
+  const arcCurrentArmGeometry = useMemo(
+    () => new THREE.BufferGeometry().setFromPoints([state.pivotWorld, arcEndPoint]),
+    [arcEndPoint, state.pivotWorld],
+  );
+  const arcGeometry = useMemo(() => {
+    if (!isRevolute || Math.abs(arcAngleRad) <= 1e-4) return null;
+    const steps = Math.max(18, Math.ceil(Math.abs(clampedVisualAngleDeg) / 6));
+    const points: THREE.Vector3[] = [];
+    for (let i = 0; i < steps; i += 1) {
+      const thetaA = arcAngleRad * (i / steps);
+      const thetaB = arcAngleRad * ((i + 1) / steps);
+      const dirA = arcStartDirection.clone().applyAxisAngle(state.axisWorld, thetaA);
+      const dirB = arcStartDirection.clone().applyAxisAngle(state.axisWorld, thetaB);
+      points.push(
+        state.pivotWorld.clone().addScaledVector(dirA, arcRadius),
+        state.pivotWorld.clone().addScaledVector(dirB, arcRadius),
+      );
+    }
+    return new THREE.BufferGeometry().setFromPoints(points);
+  }, [
+    arcAngleRad,
+    arcRadius,
+    arcStartDirection,
+    clampedVisualAngleDeg,
+    isRevolute,
+    state.axisWorld,
+    state.pivotWorld,
+  ]);
+  const arcArrowLength = Math.max(1.8, state.axisLength * 0.065);
+  const arcArrowRadius = Math.max(0.45, state.axisLength * 0.02);
+  const arcTangent = useMemo(() => {
+    if (!isRevolute || Math.abs(arcAngleRad) <= 1e-4) return null;
+    const tangent = state.axisWorld.clone().cross(arcEndDirection);
+    if (tangent.lengthSq() <= 1e-8) return null;
+    tangent.normalize();
+    if (arcAngleRad < 0) tangent.multiplyScalar(-1);
+    return tangent;
+  }, [arcAngleRad, arcEndDirection, isRevolute, state.axisWorld]);
+  const arcArrowPosition = useMemo(() => {
+    if (!arcTangent || !arcGeometry) return null;
+    return arcEndPoint.clone().addScaledVector(arcTangent, arcArrowLength * 0.38);
+  }, [arcArrowLength, arcEndPoint, arcGeometry, arcTangent]);
+  const arcArrowQuaternion = useMemo(() => {
+    if (!arcTangent || !arcGeometry) return null;
+    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), arcTangent);
+  }, [arcGeometry, arcTangent]);
+
   const unit = state.joint.unit ? ` ${state.joint.unit}` : '';
   const valueLabel = state.joint.type === 'prismatic' ? 'Offset' : 'Angle';
 
-  useEffect(() => () => axisGeometry.dispose(), [axisGeometry]);
+  useEffect(() => () => {
+    axisGeometry.dispose();
+    arcStartArmGeometry.dispose();
+    arcCurrentArmGeometry.dispose();
+    arcGeometry?.dispose();
+  }, [arcCurrentArmGeometry, arcGeometry, arcStartArmGeometry, axisGeometry]);
 
   return (
     <group>
       <lineSegments geometry={axisGeometry} renderOrder={95} userData={{ measureHelper: true }}>
-        <lineBasicMaterial color="#67d7ff" depthTest={false} transparent opacity={0.98} toneMapped={false} />
+        <lineBasicMaterial color={JOINT_AXIS_COLOR} depthTest={false} transparent opacity={0.98} toneMapped={false} />
       </lineSegments>
       <mesh
         position={[state.pivotWorld.x, state.pivotWorld.y, state.pivotWorld.z]}
@@ -828,7 +933,7 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
         userData={{ measureHelper: true }}
       >
         <sphereGeometry args={[axisDotRadius, 18, 18]} />
-        <meshBasicMaterial color="#d9f6ff" depthTest={false} toneMapped={false} />
+        <meshBasicMaterial color={JOINT_AXIS_CORE_COLOR} depthTest={false} toneMapped={false} />
       </mesh>
       <mesh
         position={[arrowPosition.x, arrowPosition.y, arrowPosition.z]}
@@ -836,9 +941,51 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
         renderOrder={96}
         userData={{ measureHelper: true }}
       >
-        <coneGeometry args={[arrowRadius, arrowLength, 18]} />
-        <meshBasicMaterial color="#4fc7ff" depthTest={false} toneMapped={false} />
+        <coneGeometry args={[axisArrowRadius, axisArrowLength, 18]} />
+        <meshBasicMaterial color={JOINT_AXIS_COLOR} depthTest={false} toneMapped={false} />
       </mesh>
+      {isRevolute && (
+        <>
+          <lineSegments geometry={arcStartArmGeometry} renderOrder={97} userData={{ measureHelper: true }}>
+            <lineBasicMaterial color={JOINT_ZERO_COLOR} depthTest={false} transparent opacity={0.95} toneMapped={false} />
+          </lineSegments>
+          <lineSegments geometry={arcCurrentArmGeometry} renderOrder={97} userData={{ measureHelper: true }}>
+            <lineBasicMaterial color={JOINT_ARC_COLOR} depthTest={false} transparent opacity={0.98} toneMapped={false} />
+          </lineSegments>
+          {arcGeometry && (
+            <lineSegments geometry={arcGeometry} renderOrder={98} userData={{ measureHelper: true }}>
+              <lineBasicMaterial color={JOINT_ARC_COLOR} depthTest={false} transparent opacity={0.98} toneMapped={false} />
+            </lineSegments>
+          )}
+          <mesh
+            position={[arcStartPoint.x, arcStartPoint.y, arcStartPoint.z]}
+            renderOrder={98}
+            userData={{ measureHelper: true }}
+          >
+            <sphereGeometry args={[arcDotRadius, 14, 14]} />
+            <meshBasicMaterial color={JOINT_ZERO_COLOR} depthTest={false} toneMapped={false} />
+          </mesh>
+          <mesh
+            position={[arcEndPoint.x, arcEndPoint.y, arcEndPoint.z]}
+            renderOrder={98}
+            userData={{ measureHelper: true }}
+          >
+            <sphereGeometry args={[arcDotRadius, 14, 14]} />
+            <meshBasicMaterial color={JOINT_ARC_COLOR} depthTest={false} toneMapped={false} />
+          </mesh>
+          {arcArrowPosition && arcArrowQuaternion && (
+            <mesh
+              position={[arcArrowPosition.x, arcArrowPosition.y, arcArrowPosition.z]}
+              quaternion={arcArrowQuaternion}
+              renderOrder={99}
+              userData={{ measureHelper: true }}
+            >
+              <coneGeometry args={[arcArrowRadius, arcArrowLength, 14]} />
+              <meshBasicMaterial color={JOINT_ARC_COLOR} depthTest={false} toneMapped={false} />
+            </mesh>
+          )}
+        </>
+      )}
 
       <Html
         position={[labelPosition.x, labelPosition.y, labelPosition.z]}
@@ -850,10 +997,10 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
           style={{
             minWidth: 160,
             borderRadius: 8,
-            border: '1px solid rgba(93, 198, 255, 0.6)',
-            background: 'linear-gradient(148deg, rgba(6, 15, 24, 0.94) 0%, rgba(8, 22, 36, 0.9) 100%)',
-            boxShadow: '0 8px 18px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(134, 220, 255, 0.2)',
-            color: '#dbf4ff',
+            border: '1px solid rgba(125, 224, 255, 0.7)',
+            background: 'linear-gradient(148deg, rgba(4, 16, 29, 0.94) 0%, rgba(11, 29, 44, 0.91) 100%)',
+            boxShadow: '0 8px 18px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(133, 230, 255, 0.24)',
+            color: '#ddf8ff',
             fontFamily: 'monospace',
             fontSize: 10,
             letterSpacing: 0.2,
@@ -861,7 +1008,7 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
             lineHeight: 1.35,
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#8fdaff', marginBottom: 5 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#90e9ff', marginBottom: 5 }}>
             {state.joint.name}
           </div>
           <div>Axis {formatSignedValue(state.axisWorld.x, 3)}, {formatSignedValue(state.axisWorld.y, 3)}, {formatSignedValue(state.axisWorld.z, 3)}</div>
@@ -2276,6 +2423,45 @@ export function Viewport() {
     return Math.max(60, diagonal * 1.35, gridSize * 6);
   }, [gridSize, objectMatrices, objects]);
 
+  const jointOverlayBaseSize = useMemo(() => {
+    const bounds = new THREE.Box3();
+    let hasBounds = false;
+
+    objects.forEach((obj) => {
+      if (obj.shape) {
+        try {
+          const bb = obj.shape.boundingBox();
+          expandBoundsByTransformedAabb(bounds, bb.min, bb.max, IDENTITY_MATRIX);
+          hasBounds = true;
+        } catch {
+          // Ignore bad shape bounds from partial execution failures.
+        }
+        return;
+      }
+      if (obj.sketch) {
+        try {
+          const bb = obj.sketch.bounds();
+          expandBoundsByTransformedAabb(
+            bounds,
+            [bb.min[0], bb.min[1], 0],
+            [bb.max[0], bb.max[1], 0],
+            IDENTITY_MATRIX,
+          );
+          hasBounds = true;
+        } catch {
+          // Ignore bad sketch bounds from partial execution failures.
+        }
+      }
+    });
+
+    if (!hasBounds) return Math.max(60, gridSize * 8);
+
+    const size = new THREE.Vector3();
+    bounds.getSize(size);
+    const diagonal = Math.max(1, size.length());
+    return Math.max(60, diagonal * 1.35, gridSize * 6);
+  }, [gridSize, objects]);
+
   const hoveredJointOverlay = useMemo((): HoveredJointOverlayState | null => {
     if (!hoveredJointName) return null;
     const joint = joints.find((entry) => entry.name === hoveredJointName);
@@ -2298,7 +2484,7 @@ export function Viewport() {
 
     const { min, max } = resolveJointRange(joint);
     const value = clampJointValue(joint, effectiveJointValues[joint.name] ?? joint.defaultValue);
-    const axisLength = Math.max(24, sectionGuideSize * 0.16);
+    const axisLength = Math.max(24, jointOverlayBaseSize * 0.16);
     return {
       joint,
       value,
@@ -2313,9 +2499,9 @@ export function Viewport() {
     explodeOffsets,
     hoveredJointName,
     jointNodeMatrices,
+    jointOverlayBaseSize,
     joints,
     objects,
-    sectionGuideSize,
   ]);
 
   const hasShape = objects.some((obj) => obj.shape);
