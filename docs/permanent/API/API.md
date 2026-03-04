@@ -1590,6 +1590,27 @@ const pinion = lib.spurGear({
 });
 ```
 
+### `lib.sideGear(options)`
+Side/crown gear where teeth are on one face (`top` or `bottom`) instead of the outer rim.
+
+Uses the same involute tooth sizing inputs as `lib.spurGear(...)`, then projects the tooth band axially from one side.
+
+**Options:**
+- all `lib.spurGear(...)` options, plus:
+- `side` (`'top' | 'bottom'`, optional) - Which face gets the teeth. Default: `'top'`
+- `toothHeight` (number, optional) - Tooth projection height from the selected face. Default: `module`
+
+```javascript
+const side = lib.sideGear({
+  module: 1.25,
+  teeth: 36,
+  faceWidth: 8,
+  toothHeight: 1.2,
+  side: 'top',
+  boreDiameter: 8,
+});
+```
+
 ### `lib.ringGear(options)`
 Internal ring gear with involute-derived tooth spaces.
 
@@ -1674,6 +1695,43 @@ if (pair.status !== 'ok') {
 }
 
 return [pair.pinion, pair.gear];
+```
+
+### `lib.sideGearPair(options)`
+Build or validate a perpendicular pair between a side gear and a vertical spur gear.
+
+Accepts either:
+- side gear shapes produced by `lib.sideGear(...)` or side-gear specs (`{ module, teeth, ... }`)
+- vertical spur shapes produced by `lib.spurGear(...)` or spur specs (`{ module, teeth, ... }`)
+
+**Options:**
+- `side` (`Shape | SideGearSpec`) - side/crown gear member
+- `vertical` (`Shape | GearPairSpec`) - mating perpendicular spur gear
+- `backlash` (number, optional) - target radial backlash for auto center distance
+- `centerDistance` (number, optional) - override center distance directly
+- `meshPlaneZ` (number, optional) - override the Z plane where the vertical gear is placed
+- `place` (boolean, optional) - auto-place `vertical`. Default: `true`
+- `phaseDeg` (number, optional) - phase rotation applied before perpendicular placement
+
+**Returns:** `SideGearPairResult` with:
+- `side`, `vertical` (shapes)
+- `jointRatio`, `speedReduction`
+- `centerDistance`, `centerDistanceNominal`, `backlash`
+- `meshPlaneZ`, `radialOverlap`
+- `diagnostics[]` and `status` (`ok | warn | error`)
+
+```javascript
+const pair = lib.sideGearPair({
+  side: { module: 1.25, teeth: 36, faceWidth: 8, toothHeight: 1.2, side: 'top' },
+  vertical: { module: 1.25, teeth: 12, faceWidth: 8 },
+  backlash: 0.05,
+});
+
+if (pair.status !== 'ok') {
+  console.warn(pair.diagnostics);
+}
+
+return [pair.side, pair.vertical];
 ```
 
 ### `lib.tSlotProfile(options?)`
