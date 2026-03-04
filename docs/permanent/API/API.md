@@ -1404,6 +1404,7 @@ Parses an SVG file and returns a `Sketch`.
   - `scale`: number (uniform scale factor)
   - `maxWidth`: number (uniformly downscale to keep final sketch width within this limit)
   - `maxHeight`: number (uniformly downscale to keep final sketch height within this limit)
+  - `centerOnOrigin`: boolean (default: `false`, recenters final sketch bounds center to `(0, 0)`)
   - `simplify`: number (final simplify tolerance)
   - `invertY`: boolean (default: `true`, converts SVG Y-down to CAD Y-up)
 
@@ -1416,6 +1417,7 @@ const badge = importSvgSketch("assets/badge.svg", {
   maxRegions: 8,
   maxWidth: 120,
   maxHeight: 80,
+  centerOnOrigin: true,
 });
 return badge;
 ```

@@ -48,6 +48,10 @@ export interface SvgImportOptions {
    * If exceeded, geometry is uniformly downscaled to fit.
    */
   maxHeight?: number;
+  /**
+   * Recenter imported geometry so its 2D bounds center is at CAD origin.
+   */
+  centerOnOrigin?: boolean;
   /** Simplification tolerance for final sketch cleanup. */
   simplify?: number;
   /**
@@ -68,6 +72,7 @@ interface NormalizedSvgImportOptions {
   scale: number;
   maxWidth: number;
   maxHeight: number;
+  centerOnOrigin: boolean;
   simplify: number;
   invertY: boolean;
 }
@@ -1201,6 +1206,17 @@ function fitSketchToMaxDimensions(sketch: Sketch, options: NormalizedSvgImportOp
   return sketch.scale(fitScale);
 }
 
+function centerSketchOnOrigin(sketch: Sketch, options: NormalizedSvgImportOptions): Sketch {
+  if (!options.centerOnOrigin) return sketch;
+  const bounds = sketch.bounds();
+  const min = bounds.min as ArrayLike<number>;
+  const max = bounds.max as ArrayLike<number>;
+  const cx = ((min[0] ?? 0) + (max[0] ?? 0)) * 0.5;
+  const cy = ((min[1] ?? 0) + (max[1] ?? 0)) * 0.5;
+  if (Math.abs(cx) <= EPS && Math.abs(cy) <= EPS) return sketch;
+  return sketch.translate(-cx, -cy);
+}
+
 function computeRootNormalizeMatrix(
   attrs: Record<string, string>,
   options: NormalizedSvgImportOptions,
@@ -1332,6 +1348,7 @@ function normalizeSvgImportOptions(options: SvgImportOptions = {}): NormalizedSv
   const maxHeight = Number.isFinite(options.maxHeight)
     ? Math.max(1e-6, options.maxHeight as number)
     : Number.POSITIVE_INFINITY;
+  const centerOnOrigin = options.centerOnOrigin ?? false;
   const simplify = Number.isFinite(options.simplify)
     ? Math.max(0, options.simplify as number)
     : 1e-5;
@@ -1348,6 +1365,7 @@ function normalizeSvgImportOptions(options: SvgImportOptions = {}): NormalizedSv
     scale,
     maxWidth,
     maxHeight,
+    centerOnOrigin,
     simplify,
     invertY,
   };
@@ -1379,6 +1397,9 @@ function validateSvgImportOptions(options: SvgImportOptions = {}): void {
   checkNumber(options.maxWidth, 'maxWidth', false);
   checkNumber(options.maxHeight, 'maxHeight', false);
   checkNumber(options.simplify, 'simplify');
+  if (options.centerOnOrigin != null && typeof options.centerOnOrigin !== 'boolean') {
+    throw new Error('SVG import option "centerOnOrigin" must be a boolean');
+  }
   if (options.invertY != null && typeof options.invertY !== 'boolean') {
     throw new Error('SVG import option "invertY" must be a boolean');
   }
@@ -1439,6 +1460,7 @@ export function sketchFromSvg(svgText: string, options: SvgImportOptions = {}): 
   if (sketch.isEmpty()) {
     throw new Error('SVG import generated an empty sketch');
   }
+  sketch = centerSketchOnOrigin(sketch, normalized);
   return sketch;
 }
 

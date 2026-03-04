@@ -402,6 +402,7 @@ const SVG_IMPORT_OPTION_KEYS = new Set([
   'scale',
   'maxWidth',
   'maxHeight',
+  'centerOnOrigin',
   'simplify',
   'invertY',
 ]);
@@ -449,6 +450,13 @@ function parseSvgImportArgs(
           throw new Error(`${importKind}("${fileName}") option "invertY" must be a boolean`);
         }
         out.invertY = value;
+        break;
+      }
+      case 'centerOnOrigin': {
+        if (typeof value !== 'boolean') {
+          throw new Error(`${importKind}("${fileName}") option "centerOnOrigin" must be a boolean`);
+        }
+        out.centerOnOrigin = value;
         break;
       }
       default: {

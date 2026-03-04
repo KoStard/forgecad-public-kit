@@ -13,6 +13,7 @@ const largestFill = importSketch("api/import-svg-sketch-shape.svg", {
   regionSelection: "largest",
   maxWidth: 35,
   maxHeight: 35,
+  centerOnOrigin: true,
 });
 
 const strokeOnly = importSvgSketch("api/import-svg-sketch-shape.svg", {

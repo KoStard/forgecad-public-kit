@@ -43,6 +43,7 @@ type SvgImportOptions = {
   scale?: number;
   maxWidth?: number;
   maxHeight?: number;
+  centerOnOrigin?: boolean;
   simplify?: number;
   invertY?: boolean;
 };
