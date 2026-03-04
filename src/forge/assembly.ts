@@ -49,7 +49,7 @@ export interface GearCouplingOptions {
   pair?: GearRatioLike;
   driverTeeth?: number;
   drivenTeeth?: number;
-  mesh?: 'external' | 'internal';
+  mesh?: 'external' | 'internal' | 'bevel' | 'face';
   offset?: number;
 }
 
@@ -469,7 +469,8 @@ export class Assembly {
       if ((options.driverTeeth as number) <= 0 || (options.drivenTeeth as number) <= 0) {
         throw new Error(`Gear coupling "${drivenJointName}" driverTeeth/drivenTeeth must be > 0`);
       }
-      const sign = options.mesh === 'internal' ? 1 : -1;
+      const meshMode = options.mesh ?? 'external';
+      const sign = meshMode === 'internal' ? 1 : -1;
       ratio = sign * ((options.driverTeeth as number) / (options.drivenTeeth as number));
     }
 

@@ -222,6 +222,28 @@ function testAssemblyGearCouplings() {
 
   const internalState = internal.solve({ A: 12 }).getJointState();
   assert(approx(internalState.B ?? Number.NaN, 6), `Expected internal mesh B=6, got ${internalState.B}`);
+
+  const bevel = assembly('BevelMeshSignInvariant')
+    .addFrame('Base')
+    .addFrame('A')
+    .addFrame('B')
+    .addRevolute('A', 'Base', 'A', { axis: [0, 0, 1] })
+    .addRevolute('B', 'Base', 'B', { axis: [1, 0, 0] })
+    .addGearCoupling('B', 'A', { driverTeeth: 24, drivenTeeth: 48, mesh: 'bevel' });
+
+  const bevelState = bevel.solve({ A: 12 }).getJointState();
+  assert(approx(bevelState.B ?? Number.NaN, -6), `Expected bevel mesh B=-6, got ${bevelState.B}`);
+
+  const face = assembly('FaceMeshSignInvariant')
+    .addFrame('Base')
+    .addFrame('A')
+    .addFrame('B')
+    .addRevolute('A', 'Base', 'A', { axis: [0, 0, 1] })
+    .addRevolute('B', 'Base', 'B', { axis: [1, 0, 0] })
+    .addGearCoupling('B', 'A', { driverTeeth: 24, drivenTeeth: 48, mesh: 'face' });
+
+  const faceState = face.solve({ A: 12 }).getJointState();
+  assert(approx(faceState.B ?? Number.NaN, -6), `Expected face mesh B=-6, got ${faceState.B}`);
 }
 
 function testRuntimeJointCouplingResolution() {
