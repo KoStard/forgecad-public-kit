@@ -681,6 +681,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   setJointValue: (name, value) => set((state) => {
     const joints = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.joints ?? []);
+    const couplings = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.couplings ?? []);
+    const coupled = new Set(couplings.map((coupling) => coupling.joint));
+    if (coupled.has(name)) return {};
     const joint = joints.find((entry) => entry.name === name);
     if (!joint) return {};
     const clamped = clampJointValue(value, joint.min, joint.max);

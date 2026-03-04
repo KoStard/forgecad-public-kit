@@ -9,6 +9,7 @@ import { assembly } from '../src/forge/assembly';
 import { box, initKernel } from '../src/forge/kernel';
 import { group } from '../src/forge/group';
 import { Transform } from '../src/forge/transform';
+import { resolveJointViewValues, type JointViewCouplingDef, type JointViewDef } from '../src/forge/jointsView';
 
 const EPS = 1e-6;
 
@@ -156,12 +157,121 @@ function testShapeGroupPointAlongSugar() {
   assertVec(bySugar.max, byTransform.max, 'group.pointAlong max');
 }
 
+function testAssemblyJointCouplings() {
+  const mech = assembly('CoupledJointsInvariant')
+    .addFrame('Base')
+    .addFrame('A')
+    .addFrame('B')
+    .addFrame('C')
+    .addRevolute('A', 'Base', 'A', { axis: [0, 0, 1] })
+    .addRevolute('B', 'A', 'B', { axis: [0, 0, 1], min: -30, max: 30 })
+    .addRevolute('C', 'B', 'C', { axis: [0, 0, 1] })
+    .addJointCoupling('B', { terms: [{ joint: 'A', ratio: 2 }], offset: 10 })
+    .addJointCoupling('C', { terms: [{ joint: 'A', ratio: -1 }, { joint: 'B', ratio: 0.5 }], offset: 5 });
+
+  const solved = mech.solve({ A: 20, B: 999 });
+  const state = solved.getJointState();
+
+  assert(approx(state.A ?? Number.NaN, 20), `Expected A=20, got ${state.A}`);
+  assert(approx(state.B ?? Number.NaN, 30), `Expected B=30 after clamp, got ${state.B}`);
+  assert(approx(state.C ?? Number.NaN, 0), `Expected C=0 from coupled joints, got ${state.C}`);
+
+  const warnings = solved.warnings().join('\n');
+  assert(
+    warnings.includes('Joint "B" state override ignored because it is coupled'),
+    `Expected ignored-override warning for B, got:\n${warnings}`,
+  );
+}
+
+function testRuntimeJointCouplingResolution() {
+  const joints: JointViewDef[] = [
+    {
+      name: 'Steer',
+      child: 'Turret',
+      parent: 'Base',
+      type: 'revolute',
+      axis: [0, 0, 1],
+      pivot: [0, 0, 0],
+      min: -180,
+      max: 180,
+      defaultValue: 0,
+      unit: '°',
+    },
+    {
+      name: 'Drive',
+      child: 'Wheel',
+      parent: 'Turret',
+      type: 'revolute',
+      axis: [1, 0, 0],
+      pivot: [0, 0, -40],
+      min: -1440,
+      max: 1440,
+      defaultValue: 0,
+      unit: '°',
+    },
+    {
+      name: 'Top Gear',
+      child: 'Top Input',
+      parent: 'Base',
+      type: 'revolute',
+      axis: [0, 0, 1],
+      pivot: [0, 0, 0],
+      min: -720,
+      max: 720,
+      defaultValue: 0,
+      unit: '°',
+    },
+    {
+      name: 'Motor',
+      child: 'Motor 1',
+      parent: 'Base',
+      type: 'revolute',
+      axis: [0, 0, 1],
+      pivot: [0, 36, 0],
+      min: -200,
+      max: 200,
+      defaultValue: 0,
+      unit: '°',
+    },
+  ];
+
+  const couplings: JointViewCouplingDef[] = [
+    {
+      joint: 'Top Gear',
+      terms: [
+        { joint: 'Steer', ratio: 1 },
+        { joint: 'Drive', ratio: 20 / 14 },
+      ],
+      offset: 0,
+    },
+    {
+      joint: 'Motor',
+      terms: [{ joint: 'Top Gear', ratio: -2 }],
+      offset: 0,
+    },
+  ];
+
+  const values = resolveJointViewValues(joints, couplings, {
+    Steer: 30,
+    Drive: 70,
+    'Top Gear': 999,
+    Motor: 999,
+  });
+
+  assert(approx(values.Steer, 30), `Expected Steer=30, got ${values.Steer}`);
+  assert(approx(values.Drive, 70), `Expected Drive=70, got ${values.Drive}`);
+  assert(approx(values['Top Gear'], 130), `Expected Top Gear=130, got ${values['Top Gear']}`);
+  assert(approx(values.Motor, -200), `Expected Motor=-200 after clamp, got ${values.Motor}`);
+}
+
 async function main() {
   await initKernel();
   testTransformMulOrder();
   testAssemblyChainAgainstAnalytic();
   testShapeGroupRotateAroundSugar();
   testShapeGroupPointAlongSugar();
+  testAssemblyJointCouplings();
+  testRuntimeJointCouplingResolution();
   console.log('✓ Transform and assembly invariants passed');
 }
 

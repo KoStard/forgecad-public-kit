@@ -2,6 +2,7 @@ import { useForgeStore } from '../store/forgeStore';
 import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
+import { resolveJointViewValues } from '@forge/jointsView';
 
 const btnStyle = (active = false): CSSProperties => ({
   padding: '4px 8px',
@@ -93,14 +94,23 @@ export function ViewPanel() {
   const setSectionPlaneAxisEnabled = useForgeStore((s) => s.setSectionPlaneAxisEnabled);
   const cutPlanes: CutPlaneDef[] = result?.cutPlanes ?? [];
   const joints = result?.jointsView?.enabled === false ? [] : (result?.jointsView?.joints ?? []);
+  const jointCouplings = result?.jointsView?.enabled === false ? [] : (result?.jointsView?.couplings ?? []);
   const animationClips = result?.jointsView?.enabled === false ? [] : (result?.jointsView?.animations ?? []);
   const activeAnimationClip = useMemo(
     () => findJointAnimationClip(animationClips, jointAnimationClip),
     [animationClips, jointAnimationClip],
   );
-  const displayedJointValues = useMemo(
+  const animatedJointValues = useMemo(
     () => resolveJointAnimation(activeAnimationClip, jointAnimationProgress, jointValues),
     [activeAnimationClip, jointAnimationProgress, jointValues],
+  );
+  const displayedJointValues = useMemo(
+    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues),
+    [animatedJointValues, jointCouplings, joints],
+  );
+  const coupledJointNames = useMemo(
+    () => new Set(jointCouplings.map((coupling) => coupling.joint)),
+    [jointCouplings],
   );
 
   useEffect(() => {
@@ -265,6 +275,7 @@ export function ViewPanel() {
             const rawValue = displayedJointValues[joint.name] ?? joint.defaultValue;
             const value = Math.max(min, Math.min(max, rawValue));
             const step = joint.type === 'prismatic' ? 0.1 : 1;
+            const isCoupled = coupledJointNames.has(joint.name);
 
             return (
               <div
@@ -278,7 +289,7 @@ export function ViewPanel() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
                   <span style={{ color: 'var(--fc-text)' }}>{joint.name}</span>
                   <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
-                    {Number(value.toFixed(2))}{joint.unit ? ` ${joint.unit}` : ''}
+                    {Number(value.toFixed(2))}{joint.unit ? ` ${joint.unit}` : ''}{isCoupled ? ' (linked)' : ''}
                   </span>
                 </div>
                 <input
@@ -287,12 +298,13 @@ export function ViewPanel() {
                   max={max}
                   step={step}
                   value={value}
-                  disabled={!!activeAnimationClip}
+                  disabled={!!activeAnimationClip || isCoupled}
                   onFocus={() => setHoveredJointName(joint.name)}
                   onBlur={() => {
                     if (hoveredJointName === joint.name) setHoveredJointName(null);
                   }}
                   onChange={(event) => setJointValue(joint.name, Number(event.target.value))}
+                  title={isCoupled ? 'Linked joint (driven by other joints)' : undefined}
                   style={{ width: '100%' }}
                 />
               </div>

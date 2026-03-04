@@ -217,6 +217,13 @@ Registers viewport-only mechanism joints. Unlike `param()`-driven geometry edits
     - `min`, `max` (number, optional) - UI clamp limits.
     - `default` (number, optional) - Initial slider value (clamped to limits).
     - `unit` (string, optional) - Display unit. Defaults to `°` for revolute, `mm` for prismatic.
+  - `couplings` (array, optional) - Derived joints driven by one or more source joints:
+    - `joint` (string) - Target joint name to drive.
+    - `terms` (array) - Source joints:
+      - `joint` (string) - Source joint name.
+      - `ratio` (number, optional) - Multiplier applied to source value. Default: `1`.
+    - `offset` (number, optional) - Constant added after summing terms. Default: `0`.
+  - Coupled joints are read-only in manual slider mode. Animate/source-drive the inputs instead.
 
 **Returns:** `void` (side effect: registers runtime view controls for this run)
 
@@ -246,15 +253,24 @@ jointsView({
       unit: "mm",
     },
   ],
+  couplings: [
+    {
+      joint: "Slide",
+      terms: [
+        { joint: "Shoulder", ratio: -0.22 },
+      ],
+      offset: 26,
+    },
+  ],
   animations: [
     {
       name: "Walk Cycle",
       duration: 1.6,
       loop: true,
       keyframes: [
-        { at: 0.0, values: { "Shoulder": 20, "Slide": 10 } },
-        { at: 0.5, values: { "Shoulder": -10, "Slide": 50 } },
-        { at: 1.0, values: { "Shoulder": 20, "Slide": 10 } },
+        { at: 0.0, values: { "Shoulder": 20 } },
+        { at: 0.5, values: { "Shoulder": -10 } },
+        { at: 1.0, values: { "Shoulder": 20 } },
       ],
     },
   ],
@@ -630,11 +646,30 @@ const solved = mech.solve();
 return solved.toScene();
 ```
 
+Linked joint example:
+
+```javascript
+mech
+  .addJointCoupling("Top Gear", {
+    terms: [
+      { joint: "Steering", ratio: 1 },
+      { joint: "Wheel Drive", ratio: 20 / 14 },
+    ],
+  })
+  .addJointCoupling("Motor 1", {
+    terms: [{ joint: "Top Gear", ratio: -2 }],
+  });
+```
+
 Key methods:
 - `addPart(name, shape, { transform?, metadata? })`
 - `addFrame(name, { transform? })` for virtual mechanism frames
 - `addJoint(name, type, parent, child, opts)` where `type` is `'fixed' | 'revolute' | 'prismatic'`
 - `addRevolute(...)`, `addPrismatic(...)`, `addFixed(...)` shorthand helpers
+- `addJointCoupling(jointName, { terms, offset? })` for linked joints:
+  - `jointName`: driven joint
+  - `terms`: `[{ joint, ratio? }, ...]` where each source contributes `ratio * sourceValue` (default ratio `1`)
+  - `offset`: additive bias after term sum (default `0`)
 - `solve(state?)` with per-joint value overrides
 - `sweepJoint(jointName, from, to, steps, baseState?, collisionOptions?)`
 

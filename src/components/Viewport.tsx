@@ -15,6 +15,7 @@ import type { DimensionDef } from '@forge/sketch/dimensions';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
+import { resolveJointViewValues } from '@forge/jointsView';
 import {
   registerOrbitGifExporter,
   type OrbitGifExportOptions,
@@ -2257,14 +2258,19 @@ export function Viewport() {
   const jointsConfig = result?.jointsView ?? null;
   const jointOverlayConfig = result?.viewConfig?.jointOverlay ?? DEFAULT_VIEW_CONFIG.jointOverlay;
   const joints = jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? []);
+  const jointCouplings = jointsConfig?.enabled === false ? [] : (jointsConfig?.couplings ?? []);
   const jointAnimations = jointsConfig?.enabled === false ? [] : (jointsConfig?.animations ?? []);
   const activeJointAnimation = useMemo(
     () => findJointAnimationClip(jointAnimations, jointAnimationClip),
     [jointAnimationClip, jointAnimations],
   );
-  const effectiveJointValues = useMemo(
+  const animatedJointValues = useMemo(
     () => resolveJointAnimation(activeJointAnimation, jointAnimationProgress, jointValues),
     [activeJointAnimation, jointAnimationProgress, jointValues],
+  );
+  const effectiveJointValues = useMemo(
+    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues),
+    [animatedJointValues, jointCouplings, joints],
   );
 
   const activeCutPlaneDefs = useMemo(() => {

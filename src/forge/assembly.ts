@@ -30,6 +30,16 @@ export interface JointOptions {
   unit?: string;
 }
 
+export interface JointCouplingTerm {
+  joint: string;
+  ratio?: number;
+}
+
+export interface JointCouplingOptions {
+  terms: JointCouplingTerm[];
+  offset?: number;
+}
+
 interface PartRecord {
   name: string;
   part: AssemblyPart;
@@ -48,6 +58,17 @@ interface JointRecord {
   max?: number;
   defaultValue: number;
   unit?: string;
+}
+
+interface JointCouplingTermRecord {
+  joint: string;
+  ratio: number;
+}
+
+interface JointCouplingRecord {
+  joint: string;
+  terms: JointCouplingTermRecord[];
+  offset: number;
 }
 
 export interface BomRow {
@@ -132,7 +153,7 @@ function motionTransform(joint: JointRecord, value: number): Transform {
 }
 
 function clampJointValue(joint: JointRecord, value: number): { value: number; wasClamped: boolean } {
-  let clamped = value;
+  let clamped = Number.isFinite(value) ? value : joint.defaultValue;
   if (joint.min != null) clamped = Math.max(joint.min, clamped);
   if (joint.max != null) clamped = Math.min(joint.max, clamped);
   return { value: clamped, wasClamped: clamped !== value };
@@ -267,6 +288,7 @@ export class SolvedAssembly {
 export class Assembly {
   private readonly parts = new Map<string, PartRecord>();
   private readonly joints = new Map<string, JointRecord>();
+  private readonly jointCouplings = new Map<string, JointCouplingRecord>();
 
   constructor(public readonly name = 'Assembly') {}
 
@@ -326,6 +348,78 @@ export class Assembly {
     return this.addJoint(name, 'fixed', parent, child, options);
   }
 
+  addJointCoupling(jointName: string, options: JointCouplingOptions): Assembly {
+    const joint = this.joints.get(jointName);
+    if (!joint) throw new Error(`Unknown joint "${jointName}"`);
+    if (joint.type === 'fixed') {
+      throw new Error(`Joint "${jointName}" is fixed and cannot be coupled`);
+    }
+    if (!options || typeof options !== 'object') {
+      throw new Error('addJointCoupling(...) expects an options object');
+    }
+    if (!Array.isArray(options.terms) || options.terms.length === 0) {
+      throw new Error(`Joint coupling "${jointName}" requires a non-empty terms array`);
+    }
+    if (options.offset !== undefined && !Number.isFinite(options.offset)) {
+      throw new Error(`Joint coupling "${jointName}" offset must be finite`);
+    }
+
+    const seen = new Set<string>();
+    const terms = options.terms.map((term, index): JointCouplingTermRecord => {
+      if (!term || typeof term !== 'object') {
+        throw new Error(`Joint coupling "${jointName}" term[${index}] must be an object`);
+      }
+      const sourceName = typeof term.joint === 'string' ? term.joint.trim() : '';
+      if (!sourceName) {
+        throw new Error(`Joint coupling "${jointName}" term[${index}] joint is required`);
+      }
+      if (!this.joints.has(sourceName)) {
+        throw new Error(`Joint coupling "${jointName}" references unknown joint "${sourceName}"`);
+      }
+      if (sourceName === jointName) {
+        throw new Error(`Joint coupling "${jointName}" cannot reference itself`);
+      }
+      if (seen.has(sourceName)) {
+        throw new Error(`Joint coupling "${jointName}" has duplicate source joint "${sourceName}"`);
+      }
+      seen.add(sourceName);
+      const ratio = term.ratio ?? 1;
+      if (!Number.isFinite(ratio)) {
+        throw new Error(`Joint coupling "${jointName}" term[${index}] ratio must be finite`);
+      }
+      return { joint: sourceName, ratio };
+    });
+
+    this.jointCouplings.set(jointName, {
+      joint: jointName,
+      terms,
+      offset: options.offset ?? 0,
+    });
+    this.assertJointCouplingsAcyclic();
+    return this;
+  }
+
+  private assertJointCouplingsAcyclic(): void {
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+
+    const walk = (jointName: string) => {
+      if (visited.has(jointName)) return;
+      if (visiting.has(jointName)) {
+        throw new Error(`Joint coupling cycle detected at "${jointName}"`);
+      }
+      visiting.add(jointName);
+      const coupling = this.jointCouplings.get(jointName);
+      if (coupling) {
+        coupling.terms.forEach((term) => walk(term.joint));
+      }
+      visiting.delete(jointName);
+      visited.add(jointName);
+    };
+
+    this.jointCouplings.forEach((_, jointName) => walk(jointName));
+  }
+
   solve(state: JointState = {}): SolvedAssembly {
     const incoming = new Map<string, string>();
     const jointsByParent = new Map<string, JointRecord[]>();
@@ -351,6 +445,41 @@ export class Assembly {
     const visiting = new Set<string>();
     const visited = new Set<string>();
     const jointValues: JointState = {};
+    const resolvingJointValues = new Set<string>();
+
+    const resolveJointValue = (jointName: string): number => {
+      const cached = jointValues[jointName];
+      if (cached !== undefined) return cached;
+      if (resolvingJointValues.has(jointName)) {
+        throw new Error(`Joint coupling cycle detected at "${jointName}"`);
+      }
+
+      const joint = this.joints.get(jointName);
+      if (!joint) throw new Error(`Unknown joint "${jointName}"`);
+
+      resolvingJointValues.add(jointName);
+
+      let raw = state[jointName] ?? joint.defaultValue;
+      const coupling = this.jointCouplings.get(jointName);
+      if (coupling) {
+        raw = coupling.offset;
+        coupling.terms.forEach((term) => {
+          raw += term.ratio * resolveJointValue(term.joint);
+        });
+        if (state[jointName] !== undefined) {
+          warnings.push(`Joint "${jointName}" state override ignored because it is coupled`);
+        }
+      }
+
+      const { value, wasClamped } = clampJointValue(joint, raw);
+      jointValues[jointName] = value;
+      if (wasClamped) {
+        warnings.push(`Joint "${jointName}" clamped from ${raw} to ${value}${joint.unit ?? ''}`);
+      }
+
+      resolvingJointValues.delete(jointName);
+      return value;
+    };
 
     const dfs = (partName: string, worldTransform: Transform) => {
       if (visiting.has(partName)) throw new Error(`Cycle detected at part "${partName}"`);
@@ -360,12 +489,7 @@ export class Assembly {
 
       const outgoing = jointsByParent.get(partName) ?? [];
       for (const joint of outgoing) {
-        const raw = state[joint.name] ?? joint.defaultValue;
-        const { value, wasClamped } = clampJointValue(joint, raw);
-        jointValues[joint.name] = value;
-        if (wasClamped) {
-          warnings.push(`Joint "${joint.name}" clamped from ${raw} to ${value}${joint.unit ?? ''}`);
-        }
+        const value = resolveJointValue(joint.name);
 
         const child = this.parts.get(joint.child)!;
         // Canonical frame composition order for Forge chain semantics:
@@ -403,6 +527,9 @@ export class Assembly {
     collisionOptions: CollisionOptions = {},
   ): JointSweepFrame[] {
     if (!this.joints.has(jointName)) throw new Error(`Unknown joint "${jointName}"`);
+    if (this.jointCouplings.has(jointName)) {
+      throw new Error(`Cannot sweep coupled joint "${jointName}". Sweep one of its source joints instead.`);
+    }
     const n = Math.max(1, Math.floor(steps));
     const frames: JointSweepFrame[] = [];
     for (let i = 0; i <= n; i++) {
