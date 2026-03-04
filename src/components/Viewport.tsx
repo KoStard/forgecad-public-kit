@@ -2,7 +2,7 @@ import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObjec
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, Lightformer, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
-import type { SceneObject, ExplodeViewDirection, ExplodeViewOptions, JointViewDef } from '@forge/index';
+import type { SceneObject, RunResult, ExplodeViewDirection, ExplodeViewOptions, JointViewDef } from '@forge/index';
 import type { DimensionDef } from '@forge/sketch/dimensions';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
@@ -65,6 +65,170 @@ const applyOrbitPose = (
     camera.updateProjectionMatrix();
   }
 };
+
+interface OrbitGifOverrideSession {
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  center: THREE.Vector3;
+  distance: number;
+  solids: THREE.Object3D[];
+  wires: THREE.Object3D[];
+}
+
+function parseExportColor(input: string | undefined, fallback: number): THREE.Color {
+  if (!input) return new THREE.Color(fallback);
+  try {
+    return new THREE.Color(input);
+  } catch {
+    return new THREE.Color(fallback);
+  }
+}
+
+function addExportLights(scene: THREE.Scene): void {
+  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+  const dir1 = new THREE.DirectionalLight(0xffffff, 1.2);
+  dir1.position.set(100, 150, 80);
+  scene.add(dir1);
+
+  const dir2 = new THREE.DirectionalLight(0xffffff, 0.3);
+  dir2.position.set(-60, -40, -80);
+  scene.add(dir2);
+
+  scene.add(new THREE.HemisphereLight(0xb1e1ff, 0x444444, 0.4));
+}
+
+function setOverrideSessionMode(session: OrbitGifOverrideSession, mode: OrbitGifMode): void {
+  const showSolid = mode === 'solid';
+  session.solids.forEach((node) => { node.visible = showSolid; });
+  session.wires.forEach((node) => { node.visible = true; });
+}
+
+function setOverrideOrbitCamera(session: OrbitGifOverrideSession, turn: number, pitchDeg: number): void {
+  const normalizedTurn = ((turn % 1) + 1) % 1;
+  const clampedPitch = THREE.MathUtils.clamp(pitchDeg, -80, 80);
+  const yaw = normalizedTurn * Math.PI * 2;
+  const pitch = THREE.MathUtils.degToRad(clampedPitch);
+  const cosPitch = Math.cos(pitch);
+  const direction = new THREE.Vector3(
+    Math.sin(yaw) * cosPitch,
+    -Math.cos(yaw) * cosPitch,
+    Math.sin(pitch),
+  ).normalize();
+
+  session.camera.position.copy(session.center).addScaledVector(direction, session.distance);
+  session.camera.lookAt(session.center);
+  session.camera.updateProjectionMatrix();
+}
+
+function disposeOverrideSession(session: OrbitGifOverrideSession): void {
+  session.scene.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (mesh.geometry) mesh.geometry.dispose();
+    const material = mesh.material;
+    if (Array.isArray(material)) {
+      material.forEach((mat) => mat.dispose());
+    } else if (material) {
+      material.dispose();
+    }
+  });
+}
+
+function createOverrideSessionFromRunResult(
+  runResult: RunResult,
+  objectSettings: Record<string, ObjectSettings> | undefined,
+  background?: string,
+): OrbitGifOverrideSession {
+  const scene = new THREE.Scene();
+  scene.background = parseExportColor(background, 0x252526);
+  addExportLights(scene);
+
+  const solids: THREE.Object3D[] = [];
+  const wires: THREE.Object3D[] = [];
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+
+  runResult.objects.forEach((obj) => {
+    if (!obj.shape) return;
+
+    const color = objectSettings?.[obj.id]?.color || obj.color;
+    const geo = shapeToGeometry(obj.shape);
+    const solid = new THREE.Mesh(
+      geo.solid,
+      new THREE.MeshPhysicalMaterial({
+        color: parseExportColor(color, 0x5b9bd5),
+        metalness: 0.05,
+        roughness: 0.35,
+        clearcoat: 0.1,
+        clearcoatRoughness: 0.4,
+        flatShading: true,
+        side: THREE.DoubleSide,
+      }),
+    );
+    scene.add(solid);
+    solids.push(solid);
+
+    const wire = new THREE.LineSegments(
+      geo.edges,
+      new THREE.LineBasicMaterial({
+        color: parseExportColor(color, 0x1a1a2e),
+        transparent: true,
+        opacity: 0.9,
+      }),
+    );
+    scene.add(wire);
+    wires.push(wire);
+
+    try {
+      const bb = obj.shape.boundingBox();
+      minX = Math.min(minX, bb.min[0]);
+      minY = Math.min(minY, bb.min[1]);
+      minZ = Math.min(minZ, bb.min[2]);
+      maxX = Math.max(maxX, bb.max[0]);
+      maxY = Math.max(maxY, bb.max[1]);
+      maxZ = Math.max(maxZ, bb.max[2]);
+    } catch {
+      // Skip invalid bounds; export still works with remaining objects.
+    }
+  });
+
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+    throw new Error('No 3D objects available for GIF export.');
+  }
+
+  const center = new THREE.Vector3(
+    (minX + maxX) * 0.5,
+    (minY + maxY) * 0.5,
+    (minZ + maxZ) * 0.5,
+  );
+  const sizeX = maxX - minX;
+  const sizeY = maxY - minY;
+  const sizeZ = maxZ - minZ;
+  const maxDim = Math.max(1, sizeX, sizeY, sizeZ);
+  const fov = 45;
+  const distance = maxDim / (2 * Math.tan((fov * Math.PI) / 360)) * 1.6;
+  const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, Math.max(10, distance * 10));
+  camera.up.set(0, 0, 1);
+  camera.aspect = 1;
+  camera.updateProjectionMatrix();
+
+  const session: OrbitGifOverrideSession = {
+    scene,
+    camera,
+    center,
+    distance,
+    solids,
+    wires,
+  };
+  setOverrideSessionMode(session, 'solid');
+  setOverrideOrbitCamera(session, 0, GIF_DEFAULT_PITCH_DEG);
+  return session;
+}
 
 const isVector3Tuple = (value: unknown): value is [number, number, number] => {
   return Array.isArray(value)
@@ -1772,12 +1936,18 @@ function OrbitGifExporterBridge({
       throw new Error('Could not create GIF capture context.');
     }
 
+    const overrideSession = options?.runResult
+      ? createOverrideSessionFromRunResult(options.runResult, options.objectSettings, options.background)
+      : null;
+
     const controls = controlsRef.current;
-    const orbitTarget = controls?.target.clone() ?? new THREE.Vector3(0, 0, 0);
-    let orbitRadius = camera.position.distanceTo(orbitTarget);
-    if (!Number.isFinite(orbitRadius) || orbitRadius <= 1e-3) {
-      orbitRadius = 160;
-    }
+    const orbitTarget = overrideSession
+      ? overrideSession.center.clone()
+      : (controls?.target.clone() ?? new THREE.Vector3(0, 0, 0));
+    let orbitRadius = overrideSession
+      ? overrideSession.distance
+      : camera.position.distanceTo(orbitTarget);
+    if (!Number.isFinite(orbitRadius) || orbitRadius <= 1e-3) orbitRadius = 160;
 
     const prevCameraPos = camera.position.clone();
     const prevCameraQuat = camera.quaternion.clone();
@@ -1790,14 +1960,21 @@ function OrbitGifExporterBridge({
 
     let frameIndex = 0;
     const writeFrame = async (mode: OrbitGifMode, turn: number): Promise<void> => {
-      setRenderMode(mode);
       await waitForAnimationFrame();
-      applyOrbitPose(camera, orbitTarget, orbitRadius, turn, pitchDeg);
-      if (controls) {
-        controls.target.copy(orbitTarget);
-        controls.update();
+
+      if (overrideSession) {
+        setOverrideSessionMode(overrideSession, mode);
+        setOverrideOrbitCamera(overrideSession, turn, pitchDeg);
+        gl.render(overrideSession.scene, overrideSession.camera);
+      } else {
+        setRenderMode(mode);
+        applyOrbitPose(camera, orbitTarget, orbitRadius, turn, pitchDeg);
+        if (controls) {
+          controls.target.copy(orbitTarget);
+          controls.update();
+        }
+        gl.render(scene, camera);
       }
-      gl.render(scene, camera);
 
       captureCtx.clearRect(0, 0, size, size);
       captureCtx.drawImage(gl.domElement, 0, 0, size, size);
@@ -1822,7 +1999,7 @@ function OrbitGifExporterBridge({
     };
 
     try {
-      if (controls) controls.enableDamping = false;
+      if (controls && !overrideSession) controls.enableDamping = false;
       gl.setPixelRatio(1);
       gl.setSize(size, size, false);
 
@@ -1839,20 +2016,24 @@ function OrbitGifExporterBridge({
       const bytes = new Uint8Array(encoder.bytes());
       return new Blob([bytes], { type: 'image/gif' });
     } finally {
-      setRenderMode(prevRenderMode);
-      await waitForAnimationFrame();
+      if (overrideSession) {
+        disposeOverrideSession(overrideSession);
+      } else {
+        setRenderMode(prevRenderMode);
+        await waitForAnimationFrame();
 
-      camera.position.copy(prevCameraPos);
-      camera.quaternion.copy(prevCameraQuat);
-      camera.up.copy(prevCameraUp);
-      if (controls && prevControlsTarget) {
-        controls.target.copy(prevControlsTarget);
-      }
-      if (controls && prevDamping !== null) {
-        controls.enableDamping = prevDamping;
-        controls.update();
-      } else if (!controls && prevControlsTarget) {
-        camera.lookAt(prevControlsTarget);
+        camera.position.copy(prevCameraPos);
+        camera.quaternion.copy(prevCameraQuat);
+        camera.up.copy(prevCameraUp);
+        if (controls && prevControlsTarget) {
+          controls.target.copy(prevControlsTarget);
+        }
+        if (controls && prevDamping !== null) {
+          controls.enableDamping = prevDamping;
+          controls.update();
+        } else if (!controls && prevControlsTarget) {
+          camera.lookAt(prevControlsTarget);
+        }
       }
 
       gl.setPixelRatio(prevPixelRatio);

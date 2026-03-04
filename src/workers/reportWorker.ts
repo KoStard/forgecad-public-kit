@@ -29,14 +29,22 @@ worker.onmessage = async (event) => {
   try {
     await ensureKernelReady();
 
-    const { files, activeFile, paramOverrides, title, objectVisuals, includeDisassembled } = data.payload;
+    const {
+      files,
+      activeFile,
+      paramOverrides,
+      quality,
+      title,
+      objectVisuals,
+      includeDisassembled,
+    } = data.payload;
     const code = files[activeFile];
     if (!code) {
       throw new Error(`Active file "${activeFile}" is missing from project files.`);
     }
 
     setParamOverrides(paramOverrides);
-    const runResult = runScript(code, activeFile, files);
+    const runResult = runScript(code, activeFile, files, { quality });
     if (runResult.error) {
       throw new Error(runResult.error);
     }

@@ -5,6 +5,7 @@ import {
   exportOrbitGifFromStore,
   exportMeshFromStore,
   exportReportFromStore,
+  type ExportQualityChoice,
   type MeshExportFormat,
 } from './exportActions';
 
@@ -26,6 +27,7 @@ export function ExportPanel() {
   const activeFile = useForgeStore((s) => s.activeFile);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [meshFormat, setMeshFormat] = useState<MeshExportFormat>('3mf');
+  const [exportQuality, setExportQuality] = useState<ExportQualityChoice>('default');
   const [meshBusy, setMeshBusy] = useState(false);
   const [meshFileStem, setMeshFileStem] = useState('forge-export');
   const [gifBusy, setGifBusy] = useState(false);
@@ -51,12 +53,13 @@ export function ExportPanel() {
   const openDialog = () => {
     if (!hasShapes) return;
     setMeshFormat('3mf');
+    setExportQuality('default');
     setMeshFileStem(defaultMeshStem);
     setDialogOpen(true);
   };
 
   const closeDialog = () => {
-    if (meshBusy || gifBusy) return;
+    if (meshBusy || gifBusy || reportBusy) return;
     setDialogOpen(false);
   };
 
@@ -64,7 +67,7 @@ export function ExportPanel() {
     if (!hasShapes || meshBusy) return;
     setMeshBusy(true);
     try {
-      await exportMeshFromStore(meshFormat, meshFileStem || defaultMeshStem);
+      await exportMeshFromStore(meshFormat, meshFileStem || defaultMeshStem, { quality: exportQuality });
       setDialogOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -82,7 +85,7 @@ export function ExportPanel() {
       // Let React commit `reportBusy` so the loading indicator is visible
       // before worker startup and message handoff.
       await waitForNextPaint();
-      await exportReportFromStore();
+      await exportReportFromStore(meshFileStem || defaultMeshStem, { quality: exportQuality });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Report export failed:', err);
@@ -97,7 +100,7 @@ export function ExportPanel() {
     setGifBusy(true);
     try {
       await waitForNextPaint();
-      await exportOrbitGifFromStore(meshFileStem || defaultMeshStem);
+      await exportOrbitGifFromStore(meshFileStem || defaultMeshStem, { quality: exportQuality });
       setDialogOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -176,7 +179,7 @@ export function ExportPanel() {
               </div>
               <button
                 onClick={closeDialog}
-                disabled={meshBusy || gifBusy}
+                disabled={meshBusy || gifBusy || reportBusy}
                 style={{
                   border: '1px solid var(--fc-border)',
                   background: 'transparent',
@@ -184,7 +187,7 @@ export function ExportPanel() {
                   borderRadius: 4,
                   width: 28,
                   height: 28,
-                  cursor: (meshBusy || gifBusy) ? 'default' : 'pointer',
+                  cursor: (meshBusy || gifBusy || reportBusy) ? 'default' : 'pointer',
                   fontSize: 17,
                   lineHeight: 1,
                 }}
@@ -273,10 +276,81 @@ export function ExportPanel() {
               </div>
             </label>
 
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--fc-textDim)' }}>Geometry quality</div>
+            <div style={{ marginTop: 6, display: 'grid', gap: 8 }}>
+              <button
+                onClick={() => setExportQuality('default')}
+                style={{
+                  textAlign: 'left',
+                  border: `1px solid ${exportQuality === 'default' ? 'var(--fc-accent)' : 'var(--fc-border)'}`,
+                  background: exportQuality === 'default' ? 'var(--fc-bgActive)' : 'var(--fc-bgOverlay)',
+                  color: 'var(--fc-text)',
+                  borderRadius: 6,
+                  padding: '9px 10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Default (current scene)</div>
+                <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
+                  Uses the geometry already loaded in the viewport.
+                </div>
+              </button>
+              <button
+                onClick={() => setExportQuality('live')}
+                style={{
+                  textAlign: 'left',
+                  border: `1px solid ${exportQuality === 'live' ? 'var(--fc-accent)' : 'var(--fc-border)'}`,
+                  background: exportQuality === 'live' ? 'var(--fc-bgActive)' : 'var(--fc-bgOverlay)',
+                  color: 'var(--fc-text)',
+                  borderRadius: 6,
+                  padding: '9px 10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Live (fast)</div>
+                <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
+                  Re-runs script with faster tessellation before export.
+                </div>
+              </button>
+              <button
+                onClick={() => setExportQuality('high')}
+                style={{
+                  textAlign: 'left',
+                  border: `1px solid ${exportQuality === 'high' ? 'var(--fc-accent)' : 'var(--fc-border)'}`,
+                  background: exportQuality === 'high' ? 'var(--fc-bgActive)' : 'var(--fc-bgOverlay)',
+                  color: 'var(--fc-text)',
+                  borderRadius: 6,
+                  padding: '9px 10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600 }}>High (export)</div>
+                <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
+                  Re-runs script with denser tessellation for final output.
+                </div>
+              </button>
+            </div>
+            {exportQuality !== 'default' && (
+              <div
+                style={{
+                  marginTop: 8,
+                  border: '1px solid var(--fc-border)',
+                  background: 'var(--fc-bgOverlay)',
+                  color: 'var(--fc-textDim)',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  fontSize: 11,
+                  lineHeight: 1.4,
+                }}
+              >
+                This export will regenerate geometry with the selected quality profile.
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <button
                 onClick={closeDialog}
-                disabled={meshBusy || gifBusy}
+                disabled={meshBusy || gifBusy || reportBusy}
                 style={{
                   border: '1px solid var(--fc-border)',
                   background: 'transparent',
@@ -284,7 +358,7 @@ export function ExportPanel() {
                   borderRadius: 4,
                   padding: '6px 10px',
                   fontSize: 12,
-                  cursor: (meshBusy || gifBusy) ? 'default' : 'pointer',
+                  cursor: (meshBusy || gifBusy || reportBusy) ? 'default' : 'pointer',
                 }}
               >
                 Cancel

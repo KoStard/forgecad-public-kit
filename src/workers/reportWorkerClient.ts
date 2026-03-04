@@ -1,10 +1,11 @@
-import type { ReportGenerationResult, ReportObjectVisual } from '@forge/index';
+import type { ForgeQualityPreset, ReportGenerationResult, ReportObjectVisual } from '@forge/index';
 import type { ReportWorkerRequest, ReportWorkerResponse } from './reportWorkerProtocol';
 
 interface GenerateReportInWorkerOptions {
   files: Record<string, string>;
   activeFile: string;
   paramOverrides: Record<string, number>;
+  quality?: ForgeQualityPreset;
   title: string;
   objectVisuals: Record<string, ReportObjectVisual>;
   includeDisassembled: boolean;

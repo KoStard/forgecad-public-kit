@@ -1,9 +1,10 @@
-import type { ReportObjectVisual } from '@forge/index';
+import type { ForgeQualityPreset, ReportObjectVisual } from '@forge/index';
 
 export interface ReportWorkerGeneratePayload {
   files: Record<string, string>;
   activeFile: string;
   paramOverrides: Record<string, number>;
+  quality?: ForgeQualityPreset;
   title: string;
   objectVisuals: Record<string, ReportObjectVisual>;
   includeDisassembled: boolean;
