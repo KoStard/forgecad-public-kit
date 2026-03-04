@@ -32,10 +32,24 @@ declare class Transform {
 declare function composeChain(...parts: Transform[]): Transform;
 
 // --- Cross-file imports ---
-/** Import a 2D sketch from another file. The file must return a Sketch. */
-declare function importSketch(fileName: string, paramOverrides?: Record<string, number>): Sketch;
+type SvgImportOptions = {
+  include?: 'auto' | 'fill' | 'stroke' | 'fill-and-stroke';
+  regionSelection?: 'all' | 'largest';
+  maxRegions?: number;
+  minRegionArea?: number;
+  minRegionAreaRatio?: number;
+  flattenTolerance?: number;
+  arcSegments?: number;
+  scale?: number;
+  simplify?: number;
+  invertY?: boolean;
+};
+/** Import a 2D sketch from another file. Supports ".sketch.js" and ".svg". */
+declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch;
 /** Import a 3D part from another file. The file must return a Shape. */
 declare function importPart(fileName: string, paramOverrides?: Record<string, number>): Shape;
+/** Import and parse an SVG file directly as a sketch. */
+declare function importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch;
 
 // --- 2D Sketch Primitives ---
 declare function rect(width: number, height: number, center?: boolean): Sketch;
