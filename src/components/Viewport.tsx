@@ -841,8 +841,8 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
   const spokeLineRadius = THREE.MathUtils.clamp(state.axisLength * 0.016, 0.5, 1.5);
   const arcLineRadius = THREE.MathUtils.clamp(state.axisLength * 0.018, 0.52, 1.7);
   const axisDotRadius = Math.max(0.75, state.axisLength * 0.02);
-  const axisArrowRadius = Math.max(0.7, state.axisLength * 0.03);
-  const axisArrowLength = Math.max(2.6, state.axisLength * 0.09);
+  const axisArrowRadius = Math.max(1.0, state.axisLength * 0.046);
+  const axisArrowLength = Math.max(3.8, state.axisLength * 0.14);
   const arrowPosition = useMemo(
     () => axisEnd.clone().addScaledVector(state.axisWorld, axisArrowLength * 0.4),
     [axisArrowLength, axisEnd, state.axisWorld],
@@ -903,8 +903,8 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
     const curve = new THREE.CatmullRomCurve3(arcCurvePoints, false, 'centripetal');
     return new THREE.TubeGeometry(curve, segments, arcLineRadius, 12, false);
   }, [arcCurvePoints, arcLineRadius]);
-  const arcArrowLength = Math.max(1.8, state.axisLength * 0.065);
-  const arcArrowRadius = Math.max(0.45, state.axisLength * 0.02);
+  const arcArrowLength = Math.max(2.8, state.axisLength * 0.1);
+  const arcArrowRadius = Math.max(0.8, state.axisLength * 0.032);
   const arcTangent = useMemo(() => {
     if (!isRevolute || Math.abs(arcAngleRad) <= 1e-4) return null;
     const tangent = state.axisWorld.clone().cross(arcEndDirection);
