@@ -460,6 +460,7 @@ type SideGearOptions = SpurGearOptions & {
   side?: 'top' | 'bottom';
   toothHeight?: number;
 };
+type FaceGearOptions = SideGearOptions;
 type RingGearOptions = {
   module: number;
   teeth: number;
@@ -502,6 +503,7 @@ type SideGearSpec = GearPairSpec & {
   side?: 'top' | 'bottom';
   toothHeight?: number;
 };
+type FaceGearSpec = SideGearSpec;
 type GearPairDiagnostic = {
   level: 'info' | 'warn' | 'error';
   code: string;
@@ -523,6 +525,20 @@ type GearPairResult = {
 };
 type SideGearPairResult = {
   side: Shape;
+  vertical: Shape;
+  centerDistance: number;
+  centerDistanceNominal: number;
+  backlash: number;
+  pressureAngleDeg: number;
+  meshPlaneZ: number;
+  radialOverlap: number;
+  jointRatio: number;
+  speedReduction: number;
+  diagnostics: GearPairDiagnostic[];
+  status: 'ok' | 'warn' | 'error';
+};
+type FaceGearPairResult = {
+  face: Shape;
   vertical: Shape;
   centerDistance: number;
   centerDistanceNominal: number;
@@ -594,6 +610,8 @@ declare const lib: {
   elbow(pipeRadius: number, bendRadius: number, options: { from?: [number, number, number]; to?: [number, number, number]; wall?: number; segments?: number }): Shape;
   /** Involute external spur gear (2D involute profile + extrusion). */
   spurGear(options: SpurGearOptions): Shape;
+  /** Face gear (crown style): teeth project from the top or bottom face. */
+  faceGear(options: FaceGearOptions): Shape;
   /** Side/crown gear: teeth project from the top or bottom face. */
   sideGear(options: SideGearOptions): Shape;
   /** Internal ring gear with involute-derived tooth spaces. */
@@ -602,6 +620,8 @@ declare const lib: {
   rackGear(options: RackGearOptions): Shape;
   /** Pair-level ratio/backlash/contact diagnostics with optional auto-placement. */
   gearPair(options: { pinion: Shape | GearPairSpec; gear: Shape | GearPairSpec; backlash?: number; centerDistance?: number; place?: boolean; phaseDeg?: number }): GearPairResult;
+  /** Perpendicular pair helper for faceGear + vertical spur gear. */
+  faceGearPair(options: { face: Shape | FaceGearSpec; vertical: Shape | GearPairSpec; backlash?: number; centerDistance?: number; meshPlaneZ?: number; place?: boolean; phaseDeg?: number }): FaceGearPairResult;
   /** Perpendicular pair helper for sideGear + vertical spur gear. */
   sideGearPair(options: { side: Shape | SideGearSpec; vertical: Shape | GearPairSpec; backlash?: number; centerDistance?: number; meshPlaneZ?: number; place?: boolean; phaseDeg?: number }): SideGearPairResult;
 };

@@ -1224,7 +1224,7 @@ export function elbow(
 const GEAR_META_KEY = Symbol.for('forgecad.library.gearMeta');
 const EPSILON = 1e-9;
 
-type GearKind = 'spur' | 'ring' | 'rack' | 'side';
+type GearKind = 'spur' | 'ring' | 'rack' | 'face';
 
 interface GearMeta {
   kind: GearKind;
@@ -1483,6 +1483,8 @@ export interface SideGearOptions extends SpurGearOptions {
   toothHeight?: number;
 }
 
+export interface FaceGearOptions extends SideGearOptions {}
+
 interface NormalizedSideGearOptions extends NormalizedSpurGearOptions {
   side: 'top' | 'bottom';
   toothHeight: number;
@@ -1563,7 +1565,7 @@ export function sideGear(options: SideGearOptions): Shape {
   const zBands = resolveSideGearZBands(normalized);
   const meta: GearMeta = {
     ...spurMeta,
-    kind: 'side',
+    kind: 'face',
     toothHeight: normalized.toothHeight,
     toothSide: normalized.side,
     toothMinZ: zBands.toothMinZ,
@@ -1597,6 +1599,14 @@ export function sideGear(options: SideGearOptions): Shape {
   }
 
   return attachGearMeta(shape, meta);
+}
+
+export function faceGear(options: FaceGearOptions): Shape {
+  try {
+    return sideGear(options);
+  } catch (error) {
+    remapErrorPrefix(error, 'sideGear', 'faceGear');
+  }
 }
 
 export interface RingGearOptions {
@@ -2062,6 +2072,8 @@ export interface SideGearSpec extends GearPairSpec {
   toothHeight?: number;
 }
 
+export interface FaceGearSpec extends SideGearSpec {}
+
 export interface SideGearPairOptions {
   side: Shape | SideGearSpec;
   vertical: Shape | GearPairSpec;
@@ -2087,10 +2099,35 @@ export interface SideGearPairResult {
   status: 'ok' | 'warn' | 'error';
 }
 
+export interface FaceGearPairOptions {
+  face: Shape | FaceGearSpec;
+  vertical: Shape | GearPairSpec;
+  backlash?: number;
+  centerDistance?: number;
+  meshPlaneZ?: number;
+  place?: boolean;
+  phaseDeg?: number;
+}
+
+export interface FaceGearPairResult {
+  face: Shape;
+  vertical: Shape;
+  centerDistance: number;
+  centerDistanceNominal: number;
+  backlash: number;
+  pressureAngleDeg: number;
+  meshPlaneZ: number;
+  radialOverlap: number;
+  jointRatio: number;
+  speedReduction: number;
+  diagnostics: GearPairDiagnostic[];
+  status: 'ok' | 'warn' | 'error';
+}
+
 function resolveSideGearPairSideMember(value: Shape | SideGearSpec): { shape: Shape; meta: GearMeta } {
   if (value instanceof Shape) {
     const meta = readGearMeta(value);
-    if (!meta || meta.kind !== 'side') {
+    if (!meta || meta.kind !== 'face') {
       throw new Error('sideGearPair: "side" shape has no side-gear metadata; pass a sideGear(...) result or SideGearSpec');
     }
     return { shape: value.clone(), meta };
@@ -2113,7 +2150,7 @@ function resolveSideGearPairSideMember(value: Shape | SideGearSpec): { shape: Sh
     toothHeight: value.toothHeight,
   });
   const meta = readGearMeta(shape);
-  if (!meta || meta.kind !== 'side') {
+  if (!meta || meta.kind !== 'face') {
     throw new Error('sideGearPair: failed to derive side-gear metadata for "side"');
   }
   return { shape, meta };
@@ -2280,6 +2317,43 @@ export function sideGearPair(options: SideGearPairOptions): SideGearPairResult {
   };
 }
 
+export function faceGearPair(options: FaceGearPairOptions): FaceGearPairResult {
+  let pair: SideGearPairResult;
+  try {
+    pair = sideGearPair({
+      side: options.face,
+      vertical: options.vertical,
+      backlash: options.backlash,
+      centerDistance: options.centerDistance,
+      meshPlaneZ: options.meshPlaneZ,
+      place: options.place,
+      phaseDeg: options.phaseDeg,
+    });
+  } catch (error) {
+    remapErrorPrefix(error, 'sideGearPair', 'faceGearPair');
+  }
+
+  const diagnostics = pair.diagnostics.map((d) => ({
+    ...d,
+    code: d.code.startsWith('sidegear.') ? `facegear.${d.code.slice('sidegear.'.length)}` : d.code,
+  }));
+
+  return {
+    face: pair.side,
+    vertical: pair.vertical,
+    centerDistance: pair.centerDistance,
+    centerDistanceNominal: pair.centerDistanceNominal,
+    backlash: pair.backlash,
+    pressureAngleDeg: pair.pressureAngleDeg,
+    meshPlaneZ: pair.meshPlaneZ,
+    radialOverlap: pair.radialOverlap,
+    jointRatio: pair.jointRatio,
+    speedReduction: pair.speedReduction,
+    diagnostics,
+    status: pairStatusFromDiagnostics(diagnostics),
+  };
+}
+
 /** All library parts, keyed by name */
 export const partLibrary = {
   boltHole,
@@ -2302,10 +2376,12 @@ export const partLibrary = {
   profile2020BSlot6Profile,
   profile2020BSlot6,
   spurGear,
+  faceGear,
   sideGear,
   ringGear,
   rackGear,
   gearPair,
+  faceGearPair,
   sideGearPair,
 };
 
