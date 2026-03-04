@@ -344,7 +344,7 @@ export function ViewPanel() {
         <div style={labelStyle}>Objects</div>
         {focusedObjectIds.length > 0 && (
           <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 8 }}>
-            Focus mode on. Shift/Cmd/Ctrl + double-click adds objects.
+            Focus mode on. Shift/Cmd/Ctrl + double-click toggles objects.
           </div>
         )}
       </div>

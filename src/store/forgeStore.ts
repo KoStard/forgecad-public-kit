@@ -811,7 +811,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       return { focusedObjectIds: [id], selectedObjectId: id };
     }
     if (state.focusedObjectIds.includes(id)) {
-      return { selectedObjectId: id };
+      const nextFocusedObjectIds = state.focusedObjectIds.filter((focusedId) => focusedId !== id);
+      return {
+        focusedObjectIds: nextFocusedObjectIds,
+        selectedObjectId: nextFocusedObjectIds.length > 0
+          ? nextFocusedObjectIds[nextFocusedObjectIds.length - 1]
+          : state.selectedObjectId,
+      };
     }
     return { focusedObjectIds: [...state.focusedObjectIds, id], selectedObjectId: id };
   }),
