@@ -672,6 +672,24 @@ const pair = lib.gearPair({
 mech.addGearCoupling("Driven", "Pinion", { pair }); // uses pair.jointRatio
 ```
 
+Bevel/face helper example:
+
+```javascript
+const bevel = lib.bevelGearPair({
+  pinion: { module: 1.5, teeth: 18, faceWidth: 10 },
+  gear: { module: 1.5, teeth: 36, faceWidth: 9 },
+  shaftAngleDeg: 90,
+});
+
+const face = lib.faceGearPair({
+  pinion: { module: 1.5, teeth: 16, faceWidth: 8 },
+  gear: { module: 1.5, teeth: 48, faceWidth: 7, toothHeight: 1.2 },
+});
+
+mech.addGearCoupling("Bevel Driven", "Bevel Driver", { pair: bevel });
+mech.addGearCoupling("Face Driven", "Face Driver", { pair: face });
+```
+
 Key methods:
 - `addPart(name, shape, { transform?, metadata? })`
 - `addFrame(name, { transform? })` for virtual mechanism frames
@@ -683,7 +701,7 @@ Key methods:
   - `offset`: additive bias after term sum (default `0`)
 - `addGearCoupling(drivenJoint, driverJoint, opts)` for revolute gear meshes:
   - ratio source (exactly one): `ratio`, `pair` (`pair.jointRatio`), or `driverTeeth + drivenTeeth`
-  - `mesh`: `'external' | 'internal'` (teeth mode only, default `'external'`)
+  - `mesh`: `'external' | 'internal' | 'bevel' | 'face'` (teeth mode only, default `'external'`; `bevel`/`face` follow external sign)
   - `offset`: additive bias after gear ratio
 - `solve(state?)` with per-joint value overrides
 - `sweepJoint(jointName, from, to, steps, baseState?, collisionOptions?)`
@@ -1655,6 +1673,64 @@ const rack = lib.rackGear({
 });
 ```
 
+### `lib.bevelGear(options)`
+Conical bevel gear generated from a tapered involute extrusion.
+
+**Options:**
+- `module` (number)
+- `teeth` (integer, >= 6)
+- `faceWidth` (number)
+- `pressureAngleDeg` (number, optional) - Default: `20`
+- `backlash` (number, optional) - Default: `0`
+- `clearance` (number, optional) - Default: `0.25 * module`
+- `addendum` (number, optional) - Default: `module`
+- `dedendum` (number, optional) - Default: `addendum + clearance`
+- `boreDiameter` (number, optional)
+- pitch cone setup (choose one):
+  - `pitchAngleDeg` (number, optional), or
+  - `mateTeeth` (+ optional `shaftAngleDeg`, default `90`) for auto pitch-angle derivation
+- `center` (boolean, optional) - Default: `true`
+- `segmentsPerTooth` (number, optional) - Default: `10`
+
+```javascript
+const bevelPinion = lib.bevelGear({
+  module: 1.5,
+  teeth: 18,
+  faceWidth: 10,
+  mateTeeth: 36,
+  shaftAngleDeg: 90,
+  boreDiameter: 5,
+});
+```
+
+### `lib.faceGear(options)`
+Face/crown-style gear: radial teeth on the top face of a disk.
+
+**Options:**
+- `module` (number)
+- `teeth` (integer, >= 8)
+- `faceWidth` (number) - Base disk thickness
+- `pressureAngleDeg` (number, optional) - Default: `20`
+- `backlash` (number, optional) - Default: `0`
+- `clearance` (number, optional) - Default: `0.25 * module`
+- `addendum` (number, optional) - Default: `module`
+- `dedendum` (number, optional) - Default: `addendum + clearance`
+- `toothHeight` (number, optional) - Axial tooth protrusion above disk
+- `rimWidth` (number, optional) - Extra radius outside tooth tips
+- `boreDiameter` (number, optional)
+- `center` (boolean, optional) - Default: `true`
+- `segmentsPerTooth` (number, optional) - Default: `10`
+
+```javascript
+const face = lib.faceGear({
+  module: 1.5,
+  teeth: 48,
+  faceWidth: 7,
+  toothHeight: 1.2,
+  boreDiameter: 10,
+});
+```
+
 ### `lib.gearPair(options)`
 Build or validate a spur-gear pair and return ratio/backlash/mesh diagnostics.
 
@@ -1689,6 +1765,65 @@ if (pair.status !== 'ok') {
 }
 
 return [pair.pinion, pair.gear];
+```
+
+### `lib.bevelGearPair(options)`
+Build or validate a bevel-gear pair and return ratio diagnostics plus recommended joint placement vectors.
+
+Accepts either:
+- bevel gear shapes produced by `lib.bevelGear(...)`, or
+- analytical specs (`{ module, teeth, ... }`) for each member
+
+**Options:**
+- `pinion` (`Shape | GearPairSpec`)
+- `gear` (`Shape | GearPairSpec`)
+- `shaftAngleDeg` (number, optional) - Default: `90`
+- `backlash` (number, optional)
+- `place` (boolean, optional) - Apply recommended transforms to returned shapes. Default: `true`
+- `phaseDeg` (number, optional) - Extra phase on the placed driven bevel gear
+
+**Returns:** `BevelGearPairResult` with:
+- `pinion`, `gear` (shapes)
+- `jointRatio`, `speedReduction`
+- `shaftAngleDeg`, `pinionPitchAngleDeg`, `gearPitchAngleDeg`, `coneDistance`
+- `pinionAxis`, `gearAxis`, `pinionCenter`, `gearCenter` (joint setup helpers)
+- `diagnostics[]` and `status` (`ok | warn | error`)
+
+```javascript
+const bevelPair = lib.bevelGearPair({
+  pinion: { module: 1.5, teeth: 18, faceWidth: 10 },
+  gear: { module: 1.5, teeth: 36, faceWidth: 9 },
+  shaftAngleDeg: 90,
+});
+```
+
+### `lib.faceGearPair(options)`
+Build or validate a face-gear stage (face gear + pinion) and return ratio diagnostics plus recommended joint placement vectors.
+
+Accepts:
+- `pinion`: spur/bevel gear shape or `GearPairSpec`
+- `gear`: face gear shape or `FaceGearPairSpec`
+
+**Options:**
+- `pinion` (`Shape | GearPairSpec`)
+- `gear` (`Shape | FaceGearPairSpec`)
+- `shaftAngleDeg` (number, optional) - Default: `90` (`90` is the calibrated auto-placement case)
+- `backlash` (number, optional)
+- `place` (boolean, optional) - Apply recommended transforms to returned shapes. Default: `true`
+- `phaseDeg` (number, optional) - Extra phase around pinion axis
+
+**Returns:** `FaceGearPairResult` with:
+- `pinion`, `gear` (shapes)
+- `jointRatio`, `speedReduction`
+- `shaftAngleDeg`, `meshRadius`
+- `pinionAxis`, `gearAxis`, `pinionCenter`, `gearCenter` (joint setup helpers)
+- `diagnostics[]` and `status` (`ok | warn | error`)
+
+```javascript
+const facePair = lib.faceGearPair({
+  pinion: { module: 1.5, teeth: 16, faceWidth: 8 },
+  gear: { module: 1.5, teeth: 48, faceWidth: 7, toothHeight: 1.2 },
+});
 ```
 
 ### `lib.tSlotProfile(options?)`

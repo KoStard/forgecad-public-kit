@@ -89,8 +89,14 @@ const mech = assembly("Spur Stage")
 
 `addGearCoupling(...)` ratio sources (choose exactly one):
 - `ratio` (explicit multiplier)
-- `pair` (`lib.gearPair(...)` result, using `pair.jointRatio`)
-- `driverTeeth` + `drivenTeeth` (auto ratio; external mesh is negative, internal is positive via `mesh: "internal"`)
+- `pair` (`lib.gearPair(...)`, `lib.bevelGearPair(...)`, or `lib.faceGearPair(...)` result using `pair.jointRatio`)
+- `driverTeeth` + `drivenTeeth` (auto ratio; `internal` mesh is positive, `external`/`bevel`/`face` are negative)
+
+For bevel/face stages, pairing helpers also return placement aids:
+- `pinionAxis`, `gearAxis`
+- `pinionCenter`, `gearCenter`
+
+These vectors are useful when wiring joints in `jointsView(...)` or setting up assembly joint frames.
 
 ## Joint frames
 
