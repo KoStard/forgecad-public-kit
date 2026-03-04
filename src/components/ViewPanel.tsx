@@ -59,6 +59,9 @@ export function ViewPanel() {
   const setObjectColor = useForgeStore((s) => s.setObjectColor);
   const selectedObjectId = useForgeStore((s) => s.selectedObjectId);
   const selectObject = useForgeStore((s) => s.selectObject);
+  const focusedObjectId = useForgeStore((s) => s.focusedObjectId);
+  const focusObject = useForgeStore((s) => s.focusObject);
+  const clearFocusedObject = useForgeStore((s) => s.clearFocusedObject);
   const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
   const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
   const setObjectPickSyncEnabled = useForgeStore((s) => s.setObjectPickSyncEnabled);
@@ -320,20 +323,37 @@ export function ViewPanel() {
 
       <div style={{ ...sectionStyle, paddingBottom: 0 }}>
         <div style={labelStyle}>Objects</div>
+        {focusedObjectId && (
+          <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 8 }}>
+            Focus mode on. Double-click empty space or press Esc to exit.
+          </div>
+        )}
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px' }}>
+      <div
+        style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px' }}
+        onDoubleClick={(event) => {
+          if (event.target !== event.currentTarget) return;
+          clearFocusedObject();
+        }}
+      >
         {objects.length === 0 && (
           <div style={{ fontSize: 12, color: 'var(--fc-textDim)', padding: '6px 0' }}>No objects loaded</div>
         )}
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
           const isSelected = selectedObjectId === obj.id;
+          const isFocused = focusedObjectId === obj.id;
+          const isDimmedByFocus = !!focusedObjectId && !isFocused;
           return (
             <div
               key={obj.id}
               ref={(node) => { objectItemRefs.current[obj.id] = node; }}
               tabIndex={-1}
               onClick={() => selectObject(obj.id)}
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                focusObject(obj.id);
+              }}
               onMouseEnter={() => setHoveredObjectId(obj.id)}
               onMouseLeave={() => setHoveredObjectId(null)}
               style={{
@@ -343,6 +363,8 @@ export function ViewPanel() {
                 marginBottom: 8,
                 background: isSelected ? 'var(--fc-bgActive)' : 'var(--fc-bgOverlay)',
                 cursor: 'pointer',
+                opacity: isDimmedByFocus ? 0.65 : 1,
+                boxShadow: isFocused ? '0 0 0 1px var(--fc-accent) inset' : undefined,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -351,6 +373,7 @@ export function ViewPanel() {
                   checked={settings.visible}
                   onChange={(e) => setObjectVisibility(obj.id, e.target.checked)}
                   onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
                 />
                 <span style={{ fontSize: 12, color: 'var(--fc-text)', flex: 1 }}>{obj.name}</span>
                 <input
@@ -358,6 +381,7 @@ export function ViewPanel() {
                   value={settings.color}
                   onChange={(e) => setObjectColor(obj.id, e.target.value)}
                   onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
                   style={{ width: 26, height: 18, border: 'none', background: 'transparent', cursor: 'pointer' }}
                 />
               </div>
@@ -371,6 +395,7 @@ export function ViewPanel() {
                   value={settings.opacity}
                   onChange={(e) => setObjectOpacity(obj.id, Number(e.target.value))}
                   onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
                   style={{ flex: 1 }}
                 />
                 <span style={{ fontSize: 11, color: 'var(--fc-textDim)', width: 32, textAlign: 'right' }}>{Math.round(settings.opacity * 100)}%</span>

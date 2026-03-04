@@ -173,6 +173,9 @@ interface ForgeStore {
   setObjectColor: (id: string, color: string) => void;
   selectedObjectId: string | null;
   selectObject: (id: string | null) => void;
+  focusedObjectId: string | null;
+  focusObject: (id: string | null) => void;
+  clearFocusedObject: () => void;
   hoveredObjectId: string | null;
   setHoveredObjectId: (id: string | null) => void;
   hoveredJointName: string | null;
@@ -268,7 +271,8 @@ const syncObjectSettings = (
   objects: SceneObject[],
   prevSettings: Record<string, ObjectSettings>,
   selectedObjectId: string | null,
-): { settings: Record<string, ObjectSettings>; selectedObjectId: string | null } => {
+  focusedObjectId: string | null,
+): { settings: Record<string, ObjectSettings>; selectedObjectId: string | null; focusedObjectId: string | null } => {
   const nextSettings: Record<string, ObjectSettings> = { ...prevSettings };
   const ids = new Set(objects.map((obj) => obj.id));
   Object.keys(nextSettings).forEach((id) => {
@@ -284,7 +288,8 @@ const syncObjectSettings = (
   const nextSelected = objects.length === 0
     ? null
     : (selectedObjectId && ids.has(selectedObjectId) ? selectedObjectId : objects[0].id);
-  return { settings: nextSettings, selectedObjectId: nextSelected };
+  const nextFocused = focusedObjectId && ids.has(focusedObjectId) ? focusedObjectId : null;
+  return { settings: nextSettings, selectedObjectId: nextSelected, focusedObjectId: nextFocused };
 };
 
 const syncCutPlaneEnabled = (
@@ -611,7 +616,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (!isRunnableFile(activeFile)) return;
     setParamOverrides(paramOverrides);
     const runResult = runScript(code, activeFile, files, { quality: runQuality });
-    const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
+    const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId, get().focusedObjectId);
     const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
     const nextJointValues = syncJointValues(runResult, jointValues);
     const nextAnimationState = syncJointAnimationState(
@@ -631,6 +636,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       hoveredJointName: syncHoveredJointName(runResult, hoveredJointName),
       objectSettings: synced.settings,
       selectedObjectId: synced.selectedObjectId,
+      focusedObjectId: synced.focusedObjectId,
       cutPlaneEnabled: nextCutPlaneEnabled,
     });
     writeViewPreferences({ objectSettings: synced.settings, cutPlaneEnabled: nextCutPlaneEnabled });
@@ -654,7 +660,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (!code) return;
     if (!isRunnableFile(activeFile)) return;
     const runResult = runScript(code, activeFile, files, { quality: runQuality });
-    const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
+    const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId, get().focusedObjectId);
     const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
     const nextJointValues = syncJointValues(runResult, jointValues);
     const nextAnimationState = syncJointAnimationState(
@@ -674,6 +680,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       hoveredJointName: syncHoveredJointName(runResult, hoveredJointName),
       objectSettings: synced.settings,
       selectedObjectId: synced.selectedObjectId,
+      focusedObjectId: synced.focusedObjectId,
       cutPlaneEnabled: nextCutPlaneEnabled,
     });
     writeViewPreferences({ objectSettings: synced.settings, cutPlaneEnabled: nextCutPlaneEnabled });
@@ -786,6 +793,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   }),
   selectedObjectId: null,
   selectObject: (id) => set({ selectedObjectId: id }),
+  focusedObjectId: null,
+  focusObject: (id) => set((state) => ({ focusedObjectId: id, selectedObjectId: id ?? state.selectedObjectId })),
+  clearFocusedObject: () => set({ focusedObjectId: null }),
   hoveredObjectId: null,
   setHoveredObjectId: (id) => set({ hoveredObjectId: id }),
   hoveredJointName: null,
