@@ -1590,8 +1590,8 @@ const pinion = lib.spurGear({
 });
 ```
 
-### `lib.sideGear(options)`
-Side/crown gear where teeth are on one face (`top` or `bottom`) instead of the outer rim.
+### `lib.faceGear(options)`
+Face gear (crown style) where teeth are on one face (`top` or `bottom`) instead of the outer rim.
 
 Uses the same involute tooth sizing inputs as `lib.spurGear(...)`, then projects the tooth band axially from one side.
 
@@ -1601,7 +1601,7 @@ Uses the same involute tooth sizing inputs as `lib.spurGear(...)`, then projects
 - `toothHeight` (number, optional) - Tooth projection height from the selected face. Default: `module`
 
 ```javascript
-const side = lib.sideGear({
+const face = lib.faceGear({
   module: 1.25,
   teeth: 36,
   faceWidth: 8,
@@ -1610,6 +1610,8 @@ const side = lib.sideGear({
   boreDiameter: 8,
 });
 ```
+
+`lib.sideGear(...)` is kept as a compatibility alias.
 
 ### `lib.ringGear(options)`
 Internal ring gear with involute-derived tooth spaces.
@@ -1697,15 +1699,15 @@ if (pair.status !== 'ok') {
 return [pair.pinion, pair.gear];
 ```
 
-### `lib.sideGearPair(options)`
-Build or validate a perpendicular pair between a side gear and a vertical spur gear.
+### `lib.faceGearPair(options)`
+Build or validate a perpendicular pair between a face gear and a vertical spur gear.
 
 Accepts either:
-- side gear shapes produced by `lib.sideGear(...)` or side-gear specs (`{ module, teeth, ... }`)
+- face gear shapes produced by `lib.faceGear(...)` or face-gear specs (`{ module, teeth, ... }`)
 - vertical spur shapes produced by `lib.spurGear(...)` or spur specs (`{ module, teeth, ... }`)
 
 **Options:**
-- `side` (`Shape | SideGearSpec`) - side/crown gear member
+- `face` (`Shape | FaceGearSpec`) - face/crown gear member
 - `vertical` (`Shape | GearPairSpec`) - mating perpendicular spur gear
 - `backlash` (number, optional) - target radial backlash for auto center distance
 - `centerDistance` (number, optional) - override center distance directly
@@ -1713,16 +1715,16 @@ Accepts either:
 - `place` (boolean, optional) - auto-place `vertical`. Default: `true`
 - `phaseDeg` (number, optional) - phase rotation applied before perpendicular placement
 
-**Returns:** `SideGearPairResult` with:
-- `side`, `vertical` (shapes)
+**Returns:** `FaceGearPairResult` with:
+- `face`, `vertical` (shapes)
 - `jointRatio`, `speedReduction`
 - `centerDistance`, `centerDistanceNominal`, `backlash`
 - `meshPlaneZ`, `radialOverlap`
 - `diagnostics[]` and `status` (`ok | warn | error`)
 
 ```javascript
-const pair = lib.sideGearPair({
-  side: { module: 1.25, teeth: 36, faceWidth: 8, toothHeight: 1.2, side: 'top' },
+const pair = lib.faceGearPair({
+  face: { module: 1.25, teeth: 36, faceWidth: 8, toothHeight: 1.2, side: 'top' },
   vertical: { module: 1.25, teeth: 12, faceWidth: 8 },
   backlash: 0.05,
 });
@@ -1731,8 +1733,10 @@ if (pair.status !== 'ok') {
   console.warn(pair.diagnostics);
 }
 
-return [pair.side, pair.vertical];
+return [pair.face, pair.vertical];
 ```
+
+`lib.sideGearPair(...)` is kept as a compatibility alias.
 
 ### `lib.tSlotProfile(options?)`
 Build a 2D T-slot cross-section sketch.
