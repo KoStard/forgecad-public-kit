@@ -371,11 +371,17 @@ const clampJointValue = (joint: JointViewDef, value: number): number => {
   return clamped;
 };
 
+export interface ResolveJointViewValueOptions {
+  clamp?: boolean;
+}
+
 export function resolveJointViewValues(
   joints: JointViewDef[],
   couplings: JointViewCouplingDef[] = [],
   baseValues: Record<string, number> = {},
+  options: ResolveJointViewValueOptions = {},
 ): Record<string, number> {
+  const shouldClamp = options.clamp ?? true;
   const jointByName = new Map<string, JointViewDef>();
   joints.forEach((joint) => jointByName.set(joint.name, joint));
   const couplingByJoint = new Map<string, JointViewCouplingDef>();
@@ -391,7 +397,8 @@ export function resolveJointViewValues(
     if (!joint) return 0;
 
     if (resolving.has(jointName)) {
-      return clampJointValue(joint, baseValues[jointName] ?? joint.defaultValue);
+      const cycleFallback = baseValues[jointName] ?? joint.defaultValue;
+      return shouldClamp ? clampJointValue(joint, cycleFallback) : cycleFallback;
     }
     resolving.add(jointName);
 
@@ -404,7 +411,7 @@ export function resolveJointViewValues(
       });
     }
 
-    const resolved = clampJointValue(joint, raw);
+    const resolved = shouldClamp ? clampJointValue(joint, raw) : (Number.isFinite(raw) ? raw : joint.defaultValue);
     cache.set(jointName, resolved);
     resolving.delete(jointName);
     return resolved;

@@ -114,6 +114,10 @@ export function ViewPanel() {
     () => resolveJointViewValues(joints, jointCouplings, animatedJointValues),
     [animatedJointValues, jointCouplings, joints],
   );
+  const displayedRawJointValues = useMemo(
+    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues, { clamp: false }),
+    [animatedJointValues, jointCouplings, joints],
+  );
   const coupledJointNames = useMemo(
     () => new Set(jointCouplings.map((coupling) => coupling.joint)),
     [jointCouplings],
@@ -294,8 +298,9 @@ export function ViewPanel() {
           <div style={labelStyle}>Joints</div>
           {joints.map((joint) => {
             const { min, max } = resolveJointRange(joint.type, joint.min, joint.max);
-            const rawValue = displayedJointValues[joint.name] ?? joint.defaultValue;
-            const value = Math.max(min, Math.min(max, rawValue));
+            const rawValue = displayedRawJointValues[joint.name] ?? joint.defaultValue;
+            const clampedValue = displayedJointValues[joint.name] ?? joint.defaultValue;
+            const value = Math.max(min, Math.min(max, clampedValue));
             const step = joint.type === 'prismatic' ? 0.1 : 1;
             const isCoupled = coupledJointNames.has(joint.name);
 
@@ -311,7 +316,7 @@ export function ViewPanel() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
                   <span style={{ color: 'var(--fc-text)' }}>{joint.name}</span>
                   <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
-                    {Number(value.toFixed(2))}{joint.unit ? ` ${joint.unit}` : ''}{isCoupled ? ' (linked)' : ''}
+                    {Number(rawValue.toFixed(2))}{joint.unit ? ` ${joint.unit}` : ''}{isCoupled ? ' (linked)' : ''}
                   </span>
                 </div>
                 <input
