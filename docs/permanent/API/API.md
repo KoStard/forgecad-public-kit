@@ -1019,6 +1019,8 @@ Loft between multiple sketches along Z stations.
 
 This implementation interpolates signed-distance fields and meshes via level-set extraction, so profiles can differ in vertex count/topology.
 
+Performance note: `loft()` is significantly heavier than primitive/extrude/revolve paths. Use loft only when profile interpolation is required. If your part is axis-symmetric (bottles, vases, knobs, lathe-style parts), prefer `revolve()` for much faster generation.
+
 **Parameters:**
 - `profiles` (`Sketch[]`) - At least 2
 - `heights` (`number[]`) - Same length as `profiles`, strictly increasing
@@ -1036,6 +1038,8 @@ const body = loft(
 
 #### `sweep(profile, path, options?)`
 Sweep a 2D profile along a 3D path (`Curve3D` or point polyline).
+
+Performance note: `sweep()` also uses level-set meshing internally. Prefer direct primitives/extrude/revolve when they can express the same shape.
 
 **Parameters:**
 - `profile` (`Sketch`) - Local cross-section in XY plane
@@ -1160,6 +1164,8 @@ const tapered = circle2d(20).extrude(50, {
 
 #### `.revolve(degrees?, segments?)`
 Revolves sketch around Y axis (becomes Z in result).
+
+Performance tip: for rotationally symmetric parts, `revolve()` should be the default choice. It is typically much faster and more stable than approximating the same form with multiple loft sections.
 
 **Parameters:**
 - `degrees` (number, optional) - Rotation angle. Default: 360 (full revolution)

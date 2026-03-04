@@ -33,6 +33,8 @@ const tapered = circle2d(20).extrude(50, {
 ### `.revolve(degrees?, segments?)`
 Revolves sketch around Y axis (becomes Z in result).
 
+Performance tip: prefer `revolve()` over `loft()` whenever the part is rotationally symmetric. Loft is for profile interpolation and is substantially heavier.
+
 **Parameters:**
 - `degrees` (number, optional) - Rotation angle. Default: 360 (full revolution)
 - `segments` (number, optional) - Number of segments. Default: auto
