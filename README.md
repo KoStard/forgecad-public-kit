@@ -206,6 +206,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 - `examples/api/sketch-basics.forge.js`: sketch primitives, offset, path, extrude
 - `examples/api/boolean-operations.forge.js`: union/difference/intersection behavior
 - `examples/api/assembly-mechanism.forge.js`: joints, sweeps, collisions, BOM
+- `examples/api/gears-tier1.forge.js`: spur/ring/rack gears + pair diagnostics
 - `examples/api/dimensioned-bracket.forge.js`: dimension annotations
 - `examples/api/bill-of-materials.forge.js`: script-authored BOM aggregation
 - `examples/api/exploded-view.forge.js`: exploded layouts + cut-plane visualization

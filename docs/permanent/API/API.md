@@ -1442,6 +1442,117 @@ L-shaped mounting bracket with optional holes.
 ### `lib.holePattern(rows, cols, spacingX, spacingY, holeDia, depth)`
 Grid of cylindrical holes.
 
+### `lib.spurGear(options)`
+Involute external spur gear with optional bore.
+
+**Options:**
+- `module` (number) - Metric module (pitch diameter / tooth count)
+- `teeth` (integer) - Tooth count (>= 6)
+- `faceWidth` (number) - Extrusion width along Z
+- `pressureAngleDeg` (number, optional) - Default: `20`
+- `backlash` (number, optional) - Tangential backlash at pitch circle. Default: `0`
+- `clearance` (number, optional) - Root clearance. Default: `0.25 * module`
+- `addendum` (number, optional) - Tooth addendum. Default: `module`
+- `dedendum` (number, optional) - Tooth dedendum. Default: `addendum + clearance`
+- `boreDiameter` (number, optional) - Center bore diameter
+- `center` (boolean, optional) - Center extrusion around Z=0. Default: `true`
+- `segmentsPerTooth` (number, optional) - Involute sampling quality. Default: `10`
+
+```javascript
+const pinion = lib.spurGear({
+  module: 1.25,
+  teeth: 14,
+  faceWidth: 8,
+  boreDiameter: 5,
+});
+```
+
+### `lib.ringGear(options)`
+Internal ring gear with involute-derived tooth spaces.
+
+**Options:**
+- `module` (number)
+- `teeth` (integer, >= 12)
+- `faceWidth` (number)
+- `pressureAngleDeg` (number, optional) - Default: `20`
+- `backlash` (number, optional) - Default: `0`
+- `clearance` (number, optional) - Default: `0.25 * module`
+- `addendum` (number, optional) - Default: `module`
+- `dedendum` (number, optional) - Default: `addendum + clearance`
+- `rimWidth` (number, optional) - Radial ring thickness outside tooth roots
+- `outerDiameter` (number, optional) - Overrides `rimWidth` if provided
+- `center` (boolean, optional) - Default: `true`
+- `segmentsPerTooth` (number, optional) - Default: `10`
+
+```javascript
+const ring = lib.ringGear({
+  module: 1.25,
+  teeth: 58,
+  faceWidth: 10,
+  rimWidth: 4,
+});
+```
+
+### `lib.rackGear(options)`
+Linear rack gear with pressure-angle flanks.
+
+**Options:**
+- `module` (number)
+- `teeth` (integer, >= 2)
+- `faceWidth` (number)
+- `pressureAngleDeg` (number, optional) - Default: `20`
+- `backlash` (number, optional) - Default: `0`
+- `clearance` (number, optional) - Default: `0.25 * module`
+- `addendum` (number, optional) - Default: `module`
+- `dedendum` (number, optional) - Default: `addendum + clearance`
+- `baseHeight` (number, optional) - Rack body thickness behind root line
+- `center` (boolean, optional) - Default: `true`
+
+```javascript
+const rack = lib.rackGear({
+  module: 1.25,
+  teeth: 24,
+  faceWidth: 8,
+  baseHeight: 3.5,
+});
+```
+
+### `lib.gearPair(options)`
+Build or validate a spur-gear pair and return ratio/backlash/mesh diagnostics.
+
+Accepts either:
+- spur gear shapes produced by `lib.spurGear(...)`, or
+- analytical specs (`{ module, teeth, ... }`) for each member
+
+**Options:**
+- `pinion` (`Shape | GearPairSpec`) - input gear
+- `gear` (`Shape | GearPairSpec`) - mating output gear
+- `backlash` (number, optional) - target backlash used for auto center distance
+- `centerDistance` (number, optional) - override center distance directly
+- `place` (boolean, optional) - auto-place `gear` at +X center distance. Default: `true`
+- `phaseDeg` (number, optional) - additional Z rotation applied to placed gear before translation
+
+**Returns:** `GearPairResult` with:
+- `pinion`, `gear` (shapes)
+- `jointRatio`, `speedReduction`
+- `centerDistance`, `centerDistanceNominal`, `backlash`
+- `pressureAngleDeg`, `workingPressureAngleDeg`, `contactRatio`
+- `diagnostics[]` and `status` (`ok | warn | error`)
+
+```javascript
+const pair = lib.gearPair({
+  pinion: { module: 1.25, teeth: 14, faceWidth: 8, boreDiameter: 5 },
+  gear: { module: 1.25, teeth: 42, faceWidth: 8, boreDiameter: 8 },
+  backlash: 0.05,
+});
+
+if (pair.status !== 'ok') {
+  console.warn(pair.diagnostics);
+}
+
+return [pair.pinion, pair.gear];
+```
+
 ### `lib.tSlotProfile(options?)`
 Build a 2D T-slot cross-section sketch.
 
