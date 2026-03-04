@@ -110,7 +110,7 @@ Latest benchmark iterations from `ForgeCADBenchmark/results/*` (`version_{n}.for
 - 3D API: booleans, transforms, hull, level set/SDF workflows, cut planes
 - Named shapes, face/edge references, fillet/chamfer helpers
 - Reusable part library (`lib`) with fasteners, tubes, brackets, threads, patterns, exploded-view helpers
-- Assembly graph API with revolute/prismatic/fixed joints
+- Assembly graph API with revolute/prismatic/fixed joints and joint couplings
 - Drawing/report pipeline: dimensions, BOM, multi-view PDF generation
 - CLI tools that run the same engine as the browser runtime
 

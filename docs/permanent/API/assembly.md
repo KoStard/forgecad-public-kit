@@ -34,6 +34,38 @@ return solved.toScene();
 - `addRevolute(name, parent, child, opts)` shorthand for `addJoint(..., "revolute", ...)`
 - `addPrismatic(name, parent, child, opts)` shorthand for `addJoint(..., "prismatic", ...)`
 - `addFixed(name, parent, child, opts)` shorthand for `addJoint(..., "fixed", ...)`
+- `addJointCoupling(jointName, { terms, offset? })` links joints with linear relationships
+
+## Joint couplings
+
+Use couplings when one joint should be derived from other joints.
+
+Formula:
+- `driven = offset + Σ(ratio_i * source_i)`
+
+Example:
+
+```javascript
+const mech = assembly("Differential")
+  .addFrame("Base")
+  .addFrame("Turret")
+  .addFrame("Wheel")
+  .addFrame("TopInput")
+  .addRevolute("Steering", "Base", "Turret", { axis: [0, 0, 1] })
+  .addRevolute("WheelDrive", "Turret", "Wheel", { axis: [1, 0, 0] })
+  .addRevolute("TopGear", "Base", "TopInput", { axis: [0, 0, 1] })
+  .addJointCoupling("TopGear", {
+    terms: [
+      { joint: "Steering", ratio: 1 },
+      { joint: "WheelDrive", ratio: 20 / 14 },
+    ],
+  });
+```
+
+Notes:
+- Coupled joints ignore direct values in `solve(state)` and emit a warning.
+- Coupling cycles are rejected.
+- `sweepJoint(...)` cannot sweep a coupled target; sweep one of its source joints instead.
 
 ## Joint frames
 
