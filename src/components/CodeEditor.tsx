@@ -466,8 +466,6 @@ type Profile2020BSlot6ProfileOptions = {
   centerBoreDia?: number;
   centerBossDia?: number;
   diagonalWebWidth?: number;
-  cornerPocketDia?: number;
-  cornerPocketOffset?: number;
   outerCornerRadius?: number;
   segments?: number;
 };

@@ -422,10 +422,6 @@ export interface Profile2020BSlot6ProfileOptions {
   centerBossDia?: number;
   /** Width of diagonal ribs connecting center boss to corner regions. */
   diagonalWebWidth?: number;
-  /** Corner relief pocket diameter (set 0 to disable). */
-  cornerPocketDia?: number;
-  /** Corner relief pocket center offset from profile center. */
-  cornerPocketOffset?: number;
   /** Outside corner radius. */
   outerCornerRadius?: number;
   /** Circle segment count. */
@@ -445,8 +441,6 @@ const DEFAULT_2020_B_SLOT6_PROFILE: Required<Profile2020BSlot6ProfileOptions> = 
   centerBoreDia: 5.5,
   centerBossDia: 8.4,
   diagonalWebWidth: 4.4,
-  cornerPocketDia: 4.4,
-  cornerPocketOffset: 5.6,
   outerCornerRadius: 1.0,
   segments: 40,
 };
@@ -481,12 +475,6 @@ function normalized2020BSlot6ProfileOptions(
   if (opts.diagonalWebWidth <= 0 || opts.diagonalWebWidth >= 12) {
     throw new Error('profile2020BSlot6Profile: diagonalWebWidth must be > 0 and < 12');
   }
-  if (opts.cornerPocketDia < 0) {
-    throw new Error('profile2020BSlot6Profile: cornerPocketDia must be >= 0');
-  }
-  if (opts.cornerPocketOffset < 0) {
-    throw new Error('profile2020BSlot6Profile: cornerPocketOffset must be >= 0');
-  }
   if (opts.outerCornerRadius < 0) {
     throw new Error('profile2020BSlot6Profile: outerCornerRadius must be >= 0');
   }
@@ -498,10 +486,6 @@ function normalized2020BSlot6ProfileOptions(
   const half = 10;
   if (opts.slotDepth >= half) {
     throw new Error('profile2020BSlot6Profile: slotDepth must be < 10');
-  }
-  const pocketR = opts.cornerPocketDia / 2;
-  if (opts.cornerPocketDia > 0 && opts.cornerPocketOffset + pocketR >= half) {
-    throw new Error('profile2020BSlot6Profile: corner pocket exceeds outer boundary');
   }
   return opts;
 }
@@ -516,7 +500,6 @@ export function profile2020BSlot6Profile(
 ): Sketch {
   const opts = normalized2020BSlot6ProfileOptions(options);
   const size = 20;
-  const half = size / 2;
 
   const outer = opts.outerCornerRadius > 0
     ? roundedRect(size, size, opts.outerCornerRadius, true)
@@ -554,19 +537,6 @@ export function profile2020BSlot6Profile(
 
   if (opts.centerBoreDia > 0) {
     profile = difference2d(profile, circle2d(opts.centerBoreDia / 2, opts.segments));
-  }
-
-  if (opts.cornerPocketDia > 0) {
-    const r = opts.cornerPocketDia / 2;
-    const o = Math.min(opts.cornerPocketOffset, half - r - 1e-6);
-    const pocket = circle2d(r, opts.segments);
-    const pockets = union2d(
-      sketchTranslate(pocket, o, o),
-      sketchTranslate(pocket, -o, o),
-      sketchTranslate(pocket, -o, -o),
-      sketchTranslate(pocket, o, -o),
-    );
-    profile = difference2d(profile, pockets);
   }
 
   return profile.simplify(1e-5);
