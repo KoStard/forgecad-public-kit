@@ -14,3 +14,4 @@ export * from './fillets';
 export * from './arcBridge';
 export * from './dimensions';
 export * from './curves';
+export * from './svgImport';

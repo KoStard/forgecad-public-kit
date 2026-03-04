@@ -8,7 +8,7 @@
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { resolve, relative, join, dirname } from 'path';
 
-const FORGE_EXTS = ['.forge.js', '.sketch.js'];
+const FORGE_EXTS = ['.forge.js', '.sketch.js', '.svg'];
 const isForgeFile = (f: string) => FORGE_EXTS.some(ext => f.endsWith(ext));
 
 /**

@@ -27,6 +27,11 @@ const collectInitialFolders = (files: Record<string, string>): string[] => {
 };
 
 const INITIAL_FOLDERS = collectInitialFolders(INITIAL_FILES);
+const isRunnableFile = (name: string): boolean => (
+  name.endsWith('.forge.js')
+  || name.endsWith('.sketch.js')
+  || name.endsWith('.js')
+);
 
 const getActiveFileFromHash = (): string | null => {
   const hash = window.location.hash.slice(1); // Remove the #
@@ -39,7 +44,10 @@ const initialActive = (() => {
     return hashFile;
   }
   const names = Object.keys(INITIAL_FILES);
-  return names.find((n) => n.endsWith('.forge.js')) || names[0];
+  return names.find((n) => n.endsWith('.forge.js'))
+    || names.find((n) => n.endsWith('.sketch.js'))
+    || names.find((n) => n.endsWith('.js'))
+    || names[0];
 })();
 
 const INITIAL_SAVED = projectFiles && Object.keys(projectFiles).length > 0
@@ -398,10 +406,14 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (!normalized) return;
     if (get().files[normalized]) return;
     if (get().folders.includes(normalized)) return;
-    const isSketch = normalized.endsWith('.sketch.js');
-    const template = isSketch
-      ? '// 2D Sketch\n\nreturn rect(50, 30, true);\n'
-      : '// 3D Part\n\nreturn box(50, 30, 10);\n';
+    const template = normalized.endsWith('.svg')
+      ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path d="M 10 10 L 90 10 L 90 90 L 10 90 Z" fill="none" stroke="#000" stroke-width="4" />
+</svg>
+`
+      : (normalized.endsWith('.sketch.js')
+        ? '// 2D Sketch\n\nreturn rect(50, 30, true);\n'
+        : '// 3D Part\n\nreturn box(50, 30, 10);\n');
     const newFolders = Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort();
     set((s) => ({
       files: { ...s.files, [normalized]: template },
@@ -576,6 +588,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     } = get();
     const code = files[activeFile];
     if (!code) return;
+    if (!isRunnableFile(activeFile)) return;
     setParamOverrides(paramOverrides);
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
@@ -618,6 +631,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     } = get();
     const code = files[activeFile];
     if (!code) return;
+    if (!isRunnableFile(activeFile)) return;
     const runResult = runScript(code, activeFile, files);
     const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId);
     const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
@@ -898,7 +912,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       if ('showSaveFilePicker' in window) {
         const handle = await (window as any).showSaveFilePicker({
           suggestedName: activeFile,
-          types: [{ description: 'ForgeCAD files', accept: { 'text/javascript': ['.forge.js', '.sketch.js', '.js'] } }],
+          types: [
+            { description: 'ForgeCAD scripts', accept: { 'text/javascript': ['.forge.js', '.sketch.js', '.js'] } },
+            { description: 'SVG', accept: { 'image/svg+xml': ['.svg'] } },
+          ],
         });
         const writable = await handle.createWritable();
         await writable.write(code);
@@ -922,7 +939,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
           savedFiles: { ...s.savedFiles, [activeFile]: code } // This assumes we are satisfied with current content being "saved"
         }));
       } else {
-        const blob = new Blob([code], { type: 'text/javascript' });
+        const mime = activeFile.endsWith('.svg') ? 'image/svg+xml' : 'text/javascript';
+        const blob = new Blob([code], { type: mime });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -1037,7 +1055,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         ? hashFile
         : (activeFile && nextFiles[activeFile]
           ? activeFile
-          : (availableFiles.find((n) => n.endsWith('.forge.js')) || availableFiles[0]));
+          : (availableFiles.find((n) => n.endsWith('.forge.js'))
+            || availableFiles.find((n) => n.endsWith('.sketch.js'))
+            || availableFiles.find((n) => n.endsWith('.js'))
+            || availableFiles[0]));
 
       const nextDirty = Object.keys(nextFiles).some((path) => nextSaved[path] !== nextFiles[path]);
 

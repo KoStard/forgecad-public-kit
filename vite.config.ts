@@ -15,6 +15,8 @@ function resolveProjectDir(): string | null {
 }
 
 const projectDir = resolveProjectDir();
+const PROJECT_FILE_EXTS = ['.forge.js', '.sketch.js', '.svg'];
+const isProjectFile = (name: string): boolean => PROJECT_FILE_EXTS.some((ext) => name.endsWith(ext));
 
 // Helper to scan project directory for forge/sketch files
 function scanProjectFiles(projectPath: string | null): Record<string, string> {
@@ -30,7 +32,7 @@ function scanProjectFiles(projectPath: string | null): Record<string, string> {
       
       if (item.isDirectory()) {
         scanDir(fullPath, relativePath);
-      } else if (item.isFile() && (item.name.endsWith('.forge.js') || item.name.endsWith('.sketch.js'))) {
+      } else if (item.isFile() && isProjectFile(item.name)) {
         entries[relativePath] = fs.readFileSync(fullPath, 'utf-8');
       }
     }
@@ -63,7 +65,7 @@ function forgeProjectPlugin() {
     handleHotUpdate({ file, server }: any) {
       if (!projectDir) return;
       const abs = path.resolve(projectDir);
-      if (file.startsWith(abs) && (file.endsWith('.forge.js') || file.endsWith('.sketch.js'))) {
+      if (file.startsWith(abs) && isProjectFile(file)) {
         // Ignore - don't trigger HMR for project file changes
         return [];
       }
@@ -100,7 +102,7 @@ function forgeProjectPlugin() {
                 res.end(JSON.stringify({ error: 'Invalid request' }));
                 return;
               }
-              if (!filename.endsWith('.forge.js') && !filename.endsWith('.sketch.js')) {
+              if (!isProjectFile(filename)) {
                 res.statusCode = 400;
                 res.end(JSON.stringify({ error: 'Invalid file type' }));
                 return;

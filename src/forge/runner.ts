@@ -67,12 +67,14 @@ import {
   spline3d,
   loft,
   sweep,
+  sketchFromSvg,
   dim,
   dimLine,
   resetDimensions,
   getCollectedDimensions,
   takeCollectedDimensions,
   type DimensionDef,
+  type SvgImportOptions,
 } from './sketch';
 import { param, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, type ParamDef } from './params';
 import { joint } from './joint';
@@ -381,6 +383,77 @@ function parseImportParamArgs(
   return normalized;
 }
 
+const SVG_IMPORT_OPTION_KEYS = new Set([
+  'include',
+  'regionSelection',
+  'maxRegions',
+  'minRegionArea',
+  'minRegionAreaRatio',
+  'flattenTolerance',
+  'arcSegments',
+  'scale',
+  'simplify',
+  'invertY',
+]);
+
+function parseSvgImportArgs(
+  importKind: 'importSketch' | 'importSvgSketch',
+  fileName: string,
+  args: unknown,
+): SvgImportOptions {
+  if (args == null) return {};
+  if (typeof args !== 'object' || Array.isArray(args)) {
+    throw new Error(`${importKind}("${fileName}") options must be an object`);
+  }
+
+  const out: SvgImportOptions = {};
+  for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
+    if (!SVG_IMPORT_OPTION_KEYS.has(key)) {
+      throw new Error(
+        `${importKind}("${fileName}") unknown SVG option "${key}". ` +
+        `Allowed keys: ${Array.from(SVG_IMPORT_OPTION_KEYS).join(', ')}`,
+      );
+    }
+
+    switch (key) {
+      case 'include': {
+        if (typeof value !== 'string' || !['auto', 'fill', 'stroke', 'fill-and-stroke'].includes(value)) {
+          throw new Error(
+            `${importKind}("${fileName}") option "include" must be one of: auto, fill, stroke, fill-and-stroke`,
+          );
+        }
+        out.include = value as SvgImportOptions['include'];
+        break;
+      }
+      case 'regionSelection': {
+        if (typeof value !== 'string' || !['all', 'largest'].includes(value)) {
+          throw new Error(
+            `${importKind}("${fileName}") option "regionSelection" must be one of: all, largest`,
+          );
+        }
+        out.regionSelection = value as SvgImportOptions['regionSelection'];
+        break;
+      }
+      case 'invertY': {
+        if (typeof value !== 'boolean') {
+          throw new Error(`${importKind}("${fileName}") option "invertY" must be a boolean`);
+        }
+        out.invertY = value;
+        break;
+      }
+      default: {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+          throw new Error(`${importKind}("${fileName}") option "${key}" must be a finite number`);
+        }
+        (out as Record<string, number>)[key] = value;
+        break;
+      }
+    }
+  }
+
+  return out;
+}
+
 function describeScriptResultType(value: unknown): string {
   if (value == null) return String(value);
   if (value instanceof Shape) return 'Shape';
@@ -529,7 +602,7 @@ function executeFile(
     };
 
     const logImportTrace = (
-      kind: 'importSketch' | 'importPart',
+      kind: 'importSketch' | 'importPart' | 'importSvgSketch',
       target: string,
       phase: 'start' | 'success' | 'error',
       details: Record<string, unknown> = {},
@@ -551,8 +624,37 @@ function executeFile(
     };
 
     // importSketch("name", { ...paramOverrides }) — executes another file, expects a Sketch result
-    const importSketch = (name: string, paramOverrides?: Record<string, number>): Sketch => {
+    const isSvgImportPath = (path: string): boolean => path.toLowerCase().endsWith('.svg');
+
+    const importSketch = (name: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch => {
       const { source: src, lookupKey, resolvedPath } = resolveImportSource(name);
+      if (isSvgImportPath(resolvedPath)) {
+        const svgOptions = parseSvgImportArgs('importSketch', name, paramOverrides);
+        logImportTrace('importSketch', resolvedPath, 'start', {
+          requested: name,
+          mode: 'svg',
+          options: svgOptions,
+        });
+        try {
+          const result = sketchFromSvg(src, svgOptions);
+          logImportTrace('importSketch', resolvedPath, 'success', {
+            requested: name,
+            mode: 'svg',
+            got: 'Sketch',
+            area: Number(result.area().toFixed(4)),
+            verts: result.numVert(),
+          });
+          return result;
+        } catch (error) {
+          logImportTrace('importSketch', resolvedPath, 'error', {
+            requested: name,
+            mode: 'svg',
+            error: formatLogError(error),
+          });
+          throw error;
+        }
+      }
+
       const localOverrides = parseImportParamArgs('importSketch', name, paramOverrides);
       const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
       logImportTrace('importSketch', resolvedPath, 'start', { requested: name, overrides: localOverrides });
@@ -570,6 +672,32 @@ function executeFile(
       const got = describeScriptResultType(result);
       logImportTrace('importSketch', resolvedPath, 'error', { requested: name, got });
       throw new Error(`"${resolvedPath}" did not return a Sketch (got ${got})`);
+    };
+
+    // importSvgSketch("name.svg", options?) — parses an SVG into Sketch geometry
+    const importSvgSketch = (name: string, optionsArg?: SvgImportOptions): Sketch => {
+      const { source: src, resolvedPath } = resolveImportSource(name);
+      if (!isSvgImportPath(resolvedPath)) {
+        throw new Error(`importSvgSketch("${name}") requires an .svg file (resolved to "${resolvedPath}")`);
+      }
+      const svgOptions = parseSvgImportArgs('importSvgSketch', name, optionsArg);
+      logImportTrace('importSvgSketch', resolvedPath, 'start', { requested: name, options: svgOptions });
+      try {
+        const result = sketchFromSvg(src, svgOptions);
+        logImportTrace('importSvgSketch', resolvedPath, 'success', {
+          requested: name,
+          got: 'Sketch',
+          area: Number(result.area().toFixed(4)),
+          verts: result.numVert(),
+        });
+        return result;
+      } catch (error) {
+        logImportTrace('importSvgSketch', resolvedPath, 'error', {
+          requested: name,
+          error: formatLogError(error),
+        });
+        throw error;
+      }
     };
 
     // importPart("name", { ...paramOverrides }) — executes another file, expects a Shape result
@@ -663,7 +791,7 @@ function executeFile(
       // Plane ops
       'intersectWithPlane', 'projectToPlane',
       // Cross-file imports
-      'importSketch', 'importPart',
+      'importSketch', 'importPart', 'importSvgSketch',
       // Dimensions
       'dim', 'dimLine',
       // Bill of materials
@@ -696,7 +824,7 @@ function executeFile(
       joint,
       Transform, composeChain, assembly, Assembly, SolvedAssembly, bomToCsv,
       intersectWithPlane, projectToPlane,
-      importSketch, importPart,
+      importSketch, importPart, importSvgSketch,
       dim, dimLine,
       bom,
       group, ShapeGroup,
