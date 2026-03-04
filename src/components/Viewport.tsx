@@ -2679,9 +2679,11 @@ export function Viewport() {
     focusObject(obj.id);
   }, [focusObject, measureMode]);
 
-  const handleViewportDoubleClick = useCallback(() => {
+  const handleViewportPointerMissed = useCallback((event: MouseEvent) => {
+    if (event.detail !== 2) return;
+    if (measureMode) return;
     clearFocusedObject();
-  }, [clearFocusedObject]);
+  }, [clearFocusedObject, measureMode]);
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -2696,7 +2698,7 @@ export function Viewport() {
         }}
         raycaster={{ params: { Line: { threshold: 0.5 } } } as any}
         camera={{ up: [0, 0, 1] }}
-        onDoubleClick={handleViewportDoubleClick}
+        onPointerMissed={handleViewportPointerMissed}
       >
         {projectionMode === 'orthographic' ? (
           <OrthographicCamera makeDefault position={[120, 80, 120]} zoom={2} near={-50000} far={50000} up={[0, 0, 1]} />
