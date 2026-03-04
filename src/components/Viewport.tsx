@@ -2674,10 +2674,10 @@ export function Viewport() {
   }, [measureMode, objectPickSyncEnabled, selectObject]);
 
   const handleObjectDoubleClick = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
-    if (!objectPickSyncEnabled || measureMode) return;
+    if (measureMode) return;
     event.stopPropagation();
     focusObject(obj.id);
-  }, [focusObject, measureMode, objectPickSyncEnabled]);
+  }, [focusObject, measureMode]);
 
   const handleViewportDoubleClick = useCallback(() => {
     clearFocusedObject();
