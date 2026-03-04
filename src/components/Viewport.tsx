@@ -387,17 +387,6 @@ const clampJointValue = (joint: JointViewDef, value: number): number => {
   return clamped;
 };
 
-const resolveJointRange = (joint: JointViewDef): { min: number; max: number } => ({
-  min: joint.min ?? (joint.type === 'prismatic' ? -100 : -180),
-  max: joint.max ?? (joint.type === 'prismatic' ? 100 : 180),
-});
-
-const formatSignedValue = (value: number, digits = 2): string => {
-  const safe = Math.abs(value) < 1e-6 ? 0 : value;
-  const fixed = safe.toFixed(digits);
-  return safe >= 0 ? `+${fixed}` : fixed;
-};
-
 const resolveArcReferenceDirection = (axisWorld: THREE.Vector3): THREE.Vector3 => {
   const candidates = [
     new THREE.Vector3(0, 0, 1),
@@ -800,8 +789,6 @@ function SectionPlaneGuides({
 interface HoveredJointOverlayState {
   joint: JointViewDef;
   value: number;
-  min: number;
-  max: number;
   pivotWorld: THREE.Vector3;
   axisWorld: THREE.Vector3;
   axisLength: number;
@@ -814,10 +801,6 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
   );
   const axisEnd = useMemo(
     () => state.pivotWorld.clone().addScaledVector(state.axisWorld, state.axisLength * 0.5),
-    [state.axisLength, state.axisWorld, state.pivotWorld],
-  );
-  const labelPosition = useMemo(
-    () => state.pivotWorld.clone().addScaledVector(state.axisWorld, state.axisLength * 0.65),
     [state.axisLength, state.axisWorld, state.pivotWorld],
   );
   const axisGeometry = useMemo(
@@ -912,9 +895,6 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
     return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), arcTangent);
   }, [arcGeometry, arcTangent]);
 
-  const unit = state.joint.unit ? ` ${state.joint.unit}` : '';
-  const valueLabel = state.joint.type === 'prismatic' ? 'Offset' : 'Angle';
-
   useEffect(() => () => {
     axisGeometry.dispose();
     arcStartArmGeometry.dispose();
@@ -987,35 +967,6 @@ function HoveredJointOverlay({ state }: { state: HoveredJointOverlayState }) {
         </>
       )}
 
-      <Html
-        position={[labelPosition.x, labelPosition.y, labelPosition.z]}
-        style={{ pointerEvents: 'none' }}
-        distanceFactor={10}
-        center
-      >
-        <div
-          style={{
-            minWidth: 160,
-            borderRadius: 8,
-            border: '1px solid rgba(125, 224, 255, 0.7)',
-            background: 'linear-gradient(148deg, rgba(4, 16, 29, 0.94) 0%, rgba(11, 29, 44, 0.91) 100%)',
-            boxShadow: '0 8px 18px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(133, 230, 255, 0.24)',
-            color: '#ddf8ff',
-            fontFamily: 'monospace',
-            fontSize: 10,
-            letterSpacing: 0.2,
-            padding: '8px 9px',
-            lineHeight: 1.35,
-          }}
-        >
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#90e9ff', marginBottom: 5 }}>
-            {state.joint.name}
-          </div>
-          <div>Axis {formatSignedValue(state.axisWorld.x, 3)}, {formatSignedValue(state.axisWorld.y, 3)}, {formatSignedValue(state.axisWorld.z, 3)}</div>
-          <div>{valueLabel} {formatSignedValue(state.value, 2)}{unit}</div>
-          <div>Range {formatSignedValue(state.min, 2)}..{formatSignedValue(state.max, 2)}{unit}</div>
-        </div>
-      </Html>
     </group>
   );
 }
@@ -2482,14 +2433,11 @@ export function Viewport() {
       pivotWorld.add(new THREE.Vector3(offset[0], offset[1], offset[2]));
     }
 
-    const { min, max } = resolveJointRange(joint);
     const value = clampJointValue(joint, effectiveJointValues[joint.name] ?? joint.defaultValue);
     const axisLength = Math.max(24, jointOverlayBaseSize * 0.16);
     return {
       joint,
       value,
-      min,
-      max,
       pivotWorld,
       axisWorld,
       axisLength,
