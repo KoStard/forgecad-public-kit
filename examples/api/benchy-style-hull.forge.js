@@ -45,8 +45,11 @@ let hull = loft(
 );
 hull = hull.smoothOut(72, 0.28).refine(2);
 
-// Orient hull so length goes along X (friendlier for scene composition).
-hull = hull.rotate(0, 90, 0).translate(-length * 0.5, 0, hullH * 0.58);
+// Orient hull so length goes along X, beam along Y, height along Z.
+hull = hull
+  .rotate(0, 90, 0) // Z (loft stations) -> X
+  .rotate(90, 0, 0) // Y (section height) -> Z
+  .translate(-length * 0.5, 0, hullH * 0.58);
 
 // Deckhouse and cabin
 const houseW = beam * 0.48;
