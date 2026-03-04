@@ -389,6 +389,49 @@ type JointsViewOptions = {
   animations?: JointAnimationClip[];
   defaultAnimation?: string;
 };
+type JointOverlayViewConfigOptions = {
+  enabled?: boolean;
+  axisColor?: string;
+  axisCoreColor?: string;
+  arcColor?: string;
+  zeroColor?: string;
+  arcVisualLimitDeg?: number;
+  axisLengthScale?: number;
+  axisLengthMin?: number;
+  axisLineRadiusScale?: number;
+  axisLineRadiusMin?: number;
+  axisLineRadiusMax?: number;
+  spokeLineRadiusScale?: number;
+  spokeLineRadiusMin?: number;
+  spokeLineRadiusMax?: number;
+  arcLineRadiusScale?: number;
+  arcLineRadiusMin?: number;
+  arcLineRadiusMax?: number;
+  axisDotRadiusScale?: number;
+  axisDotRadiusMin?: number;
+  axisArrowRadiusScale?: number;
+  axisArrowRadiusMin?: number;
+  axisArrowLengthScale?: number;
+  axisArrowLengthMin?: number;
+  axisArrowOffsetFactor?: number;
+  arcRadiusScale?: number;
+  arcRadiusMin?: number;
+  arcDotRadiusScale?: number;
+  arcDotRadiusMin?: number;
+  arcArrowRadiusScale?: number;
+  arcArrowRadiusMin?: number;
+  arcArrowLengthScale?: number;
+  arcArrowLengthMin?: number;
+  arcArrowOffsetFactor?: number;
+  arcStepDeg?: number;
+  arcMinSteps?: number;
+  arcTubeSegmentsMin?: number;
+  arcTubeSegmentsFactor?: number;
+  arcTubeRadialSegments?: number;
+};
+type ViewConfigOptions = {
+  jointOverlay?: JointOverlayViewConfigOptions;
+};
 
 type SpurGearOptions = {
   module: number;
@@ -577,6 +620,8 @@ declare function cutPlane(name: string, normal: [number, number, number], offset
 declare function explodeView(options?: ExplodeViewOptions): void;
 /** Register viewport-only runtime joint sliders (no script rerun). */
 declare function jointsView(options?: JointsViewOptions): void;
+/** Configure viewport helper visuals (hovered joint axis/arc, stroke sizes, colors). */
+declare function viewConfig(options?: ViewConfigOptions): void;
 `;
 
 export function CodeEditor() {

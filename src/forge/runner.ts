@@ -97,6 +97,12 @@ import {
   type CollectedJointsView,
 } from './jointsView';
 import {
+  viewConfig,
+  resetViewConfig,
+  getCollectedViewConfig,
+  type ViewConfig,
+} from './viewConfig';
+import {
   resolveForgeQualityPreset,
   runWithForgeQuality,
   type ForgeQualityPreset,
@@ -129,6 +135,7 @@ export interface RunResult {
   cutPlanes: CutPlaneDef[];
   explodeView: ExplodeViewOptions | null;
   jointsView: CollectedJointsView | null;
+  viewConfig: ViewConfig | null;
   quality: ForgeQualityPreset;
   error: string | null;
   timeMs: number;
@@ -824,6 +831,8 @@ function executeFile(
       'explodeView',
       // Runtime joints (viewport-only)
       'jointsView',
+      // Viewport helper visuals
+      'viewConfig',
       wrapped,
     );
 
@@ -850,6 +859,7 @@ function executeFile(
       cutPlane,
       explodeView,
       jointsView,
+      viewConfig,
     ));
   } finally {
     visited.delete(fileName);
@@ -868,6 +878,7 @@ export function runScript(
   resetCutPlanes();
   resetExplodeView();
   resetJointsView();
+  resetViewConfig();
   _collectedLogs = [];
   const t0 = performance.now();
   const execOptions: RunnerExecutionOptions = {
@@ -1040,6 +1051,7 @@ export function runScript(
         cutPlanes: getCollectedCutPlanes(),
         explodeView: getCollectedExplodeView(),
         jointsView: getCollectedJointsView(),
+        viewConfig: getCollectedViewConfig(),
         quality,
         error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
         timeMs: performance.now() - t0,
@@ -1067,6 +1079,7 @@ export function runScript(
       cutPlanes: getCollectedCutPlanes(),
       explodeView: getCollectedExplodeView(),
       jointsView: getCollectedJointsView(),
+      viewConfig: getCollectedViewConfig(),
       quality,
       error: `${msg}${lineInfo}`,
       timeMs: performance.now() - t0,

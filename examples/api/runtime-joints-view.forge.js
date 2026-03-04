@@ -36,6 +36,19 @@ const solved = leg.solve({
   ankle: 0,
 });
 
+viewConfig({
+  jointOverlay: {
+    axisColor: '#13dfff',
+    arcColor: '#ff7a1a',
+    zeroColor: '#ffe26a',
+    axisArrowLengthScale: 0.16,
+    axisArrowRadiusScale: 0.052,
+    arcArrowLengthScale: 0.12,
+    arcArrowRadiusScale: 0.038,
+    arcLineRadiusScale: 0.02,
+  },
+});
+
 jointsView({
   joints: [
     {

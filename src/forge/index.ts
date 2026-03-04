@@ -15,6 +15,7 @@ export {
   bom, resetBom, getCollectedBom,
   explodeView, resetExplodeView, getCollectedExplodeView,
   jointsView, resetJointsView, getCollectedJointsView,
+  viewConfig, resetViewConfig, getCollectedViewConfig, DEFAULT_VIEW_CONFIG, DEFAULT_JOINT_OVERLAY_VIEW_CONFIG,
   clampAnimationProgress, findJointAnimationClip, resolveJointAnimation,
   runScript,
   FORGE_QUALITY_PRESETS,
@@ -43,6 +44,12 @@ export type {
 } from './headless';
 export type { BomDef, BomOpts } from './headless';
 export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './headless';
+export type {
+  ViewConfig,
+  ViewConfigOptions,
+  JointOverlayViewConfig,
+  JointOverlayViewConfigOptions,
+} from './headless';
 export type {
   JointViewType,
   JointViewInput,

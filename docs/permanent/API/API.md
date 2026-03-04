@@ -262,6 +262,37 @@ jointsView({
 });
 ```
 
+## Viewport Helper Config
+
+### `viewConfig(options?)`
+Configures runtime viewport helper visuals for the current script. This is renderer-only behavior (no geometry recompute), similar to `jointsView()` and `explodeView()`.
+
+**Parameters:**
+- `options` (object, optional):
+  - `jointOverlay` (object, optional) - Controls hovered-joint axis/arc helper rendering:
+    - `enabled` (boolean) - Toggle helper visibility.
+    - Colors: `axisColor`, `axisCoreColor`, `arcColor`, `zeroColor`.
+    - Angular range: `arcVisualLimitDeg`.
+    - Axis size: `axisLengthScale`, `axisLengthMin`.
+    - Thickness: `axisLineRadiusScale|min|max`, `spokeLineRadiusScale|min|max`, `arcLineRadiusScale|min|max`.
+    - Dots/arrows: `axisDotRadiusScale|min`, `axisArrowRadiusScale|min`, `axisArrowLengthScale|min`, `axisArrowOffsetFactor`, `arcRadiusScale|min`, `arcDotRadiusScale|min`, `arcArrowRadiusScale|min`, `arcArrowLengthScale|min`, `arcArrowOffsetFactor`.
+    - Arc tessellation: `arcStepDeg`, `arcMinSteps`, `arcTubeSegmentsMin`, `arcTubeSegmentsFactor`, `arcTubeRadialSegments`.
+
+**Returns:** `void` (side effect: updates viewport helper config for this run)
+
+```javascript
+viewConfig({
+  jointOverlay: {
+    axisColor: "#13dfff",
+    arcColor: "#ff7a1a",
+    axisLineRadiusScale: 0.03,
+    arcLineRadiusScale: 0.022,
+    axisArrowLengthScale: 0.16,
+    arcArrowLengthScale: 0.12,
+  },
+});
+```
+
 ## Bill of Materials
 
 ### `bom(quantity, description, opts?)`

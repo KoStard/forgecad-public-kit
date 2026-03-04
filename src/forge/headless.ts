@@ -70,6 +70,19 @@ export type {
   JointsViewOptions,
   CollectedJointsView,
 } from './jointsView';
+export {
+  viewConfig,
+  resetViewConfig,
+  getCollectedViewConfig,
+  DEFAULT_VIEW_CONFIG,
+  DEFAULT_JOINT_OVERLAY_VIEW_CONFIG,
+} from './viewConfig';
+export type {
+  ViewConfig,
+  ViewConfigOptions,
+  JointOverlayViewConfig,
+  JointOverlayViewConfigOptions,
+} from './viewConfig';
 export { clampAnimationProgress, findJointAnimationClip, resolveJointAnimation } from './jointAnimation';
 export { bom, resetBom, getCollectedBom } from './bom';
 export type { BomDef, BomOpts } from './bom';
