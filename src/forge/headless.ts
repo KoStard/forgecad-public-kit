@@ -59,7 +59,7 @@ export { buildScene, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from './sceneBuil
 export type { ForgeGeometry } from './meshToGeometry';
 export { ShapeGroup, group } from './group';
 export { cutPlane, resetCutPlanes, getCollectedCutPlanes } from './cutPlane';
-export type { CutPlaneDef } from './cutPlane';
+export type { CutPlaneDef, CutPlaneExcludeInput, CutPlaneOptions } from './cutPlane';
 export { explodeView, resetExplodeView, getCollectedExplodeView } from './explodeView';
 export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './explodeView';
 export { jointsView, resetJointsView, getCollectedJointsView, resolveJointViewValues } from './jointsView';

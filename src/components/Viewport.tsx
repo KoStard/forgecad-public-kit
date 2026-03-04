@@ -289,6 +289,21 @@ const resolveHoverObjectName = (name: string, knownFileNames: Set<string>): stri
   return trimmed;
 };
 
+const isObjectExcludedFromCutPlane = (obj: SceneObject, cutPlane: CutPlaneDef): boolean => {
+  const excludedNames = cutPlane.excludeObjectNames;
+  if (!excludedNames || excludedNames.length === 0) return false;
+  const objectName = obj.name.trim();
+  if (!objectName) return false;
+  return excludedNames.includes(objectName);
+};
+
+const toClippingPlane = (cp: CutPlaneDef): THREE.Plane => {
+  const n = new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).normalize();
+  // THREE.Plane convention: clips geometry on the positive side of the plane.
+  // We negate the normal so that geometry on the normal side is removed.
+  return new THREE.Plane(n.negate(), cp.offset);
+};
+
 const ZERO_OFFSET: [number, number, number] = [0, 0, 0];
 const IDENTITY_MATRIX = new THREE.Matrix4();
 
@@ -2363,14 +2378,28 @@ export function Viewport() {
       .filter((cp) => new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).lengthSq() > 1e-8);
   }, [cutPlaneDefs, cutPlaneEnabled]);
 
-  const activeClippingPlanes = useMemo(() => {
-    return activeCutPlaneDefs.map((cp) => {
-      const n = new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).normalize();
-      // THREE.Plane convention: clips geometry on the positive side of the plane.
-      // We negate the normal so that geometry on the normal side is removed.
-      return new THREE.Plane(n.negate(), cp.offset);
+  const {
+    objectCutPlanesById,
+    objectClippingPlanesById,
+    hasAnyObjectCutPlanes,
+  } = useMemo(() => {
+    const cutPlanesById: Record<string, CutPlaneDef[]> = {};
+    const clippingPlanesById: Record<string, THREE.Plane[]> = {};
+    let hasAnyCutPlanes = false;
+
+    objects.forEach((obj) => {
+      const applicable = activeCutPlaneDefs.filter((cp) => !isObjectExcludedFromCutPlane(obj, cp));
+      cutPlanesById[obj.id] = applicable;
+      clippingPlanesById[obj.id] = applicable.map(toClippingPlane);
+      if (applicable.length > 0) hasAnyCutPlanes = true;
     });
-  }, [activeCutPlaneDefs]);
+
+    return {
+      objectCutPlanesById: cutPlanesById,
+      objectClippingPlanesById: clippingPlanesById,
+      hasAnyObjectCutPlanes: hasAnyCutPlanes,
+    };
+  }, [activeCutPlaneDefs, objects]);
 
   const explodeOffsets = useMemo(() => {
     if (explodeAmount <= 1e-8) return {} as Record<string, [number, number, number]>;
@@ -2733,7 +2762,7 @@ export function Viewport() {
         <directionalLight position={[-60, -40, -80]} intensity={0.3} />
         <hemisphereLight args={['#b1e1ff', '#444444', 0.4]} />
 
-        <ClippingManager active={activeClippingPlanes.length > 0} />
+        <ClippingManager active={hasAnyObjectCutPlanes} />
         {sectionPlaneGuidesEnabled && activeCutPlaneDefs.length > 0 && (
           <SectionPlaneGuides
             cutPlanes={activeCutPlaneDefs}
@@ -2755,6 +2784,8 @@ export function Viewport() {
             : settings;
           const isHovered = hoveredObjectId === obj.id;
           const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
+          const objectCutPlanes = objectCutPlanesById[obj.id] ?? [];
+          const objectClippingPlanes = objectClippingPlanesById[obj.id] ?? [];
           if (obj.shape) {
             return (
               <ForgeObject
@@ -2764,8 +2795,8 @@ export function Viewport() {
                 renderMode={renderMode}
                 matrix={matrix}
                 isHovered={isHovered}
-                cutPlanes={activeCutPlaneDefs}
-                fallbackClippingPlanes={activeClippingPlanes}
+                cutPlanes={objectCutPlanes}
+                fallbackClippingPlanes={objectClippingPlanes}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
                 onPointerMove={(event) => updateHoverLabel(obj, event)}
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}

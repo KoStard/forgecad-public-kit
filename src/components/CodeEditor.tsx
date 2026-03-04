@@ -816,8 +816,11 @@ declare class ShapeGroup {
   color(hex: string): ShapeGroup;
 }
 
+type CutPlaneOptions = { offset?: number; exclude?: string | string[] };
 /** Define a named section/cut plane. Appears as a toggle in the View Panel. When enabled, geometry on the normal side is clipped away. */
-declare function cutPlane(name: string, normal: [number, number, number], offset?: number): void;
+declare function cutPlane(name: string, normal: [number, number, number], offset?: number, options?: CutPlaneOptions): void;
+/** Overload: pass an options object as third arg (for example with offset and exclude). */
+declare function cutPlane(name: string, normal: [number, number, number], options?: CutPlaneOptions): void;
 /** Override default viewport explode behavior (global slider still controls amount). */
 declare function explodeView(options?: ExplodeViewOptions): void;
 /** Register viewport-only runtime joint sliders (no script rerun). */

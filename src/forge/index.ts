@@ -47,6 +47,7 @@ export type {
   JointSweepFrame,
 } from './headless';
 export type { BomDef, BomOpts } from './headless';
+export type { CutPlaneDef, CutPlaneExcludeInput, CutPlaneOptions } from './headless';
 export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './headless';
 export type {
   ViewConfig,
