@@ -39,8 +39,8 @@ const inputStyle: CSSProperties = {
 };
 
 const resolveJointRange = (type: 'revolute' | 'prismatic', min?: number, max?: number): { min: number; max: number } => ({
-  min: min ?? (type === 'prismatic' ? -100 : -180),
-  max: max ?? (type === 'prismatic' ? 100 : 180),
+  min: min ?? (type === 'prismatic' ? -100 : 0),
+  max: max ?? (type === 'prismatic' ? 100 : 360),
 });
 
 export function ViewPanel() {

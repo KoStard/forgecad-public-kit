@@ -605,7 +605,7 @@ Create a revolute (hinge) joint. Auto-creates a param slider and rotates the sha
 - `opts` (object, optional):
   - `axis` ([number, number, number]) - Rotation axis. Default: [0, 0, 1] (Z axis)
   - `min` (number) - Minimum angle. Default: 0
-  - `max` (number) - Maximum angle. Default: 180
+  - `max` (number) - Maximum angle. Default: 360
   - `default` (number) - Initial angle. Default: 0
   - `unit` (string) - Display unit. Default: "°"
 

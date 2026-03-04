@@ -34,7 +34,7 @@ export function joint(
 ): Shape {
   const axis = opts.axis ?? [0, 0, 1];
   const min = opts.min ?? 0;
-  const max = opts.max ?? 180;
+  const max = opts.max ?? 360;
   const def = opts.default ?? 0;
   const angle = param(name, def, { min, max, unit: opts.unit ?? '°', reverse: opts.reverse });
   return shape.rotateAround(axis, angle, pivot);

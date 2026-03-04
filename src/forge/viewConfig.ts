@@ -197,7 +197,7 @@ export const DEFAULT_JOINT_OVERLAY_VIEW_CONFIG: JointOverlayViewConfig = {
   axisCoreColor: '#f0fdff',
   arcColor: '#ff7a1a',
   zeroColor: '#ffe26a',
-  arcVisualLimitDeg: 330,
+  arcVisualLimitDeg: 360,
   axisLengthScale: 0.16,
   axisLengthMin: 24,
   axisLineRadiusScale: 0.024,
