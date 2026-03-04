@@ -183,6 +183,47 @@ function testAssemblyJointCouplings() {
   );
 }
 
+function testAssemblyGearCouplings() {
+  const mech = assembly('GearCouplingsInvariant')
+    .addFrame('Base')
+    .addFrame('DriverPart')
+    .addFrame('DrivenPart')
+    .addFrame('FollowerPart')
+    .addRevolute('Driver', 'Base', 'DriverPart', { axis: [0, 0, 1] })
+    .addRevolute('Driven', 'Base', 'DrivenPart', { axis: [0, 0, 1], min: -20, max: 20 })
+    .addRevolute('Follower', 'Base', 'FollowerPart', { axis: [0, 0, 1] })
+    .addGearCoupling('Driven', 'Driver', { driverTeeth: 14, drivenTeeth: 28 })
+    .addGearCoupling('Follower', 'Driven', { pair: { jointRatio: -2 }, offset: 5 });
+
+  const solved = mech.solve({ Driver: 30, Driven: 999, Follower: 999 });
+  const state = solved.getJointState();
+
+  assert(approx(state.Driver ?? Number.NaN, 30), `Expected Driver=30, got ${state.Driver}`);
+  assert(approx(state.Driven ?? Number.NaN, -15), `Expected Driven=-15 from teeth ratio, got ${state.Driven}`);
+  assert(approx(state.Follower ?? Number.NaN, 35), `Expected Follower=35 from pair ratio, got ${state.Follower}`);
+
+  const warnings = solved.warnings().join('\n');
+  assert(
+    warnings.includes('Joint "Driven" state override ignored because it is coupled'),
+    `Expected ignored-override warning for Driven, got:\n${warnings}`,
+  );
+  assert(
+    warnings.includes('Joint "Follower" state override ignored because it is coupled'),
+    `Expected ignored-override warning for Follower, got:\n${warnings}`,
+  );
+
+  const internal = assembly('InternalMeshSignInvariant')
+    .addFrame('Base')
+    .addFrame('A')
+    .addFrame('B')
+    .addRevolute('A', 'Base', 'A', { axis: [0, 0, 1] })
+    .addRevolute('B', 'Base', 'B', { axis: [0, 0, 1] })
+    .addGearCoupling('B', 'A', { driverTeeth: 20, drivenTeeth: 40, mesh: 'internal' });
+
+  const internalState = internal.solve({ A: 12 }).getJointState();
+  assert(approx(internalState.B ?? Number.NaN, 6), `Expected internal mesh B=6, got ${internalState.B}`);
+}
+
 function testRuntimeJointCouplingResolution() {
   const joints: JointViewDef[] = [
     {
@@ -271,6 +312,7 @@ async function main() {
   testShapeGroupRotateAroundSugar();
   testShapeGroupPointAlongSugar();
   testAssemblyJointCouplings();
+  testAssemblyGearCouplings();
   testRuntimeJointCouplingResolution();
   console.log('✓ Transform and assembly invariants passed');
 }

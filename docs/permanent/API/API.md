@@ -661,6 +661,17 @@ mech
   });
 ```
 
+Gear helper example:
+
+```javascript
+const pair = lib.gearPair({
+  pinion: { module: 1.25, teeth: 14, faceWidth: 8 },
+  gear: { module: 1.25, teeth: 42, faceWidth: 8 },
+});
+
+mech.addGearCoupling("Driven", "Pinion", { pair }); // uses pair.jointRatio
+```
+
 Key methods:
 - `addPart(name, shape, { transform?, metadata? })`
 - `addFrame(name, { transform? })` for virtual mechanism frames
@@ -670,6 +681,10 @@ Key methods:
   - `jointName`: driven joint
   - `terms`: `[{ joint, ratio? }, ...]` where each source contributes `ratio * sourceValue` (default ratio `1`)
   - `offset`: additive bias after term sum (default `0`)
+- `addGearCoupling(drivenJoint, driverJoint, opts)` for revolute gear meshes:
+  - ratio source (exactly one): `ratio`, `pair` (`pair.jointRatio`), or `driverTeeth + drivenTeeth`
+  - `mesh`: `'external' | 'internal'` (teeth mode only, default `'external'`)
+  - `offset`: additive bias after gear ratio
 - `solve(state?)` with per-joint value overrides
 - `sweepJoint(jointName, from, to, steps, baseState?, collisionOptions?)`
 

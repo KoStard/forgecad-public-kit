@@ -40,6 +40,19 @@ export interface JointCouplingOptions {
   offset?: number;
 }
 
+export interface GearRatioLike {
+  jointRatio: number;
+}
+
+export interface GearCouplingOptions {
+  ratio?: number;
+  pair?: GearRatioLike;
+  driverTeeth?: number;
+  drivenTeeth?: number;
+  mesh?: 'external' | 'internal';
+  offset?: number;
+}
+
 interface PartRecord {
   name: string;
   part: AssemblyPart;
@@ -397,6 +410,77 @@ export class Assembly {
     });
     this.assertJointCouplingsAcyclic();
     return this;
+  }
+
+  addGearCoupling(
+    drivenJointName: string,
+    driverJointName: string,
+    options: GearCouplingOptions = {},
+  ): Assembly {
+    if (!options || typeof options !== 'object') {
+      throw new Error('addGearCoupling(...) expects an options object');
+    }
+
+    const drivenJoint = this.joints.get(drivenJointName);
+    if (!drivenJoint) throw new Error(`Unknown joint "${drivenJointName}"`);
+    if (drivenJoint.type !== 'revolute') {
+      throw new Error(`addGearCoupling(...) expects driven joint "${drivenJointName}" to be revolute`);
+    }
+
+    const driverJoint = this.joints.get(driverJointName);
+    if (!driverJoint) throw new Error(`Unknown joint "${driverJointName}"`);
+    if (driverJoint.type !== 'revolute') {
+      throw new Error(`addGearCoupling(...) expects driver joint "${driverJointName}" to be revolute`);
+    }
+
+    if (options.offset !== undefined && !Number.isFinite(options.offset)) {
+      throw new Error(`Gear coupling "${drivenJointName}" offset must be finite`);
+    }
+
+    const usingExplicitRatio = options.ratio !== undefined;
+    const usingPairRatio = options.pair !== undefined;
+    const usingTeeth = options.driverTeeth !== undefined || options.drivenTeeth !== undefined;
+    const ratioSourcesUsed = Number(usingExplicitRatio) + Number(usingPairRatio) + Number(usingTeeth);
+    if (ratioSourcesUsed !== 1) {
+      throw new Error(
+        `Gear coupling "${drivenJointName}" must provide exactly one ratio source: ratio, pair, or driverTeeth/drivenTeeth`,
+      );
+    }
+
+    if ((options.mesh !== undefined) && !usingTeeth) {
+      throw new Error(
+        `Gear coupling "${drivenJointName}" mesh may only be set when using driverTeeth/drivenTeeth`,
+      );
+    }
+
+    let ratio: number;
+    if (usingExplicitRatio) {
+      ratio = options.ratio!;
+    } else if (usingPairRatio) {
+      const pair = options.pair;
+      if (!pair || typeof pair !== 'object') {
+        throw new Error(`Gear coupling "${drivenJointName}" pair must be an object with jointRatio`);
+      }
+      ratio = pair.jointRatio;
+    } else {
+      if (!Number.isFinite(options.driverTeeth) || !Number.isFinite(options.drivenTeeth)) {
+        throw new Error(`Gear coupling "${drivenJointName}" driverTeeth/drivenTeeth must be finite`);
+      }
+      if ((options.driverTeeth as number) <= 0 || (options.drivenTeeth as number) <= 0) {
+        throw new Error(`Gear coupling "${drivenJointName}" driverTeeth/drivenTeeth must be > 0`);
+      }
+      const sign = options.mesh === 'internal' ? 1 : -1;
+      ratio = sign * ((options.driverTeeth as number) / (options.drivenTeeth as number));
+    }
+
+    if (!Number.isFinite(ratio) || ratio === 0) {
+      throw new Error(`Gear coupling "${drivenJointName}" resolved ratio must be finite and non-zero`);
+    }
+
+    return this.addJointCoupling(drivenJointName, {
+      terms: [{ joint: driverJointName, ratio }],
+      offset: options.offset,
+    });
   }
 
   private assertJointCouplingsAcyclic(): void {

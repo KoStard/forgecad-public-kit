@@ -35,6 +35,7 @@ return solved.toScene();
 - `addPrismatic(name, parent, child, opts)` shorthand for `addJoint(..., "prismatic", ...)`
 - `addFixed(name, parent, child, opts)` shorthand for `addJoint(..., "fixed", ...)`
 - `addJointCoupling(jointName, { terms, offset? })` links joints with linear relationships
+- `addGearCoupling(drivenJoint, driverJoint, opts)` links revolute joints using gear ratios
 
 ## Joint couplings
 
@@ -66,6 +67,30 @@ Notes:
 - Coupled joints ignore direct values in `solve(state)` and emit a warning.
 - Coupling cycles are rejected.
 - `sweepJoint(...)` cannot sweep a coupled target; sweep one of its source joints instead.
+
+## Gear couplings
+
+Use this helper to connect two **revolute** joints as a gear mesh without manually writing `addJointCoupling(...)`.
+
+```javascript
+const pair = lib.gearPair({
+  pinion: { module: 1.25, teeth: 14, faceWidth: 8 },
+  gear: { module: 1.25, teeth: 42, faceWidth: 8 },
+});
+
+const mech = assembly("Spur Stage")
+  .addFrame("Base")
+  .addFrame("PinionPart")
+  .addFrame("GearPart")
+  .addRevolute("Pinion", "Base", "PinionPart", { axis: [0, 0, 1] })
+  .addRevolute("Driven", "Base", "GearPart", { axis: [0, 0, 1] })
+  .addGearCoupling("Driven", "Pinion", { pair }); // uses pair.jointRatio
+```
+
+`addGearCoupling(...)` ratio sources (choose exactly one):
+- `ratio` (explicit multiplier)
+- `pair` (`lib.gearPair(...)` result, using `pair.jointRatio`)
+- `driverTeeth` + `drivenTeeth` (auto ratio; external mesh is negative, internal is positive via `mesh: "internal"`)
 
 ## Joint frames
 

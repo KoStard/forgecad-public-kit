@@ -39,6 +39,8 @@ export type {
   JointOptions,
   JointCouplingTerm,
   JointCouplingOptions,
+  GearRatioLike,
+  GearCouplingOptions,
   BomRow,
   CollisionOptions,
   CollisionFinding,
