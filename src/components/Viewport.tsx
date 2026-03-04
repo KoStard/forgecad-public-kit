@@ -40,6 +40,7 @@ const GIF_DEFAULT_FPS = 18;
 const GIF_DEFAULT_FRAMES_PER_TURN = 54;
 const GIF_DEFAULT_HOLD_FRAMES = 4;
 const GIF_DEFAULT_PITCH_DEG = 18;
+const FOCUS_MODE_DIM_OPACITY = 0.1;
 
 const waitForAnimationFrame = (): Promise<void> => (
   new Promise((resolve) => {
@@ -646,6 +647,7 @@ function ForgeObject({
   onPointerMove,
   onPointerLeave,
   onClick,
+  onDoubleClick,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
@@ -658,6 +660,7 @@ function ForgeObject({
   onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
   onClick?: (event: ThreeEvent<MouseEvent>) => void;
+  onDoubleClick?: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const { solidGeo, edgesGeo, useFallbackClipping } = useMemo(() => {
     if (!obj.shape) return { solidGeo: null, edgesGeo: null, useFallbackClipping: false };
@@ -738,6 +741,7 @@ function ForgeObject({
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
     >
       {showSolid && (
         <mesh geometry={solidGeo}>
@@ -1132,6 +1136,7 @@ function SketchObject({
   onPointerMove,
   onPointerLeave,
   onClick,
+  onDoubleClick,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
@@ -1141,6 +1146,7 @@ function SketchObject({
   onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
   onClick?: (event: ThreeEvent<MouseEvent>) => void;
+  onDoubleClick?: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const { fillGeo, lineGeos, pointGeos } = useMemo(() => {
     if (!obj.sketch) return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
@@ -1270,6 +1276,7 @@ function SketchObject({
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
     >
       {fillGeo && showFill && (
         <mesh geometry={fillGeo}>
@@ -2305,6 +2312,9 @@ export function Viewport() {
   const hoveredObjectId = useForgeStore((s) => s.hoveredObjectId);
   const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
   const selectObject = useForgeStore((s) => s.selectObject);
+  const focusedObjectId = useForgeStore((s) => s.focusedObjectId);
+  const focusObject = useForgeStore((s) => s.focusObject);
+  const clearFocusedObject = useForgeStore((s) => s.clearFocusedObject);
   const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
   const explodeAmount = useForgeStore((s) => s.explodeAmount);
   const viewCommand = useForgeStore((s) => s.viewCommand);
@@ -2639,6 +2649,16 @@ export function Viewport() {
     setHoveredObjectId(null);
   }, [objectPickSyncEnabled, setHoveredObjectId]);
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (!useForgeStore.getState().focusedObjectId) return;
+      clearFocusedObject();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [clearFocusedObject]);
+
   const updateHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
     if (!objectPickSyncEnabled || measureMode) return;
     event.stopPropagation();
@@ -2671,6 +2691,18 @@ export function Viewport() {
     selectObject(obj.id);
   }, [measureMode, objectPickSyncEnabled, selectObject]);
 
+  const handleObjectDoubleClick = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
+    if (measureMode) return;
+    event.stopPropagation();
+    focusObject(obj.id);
+  }, [focusObject, measureMode]);
+
+  const handleViewportPointerMissed = useCallback((event: MouseEvent) => {
+    if (event.detail !== 2) return;
+    if (measureMode) return;
+    clearFocusedObject();
+  }, [clearFocusedObject, measureMode]);
+
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
@@ -2684,6 +2716,7 @@ export function Viewport() {
         }}
         raycaster={{ params: { Line: { threshold: 0.5 } } } as any}
         camera={{ up: [0, 0, 1] }}
+        onPointerMissed={handleViewportPointerMissed}
       >
         {projectionMode === 'orthographic' ? (
           <OrthographicCamera makeDefault position={[120, 80, 120]} zoom={2} near={-50000} far={50000} up={[0, 0, 1]} />
@@ -2714,6 +2747,10 @@ export function Viewport() {
 
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
+          const isDimmedByFocus = !!focusedObjectId && focusedObjectId !== obj.id;
+          const effectiveSettings = isDimmedByFocus
+            ? { ...settings, opacity: Math.min(settings.opacity, FOCUS_MODE_DIM_OPACITY) }
+            : settings;
           const isHovered = hoveredObjectId === obj.id;
           const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
           if (obj.shape) {
@@ -2721,7 +2758,7 @@ export function Viewport() {
               <ForgeObject
                 key={obj.id}
                 obj={obj}
-                settings={settings}
+                settings={effectiveSettings}
                 renderMode={renderMode}
                 matrix={matrix}
                 isHovered={isHovered}
@@ -2731,6 +2768,7 @@ export function Viewport() {
                 onPointerMove={(event) => updateHoverLabel(obj, event)}
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
                 onClick={(event) => handleObjectClick(obj, event)}
+                onDoubleClick={(event) => handleObjectDoubleClick(obj, event)}
               />
             );
           }
@@ -2739,13 +2777,14 @@ export function Viewport() {
               <SketchObject
                 key={obj.id}
                 obj={obj}
-                settings={settings}
+                settings={effectiveSettings}
                 renderMode={renderMode}
                 matrix={matrix}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
                 onPointerMove={(event) => updateHoverLabel(obj, event)}
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
                 onClick={(event) => handleObjectClick(obj, event)}
+                onDoubleClick={(event) => handleObjectDoubleClick(obj, event)}
               />
             );
           }
