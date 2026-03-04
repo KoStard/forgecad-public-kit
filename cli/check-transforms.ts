@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { assembly } from '../src/forge/assembly';
 import { box, initKernel } from '../src/forge/kernel';
 import { group } from '../src/forge/group';
+import { bevelGear } from '../src/forge/library';
 import { Transform } from '../src/forge/transform';
 import { resolveJointViewValues, type JointViewCouplingDef, type JointViewDef } from '../src/forge/jointsView';
 
@@ -327,6 +328,27 @@ function testRuntimeJointCouplingResolution() {
   assert(approx(values.Motor, -200), `Expected Motor=-200 after clamp, got ${values.Motor}`);
 }
 
+function testBevelGearTopSectionCircularity() {
+  const gear = bevelGear({
+    module: 2,
+    teeth: 24,
+    faceWidth: 10,
+    pitchAngleDeg: 45,
+  });
+
+  const bb = gear.boundingBox();
+  const topSlice = gear.manifold.slice(bb.max[2] - 1e-4).bounds();
+  const spanX = topSlice.max[0] - topSlice.min[0];
+  const spanY = topSlice.max[1] - topSlice.min[1];
+
+  assert(spanX > EPS && spanY > EPS, `Expected non-degenerate top slice, got spanX=${spanX}, spanY=${spanY}`);
+  const aspect = spanY / spanX;
+  assert(
+    aspect > 0.85 && aspect < 1.15,
+    `Expected near-circular top slice, got spanX=${spanX}, spanY=${spanY}, aspect=${aspect}`,
+  );
+}
+
 async function main() {
   await initKernel();
   testTransformMulOrder();
@@ -336,6 +358,7 @@ async function main() {
   testAssemblyJointCouplings();
   testAssemblyGearCouplings();
   testRuntimeJointCouplingResolution();
+  testBevelGearTopSectionCircularity();
   console.log('✓ Transform and assembly invariants passed');
 }
 

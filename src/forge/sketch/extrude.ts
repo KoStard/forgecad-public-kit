@@ -24,11 +24,15 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
   scaleTop?: number | [number, number];
   center?: boolean;
 }): TrackedShape {
+  const scaleTop = typeof opts?.scaleTop === 'number'
+    ? [opts.scaleTop, opts.scaleTop] as [number, number]
+    : opts?.scaleTop;
+
   const m = sketch.cross.extrude(
     height,
     opts?.divisions ?? 0,
     opts?.twist ?? 0,
-    opts?.scaleTop as any,
+    scaleTop as any,
     opts?.center ?? false,
   );
   const shape = new Shape(m, sketch.colorHex);
