@@ -373,6 +373,77 @@ type JointsViewOptions = {
   defaultAnimation?: string;
 };
 
+type SpurGearOptions = {
+  module: number;
+  teeth: number;
+  pressureAngleDeg?: number;
+  faceWidth: number;
+  backlash?: number;
+  clearance?: number;
+  addendum?: number;
+  dedendum?: number;
+  boreDiameter?: number;
+  center?: boolean;
+  segmentsPerTooth?: number;
+};
+type RingGearOptions = {
+  module: number;
+  teeth: number;
+  pressureAngleDeg?: number;
+  faceWidth: number;
+  backlash?: number;
+  clearance?: number;
+  addendum?: number;
+  dedendum?: number;
+  rimWidth?: number;
+  outerDiameter?: number;
+  center?: boolean;
+  segmentsPerTooth?: number;
+};
+type RackGearOptions = {
+  module: number;
+  teeth: number;
+  pressureAngleDeg?: number;
+  faceWidth: number;
+  backlash?: number;
+  clearance?: number;
+  addendum?: number;
+  dedendum?: number;
+  baseHeight?: number;
+  center?: boolean;
+};
+type GearPairSpec = {
+  module: number;
+  teeth: number;
+  pressureAngleDeg?: number;
+  faceWidth?: number;
+  backlash?: number;
+  clearance?: number;
+  addendum?: number;
+  dedendum?: number;
+  boreDiameter?: number;
+  segmentsPerTooth?: number;
+};
+type GearPairDiagnostic = {
+  level: 'info' | 'warn' | 'error';
+  code: string;
+  message: string;
+};
+type GearPairResult = {
+  pinion: Shape;
+  gear: Shape;
+  centerDistance: number;
+  centerDistanceNominal: number;
+  backlash: number;
+  pressureAngleDeg: number;
+  workingPressureAngleDeg: number;
+  contactRatio: number;
+  jointRatio: number;
+  speedReduction: number;
+  diagnostics: GearPairDiagnostic[];
+  status: 'ok' | 'warn' | 'error';
+};
+
 declare const lib: {
   boltHole(diameter: number, depth: number): Shape;
   counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: number): Shape;
@@ -398,6 +469,14 @@ declare const lib: {
   /** Curved pipe section (torus arc) for connecting two pipe directions */
   elbow(pipeRadius: number, bendRadius: number, angle?: number, options?: { wall?: number; segments?: number; from?: [number, number, number]; to?: [number, number, number] }): Shape;
   elbow(pipeRadius: number, bendRadius: number, options: { from?: [number, number, number]; to?: [number, number, number]; wall?: number; segments?: number }): Shape;
+  /** Involute external spur gear (2D involute profile + extrusion). */
+  spurGear(options: SpurGearOptions): Shape;
+  /** Internal ring gear with involute-derived tooth spaces. */
+  ringGear(options: RingGearOptions): Shape;
+  /** Linear rack gear with parametric pressure-angle flanks. */
+  rackGear(options: RackGearOptions): Shape;
+  /** Pair-level ratio/backlash/contact diagnostics with optional auto-placement. */
+  gearPair(options: { pinion: Shape | GearPairSpec; gear: Shape | GearPairSpec; backlash?: number; centerDistance?: number; place?: boolean; phaseDeg?: number }): GearPairResult;
 };
 
 // --- Dimensions (visual annotations) ---
