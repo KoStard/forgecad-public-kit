@@ -142,7 +142,8 @@ cutPlane("Horizontal", [0, 0, 1], cutZ);
 ```
 
 **How it works:**
-- Cut planes are GPU-accelerated (Three.js clipping planes) — instant on any geometry complexity
+- Cut planes trim viewport solids with `trimByPlane()` so section faces are capped (solid, not hollow)
+- If a trim fails on pathological mesh state, the renderer falls back to GPU clipping for that object
 - Multiple planes can be defined and toggled independently
 - Planes are per-script — they reset on each execution
 - Toggle state persists in the UI across parameter changes
