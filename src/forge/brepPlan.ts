@@ -25,6 +25,11 @@ export type BrepProfilePlan =
       transforms: BrepProfileTransformStep[];
     }
   | {
+      kind: 'polygon';
+      points: [number, number][];
+      transforms: BrepProfileTransformStep[];
+    }
+  | {
       kind: 'boolean';
       op: 'union' | 'difference' | 'intersection';
       profiles: BrepProfilePlan[];
@@ -147,6 +152,12 @@ export function cloneBrepProfilePlan(plan: BrepProfilePlan | null): BrepProfileP
       return {
         kind: 'circle',
         radius: plan.radius,
+        transforms: plan.transforms.map(cloneProfileTransform),
+      };
+    case 'polygon':
+      return {
+        kind: 'polygon',
+        points: plan.points.map(([x, y]) => [x, y]),
         transforms: plan.transforms.map(cloneProfileTransform),
       };
     case 'boolean':

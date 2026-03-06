@@ -125,6 +125,67 @@ return [{ name: 'Lead-In Ring', shape: leadIn }];
   );
 }
 
+function checkPolygonProfileTransforms(): void {
+  const plan = runExactManifest(`
+const plate = polygon([
+  [0, 0],
+  [40, 0],
+  [50, 15],
+  [25, 40],
+  [0, 20],
+])
+  .translate(3, -4)
+  .rotate(15)
+  .extrude(10);
+
+return [{ name: 'Polygon Plate', shape: plate }];
+`);
+
+  assert.equal(plan.kind, 'extrude', `Expected extrude plan, got ${plan.kind}`);
+  assert.equal(plan.profile.kind, 'polygon', `Expected polygon profile, got ${plan.profile.kind}`);
+  assert.deepEqual(plan.profile.points, [
+    [0, 0],
+    [40, 0],
+    [50, 15],
+    [25, 40],
+    [0, 20],
+  ]);
+  assert.deepEqual(plan.profile.transforms, [
+    { kind: 'translate', x: 3, y: -4 },
+    { kind: 'rotate', degrees: 15 },
+  ]);
+}
+
+function checkPolygonBooleanHoleChain(): void {
+  const plan = runExactManifest(`
+const outer = polygon([
+  [0, 0],
+  [80, 0],
+  [80, 50],
+  [0, 50],
+]);
+const hole = polygon([
+  [20, 12],
+  [60, 12],
+  [60, 38],
+  [20, 38],
+]).translate(2, -1);
+const panel = difference2d(outer, hole).extrude(6);
+
+return [{ name: 'Polygon Panel', shape: panel }];
+`);
+
+  assert.equal(plan.kind, 'extrude', `Expected extrude plan, got ${plan.kind}`);
+  assert.equal(plan.profile.kind, 'boolean', `Expected boolean profile, got ${plan.profile.kind}`);
+  assert.equal(plan.profile.op, 'difference');
+  assert.equal(plan.profile.profiles.length, 2);
+  assert.equal(plan.profile.profiles[0].kind, 'polygon');
+  assert.equal(plan.profile.profiles[1].kind, 'polygon');
+  assert.deepEqual(plan.profile.profiles[1].transforms, [
+    { kind: 'translate', x: 2, y: -1 },
+  ]);
+}
+
 function checkRotateAroundTransformPlan(): void {
   const plan = runExactManifest(`
 const door = box(80, 4, 120, false).rotateAround([0, 0, 1], 35, [0, 0, 0]);
@@ -159,6 +220,8 @@ async function main() {
   checkRoundedRectProfileTransforms();
   checkRoundedRectBooleanChain();
   checkProfileBooleanAndTaperedExtrude();
+  checkPolygonProfileTransforms();
+  checkPolygonBooleanHoleChain();
   checkRotateAroundTransformPlan();
   checkPointAlongOnPrimitiveBoolean();
   console.log('✓ BREP export invariants passed');

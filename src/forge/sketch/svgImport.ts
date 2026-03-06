@@ -1351,7 +1351,7 @@ function normalizeSvgImportOptions(options: SvgImportOptions = {}): NormalizedSv
   const centerOnOrigin = options.centerOnOrigin ?? false;
   const simplify = Number.isFinite(options.simplify)
     ? Math.max(0, options.simplify as number)
-    : 1e-5;
+    : 0;
   const invertY = options.invertY ?? true;
 
   return {

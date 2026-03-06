@@ -98,6 +98,14 @@ def apply_profile_transforms(sketch: "cq.Sketch", profile: Dict[str, Any]) -> "c
     )
 
 
+def build_polygon_sketch(points: List[List[float]]) -> "cq.Sketch":
+    if len(points) < 3:
+        raise ValueError("Polygon profile needs at least 3 points")
+    wire = cq.Wire.makePolygon([(float(x), float(y), 0.0) for x, y in points], close=True)
+    face = cq.Face.makeFromWires(wire)
+    return cq.Sketch().face(face).reset()
+
+
 def build_profile_sketch(profile: Dict[str, Any]) -> "cq.Sketch":
     kind = profile["kind"]
     if kind == "rect":
@@ -117,6 +125,9 @@ def build_profile_sketch(profile: Dict[str, Any]) -> "cq.Sketch":
 
     if kind == "circle":
         return apply_profile_transforms(cq.Sketch().circle(profile["radius"]), profile)
+
+    if kind == "polygon":
+        return apply_profile_transforms(build_polygon_sketch(profile["points"]), profile)
 
     if kind == "boolean":
         sketches = [build_profile_sketch(item) for item in profile["profiles"]]

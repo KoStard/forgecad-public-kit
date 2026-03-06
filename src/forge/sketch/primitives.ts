@@ -2,6 +2,23 @@ import { Sketch, setSketchBrepProfilePlan } from './core';
 import { getWasm } from '../kernel';
 import type { Point2D } from './entities';
 
+function normalizePolygonPoints(points: ([number, number] | Point2D)[]): [number, number][] {
+  const pts: [number, number][] = points.map((p) =>
+    Array.isArray(p) ? [p[0], p[1]] : [p.x, p.y]
+  );
+
+  // Manifold expects CCW loops, so flip CW input before building the cross-section.
+  let signedArea = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const [x1, y1] = pts[i];
+    const [x2, y2] = pts[(i + 1) % pts.length];
+    signedArea += (x2 - x1) * (y2 + y1);
+  }
+  if (signedArea > 0) pts.reverse();
+
+  return pts.map(([x, y]) => [x, y]);
+}
+
 export function rect(width: number, height: number, center = false): Sketch {
   return setSketchBrepProfilePlan(
     new Sketch(getWasm().CrossSection.square([width, height], center)),
@@ -27,20 +44,11 @@ export function roundedRect(width: number, height: number, radius: number, cente
 }
 
 export function polygon(points: ([number, number] | Point2D)[]): Sketch {
-  // Normalize: accept Point2D or [x, y] tuples
-  const raw: [number, number][] = points.map(p =>
-    Array.isArray(p) ? p : [p.x, p.y] as [number, number]
+  const pts = normalizePolygonPoints(points);
+  return setSketchBrepProfilePlan(
+    new Sketch(new (getWasm().CrossSection)([pts])),
+    { kind: 'polygon', points: pts, transforms: [] },
   );
-  // Auto-fix winding: Manifold needs CCW, so reverse if CW (positive signed area)
-  const pts = [...raw];
-  let signedArea = 0;
-  for (let i = 0; i < pts.length; i++) {
-    const [x1, y1] = pts[i];
-    const [x2, y2] = pts[(i + 1) % pts.length];
-    signedArea += (x2 - x1) * (y2 + y1);
-  }
-  if (signedArea > 0) pts.reverse();
-  return new Sketch(new (getWasm().CrossSection)([pts]));
 }
 
 export function ngon(sides: number, radius: number): Sketch {

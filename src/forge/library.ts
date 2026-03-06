@@ -382,7 +382,7 @@ export function tSlotProfile(options: TSlotProfileOptions = {}): Sketch {
     profile = difference2d(profile, circle2d(centerBoreDia / 2, segments));
   }
 
-  return profile.simplify(1e-5);
+  return profile;
 }
 
 /**
@@ -539,7 +539,7 @@ export function profile2020BSlot6Profile(
     profile = difference2d(profile, circle2d(opts.centerBoreDia / 2, opts.segments));
   }
 
-  return profile.simplify(1e-5);
+  return profile;
 }
 
 /**
@@ -1455,7 +1455,7 @@ function buildSpurGearProfile(meta: GearMeta, segmentsPerTooth: number): Sketch 
   for (let i = 0; i < meta.teeth; i++) {
     teeth.push(sketchRotate(tooth, (360 / meta.teeth) * i));
   }
-  return union2d(base, ...teeth).simplify(1e-6);
+  return union2d(base, ...teeth);
 }
 
 export function spurGear(options: SpurGearOptions): Shape {
@@ -1629,7 +1629,7 @@ export function ringGear(options: RingGearOptions): Shape {
   for (let i = 0; i < normalized.teeth; i++) {
     spaces.push(sketchRotate(toothSpace, (360 / normalized.teeth) * i));
   }
-  const profile = difference2d(ringBlank, union2d(...spaces)).simplify(1e-6);
+  const profile = difference2d(ringBlank, union2d(...spaces));
   const shape = sketchExtrude(profile, normalized.faceWidth, { center: normalized.center }).toShape();
   return attachGearMeta(shape, meta);
 }
@@ -1707,7 +1707,7 @@ export function rackGear(options: RackGearOptions): Shape {
 
   const span = (options.teeth - 1) * pitch + halfRoot * 2;
   const base = sketchTranslate(rect(span + module * 2, baseHeight, true), 0, -dedendum - baseHeight * 0.5);
-  const profile = union2d(base, ...teethSketches).simplify(1e-6);
+  const profile = union2d(base, ...teethSketches);
   const shape = sketchExtrude(profile, options.faceWidth, { center: options.center ?? true }).toShape();
 
   const meta: GearMeta = {
@@ -2015,7 +2015,7 @@ export function faceGear(options: FaceGearOptions): Shape {
   for (let i = 0; i < normalized.teeth; i++) {
     toothSketches.push(sketchRotate(tooth, (360 / normalized.teeth) * i));
   }
-  const toothProfile = union2d(...toothSketches).simplify(1e-6);
+  const toothProfile = union2d(...toothSketches);
 
   const toothZ = normalized.center ? normalized.faceWidth * 0.5 : normalized.faceWidth;
   const teeth = sketchExtrude(toothProfile, normalized.toothHeight, { center: false })
