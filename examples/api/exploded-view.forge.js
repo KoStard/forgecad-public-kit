@@ -26,7 +26,7 @@ const bolts = [
   boltTemplate.translate(45, 25, 10),
 ];
 
-const assembly = [
+const explodedParts = [
   { name: "Base", shape: base },
   { name: "Pedestal", shape: pedestal, explode: { stage: 0.35, direction: [0, 0, 1] } },
   {
@@ -49,7 +49,7 @@ const assembly = [
 
 cutPlane("Center Section", [0, 1, 0], 0);
 
-return lib.explode(assembly, {
+return lib.explode(explodedParts, {
   amount: explodeAmt,
   stages: [0.35, 0.7, 1.0],
   mode: 'radial',

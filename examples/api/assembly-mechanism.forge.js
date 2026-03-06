@@ -92,13 +92,13 @@ if (collisions.length > 0) {
   console.warn("Assembly collisions:", collisions);
 }
 
-const sweep = mech.sweepJoint("elbow", -20, 135, 16, {
+const elbowSweep = mech.sweepJoint("elbow", -20, 135, 16, {
   baseYaw,
   shoulder,
 });
-const sweptCollisions = sweep.filter(step => step.collisions.length > 0).length;
+const sweptCollisions = elbowSweep.filter(step => step.collisions.length > 0).length;
 if (sweptCollisions > 0) {
-  console.info(`Elbow sweep has collisions in ${sweptCollisions}/${sweep.length} steps`);
+  console.info(`Elbow sweep has collisions in ${sweptCollisions}/${elbowSweep.length} steps`);
 }
 
 console.log("BOM", solved.bom());

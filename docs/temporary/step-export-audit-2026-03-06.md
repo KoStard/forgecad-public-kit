@@ -2,7 +2,7 @@
 
 ## What Changed This Round
 
-Four exact-export expansions landed:
+Seven export-coverage expansions landed:
 
 1. Exact 2D rounded/tapered profile replay
    - `roundedRect()` now records an exact profile plan.
@@ -26,6 +26,20 @@ Four exact-export expansions landed:
    - Built-in anchors accept alias orderings such as `left-front` as well as `front-left`.
    - The USB-C benchmark scene that previously failed with `target._bbox is not a function` now exports cleanly.
 
+5. Exact safe rigid `Shape.transform(matrix)` replay
+   - Rigid affine matrices now preserve exact export plans instead of dropping to mesh-only.
+   - The recorded replay is decomposed into exact `rotateAround(...)` + `translate(...)` steps.
+   - This unlocked assembly-heavy examples that were previously blocked on matrix transforms.
+
+6. Mixed sketch + solid scenes now export the exact solids
+   - STEP/BREP export no longer fails just because a script also returns 2D sketch objects.
+   - Sketch-only objects are skipped with a warning; exact solids continue to export.
+
+7. Exact round-offset profile replay
+   - `Sketch.offset(delta, 'Round')` now preserves an exact profile plan instead of dropping provenance.
+   - This also unlocks round `stroke()` flows that are implemented as chained offsets on exact polygon profiles.
+   - The CadQuery replay has a fallback path for boolean-built profiles whose offset wires need a cleaned union face first.
+
 ## What I Learned
 
 - CadQuery `Workplane` is the wrong abstraction for exact 2D rounded/profile replay.
@@ -47,12 +61,20 @@ Four exact-export expansions landed:
 - A local CadQuery environment is worth it.
   - Using a repo-local `uv` environment (`.venv-brep/.venv/bin/python`) made repeated matrix runs practical and removed repeated dependency provisioning from the feedback loop.
 
+- Dedicated matrix scripts pay for themselves immediately.
+  - `uv run scripts/brep/matrix.py ...` and `rerun_failures.py` made full-example audits cheap enough to run after each exporter step.
+  - Parallel worker pools plus repo-local Python removed most of the feedback-loop friction.
+
+- Mixed-scene export should behave like a 3D exporter, not a linter.
+  - Failing an entire STEP run because a scene also contains sketches was the wrong default.
+  - Skipping non-solid objects keeps the exactness contract without penalizing common example scripts.
+
 ## Example Matrix
 
 Audit command:
 
 ```bash
-npm run step -- --uv uv --python /Users/kostard/Projects/CAD/ForgeCAD/.venv-brep/.venv/bin/python <example>
+uv run scripts/brep/matrix.py --format step examples
 ```
 
 Fresh March 6, 2026 rerun on the current examples tree: `75` bundled `.forge.js` files
@@ -60,11 +82,15 @@ Fresh March 6, 2026 rerun on the current examples tree: `75` bundled `.forge.js`
 - Before exact `rotateAround()` / `pointAlong()` support: `32` passed, `41` failed
 - After exact `rotateAround()` / `pointAlong()` support: `44` passed, `29` failed
 - After exact `polygon()` / polygon-backed profile replay follow-up: `48` passed, `27` failed
+- After safe rigid `Shape.transform(matrix)` replay: `56` passed, `19` failed
+- After mixed sketch + solid export policy cleanup: `59` passed, `16` failed
+- After exact round-offset replay: `61` passed, `14` failed
+- After fixing the `assembly-mechanism` example runtime shadowing bug: `62` passed, `13` failed
 
 Notes:
 
-- The `48 / 27` result is from the current March 6, 2026 tree with `75` examples, so it is not a perfectly apples-to-apples comparison with the earlier `73`-example snapshot.
-- Several current failures are now clearly runtime/script issues (`target._bbox is not a function`, duplicate identifier errors, etc.), not exporter regressions.
+- The current reference matrix was produced by `uv run scripts/brep/matrix.py --format step examples`.
+- The `62 / 13` result is from the current March 6, 2026 tree with `75` examples, so it is not a perfectly apples-to-apples comparison with the earlier `73`-example snapshot.
 - After the mirror + placement follow-up, targeted verification confirmed clean export for:
   - `examples/api/patterns.forge.js`
   - `examples/api/coordinate-system.forge.js`
@@ -94,98 +120,95 @@ Examples confirmed passing after the polygon/profile follow-up:
 - `examples/table-lamp.forge.js`
 - `examples/tv-stand.forge.js`
 
-## Remaining Failure Buckets
-
-### 1. Exact transform gaps that still remain
-
-Representative examples:
+Examples confirmed passing after the rigid-transform / mixed-scene / round-offset follow-ups:
 
 - `examples/api/assembly-gear-coupling.forge.js`
 - `examples/api/runtime-joints-view.forge.js`
-- `examples/robot_hand_2.forge.js`
-
-Likely causes:
-
-- `Shape.transform(matrix)` still drops exact plan even for rigid transforms
-
-### 2. Mixed sketch + solid export-policy gaps
-
-Representative examples:
-
-- `examples/api/profile-2020-b-slot6.forge.js`
-- `examples/api/sketch-basics.forge.js`
 - `examples/api/clone-duplicate.forge.js`
+- `examples/api/profile-2020-b-slot6.forge.js`
+- `examples/test-colors.forge.js`
+- `examples/api/sketch-basics.forge.js`
+- `examples/classical-piano.forge.js`
+- `examples/api/assembly-mechanism.forge.js`
 
-What changed:
+## Remaining Failure Buckets
 
-- In `examples/api/profile-2020-b-slot6.forge.js`, the `3D Extrusion` object is now exact-exportable.
-- The script still fails as a whole because it intentionally returns a 2D sketch object next to the solid, and sketch-to-BREP export is still unsupported.
-
-### 3. Remaining profile/path gaps
-
-Representative examples:
-
-- `examples/headphone-hanger-v2.forge.js`
-
-Likely causes:
-
-- `stroke()` / `offset()`-derived profiles still have no exact 2D replay path
-
-### 4. Unknown-source library geometry
+### 1. Helper/library provenance gaps
 
 Representative examples:
 
 - `examples/api/elbow-test.forge.js`
 - `examples/bolt-and-nut.forge.js`
+- `examples/api/exploded-view.forge.js`
 - `examples/5-figen-robot-hand.forge.js`
 - `examples/3d-printer.forge.js`
 
-These look less like exporter limitations and more like provenance loss inside helper/library code paths.
+Likely causes:
 
-### 5. Intentionally sampled / mesh-domain geometry
+- exact helper/library geometry still falls back to `unknown` provenance in some code paths (`lib.elbow`, fasteners, cable/tube helpers)
+
+### 2. Safe affine scale gaps
+
+Representative examples:
+
+- `examples/robot_hand.forge.js`
+- `examples/robot_hand_2.forge.js`
+
+Likely causes:
+
+- scaled-sphere grip pads and related primitive-heavy unions still drop exact plans because non-uniform solid scale replay is not supported
+
+### 3. Remaining exact geometry gaps
+
+Representative examples:
+
+- `examples/headphone-hanger-v2.forge.js`
+- `examples/api/extrude-options.forge.js`
+
+Likely causes:
+
+- `headphone-hanger-v2` still has a boolean + primitive + revolve provenance break
+- twisted extrudes remain intentionally outside the current exact subset
+
+### 4. Intentionally sampled / mesh-domain geometry
 
 Representative examples:
 
 - `examples/api/benchy-style-hull.forge.js`
 - `examples/api/curves-surfacing-basics.forge.js`
+- `examples/api/geometry-info.forge.js`
 
 These rely on `loft`, `sweep`, `levelSet`, `hull`, or deformation-heavy flows. They are not lower-hanging fruit.
 
-### 6. Non-exporter script/runtime problems
+### 5. Remaining runtime compatibility problem
 
-These are not exact-BREP planner failures:
+Representative example:
 
-- `examples/ac-unit-glm5.forge.js` -> `target._bbox is not a function`
-- `examples/ac-unit-minimax.forge.js` -> `target._bbox is not a function`
-- `examples/ac-unit.forge.js` -> `target._bbox is not a function`
-- `examples/api/coordinate-system.forge.js` -> `target._bbox is not a function`
-- `examples/classical-piano.forge.js` -> `target._bbox is not a function`
 - `examples/iphone.forge.js` -> `body.smoothOut is not a function`
-- `examples/api/assembly-mechanism.forge.js` -> `Identifier 'sweep' has already been declared`
-- `examples/api/exploded-view.forge.js` -> `Identifier 'assembly' has already been declared`
+
+This is not an exporter-plan failure; it is a runtime API mismatch between `TrackedShape` and `Shape`.
 
 ## Lowest-Hanging Next Fixes
 
 Ranked by likely payoff per unit of work:
 
-1. Safe rigid `Shape.transform(matrix)` replay
-   - High leverage for assembly-driven examples.
-   - Would likely help `assembly-gear-coupling`, `runtime-joints-view`, and parts of `robot_hand_2`.
+1. Provenance-preserving helper/library plans
+   - Highest remaining example payoff.
+   - `lib.elbow`, `lib.bolt`, fastener helpers, and cable/tube helpers should buy back several examples without expanding the exact kernel subset.
 
-2. Better handling of mixed sketch + solid scenes
-   - Several examples fail only because they intentionally return sketches next to exportable solids.
-   - This is more of a product/export-policy decision than a kernel limitation.
+2. Safe exact affine scale replay
+   - Especially valuable for scaled-sphere pads and similar soft-contact parts.
+   - This likely helps both `robot_hand` examples immediately.
 
-3. Exact 2D `offset()` / stroke replay
-   - This is the remaining real profile-export gap after polygon replay landed.
-   - It should help stroke-heavy SVG/path examples and hanger/profile variants.
+3. Then selective exact OCCT-native features
+   - `shell`, precise fillet/chamfer, and other BREP-native operations still matter more than sampled loft/sweep paths.
 
 ## Recommendation
 
 If continuing exact STEP coverage work, the next best engineering target is:
 
-1. Safe rigid `Shape.transform(matrix)` decomposition
-2. Then exact 2D `offset()` / stroke replay
-3. Then better mixed sketch + solid export policy
+1. provenance-preserving exact plans for `lib.elbow`, `lib.bolt`, and related helpers
+2. then safe exact affine scale replay for solid primitives
+3. then OCCT-native BREP features where exact export matters most
 
 That sequence should buy more example coverage than chasing sampled `loft` / `sweep` / `levelSet` paths.

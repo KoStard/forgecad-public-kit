@@ -36,18 +36,19 @@ Update it whenever:
 | `rect/circle/roundedRect.extrude(height)` | Supported | Yes | `twist` / `divisions` must be absent |
 | `rect/circle/roundedRect.extrude(height, { scaleTop })` | Supported | Yes | Replayed as exact lofts; sketch booleans are decomposed into 3D booleans when needed |
 | `rect/circle/roundedRect.revolve(degrees)` | Supported | Yes | Replayed around Forge's revolve axis convention |
+| `Sketch.offset(delta, 'Round')` | Partial | Yes | Exact round-offset replay for exact-exportable profiles; `Square` / `Miter` still drop the plan |
 | `shape.translate()` | Supported | Yes | Recorded as exact solid transform |
 | `shape.rotate(x, y, z)` | Supported | Yes | Euler replay only |
 | `rotateAround(...)` | Supported | Yes | Exact arbitrary-axis rotation is recorded with axis + pivot |
 | `pointAlong(...)` | Supported | Yes | Replayed via exact arbitrary-axis rotation from Forge's +Z axis |
 | `mirror(...)` | Supported | Yes | Replayed as an exact mirror transform across the origin plane normal |
+| `Shape.transform(matrix)` | Partial | Yes | Rigid affine subset only: orthonormal rotation + translation; scale/shear/perspective still unsupported |
 | `union()` | Supported | Yes | Only when every operand is exact-exportable |
 | `difference()` | Supported | Yes | Only when every operand is exact-exportable |
 | `intersection()` | Supported | Yes | Only when every operand is exact-exportable |
 | Returned multi-object scene | Supported | Yes | Exported as a STEP/BREP compound |
-| Sketch `offset()` | Unsupported | No | Requires exact 2D offset reconstruction |
+| Returned mixed sketch + solid scene | Supported | Yes | Exact solids export; sketch-only objects are skipped with a warning |
 | Sketch `mirror()` / arbitrary `warp()` | Unsupported | No | Not recorded in export plan |
-| `Shape.transform(matrix)` | Unsupported | No | Arbitrary affine replay not implemented |
 | `loft()` | Unsupported | No | Current Forge implementation is sampled/level-set |
 | `sweep()` | Unsupported | No | Current Forge implementation is sampled/level-set |
 | `levelSet()` | Unsupported | No | Mesh/SDF output by design |
@@ -61,7 +62,7 @@ Update it whenever:
 
 ## Planned Expansion Order
 
-1. Exact matrix-safe replay for `Shape.transform(matrix)`
-2. Exact 2D offset replay for `offset()` / `stroke()`-derived profiles
+1. Exact provenance-preserving replay for library helpers such as `lib.elbow()`, `lib.bolt()`, and related fastener/tube builders
+2. Safe exact affine scale replay where OCCT can preserve exact solids, especially scaled-sphere / pad workflows
 3. Exact OCCT-native operations where BREP matters most: `shell`, precise fillet/chamfer, sketch-on-face
 4. Optional STEP product structure and metadata export
