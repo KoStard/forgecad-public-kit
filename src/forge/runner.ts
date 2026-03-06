@@ -780,7 +780,7 @@ function executeFile(
       const ox = center ? -x / 2 : 0;
       const oy = center ? -y / 2 : 0;
       const r = Rectangle2D.fromDimensions(ox, oy, x, y);
-      const topo = buildRectExtrusionTopology(r, z);
+      const topo = buildRectExtrusionTopology(r, z, true, center ? -z / 2 : 0);
       return new TrackedShape(shape, topo, 0, true);
     };
 

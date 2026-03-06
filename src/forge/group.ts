@@ -4,7 +4,7 @@
  * Colors, individual identities are preserved.
  */
 
-import { Shape, Anchor3D, resolveAnchor3D } from './kernel';
+import { Shape, type Anchor3D, isAnchor3D, resolveAnchor3D } from './kernel';
 import { Transform, type Mat4 } from './transform';
 import { Sketch } from './sketch/core';
 import { TrackedShape } from './sketch/topology';
@@ -92,7 +92,7 @@ export class ShapeGroup {
 
   attachTo(
     target: Shape | TrackedShape | ShapeGroup,
-    targetAnchor: Anchor3D,
+    targetAnchor: Anchor3D | string,
     selfAnchor: Anchor3D = 'center',
     offset?: [number, number, number],
   ): ShapeGroup {
@@ -100,7 +100,9 @@ export class ShapeGroup {
       ? target._bbox()
       : (() => { const s = target instanceof TrackedShape ? target.toShape() : target; const b = s.boundingBox(); return { min: b.min as [number, number, number], max: b.max as [number, number, number] }; })();
     const sbb = this._bbox();
-    const tp = resolveAnchor3D(tbb.min as [number, number, number], tbb.max as [number, number, number], targetAnchor);
+    const tp = target instanceof ShapeGroup || isAnchor3D(targetAnchor)
+      ? resolveAnchor3D(tbb.min as [number, number, number], tbb.max as [number, number, number], targetAnchor as Anchor3D)
+      : (target instanceof TrackedShape ? target.referencePoint(targetAnchor) : target.referencePoint(targetAnchor));
     const sp = resolveAnchor3D(sbb.min as [number, number, number], sbb.max as [number, number, number], selfAnchor);
     let dx = tp[0] - sp[0], dy = tp[1] - sp[1], dz = tp[2] - sp[2];
     if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }

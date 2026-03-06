@@ -8,7 +8,13 @@
  * Arbitrary boolean results lose topology (mesh kernel limitation).
  */
 
-import { Shape, getAnchorPoint3D, resolveAnchor3D, type GeometryInfo } from '../kernel';
+import {
+  Shape,
+  resolveAnchor3D,
+  setShapePlacementReferences,
+  type GeometryInfo,
+  type PlacementReferenceInput,
+} from '../kernel';
 import { Transform, type Mat4 } from '../transform';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
 
@@ -46,7 +52,9 @@ export class TrackedShape {
     public readonly topology: Topology,
     private readonly baseHeight: number,
     private readonly extrudeUp: boolean,
-  ) {}
+  ) {
+    setShapePlacementReferences(this.shape, topologyToPlacementReferences(this.topology), { merge: true });
+  }
 
   /** Get a named face */
   face(name: FaceName): FaceRef {
@@ -101,6 +109,40 @@ export class TrackedShape {
       ...info,
       topology: hasTrackedTopology ? 'synthetic' : info.topology,
     };
+  }
+
+  /** Attach named placement references that survive normal transforms and imports. */
+  withReferences(refs: PlacementReferenceInput): TrackedShape {
+    return new TrackedShape(
+      this.shape.withReferences(refs),
+      cloneTopology(this.topology),
+      this.baseHeight,
+      this.extrudeUp,
+    );
+  }
+
+  /** List named placement references carried by this tracked shape. */
+  referenceNames(kind?: 'points' | 'edges' | 'surfaces' | 'objects'): string[] {
+    return this.shape.referenceNames(kind);
+  }
+
+  /** Resolve a named placement reference or built-in anchor to a 3D point. */
+  referencePoint(ref: string): [number, number, number] {
+    return this.shape.referencePoint(ref);
+  }
+
+  /** Translate the tracked shape so the given reference lands on the target coordinate. */
+  placeReference(
+    ref: string,
+    target: [number, number, number],
+    offset?: [number, number, number],
+  ): TrackedShape {
+    return new TrackedShape(
+      this.shape.placeReference(ref, target, offset),
+      cloneTopology(this.topology),
+      this.baseHeight,
+      this.extrudeUp,
+    );
   }
 
   // Delegate Shape methods, preserving topology with offset transforms
@@ -247,13 +289,16 @@ export class TrackedShape {
   ): TrackedShape {
     let tp: [number, number, number];
     if (typeof (target as any)._bbox === 'function' && !(target instanceof TrackedShape) && !(target instanceof Shape)) {
+      if (targetAnchor.includes('.')) {
+        throw new Error(`ShapeGroup targets only support built-in anchors, got "${targetAnchor}"`);
+      }
       const bb = (target as any)._bbox();
       tp = resolveAnchor3D(bb.min, bb.max, targetAnchor as any);
     } else {
-      const targetShape = target instanceof TrackedShape ? target.toShape() : target as Shape;
-      tp = getAnchorPoint3D(targetShape, targetAnchor as any);
+      const targetShape = target instanceof TrackedShape ? target : target as Shape;
+      tp = targetShape.referencePoint(targetAnchor);
     }
-    const sp = getAnchorPoint3D(this.toShape(), selfAnchor as any);
+    const sp = this.referencePoint(selfAnchor);
     let dx = tp[0] - sp[0], dy = tp[1] - sp[1], dz = tp[2] - sp[2];
     if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }
     return this.translate(dx, dy, dz);
@@ -339,6 +384,26 @@ function cloneTopology(topo: Topology): Topology {
   return { faces, edges };
 }
 
+function topologyToPlacementReferences(topo: Topology): PlacementReferenceInput {
+  const surfaces: NonNullable<PlacementReferenceInput['surfaces']> = {};
+  for (const [name, face] of topo.faces) {
+    surfaces[name] = {
+      center: [face.center[0], face.center[1], face.center[2]],
+      normal: [face.normal[0], face.normal[1], face.normal[2]],
+    };
+  }
+
+  const edges: NonNullable<PlacementReferenceInput['edges']> = {};
+  for (const [name, edge] of topo.edges) {
+    edges[name] = {
+      start: [edge.start[0], edge.start[1], edge.start[2]],
+      end: [edge.end[0], edge.end[1], edge.end[2]],
+    };
+  }
+
+  return { surfaces, edges };
+}
+
 /**
  * Build topology for an extruded rectangle.
  * Faces: top, bottom, front(bottom-side), back(top-side), left, right
@@ -349,13 +414,14 @@ export function buildRectExtrusionTopology(
   rect: Rectangle2D,
   height: number,
   up = true,
+  zBase = 0,
 ): Topology {
   const faces = new Map<FaceName, FaceRef>();
   const edges = new Map<EdgeName, EdgeRef>();
 
   const [bl, br, tr, tl] = rect.vertices;
-  const z0 = 0;
-  const z1 = up ? height : -height;
+  const z0 = zBase;
+  const z1 = zBase + (up ? height : -height);
   const zTop = Math.max(z0, z1);
   const zBot = Math.min(z0, z1);
   const cx = rect.center.x;

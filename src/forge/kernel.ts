@@ -9,11 +9,34 @@ import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import { Transform, type Mat4 } from './transform';
 import { scaleRefineSteps, scaleRefineToLength, scaleRefineToTolerance } from './quality';
 import type { BrepShapePlan } from './brepPlan';
+import { type Anchor3D, isAnchor3D, resolveAnchor3D } from './anchors';
+import {
+  applyPlacementReferenceInput,
+  clonePlacementReferences,
+  createPlacementReferences,
+  hasPlacementReferences,
+  mergePlacementReferences,
+  placementReferenceNames,
+  resolvePlacementReferencePoint,
+  transformPlacementReferences,
+  type PlacementAnchorLike,
+  type PlacementReferenceInput,
+  type PlacementReferenceKind,
+  type PlacementReferences,
+} from './placement';
 import {
   appendBrepShapeTransform,
   buildBrepBooleanPlan,
   cloneBrepShapePlan,
 } from './brepPlan';
+
+export type { Anchor3D } from './anchors';
+export { isAnchor3D, resolveAnchor3D } from './anchors';
+export type {
+  PlacementReferenceInput,
+  PlacementReferenceKind,
+  PlacementReferences,
+} from './placement';
 
 let _wasm: ManifoldToplevel | null = null;
 
@@ -71,6 +94,7 @@ export interface ShapeDimension {
 const _shapeDimensions = new WeakMap<Shape, ShapeDimension[]>();
 const _shapeGeometryInfo = new WeakMap<Shape, GeometryInfo>();
 const _shapeBrepPlans = new WeakMap<Shape, BrepShapePlan | null>();
+const _shapePlacementRefs = new WeakMap<Shape, PlacementReferences>();
 let _shapeDimensionCounter = 0;
 
 const DEFAULT_GEOMETRY_INFO: GeometryInfo = {
@@ -122,12 +146,25 @@ function setShapeBrepPlanInternal(shape: Shape, plan: BrepShapePlan | null): Sha
   return shape;
 }
 
+function setShapePlacementRefsInternal(shape: Shape, refs: PlacementReferences): Shape {
+  if (hasPlacementReferences(refs)) {
+    _shapePlacementRefs.set(shape, clonePlacementReferences(refs));
+  } else {
+    _shapePlacementRefs.delete(shape);
+  }
+  return shape;
+}
+
 function getShapeGeometryInfoInternal(shape: Shape): GeometryInfo {
   return cloneGeometryInfo(_shapeGeometryInfo.get(shape) ?? DEFAULT_GEOMETRY_INFO);
 }
 
 function getShapeBrepPlanInternal(shape: Shape): BrepShapePlan | null {
   return cloneBrepShapePlan(_shapeBrepPlans.get(shape) ?? null);
+}
+
+function getShapePlacementRefsInternal(shape: Shape): PlacementReferences {
+  return clonePlacementReferences(_shapePlacementRefs.get(shape) ?? createPlacementReferences());
 }
 
 function mergeGeometryField<T extends string>(values: T[], mixedValue: T): T {
@@ -259,6 +296,7 @@ function mirrorMatrix(normal: [number, number, number]): Mat4 {
 function withCopiedDimensions(source: Shape, out: Shape): Shape {
   setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(source), true));
   setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(source));
+  setShapePlacementRefsInternal(out, getShapePlacementRefsInternal(source));
   return setShapeBrepPlanInternal(out, getShapeBrepPlanInternal(source));
 }
 
@@ -270,6 +308,7 @@ function withTransformedDimensions(source: Shape, out: Shape, m: Mat4): Shape {
     setShapeDimensionsInternal(out, transformDimensions(dims, m));
   }
   setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(source));
+  setShapePlacementRefsInternal(out, transformPlacementReferences(getShapePlacementRefsInternal(source), m));
   return setShapeBrepPlanInternal(out, getShapeBrepPlanInternal(source));
 }
 
@@ -278,6 +317,10 @@ function withMergedDimensions(sources: Shape[], out: Shape): Shape {
   setShapeDimensionsInternal(out, cloneDimensions(merged, true));
   const baseInfo = sources.length > 0 ? getShapeGeometryInfoInternal(sources[0]) : DEFAULT_GEOMETRY_INFO;
   setShapeGeometryInfoInternal(out, baseInfo);
+  setShapePlacementRefsInternal(
+    out,
+    mergePlacementReferences(...sources.map((shape) => getShapePlacementRefsInternal(shape))),
+  );
   const basePlan = sources.length > 0 ? getShapeBrepPlanInternal(sources[0]) : null;
   return setShapeBrepPlanInternal(out, basePlan);
 }
@@ -285,6 +328,7 @@ function withMergedDimensions(sources: Shape[], out: Shape): Shape {
 function withBaseDimensions(base: Shape, out: Shape): Shape {
   setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(base), true));
   setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(base));
+  setShapePlacementRefsInternal(out, getShapePlacementRefsInternal(base));
   return setShapeBrepPlanInternal(out, getShapeBrepPlanInternal(base));
 }
 
@@ -304,6 +348,21 @@ export function setShapeDimensions(
 /** Read dimensions bound to this shape instance (defensive copy). */
 export function getShapeDimensions(shape: Shape): ShapeDimension[] {
   return cloneDimensions(getShapeDimensionsInternal(shape), false);
+}
+
+export function setShapePlacementReferences(
+  shape: Shape,
+  refs: PlacementReferenceInput,
+  options: { merge?: boolean } = {},
+): Shape {
+  const next = options.merge ?? true
+    ? applyPlacementReferenceInput(getShapePlacementRefsInternal(shape), refs)
+    : applyPlacementReferenceInput(createPlacementReferences(), refs);
+  return setShapePlacementRefsInternal(shape, next);
+}
+
+export function getShapePlacementReferences(shape: Shape): PlacementReferences {
+  return getShapePlacementRefsInternal(shape);
 }
 
 export function getShapeGeometryInfo(shape: Shape): GeometryInfo {
@@ -362,6 +421,39 @@ export class Shape {
   /** Inspect which backend/representation produced this solid. */
   geometryInfo(): GeometryInfo {
     return getShapeGeometryInfoInternal(this);
+  }
+
+  /** Attach named placement references that survive normal transforms and imports. */
+  withReferences(refs: PlacementReferenceInput): Shape {
+    return setShapePlacementReferences(this.clone(), refs, { merge: true });
+  }
+
+  /** List named placement references carried by this shape. */
+  referenceNames(kind?: PlacementReferenceKind): string[] {
+    return placementReferenceNames(getShapePlacementRefsInternal(this), kind);
+  }
+
+  /** Resolve a named placement reference or built-in anchor to a 3D point. */
+  referencePoint(ref: PlacementAnchorLike): [number, number, number] {
+    return resolveAnchorLikePoint(this, ref);
+  }
+
+  /** Translate the shape so the given reference lands on the target coordinate. */
+  placeReference(
+    ref: PlacementAnchorLike,
+    target: [number, number, number],
+    offset?: [number, number, number],
+  ): Shape {
+    const sourcePoint = this.referencePoint(ref);
+    let dx = target[0] - sourcePoint[0];
+    let dy = target[1] - sourcePoint[1];
+    let dz = target[2] - sourcePoint[2];
+    if (offset) {
+      dx += offset[0];
+      dy += offset[1];
+      dz += offset[2];
+    }
+    return this.translate(dx, dy, dz);
   }
 
   // --- Transforms (all return new Shape, immutable) ---
@@ -652,18 +744,12 @@ export class Shape {
   /** Position this shape relative to another using named 3D anchor points */
   attachTo(
     target: Shape | { _bbox(): { min: number[]; max: number[] } },
-    targetAnchor: Anchor3D,
-    selfAnchor: Anchor3D = 'center',
+    targetAnchor: PlacementAnchorLike,
+    selfAnchor: PlacementAnchorLike = 'center',
     offset?: [number, number, number],
   ): Shape {
-    let tp: [number, number, number];
-    if (typeof (target as any)._bbox === 'function') {
-      const bb = (target as any)._bbox();
-      tp = resolveAnchor3D(bb.min, bb.max, targetAnchor);
-    } else {
-      tp = getAnchorPoint3D(target as Shape, targetAnchor);
-    }
-    const sp = getAnchorPoint3D(this, selfAnchor);
+    const tp = resolveTargetAnchorLikePoint(target, targetAnchor);
+    const sp = this.referencePoint(selfAnchor);
     let dx = tp[0] - sp[0], dy = tp[1] - sp[1], dz = tp[2] - sp[2];
     if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }
     return this.translate(dx, dy, dz);
@@ -713,63 +799,35 @@ export class Shape {
 
 // --- 3D Anchor positioning ---
 
-export type Anchor3D = 'center' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'
-  // edge midpoints (2 axes specified)
-  | 'front-left' | 'front-right' | 'back-left' | 'back-right'
-  | 'top-front' | 'top-back' | 'top-left' | 'top-right'
-  | 'bottom-front' | 'bottom-back' | 'bottom-left' | 'bottom-right'
-  // true corners (3 axes specified)
-  | 'top-front-left' | 'top-front-right' | 'top-back-left' | 'top-back-right'
-  | 'bottom-front-left' | 'bottom-front-right' | 'bottom-back-left' | 'bottom-back-right';
-
-export function resolveAnchor3D(
-  min: [number, number, number],
-  max: [number, number, number],
-  anchor: Anchor3D,
-): [number, number, number] {
-  const cx = (min[0] + max[0]) / 2;
-  const cy = (min[1] + max[1]) / 2;
-  const cz = (min[2] + max[2]) / 2;
-
-  switch (anchor) {
-    case 'center': return [cx, cy, cz];
-    // face centers (1 axis pinned)
-    case 'front': return [cx, min[1], cz];
-    case 'back': return [cx, max[1], cz];
-    case 'left': return [min[0], cy, cz];
-    case 'right': return [max[0], cy, cz];
-    case 'top': return [cx, cy, max[2]];
-    case 'bottom': return [cx, cy, min[2]];
-    // edge midpoints (2 axes pinned)
-    case 'front-left': return [min[0], min[1], cz];
-    case 'front-right': return [max[0], min[1], cz];
-    case 'back-left': return [min[0], max[1], cz];
-    case 'back-right': return [max[0], max[1], cz];
-    case 'top-front': return [cx, min[1], max[2]];
-    case 'top-back': return [cx, max[1], max[2]];
-    case 'top-left': return [min[0], cy, max[2]];
-    case 'top-right': return [max[0], cy, max[2]];
-    case 'bottom-front': return [cx, min[1], min[2]];
-    case 'bottom-back': return [cx, max[1], min[2]];
-    case 'bottom-left': return [min[0], cy, min[2]];
-    case 'bottom-right': return [max[0], cy, min[2]];
-    // true corners (3 axes pinned)
-    case 'top-front-left': return [min[0], min[1], max[2]];
-    case 'top-front-right': return [max[0], min[1], max[2]];
-    case 'top-back-left': return [min[0], max[1], max[2]];
-    case 'top-back-right': return [max[0], max[1], max[2]];
-    case 'bottom-front-left': return [min[0], min[1], min[2]];
-    case 'bottom-front-right': return [max[0], min[1], min[2]];
-    case 'bottom-back-left': return [min[0], max[1], min[2]];
-    case 'bottom-back-right': return [max[0], max[1], min[2]];
-    default: throw new Error(`Unknown anchor "${anchor}". Valid anchors: center, front, back, left, right, top, bottom, front-left, front-right, back-left, back-right, top-front, top-back, top-left, top-right, bottom-front, bottom-back, bottom-left, bottom-right, top-front-left, top-front-right, top-back-left, top-back-right, bottom-front-left, bottom-front-right, bottom-back-left, bottom-back-right`);
-  }
-}
-
 export function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, number, number] {
   const s: Shape = typeof (shape as any).toShape === 'function' ? (shape as any).toShape() : shape;
   const bb = s.boundingBox();
   return resolveAnchor3D(bb.min as [number, number, number], bb.max as [number, number, number], anchor);
+}
+
+function resolveAnchorLikePoint(shape: Shape, ref: PlacementAnchorLike): [number, number, number] {
+  if (isAnchor3D(ref)) return getAnchorPoint3D(shape, ref);
+  const point = resolvePlacementReferencePoint(getShapePlacementRefsInternal(shape), ref);
+  if (point) return point;
+  throw new Error(
+    `Unknown placement reference "${ref}". Available: ${placementReferenceNames(getShapePlacementRefsInternal(shape)).join(', ') || 'none'}`,
+  );
+}
+
+function resolveTargetAnchorLikePoint(
+  target: Shape | { _bbox(): { min: number[]; max: number[] } },
+  ref: PlacementAnchorLike,
+): [number, number, number] {
+  if (target instanceof Shape) return resolveAnchorLikePoint(target, ref);
+  if (typeof ref === 'string' && !isAnchor3D(ref)) {
+    throw new Error(`ShapeGroup targets only support built-in anchors, got "${ref}"`);
+  }
+  const bb = target._bbox();
+  return resolveAnchor3D(
+    bb.min as [number, number, number],
+    bb.max as [number, number, number],
+    ref as Anchor3D,
+  );
 }
 
 // --- Primitive constructors ---

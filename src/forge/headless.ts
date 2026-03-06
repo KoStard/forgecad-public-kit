@@ -17,7 +17,22 @@
 import { initKernel } from './kernel';
 
 // Re-export everything from the public API
-export { Shape, box, cylinder, sphere, union, difference, intersection, hull3d, levelSet, getWasm } from './kernel';
+export {
+  Shape,
+  box,
+  cylinder,
+  sphere,
+  union,
+  difference,
+  intersection,
+  hull3d,
+  levelSet,
+  getWasm,
+  isAnchor3D,
+  resolveAnchor3D,
+  getShapePlacementReferences,
+  setShapePlacementReferences,
+} from './kernel';
 export type {
   Anchor3D,
   GeometryBackend,
@@ -26,6 +41,9 @@ export type {
   GeometryTopology,
   GeometrySource,
   GeometryInfo,
+  PlacementReferenceInput,
+  PlacementReferenceKind,
+  PlacementReferences,
 } from './kernel';
 export { Transform, composeChain } from './transform';
 export type { Mat4, Vec3, TransformInput } from './transform';

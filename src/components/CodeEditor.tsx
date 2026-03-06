@@ -47,9 +47,15 @@ type SvgImportOptions = {
   simplify?: number;
   invertY?: boolean;
 };
+type PlacementReferenceInput = {
+  points?: Record<string, [number, number, number]>;
+  edges?: Record<string, { start: [number, number, number]; end: [number, number, number] }>;
+  surfaces?: Record<string, { center: [number, number, number]; normal: [number, number, number] }>;
+  objects?: Record<string, Shape | TrackedShape | ShapeGroup | { min: [number, number, number]; max: [number, number, number] }>;
+};
 /** Import a 2D sketch from another file. Supports ".sketch.js" and ".svg". */
 declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch;
-/** Import a 3D part from another file. The file must return a Shape. */
+/** Import a 3D part from another file. The file must return a Shape or TrackedShape. */
 declare function importPart(fileName: string, paramOverrides?: Record<string, number>): Shape;
 /** Import and parse an SVG file directly as a sketch. */
 declare function importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch;
@@ -141,6 +147,14 @@ declare class Shape {
   rotateAround(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): Shape;
   /** Reorient so primary axis (Z) points along given direction. E.g. cylinder(h,r).pointAlong([1,0,0]) lays it along X */
   pointAlong(direction: [number, number, number]): Shape;
+  /** Attach named placement references that survive transforms and imports. */
+  withReferences(refs: PlacementReferenceInput): Shape;
+  /** List placement references. Pass a kind to get raw names, or omit it for prefixed names like "points.mount". */
+  referenceNames(kind?: 'points' | 'edges' | 'surfaces' | 'objects'): string[];
+  /** Resolve a built-in anchor or named placement reference to a world-space point. */
+  referencePoint(ref: AnchorTarget3D): [number, number, number];
+  /** Translate this shape so the given anchor/reference lands on the target coordinate. */
+  placeReference(ref: AnchorTarget3D, target: [number, number, number], offset?: [number, number, number]): Shape;
 
   // Booleans
   add(other: Shape): Shape;
@@ -167,8 +181,8 @@ declare class Shape {
   color(hex: string): Shape;
 
   // 3D Anchor positioning
-  /** Position this shape relative to another using named 3D anchor points */
-  attachTo(target: Shape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D, offset?: [number, number, number]): Shape;
+  /** Position this shape relative to another using built-in anchors or named placement references */
+  attachTo(target: Shape, targetAnchor: AnchorTarget3D, selfAnchor?: AnchorTarget3D, offset?: [number, number, number]): Shape;
   /** Place on a face of a parent shape. u/v = position within face, protrude = outward distance */
   onFace(parent: Shape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number }): Shape;
 
@@ -311,6 +325,10 @@ declare class TrackedShape {
   faceNames(): string[];
   edgeNames(): string[];
   translate(dx: number, dy: number, dz: number): TrackedShape;
+  withReferences(refs: PlacementReferenceInput): TrackedShape;
+  referenceNames(kind?: 'points' | 'edges' | 'surfaces' | 'objects'): string[];
+  referencePoint(ref: AnchorTarget3D): [number, number, number];
+  placeReference(ref: AnchorTarget3D, target: [number, number, number], offset?: [number, number, number]): TrackedShape;
   /** Alias for translate */
   moveBy(dx: number, dy: number, dz: number): TrackedShape;
   /** Move so bounding box min corner is at the given global coordinate */
@@ -326,8 +344,8 @@ declare class TrackedShape {
   scale(v: number | [number, number, number]): TrackedShape;
   mirror(normal: [number, number, number]): TrackedShape;
   rotateAroundEdge(edgeName: string, angleDeg: number): TrackedShape;
-  /** Position this shape relative to another using named 3D anchor points */
-  attachTo(target: Shape | TrackedShape, targetAnchor: Anchor3D, selfAnchor?: Anchor3D, offset?: [number, number, number]): TrackedShape;
+  /** Position this shape relative to another using built-in anchors or named placement references */
+  attachTo(target: Shape | TrackedShape, targetAnchor: AnchorTarget3D, selfAnchor?: AnchorTarget3D, offset?: [number, number, number]): TrackedShape;
   /** Place on a face of a parent shape. u/v = position within face, protrude = outward distance */
   onFace(parent: Shape | TrackedShape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number }): TrackedShape;
   color(hex: string): TrackedShape;
@@ -815,6 +833,7 @@ type Anchor3D = 'center' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom
   | 'bottom-front' | 'bottom-back' | 'bottom-left' | 'bottom-right'
   | 'top-front-left' | 'top-front-right' | 'top-back-left' | 'top-back-right'
   | 'bottom-front-left' | 'bottom-front-right' | 'bottom-back-left' | 'bottom-back-right';
+type AnchorTarget3D = Anchor3D | (string & {});
 
 // --- Group ---
 /** Group multiple shapes/sketches for joint transforms without merging meshes. Colors preserved. */
