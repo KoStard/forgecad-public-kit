@@ -189,6 +189,8 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 | Render PNG views | `npm run render -- examples/cup.forge.js` |
 | Render orbit GIF (solid + wireframe) | `npm run gif -- examples/cup.forge.js` |
 | Export sketch SVG | `npm run svg -- examples/frame.sketch.js` |
+| Export exact STEP (supported subset only) | `npm run step -- examples/api/brep-exportable.forge.js` |
+| Export exact BREP (supported subset only) | `npm run brep -- examples/api/brep-exportable.forge.js` |
 | Generate report PDF | `npm run report -- examples/cup.forge.js` |
 | Parameter robustness scan | `npm run param-check -- examples/shoe-rack-doors.forge.js --samples 10` |
 | Transform invariants | `npm run check:transforms` |
@@ -212,6 +214,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 - `examples/api/dimensioned-bracket.forge.js`: dimension annotations
 - `examples/api/bill-of-materials.forge.js`: script-authored BOM aggregation
 - `examples/api/exploded-view.forge.js`: exploded layouts + cut-plane visualization
+- `examples/api/brep-exportable.forge.js`: exact-exportable STEP/BREP subset demo
 - `examples/api/geometry-info.forge.js`: inspect backend/provenance info for solids
 
 ## Core architecture

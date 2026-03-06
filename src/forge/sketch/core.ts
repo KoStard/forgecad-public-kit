@@ -1,23 +1,33 @@
 import type { CrossSection } from 'manifold-3d';
 import { Shape } from '../kernel';
+import type { BrepProfilePlan } from '../brepPlan';
+import { cloneBrepProfilePlan } from '../brepPlan';
 
 type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
+
+const _sketchBrepProfilePlans = new WeakMap<Sketch, BrepProfilePlan | null>();
+
+function setSketchBrepProfilePlanInternal(sketch: Sketch, plan: BrepProfilePlan | null): Sketch {
+  _sketchBrepProfilePlans.set(sketch, cloneBrepProfilePlan(plan));
+  return sketch;
+}
 
 export class Sketch {
   public colorHex: string | undefined;
 
   constructor(public readonly cross: CrossSection, color?: string) {
     this.colorHex = color;
+    setSketchBrepProfilePlanInternal(this, null);
   }
 
   /** Set the color of this sketch (hex string, e.g. "#ff0000") */
   color(value: string | undefined): Sketch {
-    return new Sketch(this.cross, value);
+    return setSketchBrepProfilePlanInternal(new Sketch(this.cross, value), getSketchBrepProfilePlan(this));
   }
 
   /** Return a new Sketch wrapper for explicit duplication in scripts. */
   clone(): Sketch {
-    return new Sketch(this.cross, this.colorHex);
+    return setSketchBrepProfilePlanInternal(new Sketch(this.cross, this.colorHex), getSketchBrepProfilePlan(this));
   }
 
   /** Alias for clone() */
@@ -58,3 +68,11 @@ export class Sketch {
 }
 
 export type { Anchor };
+
+export function getSketchBrepProfilePlan(sketch: Sketch): BrepProfilePlan | null {
+  return cloneBrepProfilePlan(_sketchBrepProfilePlans.get(sketch) ?? null);
+}
+
+export function setSketchBrepProfilePlan(sketch: Sketch, plan: BrepProfilePlan | null): Sketch {
+  return setSketchBrepProfilePlanInternal(sketch, plan);
+}

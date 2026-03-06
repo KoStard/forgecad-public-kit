@@ -1,13 +1,19 @@
-import { Sketch } from './core';
+import { Sketch, setSketchBrepProfilePlan } from './core';
 import { getWasm } from '../kernel';
 import type { Point2D } from './entities';
 
 export function rect(width: number, height: number, center = false): Sketch {
-  return new Sketch(getWasm().CrossSection.square([width, height], center));
+  return setSketchBrepProfilePlan(
+    new Sketch(getWasm().CrossSection.square([width, height], center)),
+    { kind: 'rect', width, height, center, transforms: [] },
+  );
 }
 
 export function circle2d(radius: number, segments?: number): Sketch {
-  return new Sketch(getWasm().CrossSection.circle(radius, segments ?? 0));
+  return setSketchBrepProfilePlan(
+    new Sketch(getWasm().CrossSection.circle(radius, segments ?? 0)),
+    { kind: 'circle', radius, transforms: [] },
+  );
 }
 
 export function roundedRect(width: number, height: number, radius: number, center = false): Sketch {

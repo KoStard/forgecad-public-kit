@@ -81,7 +81,7 @@ This keeps scripts stable while internals evolve.
 
 Do not port everything to BREP.
 
-Use a BREP backend only for features where it pays for itself:
+Use a BREP backend only for features where it pays for itself. The current lowest-friction path is a Python OCCT backend through CadQuery/OCP, not a full FreeCAD app dependency and not an in-browser OCCT port on day one.
 
 - shell
 - exact fillet/chamfer

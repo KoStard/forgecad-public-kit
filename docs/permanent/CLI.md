@@ -49,6 +49,36 @@ Runs a `.sketch.js` script in Node.js using the real forge engine and outputs SV
 
 **How it works:** Initializes the Manifold WASM kernel, runs the script through `runScript()`, extracts the Sketch result, converts polygons to SVG paths.
 
+### STEP / BREP Export (exact subset, Python + CadQuery)
+
+```bash
+python3 -m venv .venv-brep
+./.venv-brep/bin/pip install -r requirements-brep.txt
+
+npm run step -- examples/api/brep-exportable.forge.js
+npm run brep -- examples/api/brep-exportable.forge.js
+
+# Optional overrides:
+npm run step -- --output out/demo.step examples/api/brep-exportable.forge.js
+npm run step -- --python /path/to/python examples/api/brep-exportable.forge.js
+```
+
+This exporter is intentionally exact-subset only. It does **not** try to convert arbitrary triangle meshes back into fake BREP. Instead, Forge records an exact export plan only for operations that can be replayed robustly in OpenCascade via CadQuery.
+
+Currently supported:
+- `box`, `cylinder`, `sphere`
+- `rect(...).extrude(...)`, `circle2d(...).extrude(...)`
+- `rect/circle` profile `revolve(...)`
+- `translate(...)`, `rotate(...)`
+- `union(...)`, `difference(...)`, `intersection(...)`
+
+Current non-goals:
+- `loft`, `sweep`, `levelSet`, `warp`, `smoothOut`, `refine`
+- arbitrary sketch booleans / offsets / mirrors / scales
+- arbitrary matrix transforms
+
+If any returned object falls outside the exact subset, the CLI fails with a reason instead of silently exporting degraded geometry.
+
 ### PNG Render (requires Chrome)
 
 ```bash
