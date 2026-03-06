@@ -67,7 +67,17 @@ This exporter is intentionally exact-subset only. It does **not** try to convert
 
 The maintained feature matrix lives in [`docs/permanent/API/brep-export.md`](API/brep-export.md).
 
-If any returned object falls outside the exact subset, the CLI fails with a reason instead of silently exporting degraded geometry.
+If any returned solid object falls outside the exact subset, the CLI fails with a reason instead of silently exporting degraded geometry. When a scene mixes solids and 2D sketches, the exact solids export and the sketch-only objects are skipped with a warning.
+
+For coverage runs across many examples, use the `uv` matrix scripts:
+
+```bash
+uv run scripts/brep/matrix.py --format step examples
+uv run scripts/brep/matrix.py --format brep examples
+uv run scripts/brep/rerun_failures.py tmp/brep-matrix-step-20260306T120000Z.json
+```
+
+These scripts use the repo-local `.venv-brep/.venv/bin/python` by default, run exports through a bounded parallel worker pool, and write JSON reports under `tmp/`.
 
 ### PNG Render (requires Chrome)
 
