@@ -1556,6 +1556,31 @@ const bracket2 = importPart("bracket.forge.js", { "Thickness": 8 })
 return union(bracket, bracket2);
 ```
 
+Imported parts can also carry named placement references:
+
+```javascript
+// widget.forge.js
+return union(base, post).withReferences({
+  points: {
+    mount: [0, -16, -4],
+  },
+  objects: {
+    post,
+  },
+});
+```
+
+```javascript
+// assembly.forge.js
+const widget = importPart("widget.forge.js")
+  .placeReference("mount", [120, 40, 0]);
+
+const cap = box(18, 18, 8, true)
+  .attachTo(widget, "objects.post.top", "bottom");
+
+return [widget, cap];
+```
+
 ### Import Rules
 - Circular imports are detected and throw an error
 - Imported files can be instantiated multiple times
@@ -1563,8 +1588,78 @@ return union(bracket, bracket2);
 - Params supplied through `paramOverrides` are treated as fixed arguments for that import call
 - Relative imports (`./` / `../`) are resolved from the current file path
 - `importPart()` accepts imported `Shape` or `TrackedShape` results and always returns a chainable `Shape`
+- Source files can attach placement references with `.withReferences({ points, edges, surfaces, objects })`
+- Imported tracked solids keep their named faces/edges as `surfaces.<faceName>` and `edges.<edgeName>` references
 - SVG import supports deterministic region filtering (`regionSelection`, `maxRegions`, area thresholds)
 - The returned `Shape` or `Sketch` is fully chainable — use `.translate()`, `.rotate()`, `.subtract()`, etc.
+
+### Placement References
+
+### `.withReferences({ points?, edges?, surfaces?, objects? })`
+Attach named placement references to a `Shape` or `TrackedShape`. These references survive normal transforms and `importPart()`.
+
+**Reference kinds:**
+- `points`: exact 3D coordinates
+- `edges`: `{ start, end }` segments; default reference point is the midpoint
+- `surfaces`: `{ center, normal }`; default reference point is the center
+- `objects`: bounding boxes derived from another shape/group or explicit `{ min, max }`
+
+```javascript
+const part = union(base, post).withReferences({
+  points: {
+    mount: [0, -16, -4],
+  },
+  edges: {
+    postAxis: { start: [12, 0, 4], end: [12, 0, 30] },
+  },
+  surfaces: {
+    mountingFace: { center: [0, -16, 0], normal: [0, -1, 0] },
+  },
+  objects: {
+    base,
+    post,
+  },
+});
+```
+
+### `.referenceNames(kind?)`
+Lists named placement references on a shape.
+
+```javascript
+part.referenceNames();          // ['edges.postAxis', 'objects.base', 'objects.post', 'points.mount', ...]
+part.referenceNames('points');  // ['mount']
+```
+
+### `.referencePoint(ref)`
+Resolve a placement reference to a world-space point.
+
+Supported forms:
+- `mount` or `points.mount`
+- `edges.postAxis`
+- `edges.postAxis.start`
+- `surfaces.mountingFace`
+- `objects.post.top`
+
+```javascript
+const p = part.referencePoint("objects.post.top");
+```
+
+### `.placeReference(ref, [x, y, z], offset?)`
+Translate a shape so the given placement reference lands on a target coordinate.
+
+```javascript
+const placed = importPart("widget.forge.js")
+  .placeReference("mount", [120, 40, 0]);
+```
+
+### `attachTo()` with named references
+
+`attachTo()` still accepts the built-in 3D anchors, but it can now also consume named placement references:
+
+```javascript
+const cap = box(18, 18, 8, true)
+  .attachTo(widget, "objects.post.top", "bottom");
+```
 
 ### Typical Project Structure
 ```

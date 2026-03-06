@@ -19,6 +19,7 @@
     "param-check": "npx tsx cli/param-check.ts",
     "check:transforms": "npx tsx cli/check-transforms.ts",
     "check:brep": "npx tsx cli/check-brep-export.ts",
+    "check:placement": "npx tsx cli/check-placement-references.ts",
     "check:dimensions": "npx tsx cli/check-dimensions.ts",
     "debug:dimensions": "npx tsx cli/debug-dimensions.ts"
   },

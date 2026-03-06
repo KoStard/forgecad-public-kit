@@ -78,6 +78,34 @@ const pipe = cylinder(pipeLen, 5)
   .translate(40, (bb1.max[1] + bb2.min[1]) / 2, bb1.min[2] + 15);
 ```
 
+### 5. `placeReference()` / named import references — For reusable multi-file parts
+
+When a part will be imported elsewhere, define semantic placement references once in the source file:
+
+```javascript
+// widget.forge.js
+return union(base, post).withReferences({
+  points: {
+    mount: [0, -16, -4],
+  },
+  objects: {
+    post,
+  },
+});
+```
+
+Then consume them in the importing file:
+
+```javascript
+const widget = importPart("widget.forge.js")
+  .placeReference("mount", [120, 40, 0]);
+
+const cap = box(18, 18, 8, true)
+  .attachTo(widget, "objects.post.top", "bottom");
+```
+
+Use this when manual coordinate math starts to feel like assembly bookkeeping.
+
 ## Common Mistakes
 
 ### ❌ Manual center-offset math
