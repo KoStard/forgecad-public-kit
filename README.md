@@ -217,6 +217,8 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 - `examples/api/brep-exportable.forge.js`: exact-exportable STEP/BREP subset demo
 - `examples/api/geometry-info.forge.js`: inspect backend/provenance info for solids
 
+BREP export support is intentionally tracked as a living parity table in [docs/permanent/API/brep-export.md](docs/permanent/API/brep-export.md).
+
 ## Core architecture
 
 ```text

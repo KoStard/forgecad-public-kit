@@ -2145,6 +2145,8 @@ shape.geometryInfo()     // { backend, representation, fidelity, topology, sourc
 
 `geometryInfo()` is the current contract boundary for future hybrid kernels. Today most results are `manifold` + `mesh-solid`; `loft()` / `sweep()` report `sampled`, and tracked extrusions report `topology: 'synthetic'`. A future OCCT/BREP backend can change these values without forcing a language rewrite.
 
+For the maintained exact STEP/BREP support matrix, see [brep-export.md](brep-export.md).
+
 ### 2D Sketch Queries
 ```javascript
 sketch.area()         // Area in mm²

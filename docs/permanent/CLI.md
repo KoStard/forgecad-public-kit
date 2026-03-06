@@ -52,30 +52,20 @@ Runs a `.sketch.js` script in Node.js using the real forge engine and outputs SV
 ### STEP / BREP Export (exact subset, Python + CadQuery)
 
 ```bash
-python3 -m venv .venv-brep
-./.venv-brep/bin/pip install -r requirements-brep.txt
-
 npm run step -- examples/api/brep-exportable.forge.js
 npm run brep -- examples/api/brep-exportable.forge.js
 
 # Optional overrides:
 npm run step -- --output out/demo.step examples/api/brep-exportable.forge.js
-npm run step -- --python /path/to/python examples/api/brep-exportable.forge.js
+npm run step -- --python 3.11 examples/api/brep-exportable.forge.js
+npm run step -- --uv /custom/path/to/uv examples/api/brep-exportable.forge.js
 ```
+
+This exporter is `uv`-first. `cli/forge-brep-export.py` carries inline dependency metadata, so `uv run` provisions CadQuery automatically for the exporter environment.
 
 This exporter is intentionally exact-subset only. It does **not** try to convert arbitrary triangle meshes back into fake BREP. Instead, Forge records an exact export plan only for operations that can be replayed robustly in OpenCascade via CadQuery.
 
-Currently supported:
-- `box`, `cylinder`, `sphere`
-- `rect(...).extrude(...)`, `circle2d(...).extrude(...)`
-- `rect/circle` profile `revolve(...)`
-- `translate(...)`, `rotate(...)`
-- `union(...)`, `difference(...)`, `intersection(...)`
-
-Current non-goals:
-- `loft`, `sweep`, `levelSet`, `warp`, `smoothOut`, `refine`
-- arbitrary sketch booleans / offsets / mirrors / scales
-- arbitrary matrix transforms
+The maintained feature matrix lives in [`docs/permanent/API/brep-export.md`](API/brep-export.md).
 
 If any returned object falls outside the exact subset, the CLI fails with a reason instead of silently exporting degraded geometry.
 

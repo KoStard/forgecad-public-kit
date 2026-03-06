@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs';
-import { basename, extname, join, resolve } from 'path';
+import { extname, join, resolve } from 'path';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
 import { init, runScript } from '../src/forge/headless';
@@ -13,6 +13,7 @@ function parseArgs(argv: string[]) {
   let format: BrepFormat = 'step';
   let outputPath: string | undefined;
   let pythonPath: string | undefined;
+  let uvPath: string | undefined;
   let scriptPath: string | undefined;
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -38,6 +39,12 @@ function parseArgs(argv: string[]) {
       i += 1;
       continue;
     }
+    if (arg === '--uv') {
+      uvPath = argv[i + 1];
+      if (!uvPath) throw new Error('--uv requires a path');
+      i += 1;
+      continue;
+    }
     if (arg.startsWith('--')) {
       throw new Error(`Unknown flag: ${arg}`);
     }
@@ -46,10 +53,10 @@ function parseArgs(argv: string[]) {
   }
 
   if (!scriptPath) {
-    throw new Error('Usage: npx tsx cli/forge-brep.ts [--format step|brep] [--output path] [--python path] <script.forge.js>');
+    throw new Error('Usage: npx tsx cli/forge-brep.ts [--format step|brep] [--output path] [--python path] [--uv path] <script.forge.js>');
   }
 
-  return { format, outputPath, pythonPath, scriptPath };
+  return { format, outputPath, pythonPath, uvPath, scriptPath };
 }
 
 function defaultOutputPath(scriptPath: string, format: BrepFormat): string {
@@ -57,17 +64,17 @@ function defaultOutputPath(scriptPath: string, format: BrepFormat): string {
   return abs.slice(0, abs.length - extname(abs).length) + `.${format}`;
 }
 
-function resolvePythonExecutable(requested?: string): string {
+function resolveUvExecutable(requested?: string): string {
   if (requested) return requested;
-  if (process.env.FORGECAD_BREP_PYTHON) return process.env.FORGECAD_BREP_PYTHON;
+  if (process.env.FORGECAD_BREP_UV) return process.env.FORGECAD_BREP_UV;
 
-  const localVenv = resolve('.venv-brep/bin/python');
-  if (existsSync(localVenv)) return localVenv;
-  return 'python3';
+  const localUv = resolve('.venv/bin/uv');
+  if (existsSync(localUv)) return localUv;
+  return 'uv';
 }
 
 async function main() {
-  const { format, outputPath, pythonPath, scriptPath } = parseArgs(process.argv.slice(2));
+  const { format, outputPath, pythonPath, uvPath, scriptPath } = parseArgs(process.argv.slice(2));
   const code = readFileSync(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
@@ -97,20 +104,25 @@ async function main() {
   const tempDir = mkdtempSync(join(tmpdir(), 'forgecad-brep-'));
   const manifestPath = join(tempDir, 'manifest.json');
   const finalOutput = resolve(outputPath ?? defaultOutputPath(scriptPath, format));
-  const python = resolvePythonExecutable(pythonPath);
+  const uv = resolveUvExecutable(uvPath);
   writeFileSync(manifestPath, JSON.stringify({ format, objects: manifest.objects }, null, 2));
 
   const exporterScript = resolve('cli/forge-brep-export.py');
+  const uvArgs = ['run'];
+  if (pythonPath) {
+    uvArgs.push('--python', pythonPath);
+  }
+  uvArgs.push(exporterScript, '--input', manifestPath, '--output', finalOutput, '--format', format);
   const proc = spawnSync(
-    python,
-    [exporterScript, '--input', manifestPath, '--output', finalOutput, '--format', format],
+    uv,
+    uvArgs,
     { stdio: 'inherit' },
   );
 
   rmSync(tempDir, { recursive: true, force: true });
 
   if (proc.error) {
-    console.error(`Failed to launch Python exporter with "${python}": ${proc.error.message}`);
+    console.error(`Failed to launch uv exporter with "${uv}": ${proc.error.message}`);
     process.exit(1);
   }
   if ((proc.status ?? 1) !== 0) {
