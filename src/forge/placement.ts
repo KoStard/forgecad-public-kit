@@ -1,6 +1,6 @@
 import type { Mat4, Vec3 } from './transform';
 import { Transform } from './transform';
-import { type Anchor3D, isAnchor3D, resolveAnchor3D } from './anchors';
+import { type Anchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
 
 export type PlacementReferenceKind = 'points' | 'edges' | 'surfaces' | 'objects';
 
@@ -293,13 +293,14 @@ function resolvePointFromKind(
       const objectRef = refs.objects[name];
       if (!objectRef) return null;
       const anchor = selector ?? 'center';
-      if (!isAnchor3D(anchor)) {
+      const normalized = normalizeAnchor3D(anchor);
+      if (!normalized) {
         placementRefSelectorError(
           originalRef,
           `supports only Anchor3D selectors (${['center', 'top', 'bottom', 'left', 'right', 'front', 'back'].join(', ')} ...)`,
         );
       }
-      return resolveAnchor3D(objectRef.min, objectRef.max, anchor);
+      return resolveAnchor3D(objectRef.min, objectRef.max, normalized);
     }
     default:
       return null;

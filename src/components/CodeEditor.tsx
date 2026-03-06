@@ -182,9 +182,9 @@ declare class Shape {
 
   // 3D Anchor positioning
   /** Position this shape relative to another using built-in anchors or named placement references */
-  attachTo(target: Shape, targetAnchor: AnchorTarget3D, selfAnchor?: AnchorTarget3D, offset?: [number, number, number]): Shape;
+  attachTo(target: Shape | TrackedShape, targetAnchor: AnchorTarget3D, selfAnchor?: AnchorTarget3D, offset?: [number, number, number]): Shape;
   /** Place on a face of a parent shape. u/v = position within face, protrude = outward distance */
-  onFace(parent: Shape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number }): Shape;
+  onFace(parent: Shape | TrackedShape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number }): Shape;
 
   // Query
   volume(): number;

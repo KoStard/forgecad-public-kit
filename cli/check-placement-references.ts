@@ -97,10 +97,32 @@ return body;
   expectVec(imported.referencePoint('objects.body.right'), [30, 5, 0], 'import.objectAnchor');
 }
 
+function checkShapeTrackedShapePlacementInterop(): void {
+  const files: Record<string, string> = {
+    'main.forge.js': `
+const target = roundedRect(20, 10, 2, true).extrude(6, { center: true });
+const source = difference(
+  box(4, 4, 4, true),
+  cylinder(4, 1, undefined, undefined, true),
+);
+return source.attachTo(target, 'left-front', 'front-left');
+`,
+  };
+
+  const result = runScript(files['main.forge.js'], 'main.forge.js', files);
+  expect(!result.error, `shape->tracked attachTo failed: ${result.error}`);
+  expect(result.shape != null, 'interop result should be a shape');
+
+  const bb = result.shape!.boundingBox();
+  expectVec(bb.min as [number, number, number], [-10, -5, -2], 'interop.attachTo.min');
+  expectVec(bb.max as [number, number, number], [-6, -1, 2], 'interop.attachTo.max');
+}
+
 async function main() {
   await initKernel();
   checkTransformAndPlacementHelpers();
   checkImportRuntimePropagation();
+  checkShapeTrackedShapePlacementInterop();
   console.log('✓ Placement reference invariants passed');
 }
 

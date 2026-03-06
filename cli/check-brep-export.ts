@@ -200,6 +200,19 @@ return [{ name: 'Door', shape: door }];
   assert.equal(rotateAround.degrees, 35);
 }
 
+function checkMirrorTransformPlan(): void {
+  const plan = runExactManifest(`
+const bracket = box(24, 10, 4, true).mirror([1, 0, 0]);
+return [{ name: 'Bracket', shape: bracket }];
+`);
+
+  const mirror = collectShapeTransforms(plan).find((step) => step.kind === 'mirror');
+  assert(mirror, 'Expected mirror() to preserve an exact mirror transform step');
+  assert.equal(mirror.normalX, 1);
+  assert.equal(mirror.normalY, 0);
+  assert.equal(mirror.normalZ, 0);
+}
+
 function checkPointAlongOnPrimitiveBoolean(): void {
   const plan = runExactManifest(`
 const pipe = cylinder(60, 5).pointAlong([0, 1, 0]);
@@ -223,6 +236,7 @@ async function main() {
   checkPolygonProfileTransforms();
   checkPolygonBooleanHoleChain();
   checkRotateAroundTransformPlan();
+  checkMirrorTransformPlan();
   checkPointAlongOnPrimitiveBoolean();
   console.log('✓ BREP export invariants passed');
 }

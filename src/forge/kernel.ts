@@ -9,7 +9,7 @@ import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import { Transform, type Mat4 } from './transform';
 import { scaleRefineSteps, scaleRefineToLength, scaleRefineToTolerance } from './quality';
 import type { BrepShapePlan } from './brepPlan';
-import { type Anchor3D, isAnchor3D, resolveAnchor3D } from './anchors';
+import { type Anchor3D, isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
 import {
   applyPlacementReferenceInput,
   clonePlacementReferences,
@@ -31,7 +31,7 @@ import {
 } from './brepPlan';
 
 export type { Anchor3D } from './anchors';
-export { isAnchor3D, resolveAnchor3D } from './anchors';
+export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
 export type {
   PlacementReferenceInput,
   PlacementReferenceKind,
@@ -368,6 +368,11 @@ function withBaseDimensions(base: Shape, out: Shape): Shape {
   return setShapeBrepPlanInternal(out, getShapeBrepPlanInternal(base));
 }
 
+type ShapeAnchorTarget =
+  | Shape
+  | { referencePoint(ref: string): [number, number, number] }
+  | { _bbox(): { min: number[]; max: number[] } };
+
 /**
  * Bind dimensions to a shape instance. Used for importPart-scoped dimensions.
  * By default IDs are regenerated so multiple instances never collide.
@@ -545,7 +550,12 @@ export class Shape {
       this,
       new Shape(this.manifold.mirror(normal), this.colorHex),
       mirrorMatrix(normal),
-    ), null);
+    ), appendBrepShapeTransform(getShapeBrepPlanInternal(this), {
+      kind: 'mirror',
+      normalX: normal[0],
+      normalY: normal[1],
+      normalZ: normal[2],
+    }));
   }
 
   /**
@@ -767,7 +777,7 @@ export class Shape {
 
   /** Position this shape relative to another using named 3D anchor points */
   attachTo(
-    target: Shape | { _bbox(): { min: number[]; max: number[] } },
+    target: ShapeAnchorTarget,
     targetAnchor: PlacementAnchorLike,
     selfAnchor: PlacementAnchorLike = 'center',
     offset?: [number, number, number],
@@ -791,7 +801,7 @@ export class Shape {
    * - `protrude` = how far the child sticks out (positive = outward from face)
    */
   onFace(
-    parent: Shape | { _bbox(): { min: number[]; max: number[] } },
+    parent: ShapeAnchorTarget,
     face: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom',
     opts: { u?: number; v?: number; protrude?: number } = {},
   ): Shape {
@@ -833,24 +843,30 @@ function resolveAnchorLikePoint(shape: Shape, ref: PlacementAnchorLike): [number
   if (isAnchor3D(ref)) return getAnchorPoint3D(shape, ref);
   const point = resolvePlacementReferencePoint(getShapePlacementRefsInternal(shape), ref);
   if (point) return point;
+  const normalized = normalizeAnchor3D(ref);
+  if (normalized) return getAnchorPoint3D(shape, normalized);
   throw new Error(
     `Unknown placement reference "${ref}". Available: ${placementReferenceNames(getShapePlacementRefsInternal(shape)).join(', ') || 'none'}`,
   );
 }
 
 function resolveTargetAnchorLikePoint(
-  target: Shape | { _bbox(): { min: number[]; max: number[] } },
+  target: ShapeAnchorTarget,
   ref: PlacementAnchorLike,
 ): [number, number, number] {
   if (target instanceof Shape) return resolveAnchorLikePoint(target, ref);
-  if (typeof ref === 'string' && !isAnchor3D(ref)) {
+  if ('referencePoint' in target && typeof target.referencePoint === 'function') {
+    return target.referencePoint(ref);
+  }
+  const normalized = normalizeAnchor3D(ref);
+  if (!normalized) {
     throw new Error(`ShapeGroup targets only support built-in anchors, got "${ref}"`);
   }
   const bb = target._bbox();
   return resolveAnchor3D(
     bb.min as [number, number, number],
     bb.max as [number, number, number],
-    ref as Anchor3D,
+    normalized,
   );
 }
 

@@ -48,6 +48,12 @@ export type BrepShapeTransformStep =
       pivotX: number;
       pivotY: number;
       pivotZ: number;
+    }
+  | {
+      kind: 'mirror';
+      normalX: number;
+      normalY: number;
+      normalZ: number;
     };
 
 export type BrepShapePlan =
@@ -124,6 +130,13 @@ function cloneShapeTransform(step: BrepShapeTransformStep): BrepShapeTransformSt
         pivotX: step.pivotX,
         pivotY: step.pivotY,
         pivotZ: step.pivotZ,
+      };
+    case 'mirror':
+      return {
+        kind: 'mirror',
+        normalX: step.normalX,
+        normalY: step.normalY,
+        normalZ: step.normalZ,
       };
   }
 }

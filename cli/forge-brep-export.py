@@ -229,6 +229,9 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
                 )
                 result = result.rotate(pivot, axis_end, step["degrees"])
                 continue
+            if step["kind"] == "mirror":
+                result = result.mirror((step["normalX"], step["normalY"], step["normalZ"]))
+                continue
             raise ValueError(f"Unsupported transform step: {step['kind']}")
         return result
     raise ValueError(f"Unsupported plan kind: {kind}")
