@@ -212,6 +212,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 - `examples/api/dimensioned-bracket.forge.js`: dimension annotations
 - `examples/api/bill-of-materials.forge.js`: script-authored BOM aggregation
 - `examples/api/exploded-view.forge.js`: exploded layouts + cut-plane visualization
+- `examples/api/geometry-info.forge.js`: inspect backend/provenance info for solids
 
 ## Core architecture
 
