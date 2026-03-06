@@ -2,7 +2,7 @@
 
 ## What Changed This Round
 
-Three exact-export expansions landed:
+Four exact-export expansions landed:
 
 1. Exact 2D rounded/tapered profile replay
    - `roundedRect()` now records an exact profile plan.
@@ -19,6 +19,12 @@ Three exact-export expansions landed:
    - Polygon-backed flows such as `ngon()`, sampled `ellipse()`, `star()`, `path().close()`, and SVG fill loops now stay exact when they only use replayable booleans/transforms.
    - Tiny cleanup `simplify(...)` calls were removed from profile-library helpers that were otherwise already exact-exportable.
    - SVG import no longer auto-runs final sketch simplify by default, which preserves exact fill-profile provenance unless callers explicitly opt into simplification.
+
+4. Exact mirror replay + placement interop cleanup
+   - `mirror(...)` now records an exact transform step instead of dropping the BREP plan.
+   - `Shape.attachTo(...)` / `Shape.onFace(...)` now accept `TrackedShape` targets the same way tracked placement already did.
+   - Built-in anchors accept alias orderings such as `left-front` as well as `front-left`.
+   - The USB-C benchmark scene that previously failed with `target._bbox is not a function` now exports cleanly.
 
 ## What I Learned
 
@@ -59,6 +65,10 @@ Notes:
 
 - The `48 / 27` result is from the current March 6, 2026 tree with `75` examples, so it is not a perfectly apples-to-apples comparison with the earlier `73`-example snapshot.
 - Several current failures are now clearly runtime/script issues (`target._bbox is not a function`, duplicate identifier errors, etc.), not exporter regressions.
+- After the mirror + placement follow-up, targeted verification confirmed clean export for:
+  - `examples/api/patterns.forge.js`
+  - `examples/api/coordinate-system.forge.js`
+  - `/Users/kostard/Projects/CAD/ForgeCADBenchmark/results/usb-c-openai-gpt-5.4_20260305_235124/workspace/main.forge.js`
 
 Examples that flipped from failing to passing after the transform-plan work:
 
@@ -91,13 +101,11 @@ Examples confirmed passing after the polygon/profile follow-up:
 Representative examples:
 
 - `examples/api/assembly-gear-coupling.forge.js`
-- `examples/api/patterns.forge.js`
 - `examples/api/runtime-joints-view.forge.js`
 - `examples/robot_hand_2.forge.js`
 
 Likely causes:
 
-- `mirror(...)` still drops exact plan
 - `Shape.transform(matrix)` still drops exact plan even for rigid transforms
 
 ### 2. Mixed sketch + solid export-policy gaps
@@ -164,15 +172,11 @@ Ranked by likely payoff per unit of work:
    - High leverage for assembly-driven examples.
    - Would likely help `assembly-gear-coupling`, `runtime-joints-view`, and parts of `robot_hand_2`.
 
-2. Exact `mirror(...)` replay for axis-aligned and general plane normals
-   - Smaller surface area than polygon replay.
-   - Should clean up `examples/api/patterns.forge.js` immediately and reduce a few robot-hand style failures.
-
-3. Better handling of mixed sketch + solid scenes
+2. Better handling of mixed sketch + solid scenes
    - Several examples fail only because they intentionally return sketches next to exportable solids.
    - This is more of a product/export-policy decision than a kernel limitation.
 
-4. Exact 2D `offset()` / stroke replay
+3. Exact 2D `offset()` / stroke replay
    - This is the remaining real profile-export gap after polygon replay landed.
    - It should help stroke-heavy SVG/path examples and hanger/profile variants.
 
@@ -181,7 +185,7 @@ Ranked by likely payoff per unit of work:
 If continuing exact STEP coverage work, the next best engineering target is:
 
 1. Safe rigid `Shape.transform(matrix)` decomposition
-2. Then exact `mirror(...)`
-3. Then exact 2D `offset()` / stroke replay
+2. Then exact 2D `offset()` / stroke replay
+3. Then better mixed sketch + solid export policy
 
 That sequence should buy more example coverage than chasing sampled `loft` / `sweep` / `levelSet` paths.

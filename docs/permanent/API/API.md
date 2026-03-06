@@ -842,6 +842,8 @@ Available on both `Shape` and `TrackedShape`.
 - Edge midpoints (2 axes pinned): `'front-left'`, `'front-right'`, `'back-left'`, `'back-right'`, `'top-front'`, `'top-back'`, `'top-left'`, `'top-right'`, `'bottom-front'`, `'bottom-back'`, `'bottom-left'`, `'bottom-right'`
 - True corners (3 axes pinned): `'top-front-left'`, `'top-front-right'`, `'top-back-left'`, `'top-back-right'`, `'bottom-front-left'`, `'bottom-front-right'`, `'bottom-back-left'`, `'bottom-back-right'`
 
+Anchor word order is flexible for built-ins: `'front-left'` and `'left-front'` are treated the same.
+
 **Returns:** Same type as caller (Shape or TrackedShape)
 
 ```javascript
