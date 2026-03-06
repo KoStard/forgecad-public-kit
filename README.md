@@ -2,9 +2,9 @@
 
 ![Robot Hand V2](<https://raw.githubusercontent.com/KoStard/ForgeCAD-assets/main/Robot%20Hand%20V2.gif>)
 
-Code-first parametric CAD for the browser and CLI.
+Code-first parametric CAD for JavaScript/TypeScript, in the browser and CLI.
 
-ForgeCAD combines a JavaScript/TypeScript modeling API, live parameters, constraints, and assembly tooling on top of the [Manifold](https://github.com/elalish/manifold) WASM geometry kernel.
+ForgeCAD is a multi-backend CAD system with a JavaScript/TypeScript modeling API, live parameters, constraints, assemblies, reports, and exact STEP/BREP export. Interactive browser modeling currently uses [Manifold](https://github.com/elalish/manifold) for fast geometry work, while exact export runs through CadQuery/OpenCascade and the public modeling layer stays backend-aware rather than tied to one kernel.
 
 TypeScript is the file format. The browser is the CAD system.
 
@@ -31,6 +31,7 @@ Most geometry kernels are powerful but low-level. ForgeCAD adds the missing CAD 
 - Multi-file composition with `importPart(...)` and `importSketch(...)`
 - Assembly + mechanism modeling with joints, sweeps, and collision checks
 - Script-authored BOM + dimension annotations for report export
+- Exact STEP/BREP export for the maintained replayable subset
 
 The result is a CAD workflow that is version-control friendly, AI-editable, and still practical for real mechanical modeling.
 
@@ -231,11 +232,13 @@ ForgeCAD modeling layer
   - assembly + reporting helpers
         |
         v
-Manifold WASM geometry kernel
-  - booleans, extrusion, mesh operations
+Geometry backends
+  - Manifold WASM for fast browser modeling and mesh-domain operations
+  - CadQuery/OpenCascade replay for exact STEP/BREP export
+  - backend/provenance contract for future hybrid kernels
         |
         +--> Browser app (Monaco + Three.js)
-        +--> CLI tools (headless runtime)
+        +--> CLI tools (headless runtime and exact export)
 ```
 
 ## Project status
