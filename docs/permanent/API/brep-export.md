@@ -22,24 +22,27 @@ Update it whenever:
 | `sphere()` | Supported | Yes | Native OCCT solid replay |
 | `rect()` | Supported | Yes | As a profile for supported extrude/revolve flows |
 | `circle2d()` | Supported | Yes | As a profile for supported extrude/revolve flows |
+| `roundedRect()` | Supported | Yes | Replayed as an exact rounded wire/profile |
 | `rect(...).translate()` | Supported | Yes | Recorded as profile transforms |
 | `circle2d(...).translate()` | Supported | Yes | Recorded as profile transforms |
+| `roundedRect(...).translate()` | Supported | Yes | Recorded as profile transforms |
 | `rect(...).rotate()` | Supported | Yes | Recorded as profile transforms |
 | `circle2d(...).rotate()` | Supported | Yes | Recorded as profile transforms |
-| `rect(...).extrude(height)` | Supported | Yes | `twist/divisions/scaleTop` must be absent |
-| `circle2d(...).extrude(height)` | Supported | Yes | `twist/divisions/scaleTop` must be absent |
-| `rect/circle.revolve(degrees)` | Supported | Yes | Replayed around Forge's revolve axis convention |
+| `roundedRect(...).rotate()` | Supported | Yes | Recorded as profile transforms |
+| `rect/circle/roundedRect.scale(...)` | Supported | Yes | Recorded as exact affine profile transforms |
+| Sketch booleans (`union2d`, `difference2d`, `intersection2d`) | Supported | Yes | Only when every child profile is exact-exportable |
+| `rect/circle/roundedRect.extrude(height)` | Supported | Yes | `twist` / `divisions` must be absent |
+| `rect/circle/roundedRect.extrude(height, { scaleTop })` | Supported | Yes | Replayed as exact lofts; sketch booleans are decomposed into 3D booleans when needed |
+| `rect/circle/roundedRect.revolve(degrees)` | Supported | Yes | Replayed around Forge's revolve axis convention |
 | `shape.translate()` | Supported | Yes | Recorded as exact solid transform |
 | `shape.rotate(x, y, z)` | Supported | Yes | Euler replay only |
 | `union()` | Supported | Yes | Only when every operand is exact-exportable |
 | `difference()` | Supported | Yes | Only when every operand is exact-exportable |
 | `intersection()` | Supported | Yes | Only when every operand is exact-exportable |
 | Returned multi-object scene | Supported | Yes | Exported as a STEP/BREP compound |
-| `roundedRect()` | Unsupported | No | Needs exact rounded-profile replay |
 | `polygon()` / `ngon()` / `ellipse()` / `slot()` / `star()` | Unsupported | No | No exact 2D wire/profile replay yet |
-| Sketch booleans (`union2d`, `difference2d`, `intersection2d`) | Unsupported | No | Requires exact 2D region replay |
 | Sketch `offset()` | Unsupported | No | Requires exact 2D offset reconstruction |
-| Sketch `mirror()` / `scale()` / arbitrary `warp()` | Unsupported | No | Not recorded in export plan |
+| Sketch `mirror()` / arbitrary `warp()` | Unsupported | No | Not recorded in export plan |
 | `Shape.transform(matrix)` | Unsupported | No | Arbitrary affine replay not implemented |
 | `rotateAround(...)` / `pointAlong(...)` / `mirror(...)` | Unsupported | No | Needs exact transform-plan support |
 | `loft()` | Unsupported | No | Current Forge implementation is sampled/level-set |
@@ -55,7 +58,7 @@ Update it whenever:
 
 ## Planned Expansion Order
 
-1. Exact 2D profile replay for `roundedRect`, `polygon`, `ellipse`, and sketch booleans
+1. Exact 2D profile replay for `polygon`, direct `ellipse()`, `slot()`, and `star()`
 2. Exact transform replay for `rotateAround`, `mirror`, and matrix-safe subsets
 3. Exact OCCT-native operations where BREP matters most: `shell`, precise fillet/chamfer, sketch-on-face
 4. Optional STEP product structure and metadata export
