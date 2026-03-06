@@ -8,7 +8,7 @@
  * Arbitrary boolean results lose topology (mesh kernel limitation).
  */
 
-import { Shape, getAnchorPoint3D, resolveAnchor3D } from '../kernel';
+import { Shape, getAnchorPoint3D, resolveAnchor3D, type GeometryInfo } from '../kernel';
 import { Transform, type Mat4 } from '../transform';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
 
@@ -91,6 +91,16 @@ export class TrackedShape {
   /** Alias for clone() */
   duplicate(): TrackedShape {
     return this.clone();
+  }
+
+  /** Inspect backend/representation info, including tracked-topology status. */
+  geometryInfo(): GeometryInfo {
+    const info = this.shape.geometryInfo();
+    const hasTrackedTopology = this.topology.faces.size > 0 || this.topology.edges.size > 0;
+    return {
+      ...info,
+      topology: hasTrackedTopology ? 'synthetic' : info.topology,
+    };
   }
 
   // Delegate Shape methods, preserving topology with offset transforms

@@ -18,7 +18,15 @@ import { initKernel } from './kernel';
 
 // Re-export everything from the public API
 export { Shape, box, cylinder, sphere, union, difference, intersection, hull3d, levelSet, getWasm } from './kernel';
-export type { Anchor3D } from './kernel';
+export type {
+  Anchor3D,
+  GeometryBackend,
+  GeometryRepresentation,
+  GeometryFidelity,
+  GeometryTopology,
+  GeometrySource,
+  GeometryInfo,
+} from './kernel';
 export { Transform, composeChain } from './transform';
 export type { Mat4, Vec3, TransformInput } from './transform';
 export { intersectWithPlane, projectToPlane } from './section';

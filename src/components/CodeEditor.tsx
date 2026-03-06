@@ -101,6 +101,29 @@ declare function sweep(
   options?: { samples?: number; edgeLength?: number; boundsPadding?: number; up?: [number, number, number] }
 ): Shape;
 
+type GeometryBackend = 'manifold' | 'occt' | 'hybrid' | 'unknown';
+type GeometryRepresentation = 'mesh-solid' | 'brep-solid' | 'surface' | 'mixed';
+type GeometryFidelity = 'kernel-native' | 'sampled' | 'deformed' | 'mixed' | 'unknown';
+type GeometryTopology = 'none' | 'synthetic' | 'kernel';
+type GeometrySource =
+  | 'primitive'
+  | 'extrude'
+  | 'revolve'
+  | 'boolean'
+  | 'hull'
+  | 'level-set'
+  | 'loft'
+  | 'sweep'
+  | 'deform'
+  | 'unknown';
+type GeometryInfo = {
+  backend: GeometryBackend;
+  representation: GeometryRepresentation;
+  fidelity: GeometryFidelity;
+  topology: GeometryTopology;
+  sources: GeometrySource[];
+};
+
 declare class Shape {
   clone(): Shape;
   duplicate(): Shape;
@@ -156,6 +179,7 @@ declare class Shape {
   isEmpty(): boolean;
   numTri(): number;
   minGap(other: Shape, searchLength: number): number;
+  geometryInfo(): GeometryInfo;
 }
 
 declare class Sketch {
@@ -307,6 +331,7 @@ declare class TrackedShape {
   /** Place on a face of a parent shape. u/v = position within face, protrude = outward distance */
   onFace(parent: Shape | TrackedShape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number }): TrackedShape;
   color(hex: string): TrackedShape;
+  geometryInfo(): GeometryInfo;
   toShape(): Shape;
 }
 

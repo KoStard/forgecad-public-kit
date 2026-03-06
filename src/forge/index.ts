@@ -31,6 +31,14 @@ export type { PlaneSpec } from './headless';
 export type { ParamDef } from './headless';
 export type { Mat4, Vec3, TransformInput } from './headless';
 export type {
+  GeometryBackend,
+  GeometryRepresentation,
+  GeometryFidelity,
+  GeometryTopology,
+  GeometrySource,
+  GeometryInfo,
+} from './headless';
+export type {
   AssemblyPart,
   JointType,
   JointState,

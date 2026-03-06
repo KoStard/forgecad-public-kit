@@ -1,7 +1,7 @@
 import { Sketch } from './core';
 import { polygon } from './primitives';
 import { stroke } from './path';
-import { levelSet, type Shape } from '../kernel';
+import { levelSet, setShapeGeometryInfo, type Shape } from '../kernel';
 import {
   scaleLevelSetBoundsPadding,
   scaleLevelSetEdgeLength,
@@ -429,7 +429,7 @@ export function loft(
     return Math.min(crossField, zCap);
   };
 
-  return levelSet(
+  const shape = levelSet(
     ([x, y, z]) => sdfAt(x, y, z),
     {
       min: [minX - pad, minY - pad, zMin - pad],
@@ -437,6 +437,10 @@ export function loft(
     },
     edgeLength,
   );
+  return setShapeGeometryInfo(shape, {
+    fidelity: 'sampled',
+    sources: ['loft', ...shape.geometryInfo().sources],
+  });
 }
 
 interface SweepSegment {
@@ -545,7 +549,7 @@ export function sweep(
     return field;
   };
 
-  return levelSet(
+  const shape = levelSet(
     (p) => sweepSdf(p as Vec3),
     {
       min: [minX - pad, minY - pad, minZ - pad],
@@ -553,4 +557,8 @@ export function sweep(
     },
     edgeLength,
   );
+  return setShapeGeometryInfo(shape, {
+    fidelity: 'sampled',
+    sources: ['sweep', ...shape.geometryInfo().sources],
+  });
 }

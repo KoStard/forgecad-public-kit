@@ -177,10 +177,13 @@ async function main() {
   console.log(`✓ Objects: ${result.objects.length}`);
   for (const obj of result.objects) {
     const grpTag = obj.groupName ? ` [${obj.groupName}]` : '';
+    const geomTag = obj.geometryInfo
+      ? `  geom=${obj.geometryInfo.backend}/${obj.geometryInfo.representation}/${obj.geometryInfo.fidelity}/topology:${obj.geometryInfo.topology}/sources:${obj.geometryInfo.sources.join('+')}`
+      : '';
     if (obj.shape) {
       const bb = obj.shape.boundingBox();
       console.log(
-        `  ${obj.name}${grpTag}: vol=${obj.shape.volume().toFixed(1)}mm³  bbox=[${bb.min.map((v: number) => v.toFixed(1))}] → [${bb.max.map((v: number) => v.toFixed(1))}]`
+        `  ${obj.name}${grpTag}: vol=${obj.shape.volume().toFixed(1)}mm³  bbox=[${bb.min.map((v: number) => v.toFixed(1))}] → [${bb.max.map((v: number) => v.toFixed(1))}]${geomTag}`
       );
     }
     if (obj.sketch) {

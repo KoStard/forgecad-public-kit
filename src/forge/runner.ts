@@ -20,6 +20,7 @@ import {
   setShapeDimensions,
   getShapeDimensions,
   type ShapeDimension,
+  type GeometryInfo,
 } from './kernel';
 import type { Anchor3D } from './kernel';
 import { intersectWithPlane, projectToPlane } from './section';
@@ -114,6 +115,7 @@ export interface SceneObject {
   shape: Shape | null;
   sketch: Sketch | null;
   color?: string;
+  geometryInfo?: GeometryInfo | null;
   sketchMeta?: SketchConstraintMeta;
   /** If this object belongs to a named group (assembly), the group name */
   groupName?: string;
@@ -197,6 +199,7 @@ function toRoundedNumberArray(value: unknown): number[] {
 function summarizeShapeForLog(shape: Shape): Record<string, unknown> {
   const summary: Record<string, unknown> = { type: 'Shape' };
   if (shape.colorHex != null) summary.color = shape.colorHex;
+  summary.geometry = shape.geometryInfo();
 
   try {
     const bbox = shape.boundingBox();
@@ -251,6 +254,7 @@ function summarizeTrackedShapeForLog(shape: TrackedShape): Record<string, unknow
 
   return {
     type: 'TrackedShape',
+    geometry: shape.geometryInfo(),
     shape: summarizeShapeForLog(shape.toShape()),
     topology: {
       faceCount: faceNames.length,
@@ -893,9 +897,23 @@ export function runScript(
 
     const objects: SceneObject[] = [];
     const shapeDimensions: DimensionDef[] = [];
-    const pushShape = (shape: Shape, name: string, groupName?: string, color?: string) => {
+    const pushShape = (
+      shape: Shape,
+      name: string,
+      groupName?: string,
+      color?: string,
+      geometryInfo?: GeometryInfo,
+    ) => {
       const objectId = `obj-${objects.length + 1}`;
-      objects.push({ id: objectId, name, shape, sketch: null, color: color || shape.colorHex, groupName });
+      objects.push({
+        id: objectId,
+        name,
+        shape,
+        sketch: null,
+        color: color || shape.colorHex,
+        geometryInfo: geometryInfo ?? shape.geometryInfo(),
+        groupName,
+      });
 
       const dims = getShapeDimensions(shape) as unknown as DimensionDef[];
       dims.forEach((dim) => {
@@ -926,6 +944,7 @@ export function runScript(
         name,
         shape: null,
         sketch,
+        geometryInfo: null,
         sketchMeta: meta,
         color: sketch.colorHex,
         groupName,
@@ -944,7 +963,7 @@ export function runScript(
         return;
       }
       if (child instanceof TrackedShape) {
-        pushShape(child.toShape(), label, groupName);
+        pushShape(child.toShape(), label, groupName, undefined, child.geometryInfo());
       } else if (child instanceof Shape) {
         pushShape(child, label, groupName);
       } else if (child instanceof Sketch) {
@@ -964,7 +983,7 @@ export function runScript(
           if (child instanceof ShapeGroup) {
             flattenGroupChild(child, childLabel, name);
           } else if (child instanceof TrackedShape) {
-            pushShape(child.toShape(), childLabel, name);
+            pushShape(child.toShape(), childLabel, name, undefined, child.geometryInfo());
           } else if (child instanceof Shape) {
             pushShape(child, childLabel, name);
           } else if (child instanceof Sketch) {
@@ -981,7 +1000,7 @@ export function runScript(
         return;
       }
       if (item.shape instanceof TrackedShape) {
-        pushShape(item.shape.toShape(), name, grp, item.color);
+        pushShape(item.shape.toShape(), name, grp, item.color, item.shape.geometryInfo());
         return;
       }
       if (item.shape instanceof Shape) {
@@ -995,6 +1014,7 @@ export function runScript(
           name,
           shape: null,
           sketch: item.sketch,
+          geometryInfo: null,
           sketchMeta: meta,
           color: item.color || item.sketch.colorHex,
           groupName: grp,
@@ -1013,7 +1033,7 @@ export function runScript(
           return;
         }
         if (item instanceof TrackedShape) {
-          pushShape(item.toShape(), label);
+          pushShape(item.toShape(), label, undefined, undefined, item.geometryInfo());
           return;
         }
         if (item instanceof Shape) {
@@ -1031,7 +1051,7 @@ export function runScript(
         throw new Error('Array results must contain Shape/Sketch items');
       });
     } else if (result instanceof TrackedShape) {
-      pushShape(result.toShape(), fileName);
+      pushShape(result.toShape(), fileName, undefined, undefined, result.geometryInfo());
     } else if (result instanceof Shape) {
       pushShape(result, fileName);
     } else if (result instanceof Sketch) {

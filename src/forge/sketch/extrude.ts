@@ -35,13 +35,19 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
     scaleTop as any,
     opts?.center ?? false,
   );
-  const shape = new Shape(m, sketch.colorHex);
+  const shape = new Shape(m, sketch.colorHex, {
+    fidelity: 'kernel-native',
+    sources: ['extrude'],
+  });
   const topo = buildGenericExtrusionTopology(sketch, height, opts?.center ?? false);
   return new TrackedShape(shape, topo, 0, true);
 }
 
 export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number): Shape {
-  return new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex);
+  return new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex, {
+    fidelity: 'kernel-native',
+    sources: ['revolve'],
+  });
 }
 
 Sketch.prototype.extrude = function (height: number, opts?: {

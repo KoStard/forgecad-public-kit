@@ -26,6 +26,30 @@ export function getWasm(): ManifoldToplevel {
   return _wasm;
 }
 
+export type GeometryBackend = 'manifold' | 'occt' | 'hybrid' | 'unknown';
+export type GeometryRepresentation = 'mesh-solid' | 'brep-solid' | 'surface' | 'mixed';
+export type GeometryFidelity = 'kernel-native' | 'sampled' | 'deformed' | 'mixed' | 'unknown';
+export type GeometryTopology = 'none' | 'synthetic' | 'kernel';
+export type GeometrySource =
+  | 'primitive'
+  | 'extrude'
+  | 'revolve'
+  | 'boolean'
+  | 'hull'
+  | 'level-set'
+  | 'loft'
+  | 'sweep'
+  | 'deform'
+  | 'unknown';
+
+export interface GeometryInfo {
+  backend: GeometryBackend;
+  representation: GeometryRepresentation;
+  fidelity: GeometryFidelity;
+  topology: GeometryTopology;
+  sources: GeometrySource[];
+}
+
 export interface ShapeDimension {
   id: string;
   from: [number, number, number];
@@ -39,7 +63,89 @@ export interface ShapeDimension {
 }
 
 const _shapeDimensions = new WeakMap<Shape, ShapeDimension[]>();
+const _shapeGeometryInfo = new WeakMap<Shape, GeometryInfo>();
 let _shapeDimensionCounter = 0;
+
+const DEFAULT_GEOMETRY_INFO: GeometryInfo = {
+  backend: 'manifold',
+  representation: 'mesh-solid',
+  fidelity: 'unknown',
+  topology: 'none',
+  sources: ['unknown'],
+};
+
+function uniqueGeometrySources(sources: GeometrySource[]): GeometrySource[] {
+  const out: GeometrySource[] = [];
+  const seen = new Set<GeometrySource>();
+  for (const source of sources) {
+    if (seen.has(source)) continue;
+    seen.add(source);
+    out.push(source);
+  }
+  return out;
+}
+
+function cloneGeometryInfo(info: GeometryInfo): GeometryInfo {
+  return {
+    backend: info.backend,
+    representation: info.representation,
+    fidelity: info.fidelity,
+    topology: info.topology,
+    sources: [...info.sources],
+  };
+}
+
+function createGeometryInfo(seed: Partial<GeometryInfo> = {}): GeometryInfo {
+  return {
+    backend: seed.backend ?? DEFAULT_GEOMETRY_INFO.backend,
+    representation: seed.representation ?? DEFAULT_GEOMETRY_INFO.representation,
+    fidelity: seed.fidelity ?? DEFAULT_GEOMETRY_INFO.fidelity,
+    topology: seed.topology ?? DEFAULT_GEOMETRY_INFO.topology,
+    sources: uniqueGeometrySources(seed.sources ? [...seed.sources] : [...DEFAULT_GEOMETRY_INFO.sources]),
+  };
+}
+
+function setShapeGeometryInfoInternal(shape: Shape, info: GeometryInfo): Shape {
+  _shapeGeometryInfo.set(shape, cloneGeometryInfo(info));
+  return shape;
+}
+
+function getShapeGeometryInfoInternal(shape: Shape): GeometryInfo {
+  return cloneGeometryInfo(_shapeGeometryInfo.get(shape) ?? DEFAULT_GEOMETRY_INFO);
+}
+
+function mergeGeometryField<T extends string>(values: T[], mixedValue: T): T {
+  const unique = [...new Set(values)];
+  return unique.length === 1 ? unique[0] : mixedValue;
+}
+
+function deriveGeometryInfo(
+  info: GeometryInfo,
+  source: GeometrySource,
+  overrides: Partial<GeometryInfo> = {},
+): GeometryInfo {
+  return createGeometryInfo({
+    backend: overrides.backend ?? info.backend,
+    representation: overrides.representation ?? info.representation,
+    fidelity: overrides.fidelity ?? info.fidelity,
+    topology: overrides.topology ?? info.topology,
+    sources: uniqueGeometrySources([source, ...info.sources, ...(overrides.sources ?? [])]),
+  });
+}
+
+function mergeGeometryInfos(
+  infos: GeometryInfo[],
+  source: GeometrySource,
+  overrides: Partial<GeometryInfo> = {},
+): GeometryInfo {
+  return createGeometryInfo({
+    backend: overrides.backend ?? mergeGeometryField(infos.map((info) => info.backend), 'hybrid'),
+    representation: overrides.representation ?? mergeGeometryField(infos.map((info) => info.representation), 'mixed'),
+    fidelity: overrides.fidelity ?? mergeGeometryField(infos.map((info) => info.fidelity), 'mixed'),
+    topology: overrides.topology ?? mergeGeometryField(infos.map((info) => info.topology), 'none'),
+    sources: uniqueGeometrySources([source, ...infos.flatMap((info) => info.sources), ...(overrides.sources ?? [])]),
+  });
+}
 
 function nextShapeDimensionId(): string {
   _shapeDimensionCounter += 1;
@@ -135,22 +241,30 @@ function mirrorMatrix(normal: [number, number, number]): Mat4 {
 }
 
 function withCopiedDimensions(source: Shape, out: Shape): Shape {
-  return setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(source), true));
+  setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(source), true));
+  return setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(source));
 }
 
 function withTransformedDimensions(source: Shape, out: Shape, m: Mat4): Shape {
   const dims = getShapeDimensionsInternal(source);
-  if (dims.length === 0) return setShapeDimensionsInternal(out, []);
-  return setShapeDimensionsInternal(out, transformDimensions(dims, m));
+  if (dims.length === 0) {
+    setShapeDimensionsInternal(out, []);
+  } else {
+    setShapeDimensionsInternal(out, transformDimensions(dims, m));
+  }
+  return setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(source));
 }
 
 function withMergedDimensions(sources: Shape[], out: Shape): Shape {
   const merged = sources.flatMap((s) => getShapeDimensionsInternal(s));
-  return setShapeDimensionsInternal(out, cloneDimensions(merged, true));
+  setShapeDimensionsInternal(out, cloneDimensions(merged, true));
+  const baseInfo = sources.length > 0 ? getShapeGeometryInfoInternal(sources[0]) : DEFAULT_GEOMETRY_INFO;
+  return setShapeGeometryInfoInternal(out, baseInfo);
 }
 
 function withBaseDimensions(base: Shape, out: Shape): Shape {
-  return setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(base), true));
+  setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(base), true));
+  return setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(base));
 }
 
 /**
@@ -171,12 +285,28 @@ export function getShapeDimensions(shape: Shape): ShapeDimension[] {
   return cloneDimensions(getShapeDimensionsInternal(shape), false);
 }
 
+export function getShapeGeometryInfo(shape: Shape): GeometryInfo {
+  return getShapeGeometryInfoInternal(shape);
+}
+
+export function setShapeGeometryInfo(shape: Shape, info: Partial<GeometryInfo>): Shape {
+  const current = getShapeGeometryInfoInternal(shape);
+  return setShapeGeometryInfoInternal(shape, createGeometryInfo({
+    backend: info.backend ?? current.backend,
+    representation: info.representation ?? current.representation,
+    fidelity: info.fidelity ?? current.fidelity,
+    topology: info.topology ?? current.topology,
+    sources: info.sources ?? current.sources,
+  }));
+}
+
 /** Thin wrapper around Manifold with chainable API */
 export class Shape {
   public colorHex: string | undefined;
 
-  constructor(public readonly manifold: Manifold, color?: string) {
+  constructor(public readonly manifold: Manifold, color?: string, geometryInfo?: Partial<GeometryInfo>) {
     this.colorHex = color;
+    setShapeGeometryInfoInternal(this, createGeometryInfo(geometryInfo));
   }
 
   /** Set the color of this shape (hex string, e.g. "#ff0000") */
@@ -197,6 +327,11 @@ export class Shape {
   /** Alias for clone() */
   duplicate(): Shape {
     return this.clone();
+  }
+
+  /** Inspect which backend/representation produced this solid. */
+  geometryInfo(): GeometryInfo {
+    return getShapeGeometryInfoInternal(this);
   }
 
   // --- Transforms (all return new Shape, immutable) ---
@@ -321,31 +456,46 @@ export class Shape {
 
   /** Mark edges for smoothing based on angle. Call refine() after to apply. */
   smoothOut(minSharpAngle = 60, minSmoothness = 0): Shape {
-    return withCopiedDimensions(this, new Shape(this.manifold.smoothOut(minSharpAngle, minSmoothness), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withCopiedDimensions(this, new Shape(this.manifold.smoothOut(minSharpAngle, minSmoothness), this.colorHex)),
+      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
+    );
   }
 
   /** Subdivide mesh, interpolating smooth surfaces set by smoothOut(). */
   refine(n: number): Shape {
     const steps = scaleRefineSteps(n);
     if (steps <= 0) return this.clone();
-    return withCopiedDimensions(this, new Shape(this.manifold.refine(steps), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withCopiedDimensions(this, new Shape(this.manifold.refine(steps), this.colorHex)),
+      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
+    );
   }
 
   /** Subdivide until edges are shorter than length. */
   refineToLength(length: number): Shape {
     const effectiveLength = scaleRefineToLength(length);
-    return withCopiedDimensions(this, new Shape(this.manifold.refineToLength(effectiveLength), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withCopiedDimensions(this, new Shape(this.manifold.refineToLength(effectiveLength), this.colorHex)),
+      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
+    );
   }
 
   /** Subdivide until surface is within tolerance of smooth surface. */
   refineToTolerance(tolerance: number): Shape {
     const effectiveTolerance = scaleRefineToTolerance(tolerance);
-    return withCopiedDimensions(this, new Shape(this.manifold.refineToTolerance(effectiveTolerance), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withCopiedDimensions(this, new Shape(this.manifold.refineToTolerance(effectiveTolerance), this.colorHex)),
+      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
+    );
   }
 
   /** Warp vertices with a function. */
   warp(fn: (vert: [number, number, number]) => void): Shape {
-    return withCopiedDimensions(this, new Shape(this.manifold.warp(fn as any), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withCopiedDimensions(this, new Shape(this.manifold.warp(fn as any), this.colorHex)),
+      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
+    );
   }
 
   // --- Booleans ---
@@ -357,17 +507,26 @@ export class Shape {
 
   add(other: Shape | { toShape(): Shape }): Shape {
     const o = Shape._unwrap(other);
-    return withMergedDimensions([this, o], new Shape(this.manifold.add(o.manifold), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withMergedDimensions([this, o], new Shape(this.manifold.add(o.manifold), this.colorHex)),
+      mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(o)], 'boolean', { topology: 'none' }),
+    );
   }
 
   subtract(other: Shape | { toShape(): Shape }): Shape {
     const o = Shape._unwrap(other);
-    return withBaseDimensions(this, new Shape(this.manifold.subtract(o.manifold), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withBaseDimensions(this, new Shape(this.manifold.subtract(o.manifold), this.colorHex)),
+      mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(o)], 'boolean', { topology: 'none' }),
+    );
   }
 
   intersect(other: Shape | { toShape(): Shape }): Shape {
     const o = Shape._unwrap(other);
-    return withMergedDimensions([this, o], new Shape(this.manifold.intersect(o.manifold), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withMergedDimensions([this, o], new Shape(this.manifold.intersect(o.manifold), this.colorHex)),
+      mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(o)], 'boolean', { topology: 'none' }),
+    );
   }
 
   // --- Cutting ---
@@ -376,38 +535,49 @@ export class Shape {
   split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
     const c = Shape._unwrap(cutter);
     const [a, b] = this.manifold.split(c.manifold);
+    const info = mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(c)], 'boolean', { topology: 'none' });
     return [
-      withBaseDimensions(this, new Shape(a, this.colorHex)),
-      withBaseDimensions(this, new Shape(b, this.colorHex)),
+      setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(a, this.colorHex)), info),
+      setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(b, this.colorHex)), info),
     ];
   }
 
   /** Split by infinite plane. Returns [below/inside, above/outside]. */
   splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
     const [a, b] = this.manifold.splitByPlane(normal, originOffset);
+    const info = deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' });
     return [
-      withBaseDimensions(this, new Shape(a, this.colorHex)),
-      withBaseDimensions(this, new Shape(b, this.colorHex)),
+      setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(a, this.colorHex)), info),
+      setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(b, this.colorHex)), info),
     ];
   }
 
   /** Cut away everything on the positive side of the plane. */
   trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
-    return withBaseDimensions(this, new Shape(this.manifold.trimByPlane(normal, originOffset), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withBaseDimensions(this, new Shape(this.manifold.trimByPlane(normal, originOffset), this.colorHex)),
+      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' }),
+    );
   }
 
   // --- Hull ---
 
   /** Convex hull of this shape. */
   hull(): Shape {
-    return withBaseDimensions(this, new Shape(this.manifold.hull(), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withBaseDimensions(this, new Shape(this.manifold.hull(), this.colorHex)),
+      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'hull', { topology: 'none' }),
+    );
   }
 
   // --- Simplification ---
 
   /** Reduce mesh complexity. Vertices closer than tolerance are merged. */
   simplify(tolerance?: number): Shape {
-    return withBaseDimensions(this, new Shape(this.manifold.simplify(tolerance), this.colorHex));
+    return setShapeGeometryInfoInternal(
+      withBaseDimensions(this, new Shape(this.manifold.simplify(tolerance), this.colorHex)),
+      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
+    );
   }
 
   // --- Query ---
@@ -569,7 +739,10 @@ export function getAnchorPoint3D(shape: Shape, anchor: Anchor3D): [number, numbe
 // --- Primitive constructors ---
 
 export function box(x: number, y: number, z: number, center = false): Shape {
-  return new Shape(getWasm().Manifold.cube([x, y, z], center));
+  return new Shape(getWasm().Manifold.cube([x, y, z], center), undefined, {
+    fidelity: 'kernel-native',
+    sources: ['primitive'],
+  });
 }
 
 export function cylinder(
@@ -581,11 +754,19 @@ export function cylinder(
 ): Shape {
   return new Shape(
     getWasm().Manifold.cylinder(height, radius, radiusTop ?? -1, segments ?? 0, center),
+    undefined,
+    {
+      fidelity: 'kernel-native',
+      sources: ['primitive'],
+    },
   );
 }
 
 export function sphere(radius: number, segments?: number): Shape {
-  return new Shape(getWasm().Manifold.sphere(radius, segments ?? 0));
+  return new Shape(getWasm().Manifold.sphere(radius, segments ?? 0), undefined, {
+    fidelity: 'kernel-native',
+    sources: ['primitive'],
+  });
 }
 
 // --- Boolean helpers ---
@@ -593,17 +774,26 @@ export function sphere(radius: number, segments?: number): Shape {
 export function union(...shapes: Shape[]): Shape {
   if (shapes.length === 0) throw new Error('union requires at least one shape');
   if (shapes.length === 1) return shapes[0];
-  return withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(shapes.map((s) => s.manifold))));
+  return setShapeGeometryInfoInternal(
+    withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(shapes.map((s) => s.manifold)))),
+    mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
+  );
 }
 
 export function difference(...shapes: Shape[]): Shape {
   if (shapes.length < 2) throw new Error('difference requires at least two shapes');
-  return withBaseDimensions(shapes[0], new Shape(getWasm().Manifold.difference(shapes.map((s) => s.manifold))));
+  return setShapeGeometryInfoInternal(
+    withBaseDimensions(shapes[0], new Shape(getWasm().Manifold.difference(shapes.map((s) => s.manifold)))),
+    mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
+  );
 }
 
 export function intersection(...shapes: Shape[]): Shape {
   if (shapes.length < 2) throw new Error('intersection requires at least two shapes');
-  return withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(shapes.map((s) => s.manifold))));
+  return setShapeGeometryInfoInternal(
+    withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(shapes.map((s) => s.manifold)))),
+    mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
+  );
 }
 
 /** Convex hull of multiple shapes and/or points. */
@@ -611,7 +801,12 @@ export function hull3d(...args: (Shape | [number, number, number])[]): Shape {
   const items = args.map(a => a instanceof Shape ? a.manifold : a);
   const out = new Shape(getWasm().Manifold.hull(items));
   const shapeArgs = args.filter((a): a is Shape => a instanceof Shape);
-  return withMergedDimensions(shapeArgs, out);
+  return setShapeGeometryInfoInternal(
+    withMergedDimensions(shapeArgs, out),
+    shapeArgs.length > 0
+      ? mergeGeometryInfos(shapeArgs.map((shape) => getShapeGeometryInfoInternal(shape)), 'hull', { topology: 'none' })
+      : createGeometryInfo({ fidelity: 'kernel-native', sources: ['hull'] }),
+  );
 }
 
 /** Create shape from a signed distance function. Positive = inside. */
@@ -626,5 +821,8 @@ export function levelSet(
     { min: bounds.min, max: bounds.max },
     edgeLength,
     level,
-  ));
+  ), undefined, {
+    fidelity: 'sampled',
+    sources: ['level-set'],
+  });
 }

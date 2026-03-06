@@ -1366,6 +1366,7 @@ box.transform(Transform.translation(10, 0, 0));
 box.scale([1.2, 1, 1]);
 box.mirror([1, 0, 0]);
 box.rotateAroundEdge('top-bottom', 90);  // rotate around named edge
+box.geometryInfo();       // backend/representation/topology summary
 box.toShape();             // unwrap to plain Shape for booleans
 box.clone();               // explicit duplicate with topology
 ```
@@ -2139,7 +2140,10 @@ shape.boundingBox()      // { min: [x,y,z], max: [x,y,z] }
 shape.isEmpty()          // true if no geometry
 shape.numTri()           // Triangle count
 shape.minGap(other, 50)  // Minimum distance to another shape (within search radius)
+shape.geometryInfo()     // { backend, representation, fidelity, topology, sources }
 ```
+
+`geometryInfo()` is the current contract boundary for future hybrid kernels. Today most results are `manifold` + `mesh-solid`; `loft()` / `sweep()` report `sampled`, and tracked extrusions report `topology: 'synthetic'`. A future OCCT/BREP backend can change these values without forcing a language rewrite.
 
 ### 2D Sketch Queries
 ```javascript
