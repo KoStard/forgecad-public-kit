@@ -1,7 +1,6 @@
 import { buildBinaryStl } from './exportMesh';
 import type {
   AssemblyDefinition,
-  AssemblyJointCouplingDef,
   AssemblyJointDef,
   AssemblyPart,
   AssemblyPartDef,
@@ -85,6 +84,7 @@ function escapeXml(value: string): string {
 function sanitizeToken(value: string, fallback: string): string {
   const slug = value
     .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, '_')
     .replace(/^_+|_+$/g, '');
@@ -539,9 +539,8 @@ function modelXml(
   linkWorlds: Map<string, Transform>,
   warnings: string[],
 ): { xml: string; cmdVelTopic?: string; jointStateTopic?: string } {
-  const partsByName = new Map(spec.assembly.parts.map((part) => [part.name, part]));
   const cmdVelTopic = spec.plugins.diffDrive?.topic || `/model/${modelName}/cmd_vel`;
-  const jointStateTopic = spec.plugins.jointStatePublisher?.topic || `/world/default/model/${modelName}/joint_state`;
+  const jointStateTopic = spec.plugins.jointStatePublisher?.topic || `/model/${modelName}/joint_state`;
 
   const linksXml = spec.assembly.parts.map((part) => {
     const sdfLinkName = linkNameMap.get(part.name)!;
@@ -596,7 +595,7 @@ function modelXml(
 
   const jointsXml = spec.assembly.joints.map((joint) => {
     const sourceOverrides = spec.joints[joint.name];
-    const sdfJointName = jointNameMap.get(joint.name)!;
+    const sdfJointName = jointNameMap.get(`${joint.name}_joint`)!;
     const sdfParent = linkNameMap.get(joint.parent) ?? 'world';
     const sdfChild = linkNameMap.get(joint.child)!;
     const limitLower = jointTypeLimitUnits(joint, joint.min);
@@ -630,8 +629,8 @@ function modelXml(
   const plugins: string[] = [];
   if (spec.plugins.diffDrive) {
     plugins.push(`    <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
-      ${spec.plugins.diffDrive.leftJoints.map((jointName) => `<left_joint>${escapeXml(jointNameMap.get(jointName)!)}</left_joint>`).join('\n      ')}
-      ${spec.plugins.diffDrive.rightJoints.map((jointName) => `<right_joint>${escapeXml(jointNameMap.get(jointName)!)}</right_joint>`).join('\n      ')}
+      ${spec.plugins.diffDrive.leftJoints.map((jointName) => `<left_joint>${escapeXml(jointNameMap.get(`${jointName}_joint`)!)}</left_joint>`).join('\n      ')}
+      ${spec.plugins.diffDrive.rightJoints.map((jointName) => `<right_joint>${escapeXml(jointNameMap.get(`${jointName}_joint`)!)}</right_joint>`).join('\n      ')}
       <wheel_separation>${formatNumber(mmToM(spec.plugins.diffDrive.wheelSeparationMm), 6)}</wheel_separation>
       <wheel_radius>${formatNumber(mmToM(spec.plugins.diffDrive.wheelRadiusMm), 6)}</wheel_radius>
       <topic>${escapeXml(cmdVelTopic)}</topic>${spec.plugins.diffDrive.odomTopic ? `
@@ -650,7 +649,7 @@ function modelXml(
   if (jointState?.enabled !== false) {
     plugins.push(`    <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
       <topic>${escapeXml(jointState?.topic || jointStateTopic)}</topic>${(jointState?.joints ?? []).map((jointName) => `
-      <joint_name>${escapeXml(jointNameMap.get(jointName)!)}</joint_name>`).join('')}${jointState?.updateRate !== undefined ? `
+      <joint_name>${escapeXml(jointNameMap.get(`${jointName}_joint`)!)}</joint_name>`).join('')}${jointState?.updateRate !== undefined ? `
       <update_rate>${formatNumber(jointState.updateRate, 6)}</update_rate>` : ''}
     </plugin>`);
   }
@@ -691,7 +690,7 @@ export function buildSdfRobotPackage(spec: CollectedRobotExport): SdfPackageOutp
   const modelName = sanitizeToken(spec.modelName, 'forgecad_robot');
   const modelFolder = `models/${modelName}`;
   const linkNameMap = uniqueNameMap(spec.assembly.parts.map((part) => part.name), 'link');
-  const jointNameMap = uniqueNameMap(spec.assembly.joints.map((joint) => joint.name), 'joint');
+  const jointNameMap = uniqueNameMap(spec.assembly.joints.map((joint) => `${joint.name}_joint`), 'joint');
   const jointValues = resolveJointValues(spec.assembly, spec.state, warnings);
   const linkWorlds = computeLinkFrameWorlds(spec.assembly, jointValues);
   const geometries = new Map<string, LinkGeometry>();
@@ -730,7 +729,7 @@ export function buildSdfRobotPackage(spec: CollectedRobotExport): SdfPackageOutp
 
   const manifestJoints: SdfPackageManifestJoint[] = spec.assembly.joints.map((joint) => ({
     sourceName: joint.name,
-    sdfName: jointNameMap.get(joint.name)!,
+    sdfName: jointNameMap.get(`${joint.name}_joint`)!,
     parent: linkNameMap.get(joint.parent) ?? 'world',
     child: linkNameMap.get(joint.child)!,
     type: joint.type,

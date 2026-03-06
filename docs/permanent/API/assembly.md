@@ -125,3 +125,44 @@ This keeps kinematic chains declarative and avoids repeated manual pivot math.
 - Per-part metadata in `addPart(..., { metadata })`
 - `solved.bom()` returns JSON-ready rows
 - `solved.bomCsv()` / `bomToCsv(rows)` for CSV export
+
+## Robot export
+
+Use `robotExport({...})` when an assembly should become a simulator package instead of only a viewport scene.
+
+```javascript
+const rover = assembly("Scout")
+  .addPart("Chassis", box(300, 220, 50, true))
+  .addPart("Wheel", cylinder(30, 60, undefined, 48, true).pointAlong([0, 1, 0]))
+  .addRevolute("leftWheel", "Chassis", "Wheel", {
+    axis: [0, 1, 0],
+    frame: Transform.identity().translate(90, 140, 60),
+    effort: 20,
+    velocity: 1080,
+  });
+
+robotExport({
+  assembly: rover,
+  modelName: "Scout",
+  links: {
+    Chassis: { massKg: 10 },
+    Wheel: { massKg: 0.8 },
+  },
+  plugins: {
+    diffDrive: {
+      leftJoints: ["leftWheel"],
+      rightJoints: ["rightWheel"],
+      wheelSeparationMm: 280,
+      wheelRadiusMm: 60,
+    },
+  },
+  world: {
+    generateDemoWorld: true,
+  },
+});
+```
+
+Notes:
+- Revolute joint `velocity` values are expressed in degrees/second in Forge; the SDF exporter converts them to radians/second.
+- Prismatic distances are authored in millimeters and exported in meters.
+- `massKg` is preferred for demo robots; `densityKgM3` is a decent fallback when mass is unknown.
