@@ -30,6 +30,8 @@ Update it whenever:
 | `circle2d(...).rotate()` | Supported | Yes | Recorded as profile transforms |
 | `roundedRect(...).rotate()` | Supported | Yes | Recorded as profile transforms |
 | `rect/circle/roundedRect.scale(...)` | Supported | Yes | Recorded as exact affine profile transforms |
+| `polygon()` / `ngon()` / polygon-backed `ellipse()` / `star()` | Supported | Yes | Replayed as exact line-segment profiles from recorded point loops |
+| `slot()` | Supported | Yes | Built from exact rect/circle booleans |
 | Sketch booleans (`union2d`, `difference2d`, `intersection2d`) | Supported | Yes | Only when every child profile is exact-exportable |
 | `rect/circle/roundedRect.extrude(height)` | Supported | Yes | `twist` / `divisions` must be absent |
 | `rect/circle/roundedRect.extrude(height, { scaleTop })` | Supported | Yes | Replayed as exact lofts; sketch booleans are decomposed into 3D booleans when needed |
@@ -42,7 +44,6 @@ Update it whenever:
 | `difference()` | Supported | Yes | Only when every operand is exact-exportable |
 | `intersection()` | Supported | Yes | Only when every operand is exact-exportable |
 | Returned multi-object scene | Supported | Yes | Exported as a STEP/BREP compound |
-| `polygon()` / `ngon()` / `ellipse()` / `slot()` / `star()` | Unsupported | No | No exact 2D wire/profile replay yet |
 | Sketch `offset()` | Unsupported | No | Requires exact 2D offset reconstruction |
 | Sketch `mirror()` / arbitrary `warp()` | Unsupported | No | Not recorded in export plan |
 | `Shape.transform(matrix)` | Unsupported | No | Arbitrary affine replay not implemented |
@@ -60,7 +61,7 @@ Update it whenever:
 
 ## Planned Expansion Order
 
-1. Exact 2D profile replay for `polygon`, direct `ellipse()`, `slot()`, and `star()`
-2. Exact transform replay for `mirror` and matrix-safe subsets
+1. Exact transform replay for `mirror` and matrix-safe subsets
+2. Exact 2D offset replay for `offset()` / `stroke()`-derived profiles
 3. Exact OCCT-native operations where BREP matters most: `shell`, precise fillet/chamfer, sketch-on-face
 4. Optional STEP product structure and metadata export
