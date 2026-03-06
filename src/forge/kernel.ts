@@ -8,7 +8,7 @@
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import { Transform, type Mat4 } from './transform';
 import { scaleRefineSteps, scaleRefineToLength, scaleRefineToTolerance } from './quality';
-import type { BrepShapePlan } from './brepPlan';
+import type { BrepShapePlan, BrepShapeTransformStep } from './brepPlan';
 import { type Anchor3D, isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
 import {
   applyPlacementReferenceInput,
@@ -26,6 +26,7 @@ import {
 } from './placement';
 import {
   appendBrepShapeTransform,
+  appendBrepShapeTransforms,
   buildBrepBooleanPlan,
   cloneBrepShapePlan,
 } from './brepPlan';
@@ -329,6 +330,126 @@ function mirrorMatrix(normal: [number, number, number]): Mat4 {
   ];
 }
 
+function dotVec3(a: [number, number, number], b: [number, number, number]): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function crossVec3(a: [number, number, number], b: [number, number, number]): [number, number, number] {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+
+function lengthVec3(v: [number, number, number]): number {
+  return Math.hypot(v[0], v[1], v[2]);
+}
+
+function normalizeVec3(v: [number, number, number]): [number, number, number] {
+  const len = lengthVec3(v);
+  if (len < 1e-12) return [1, 0, 0];
+  return [v[0] / len, v[1] / len, v[2] / len];
+}
+
+function rigidTransformStepsFromMatrix(m: Mat4): BrepShapeTransformStep[] | null {
+  const eps = 1e-6;
+
+  if (
+    Math.abs(m[3]) > eps
+    || Math.abs(m[7]) > eps
+    || Math.abs(m[11]) > eps
+    || Math.abs(m[15] - 1) > eps
+  ) {
+    return null;
+  }
+
+  const col0: [number, number, number] = [m[0], m[1], m[2]];
+  const col1: [number, number, number] = [m[4], m[5], m[6]];
+  const col2: [number, number, number] = [m[8], m[9], m[10]];
+
+  const len0 = lengthVec3(col0);
+  const len1 = lengthVec3(col1);
+  const len2 = lengthVec3(col2);
+  if (
+    Math.abs(len0 - 1) > eps
+    || Math.abs(len1 - 1) > eps
+    || Math.abs(len2 - 1) > eps
+  ) {
+    return null;
+  }
+
+  if (
+    Math.abs(dotVec3(col0, col1)) > eps
+    || Math.abs(dotVec3(col0, col2)) > eps
+    || Math.abs(dotVec3(col1, col2)) > eps
+  ) {
+    return null;
+  }
+
+  const det = dotVec3(col0, crossVec3(col1, col2));
+  if (Math.abs(det - 1) > eps) return null;
+
+  const r00 = m[0], r01 = m[4], r02 = m[8];
+  const r10 = m[1], r11 = m[5], r12 = m[9];
+  const r20 = m[2], r21 = m[6], r22 = m[10];
+  const tx = m[12], ty = m[13], tz = m[14];
+
+  const steps: BrepShapeTransformStep[] = [];
+  const trace = r00 + r11 + r22;
+  const cosTheta = Math.max(-1, Math.min(1, (trace - 1) / 2));
+  const angle = Math.acos(cosTheta);
+  const angleDeg = angle * 180 / Math.PI;
+
+  if (angleDeg > 1e-6) {
+    let axis: [number, number, number];
+
+    if (Math.PI - angle < 1e-5) {
+      const xx = Math.max(0, (r00 + 1) / 2);
+      const yy = Math.max(0, (r11 + 1) / 2);
+      const zz = Math.max(0, (r22 + 1) / 2);
+      const xy = (r01 + r10) / 4;
+      const xz = (r02 + r20) / 4;
+      const yz = (r12 + r21) / 4;
+
+      if (xx >= yy && xx >= zz) {
+        const x = Math.sqrt(xx);
+        axis = [x, x > eps ? xy / x : 0, x > eps ? xz / x : 0];
+      } else if (yy >= zz) {
+        const y = Math.sqrt(yy);
+        axis = [y > eps ? xy / y : 0, y, y > eps ? yz / y : 0];
+      } else {
+        const z = Math.sqrt(zz);
+        axis = [z > eps ? xz / z : 0, z > eps ? yz / z : 0, z];
+      }
+    } else {
+      axis = normalizeVec3([
+        r21 - r12,
+        r02 - r20,
+        r10 - r01,
+      ]);
+    }
+
+    axis = normalizeVec3(axis);
+    steps.push({
+      kind: 'rotateAround',
+      axisX: axis[0],
+      axisY: axis[1],
+      axisZ: axis[2],
+      degrees: angleDeg,
+      pivotX: 0,
+      pivotY: 0,
+      pivotZ: 0,
+    });
+  }
+
+  if (Math.abs(tx) > eps || Math.abs(ty) > eps || Math.abs(tz) > eps) {
+    steps.push({ kind: 'translate', x: tx, y: ty, z: tz });
+  }
+
+  return steps;
+}
+
 function withCopiedDimensions(source: Shape, out: Shape): Shape {
   setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(source), true));
   setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(source));
@@ -533,7 +654,12 @@ export class Shape {
     const mat = m instanceof Transform ? m.toArray() : m;
     return setShapeBrepPlanInternal(
       withTransformedDimensions(this, new Shape(this.manifold.transform(mat), this.colorHex), mat),
-      null,
+      (() => {
+        const steps = rigidTransformStepsFromMatrix(mat);
+        if (steps == null) return null;
+        if (steps.length === 0) return getShapeBrepPlanInternal(this);
+        return appendBrepShapeTransforms(getShapeBrepPlanInternal(this), steps);
+      })(),
     );
   }
 

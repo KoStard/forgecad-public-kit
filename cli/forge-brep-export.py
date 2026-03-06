@@ -106,6 +106,27 @@ def build_polygon_sketch(points: List[List[float]]) -> "cq.Sketch":
     return cq.Sketch().face(face).reset()
 
 
+def build_sketch_from_face(face: "cq.Face") -> "cq.Sketch":
+    return cq.Sketch().face(face).reset()
+
+
+def build_clean_profile_face(profile: Dict[str, Any]) -> "cq.Face":
+    solid = build_extruded_profile(profile, 1.0, False)
+    top_faces = cq.Workplane(obj=solid).faces(">Z").vals()
+    if not top_faces:
+        raise ValueError("Failed to recover a profile face from the base shape")
+
+    merged = top_faces[0]
+    for face in top_faces[1:]:
+        merged = merged.fuse(face)
+    merged = merged.clean()
+
+    faces = merged.Faces() if hasattr(merged, "Faces") else [merged]
+    if len(faces) != 1:
+        raise ValueError(f"Offset fallback expected 1 merged face, got {len(faces)}")
+    return faces[0]
+
+
 def build_profile_sketch(profile: Dict[str, Any]) -> "cq.Sketch":
     kind = profile["kind"]
     if kind == "rect":
@@ -144,6 +165,24 @@ def build_profile_sketch(profile: Dict[str, Any]) -> "cq.Sketch":
             else:
                 raise ValueError(f"Unsupported profile boolean op: {profile['op']}")
         return apply_profile_transforms(result, profile)
+
+    if kind == "offset":
+        if profile["join"] != "Round":
+            raise ValueError(f"Unsupported profile offset join: {profile['join']}")
+        delta = float(profile["delta"])
+        try:
+            sketch = build_profile_sketch(profile["base"]).reset().wires().offset(delta)
+        except Exception:
+            face = build_clean_profile_face(profile["base"])
+            outer_wires = face.outerWire().offset2D(delta, kind="arc")
+            if len(outer_wires) != 1:
+                raise ValueError(f"Offset fallback expected 1 outer wire, got {len(outer_wires)}")
+
+            inner_wires = []
+            for hole in face.innerWires():
+                inner_wires.extend(hole.offset2D(-delta, kind="arc"))
+            sketch = build_sketch_from_face(cq.Face.makeFromWires(outer_wires[0], inner_wires))
+        return apply_profile_transforms(sketch, profile)
 
     raise ValueError(f"Unsupported profile kind: {kind}")
 

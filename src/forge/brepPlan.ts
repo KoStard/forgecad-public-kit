@@ -34,6 +34,13 @@ export type BrepProfilePlan =
       op: 'union' | 'difference' | 'intersection';
       profiles: BrepProfilePlan[];
       transforms: BrepProfileTransformStep[];
+    }
+  | {
+      kind: 'offset';
+      base: BrepProfilePlan;
+      delta: number;
+      join: 'Round';
+      transforms: BrepProfileTransformStep[];
     };
 
 export type BrepShapeTransformStep =
@@ -180,6 +187,14 @@ export function cloneBrepProfilePlan(plan: BrepProfilePlan | null): BrepProfileP
         profiles: plan.profiles.map((profile) => cloneBrepProfilePlan(profile)!),
         transforms: plan.transforms.map(cloneProfileTransform),
       };
+    case 'offset':
+      return {
+        kind: 'offset',
+        base: cloneBrepProfilePlan(plan.base)!,
+        delta: plan.delta,
+        join: plan.join,
+        transforms: plan.transforms.map(cloneProfileTransform),
+      };
   }
 }
 
@@ -256,6 +271,17 @@ export function appendBrepShapeTransform(
   };
 }
 
+export function appendBrepShapeTransforms(
+  plan: BrepShapePlan | null,
+  steps: BrepShapeTransformStep[],
+): BrepShapePlan | null {
+  let out = cloneBrepShapePlan(plan);
+  for (const step of steps) {
+    out = appendBrepShapeTransform(out, step);
+  }
+  return out;
+}
+
 export function buildBrepBooleanPlan(
   op: 'union' | 'difference' | 'intersection',
   shapes: Array<BrepShapePlan | null>,
@@ -277,6 +303,21 @@ export function buildBrepBooleanProfilePlan(
     kind: 'boolean',
     op,
     profiles: profiles.map((profile) => cloneBrepProfilePlan(profile)!),
+    transforms: [],
+  };
+}
+
+export function buildBrepOffsetProfilePlan(
+  base: BrepProfilePlan | null,
+  delta: number,
+  join: 'Round',
+): BrepProfilePlan | null {
+  if (!base) return null;
+  return {
+    kind: 'offset',
+    base: cloneBrepProfilePlan(base)!,
+    delta,
+    join,
     transforms: [],
   };
 }

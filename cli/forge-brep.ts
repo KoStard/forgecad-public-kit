@@ -92,6 +92,9 @@ async function main() {
     if (manifest.objects.length > 0) {
       console.error(`  Exportable objects: ${manifest.objects.map((obj) => obj.name).join(', ')}`);
     }
+    if (manifest.skipped.length > 0) {
+      console.error(`  Skipped non-solid objects: ${manifest.skipped.map((obj) => obj.name).join(', ')}`);
+    }
     for (const item of manifest.unsupported) {
       const geom = item.geometryInfo
         ? ` [${item.geometryInfo.backend}/${item.geometryInfo.representation}/${item.geometryInfo.fidelity}/${item.geometryInfo.sources.join('+')}]`
@@ -106,6 +109,10 @@ async function main() {
   const finalOutput = resolve(outputPath ?? defaultOutputPath(scriptPath, format));
   const uv = resolveUvExecutable(uvPath);
   writeFileSync(manifestPath, JSON.stringify({ format, objects: manifest.objects }, null, 2));
+
+  if (manifest.skipped.length > 0) {
+    console.error(`Skipping non-solid objects: ${manifest.skipped.map((obj) => obj.name).join(', ')}`);
+  }
 
   const exporterScript = resolve('cli/forge-brep-export.py');
   const uvArgs = ['run'];

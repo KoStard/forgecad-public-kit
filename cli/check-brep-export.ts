@@ -186,6 +186,22 @@ return [{ name: 'Polygon Panel', shape: panel }];
   ]);
 }
 
+function checkRoundOffsetProfilePlan(): void {
+  const plan = runExactManifest(`
+const shell = ngon(6, 20)
+  .offset(-3)
+  .extrude(8);
+
+return [{ name: 'Shell', shape: shell }];
+`);
+
+  assert.equal(plan.kind, 'extrude', `Expected extrude plan, got ${plan.kind}`);
+  assert.equal(plan.profile.kind, 'offset', `Expected offset profile, got ${plan.profile.kind}`);
+  assert.equal(plan.profile.base.kind, 'polygon', `Expected polygon offset base, got ${plan.profile.base.kind}`);
+  assert.equal(plan.profile.delta, -3);
+  assert.equal(plan.profile.join, 'Round');
+}
+
 function checkRotateAroundTransformPlan(): void {
   const plan = runExactManifest(`
 const door = box(80, 4, 120, false).rotateAround([0, 0, 1], 35, [0, 0, 0]);
@@ -213,6 +229,31 @@ return [{ name: 'Bracket', shape: bracket }];
   assert.equal(mirror.normalZ, 0);
 }
 
+function checkRigidMatrixTransformPlan(): void {
+  const plan = runExactManifest(`
+const moved = box(20, 12, 8, true).transform(
+  Transform.identity()
+    .translate(15, -4, 2)
+    .rotateAxis([0, 0, 1], 90)
+);
+return [{ name: 'Moved', shape: moved }];
+`);
+
+  const steps = collectShapeTransforms(plan);
+  const rotateAround = steps.find((step) => step.kind === 'rotateAround');
+  assert(rotateAround, 'Expected rigid transform(matrix) to preserve an exact rotation step');
+  assert.equal(Math.round(rotateAround.axisX), 0);
+  assert.equal(Math.round(rotateAround.axisY), 0);
+  assert.equal(Math.round(rotateAround.axisZ), 1);
+  assert.equal(Math.round(rotateAround.degrees), 90);
+
+  const translate = steps.find((step) => step.kind === 'translate');
+  assert(translate, 'Expected rigid transform(matrix) to preserve an exact translation step');
+  assert.equal(Math.round(translate.x), 4);
+  assert.equal(Math.round(translate.y), 15);
+  assert.equal(Math.round(translate.z), 2);
+}
+
 function checkPointAlongOnPrimitiveBoolean(): void {
   const plan = runExactManifest(`
 const pipe = cylinder(60, 5).pointAlong([0, 1, 0]);
@@ -228,6 +269,28 @@ return [{ name: 'Pipe Cut', shape: body }];
   assert.equal(rotateAround.degrees, 90);
 }
 
+function checkMixedSketchAndSolidScenePolicy(): void {
+  const files: Record<string, string> = {
+    'main.forge.js': `
+const plate = rect(40, 24).extrude(8);
+const slot2d = slot(18, 6).translate(0, -20);
+return [
+  { name: 'Plate', shape: plate },
+  { name: 'Slot', sketch: slot2d },
+];
+`,
+  };
+  const result = runScript(files['main.forge.js'], 'main.forge.js', files);
+  assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
+
+  const manifest = buildBrepExportManifest(result.objects);
+  assert.equal(manifest.unsupported.length, 0, 'Mixed sketch + solid scene should not be rejected');
+  assert.equal(manifest.objects.length, 1, 'Expected the solid object to remain exportable');
+  assert.equal(manifest.objects[0].name, 'Plate');
+  assert.equal(manifest.skipped.length, 1, 'Expected sketches to be skipped, not rejected');
+  assert.equal(manifest.skipped[0].name, 'Slot');
+}
+
 async function main() {
   await init();
   checkRoundedRectProfileTransforms();
@@ -235,9 +298,12 @@ async function main() {
   checkProfileBooleanAndTaperedExtrude();
   checkPolygonProfileTransforms();
   checkPolygonBooleanHoleChain();
+  checkRoundOffsetProfilePlan();
   checkRotateAroundTransformPlan();
   checkMirrorTransformPlan();
+  checkRigidMatrixTransformPlan();
   checkPointAlongOnPrimitiveBoolean();
+  checkMixedSketchAndSolidScenePolicy();
   console.log('✓ BREP export invariants passed');
 }
 

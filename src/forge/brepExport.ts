@@ -14,23 +14,29 @@ export interface BrepExportUnsupportedObject {
   geometryInfo?: GeometryInfo | null;
 }
 
+export interface BrepExportSkippedObject {
+  name: string;
+  reason: string;
+}
+
 export interface BrepExportManifest {
   objects: BrepExportObject[];
   unsupported: BrepExportUnsupportedObject[];
+  skipped: BrepExportSkippedObject[];
 }
 
 export function buildBrepExportManifest(objects: SceneObject[]): BrepExportManifest {
   const manifest: BrepExportManifest = {
     objects: [],
     unsupported: [],
+    skipped: [],
   };
 
   for (const object of objects) {
     if (object.sketch) {
-      manifest.unsupported.push({
+      manifest.skipped.push({
         name: object.name,
-        reason: 'Sketch export to BREP is not implemented yet. Export a solid shape instead.',
-        geometryInfo: null,
+        reason: 'Sketch objects are skipped for STEP/BREP export.',
       });
       continue;
     }
