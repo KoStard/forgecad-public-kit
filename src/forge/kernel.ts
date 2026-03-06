@@ -230,6 +230,42 @@ function rotationEulerMatrix(xDeg: number, yDeg: number, zDeg: number): Mat4 {
     .toArray();
 }
 
+function rotationAroundAxisMatrix(
+  axis: [number, number, number],
+  angleDeg: number,
+  pivot: [number, number, number],
+): Mat4 {
+  const [px, py, pz] = pivot;
+  const rad = angleDeg * Math.PI / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const len = Math.sqrt(axis[0] ** 2 + axis[1] ** 2 + axis[2] ** 2) || 1;
+  const ux = axis[0] / len;
+  const uy = axis[1] / len;
+  const uz = axis[2] / len;
+
+  const m00 = cos + ux * ux * (1 - cos);
+  const m01 = ux * uy * (1 - cos) - uz * sin;
+  const m02 = ux * uz * (1 - cos) + uy * sin;
+  const m10 = uy * ux * (1 - cos) + uz * sin;
+  const m11 = cos + uy * uy * (1 - cos);
+  const m12 = uy * uz * (1 - cos) - ux * sin;
+  const m20 = uz * ux * (1 - cos) - uy * sin;
+  const m21 = uz * uy * (1 - cos) + ux * sin;
+  const m22 = cos + uz * uz * (1 - cos);
+
+  const tx = px - (m00 * px + m01 * py + m02 * pz);
+  const ty = py - (m10 * px + m11 * py + m12 * pz);
+  const tz = pz - (m20 * px + m21 * py + m22 * pz);
+
+  return [
+    m00, m10, m20, 0,
+    m01, m11, m21, 0,
+    m02, m12, m22, 0,
+    tx,  ty,  tz,  1,
+  ];
+}
+
 function mirrorMatrix(normal: [number, number, number]): Mat4 {
   const [nx0, ny0, nz0] = normal;
   const len = Math.hypot(nx0, ny0, nz0);
@@ -437,7 +473,7 @@ export class Shape {
     const cosA = nz; // dot([0,0,1], [nx,ny,nz])
     if (sinA < 1e-10) {
       // Parallel or anti-parallel to Z
-      return cosA > 0 ? this : setShapeBrepPlanInternal(this.rotate(180, 0, 0), null);
+      return cosA > 0 ? this : this.rotate(180, 0, 0);
     }
     const angleDeg = Math.atan2(sinA, cosA) * 180 / Math.PI;
     // Normalize cross product to get rotation axis
@@ -454,37 +490,25 @@ export class Shape {
     angleDeg: number,
     pivot: [number, number, number] = [0, 0, 0],
   ): Shape {
-    const [px, py, pz] = pivot;
-    const rad = angleDeg * Math.PI / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    // Normalize axis
     const len = Math.sqrt(axis[0] ** 2 + axis[1] ** 2 + axis[2] ** 2) || 1;
-    const ux = axis[0] / len, uy = axis[1] / len, uz = axis[2] / len;
-    // Rodrigues' rotation matrix + translation for pivot
-    const m00 = cos + ux * ux * (1 - cos);
-    const m01 = ux * uy * (1 - cos) - uz * sin;
-    const m02 = ux * uz * (1 - cos) + uy * sin;
-    const m10 = uy * ux * (1 - cos) + uz * sin;
-    const m11 = cos + uy * uy * (1 - cos);
-    const m12 = uy * uz * (1 - cos) - ux * sin;
-    const m20 = uz * ux * (1 - cos) - uy * sin;
-    const m21 = uz * uy * (1 - cos) + ux * sin;
-    const m22 = cos + uz * uz * (1 - cos);
-    // Translation: pivot + R * (-pivot)
-    const tx = px - (m00 * px + m01 * py + m02 * pz);
-    const ty = py - (m10 * px + m11 * py + m12 * pz);
-    const tz = pz - (m20 * px + m21 * py + m22 * pz);
-    // Manifold.transform takes column-major 4x3 (first 12 of 4x4)
-    const matrix = [
-      m00, m10, m20, 0,
-      m01, m11, m21, 0,
-      m02, m12, m22, 0,
-      tx,  ty,  tz,  1,
-    ] as Mat4;
+    const normalizedAxis: [number, number, number] = [
+      axis[0] / len,
+      axis[1] / len,
+      axis[2] / len,
+    ];
+    const matrix = rotationAroundAxisMatrix(normalizedAxis, angleDeg, pivot);
     return setShapeBrepPlanInternal(
       withTransformedDimensions(this, new Shape(this.manifold.transform(matrix as any), this.colorHex), matrix),
-      null,
+      appendBrepShapeTransform(getShapeBrepPlanInternal(this), {
+        kind: 'rotateAround',
+        axisX: normalizedAxis[0],
+        axisY: normalizedAxis[1],
+        axisZ: normalizedAxis[2],
+        degrees: angleDeg,
+        pivotX: pivot[0],
+        pivotY: pivot[1],
+        pivotZ: pivot[2],
+      }),
     );
   }
 

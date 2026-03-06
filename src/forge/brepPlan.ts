@@ -33,7 +33,17 @@ export type BrepProfilePlan =
 
 export type BrepShapeTransformStep =
   | { kind: 'translate'; x: number; y: number; z: number }
-  | { kind: 'rotate'; xDeg: number; yDeg: number; zDeg: number };
+  | { kind: 'rotate'; xDeg: number; yDeg: number; zDeg: number }
+  | {
+      kind: 'rotateAround';
+      axisX: number;
+      axisY: number;
+      axisZ: number;
+      degrees: number;
+      pivotX: number;
+      pivotY: number;
+      pivotZ: number;
+    };
 
 export type BrepShapePlan =
   | {
@@ -89,15 +99,28 @@ function cloneProfileTransform(step: BrepProfileTransformStep): BrepProfileTrans
 }
 
 function cloneShapeTransform(step: BrepShapeTransformStep): BrepShapeTransformStep {
-  if (step.kind === 'translate') {
-    return { kind: 'translate', x: step.x, y: step.y, z: step.z };
+  switch (step.kind) {
+    case 'translate':
+      return { kind: 'translate', x: step.x, y: step.y, z: step.z };
+    case 'rotate':
+      return {
+        kind: 'rotate',
+        xDeg: step.xDeg,
+        yDeg: step.yDeg,
+        zDeg: step.zDeg,
+      };
+    case 'rotateAround':
+      return {
+        kind: 'rotateAround',
+        axisX: step.axisX,
+        axisY: step.axisY,
+        axisZ: step.axisZ,
+        degrees: step.degrees,
+        pivotX: step.pivotX,
+        pivotY: step.pivotY,
+        pivotZ: step.pivotZ,
+      };
   }
-  return {
-    kind: 'rotate',
-    xDeg: step.xDeg,
-    yDeg: step.yDeg,
-    zDeg: step.zDeg,
-  };
 }
 
 export function cloneBrepProfilePlan(plan: BrepProfilePlan | null): BrepProfilePlan | null {

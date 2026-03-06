@@ -36,6 +36,8 @@ Update it whenever:
 | `rect/circle/roundedRect.revolve(degrees)` | Supported | Yes | Replayed around Forge's revolve axis convention |
 | `shape.translate()` | Supported | Yes | Recorded as exact solid transform |
 | `shape.rotate(x, y, z)` | Supported | Yes | Euler replay only |
+| `rotateAround(...)` | Supported | Yes | Exact arbitrary-axis rotation is recorded with axis + pivot |
+| `pointAlong(...)` | Supported | Yes | Replayed via exact arbitrary-axis rotation from Forge's +Z axis |
 | `union()` | Supported | Yes | Only when every operand is exact-exportable |
 | `difference()` | Supported | Yes | Only when every operand is exact-exportable |
 | `intersection()` | Supported | Yes | Only when every operand is exact-exportable |
@@ -44,7 +46,7 @@ Update it whenever:
 | Sketch `offset()` | Unsupported | No | Requires exact 2D offset reconstruction |
 | Sketch `mirror()` / arbitrary `warp()` | Unsupported | No | Not recorded in export plan |
 | `Shape.transform(matrix)` | Unsupported | No | Arbitrary affine replay not implemented |
-| `rotateAround(...)` / `pointAlong(...)` / `mirror(...)` | Unsupported | No | Needs exact transform-plan support |
+| `mirror(...)` | Unsupported | No | Exact mirror replay is not implemented yet |
 | `loft()` | Unsupported | No | Current Forge implementation is sampled/level-set |
 | `sweep()` | Unsupported | No | Current Forge implementation is sampled/level-set |
 | `levelSet()` | Unsupported | No | Mesh/SDF output by design |
@@ -59,6 +61,6 @@ Update it whenever:
 ## Planned Expansion Order
 
 1. Exact 2D profile replay for `polygon`, direct `ellipse()`, `slot()`, and `star()`
-2. Exact transform replay for `rotateAround`, `mirror`, and matrix-safe subsets
+2. Exact transform replay for `mirror` and matrix-safe subsets
 3. Exact OCCT-native operations where BREP matters most: `shell`, precise fillet/chamfer, sketch-on-face
 4. Optional STEP product structure and metadata export

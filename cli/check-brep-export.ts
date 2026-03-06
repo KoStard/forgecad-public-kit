@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { init, runScript } from '../src/forge/headless';
 import { buildBrepExportManifest } from '../src/forge/brepExport';
-import type { BrepProfilePlan, BrepShapePlan } from '../src/forge/brepPlan';
+import type { BrepProfilePlan, BrepShapePlan, BrepShapeTransformStep } from '../src/forge/brepPlan';
 
 function runExactManifest(code: string) {
   const files: Record<string, string> = { 'main.forge.js': code };
@@ -36,6 +36,22 @@ function collectProfiles(plan: BrepShapePlan): BrepProfilePlan[] {
       return plan.shapes.flatMap(collectProfiles);
     case 'transform':
       return collectProfiles(plan.base);
+  }
+}
+
+function collectShapeTransforms(plan: BrepShapePlan): BrepShapeTransformStep[] {
+  switch (plan.kind) {
+    case 'box':
+    case 'cylinder':
+    case 'sphere':
+      return [];
+    case 'extrude':
+    case 'revolve':
+      return [];
+    case 'boolean':
+      return plan.shapes.flatMap(collectShapeTransforms);
+    case 'transform':
+      return [...plan.steps, ...collectShapeTransforms(plan.base)];
   }
 }
 
@@ -109,11 +125,42 @@ return [{ name: 'Lead-In Ring', shape: leadIn }];
   );
 }
 
+function checkRotateAroundTransformPlan(): void {
+  const plan = runExactManifest(`
+const door = box(80, 4, 120, false).rotateAround([0, 0, 1], 35, [0, 0, 0]);
+return [{ name: 'Door', shape: door }];
+`);
+
+  const rotateAround = collectShapeTransforms(plan).find((step) => step.kind === 'rotateAround');
+  assert(rotateAround, 'Expected rotateAround transform step to be preserved');
+  assert.equal(rotateAround.axisX, 0);
+  assert.equal(rotateAround.axisY, 0);
+  assert.equal(rotateAround.axisZ, 1);
+  assert.equal(rotateAround.degrees, 35);
+}
+
+function checkPointAlongOnPrimitiveBoolean(): void {
+  const plan = runExactManifest(`
+const pipe = cylinder(60, 5).pointAlong([0, 1, 0]);
+const body = box(30, 30, 30, true).subtract(pipe);
+return [{ name: 'Pipe Cut', shape: body }];
+`);
+
+  const rotateAround = collectShapeTransforms(plan).find((step) => step.kind === 'rotateAround');
+  assert(rotateAround, 'Expected pointAlong() to preserve an exact rotateAround transform step');
+  assert.equal(rotateAround.axisX, -1);
+  assert.equal(rotateAround.axisY, 0);
+  assert.equal(rotateAround.axisZ, 0);
+  assert.equal(rotateAround.degrees, 90);
+}
+
 async function main() {
   await init();
   checkRoundedRectProfileTransforms();
   checkRoundedRectBooleanChain();
   checkProfileBooleanAndTaperedExtrude();
+  checkRotateAroundTransformPlan();
+  checkPointAlongOnPrimitiveBoolean();
   console.log('✓ BREP export invariants passed');
 }
 

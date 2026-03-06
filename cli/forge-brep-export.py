@@ -209,6 +209,15 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
                 if abs(step["zDeg"]) > 1e-9:
                     result = result.rotate((0, 0, 0), (0, 0, 1), step["zDeg"])
                 continue
+            if step["kind"] == "rotateAround":
+                pivot = (step["pivotX"], step["pivotY"], step["pivotZ"])
+                axis_end = (
+                    step["pivotX"] + step["axisX"],
+                    step["pivotY"] + step["axisY"],
+                    step["pivotZ"] + step["axisZ"],
+                )
+                result = result.rotate(pivot, axis_end, step["degrees"])
+                continue
             raise ValueError(f"Unsupported transform step: {step['kind']}")
         return result
     raise ValueError(f"Unsupported plan kind: {kind}")
