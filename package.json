@@ -13,6 +13,7 @@
     "gif": "npx tsx cli/forge-gif.ts",
     "report": "npx tsx cli/forge-report.ts",
     "svg": "npx tsx cli/forge-svg.ts",
+    "sdf": "npx tsx cli/forge-sdf.ts",
     "step": "npx tsx cli/forge-brep.ts --format step",
     "brep": "npx tsx cli/forge-brep.ts --format brep",
     "test-run": "npx tsx cli/test-run.ts",

@@ -386,6 +386,8 @@ type AssemblyPartMetadata = {
   tolerance?: string;
   qty?: number;
   notes?: string;
+  densityKgM3?: number;
+  massKg?: number;
   [key: string]: unknown;
 };
 type AssemblyPartOptions = {
@@ -399,6 +401,10 @@ type AssemblyJointOptions = {
   max?: number;
   default?: number;
   unit?: string;
+  effort?: number;
+  velocity?: number;
+  damping?: number;
+  friction?: number;
 };
 type AssemblyJointCouplingOptions = {
   terms: JointCouplingTerm[];
@@ -443,7 +449,67 @@ type AssemblySceneItem = {
   group?: Array<{ name: string; shape: Shape }>;
   metadata?: AssemblyPartMetadata;
 };
+type RobotLinkExportOptions = {
+  massKg?: number;
+  densityKgM3?: number;
+  collision?: 'visual' | 'none';
+};
+type RobotJointExportOptions = {
+  effort?: number;
+  velocity?: number;
+  damping?: number;
+  friction?: number;
+};
+type RobotDiffDrivePluginOptions = {
+  leftJoints: string[];
+  rightJoints: string[];
+  wheelSeparationMm: number;
+  wheelRadiusMm: number;
+  topic?: string;
+  odomTopic?: string;
+  tfTopic?: string;
+  frameId?: string;
+  odomFrameId?: string;
+  maxLinearVelocity?: number;
+  maxAngularVelocity?: number;
+  linearAcceleration?: number;
+  angularAcceleration?: number;
+};
+type RobotJointStatePublisherOptions = {
+  enabled?: boolean;
+  joints?: string[];
+  topic?: string;
+  updateRate?: number;
+};
+type RobotPose6 = [number, number, number, number, number, number];
+type RobotWorldKeyboardTeleopOptions = {
+  enabled?: boolean;
+  linearStep?: number;
+  angularStep?: number;
+};
+type RobotWorldOptions = {
+  name?: string;
+  generateDemoWorld?: boolean;
+  spawnPose?: RobotPose6;
+  keyboardTeleop?: RobotWorldKeyboardTeleopOptions;
+};
+type RobotExportOptions = {
+  assembly: Assembly;
+  modelName?: string;
+  state?: AssemblyJointState;
+  static?: boolean;
+  selfCollide?: boolean;
+  allowAutoDisable?: boolean;
+  links?: Record<string, RobotLinkExportOptions>;
+  joints?: Record<string, RobotJointExportOptions>;
+  plugins?: {
+    diffDrive?: RobotDiffDrivePluginOptions;
+    jointStatePublisher?: RobotJointStatePublisherOptions;
+  };
+  world?: RobotWorldOptions;
+};
 declare function bomToCsv(rows: BomRow[]): string;
+declare function robotExport(options: RobotExportOptions): void;
 declare class SolvedAssembly {
   readonly name: string;
   warnings(): string[];

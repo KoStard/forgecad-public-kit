@@ -85,6 +85,7 @@ import { partLibrary } from './library';
 import { ShapeGroup, group } from './group';
 import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
 import { bom, resetBom, getCollectedBom, type BomDef } from './bom';
+import { robotExport, resetRobotExport } from './robotExport';
 import {
   explodeView,
   resetExplodeView,
@@ -825,6 +826,8 @@ function executeFile(
       'dim', 'dimLine',
       // Bill of materials
       'bom',
+      // Robot export declarations
+      'robotExport',
       // Group
       'group', 'ShapeGroup',
       // Console
@@ -858,6 +861,7 @@ function executeFile(
       importSketch, importPart, importSvgSketch,
       dim, dimLine,
       bom,
+      robotExport,
       group, ShapeGroup,
       makeSandboxConsole(),
       cutPlane,
@@ -879,6 +883,7 @@ export function runScript(
   resetParams();
   resetDimensions();
   resetBom();
+  resetRobotExport();
   resetCutPlanes();
   resetExplodeView();
   resetJointsView();

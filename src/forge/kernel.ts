@@ -988,6 +988,9 @@ function resolveTargetAnchorLikePoint(
   if (!normalized) {
     throw new Error(`ShapeGroup targets only support built-in anchors, got "${ref}"`);
   }
+  if (!('_bbox' in target) || typeof target._bbox !== 'function') {
+    throw new Error('ShapeGroup anchor target is missing _bbox()');
+  }
   const bb = target._bbox();
   return resolveAnchor3D(
     bb.min as [number, number, number],
