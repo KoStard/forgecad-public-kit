@@ -42,7 +42,7 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
     opts?.twist == null || opts.twist === 0
   ) && (
     opts?.divisions == null || opts.divisions === 0
-  ) && scaleTop == null
+  )
     ? (() => {
         const profile = getSketchBrepProfilePlan(sketch);
         if (!profile) return null;
@@ -51,6 +51,7 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
           profile,
           height,
           center: opts?.center ?? false,
+          scaleTop,
         };
       })()
     : null);

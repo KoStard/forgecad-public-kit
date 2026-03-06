@@ -1,6 +1,7 @@
 export type BrepProfileTransformStep =
   | { kind: 'translate'; x: number; y: number }
-  | { kind: 'rotate'; degrees: number };
+  | { kind: 'rotate'; degrees: number }
+  | { kind: 'scale'; x: number; y: number };
 
 export type BrepProfilePlan =
   | {
@@ -11,8 +12,22 @@ export type BrepProfilePlan =
       transforms: BrepProfileTransformStep[];
     }
   | {
+      kind: 'roundedRect';
+      width: number;
+      height: number;
+      radius: number;
+      center: boolean;
+      transforms: BrepProfileTransformStep[];
+    }
+  | {
       kind: 'circle';
       radius: number;
+      transforms: BrepProfileTransformStep[];
+    }
+  | {
+      kind: 'boolean';
+      op: 'union' | 'difference' | 'intersection';
+      profiles: BrepProfilePlan[];
       transforms: BrepProfileTransformStep[];
     };
 
@@ -44,6 +59,7 @@ export type BrepShapePlan =
       profile: BrepProfilePlan;
       height: number;
       center: boolean;
+      scaleTop?: [number, number];
     }
   | {
       kind: 'revolve';
@@ -62,10 +78,14 @@ export type BrepShapePlan =
     };
 
 function cloneProfileTransform(step: BrepProfileTransformStep): BrepProfileTransformStep {
-  if (step.kind === 'translate') {
-    return { kind: 'translate', x: step.x, y: step.y };
+  switch (step.kind) {
+    case 'translate':
+      return { kind: 'translate', x: step.x, y: step.y };
+    case 'rotate':
+      return { kind: 'rotate', degrees: step.degrees };
+    case 'scale':
+      return { kind: 'scale', x: step.x, y: step.y };
   }
-  return { kind: 'rotate', degrees: step.degrees };
 }
 
 function cloneShapeTransform(step: BrepShapeTransformStep): BrepShapeTransformStep {
@@ -82,20 +102,38 @@ function cloneShapeTransform(step: BrepShapeTransformStep): BrepShapeTransformSt
 
 export function cloneBrepProfilePlan(plan: BrepProfilePlan | null): BrepProfilePlan | null {
   if (!plan) return null;
-  if (plan.kind === 'rect') {
-    return {
-      kind: 'rect',
-      width: plan.width,
-      height: plan.height,
-      center: plan.center,
-      transforms: plan.transforms.map(cloneProfileTransform),
-    };
+  switch (plan.kind) {
+    case 'rect':
+      return {
+        kind: 'rect',
+        width: plan.width,
+        height: plan.height,
+        center: plan.center,
+        transforms: plan.transforms.map(cloneProfileTransform),
+      };
+    case 'roundedRect':
+      return {
+        kind: 'roundedRect',
+        width: plan.width,
+        height: plan.height,
+        radius: plan.radius,
+        center: plan.center,
+        transforms: plan.transforms.map(cloneProfileTransform),
+      };
+    case 'circle':
+      return {
+        kind: 'circle',
+        radius: plan.radius,
+        transforms: plan.transforms.map(cloneProfileTransform),
+      };
+    case 'boolean':
+      return {
+        kind: 'boolean',
+        op: plan.op,
+        profiles: plan.profiles.map((profile) => cloneBrepProfilePlan(profile)!),
+        transforms: plan.transforms.map(cloneProfileTransform),
+      };
   }
-  return {
-    kind: 'circle',
-    radius: plan.radius,
-    transforms: plan.transforms.map(cloneProfileTransform),
-  };
 }
 
 export function cloneBrepShapePlan(plan: BrepShapePlan | null): BrepShapePlan | null {
@@ -119,6 +157,7 @@ export function cloneBrepShapePlan(plan: BrepShapePlan | null): BrepShapePlan | 
         profile: cloneBrepProfilePlan(plan.profile)!,
         height: plan.height,
         center: plan.center,
+        scaleTop: plan.scaleTop ? [plan.scaleTop[0], plan.scaleTop[1]] : undefined,
       };
     case 'revolve':
       return {
@@ -179,5 +218,18 @@ export function buildBrepBooleanPlan(
     kind: 'boolean',
     op,
     shapes: shapes.map((shape) => cloneBrepShapePlan(shape)!),
+  };
+}
+
+export function buildBrepBooleanProfilePlan(
+  op: 'union' | 'difference' | 'intersection',
+  profiles: Array<BrepProfilePlan | null>,
+): BrepProfilePlan | null {
+  if (profiles.some((profile) => profile == null)) return null;
+  return {
+    kind: 'boolean',
+    op,
+    profiles: profiles.map((profile) => cloneBrepProfilePlan(profile)!),
+    transforms: [],
   };
 }

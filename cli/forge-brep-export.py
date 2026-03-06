@@ -8,8 +8,9 @@
 
 import argparse
 import json
+import math
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 try:
     import cadquery as cq
@@ -20,25 +21,157 @@ except Exception as exc:
     )
 
 
-def apply_profile_transforms(wp: "cq.Workplane", profile: Dict[str, Any]) -> "cq.Workplane":
+def combine_shapes(op: str, shapes: List["cq.Shape"]) -> "cq.Shape":
+    if not shapes:
+        raise ValueError("Boolean operation has no shapes")
+    result = shapes[0]
+    for shape in shapes[1:]:
+        if op == "union":
+            result = result.fuse(shape)
+        elif op == "difference":
+            result = result.cut(shape)
+        elif op == "intersection":
+            result = result.intersect(shape)
+        else:
+            raise ValueError(f"Unsupported boolean op: {op}")
+    return result
+
+
+def multiply_affine(lhs: List[List[float]], rhs: List[List[float]]) -> List[List[float]]:
+    return [
+        [sum(lhs[row][k] * rhs[k][col] for k in range(3)) for col in range(3)]
+        for row in range(3)
+    ]
+
+
+def build_profile_transform_matrix(profile: Dict[str, Any]) -> Optional["cq.Matrix"]:
+    matrix = [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ]
+    has_transform = False
+
     for step in profile.get("transforms", []):
+        has_transform = True
         if step["kind"] == "translate":
-            wp = wp.transformed(offset=cq.Vector(step["x"], step["y"], 0))
+            step_matrix = [
+                [1.0, 0.0, float(step["x"])],
+                [0.0, 1.0, float(step["y"])],
+                [0.0, 0.0, 1.0],
+            ]
         elif step["kind"] == "rotate":
-            wp = wp.transformed(rotate=cq.Vector(0, 0, step["degrees"]))
+            radians = math.radians(float(step["degrees"]))
+            cos_a = math.cos(radians)
+            sin_a = math.sin(radians)
+            step_matrix = [
+                [cos_a, -sin_a, 0.0],
+                [sin_a, cos_a, 0.0],
+                [0.0, 0.0, 1.0],
+            ]
+        elif step["kind"] == "scale":
+            step_matrix = [
+                [float(step["x"]), 0.0, 0.0],
+                [0.0, float(step["y"]), 0.0],
+                [0.0, 0.0, 1.0],
+            ]
         else:
             raise ValueError(f"Unsupported profile transform: {step['kind']}")
-    return wp
+        matrix = multiply_affine(step_matrix, matrix)
+
+    if not has_transform:
+        return None
+
+    return cq.Matrix([
+        [matrix[0][0], matrix[0][1], 0.0, matrix[0][2]],
+        [matrix[1][0], matrix[1][1], 0.0, matrix[1][2]],
+        [0.0, 0.0, 1.0, 0.0],
+    ])
 
 
-def build_profile_workplane(profile: Dict[str, Any]) -> "cq.Workplane":
-    wp = cq.Workplane("XY")
-    wp = apply_profile_transforms(wp, profile)
-    if profile["kind"] == "rect":
-        return wp.rect(profile["width"], profile["height"], centered=profile["center"])
-    if profile["kind"] == "circle":
-        return wp.circle(profile["radius"])
-    raise ValueError(f"Unsupported profile kind: {profile['kind']}")
+def apply_profile_transforms(sketch: "cq.Sketch", profile: Dict[str, Any]) -> "cq.Sketch":
+    matrix = build_profile_transform_matrix(profile)
+    if matrix is None:
+        return sketch
+    return sketch.map(
+        lambda item: item.transformGeometry(matrix) if hasattr(item, "transformGeometry") else item
+    )
+
+
+def build_profile_sketch(profile: Dict[str, Any]) -> "cq.Sketch":
+    kind = profile["kind"]
+    if kind == "rect":
+        sketch = cq.Sketch().rect(profile["width"], profile["height"])
+        if not profile["center"]:
+            sketch = sketch.moved(cq.Location(cq.Vector(profile["width"] / 2, profile["height"] / 2, 0)))
+        return apply_profile_transforms(sketch, profile)
+
+    if kind == "roundedRect":
+        radius = min(profile["radius"], profile["width"] / 2, profile["height"] / 2)
+        sketch = cq.Sketch().rect(profile["width"], profile["height"])
+        if radius > 1e-9:
+            sketch = sketch.vertices().fillet(radius).reset()
+        if not profile["center"]:
+            sketch = sketch.moved(cq.Location(cq.Vector(profile["width"] / 2, profile["height"] / 2, 0)))
+        return apply_profile_transforms(sketch, profile)
+
+    if kind == "circle":
+        return apply_profile_transforms(cq.Sketch().circle(profile["radius"]), profile)
+
+    if kind == "boolean":
+        sketches = [build_profile_sketch(item) for item in profile["profiles"]]
+        if not sketches:
+            raise ValueError("Profile boolean has no child profiles")
+        result = sketches[0]
+        for sketch in sketches[1:]:
+            if profile["op"] == "union":
+                result = result + sketch
+            elif profile["op"] == "difference":
+                result = result - sketch
+            elif profile["op"] == "intersection":
+                result = result * sketch
+            else:
+                raise ValueError(f"Unsupported profile boolean op: {profile['op']}")
+        return apply_profile_transforms(result, profile)
+
+    raise ValueError(f"Unsupported profile kind: {kind}")
+
+
+def with_profile_scale(profile: Dict[str, Any], sx: float, sy: float) -> Dict[str, Any]:
+    clone = dict(profile)
+    clone["transforms"] = [*profile.get("transforms", []), {"kind": "scale", "x": sx, "y": sy}]
+    return clone
+
+
+def build_extruded_profile(
+    profile: Dict[str, Any],
+    height: float,
+    center: bool,
+    scale_top: Optional[List[float]] = None,
+) -> "cq.Shape":
+    if profile["kind"] == "boolean":
+        shapes = [build_extruded_profile(item, height, center, scale_top) for item in profile["profiles"]]
+        return combine_shapes(profile["op"], shapes)
+
+    if scale_top is None or (abs(scale_top[0] - 1.0) < 1e-9 and abs(scale_top[1] - 1.0) < 1e-9):
+        sketch = build_profile_sketch(profile)
+        return cq.Workplane("XY").placeSketch(sketch).extrude(height, both=center).val()
+
+    z0 = -height / 2 if center else 0.0
+    z1 = height / 2 if center else height
+    bottom = build_profile_sketch(profile).moved(cq.Location(cq.Vector(0, 0, z0)))
+    top = build_profile_sketch(with_profile_scale(profile, scale_top[0], scale_top[1])).moved(
+        cq.Location(cq.Vector(0, 0, z1))
+    )
+    return cq.Workplane("XY").placeSketch(bottom, top).loft().val()
+
+
+def build_revolved_profile(profile: Dict[str, Any], degrees: float) -> "cq.Shape":
+    if profile["kind"] == "boolean":
+        shapes = [build_revolved_profile(item, degrees) for item in profile["profiles"]]
+        return combine_shapes(profile["op"], shapes)
+    sketch = build_profile_sketch(profile)
+    return cq.Workplane("XY").placeSketch(sketch).revolve(degrees, (0, 0, 0), (0, 1, 0)).val()
 
 
 def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
@@ -57,26 +190,11 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
     if kind == "sphere":
         return cq.Solid.makeSphere(plan["radius"])
     if kind == "extrude":
-        wp = build_profile_workplane(plan["profile"])
-        return wp.extrude(plan["height"], both=plan["center"]).val()
+        return build_extruded_profile(plan["profile"], plan["height"], plan["center"], plan.get("scaleTop"))
     if kind == "revolve":
-        wp = build_profile_workplane(plan["profile"])
-        return wp.revolve(plan["degrees"], (0, 0, 0), (0, 1, 0)).val()
+        return build_revolved_profile(plan["profile"], plan["degrees"])
     if kind == "boolean":
-        shapes = [build_shape(item) for item in plan["shapes"]]
-        if not shapes:
-            raise ValueError("Boolean plan has no shapes")
-        result = shapes[0]
-        for shape in shapes[1:]:
-            if plan["op"] == "union":
-                result = result.fuse(shape)
-            elif plan["op"] == "difference":
-                result = result.cut(shape)
-            elif plan["op"] == "intersection":
-                result = result.intersect(shape)
-            else:
-                raise ValueError(f"Unsupported boolean op: {plan['op']}")
-        return result
+        return combine_shapes(plan["op"], [build_shape(item) for item in plan["shapes"]])
     if kind == "transform":
         result = build_shape(plan["base"])
         for step in plan["steps"]:

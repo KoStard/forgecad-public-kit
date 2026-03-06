@@ -20,7 +20,11 @@ export function sketchRotateAround(sketch: Sketch, degrees: number, pivot: [numb
 }
 
 export function sketchScale(sketch: Sketch, v: number | [number, number]): Sketch {
-  return setSketchBrepProfilePlan(new Sketch(sketch.cross.scale(v as any), sketch.colorHex), null);
+  const scale = typeof v === 'number' ? [v, v] : v;
+  return setSketchBrepProfilePlan(
+    new Sketch(sketch.cross.scale(v as any), sketch.colorHex),
+    appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), { kind: 'scale', x: scale[0], y: scale[1] }),
+  );
 }
 
 export function sketchMirror(sketch: Sketch, ax: [number, number]): Sketch {

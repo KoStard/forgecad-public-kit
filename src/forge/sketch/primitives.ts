@@ -20,7 +20,10 @@ export function roundedRect(width: number, height: number, radius: number, cente
   const r = Math.min(radius, width / 2, height / 2);
   const inner = getWasm().CrossSection.square([width - 2 * r, height - 2 * r], true)
     .translate(center ? 0 : width / 2, center ? 0 : height / 2);
-  return new Sketch(inner.offset(r, 'Round'));
+  return setSketchBrepProfilePlan(
+    new Sketch(inner.offset(r, 'Round')),
+    { kind: 'roundedRect', width, height, radius: r, center, transforms: [] },
+  );
 }
 
 export function polygon(points: ([number, number] | Point2D)[]): Sketch {
