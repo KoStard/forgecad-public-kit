@@ -2,6 +2,8 @@
 
 Convert 2D sketches into 3D shapes through extrusion or revolution. The sketch's color (if set) is carried over to the resulting Shape.
 
+If a sketch has been placed with [`onFace()`](sketch-on-face.md), extrusion follows that face normal instead of the global Z axis.
+
 ## Methods
 
 ### `.extrude(height, options?)`
@@ -28,6 +30,10 @@ const twisted = ngon(6, 20).extrude(60, {
 const tapered = circle2d(20).extrude(50, {
   scaleTop: 0.5
 });
+
+const badge = roundedRect(28, 10, 2, true)
+  .onFace(box(120, 60, 40, true), 'front', { v: 8 })
+  .extrude(2);
 ```
 
 ### `.revolve(degrees?, segments?)`

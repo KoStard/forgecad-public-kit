@@ -66,5 +66,5 @@ Update it whenever:
 
 1. Exact provenance-preserving replay for library helpers such as `lib.elbow()`, `lib.bolt()`, and related fastener/tube builders
 2. Safe exact affine scale replay where OCCT can preserve exact solids, especially scaled-sphere / pad workflows
-3. Exact OCCT-native operations where BREP matters most: `shell`, precise fillet/chamfer, sketch-on-face
+3. Exact OCCT-native operations where BREP matters most: `shell`, precise fillet/chamfer, richer face-driven feature ops
 4. Optional STEP product structure and metadata export

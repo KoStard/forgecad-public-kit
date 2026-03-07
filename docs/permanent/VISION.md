@@ -28,6 +28,7 @@ The kernel is not the product. The modeling layer on top is.
 - **Code-as-format** — plain JS/TS files, version-controllable, LLM-writable
 - **3D smoothing** — `smoothOut()` + `refine()` / `refineToLength()` / `refineToTolerance()` for edge rounding
 - **3D advanced ops** — `hull3d()` (convex hull of shapes + points), `levelSet()` (SDF-based shapes), `warp()`, `split()`, `splitByPlane()`, `trimByPlane()`
+- **Sketch on face** — `sketch.onFace(body, face, ...)` places a 2D sketch on a standard body face and extrudes from that face normal
 - **Part library** — bolt holes, counterbores, tubes, pipes, hex nuts, rounded boxes, brackets, hole patterns, threaded bolts/nuts (real helical threads via SDF levelSet)
 - **Colors** — `.color('#ff0000')` on both Shape and Sketch, preserved through transforms and booleans
 - **CLI tools** — SVG export (pure Node), PNG render (Puppeteer), all sharing the same engine via `headless.ts`
@@ -44,7 +45,6 @@ The kernel is not the product. The modeling layer on top is.
 | 2D sketch fillet | Insert tangent arc at path corners | Custom rounded profiles without `roundedRect` | Medium |
 | Arc entity | First-class arc in constraint system | Needed for fillet results to participate in constraints | Medium |
 | Shell operation | Hollow a solid with wall thickness | Enclosures, cases, containers | Medium |
-| Sketch on face | Project sketch onto a 3D face, extrude from it | Feature placement on existing geometry | Hard |
 | Per-edge 3D fillet | Round specific edges by exact radius | The #1 most-used Fusion360 operation | Very Hard (mesh kernel) |
 | Trim/extend | Cut or extend sketch entities at intersections | Complex sketch editing | Medium |
 | Splines | B-spline curves in sketches | Organic shapes | Medium |

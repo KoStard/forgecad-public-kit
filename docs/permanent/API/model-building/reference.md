@@ -924,6 +924,28 @@ return union2d(plate, arm);
 const shifted = rect(4, 70).attachTo(plate, 'bottom-left', 'top-left', [5, 0]);
 ```
 
+#### `.onFace(parent, face, opts?)`
+Place a sketch on a standard 3D face so it renders there and extrudes along that face normal.
+
+**Parameters:**
+- `parent` (`Shape | TrackedShape`)
+- `face` (`'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'`)
+- `opts` (object, optional):
+  - `u` (number) - face-local horizontal offset from face center
+  - `v` (number) - face-local vertical offset from face center
+  - `protrude` (number) - offset along the face normal. Positive = outward
+  - `selfAnchor` (`Anchor`) - 2D anchor to align to the face center. Default: `'center'`
+
+**Returns:** `Sketch`
+
+```javascript
+const panel = box(120, 60, 40, true);
+
+const logo = roundedRect(26, 10, 2, true)
+  .onFace(panel, 'front', { v: 8 })
+  .extrude(2);
+```
+
 #### `.rotateAround(degrees, pivot)`
 Rotate around a specific point instead of origin.
 

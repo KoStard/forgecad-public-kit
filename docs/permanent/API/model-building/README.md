@@ -16,8 +16,9 @@ This is the complete reading set for writing ForgeCAD models. If the task is "bu
 10. [sketch-transforms.md](sketch-transforms.md) - 2D transforms
 11. [sketch-booleans.md](sketch-booleans.md) - sketch boolean operations
 12. [sketch-operations.md](sketch-operations.md) - offset, hull, simplify, warp
-13. [sketch-extrude.md](sketch-extrude.md) - extrusion and revolve
-14. [sketch-anchor.md](sketch-anchor.md) - 2D anchor-based positioning
+13. [sketch-on-face.md](sketch-on-face.md) - attach sketches to standard 3D faces
+14. [sketch-extrude.md](sketch-extrude.md) - extrusion and revolve
+15. [sketch-anchor.md](sketch-anchor.md) - 2D anchor-based positioning
 
 ## Intentionally Excluded
 
