@@ -111,9 +111,11 @@ def apply_profile_transforms(sketch: "cq.Sketch", profile: Dict[str, Any]) -> "c
     matrix = build_profile_transform_matrix(profile)
     if matrix is None:
         return sketch
-    return sketch.map(
-        lambda item: item.transformGeometry(matrix) if hasattr(item, "transformGeometry") else item
-    )
+    faces = sketch.faces().vals()
+    transformed = cq.Sketch()
+    for face in faces:
+        transformed = transformed.face(face.transformGeometry(matrix))
+    return transformed.reset()
 
 
 def apply_shape_affine(shape: "cq.Shape", matrix: "cq.Matrix") -> "cq.Shape":
@@ -270,7 +272,7 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
             shape = shape.translate((0, 0, -plan["height"] / 2))
         return shape
     if kind == "sphere":
-        return cq.Solid.makeSphere(plan["radius"])
+        return cq.Workplane("XY").sphere(plan["radius"]).val()
     if kind == "extrude":
         return build_extruded_profile(plan["profile"], plan["height"], plan["center"], plan.get("scaleTop"))
     if kind == "revolve":
