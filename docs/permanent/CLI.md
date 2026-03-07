@@ -65,7 +65,7 @@ This exporter is `uv`-first. `cli/forge-brep-export.py` carries inline dependenc
 
 This exporter is intentionally exact-subset only. It does **not** try to convert arbitrary triangle meshes back into fake BREP. Instead, Forge records an exact export plan only for operations that can be replayed robustly in OpenCascade via CadQuery.
 
-The maintained feature matrix lives in [`docs/permanent/API/brep-export.md`](API/brep-export.md).
+The maintained feature matrix lives in [`docs/permanent/API/output/brep-export.md`](API/output/brep-export.md).
 
 If any returned solid object falls outside the exact subset, the CLI fails with a reason instead of silently exporting degraded geometry. When a scene mixes solids and 2D sketches, the exact solids export and the sketch-only objects are skipped with a warning.
 

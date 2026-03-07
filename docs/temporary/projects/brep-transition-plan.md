@@ -63,7 +63,7 @@ This is the correct place to formalize before any bigger migration. It lets Forg
 
 That is enough to make hybrid execution explicit without forcing a new language.
 
-The maintained exact-export parity matrix lives in [`docs/permanent/API/brep-export.md`](../../permanent/API/brep-export.md).
+The maintained exact-export parity matrix lives in [`docs/permanent/API/output/brep-export.md`](../../permanent/API/output/brep-export.md).
 
 ## Recommended architecture
 

@@ -200,7 +200,7 @@ Then propagate this through:
   - Pattern-enabled material shader + decal render path.
 - `src/components/CodeEditor.tsx`
   - Type declarations for new API.
-- `docs/permanent/API/API.md` + `examples/api/`
+- `docs/permanent/API/model-building/reference.md` + `examples/api/`
   - Usage docs and examples.
 
 ## Export/Report Expectations

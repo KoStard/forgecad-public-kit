@@ -385,7 +385,7 @@ Make sure each component can be manufactured.
 It should be mounted somewhere.
 Make it controllable through params.
 As this is a complex task, break it down to simpler ones, solve them, combine, iterate.
-Read examples/api/* and docs/permanent/API/* to learn about ForgeCAD.
+Read docs/permanent/API/model-building/README.md and examples/api/* to learn about ForgeCAD.
 Call it examples/robot_hand.forge.js
 Don't read any other files in the project, no other examples. It's an isolated experiment.
 Make it reliable, easy to 3D print, robust.

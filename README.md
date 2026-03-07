@@ -8,7 +8,7 @@ ForgeCAD is a multi-backend CAD system with a JavaScript/TypeScript modeling API
 
 TypeScript is the file format. The browser is the CAD system.
 
-[API Reference](docs/permanent/API/API.md) • [CLI Docs](docs/permanent/CLI.md) • [Vision](docs/permanent/VISION.md) • [Examples](examples)
+[API Reference](docs/permanent/API/README.md) • [CLI Docs](docs/permanent/CLI.md) • [Vision](docs/permanent/VISION.md) • [Examples](examples)
 
 ## Start Here
 
@@ -47,14 +47,16 @@ ForgeCAD is built to work cleanly with coding agents. Your CAD models are plain 
 
 When an AI model is asked to generate ForgeCAD models, require this workflow:
 
-1. Read **all files** in `docs/permanent/API/` first.
-2. Read **all files** in `examples/api/` next.
-3. Only then generate or modify `.forge.js` / `.sketch.js` models.
+1. Read `docs/permanent/API/model-building/README.md` first.
+2. Read every file listed there.
+3. Read the relevant files in `examples/api/` next.
+4. Only then generate or modify `.forge.js` / `.sketch.js` models.
+5. Read `docs/permanent/API/runtime/` or `docs/permanent/API/output/` only if the task explicitly needs viewport behavior, reporting, or export.
 
 Use this instruction in prompts to avoid missing API capabilities or producing invalid model code:
 
 ```text
-Before generating any ForgeCAD model code, read every file in docs/permanent/API/ and examples/api/ for full context. Then generate a runnable model using only documented ForgeCAD APIs and patterns from those files.
+Before generating any ForgeCAD model code, read docs/permanent/API/model-building/README.md, then every file it lists, then the relevant files in examples/api/. Only read docs/permanent/API/runtime/ or docs/permanent/API/output/ if the task explicitly needs those areas. Then generate a runnable model using only documented ForgeCAD APIs and patterns from those files.
 ```
 
 Example AI workflows:
@@ -218,7 +220,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 - `examples/api/brep-exportable.forge.js`: exact-exportable STEP/BREP subset demo
 - `examples/api/geometry-info.forge.js`: inspect backend/provenance info for solids
 
-BREP export support is intentionally tracked as a living parity table in [docs/permanent/API/brep-export.md](docs/permanent/API/brep-export.md).
+BREP export support is intentionally tracked as a living parity table in [docs/permanent/API/output/brep-export.md](docs/permanent/API/output/brep-export.md).
 
 ## Core architecture
 
@@ -278,7 +280,7 @@ npm run param-check -- path/to/your-example.forge.js --samples 10
 
 ## Additional docs
 
-- API: [`docs/permanent/API/API.md`](docs/permanent/API/API.md)
+- API: [`docs/permanent/API/README.md`](docs/permanent/API/README.md)
 - CLI: [`docs/permanent/CLI.md`](docs/permanent/CLI.md)
 - Vision: [`docs/permanent/VISION.md`](docs/permanent/VISION.md)
 - Coding notes: [`docs/permanent/CODING.md`](docs/permanent/CODING.md)

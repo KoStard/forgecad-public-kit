@@ -132,7 +132,7 @@ This standard is package-wide for any user-facing API exposed to scripts.
 - Runtime API and editor declarations must ship together:
   - Runtime surface: `src/forge/*` exports + `src/forge/runner.ts` sandbox bindings
   - Editor surface: `src/components/CodeEditor.tsx` `FORGE_TYPES`
-  - Docs surface: `docs/permanent/API/*.md`
+  - Docs surface: `docs/permanent/API/**/*.md`
 - If an important feature is missing from editor declarations, you must either:
   - implement declarations in the same change, or
   - create a tracked task in `tasks/` that explicitly names the missing surface and scope.
@@ -239,7 +239,7 @@ Before committing UI changes:
 2. It's auto-exported via `sketch/index.ts` → `headless.ts` → `index.ts`
 3. Add it to the sandbox in `src/forge/runner.ts` (both the `new Function()` args and the call)
 4. Add TypeScript hints in `src/components/CodeEditor.tsx` (`FORGE_TYPES`)
-5. Update `docs/permanent/API/sketch-primitives.md`
+5. Update `docs/permanent/API/model-building/sketch-primitives.md`
 6. Commit: "Add [primitive] sketch primitive"
 
 ### Adding a New 3D Primitive
@@ -247,7 +247,7 @@ Before committing UI changes:
 2. Export from `headless.ts`
 3. Add to runner sandbox in `src/forge/runner.ts`
 4. Add TypeScript hints in `src/components/CodeEditor.tsx`
-5. Update `docs/permanent/API/API.md`
+5. Update `docs/permanent/API/model-building/reference.md`
 6. Commit: "Add [primitive] 3D primitive"
 
 ### Adding a New CLI Command
