@@ -62,6 +62,8 @@ If you already have a Forge server running, point the CLI at it:
 npm run notebook -- examples/demo.forge-notebook.json --server http://localhost:5173 --code "show(box(40, 20, 10));"
 ```
 
+Notebook paths are resolved from the shell working directory before the CLI calls the server, so the server's opened project root does not add an extra path prefix.
+
 Notebook cell behavior:
 
 - Cells share state top-to-bottom

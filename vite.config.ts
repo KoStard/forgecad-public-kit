@@ -90,42 +90,65 @@ function readJsonBody(req: any): Promise<any> {
   });
 }
 
-function resolveProjectFilePath(projectPath: string | null, filename: string): string {
+function resolveProjectFileRequest(projectPath: string | null, filename: string): {
+  filePath: string;
+  filename: string;
+} {
   if (!projectPath) throw new Error('No project directory');
-  if (!filename || !isProjectFile(filename)) throw new Error('Invalid file type');
-  const abs = path.resolve(projectPath);
-  const filePath = path.join(abs, filename);
-  const relativePath = path.relative(abs, filePath);
-  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) throw new Error('Invalid path');
-  return filePath;
+  if (!filename) throw new Error('Invalid file path');
+  const requestedPath = filename;
+  const absProjectPath = path.resolve(projectPath);
+  const filePath = path.isAbsolute(filename)
+    ? path.resolve(filename)
+    : path.resolve(absProjectPath, filename);
+  if (!isProjectFile(filePath)) throw new Error('Invalid file type');
+  const relativePath = path.relative(absProjectPath, filePath);
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    throw new Error(`Path "${requestedPath}" is outside the opened project root`);
+  }
+  return {
+    filePath,
+    filename: relativePath.replace(/\\/g, '/'),
+  };
 }
 
 function loadNotebook(projectPath: string | null, filename: string, notebookText?: string, createIfMissing = false) {
-  if (!isNotebookFile(filename)) {
+  const resolved = resolveProjectFileRequest(projectPath, filename);
+  if (!isNotebookFile(resolved.filename)) {
     throw new Error('Notebook filename must end with .forge-notebook.json');
   }
   if (typeof notebookText === 'string') {
-    return parseNotebook(notebookText);
+    return {
+      filename: resolved.filename,
+      notebook: parseNotebook(notebookText),
+    };
   }
-  const filePath = resolveProjectFilePath(projectPath, filename);
-  if (!fs.existsSync(filePath)) {
-    if (createIfMissing) return createNotebook();
-    throw new Error(`Notebook "${filename}" does not exist`);
+  if (!fs.existsSync(resolved.filePath)) {
+    if (createIfMissing) {
+      return {
+        filename: resolved.filename,
+        notebook: createNotebook(),
+      };
+    }
+    throw new Error(`Notebook "${resolved.filename}" does not exist`);
   }
-  return parseNotebook(fs.readFileSync(filePath, 'utf-8'));
+  return {
+    filename: resolved.filename,
+    notebook: parseNotebook(fs.readFileSync(resolved.filePath, 'utf-8')),
+  };
 }
 
 function saveNotebook(projectPath: string | null, filename: string, notebookText: string): void {
-  const filePath = resolveProjectFilePath(projectPath, filename);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, notebookText, 'utf-8');
+  const resolved = resolveProjectFileRequest(projectPath, filename);
+  fs.mkdirSync(path.dirname(resolved.filePath), { recursive: true });
+  fs.writeFileSync(resolved.filePath, notebookText, 'utf-8');
 }
 
 async function executeNotebookRequest(body: any, createIfMissing = false) {
-  const filename = typeof body.filename === 'string' ? body.filename : '';
-  const notebook = loadNotebook(
+  const requestFilename = typeof body.filename === 'string' ? body.filename : '';
+  const { filename, notebook } = loadNotebook(
     projectDir,
-    filename,
+    requestFilename,
     typeof body.notebook === 'string' ? body.notebook : undefined,
     createIfMissing,
   );
@@ -217,9 +240,9 @@ function forgeProjectPlugin() {
                 sendJson(res, 400, { error: 'Invalid request' });
                 return;
               }
-              const filePath = resolveProjectFilePath(projectDir, filename);
-              fs.mkdirSync(path.dirname(filePath), { recursive: true });
-              fs.writeFileSync(filePath, content, 'utf-8');
+              const resolved = resolveProjectFileRequest(projectDir, filename);
+              fs.mkdirSync(path.dirname(resolved.filePath), { recursive: true });
+              fs.writeFileSync(resolved.filePath, content, 'utf-8');
               sendJson(res, 200, { success: true });
             })
             .catch((e: any) => {
@@ -241,20 +264,20 @@ function forgeProjectPlugin() {
             .then(async (body) => {
               const filename = typeof body.filename === 'string' ? body.filename : '';
               const source = typeof body.source === 'string' ? body.source : '';
-              const notebook = loadNotebook(
+              const loaded = loadNotebook(
                 projectDir,
                 filename,
                 typeof body.notebook === 'string' ? body.notebook : undefined,
                 true,
               );
               const appended = appendNotebookCell(
-                notebook,
+                loaded.notebook,
                 source,
                 typeof body.afterCellId === 'string' ? body.afterCellId : undefined,
               );
               const payload = await executeNotebookRequest({
                 ...body,
-                filename,
+                filename: loaded.filename,
                 notebook: serializeNotebook(appended.notebook),
                 cellId: appended.cell.id,
               }, true);

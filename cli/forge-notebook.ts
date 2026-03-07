@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { spawn, type ChildProcess } from 'child_process';
 import { createServer } from 'net';
-import { dirname, relative, resolve } from 'path';
+import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { stdin as input } from 'node:process';
 import { findProjectRoot } from './collect-files';
@@ -73,7 +73,9 @@ Explicit subcommands are still available:
 
 Options:
   --server <url>   Reuse an existing Forge server instead of auto-starting one
-  --port <n>       Preferred port when auto-starting a server (default: ${DEFAULT_PORT})`);
+  --port <n>       Preferred port when auto-starting a server (default: ${DEFAULT_PORT})
+
+Notebook paths resolve from the shell CWD before the request is sent to the server.`);
   process.exit(exitCode);
 }
 
@@ -269,27 +271,27 @@ async function startServer(projectDir: string, preferredPort: number): Promise<P
 }
 
 async function ensureServer(cli: ParsedCli): Promise<ServerHandle> {
+  const requestTarget = resolve(cli.target);
   const explicitBase = cli.serverBase || process.env.FORGE_NOTEBOOK_SERVER;
   if (explicitBase) {
     const baseUrl = explicitBase.replace(/\/+$/, '');
     if (!(await canReachServer(baseUrl))) {
       throw new Error(`Could not reach Forge server at ${baseUrl}.`);
     }
-    return { baseUrl, process: null, requestTarget: cli.target };
+    return { baseUrl, process: null, requestTarget };
   }
 
   const defaultBase = `http://localhost:${cli.port}`;
   if (await canReachServer(defaultBase)) {
-    return { baseUrl: defaultBase, process: null, requestTarget: cli.target };
+    return { baseUrl: defaultBase, process: null, requestTarget };
   }
 
-  const projectDir = findProjectRoot(cli.target);
+  const projectDir = findProjectRoot(requestTarget);
   const handle = await startServer(projectDir, cli.port);
   if (!(await canReachServer(handle.baseUrl))) {
     handle.process?.kill();
     throw new Error(`Started Forge server at ${handle.baseUrl}, but it did not respond to notebook requests.`);
   }
-  const requestTarget = relative(projectDir, resolve(cli.target)).replace(/\\/g, '/');
   return {
     ...handle,
     requestTarget,
