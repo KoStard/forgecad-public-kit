@@ -53,6 +53,14 @@ type PlacementReferenceInput = {
   surfaces?: Record<string, { center: [number, number, number]; normal: [number, number, number] }>;
   objects?: Record<string, Shape | TrackedShape | ShapeGroup | { min: [number, number, number]; max: [number, number, number] }>;
 };
+type FaceRef = {
+  name: string;
+  normal: [number, number, number];
+  center: [number, number, number];
+  planar?: boolean;
+  uAxis?: [number, number, number];
+  vAxis?: [number, number, number];
+};
 /** Import a 2D sketch from another file. Supports ".sketch.js" and ".svg". */
 declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch;
 /** Import a 3D part from another file. The file must return a Shape or TrackedShape. */
@@ -211,7 +219,8 @@ declare class Sketch {
   simplify(epsilon?: number): Sketch;
   warp(fn: (vert: [number, number]) => void): Sketch;
   attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: [number, number]): Sketch;
-  onFace(parent: Shape | TrackedShape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor }): Sketch;
+  onFace(parent: Shape | TrackedShape, face: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef, opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor }): Sketch;
+  onFace(face: FaceRef, opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor }): Sketch;
   rotateAround(degrees: number, pivot: [number, number]): Sketch;
   color(hex: string): Sketch;
   extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean }): TrackedShape;
@@ -321,7 +330,7 @@ declare class Rectangle2D {
 declare class TrackedShape {
   clone(): TrackedShape;
   duplicate(): TrackedShape;
-  face(name: string): { normal: [number, number, number]; center: [number, number, number] };
+  face(name: string): FaceRef;
   edge(name: string): { start: [number, number, number]; end: [number, number, number] };
   faceNames(): string[];
   edgeNames(): string[];

@@ -15,7 +15,7 @@ import {
   type GeometryInfo,
   type PlacementReferenceInput,
 } from '../kernel';
-import { Transform, type Mat4 } from '../transform';
+import { Transform, normalizeAxis, type Mat4 } from '../transform';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
 
 export type FaceName = string;
@@ -27,6 +27,12 @@ export interface FaceRef {
   normal: [number, number, number];
   /** Center point of the face */
   center: [number, number, number];
+  /** True when the face can host a 2D sketch placement frame */
+  planar?: boolean;
+  /** Face-local horizontal axis for planar faces */
+  uAxis?: [number, number, number];
+  /** Face-local vertical axis for planar faces */
+  vAxis?: [number, number, number];
 }
 
 export interface EdgeRef {
@@ -351,6 +357,8 @@ function offsetTopology(topo: Topology, dx: number, dy: number, dz: number): Top
     faces.set(name, {
       ...face,
       center: [face.center[0] + dx, face.center[1] + dy, face.center[2] + dz],
+      uAxis: face.uAxis ? [face.uAxis[0], face.uAxis[1], face.uAxis[2]] : undefined,
+      vAxis: face.vAxis ? [face.vAxis[0], face.vAxis[1], face.vAxis[2]] : undefined,
     });
   }
   const edges = new Map<EdgeName, EdgeRef>();
@@ -371,6 +379,8 @@ function cloneTopology(topo: Topology): Topology {
       ...face,
       normal: [face.normal[0], face.normal[1], face.normal[2]],
       center: [face.center[0], face.center[1], face.center[2]],
+      uAxis: face.uAxis ? [face.uAxis[0], face.uAxis[1], face.uAxis[2]] : undefined,
+      vAxis: face.vAxis ? [face.vAxis[0], face.vAxis[1], face.vAxis[2]] : undefined,
     });
   }
   const edges = new Map<EdgeName, EdgeRef>();
@@ -381,6 +391,31 @@ function cloneTopology(topo: Topology): Topology {
       end: [edge.end[0], edge.end[1], edge.end[2]],
     });
   }
+  return { faces, edges };
+}
+
+export function transformTopology(topo: Topology, m: Mat4 | Transform): Topology {
+  const tx = Transform.from(m);
+  const faces = new Map<FaceName, FaceRef>();
+  for (const [name, face] of topo.faces) {
+    faces.set(name, {
+      ...face,
+      normal: normalizeAxis(tx.vector(face.normal)),
+      center: tx.point(face.center),
+      uAxis: face.uAxis ? normalizeAxis(tx.vector(face.uAxis)) : undefined,
+      vAxis: face.vAxis ? normalizeAxis(tx.vector(face.vAxis)) : undefined,
+    });
+  }
+
+  const edges = new Map<EdgeName, EdgeRef>();
+  for (const [name, edge] of topo.edges) {
+    edges.set(name, {
+      ...edge,
+      start: tx.point(edge.start),
+      end: tx.point(edge.end),
+    });
+  }
+
   return { faces, edges };
 }
 
@@ -426,10 +461,26 @@ export function buildRectExtrusionTopology(
   const zBot = Math.min(z0, z1);
   const cx = rect.center.x;
   const cy = rect.center.y;
+  const topU: [number, number, number] = normalizeAxis([br.x - bl.x, br.y - bl.y, 0]);
+  const topV: [number, number, number] = normalizeAxis([tl.x - bl.x, tl.y - bl.y, 0]);
 
   // Faces
-  faces.set('top', { name: 'top', normal: [0, 0, 1], center: [cx, cy, zTop] });
-  faces.set('bottom', { name: 'bottom', normal: [0, 0, -1], center: [cx, cy, zBot] });
+  faces.set('top', {
+    name: 'top',
+    normal: [0, 0, 1],
+    center: [cx, cy, zTop],
+    planar: true,
+    uAxis: topU,
+    vAxis: topV,
+  });
+  faces.set('bottom', {
+    name: 'bottom',
+    normal: [0, 0, -1],
+    center: [cx, cy, zBot],
+    planar: true,
+    uAxis: topU,
+    vAxis: [-topV[0], -topV[1], -topV[2]],
+  });
 
   // Side faces named after the rectangle sides they came from
   const sideNames: [RectSide, Point2D, Point2D][] = [
@@ -447,10 +498,14 @@ export function buildRectExtrusionTopology(
     // Outward normal (for CCW winding)
     const nx = dy / len;
     const ny = -dx / len;
+    const uAxis: [number, number, number] = [dx / len, dy / len, 0];
     faces.set(`side-${sideName}`, {
       name: `side-${sideName}`,
       normal: [nx, ny, 0],
       center: [mid.x, mid.y, (zTop + zBot) / 2],
+      planar: true,
+      uAxis,
+      vAxis: [0, 0, 1],
     });
   }
 
@@ -491,9 +546,28 @@ export function buildCircleExtrusionTopology(
   const topRadius = circ.radiusTop ?? circ.radius;
   const midRadius = (Math.abs(circ.radius) + Math.abs(topRadius)) / 2;
 
-  faces.set('top', { name: 'top', normal: [0, 0, 1], center: [cx, cy, zTop] });
-  faces.set('bottom', { name: 'bottom', normal: [0, 0, -1], center: [cx, cy, zBot] });
-  faces.set('side', { name: 'side', normal: [1, 0, 0], center: [cx + midRadius, cy, (zTop + zBot) / 2] });
+  faces.set('top', {
+    name: 'top',
+    normal: [0, 0, 1],
+    center: [cx, cy, zTop],
+    planar: true,
+    uAxis: [1, 0, 0],
+    vAxis: [0, 1, 0],
+  });
+  faces.set('bottom', {
+    name: 'bottom',
+    normal: [0, 0, -1],
+    center: [cx, cy, zBot],
+    planar: true,
+    uAxis: [1, 0, 0],
+    vAxis: [0, -1, 0],
+  });
+  faces.set('side', {
+    name: 'side',
+    normal: [1, 0, 0],
+    center: [cx + midRadius, cy, (zTop + zBot) / 2],
+    planar: false,
+  });
 
   // Top and bottom rim edges (represented as a single named reference at 0°)
   edges.set('top-rim', { name: 'top-rim', start: [cx + topRadius, cy, zTop], end: [cx, cy + topRadius, zTop] });

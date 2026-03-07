@@ -3,6 +3,7 @@ import { Shape } from '../kernel';
 import type { BrepProfilePlan } from '../brepPlan';
 import { cloneBrepProfilePlan } from '../brepPlan';
 import type { Mat4 } from '../transform';
+import type { FaceRef } from './topology';
 
 type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type SketchPlacement3D = Mat4;
@@ -85,8 +86,8 @@ export class Sketch {
   revolve(degrees?: number, segments?: number): Shape { throw new Error('Not implemented'); }
   attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: [number, number]): Sketch { throw new Error('Not implemented'); }
   onFace(
-    parent: Shape | { toShape(): Shape } | { _bbox(): { min: number[]; max: number[] } },
-    face: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom',
+    parentOrFace: Shape | { toShape(): Shape } | { _bbox(): { min: number[]; max: number[] } } | FaceRef,
+    faceOrOpts?: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | string | FaceRef | { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor },
     opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor },
   ): Sketch { throw new Error('Not implemented'); }
 }

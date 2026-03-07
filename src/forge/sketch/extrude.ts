@@ -1,6 +1,6 @@
 import { Sketch, getSketchBrepProfilePlan, getSketchPlacement3D } from './core';
 import { Shape, setShapeBrepPlan } from '../kernel';
-import { TrackedShape, type Topology, type FaceName, type FaceRef, type EdgeName, type EdgeRef } from './topology';
+import { TrackedShape, transformTopology, type Topology, type FaceName, type FaceRef, type EdgeName, type EdgeRef } from './topology';
 
 function buildGenericExtrusionTopology(sketch: Sketch, height: number, center: boolean): Topology {
   const faces = new Map<FaceName, FaceRef>();
@@ -11,9 +11,28 @@ function buildGenericExtrusionTopology(sketch: Sketch, height: number, center: b
   const zBot = center ? -height / 2 : 0;
   const zTop = center ? height / 2 : height;
 
-  faces.set('top', { name: 'top', normal: [0, 0, 1], center: [cx, cy, zTop] });
-  faces.set('bottom', { name: 'bottom', normal: [0, 0, -1], center: [cx, cy, zBot] });
-  faces.set('side', { name: 'side', normal: [1, 0, 0], center: [b.max[0], cy, (zTop + zBot) / 2] });
+  faces.set('top', {
+    name: 'top',
+    normal: [0, 0, 1],
+    center: [cx, cy, zTop],
+    planar: true,
+    uAxis: [1, 0, 0],
+    vAxis: [0, 1, 0],
+  });
+  faces.set('bottom', {
+    name: 'bottom',
+    normal: [0, 0, -1],
+    center: [cx, cy, zBot],
+    planar: true,
+    uAxis: [1, 0, 0],
+    vAxis: [0, -1, 0],
+  });
+  faces.set('side', {
+    name: 'side',
+    normal: [1, 0, 0],
+    center: [b.max[0], cy, (zTop + zBot) / 2],
+    planar: false,
+  });
 
   return { faces, edges };
 }
@@ -59,7 +78,7 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
   const placed = new TrackedShape(shape, topo, 0, true);
   const placement = getSketchPlacement3D(sketch);
   if (!placement) return placed;
-  return placed.transform(placement);
+  return new TrackedShape(shape.transform(placement), transformTopology(topo, placement), 0, true);
 }
 
 export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number): Shape {
