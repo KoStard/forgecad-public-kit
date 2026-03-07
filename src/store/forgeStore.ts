@@ -12,6 +12,8 @@ import {
 } from '@forge/index';
 import { setParamOverrides } from '@forge/params';
 import projectFiles from 'virtual:forge-project';
+import { isNotebookFile, parseNotebook, resolveNotebookPreviewCellId, serializeNotebook, createNotebook } from '../notebook/model';
+import { runNotebook } from '../notebook/runtime';
 import { type ThemeName, applyTheme } from '../theme';
 import { clampAnimationSpeed } from '../animationSpeed';
 
@@ -58,6 +60,7 @@ const initialActive = (() => {
   return names.find((n) => n.endsWith('.forge.js'))
     || names.find((n) => n.endsWith('.sketch.js'))
     || names.find((n) => n.endsWith('.js'))
+    || names.find((n) => isNotebookFile(n))
     || names[0];
 })();
 
@@ -374,6 +377,94 @@ const syncJointAnimationState = (
   return { clip, progress, playing };
 };
 
+function createErrorRunResult(message: string, quality: ForgeQualityPreset): RunResult {
+  return {
+    shape: null,
+    sketch: null,
+    objects: [],
+    params: [],
+    dimensions: [],
+    bom: [],
+    cutPlanes: [],
+    explodeView: null,
+    jointsView: null,
+    viewConfig: null,
+    quality,
+    error: message,
+    timeMs: 0,
+    logs: [{ level: 'error', args: [message], timestamp: Date.now() }],
+  };
+}
+
+function runNotebookPreview(
+  fileName: string,
+  source: string,
+  files: Record<string, string>,
+  quality: ForgeQualityPreset,
+): RunResult {
+  try {
+    const notebook = parseNotebook(source);
+    const targetCellId = resolveNotebookPreviewCellId(notebook);
+    return runNotebook(notebook, fileName, files, {
+      quality,
+      targetCellId,
+    }).displayResult;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return createErrorRunResult(message, quality);
+  }
+}
+
+function buildRunState(
+  runResult: RunResult,
+  state: Pick<
+    ForgeStore,
+    | 'objectSettings'
+    | 'selectedObjectId'
+    | 'focusedObjectIds'
+    | 'cutPlaneEnabled'
+    | 'jointValues'
+    | 'jointAnimationClip'
+    | 'jointAnimationProgress'
+    | 'jointAnimationPlaying'
+    | 'hoveredJointName'
+  >,
+) {
+  const synced = syncObjectSettings(
+    runResult.objects,
+    state.objectSettings,
+    state.selectedObjectId,
+    state.focusedObjectIds,
+  );
+  const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, state.cutPlaneEnabled);
+  const nextJointValues = syncJointValues(runResult, state.jointValues);
+  const nextAnimationState = syncJointAnimationState(
+    runResult,
+    state.jointAnimationClip,
+    state.jointAnimationProgress,
+    state.jointAnimationPlaying,
+  );
+
+  return {
+    nextState: {
+      result: runResult,
+      consoleLogs: runResult.logs,
+      params: runResult.params,
+      jointValues: nextJointValues,
+      jointAnimationClip: nextAnimationState.clip,
+      jointAnimationProgress: nextAnimationState.progress,
+      jointAnimationPlaying: nextAnimationState.playing,
+      hoveredJointName: syncHoveredJointName(runResult, state.hoveredJointName),
+      objectSettings: synced.settings,
+      selectedObjectId: synced.selectedObjectId,
+      focusedObjectIds: synced.focusedObjectIds,
+      cutPlaneEnabled: nextCutPlaneEnabled,
+    },
+    nextCutPlaneEnabled,
+    nextObjectSettings: synced.settings,
+  };
+}
+
 const readViewPreferences = (): Partial<ViewPreferencesState> => {
   if (typeof window === 'undefined') return {};
   try {
@@ -428,7 +519,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (!normalized) return;
     if (get().files[normalized]) return;
     if (get().folders.includes(normalized)) return;
-    const template = normalized.endsWith('.svg')
+    const template = isNotebookFile(normalized)
+      ? serializeNotebook(createNotebook())
+      : normalized.endsWith('.svg')
       ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <path d="M 10 10 L 90 10 L 90 90 L 10 90 Z" fill="none" stroke="#000" stroke-width="4" />
 </svg>
@@ -608,43 +701,18 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const {
       files,
       activeFile,
-      paramOverrides,
-      jointValues,
-      jointAnimationClip,
-      jointAnimationProgress,
-      jointAnimationPlaying,
-      hoveredJointName,
       runQuality,
     } = get();
     const code = files[activeFile];
     if (!code) return;
-    if (!isRunnableFile(activeFile)) return;
-    setParamOverrides(paramOverrides);
-    const runResult = runScript(code, activeFile, files, { quality: runQuality });
-    const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId, get().focusedObjectIds);
-    const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
-    const nextJointValues = syncJointValues(runResult, jointValues);
-    const nextAnimationState = syncJointAnimationState(
-      runResult,
-      jointAnimationClip,
-      jointAnimationProgress,
-      jointAnimationPlaying,
-    );
-    set({
-      result: runResult,
-      consoleLogs: runResult.logs,
-      params: runResult.params,
-      jointValues: nextJointValues,
-      jointAnimationClip: nextAnimationState.clip,
-      jointAnimationProgress: nextAnimationState.progress,
-      jointAnimationPlaying: nextAnimationState.playing,
-      hoveredJointName: syncHoveredJointName(runResult, hoveredJointName),
-      objectSettings: synced.settings,
-      selectedObjectId: synced.selectedObjectId,
-      focusedObjectIds: synced.focusedObjectIds,
-      cutPlaneEnabled: nextCutPlaneEnabled,
-    });
-    writeViewPreferences({ objectSettings: synced.settings, cutPlaneEnabled: nextCutPlaneEnabled });
+    if (!isRunnableFile(activeFile) && !isNotebookFile(activeFile)) return;
+    setParamOverrides(get().paramOverrides);
+    const runResult = isNotebookFile(activeFile)
+      ? runNotebookPreview(activeFile, code, files, runQuality)
+      : runScript(code, activeFile, files, { quality: runQuality });
+    const applied = buildRunState(runResult, get());
+    set(applied.nextState);
+    writeViewPreferences({ objectSettings: applied.nextObjectSettings, cutPlaneEnabled: applied.nextCutPlaneEnabled });
   },
 
   setParam: (name, value) => {
@@ -654,41 +722,17 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const {
       files,
       activeFile,
-      jointValues,
-      jointAnimationClip,
-      jointAnimationProgress,
-      jointAnimationPlaying,
-      hoveredJointName,
       runQuality,
     } = get();
     const code = files[activeFile];
     if (!code) return;
-    if (!isRunnableFile(activeFile)) return;
-    const runResult = runScript(code, activeFile, files, { quality: runQuality });
-    const synced = syncObjectSettings(runResult.objects, get().objectSettings, get().selectedObjectId, get().focusedObjectIds);
-    const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, get().cutPlaneEnabled);
-    const nextJointValues = syncJointValues(runResult, jointValues);
-    const nextAnimationState = syncJointAnimationState(
-      runResult,
-      jointAnimationClip,
-      jointAnimationProgress,
-      jointAnimationPlaying,
-    );
-    set({
-      result: runResult,
-      consoleLogs: runResult.logs,
-      params: runResult.params,
-      jointValues: nextJointValues,
-      jointAnimationClip: nextAnimationState.clip,
-      jointAnimationProgress: nextAnimationState.progress,
-      jointAnimationPlaying: nextAnimationState.playing,
-      hoveredJointName: syncHoveredJointName(runResult, hoveredJointName),
-      objectSettings: synced.settings,
-      selectedObjectId: synced.selectedObjectId,
-      focusedObjectIds: synced.focusedObjectIds,
-      cutPlaneEnabled: nextCutPlaneEnabled,
-    });
-    writeViewPreferences({ objectSettings: synced.settings, cutPlaneEnabled: nextCutPlaneEnabled });
+    if (!isRunnableFile(activeFile) && !isNotebookFile(activeFile)) return;
+    const runResult = isNotebookFile(activeFile)
+      ? runNotebookPreview(activeFile, code, files, runQuality)
+      : runScript(code, activeFile, files, { quality: runQuality });
+    const applied = buildRunState(runResult, get());
+    set(applied.nextState);
+    writeViewPreferences({ objectSettings: applied.nextObjectSettings, cutPlaneEnabled: applied.nextCutPlaneEnabled });
   },
 
   setJointValue: (name, value) => set((state) => {
@@ -974,6 +1018,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
           suggestedName: activeFile,
           types: [
             { description: 'ForgeCAD scripts', accept: { 'text/javascript': ['.forge.js', '.sketch.js', '.js'] } },
+            { description: 'ForgeCAD notebooks', accept: { 'application/json': ['.forge-notebook.json'] } },
             { description: 'SVG', accept: { 'image/svg+xml': ['.svg'] } },
           ],
         });
@@ -999,7 +1044,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
           savedFiles: { ...s.savedFiles, [activeFile]: code } // This assumes we are satisfied with current content being "saved"
         }));
       } else {
-        const mime = activeFile.endsWith('.svg') ? 'image/svg+xml' : 'text/javascript';
+        const mime = isNotebookFile(activeFile)
+          ? 'application/json'
+          : (activeFile.endsWith('.svg') ? 'image/svg+xml' : 'text/javascript');
         const blob = new Blob([code], { type: mime });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1118,6 +1165,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
           : (availableFiles.find((n) => n.endsWith('.forge.js'))
             || availableFiles.find((n) => n.endsWith('.sketch.js'))
             || availableFiles.find((n) => n.endsWith('.js'))
+            || availableFiles.find((n) => isNotebookFile(n))
             || availableFiles[0]));
 
       const nextDirty = Object.keys(nextFiles).some((path) => nextSaved[path] !== nextFiles[path]);

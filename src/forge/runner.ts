@@ -150,6 +150,8 @@ export interface RunScriptOptions {
   debugImports?: boolean;
   /** Geometry quality profile for this execution. */
   quality?: ForgeQualityPreset;
+  /** Allow successful runs that intentionally do not return renderable objects. */
+  allowEmptyResult?: boolean;
 }
 
 // Collected logs from the current script execution
@@ -1078,7 +1080,7 @@ export function runScript(
         jointsView: getCollectedJointsView(),
         viewConfig: getCollectedViewConfig(),
         quality,
-        error: objects.length > 0 ? null : 'Script must return a Shape or Sketch',
+        error: objects.length > 0 || options.allowEmptyResult ? null : 'Script must return a Shape or Sketch',
         timeMs: performance.now() - t0,
         logs: _collectedLogs.slice(),
       };
