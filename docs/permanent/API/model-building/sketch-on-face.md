@@ -2,13 +2,10 @@
 
 Attach a 2D sketch to a 3D face so it renders in-place and extrudes along that face normal.
 
-This is the code-first equivalent of "start sketch on face" for the six standard body faces:
-- `front`
-- `back`
-- `left`
-- `right`
-- `top`
-- `bottom`
+This supports:
+- canonical body faces: `front`, `back`, `left`, `right`, `top`, `bottom`
+- tracked planar faces on `TrackedShape`, like `side-left`
+- direct `FaceRef` targets from `tracked.face('top')`
 
 ## `.onFace(parent, face, opts?)`
 
@@ -16,7 +13,7 @@ Places a sketch onto a parent face using face-local coordinates.
 
 **Parameters:**
 - `parent` (`Shape | TrackedShape`) - target body
-- `face` (`'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'`)
+- `face` (`'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | string | FaceRef`)
 - `opts` (object, optional):
   - `u` (number) - face-local horizontal offset from the face center
   - `v` (number) - face-local vertical offset from the face center
@@ -24,6 +21,24 @@ Places a sketch onto a parent face using face-local coordinates.
   - `selfAnchor` (`Anchor`) - which 2D sketch anchor aligns to the face center. Default: `'center'`
 
 **Returns:** `Sketch`
+
+## `.onFace(faceRef, opts?)`
+
+Places a sketch directly from a tracked planar `FaceRef`.
+
+This is useful when the script has already selected a face semantically:
+
+```javascript
+const panel = Rectangle2D.from3Points(
+  point(-30, -18),
+  point(28, -6),
+  point(18, 24),
+).extrude(16);
+
+const cap = circle2d(5)
+  .onFace(panel.face('top'), { u: 12, protrude: 0.05 })
+  .extrude(1.2);
+```
 
 ```javascript
 const body = box(120, 60, 40, true).color('#d8dce3');
@@ -41,15 +56,22 @@ return [
 
 ## Face-local coordinates
 
-- `front` / `back`: `u = X`, `v = Z`
-- `left` / `right`: `u` runs across the face, `v = Z`
-- `top` / `bottom`: `u = X`, `v` runs across the face
+- Canonical faces:
+  - `front` / `back`: `u = X`, `v = Z`
+  - `left` / `right`: `u` runs across the face, `v = Z`
+  - `top` / `bottom`: `u = X`, `v` runs across the face
+- Tracked planar faces use their own stored local frame:
+  - side faces of extruded rectangles: `u` follows the source edge, `v = Z`
+  - tracked `top` / `bottom` faces follow the source sketch axes
+  - direct `FaceRef` placement uses that face's `uAxis` / `vAxis`
 
 The sketch's local `+Z` becomes the face normal, so `extrude(positive)` goes outward from that face.
 
 ## Notes
 
 - This is a planar face-placement feature, not arbitrary curved-surface projection.
+- Tracked curved faces like `cylinder(...).face('side')` are rejected because they do not have a planar sketch frame.
 - The placed sketch still supports normal 2D operations like `translate`, `rotate`, `scale`, and sketch booleans before extrusion.
 - If multiple sketches share the same face placement, their 2D booleans preserve that shared placement.
 - If booleans mix sketches with different 3D placements, the result drops back to an unplaced sketch.
+- Extruding a placed sketch keeps the tracked `top` / `bottom` / `side` metadata from that extrusion, transformed into world space.

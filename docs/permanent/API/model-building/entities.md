@@ -49,8 +49,8 @@ c.pointAtAngle(90); // Point2D at top
 
 // Extrude to cylinder with topology
 const cyl = c.extrude(30);
-cyl.face('top');    // FaceRef
-cyl.face('side');   // FaceRef
+cyl.face('top');    // FaceRef (planar)
+cyl.face('side');   // FaceRef (curved, planar === false)
 
 // Construction methods
 Circle2D.fromCenterAndRadius(point(0, 0), 25);
@@ -105,7 +105,7 @@ const rect = Rectangle2D.fromCenterAndDimensions(point(0, 0), 100, 60);
 const box = rect.extrude(20);
 
 // Named faces
-box.face('top');          // FaceRef { normal, center }
+box.face('top');          // FaceRef { normal, center, planar, uAxis, vAxis }
 box.face('bottom');
 box.face('side-left');
 box.face('side-right');

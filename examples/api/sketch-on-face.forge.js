@@ -1,4 +1,5 @@
-// Sketch on face — place 2D profiles onto body faces, then extrude along the face normal.
+// Sketch on face — place 2D profiles onto canonical or tracked planar faces,
+// then extrude along that face normal.
 
 const body = box(140, 70, 44, true).color('#d5dbe3');
 
@@ -23,6 +24,25 @@ const sidePort = roundedRect(22, 10, 3, true)
   .extrude(3)
   .color('#20262e');
 
+const trackedPanel = Rectangle2D.from3Points(
+  point(-34, -18),
+  point(30, -6),
+  point(18, 26),
+)
+  .extrude(18)
+  .translate(0, 92, 0)
+  .color('#c4ccd6');
+
+const trackedSideBadge = roundedRect(22, 8, 2, true)
+  .onFace(trackedPanel, 'side-right', { v: -2, protrude: 0.05 })
+  .extrude(1.4)
+  .color('#27313c');
+
+const trackedTopCap = circle2d(5)
+  .onFace(trackedPanel.face('top'), { u: 12, protrude: 0.05 })
+  .extrude(1.2)
+  .color('#5a6c7c');
+
 cutPlane('Center X', [1, 0, 0], 0);
 
 return [
@@ -30,4 +50,7 @@ return [
   { name: 'Front Badge', shape: frontBadge },
   { name: 'Top Vent', shape: topVent },
   { name: 'Side Port', shape: sidePort },
+  { name: 'Tracked Panel', shape: trackedPanel },
+  { name: 'Tracked Side Badge', shape: trackedSideBadge },
+  { name: 'Tracked Top Cap', shape: trackedTopCap },
 ];

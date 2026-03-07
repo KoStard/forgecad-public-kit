@@ -28,7 +28,7 @@ The kernel is not the product. The modeling layer on top is.
 - **Code-as-format** — plain JS/TS files, version-controllable, LLM-writable
 - **3D smoothing** — `smoothOut()` + `refine()` / `refineToLength()` / `refineToTolerance()` for edge rounding
 - **3D advanced ops** — `hull3d()` (convex hull of shapes + points), `levelSet()` (SDF-based shapes), `warp()`, `split()`, `splitByPlane()`, `trimByPlane()`
-- **Sketch on face** — `sketch.onFace(body, face, ...)` places a 2D sketch on a standard body face and extrudes from that face normal
+- **Sketch on face** — `sketch.onFace(body, face, ...)` places a 2D sketch on canonical or tracked planar faces and extrudes from that face normal
 - **Part library** — bolt holes, counterbores, tubes, pipes, hex nuts, rounded boxes, brackets, hole patterns, threaded bolts/nuts (real helical threads via SDF levelSet)
 - **Colors** — `.color('#ff0000')` on both Shape and Sketch, preserved through transforms and booleans
 - **CLI tools** — SVG export (pure Node), PNG render (Puppeteer), all sharing the same engine via `headless.ts`

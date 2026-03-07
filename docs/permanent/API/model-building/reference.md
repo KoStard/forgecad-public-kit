@@ -128,7 +128,7 @@ Creates a rectangular box with named faces and edges.
 ```javascript
 const cube = box(50, 50, 50, true);  // Centered cube
 const plate = box(100, 80, 5);        // Corner at origin
-plate.face('top');                     // FaceRef { normal, center }
+plate.face('top');                     // FaceRef { normal, center, planar, uAxis, vAxis }
 plate.edge('vert-bl');                 // EdgeRef { start, end }
 ```
 
@@ -148,8 +148,8 @@ Creates a cylinder or cone with named faces and edges.
 const cyl = cylinder(50, 10);              // Cylinder
 const cone = cylinder(50, 20, 5);          // Cone (tapered)
 const hex = cylinder(10, 15, 15, 6);       // Hexagonal prism
-cyl.face('top');                            // FaceRef
-cyl.face('side');                           // FaceRef
+cyl.face('top');                            // FaceRef (planar)
+cyl.face('side');                           // FaceRef (curved, planar === false)
 ```
 
 ### `sphere(radius, segments?)`
@@ -925,11 +925,11 @@ const shifted = rect(4, 70).attachTo(plate, 'bottom-left', 'top-left', [5, 0]);
 ```
 
 #### `.onFace(parent, face, opts?)`
-Place a sketch on a standard 3D face so it renders there and extrudes along that face normal.
+Place a sketch on a canonical or tracked planar 3D face so it renders there and extrudes along that face normal.
 
 **Parameters:**
 - `parent` (`Shape | TrackedShape`)
-- `face` (`'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'`)
+- `face` (`'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | string | FaceRef`)
 - `opts` (object, optional):
   - `u` (number) - face-local horizontal offset from face center
   - `v` (number) - face-local vertical offset from face center
@@ -945,6 +945,26 @@ const logo = roundedRect(26, 10, 2, true)
   .onFace(panel, 'front', { v: 8 })
   .extrude(2);
 ```
+
+Tracked planar faces can also be addressed by name or passed directly:
+
+```javascript
+const angled = Rectangle2D.from3Points(
+  point(-30, -18),
+  point(28, -6),
+  point(18, 24),
+).extrude(16);
+
+const badge = roundedRect(18, 8, 2, true)
+  .onFace(angled, 'side-right', { protrude: 0.05 })
+  .extrude(1.2);
+
+const cap = circle2d(5)
+  .onFace(angled.face('top'), { u: 10, protrude: 0.05 })
+  .extrude(1);
+```
+
+Curved tracked faces such as `cylinder(30, 10).face('side')` are not valid sketch targets.
 
 #### `.rotateAround(degrees, pivot)`
 Rotate around a specific point instead of origin.
@@ -1107,7 +1127,7 @@ r.extrude(20);              // TrackedShape with named faces/edges
 ```javascript
 const box = rectangle(0, 0, 100, 60).extrude(20);
 
-box.face('top');           // FaceRef { normal, center }
+box.face('top');           // FaceRef { normal, center, planar, uAxis, vAxis }
 box.face('side-left');     // side face from rect's left edge
 box.edge('vert-bl');       // vertical edge at bottom-left corner
 box.faceNames();           // all face names
