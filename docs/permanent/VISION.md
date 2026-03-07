@@ -21,7 +21,7 @@ The kernel is not the product. The modeling layer on top is.
 - **Topology tracking** — `TrackedShape` preserves face/edge names through extrusion and translation. `shape.face('top')`, `shape.edge('vert-bl')`, `shape.rotateAroundEdge('top-bottom', 90)`.
 - **Sketch primitives** — `roundedRect`, `slot`, `star`, `ngon`, `ellipse`, `polygon`, path builder with stroke
 - **Patterns** — `linearPattern`, `circularPattern`, `mirrorCopy` for 3D shape arrays
-- **Fillets & chamfers** — `filletEdge()`, `chamferEdge()` for vertical edges using topology references
+- **Fillets & chamfers** — `filletCorners()` for selective 2D polygon corners, plus `filletEdge()` / `chamferEdge()` for vertical 3D edges using topology references
 - **Arc bridge** — `arcBridgeBetweenRects()` for smooth arc surfaces between rectangular areas (e.g., laptop hinges)
 - **Parameters** — `param()` creates live UI sliders, code re-executes on change
 - **Multi-file** — `importSketch()`, `importPart()` with circular import detection, folder support
@@ -42,7 +42,6 @@ The kernel is not the product. The modeling layer on top is.
 
 | Feature | What it does | Why it matters | Difficulty |
 |---------|-------------|----------------|------------|
-| 2D sketch fillet | Insert tangent arc at path corners | Custom rounded profiles without `roundedRect` | Medium |
 | Arc entity | First-class arc in constraint system | Needed for fillet results to participate in constraints | Medium |
 | Shell operation | Hollow a solid with wall thickness | Enclosures, cases, containers | Medium |
 | Per-edge 3D fillet | Round specific edges by exact radius | The #1 most-used Fusion360 operation | Very Hard (mesh kernel) |

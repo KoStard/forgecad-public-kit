@@ -71,6 +71,8 @@ const hull = hull2d(
 );
 ```
 
+`hull2d()` is best for intentionally blended convex silhouettes. If you need true corner fillets while keeping some neighboring corners sharp, use `filletCorners(...)` instead.
+
 ## Performance Note
 
 The multi-argument functions (`union2d`, `difference2d`, `intersection2d`) use Manifold's batch operations internally, which are faster than chaining `.add()` / `.subtract()` calls one by one. Prefer them when combining many sketches.

@@ -19,6 +19,48 @@ const inner = circle2d(20).offset(-2);     // Shrink by 2mm
 const sharp = ngon(6, 20).offset(3, 'Miter');
 ```
 
+Use the common `offset(-r).offset(+r)` pattern when you want to round **every convex corner** of a closed sketch.
+
+### `filletCorners(points, corners)`
+Round only specific convex corners of a polygon point list.
+
+**Parameters:**
+- `points` (([number, number] | Point2D)[]) - Closed polygon vertices in order
+- `corners` (`{ index: number, radius: number, segments?: number }[]`) - Which vertices to fillet
+
+**Returns:** `Sketch`
+
+```javascript
+const roofPoints = [
+  [0, 0],
+  [90, 0],
+  [90, 44],
+  [66, 74],
+  [45, 86],
+  [24, 74],
+  [0, 44],
+];
+
+const roof = filletCorners(roofPoints, [
+  { index: 3, radius: 19 },
+  { index: 4, radius: 19 },
+  { index: 5, radius: 19 },
+]);
+```
+
+Notes:
+- only convex corners are supported
+- if two neighboring fillets would overlap on the same edge, the function throws
+- compare `polygon(points)` and `filletCorners(points, ...)` before extruding when debugging mixed sharp-and-rounded outlines
+
+## Choosing A Rounding Strategy
+
+- `offset(-r).offset(+r)` rounds all convex corners of an existing closed profile
+- `stroke(points, width, 'Round')` thickens a centerline path; use it for ribs, traces, and wire-like geometry
+- `hull2d()` of circles creates a blended convex silhouette, closer to a capsule or cap than a true corner fillet
+- `filletCorners(points, ...)` is the right tool when some corners stay sharp and others need true tangent fillets
+- See `examples/api/sketch-rounding-strategies.forge.js` for a side-by-side comparison
+
 ### `.hull()`
 Returns the convex hull of this sketch.
 

@@ -55,10 +55,32 @@ const profile = outer.subtract(inner);
 return profile.extrude(height, { twist: 45, divisions: 32 });
 ```
 
-### Rounded Edges
+### Rounded Profiles
 ```javascript
 const base = rect(50, 30).offset(-3, 'Round').offset(3, 'Round');
 return base.extrude(10);
+```
+
+Use that pattern when every convex corner should round. For mixed sharp-and-rounded outlines, fillet only the intended vertices instead:
+
+```javascript
+const roofPoints = [
+  [0, 0],
+  [90, 0],
+  [90, 44],
+  [66, 74],
+  [45, 86],
+  [24, 74],
+  [0, 44],
+];
+
+const roof = filletCorners(roofPoints, [
+  { index: 3, radius: 19 },
+  { index: 4, radius: 19 },
+  { index: 5, radius: 19 },
+]);
+
+return roof.extrude(12);
 ```
 
 ### Chamfers and Fillets
@@ -70,6 +92,13 @@ const chamfer = box(10, 60, 10)
 
 return part.subtract(chamfer);
 ```
+
+### Choosing the right sketch-rounding tool
+
+- `offset(-r).offset(+r)` for rounding every convex corner of a closed outline
+- `stroke(points, width, 'Round')` for centerline-based geometry such as ribs or traces
+- `hull2d()` of circles for a blended cap/capsule silhouette
+- `filletCorners(points, ...)` for selective true-corner fillets on mixed profiles
 
 ## Best Practices
 
@@ -118,6 +147,22 @@ const withHole = base.subtract(cylinder(12, 5).translate(25, 25, 0));
 // return withHole;
 
 return withHole.add(cylinder(20, 3).translate(25, 25, 10));
+```
+
+For sketch-heavy work, compare the raw profile and the rounded profile before extruding:
+
+```javascript
+const raw = polygon(roofPoints);
+const rounded = filletCorners(roofPoints, [
+  { index: 3, radius: 19 },
+  { index: 4, radius: 19 },
+  { index: 5, radius: 19 },
+]);
+
+return [
+  { name: "Raw", sketch: raw },
+  { name: "Rounded", sketch: rounded.translate(120, 0) },
+];
 ```
 
 ## Error Handling
