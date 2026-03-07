@@ -49,6 +49,13 @@ npm run notebook -- examples/demo.forge-notebook.json
 npm run notebook -- run examples/demo.forge-notebook.json <cell-id>
 ```
 
+Export a notebook into a plain `.forge.js` script:
+
+```bash
+npm run notebook -- export examples/demo.forge-notebook.json
+npm run notebook -- export examples/demo.forge-notebook.json out/demo-from-notebook.forge.js
+```
+
 If you already have a Forge server running, point the CLI at it:
 
 ```bash
