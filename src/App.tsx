@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { initKernel } from '@forge/kernel';
 import { useForgeStore } from './store/forgeStore';
 import { CodeEditor } from './components/CodeEditor';
+import { NotebookEditor } from './components/NotebookEditor';
 import { Viewport } from './components/Viewport';
 import { ParamPanel } from './components/ParamPanel';
 import { ExportPanel } from './components/ExportPanel';
@@ -10,6 +11,7 @@ import { ViewPanel } from './components/ViewPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { FileSwitcher } from './components/FileSwitcher';
 import { ConsolePanel } from './components/ConsolePanel';
+import { isNotebookFile } from './notebook/model';
 
 const btnStyle = (active = false): React.CSSProperties => ({
   padding: '4px 10px',
@@ -139,6 +141,7 @@ export function App() {
   const kernelReady = useForgeStore((s) => s.kernelReady);
   const setKernelReady = useForgeStore((s) => s.setKernelReady);
   const execute = useForgeStore((s) => s.execute);
+  const activeFile = useForgeStore((s) => s.activeFile);
   const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
   const refreshFiles = useForgeStore((s) => s.refreshFiles);
@@ -153,6 +156,7 @@ export function App() {
     readPanelWidth(VIEW_PANEL_WIDTH_KEY, 280, minViewPanelWidth, maxViewPanelWidth)
   ));
   const dragStateRef = useRef<{ type: 'code' | 'view'; startX: number; startWidth: number } | null>(null);
+  const notebookMode = isNotebookFile(activeFile);
 
   useEffect(() => {
     initKernel().then(() => {
@@ -240,7 +244,7 @@ export function App() {
         {fileExplorerOpen && <FileExplorer />}
         <div style={{ width: codePanelWidth, minWidth: minCodePanelWidth, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--fc-border)' }}>
           <div style={{ flex: 1, minHeight: 0 }}>
-            <CodeEditor />
+            {notebookMode ? <NotebookEditor /> : <CodeEditor />}
           </div>
           <ParamPanel />
           <ConsolePanel />
