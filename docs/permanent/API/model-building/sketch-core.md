@@ -65,4 +65,4 @@ Anchor points for positioning sketches:
 ## Dimensions
 
 Use `dim()` / `dimLine()` for visual measurement callouts and report annotations.
-See [sketch-dimensions.md](sketch-dimensions.md) for options and ownership behavior.
+See [../output/dimensions.md](../output/dimensions.md) for options and ownership behavior.

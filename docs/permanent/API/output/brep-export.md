@@ -1,5 +1,7 @@
 # BREP Export Parity
 
+This file tracks exact STEP/BREP export support. It is intentionally separated from the model-building docs because it describes output coverage, not the authoring surface itself.
+
 This table is the source of truth for ForgeCAD exact STEP/BREP export support.
 
 Update it whenever:

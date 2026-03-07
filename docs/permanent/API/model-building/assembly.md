@@ -118,10 +118,9 @@ This keeps kinematic chains declarative and avoids repeated manual pivot math.
 - `assembly.sweepJoint("elbow", -20, 140, 24)` samples motion and reports collisions
 
 ## Common pitfalls
-- If parts vanish, check whether section clipping is enabled before debugging kinematics.
+- If parts vanish in the viewport, check whether a cut plane is active before debugging kinematics. The viewer-side APIs live in [../runtime/viewport.md](../runtime/viewport.md).
 - If a returned object is empty, Forge logs a warning in script output.
 
-## Manufacturing helpers
-- Per-part metadata in `addPart(..., { metadata })`
-- `solved.bom()` returns JSON-ready rows
-- `solved.bomCsv()` / `bomToCsv(rows)` for CSV export
+## Metadata
+- `addPart(..., { metadata })` attaches per-part metadata to an assembly part.
+- BOM/report helpers such as `solved.bom()` and `solved.bomCsv()` live in [../output/bom.md](../output/bom.md).
