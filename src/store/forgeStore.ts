@@ -1018,7 +1018,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
           suggestedName: activeFile,
           types: [
             { description: 'ForgeCAD scripts', accept: { 'text/javascript': ['.forge.js', '.sketch.js', '.js'] } },
-            { description: 'ForgeCAD notebooks', accept: { 'application/json': ['.forge.ipynb'] } },
+            { description: 'ForgeCAD notebooks', accept: { 'application/json': ['.forge-notebook.json'] } },
             { description: 'SVG', accept: { 'image/svg+xml': ['.svg'] } },
           ],
         });

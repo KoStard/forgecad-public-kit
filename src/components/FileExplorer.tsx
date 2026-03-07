@@ -319,7 +319,7 @@ export function FileExplorer() {
         <div style={{ padding: '4px 12px', borderBottom: '1px solid var(--fc-borderLight)' }}>
           <input
             autoFocus
-            placeholder={creating === 'folder' ? 'Folder name' : 'name.forge.js, name.sketch.js, name.forge.ipynb, or asset.svg'}
+            placeholder={creating === 'folder' ? 'Folder name' : 'name.forge.js, name.sketch.js, name.forge-notebook.json, or asset.svg'}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreating(null); }}

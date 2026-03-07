@@ -26,7 +26,7 @@ function resolveProjectDir(): string | null {
 }
 
 const projectDir = resolveProjectDir();
-const PROJECT_FILE_EXTS = ['.forge.js', '.sketch.js', '.svg', '.forge.ipynb'];
+const PROJECT_FILE_EXTS = ['.forge.js', '.sketch.js', '.svg', '.forge-notebook.json'];
 const isProjectFile = (name: string): boolean => PROJECT_FILE_EXTS.some((ext) => name.endsWith(ext));
 
 let notebookKernelReady: Promise<void> | null = null;
@@ -102,7 +102,7 @@ function resolveProjectFilePath(projectPath: string | null, filename: string): s
 
 function loadNotebook(projectPath: string | null, filename: string, notebookText?: string, createIfMissing = false) {
   if (!isNotebookFile(filename)) {
-    throw new Error('Notebook filename must end with .forge.ipynb');
+    throw new Error('Notebook filename must end with .forge-notebook.json');
   }
   if (typeof notebookText === 'string') {
     return parseNotebook(notebookText);

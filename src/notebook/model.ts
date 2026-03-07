@@ -1,4 +1,4 @@
-export const NOTEBOOK_FILE_EXTENSION = '.forge.ipynb';
+export const NOTEBOOK_FILE_EXTENSION = '.forge-notebook.json';
 export const NOTEBOOK_FORMAT = 'forgecad-notebook/v1';
 
 export interface NotebookExecutionSummary {

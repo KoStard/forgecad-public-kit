@@ -26,7 +26,7 @@ The key function is `runScript(code, fileName, allFiles)` — it wraps user code
 
 ### Notebook Cells (server-backed)
 
-Forge notebooks live in `.forge.ipynb` files and behave like lightweight Jupyter notebooks for ForgeCAD code cells.
+Forge notebooks live in `.forge-notebook.json` files and behave like lightweight Jupyter notebooks for ForgeCAD code cells.
 
 The browser and CLI both use the Vite server for notebook execution. The CLI does not run Forge locally for notebook cells; it just posts cell code to the running ForgeCAD server and reads the returned output summary.
 
@@ -39,20 +39,20 @@ npm run dev -- ./examples
 Append a new code cell and run it immediately:
 
 ```bash
-npm run notebook -- append examples/demo.forge.ipynb --code "show(box(40, 20, 10));"
+npm run notebook -- append examples/demo.forge-notebook.json --code "show(box(40, 20, 10));"
 ```
 
 Or pipe a larger cell in through stdin:
 
 ```bash
-cat /tmp/cell.js | npm run notebook -- append examples/demo.forge.ipynb
+cat /tmp/cell.js | npm run notebook -- append examples/demo.forge-notebook.json
 ```
 
 Re-run the last preview cell, or a specific cell id:
 
 ```bash
-npm run notebook -- run examples/demo.forge.ipynb
-npm run notebook -- run examples/demo.forge.ipynb <cell-id>
+npm run notebook -- run examples/demo.forge-notebook.json
+npm run notebook -- run examples/demo.forge-notebook.json <cell-id>
 ```
 
 Notebook cell behavior:

@@ -33,8 +33,8 @@ interface NotebookResponse {
 
 function usage(): never {
   console.error(`Usage:
-  npx tsx cli/forge-notebook.ts append <notebook.forge.ipynb> [--code "..."] [--file path] [--after cell-id] [--server url]
-  npx tsx cli/forge-notebook.ts run <notebook.forge.ipynb> [cell-id] [--server url]`);
+  npx tsx cli/forge-notebook.ts append <notebook.forge-notebook.json> [--code "..."] [--file path] [--after cell-id] [--server url]
+  npx tsx cli/forge-notebook.ts run <notebook.forge-notebook.json> [cell-id] [--server url]`);
   process.exit(1);
 }
 
