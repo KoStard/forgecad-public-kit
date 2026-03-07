@@ -36,6 +36,8 @@ Append a new code cell and run it immediately in one command:
 npm run notebook -- examples/demo.forge-notebook.json --code "show(box(40, 20, 10));"
 ```
 
+If the target notebook file does not exist yet, append mode auto-creates it first with the default ForgeCAD notebook structure, then adds the new cell.
+
 Or pipe a larger cell in through stdin:
 
 ```bash
@@ -48,6 +50,8 @@ Re-run the last preview cell, or a specific cell id:
 npm run notebook -- examples/demo.forge-notebook.json
 npm run notebook -- run examples/demo.forge-notebook.json <cell-id>
 ```
+
+`run` expects the notebook file to already exist. Auto-creation only applies to append flows (`--code`, `--file`, stdin, or the explicit `append` subcommand).
 
 Export a notebook into a plain `.forge.js` script:
 

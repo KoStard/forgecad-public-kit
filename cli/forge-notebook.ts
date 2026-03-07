@@ -71,6 +71,10 @@ Explicit subcommands are still available:
   npm run notebook -- run <notebook.forge-notebook.json> [cell-id]
   npm run notebook -- export <notebook.forge-notebook.json> [output.forge.js]
 
+Notes:
+  append auto-creates the notebook file if it does not exist yet
+  run/export require an existing notebook file
+
 Options:
   --server <url>   Reuse an existing Forge server instead of auto-starting one
   --port <n>       Preferred port when auto-starting a server (default: ${DEFAULT_PORT})`);
