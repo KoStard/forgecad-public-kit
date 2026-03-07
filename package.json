@@ -8,6 +8,7 @@
     "dev:blank": "vite",
     "open": "vite --",
     "build": "tsc && vite build",
+    "build:skill:forgecad": "node scripts/build-forgecad-skill.mjs",
     "preview": "vite preview",
     "render": "node cli/forge-render.mjs",
     "gif": "npx tsx cli/forge-gif.ts",
