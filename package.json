@@ -22,7 +22,10 @@
     "check:brep": "npx tsx cli/check-brep-export.ts",
     "check:placement": "npx tsx cli/check-placement-references.ts",
     "check:dimensions": "npx tsx cli/check-dimensions.ts",
-    "debug:dimensions": "npx tsx cli/debug-dimensions.ts"
+    "debug:dimensions": "npx tsx cli/debug-dimensions.ts",
+    "meta:init": "bash scripts/local-meta.sh init",
+    "meta:status": "bash scripts/local-meta.sh status",
+    "meta:path": "bash scripts/local-meta.sh path"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
