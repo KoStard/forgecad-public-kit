@@ -60,6 +60,7 @@ import {
   linearPattern,
   circularPattern,
   mirrorCopy,
+  filletCorners,
   filletEdge,
   chamferEdge,
   arcBridgeBetweenRects,
@@ -809,7 +810,7 @@ function executeFile(
       // Patterns
       'linearPattern', 'circularPattern', 'mirrorCopy',
       // Fillets
-      'filletEdge', 'chamferEdge',
+      'filletCorners', 'filletEdge', 'chamferEdge',
       // Arc bridge
       'arcBridgeBetweenRects',
       // Curves & surfacing
@@ -853,7 +854,7 @@ function executeFile(
       union2d, difference2d, intersection2d, hull2d,
       Point2D, Line2D, Circle2D, Rectangle2D, TrackedShape, point, line, circle, rectangle, Constraint, degrees, radians,
       linearPattern, circularPattern, mirrorCopy,
-      filletEdge, chamferEdge,
+      filletCorners, filletEdge, chamferEdge,
       arcBridgeBetweenRects,
       Curve3D, spline2d, spline3d, loft, sweep,
       param, Shape, Sketch, partLibrary,

@@ -1016,6 +1016,35 @@ const inner = circle2d(20).offset(-2);     // Shrink by 2mm
 const sharp = ngon(6, 20).offset(3, 'Miter');
 ```
 
+Use `offset(-r).offset(+r)` when you want to round **all convex corners** of a closed sketch.
+
+#### `filletCorners(points, corners)`
+Round only specific convex corners of a polygon point list.
+
+```javascript
+const roofPoints = [
+  [0, 0],
+  [90, 0],
+  [90, 44],
+  [66, 74],
+  [45, 86],
+  [24, 74],
+  [0, 44],
+];
+
+const roof = filletCorners(roofPoints, [
+  { index: 3, radius: 19 },
+  { index: 4, radius: 19 },
+  { index: 5, radius: 19 },
+]);
+```
+
+Rules of thumb:
+- `offset(-r).offset(+r)` rounds every convex corner in a closed profile
+- `stroke(points, width, 'Round')` is for thickening a centerline, not for selectively rounding a polygon
+- `hull2d()` of circles gives a blended convex cap/capsule silhouette
+- `filletCorners(points, ...)` is the right choice when some corners stay sharp
+
 #### `.simplify(epsilon?)`
 Removes vertices that don't significantly affect the shape.
 
@@ -1177,7 +1206,7 @@ const full = mirrorCopy(box(50, 30, 10), [1, 0, 0]);
 
 ## Fillets & Chamfers
 
-Approximate fillets and chamfers for vertical edges using topology references.
+`filletCorners()` handles selective 2D polygon corners. The helpers below approximate 3D fillets and chamfers for vertical edges using topology references.
 
 ### `filletEdge(shape, edge, radius, quadrant?, segments?)`
 ```javascript

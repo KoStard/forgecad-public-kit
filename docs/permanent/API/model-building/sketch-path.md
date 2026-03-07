@@ -66,3 +66,5 @@ const bracket = stroke([[0, 0], [50, 0], [50, -70]], 4);
 // Rounded corners
 const rounded = stroke([[0, 0], [50, 0], [50, -50]], 4, 'Round');
 ```
+
+Use `stroke(..., 'Round')` for centerline-based geometry such as ribs, traces, and wire-like profiles. It is not the same as rounding selected corners of an existing closed polygon. For mixed sharp-and-rounded outlines, build the polygon first and use `filletCorners(...)`.
