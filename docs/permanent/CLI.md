@@ -79,6 +79,34 @@ uv run scripts/brep/rerun_failures.py tmp/brep-matrix-step-20260306T120000Z.json
 
 These scripts use the repo-local `.venv-brep/.venv/bin/python` by default, run exports through a bounded parallel worker pool, and write JSON reports under `tmp/`.
 
+### SDF Robot Export (Gazebo package)
+
+```bash
+npm run sdf -- examples/api/sdf-rover-demo.forge.js
+
+# Optional output directory:
+npm run sdf -- --output out/forge_scout examples/api/sdf-rover-demo.forge.js
+```
+
+This exporter writes a Gazebo-friendly package workspace:
+
+- `models/<model-name>/model.sdf`
+- `models/<model-name>/model.config`
+- `models/<model-name>/meshes/*.stl`
+- `worlds/<world-name>.sdf` when the script requests a demo world
+- `manifest.json` with topic names, link/joint mappings, and exporter warnings
+
+The script must call `robotExport({...})` with an `assembly(...)` graph. The exporter uses the declared parts + joints directly; it does **not** try to infer a robot from flattened scene meshes.
+
+Current behavior:
+
+- Per-link geometry is exported as STL mesh assets
+- Collision geometry reuses the same mesh unless `collision: 'none'` is set on a link
+- Link mass comes from `massKg`, else `densityKgM3 * volume`, else a default density
+- Inertia is an approximate box fit based on link bounds
+- Coupled joints are currently rejected
+- Parts without geometry are currently rejected
+
 ### PNG Render (requires Chrome)
 
 ```bash

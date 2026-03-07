@@ -428,6 +428,37 @@ Solved assembly helpers:
 - `solved.bom()` / `solved.bomCsv()`
 - `bomToCsv(rows)` (standalone helper)
 
+### `robotExport(options)`
+Declares that the current script should also export an `assembly(...)` as a robot package for the SDF CLI.
+
+Key fields:
+- `assembly`: required source assembly graph
+- `modelName`: simulator-facing model name
+- `links.<part>.massKg` or `densityKgM3`: inertial hints
+- `joints.<joint>.effort|velocity|damping|friction`: simulator tuning
+- `plugins.diffDrive`: diff-drive plugin wiring for Gazebo
+- `world.generateDemoWorld`: emit a simple obstacle-course world alongside the model
+
+Example:
+
+```javascript
+robotExport({
+  assembly: mech,
+  modelName: "Forge Scout",
+  links: {
+    Base: { massKg: 12 },
+  },
+  plugins: {
+    diffDrive: {
+      leftJoints: ["leftFront", "leftRear"],
+      rightJoints: ["rightFront", "rightRear"],
+      wheelSeparationMm: 320,
+      wheelRadiusMm: 72,
+    },
+  },
+});
+```
+
 ## 3D Boolean Operations
 
 ### `union(...shapes)`

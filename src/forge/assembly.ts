@@ -13,6 +13,8 @@ export interface PartMetadata {
   tolerance?: string;
   qty?: number;
   notes?: string;
+  densityKgM3?: number;
+  massKg?: number;
   [key: string]: unknown;
 }
 
@@ -28,6 +30,10 @@ export interface JointOptions {
   max?: number;
   default?: number;
   unit?: string;
+  effort?: number;
+  velocity?: number;
+  damping?: number;
+  friction?: number;
 }
 
 export interface JointCouplingTerm {
@@ -71,6 +77,10 @@ interface JointRecord {
   max?: number;
   defaultValue: number;
   unit?: string;
+  effort?: number;
+  velocity?: number;
+  damping?: number;
+  friction?: number;
 }
 
 interface JointCouplingTermRecord {
@@ -82,6 +92,43 @@ interface JointCouplingRecord {
   joint: string;
   terms: JointCouplingTermRecord[];
   offset: number;
+}
+
+export interface AssemblyPartDef {
+  name: string;
+  part: AssemblyPart;
+  base: Transform;
+  metadata?: PartMetadata;
+}
+
+export interface AssemblyJointDef {
+  name: string;
+  type: JointType;
+  parent: string;
+  child: string;
+  frame: Transform;
+  axis: Vec3;
+  min?: number;
+  max?: number;
+  defaultValue: number;
+  unit?: string;
+  effort?: number;
+  velocity?: number;
+  damping?: number;
+  friction?: number;
+}
+
+export interface AssemblyJointCouplingDef {
+  joint: string;
+  terms: JointCouplingTermRecord[];
+  offset: number;
+}
+
+export interface AssemblyDefinition {
+  name: string;
+  parts: AssemblyPartDef[];
+  joints: AssemblyJointDef[];
+  jointCouplings: AssemblyJointCouplingDef[];
 }
 
 export interface BomRow {
@@ -345,6 +392,10 @@ export class Assembly {
       max: options.max,
       defaultValue: options.default ?? 0,
       unit: options.unit,
+      effort: options.effort,
+      velocity: options.velocity,
+      damping: options.damping,
+      friction: options.friction,
     });
     return this;
   }
@@ -628,6 +679,39 @@ export class Assembly {
       });
     }
     return frames;
+  }
+
+  describe(): AssemblyDefinition {
+    return {
+      name: this.name,
+      parts: [...this.parts.values()].map((part) => ({
+        name: part.name,
+        part: part.part,
+        base: part.base,
+        metadata: part.metadata ? { ...part.metadata } : undefined,
+      })),
+      joints: [...this.joints.values()].map((joint) => ({
+        name: joint.name,
+        type: joint.type,
+        parent: joint.parent,
+        child: joint.child,
+        frame: joint.frame,
+        axis: [...joint.axis] as Vec3,
+        min: joint.min,
+        max: joint.max,
+        defaultValue: joint.defaultValue,
+        unit: joint.unit,
+        effort: joint.effort,
+        velocity: joint.velocity,
+        damping: joint.damping,
+        friction: joint.friction,
+      })),
+      jointCouplings: [...this.jointCouplings.values()].map((coupling) => ({
+        joint: coupling.joint,
+        terms: coupling.terms.map((term) => ({ joint: term.joint, ratio: term.ratio })),
+        offset: coupling.offset,
+      })),
+    };
   }
 }
 

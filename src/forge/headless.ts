@@ -57,6 +57,10 @@ export type { RevoluteJointOpts } from './joint';
 export { Assembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
 export type {
   AssemblyPart,
+  AssemblyPartDef,
+  AssemblyJointDef,
+  AssemblyJointCouplingDef,
+  AssemblyDefinition,
   JointType,
   JointState,
   PartMetadata,
@@ -71,6 +75,18 @@ export type {
   CollisionFinding,
   JointSweepFrame,
 } from './assembly';
+export { robotExport, resetRobotExport, getCollectedRobotExport } from './robotExport';
+export type {
+  RobotLinkExportOptions,
+  RobotJointExportOptions,
+  RobotDiffDrivePluginOptions,
+  RobotJointStatePublisherOptions,
+  RobotPose6,
+  RobotWorldKeyboardTeleopOptions,
+  RobotWorldOptions,
+  RobotExportOptions,
+  CollectedRobotExport,
+} from './robotExport';
 export { runScript } from './runner';
 export type { RunResult, SceneObject, LogEntry, RunScriptOptions } from './runner';
 export {
