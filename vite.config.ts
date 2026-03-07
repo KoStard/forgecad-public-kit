@@ -2,6 +2,17 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import fs from 'fs';
+import { init, resolveForgeQualityPreset } from './src/forge/headless';
+import { buildNotebookOutputs } from './src/notebook/output';
+import {
+  appendNotebookCell,
+  createNotebook,
+  isNotebookFile,
+  parseNotebook,
+  serializeNotebook,
+  updateNotebookCellExecution,
+} from './src/notebook/model';
+import { runNotebook } from './src/notebook/runtime';
 
 // Resolve project dir from: FORGE_PROJECT env var, or first non-flag CLI arg after '--'
 function resolveProjectDir(): string | null {
@@ -15,8 +26,17 @@ function resolveProjectDir(): string | null {
 }
 
 const projectDir = resolveProjectDir();
-const PROJECT_FILE_EXTS = ['.forge.js', '.sketch.js', '.svg'];
+const PROJECT_FILE_EXTS = ['.forge.js', '.sketch.js', '.svg', '.forge.ipynb'];
 const isProjectFile = (name: string): boolean => PROJECT_FILE_EXTS.some((ext) => name.endsWith(ext));
+
+let notebookKernelReady: Promise<void> | null = null;
+
+function ensureNotebookKernel(): Promise<void> {
+  if (!notebookKernelReady) {
+    notebookKernelReady = init();
+  }
+  return notebookKernelReady;
+}
 
 // Helper to scan project directory for forge/sketch files
 function scanProjectFiles(projectPath: string | null): Record<string, string> {
@@ -45,6 +65,105 @@ function scanProjectFiles(projectPath: string | null): Record<string, string> {
   }
   
   return entries;
+}
+
+function sendJson(res: any, statusCode: number, payload: unknown): void {
+  res.statusCode = statusCode;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify(payload));
+}
+
+function readJsonBody(req: any): Promise<any> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk: any) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function resolveProjectFilePath(projectPath: string | null, filename: string): string {
+  if (!projectPath) throw new Error('No project directory');
+  if (!filename || !isProjectFile(filename)) throw new Error('Invalid file type');
+  const abs = path.resolve(projectPath);
+  const filePath = path.join(abs, filename);
+  const relativePath = path.relative(abs, filePath);
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) throw new Error('Invalid path');
+  return filePath;
+}
+
+function loadNotebook(projectPath: string | null, filename: string, notebookText?: string, createIfMissing = false) {
+  if (!isNotebookFile(filename)) {
+    throw new Error('Notebook filename must end with .forge.ipynb');
+  }
+  if (typeof notebookText === 'string') {
+    return parseNotebook(notebookText);
+  }
+  const filePath = resolveProjectFilePath(projectPath, filename);
+  if (!fs.existsSync(filePath)) {
+    if (createIfMissing) return createNotebook();
+    throw new Error(`Notebook "${filename}" does not exist`);
+  }
+  return parseNotebook(fs.readFileSync(filePath, 'utf-8'));
+}
+
+function saveNotebook(projectPath: string | null, filename: string, notebookText: string): void {
+  const filePath = resolveProjectFilePath(projectPath, filename);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, notebookText, 'utf-8');
+}
+
+async function executeNotebookRequest(body: any, createIfMissing = false) {
+  const filename = typeof body.filename === 'string' ? body.filename : '';
+  const notebook = loadNotebook(
+    projectDir,
+    filename,
+    typeof body.notebook === 'string' ? body.notebook : undefined,
+    createIfMissing,
+  );
+
+  await ensureNotebookKernel();
+
+  const notebookText = serializeNotebook(notebook);
+  const allFiles = {
+    ...scanProjectFiles(projectDir),
+    [filename]: notebookText,
+  };
+  const quality = resolveForgeQualityPreset(typeof body.quality === 'string' ? body.quality : undefined);
+  const run = runNotebook(notebook, filename, allFiles, {
+    quality,
+    targetCellId: typeof body.cellId === 'string' ? body.cellId : undefined,
+  });
+
+  const nextNotebook = run.targetCellId
+    ? updateNotebookCellExecution(notebook, run.targetCellId, buildNotebookOutputs(run.cellResult))
+    : notebook;
+  const nextNotebookText = serializeNotebook(nextNotebook);
+  saveNotebook(projectDir, filename, nextNotebookText);
+
+  return {
+    cellId: run.targetCellId,
+    filename,
+    notebook: nextNotebook,
+    notebookText: nextNotebookText,
+    outputs: run.targetCellId
+      ? (nextNotebook.cells.find((cell) => cell.id === run.targetCellId)?.outputs ?? [])
+      : [],
+    summary: {
+      error: run.cellResult.error,
+      objectCount: run.cellResult.objects.length,
+      paramNames: run.cellResult.params.map((param) => param.name),
+      timeMs: run.cellResult.timeMs,
+    },
+  };
 }
 
 function forgeProjectPlugin() {
@@ -87,41 +206,61 @@ function forgeProjectPlugin() {
         
         // Handle /api/save - save a file
         if (req.method === 'POST' && req.url === '/api/save') {
-          let body = '';
-          req.on('data', (chunk: any) => body += chunk);
-          req.on('end', () => {
-            try {
-              const { filename, content } = JSON.parse(body);
+          readJsonBody(req)
+            .then((body) => {
+              const { filename, content } = body;
               if (!projectDir) {
-                res.statusCode = 400;
-                res.end(JSON.stringify({ error: 'No project directory' }));
+                sendJson(res, 400, { error: 'No project directory' });
                 return;
               }
               if (!filename || typeof content !== 'string') {
-                res.statusCode = 400;
-                res.end(JSON.stringify({ error: 'Invalid request' }));
+                sendJson(res, 400, { error: 'Invalid request' });
                 return;
               }
-              if (!isProjectFile(filename)) {
-                res.statusCode = 400;
-                res.end(JSON.stringify({ error: 'Invalid file type' }));
-                return;
-              }
-              const abs = path.resolve(projectDir);
-              const filePath = path.join(abs, filename);
-              if (!filePath.startsWith(abs)) {
-                res.statusCode = 400;
-                res.end(JSON.stringify({ error: 'Invalid path' }));
-                return;
-              }
+              const filePath = resolveProjectFilePath(projectDir, filename);
+              fs.mkdirSync(path.dirname(filePath), { recursive: true });
               fs.writeFileSync(filePath, content, 'utf-8');
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ success: true }));
-            } catch (e: any) {
-              res.statusCode = 500;
-              res.end(JSON.stringify({ error: e.message }));
-            }
-          });
+              sendJson(res, 200, { success: true });
+            })
+            .catch((e: any) => {
+              sendJson(res, 500, { error: e.message });
+            });
+          return;
+        }
+
+        if (req.method === 'POST' && req.url === '/api/notebook/execute') {
+          readJsonBody(req)
+            .then((body) => executeNotebookRequest(body, true))
+            .then((payload) => sendJson(res, 200, payload))
+            .catch((e: any) => sendJson(res, 500, { error: e.message }));
+          return;
+        }
+
+        if (req.method === 'POST' && req.url === '/api/notebook/append-cell') {
+          readJsonBody(req)
+            .then(async (body) => {
+              const filename = typeof body.filename === 'string' ? body.filename : '';
+              const source = typeof body.source === 'string' ? body.source : '';
+              const notebook = loadNotebook(
+                projectDir,
+                filename,
+                typeof body.notebook === 'string' ? body.notebook : undefined,
+                true,
+              );
+              const appended = appendNotebookCell(
+                notebook,
+                source,
+                typeof body.afterCellId === 'string' ? body.afterCellId : undefined,
+              );
+              const payload = await executeNotebookRequest({
+                ...body,
+                filename,
+                notebook: serializeNotebook(appended.notebook),
+                cellId: appended.cell.id,
+              }, true);
+              sendJson(res, 200, payload);
+            })
+            .catch((e: any) => sendJson(res, 500, { error: e.message }));
           return;
         }
         
