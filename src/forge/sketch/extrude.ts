@@ -1,4 +1,4 @@
-import { Sketch, getSketchBrepProfilePlan } from './core';
+import { Sketch, getSketchBrepProfilePlan, getSketchPlacement3D } from './core';
 import { Shape, setShapeBrepPlan } from '../kernel';
 import { TrackedShape, type Topology, type FaceName, type FaceRef, type EdgeName, type EdgeRef } from './topology';
 
@@ -56,11 +56,14 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
       })()
     : null);
   const topo = buildGenericExtrusionTopology(sketch, height, opts?.center ?? false);
-  return new TrackedShape(shape, topo, 0, true);
+  const placed = new TrackedShape(shape, topo, 0, true);
+  const placement = getSketchPlacement3D(sketch);
+  if (!placement) return placed;
+  return placed.transform(placement);
 }
 
 export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number): Shape {
-  return setShapeBrepPlan(new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex, {
+  const revolved = setShapeBrepPlan(new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex, {
     fidelity: 'kernel-native',
     sources: ['revolve'],
   }), (() => {
@@ -73,6 +76,9 @@ export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number):
       degrees,
     };
   })());
+  const placement = getSketchPlacement3D(sketch);
+  if (!placement) return revolved;
+  return revolved.transform(placement);
 }
 
 Sketch.prototype.extrude = function (height: number, opts?: {

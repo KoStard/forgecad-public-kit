@@ -14,6 +14,7 @@ import type {
 import type { DimensionDef } from '@forge/sketch/dimensions';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
+import { getSketchWorldMatrix } from '@forge/sketch/placement3d';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
 import { resolveJointViewValues } from '@forge/jointsView';
 import {
@@ -353,11 +354,13 @@ const resolveObjectCenter = (obj: SceneObject): [number, number, number] | null 
   if (obj.sketch) {
     try {
       const bb = obj.sketch.bounds();
-      return [
+      const local = new THREE.Vector3(
         (bb.min[0] + bb.max[0]) / 2,
         (bb.min[1] + bb.max[1]) / 2,
         0,
-      ];
+      );
+      local.applyMatrix4(new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch)));
+      return [local.x, local.y, local.z];
     } catch {
       return null;
     }
@@ -2482,10 +2485,13 @@ export function Viewport() {
   const objectMatrices = useMemo(() => {
     const out: Record<string, THREE.Matrix4> = {};
     objects.forEach((obj) => {
+      const baseMatrix = obj.sketch
+        ? new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch))
+        : new THREE.Matrix4();
       const jointMatrix = jointMatrices[obj.id] ?? new THREE.Matrix4();
       const offset = explodeOffsets[obj.id] ?? ZERO_OFFSET;
       const explodeMatrix = new THREE.Matrix4().makeTranslation(offset[0], offset[1], offset[2]);
-      out[obj.id] = explodeMatrix.multiply(jointMatrix);
+      out[obj.id] = explodeMatrix.multiply(jointMatrix).multiply(baseMatrix);
     });
     return out;
   }, [explodeOffsets, jointMatrices, objects]);
@@ -2587,7 +2593,7 @@ export function Viewport() {
             bounds,
             [bb.min[0], bb.min[1], 0],
             [bb.max[0], bb.max[1], 0],
-            IDENTITY_MATRIX,
+            new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch)),
           );
           hasBounds = true;
         } catch {

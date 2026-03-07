@@ -1,6 +1,7 @@
 export { Sketch, type Anchor } from './core';
 export * from './primitives';
 export * from './transforms';
+export * from './placement3d';
 export * from './booleans';
 export * from './operations';
 export * from './extrude';

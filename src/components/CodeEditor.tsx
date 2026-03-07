@@ -211,6 +211,7 @@ declare class Sketch {
   simplify(epsilon?: number): Sketch;
   warp(fn: (vert: [number, number]) => void): Sketch;
   attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: [number, number]): Sketch;
+  onFace(parent: Shape | TrackedShape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor }): Sketch;
   rotateAround(degrees: number, pivot: [number, number]): Sketch;
   color(hex: string): Sketch;
   extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean }): TrackedShape;

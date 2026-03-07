@@ -1,17 +1,23 @@
-import { Sketch, getSketchBrepProfilePlan, setSketchBrepProfilePlan } from './core';
+import { Sketch, copySketchPlacement3D, getSketchBrepProfilePlan, setSketchBrepProfilePlan } from './core';
 import { appendBrepProfileTransform } from '../brepPlan';
 
 export function sketchTranslate(sketch: Sketch, x: number, y = 0): Sketch {
-  return setSketchBrepProfilePlan(
-    new Sketch(sketch.cross.translate(x, y), sketch.colorHex),
-    appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), { kind: 'translate', x, y }),
+  return copySketchPlacement3D(
+    sketch,
+    setSketchBrepProfilePlan(
+      new Sketch(sketch.cross.translate(x, y), sketch.colorHex),
+      appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), { kind: 'translate', x, y }),
+    ),
   );
 }
 
 export function sketchRotate(sketch: Sketch, degrees: number): Sketch {
-  return setSketchBrepProfilePlan(
-    new Sketch(sketch.cross.rotate(degrees), sketch.colorHex),
-    appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), { kind: 'rotate', degrees }),
+  return copySketchPlacement3D(
+    sketch,
+    setSketchBrepProfilePlan(
+      new Sketch(sketch.cross.rotate(degrees), sketch.colorHex),
+      appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), { kind: 'rotate', degrees }),
+    ),
   );
 }
 
@@ -21,14 +27,17 @@ export function sketchRotateAround(sketch: Sketch, degrees: number, pivot: [numb
 
 export function sketchScale(sketch: Sketch, v: number | [number, number]): Sketch {
   const scale = typeof v === 'number' ? [v, v] : v;
-  return setSketchBrepProfilePlan(
-    new Sketch(sketch.cross.scale(v as any), sketch.colorHex),
-    appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), { kind: 'scale', x: scale[0], y: scale[1] }),
+  return copySketchPlacement3D(
+    sketch,
+    setSketchBrepProfilePlan(
+      new Sketch(sketch.cross.scale(v as any), sketch.colorHex),
+      appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), { kind: 'scale', x: scale[0], y: scale[1] }),
+    ),
   );
 }
 
 export function sketchMirror(sketch: Sketch, ax: [number, number]): Sketch {
-  return setSketchBrepProfilePlan(new Sketch(sketch.cross.mirror(ax), sketch.colorHex), null);
+  return copySketchPlacement3D(sketch, setSketchBrepProfilePlan(new Sketch(sketch.cross.mirror(ax), sketch.colorHex), null));
 }
 
 Sketch.prototype.translate = function (x: number, y = 0) { return sketchTranslate(this, x, y); };
