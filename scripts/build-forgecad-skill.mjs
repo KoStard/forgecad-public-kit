@@ -141,7 +141,6 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 ## Included Sources
 
 Keep this skill self-contained by relying on the inlined source corpus below.
-Regenerate this file with \`node scripts/build-forgecad-skill.mjs\` after updating the source docs or examples.
 
 ### Requested Inputs
 
