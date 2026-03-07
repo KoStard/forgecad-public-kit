@@ -61,8 +61,8 @@ Update it whenever:
 | `hull3d()` | Unsupported | No | No exact convex-hull replay yet |
 | `trimByPlane()` / `split*()` | Unsupported | No | Exact OCCT replay not implemented |
 | `TrackedShape` topology preservation | Partial | Synthetic only | Export succeeds for supported base solids, but named topology is not written to STEP/BREP |
-| Colors/materials in STEP/BREP | Unsupported | No | Geometry only for now |
-| STEP assembly structure/BOM metadata | Unsupported | No | Compound only, no product structure export yet |
+| Colors/materials in STEP/BREP | Partial | STEP only | Scene-object colors are written to STEP via CadQuery assembly export; `.brep` remains geometry-only |
+| STEP assembly structure/BOM metadata | Partial | Names only | STEP export writes a flat scene-object assembly to preserve names/colors; Forge assembly/BOM metadata is still not exported |
 
 ## Planned Expansion Order
 

@@ -316,15 +316,72 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
     raise ValueError(f"Unsupported plan kind: {kind}")
 
 
+def parse_hex_color(value: Optional[str]) -> Optional["cq.Color"]:
+    if not value:
+        return None
+    text = value.strip()
+    if not text.startswith("#"):
+        try:
+            return cq.Color(text)
+        except Exception:
+            return None
+
+    if len(text) == 7:
+        try:
+            r = int(text[1:3], 16) / 255.0
+            g = int(text[3:5], 16) / 255.0
+            b = int(text[5:7], 16) / 255.0
+        except ValueError:
+            return None
+        return cq.Color(r, g, b)
+
+    if len(text) == 4:
+        try:
+            r = int(text[1] * 2, 16) / 255.0
+            g = int(text[2] * 2, 16) / 255.0
+            b = int(text[3] * 2, 16) / 255.0
+        except ValueError:
+            return None
+        return cq.Color(r, g, b)
+
+    return None
+
+
+def make_unique_name(name: Optional[str], index: int, used: set[str]) -> str:
+    base = (name or "").strip() or f"Object {index + 1}"
+    candidate = base
+    suffix = 2
+    while candidate in used:
+        candidate = f"{base} ({suffix})"
+        suffix += 1
+    used.add(candidate)
+    return candidate
+
+
+def export_step_assembly(objects: List[Dict[str, Any]], output_path: Path) -> None:
+    assy = cq.Assembly(name=output_path.stem or "ForgeCAD")
+    used_names: set[str] = set()
+
+    for index, obj in enumerate(objects):
+        shape = build_shape(obj["plan"])
+        assy.add(
+            shape,
+            name=make_unique_name(obj.get("name"), index, used_names),
+            color=parse_hex_color(obj.get("color")),
+        )
+
+    assy.export(str(output_path), exportType="STEP")
+
+
 def export_shapes(objects: List[Dict[str, Any]], output_path: Path, fmt: str) -> None:
-    shapes = [build_shape(obj["plan"]) for obj in objects]
-    if not shapes:
+    if not objects:
         raise ValueError("No exportable shapes were provided")
-    merged = shapes[0] if len(shapes) == 1 else cq.Compound.makeCompound(shapes)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "step":
-        merged.exportStep(str(output_path))
+        export_step_assembly(objects, output_path)
         return
+    shapes = [build_shape(obj["plan"]) for obj in objects]
+    merged = shapes[0] if len(shapes) == 1 else cq.Compound.makeCompound(shapes)
     if fmt == "brep":
         merged.exportBrep(str(output_path))
         return
