@@ -28,31 +28,31 @@ The key function is `runScript(code, fileName, allFiles)` — it wraps user code
 
 Forge notebooks live in `.forge-notebook.json` files and behave like lightweight Jupyter notebooks for ForgeCAD code cells.
 
-The browser and CLI both use the Vite server for notebook execution. The CLI does not run Forge locally for notebook cells; it just posts cell code to the running ForgeCAD server and reads the returned output summary.
+The browser and CLI both use the Vite server for notebook execution. The CLI does not run Forge locally for notebook cells; it auto-starts or reuses the Forge server, sends the cell code, then prints the returned output summary.
 
-Start the dev server against a project directory first:
-
-```bash
-npm run dev -- ./examples
-```
-
-Append a new code cell and run it immediately:
+Append a new code cell and run it immediately in one command:
 
 ```bash
-npm run notebook -- append examples/demo.forge-notebook.json --code "show(box(40, 20, 10));"
+npm run notebook -- examples/demo.forge-notebook.json --code "show(box(40, 20, 10));"
 ```
 
 Or pipe a larger cell in through stdin:
 
 ```bash
-cat /tmp/cell.js | npm run notebook -- append examples/demo.forge-notebook.json
+cat /tmp/cell.js | npm run notebook -- examples/demo.forge-notebook.json
 ```
 
 Re-run the last preview cell, or a specific cell id:
 
 ```bash
-npm run notebook -- run examples/demo.forge-notebook.json
+npm run notebook -- examples/demo.forge-notebook.json
 npm run notebook -- run examples/demo.forge-notebook.json <cell-id>
+```
+
+If you already have a Forge server running, point the CLI at it:
+
+```bash
+npm run notebook -- examples/demo.forge-notebook.json --server http://localhost:5173 --code "show(box(40, 20, 10));"
 ```
 
 Notebook cell behavior:

@@ -8,7 +8,7 @@
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { resolve, relative, join, dirname } from 'path';
 
-const FORGE_EXTS = ['.forge.js', '.sketch.js', '.svg'];
+const FORGE_EXTS = ['.forge.js', '.sketch.js', '.svg', '.forge-notebook.json'];
 const isForgeFile = (f: string) => FORGE_EXTS.some(ext => f.endsWith(ext));
 
 /**
@@ -39,7 +39,7 @@ function collectFilesRecursive(dir: string, root: string): Record<string, string
  * immediate child directories with forge files. We only check direct
  * children (not deeply nested) to avoid going too far up.
  */
-function findProjectRoot(scriptPath: string): string {
+export function findProjectRoot(scriptPath: string): string {
   const absScript = resolve(scriptPath);
   const scriptDir = dirname(absScript);
 
