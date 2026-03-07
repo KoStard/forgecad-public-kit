@@ -89,10 +89,32 @@ const profile = outer.subtract(inner);
 return profile.extrude(height, { twist: 45, divisions: 32 });
 ```
 
-### Rounded Edges
+### Rounded Profiles
 ```javascript
 const base = rect(50, 30).offset(-3, 'Round').offset(3, 'Round');
 return base.extrude(10);
+```
+
+Use that pattern when every convex corner should round. For mixed sharp-and-rounded outlines, fillet only the intended vertices instead:
+
+```javascript
+const roofPoints = [
+  [0, 0],
+  [90, 0],
+  [90, 44],
+  [66, 74],
+  [45, 86],
+  [24, 74],
+  [0, 44],
+];
+
+const roof = filletCorners(roofPoints, [
+  { index: 3, radius: 19 },
+  { index: 4, radius: 19 },
+  { index: 5, radius: 19 },
+]);
+
+return roof.extrude(12);
 ```
 
 ### Chamfers and Fillets
@@ -104,6 +126,13 @@ const chamfer = box(10, 60, 10)
 
 return part.subtract(chamfer);
 ```
+
+### Choosing the right sketch-rounding tool
+
+- `offset(-r).offset(+r)` for rounding every convex corner of a closed outline
+- `stroke(points, width, 'Round')` for centerline-based geometry such as ribs or traces
+- `hull2d()` of circles for a blended cap/capsule silhouette
+- `filletCorners(points, ...)` for selective true-corner fillets on mixed profiles
 
 ## Best Practices
 
@@ -152,6 +181,22 @@ const withHole = base.subtract(cylinder(12, 5).translate(25, 25, 0));
 // return withHole;
 
 return withHole.add(cylinder(20, 3).translate(25, 25, 10));
+```
+
+For sketch-heavy work, compare the raw profile and the rounded profile before extruding:
+
+```javascript
+const raw = polygon(roofPoints);
+const rounded = filletCorners(roofPoints, [
+  { index: 3, radius: 19 },
+  { index: 4, radius: 19 },
+  { index: 5, radius: 19 },
+]);
+
+return [
+  { name: "Raw", sketch: raw },
+  { name: "Rounded", sketch: rounded.translate(120, 0) },
+];
 ```
 
 ## Error Handling
@@ -240,7 +285,7 @@ This is the complete reading set for writing ForgeCAD models. If the task is "bu
 9. [sketch-path.md](sketch-path.md) - path builder and stroke generation
 10. [sketch-transforms.md](sketch-transforms.md) - 2D transforms
 11. [sketch-booleans.md](sketch-booleans.md) - sketch boolean operations
-12. [sketch-operations.md](sketch-operations.md) - offset, hull, simplify, warp
+12. [sketch-operations.md](sketch-operations.md) - offset, selective sketch fillets, hull, simplify, warp
 13. [sketch-on-face.md](sketch-on-face.md) - attach sketches to standard 3D faces
 14. [sketch-extrude.md](sketch-extrude.md) - extrusion and revolve
 15. [sketch-anchor.md](sketch-anchor.md) - 2D anchor-based positioning
@@ -2028,6 +2073,35 @@ const inner = circle2d(20).offset(-2);     // Shrink by 2mm
 const sharp = ngon(6, 20).offset(3, 'Miter');
 ```
 
+Use `offset(-r).offset(+r)` when you want to round **all convex corners** of a closed sketch.
+
+#### `filletCorners(points, corners)`
+Round only specific convex corners of a polygon point list.
+
+```javascript
+const roofPoints = [
+  [0, 0],
+  [90, 0],
+  [90, 44],
+  [66, 74],
+  [45, 86],
+  [24, 74],
+  [0, 44],
+];
+
+const roof = filletCorners(roofPoints, [
+  { index: 3, radius: 19 },
+  { index: 4, radius: 19 },
+  { index: 5, radius: 19 },
+]);
+```
+
+Rules of thumb:
+- `offset(-r).offset(+r)` rounds every convex corner in a closed profile
+- `stroke(points, width, 'Round')` is for thickening a centerline, not for selectively rounding a polygon
+- `hull2d()` of circles gives a blended convex cap/capsule silhouette
+- `filletCorners(points, ...)` is the right choice when some corners stay sharp
+
 #### `.simplify(epsilon?)`
 Removes vertices that don't significantly affect the shape.
 
@@ -2189,7 +2263,7 @@ const full = mirrorCopy(box(50, 30, 10), [1, 0, 0]);
 
 ## Fillets & Chamfers
 
-Approximate fillets and chamfers for vertical edges using topology references.
+`filletCorners()` handles selective 2D polygon corners. The helpers below approximate 3D fillets and chamfers for vertical edges using topology references.
 
 ### `filletEdge(shape, edge, radius, quadrant?, segments?)`
 ```javascript
@@ -3091,6 +3165,8 @@ const hull = hull2d(
 );
 ```
 
+`hull2d()` is best for intentionally blended convex silhouettes. If you need true corner fillets while keeping some neighboring corners sharp, use `filletCorners(...)` instead.
+
 ## Performance Note
 
 The multi-argument functions (`union2d`, `difference2d`, `intersection2d`) use Manifold's batch operations internally, which are faster than chaining `.add()` / `.subtract()` calls one by one. Prefer them when combining many sketches.
@@ -3345,6 +3421,48 @@ const inner = circle2d(20).offset(-2);     // Shrink by 2mm
 const sharp = ngon(6, 20).offset(3, 'Miter');
 ```
 
+Use the common `offset(-r).offset(+r)` pattern when you want to round **every convex corner** of a closed sketch.
+
+### `filletCorners(points, corners)`
+Round only specific convex corners of a polygon point list.
+
+**Parameters:**
+- `points` (([number, number] | Point2D)[]) - Closed polygon vertices in order
+- `corners` (`{ index: number, radius: number, segments?: number }[]`) - Which vertices to fillet
+
+**Returns:** `Sketch`
+
+```javascript
+const roofPoints = [
+  [0, 0],
+  [90, 0],
+  [90, 44],
+  [66, 74],
+  [45, 86],
+  [24, 74],
+  [0, 44],
+];
+
+const roof = filletCorners(roofPoints, [
+  { index: 3, radius: 19 },
+  { index: 4, radius: 19 },
+  { index: 5, radius: 19 },
+]);
+```
+
+Notes:
+- only convex corners are supported
+- if two neighboring fillets would overlap on the same edge, the function throws
+- compare `polygon(points)` and `filletCorners(points, ...)` before extruding when debugging mixed sharp-and-rounded outlines
+
+## Choosing A Rounding Strategy
+
+- `offset(-r).offset(+r)` rounds all convex corners of an existing closed profile
+- `stroke(points, width, 'Round')` thickens a centerline path; use it for ribs, traces, and wire-like geometry
+- `hull2d()` of circles creates a blended convex silhouette, closer to a capsule or cap than a true corner fillet
+- `filletCorners(points, ...)` is the right tool when some corners stay sharp and others need true tangent fillets
+- See `examples/api/sketch-rounding-strategies.forge.js` for a side-by-side comparison
+
 ### `.hull()`
 Returns the convex hull of this sketch.
 
@@ -3447,6 +3565,8 @@ const bracket = stroke([[0, 0], [50, 0], [50, -70]], 4);
 // Rounded corners
 const rounded = stroke([[0, 0], [50, 0], [50, -50]], 4, 'Round');
 ```
+
+Use `stroke(..., 'Round')` for centerline-based geometry such as ribs, traces, and wire-like profiles. It is not the same as rounding selected corners of an existing closed polygon. For mixed sharp-and-rounded outlines, build the polygon first and use `filletCorners(...)`.
 ````
 
 ### docs/permanent/API/model-building/sketch-primitives.md
@@ -3664,6 +3784,8 @@ Append a new code cell and run it immediately in one command:
 npm run notebook -- examples/demo.forge-notebook.json --code "show(box(40, 20, 10));"
 ```
 
+If the target notebook file does not exist yet, append mode auto-creates it first with the default ForgeCAD notebook structure, then adds the new cell.
+
 Or pipe a larger cell in through stdin:
 
 ```bash
@@ -3677,6 +3799,8 @@ npm run notebook -- examples/demo.forge-notebook.json
 npm run notebook -- run examples/demo.forge-notebook.json <cell-id>
 ```
 
+`run` expects the notebook file to already exist. Auto-creation only applies to append flows (`--code`, `--file`, stdin, or the explicit `append` subcommand).
+
 Export a notebook into a plain `.forge.js` script:
 
 ```bash
@@ -3689,6 +3813,8 @@ If you already have a Forge server running, point the CLI at it:
 ```bash
 npm run notebook -- examples/demo.forge-notebook.json --server http://localhost:5173 --code "show(box(40, 20, 10));"
 ```
+
+Notebook paths are resolved from the shell working directory before the CLI calls the server, so the server's opened project root does not add an extra path prefix.
 
 Notebook cell behavior:
 
@@ -4529,6 +4655,222 @@ return [
   { name: "Cylinder (manual math)", shape: cyl1 },
   { name: "Base (centered)", shape: base2 },
   { name: "Cylinder (attachTo)", shape: cyl2 },
+];
+````
+
+### examples/api/chess.forge.js
+
+````javascript
+// 3D Chess Set - Complete chess board with all pieces
+// Uses parametric design for easy customization
+
+const boardSize = param("Board Size", 280, { min: 200, max: 400, unit: "mm" });
+const squareSize = boardSize / 8;
+const pieceScale = param("Piece Scale", 1, { min: 0.6, max: 1.2 });
+
+// Board colors - proper chess board
+const lightSquare = '#E8D4B8';
+const darkSquare = '#2F2F2F';
+const whitePiece = '#F5F5F5';
+const blackPiece = '#1A1A1A';
+
+// Board squares - return as separate objects to preserve colors
+const boardSquares = [];
+for (let row = 0; row < 8; row++) {
+  for (let col = 0; col < 8; col++) {
+    const isDark = (row + col) % 2 === 1;
+    const color = isDark ? darkSquare : lightSquare;
+    const x = col * squareSize - boardSize / 2;
+    const y = row * squareSize - boardSize / 2;
+    boardSquares.push(
+      box(squareSize, squareSize, 4)
+        .translate(x, y, -2)
+        .color(color)
+    );
+  }
+}
+
+// Piece creation functions
+function createPawn(isWhite) {
+  const base = cylinder(6 * pieceScale, 3 * pieceScale, undefined, 24, true)
+    .translate(0, 0, 1.5 * pieceScale);
+  const body = cylinder(8 * pieceScale, 2.5 * pieceScale, undefined, 16, true)
+    .translate(0, 0, 5.5 * pieceScale);
+  const head = sphere(2.5 * pieceScale, 12)
+    .translate(0, 0, 11 * pieceScale);
+  return union(base, body, head).color(isWhite ? whitePiece : blackPiece);
+}
+
+function createRook(isWhite) {
+  const base = cylinder(5 * pieceScale, 4 * pieceScale, undefined, 24, true)
+    .translate(0, 0, 2 * pieceScale);
+  const body = cylinder(5 * pieceScale, 4 * pieceScale, 8 * pieceScale, 16, true)
+    .translate(0, 0, 6 * pieceScale);
+  const top = cylinder(5.5 * pieceScale, 5 * pieceScale, 2 * pieceScale, 16, true)
+    .translate(0, 0, 12 * pieceScale);
+  
+  // Battlements
+  let battlements = [];
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * 360;
+    const x = Math.cos(angle * Math.PI / 180) * 4.5 * pieceScale;
+    const y = Math.sin(angle * Math.PI / 180) * 4.5 * pieceScale;
+    battlements.push(
+      box(1.2 * pieceScale, 1.2 * pieceScale, 3 * pieceScale, true)
+        .translate(x, y, 13 * pieceScale)
+    );
+  }
+  
+  return union(base, body, top, ...battlements).color(isWhite ? whitePiece : blackPiece);
+}
+
+function createKnight(isWhite) {
+  const base = cylinder(4 * pieceScale, 3.5 * pieceScale, undefined, 20, true)
+    .translate(0, 0, 2 * pieceScale);
+  const body = cylinder(4 * pieceScale, 3 * pieceScale, 6 * pieceScale, 12, true)
+    .translate(0, 0, 6 * pieceScale);
+  
+  // Horse head approximation
+  const neck = cylinder(3 * pieceScale, 2 * pieceScale, 8 * pieceScale, 12, true)
+    .rotate(20, 0, 0)
+    .translate(0, 0, 11 * pieceScale);
+  const snout = sphere(2.5 * pieceScale, 10)
+    .translate(0, 2 * pieceScale, 18 * pieceScale);
+  const ear = sphere(1.5 * pieceScale, 8)
+    .translate(0, -1 * pieceScale, 20 * pieceScale);
+  
+  return union(base, body, neck, snout, ear).color(isWhite ? whitePiece : blackPiece);
+}
+
+function createBishop(isWhite) {
+  const base = cylinder(4 * pieceScale, 3 * pieceScale, undefined, 20, true)
+    .translate(0, 0, 2 * pieceScale);
+  const body = ngon(8, 3 * pieceScale)
+    .extrude(10 * pieceScale)
+    .translate(0, 0, 6 * pieceScale);
+  const head = sphere(2.5 * pieceScale, 12)
+    .translate(0, 0, 16 * pieceScale);
+  // Bishop mitre top
+  const top = cylinder(1.5 * pieceScale, 3 * pieceScale, 3 * pieceScale, 12, true)
+    .translate(0, 0, 19 * pieceScale);
+  
+  return union(base, body, head, top).color(isWhite ? whitePiece : blackPiece);
+}
+
+function createQueen(isWhite) {
+  const base = cylinder(6 * pieceScale, 4 * pieceScale, undefined, 24, true)
+    .translate(0, 0, 2 * pieceScale);
+  const body = cylinder(5 * pieceScale, 4 * pieceScale, 8 * pieceScale, 16, true)
+    .translate(0, 0, 6 * pieceScale);
+  
+  // Crown
+  const crown = ngon(6, 4 * pieceScale)
+    .offset(1 * pieceScale, 'Round')
+    .extrude(3 * pieceScale)
+    .translate(0, 0, 14 * pieceScale);
+  
+  // Crown points
+  let points = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * 360;
+    const x = Math.cos(angle * Math.PI / 180) * 4 * pieceScale;
+    const y = Math.sin(angle * Math.PI / 180) * 4 * pieceScale;
+    points.push(
+      cylinder(1 * pieceScale, 0.8 * pieceScale, 4 * pieceScale, 8, true)
+        .translate(x, y, 16 * pieceScale)
+    );
+  }
+  
+  const orb = sphere(1.5 * pieceScale, 10)
+    .translate(0, 0, 21 * pieceScale);
+  
+  return union(base, body, crown, ...points, orb).color(isWhite ? whitePiece : blackPiece);
+}
+
+function createKing(isWhite) {
+  const base = cylinder(6 * pieceScale, 4 * pieceScale, undefined, 24, true)
+    .translate(0, 0, 2 * pieceScale);
+  const body = cylinder(5 * pieceScale, 4 * pieceScale, 8 * pieceScale, 16, true)
+    .translate(0, 0, 6 * pieceScale);
+  
+  // Crown
+  const crown = ngon(6, 4 * pieceScale)
+    .offset(1 * pieceScale, 'Round')
+    .extrude(3 * pieceScale)
+    .translate(0, 0, 14 * pieceScale);
+  
+  // Cross
+  const crossV = box(1 * pieceScale, 1 * pieceScale, 5 * pieceScale, true)
+    .translate(0, 0, 20 * pieceScale);
+  const crossH = box(3 * pieceScale, 1 * pieceScale, 1 * pieceScale, true)
+    .translate(0, 0, 18.5 * pieceScale);
+  
+  return union(base, body, crown, crossV, crossH).color(isWhite ? whitePiece : blackPiece);
+}
+
+// Place pieces on board - centered on each square
+function placePiece(piece, col, row, isWhite) {
+  const x = (col - 3.5) * squareSize;
+  const y = (row - 3.5) * squareSize;
+  return piece.translate(x, y, 4);
+}
+
+// White pieces (bottom)
+const whitePawns = Array.from({ length: 8 }, (_, i) => 
+  placePiece(createPawn(true), i, 1, true)
+);
+const whiteRooks = [
+  placePiece(createRook(true), 0, 0, true),
+  placePiece(createRook(true), 7, 0, true)
+];
+const whiteKnights = [
+  placePiece(createKnight(true), 1, 0, true),
+  placePiece(createKnight(true), 6, 0, true)
+];
+const whiteBishops = [
+  placePiece(createBishop(true), 2, 0, true),
+  placePiece(createBishop(true), 5, 0, true)
+];
+const whiteQueen = placePiece(createQueen(true), 3, 0, true);
+const whiteKing = placePiece(createKing(true), 4, 0, true);
+
+// Black pieces (top)
+const blackPawns = Array.from({ length: 8 }, (_, i) => 
+  placePiece(createPawn(false), i, 6, false)
+);
+const blackRooks = [
+  placePiece(createRook(false), 0, 7, false),
+  placePiece(createRook(false), 7, 7, false)
+];
+const blackKnights = [
+  placePiece(createKnight(false), 1, 7, false),
+  placePiece(createKnight(false), 6, 7, false)
+];
+const blackBishops = [
+  placePiece(createBishop(false), 2, 7, false),
+  placePiece(createBishop(false), 5, 7, false)
+];
+const blackQueen = placePiece(createQueen(false), 3, 7, false);
+const blackKing = placePiece(createKing(false), 4, 7, false);
+
+// Board border
+const borderOuter = box(boardSize + 16, boardSize + 16, 6, true)
+  .translate(0, 0, -5);
+const borderHole = box(boardSize, boardSize, 10, true);
+const border = borderOuter.subtract(borderHole).color('#5C4033');
+
+// All pieces
+const allPieces = [
+  ...whitePawns, ...whiteRooks, ...whiteKnights, ...whiteBishops,
+  whiteQueen, whiteKing,
+  ...blackPawns, ...blackRooks, ...blackKnights, ...blackBishops,
+  blackQueen, blackKing
+];
+
+return [
+  { name: "Border", shape: border },
+  ...boardSquares.map((s, i) => ({ name: `Square ${i}`, shape: s })),
+  ...allPieces.map((p, i) => ({ name: `Piece ${i}`, shape: p }))
 ];
 ````
 
@@ -6016,6 +6358,67 @@ return [
   { name: 'Tracked Panel', shape: trackedPanel },
   { name: 'Tracked Side Badge', shape: trackedSideBadge },
   { name: 'Tracked Top Cap', shape: trackedTopCap },
+];
+````
+
+### examples/api/sketch-rounding-strategies.forge.js
+
+````javascript
+// Compare common sketch-rounding strategies on the same roof profile.
+// Only the selective fillet keeps the lower roof corners sharp.
+
+const radius = param("Radius", 14, { min: 4, max: 24, unit: "mm" });
+const gap = 120;
+const bodyWidth = 90;
+const bodyHeight = 44;
+const shoulderInset = 24;
+const shoulderRise = 30;
+const peakRise = 42;
+
+const roofPoints = [
+  [0, 0],
+  [bodyWidth, 0],
+  [bodyWidth, bodyHeight],
+  [bodyWidth - shoulderInset, bodyHeight + shoulderRise],
+  [bodyWidth / 2, bodyHeight + peakRise],
+  [shoulderInset, bodyHeight + shoulderRise],
+  [0, bodyHeight],
+];
+
+const roofRidge = [
+  [0, bodyHeight],
+  [shoulderInset, bodyHeight + shoulderRise],
+  [bodyWidth / 2, bodyHeight + peakRise],
+  [bodyWidth - shoulderInset, bodyHeight + shoulderRise],
+  [bodyWidth, bodyHeight],
+];
+
+const rawProfile = polygon(roofPoints).color('#7b858c');
+const roundedAllCorners = rawProfile.offset(-radius, 'Round').offset(radius, 'Round').color('#d4862d');
+const strokedCenterline = union2d(
+  rect(bodyWidth, bodyHeight),
+  stroke(roofRidge, radius * 2, 'Round'),
+).color('#2a9d8f');
+const hulledCircles = union2d(
+  rect(bodyWidth, bodyHeight),
+  hull2d(
+    circle2d(radius).translate(shoulderInset, bodyHeight + shoulderRise),
+    circle2d(radius).translate(bodyWidth / 2, bodyHeight + peakRise),
+    circle2d(radius).translate(bodyWidth - shoulderInset, bodyHeight + shoulderRise),
+  ),
+).color('#7f5af0');
+const selectiveFillet = filletCorners(roofPoints, [
+  { index: 3, radius },
+  { index: 4, radius },
+  { index: 5, radius },
+]).color('#e63946');
+
+return [
+  { name: "Raw polygon", sketch: rawProfile },
+  { name: "offset(-r).offset(+r)", sketch: roundedAllCorners.translate(gap, 0) },
+  { name: "stroke(..., 'Round')", sketch: strokedCenterline.translate(gap * 2, 0) },
+  { name: "hull2d() of circles", sketch: hulledCircles.translate(gap * 3, 0) },
+  { name: "filletCorners()", sketch: selectiveFillet.translate(gap * 4, 0) },
 ];
 ````
 
