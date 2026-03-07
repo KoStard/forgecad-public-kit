@@ -168,16 +168,27 @@ export function App() {
   // Refresh files on mount and when tab becomes visible
   useEffect(() => {
     refreshFiles();
-    
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         refreshFiles();
       }
     };
-    
+    const handleFocus = () => {
+      refreshFiles();
+    };
+    const refreshInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshFiles();
+      }
+    }, 2000);
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
     return () => {
+      window.clearInterval(refreshInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [refreshFiles]);
 
