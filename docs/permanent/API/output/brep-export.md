@@ -41,6 +41,7 @@ Update it whenever:
 | `Sketch.offset(delta, 'Round')` | Partial | Yes | Exact round-offset replay for exact-exportable profiles; `Square` / `Miter` still drop the plan |
 | `shape.translate()` | Supported | Yes | Recorded as exact solid transform |
 | `shape.rotate(x, y, z)` | Supported | Yes | Euler replay only |
+| `shape.scale(v)` | Supported | Yes | Recorded as an exact affine solid transform when every scale factor is finite and non-zero |
 | `rotateAround(...)` | Supported | Yes | Exact arbitrary-axis rotation is recorded with axis + pivot |
 | `pointAlong(...)` | Supported | Yes | Replayed via exact arbitrary-axis rotation from Forge's +Z axis |
 | `mirror(...)` | Supported | Yes | Replayed as an exact mirror transform across the origin plane normal |
@@ -50,7 +51,8 @@ Update it whenever:
 | `intersection()` | Supported | Yes | Only when every operand is exact-exportable |
 | Returned multi-object scene | Supported | Yes | Exported as a STEP/BREP compound |
 | Returned mixed sketch + solid scene | Supported | Yes | Exact solids export; sketch-only objects are skipped with a warning |
-| Sketch `mirror()` / arbitrary `warp()` | Unsupported | No | Not recorded in export plan |
+| Sketch `mirror()` | Supported | Yes | Recorded as an exact profile reflection across the origin line normal |
+| arbitrary `warp()` | Unsupported | No | Not recorded in export plan |
 | `loft()` | Unsupported | No | Current Forge implementation is sampled/level-set |
 | `sweep()` | Unsupported | No | Current Forge implementation is sampled/level-set |
 | `levelSet()` | Unsupported | No | Mesh/SDF output by design |

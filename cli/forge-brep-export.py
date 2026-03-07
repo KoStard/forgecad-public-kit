@@ -75,6 +75,24 @@ def build_profile_transform_matrix(profile: Dict[str, Any]) -> Optional["cq.Matr
                 [0.0, float(step["y"]), 0.0],
                 [0.0, 0.0, 1.0],
             ]
+        elif step["kind"] == "mirror":
+            nx = float(step["normalX"])
+            ny = float(step["normalY"])
+            length = math.hypot(nx, ny)
+            if length < 1e-12:
+                step_matrix = [
+                    [1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0],
+                    [0.0, 0.0, 1.0],
+                ]
+            else:
+                nx /= length
+                ny /= length
+                step_matrix = [
+                    [1.0 - 2.0 * nx * nx, -2.0 * nx * ny, 0.0],
+                    [-2.0 * ny * nx, 1.0 - 2.0 * ny * ny, 0.0],
+                    [0.0, 0.0, 1.0],
+                ]
         else:
             raise ValueError(f"Unsupported profile transform: {step['kind']}")
         matrix = multiply_affine(step_matrix, matrix)
@@ -96,6 +114,20 @@ def apply_profile_transforms(sketch: "cq.Sketch", profile: Dict[str, Any]) -> "c
     return sketch.map(
         lambda item: item.transformGeometry(matrix) if hasattr(item, "transformGeometry") else item
     )
+
+
+def apply_shape_affine(shape: "cq.Shape", matrix: "cq.Matrix") -> "cq.Shape":
+    if hasattr(shape, "transformGeometry"):
+        return shape.transformGeometry(matrix)
+    return shape.transformShape(matrix)
+
+
+def build_shape_scale_matrix(sx: float, sy: float, sz: float) -> "cq.Matrix":
+    return cq.Matrix([
+        [sx, 0.0, 0.0, 0.0],
+        [0.0, sy, 0.0, 0.0],
+        [0.0, 0.0, sz, 0.0],
+    ])
 
 
 def build_polygon_sketch(points: List[List[float]]) -> "cq.Sketch":
@@ -258,6 +290,12 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
                     result = result.rotate((0, 0, 0), (0, 1, 0), step["yDeg"])
                 if abs(step["zDeg"]) > 1e-9:
                     result = result.rotate((0, 0, 0), (0, 0, 1), step["zDeg"])
+                continue
+            if step["kind"] == "scale":
+                result = apply_shape_affine(
+                    result,
+                    build_shape_scale_matrix(float(step["x"]), float(step["y"]), float(step["z"])),
+                )
                 continue
             if step["kind"] == "rotateAround":
                 pivot = (step["pivotX"], step["pivotY"], step["pivotZ"])

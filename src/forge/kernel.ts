@@ -330,6 +330,17 @@ function mirrorMatrix(normal: [number, number, number]): Mat4 {
   ];
 }
 
+function normalizeShapeScale(v: number | [number, number, number]): [number, number, number] | null {
+  const scale = typeof v === 'number' ? [v, v, v] as const : v;
+  if (!Number.isFinite(scale[0]) || !Number.isFinite(scale[1]) || !Number.isFinite(scale[2])) {
+    return null;
+  }
+  if (Math.abs(scale[0]) < 1e-12 || Math.abs(scale[1]) < 1e-12 || Math.abs(scale[2]) < 1e-12) {
+    return null;
+  }
+  return [scale[0], scale[1], scale[2]];
+}
+
 function dotVec3(a: [number, number, number], b: [number, number, number]): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
@@ -664,11 +675,19 @@ export class Shape {
   }
 
   scale(v: number | [number, number, number]): Shape {
+    const scale = normalizeShapeScale(v);
     return setShapeBrepPlanInternal(withTransformedDimensions(
       this,
       new Shape(this.manifold.scale(v as any), this.colorHex),
       Transform.scale(v).toArray(),
-    ), null);
+    ), scale
+      ? appendBrepShapeTransform(getShapeBrepPlanInternal(this), {
+          kind: 'scale',
+          x: scale[0],
+          y: scale[1],
+          z: scale[2],
+        })
+      : null);
   }
 
   mirror(normal: [number, number, number]): Shape {

@@ -229,6 +229,37 @@ return [{ name: 'Bracket', shape: bracket }];
   assert.equal(mirror.normalZ, 0);
 }
 
+function checkScaleTransformPlan(): void {
+  const plan = runExactManifest(`
+const ellipsoid = sphere(6).scale([1.2, 0.8, 0.5]).translate(4, -2, 1);
+const body = box(30, 24, 18, true).subtract(ellipsoid);
+return [{ name: 'Scaled Cut', shape: body }];
+`);
+
+  const scale = collectShapeTransforms(plan).find((step) => step.kind === 'scale');
+  assert(scale, 'Expected scale() to preserve an exact solid scale transform step');
+  assert.equal(scale.x, 1.2);
+  assert.equal(scale.y, 0.8);
+  assert.equal(scale.z, 0.5);
+}
+
+function checkMirroredSketchProfilePlan(): void {
+  const plan = runExactManifest(`
+const collar = polygon([
+  [0, 0],
+  [8, 0],
+  [5.8, -4.5],
+]).mirror([1, 0]).extrude(1.2);
+return [{ name: 'Collar', shape: collar }];
+`);
+
+  assert.equal(plan.kind, 'extrude', `Expected extrude plan, got ${plan.kind}`);
+  assert.equal(plan.profile.kind, 'polygon', `Expected polygon profile, got ${plan.profile.kind}`);
+  assert.deepEqual(plan.profile.transforms, [
+    { kind: 'mirror', normalX: 1, normalY: 0 },
+  ]);
+}
+
 function checkRigidMatrixTransformPlan(): void {
   const plan = runExactManifest(`
 const moved = box(20, 12, 8, true).transform(
@@ -301,6 +332,8 @@ async function main() {
   checkRoundOffsetProfilePlan();
   checkRotateAroundTransformPlan();
   checkMirrorTransformPlan();
+  checkScaleTransformPlan();
+  checkMirroredSketchProfilePlan();
   checkRigidMatrixTransformPlan();
   checkPointAlongOnPrimitiveBoolean();
   checkMixedSketchAndSolidScenePolicy();

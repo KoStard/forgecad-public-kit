@@ -1,7 +1,8 @@
 export type BrepProfileTransformStep =
   | { kind: 'translate'; x: number; y: number }
   | { kind: 'rotate'; degrees: number }
-  | { kind: 'scale'; x: number; y: number };
+  | { kind: 'scale'; x: number; y: number }
+  | { kind: 'mirror'; normalX: number; normalY: number };
 
 export type BrepProfilePlan =
   | {
@@ -46,6 +47,7 @@ export type BrepProfilePlan =
 export type BrepShapeTransformStep =
   | { kind: 'translate'; x: number; y: number; z: number }
   | { kind: 'rotate'; xDeg: number; yDeg: number; zDeg: number }
+  | { kind: 'scale'; x: number; y: number; z: number }
   | {
       kind: 'rotateAround';
       axisX: number;
@@ -113,6 +115,8 @@ function cloneProfileTransform(step: BrepProfileTransformStep): BrepProfileTrans
       return { kind: 'rotate', degrees: step.degrees };
     case 'scale':
       return { kind: 'scale', x: step.x, y: step.y };
+    case 'mirror':
+      return { kind: 'mirror', normalX: step.normalX, normalY: step.normalY };
   }
 }
 
@@ -126,6 +130,13 @@ function cloneShapeTransform(step: BrepShapeTransformStep): BrepShapeTransformSt
         xDeg: step.xDeg,
         yDeg: step.yDeg,
         zDeg: step.zDeg,
+      };
+    case 'scale':
+      return {
+        kind: 'scale',
+        x: step.x,
+        y: step.y,
+        z: step.z,
       };
     case 'rotateAround':
       return {

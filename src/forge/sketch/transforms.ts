@@ -37,7 +37,17 @@ export function sketchScale(sketch: Sketch, v: number | [number, number]): Sketc
 }
 
 export function sketchMirror(sketch: Sketch, ax: [number, number]): Sketch {
-  return copySketchPlacement3D(sketch, setSketchBrepProfilePlan(new Sketch(sketch.cross.mirror(ax), sketch.colorHex), null));
+  return copySketchPlacement3D(
+    sketch,
+    setSketchBrepProfilePlan(
+      new Sketch(sketch.cross.mirror(ax), sketch.colorHex),
+      appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), {
+        kind: 'mirror',
+        normalX: ax[0],
+        normalY: ax[1],
+      }),
+    ),
+  );
 }
 
 Sketch.prototype.translate = function (x: number, y = 0) { return sketchTranslate(this, x, y); };
