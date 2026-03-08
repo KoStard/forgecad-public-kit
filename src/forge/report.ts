@@ -136,6 +136,12 @@ interface DimensionOwnership {
   byComponent: Map<string, DimensionDef[]>;
 }
 
+interface ComponentPageGroup {
+  representative: ReportObject;
+  dimensions: DimensionDef[];
+  instanceCount: number;
+}
+
 const DEFAULT_VIEWS: ReportViewId[] = ['front', 'right', 'top', 'iso'];
 const DEFAULT_COLOR_HEX = '#5b9bd5';
 const PAGE_WIDTH = 842;
@@ -509,6 +515,96 @@ function buildDimensionOwnership(
   });
 
   return { byId, combined, byComponent };
+}
+
+function signatureNumber(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  return value.toFixed(4);
+}
+
+function summarizeMetricSeries(values: number[]): string {
+  if (values.length === 0) return '0:0:0:0';
+
+  let sum = 0;
+  let sumSquares = 0;
+  let min = Infinity;
+  let max = -Infinity;
+
+  values.forEach((value) => {
+    sum += value;
+    sumSquares += value * value;
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+  });
+
+  return [
+    signatureNumber(sum),
+    signatureNumber(sumSquares),
+    signatureNumber(min),
+    signatureNumber(max),
+  ].join(':');
+}
+
+function triangleArea(triangle: ReportTriangle): number {
+  const cross = cross3(sub3(triangle.b, triangle.a), sub3(triangle.c, triangle.a));
+  return Math.hypot(cross[0], cross[1], cross[2]) * 0.5;
+}
+
+function makeComponentPageSignature(object: ReportObject): string {
+  const extents = [
+    Math.abs(object.bbox.max[0] - object.bbox.min[0]),
+    Math.abs(object.bbox.max[1] - object.bbox.min[1]),
+    Math.abs(object.bbox.max[2] - object.bbox.min[2]),
+  ]
+    .sort((a, b) => a - b)
+    .map(signatureNumber)
+    .join(':');
+  const triangleAreas = object.triangles.map(triangleArea);
+  const edgeLengths = object.edges.map((edge) => distance3(edge.a, edge.b));
+
+  return [
+    extents,
+    object.triangles.length,
+    summarizeMetricSeries(triangleAreas),
+    object.edges.length,
+    summarizeMetricSeries(edgeLengths),
+  ].join('|');
+}
+
+function collectComponentPageGroups(
+  objects: ReportObject[],
+  ownership: DimensionOwnership,
+): ComponentPageGroup[] {
+  const grouped = new Map<string, ReportObject[]>();
+
+  objects.forEach((object) => {
+    const key = makeComponentPageSignature(object);
+    const bucket = grouped.get(key);
+    if (bucket) {
+      bucket.push(object);
+      return;
+    }
+    grouped.set(key, [object]);
+  });
+
+  return Array.from(grouped.values()).map((groupObjects) => {
+    let representative = groupObjects[0];
+    let dimensions = ownership.byComponent.get(representative.id) || [];
+
+    groupObjects.slice(1).forEach((object) => {
+      const candidateDimensions = ownership.byComponent.get(object.id) || [];
+      if (candidateDimensions.length > dimensions.length) {
+        representative = object;
+        dimensions = candidateDimensions;
+      }
+    });
+
+    return {
+      representative,
+      dimensions,
+      instanceCount: groupObjects.length,
+    };
+  });
 }
 
 function projectedBounds(
@@ -2379,6 +2475,7 @@ function buildPages(
   const bomChunks = splitBomRowsIntoPages(bomRows);
   const generated = new Date().toISOString().replace('T', ' ').slice(0, 19);
   const ownership = buildDimensionOwnership(dimensions, objects);
+  const componentGroups = collectComponentPageGroups(objects, ownership);
 
   if (bomRows.length > 0) {
     let rowOffset = 0;
@@ -2399,20 +2496,27 @@ function buildPages(
   basePages.push({
     kind: 'standard',
     title: 'ASSEMBLY OVERVIEW',
-    subtitle: `${objects.length} components | ${ownership.combined.length} shared dimensions | ${generated} UTC`,
+    subtitle: `${objects.length} components | ${componentGroups.length} unique item pages | ${ownership.combined.length} shared dimensions | ${generated} UTC`,
     objects,
     dimensions: ownership.combined,
   });
 
   if (includeDisassembled) {
-    objects.forEach((obj) => {
-      const dims = ownership.byComponent.get(obj.id) || [];
+    componentGroups.forEach((group) => {
+      const obj = group.representative;
+      const subtitleParts = [
+        obj.groupName ? `Group ${obj.groupName}` : '',
+        `${group.dimensions.length} component dimensions`,
+      ].filter(Boolean);
+      if (group.instanceCount > 1) {
+        subtitleParts.push(`${group.instanceCount} identical instances merged`);
+      }
       basePages.push({
         kind: 'standard',
         title: `COMPONENT: ${obj.name}`,
-        subtitle: `${obj.groupName ? `Group ${obj.groupName} | ` : ''}${dims.length} component dimensions`,
+        subtitle: subtitleParts.join(' | '),
         objects: [obj],
-        dimensions: dims,
+        dimensions: group.dimensions,
       });
     });
   }

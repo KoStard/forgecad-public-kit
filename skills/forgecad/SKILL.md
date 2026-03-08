@@ -4015,7 +4015,7 @@ npm run report -- examples/cup.forge.js [output.pdf] --dim-angle-tol 18
 Generates a searchable-text PDF report with multiple projected drawing views:
 - Bill of Materials page (auto-summed from script `bom()` entries)
 - Combined model page (front/right/top/isometric)
-- Disassembled component pages (same view set per returned component)
+- Disassembled component pages (same view set per unique component geometry; repeated identical items collapse into one page)
 - Auto-generated detail continuation pages for elongated/high-detail views (separate pages, not overlayed)
 - `dim()` annotations included per view only when their axis aligns with that view's projection plane axes
 
@@ -4161,4 +4161,3 @@ const result = runScript(code, 'main.forge.js', allFiles);
 | `manifold-3d` | Geometry kernel (WASM) | Works in both Node and browser |
 | `three` | 3D rendering (used by render.ts) | Loaded in browser context by Puppeteer |
 ````
-

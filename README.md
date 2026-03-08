@@ -115,7 +115,7 @@ Latest benchmark iterations from `ForgeCADBenchmark/results/*` (`version_{n}.for
 - Named shapes, face/edge references, fillet/chamfer helpers
 - Reusable part library (`lib`) with fasteners, tubes, brackets, threads, patterns, exploded-view helpers
 - Assembly graph API with revolute/prismatic/fixed joints and joint couplings
-- Drawing/report pipeline: dimensions, BOM, multi-view PDF generation
+- Drawing/report pipeline: dimensions, BOM, multi-view PDF generation with duplicate-part page collapsing
 - CLI tools that run the same engine as the browser runtime
 
 ## Quick Start
@@ -205,7 +205,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 - `render` outputs multi-angle PNGs (`front`, `side`, `top`, `iso`) by default.
 - `gif` outputs a single orbit animation with a full solid pass, then full wireframe pass.
 - `svg` runs fully in Node (no browser/Puppeteer).
-- `report` generates searchable-text PDF pages (overview, components, BOM, dimensions).
+- `report` generates searchable-text PDF pages (overview, unique components, BOM, dimensions).
 - `param-check` samples parameter ranges and reports runtime errors, degenerates, and new collisions.
 
 ## Start with these examples
