@@ -31,6 +31,7 @@ function walkFiles(relativePath) {
   }
 
   return readdirSync(absolutePath, { withFileTypes: true })
+    .filter((entry) => !entry.name.startsWith("."))
     .flatMap((entry) => {
       const nextRelativePath = path.join(relativePath, entry.name);
       if (entry.isDirectory()) {
@@ -134,20 +135,13 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 1. Identify the target artifact first: \`.forge.js\`, \`.sketch.js\`, \`.forge-notebook.json\`, SVG asset, or a CLI/export task.
 2. Read the model-building docs in order when geometry behavior matters: core reference, coordinate system, geometry conventions, positioning, entities, assembly, then sketch modules.
 3. Use multi-file imports deliberately: \`importPart()\` for parts, \`importSketch()\` for sketches or SVGs, explicit \`paramOverrides\`, and \`.withReferences()\` plus \`.placeReference()\` for reusable placement.
-4. Use notebooks when the task benefits from stateful iteration; remember cells share state, \`show()\` pins visible geometry, and notebooks can be exported to plain \`.forge.js\`.
+4. Use notebooks when the task benefits from stateful iteration, iterative development or debugging; remember cells share state, \`show()\` pins visible geometry, and notebooks can be exported to plain \`.forge.js\`. You can later convert it to a forge.js file.
 5. Validate through the CLI with \`npm run test-run -- <file>\`; add \`--debug-imports\` when import chains or overrides might be wrong.
-6. Reuse patterns from \`examples/api/\` before inventing a modeling recipe from scratch.
+6. Reuse patterns from \`examples/api/\` (already included) before inventing a modeling recipe from scratch.
 
 ## Included Sources
 
-Keep this skill self-contained by relying on the inlined source corpus below.
-
-### Requested Inputs
-
-- \`docs/permanent/API/guides/modeling-recipes.md\`
-- \`docs/permanent/API/model-building/\`
-- \`docs/permanent/CLI.md\`
-- \`examples/api/\`
+Keep this skill self-contained by relying on the inlined source corpus below. Usually you won't need further exploration in the codebase and can directly go into the task.
 
 ${sectionedSources}
 `;
