@@ -11,6 +11,7 @@ import { init, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
 import type { SceneObject } from '../src/forge/runner';
 import type { DimensionDef } from '../src/forge/sketch/dimensions';
+import { mapDimensionsToOwnerIds } from '../src/forge/reportDimensionOwnership';
 
 const scriptPath = process.argv[2];
 if (!scriptPath) {
@@ -102,36 +103,15 @@ function mapDimensionsToOwners(
   dimensions: DimensionDef[],
   objects: ShapeObjectWithBounds[],
 ): DimensionOwnership {
-  const byName = new Map<string, ShapeObjectWithBounds[]>();
-  objects.forEach((obj) => {
-    const list = byName.get(obj.name) || [];
-    list.push(obj);
-    byName.set(obj.name, list);
-  });
-
-  const byDimensionId = new Map<string, string[]>();
+  const byDimensionId = mapDimensionsToOwnerIds(
+    dimensions,
+    objects.map((obj) => ({ id: obj.id, name: obj.name, bbox: obj.bb as { min: Vec3; max: Vec3 } })),
+  );
   let combinedCount = 0;
 
-  for (const dim of dimensions) {
-    const explicitNames = dim.components ?? [];
-    if (explicitNames.length > 0) {
-      const ids = Array.from(new Set(explicitNames.flatMap((name) => {
-        const hit = byName.get(name);
-        if (!hit || hit.length !== 1) return [];
-        return [hit[0].id];
-      })));
-      byDimensionId.set(dim.id, ids);
-      if (ids.length !== 1) combinedCount += 1;
-      continue;
-    }
-
-    const candidates = objects
-      .filter((obj) => inBounds(dim.from, obj.bb.min, obj.bb.max, 1e-3) && inBounds(dim.to, obj.bb.min, obj.bb.max, 1e-3))
-      .map((obj) => obj.id);
-    const owners = candidates.length === 1 ? candidates : [];
-    byDimensionId.set(dim.id, owners);
-    if (owners.length !== 1) combinedCount += 1;
-  }
+  dimensions.forEach((dim) => {
+    if ((byDimensionId.get(dim.id) || []).length !== 1) combinedCount += 1;
+  });
 
   return { combinedCount, byDimensionId };
 }
