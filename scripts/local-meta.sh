@@ -96,6 +96,7 @@ init_meta_repo() {
   mkdir -p \
     "$root/benchmarks" \
     "$root/ideas" \
+    "$root/models" \
     "$root/notes" \
     "$root/scratch" \
     "$root/worktrees"
@@ -109,6 +110,7 @@ This repository is local-only. It exists to track notes, ideas, benchmark briefs
 Suggested layout:
 - `benchmarks/` for prompt packs and evaluator notes
 - `ideas/` for design sketches and roadmap fragments
+- `models/` for local model variants and experiments
 - `notes/` for durable project knowledge
 - `scratch/` for disposable experiments
 - `worktrees/` for worktree-specific temporary material
