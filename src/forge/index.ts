@@ -95,6 +95,7 @@ export type {
 export type { RunResult, SceneObject, LogEntry } from './headless';
 export type { ForgeGeometry } from './headless';
 export type { ForgeQualityPreset, ForgeQualityProfile } from './headless';
+export type { GroupChild, NamedGroupChild, GroupInput } from './headless';
 export type {
   ReportViewId,
   ReportObjectVisual,

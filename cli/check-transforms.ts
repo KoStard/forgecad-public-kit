@@ -9,6 +9,7 @@ import { assembly } from '../src/forge/assembly';
 import { box, initKernel } from '../src/forge/kernel';
 import { group } from '../src/forge/group';
 import { bevelGear } from '../src/forge/library';
+import { runScript } from '../src/forge/runner';
 import { Transform } from '../src/forge/transform';
 import { resolveJointViewValues, type JointViewCouplingDef, type JointViewDef } from '../src/forge/jointsView';
 
@@ -156,6 +157,46 @@ function testShapeGroupPointAlongSugar() {
 
   assertVec(bySugar.min, byTransform.min, 'group.pointAlong min');
   assertVec(bySugar.max, byTransform.max, 'group.pointAlong max');
+}
+
+function testAssemblyNamedGroupLabels() {
+  const script = `
+    const housing = group(
+      { name: "Body", shape: box(80, 60, 20).color("#6e7b88") },
+      { name: "Lid", shape: box(80, 60, 4).translate(0, 0, 20).color("#c9d2db") },
+      {
+        name: "Hardware",
+        group: [
+          { name: "Left Screw", shape: cylinder(24, 2).translate(12, 12, 0) },
+          { name: "Right Screw", shape: cylinder(24, 2).translate(68, 12, 0) },
+        ],
+      },
+    );
+
+    const mech = assembly("Named Group Labels")
+      .addPart("Base Assembly", housing);
+
+    return mech.solve().toScene();
+  `;
+
+  const result = runScript(script, 'named-group-labels.forge.js', {
+    'named-group-labels.forge.js': script,
+  });
+
+  assert.equal(result.error, null, `Expected named group script to run, got ${result.error}`);
+  assert.deepEqual(
+    result.objects.map((obj) => obj.name),
+    [
+      'Base Assembly.Body',
+      'Base Assembly.Lid',
+      'Base Assembly.Hardware.Left Screw',
+      'Base Assembly.Hardware.Right Screw',
+    ],
+  );
+  assert(
+    result.objects.every((obj) => obj.groupName === 'Base Assembly'),
+    `Expected flattened objects to retain groupName Base Assembly, got ${JSON.stringify(result.objects.map((obj) => obj.groupName))}`,
+  );
 }
 
 function testAssemblyJointCouplings() {
@@ -355,6 +396,7 @@ async function main() {
   testAssemblyChainAgainstAnalytic();
   testShapeGroupRotateAroundSugar();
   testShapeGroupPointAlongSugar();
+  testAssemblyNamedGroupLabels();
   testAssemblyJointCouplings();
   testAssemblyGearCouplings();
   testRuntimeJointCouplingResolution();

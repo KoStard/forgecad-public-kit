@@ -40,7 +40,11 @@ const fingerLen = 50;
 const finger = box(fingerLen, 8, 10).translate(8, -4, -5).color("#414952");
 const fingerLeft = finger.translate(18, 8 + open * 0.5, 0);
 const fingerRight = finger.translate(18, -8 - open * 0.5, 0);
-const gripper = group(toolBody, fingerLeft, fingerRight);
+const gripper = group(
+  { name: "Tool Body", shape: toolBody },
+  { name: "Left Finger", shape: fingerLeft },
+  { name: "Right Finger", shape: fingerRight },
+);
 
 const mech = assembly("Robot Arm Demo")
   .addPart("Base", base, {

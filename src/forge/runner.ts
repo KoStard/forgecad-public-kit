@@ -963,10 +963,19 @@ export function runScript(
       return !!item && typeof item === 'object' && 'name' in item;
     };
 
+    const groupChildLabel = (grp: ShapeGroup, parentLabel: string, index: number): string => {
+      const childName = grp.childName(index);
+      return childName ? `${parentLabel}.${childName}` : `${parentLabel}.${index + 1}`;
+    };
+
+    const rootGroupChildLabel = (grp: ShapeGroup, index: number): string => {
+      return grp.childName(index) ?? `Object ${index + 1}`;
+    };
+
     const flattenGroupChild = (child: Shape | Sketch | TrackedShape | ShapeGroup, label: string, groupName?: string) => {
       if (child instanceof ShapeGroup) {
         child.children.forEach((nested, i) => {
-          flattenGroupChild(nested, `${label}.${i + 1}`, groupName);
+          flattenGroupChild(nested, groupChildLabel(child, label, i), groupName);
         });
         return;
       }
@@ -1004,7 +1013,7 @@ export function runScript(
       }
 
       if (item.shape instanceof ShapeGroup) {
-        item.shape.children.forEach((child: any, i: number) => flattenGroupChild(child, `${name}.${i + 1}`, name));
+        item.shape.children.forEach((child: any, i: number) => flattenGroupChild(child, groupChildLabel(item.shape, name, i), name));
         return;
       }
       if (item.shape instanceof TrackedShape) {
@@ -1032,12 +1041,12 @@ export function runScript(
     };
 
     if (result instanceof ShapeGroup) {
-      result.children.forEach((child, i) => flattenGroupChild(child, `Object ${i + 1}`));
+      result.children.forEach((child, i) => flattenGroupChild(child, rootGroupChildLabel(result, i), undefined));
     } else if (Array.isArray(result)) {
       result.forEach((item, index) => {
         const label = `Object ${index + 1}`;
         if (item instanceof ShapeGroup) {
-          item.children.forEach((child, i) => flattenGroupChild(child, `${label}.${i + 1}`));
+          item.children.forEach((child, i) => flattenGroupChild(child, groupChildLabel(item, label, i)));
           return;
         }
         if (item instanceof TrackedShape) {

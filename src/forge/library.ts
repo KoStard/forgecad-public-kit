@@ -711,10 +711,10 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     const local = nodeOffset(grp, path, depth);
     const total = explodeAdd(inherited, local);
     return new ShapeGroup(grp.children.map((child, i) => {
-      const p = childPath(path, i);
+      const p = childPath(path, i, grp.childName(i));
       if (child instanceof ShapeGroup) return explodeGroup(child, p, depth + 1, total);
       return explodeLeaf(child, explodeAdd(total, nodeOffset(child, p, depth + 1)));
-    }));
+    }), grp.childNames);
   };
 
   const explodeItemNode = (
@@ -761,10 +761,10 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
 
   if (items instanceof ShapeGroup) {
     return new ShapeGroup(items.children.map((child, i) => {
-      const p = childPath('root', i);
+      const p = childPath('root', i, items.childName(i));
       if (child instanceof ShapeGroup) return explodeGroup(child, p, 1, [0, 0, 0]);
       return explodeLeaf(child, nodeOffset(child, p, 1));
-    })) as T;
+    }), items.childNames) as T;
   }
 
   return items.map((item, i) => {

@@ -125,6 +125,22 @@ This keeps kinematic chains declarative and avoids repeated manual pivot math.
 - `addPart(..., { metadata })` attaches per-part metadata to an assembly part.
 - BOM/report helpers such as `solved.bom()` and `solved.bomCsv()` live in [../output/bom.md](../output/bom.md).
 
+## Naming grouped assembly children
+
+When an assembly part is a `ShapeGroup`, Forge flattens the group into separate viewport objects. To avoid opaque labels like `Base Assembly.1`, name the group children explicitly:
+
+```javascript
+const housing = group(
+  { name: "Body", shape: body },
+  { name: "Lid", shape: lid },
+);
+
+const mech = assembly("Case")
+  .addPart("Base Assembly", housing);
+```
+
+That produces labels such as `Base Assembly.Body` and `Base Assembly.Lid`.
+
 ## Robot export
 
 Use `robotExport({...})` when an assembly should become a simulator package instead of only a viewport scene.

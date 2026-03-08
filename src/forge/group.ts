@@ -11,11 +11,96 @@ import { TrackedShape } from './sketch/topology';
 
 export type GroupChild = Shape | Sketch | TrackedShape | ShapeGroup;
 
+export interface NamedGroupChild {
+  name: string;
+  shape?: Shape | TrackedShape | ShapeGroup;
+  sketch?: Sketch;
+  group?: GroupInput[];
+}
+
+export type GroupInput = GroupChild | NamedGroupChild;
+
+function normalizeChildName(name?: string): string | undefined {
+  if (typeof name !== 'string') return undefined;
+  const trimmed = name.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function isNamedGroupChild(value: unknown): value is NamedGroupChild {
+  return !!value && typeof value === 'object' && typeof (value as { name?: unknown }).name === 'string';
+}
+
+function resolveNamedGroupChild(item: NamedGroupChild): GroupChild {
+  const childName = normalizeChildName(item.name);
+  if (!childName) {
+    throw new Error('group(...) named items require a non-empty name');
+  }
+
+  const hasShape = item.shape !== undefined;
+  const hasSketch = item.sketch !== undefined;
+  const hasGroup = Array.isArray(item.group);
+  const payloadCount = Number(hasShape) + Number(hasSketch) + Number(hasGroup);
+  if (payloadCount !== 1) {
+    throw new Error(`group(...) named item "${childName}" must provide exactly one of shape, sketch, or group`);
+  }
+
+  if (hasShape) {
+    if (
+      !(item.shape instanceof Shape)
+      && !(item.shape instanceof TrackedShape)
+      && !(item.shape instanceof ShapeGroup)
+    ) {
+      throw new Error(`group(...) named item "${childName}" shape must be a Shape, TrackedShape, or ShapeGroup`);
+    }
+    return item.shape as Shape | TrackedShape | ShapeGroup;
+  }
+  if (hasSketch) {
+    if (!(item.sketch instanceof Sketch)) {
+      throw new Error(`group(...) named item "${childName}" sketch must be a Sketch`);
+    }
+    return item.sketch as Sketch;
+  }
+  return group(...(item.group as GroupInput[]));
+}
+
+function normalizeGroupInputs(items: GroupInput[]): {
+  children: GroupChild[];
+  childNames: Array<string | undefined>;
+} {
+  const children: GroupChild[] = [];
+  const childNames: Array<string | undefined> = [];
+
+  items.forEach((item) => {
+    if (isNamedGroupChild(item)) {
+      children.push(resolveNamedGroupChild(item));
+      childNames.push(normalizeChildName(item.name));
+      return;
+    }
+    children.push(item);
+    childNames.push(undefined);
+  });
+
+  return { children, childNames };
+}
+
 export class ShapeGroup {
-  constructor(public readonly children: GroupChild[]) {}
+  public readonly children: GroupChild[];
+  public readonly childNames: Array<string | undefined>;
+
+  constructor(children: GroupChild[], childNames?: Array<string | undefined>) {
+    if (childNames && childNames.length !== children.length) {
+      throw new Error('ShapeGroup childNames must match children length');
+    }
+    this.children = [...children];
+    this.childNames = this.children.map((_, index) => normalizeChildName(childNames?.[index]));
+  }
+
+  childName(index: number): string | undefined {
+    return this.childNames[index];
+  }
 
   private mapChildren(fn: (child: GroupChild) => GroupChild): ShapeGroup {
-    return new ShapeGroup(this.children.map(fn));
+    return new ShapeGroup(this.children.map(fn), this.childNames);
   }
 
   /** Return a deep-cloned ShapeGroup tree. */
@@ -177,7 +262,7 @@ export class ShapeGroup {
       if (c instanceof TrackedShape) return c.transform(m);
       if (c instanceof Shape) return c.transform(m);
       throw new Error('ShapeGroup.transform only supports 3D children (Shape/TrackedShape/ShapeGroup). For Sketch children, use 2D transforms (translate/rotate/scale/mirror).');
-    }));
+    }), this.childNames);
   }
 
   scale(v: number | [number, number, number]): ShapeGroup {
@@ -208,6 +293,7 @@ export class ShapeGroup {
   }
 }
 
-export function group(...items: GroupChild[]): ShapeGroup {
-  return new ShapeGroup(items);
+export function group(...items: GroupInput[]): ShapeGroup {
+  const normalized = normalizeGroupInputs(items);
+  return new ShapeGroup(normalized.children, normalized.childNames);
 }

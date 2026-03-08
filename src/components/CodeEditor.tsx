@@ -915,10 +915,19 @@ type AnchorTarget3D = Anchor3D | (string & {});
 
 // --- Group ---
 /** Group multiple shapes/sketches for joint transforms without merging meshes. Colors preserved. */
-declare function group(...items: (Shape | Sketch | TrackedShape | ShapeGroup)[]): ShapeGroup;
+type NamedGroupItem = {
+  name: string;
+  shape?: Shape | TrackedShape | ShapeGroup;
+  sketch?: Sketch;
+  group?: GroupItem[];
+};
+type GroupItem = Shape | Sketch | TrackedShape | ShapeGroup | NamedGroupItem;
+declare function group(...items: GroupItem[]): ShapeGroup;
 
 declare class ShapeGroup {
   readonly children: (Shape | Sketch | TrackedShape | ShapeGroup)[];
+  readonly childNames: (string | undefined)[];
+  childName(index: number): string | undefined;
   clone(): ShapeGroup;
   duplicate(): ShapeGroup;
   translate(x: number, y: number, z: number): ShapeGroup;

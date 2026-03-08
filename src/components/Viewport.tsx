@@ -2471,7 +2471,7 @@ export function Viewport() {
       if (jointByChild.has(obj.name)) {
         nodeName = obj.name;
       } else if (obj.groupName && jointByChild.has(obj.groupName)) {
-        // ShapeGroup returns are flattened as "Group.1", "Group.2", ...
+        // ShapeGroup returns are flattened as "Group.Lid" or the fallback "Group.1".
         // Resolve joints against the parent group name when exact object name is absent.
         nodeName = obj.groupName;
       }

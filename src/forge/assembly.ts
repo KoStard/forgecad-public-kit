@@ -188,7 +188,8 @@ function partToShapes(part: AssemblyPart): Shape[] {
 
   const out: Shape[] = [];
   for (const child of part.children) {
-    if (child instanceof TrackedShape) out.push(child.toShape());
+    if (child instanceof ShapeGroup) out.push(...partToShapes(child));
+    else if (child instanceof TrackedShape) out.push(child.toShape());
     else if (child instanceof Shape) out.push(child);
   }
   return out;
@@ -254,6 +255,28 @@ export class SolvedAssembly {
     group?: Array<{ name: string; shape: Shape }>;
     metadata?: PartMetadata;
   }> {
+    const appendGroupChildren = (
+      grp: ShapeGroup,
+      prefix: string,
+      out: Array<{ name: string; shape: Shape }>,
+    ) => {
+      grp.children.forEach((child, index) => {
+        const childName = grp.childName(index);
+        const label = childName ? `${prefix}.${childName}` : `${prefix}.${index + 1}`;
+        if (child instanceof ShapeGroup) {
+          appendGroupChildren(child, label, out);
+          return;
+        }
+        if (child instanceof TrackedShape) {
+          out.push({ name: label, shape: child.toShape() });
+          return;
+        }
+        if (child instanceof Shape) {
+          out.push({ name: label, shape: child });
+        }
+      });
+    };
+
     const out: Array<{
       name: string;
       shape?: Shape;
@@ -265,10 +288,7 @@ export class SolvedAssembly {
       const part = this.getPart(name);
       if (part instanceof ShapeGroup) {
         const groupItems: Array<{ name: string; shape: Shape }> = [];
-        part.children.forEach((child, index) => {
-          if (child instanceof TrackedShape) groupItems.push({ name: `${name}.${index + 1}`, shape: child.toShape() });
-          else if (child instanceof Shape) groupItems.push({ name: `${name}.${index + 1}`, shape: child });
-        });
+        appendGroupChildren(part, name, groupItems);
         out.push({ name, group: groupItems, metadata: rec.metadata });
       } else if (part instanceof TrackedShape) {
         out.push({ name, shape: part.toShape(), metadata: rec.metadata });
