@@ -12,11 +12,13 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 ## Workflow
 
 1. Identify the target artifact first: `.forge.js`, `.sketch.js`, `.forge-notebook.json`, SVG asset, or a CLI/export task.
-2. Read the model-building docs in order when geometry behavior matters: core reference, coordinate system, geometry conventions, positioning, entities, assembly, then sketch modules.
-3. Use multi-file imports deliberately: `importPart()` for parts, `importSketch()` for sketches or SVGs, explicit `paramOverrides`, and `.withReferences()` plus `.placeReference()` for reusable placement.
-4. Use notebooks when the task benefits from stateful iteration, iterative development or debugging; remember cells share state, `show()` pins visible geometry, and notebooks can be exported to plain `.forge.js`. You can later convert it to a forge.js file.
-5. Validate through the CLI with `npm run test-run -- <file>`; add `--debug-imports` when import chains or overrides might be wrong.
-6. Reuse patterns from `examples/api/` before inventing a modeling recipe from scratch.
+2. Default to a concrete first pass when the user clearly wants a fix or a model, not a long design review. Easy iteration is cheaper than speculative back-and-forth.
+3. Read the model-building docs in order when geometry behavior matters, but keep exploration proportional. Read enough to avoid API mistakes, then start building.
+4. If an existing model is broken or incoherent, replace the weak structure with a cleaner buildable design instead of preserving bad architecture.
+5. Use multi-file imports deliberately: `importPart()` for parts, `importSketch()` for sketches or SVGs, explicit `paramOverrides`, and `.withReferences()` plus `.placeReference()` for reusable placement.
+6. Use notebooks when the task benefits from stateful iteration, iterative development or debugging; remember cells share state, `show()` pins visible geometry, and notebooks can be exported to plain `.forge.js`. You can later convert it to a forge.js file.
+7. Validate quickly through the CLI with `npm run test-run -- <file>`; add `--debug-imports` when import chains or overrides might be wrong, then refine from the runtime result.
+8. Reuse patterns from `examples/api/` before inventing a modeling recipe from scratch.
 
 ## Included Sources
 
@@ -28,6 +30,14 @@ Keep this skill self-contained by relying on the inlined source corpus below. Us
 # Modeling Recipes
 
 This file collects patterns, best practices, debugging tips, and example snippets that are useful once you already know the model-building API.
+
+## Iteration Bias
+
+- Default to a buildable first pass instead of a long proposal when the user clearly wants geometry changed.
+- Replace a broken or incoherent model wholesale when that is faster and cleaner than incremental patching.
+- Keep printed hardware structurally honest: use it for guides, spacers, retainers, and moderate-load mechanisms; use wood or metal for primary strength.
+- Validate early with `npm run test-run -- <file>` and refine from the actual runtime result.
+- Prefer a few clean part files over one giant script once a design has repeated hardware or a small mechanism.
 
 ## Common Patterns
 
@@ -264,6 +274,8 @@ For larger runnable examples, read `examples/api/`.
 # Model-Building Docs
 
 This is the complete reading set for writing ForgeCAD models. If the task is "build or modify a model", read every file below before coding.
+
+For repair and iteration work, do not confuse reading with waiting. Read enough to stay inside the API, make a strong first pass quickly, validate it, and then iterate. If the current model is fundamentally weak, replacing it cleanly is usually better than preserving a bad structure.
 
 ## Required Files
 

@@ -2,6 +2,8 @@
 
 This is the complete reading set for writing ForgeCAD models. If the task is "build or modify a model", read every file below before coding.
 
+For repair and iteration work, do not confuse reading with waiting. Read enough to stay inside the API, make a strong first pass quickly, validate it, and then iterate. If the current model is fundamentally weak, replacing it cleanly is usually better than preserving a bad structure.
+
 ## Required Files
 
 1. [reference.md](reference.md) - core script contract, 3D API, imports, library helpers, return formats

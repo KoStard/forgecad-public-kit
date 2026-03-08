@@ -2,6 +2,14 @@
 
 This file collects patterns, best practices, debugging tips, and example snippets that are useful once you already know the model-building API.
 
+## Iteration Bias
+
+- Default to a buildable first pass instead of a long proposal when the user clearly wants geometry changed.
+- Replace a broken or incoherent model wholesale when that is faster and cleaner than incremental patching.
+- Keep printed hardware structurally honest: use it for guides, spacers, retainers, and moderate-load mechanisms; use wood or metal for primary strength.
+- Validate early with `npm run test-run -- <file>` and refine from the actual runtime result.
+- Prefer a few clean part files over one giant script once a design has repeated hardware or a small mechanism.
+
 ## Common Patterns
 
 ### Parametric Box with Holes
