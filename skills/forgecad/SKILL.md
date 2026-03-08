@@ -7,7 +7,7 @@ description: ForgeCAD model authoring, editing, debugging, and execution guidanc
 
 ## Overview
 
-Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workflows with the documented API and examples in this file. Prefer the documented ForgeCAD primitives, import rules, placement strategies, and CLI commands over inventing new APIs or geometry conventions.
+Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workflows with the documented API in this file. Prefer the documented ForgeCAD primitives, import rules, placement strategies, and CLI commands over inventing new APIs or geometry conventions.
 
 ## Workflow
 
@@ -16,11 +16,245 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 3. Use multi-file imports deliberately: `importPart()` for parts, `importSketch()` for sketches or SVGs, explicit `paramOverrides`, and `.withReferences()` plus `.placeReference()` for reusable placement.
 4. Use notebooks when the task benefits from stateful iteration, iterative development or debugging; remember cells share state, `show()` pins visible geometry, and notebooks can be exported to plain `.forge.js`. You can later convert it to a forge.js file.
 5. Validate through the CLI with `npm run test-run -- <file>`; add `--debug-imports` when import chains or overrides might be wrong.
-6. Reuse patterns from `examples/api/` (already included) before inventing a modeling recipe from scratch.
+6. Reuse patterns from `examples/api/` before inventing a modeling recipe from scratch.
 
 ## Included Sources
 
 Keep this skill self-contained by relying on the inlined source corpus below. Usually you won't need further exploration in the codebase and can directly go into the task.
+
+## docs/permanent/API/guides/modeling-recipes.md
+
+````markdown
+# Modeling Recipes
+
+This file collects patterns, best practices, debugging tips, and example snippets that are useful once you already know the model-building API.
+
+## Common Patterns
+
+### Parametric Box with Holes
+```javascript
+const w = param("Width", 80, { min: 40, max: 150, unit: "mm" });
+const h = param("Height", 60, { min: 30, max: 100, unit: "mm" });
+const t = param("Thickness", 5, { min: 2, max: 10, unit: "mm" });
+const holeD = param("Hole Diameter", 8, { min: 4, max: 20, unit: "mm" });
+
+const base = box(w, h, t);
+const hole = cylinder(t + 2, holeD / 2).translate(w / 2, h / 2, -1);
+
+return base.subtract(hole);
+```
+
+### Hollow Shell (Wall Thickness)
+```javascript
+const outer = param("Outer Size", 50, { min: 20, max: 100, unit: "mm" });
+const wall = param("Wall", 3, { min: 1, max: 10, unit: "mm" });
+
+const outerBox = box(outer, outer, outer, true);
+const innerBox = box(outer - 2 * wall, outer - 2 * wall, outer - 2 * wall, true);
+
+return outerBox.subtract(innerBox);
+```
+
+### Array/Pattern
+```javascript
+const count = param("Count", 5, { min: 2, max: 10 });
+const spacing = param("Spacing", 15, { min: 5, max: 30, unit: "mm" });
+
+let shapes = [];
+for (let i = 0; i < count; i++) {
+  shapes.push(cylinder(10, 5).translate(i * spacing, 0, 0));
+}
+
+return union(...shapes);
+```
+
+### Sketch-Based Design
+```javascript
+const sides = param("Sides", 6, { min: 3, max: 12 });
+const radius = param("Radius", 25, { min: 10, max: 50, unit: "mm" });
+const height = param("Height", 60, { min: 20, max: 120, unit: "mm" });
+const wall = param("Wall", 3, { min: 1, max: 8, unit: "mm" });
+
+const outer = ngon(sides, radius);
+const inner = ngon(sides, radius - wall);
+const profile = outer.subtract(inner);
+
+return profile.extrude(height, { twist: 45, divisions: 32 });
+```
+
+### Rounded Profiles
+```javascript
+const base = rect(50, 30).offset(-3, 'Round').offset(3, 'Round');
+return base.extrude(10);
+```
+
+Use that pattern when every convex corner should round. For mixed sharp-and-rounded outlines, fillet only the intended vertices instead:
+
+```javascript
+const roofPoints = [
+  [0, 0],
+  [90, 0],
+  [90, 44],
+  [66, 74],
+  [45, 86],
+  [24, 74],
+  [0, 44],
+];
+
+const roof = filletCorners(roofPoints, [
+  { index: 3, radius: 19 },
+  { index: 4, radius: 19 },
+  { index: 5, radius: 19 },
+]);
+
+return roof.extrude(12);
+```
+
+### Chamfers and Fillets
+```javascript
+const part = box(50, 50, 20);
+const chamfer = box(10, 60, 10)
+  .rotate(0, 45, 0)
+  .translate(50, -5, 15);
+
+return part.subtract(chamfer);
+```
+
+### Choosing the right sketch-rounding tool
+
+- `offset(-r).offset(+r)` for rounding every convex corner of a closed outline
+- `stroke(points, width, 'Round')` for centerline-based geometry such as ribs or traces
+- `hull2d()` of circles for a blended cap/capsule silhouette
+- `filletCorners(points, ...)` for selective true-corner fillets on mixed profiles
+
+## Best Practices
+
+### Performance
+- Boolean operations are expensive; minimize them
+- Use parameters for values that might change
+- Avoid deep nesting of operations in loops
+
+### Readability
+```javascript
+const base = box(100, 100, 10);
+const hole = cylinder(12, 8);
+const result = base.subtract(hole.translate(50, 50, 0));
+return result;
+```
+
+Prefer named intermediate values over deeply nested one-liners.
+
+### Units
+- All dimensions are millimeters by default
+- Angles are degrees
+- Use the `unit` parameter option when it helps the reader
+
+### Centering
+```javascript
+const centered = box(50, 50, 50, true).translate(x, y, z);
+const corner = box(50, 50, 50).translate(x - 25, y - 25, z - 25);
+```
+
+Centered primitives are usually easier to position.
+
+## Debugging
+
+### Console Output
+```javascript
+console.log("Width:", width);
+console.log("Volume:", shape.volume());
+```
+
+### Incremental Building
+```javascript
+const base = box(50, 50, 10);
+// return base;
+
+const withHole = base.subtract(cylinder(12, 5).translate(25, 25, 0));
+// return withHole;
+
+return withHole.add(cylinder(20, 3).translate(25, 25, 10));
+```
+
+For sketch-heavy work, compare the raw profile and the rounded profile before extruding:
+
+```javascript
+const raw = polygon(roofPoints);
+const rounded = filletCorners(roofPoints, [
+  { index: 3, radius: 19 },
+  { index: 4, radius: 19 },
+  { index: 5, radius: 19 },
+]);
+
+return [
+  { name: "Raw", sketch: raw },
+  { name: "Rounded", sketch: rounded.translate(120, 0) },
+];
+```
+
+## Error Handling
+
+Common errors:
+- `"Kernel not initialized"` - internal/runtime issue, reload the app
+- `"Cannot read property of undefined"` - usually a bad variable name or missing declaration
+- invalid geometry - commonly caused by zero dimensions or self-intersecting sketches
+- script execution error - inspect the JS error in console output
+
+## Example Snippets
+
+### Parametric Phone Stand
+```javascript
+const width = param("Width", 80, { min: 40, max: 150, unit: "mm" });
+const depth = param("Depth", 60, { min: 30, max: 100, unit: "mm" });
+const thick = param("Thickness", 5, { min: 2, max: 15, unit: "mm" });
+const backH = param("Back Height", 40, { min: 20, max: 80, unit: "mm" });
+const cableD = param("Cable Hole", 8, { min: 4, max: 15, unit: "mm" });
+
+const base = box(width, depth, thick);
+const back = box(width, thick, backH).translate(0, depth - thick, thick);
+const lip = box(width, 10, 8).translate(0, 0, thick);
+const hole = cylinder(thick + 2, cableD / 2)
+  .rotate(90, 0, 0)
+  .translate(width / 2, depth / 2, -1);
+
+return union(base, back, lip).subtract(hole);
+```
+
+### Multi-Object Scene with Colors
+```javascript
+const base = box(100, 100, 5).color('#888888');
+const col1 = cylinder(40, 5).translate(20, 20, 5).color('#cc4444');
+const col2 = cylinder(40, 5).translate(80, 20, 5).color('#4444cc');
+const col3 = cylinder(40, 5).translate(50, 80, 5).color('#44cc44');
+const top = box(100, 100, 3).translate(0, 0, 45).color('#888888');
+
+return [
+  { name: "Base", shape: base },
+  { name: "Column A", shape: col1 },
+  { name: "Column B", shape: col2 },
+  { name: "Column C", shape: col3 },
+  { name: "Top", shape: top },
+];
+```
+
+### Entity-Based Design with Topology
+```javascript
+const baseRect = rectangle(0, 0, 80, 60);
+const base = baseRect.extrude(20);
+
+let result = filletEdge(base, base.edge('vert-br'), 8, [-1, -1]);
+result = filletEdge(result, base.edge('vert-bl'), 8, [1, -1]);
+
+const holes = circularPattern(
+  cylinder(25, 4).translate(40, 30, -1),
+  4, 40, 30,
+);
+
+return result.toShape().subtract(holes);
+```
+
+For larger runnable examples, read `examples/api/`.
+````
 
 ## docs/permanent/API/model-building
 
@@ -3884,2212 +4118,5 @@ const result = runScript(code, 'main.forge.js', allFiles);
 | `puppeteer-core` | Headless Chrome for PNG rendering | Dev dependency |
 | `manifold-3d` | Geometry kernel (WASM) | Works in both Node and browser |
 | `three` | 3D rendering (used by render.ts) | Loaded in browser context by Puppeteer |
-````
-
-## examples/api
-
-### examples/api/assembly-gear-coupling.forge.js
-
-````javascript
-// Assembly + gear coupling demo
-// Uses addGearCoupling(...) so the driven joint follows pinion motion automatically.
-
-const pinionDeg = param("Pinion Angle", 20, { min: -180, max: 180, step: 1, unit: "°" });
-
-const pair = lib.gearPair({
-  pinion: { module: 1.25, teeth: 14, faceWidth: 8, boreDiameter: 5 },
-  gear: { module: 1.25, teeth: 42, faceWidth: 8, boreDiameter: 8 },
-  backlash: 0.05,
-  place: false,
-});
-
-const mech = assembly("Gear Coupling Demo")
-  .addFrame("Base")
-  .addPart("Pinion", pair.pinion.color("#d5a15f"))
-  .addPart("Driven", pair.gear.color("#9ab3ca"), {
-    transform: Transform.identity().translate(pair.centerDistance, 0, 0),
-  })
-  .addRevolute("Pinion", "Base", "Pinion", {
-    axis: [0, 0, 1],
-    min: -720,
-    max: 720,
-  })
-  .addRevolute("Driven", "Base", "Driven", {
-    axis: [0, 0, 1],
-    min: -720,
-    max: 720,
-  })
-  .addGearCoupling("Driven", "Pinion", { pair });
-
-const solved = mech.solve({ Pinion: pinionDeg });
-return solved.toScene();
-````
-
-### examples/api/assembly-mechanism.forge.js
-
-````javascript
-// Assembly + mechanism demo
-// Shows Transform composition, assembly joints, BOM metadata, and collision checks.
-
-const baseYaw = param("Base Yaw", 20, { min: -170, max: 170, unit: "°" });
-const shoulder = param("Shoulder", 30, { min: -30, max: 110, unit: "°" });
-const elbow = param("Elbow", 45, { min: -20, max: 135, unit: "°" });
-const open = param("Gripper Open", 28, { min: 0, max: 55, unit: "mm" });
-
-const upperLen = 180;
-const foreLen = 160;
-
-const basePlate = box(180, 140, 10, true).translate(0, 0, 5);
-const tower = cylinder(20, 36).translate(0, 0, 10);
-
-const m4 = lib.fastenerHole({ size: "M4", fit: "normal", depth: 14, counterbore: { depth: 4 } });
-const mountHoles = [
-  m4.translate(55, 40, 7),
-  m4.translate(-55, 40, 7),
-  m4.translate(55, -40, 7),
-  m4.translate(-55, -40, 7),
-];
-
-const base = difference(union(basePlate, tower), ...mountHoles).color("#6e7b88");
-
-const upperArm = box(upperLen, 28, 28)
-  .translate(0, -14, -14)
-  .subtract(cylinder(32, 8).pointAlong([0, 1, 0]).translate(0, 0, 0))
-  .color("#5f87c6");
-
-const forearm = box(foreLen, 24, 24)
-  .translate(0, -12, -12)
-  .subtract(cylinder(28, 7).pointAlong([0, 1, 0]).translate(0, 0, 0))
-  .color("#6fa2d6");
-
-const wristHub = cylinder(26, 10).pointAlong([1, 0, 0]).translate(0, 0, 0);
-const palm = box(34, 44, 16, true).translate(16, 0, 0);
-const toolBody = union(wristHub, palm).color("#b8c5d3");
-
-const fingerLen = 50;
-const finger = box(fingerLen, 8, 10).translate(8, -4, -5).color("#414952");
-const fingerLeft = finger.translate(18, 8 + open * 0.5, 0);
-const fingerRight = finger.translate(18, -8 - open * 0.5, 0);
-const gripper = group(toolBody, fingerLeft, fingerRight);
-
-const mech = assembly("Robot Arm Demo")
-  .addPart("Base", base, {
-    metadata: { material: "PETG", process: "FDM", tolerance: "+/-0.2mm", qty: 1 },
-  })
-  .addPart("Upper Arm", upperArm, {
-    metadata: { material: "PETG-CF", process: "FDM", qty: 1 },
-  })
-  .addPart("Forearm", forearm, {
-    metadata: { material: "PETG-CF", process: "FDM", qty: 1 },
-  })
-  .addPart("Gripper", gripper, {
-    metadata: { material: "PETG", process: "FDM", notes: "Print fingers in TPU for compliance", qty: 1 },
-  })
-  .addJoint("baseYaw", "revolute", "Base", "Upper Arm", {
-    axis: [0, 0, 1],
-    min: -170,
-    max: 170,
-    frame: Transform.identity().translate(0, 0, 46),
-  })
-  .addJoint("shoulder", "revolute", "Upper Arm", "Forearm", {
-    axis: [0, -1, 0],
-    min: -30,
-    max: 110,
-    frame: Transform.identity().translate(upperLen + 8, 0, 0),
-  })
-  .addJoint("elbow", "revolute", "Forearm", "Gripper", {
-    axis: [0, -1, 0],
-    min: -20,
-    max: 135,
-    frame: Transform.identity().translate(foreLen + 12, 0, 0),
-  });
-
-const solved = mech.solve({
-  baseYaw,
-  shoulder,
-  elbow,
-});
-
-const collisions = solved.collisionReport({
-  minOverlapVolume: 0.5,
-  ignorePairs: [
-    ["Upper Arm", "Forearm"],
-    ["Forearm", "Gripper"],
-  ],
-});
-
-if (collisions.length > 0) {
-  console.warn("Assembly collisions:", collisions);
-}
-
-const elbowSweep = mech.sweepJoint("elbow", -20, 135, 16, {
-  baseYaw,
-  shoulder,
-});
-const sweptCollisions = elbowSweep.filter(step => step.collisions.length > 0).length;
-if (sweptCollisions > 0) {
-  console.info(`Elbow sweep has collisions in ${sweptCollisions}/${elbowSweep.length} steps`);
-}
-
-console.log("BOM", solved.bom());
-console.log("BOM CSV\n" + solved.bomCsv());
-
-return solved.toScene();
-````
-
-### examples/api/attachTo-basics.forge.js
-
-````javascript
-// attachTo() — the primary way to position parts relative to each other.
-//
-// Mental model: child.attachTo(parent, parentAnchor, selfAnchor, offset)
-//   "Put my [selfAnchor] at the parent's [parentAnchor], then shift by [offset]"
-//
-// Anchor names:
-//   1 word  = face center:  'top', 'bottom', 'front', 'back', 'left', 'right'
-//   2 words = edge midpoint: 'top-front', 'back-left', etc.
-//   3 words = corner:        'top-front-left', 'bottom-back-right', etc.
-
-const baseW = param("Base Width", 100, { min: 50, max: 200, unit: "mm" });
-const baseD = param("Base Depth", 80, { min: 40, max: 150, unit: "mm" });
-const baseH = param("Base Height", 10, { min: 5, max: 30, unit: "mm" });
-
-const base = box(baseW, baseD, baseH, true).color('#888888');
-
-// Stack on top: column's bottom face meets base's top face
-const column = cylinder(40, 8).color('#4488cc')
-  .attachTo(base, 'top', 'bottom');
-
-// Protrude from front: button's back face meets base's front face
-const button = box(20, 6, 10, true).color('#cc4444')
-  .attachTo(base, 'front', 'back');
-
-// Hang below: bracket's top face meets base's bottom face
-const bracket = box(30, 30, 5, true).color('#44cc44')
-  .attachTo(base, 'bottom', 'top');
-
-// Attach to side with offset: panel's left face meets base's right face,
-// then shift 0mm on X, 0mm on Y, 10mm up on Z
-const sidePanel = box(4, 40, 25, true).color('#cc8844')
-  .attachTo(base, 'right', 'left', [0, 0, 10]);
-
-// Corner alignment: small cube at top-front-right corner of base
-const corner = box(8, 8, 8, true).color('#8844cc')
-  .attachTo(base, 'top-front-right', 'bottom-back-left');
-
-return [
-  { name: "Base", shape: base },
-  { name: "Column (top→bottom)", shape: column },
-  { name: "Button (front→back)", shape: button },
-  { name: "Bracket (bottom→top)", shape: bracket },
-  { name: "Side Panel (right→left, +10Z)", shape: sidePanel },
-  { name: "Corner Cube", shape: corner },
-];
-````
-
-### examples/api/benchy-style-hull.forge.js
-
-````javascript
-// Benchy-style hull concept using reusable curve/surface APIs.
-// Not an exact #3DBenchy clone; this shows the modeling workflow:
-// sections -> loft hull, sweep rails/chimney, simple superstructure.
-
-const length = param("Length", 92, { min: 60, max: 150, unit: "mm" });
-const beam = param("Beam", 42, { min: 24, max: 70, unit: "mm" });
-const hullH = param("Hull Height", 34, { min: 18, max: 60, unit: "mm" });
-const deckDrop = param("Deck Drop", 6, { min: 2, max: 12, unit: "mm" });
-
-const mkSection = (w, h, keel = 0, chine = 0) => spline2d([
-  [w * 0.5, 0],
-  [w * 0.45, h * 0.28 + chine],
-  [w * 0.25, h * 0.5 + chine],
-  [0, h * 0.58 + keel],
-  [-w * 0.25, h * 0.5 + chine],
-  [-w * 0.45, h * 0.28 + chine],
-  [-w * 0.5, 0],
-  [-w * 0.45, -h * 0.18],
-  [-w * 0.23, -h * 0.32],
-  [0, -h * 0.36 - deckDrop],
-  [w * 0.23, -h * 0.32],
-  [w * 0.45, -h * 0.18],
-], {
-  closed: true,
-  samplesPerSegment: 10,
-  tension: 0.45,
-});
-
-const z0 = 0;
-const z1 = length * 0.22;
-const z2 = length * 0.56;
-const z3 = length * 0.88;
-const z4 = length;
-
-let hull = loft(
-  [
-    mkSection(beam * 0.52, hullH * 0.72, 2, 1), // stern
-    mkSection(beam * 0.94, hullH * 0.95, 3, 1.5),
-    mkSection(beam, hullH, 3.5, 1.2),           // max beam
-    mkSection(beam * 0.58, hullH * 0.82, 1.5, 0.5),
-    mkSection(beam * 0.18, hullH * 0.35, 0, 0), // bow tip
-  ],
-  [z0, z1, z2, z3, z4],
-  { edgeLength: 0.95 },
-);
-hull = hull.smoothOut(72, 0.28).refine(2);
-
-// Orient hull so length goes along X, beam along Y, height along Z.
-hull = hull
-  .rotate(0, 90, 0) // Z (loft stations) -> X
-  .rotate(90, 0, 0) // Y (section height) -> Z
-  .translate(-length * 0.5, 0, hullH * 0.58);
-
-// Deckhouse and cabin
-const houseW = beam * 0.48;
-const houseD = length * 0.26;
-const houseH = hullH * 0.62;
-const house = roundedRect(houseW, houseD, 4, true).extrude(houseH)
-  .translate(length * 0.04, 0, hullH * 0.82);
-
-const cabinCut = roundedRect(houseW * 0.68, houseD * 0.56, 2.2, true).extrude(houseH * 0.7)
-  .translate(length * 0.04, 0, hullH * 1.08);
-
-// Chimney via sweep
-const stackPath = spline3d(
-  [
-    [length * 0.02, 0, hullH * 1.45],
-    [length * 0.02, 0, hullH * 1.72],
-    [length * 0.08, 0, hullH * 1.84],
-  ],
-  { tension: 0.5 },
-);
-const stack = sweep(circle2d(3.8, 26), stackPath, {
-  samples: 28,
-  edgeLength: 0.55,
-});
-const stackInner = sweep(circle2d(2.2, 22), stackPath, {
-  samples: 28,
-  edgeLength: 0.55,
-});
-
-const cabin = house.subtract(cabinCut);
-const chimney = stack.subtract(stackInner);
-
-return [
-  { name: "Hull", shape: hull.color('#ce6f4e') },
-  { name: "Cabin", shape: cabin.color('#f0eee9') },
-  { name: "Chimney", shape: chimney.color('#3d4854') },
-];
-````
-
-### examples/api/bill-of-materials.forge.js
-
-````javascript
-// API demo: script-declared bill of materials that gets auto-summed in report export
-
-const frameWidth = param('Frame Width', 900, { min: 300, max: 1800, unit: 'mm' });
-const frameDepth = param('Frame Depth', 500, { min: 200, max: 1200, unit: 'mm' });
-const legHeight = param('Leg Height', 720, { min: 300, max: 1200, unit: 'mm' });
-const tubeW = param('Tube Width', 30, { min: 15, max: 80, unit: 'mm' });
-const tubeH = param('Tube Height', 20, { min: 10, max: 80, unit: 'mm' });
-
-const frontBolts = param('Front Bolts', 8, { min: 0, max: 64, integer: true });
-const rearBolts = param('Rear Bolts', 8, { min: 0, max: 64, integer: true });
-const boltLength = param('Bolt Length', 16, { min: 6, max: 60, unit: 'mm' });
-
-const wall = 2;
-const longTubeMm = frameWidth * 2;
-const shortTubeMm = frameDepth * 2;
-const legTubeMm = legHeight * 4;
-const totalTubeMm = longTubeMm + shortTubeMm + legTubeMm;
-
-// Physical materials are authored by code, not inferred from mesh primitives.
-bom(totalTubeMm, `iron tube with dimensions ${tubeW} x ${tubeH}`, { unit: 'mm' });
-
-// These two lines intentionally share the same descriptor so report export sums them.
-bom(frontBolts, `M4 bolt of ${boltLength} mm length`, { unit: 'pieces' });
-bom(rearBolts, `M4 bolt of ${boltLength} mm length`, { unit: 'pieces' });
-
-const railFront = box(frameWidth, tubeW, tubeH).color('#778da9');
-const railBack = box(frameWidth, tubeW, tubeH).translate(0, frameDepth - tubeW, 0).color('#778da9');
-const railLeft = box(tubeW, frameDepth, tubeH).color('#778da9');
-const railRight = box(tubeW, frameDepth, tubeH).translate(frameWidth - tubeW, 0, 0).color('#778da9');
-
-const legSize = Math.min(tubeW, tubeH);
-const legA = box(legSize, legSize, legHeight).translate(0, 0, tubeH).color('#415a77');
-const legB = box(legSize, legSize, legHeight).translate(frameWidth - legSize, 0, tubeH).color('#415a77');
-const legC = box(legSize, legSize, legHeight).translate(0, frameDepth - legSize, tubeH).color('#415a77');
-const legD = box(legSize, legSize, legHeight).translate(frameWidth - legSize, frameDepth - legSize, tubeH).color('#415a77');
-
-return [
-  { name: 'Front Rail', shape: railFront },
-  { name: 'Back Rail', shape: railBack },
-  { name: 'Left Rail', shape: railLeft },
-  { name: 'Right Rail', shape: railRight },
-  { name: 'Leg A', shape: legA },
-  { name: 'Leg B', shape: legB },
-  { name: 'Leg C', shape: legC },
-  { name: 'Leg D', shape: legD },
-];
-````
-
-### examples/api/boolean-operations.forge.js
-
-````javascript
-// Boolean operations — union, difference, intersection.
-//
-// union(a, b)        → combined volume
-// difference(a, b)   → a minus b (subtract b from a)
-// intersection(a, b) → only the overlapping volume
-//
-// Method syntax: a.add(b), a.subtract(b), a.intersect(b)
-
-const size = param("Size", 30, { min: 15, max: 50, unit: "mm" });
-const overlap = param("Overlap", 15, { min: 0, max: 30, unit: "mm" });
-const spacing = 80;
-
-// Two overlapping shapes for each demo
-function makePair(offsetX) {
-  const a = box(size, size, size, true).translate(offsetX, 0, 0).color('#4488cc');
-  const b = sphere(size * 0.6).translate(offsetX + size - overlap, 0, 0).color('#cc4444');
-  return [a, b];
-}
-
-// 1. Union — combined
-const [u1, u2] = makePair(0);
-const unioned = union(u1, u2).color('#8866cc');
-
-// 2. Difference — box minus sphere
-const [d1, d2] = makePair(spacing);
-const diffed = d1.subtract(d2);
-
-// 3. Intersection — only overlap
-const [i1, i2] = makePair(2 * spacing);
-const intersected = intersection(i1, i2).color('#cc8844');
-
-// Show the original shapes (translucent-ish via separate objects) for reference
-const refA = box(size, size, size, true).translate(3 * spacing, 0, 0).color('#4488cc');
-const refB = sphere(size * 0.6).translate(3 * spacing + size - overlap, 0, 0).color('#cc4444');
-
-return [
-  { name: "Union", shape: unioned },
-  { name: "Difference (box - sphere)", shape: diffed },
-  { name: "Intersection", shape: intersected },
-  { name: "Original Box", shape: refA },
-  { name: "Original Sphere", shape: refB },
-];
-````
-
-### examples/api/bounding-box-visualizer.forge.js
-
-````javascript
-// Visualize bounding boxes — useful for debugging positioning.
-//
-// boundingBox() returns { min: [x,y,z], max: [x,y,z] }.
-// This example draws thin cylinders along the 12 edges of the bbox.
-
-const edgeR = 0.5; // wireframe edge radius
-
-function vizBBox(shape) {
-  const bb = shape.boundingBox();
-  const [x0, y0, z0] = bb.min;
-  const [x1, y1, z1] = bb.max;
-  const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
-
-  const edges = [];
-  // 4 edges along X (at each combination of Y,Z corners)
-  for (const y of [y0, y1]) {
-    for (const z of [z0, z1]) {
-      edges.push(cylinder(dx, edgeR).pointAlong([1, 0, 0]).translate(x0, y, z));
-    }
-  }
-  // 4 edges along Y
-  for (const x of [x0, x1]) {
-    for (const z of [z0, z1]) {
-      edges.push(cylinder(dy, edgeR).pointAlong([0, 1, 0]).translate(x, y0, z));
-    }
-  }
-  // 4 edges along Z
-  for (const x of [x0, x1]) {
-    for (const y of [y0, y1]) {
-      edges.push(cylinder(dz, edgeR).translate(x, y, z0));
-    }
-  }
-  return union(...edges);
-}
-
-// --- Demo shapes ---
-
-// A rotated box — bbox is larger than the shape itself
-const angle = param("Rotation", 30, { min: 0, max: 90, unit: "°" });
-const rotBox = box(40, 30, 20, true).rotate(0, 0, angle).color('#4488cc');
-const rotBBox = vizBBox(rotBox).color('#cc4444');
-
-// A sphere — bbox is a perfect cube around it
-const sph = sphere(20).translate(80, 0, 0).color('#44cc44');
-const sphBBox = vizBBox(sph).color('#cc4444');
-
-// A tilted cylinder — bbox shows the extent
-const tiltCyl = cylinder(50, 10).rotate(30, 0, 0).translate(0, 80, 0).color('#cc88ff');
-const cylBBox = vizBBox(tiltCyl).color('#cc4444');
-
-return [
-  { name: "Rotated Box", shape: rotBox },
-  { name: "Box BBox", shape: rotBBox },
-  { name: "Sphere", shape: sph },
-  { name: "Sphere BBox", shape: sphBBox },
-  { name: "Tilted Cylinder", shape: tiltCyl },
-  { name: "Cylinder BBox", shape: cylBBox },
-];
-````
-
-### examples/api/brep-exportable.forge.js
-
-````javascript
-// Exact-exportable subset demo for STEP/BREP.
-// Run: npm run step -- examples/api/brep-exportable.forge.js
-
-const plate = rect(120, 80, true).extrude(10).color('#748b99');
-const boss = cylinder(24, 18).translate(0, 0, 10).color('#b7c4cc');
-
-const leftHole = cylinder(18, 5).translate(-34, 0, -4);
-const rightHole = cylinder(18, 5).translate(34, 0, -4);
-const centerBore = cylinder(34, 8).translate(0, 0, 6);
-
-const exactPart = union(plate.toShape(), boss)
-  .subtract(leftHole)
-  .subtract(rightHole)
-  .subtract(centerBore)
-  .color('#9db1bd');
-
-return [
-  { name: 'Exact Export Demo', shape: exactPart },
-];
-````
-
-### examples/api/center-true-vs-false.forge.js
-
-````javascript
-// center=true vs center=false — the #1 source of positioning confusion.
-//
-// box(w, d, h)        → corner at origin, extends into +X, +Y, +Z
-// box(w, d, h, true)  → centered at origin
-//
-// Same applies to cylinder(h, r) vs cylinder(h, r, r, undefined, true).
-
-const w = 40, d = 30, h = 20;
-
-// --- Side-by-side comparison ---
-
-// Left: center=false (default). Red sphere marks the origin [0,0,0].
-const cornerBox = box(w, d, h).color('#4488cc').translate(-60, 0, 0);
-const cornerOrigin = sphere(2).color('#cc0000').translate(-60, 0, 0);
-
-// Right: center=true. Red sphere marks the origin [0,0,0].
-const centeredBox = box(w, d, h, true).color('#44cc88').translate(60, 0, 0);
-const centeredOrigin = sphere(2).color('#cc0000').translate(60, 0, 0);
-
-// --- Practical impact: placing a cylinder on top of a base ---
-
-// With center=false: cylinder must go to (w/2, d/2, h)
-const base1 = box(w, d, h).color('#888888').translate(-60, 60, 0);
-const cyl1 = cylinder(15, 6).color('#cc8844').translate(-60 + w/2, 60 + d/2, h);
-
-// With center=true + attachTo: no math needed
-const base2 = box(w, d, h, true).color('#888888').translate(60, 60 + d/2, h/2);
-const cyl2 = cylinder(15, 6).color('#cc8844')
-  .attachTo(base2, 'top', 'bottom');
-
-return [
-  { name: "Corner Box (center=false)", shape: cornerBox },
-  { name: "Corner Origin ●", shape: cornerOrigin },
-  { name: "Centered Box (center=true)", shape: centeredBox },
-  { name: "Centered Origin ●", shape: centeredOrigin },
-  { name: "Base (corner)", shape: base1 },
-  { name: "Cylinder (manual math)", shape: cyl1 },
-  { name: "Base (centered)", shape: base2 },
-  { name: "Cylinder (attachTo)", shape: cyl2 },
-];
-````
-
-### examples/api/clone-duplicate.forge.js
-
-````javascript
-// clone() / duplicate() — explicit copy helpers for Shape, TrackedShape, Sketch, and ShapeGroup.
-
-const spacing = param("Spacing", 90, { min: 40, max: 180, unit: "mm" });
-
-// --- Shape clone ---
-const block = box(36, 20, 12, true).color("#4a90e2");
-const blockL = block.clone().translate(-spacing / 2, 0, 0);
-const blockR = block.duplicate().translate(spacing / 2, 0, 0);
-
-// --- TrackedShape clone (topology preserved) ---
-const post = cylinder(36, 6).color("#49b675");
-const postCopy = post.clone().translate(0, 45, 0);
-
-// --- Sketch clone ---
-const slotProfile = slot(30, 10).color("#e98b39");
-const slotL = slotProfile.clone().translate(-spacing / 2, -35);
-const slotR = slotProfile.duplicate().translate(spacing / 2, -35);
-
-// --- ShapeGroup clone ---
-const module = group(block, post.attachTo(block, "top", "bottom"));
-const moduleL = module.clone().translate(-spacing / 2, 95, 0);
-const moduleR = module.duplicate().translate(spacing / 2, 95, 0).color("#c85a54");
-
-return [
-  { name: "Shape clone/duplicate", group: [
-    { name: "Block L", shape: blockL },
-    { name: "Block R", shape: blockR },
-  ] },
-  { name: "TrackedShape clone", shape: postCopy },
-  { name: "Sketch clone/duplicate", group: [
-    { name: "Slot L", sketch: slotL },
-    { name: "Slot R", sketch: slotR },
-  ] },
-  { name: "ShapeGroup clone/duplicate", group: [
-    { name: "Module L", shape: moduleL },
-    { name: "Module R", shape: moduleR },
-  ] },
-];
-````
-
-### examples/api/colors-union-vs-array.forge.js
-
-````javascript
-// Colors: union() vs returning separate objects.
-//
-// ❌ union() merges into one mesh → only the first shape's color survives.
-// ✅ Returning an array of {name, shape} → each keeps its own color.
-
-const size = 25;
-const gap = 5;
-
-// --- Three colored boxes ---
-const red   = box(size, size, size, true).color('#cc4444');
-const green = box(size, size, size, true).color('#44cc44').translate(size + gap, 0, 0);
-const blue  = box(size, size, size, true).color('#4444cc').translate(2 * (size + gap), 0, 0);
-
-// BAD: union kills individual colors — result is all red (first shape's color)
-const merged = union(red, green, blue).translate(-80, 0, 0);
-
-// GOOD: separate objects keep their colors
-const redSep   = box(size, size, size, true).color('#cc4444').translate(80, 0, 0);
-const greenSep = box(size, size, size, true).color('#44cc44').translate(80 + size + gap, 0, 0);
-const blueSep  = box(size, size, size, true).color('#4444cc').translate(80 + 2 * (size + gap), 0, 0);
-
-return [
-  { name: "❌ Union (all one color)", shape: merged },
-  { name: "✅ Red (separate)", shape: redSep },
-  { name: "✅ Green (separate)", shape: greenSep },
-  { name: "✅ Blue (separate)", shape: blueSep },
-];
-````
-
-### examples/api/coordinate-system.forge.js
-
-````javascript
-// Coordinate system — ForgeCAD uses Z-up, right-handed.
-//   X = right (+X), left (-X)
-//   Y = forward (+Y), back (-Y)
-//   Z = up (+Z), down (-Z)
-//
-// "front" = -Y face (camera default looks from -Y toward +Y)
-// "back"  = +Y face
-
-const axisLen = 80;
-const shaftR = 2;
-const tipH = 10;
-const tipR = 5;
-
-// X axis — red, pointing right
-const xShaft = cylinder(axisLen, shaftR).pointAlong([1, 0, 0]).color('#cc4444');
-const xTip = cylinder(tipH, tipR, 0).pointAlong([1, 0, 0]).translate(axisLen, 0, 0).color('#cc4444');
-const xMark = sphere(4).translate(axisLen + tipH + 5, 0, 0).color('#cc4444');
-
-// Y axis — green, pointing forward
-const yShaft = cylinder(axisLen, shaftR).pointAlong([0, 1, 0]).color('#44cc44');
-const yTip = cylinder(tipH, tipR, 0).pointAlong([0, 1, 0]).translate(0, axisLen, 0).color('#44cc44');
-const yMark = box(7, 7, 7, true).translate(0, axisLen + tipH + 5, 0).color('#44cc44');
-
-// Z axis — blue, pointing up
-const zShaft = cylinder(axisLen, shaftR).color('#4444cc');
-const zTip = cylinder(tipH, tipR, 0).translate(0, 0, axisLen).color('#4444cc');
-const zMark = cylinder(4, 4, 4, 6).translate(0, 0, axisLen + tipH + 5).color('#4444cc');
-
-// Origin
-const origin = sphere(3).color('#ffffff');
-
-// Reference box to show face names
-const ref = box(30, 20, 15, true).translate(40, 40, 0).color('#888888');
-// "front" face is at -Y, "right" face is at +X, "top" face is at +Z
-const frontDot = sphere(3).color('#ffaa00')
-  .attachTo(ref, 'front', 'center', [0, -5, 0]);
-const topDot = sphere(3).color('#ffaa00')
-  .attachTo(ref, 'top', 'center', [0, 0, 5]);
-
-return [
-  { name: "X shaft (right)", shape: xShaft },
-  { name: "X tip", shape: xTip },
-  { name: "X mark ●", shape: xMark },
-  { name: "Y shaft (forward)", shape: yShaft },
-  { name: "Y tip", shape: yTip },
-  { name: "Y mark ■", shape: yMark },
-  { name: "Z shaft (up)", shape: zShaft },
-  { name: "Z tip", shape: zTip },
-  { name: "Z mark ⬡", shape: zMark },
-  { name: "Origin", shape: origin },
-  { name: "Reference Box", shape: ref },
-  { name: "Front dot (−Y)", shape: frontDot },
-  { name: "Top dot (+Z)", shape: topDot },
-];
-````
-
-### examples/api/curves-surfacing-basics.forge.js
-
-````javascript
-// Curves + Surfacing basics
-// Demonstrates reusable APIs for everyday products:
-// - spline2d() for smooth section sketches
-// - loft() for section-driven solids
-// - spline3d() + sweep() for curved tubes/handles/details
-
-const height = param("Bottle Height", 170, { min: 110, max: 260, unit: "mm" });
-const bodyW = param("Body Width", 72, { min: 45, max: 110, unit: "mm" });
-const bodyD = param("Body Depth", 48, { min: 30, max: 90, unit: "mm" });
-const neckW = param("Neck Width", 28, { min: 18, max: 45, unit: "mm" });
-const neckD = param("Neck Depth", 24, { min: 14, max: 40, unit: "mm" });
-const corner = param("Corner Round", 8, { min: 2, max: 20, unit: "mm" });
-
-const sectionAt = (w, d, pinch = 0) => spline2d([
-  [w * 0.5, 0],
-  [w * 0.42, d * 0.45],
-  [w * 0.2, d * 0.5 + pinch],
-  [0, d * 0.52 + pinch],
-  [-w * 0.2, d * 0.5 + pinch],
-  [-w * 0.42, d * 0.45],
-  [-w * 0.5, 0],
-  [-w * 0.42, -d * 0.45],
-  [-w * 0.2, -d * 0.5 + pinch],
-  [0, -d * 0.52 + pinch],
-  [w * 0.2, -d * 0.5 + pinch],
-  [w * 0.42, -d * 0.45],
-], {
-  closed: true,
-  samplesPerSegment: 10,
-  tension: 0.42,
-}).offset(corner * 0.08, 'Round');
-
-const z0 = 0;
-const z1 = height * 0.25;
-const z2 = height * 0.62;
-const z3 = height * 0.9;
-const z4 = height;
-
-const body = loft(
-  [
-    sectionAt(bodyW * 0.86, bodyD * 0.84, -2),
-    sectionAt(bodyW, bodyD, 0),
-    sectionAt(bodyW * 0.92, bodyD * 0.94, 1),
-    sectionAt(neckW * 1.25, neckD * 1.2, 0.5),
-    sectionAt(neckW, neckD, 0),
-  ],
-  [z0, z1, z2, z3, z4],
-  { edgeLength: 1.1 },
-);
-
-// Hollow interior by lofting smaller inner sections.
-const wall = 2.4;
-const inner = loft(
-  [
-    sectionAt(bodyW * 0.78, bodyD * 0.76, -2.2),
-    sectionAt(bodyW - wall * 2, bodyD - wall * 2, -0.6),
-    sectionAt(bodyW * 0.86 - wall * 2, bodyD * 0.88 - wall * 2, 0.2),
-    sectionAt(neckW * 1.06 - wall, neckD * 1.06 - wall, 0),
-    sectionAt(neckW - wall, neckD - wall, 0),
-  ],
-  [z0 + 3, z1, z2, z3, z4 + 2],
-  { edgeLength: 1.1 },
-);
-
-let bottle = body.subtract(inner);
-// Mild smoothing to reduce voxel-like artifacts on curved sections.
-bottle = bottle.smoothOut(70, 0.25).refine(2);
-
-// Curved spout/tube detail using sweep.
-const spoutPath = spline3d(
-  [
-    [0, 0, z4 - 8],
-    [12, 0, z4 + 8],
-    [26, 0, z4 + 24],
-    [36, 0, z4 + 16],
-  ],
-  { tension: 0.45 },
-);
-const spout = sweep(circle2d(2.8, 20), spoutPath, {
-  samples: 36,
-  edgeLength: 0.65,
-});
-
-const topCap = circle2d(Math.max(neckW, neckD) * 0.34, 40).extrude(9)
-  .translate(0, 0, z4 - 1.5);
-
-return [
-  { name: "Bottle Body", shape: bottle.color('#d8e5ec') },
-  { name: "Spout", shape: spout.color('#c0ccd4') },
-  { name: "Cap", shape: topCap.color('#4f5f70') },
-];
-````
-
-### examples/api/dimensioned-bracket.forge.js
-
-````javascript
-// Dimensioned L-bracket — shows how to add dimension annotations
-
-const w = param("Width", 80, { min: 40, max: 150, unit: "mm" });
-const h = param("Height", 60, { min: 30, max: 100, unit: "mm" });
-const d = param("Depth", 40, { min: 20, max: 80, unit: "mm" });
-const t = param("Thickness", 5, { min: 2, max: 15, unit: "mm" });
-
-// Build the L-bracket
-const base = box(w, d, t);
-const wall = box(t, d, h).translate(0, 0, t);
-const bracket = union(base, wall);
-
-// Add dimensions — purely visual annotations
-dim([0, 0, 0], [w, 0, 0], { label: "Width" });
-dim([0, 0, 0], [0, d, 0], { label: "Depth", offset: 12 });
-dim([0, 0, 0], [0, 0, h + t], { label: "Height", offset: 15 });
-dim([0, 0, 0], [t, 0, 0], { label: "Wall", offset: -8, color: "#ffaa44" });
-
-return bracket;
-````
-
-### examples/api/elbow-test.forge.js
-
-````javascript
-// Test lib.elbow() — pipe bend primitive
-const pipeR = param("Pipe Radius", 5, { min: 2, max: 15, unit: "mm" });
-const bendR = param("Bend Radius", 25, { min: 10, max: 60, unit: "mm" });
-const angle = param("Angle", 90, { min: 15, max: 180, unit: "°" });
-
-// Basic elbow at default orientation
-const basic = lib.elbow(pipeR, bendR, angle).color('#B87333');
-
-// Elbow with from/to directions
-const oriented = lib.elbow(pipeR, bendR, {
-  from: [0, 0, 1],
-  to: [1, 0, 0],
-}).translate(80, 0, 0).color('#4488cc');
-
-// Hollow elbow
-const hollow = lib.elbow(pipeR, bendR, angle, { wall: 1.5 })
-  .translate(0, 80, 0).color('#888888');
-
-return [
-  { name: "Basic 90° Elbow", shape: basic },
-  { name: "Oriented Elbow (Z→X)", shape: oriented },
-  { name: "Hollow Elbow", shape: hollow },
-];
-````
-
-### examples/api/exploded-view.forge.js
-
-````javascript
-// Standard-library exploded view: staged offsets + per-part direction overrides.
-
-const explodeAmt = param("Explode", 0, { min: 0, max: 36, unit: "mm" });
-
-const base = box(120, 80, 10, true).color('#5f6d7a');
-const pedestal = box(70, 40, 20, true).translate(0, 0, 15).color('#6f7f8f');
-
-const motorBody = cylinder(55, 16, 16, 40, true)
-  .pointAlong([1, 0, 0])
-  .translate(0, 0, 32)
-  .color('#8f9eab');
-const shaft = cylinder(80, 4, 4, 24, true)
-  .pointAlong([1, 0, 0])
-  .translate(0, 0, 32)
-  .color('#d1d7de');
-const rotorCap = cylinder(8, 18, 18, 36, true)
-  .pointAlong([1, 0, 0])
-  .translate(31, 0, 32)
-  .color('#9eacb9');
-
-const boltTemplate = lib.bolt(6, 26).rotate(180, 0, 0).color('#d8dde3');
-const bolts = [
-  boltTemplate.translate(-45, -25, 10),
-  boltTemplate.translate(45, -25, 10),
-  boltTemplate.translate(-45, 25, 10),
-  boltTemplate.translate(45, 25, 10),
-];
-
-const explodedParts = [
-  { name: "Base", shape: base },
-  { name: "Pedestal", shape: pedestal, explode: { stage: 0.35, direction: [0, 0, 1] } },
-  {
-    name: "Drive",
-    group: [
-      { name: "Motor Body", shape: motorBody },
-      { name: "Rotor Cap", shape: rotorCap, explode: { stage: 1.1, direction: [1, 0, 0] } },
-      { name: "Shaft", shape: shaft },
-    ],
-  },
-  {
-    name: "Fasteners",
-    group: bolts.map((b, i) => ({
-      name: `Bolt ${i + 1}`,
-      shape: b,
-      explode: { stage: 0.9, direction: 'z' },
-    })),
-  },
-];
-
-cutPlane("Center Section", [0, 1, 0], 0);
-
-return lib.explode(explodedParts, {
-  amount: explodeAmt,
-  stages: [0.35, 0.7, 1.0],
-  mode: 'radial',
-  byName: {
-    "Shaft": { direction: [1, 0, 0], stage: 1.4 },
-    "Fasteners": { axisLock: 'z', stage: 0.45 },
-  },
-});
-````
-
-### examples/api/extrude-options.forge.js
-
-````javascript
-// Extrude options — twist, taper, center.
-//
-// .extrude(height) is the basic form.
-// Options: { twist, divisions, scaleTop, center }
-
-const r = param("Radius", 20, { min: 10, max: 40, unit: "mm" });
-const h = param("Height", 60, { min: 20, max: 120, unit: "mm" });
-const twist = param("Twist", 90, { min: 0, max: 360, unit: "°" });
-const taper = param("Taper", 0.5, { min: 0.1, max: 1.0 });
-const spacing = 60;
-
-// 1. Plain extrude
-const plain = ngon(6, r).extrude(h)
-  .color('#4488cc');
-
-// 2. Twisted extrude — needs divisions for smooth twist
-const twisted = ngon(6, r).extrude(h, { twist: twist, divisions: 32 })
-  .translate(spacing, 0, 0)
-  .color('#cc8844');
-
-// 3. Tapered extrude — scaleTop shrinks the top face
-const tapered = circle2d(r).extrude(h, { scaleTop: taper })
-  .translate(2 * spacing, 0, 0)
-  .color('#44cc88');
-
-// 4. Centered extrude — shape is centered along Z instead of starting at Z=0
-const centered = rect(r * 1.5, r, true).extrude(h, { center: true })
-  .translate(3 * spacing, 0, 0)
-  .color('#cc44cc');
-
-// 5. Combined: twist + taper
-const combo = star(5, r, r * 0.5).extrude(h, {
-  twist: twist,
-  scaleTop: taper,
-  divisions: 32,
-}).translate(4 * spacing, 0, 0).color('#cccc44');
-
-return [
-  { name: "Plain", shape: plain },
-  { name: "Twisted", shape: twisted },
-  { name: "Tapered", shape: tapered },
-  { name: "Centered (Z)", shape: centered },
-  { name: "Twist + Taper", shape: combo },
-];
-````
-
-### examples/api/gears-bevel-face-joints.forge.js
-
-````javascript
-// Bevel + face gear demo with runtime joint couplings.
-// Use the "Joints" section in the View Panel to drive both stages.
-
-const moduleSize = param("Module", 1.4, { min: 0.8, max: 3.0, step: 0.05 });
-const bevelInput = param("Bevel Driver", 30, { min: -360, max: 360, step: 1, unit: "°" });
-const faceInput = param("Face Driver", 20, { min: -360, max: 360, step: 1, unit: "°" });
-const shaftAngle = param("Bevel Shaft", 90, { min: 60, max: 120, step: 1, unit: "°" });
-
-const bevelStage = lib.bevelGearPair({
-  pinion: {
-    module: moduleSize,
-    teeth: 16,
-    faceWidth: 10,
-    boreDiameter: 5,
-  },
-  gear: {
-    module: moduleSize,
-    teeth: 32,
-    faceWidth: 9,
-    boreDiameter: 8,
-  },
-  shaftAngleDeg: shaftAngle,
-  place: true,
-});
-
-const faceStage = lib.faceGearPair({
-  pinion: {
-    module: moduleSize,
-    teeth: 14,
-    faceWidth: 8,
-    boreDiameter: 5,
-  },
-  gear: {
-    module: moduleSize,
-    teeth: 44,
-    faceWidth: 7,
-    toothHeight: moduleSize * 0.9,
-    boreDiameter: 10,
-  },
-  place: true,
-});
-
-for (const d of [...bevelStage.diagnostics, ...faceStage.diagnostics]) {
-  const tag = `[${d.level}] ${d.code}`;
-  if (d.level === "error") console.error(tag, d.message);
-  else if (d.level === "warn") console.warn(tag, d.message);
-  else console.info(tag, d.message);
-}
-
-const addOffset = (point, offset) => [
-  point[0] + offset[0],
-  point[1] + offset[1],
-  point[2] + offset[2],
-];
-
-const bevelOffset = [-110, 0, 0];
-const faceOffset = [110, 0, 0];
-
-const bevelPinionPivot = addOffset(bevelStage.pinionCenter, bevelOffset);
-const bevelGearPivot = addOffset(bevelStage.gearCenter, bevelOffset);
-const facePinionPivot = addOffset(faceStage.pinionCenter, faceOffset);
-const faceGearPivot = addOffset(faceStage.gearCenter, faceOffset);
-
-jointsView({
-  joints: [
-    {
-      name: "Bevel Driver",
-      child: "Bevel Pinion",
-      type: "revolute",
-      axis: bevelStage.pinionAxis,
-      pivot: bevelPinionPivot,
-      min: -1080,
-      max: 1080,
-      default: bevelInput,
-      unit: "°",
-    },
-    {
-      name: "Bevel Driven",
-      child: "Bevel Gear",
-      type: "revolute",
-      axis: bevelStage.gearAxis,
-      pivot: bevelGearPivot,
-      min: -1080,
-      max: 1080,
-      default: 0,
-      unit: "°",
-    },
-    {
-      name: "Face Driver",
-      child: "Face Pinion",
-      type: "revolute",
-      axis: faceStage.pinionAxis,
-      pivot: facePinionPivot,
-      min: -1080,
-      max: 1080,
-      default: faceInput,
-      unit: "°",
-    },
-    {
-      name: "Face Driven",
-      child: "Face Gear",
-      type: "revolute",
-      axis: faceStage.gearAxis,
-      pivot: faceGearPivot,
-      min: -1080,
-      max: 1080,
-      default: 0,
-      unit: "°",
-    },
-  ],
-  couplings: [
-    {
-      joint: "Bevel Driven",
-      terms: [{ joint: "Bevel Driver", ratio: bevelStage.jointRatio }],
-    },
-    {
-      joint: "Face Driven",
-      terms: [{ joint: "Face Driver", ratio: faceStage.jointRatio }],
-    },
-  ],
-  animations: [
-    {
-      name: "Dual Spin",
-      duration: 2.4,
-      loop: true,
-      keyframes: [
-        { at: 0.0, values: { "Bevel Driver": 0, "Face Driver": 0 } },
-        { at: 0.5, values: { "Bevel Driver": 180, "Face Driver": 120 } },
-        { at: 1.0, values: { "Bevel Driver": 360, "Face Driver": 240 } },
-      ],
-    },
-  ],
-  defaultAnimation: "Dual Spin",
-});
-
-return [
-  {
-    name: "Bevel Pinion",
-    shape: bevelStage.pinion.translate(bevelOffset[0], bevelOffset[1], bevelOffset[2]).color("#d7a25e"),
-  },
-  {
-    name: "Bevel Gear",
-    shape: bevelStage.gear.translate(bevelOffset[0], bevelOffset[1], bevelOffset[2]).color("#8ea8be"),
-  },
-  {
-    name: "Face Pinion",
-    shape: faceStage.pinion.translate(faceOffset[0], faceOffset[1], faceOffset[2]).color("#c98f5a"),
-  },
-  {
-    name: "Face Gear",
-    shape: faceStage.gear.translate(faceOffset[0], faceOffset[1], faceOffset[2]).color("#6f8795"),
-  },
-];
-````
-
-### examples/api/gears-tier1.forge.js
-
-````javascript
-// Tier 1 gears demo: spur pair + ring gear + rack gear
-
-const moduleSize = param("Module", 1.25, { min: 0.6, max: 3.0, step: 0.05 });
-const pinionTeeth = param("Pinion Teeth", 14, { min: 8, max: 28, integer: true });
-const drivenTeeth = param("Driven Teeth", 42, { min: 16, max: 90, integer: true });
-const backlash = param("Backlash", 0.05, { min: 0, max: 0.2, step: 0.01, unit: "mm" });
-const faceWidth = param("Face Width", 10, { min: 4, max: 18, unit: "mm" });
-
-const pair = lib.gearPair({
-  pinion: {
-    module: moduleSize,
-    teeth: pinionTeeth,
-    pressureAngleDeg: 20,
-    faceWidth,
-    boreDiameter: 5,
-  },
-  gear: {
-    module: moduleSize,
-    teeth: drivenTeeth,
-    pressureAngleDeg: 20,
-    faceWidth,
-    boreDiameter: 8,
-  },
-  backlash,
-});
-
-for (const d of pair.diagnostics) {
-  const tag = `[${d.level}] ${d.code}`;
-  if (d.level === "error") console.error(tag, d.message);
-  else if (d.level === "warn") console.warn(tag, d.message);
-  else console.info(tag, d.message);
-}
-
-const ring = lib.ringGear({
-  module: moduleSize,
-  teeth: Math.max(30, drivenTeeth + pinionTeeth + 4),
-  pressureAngleDeg: 20,
-  faceWidth,
-  backlash,
-  rimWidth: moduleSize * 3,
-}).translate(0, 95, 0);
-
-const rack = lib.rackGear({
-  module: moduleSize,
-  teeth: 22,
-  pressureAngleDeg: 20,
-  faceWidth,
-  backlash,
-  baseHeight: moduleSize * 2,
-}).translate(0, -95, 0);
-
-return [
-  { name: "Spur Pinion", shape: pair.pinion.color("#d5a15f") },
-  { name: "Spur Gear", shape: pair.gear.color("#9ab3ca") },
-  { name: "Ring Gear", shape: ring.color("#71808d") },
-  { name: "Rack Gear", shape: rack.color("#6f9272") },
-];
-````
-
-### examples/api/geometry-info.forge.js
-
-````javascript
-// Geometry provenance inspection.
-// Run with: npm run test-run -- examples/api/geometry-info.forge.js
-// The CLI now prints backend/representation/fidelity/topology for each object.
-
-const base = rectangle(-35, -20, 70, 40).extrude(18).color('#5f7c8a');
-
-const cutter = circle2d(11, 36).extrude(26).translate(0, 0, -4);
-const machined = base
-  .toShape()
-  .subtract(cutter)
-  .color('#9eb4bf')
-  .translate(0, 72, 0);
-
-const station = (w, d) => spline2d([
-  [w * 0.5, 0],
-  [w * 0.32, d * 0.46],
-  [0, d * 0.55],
-  [-w * 0.32, d * 0.46],
-  [-w * 0.5, 0],
-  [-w * 0.32, -d * 0.46],
-  [0, -d * 0.55],
-  [w * 0.32, -d * 0.46],
-], {
-  closed: true,
-  samplesPerSegment: 9,
-  tension: 0.35,
-});
-
-const lofted = loft(
-  [
-    station(26, 18),
-    station(48, 28),
-    station(34, 22),
-  ],
-  [0, 20, 46],
-  { edgeLength: 0.85 },
-)
-  .translate(110, 18, 0)
-  .color('#d8b36a');
-
-console.info('Tracked extrude', base.geometryInfo());
-console.info('Boolean cut', machined.geometryInfo());
-console.info('Lofted body', lofted.geometryInfo());
-
-return [
-  { name: 'Tracked Extrude', shape: base },
-  { name: 'Boolean Cut', shape: machined },
-  { name: 'Lofted Body', shape: lofted },
-];
-````
-
-### examples/api/group-test.forge.js
-
-````javascript
-// Test assembly grouping — nested group format
-const baseW = param("Base Width", 100, { min: 60, max: 200, unit: "mm" });
-const baseD = param("Base Depth", 80, { min: 40, max: 150, unit: "mm" });
-
-// Bed assembly
-const bedPlate = box(baseW, baseD, 5).color('#666666');
-const glass = box(baseW - 10, baseD - 10, 3).translate(5, 5, 5).color('#aaddff');
-const heater = box(baseW - 20, baseD - 20, 1).translate(10, 10, -1).color('#cc4444');
-
-// Gantry
-const leftRail = box(5, baseD, 60).translate(-10, 0, 8).color('#888888');
-const rightRail = box(5, baseD, 60).translate(baseW + 5, 0, 8).color('#888888');
-const crossBar = box(baseW + 20, 5, 5).translate(-10, baseD / 2, 63).color('#aaaaaa');
-
-// Extruder (intentionally overlaps crossbar — intra-group collision)
-const nozzle = cylinder(15, 4).translate(baseW / 2, baseD / 2, 48).color('#ff8800');
-const heatsink = box(20, 20, 10, true).translate(baseW / 2, baseD / 2, 60).color('#cccccc');
-
-return [
-  { name: "Bed Assembly", group: [
-    { name: "Bed Plate", shape: bedPlate },
-    { name: "Glass Bed", shape: glass },
-    { name: "Heater", shape: heater },
-  ]},
-  { name: "Gantry", group: [
-    { name: "Left Rail", shape: leftRail },
-    { name: "Right Rail", shape: rightRail },
-    { name: "Cross Bar", shape: crossBar },
-  ]},
-  { name: "Extruder", group: [
-    { name: "Nozzle", shape: nozzle },
-    { name: "Heatsink", shape: heatsink },
-  ]},
-];
-````
-
-### examples/api/group-vs-union.forge.js
-
-````javascript
-// group() vs union() — when to use which.
-//
-// union(a, b)  → merges into ONE mesh. Colors lost. Good for boolean operand.
-// group(a, b)  → keeps separate. Colors preserved. Transforms together.
-//
-// Use union when you need a single solid (e.g., to subtract from something).
-// Use group when you want parts to move together but stay visually distinct.
-
-const base = box(60, 60, 5, true).color('#888888');
-const col = cylinder(30, 5).color('#cc4444')
-  .attachTo(base, 'top', 'bottom');
-
-// --- group: colors preserved, transforms together ---
-const grouped = group(base, col).translate(-50, 0, 0);
-
-// --- union: one solid, one color ---
-const unioned = union(base, col).translate(50, 0, 0).color('#4488cc');
-
-return [
-  grouped,  // each child becomes a separate viewport object
-  { name: "Union (single solid)", shape: unioned },
-];
-````
-
-### examples/api/import-args-unit.forge.js
-
-````javascript
-const w = param("Width", 30, { min: 10, max: 80, unit: "mm" });
-const h = param("Height", 20, { min: 10, max: 80, unit: "mm" });
-const d = param("Depth", 10, { min: 4, max: 40, unit: "mm" });
-
-return box(w, d, h, true);
-````
-
-### examples/api/import-args.forge.js
-
-````javascript
-const left = importPart("api/import-args-unit.forge.js", {
-  "Width": 24,
-  "Height": 24,
-  "Depth": 8,
-}).translate(-20, 0, 0);
-
-const right = importPart("api/import-args-unit.forge.js", {
-  "Width": 52,
-  "Height": 16,
-  "Depth": 12,
-}).translate(20, 0, 0);
-
-return [
-  { name: "Left", shape: left, color: "#5c88da" },
-  { name: "Right", shape: right, color: "#d97c45" },
-];
-````
-
-### examples/api/import-dimensions-follow.forge.js
-
-````javascript
-const left = importPart("api/dimensioned-bracket.forge.js", {
-  "Width": 55,
-  "Height": 45,
-  "Depth": 28,
-  "Thickness": 4,
-}).translate(-80, 0, 0);
-
-const right = importPart("api/dimensioned-bracket.forge.js", {
-  "Width": 55,
-  "Height": 45,
-  "Depth": 28,
-  "Thickness": 4,
-}).translate(80, 0, 0).rotate(0, 0, 180);
-
-return [
-  { name: "Left Bracket", shape: left, color: "#6a7bd1" },
-  { name: "Right Bracket", shape: right, color: "#d18a5a" },
-];
-````
-
-### examples/api/import-placement-references.forge.js
-
-````javascript
-// Placement references let imported parts define semantic attachment points.
-
-const left = importPart("api/import-placement-widget-source.forge.js")
-  .placeReference("mount", [-90, 0, 0]);
-
-const right = importPart("api/import-placement-widget-source.forge.js", {
-  "Post Height": 40,
-}).attachTo(left, "objects.post.top", "mount", [90, 0, 0]);
-
-const cap = box(18, 18, 8, true)
-  .attachTo(right, "objects.post.top", "bottom")
-  .color("#384b5f");
-
-return [
-  { name: "Left", shape: left, color: "#5b7c8d" },
-  { name: "Right", shape: right, color: "#d38b4d" },
-  { name: "Cap", shape: cap },
-];
-````
-
-### examples/api/import-placement-widget-source.forge.js
-
-````javascript
-const postHeight = param("Post Height", 26, { min: 12, max: 60, unit: "mm" });
-
-const base = box(48, 32, 8, true);
-const post = cylinder(postHeight, 5, undefined, 48, true)
-  .translate(12, 0, 4 + postHeight / 2);
-
-return union(base, post)
-  .withReferences({
-    points: {
-      mount: [0, -16, -4],
-      postCenter: [12, 0, 4 + postHeight / 2],
-    },
-    edges: {
-      postAxis: {
-        start: [12, 0, 4],
-        end: [12, 0, 4 + postHeight],
-      },
-    },
-    surfaces: {
-      mountingFace: {
-        center: [0, -16, 0],
-        normal: [0, -1, 0],
-      },
-    },
-    objects: {
-      base,
-      post,
-    },
-  })
-  .color("#5b7c8d");
-````
-
-### examples/api/import-relative-paths.forge.js
-
-````javascript
-// Relative import paths: ./ resolves from this file's folder.
-
-const left = importPart("./import-args-unit.forge.js", {
-  "Width": 26,
-  "Height": 22,
-  "Depth": 9,
-}).translate(-24, 0, 0);
-
-const right = importPart("./import-args-unit.forge.js", {
-  "Width": 46,
-  "Height": 18,
-  "Depth": 12,
-}).translate(24, 0, 0);
-
-return [
-  { name: "Left (./)", shape: left, color: "#5f87c6" },
-  { name: "Right (./)", shape: right, color: "#d18a5a" },
-];
-````
-
-### examples/api/import-svg-sketch-shape.svg
-
-````xml
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80">
-  <path
-    fill="#111111"
-    fill-rule="evenodd"
-    d="M 8 8 H 72 V 72 H 8 Z M 28 28 H 52 V 52 H 28 Z"
-  />
-  <circle cx="100" cy="16" r="7" fill="#111111" />
-  <polyline
-    points="88,46 100,60 112,46"
-    fill="none"
-    stroke="#111111"
-    stroke-width="5"
-    stroke-linejoin="round"
-  />
-</svg>
-````
-
-### examples/api/import-svg-sketch.forge.js
-
-````javascript
-// SVG import demo:
-// - Filled regions (all vs largest only)
-// - Stroke-only import
-// - importSketch(...) overload for .svg
-
-const allFill = importSvgSketch("api/import-svg-sketch-shape.svg", {
-  include: "fill",
-  regionSelection: "all",
-});
-
-const largestFill = importSketch("api/import-svg-sketch-shape.svg", {
-  include: "fill",
-  regionSelection: "largest",
-  maxWidth: 35,
-  maxHeight: 35,
-  centerOnOrigin: true,
-});
-
-const strokeOnly = importSvgSketch("api/import-svg-sketch-shape.svg", {
-  include: "stroke",
-  flattenTolerance: 0.2,
-});
-
-return [
-  { name: "Fill (all regions)", shape: allFill.extrude(4).translate(-55, 0, 0).color("#5f87c6") },
-  { name: "Fill (largest region)", shape: largestFill.extrude(4).color("#d08f5b") },
-  { name: "Stroke geometry", shape: strokeOnly.extrude(4).translate(55, 0, 0).color("#66b38d") },
-];
-````
-
-### examples/api/patterns.forge.js
-
-````javascript
-// Patterns — linearPattern and circularPattern for repeating shapes.
-
-const count = param("Count", 6, { min: 2, max: 12, integer: true });
-const spacing = param("Spacing", 20, { min: 10, max: 40, unit: "mm" });
-const radius = param("Ring Radius", 40, { min: 20, max: 80, unit: "mm" });
-
-// --- linearPattern: repeat along a direction ---
-const peg = cylinder(15, 4).color('#4488cc');
-const row = linearPattern(peg, count, spacing, 0);
-
-// --- circularPattern: repeat around Z axis ---
-const hole = cylinder(8, 3).translate(radius, 0, 0).color('#cc4444');
-const ring = circularPattern(hole, count);
-
-// --- mirrorCopy: mirror + union with original ---
-const halfBracket = box(40, 10, 20).color('#44cc88');
-const fullBracket = mirrorCopy(halfBracket, [1, 0, 0]).translate(0, 0, 40);
-
-// Show a base plate with the circular holes subtracted
-const plate = cylinder(10, radius + 15).color('#888888').translate(0, 80, 0);
-const holeRing = circularPattern(
-  cylinder(12, 3).translate(radius, 0, -1),
-  count
-).translate(0, 80, 0);
-const drilled = plate.subtract(holeRing);
-
-return [
-  { name: "Linear Pattern", shape: row },
-  { name: "Circular Pattern", shape: ring },
-  { name: "Mirror Copy", shape: fullBracket },
-  { name: "Drilled Plate", shape: drilled },
-];
-````
-
-### examples/api/pointAlong-orientation.forge.js
-
-````javascript
-// pointAlong() — orient a cylinder's axis without thinking about Euler angles.
-//
-// Cylinders default to Z-up. To lay one along X or Y:
-//   ❌ cylinder(80, 5).rotate(90, 0, 0)   — which axis? confusing
-//   ✅ cylinder(80, 5).pointAlong([0, 1, 0]) — "point along Y"
-//
-// After pointAlong, the cylinder starts at origin and extends in that direction.
-// Always call pointAlong BEFORE translate/attachTo.
-
-const len = param("Length", 80, { min: 30, max: 150, unit: "mm" });
-const r = param("Radius", 5, { min: 2, max: 15, unit: "mm" });
-const spacing = 40;
-
-// Default: along +Z (up)
-const zCyl = cylinder(len, r).color('#4444cc')
-  .translate(0, 0, 0);
-const zTip = sphere(r * 1.5).color('#6666ff')
-  .translate(0, 0, len);
-
-// Along +X (right)
-const xCyl = cylinder(len, r).color('#cc4444')
-  .pointAlong([1, 0, 0])
-  .translate(0, spacing, 0);
-const xTip = sphere(r * 1.5).color('#ff6666')
-  .translate(len, spacing, 0);
-
-// Along +Y (forward)
-const yCyl = cylinder(len, r).color('#44cc44')
-  .pointAlong([0, 1, 0])
-  .translate(0, 0, 0)
-  .translate(spacing, 0, 0);
-const yTip = sphere(r * 1.5).color('#66ff66')
-  .translate(spacing, len, 0);
-
-// Along diagonal [1, 1, 1]
-const dCyl = cylinder(len, r).color('#cccc44')
-  .pointAlong([1, 1, 1])
-  .translate(spacing, spacing, 0);
-const dLen = len / Math.sqrt(3); // projected length per axis
-const dTip = sphere(r * 1.5).color('#ffff66')
-  .translate(spacing + dLen, spacing + dLen, dLen);
-
-return [
-  { name: "Z-axis (default)", shape: zCyl },
-  { name: "Z tip", shape: zTip },
-  { name: "X-axis (pointAlong [1,0,0])", shape: xCyl },
-  { name: "X tip", shape: xTip },
-  { name: "Y-axis (pointAlong [0,1,0])", shape: yCyl },
-  { name: "Y tip", shape: yTip },
-  { name: "Diagonal (pointAlong [1,1,1])", shape: dCyl },
-  { name: "Diagonal tip", shape: dTip },
-];
-````
-
-### examples/api/profile-2020-b-slot6.forge.js
-
-````javascript
-// 20x20 B-type slot 6 profile extrusion.
-// Demonstrates:
-// - algorithmic 2D profile generation (`lib.tSlotProfile`)
-// - direct 3D helper (`lib.profile2020BSlot6`)
-// - parameterized technical dimensions
-
-const length = param("Length", 220, { min: 40, max: 800, unit: "mm" });
-const slotDepth = param("Slot Depth", 5.5, { min: 4.6, max: 6.6, step: 0.1, unit: "mm" });
-const slotInner = param("Slot Inner Width", 8.2, { min: 7, max: 10.5, step: 0.1, unit: "mm" });
-const centerBore = param("Center Bore", 5.5, { min: 0, max: 6.5, step: 0.1, unit: "mm" });
-
-const profile2d = lib.profile2020BSlot6Profile({
-  slotInnerWidth: slotInner,
-  slotDepth,
-  centerBoreDia: centerBore,
-});
-
-const extrusion = lib.profile2020BSlot6(length, {
-  center: true,
-  slotDepth,
-  slotInnerWidth: slotInner,
-  centerBoreDia: centerBore,
-}).color('#98a7b8');
-
-// Visual dimensions
-dim([-10, -10, 0], [10, -10, 0], { label: "20 mm", offset: -8, color: "#ffaa44" });
-dim([10, -10, 0], [10, 10, 0], { label: "20 mm", offset: 10, color: "#ffaa44" });
-dim([0, 0, -length / 2], [0, 0, length / 2], { label: "Length", offset: 16, color: "#66ccff" });
-if (centerBore > 0) {
-  dim([-centerBore / 2, 0, 0], [centerBore / 2, 0, 0], { label: "Center bore", offset: -14, color: "#88dd88" });
-}
-
-return [
-  { name: "2D Profile", sketch: profile2d.translate(-34, 0), color: "#f3c98b" },
-  { name: "3D Extrusion", shape: extrusion.translate(36, 0, 0), color: "#98a7b8" },
-];
-````
-
-### examples/api/runtime-joints-view.forge.js
-
-````javascript
-// Runtime joints demo
-// Move the "Joints" sliders in the View Panel for smooth articulation,
-// or use the Animation controls (play/pause + scrub), all without recompute.
-// Demonstrates linked joints via couplings (Ankle is driven by Hip + Knee).
-
-const body = box(150, 70, 36, true).translate(0, 0, 40).color('#6e7b88');
-
-const upperLen = 84;
-const lowerLen = 86;
-const footLen = 48;
-
-const upper = box(upperLen, 18, 18).translate(0, -9, -9).color('#7da2d6');
-const lower = box(lowerLen, 16, 16).translate(0, -8, -8).color('#8db3e4');
-const foot = box(footLen, 24, 10, true).translate(footLen * 0.5 - 8, 0, -10).color('#9dbfe8');
-
-const leg = assembly('Leg Runtime Demo')
-  .addPart('Body', body)
-  .addPart('Upper Leg', upper)
-  .addPart('Lower Leg', lower)
-  .addPart('Foot', foot)
-  .addRevolute('hip', 'Body', 'Upper Leg', {
-    axis: [0, -1, 0],
-    frame: Transform.identity().translate(34, 24, 40),
-  })
-  .addRevolute('knee', 'Upper Leg', 'Lower Leg', {
-    axis: [0, -1, 0],
-    frame: Transform.identity().translate(upperLen, 0, 0),
-  })
-  .addRevolute('ankle', 'Lower Leg', 'Foot', {
-    axis: [0, -1, 0],
-    frame: Transform.identity().translate(lowerLen, 0, 0),
-  });
-
-const solved = leg.solve({
-  hip: 0,
-  knee: 0,
-  ankle: 0,
-});
-
-viewConfig({
-  jointOverlay: {
-    axisColor: '#13dfff',
-    arcColor: '#ff7a1a',
-    zeroColor: '#ffe26a',
-    axisArrowLengthScale: 0.16,
-    axisArrowRadiusScale: 0.052,
-    arcArrowLengthScale: 0.12,
-    arcArrowRadiusScale: 0.038,
-    arcLineRadiusScale: 0.02,
-  },
-});
-
-jointsView({
-  joints: [
-    {
-      name: 'Hip',
-      child: 'Upper Leg',
-      parent: 'Body',
-      type: 'revolute',
-      axis: [0, -1, 0],
-      pivot: [34, 24, 40],
-      min: -50,
-      max: 80,
-      default: 10,
-    },
-    {
-      name: 'Knee',
-      child: 'Lower Leg',
-      parent: 'Upper Leg',
-      type: 'revolute',
-      axis: [0, -1, 0],
-      pivot: [34 + upperLen, 24, 40],
-      min: -5,
-      max: 125,
-      default: 40,
-    },
-    {
-      name: 'Ankle',
-      child: 'Foot',
-      parent: 'Lower Leg',
-      type: 'revolute',
-      axis: [0, -1, 0],
-      pivot: [34 + upperLen + lowerLen, 24, 40],
-      min: -40,
-      max: 55,
-      default: -10,
-    },
-  ],
-  couplings: [
-    {
-      joint: 'Ankle',
-      terms: [
-        { joint: 'Knee', ratio: -0.35 },
-        { joint: 'Hip', ratio: 0.18 },
-      ],
-      offset: 6,
-    },
-  ],
-  animations: [
-    {
-      name: 'Step',
-      duration: 1.8,
-      loop: true,
-      keyframes: [
-        { at: 0.0, values: { Hip: 18, Knee: 42 } },
-        { at: 0.25, values: { Hip: -20, Knee: 22 } },
-        { at: 0.5, values: { Hip: 8, Knee: 86 } },
-        { at: 0.75, values: { Hip: 24, Knee: 34 } },
-        { at: 1.0, values: { Hip: 18, Knee: 42 } },
-      ],
-    },
-  ],
-  defaultAnimation: 'Step',
-});
-
-return solved.toScene();
-````
-
-### examples/api/sdf-rover-demo.forge.js
-
-````javascript
-// SDF export demo: four-wheel differential-drive rover with a demo world.
-// Run:
-//   npm run sdf -- examples/api/sdf-rover-demo.forge.js
-
-const chassisLength = 430;
-const chassisWidth = 260;
-const chassisHeight = 58;
-const roofLength = 210;
-const roofWidth = 150;
-const roofHeight = 46;
-const bumperLength = 150;
-const bumperWidth = 300;
-const bumperDepth = 24;
-
-const wheelRadius = 72;
-const wheelWidth = 34;
-const wheelTrack = 320;
-const wheelbase = 250;
-const groundClearance = 26;
-const bodyZ = wheelRadius + groundClearance + chassisHeight * 0.5;
-
-const baseDeck = box(chassisLength, chassisWidth, chassisHeight, true)
-  .translate(0, 0, bodyZ);
-
-const roofPod = box(roofLength, roofWidth, roofHeight, true)
-  .translate(20, 0, bodyZ + 40);
-
-const bumper = hull3d(
-  box(54, bumperWidth, bumperDepth, true).translate(chassisLength * 0.5 - 18, 0, wheelRadius + 6),
-  box(bumperLength, bumperWidth - 42, bumperDepth * 0.7, true).translate(chassisLength * 0.5 + 46, 0, wheelRadius - 10),
-).color('#c8742b');
-
-const sensorMast = union(
-  cylinder(92, 10, undefined, 40, true).translate(58, 0, bodyZ + 78),
-  box(78, 34, 26, true).translate(88, 0, bodyZ + 126),
-).color('#d7dee8');
-
-const chassis = union(baseDeck, roofPod)
-  .color('#60707d');
-
-const wheelTire = difference(
-  cylinder(wheelWidth, wheelRadius, undefined, 64, true).pointAlong([0, 1, 0]),
-  cylinder(wheelWidth + 2, wheelRadius * 0.56, undefined, 48, true).pointAlong([0, 1, 0]),
-).color('#1d2329');
-
-const wheelRim = union(
-  cylinder(wheelWidth * 0.86, wheelRadius * 0.52, undefined, 40, true).pointAlong([0, 1, 0]),
-  cylinder(wheelWidth * 1.02, wheelRadius * 0.16, undefined, 28, true).pointAlong([0, 1, 0]),
-).color('#b8c5d3');
-
-const wheel = group(wheelTire, wheelRim);
-
-const rover = assembly('Forge Scout Rover')
-  .addPart('Chassis', group(chassis, bumper, sensorMast), {
-    metadata: {
-      material: 'PETG-CF',
-      process: 'FDM',
-      massKg: 13.5,
-      notes: 'Battery bay lives under the roof pod.',
-    },
-  })
-  .addPart('Front Left Wheel', wheel, {
-    metadata: { material: 'TPU + PLA hub', massKg: 0.95 },
-  })
-  .addPart('Front Right Wheel', wheel, {
-    metadata: { material: 'TPU + PLA hub', massKg: 0.95 },
-  })
-  .addPart('Rear Left Wheel', wheel, {
-    metadata: { material: 'TPU + PLA hub', massKg: 0.95 },
-  })
-  .addPart('Rear Right Wheel', wheel, {
-    metadata: { material: 'TPU + PLA hub', massKg: 0.95 },
-  })
-  .addRevolute('frontLeftWheel', 'Chassis', 'Front Left Wheel', {
-    axis: [0, 1, 0],
-    frame: Transform.identity().translate(wheelbase * 0.5, wheelTrack * 0.5, wheelRadius),
-    effort: 22,
-    velocity: 1320,
-    damping: 0.12,
-    friction: 0.03,
-  })
-  .addRevolute('frontRightWheel', 'Chassis', 'Front Right Wheel', {
-    axis: [0, 1, 0],
-    frame: Transform.identity().translate(wheelbase * 0.5, -wheelTrack * 0.5, wheelRadius),
-    effort: 22,
-    velocity: 1320,
-    damping: 0.12,
-    friction: 0.03,
-  })
-  .addRevolute('rearLeftWheel', 'Chassis', 'Rear Left Wheel', {
-    axis: [0, 1, 0],
-    frame: Transform.identity().translate(-wheelbase * 0.5, wheelTrack * 0.5, wheelRadius),
-    effort: 22,
-    velocity: 1320,
-    damping: 0.12,
-    friction: 0.03,
-  })
-  .addRevolute('rearRightWheel', 'Chassis', 'Rear Right Wheel', {
-    axis: [0, 1, 0],
-    frame: Transform.identity().translate(-wheelbase * 0.5, -wheelTrack * 0.5, wheelRadius),
-    effort: 22,
-    velocity: 1320,
-    damping: 0.12,
-    friction: 0.03,
-  });
-
-robotExport({
-  assembly: rover,
-  modelName: 'Forge Scout Rover',
-  links: {
-    Chassis: { massKg: 13.5 },
-    'Front Left Wheel': { massKg: 0.95 },
-    'Front Right Wheel': { massKg: 0.95 },
-    'Rear Left Wheel': { massKg: 0.95 },
-    'Rear Right Wheel': { massKg: 0.95 },
-  },
-  plugins: {
-    diffDrive: {
-      leftJoints: ['frontLeftWheel', 'rearLeftWheel'],
-      rightJoints: ['frontRightWheel', 'rearRightWheel'],
-      wheelSeparationMm: wheelTrack,
-      wheelRadiusMm: wheelRadius,
-      maxLinearVelocity: 1.8,
-      maxAngularVelocity: 2.8,
-      linearAcceleration: 1.6,
-      angularAcceleration: 3.2,
-    },
-    jointStatePublisher: {
-      enabled: true,
-      updateRate: 30,
-    },
-  },
-  world: {
-    generateDemoWorld: true,
-    name: 'Forge Scout Trial',
-    spawnPose: [-1800, 0, 120, 0, 0, 0],
-    keyboardTeleop: {
-      enabled: true,
-      linearStep: 0.9,
-      angularStep: 1.35,
-    },
-  },
-});
-
-return rover.solve().toScene();
-````
-
-### examples/api/section-plane-visualization.forge.js
-
-````javascript
-// Section Plane Visualization — renderer-side guides for active cut planes.
-//
-// How to use:
-// 1) Toggle planes in View Panel -> Cut Planes
-// 2) Adjust View Panel -> Section Visuals (fill, border, normal axis)
-// 3) "Probe" is excluded from both cuts, so it stays intact for alignment checks.
-//
-// No helper solids are needed in your model. Guides are viewport-only overlays.
-
-const width = param("Width", 120, { min: 80, max: 180, unit: "mm" });
-const depth = param("Depth", 80, { min: 50, max: 140, unit: "mm" });
-const height = param("Height", 70, { min: 40, max: 120, unit: "mm" });
-const wall = param("Wall", 8, { min: 3, max: 16, unit: "mm" });
-
-const cutX = param("Cut X", 0, { min: -80, max: 80, unit: "mm" });
-const cutZ = param("Cut Z", 10, { min: -30, max: 80, unit: "mm" });
-
-cutPlane("Internal X", [1, 0, 0], cutX, { exclude: "Probe" });
-cutPlane("Internal Z", [0, 0, 1], cutZ, { exclude: "Probe" });
-
-const shell = box(width, depth, height, true);
-const cavity = box(width - wall * 2, depth - wall * 2, height - wall * 1.6, true).translate(0, 0, wall * 0.2);
-const passX = cylinder(width + 8, Math.min(depth, height) * 0.12, undefined, 48, true).rotate(0, 90, 0);
-const passY = cylinder(depth + 8, Math.min(width, height) * 0.09, undefined, 48, true).rotate(90, 0, 0).translate(0, 0, 12);
-const probe = cylinder(height + 20, 2.5, undefined, 36, true)
-  .translate(width * 0.22, depth * 0.18, 0)
-  .color("#f3a847");
-
-const housing = shell
-  .subtract(cavity)
-  .subtract(passX)
-  .subtract(passY)
-  .color("#8aa7c8");
-
-return [
-  { name: "Housing", shape: housing },
-  { name: "Probe", shape: probe },
-];
-````
-
-### examples/api/sketch-basics.forge.js
-
-````javascript
-// 2D sketch basics — primitives, booleans, offset, then extrude to 3D.
-
-const wall = param("Wall", 3, { min: 1, max: 8, unit: "mm" });
-const height = param("Height", 30, { min: 10, max: 80, unit: "mm" });
-
-// --- Sketch primitives ---
-const r = rect(40, 30);
-const c = circle2d(15).translate(20, 15);
-const hex = ngon(6, 12).translate(70, 15);
-const rounded = roundedRect(40, 30, 5).translate(100, 0);
-const oblong = slot(40, 15).translate(0, -30);
-
-// --- 2D booleans ---
-// Subtract circle from rectangle → plate with hole
-const plateSketch = rect(50, 40).subtract(circle2d(10).translate(25, 20));
-
-// --- Offset: inflate/deflate contours ---
-const outer = ngon(6, 20);
-const inner = outer.offset(-wall);
-const shellSketch = outer.subtract(inner); // hollow hexagon
-
-// --- Extrude to 3D ---
-const plate3d = plateSketch.extrude(height).translate(0, 60, 0).color('#4488cc');
-const shell3d = shellSketch.extrude(height).translate(70, 60, 0).color('#cc8844');
-
-// --- Path builder ---
-const bracket = path()
-  .moveTo(0, 0)
-  .lineH(30)
-  .lineV(40)
-  .lineH(-10)
-  .lineV(-30)
-  .lineH(-20)
-  .close()
-  .extrude(5)
-  .translate(130, 60, 0)
-  .color('#44cc88');
-
-return [
-  { name: "Rect", sketch: r },
-  { name: "Circle", sketch: c },
-  { name: "Hexagon", sketch: hex },
-  { name: "Rounded Rect", sketch: rounded },
-  { name: "Slot", sketch: oblong },
-  { name: "Plate (extruded)", shape: plate3d },
-  { name: "Shell (offset + extrude)", shape: shell3d },
-  { name: "Bracket (path + extrude)", shape: bracket },
-];
-````
-
-### examples/api/sketch-on-face.forge.js
-
-````javascript
-// Sketch on face — place 2D profiles onto canonical or tracked planar faces,
-// then extrude along that face normal.
-
-const body = box(140, 70, 44, true).color('#d5dbe3');
-
-const frontBadge = roundedRect(30, 12, 2.5, true)
-  .subtract(circle2d(2.5).translate(-8, 0))
-  .subtract(circle2d(2.5).translate(8, 0))
-  .onFace(body, 'front', { v: 10, protrude: 0.05 })
-  .extrude(2.4)
-  .color('#1d2733');
-
-const topVent = union2d(
-  rect(56, 6, true),
-  rect(56, 6, true).translate(0, 10),
-  rect(56, 6, true).translate(0, -10),
-)
-  .onFace(body, 'top', { v: 8, protrude: 0.05 })
-  .extrude(1.5)
-  .color('#55697e');
-
-const sidePort = roundedRect(22, 10, 3, true)
-  .onFace(body, 'right', { u: -8, v: 0, protrude: 0.05 })
-  .extrude(3)
-  .color('#20262e');
-
-const trackedPanel = Rectangle2D.from3Points(
-  point(-34, -18),
-  point(30, -6),
-  point(18, 26),
-)
-  .extrude(18)
-  .translate(0, 92, 0)
-  .color('#c4ccd6');
-
-const trackedSideBadge = roundedRect(22, 8, 2, true)
-  .onFace(trackedPanel, 'side-right', { v: -2, protrude: 0.05 })
-  .extrude(1.4)
-  .color('#27313c');
-
-const trackedTopCap = circle2d(5)
-  .onFace(trackedPanel.face('top'), { u: 12, protrude: 0.05 })
-  .extrude(1.2)
-  .color('#5a6c7c');
-
-cutPlane('Center X', [1, 0, 0], 0);
-
-return [
-  { name: 'Body', shape: body },
-  { name: 'Front Badge', shape: frontBadge },
-  { name: 'Top Vent', shape: topVent },
-  { name: 'Side Port', shape: sidePort },
-  { name: 'Tracked Panel', shape: trackedPanel },
-  { name: 'Tracked Side Badge', shape: trackedSideBadge },
-  { name: 'Tracked Top Cap', shape: trackedTopCap },
-];
-````
-
-### examples/api/sketch-rounding-strategies.forge.js
-
-````javascript
-// Compare common sketch-rounding strategies on the same roof profile.
-// Only the selective fillet keeps the lower roof corners sharp.
-
-const radius = param("Radius", 14, { min: 4, max: 24, unit: "mm" });
-const gap = 120;
-const bodyWidth = 90;
-const bodyHeight = 44;
-const shoulderInset = 24;
-const shoulderRise = 30;
-const peakRise = 42;
-
-const roofPoints = [
-  [0, 0],
-  [bodyWidth, 0],
-  [bodyWidth, bodyHeight],
-  [bodyWidth - shoulderInset, bodyHeight + shoulderRise],
-  [bodyWidth / 2, bodyHeight + peakRise],
-  [shoulderInset, bodyHeight + shoulderRise],
-  [0, bodyHeight],
-];
-
-const roofRidge = [
-  [0, bodyHeight],
-  [shoulderInset, bodyHeight + shoulderRise],
-  [bodyWidth / 2, bodyHeight + peakRise],
-  [bodyWidth - shoulderInset, bodyHeight + shoulderRise],
-  [bodyWidth, bodyHeight],
-];
-
-const rawProfile = polygon(roofPoints).color('#7b858c');
-const roundedAllCorners = rawProfile.offset(-radius, 'Round').offset(radius, 'Round').color('#d4862d');
-const strokedCenterline = union2d(
-  rect(bodyWidth, bodyHeight),
-  stroke(roofRidge, radius * 2, 'Round'),
-).color('#2a9d8f');
-const hulledCircles = union2d(
-  rect(bodyWidth, bodyHeight),
-  hull2d(
-    circle2d(radius).translate(shoulderInset, bodyHeight + shoulderRise),
-    circle2d(radius).translate(bodyWidth / 2, bodyHeight + peakRise),
-    circle2d(radius).translate(bodyWidth - shoulderInset, bodyHeight + shoulderRise),
-  ),
-).color('#7f5af0');
-const selectiveFillet = filletCorners(roofPoints, [
-  { index: 3, radius },
-  { index: 4, radius },
-  { index: 5, radius },
-]).color('#e63946');
-
-return [
-  { name: "Raw polygon", sketch: rawProfile },
-  { name: "offset(-r).offset(+r)", sketch: roundedAllCorners.translate(gap, 0) },
-  { name: "stroke(..., 'Round')", sketch: strokedCenterline.translate(gap * 2, 0) },
-  { name: "hull2d() of circles", sketch: hulledCircles.translate(gap * 3, 0) },
-  { name: "filletCorners()", sketch: selectiveFillet.translate(gap * 4, 0) },
-];
-````
-
-### examples/api/spatial-recipes.forge.js
-
-````javascript
-// Spatial Recipes — common arrangements for multi-part assemblies.
-//
-// ForgeCAD coordinate system:
-//   X = left/right    (+X = right)
-//   Y = forward/back  (+Y = forward, −Y = back toward camera)
-//   Z = up/down       (+Z = up)
-//
-// "front" anchor = −Y face (faces the camera in default view)
-// "back"  anchor = +Y face
-//
-// These recipes show how to position parts relative to each other
-// using attachTo() and onFace() so you never need manual coordinate math.
-
-const recipe = param("Recipe", 1, { min: 1, max: 3, integer: true });
-
-if (recipe === 1) {
-  // ─── Recipe 1: Wall separating two spaces ───
-  // Wall is thin along Y. Indoor side = −Y. Outdoor side = +Y.
-
-  const wallThick = 15;
-  const wall = box(200, wallThick, 150, true).color('#C4A77D');
-
-  // Indoor unit: its back face meets the wall's front face
-  const indoor = box(120, 30, 50, true).color('#F5F5F5')
-    .attachTo(wall, 'front', 'back', [0, -5, 0]);
-
-  // Outdoor unit: its front face meets the wall's back face
-  const outdoor = box(140, 40, 60, true).color('#888888')
-    .attachTo(wall, 'back', 'front', [0, 5, -10]);
-
-  // Pipe hole through wall — orient along Y (same as wall thickness)
-  const hole = cylinder(wallThick + 2, 10).pointAlong([0, 1, 0]);
-  const wallWithHole = wall.subtract(hole);
-
-  // Pipe spanning both sides — also along Y, centered at same XZ as hole
-  const pipe = cylinder(100, 4).pointAlong([0, 1, 0]).color('#B87333');
-
-  return [
-    { name: "Wall", shape: wallWithHole },
-    { name: "Indoor Unit", shape: indoor },
-    { name: "Outdoor Unit", shape: outdoor },
-    { name: "Pipe", shape: pipe },
-  ];
-}
-
-if (recipe === 2) {
-  // ─── Recipe 2: Surface details using onFace() ───
-  // onFace(parent, face, {u, v, protrude}) places a child on a parent's face.
-  //   u, v = position within the face (from center)
-  //   protrude = how far it sticks out (positive = outward)
-  //
-  // Face coordinate mapping:
-  //   front/back: u = left/right (X), v = up/down (Z)
-  //   left/right: u = forward/back (Y), v = up/down (Z)
-  //   top/bottom: u = left/right (X), v = forward/back (Y)
-
-  const body = box(100, 40, 60, true).color('#F5F5F5');
-
-  // Vent slits on front face, near bottom
-  const vent = box(80, 2, 12, true).color('#333333')
-    .onFace(body, 'front', { v: -15, protrude: 2 });
-
-  // Display panel on front face, near top-right
-  const display = box(35, 1.5, 8, true).color('#00ddee')
-    .onFace(body, 'front', { u: 20, v: 15, protrude: 1 });
-
-  // Button on front face, top-left area
-  const button = box(6, 2, 6, true).color('#44cc44')
-    .onFace(body, 'front', { u: -30, v: 18, protrude: 2 });
-
-  // Side vent on left face
-  const sideVent = box(2, 30, 40, true).color('#666666')
-    .onFace(body, 'left', { protrude: 1 });
-
-  // Fan on top, protruding 5mm
-  const fan = cylinder(10, 40).color('#333333')
-    .onFace(body, 'top', { protrude: 5 });
-
-  return [
-    { name: "Body", shape: body },
-    { name: "Front Vent", shape: vent },
-    { name: "Display", shape: display },
-    { name: "Button", shape: button },
-    { name: "Side Vent", shape: sideVent },
-    { name: "Top Fan", shape: fan },
-  ];
-}
-
-if (recipe === 3) {
-  // ─── Recipe 3: Full AC outdoor condenser ───
-  // Combines attachTo() for stacking and onFace() for surface details
-
-  const body = box(140, 50, 70, true).color('#888888');
-
-  // Fan housing on top — cylinder defaults to Z-up, correct for top placement
-  const fan = cylinder(10, 50).color('#333333')
-    .onFace(body, 'top', { protrude: 2 });
-
-  // Fan grill (flat disc on top of fan)
-  const grill = cylinder(2, 52).color('#777777')
-    .attachTo(fan, 'top', 'bottom');
-
-  // Pipe ports on front face — orient along Y (pointing outward from front)
-  const pipe1 = cylinder(20, 5).pointAlong([0, -1, 0]).color('#B87333')
-    .onFace(body, 'front', { u: -15, v: -10, protrude: 2 });
-
-  const pipe2 = cylinder(20, 3).pointAlong([0, -1, 0]).color('#B87333')
-    .onFace(body, 'front', { u: 15, v: -10, protrude: 2 });
-
-  // Side louvers on right face
-  const louver = box(2, 3, 50, true).color('#666666')
-    .onFace(body, 'right', { protrude: 1 });
-
-  // Feet on bottom
-  const foot = box(20, 15, 5, true).color('#222222');
-  const footL = foot.attachTo(body, 'bottom-left', 'top-left', [10, 5, -1]);
-  const footR = foot.attachTo(body, 'bottom-right', 'top-right', [-10, 5, -1]);
-
-  return [
-    { name: "Body", shape: body },
-    { name: "Fan", shape: fan },
-    { name: "Grill", shape: grill },
-    { name: "Pipe 1", shape: pipe1 },
-    { name: "Pipe 2", shape: pipe2 },
-    { name: "Louver", shape: louver },
-    { name: "Foot L", shape: footL },
-    { name: "Foot R", shape: footR },
-  ];
-}
 ````
 

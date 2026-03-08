@@ -13,14 +13,14 @@ const sourceRoots = [
   "docs/permanent/API/guides/modeling-recipes.md",
   "docs/permanent/API/model-building",
   "docs/permanent/CLI.md",
-  "examples/api",
+  // "examples/api",
 ];
 
 const sectionOrder = [
   "docs/permanent/API/guides/modeling-recipes.md",
   "docs/permanent/API/model-building/",
   "docs/permanent/CLI.md",
-  "examples/api/",
+  // "examples/api/",
 ];
 
 function walkFiles(relativePath) {
@@ -128,7 +128,7 @@ description: ForgeCAD model authoring, editing, debugging, and execution guidanc
 
 ## Overview
 
-Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workflows with the documented API and examples in this file. Prefer the documented ForgeCAD primitives, import rules, placement strategies, and CLI commands over inventing new APIs or geometry conventions.
+Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workflows with the documented API in this file. Prefer the documented ForgeCAD primitives, import rules, placement strategies, and CLI commands over inventing new APIs or geometry conventions.
 
 ## Workflow
 
@@ -137,7 +137,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 3. Use multi-file imports deliberately: \`importPart()\` for parts, \`importSketch()\` for sketches or SVGs, explicit \`paramOverrides\`, and \`.withReferences()\` plus \`.placeReference()\` for reusable placement.
 4. Use notebooks when the task benefits from stateful iteration, iterative development or debugging; remember cells share state, \`show()\` pins visible geometry, and notebooks can be exported to plain \`.forge.js\`. You can later convert it to a forge.js file.
 5. Validate through the CLI with \`npm run test-run -- <file>\`; add \`--debug-imports\` when import chains or overrides might be wrong.
-6. Reuse patterns from \`examples/api/\` (already included) before inventing a modeling recipe from scratch.
+6. Reuse patterns from \`examples/api/\` before inventing a modeling recipe from scratch.
 
 ## Included Sources
 
