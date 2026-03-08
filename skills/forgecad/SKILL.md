@@ -423,6 +423,22 @@ This keeps kinematic chains declarative and avoids repeated manual pivot math.
 - `addPart(..., { metadata })` attaches per-part metadata to an assembly part.
 - BOM/report helpers such as `solved.bom()` and `solved.bomCsv()` live in [../output/bom.md](../output/bom.md).
 
+## Naming grouped assembly children
+
+When an assembly part is a `ShapeGroup`, Forge flattens the group into separate viewport objects. To avoid opaque labels like `Base Assembly.1`, name the group children explicitly:
+
+```javascript
+const housing = group(
+  { name: "Body", shape: body },
+  { name: "Lid", shape: lid },
+);
+
+const mech = assembly("Case")
+  .addPart("Base Assembly", housing);
+```
+
+That produces labels such as `Base Assembly.Body` and `Base Assembly.Lid`.
+
 ## Robot export
 
 Use `robotExport({...})` when an assembly should become a simulator package instead of only a viewport scene.
@@ -1558,7 +1574,7 @@ shape.intersect(other) // Same as intersection(shape, other)
 Groups multiple shapes/sketches for joint transforms without merging them into a single mesh. Unlike `union`, colors and individual identities are preserved.
 
 **Parameters:**
-- `...items` (Shape | Sketch | TrackedShape | ShapeGroup) - Items to group (nested groups allowed)
+- `...items` (Shape | Sketch | TrackedShape | ShapeGroup | `{ name, shape? | sketch? | group? }`) - Items to group (nested groups allowed)
 
 **Returns:** `ShapeGroup`
 
@@ -1570,6 +1586,20 @@ const column = cylinder(40, 5).translate(50, 50, 5).color('#4488cc');
 const assembly = group(base, column).translate(200, 0, 0);
 return assembly;
 ```
+
+Named child descriptors are useful when the group will be flattened later, especially inside assemblies:
+
+```javascript
+const shell = box(80, 60, 24).color('#6e7b88');
+const lid = box(80, 60, 4).translate(0, 0, 24).color('#c9d2db');
+
+const housing = group(
+  { name: 'Shell', shape: shell },
+  { name: 'Lid', shape: lid },
+);
+```
+
+When that group is returned directly, each named child keeps its own viewport object. When the group is used as an assembly part, Forge uses those child names to produce labels such as `Base Assembly.Lid` instead of `Base Assembly.2`.
 
 ### ShapeGroup Methods
 All transforms are chainable and return a new ShapeGroup:
@@ -1602,7 +1632,7 @@ const openedB = lid.transform(Transform.rotationAxis([1, 0, 0], 35, [0, hingeY, 
 const laidDown = lid.pointAlong([1, 0, 0]); // same intent as Shape/TrackedShape.pointAlong
 ```
 
-When a ShapeGroup is returned from a script, each child becomes a separate viewport object with its own visibility/color controls.
+When a ShapeGroup is returned from a script, each child becomes a separate viewport object with its own visibility/color controls. Named children keep those names in the viewport/object tree.
 
 ## 3D Anchor Positioning
 
