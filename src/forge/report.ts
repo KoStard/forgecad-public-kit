@@ -3,6 +3,7 @@ import { shapeToGeometry } from './meshToGeometry';
 import type { RunResult, SceneObject } from './runner';
 import type { DimensionDef } from './sketch/dimensions';
 import type { BomDef } from './bom';
+import { mapDimensionsToOwnerIds } from './reportDimensionOwnership';
 
 export type ReportViewId = 'front' | 'right' | 'top' | 'iso';
 
@@ -484,36 +485,7 @@ function mapDimensionsToOwners(
   dimensions: DimensionDef[],
   objects: ReportObject[],
 ): Map<string, string[]> {
-  const byName = new Map<string, ReportObject[]>();
-  objects.forEach((obj) => {
-    const list = byName.get(obj.name) || [];
-    list.push(obj);
-    byName.set(obj.name, list);
-  });
-
-  const out = new Map<string, string[]>();
-
-  for (const dim of dimensions) {
-    const explicitNames = dim.components ?? [];
-    if (explicitNames.length > 0) {
-      const ids = Array.from(new Set(explicitNames.flatMap((name) => {
-        const hit = byName.get(name);
-        if (!hit || hit.length !== 1) return [];
-        return [hit[0].id];
-      })));
-      out.set(dim.id, ids);
-      continue;
-    }
-
-    const tolerance = 1e-3;
-    const candidates = objects
-      .filter((obj) => pointInBounds(dim.from, obj.bbox, tolerance) && pointInBounds(dim.to, obj.bbox, tolerance))
-      .map((obj) => obj.id);
-
-    out.set(dim.id, candidates.length === 1 ? candidates : []);
-  }
-
-  return out;
+  return mapDimensionsToOwnerIds(dimensions, objects);
 }
 
 function buildDimensionOwnership(

@@ -18,6 +18,7 @@ import {
 } from '../src/forge/kernel';
 import { Transform } from '../src/forge/transform';
 import { runScript } from '../src/forge/headless';
+import { mapDimensionsToOwnerIds } from '../src/forge/reportDimensionOwnership';
 
 type Dim = {
   id: string;
@@ -151,12 +152,71 @@ return part;
   expectVec(d.to, [17, 2, 3], 'import runtime translated to');
 }
 
+function checkGroupedExplicitOwnership(): void {
+  const files: Record<string, string> = {
+    'main.forge.js': `
+const panel = group({ name: "Panel", shape: box(40, 20, 5) });
+dim([0, 0, 0], [40, 0, 0], { component: "Panel" });
+const asm = assembly("Case").addPart("Base Assembly", panel);
+return asm.solve().toScene();
+`,
+  };
+
+  const result = runScript(files['main.forge.js'], 'main.forge.js', files);
+  expect(!result.error, `grouped ownership runScript failed: ${result.error}`);
+  expect(result.dimensions.length === 1, `grouped ownership should keep 1 dim, got ${result.dimensions.length}`);
+
+  const objects = result.objects
+    .filter((obj): obj is typeof obj & { shape: Shape } => !!obj.shape)
+    .map((obj) => ({
+      id: obj.id,
+      name: obj.name,
+      bbox: obj.shape.boundingBox() as { min: [number, number, number]; max: [number, number, number] },
+    }));
+
+  const owners = mapDimensionsToOwnerIds(result.dimensions, objects).get(result.dimensions[0].id) || [];
+  expect(owners.length === 1, `grouped explicit component should resolve to exactly 1 owner, got ${owners.length}`);
+
+  const ownerName = result.objects.find((obj) => obj.id === owners[0])?.name;
+  expect(ownerName === 'Base Assembly.Panel', `expected grouped owner "Base Assembly.Panel", got "${ownerName}"`);
+}
+
+function checkAmbiguousGroupedExplicitOwnership(): void {
+  const files: Record<string, string> = {
+    'main.forge.js': `
+const panel = () => group({ name: "Panel", shape: box(40, 20, 5) });
+dim([0, 0, 0], [40, 0, 0], { component: "Panel" });
+const asm = assembly("Case")
+  .addPart("Base Assembly", panel())
+  .addPart("Lid Assembly", panel().translate(0, 40, 0));
+return asm.solve().toScene();
+`,
+  };
+
+  const result = runScript(files['main.forge.js'], 'main.forge.js', files);
+  expect(!result.error, `ambiguous grouped ownership runScript failed: ${result.error}`);
+  expect(result.dimensions.length === 1, `ambiguous grouped ownership should keep 1 dim, got ${result.dimensions.length}`);
+
+  const objects = result.objects
+    .filter((obj): obj is typeof obj & { shape: Shape } => !!obj.shape)
+    .map((obj) => ({
+      id: obj.id,
+      name: obj.name,
+      bbox: obj.shape.boundingBox() as { min: [number, number, number]; max: [number, number, number] },
+    }));
+
+  const owners = mapDimensionsToOwnerIds(result.dimensions, objects).get(result.dimensions[0].id) || [];
+  expect(owners.length === 0, `ambiguous grouped explicit component should stay unowned, got ${owners.length}`);
+}
+
 async function main() {
   await initKernel();
   checkTransformPropagation();
   checkCopyLikeOps();
   checkBooleanPropagation();
   checkImportRuntimePropagation();
+  checkGroupedExplicitOwnership();
+  checkAmbiguousGroupedExplicitOwnership();
   console.log('✓ Dimension propagation invariants passed');
 }
 
