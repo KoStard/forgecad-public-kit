@@ -10,13 +10,16 @@ const base = box(60, 60, 5, true).color('#888888');
 const col = cylinder(30, 5).color('#cc4444')
   .attachTo(base, 'top', 'bottom');
 
-// --- group: colors preserved, transforms together ---
-const grouped = group(base, col).translate(-50, 0, 0);
+// --- group: colors preserved, transforms together (with named children) ---
+const grouped = group(
+  { name: "Base", shape: base },
+  { name: "Column", shape: col }
+).translate(-50, 0, 0);
 
 // --- union: one solid, one color ---
 const unioned = union(base, col).translate(50, 0, 0).color('#4488cc');
 
 return [
-  grouped,  // each child becomes a separate viewport object
+  grouped,  // each child becomes a separate viewport object with names
   { name: "Union (single solid)", shape: unioned },
 ];

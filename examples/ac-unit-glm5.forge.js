@@ -150,7 +150,7 @@ return [
   // Indoor unit
   { name: "Indoor Body", shape: indoorBody },
   { name: "Front Panel", shape: frontPanel },
-  { name: "Vents", shape: group(...vents) },
+  { name: "Vents", group: vents.map((v, i) => ({ name: `Vent ${i + 1}`, shape: v })) },
   { name: "Display", shape: display },
   { name: "LED", shape: led },
   { name: "Mounting Bracket", shape: bracket },
@@ -160,8 +160,11 @@ return [
   { name: "Fan Housing", shape: fanHousing },
   { name: "Fan Blades", shape: fanBlade },
   { name: "Fan Grille", shape: grille },
-  { name: "Heat Fins", shape: group(...fins) },
-  { name: "Legs", shape: group(leg1, leg2) },
+  { name: "Heat Fins", group: fins.map((f, i) => ({ name: `Fin ${i + 1}`, shape: f })) },
+  { name: "Legs", group: [
+    { name: "Left Leg", shape: leg1 },
+    { name: "Right Leg", shape: leg2 }
+  ] },
   
   // Pipes
   { name: "Pipe 1 (drop)", shape: pipe1 },

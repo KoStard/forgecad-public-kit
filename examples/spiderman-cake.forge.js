@@ -75,7 +75,13 @@ for (let i = 0; i < candleCount; i++) {
   const flame = sphere(2.5).color(flameOrange)
     .attachTo(candleBody, 'top', 'bottom', [0, 0, 1]);
 
-  cake.push({ name: `Candle ${i + 1}`, shape: group(candleBody, flame) });
+  cake.push({
+    name: `Candle ${i + 1}`,
+    group: [
+      { name: "Body", shape: candleBody },
+      { name: "Flame", shape: flame }
+    ]
+  });
 }
 
 // --- Cake Board ---

@@ -48,10 +48,17 @@ const wheelRim = union(
   cylinder(wheelWidth * 1.02, wheelRadius * 0.16, undefined, 28, true).pointAlong([0, 1, 0]),
 ).color('#b8c5d3');
 
-const wheel = group(wheelTire, wheelRim);
+const wheel = group(
+  { name: "Tire", shape: wheelTire },
+  { name: "Rim", shape: wheelRim }
+);
 
 const rover = assembly('Forge Scout Rover')
-  .addPart('Chassis', group(chassis, bumper, sensorMast), {
+  .addPart('Chassis', group(
+    { name: "Deck", shape: chassis },
+    { name: "Bumper", shape: bumper },
+    { name: "Sensor Mast", shape: sensorMast }
+  ), {
     metadata: {
       material: 'PETG-CF',
       process: 'FDM',

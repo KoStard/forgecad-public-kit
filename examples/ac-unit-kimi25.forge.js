@@ -204,7 +204,10 @@ const conn2Outdoor = cylinder(20, pipeR + 2, undefined, 16, true)
 
 return [
   { name: "Wall", shape: wall },
-  { name: "Indoor Brackets", shape: group(indoorBracketL, indoorBracketR) },
+  { name: "Indoor Brackets", group: [
+    { name: "Left Bracket", shape: indoorBracketL },
+    { name: "Right Bracket", shape: indoorBracketR }
+  ] },
   { name: "Indoor Unit Body", shape: indoorBody },
   { name: "Indoor Vent", shape: ventPanel },
   { name: "Indoor Top Vent", shape: topVent },
@@ -213,9 +216,12 @@ return [
   { name: "Outdoor Mount Plate", shape: mountPlate },
   { name: "Outdoor Unit Body", shape: outdoorBody },
   { name: "Fan Grill", shape: fanGrill },
-  { name: "Fan Blades", shape: group(...fanBlades) },
-  { name: "Side Vents", shape: group(...sideVents) },
-  { name: "Outdoor Feet", shape: group(leftFoot, rightFoot) },
+  { name: "Fan Blades", group: fanBlades.map((b, i) => ({ name: `Blade ${i + 1}`, shape: b })) },
+  { name: "Side Vents", group: sideVents.map((v, i) => ({ name: `Vent ${i + 1}`, shape: v })) },
+  { name: "Outdoor Feet", group: [
+    { name: "Left Foot", shape: leftFoot },
+    { name: "Right Foot", shape: rightFoot }
+  ] },
   { name: "Pipe 1 (Outdoor)", shape: pipe1Outdoor },
   { name: "Pipe 1 (Wall)", shape: pipe1Wall },
   { name: "Pipe 1 (Indoor)", shape: pipe1Indoor },
