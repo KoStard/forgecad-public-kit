@@ -12,6 +12,7 @@ import {
   Shape,
   resolveAnchor3D,
   setShapePlacementReferences,
+  type ShapeOperandInput,
   type GeometryInfo,
   type PlacementReferenceInput,
 } from '../kernel';
@@ -331,15 +332,18 @@ export class TrackedShape {
   }
 
   /** Boolean subtract — returns plain Shape (topology lost) */
-  subtract(other: Shape | TrackedShape): Shape {
-    const otherShape = other instanceof TrackedShape ? other.toShape() : other;
-    return this.shape.subtract(otherShape);
+  subtract(...others: ShapeOperandInput[]): Shape {
+    return this.shape.subtract(...others);
   }
 
   /** Boolean add — returns plain Shape (topology lost) */
-  add(other: Shape | TrackedShape): Shape {
-    const otherShape = other instanceof TrackedShape ? other.toShape() : other;
-    return this.shape.add(otherShape);
+  add(...others: ShapeOperandInput[]): Shape {
+    return this.shape.add(...others);
+  }
+
+  /** Boolean intersect — returns plain Shape (topology lost) */
+  intersect(...others: ShapeOperandInput[]): Shape {
+    return this.shape.intersect(...others);
   }
 
   boundingBox() {

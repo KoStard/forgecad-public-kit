@@ -30,6 +30,7 @@ import {
   buildBrepBooleanPlan,
   cloneBrepShapePlan,
 } from './brepPlan';
+import { describeApiArg, normalizeVariadicArgs } from './apiArgs';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -90,6 +91,22 @@ export interface ShapeDimension {
   color?: string;
   components?: string[];
   currentComponent?: boolean;
+}
+
+export interface ShapeLike {
+  toShape(): Shape;
+}
+
+export type ShapeOperandInput = Shape | ShapeLike | readonly (Shape | ShapeLike)[];
+
+function unwrapShapeLike(value: unknown): Shape {
+  if (value instanceof Shape) return value;
+  if (value && typeof value === 'object' && typeof (value as { toShape?: unknown }).toShape === 'function') {
+    const resolved = (value as ShapeLike).toShape();
+    if (resolved instanceof Shape) return resolved;
+    throw new Error(`expected toShape() to return a Shape, got ${describeApiArg(resolved)}`);
+  }
+  throw new Error(`expected a Shape or TrackedShape-compatible value, got ${describeApiArg(value)}`);
 }
 
 const _shapeDimensions = new WeakMap<Shape, ShapeDimension[]>();
@@ -808,32 +825,47 @@ export class Shape {
   // --- Booleans ---
 
   /** Unwrap TrackedShape (or any object with toShape()) without circular import. */
-  private static _unwrap(s: any): Shape {
-    return typeof s.toShape === 'function' ? s.toShape() : s;
+  private static _unwrap(value: unknown): Shape {
+    return unwrapShapeLike(value);
   }
 
-  add(other: Shape | { toShape(): Shape }): Shape {
-    const o = Shape._unwrap(other);
+  add(...others: ShapeOperandInput[]): Shape {
+    const shapes = [this, ...normalizeShapeOperands(
+      'Shape.add()',
+      others,
+      1,
+      'Use shape.add(other1, other2) or shape.add([other1, other2]).',
+    )];
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withMergedDimensions([this, o], new Shape(this.manifold.add(o.manifold), this.colorHex)),
-      mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(o)], 'boolean', { topology: 'none' }),
-    ), buildBrepBooleanPlan('union', [getShapeBrepPlanInternal(this), getShapeBrepPlanInternal(o)]));
+      withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(shapes.map((shape) => shape.manifold)), this.colorHex)),
+      mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
+    ), buildBrepBooleanPlan('union', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
   }
 
-  subtract(other: Shape | { toShape(): Shape }): Shape {
-    const o = Shape._unwrap(other);
+  subtract(...others: ShapeOperandInput[]): Shape {
+    const shapes = [this, ...normalizeShapeOperands(
+      'Shape.subtract()',
+      others,
+      1,
+      'Use shape.subtract(other1, other2) or shape.subtract([other1, other2]).',
+    )];
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(this.manifold.subtract(o.manifold), this.colorHex)),
-      mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(o)], 'boolean', { topology: 'none' }),
-    ), buildBrepBooleanPlan('difference', [getShapeBrepPlanInternal(this), getShapeBrepPlanInternal(o)]));
+      withBaseDimensions(this, new Shape(getWasm().Manifold.difference(shapes.map((shape) => shape.manifold)), this.colorHex)),
+      mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
+    ), buildBrepBooleanPlan('difference', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
   }
 
-  intersect(other: Shape | { toShape(): Shape }): Shape {
-    const o = Shape._unwrap(other);
+  intersect(...others: ShapeOperandInput[]): Shape {
+    const shapes = [this, ...normalizeShapeOperands(
+      'Shape.intersect()',
+      others,
+      1,
+      'Use shape.intersect(other1, other2) or shape.intersect([other1, other2]).',
+    )];
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withMergedDimensions([this, o], new Shape(this.manifold.intersect(o.manifold), this.colorHex)),
-      mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(o)], 'boolean', { topology: 'none' }),
-    ), buildBrepBooleanPlan('intersection', [getShapeBrepPlanInternal(this), getShapeBrepPlanInternal(o)]));
+      withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(shapes.map((shape) => shape.manifold)), this.colorHex)),
+      mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
+    ), buildBrepBooleanPlan('intersection', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
   }
 
   // --- Cutting ---
@@ -1057,38 +1089,85 @@ export function sphere(radius: number, segments?: number): Shape {
   }), { kind: 'sphere', radius });
 }
 
+function normalizeShapeOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Shape[] {
+  return normalizeVariadicArgs({
+    apiName,
+    inputs,
+    minCount,
+    itemName: 'shape',
+    usage,
+    coerce: (value) => unwrapShapeLike(value),
+  });
+}
+
+function normalizePoint3(value: unknown, apiName: string, index: number): [number, number, number] {
+  if (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
+  ) {
+    return value as [number, number, number];
+  }
+  throw new Error(`${apiName} argument ${index}: expected a [x, y, z] point, got ${describeApiArg(value)}`);
+}
+
 // --- Boolean helpers ---
 
-export function union(...shapes: Shape[]): Shape {
+export function union(...inputs: ShapeOperandInput[]): Shape {
+  const shapes = normalizeShapeOperands(
+    'union()',
+    inputs,
+    1,
+    'Use union(shape1, shape2) or union([shape1, shape2]).',
+  );
   if (shapes.length === 0) throw new Error('union requires at least one shape');
   if (shapes.length === 1) return shapes[0];
   return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-    withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(shapes.map((s) => s.manifold)))),
+    withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(shapes.map((s) => s.manifold)), shapes[0].colorHex)),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), buildBrepBooleanPlan('union', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
 }
 
-export function difference(...shapes: Shape[]): Shape {
+export function difference(...inputs: ShapeOperandInput[]): Shape {
+  const shapes = normalizeShapeOperands(
+    'difference()',
+    inputs,
+    2,
+    'Use difference(base, cutter1, cutter2) or difference([base, cutter1, cutter2]).',
+  );
   if (shapes.length < 2) throw new Error('difference requires at least two shapes');
   return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-    withBaseDimensions(shapes[0], new Shape(getWasm().Manifold.difference(shapes.map((s) => s.manifold)))),
+    withBaseDimensions(shapes[0], new Shape(getWasm().Manifold.difference(shapes.map((s) => s.manifold)), shapes[0].colorHex)),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), buildBrepBooleanPlan('difference', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
 }
 
-export function intersection(...shapes: Shape[]): Shape {
+export function intersection(...inputs: ShapeOperandInput[]): Shape {
+  const shapes = normalizeShapeOperands(
+    'intersection()',
+    inputs,
+    2,
+    'Use intersection(shape1, shape2) or intersection([shape1, shape2]).',
+  );
   if (shapes.length < 2) throw new Error('intersection requires at least two shapes');
   return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-    withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(shapes.map((s) => s.manifold)))),
+    withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(shapes.map((s) => s.manifold)), shapes[0].colorHex)),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), buildBrepBooleanPlan('intersection', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
 }
 
 /** Convex hull of multiple shapes and/or points. */
-export function hull3d(...args: (Shape | [number, number, number])[]): Shape {
-  const items = args.map(a => a instanceof Shape ? a.manifold : a);
-  const out = new Shape(getWasm().Manifold.hull(items));
-  const shapeArgs = args.filter((a): a is Shape => a instanceof Shape);
+export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]): Shape {
+  const shapeArgs: Shape[] = [];
+  const items = args.map((arg, index) => {
+    if (arg instanceof Shape || (arg && typeof arg === 'object' && typeof (arg as { toShape?: unknown }).toShape === 'function')) {
+      const shape = unwrapShapeLike(arg);
+      shapeArgs.push(shape);
+      return shape.manifold;
+    }
+    return normalizePoint3(arg, 'hull3d()', index + 1);
+  });
+  const out = new Shape(getWasm().Manifold.hull(items), shapeArgs[0]?.colorHex);
   return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(shapeArgs, out),
     shapeArgs.length > 0

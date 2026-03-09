@@ -1,38 +1,77 @@
-import { Sketch, getSketchBrepProfilePlan, mergeSketchPlacement3D, setSketchBrepProfilePlan, setSketchPlacement3D } from './core';
+import { Sketch, type SketchOperandInput, getSketchBrepProfilePlan, mergeSketchPlacement3D, setSketchBrepProfilePlan, setSketchPlacement3D } from './core';
 import { getWasm } from '../kernel';
 import { buildBrepBooleanProfilePlan } from '../brepPlan';
+import { describeApiArg, normalizeVariadicArgs } from '../apiArgs';
 
-export function sketchAdd(sketch: Sketch, other: Sketch): Sketch {
+function normalizeSketchOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Sketch[] {
+  return normalizeVariadicArgs({
+    apiName,
+    inputs,
+    minCount,
+    itemName: 'sketch',
+    usage,
+    coerce: (value) => {
+      if (value instanceof Sketch) return value;
+      throw new Error(`expected a Sketch, got ${describeApiArg(value)}`);
+    },
+  });
+}
+
+export function sketchAdd(sketch: Sketch, ...others: SketchOperandInput[]): Sketch {
+  const sketches = [sketch, ...normalizeSketchOperands(
+    'Sketch.add()',
+    others,
+    1,
+    'Use sketch.add(other1, other2) or sketch.add([other1, other2]).',
+  )];
   return setSketchPlacement3D(
     setSketchBrepProfilePlan(
-      new Sketch(sketch.cross.add(other.cross), sketch.colorHex),
-      buildBrepBooleanProfilePlan('union', [getSketchBrepProfilePlan(sketch), getSketchBrepProfilePlan(other)]),
+      new Sketch(getWasm().CrossSection.union(sketches.map((entry) => entry.cross)), sketch.colorHex),
+      buildBrepBooleanProfilePlan('union', sketches.map((entry) => getSketchBrepProfilePlan(entry))),
     ),
-    mergeSketchPlacement3D([sketch, other]),
+    mergeSketchPlacement3D(sketches),
   );
 }
 
-export function sketchSubtract(sketch: Sketch, other: Sketch): Sketch {
+export function sketchSubtract(sketch: Sketch, ...others: SketchOperandInput[]): Sketch {
+  const sketches = [sketch, ...normalizeSketchOperands(
+    'Sketch.subtract()',
+    others,
+    1,
+    'Use sketch.subtract(other1, other2) or sketch.subtract([other1, other2]).',
+  )];
   return setSketchPlacement3D(
     setSketchBrepProfilePlan(
-      new Sketch(sketch.cross.subtract(other.cross), sketch.colorHex),
-      buildBrepBooleanProfilePlan('difference', [getSketchBrepProfilePlan(sketch), getSketchBrepProfilePlan(other)]),
+      new Sketch(getWasm().CrossSection.difference(sketches.map((entry) => entry.cross)), sketch.colorHex),
+      buildBrepBooleanProfilePlan('difference', sketches.map((entry) => getSketchBrepProfilePlan(entry))),
     ),
-    mergeSketchPlacement3D([sketch, other]),
+    mergeSketchPlacement3D(sketches),
   );
 }
 
-export function sketchIntersect(sketch: Sketch, other: Sketch): Sketch {
+export function sketchIntersect(sketch: Sketch, ...others: SketchOperandInput[]): Sketch {
+  const sketches = [sketch, ...normalizeSketchOperands(
+    'Sketch.intersect()',
+    others,
+    1,
+    'Use sketch.intersect(other1, other2) or sketch.intersect([other1, other2]).',
+  )];
   return setSketchPlacement3D(
     setSketchBrepProfilePlan(
-      new Sketch(sketch.cross.intersect(other.cross), sketch.colorHex),
-      buildBrepBooleanProfilePlan('intersection', [getSketchBrepProfilePlan(sketch), getSketchBrepProfilePlan(other)]),
+      new Sketch(getWasm().CrossSection.intersection(sketches.map((entry) => entry.cross)), sketch.colorHex),
+      buildBrepBooleanProfilePlan('intersection', sketches.map((entry) => getSketchBrepProfilePlan(entry))),
     ),
-    mergeSketchPlacement3D([sketch, other]),
+    mergeSketchPlacement3D(sketches),
   );
 }
 
-export function union2d(...sketches: Sketch[]): Sketch {
+export function union2d(...inputs: SketchOperandInput[]): Sketch {
+  const sketches = normalizeSketchOperands(
+    'union2d()',
+    inputs,
+    1,
+    'Use union2d(sketch1, sketch2) or union2d([sketch1, sketch2]).',
+  );
   if (sketches.length === 0) throw new Error('union2d requires at least one sketch');
   if (sketches.length === 1) return sketches[0];
   return setSketchPlacement3D(
@@ -44,7 +83,13 @@ export function union2d(...sketches: Sketch[]): Sketch {
   );
 }
 
-export function difference2d(...sketches: Sketch[]): Sketch {
+export function difference2d(...inputs: SketchOperandInput[]): Sketch {
+  const sketches = normalizeSketchOperands(
+    'difference2d()',
+    inputs,
+    2,
+    'Use difference2d(base, cutter1, cutter2) or difference2d([base, cutter1, cutter2]).',
+  );
   if (sketches.length < 2) throw new Error('difference2d requires at least two sketches');
   return setSketchPlacement3D(
     setSketchBrepProfilePlan(
@@ -55,7 +100,13 @@ export function difference2d(...sketches: Sketch[]): Sketch {
   );
 }
 
-export function intersection2d(...sketches: Sketch[]): Sketch {
+export function intersection2d(...inputs: SketchOperandInput[]): Sketch {
+  const sketches = normalizeSketchOperands(
+    'intersection2d()',
+    inputs,
+    2,
+    'Use intersection2d(sketch1, sketch2) or intersection2d([sketch1, sketch2]).',
+  );
   if (sketches.length < 2) throw new Error('intersection2d requires at least two sketches');
   return setSketchPlacement3D(
     setSketchBrepProfilePlan(
@@ -66,7 +117,13 @@ export function intersection2d(...sketches: Sketch[]): Sketch {
   );
 }
 
-export function hull2d(...sketches: Sketch[]): Sketch {
+export function hull2d(...inputs: SketchOperandInput[]): Sketch {
+  const sketches = normalizeSketchOperands(
+    'hull2d()',
+    inputs,
+    1,
+    'Use hull2d(sketch1, sketch2) or hull2d([sketch1, sketch2]).',
+  );
   if (sketches.length === 0) throw new Error('hull2d requires at least one sketch');
   return setSketchPlacement3D(
     setSketchBrepProfilePlan(
@@ -77,6 +134,6 @@ export function hull2d(...sketches: Sketch[]): Sketch {
   );
 }
 
-Sketch.prototype.add = function (other: Sketch) { return sketchAdd(this, other); };
-Sketch.prototype.subtract = function (other: Sketch) { return sketchSubtract(this, other); };
-Sketch.prototype.intersect = function (other: Sketch) { return sketchIntersect(this, other); };
+Sketch.prototype.add = function (...others: SketchOperandInput[]) { return sketchAdd(this, ...others); };
+Sketch.prototype.subtract = function (...others: SketchOperandInput[]) { return sketchSubtract(this, ...others); };
+Sketch.prototype.intersect = function (...others: SketchOperandInput[]) { return sketchIntersect(this, ...others); };
