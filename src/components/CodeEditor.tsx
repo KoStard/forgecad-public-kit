@@ -1011,6 +1011,7 @@ export function CodeEditor() {
 
   return (
     <div
+      data-fc-editor-surface="monaco"
       style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}

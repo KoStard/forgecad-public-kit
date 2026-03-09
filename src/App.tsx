@@ -11,6 +11,7 @@ import { ViewPanel } from './components/ViewPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { FileSwitcher } from './components/FileSwitcher';
 import { ConsolePanel } from './components/ConsolePanel';
+import { isSaveShortcut, shouldBlockBrowserShortcut, type EditorSurface } from './editorShortcuts';
 import { isNotebookFile } from './notebook/model';
 
 const btnStyle = (active = false): React.CSSProperties => ({
@@ -145,6 +146,7 @@ export function App() {
   const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
   const refreshFiles = useForgeStore((s) => s.refreshFiles);
+  const saveFile = useForgeStore((s) => s.saveFile);
   const minCodePanelWidth = 320;
   const maxCodePanelWidth = 860;
   const minViewPanelWidth = 220;
@@ -236,6 +238,34 @@ export function App() {
   useEffect(() => {
     persistPanelWidth(VIEW_PANEL_WIDTH_KEY, viewPanelWidth);
   }, [viewPanelWidth]);
+
+  useEffect(() => {
+    const handleEditorShortcut = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const surfaceValue = target
+        .closest<HTMLElement>('[data-fc-editor-surface]')
+        ?.dataset.fcEditorSurface;
+
+      if (surfaceValue !== 'monaco' && surfaceValue !== 'notebook') return;
+
+      const surface = surfaceValue as EditorSurface;
+
+      if (surface === 'notebook' && isSaveShortcut(event)) {
+        event.preventDefault();
+        void saveFile();
+        return;
+      }
+
+      if (shouldBlockBrowserShortcut(event, surface)) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleEditorShortcut, true);
+    return () => window.removeEventListener('keydown', handleEditorShortcut, true);
+  }, [saveFile]);
 
   if (!kernelReady) {
     return (
