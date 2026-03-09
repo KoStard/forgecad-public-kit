@@ -50,6 +50,8 @@ Utility modules can use `export` / `export default`, `require(...)`, and explici
 import { box, union } from "forgecad";
 ```
 
+Modules can also use top-level `return` (including arrays) as the module value, as long as they do not also define exports in the same file.
+
 Use `importPart()` / `importSketch()` when you want the specialized model/sketch import behavior (parameter scoping, SVG parsing, dimension propagation). Use plain JS modules for reusable functions, classes, and constants. See [examples/api/js-module-imports.forge.js](examples/api/js-module-imports.forge.js).
 
 ## Seamless AI integration

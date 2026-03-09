@@ -1333,8 +1333,8 @@ Constraints accept both string IDs and entity objects (Point2D, Line2D) — enti
 ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.js`, return a `Sketch`), **parts** (`.forge.js`, return a `Shape` or `TrackedShape`), or **SVG assets** (`.svg`, parsed into a `Sketch`).
 
 ### File Types
-- `*.sketch.js` — 2D sketch file, must return a `Sketch`
-- `*.forge.js` — 3D part file, must return a `Shape` or `TrackedShape`
+- `*.sketch.js` — 2D sketch file; when used with `importSketch()`, must return a `Sketch`
+- `*.forge.js` — 3D Forge file; when used with `importPart()`, must return a `Shape` or `TrackedShape`
 - `*.svg` — vector artwork file, imported as sketch geometry
 
 ### Import Path Resolution
@@ -1464,6 +1464,33 @@ return [widget, cap];
 - Imported tracked solids keep their named faces/edges as `surfaces.<faceName>` and `edges.<edgeName>` references
 - SVG import supports deterministic region filtering (`regionSelection`, `maxRegions`, area thresholds)
 - The returned `Shape` or `Sketch` is fully chainable — use `.translate()`, `.rotate()`, `.subtract()`, etc.
+
+### Plain JS Module Imports
+Alongside `importPart()` / `importSketch()`, regular JS `import` / `require(...)` is supported for utility modules.
+
+- If a module uses `export` / `module.exports`, that export value is used.
+- If a module has no explicit exports and uses a top-level `return`, that return value becomes the module value (including arrays).
+- Do not mix explicit exports with top-level `return` in the same module; this throws an error.
+
+```javascript
+// scene-items.js
+import { box, cylinder } from "forgecad";
+
+return [
+  { name: "Plate", shape: box(20, 12, 2, true) },
+  { name: "Pin", shape: cylinder(14, 3, undefined, undefined, true).translate(0, 0, 8) },
+];
+```
+
+```javascript
+// main.forge.js
+import items from "./scene-items.js";
+
+return items.map((entry, index) => ({
+  name: entry.name,
+  shape: entry.shape.translate(index === 0 ? -20 : 20, 0, 0),
+}));
+```
 
 ### Placement References
 

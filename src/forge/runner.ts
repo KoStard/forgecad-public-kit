@@ -876,6 +876,13 @@ function resolveExportedEntryResult(exportsValue: unknown): unknown {
   return undefined;
 }
 
+function hasExplicitModuleExports(exportsValue: unknown, initialExportsRef: unknown): boolean {
+  if (exportsValue !== initialExportsRef) return true;
+  if (!exportsValue || typeof exportsValue !== 'object') return exportsValue != null;
+  const keys = Object.keys(exportsValue as Record<string, unknown>);
+  return keys.some((key) => key !== '__esModule');
+}
+
 function createForgeRuntimeModule(bindings: Record<string, unknown>): Record<string, unknown> {
   const runtime = { ...bindings } as Record<string, unknown>;
   Object.defineProperty(runtime, '__esModule', { value: true });
@@ -1218,6 +1225,7 @@ function executeFile(
     const moduleValue = {
       exports: executionMode === 'module' && moduleCacheEntry ? moduleCacheEntry.exports : {},
     };
+    const initialExportsRef = moduleValue.exports;
     const returnValue = runWithParamScope(scope, () => fn(
       moduleValue.exports,
       moduleValue,
@@ -1228,14 +1236,20 @@ function executeFile(
     ));
 
     if (executionMode === 'module') {
+      if (returnValue !== undefined) {
+        if (hasExplicitModuleExports(moduleValue.exports, initialExportsRef)) {
+          throw new Error(
+            `"${fileName}" mixed top-level return with exports while being imported as a JS module. ` +
+            'Use either return or export/module.exports, not both.',
+          );
+        }
+        if (moduleCacheEntry) {
+          moduleCacheEntry.exports = returnValue;
+        }
+        return returnValue;
+      }
       if (moduleCacheEntry) {
         moduleCacheEntry.exports = moduleValue.exports;
-      }
-      if (returnValue !== undefined) {
-        throw new Error(
-          `"${fileName}" used top-level return while being imported as a JS module. ` +
-          'Use importPart()/importSketch() or export values instead.',
-        );
       }
       return moduleValue.exports;
     }

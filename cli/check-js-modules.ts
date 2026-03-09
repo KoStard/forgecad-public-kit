@@ -3,8 +3,9 @@
  * JS module import invariants.
  *
  * Ensures ForgeCAD entry files can use ESM imports, utility .js modules
- * can use exports/default exports, `require(...)` shares the same cache,
- * and virtual `forgecad` imports resolve inside utility modules.
+ * can use exports/default exports or top-level return values, `require(...)`
+ * shares the same cache, and virtual `forgecad` imports resolve inside
+ * utility modules.
  */
 import { resolve } from 'path';
 import { init, runScript } from '../src/forge/headless';
@@ -46,6 +47,59 @@ async function main() {
   const bbox = result.shape!.boundingBox();
   expectVec(bbox.min as number[], [-20, -9, -2], 'bbox.min');
   expectVec(bbox.max as number[], [20, 9, 20], 'bbox.max');
+
+  const returnArrayModuleFiles: Record<string, string> = {
+    'main.forge.js': `
+import sceneItems from "./scene-items.js";
+
+if (!Array.isArray(sceneItems)) {
+  throw new Error("Expected scene-items default import to be an array");
+}
+if (sceneItems.length !== 2) {
+  throw new Error(\`Expected 2 scene items, got \${sceneItems.length}\`);
+}
+
+return sceneItems.map((entry, index) => ({
+  name: index === 0 ? "Imported Plate" : "Imported Pin",
+  shape: entry.shape.translate(index === 0 ? -14 : 14, 0, 0),
+}));
+`,
+    'scene-items.js': `
+import { box, cylinder } from "forgecad";
+
+return [
+  { name: "Plate", shape: box(10, 6, 2, true) },
+  { name: "Pin", shape: cylinder(8, 2, undefined, undefined, true).translate(0, 0, 5) },
+];
+`,
+  };
+  const returnArrayResult = runScript(
+    returnArrayModuleFiles['main.forge.js'],
+    'main.forge.js',
+    returnArrayModuleFiles,
+  );
+  expect(!returnArrayResult.error, `array-return module import failed: ${returnArrayResult.error}`);
+  expect(returnArrayResult.objects.length === 2, `expected 2 imported objects, got ${returnArrayResult.objects.length}`);
+
+  const mixedModuleFiles: Record<string, string> = {
+    'main.forge.js': `
+import value from "./mixed-module.js";
+return box(4, 4, 4, true).translate(value, 0, 0);
+`,
+    'mixed-module.js': `
+export const answer = 42;
+return answer;
+`,
+  };
+  const mixedModuleResult = runScript(
+    mixedModuleFiles['main.forge.js'],
+    'main.forge.js',
+    mixedModuleFiles,
+  );
+  expect(
+    Boolean(mixedModuleResult.error) && mixedModuleResult.error!.includes('mixed top-level return with exports'),
+    `expected mixed return/export failure, got: ${mixedModuleResult.error ?? 'success'}`,
+  );
 
   console.log('✓ JS module import invariants passed');
 }
