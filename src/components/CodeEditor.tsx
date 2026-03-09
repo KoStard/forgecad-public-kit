@@ -21,6 +21,13 @@ declare class Transform {
   static identity(): Transform;
   static translation(x: number, y: number, z: number): Transform;
   static rotationAxis(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): Transform;
+  static rotateAroundTo(
+    axis: [number, number, number],
+    pivot: [number, number, number],
+    movingPoint: [number, number, number],
+    targetPoint: [number, number, number],
+    options?: RotateAroundToOptions,
+  ): Transform;
   static scale(v: number | [number, number, number]): Transform;
   translate(x: number, y: number, z: number): Transform;
   rotateAxis(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): Transform;
@@ -140,6 +147,8 @@ type GeometryInfo = {
   topology: GeometryTopology;
   sources: GeometrySource[];
 };
+type RotateTarget3D = AnchorTarget3D | [number, number, number];
+type RotateAroundToOptions = { mode?: 'plane' | 'line' };
 
 declare class Shape {
   clone(): Shape;
@@ -156,6 +165,14 @@ declare class Shape {
   transform(m: number[] | Transform): Shape;  // 4x4 column-major matrix or Transform
   /** Rotate around an arbitrary axis through a pivot point */
   rotateAround(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): Shape;
+  /** Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point */
+  rotateAroundTo(
+    axis: [number, number, number],
+    pivot: [number, number, number],
+    movingPoint: RotateTarget3D,
+    targetPoint: RotateTarget3D,
+    options?: RotateAroundToOptions,
+  ): Shape;
   /** Reorient so primary axis (Z) points along given direction. E.g. cylinder(h,r).pointAlong([1,0,0]) lays it along X */
   pointAlong(direction: [number, number, number]): Shape;
   /** Attach named placement references that survive transforms and imports. */
@@ -352,6 +369,14 @@ declare class TrackedShape {
   transform(m: number[] | Transform): TrackedShape;
   /** Rotate around an arbitrary axis through a pivot point */
   rotateAround(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): TrackedShape;
+  /** Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point */
+  rotateAroundTo(
+    axis: [number, number, number],
+    pivot: [number, number, number],
+    movingPoint: RotateTarget3D,
+    targetPoint: RotateTarget3D,
+    options?: RotateAroundToOptions,
+  ): TrackedShape;
   /** Reorient so primary axis (Z) points along given direction */
   pointAlong(direction: [number, number, number]): TrackedShape;
   scale(v: number | [number, number, number]): TrackedShape;
@@ -944,6 +969,14 @@ declare class ShapeGroup {
   rotate(x: number, y: number, z: number): ShapeGroup;
   /** Rotate around an arbitrary axis through a pivot point */
   rotateAround(axis: [number, number, number], angleDeg: number, pivot?: [number, number, number]): ShapeGroup;
+  /** Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point */
+  rotateAroundTo(
+    axis: [number, number, number],
+    pivot: [number, number, number],
+    movingPoint: Anchor3D | [number, number, number],
+    targetPoint: Anchor3D | [number, number, number],
+    options?: RotateAroundToOptions,
+  ): ShapeGroup;
   /** Reorient all 3D children so primary axis (Z) points along given direction */
   pointAlong(direction: [number, number, number]): ShapeGroup;
   /** Apply a 4x4 transform matrix or Transform to all 3D children */

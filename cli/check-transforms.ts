@@ -159,6 +159,48 @@ function testShapeGroupPointAlongSugar() {
   assertVec(bySugar.max, byTransform.max, 'group.pointAlong max');
 }
 
+function testShapeRotateAroundTo() {
+  const arm = box(80, 8, 8, true)
+    .translate(40, 0, 0)
+    .withReferences({ points: { tip: [80, 0, 0] } });
+
+  const expectedXY = 80 / Math.sqrt(2);
+
+  const planeAligned = arm.rotateAroundTo([0, 0, 1], [0, 0, 0], 'tip', [30, 30, 24]);
+  assertVec(
+    planeAligned.referencePoint('tip'),
+    [expectedXY, expectedXY, 0],
+    'shape.rotateAroundTo plane tip',
+  );
+
+  const lineAligned = arm.rotateAroundTo([0, 0, 1], [0, 0, 0], 'tip', [30, 30, 0], { mode: 'line' });
+  assertVec(
+    lineAligned.referencePoint('tip'),
+    [expectedXY, expectedXY, 0],
+    'shape.rotateAroundTo line tip',
+  );
+
+  assert.throws(
+    () => arm.rotateAroundTo([0, 0, 1], [0, 0, 0], 'tip', [30, 30, 10], { mode: 'line' }),
+    /cannot reach the target line|axial offset/,
+  );
+}
+
+function testShapeGroupRotateAroundToSugar() {
+  const g = group(
+    box(30, 12, 8, true).translate(20, 0, 2),
+    box(10, 6, 4, true).translate(40, 0, 6),
+  );
+
+  const bySugar = g.rotateAroundTo([0, 0, 1], [0, 0, 0], [40, 0, 6], [30, 30, 20]).boundingBox();
+  const byTransform = g.transform(
+    Transform.rotateAroundTo([0, 0, 1], [0, 0, 0], [40, 0, 6], [30, 30, 20]),
+  ).boundingBox();
+
+  assertVec(bySugar.min, byTransform.min, 'group.rotateAroundTo min');
+  assertVec(bySugar.max, byTransform.max, 'group.rotateAroundTo max');
+}
+
 function testAssemblyNamedGroupLabels() {
   const script = `
     const housing = group(
@@ -396,6 +438,8 @@ async function main() {
   testAssemblyChainAgainstAnalytic();
   testShapeGroupRotateAroundSugar();
   testShapeGroupPointAlongSugar();
+  testShapeRotateAroundTo();
+  testShapeGroupRotateAroundToSugar();
   testAssemblyNamedGroupLabels();
   testAssemblyJointCouplings();
   testAssemblyGearCouplings();

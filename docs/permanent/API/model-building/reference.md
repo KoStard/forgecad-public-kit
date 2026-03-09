@@ -270,6 +270,34 @@ Rotates around an arbitrary axis through a pivot point.
 const opened = door.rotateAround([0, 0, 1], 45, [hingeX, hingeY, 0]);
 ```
 
+### `.rotateAroundTo(axis, pivot, movingPoint, targetPoint, opts?)`
+Solves the rotation around an axis that makes `movingPoint` reach the target line/plane implied by `targetPoint`.
+
+**Parameters:**
+- `axis` ([number, number, number]) - Rotation axis direction
+- `pivot` ([number, number, number]) - Point on the rotation axis
+- `movingPoint` (`[number, number, number] | string`) - World-space point or this shape's anchor/reference
+- `targetPoint` (`[number, number, number] | string`) - World-space point or this shape's anchor/reference
+- `opts` (object, optional)
+  - `mode` (`'plane' | 'line'`) - Default: `'plane'`
+
+Modes:
+- `'plane'` — rotate until `movingPoint` lies in the plane defined by `axis` + `targetPoint`
+- `'line'` — rotate until `movingPoint` lies on the infinite line from `pivot` through `targetPoint`; throws if the geometry makes that impossible
+
+```javascript
+const arm = box(80, 8, 8, true)
+  .translate(40, 0, 0)
+  .withReferences({ points: { tip: [80, 0, 0] } });
+
+const aimed = arm.rotateAroundTo(
+  [0, 0, 1],
+  [0, 0, 0],
+  "tip",
+  [30, 30, 20],
+);
+```
+
 ### `.pointAlong(direction)`
 Reorients a shape so its primary axis (Z) points along the given direction. Useful for laying cylinders and extrusions along X or Y without thinking about Euler angles.
 
@@ -301,6 +329,7 @@ Core methods:
 - `Transform.identity()`
 - `Transform.translation(x, y, z)`
 - `Transform.rotationAxis(axis, angleDeg, pivot?)`
+- `Transform.rotateAroundTo(axis, pivot, movingPoint, targetPoint, opts?)`
 - `Transform.scale(v)`
 - `T.mul(other)` (chain-composition order)
 - `composeChain(a, b, c, ...)` explicit left-to-right chain composition
@@ -561,6 +590,7 @@ group.moveTo(x, y, z)
 group.moveToLocal(target, x, y, z)
 group.rotate(x, y, z)
 group.rotateAround(axis, angleDeg, pivot?)
+group.rotateAroundTo(axis, pivot, movingPoint, targetPoint, opts?)
 group.pointAlong(direction)
 group.transform(m)
 group.scale(v)
@@ -571,6 +601,7 @@ group.duplicate() // alias
 ```
 
 `group.rotateAround(...)` is convenience sugar for `group.transform(Transform.rotationAxis(...))`.
+`group.rotateAroundTo(...)` is convenience sugar for `group.transform(Transform.rotateAroundTo(...))`.
 `group.pointAlong(...)` is convenience sugar for a group-wide axis rotation from Z to `direction`.
 
 ```javascript
@@ -1201,6 +1232,7 @@ box.edgeNames();           // all edge names
 box.translate(50, 0, 0);  // preserves topology
 box.rotate(0, 0, 15);     // same 3D transform surface as Shape
 box.rotateAround([0, 0, 1], 45, [0, 0, 0]);
+box.rotateAroundTo([0, 0, 1], [50, 30, 0], 'top-front-right', [120, 120, 10]);
 box.pointAlong([1, 0, 0]);
 box.transform(Transform.translation(10, 0, 0));
 box.scale([1.2, 1, 1]);

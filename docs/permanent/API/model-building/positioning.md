@@ -53,7 +53,34 @@ const grille = cylinder(4, 30)
   .attachTo(outdoorUnit, 'back', 'front', [0, 2, 0]);
 ```
 
-### 3. `moveToLocal()` — Position relative to another shape's corner
+### 3. `rotateAroundTo()` — Aim a point around a hinge/axis
+
+Use this when a part already has the correct pivot/axis, and you want to solve the angle from geometry instead of doing trig by hand.
+
+```javascript
+const arm = box(80, 8, 8, true)
+  .translate(40, 0, 0)
+  .withReferences({ points: { tip: [80, 0, 0] } });
+
+// Rotate around Z until the tip lies in the plane formed by the Z axis and the target point
+const aimed = arm.rotateAroundTo(
+  [0, 0, 1],
+  [0, 0, 0],
+  "tip",
+  [30, 30, 20],
+);
+
+// Exact line solve: throws if the target line is unreachable while preserving radius about the axis
+const lineHit = arm.rotateAroundTo(
+  [0, 0, 1],
+  [0, 0, 0],
+  "tip",
+  [30, 30, 0],
+  { mode: 'line' },
+);
+```
+
+### 4. `moveToLocal()` — Position relative to another shape's corner
 
 When you need to place something at a specific offset from another shape's bounding box origin (min corner):
 
@@ -62,7 +89,7 @@ const base = box(100, 100, 10);
 const part = box(20, 20, 30).moveToLocal(base, 10, 10, 10);
 ```
 
-### 4. `translate()` — Only for simple offsets or connecting independently-positioned parts
+### 5. `translate()` — Only for simple offsets or connecting independently-positioned parts
 
 Use `translate()` when:
 - Moving a shape by a known fixed amount
@@ -78,7 +105,7 @@ const pipe = cylinder(pipeLen, 5)
   .translate(40, (bb1.max[1] + bb2.min[1]) / 2, bb1.min[2] + 15);
 ```
 
-### 5. `placeReference()` / named import references — For reusable multi-file parts
+### 6. `placeReference()` / named import references — For reusable multi-file parts
 
 When a part will be imported elsewhere, define semantic placement references once in the source file:
 

@@ -5,7 +5,7 @@
  */
 
 import { Shape, type Anchor3D, isAnchor3D, resolveAnchor3D } from './kernel';
-import { Transform, type Mat4 } from './transform';
+import { Transform, type Mat4, type RotateAroundToOptions } from './transform';
 import { Sketch } from './sketch/core';
 import { TrackedShape } from './sketch/topology';
 
@@ -156,6 +156,16 @@ export class ShapeGroup {
     return { min: bb.min as [number, number, number], max: bb.max as [number, number, number] };
   }
 
+  private resolveRotatePoint(point: Anchor3D | [number, number, number]): [number, number, number] {
+    if (Array.isArray(point)) return [point[0], point[1], point[2]];
+    const bb = this._bbox();
+    return resolveAnchor3D(
+      bb.min as [number, number, number],
+      bb.max as [number, number, number],
+      point,
+    );
+  }
+
   /** Move so combined bounding box min corner is at the given global coordinate */
   moveTo(x: number, y: number, z: number): ShapeGroup {
     const bb = this._bbox();
@@ -233,6 +243,26 @@ export class ShapeGroup {
     pivot: [number, number, number] = [0, 0, 0],
   ): ShapeGroup {
     return this.transform(Transform.rotationAxis(axis, angleDeg, pivot));
+  }
+
+  /**
+   * Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point.
+   * ShapeGroup string points use built-in anchors only.
+   */
+  rotateAroundTo(
+    axis: [number, number, number],
+    pivot: [number, number, number],
+    movingPoint: Anchor3D | [number, number, number],
+    targetPoint: Anchor3D | [number, number, number],
+    options: RotateAroundToOptions = {},
+  ): ShapeGroup {
+    return this.transform(Transform.rotateAroundTo(
+      axis,
+      pivot,
+      this.resolveRotatePoint(movingPoint),
+      this.resolveRotatePoint(targetPoint),
+      options,
+    ));
   }
 
   /**

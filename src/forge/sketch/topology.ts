@@ -16,7 +16,7 @@ import {
   type GeometryInfo,
   type PlacementReferenceInput,
 } from '../kernel';
-import { Transform, normalizeAxis, type Mat4 } from '../transform';
+import { Transform, normalizeAxis, type Mat4, type RotateAroundToOptions } from '../transform';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
 
 export type FaceName = string;
@@ -251,6 +251,22 @@ export class TrackedShape {
   ): TrackedShape {
     return new TrackedShape(
       this.shape.rotateAround(axis, angleDeg, pivot),
+      { faces: new Map(), edges: new Map() },
+      this.baseHeight,
+      this.extrudeUp,
+    );
+  }
+
+  /** Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point. */
+  rotateAroundTo(
+    axis: [number, number, number],
+    pivot: [number, number, number],
+    movingPoint: string | [number, number, number],
+    targetPoint: string | [number, number, number],
+    options: RotateAroundToOptions = {},
+  ): TrackedShape {
+    return new TrackedShape(
+      this.shape.rotateAroundTo(axis, pivot, movingPoint, targetPoint, options),
       { faces: new Map(), edges: new Map() },
       this.baseHeight,
       this.extrudeUp,

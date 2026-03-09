@@ -7,8 +7,117 @@ export type Mat4 = [
 ];
 
 export type TransformInput = Transform | Mat4;
+export type RotateAroundToMode = 'plane' | 'line';
+
+export interface RotateAroundToOptions {
+  mode?: RotateAroundToMode;
+}
 
 const EPS = 1e-10;
+
+function subVec3(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function scaleVec3(v: Vec3, s: number): Vec3 {
+  return [v[0] * s, v[1] * s, v[2] * s];
+}
+
+function dotVec3(a: Vec3, b: Vec3): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function crossVec3(a: Vec3, b: Vec3): Vec3 {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+
+function lengthVec3(v: Vec3): number {
+  return Math.hypot(v[0], v[1], v[2]);
+}
+
+function projectRadial(v: Vec3, axis: Vec3): { axial: number; radial: Vec3 } {
+  const axial = dotVec3(v, axis);
+  return {
+    axial,
+    radial: subVec3(v, scaleVec3(axis, axial)),
+  };
+}
+
+function signedAngleAroundAxis(from: Vec3, to: Vec3, axis: Vec3): number {
+  const fromLen = lengthVec3(from);
+  const toLen = lengthVec3(to);
+  if (fromLen < EPS || toLen < EPS) return 0;
+  const fn = scaleVec3(from, 1 / fromLen);
+  const tn = scaleVec3(to, 1 / toLen);
+  const sin = dotVec3(axis, crossVec3(fn, tn));
+  const cos = dotVec3(fn, tn);
+  return Math.atan2(sin, cos) * 180 / Math.PI;
+}
+
+function shortestAlignedAngle(from: Vec3, target: Vec3, axis: Vec3): number {
+  const direct = signedAngleAroundAxis(from, target, axis);
+  const opposite = signedAngleAroundAxis(from, scaleVec3(target, -1), axis);
+  return Math.abs(direct) <= Math.abs(opposite) ? direct : opposite;
+}
+
+export function solveRotateAroundAngle(
+  axis: Vec3,
+  pivot: Vec3,
+  movingPoint: Vec3,
+  targetPoint: Vec3,
+  options: RotateAroundToOptions = {},
+): number {
+  const mode = options.mode ?? 'plane';
+  const unitAxis = normalizeVec3(axis);
+  const moving = subVec3(movingPoint, pivot);
+  const target = subVec3(targetPoint, pivot);
+
+  const movingDecomp = projectRadial(moving, unitAxis);
+  const targetDecomp = projectRadial(target, unitAxis);
+  const movingRadialLen = lengthVec3(movingDecomp.radial);
+  const targetRadialLen = lengthVec3(targetDecomp.radial);
+
+  if (movingRadialLen < EPS) {
+    if (mode === 'line' && targetRadialLen >= EPS) {
+      throw new Error('rotateAroundTo(...): moving point lies on the rotation axis, so line alignment is impossible');
+    }
+    return 0;
+  }
+
+  if (mode === 'plane') {
+    if (targetRadialLen < EPS) {
+      throw new Error('rotateAroundTo(...): target point lies on the rotation axis, so the target plane is undefined');
+    }
+    return signedAngleAroundAxis(movingDecomp.radial, targetDecomp.radial, unitAxis);
+  }
+
+  if (targetRadialLen < EPS) {
+    throw new Error('rotateAroundTo(...): target line lies on the rotation axis, but the moving point does not');
+  }
+
+  const axialTol = 1e-8 * Math.max(1, Math.abs(movingDecomp.axial), Math.abs(targetDecomp.axial));
+  const radialTol = 1e-8 * Math.max(1, movingRadialLen, targetRadialLen);
+
+  if (Math.abs(targetDecomp.axial) < axialTol) {
+    if (Math.abs(movingDecomp.axial) > axialTol) {
+      throw new Error('rotateAroundTo(...): target line stays on the pivot plane, but the moving point has axial offset');
+    }
+    return shortestAlignedAngle(movingDecomp.radial, targetDecomp.radial, unitAxis);
+  }
+
+  const lambda = movingDecomp.axial / targetDecomp.axial;
+  const expectedRadialLen = Math.abs(lambda) * targetRadialLen;
+  if (Math.abs(movingRadialLen - expectedRadialLen) > radialTol) {
+    throw new Error('rotateAroundTo(...): moving point cannot reach the target line while preserving radius around the axis');
+  }
+
+  const desiredRadial = lambda >= 0 ? targetDecomp.radial : scaleVec3(targetDecomp.radial, -1);
+  return signedAngleAroundAxis(movingDecomp.radial, desiredRadial, unitAxis);
+}
 
 function identityMatrix(): Mat4 {
   return [
@@ -160,6 +269,17 @@ export class Transform {
       m02, m12, m22, 0,
       tx, ty, tz, 1,
     ]);
+  }
+
+  static rotateAroundTo(
+    axis: Vec3,
+    pivot: Vec3,
+    movingPoint: Vec3,
+    targetPoint: Vec3,
+    options: RotateAroundToOptions = {},
+  ): Transform {
+    const angleDeg = solveRotateAroundAngle(axis, pivot, movingPoint, targetPoint, options);
+    return Transform.rotationAxis(axis, angleDeg, pivot);
   }
 
   /**

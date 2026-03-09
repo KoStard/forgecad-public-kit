@@ -6,7 +6,7 @@
  */
 
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
-import { Transform, type Mat4 } from './transform';
+import { Transform, solveRotateAroundAngle, type Mat4, type RotateAroundToOptions, type Vec3 } from './transform';
 import { scaleRefineSteps, scaleRefineToLength, scaleRefineToTolerance } from './quality';
 import type { BrepShapePlan, BrepShapeTransformStep } from './brepPlan';
 import { type Anchor3D, isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -522,6 +522,13 @@ type ShapeAnchorTarget =
   | { referencePoint(ref: string): [number, number, number] }
   | { _bbox(): { min: number[]; max: number[] } };
 
+type RotationPointLike = PlacementAnchorLike | Vec3;
+
+function resolveRotationPoint(shape: Shape, point: RotationPointLike): Vec3 {
+  if (Array.isArray(point)) return [point[0], point[1], point[2]];
+  return shape.referencePoint(point);
+}
+
 /**
  * Bind dimensions to a shape instance. Used for importPart-scoped dimensions.
  * By default IDs are regenerated so multiple instances never collide.
@@ -774,6 +781,23 @@ export class Shape {
         pivotZ: pivot[2],
       }),
     );
+  }
+
+  /**
+   * Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point.
+   * `movingPoint` / `targetPoint` may be raw world points or this shape's anchors/references.
+   */
+  rotateAroundTo(
+    axis: [number, number, number],
+    pivot: [number, number, number],
+    movingPoint: RotationPointLike,
+    targetPoint: RotationPointLike,
+    options: RotateAroundToOptions = {},
+  ): Shape {
+    const moving = resolveRotationPoint(this, movingPoint);
+    const target = resolveRotationPoint(this, targetPoint);
+    const angleDeg = solveRotateAroundAngle(axis, pivot, moving, target, options);
+    return this.rotateAround(axis, angleDeg, pivot);
   }
 
   // --- Smoothing ---
