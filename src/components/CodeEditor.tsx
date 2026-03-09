@@ -6,9 +6,12 @@ const FORGE_TYPES = `
 declare function box(x: number, y: number, z: number, center?: boolean): TrackedShape;
 declare function cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape;
 declare function sphere(radius: number, segments?: number): Shape;
-declare function union(...shapes: Shape[]): Shape;
-declare function difference(...shapes: Shape[]): Shape;
-declare function intersection(...shapes: Shape[]): Shape;
+type ShapeBooleanOperand = Shape | TrackedShape;
+type ShapeBooleanOperandInput = ShapeBooleanOperand | ShapeBooleanOperand[];
+type SketchBooleanOperandInput = Sketch | Sketch[];
+declare function union(...shapes: ShapeBooleanOperandInput[]): Shape;
+declare function difference(...shapes: ShapeBooleanOperandInput[]): Shape;
+declare function intersection(...shapes: ShapeBooleanOperandInput[]): Shape;
 declare function param(name: string, defaultValue: number, opts?: { min?: number; max?: number; step?: number; unit?: string; integer?: boolean; reverse?: boolean }): number;
 type PlaneSpec = { origin: [number, number, number]; normal: [number, number, number] } | { plane: 'XY' | 'XZ' | 'YZ'; offset?: number };
 declare function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch;
@@ -77,10 +80,10 @@ declare function ngon(sides: number, radius: number): Sketch;
 declare function ellipse(rx: number, ry: number, segments?: number): Sketch;
 declare function slot(length: number, width: number): Sketch;
 declare function star(points: number, outerR: number, innerR: number): Sketch;
-declare function union2d(...sketches: Sketch[]): Sketch;
-declare function difference2d(...sketches: Sketch[]): Sketch;
-declare function intersection2d(...sketches: Sketch[]): Sketch;
-declare function hull2d(...sketches: Sketch[]): Sketch;
+declare function union2d(...sketches: SketchBooleanOperandInput[]): Sketch;
+declare function difference2d(...sketches: SketchBooleanOperandInput[]): Sketch;
+declare function intersection2d(...sketches: SketchBooleanOperandInput[]): Sketch;
+declare function hull2d(...sketches: SketchBooleanOperandInput[]): Sketch;
 declare function constrainedSketch(): ConstrainedSketchBuilder;
 declare function spline2d(
   points: [number, number][],
@@ -165,9 +168,9 @@ declare class Shape {
   placeReference(ref: AnchorTarget3D, target: [number, number, number], offset?: [number, number, number]): Shape;
 
   // Booleans
-  add(other: Shape): Shape;
-  subtract(other: Shape): Shape;
-  intersect(other: Shape): Shape;
+  add(...others: ShapeBooleanOperandInput[]): Shape;
+  subtract(...others: ShapeBooleanOperandInput[]): Shape;
+  intersect(...others: ShapeBooleanOperandInput[]): Shape;
 
   // Smoothing
   smoothOut(minSharpAngle?: number, minSmoothness?: number): Shape;
@@ -211,9 +214,9 @@ declare class Sketch {
   rotate(degrees: number): Sketch;
   scale(v: number | [number, number]): Sketch;
   mirror(ax: [number, number]): Sketch;
-  add(other: Sketch): Sketch;
-  subtract(other: Sketch): Sketch;
-  intersect(other: Sketch): Sketch;
+  add(...others: SketchBooleanOperandInput[]): Sketch;
+  subtract(...others: SketchBooleanOperandInput[]): Sketch;
+  intersect(...others: SketchBooleanOperandInput[]): Sketch;
   offset(delta: number, join?: 'Square' | 'Round' | 'Miter'): Sketch;
   hull(): Sketch;
   simplify(epsilon?: number): Sketch;
@@ -360,6 +363,9 @@ declare class TrackedShape {
   onFace(parent: Shape | TrackedShape, face: 'front'|'back'|'left'|'right'|'top'|'bottom', opts?: { u?: number; v?: number; protrude?: number }): TrackedShape;
   color(hex: string): TrackedShape;
   geometryInfo(): GeometryInfo;
+  add(...others: ShapeBooleanOperandInput[]): Shape;
+  subtract(...others: ShapeBooleanOperandInput[]): Shape;
+  intersect(...others: ShapeBooleanOperandInput[]): Shape;
   toShape(): Shape;
 }
 
@@ -564,7 +570,7 @@ declare class Assembly {
 declare function assembly(name?: string): Assembly;
 
 // --- 3D Advanced ---
-declare function hull3d(...args: (Shape | [number, number, number])[]): Shape;
+declare function hull3d(...args: (Shape | TrackedShape | [number, number, number])[]): Shape;
 declare function levelSet(sdf: (p: [number, number, number]) => number, bounds: { min: [number, number, number]; max: [number, number, number] }, edgeLength: number, level?: number): Shape;
 
 type ExplodeAxis = 'x' | 'y' | 'z';

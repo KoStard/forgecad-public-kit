@@ -4,7 +4,10 @@
 // difference(a, b)   → a minus b (subtract b from a)
 // intersection(a, b) → only the overlapping volume
 //
-// Method syntax: a.add(b), a.subtract(b), a.intersect(b)
+// Method syntax also accepts multiple cutters/operands:
+// a.add(b, c), a.subtract(b, c), a.intersect(b, c)
+// and the helper functions also accept arrays:
+// difference([a, b, c]), union([a, b, c]), intersection([a, b, c])
 
 const size = param("Size", 30, { min: 15, max: 50, unit: "mm" });
 const overlap = param("Overlap", 15, { min: 0, max: 30, unit: "mm" });
@@ -21,9 +24,12 @@ function makePair(offsetX) {
 const [u1, u2] = makePair(0);
 const unioned = union(u1, u2).color('#8866cc');
 
-// 2. Difference — box minus sphere
+// 2. Difference — box minus sphere and cross-bore
 const [d1, d2] = makePair(spacing);
-const diffed = d1.subtract(d2);
+const d3 = cylinder(size * 1.2, size * 0.14, undefined, undefined, true)
+  .pointAlong([0, 1, 0])
+  .translate(spacing, 0, 0);
+const diffed = d1.subtract(d2, d3);
 
 // 3. Intersection — only overlap
 const [i1, i2] = makePair(2 * spacing);
@@ -35,7 +41,7 @@ const refB = sphere(size * 0.6).translate(3 * spacing + size - overlap, 0, 0).co
 
 return [
   { name: "Union", shape: unioned },
-  { name: "Difference (box - sphere)", shape: diffed },
+  { name: "Difference (box - sphere - bore)", shape: diffed },
   { name: "Intersection", shape: intersected },
   { name: "Original Box", shape: refA },
   { name: "Original Sphere", shape: refB },
