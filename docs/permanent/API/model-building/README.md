@@ -1,26 +1,22 @@
 # Model-Building Docs
 
-This is the complete reading set for writing ForgeCAD models. If the task is "build or modify a model", read every file below before coding.
+This folder is partitioned so each API surface has one primary owner file. Avoid reading everything by default; load only what the current task needs.
 
-For repair and iteration work, do not confuse reading with waiting. Read enough to stay inside the API, make a strong first pass quickly, validate it, and then iterate. If the current model is fundamentally weak, replacing it cleanly is usually better than preserving a bad structure.
+## Ownership
 
-## Required Files
+- [reference.md](reference.md): core script contract, 3D primitives/transforms, booleans, imports, library helpers, return formats, and curves/surfacing APIs.
+- [coordinate-system.md](coordinate-system.md), [geometry-conventions.md](geometry-conventions.md), [positioning.md](positioning.md): orientation rules, winding/transform conventions, and placement strategy.
+- [sketch-core.md](sketch-core.md), [sketch-primitives.md](sketch-primitives.md), [sketch-path.md](sketch-path.md), [sketch-transforms.md](sketch-transforms.md), [sketch-booleans.md](sketch-booleans.md), [sketch-operations.md](sketch-operations.md), [sketch-on-face.md](sketch-on-face.md), [sketch-extrude.md](sketch-extrude.md), [sketch-anchor.md](sketch-anchor.md): detailed 2D sketch APIs.
+- [entities.md](entities.md): named entities, tracked topology, constrained sketches, patterns, and fillet/chamfer utilities.
+- [assembly.md](assembly.md): assembly graph, joints, couplings, validation, and robot export behavior.
 
-1. [reference.md](reference.md) - core script contract, 3D API, imports, library helpers, return formats
-2. [coordinate-system.md](coordinate-system.md) - axis conventions and standard views
-3. [geometry-conventions.md](geometry-conventions.md) - winding, transform order, revolve axis, frame composition
-4. [positioning.md](positioning.md) - preferred placement strategy for parts and sketches
-5. [entities.md](entities.md) - named 2D entities, tracked topology, fillet/chamfer helpers, patterns
-6. [assembly.md](assembly.md) - assembly graphs, joints, couplings, sweep/collision validation
-7. [sketch-core.md](sketch-core.md) - `Sketch` basics, queries, anchors
-8. [sketch-primitives.md](sketch-primitives.md) - `rect`, `circle2d`, `roundedRect`, `polygon`, `ngon`, `ellipse`, `slot`, `star`
-9. [sketch-path.md](sketch-path.md) - path builder and stroke generation
-10. [sketch-transforms.md](sketch-transforms.md) - 2D transforms
-11. [sketch-booleans.md](sketch-booleans.md) - sketch boolean operations
-12. [sketch-operations.md](sketch-operations.md) - offset, selective sketch fillets, hull, simplify, warp
-13. [sketch-on-face.md](sketch-on-face.md) - attach sketches to standard 3D faces
-14. [sketch-extrude.md](sketch-extrude.md) - extrusion and revolve
-15. [sketch-anchor.md](sketch-anchor.md) - 2D anchor-based positioning
+## Read Plan
+
+1. Start with [reference.md](reference.md) plus [coordinate-system.md](coordinate-system.md), [geometry-conventions.md](geometry-conventions.md), and [positioning.md](positioning.md).
+2. Add sketch docs only when the task is sketch-heavy.
+3. Add [entities.md](entities.md) for topology-aware edits, constraints, or pattern helpers.
+4. Add [assembly.md](assembly.md) only for joint/coupling/mechanism work.
+5. Pull in guides and CLI docs only when you need recipes, troubleshooting, or command usage.
 
 ## Intentionally Excluded
 
