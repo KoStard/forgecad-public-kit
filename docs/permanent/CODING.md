@@ -76,6 +76,25 @@ examples/                 # Example scripts
 ### Minimal Implementation
 Write only the code needed to solve the problem. No verbose implementations, no speculative features.
 
+## Domain Localization Standard (Required)
+
+This standard is package-wide for any new user-facing concept or API family.
+
+### Contract
+- Each concept family must have a clear primary home in both code and docs.
+- Extend the module that already owns the mental model instead of scattering helpers across unrelated files.
+- When a feature spans multiple layers, pick one domain owner and make the other layers mirror that owner.
+- Keep related runtime code, examples, checks, and docs close to the same domain name whenever practical.
+
+### Examples
+- Assembly and kinematics live under `src/forge/assembly.ts` and `docs/permanent/API/model-building/assembly.md`.
+- Sketch constraints live under `src/forge/sketch/constraints.ts` and the sketch/entity API docs.
+- Transform/placement helpers should stay grouped with transform and positioning surfaces, not reappear as ad-hoc helpers in unrelated modules.
+
+### Enforcement
+- Before adding a new API, state which domain owns it.
+- If a concept currently has no clean home, create one instead of spreading the first implementation across multiple files.
+
 ### TypeScript
 - Use explicit types for function parameters and return values
 - Avoid `any` - use `unknown` or proper types
