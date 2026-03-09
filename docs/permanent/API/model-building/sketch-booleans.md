@@ -4,27 +4,34 @@
 
 ## Methods
 
-### `.add(other)`
-Combines two sketches (union).
+### `.add(...others)`
+Combines sketches (union). Accepts `sketch.add(a, b)` and `sketch.add([a, b])`.
 
 ```javascript
-const combined = rect(50, 30).add(circle2d(20).translate(25, 15));
+const combined = rect(50, 30).add(
+  circle2d(20).translate(25, 15),
+  ngon(6, 15).translate(40, 15)
+);
 ```
 
-### `.subtract(other)`
-Subtracts another sketch from this one.
+### `.subtract(...others)`
+Subtracts one or more sketches from this one. Accepts `sketch.subtract(a, b)` and `sketch.subtract([a, b])`.
 
 ```javascript
 const plate = rect(100, 80);
 const hole = circle2d(10);
-const result = plate.subtract(hole.translate(50, 40));
+const slotCut = rect(18, 8).translate(41, 36);
+const result = plate.subtract(hole.translate(25, 40), slotCut);
 ```
 
-### `.intersect(other)`
-Keeps only the overlapping area.
+### `.intersect(...others)`
+Keeps only the area shared by every operand. Accepts `sketch.intersect(a, b)` and `sketch.intersect([a, b])`.
 
 ```javascript
-const overlap = rect(50, 50).intersect(circle2d(30).translate(25, 25));
+const overlap = rect(50, 50).intersect(
+  circle2d(30).translate(25, 25),
+  rect(40, 20).translate(5, 15)
+);
 ```
 
 ## Functions
@@ -40,6 +47,8 @@ const combined = union2d(
 );
 ```
 
+`union2d([a, b, c])` is also supported when your sketches are already in an array.
+
 ### `difference2d(...sketches)`
 Subtracts sketches[1..n] from sketches[0].
 
@@ -49,6 +58,8 @@ const hole1 = circle2d(10).translate(25, 40);
 const hole2 = circle2d(10).translate(75, 40);
 const result = difference2d(plate, hole1, hole2);
 ```
+
+`difference2d([base, cutter1, cutter2])` works too.
 
 ### `intersection2d(...sketches)`
 Keeps only the area where all sketches overlap.
@@ -60,6 +71,8 @@ const overlap = intersection2d(
 );
 ```
 
+`intersection2d([a, b, c])` is also supported.
+
 ### `hull2d(...sketches)`
 Creates the convex hull of multiple sketches.
 
@@ -70,6 +83,8 @@ const hull = hull2d(
   circle2d(10).translate(25, 40)
 );
 ```
+
+`hull2d([a, b, c])` is also supported when your sketches are already in an array.
 
 `hull2d()` is best for intentionally blended convex silhouettes. If you need true corner fillets while keeping some neighboring corners sharp, use `filletCorners(...)` instead.
 

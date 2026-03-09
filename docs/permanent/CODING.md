@@ -141,6 +141,23 @@ This standard is package-wide for any user-facing API exposed to scripts.
 - Before merge, verify new/changed script APIs are present in all three surfaces above.
 - Do not ship runtime-only features without either declaration parity or a tracking task.
 
+## Script API Contract Standard (Required)
+
+This standard is package-wide for any API exposed to user scripts.
+
+### Contract
+- Collection-shaped script APIs must accept the intuitive collection forms the docs advertise:
+  - variadic operands when the operation naturally works on many inputs
+  - a single array of operands when that keeps call sites composable
+- Method syntax and function syntax must mirror each other for the same operation family.
+- User-facing APIs must not silently ignore extra arguments. Unsupported arity or operand types must throw a direct runtime error with the API name in the message.
+- If a future API needs configuration, do not smuggle it in as an ambiguous trailing object on an operand list. Use a distinct helper or a clearly named options-bearing API.
+
+### Enforcement
+- Any change to user-facing script APIs must run:
+  - `npm run check:api`
+- If the change also affects transforms, dimensions, placement refs, or geometry semantics, run the relevant existing invariant checks too.
+
 ## Git Workflow
 
 ### Commit Every Major Change

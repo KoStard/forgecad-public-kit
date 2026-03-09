@@ -7,6 +7,7 @@ import type { FaceRef } from './topology';
 
 type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type SketchPlacement3D = Mat4;
+export type SketchOperandInput = Sketch | readonly Sketch[];
 
 const _sketchBrepProfilePlans = new WeakMap<Sketch, BrepProfilePlan | null>();
 const _sketchPlacement3D = new WeakMap<Sketch, SketchPlacement3D | null>();
@@ -67,9 +68,9 @@ export class Sketch {
   rotateAround(degrees: number, pivot: [number, number]): Sketch { throw new Error('Not implemented'); }
   scale(v: number | [number, number]): Sketch { throw new Error('Not implemented'); }
   mirror(ax: [number, number]): Sketch { throw new Error('Not implemented'); }
-  add(other: Sketch): Sketch { throw new Error('Not implemented'); }
-  subtract(other: Sketch): Sketch { throw new Error('Not implemented'); }
-  intersect(other: Sketch): Sketch { throw new Error('Not implemented'); }
+  add(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
+  subtract(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
+  intersect(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
   offset(delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
     return copySketchPlacement3D(this, new Sketch(this.cross.offset(delta, join), this.colorHex));
   }

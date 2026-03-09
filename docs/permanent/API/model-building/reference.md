@@ -469,6 +469,12 @@ const combined = union(
   box(50, 50, 10),
   cylinder(20, 15).translate(25, 25, 10)
 );
+
+const parts = [
+  box(50, 50, 10),
+  cylinder(20, 15).translate(25, 25, 10),
+];
+const combinedFromArray = union(parts);
 ```
 
 ### `difference(...shapes)`
@@ -476,11 +482,14 @@ Subtracts shapes[1..n] from shapes[0].
 
 ```javascript
 const plate = box(100, 100, 5);
-const hole = cylinder(6, 10);
-const result = difference(plate, hole.translate(50, 50, 0));
+const hole1 = cylinder(6, 10).translate(25, 50, 0);
+const hole2 = cylinder(6, 10).translate(75, 50, 0);
+const result = difference(plate, hole1, hole2);
+const resultFromArray = difference([plate, hole1, hole2]);
 
 // Or using method syntax:
-const result = plate.subtract(hole.translate(50, 50, 0));
+const result = plate.subtract(hole1, hole2);
+const sameResult = plate.subtract([hole1, hole2]);
 ```
 
 ### `intersection(...shapes)`
@@ -491,15 +500,23 @@ const overlap = intersection(
   sphere(30),
   box(40, 40, 40, true)
 );
+
+const overlapFromArray = intersection([
+  sphere(30),
+  box(40, 40, 40, true),
+]);
 ```
 
 ### Method Syntax
 Shapes also have boolean methods:
 
 ```javascript
-shape.add(other)       // Same as union(shape, other)
-shape.subtract(other)  // Same as difference(shape, other)
-shape.intersect(other) // Same as intersection(shape, other)
+shape.add(other1, other2)
+shape.add([other1, other2])
+shape.subtract(other1, other2)
+shape.subtract([other1, other2])
+shape.intersect(other1, other2)
+shape.intersect([other1, other2])
 ```
 
 ## Group
@@ -1009,11 +1026,16 @@ intersection2d(...sketches)
 hull2d(...sketches)  // Convex hull
 
 // Or method syntax:
-sketch.add(other)
-sketch.subtract(other)
-sketch.intersect(other)
+sketch.add(other1, other2)
+sketch.add([other1, other2])
+sketch.subtract(other1, other2)
+sketch.subtract([other1, other2])
+sketch.intersect(other1, other2)
+sketch.intersect([other1, other2])
 sketch.hull()
 ```
+
+The 2D helper forms also accept a single array, for example `difference2d([base, cutter1, cutter2])`.
 
 ### 2D Operations
 

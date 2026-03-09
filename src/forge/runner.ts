@@ -768,16 +768,6 @@ function executeFile(
 
     const wrapped = `"use strict";\n${code}`;
 
-    // Wrappers that auto-unwrap TrackedShape for boolean ops
-    const unwrap = (s: Shape | TrackedShape): Shape =>
-      s instanceof TrackedShape ? s.toShape() : s;
-    const wrappedUnion = (...shapes: (Shape | TrackedShape)[]) => union(...shapes.map(unwrap));
-    const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => difference(...shapes.map(unwrap));
-    const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => intersection(...shapes.map(unwrap));
-
-    const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) =>
-      hull3d(...args.map(a => a instanceof TrackedShape ? a.toShape() : a));
-
     // Tracked wrappers for primitives — user scripts get TrackedShape with named faces/edges
     const trackedBox = (x: number, y: number, z: number, center = false): TrackedShape => {
       const shape = box(x, y, z, center);
@@ -848,8 +838,8 @@ function executeFile(
 
     return runWithParamScope(scope, () => fn(
       trackedBox, trackedCylinder, sphere,
-      wrappedUnion, wrappedDifference, wrappedIntersection,
-      wrappedHull3d, levelSet,
+      union, difference, intersection,
+      hull3d, levelSet,
       rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
       union2d, difference2d, intersection2d, hull2d,
       Point2D, Line2D, Circle2D, Rectangle2D, TrackedShape, point, line, circle, rectangle, Constraint, degrees, radians,
