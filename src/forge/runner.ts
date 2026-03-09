@@ -7,6 +7,7 @@
  * Supports cross-file imports via importSketch() and importPart().
  */
 
+import * as ts from 'typescript';
 import {
   Shape,
   box,
@@ -166,12 +167,42 @@ interface ImportScope {
 interface RunnerExecutionOptions {
   debugImports: boolean;
   fileIndex: Map<string, string>;
+  compiledFiles: Map<string, CompiledScript>;
+  moduleCache: Map<string, ModuleCacheEntry>;
 }
 
 const LOG_MAX_DEPTH = 4;
 const LOG_MAX_ARRAY_ITEMS = 24;
 const LOG_MAX_OBJECT_KEYS = 32;
 const LOG_NUMBER_PRECISION = 4;
+const FORGE_RUNTIME_MODULE_SPECIFIERS = new Set([
+  'forgecad',
+  '@forge/runtime',
+  '@forgecad/runtime',
+]);
+
+interface SourceMapSegment {
+  generatedColumn: number;
+  sourceLine: number;
+  sourceColumn: number;
+}
+
+interface CompiledScript {
+  source: string;
+  code: string;
+  sourceMapSegments: SourceMapSegment[][];
+}
+
+interface ModuleCacheEntry {
+  exports: unknown;
+  loaded: boolean;
+}
+
+interface ResolvedImportSource {
+  source: string;
+  lookupKey: string;
+  resolvedPath: string;
+}
 
 function formatLogError(error: unknown): string {
   if (error instanceof Error) return `${error.name}: ${error.message}`;
@@ -590,6 +621,268 @@ function buildFileIndex(allFiles: Record<string, string>): Map<string, string> {
   return fileIndex;
 }
 
+function resolveImportSource(
+  fromFile: string,
+  requestedName: string,
+  allFiles: Record<string, string>,
+  options: RunnerExecutionOptions,
+): ResolvedImportSource {
+  if (typeof requestedName !== 'string' || requestedName.trim().length === 0) {
+    throw new Error('Import path must be a non-empty string');
+  }
+  const resolvedPath = resolveImportPath(fromFile, requestedName);
+  const lookupKey = options.fileIndex.get(resolvedPath);
+  if (!lookupKey) {
+    const suffix = resolvedPath && resolvedPath !== requestedName
+      ? ` (resolved to "${resolvedPath}" from "${fromFile}")`
+      : ` (from "${fromFile}")`;
+    throw new Error(`File not found: "${requestedName}"${suffix}`);
+  }
+  const source = allFiles[lookupKey];
+  if (typeof source !== 'string') {
+    throw new Error(`File not found: "${requestedName}" (resolved to "${resolvedPath}")`);
+  }
+  return { source, lookupKey, resolvedPath };
+}
+
+function logImportTrace(
+  fileName: string,
+  scope: ImportScope,
+  options: RunnerExecutionOptions,
+  kind: 'importSketch' | 'importPart' | 'importSvgSketch' | 'require',
+  target: string,
+  phase: 'start' | 'success' | 'error',
+  details: Record<string, unknown> = {},
+): void {
+  if (!options.debugImports) return;
+  const payload = {
+    kind,
+    from: fileName,
+    to: target,
+    scope: scope.namePrefix ?? fileName,
+    phase,
+    ...details,
+  };
+  _collectedLogs.push({
+    level: 'info',
+    args: [`[import] ${kind} ${phase}`, formatLogArg(payload)],
+    timestamp: Date.now(),
+  });
+}
+
+function isSvgImportPath(path: string): boolean {
+  return path.toLowerCase().endsWith('.svg');
+}
+
+function stableSerializeOverrides(overrides?: Record<string, number>): string {
+  if (!overrides) return '';
+  return JSON.stringify(Object.keys(overrides).sort().map((key) => [key, overrides[key]]));
+}
+
+function makeModuleCacheKey(fileName: string, scope: ImportScope): string {
+  return `${fileName}\0${scope.namePrefix ?? ''}\0${stableSerializeOverrides(scope.localOverrides)}`;
+}
+
+const BASE64_VLQ_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const BASE64_VLQ_LOOKUP = Object.fromEntries(
+  BASE64_VLQ_CHARS.split('').map((char, index) => [char, index]),
+) as Record<string, number>;
+
+function decodeBase64Vlq(segment: string): number[] {
+  const values: number[] = [];
+  let index = 0;
+
+  while (index < segment.length) {
+    let value = 0;
+    let shift = 0;
+    let continuation = false;
+
+    do {
+      const digit = BASE64_VLQ_LOOKUP[segment[index]];
+      index += 1;
+      if (digit == null) {
+        throw new Error(`Invalid source map segment "${segment}"`);
+      }
+      continuation = (digit & 32) !== 0;
+      value += (digit & 31) << shift;
+      shift += 5;
+    } while (continuation && index < segment.length);
+
+    const signed = (value & 1) === 1 ? -(value >> 1) : (value >> 1);
+    values.push(signed);
+  }
+
+  return values;
+}
+
+function decodeSourceMapSegments(sourceMapText?: string): SourceMapSegment[][] {
+  if (!sourceMapText) return [];
+
+  let mappings = '';
+  try {
+    const parsed = JSON.parse(sourceMapText) as { mappings?: string };
+    mappings = typeof parsed.mappings === 'string' ? parsed.mappings : '';
+  } catch {
+    return [];
+  }
+  if (!mappings) return [];
+
+  let sourceIndex = 0;
+  let sourceLine = 0;
+  let sourceColumn = 0;
+  let nameIndex = 0;
+
+  return mappings.split(';').map((line) => {
+    if (!line) return [];
+
+    let generatedColumn = 0;
+    const segments: SourceMapSegment[] = [];
+    for (const segmentText of line.split(',')) {
+      if (!segmentText) continue;
+      const values = decodeBase64Vlq(segmentText);
+      generatedColumn += values[0] ?? 0;
+      if (values.length >= 4) {
+        sourceIndex += values[1];
+        sourceLine += values[2];
+        sourceColumn += values[3];
+        if (values.length >= 5) nameIndex += values[4];
+        if (sourceIndex === 0) {
+          segments.push({
+            generatedColumn,
+            sourceLine: sourceLine + 1,
+            sourceColumn: sourceColumn + 1,
+          });
+        }
+      }
+    }
+    void nameIndex;
+    return segments;
+  });
+}
+
+function formatTranspileDiagnostic(fileName: string, code: string, diagnostic: ts.Diagnostic): string {
+  const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+  const sourceFile = diagnostic.file ?? ts.createSourceFile(fileName, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(diagnostic.start ?? 0);
+  return `${message} (${fileName}:${line + 1}:${character + 1})`;
+}
+
+function compileScript(code: string, fileName: string, options: RunnerExecutionOptions): CompiledScript {
+  const cached = options.compiledFiles.get(fileName);
+  if (cached && cached.source === code) {
+    return cached;
+  }
+
+  const transpiled = ts.transpileModule(code, {
+    fileName,
+    reportDiagnostics: true,
+    compilerOptions: {
+      allowJs: true,
+      target: ts.ScriptTarget.ES2020,
+      module: ts.ModuleKind.CommonJS,
+      esModuleInterop: true,
+      allowSyntheticDefaultImports: true,
+      sourceMap: true,
+      inlineSources: true,
+      newLine: ts.NewLineKind.LineFeed,
+    },
+  });
+
+  const diagnostics = (transpiled.diagnostics ?? []).filter((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error);
+  if (diagnostics.length > 0) {
+    throw new Error(formatTranspileDiagnostic(fileName, code, diagnostics[0]));
+  }
+
+  const compiled: CompiledScript = {
+    source: code,
+    code: transpiled.outputText.replace(/\n\/\/# sourceMappingURL=.*$/u, ''),
+    sourceMapSegments: decodeSourceMapSegments(transpiled.sourceMapText),
+  };
+  options.compiledFiles.set(fileName, compiled);
+  return compiled;
+}
+
+function mapGeneratedPositionToSource(
+  compiled: CompiledScript | undefined,
+  generatedLine: number,
+  generatedColumn: number,
+): { line: number; column: number } | null {
+  if (!compiled) return null;
+  const segments = compiled.sourceMapSegments[generatedLine - 1];
+  if (!segments || segments.length === 0) return null;
+
+  let match = segments[0];
+  for (const segment of segments) {
+    if (segment.generatedColumn + 1 > generatedColumn) break;
+    match = segment;
+  }
+
+  return {
+    line: match.sourceLine,
+    column: match.sourceColumn + Math.max(0, generatedColumn - (match.generatedColumn + 1)),
+  };
+}
+
+function resolveErrorLocation(
+  stack: string,
+  compiledFiles: Map<string, CompiledScript>,
+): { fileName: string; line: number; column: number } | null {
+  const framePattern = /(?:eval\s+\()?([^()\s]+):(\d+):(\d+)\)?/u;
+
+  for (const line of stack.split('\n')) {
+    const match = line.match(framePattern);
+    if (!match) continue;
+    const [, candidateFile, lineText, columnText] = match;
+    if (!compiledFiles.has(candidateFile)) continue;
+    const generatedLine = parseInt(lineText, 10);
+    const generatedColumn = parseInt(columnText, 10);
+    const mapped = mapGeneratedPositionToSource(compiledFiles.get(candidateFile), generatedLine, generatedColumn);
+    return {
+      fileName: candidateFile,
+      line: mapped?.line ?? generatedLine,
+      column: mapped?.column ?? generatedColumn,
+    };
+  }
+
+  const anonymousMatch = stack.match(/<anonymous>:(\d+):(\d+)/u);
+  if (!anonymousMatch) return null;
+  return {
+    fileName: '<anonymous>',
+    line: Math.max(1, parseInt(anonymousMatch[1], 10) - 2),
+    column: parseInt(anonymousMatch[2], 10),
+  };
+}
+
+function isRenderableEntryResult(value: unknown): boolean {
+  return (
+    value instanceof Shape
+    || value instanceof Sketch
+    || value instanceof TrackedShape
+    || value instanceof ShapeGroup
+    || Array.isArray(value)
+  );
+}
+
+function resolveExportedEntryResult(exportsValue: unknown): unknown {
+  if (isRenderableEntryResult(exportsValue)) return exportsValue;
+  if (
+    exportsValue
+    && typeof exportsValue === 'object'
+    && 'default' in (exportsValue as Record<string, unknown>)
+    && isRenderableEntryResult((exportsValue as Record<string, unknown>).default)
+  ) {
+    return (exportsValue as Record<string, unknown>).default;
+  }
+  return undefined;
+}
+
+function createForgeRuntimeModule(bindings: Record<string, unknown>): Record<string, unknown> {
+  const runtime = { ...bindings } as Record<string, unknown>;
+  Object.defineProperty(runtime, '__esModule', { value: true });
+  runtime.default = runtime;
+  return runtime;
+}
+
 /**
  * Execute a single file's code with the forge sandbox.
  * `allFiles` enables cross-file imports.
@@ -602,11 +895,16 @@ function executeFile(
   visited: Set<string>,
   scope: ImportScope = {},
   options: RunnerExecutionOptions,
-): Shape | Sketch | TrackedShape | ShapeGroup | null {
-  if (visited.has(fileName)) {
-    throw new Error(`Circular import detected: ${fileName}`);
+  executionMode: 'script' | 'module' = 'script',
+  moduleCacheEntry?: ModuleCacheEntry,
+): unknown {
+  const trackCircularImports = executionMode === 'script';
+  if (trackCircularImports) {
+    if (visited.has(fileName)) {
+      throw new Error(`Circular import detected: ${fileName}`);
+    }
+    visited.add(fileName);
   }
-  visited.add(fileName);
   try {
     let importCallCount = 0;
     const makeChildScopePrefix = (name: string) => {
@@ -615,62 +913,18 @@ function executeFile(
       return scope.namePrefix ? `${scope.namePrefix} > ${local}` : local;
     };
 
-    const resolveImportSource = (requestedName: string) => {
-      if (typeof requestedName !== 'string' || requestedName.trim().length === 0) {
-        throw new Error('Import path must be a non-empty string');
-      }
-      const resolvedPath = resolveImportPath(fileName, requestedName);
-      const lookupKey = options.fileIndex.get(resolvedPath);
-      if (!lookupKey) {
-        const suffix = resolvedPath && resolvedPath !== requestedName
-          ? ` (resolved to "${resolvedPath}" from "${fileName}")`
-          : ` (from "${fileName}")`;
-        throw new Error(`File not found: "${requestedName}"${suffix}`);
-      }
-      const source = allFiles[lookupKey];
-      if (typeof source !== 'string') {
-        throw new Error(`File not found: "${requestedName}" (resolved to "${resolvedPath}")`);
-      }
-      return { source, lookupKey, resolvedPath };
-    };
-
-    const logImportTrace = (
-      kind: 'importSketch' | 'importPart' | 'importSvgSketch',
-      target: string,
-      phase: 'start' | 'success' | 'error',
-      details: Record<string, unknown> = {},
-    ) => {
-      if (!options.debugImports) return;
-      const payload = {
-        kind,
-        from: fileName,
-        to: target,
-        scope: scope.namePrefix ?? fileName,
-        phase,
-        ...details,
-      };
-      _collectedLogs.push({
-        level: 'info',
-        args: [`[import] ${kind} ${phase}`, formatLogArg(payload)],
-        timestamp: Date.now(),
-      });
-    };
-
-    // importSketch("name", { ...paramOverrides }) — executes another file, expects a Sketch result
-    const isSvgImportPath = (path: string): boolean => path.toLowerCase().endsWith('.svg');
-
     const importSketch = (name: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch => {
-      const { source: src, lookupKey, resolvedPath } = resolveImportSource(name);
+      const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
       if (isSvgImportPath(resolvedPath)) {
         const svgOptions = parseSvgImportArgs('importSketch', name, paramOverrides);
-        logImportTrace('importSketch', resolvedPath, 'start', {
+        logImportTrace(fileName, scope, options, 'importSketch', resolvedPath, 'start', {
           requested: name,
           mode: 'svg',
           options: svgOptions,
         });
         try {
           const result = sketchFromSvg(src, svgOptions);
-          logImportTrace('importSketch', resolvedPath, 'success', {
+          logImportTrace(fileName, scope, options, 'importSketch', resolvedPath, 'success', {
             requested: name,
             mode: 'svg',
             got: 'Sketch',
@@ -679,7 +933,7 @@ function executeFile(
           });
           return result;
         } catch (error) {
-          logImportTrace('importSketch', resolvedPath, 'error', {
+          logImportTrace(fileName, scope, options, 'importSketch', resolvedPath, 'error', {
             requested: name,
             mode: 'svg',
             error: formatLogError(error),
@@ -690,34 +944,34 @@ function executeFile(
 
       const localOverrides = parseImportParamArgs('importSketch', name, paramOverrides);
       const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
-      logImportTrace('importSketch', resolvedPath, 'start', { requested: name, overrides: localOverrides });
+      logImportTrace(fileName, scope, options, 'importSketch', resolvedPath, 'start', { requested: name, overrides: localOverrides });
       let result: ReturnType<typeof executeFile>;
       try {
         result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
       } catch (error) {
-        logImportTrace('importSketch', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
+        logImportTrace(fileName, scope, options, 'importSketch', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
         throw error;
       }
       if (result instanceof Sketch) {
-        logImportTrace('importSketch', resolvedPath, 'success', { requested: name, got: 'Sketch' });
+        logImportTrace(fileName, scope, options, 'importSketch', resolvedPath, 'success', { requested: name, got: 'Sketch' });
         return result;
       }
       const got = describeScriptResultType(result);
-      logImportTrace('importSketch', resolvedPath, 'error', { requested: name, got });
+      logImportTrace(fileName, scope, options, 'importSketch', resolvedPath, 'error', { requested: name, got });
       throw new Error(`"${resolvedPath}" did not return a Sketch (got ${got})`);
     };
 
     // importSvgSketch("name.svg", options?) — parses an SVG into Sketch geometry
     const importSvgSketch = (name: string, optionsArg?: SvgImportOptions): Sketch => {
-      const { source: src, resolvedPath } = resolveImportSource(name);
+      const { source: src, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
       if (!isSvgImportPath(resolvedPath)) {
         throw new Error(`importSvgSketch("${name}") requires an .svg file (resolved to "${resolvedPath}")`);
       }
       const svgOptions = parseSvgImportArgs('importSvgSketch', name, optionsArg);
-      logImportTrace('importSvgSketch', resolvedPath, 'start', { requested: name, options: svgOptions });
+      logImportTrace(fileName, scope, options, 'importSvgSketch', resolvedPath, 'start', { requested: name, options: svgOptions });
       try {
         const result = sketchFromSvg(src, svgOptions);
-        logImportTrace('importSvgSketch', resolvedPath, 'success', {
+        logImportTrace(fileName, scope, options, 'importSvgSketch', resolvedPath, 'success', {
           requested: name,
           got: 'Sketch',
           area: Number(result.area().toFixed(4)),
@@ -725,7 +979,7 @@ function executeFile(
         });
         return result;
       } catch (error) {
-        logImportTrace('importSvgSketch', resolvedPath, 'error', {
+        logImportTrace(fileName, scope, options, 'importSvgSketch', resolvedPath, 'error', {
           requested: name,
           error: formatLogError(error),
         });
@@ -735,25 +989,25 @@ function executeFile(
 
     // importPart("name", { ...paramOverrides }) — executes another file, expects a Shape result
     const importPart = (name: string, paramOverrides?: Record<string, number>): Shape => {
-      const { source: src, lookupKey, resolvedPath } = resolveImportSource(name);
+      const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
       const localOverrides = parseImportParamArgs('importPart', name, paramOverrides);
       const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
       const dimStart = getCollectedDimensions().length;
-      logImportTrace('importPart', resolvedPath, 'start', { requested: name, overrides: localOverrides });
+      logImportTrace(fileName, scope, options, 'importPart', resolvedPath, 'start', { requested: name, overrides: localOverrides });
       let result: ReturnType<typeof executeFile>;
       try {
         result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
       } catch (error) {
-        logImportTrace('importPart', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
+        logImportTrace(fileName, scope, options, 'importPart', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
         throw error;
       }
       const importedDims = takeCollectedDimensions(dimStart);
       if (result instanceof Shape) {
-        logImportTrace('importPart', resolvedPath, 'success', { requested: name, got: 'Shape', importedDims: importedDims.length });
+        logImportTrace(fileName, scope, options, 'importPart', resolvedPath, 'success', { requested: name, got: 'Shape', importedDims: importedDims.length });
         return setShapeDimensions(result, importedDims as ShapeDimension[]);
       }
       if (result instanceof TrackedShape) {
-        logImportTrace('importPart', resolvedPath, 'success', {
+        logImportTrace(fileName, scope, options, 'importPart', resolvedPath, 'success', {
           requested: name,
           got: 'TrackedShape',
           importedDims: importedDims.length,
@@ -762,11 +1016,19 @@ function executeFile(
         return setShapeDimensions(result.toShape(), importedDims as ShapeDimension[]);
       }
       const got = describeScriptResultType(result);
-      logImportTrace('importPart', resolvedPath, 'error', { requested: name, got });
+      logImportTrace(fileName, scope, options, 'importPart', resolvedPath, 'error', { requested: name, got });
       throw new Error(`"${resolvedPath}" did not return a Shape (got ${got})`);
     };
 
-    const wrapped = `"use strict";\n${code}`;
+    // Wrappers that auto-unwrap TrackedShape for boolean ops
+    const unwrap = (s: Shape | TrackedShape): Shape =>
+      s instanceof TrackedShape ? s.toShape() : s;
+    const wrappedUnion = (...shapes: (Shape | TrackedShape)[]) => union(...shapes.map(unwrap));
+    const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => difference(...shapes.map(unwrap));
+    const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => intersection(...shapes.map(unwrap));
+
+    const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) =>
+      hull3d(...args.map(a => a instanceof TrackedShape ? a.toShape() : a));
 
     // Tracked wrappers for primitives — user scripts get TrackedShape with named faces/edges
     const trackedBox = (x: number, y: number, z: number, center = false): TrackedShape => {
@@ -787,83 +1049,206 @@ function executeFile(
       return new TrackedShape(shape, topo, 0, true);
     };
 
-    const fn = new Function(
-      // 3D
-      'box', 'cylinder', 'sphere',
-      'union', 'difference', 'intersection',
-      'hull3d', 'levelSet',
-      // 2D
-      'rect', 'circle2d', 'roundedRect', 'polygon', 'ngon', 'ellipse', 'slot', 'star', 'path', 'stroke', 'constrainedSketch',
-      'union2d', 'difference2d', 'intersection2d', 'hull2d',
-      // Entities
-      'Point2D', 'Line2D', 'Circle2D', 'Rectangle2D', 'TrackedShape', 'point', 'line', 'circle', 'rectangle', 'Constraint', 'degrees', 'radians',
-      // Patterns
-      'linearPattern', 'circularPattern', 'mirrorCopy',
-      // Fillets
-      'filletCorners', 'filletEdge', 'chamferEdge',
-      // Arc bridge
-      'arcBridgeBetweenRects',
-      // Curves & surfacing
-      'Curve3D', 'spline2d', 'spline3d', 'loft', 'sweep',
-      // Params & classes
-      'param', 'Shape', 'Sketch', 'lib',
-      // Joints
-      'joint',
-      // Transform + Assembly
-      'Transform', 'composeChain', 'assembly', 'Assembly', 'SolvedAssembly', 'bomToCsv',
-      // Plane ops
-      'intersectWithPlane', 'projectToPlane',
-      // Cross-file imports
-      'importSketch', 'importPart', 'importSvgSketch',
-      // Dimensions
-      'dim', 'dimLine',
-      // Bill of materials
-      'bom',
-      // Robot export declarations
-      'robotExport',
-      // Group
-      'group', 'ShapeGroup',
-      // Console
-      'console',
-      // Cut planes
-      'cutPlane',
-      // View explode override
-      'explodeView',
-      // Runtime joints (viewport-only)
-      'jointsView',
-      // Viewport helper visuals
-      'viewConfig',
-      wrapped,
-    );
-
-    return runWithParamScope(scope, () => fn(
-      trackedBox, trackedCylinder, sphere,
-      union, difference, intersection,
-      hull3d, levelSet,
-      rect, circle2d, roundedRect, polygon, ngon, ellipse, slot, star, path, stroke, constrainedSketch,
-      union2d, difference2d, intersection2d, hull2d,
-      Point2D, Line2D, Circle2D, Rectangle2D, TrackedShape, point, line, circle, rectangle, Constraint, degrees, radians,
-      linearPattern, circularPattern, mirrorCopy,
-      filletCorners, filletEdge, chamferEdge,
+    const sandboxConsole = makeSandboxConsole();
+    const runtimeBindings: Record<string, unknown> = {
+      box: trackedBox,
+      cylinder: trackedCylinder,
+      sphere,
+      union: wrappedUnion,
+      difference: wrappedDifference,
+      intersection: wrappedIntersection,
+      hull3d: wrappedHull3d,
+      levelSet,
+      rect,
+      circle2d,
+      roundedRect,
+      polygon,
+      ngon,
+      ellipse,
+      slot,
+      star,
+      path,
+      stroke,
+      constrainedSketch,
+      union2d,
+      difference2d,
+      intersection2d,
+      hull2d,
+      Point2D,
+      Line2D,
+      Circle2D,
+      Rectangle2D,
+      TrackedShape,
+      point,
+      line,
+      circle,
+      rectangle,
+      Constraint,
+      degrees,
+      radians,
+      linearPattern,
+      circularPattern,
+      mirrorCopy,
+      filletCorners,
+      filletEdge,
+      chamferEdge,
       arcBridgeBetweenRects,
-      Curve3D, spline2d, spline3d, loft, sweep,
-      param, Shape, Sketch, partLibrary,
+      Curve3D,
+      spline2d,
+      spline3d,
+      loft,
+      sweep,
+      param,
+      Shape,
+      Sketch,
+      lib: partLibrary,
       joint,
-      Transform, composeChain, assembly, Assembly, SolvedAssembly, bomToCsv,
-      intersectWithPlane, projectToPlane,
-      importSketch, importPart, importSvgSketch,
-      dim, dimLine,
+      Transform,
+      composeChain,
+      assembly,
+      Assembly,
+      SolvedAssembly,
+      bomToCsv,
+      intersectWithPlane,
+      projectToPlane,
+      importSketch,
+      importPart,
+      importSvgSketch,
+      dim,
+      dimLine,
       bom,
       robotExport,
-      group, ShapeGroup,
-      makeSandboxConsole(),
+      group,
+      ShapeGroup,
+      console: sandboxConsole,
       cutPlane,
       explodeView,
       jointsView,
       viewConfig,
+    };
+
+    const requireModule = (requestedName: string): unknown => {
+      if (typeof requestedName !== 'string' || requestedName.trim().length === 0) {
+        throw new Error('Module specifier must be a non-empty string');
+      }
+      const normalizedRequested = requestedName.trim();
+
+      if (FORGE_RUNTIME_MODULE_SPECIFIERS.has(normalizedRequested)) {
+        logImportTrace(fileName, scope, options, 'require', normalizedRequested, 'start', { requested: normalizedRequested, virtual: true });
+        const runtimeModule = createForgeRuntimeModule(runtimeBindings);
+        logImportTrace(fileName, scope, options, 'require', normalizedRequested, 'success', {
+          requested: normalizedRequested,
+          virtual: true,
+          got: 'ForgeRuntimeModule',
+        });
+        return runtimeModule;
+      }
+
+      const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, normalizedRequested, allFiles, options);
+      if (isSvgImportPath(resolvedPath)) {
+        throw new Error(
+          `JS import "${normalizedRequested}" resolved to "${resolvedPath}", which is an SVG asset. ` +
+          'Use importSketch() or importSvgSketch() instead.',
+        );
+      }
+      if (resolvedPath.endsWith('.forge-notebook.json')) {
+        throw new Error(
+          `JS import "${normalizedRequested}" resolved to "${resolvedPath}", which is a notebook file. ` +
+          'Export the notebook to .forge.js first.',
+        );
+      }
+
+      logImportTrace(fileName, scope, options, 'require', resolvedPath, 'start', { requested: normalizedRequested });
+
+      const cacheKey = makeModuleCacheKey(lookupKey, scope);
+      const cached = options.moduleCache.get(cacheKey);
+      if (cached) {
+        logImportTrace(fileName, scope, options, 'require', resolvedPath, 'success', {
+          requested: normalizedRequested,
+          got: describeScriptResultType(cached.exports),
+          cached: true,
+        });
+        return cached.exports;
+      }
+
+      const nextModuleEntry: ModuleCacheEntry = { exports: {}, loaded: false };
+      options.moduleCache.set(cacheKey, nextModuleEntry);
+      try {
+        const moduleExports = executeFile(
+          src,
+          lookupKey,
+          allFiles,
+          visited,
+          scope,
+          options,
+          'module',
+          nextModuleEntry,
+        );
+        nextModuleEntry.exports = moduleExports;
+        nextModuleEntry.loaded = true;
+        logImportTrace(fileName, scope, options, 'require', resolvedPath, 'success', {
+          requested: normalizedRequested,
+          got: describeScriptResultType(moduleExports),
+          cached: false,
+        });
+        return moduleExports;
+      } catch (error) {
+        options.moduleCache.delete(cacheKey);
+        logImportTrace(fileName, scope, options, 'require', resolvedPath, 'error', {
+          requested: normalizedRequested,
+          error: formatLogError(error),
+        });
+        throw error;
+      }
+    };
+
+    const compiled = compileScript(code, fileName, options);
+    const bindingNames = Object.keys(runtimeBindings);
+    const bindingValues = bindingNames.map((name) => runtimeBindings[name]);
+    const fn = new Function(
+      'exports',
+      'module',
+      'require',
+      '__filename',
+      '__dirname',
+      ...bindingNames,
+      `${compiled.code}\n//# sourceURL=${fileName}`,
+    );
+
+    const moduleValue = {
+      exports: executionMode === 'module' && moduleCacheEntry ? moduleCacheEntry.exports : {},
+    };
+    const returnValue = runWithParamScope(scope, () => fn(
+      moduleValue.exports,
+      moduleValue,
+      requireModule,
+      fileName,
+      dirnamePath(fileName),
+      ...bindingValues,
     ));
+
+    if (executionMode === 'module') {
+      if (moduleCacheEntry) {
+        moduleCacheEntry.exports = moduleValue.exports;
+      }
+      if (returnValue !== undefined) {
+        throw new Error(
+          `"${fileName}" used top-level return while being imported as a JS module. ` +
+          'Use importPart()/importSketch() or export values instead.',
+        );
+      }
+      return moduleValue.exports;
+    }
+
+    const exportedResult = resolveExportedEntryResult(moduleValue.exports);
+    if (returnValue === undefined) {
+      return exportedResult ?? null;
+    }
+    return returnValue;
   } finally {
-    visited.delete(fileName);
+    if (trackCircularImports) {
+      visited.delete(fileName);
+    }
   }
 }
 
@@ -886,6 +1271,8 @@ export function runScript(
   const execOptions: RunnerExecutionOptions = {
     debugImports: options.debugImports ?? envFlagEnabled('FORGECAD_DEBUG_IMPORTS'),
     fileIndex: buildFileIndex(allFiles),
+    compiledFiles: new Map(),
+    moduleCache: new Map(),
   };
   const quality = resolveForgeQualityPreset(options.quality);
 
@@ -1088,12 +1475,12 @@ export function runScript(
   } catch (e: any) {
     const msg = e.message || String(e);
     const stack = e.stack || '';
-    // Extract script line number from stack: "<anonymous>:LINE:COL" — offset by 2 (Function wrapper + "use strict")
     let lineInfo = '';
-    const m = stack.match(/<anonymous>:(\d+):(\d+)/);
-    if (m) {
-      const scriptLine = Math.max(1, parseInt(m[1], 10) - 2);
-      lineInfo = ` (line ${scriptLine})`;
+    const location = resolveErrorLocation(stack, execOptions.compiledFiles);
+    if (location) {
+      lineInfo = location.fileName === fileName
+        ? ` (line ${location.line})`
+        : ` (${location.fileName}:${location.line}:${location.column})`;
     }
     _collectedLogs.push({ level: 'error', args: [`${msg}${lineInfo}`, ...(stack ? [stack] : [])], timestamp: Date.now() });
     return {

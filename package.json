@@ -23,6 +23,7 @@
     "check:transforms": "npx tsx cli/check-transforms.ts",
     "check:brep": "npx tsx cli/check-brep-export.ts",
     "check:placement": "npx tsx cli/check-placement-references.ts",
+    "check:js-modules": "npx tsx cli/check-js-modules.ts",
     "check:dimensions": "npx tsx cli/check-dimensions.ts",
     "check:api": "npx tsx cli/check-api-contracts.ts",
     "debug:dimensions": "npx tsx cli/debug-dimensions.ts",

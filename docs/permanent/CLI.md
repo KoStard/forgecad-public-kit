@@ -20,7 +20,7 @@ src/forge/headless.ts    ← Single entry point for all contexts
 **Browser** imports via `src/forge/index.ts` → re-exports from `headless.ts`.
 **CLI tools** import directly from `src/forge/headless.ts`.
 
-The key function is `runScript(code, fileName, allFiles)` — it wraps user code in a `Function()` sandbox with the entire forge API injected. CLI scripts just call `init()` + `runScript()` and work with the results.
+The key function is `runScript(code, fileName, allFiles)` — it wraps user code in a `Function()` sandbox with the entire forge API injected, and transpiles project files so standard JS `import` / `export` / `require(...)` work for shared utility modules. CLI scripts just call `init()` + `runScript()` and work with the results.
 
 ## Available Commands
 
@@ -354,20 +354,28 @@ for (const obj of result.objects) {
 
 ### Cross-file imports
 
-When running scripts that use `importSketch()` / `importSvgSketch()` / `importPart()`, pass all project files (or at least all files reachable by imports), keyed by project-relative path. This supports root-relative and relative imports, including `.svg` assets (`./assets/logo.svg`):
+When running scripts that use `importSketch()` / `importSvgSketch()` / `importPart()` or plain JS module imports, pass all project files (or at least all files reachable by imports), keyed by project-relative path. This supports root-relative and relative imports, utility `.js` modules, and `.svg` assets (`./assets/logo.svg`):
 
 ```typescript
 import { readdirSync, readFileSync } from 'fs';
 
 const allFiles: Record<string, string> = {};
 for (const f of readdirSync(scriptDir)) {
-  if (f.endsWith('.forge.js') || f.endsWith('.sketch.js') || f.endsWith('.svg')) {
+  if (f.endsWith('.forge.js') || f.endsWith('.sketch.js') || f.endsWith('.js') || f.endsWith('.svg')) {
     allFiles[f] = readFileSync(join(scriptDir, f), 'utf-8');
   }
 }
 
 const result = runScript(code, 'main.forge.js', allFiles);
 ```
+
+For utility modules that want explicit ForgeCAD imports instead of globals, use the virtual runtime module:
+
+```javascript
+import { box, union } from "forgecad";
+```
+
+Keep using `importPart()` / `importSketch()` for model/sketch files when you want ForgeCAD-specific behavior like param override scopes or SVG parsing.
 
 ## Dependencies
 
