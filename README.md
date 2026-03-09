@@ -28,12 +28,29 @@ Most geometry kernels are powerful but low-level. ForgeCAD adds the missing CAD 
 - Constraint-driven sketch workflows
 - Named entities and topology-aware operations
 - Parametric design via `param(...)` sliders
-- Multi-file composition with `importPart(...)` and `importSketch(...)`
+- Multi-file composition with `importPart(...)`, `importSketch(...)`, and plain `.js` utility modules
 - Assembly + mechanism modeling with joints, sweeps, and collision checks
 - Script-authored BOM + dimension annotations for report export
 - Exact STEP/BREP export for the maintained replayable subset
 
 The result is a CAD workflow that is version-control friendly, AI-editable, and still practical for real mechanical modeling.
+
+### JS utility modules
+
+ForgeCAD model files (`.forge.js`, `.sketch.js`) can now use standard JS imports for shared helpers:
+
+```javascript
+import { buildAssembly } from "./assembly-utils.js";
+export default buildAssembly();
+```
+
+Utility modules can use `export` / `export default`, `require(...)`, and explicit ForgeCAD runtime imports:
+
+```javascript
+import { box, union } from "forgecad";
+```
+
+Use `importPart()` / `importSketch()` when you want the specialized model/sketch import behavior (parameter scoping, SVG parsing, dimension propagation). Use plain JS modules for reusable functions, classes, and constants. See [examples/api/js-module-imports.forge.js](examples/api/js-module-imports.forge.js).
 
 ## Seamless AI integration
 
