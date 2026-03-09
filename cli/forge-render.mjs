@@ -67,7 +67,7 @@ const code = await readFile(resolve(scriptPath), 'utf-8');
 // (mirrors collect-files.ts logic for plain Node)
 import { readdirSync, readFileSync, statSync } from 'fs';
 
-const FORGE_EXTS = ['.forge.js', '.sketch.js', '.svg'];
+const FORGE_EXTS = ['.forge.js', '.sketch.js', '.js', '.svg'];
 const isForgeFile = (f) => FORGE_EXTS.some(ext => f.endsWith(ext));
 
 function collectRec(dir, root) {

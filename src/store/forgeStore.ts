@@ -40,10 +40,15 @@ const collectInitialFolders = (files: Record<string, string>): string[] => {
 };
 
 const INITIAL_FOLDERS = collectInitialFolders(INITIAL_FILES);
-const isRunnableFile = (name: string): boolean => (
+const isModelFile = (name: string): boolean => (
   name.endsWith('.forge.js')
   || name.endsWith('.sketch.js')
-  || name.endsWith('.js')
+);
+const isRunnableFile = isModelFile;
+const findPreferredEntryFile = (names: string[]): string | null => (
+  names.find((n) => isModelFile(n))
+  || names.find((n) => isNotebookFile(n))
+  || null
 );
 
 const getActiveFileFromHash = (): string | null => {
@@ -57,8 +62,7 @@ const initialActive = (() => {
     return hashFile;
   }
   const names = Object.keys(INITIAL_FILES);
-  return names.find((n) => n.endsWith('.forge.js'))
-    || names.find((n) => n.endsWith('.sketch.js'))
+  return findPreferredEntryFile(names)
     || names.find((n) => n.endsWith('.js'))
     || names.find((n) => isNotebookFile(n))
     || names[0];
@@ -82,6 +86,40 @@ const getParentPath = (value: string): string => {
   const normalized = normalizePath(value);
   const idx = normalized.lastIndexOf('/');
   return idx === -1 ? '' : normalized.slice(0, idx);
+};
+
+const sharedPathDepth = (a: string, b: string): number => {
+  const aParts = normalizePath(a).split('/').filter(Boolean);
+  const bParts = normalizePath(b).split('/').filter(Boolean);
+  const length = Math.min(aParts.length, bParts.length);
+  let depth = 0;
+  while (depth < length && aParts[depth] === bParts[depth]) depth += 1;
+  return depth;
+};
+
+const resolvePreviewFile = (activeFile: string, files: Record<string, string>): string | null => {
+  if (isRunnableFile(activeFile) || isNotebookFile(activeFile)) return activeFile;
+
+  const candidates = Object.keys(files).filter((name) => isRunnableFile(name) || isNotebookFile(name));
+  if (candidates.length === 0) return null;
+
+  const activeDir = getParentPath(activeFile);
+  let best = candidates[0];
+  let bestDepth = -1;
+  for (const candidate of candidates) {
+    const depth = sharedPathDepth(activeDir, getParentPath(candidate));
+    const bestIsNotebook = isNotebookFile(best);
+    const candidateIsNotebook = isNotebookFile(candidate);
+    if (
+      depth > bestDepth
+      || (depth === bestDepth && bestIsNotebook && !candidateIsNotebook)
+      || (depth === bestDepth && bestIsNotebook === candidateIsNotebook && candidate < best)
+    ) {
+      best = candidate;
+      bestDepth = depth;
+    }
+  }
+  return best;
 };
 
 const collectParentPaths = (value: string): string[] => {
@@ -526,9 +564,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   <path d="M 10 10 L 90 10 L 90 90 L 10 90 Z" fill="none" stroke="#000" stroke-width="4" />
 </svg>
 `
-      : (normalized.endsWith('.sketch.js')
+      : normalized.endsWith('.sketch.js')
         ? '// 2D Sketch\n\nreturn rect(50, 30, true);\n'
-        : '// 3D Part\n\nreturn box(50, 30, 10);\n');
+        : normalized.endsWith('.forge.js')
+          ? '// 3D Part\n\nreturn box(50, 30, 10);\n'
+          : '// Shared JS utilities for ForgeCAD.\n\nexport function exampleValue() {\n  return 42;\n}\n';
     const newFolders = Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort();
     set((s) => ({
       files: { ...s.files, [normalized]: template },
@@ -703,13 +743,17 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       activeFile,
       runQuality,
     } = get();
-    const code = files[activeFile];
+    const previewFile = resolvePreviewFile(activeFile, files);
+    if (!previewFile) {
+      set({ result: null, consoleLogs: [], params: [] });
+      return;
+    }
+    const code = files[previewFile];
     if (!code) return;
-    if (!isRunnableFile(activeFile) && !isNotebookFile(activeFile)) return;
     setParamOverrides(get().paramOverrides);
-    const runResult = isNotebookFile(activeFile)
-      ? runNotebookPreview(activeFile, code, files, runQuality)
-      : runScript(code, activeFile, files, { quality: runQuality });
+    const runResult = isNotebookFile(previewFile)
+      ? runNotebookPreview(previewFile, code, files, runQuality)
+      : runScript(code, previewFile, files, { quality: runQuality });
     const applied = buildRunState(runResult, get());
     set(applied.nextState);
     writeViewPreferences({ objectSettings: applied.nextObjectSettings, cutPlaneEnabled: applied.nextCutPlaneEnabled });
@@ -724,12 +768,16 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       activeFile,
       runQuality,
     } = get();
-    const code = files[activeFile];
+    const previewFile = resolvePreviewFile(activeFile, files);
+    if (!previewFile) {
+      set({ result: null, consoleLogs: [], params: [] });
+      return;
+    }
+    const code = files[previewFile];
     if (!code) return;
-    if (!isRunnableFile(activeFile) && !isNotebookFile(activeFile)) return;
-    const runResult = isNotebookFile(activeFile)
-      ? runNotebookPreview(activeFile, code, files, runQuality)
-      : runScript(code, activeFile, files, { quality: runQuality });
+    const runResult = isNotebookFile(previewFile)
+      ? runNotebookPreview(previewFile, code, files, runQuality)
+      : runScript(code, previewFile, files, { quality: runQuality });
     const applied = buildRunState(runResult, get());
     set(applied.nextState);
     writeViewPreferences({ objectSettings: applied.nextObjectSettings, cutPlaneEnabled: applied.nextCutPlaneEnabled });
@@ -1162,10 +1210,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         ? hashFile
         : (activeFile && nextFiles[activeFile]
           ? activeFile
-          : (availableFiles.find((n) => n.endsWith('.forge.js'))
-            || availableFiles.find((n) => n.endsWith('.sketch.js'))
+          : (findPreferredEntryFile(availableFiles)
             || availableFiles.find((n) => n.endsWith('.js'))
-            || availableFiles.find((n) => isNotebookFile(n))
             || availableFiles[0]));
 
       const nextDirty = Object.keys(nextFiles).some((path) => nextSaved[path] !== nextFiles[path]);
