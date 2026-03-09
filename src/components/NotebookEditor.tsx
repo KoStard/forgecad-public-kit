@@ -225,6 +225,7 @@ export function NotebookEditor() {
             </div>
 
             <textarea
+              data-fc-editor-surface="notebook"
               value={source}
               spellCheck={false}
               onFocus={() => setActiveCellId(cell.id)}
