@@ -3,8 +3,8 @@
 import { runCaptureCli } from './forge-capture';
 
 void runCaptureCli({
-  command: 'cli/forge-gif.ts',
-  defaultFormat: 'gif',
+  command: 'cli/forge-record.ts',
+  defaultFormat: 'mp4',
 }).catch((err) => {
   console.error(err);
   process.exit(1);

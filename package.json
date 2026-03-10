@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "render": "node cli/forge-render.mjs",
     "gif": "npx tsx cli/forge-gif.ts",
+    "record": "npx tsx cli/forge-record.ts",
     "report": "npx tsx cli/forge-report.ts",
     "svg": "npx tsx cli/forge-svg.ts",
     "sdf": "npx tsx cli/forge-sdf.ts",
