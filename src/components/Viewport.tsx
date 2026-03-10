@@ -1181,7 +1181,7 @@ function ForgeObject({
         useFallbackClipping: false,
       };
     }
-  }, [clippingTransformKey, cutPlanes, hasCutPlanes, matrix, obj.name, obj.shape]);
+  }, [clippingTransformKey, cutPlanes, hasCutPlanes, obj.name, obj.shape]);
 
   useEffect(() => {
     return () => {
