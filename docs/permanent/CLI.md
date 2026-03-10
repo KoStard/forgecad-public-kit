@@ -162,6 +162,7 @@ Current behavior:
 
 ```bash
 npm run render -- examples/cup.forge.js [output.png]
+npm run render -- examples/cup.forge.js out/scene.png --scene '{"camera":{"projectionMode":"perspective","position":[200,-160,120],"target":[0,0,20],"up":[0,0,1]},"objects":{"obj-2":{"visible":false},"obj-3":{"opacity":0.35}}}'
 ```
 
 Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to launch headless Chrome with WebGL for Three.js rendering.
@@ -179,6 +180,15 @@ Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to l
 | `FORGE_SIZE` | `1024` | Image size in pixels |
 | `FORGE_PORT` | `5173` | Vite dev server port |
 | `CHROME_PATH` | Auto-detected | Chrome/Chromium executable path |
+
+**CLI options:**
+- `--angles <front,side,top,iso>` — standard angles to render
+- `--size <px>` — output size override
+- `--port <n>` — Vite port override
+- `--camera <spec>` — exact camera pose, e.g. `proj=perspective;pos=120,80,120;target=0,0,0;up=0,0,1`
+- `--scene <json>` — full scene state copied from the viewport, including camera plus object visibility/opacity/color overrides
+- `--background <color>` — background override
+- `--chrome-path <path>` — Chrome executable path override
 
 **Camera angles:** `front` (−Y), `back` (+Y), `side` (+X), `top` (+Z), `iso` (diagonal)
 
@@ -199,6 +209,7 @@ Creates high-quality animated captures from the real Forge viewport renderer:
 - Fixed-camera animation captures for `jointsView()` clips
 - Named cut-plane captures
 - Exact camera replay via `--camera`
+- Full viewport scene replay via `--scene`
 
 **How it works:**
 1. Auto-starts (or reuses) the Vite dev server.
@@ -216,6 +227,7 @@ Creates high-quality animated captures from the real Forge viewport renderer:
 - `--animation-loops <n>` — repeat the chosen clip
 - `--cut-plane <name>` — enable a named cut plane (repeatable)
 - `--camera <spec>` — exact camera pose, e.g. `proj=perspective;pos=120,80,120;target=0,0,0;up=0,0,1`
+- `--scene <json>` — full scene state copied from the viewport, including camera plus object visibility/opacity/color overrides
 - `--render-mode <solid|wireframe>` — primary render mode
 - `--include-wireframe-pass` / `--no-wireframe-pass` — control the extra wireframe pass
 - `--size <px>` — output frame resolution (default `960`)
@@ -249,9 +261,9 @@ Creates high-quality animated captures from the real Forge viewport renderer:
 - `FORGE_PORT`
 - `CHROME_PATH`
 
-**UI camera handoff:**
-- The View Panel now exposes a `Camera` section.
-- Use `Copy CLI --camera` to grab the current viewport framing and paste it directly into the capture command.
+**UI scene handoff:**
+- The View Panel exposes a `Camera` section.
+- Use `Copy CLI --scene` to grab the current viewport framing plus per-object scene overrides and paste it directly into `render`, `gif`, or `record`.
 
 ### PDF Report (2D drawing pack)
 
