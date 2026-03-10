@@ -15,6 +15,7 @@ function parseArgs(argv: string[]) {
   let pythonPath: string | undefined;
   let uvPath: string | undefined;
   let scriptPath: string | undefined;
+  let allowFaceted = false;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -45,6 +46,10 @@ function parseArgs(argv: string[]) {
       i += 1;
       continue;
     }
+    if (arg === '--allow-faceted') {
+      allowFaceted = true;
+      continue;
+    }
     if (arg.startsWith('--')) {
       throw new Error(`Unknown flag: ${arg}`);
     }
@@ -53,10 +58,10 @@ function parseArgs(argv: string[]) {
   }
 
   if (!scriptPath) {
-    throw new Error('Usage: npx tsx cli/forge-brep.ts [--format step|brep] [--output path] [--python path] [--uv path] <script.forge.js>');
+    throw new Error('Usage: npx tsx cli/forge-brep.ts [--format step|brep] [--output path] [--python path] [--uv path] [--allow-faceted] <script.forge.js>');
   }
 
-  return { format, outputPath, pythonPath, uvPath, scriptPath };
+  return { format, outputPath, pythonPath, uvPath, scriptPath, allowFaceted };
 }
 
 function defaultOutputPath(scriptPath: string, format: BrepFormat): string {
@@ -74,7 +79,7 @@ function resolveUvExecutable(requested?: string): string {
 }
 
 async function main() {
-  const { format, outputPath, pythonPath, uvPath, scriptPath } = parseArgs(process.argv.slice(2));
+  const { format, outputPath, pythonPath, uvPath, scriptPath, allowFaceted } = parseArgs(process.argv.slice(2));
   const code = readFileSync(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
@@ -86,7 +91,7 @@ async function main() {
     process.exit(1);
   }
 
-  const manifest = buildBrepExportManifest(result.objects);
+  const manifest = buildBrepExportManifest(result.objects, { allowFaceted });
   if (manifest.objects.length === 0 || manifest.unsupported.length > 0) {
     console.error('BREP export cannot proceed for this script.');
     if (manifest.objects.length > 0) {
@@ -101,6 +106,12 @@ async function main() {
         : '';
       console.error(`  - ${item.name}: ${item.reason}${geom}`);
     }
+    if (!allowFaceted) {
+      const facetable = manifest.unsupported.some((item) => item.geometryInfo?.representation === 'mesh-solid');
+      if (facetable) {
+        console.error('  Hint: retry with --allow-faceted to export closed mesh solids as faceted STEP/BREP.');
+      }
+    }
     process.exit(2);
   }
 
@@ -112,6 +123,9 @@ async function main() {
 
   if (manifest.skipped.length > 0) {
     console.error(`Skipping non-solid objects: ${manifest.skipped.map((obj) => obj.name).join(', ')}`);
+  }
+  if (manifest.fallbacks.length > 0) {
+    console.error(`Using faceted fallback for: ${manifest.fallbacks.map((obj) => obj.name).join(', ')}`);
   }
 
   const exporterScript = resolve('cli/forge-brep-export.py');

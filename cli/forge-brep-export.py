@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 
 try:
     import cadquery as cq
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
 except Exception as exc:
     raise SystemExit(
         "CadQuery is required for BREP export. Install it in the selected Python environment. "
@@ -316,6 +317,58 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
     raise ValueError(f"Unsupported plan kind: {kind}")
 
 
+def triangle_area(points: List[tuple[float, float, float]]) -> float:
+    ax = points[1][0] - points[0][0]
+    ay = points[1][1] - points[0][1]
+    az = points[1][2] - points[0][2]
+    bx = points[2][0] - points[0][0]
+    by = points[2][1] - points[0][1]
+    bz = points[2][2] - points[0][2]
+    cx = ay * bz - az * by
+    cy = az * bx - ax * bz
+    cz = ax * by - ay * bx
+    return math.sqrt(cx * cx + cy * cy + cz * cz) * 0.5
+
+
+def build_faceted_shape(mesh: Dict[str, Any]) -> "cq.Shape":
+    vertices = [tuple(float(component) for component in vertex) for vertex in mesh["vertices"]]
+    faces = []
+
+    for tri in mesh["triangles"]:
+        indices = [int(index) for index in tri]
+        if len({*indices}) < 3:
+            continue
+        points = [vertices[index] for index in indices]
+        if triangle_area(points) < 1e-9:
+            continue
+        wire = cq.Wire.makePolygon(points, close=True)
+        faces.append(cq.Face.makeFromWires(wire))
+
+    if not faces:
+        raise ValueError("Faceted mesh fallback produced no valid faces")
+
+    sewing = BRepBuilderAPI_Sewing()
+    for face in faces:
+        sewing.Add(face.wrapped)
+    sewing.Perform()
+
+    sewed_shape = cq.Shape.cast(sewing.SewedShape())
+    shells = sewed_shape.Shells()
+    if not shells:
+        raise ValueError("Faceted mesh fallback did not produce a closed shell")
+
+    shell = shells[0]
+    solid = cq.Solid.makeSolid(shell)
+    return solid.clean()
+
+
+def build_export_shape(obj: Dict[str, Any]) -> "cq.Shape":
+    kind = obj.get("kind", "exact")
+    if kind == "faceted":
+        return build_faceted_shape(obj["mesh"])
+    return build_shape(obj["plan"])
+
+
 def parse_hex_color(value: Optional[str]) -> Optional["cq.Color"]:
     if not value:
         return None
@@ -363,7 +416,7 @@ def export_step_assembly(objects: List[Dict[str, Any]], output_path: Path) -> No
     used_names: set[str] = set()
 
     for index, obj in enumerate(objects):
-        shape = build_shape(obj["plan"])
+        shape = build_export_shape(obj)
         assy.add(
             shape,
             name=make_unique_name(obj.get("name"), index, used_names),
@@ -380,7 +433,7 @@ def export_shapes(objects: List[Dict[str, Any]], output_path: Path, fmt: str) ->
     if fmt == "step":
         export_step_assembly(objects, output_path)
         return
-    shapes = [build_shape(obj["plan"]) for obj in objects]
+    shapes = [build_export_shape(obj) for obj in objects]
     merged = shapes[0] if len(shapes) == 1 else cq.Compound.makeCompound(shapes)
     if fmt == "brep":
         merged.exportBrep(str(output_path))

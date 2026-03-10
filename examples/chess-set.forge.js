@@ -109,62 +109,34 @@ function kingShape() {
 
 function knightShape() {
   const base = pieceBase(squareSize * 0.32, squareSize * 0.12);
-  const chest = sphere(squareSize * 0.16)
-    .scale([1.05, 0.82, 1.18])
-    .translate(0, -squareSize * 0.01, squareSize * 0.46);
-  const shoulder = sphere(squareSize * 0.1)
-    .scale([0.88, 0.78, 0.94])
-    .translate(0, squareSize * 0.05, squareSize * 0.62);
-  const neck = cylinder(squareSize * 0.38, squareSize * 0.11, squareSize * 0.075, undefined, true)
-    .rotate(-34, 0, 0)
-    .translate(0, squareSize * 0.06, squareSize * 0.8);
-  const head = sphere(squareSize * 0.115)
-    .scale([0.95, 1.05, 0.84])
-    .translate(0, squareSize * 0.17, squareSize * 1.03);
-  const brow = sphere(squareSize * 0.085)
-    .scale([0.9, 1, 0.72])
-    .translate(0, squareSize * 0.15, squareSize * 1.12);
-  const muzzle = cylinder(squareSize * 0.19, squareSize * 0.058, squareSize * 0.035, undefined, true)
-    .rotate(-70, 0, 0)
-    .translate(0, squareSize * 0.24, squareSize * 0.98);
-  const cheekL = sphere(squareSize * 0.05)
-    .scale([0.55, 0.8, 0.7])
-    .translate(-squareSize * 0.05, squareSize * 0.18, squareSize * 0.99);
-  const cheekR = sphere(squareSize * 0.05)
-    .scale([0.55, 0.8, 0.7])
-    .translate(squareSize * 0.05, squareSize * 0.18, squareSize * 0.99);
-  const mane = box(squareSize * 0.085, squareSize * 0.12, squareSize * 0.38, true)
-    .rotate(-18, 0, 0)
-    .translate(0, squareSize * 0.02, squareSize * 0.94);
+  const chest = sphere(squareSize * 0.18).translate(0, 0, squareSize * 0.45);
+  const neck = hull3d(
+    sphere(squareSize * 0.14).translate(0, 0, squareSize * 0.62),
+    sphere(squareSize * 0.12).translate(0, squareSize * 0.08, squareSize * 0.82),
+    sphere(squareSize * 0.1).translate(0, squareSize * 0.12, squareSize * 1.02)
+  );
+  const head = hull3d(
+    sphere(squareSize * 0.11).translate(0, squareSize * 0.12, squareSize * 1.02),
+    sphere(squareSize * 0.08).translate(0, squareSize * 0.22, squareSize * 0.98),
+    sphere(squareSize * 0.07).translate(0, squareSize * 0.18, squareSize * 1.14)
+  );
+  const muzzle = hull3d(
+    sphere(squareSize * 0.055).translate(0, squareSize * 0.24, squareSize * 0.98),
+    sphere(squareSize * 0.045).translate(0, squareSize * 0.31, squareSize * 0.94)
+  );
+  const mane = box(squareSize * 0.08, squareSize * 0.12, squareSize * 0.36, true)
+    .rotate(-12, 0, 0)
+    .translate(0, squareSize * 0.03, squareSize * 0.94);
   const earL = box(squareSize * 0.035, squareSize * 0.08, squareSize * 0.12, true)
     .rotate(-18, 0, 14)
     .translate(-squareSize * 0.04, squareSize * 0.18, squareSize * 1.2);
   const earR = box(squareSize * 0.035, squareSize * 0.08, squareSize * 0.12, true)
     .rotate(-18, 0, -14)
     .translate(squareSize * 0.04, squareSize * 0.18, squareSize * 1.2);
-  const jawCut = box(squareSize * 0.5, squareSize * 0.28, squareSize * 0.34, true)
-    .rotate(56, 0, 0)
-    .translate(0, -squareSize * 0.05, squareSize * 0.92);
-  const faceCut = box(squareSize * 0.24, squareSize * 0.2, squareSize * 0.16, true)
-    .rotate(22, 0, 0)
-    .translate(0, squareSize * 0.04, squareSize * 1.03);
-  const noseCut = box(squareSize * 0.15, squareSize * 0.16, squareSize * 0.11, true)
-    .rotate(14, 0, 0)
-    .translate(0, squareSize * 0.29, squareSize * 0.95);
-  return union(
-    base,
-    chest,
-    shoulder,
-    neck,
-    head,
-    brow,
-    muzzle,
-    cheekL,
-    cheekR,
-    mane,
-    earL,
-    earR
-  ).subtract(jawCut, faceCut, noseCut);
+  const chinCut = box(squareSize * 0.5, squareSize * 0.28, squareSize * 0.34, true)
+    .rotate(58, 0, 0)
+    .translate(0, -squareSize * 0.04, squareSize * 0.93);
+  return union(base, chest, neck, head, muzzle, mane, earL, earR).subtract(chinCut);
 }
 
 function makePiece(kind) {
