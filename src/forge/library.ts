@@ -13,6 +13,18 @@ import { rect, roundedRect, circle2d, polygon } from './sketch/primitives';
 import { union2d, difference2d } from './sketch/booleans';
 import { sketchTranslate, sketchRotate } from './sketch/transforms';
 import { sketchExtrude } from './sketch/extrude';
+import {
+  type ExplodeAxis,
+  type ExplodeBounds,
+  type ExplodeConfigOptions,
+  type ExplodeDirective,
+  type ExplodeDirection,
+  computeExplodeOffset,
+  createResolvedExplodeConfig,
+  explodeAdd,
+  explodeBoundsCenter,
+  explodeMergeBounds,
+} from './explodeCore';
 
 /** M-series bolt hole (through-hole) */
 export function boltHole(diameter: number, depth: number): Shape {
@@ -556,17 +568,7 @@ export function profile2020BSlot6(length: number, options: Profile2020BSlot6Opti
   return sketchExtrude(profile, length, { center }).toShape();
 }
 
-export type ExplodeAxis = 'x' | 'y' | 'z';
-export type ExplodeDirection = 'radial' | ExplodeAxis | [number, number, number];
-
-export interface ExplodeDirective {
-  /** Multiplier applied to `amount` for this node */
-  stage?: number;
-  /** Direction mode for this node */
-  direction?: ExplodeDirection;
-  /** Optional axis lock after direction is resolved */
-  axisLock?: ExplodeAxis;
-}
+export type { ExplodeAxis, ExplodeDirective, ExplodeDirection };
 
 export interface ExplodeNamedItem {
   name: string;
@@ -579,26 +581,7 @@ export interface ExplodeNamedItem {
 
 export type ExplodeItem = Shape | Sketch | TrackedShape | ShapeGroup | ExplodeNamedItem;
 
-export interface ExplodeOptions {
-  /** Base explode distance in model units. Default: 10 */
-  amount?: number;
-  /**
-   * Per-depth stage multipliers (depth 1 = first level).
-   * If depth exceeds this array, the last value is reused.
-   * Default when omitted: depth number (1, 2, 3, ...)
-   */
-  stages?: number[];
-  /** Default direction mode for nodes that have no overrides. Default: 'radial' */
-  mode?: ExplodeDirection;
-  /** Global axis lock, can be overridden per-node */
-  axisLock?: ExplodeAxis;
-  /** Per-name overrides for named items (exact name match) */
-  byName?: Record<string, ExplodeDirective>;
-  /** Per-path overrides for any node (path format: "1:Assembly/2:Bolt/1") */
-  byPath?: Record<string, ExplodeDirective>;
-}
-
-type ExplodeBounds = { min: [number, number, number]; max: [number, number, number] };
+export interface ExplodeOptions extends ExplodeConfigOptions {}
 
 /**
  * Deterministic exploded-view transform for arrays / named assemblies / ShapeGroup trees.
@@ -608,84 +591,35 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
   items: T,
   options: ExplodeOptions = {},
 ): T {
-  const amount = options.amount ?? 10;
-  const stages = options.stages ?? [];
-  const defaultMode = options.mode ?? 'radial';
-  const defaultAxisLock = options.axisLock;
-  const byName = options.byName ?? {};
-  const byPath = options.byPath ?? {};
-
+  const config = createResolvedExplodeConfig(options);
   const boundsCache = new WeakMap<object, ExplodeBounds | null>();
   const rootBounds = computeExplodeBounds(items, boundsCache);
   const rootCenter = explodeBoundsCenter(rootBounds) ?? [0, 0, 0];
 
-  const stageForDepth = (depth: number): number => {
-    if (stages.length === 0) return Math.max(1, depth);
-    const idx = Math.max(0, depth - 1);
-    return stages[Math.min(idx, stages.length - 1)];
-  };
-
-  const mergeDirective = (...directives: (ExplodeDirective | undefined)[]): ExplodeDirective => {
-    const out: ExplodeDirective = {};
-    directives.forEach((d) => {
-      if (!d) return;
-      if (d.stage != null) out.stage = d.stage;
-      if (d.direction != null) out.direction = d.direction;
-      if (d.axisLock != null) out.axisLock = d.axisLock;
-    });
-    return out;
-  };
-
-  const resolveNodeDirection = (
-    path: string,
-    center: [number, number, number],
-    direction: ExplodeDirection,
-  ): [number, number, number] => {
-    if (Array.isArray(direction)) {
-      return explodeNormalize(direction, explodeFallbackVector(`${path}|vec`));
-    }
-    if (direction === 'radial') {
-      return explodeNormalize(
-        [center[0] - rootCenter[0], center[1] - rootCenter[1], center[2] - rootCenter[2]],
-        explodeFallbackVector(`${path}|radial`),
-      );
-    }
-    if (direction === 'x') return [1, 0, 0];
-    if (direction === 'y') return [0, 1, 0];
-    return [0, 0, 1];
-  };
-
-  const applyAxisLock = (
-    vec: [number, number, number],
-    axis: ExplodeAxis | undefined,
-    path: string,
-  ): [number, number, number] => {
-    if (!axis) return vec;
-    const idx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
-    const fallback = explodeFallbackVector(`${path}|axis`);
-    const comp = Math.abs(vec[idx]) > 1e-8 ? vec[idx] : fallback[idx];
-    const sign = comp >= 0 ? 1 : -1;
-    return idx === 0 ? [sign, 0, 0] : idx === 1 ? [0, sign, 0] : [0, 0, sign];
-  };
+  const centerForNode = (
+    node: unknown,
+    fallback: [number, number, number],
+  ): [number, number, number] => explodeBoundsCenter(computeExplodeBounds(node, boundsCache)) ?? fallback;
 
   const nodeOffset = (
     node: unknown,
     path: string,
     depth: number,
+    originCenter: [number, number, number],
     name?: string,
     local?: ExplodeDirective,
   ): [number, number, number] => {
-    const bounds = computeExplodeBounds(node, boundsCache);
-    const center = explodeBoundsCenter(bounds) ?? rootCenter;
-    const merged = mergeDirective(
-      name ? byName[name] : undefined,
-      byPath[path],
+    const center = centerForNode(node, originCenter);
+    return computeExplodeOffset({
+      pathKeys: [path],
+      seed: path,
+      depth,
+      center,
+      originCenter,
+      name,
       local,
-    );
-    const stage = merged.stage ?? stageForDepth(depth);
-    const dir = resolveNodeDirection(path, center, merged.direction ?? defaultMode);
-    const locked = applyAxisLock(dir, merged.axisLock ?? defaultAxisLock, path);
-    return explodeMul(locked, amount * stage);
+      config,
+    });
   };
 
   const explodeLeaf = (
@@ -707,13 +641,15 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     path: string,
     depth: number,
     inherited: [number, number, number],
+    parentCenter: [number, number, number],
   ): ShapeGroup => {
-    const local = nodeOffset(grp, path, depth);
+    const groupCenter = centerForNode(grp, parentCenter);
+    const local = nodeOffset(grp, path, depth, parentCenter);
     const total = explodeAdd(inherited, local);
     return new ShapeGroup(grp.children.map((child, i) => {
       const p = childPath(path, i, grp.childName(i));
-      if (child instanceof ShapeGroup) return explodeGroup(child, p, depth + 1, total);
-      return explodeLeaf(child, explodeAdd(total, nodeOffset(child, p, depth + 1)));
+      if (child instanceof ShapeGroup) return explodeGroup(child, p, depth + 1, total, groupCenter);
+      return explodeLeaf(child, explodeAdd(total, nodeOffset(child, p, depth + 1, groupCenter)));
     }), grp.childNames);
   };
 
@@ -722,19 +658,21 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     path: string,
     depth: number,
     inherited: [number, number, number],
+    parentCenter: [number, number, number],
   ): ExplodeItem => {
-    if (item instanceof ShapeGroup) return explodeGroup(item, path, depth, inherited);
+    if (item instanceof ShapeGroup) return explodeGroup(item, path, depth, inherited, parentCenter);
     if (item instanceof TrackedShape || item instanceof Shape || item instanceof Sketch) {
-      return explodeLeaf(item, explodeAdd(inherited, nodeOffset(item, path, depth)));
+      return explodeLeaf(item, explodeAdd(inherited, nodeOffset(item, path, depth, parentCenter)));
     }
     if (!isExplodeNamedItem(item)) return item;
 
-    const local = nodeOffset(item, path, depth, item.name, item.explode);
+    const itemCenter = centerForNode(item, parentCenter);
+    const local = nodeOffset(item, path, depth, parentCenter, item.name, item.explode);
     const total = explodeAdd(inherited, local);
     const out: ExplodeNamedItem = { ...item };
 
     if (item.shape instanceof ShapeGroup) {
-      out.shape = explodeGroup(item.shape, `${path}/shape`, depth + 1, total);
+      out.shape = explodeGroup(item.shape, `${path}/shape`, depth + 1, total, itemCenter);
     } else if (item.shape instanceof TrackedShape || item.shape instanceof Shape) {
       out.shape = explodeLeaf(
         item.shape,
@@ -752,7 +690,7 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     if (Array.isArray(item.group)) {
       out.group = item.group.map((child, i) => {
         const p = childPath(`${path}/group`, i, isExplodeNamedItem(child) ? child.name : undefined);
-        return explodeItemNode(child, p, depth + 1, total);
+        return explodeItemNode(child, p, depth + 1, total, itemCenter);
       });
     }
 
@@ -762,14 +700,14 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
   if (items instanceof ShapeGroup) {
     return new ShapeGroup(items.children.map((child, i) => {
       const p = childPath('root', i, items.childName(i));
-      if (child instanceof ShapeGroup) return explodeGroup(child, p, 1, [0, 0, 0]);
-      return explodeLeaf(child, nodeOffset(child, p, 1));
+      if (child instanceof ShapeGroup) return explodeGroup(child, p, 1, [0, 0, 0], rootCenter);
+      return explodeLeaf(child, nodeOffset(child, p, 1, rootCenter));
     }), items.childNames) as T;
   }
 
   return items.map((item, i) => {
     const p = childPath('root', i, isExplodeNamedItem(item) ? item.name : undefined);
-    return explodeItemNode(item, p, 1, [0, 0, 0]);
+    return explodeItemNode(item, p, 1, [0, 0, 0], rootCenter);
   }) as T;
 }
 
@@ -824,77 +762,6 @@ function shapeToBounds(shape: Shape): ExplodeBounds {
     min: [bb.min[0], bb.min[1], bb.min[2]],
     max: [bb.max[0], bb.max[1], bb.max[2]],
   };
-}
-
-function explodeMergeBounds(a: ExplodeBounds | null, b: ExplodeBounds | null): ExplodeBounds | null {
-  if (!a) return b ? { min: [...b.min], max: [...b.max] } as ExplodeBounds : null;
-  if (!b) return { min: [...a.min], max: [...a.max] } as ExplodeBounds;
-  return {
-    min: [
-      Math.min(a.min[0], b.min[0]),
-      Math.min(a.min[1], b.min[1]),
-      Math.min(a.min[2], b.min[2]),
-    ],
-    max: [
-      Math.max(a.max[0], b.max[0]),
-      Math.max(a.max[1], b.max[1]),
-      Math.max(a.max[2], b.max[2]),
-    ],
-  };
-}
-
-function explodeBoundsCenter(bounds: ExplodeBounds | null): [number, number, number] | null {
-  if (!bounds) return null;
-  return [
-    (bounds.min[0] + bounds.max[0]) * 0.5,
-    (bounds.min[1] + bounds.max[1]) * 0.5,
-    (bounds.min[2] + bounds.max[2]) * 0.5,
-  ];
-}
-
-function explodeAdd(
-  a: [number, number, number],
-  b: [number, number, number],
-): [number, number, number] {
-  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-}
-
-function explodeMul(
-  v: [number, number, number],
-  s: number,
-): [number, number, number] {
-  return [v[0] * s, v[1] * s, v[2] * s];
-}
-
-function explodeLength(v: [number, number, number]): number {
-  return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-}
-
-function explodeNormalize(
-  v: [number, number, number],
-  fallback: [number, number, number],
-): [number, number, number] {
-  const len = explodeLength(v);
-  if (len > 1e-8) return [v[0] / len, v[1] / len, v[2] / len];
-  const fbLen = explodeLength(fallback);
-  if (fbLen > 1e-8) return [fallback[0] / fbLen, fallback[1] / fbLen, fallback[2] / fbLen];
-  return [1, 0, 0];
-}
-
-function explodeHash(value: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function explodeFallbackVector(seed: string): [number, number, number] {
-  const x = ((explodeHash(`${seed}|x`) % 2001) - 1000) / 1000;
-  const y = ((explodeHash(`${seed}|y`) % 2001) - 1000) / 1000;
-  const z = ((explodeHash(`${seed}|z`) % 2001) - 1000) / 1000;
-  return [x, y, z];
 }
 
 /**

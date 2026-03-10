@@ -6,7 +6,6 @@ import { DEFAULT_VIEW_CONFIG, intersectWithPlane } from '@forge/index';
 import type {
   SceneObject,
   RunResult,
-  ExplodeViewDirection,
   ExplodeViewOptions,
   JointViewDef,
   JointOverlayViewConfig,
@@ -17,6 +16,14 @@ import { shapeToGeometry } from '@forge/meshToGeometry';
 import { getSketchWorldMatrix } from '@forge/sketch/placement3d';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
 import { resolveJointViewValues } from '@forge/jointsView';
+import {
+  type ExplodeBounds,
+  computeExplodeOffset,
+  createResolvedExplodeConfig,
+  explodeAdd,
+  explodeBoundsCenter,
+  explodeMergeBounds,
+} from '@forge/explodeCore';
 import {
   registerOrbitGifExporter,
   type OrbitGifExportOptions,
@@ -616,99 +623,186 @@ const toClippingPlane = (cp: CutPlaneDef): THREE.Plane => {
 const ZERO_OFFSET: [number, number, number] = [0, 0, 0];
 const IDENTITY_MATRIX = new THREE.Matrix4();
 
-const explodeHash = (value: string): number => {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
+interface ExplodeTreeNode {
+  key: string;
+  label: string;
+  path: string[];
+  objectIds: string[];
+  children: ExplodeTreeNode[];
+  bounds: ExplodeBounds | null;
+}
+
+interface MutableExplodeTreeNode {
+  key: string;
+  label: string;
+  path: string[];
+  objectIds: string[];
+  bounds: ExplodeBounds | null;
+  children: MutableExplodeTreeNode[];
+  childrenByLabel: Map<string, MutableExplodeTreeNode>;
+}
+
+const cleanExplodeTreeSegments = (segments: string[] | undefined): string[] => (
+  (segments ?? [])
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+);
+
+const getExplodeTreePath = (object: SceneObject): string[] => {
+  const explicitTreePath = cleanExplodeTreeSegments(object.treePath);
+  if (explicitTreePath.length > 0) return explicitTreePath;
+
+  const name = object.name.trim() || object.id;
+  const groupName = object.groupName?.trim();
+  if (!groupName) return [name];
+
+  const groupPath = groupName
+    .split('.')
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+  const prefixedLeaf = `${groupName}.`;
+  if (name.startsWith(prefixedLeaf)) {
+    const leafName = name.slice(prefixedLeaf.length).trim();
+    return [...groupPath, leafName || name];
   }
-  return hash >>> 0;
+  return [...groupPath, name];
 };
 
-const explodeFallbackVector = (seed: string): [number, number, number] => {
-  const x = ((explodeHash(`${seed}|x`) % 2001) - 1000) / 1000;
-  const y = ((explodeHash(`${seed}|y`) % 2001) - 1000) / 1000;
-  const z = ((explodeHash(`${seed}|z`) % 2001) - 1000) / 1000;
-  return [x, y, z];
-};
-
-const explodeLength = (v: [number, number, number]): number =>
-  Math.hypot(v[0], v[1], v[2]);
-
-const explodeNormalize = (
-  v: [number, number, number],
-  fallback: [number, number, number],
-): [number, number, number] => {
-  const len = explodeLength(v);
-  if (len > 1e-8) return [v[0] / len, v[1] / len, v[2] / len];
-  const fbLen = explodeLength(fallback);
-  if (fbLen > 1e-8) return [fallback[0] / fbLen, fallback[1] / fbLen, fallback[2] / fbLen];
-  return [1, 0, 0];
-};
-
-const resolveObjectCenter = (obj: SceneObject): [number, number, number] | null => {
-  if (obj.shape) {
+const resolveSceneObjectBounds = (object: SceneObject): ExplodeBounds | null => {
+  if (object.shape) {
     try {
-      const bb = obj.shape.boundingBox();
-      return [
-        (bb.min[0] + bb.max[0]) / 2,
-        (bb.min[1] + bb.max[1]) / 2,
-        (bb.min[2] + bb.max[2]) / 2,
-      ];
+      const bb = object.shape.boundingBox();
+      return {
+        min: [bb.min[0], bb.min[1], bb.min[2]],
+        max: [bb.max[0], bb.max[1], bb.max[2]],
+      };
     } catch {
       return null;
     }
   }
-  if (obj.sketch) {
+
+  if (object.sketch) {
     try {
-      const bb = obj.sketch.bounds();
-      const local = new THREE.Vector3(
-        (bb.min[0] + bb.max[0]) / 2,
-        (bb.min[1] + bb.max[1]) / 2,
-        0,
-      );
-      local.applyMatrix4(new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch)));
-      return [local.x, local.y, local.z];
+      const bb = object.sketch.bounds();
+      const matrix = new THREE.Matrix4().fromArray(getSketchWorldMatrix(object.sketch));
+      const corners = [
+        new THREE.Vector3(bb.min[0], bb.min[1], 0),
+        new THREE.Vector3(bb.min[0], bb.max[1], 0),
+        new THREE.Vector3(bb.max[0], bb.min[1], 0),
+        new THREE.Vector3(bb.max[0], bb.max[1], 0),
+      ].map((corner) => corner.applyMatrix4(matrix));
+      const min = [...corners[0].toArray()] as [number, number, number];
+      const max = [...corners[0].toArray()] as [number, number, number];
+      corners.slice(1).forEach((corner) => {
+        min[0] = Math.min(min[0], corner.x);
+        min[1] = Math.min(min[1], corner.y);
+        min[2] = Math.min(min[2], corner.z);
+        max[0] = Math.max(max[0], corner.x);
+        max[1] = Math.max(max[1], corner.y);
+        max[2] = Math.max(max[2], corner.z);
+      });
+      return { min, max };
     } catch {
       return null;
     }
   }
+
   return null;
 };
 
-const resolveExplodeDirection = (
-  mode: ExplodeViewDirection,
-  center: [number, number, number],
-  rootCenter: [number, number, number],
-  seed: string,
-): [number, number, number] => {
-  if (Array.isArray(mode)) {
-    return explodeNormalize(mode, explodeFallbackVector(`${seed}|vec`));
-  }
-  if (mode === 'radial') {
-    return explodeNormalize(
-      [center[0] - rootCenter[0], center[1] - rootCenter[1], center[2] - rootCenter[2]],
-      explodeFallbackVector(`${seed}|radial`),
-    );
-  }
-  if (mode === 'x') return [1, 0, 0];
-  if (mode === 'y') return [0, 1, 0];
-  return [0, 0, 1];
+const createMutableExplodeTreeNode = (path: string[]): MutableExplodeTreeNode => ({
+  key: path.join('/') || 'root',
+  label: path[path.length - 1] ?? 'root',
+  path,
+  objectIds: [],
+  bounds: null,
+  children: [],
+  childrenByLabel: new Map(),
+});
+
+const finalizeExplodeTree = (node: MutableExplodeTreeNode): ExplodeTreeNode => {
+  const children = node.children.map((child) => finalizeExplodeTree(child));
+  let bounds = node.bounds;
+  children.forEach((child) => {
+    bounds = explodeMergeBounds(bounds, child.bounds);
+  });
+  return {
+    key: node.key,
+    label: node.label,
+    path: node.path,
+    objectIds: [...node.objectIds],
+    children,
+    bounds,
+  };
 };
 
-const applyExplodeAxisLock = (
-  vec: [number, number, number],
-  axis: 'x' | 'y' | 'z' | undefined,
-  seed: string,
-): [number, number, number] => {
-  if (!axis) return vec;
-  const idx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
-  const fallback = explodeFallbackVector(`${seed}|axis`);
-  const comp = Math.abs(vec[idx]) > 1e-8 ? vec[idx] : fallback[idx];
-  const sign = comp >= 0 ? 1 : -1;
-  if (idx === 0) return [sign, 0, 0];
-  if (idx === 1) return [0, sign, 0];
-  return [0, 0, sign];
+const buildExplodeTree = (objects: SceneObject[]): ExplodeTreeNode => {
+  const root = createMutableExplodeTreeNode([]);
+
+  objects.forEach((object) => {
+    const path = getExplodeTreePath(object);
+    let node = root;
+    path.forEach((segment, index) => {
+      let child = node.childrenByLabel.get(segment);
+      if (!child) {
+        child = createMutableExplodeTreeNode([...node.path, segment]);
+        node.childrenByLabel.set(segment, child);
+        node.children.push(child);
+      }
+      node = child;
+      if (index === path.length - 1) {
+        node.objectIds.push(object.id);
+        node.bounds = explodeMergeBounds(node.bounds, resolveSceneObjectBounds(object));
+      }
+    });
+  });
+
+  return finalizeExplodeTree(root);
+};
+
+const computeExplodeTreeOffsets = (
+  root: ExplodeTreeNode,
+  explodeAmount: number,
+  explodeConfig: ExplodeViewOptions | null,
+): Record<string, [number, number, number]> => {
+  if (explodeAmount <= 1e-8) return {};
+  const config = createResolvedExplodeConfig({
+    amount: explodeAmount * (explodeConfig?.amountScale ?? 1),
+    stages: explodeConfig?.stages,
+    mode: explodeConfig?.mode,
+    axisLock: explodeConfig?.axisLock,
+    byName: explodeConfig?.byName,
+    byPath: explodeConfig?.byPath,
+  });
+  if (Math.abs(config.amount) <= 1e-8) return {};
+
+  const rootCenter = explodeBoundsCenter(root.bounds) ?? [0, 0, 0];
+  const offsets: Record<string, [number, number, number]> = {};
+
+  const walk = (
+    node: ExplodeTreeNode,
+    depth: number,
+    inherited: [number, number, number],
+    parentCenter: [number, number, number],
+  ) => {
+    const center = explodeBoundsCenter(node.bounds) ?? parentCenter;
+    const total = explodeAdd(inherited, computeExplodeOffset({
+      pathKeys: [node.path.join('/')],
+      seed: node.key,
+      depth,
+      center,
+      originCenter: parentCenter,
+      name: node.label,
+      config,
+    }));
+    node.objectIds.forEach((objectId) => {
+      offsets[objectId] = total;
+    });
+    node.children.forEach((child) => walk(child, depth + 1, total, center));
+  };
+
+  root.children.forEach((child) => walk(child, 1, [0, 0, 0], rootCenter));
+  return offsets;
 };
 
 const clampJointValue = (joint: JointViewDef, value: number): number => {
@@ -3084,44 +3178,7 @@ export function Viewport() {
     if (explodeAmount <= 1e-8) return {} as Record<string, [number, number, number]>;
     if (explodeConfig?.enabled === false) return {} as Record<string, [number, number, number]>;
     if (objects.length === 0) return {} as Record<string, [number, number, number]>;
-
-    const centersById: Record<string, [number, number, number]> = {};
-    const centers: [number, number, number][] = [];
-    objects.forEach((obj) => {
-      const center = resolveObjectCenter(obj);
-      if (!center) return;
-      centersById[obj.id] = center;
-      centers.push(center);
-    });
-    if (centers.length === 0) return {} as Record<string, [number, number, number]>;
-
-    const rootCenter: [number, number, number] = [
-      centers.reduce((sum, c) => sum + c[0], 0) / centers.length,
-      centers.reduce((sum, c) => sum + c[1], 0) / centers.length,
-      centers.reduce((sum, c) => sum + c[2], 0) / centers.length,
-    ];
-
-    const globalMode = explodeConfig?.mode ?? 'radial';
-    const globalAxis = explodeConfig?.axisLock;
-    const globalScale = explodeConfig?.amountScale ?? 1;
-    const byName = explodeConfig?.byName ?? {};
-
-    const offsets: Record<string, [number, number, number]> = {};
-    objects.forEach((obj) => {
-      const center = centersById[obj.id] ?? rootCenter;
-      const directive = byName[obj.name];
-      const mode = directive?.direction ?? globalMode;
-      const axisLock = directive?.axisLock ?? globalAxis;
-      const stage = directive?.stage ?? 1;
-      const amount = explodeAmount * globalScale * stage;
-      if (Math.abs(amount) <= 1e-8) return;
-      const seed = `${obj.id}|${obj.name}`;
-      const direction = resolveExplodeDirection(mode, center, rootCenter, seed);
-      const locked = applyExplodeAxisLock(direction, axisLock, seed);
-      offsets[obj.id] = [locked[0] * amount, locked[1] * amount, locked[2] * amount];
-    });
-
-    return offsets;
+    return computeExplodeTreeOffsets(buildExplodeTree(objects), explodeAmount, explodeConfig);
   }, [explodeAmount, explodeConfig, objects]);
 
   const jointNodeMatrices = useMemo(

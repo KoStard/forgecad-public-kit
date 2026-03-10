@@ -1,24 +1,27 @@
-import type { ExplodeAxis, ExplodeDirection } from './library';
+import type { ExplodeAxis, ExplodeDirective, ExplodeDirection } from './explodeCore';
 
 export type ExplodeViewDirection = ExplodeDirection;
-
-export interface ExplodeViewDirective {
-  stage?: number;
-  direction?: ExplodeViewDirection;
-  axisLock?: ExplodeAxis;
-}
+export interface ExplodeViewDirective extends ExplodeDirective {}
 
 export interface ExplodeViewOptions {
   /** Set false to disable viewport explode offsets for this script output. */
   enabled?: boolean;
   /** Scales the UI explode amount. Default: 1 */
   amountScale?: number;
+  /**
+   * Per-depth stage multipliers (depth 1 = first level).
+   * If depth exceeds this array, the last value is reused.
+   * Default when omitted: depth number (1, 2, 3, ...)
+   */
+  stages?: number[];
   /** Global direction mode fallback. Default: 'radial' */
   mode?: ExplodeViewDirection;
   /** Global axis lock fallback. */
   axisLock?: ExplodeAxis;
   /** Per-object overrides by final object name. */
   byName?: Record<string, ExplodeViewDirective>;
+  /** Per-tree-path overrides using slash-separated object tree segments. */
+  byPath?: Record<string, ExplodeViewDirective>;
 }
 
 let _collected: ExplodeViewOptions | null = null;
@@ -57,6 +60,7 @@ const cloneOptions = (options: ExplodeViewOptions): ExplodeViewOptions => {
   const out: ExplodeViewOptions = {};
   if (options.enabled !== undefined) out.enabled = options.enabled;
   if (options.amountScale !== undefined) out.amountScale = options.amountScale;
+  if (options.stages !== undefined) out.stages = [...options.stages];
   if (options.mode !== undefined) {
     out.mode = Array.isArray(options.mode)
       ? [...options.mode] as [number, number, number]
@@ -69,6 +73,13 @@ const cloneOptions = (options: ExplodeViewOptions): ExplodeViewOptions => {
       byName[name] = cloneDirective(directive);
     });
     out.byName = byName;
+  }
+  if (options.byPath) {
+    const byPath: Record<string, ExplodeViewDirective> = {};
+    Object.entries(options.byPath).forEach(([path, directive]) => {
+      byPath[path] = cloneDirective(directive);
+    });
+    out.byPath = byPath;
   }
   return out;
 };
@@ -124,6 +135,13 @@ export function explodeView(options: ExplodeViewOptions = {}): void {
     next.amountScale = options.amountScale;
   }
 
+  if (options.stages !== undefined) {
+    if (!Array.isArray(options.stages) || !options.stages.every((value) => Number.isFinite(value))) {
+      throw new Error('explodeView.stages must be an array of finite numbers');
+    }
+    next.stages = [...options.stages];
+  }
+
   if (options.mode !== undefined) {
     next.mode = normalizeDirection(options.mode, 'explodeView.mode');
   }
@@ -145,6 +163,20 @@ export function explodeView(options: ExplodeViewOptions = {}): void {
       byName[name] = mergeDirective(byName[name] ?? {}, directive, `explodeView.byName["${name}"]`);
     });
     next.byName = byName;
+  }
+
+  if (options.byPath !== undefined) {
+    if (!options.byPath || typeof options.byPath !== 'object') {
+      throw new Error('explodeView.byPath must be an object map');
+    }
+    const byPath: Record<string, ExplodeViewDirective> = { ...(next.byPath ?? {}) };
+    Object.entries(options.byPath).forEach(([path, directive]) => {
+      if (!directive || typeof directive !== 'object') {
+        throw new Error(`explodeView.byPath["${path}"] must be an object`);
+      }
+      byPath[path] = mergeDirective(byPath[path] ?? {}, directive, `explodeView.byPath["${path}"]`);
+    });
+    next.byPath = byPath;
   }
 
   _collected = next;
