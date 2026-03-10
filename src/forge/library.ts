@@ -19,7 +19,7 @@ import {
   type ExplodeConfigOptions,
   type ExplodeDirective,
   type ExplodeDirection,
-  computeExplodeOffset,
+  computeExplodeMotion,
   createResolvedExplodeConfig,
   explodeAdd,
   explodeBoundsCenter,
@@ -601,21 +601,23 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     fallback: [number, number, number],
   ): [number, number, number] => explodeBoundsCenter(computeExplodeBounds(node, boundsCache)) ?? fallback;
 
-  const nodeOffset = (
+  const nodeMotion = (
     node: unknown,
     path: string,
     depth: number,
     originCenter: [number, number, number],
+    inheritedDirection: [number, number, number] | undefined,
     name?: string,
     local?: ExplodeDirective,
-  ): [number, number, number] => {
+  ) => {
     const center = centerForNode(node, originCenter);
-    return computeExplodeOffset({
+    return computeExplodeMotion({
       pathKeys: [path],
       seed: path,
       depth,
       center,
       originCenter,
+      inheritedDirection,
       name,
       local,
       config,
@@ -642,14 +644,15 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     depth: number,
     inherited: [number, number, number],
     parentCenter: [number, number, number],
+    parentDirection: [number, number, number] | undefined,
   ): ShapeGroup => {
     const groupCenter = centerForNode(grp, parentCenter);
-    const local = nodeOffset(grp, path, depth, parentCenter);
-    const total = explodeAdd(inherited, local);
+    const motion = nodeMotion(grp, path, depth, parentCenter, parentDirection);
+    const total = explodeAdd(inherited, motion.offset);
     return new ShapeGroup(grp.children.map((child, i) => {
       const p = childPath(path, i, grp.childName(i));
-      if (child instanceof ShapeGroup) return explodeGroup(child, p, depth + 1, total, groupCenter);
-      return explodeLeaf(child, explodeAdd(total, nodeOffset(child, p, depth + 1, groupCenter)));
+      if (child instanceof ShapeGroup) return explodeGroup(child, p, depth + 1, total, groupCenter, motion.direction);
+      return explodeLeaf(child, explodeAdd(total, nodeMotion(child, p, depth + 1, groupCenter, motion.direction).offset));
     }), grp.childNames);
   };
 
@@ -659,20 +662,21 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     depth: number,
     inherited: [number, number, number],
     parentCenter: [number, number, number],
+    parentDirection: [number, number, number] | undefined,
   ): ExplodeItem => {
-    if (item instanceof ShapeGroup) return explodeGroup(item, path, depth, inherited, parentCenter);
+    if (item instanceof ShapeGroup) return explodeGroup(item, path, depth, inherited, parentCenter, parentDirection);
     if (item instanceof TrackedShape || item instanceof Shape || item instanceof Sketch) {
-      return explodeLeaf(item, explodeAdd(inherited, nodeOffset(item, path, depth, parentCenter)));
+      return explodeLeaf(item, explodeAdd(inherited, nodeMotion(item, path, depth, parentCenter, parentDirection).offset));
     }
     if (!isExplodeNamedItem(item)) return item;
 
     const itemCenter = centerForNode(item, parentCenter);
-    const local = nodeOffset(item, path, depth, parentCenter, item.name, item.explode);
-    const total = explodeAdd(inherited, local);
+    const motion = nodeMotion(item, path, depth, parentCenter, parentDirection, item.name, item.explode);
+    const total = explodeAdd(inherited, motion.offset);
     const out: ExplodeNamedItem = { ...item };
 
     if (item.shape instanceof ShapeGroup) {
-      out.shape = explodeGroup(item.shape, `${path}/shape`, depth + 1, total, itemCenter);
+      out.shape = explodeGroup(item.shape, `${path}/shape`, depth + 1, total, itemCenter, motion.direction);
     } else if (item.shape instanceof TrackedShape || item.shape instanceof Shape) {
       out.shape = explodeLeaf(
         item.shape,
@@ -690,7 +694,7 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     if (Array.isArray(item.group)) {
       out.group = item.group.map((child, i) => {
         const p = childPath(`${path}/group`, i, isExplodeNamedItem(child) ? child.name : undefined);
-        return explodeItemNode(child, p, depth + 1, total, itemCenter);
+        return explodeItemNode(child, p, depth + 1, total, itemCenter, motion.direction);
       });
     }
 
@@ -700,14 +704,14 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
   if (items instanceof ShapeGroup) {
     return new ShapeGroup(items.children.map((child, i) => {
       const p = childPath('root', i, items.childName(i));
-      if (child instanceof ShapeGroup) return explodeGroup(child, p, 1, [0, 0, 0], rootCenter);
-      return explodeLeaf(child, nodeOffset(child, p, 1, rootCenter));
+      if (child instanceof ShapeGroup) return explodeGroup(child, p, 1, [0, 0, 0], rootCenter, undefined);
+      return explodeLeaf(child, nodeMotion(child, p, 1, rootCenter, undefined).offset);
     }), items.childNames) as T;
   }
 
   return items.map((item, i) => {
     const p = childPath('root', i, isExplodeNamedItem(item) ? item.name : undefined);
-    return explodeItemNode(item, p, 1, [0, 0, 0], rootCenter);
+    return explodeItemNode(item, p, 1, [0, 0, 0], rootCenter, undefined);
   }) as T;
 }
 

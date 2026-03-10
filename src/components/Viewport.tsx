@@ -18,7 +18,7 @@ import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnima
 import { resolveJointViewValues } from '@forge/jointsView';
 import {
   type ExplodeBounds,
-  computeExplodeOffset,
+  computeExplodeMotion,
   createResolvedExplodeConfig,
   explodeAdd,
   explodeBoundsCenter,
@@ -784,24 +784,27 @@ const computeExplodeTreeOffsets = (
     depth: number,
     inherited: [number, number, number],
     parentCenter: [number, number, number],
+    parentDirection: [number, number, number] | undefined,
   ) => {
     const center = explodeBoundsCenter(node.bounds) ?? parentCenter;
-    const total = explodeAdd(inherited, computeExplodeOffset({
+    const motion = computeExplodeMotion({
       pathKeys: [node.path.join('/')],
       seed: node.key,
       depth,
       center,
       originCenter: parentCenter,
+      inheritedDirection: parentDirection,
       name: node.label,
       config,
-    }));
+    });
+    const total = explodeAdd(inherited, motion.offset);
     node.objectIds.forEach((objectId) => {
       offsets[objectId] = total;
     });
-    node.children.forEach((child) => walk(child, depth + 1, total, center));
+    node.children.forEach((child) => walk(child, depth + 1, total, center, motion.direction));
   };
 
-  root.children.forEach((child) => walk(child, 1, [0, 0, 0], rootCenter));
+  root.children.forEach((child) => walk(child, 1, [0, 0, 0], rootCenter, undefined));
   return offsets;
 };
 

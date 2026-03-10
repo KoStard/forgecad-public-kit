@@ -11,7 +11,7 @@ export interface ExplodeViewOptions {
   /**
    * Per-depth stage multipliers (depth 1 = first level).
    * If depth exceeds this array, the last value is reused.
-   * Default when omitted: depth number (1, 2, 3, ...)
+   * Default when omitted: reciprocal depth (1, 1/2, 1/3, ...)
    */
   stages?: number[];
   /** Global direction mode fallback. Default: 'radial' */

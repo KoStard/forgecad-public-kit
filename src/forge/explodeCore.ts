@@ -41,12 +41,21 @@ export interface ExplodeOffsetInput {
   config: ResolvedExplodeConfig;
 }
 
+export interface ExplodeMotionInput extends ExplodeOffsetInput {
+  inheritedDirection?: [number, number, number];
+}
+
+export interface ResolvedExplodeMotion {
+  direction: [number, number, number];
+  offset: [number, number, number];
+}
+
 export function createResolvedExplodeConfig(options: ExplodeConfigOptions = {}): ResolvedExplodeConfig {
   const stages = options.stages ?? [];
   return {
     amount: options.amount ?? 10,
     stageForDepth: (depth: number): number => {
-      if (stages.length === 0) return Math.max(1, depth);
+      if (stages.length === 0) return 1 / Math.max(1, depth);
       const idx = Math.max(0, depth - 1);
       return stages[Math.min(idx, stages.length - 1)];
     },
@@ -83,7 +92,7 @@ export function resolveExplodeDirective(
   return mergeExplodeDirectives(...directives);
 }
 
-export function computeExplodeOffset({
+export function computeExplodeMotion({
   pathKeys,
   seed,
   depth,
@@ -92,17 +101,27 @@ export function computeExplodeOffset({
   name,
   local,
   config,
-}: ExplodeOffsetInput): [number, number, number] {
+  inheritedDirection,
+}: ExplodeMotionInput): ResolvedExplodeMotion {
   const merged = resolveExplodeDirective(pathKeys, name, local, config);
   const stage = merged.stage ?? config.stageForDepth(depth);
+  const effectiveDirection = merged.direction ?? config.defaultMode;
   const direction = resolveExplodeDirection(
-    merged.direction ?? config.defaultMode,
+    effectiveDirection,
     center,
     originCenter,
     seed,
   );
-  const locked = applyExplodeAxisLock(direction, merged.axisLock ?? config.defaultAxisLock, seed);
-  return explodeMul(locked, config.amount * stage);
+  const branched = applyExplodeTreeBias(direction, effectiveDirection, inheritedDirection, seed);
+  const locked = applyExplodeAxisLock(branched, merged.axisLock ?? config.defaultAxisLock, seed);
+  return {
+    direction: locked,
+    offset: explodeMul(locked, config.amount * stage),
+  };
+}
+
+export function computeExplodeOffset(input: ExplodeMotionInput): [number, number, number] {
+  return computeExplodeMotion(input).offset;
 }
 
 export function explodeMergeBounds(a: ExplodeBounds | null, b: ExplodeBounds | null): ExplodeBounds | null {
@@ -147,6 +166,13 @@ export function explodeMul(
 
 export function explodeLength(v: [number, number, number]): number {
   return Math.hypot(v[0], v[1], v[2]);
+}
+
+export function explodeDot(
+  a: [number, number, number],
+  b: [number, number, number],
+): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
 export function explodeNormalize(
@@ -204,6 +230,46 @@ export function resolveExplodeDirection(
   if (mode === 'x') return [1, 0, 0];
   if (mode === 'y') return [0, 1, 0];
   return [0, 0, 1];
+}
+
+function explodeProjectPerpendicular(
+  vec: [number, number, number],
+  axis: [number, number, number],
+): [number, number, number] {
+  const dot = explodeDot(vec, axis);
+  return [
+    vec[0] - axis[0] * dot,
+    vec[1] - axis[1] * dot,
+    vec[2] - axis[2] * dot,
+  ];
+}
+
+export function applyExplodeTreeBias(
+  direction: [number, number, number],
+  mode: ExplodeDirection,
+  inheritedDirection: [number, number, number] | undefined,
+  seed: string,
+): [number, number, number] {
+  if (!inheritedDirection || mode !== 'radial') return direction;
+
+  const branch = explodeNormalize(
+    inheritedDirection,
+    explodeFallbackVector(`${seed}|branch`),
+  );
+  const fanSource = explodeFallbackVector(`${seed}|fan`);
+  const sideways = explodeNormalize(
+    explodeProjectPerpendicular(fanSource, branch),
+    fanSource,
+  );
+
+  return explodeNormalize(
+    [
+      direction[0] * 0.85 + branch[0] * 1.35 + sideways[0] * 0.35,
+      direction[1] * 0.85 + branch[1] * 1.35 + sideways[1] * 0.35,
+      direction[2] * 0.85 + branch[2] * 1.35 + sideways[2] * 0.35,
+    ],
+    direction,
+  );
 }
 
 export function applyExplodeAxisLock(
