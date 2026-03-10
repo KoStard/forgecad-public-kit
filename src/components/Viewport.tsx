@@ -2564,8 +2564,13 @@ export function Viewport() {
     [activeJointAnimation, jointAnimationProgress, jointValues],
   );
   const effectiveJointValues = useMemo(
-    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues),
-    [animatedJointValues, jointCouplings, joints],
+    () => resolveJointViewValues(
+      joints,
+      jointCouplings,
+      animatedJointValues,
+      { clamp: !(activeJointAnimation?.continuous ?? false) },
+    ),
+    [activeJointAnimation?.continuous, animatedJointValues, jointCouplings, joints],
   );
 
   const activeCutPlaneDefs = useMemo(() => {
