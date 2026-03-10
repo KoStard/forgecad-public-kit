@@ -47,6 +47,9 @@ const SECTION_HATCH_MAX_SPACING = 8;
 const SECTION_HATCH_SPACING_SCALE = 0.12;
 const SECTION_HATCH_MIN_LINE_WIDTH = 0.18;
 const SECTION_HATCH_MAX_LINE_WIDTH = 0.9;
+const SECTION_SURFACE_LIFT_MIN = 0.0005;
+const SECTION_SURFACE_LIFT_MAX = 0.01;
+const SECTION_SURFACE_LIFT_SCALE = 5e-5;
 const PLANE_TRANSFORM_EPS = 1e-8;
 
 interface PlaneTransform {
@@ -58,6 +61,7 @@ interface CutSurfaceDef {
   id: string;
   geometry: THREE.BufferGeometry;
   outlineGeometries: THREE.BufferGeometry[];
+  sourcePlaneIndex: number;
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
   hatchAngleRad: number;
@@ -282,6 +286,24 @@ function buildOutlineGeometriesFromPolygons(polygons: number[][][]): THREE.Buffe
     .map((polygon) => new THREE.BufferGeometry().setFromPoints(
       polygon.map((point) => new THREE.Vector3(point[0], point[1], 0)),
     ));
+}
+
+function resolveSectionSurfaceLift(shape: SceneObject['shape'] | undefined): number {
+  if (!shape) return SECTION_SURFACE_LIFT_MIN;
+  try {
+    const bb = shape.boundingBox();
+    const dx = bb.max[0] - bb.min[0];
+    const dy = bb.max[1] - bb.min[1];
+    const dz = bb.max[2] - bb.min[2];
+    const diagonal = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    return THREE.MathUtils.clamp(
+      diagonal * SECTION_SURFACE_LIFT_SCALE,
+      SECTION_SURFACE_LIFT_MIN,
+      SECTION_SURFACE_LIFT_MAX,
+    );
+  } catch {
+    return SECTION_SURFACE_LIFT_MIN;
+  }
 }
 
 function resolveSectionHatchMetrics(geometry: THREE.BufferGeometry): { spacing: number; lineWidth: number } {
@@ -904,6 +926,7 @@ function ForgeObject({
         // Cut planes are defined in world space, so convert each plane into this object's
         // local coordinates before sectioning to keep everything aligned with animated transforms.
         const inverseMatrix = matrix.clone().invert();
+        const surfaceLift = resolveSectionSurfaceLift(obj.shape);
         cutPlanes?.forEach((cutPlaneDef, planeIndex) => {
           const worldNormal = new THREE.Vector3(
             cutPlaneDef.normal[0],
@@ -940,7 +963,7 @@ function ForgeObject({
               });
               const polygons = sectionSketch.toPolygons();
               const geometry = buildFilledGeometryFromPolygons(polygons);
-              const transform = resolvePlaneTransform(localNormal, localOffset);
+              const transform = resolvePlaneTransform(localNormal, localOffset, surfaceLift);
               if (geometry && transform) {
                 const outlineGeometries = buildOutlineGeometriesFromPolygons(polygons);
                 const hatch = resolveSectionHatchMetrics(geometry);
@@ -949,6 +972,7 @@ function ForgeObject({
                   id: `${cutPlaneDef.name}:${planeIndex}`,
                   geometry,
                   outlineGeometries,
+                  sourcePlaneIndex: planeIndex,
                   position: transform.center,
                   quaternion: transform.quaternion,
                   hatchAngleRad: THREE.MathUtils.degToRad(35 + (angleSeed % 2) * 55),
@@ -1116,6 +1140,10 @@ function SectionCutSurface({
   opacity: number;
   clippingPlanes: THREE.Plane[];
 }) {
+  const sectionClippingPlanes = useMemo(
+    () => clippingPlanes.filter((_, index) => index !== surface.sourcePlaneIndex),
+    [clippingPlanes, surface.sourcePlaneIndex],
+  );
   const material = useMemo(() => {
     const baseColor = parseExportColor(color, 0x5b9bd5).lerp(new THREE.Color('#ffffff'), 0.2);
     const lineColor = parseExportColor(color, 0x5b9bd5).lerp(new THREE.Color('#101010'), 0.55);
@@ -1129,7 +1157,7 @@ function SectionCutSurface({
       polygonOffset: true,
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -2,
-      clippingPlanes,
+      clippingPlanes: sectionClippingPlanes,
       toneMapped: false,
     });
     mat.onBeforeCompile = (shader) => {
@@ -1173,7 +1201,7 @@ vec4 diffuseColor = vec4(sectionColor, opacity);`,
       + `${surface.hatchSpacing.toFixed(3)}:${surface.hatchLineWidth.toFixed(3)}:${surface.hatchAngleRad.toFixed(3)}`
     );
     return mat;
-  }, [clippingPlanes, color, opacity, surface.hatchAngleRad, surface.hatchLineWidth, surface.hatchSpacing]);
+  }, [color, opacity, sectionClippingPlanes, surface.hatchAngleRad, surface.hatchLineWidth, surface.hatchSpacing]);
   const outlineColor = useMemo(
     () => parseExportColor(color, 0x5b9bd5).lerp(new THREE.Color('#050505'), 0.68),
     [color],
@@ -1196,7 +1224,7 @@ vec4 diffuseColor = vec4(sectionColor, opacity);`,
             transparent={opacity < 1}
             opacity={Math.min(1, opacity + 0.18)}
             depthWrite={false}
-            clippingPlanes={clippingPlanes}
+            clippingPlanes={sectionClippingPlanes}
             toneMapped={false}
           />
         </lineLoop>
