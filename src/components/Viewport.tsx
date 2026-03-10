@@ -949,17 +949,18 @@ function LocalStudioEnvironment() {
   );
 }
 
-function PerformanceInfoHud({
+function PerformanceInfoSampler({
   enabled,
   modelTriangles,
   sceneObjects,
+  onStatsChange,
 }: {
   enabled: boolean;
   modelTriangles: number;
   sceneObjects: number;
+  onStatsChange: (stats: ViewportPerformanceInfo | null) => void;
 }) {
   const gl = useThree((s) => s.gl);
-  const [stats, setStats] = useState<ViewportPerformanceInfo | null>(null);
   const sampleRef = useRef({
     frames: 0,
     elapsedSec: 0,
@@ -974,8 +975,8 @@ function PerformanceInfoHud({
       frameTimeMsTotal: 0,
       sinceEmitSec: 0,
     };
-    if (!enabled) setStats(null);
-  }, [enabled, modelTriangles, sceneObjects]);
+    if (!enabled) onStatsChange(null);
+  }, [enabled, modelTriangles, onStatsChange, sceneObjects]);
 
   useFrame((_state, delta) => {
     if (!enabled) return;
@@ -989,7 +990,7 @@ function PerformanceInfoHud({
     if (sample.sinceEmitSec < PERFORMANCE_SAMPLE_INTERVAL_SEC) return;
 
     const frameCount = Math.max(1, sample.frames);
-    setStats({
+    onStatsChange({
       fps: frameCount / Math.max(sample.elapsedSec, 1e-6),
       frameTimeMs: sample.frameTimeMsTotal / frameCount,
       sceneObjects,
@@ -1009,6 +1010,16 @@ function PerformanceInfoHud({
     sample.sinceEmitSec = 0;
   });
 
+  return null;
+}
+
+function PerformanceInfoPanel({
+  enabled,
+  stats,
+}: {
+  enabled: boolean;
+  stats: ViewportPerformanceInfo | null;
+}) {
   if (!enabled) return null;
 
   const rows = stats
@@ -1028,55 +1039,54 @@ function PerformanceInfoHud({
     : null;
 
   return (
-    <Html fullscreen style={{ pointerEvents: 'none' }}>
+    <div
+      style={{
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        minWidth: 180,
+        padding: '10px 12px',
+        borderRadius: 8,
+        border: '1px solid var(--fc-border)',
+        background: 'var(--fc-bgPanel)',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.22)',
+        color: 'var(--fc-text)',
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        fontSize: 11,
+        lineHeight: 1.45,
+        pointerEvents: 'none',
+      }}
+    >
       <div
         style={{
-          position: 'absolute',
-          top: 12,
-          right: 12,
-          minWidth: 180,
-          padding: '10px 12px',
-          borderRadius: 8,
-          border: '1px solid var(--fc-border)',
-          background: 'var(--fc-bgPanel)',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.22)',
-          color: 'var(--fc-text)',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-          fontSize: 11,
-          lineHeight: 1.45,
+          marginBottom: 6,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: 0.8,
+          textTransform: 'uppercase',
+          color: 'var(--fc-textDim)',
         }}
       >
+        Performance
+      </div>
+      {!rows && (
+        <div style={{ color: 'var(--fc-textDim)' }}>Measuring...</div>
+      )}
+      {rows?.map(([label, value]) => (
         <div
+          key={label}
           style={{
-            marginBottom: 6,
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: 0.8,
-            textTransform: 'uppercase',
-            color: 'var(--fc-textDim)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
           }}
         >
-          Performance
+          <span style={{ color: 'var(--fc-textDim)' }}>{label}</span>
+          <span>{value}</span>
         </div>
-        {!rows && (
-          <div style={{ color: 'var(--fc-textDim)' }}>Measuring...</div>
-        )}
-        {rows?.map(([label, value]) => (
-          <div
-            key={label}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-            }}
-          >
-            <span style={{ color: 'var(--fc-textDim)' }}>{label}</span>
-            <span>{value}</span>
-          </div>
-        ))}
-      </div>
-    </Html>
+      ))}
+    </div>
   );
 }
 
@@ -3015,6 +3025,7 @@ export function Viewport() {
   const sectionPlaneFillOpacity = useForgeStore((s) => s.sectionPlaneFillOpacity);
   const sectionPlaneBorderEnabled = useForgeStore((s) => s.sectionPlaneBorderEnabled);
   const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
+  const [performanceInfo, setPerformanceInfo] = useState<ViewportPerformanceInfo | null>(null);
   const cutPlaneDefs: CutPlaneDef[] = result?.cutPlanes ?? [];
   const explodeConfig: ExplodeViewOptions | null = result?.explodeView ?? null;
   const jointsConfig = result?.jointsView ?? null;
@@ -3557,6 +3568,10 @@ export function Viewport() {
     clearFocusedObject();
   }, [clearFocusedObject, measureMode]);
 
+  const handlePerformanceInfoChange = useCallback((stats: ViewportPerformanceInfo | null) => {
+    setPerformanceInfo(stats);
+  }, []);
+
   return (
     <div
       ref={containerRef}
@@ -3658,10 +3673,11 @@ export function Viewport() {
           <DimensionAnnotation key={d.id} def={d} />
         ))}
         <MeasureTool />
-        <PerformanceInfoHud
+        <PerformanceInfoSampler
           enabled={showPerformanceInfo}
           sceneObjects={visibleSceneObjectCount}
           modelTriangles={visibleModelTriangles}
+          onStatsChange={handlePerformanceInfoChange}
         />
 
         {gridEnabled && !isSketchOnly && (
@@ -3735,6 +3751,11 @@ export function Viewport() {
           clearCommand={clearViewCommand}
         />
       </Canvas>
+
+      <PerformanceInfoPanel
+        enabled={showPerformanceInfo}
+        stats={performanceInfo}
+      />
 
       {/* Measure mode indicator */}
       {measureMode && (
