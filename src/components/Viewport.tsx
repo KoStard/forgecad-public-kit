@@ -47,9 +47,6 @@ const SECTION_HATCH_MAX_SPACING = 8;
 const SECTION_HATCH_SPACING_SCALE = 0.12;
 const SECTION_HATCH_MIN_LINE_WIDTH = 0.18;
 const SECTION_HATCH_MAX_LINE_WIDTH = 0.9;
-const SECTION_SURFACE_INSET_MIN = 0.001;
-const SECTION_SURFACE_INSET_MAX = 0.05;
-const SECTION_SURFACE_INSET_SCALE = 1e-4;
 const PLANE_TRANSFORM_EPS = 1e-8;
 
 interface PlaneTransform {
@@ -285,24 +282,6 @@ function buildOutlineGeometriesFromPolygons(polygons: number[][][]): THREE.Buffe
     .map((polygon) => new THREE.BufferGeometry().setFromPoints(
       polygon.map((point) => new THREE.Vector3(point[0], point[1], 0)),
     ));
-}
-
-function resolveSectionSurfaceInset(shape: SceneObject['shape'] | undefined): number {
-  if (!shape) return 0.01;
-  try {
-    const bb = shape.boundingBox();
-    const dx = bb.max[0] - bb.min[0];
-    const dy = bb.max[1] - bb.min[1];
-    const dz = bb.max[2] - bb.min[2];
-    const diagonal = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    return THREE.MathUtils.clamp(
-      diagonal * SECTION_SURFACE_INSET_SCALE,
-      SECTION_SURFACE_INSET_MIN,
-      SECTION_SURFACE_INSET_MAX,
-    );
-  } catch {
-    return 0.01;
-  }
 }
 
 function resolveSectionHatchMetrics(geometry: THREE.BufferGeometry): { spacing: number; lineWidth: number } {
@@ -925,7 +904,6 @@ function ForgeObject({
         // Cut planes are defined in world space, so convert each plane into this object's
         // local coordinates before sectioning to keep everything aligned with animated transforms.
         const inverseMatrix = matrix.clone().invert();
-        const surfaceInset = resolveSectionSurfaceInset(obj.shape);
         cutPlanes?.forEach((cutPlaneDef, planeIndex) => {
           const worldNormal = new THREE.Vector3(
             cutPlaneDef.normal[0],
@@ -962,7 +940,7 @@ function ForgeObject({
               });
               const polygons = sectionSketch.toPolygons();
               const geometry = buildFilledGeometryFromPolygons(polygons);
-              const transform = resolvePlaneTransform(localNormal, localOffset, -surfaceInset);
+              const transform = resolvePlaneTransform(localNormal, localOffset);
               if (geometry && transform) {
                 const outlineGeometries = buildOutlineGeometriesFromPolygons(polygons);
                 const hatch = resolveSectionHatchMetrics(geometry);
