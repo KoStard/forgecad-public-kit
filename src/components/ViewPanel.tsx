@@ -58,6 +58,8 @@ export function ViewPanel() {
   const gridSize = useForgeStore((s) => s.gridSize);
   const setGridEnabled = useForgeStore((s) => s.setGridEnabled);
   const setGridSize = useForgeStore((s) => s.setGridSize);
+  const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
+  const setShowPerformanceInfo = useForgeStore((s) => s.setShowPerformanceInfo);
   const result = useForgeStore((s) => s.result);
   const objectSettings = useForgeStore((s) => s.objectSettings);
   const setObjectVisibility = useForgeStore((s) => s.setObjectVisibility);
@@ -591,6 +593,16 @@ export function ViewPanel() {
               onChange={toggleDimensions}
             />
             Show dimensions
+          </label>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
+            <input
+              type="checkbox"
+              checked={showPerformanceInfo}
+              onChange={(e) => setShowPerformanceInfo(e.target.checked)}
+            />
+            Show performance info
           </label>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>

@@ -23,6 +23,8 @@ export function CommandPalette() {
   const setTheme = useForgeStore((s) => s.setTheme);
   const theme = useForgeStore((s) => s.theme);
   const result = useForgeStore((s) => s.result);
+  const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
+  const setShowPerformanceInfo = useForgeStore((s) => s.setShowPerformanceInfo);
 
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
@@ -72,6 +74,14 @@ export function CommandPalette() {
   ];
 
   const rootCommands: Command[] = [
+    {
+      id: 'toggle-performance-info',
+      label: `${showPerformanceInfo ? 'Hide' : 'Show'} Performance Info`,
+      action: () => {
+        setShowPerformanceInfo(!showPerformanceInfo);
+        close();
+      },
+    },
     { id: 'export', label: 'Export', children: exportChoices, action: () => {} },
     { id: 'theme', label: 'Change Theme', children: themeChoices, action: () => {} },
   ];

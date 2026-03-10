@@ -212,6 +212,8 @@ interface ForgeStore {
   gridSize: number;
   setGridEnabled: (enabled: boolean) => void;
   setGridSize: (size: number) => void;
+  showPerformanceInfo: boolean;
+  setShowPerformanceInfo: (enabled: boolean) => void;
   objectSettings: Record<string, ObjectSettings>;
   setObjectVisibility: (id: string, visible: boolean) => void;
   setObjectOpacity: (id: string, opacity: number) => void;
@@ -296,6 +298,7 @@ interface ViewPreferencesState {
   projectionMode: ProjectionMode;
   gridEnabled: boolean;
   gridSize: number;
+  showPerformanceInfo: boolean;
   objectSettings: Record<string, ObjectSettings>;
   objectPickSyncEnabled: boolean;
   measureSnapPx: number;
@@ -877,6 +880,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   setGridSize: (size) => {
     writeViewPreferences({ gridSize: size });
     set({ gridSize: size });
+  },
+  showPerformanceInfo: initialViewPreferences.showPerformanceInfo ?? false,
+  setShowPerformanceInfo: (enabled) => {
+    writeViewPreferences({ showPerformanceInfo: enabled });
+    set({ showPerformanceInfo: enabled });
   },
   objectSettings: initialViewPreferences.objectSettings ?? {},
   setObjectVisibility: (id, visible) => set((s) => {
