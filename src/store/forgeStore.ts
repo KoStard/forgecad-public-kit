@@ -151,6 +151,9 @@ export interface ObjectSettings {
   color: string;
 }
 
+type ObjectSettingsMap = Record<string, ObjectSettings>;
+type ObjectSettingsByFile = Record<string, ObjectSettingsMap>;
+
 export interface ViewCommand {
   id: number;
   type: 'fit' | 'zoom' | 'snap';
@@ -214,7 +217,9 @@ interface ForgeStore {
   setGridSize: (size: number) => void;
   showPerformanceInfo: boolean;
   setShowPerformanceInfo: (enabled: boolean) => void;
-  objectSettings: Record<string, ObjectSettings>;
+  previewFile: string | null;
+  objectSettings: ObjectSettingsMap;
+  objectSettingsByFile: ObjectSettingsByFile;
   setObjectVisibility: (id: string, visible: boolean) => void;
   showAllObjects: () => void;
   setObjectsVisibility: (ids: string[], visible: boolean) => void;
@@ -301,7 +306,7 @@ interface ViewPreferencesState {
   gridEnabled: boolean;
   gridSize: number;
   showPerformanceInfo: boolean;
-  objectSettings: Record<string, ObjectSettings>;
+  objectSettingsByFile: ObjectSettingsByFile;
   objectPickSyncEnabled: boolean;
   measureSnapPx: number;
   dimensionsVisible: boolean;
@@ -319,6 +324,54 @@ interface ViewPreferencesState {
 
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
 const VIEW_PREFERENCES_KEY = 'fc-view-preferences-v1';
+
+const getObjectSettingsForPreviewFile = (
+  objectSettingsByFile: ObjectSettingsByFile,
+  previewFile: string | null,
+): ObjectSettingsMap => {
+  if (!previewFile) return {};
+  return objectSettingsByFile[previewFile] ?? {};
+};
+
+const setObjectSettingsForPreviewFile = (
+  objectSettingsByFile: ObjectSettingsByFile,
+  previewFile: string | null,
+  objectSettings: ObjectSettingsMap,
+): ObjectSettingsByFile => {
+  if (!previewFile) return objectSettingsByFile;
+  if (Object.keys(objectSettings).length === 0) {
+    if (!(previewFile in objectSettingsByFile)) return objectSettingsByFile;
+    const next = { ...objectSettingsByFile };
+    delete next[previewFile];
+    return next;
+  }
+  return { ...objectSettingsByFile, [previewFile]: objectSettings };
+};
+
+const remapObjectSettingsByFile = (
+  objectSettingsByFile: ObjectSettingsByFile,
+  from: string,
+  to: string,
+): ObjectSettingsByFile => {
+  let changed = false;
+  const next: ObjectSettingsByFile = {};
+  Object.entries(objectSettingsByFile).forEach(([file, settings]) => {
+    const mapped = movePath(file, from, to);
+    if (mapped !== file) changed = true;
+    next[mapped] = settings;
+  });
+  return changed ? next : objectSettingsByFile;
+};
+
+const removeObjectSettingsForFile = (
+  objectSettingsByFile: ObjectSettingsByFile,
+  file: string,
+): ObjectSettingsByFile => {
+  if (!(file in objectSettingsByFile)) return objectSettingsByFile;
+  const next = { ...objectSettingsByFile };
+  delete next[file];
+  return next;
+};
 
 const syncObjectSettings = (
   objects: SceneObject[],
@@ -472,10 +525,11 @@ function runNotebookPreview(
 }
 
 function buildRunState(
+  previewFile: string | null,
   runResult: RunResult,
   state: Pick<
     ForgeStore,
-    | 'objectSettings'
+    | 'objectSettingsByFile'
     | 'selectedObjectId'
     | 'focusedObjectIds'
     | 'cutPlaneEnabled'
@@ -488,9 +542,14 @@ function buildRunState(
 ) {
   const synced = syncObjectSettings(
     runResult.objects,
-    state.objectSettings,
+    getObjectSettingsForPreviewFile(state.objectSettingsByFile, previewFile),
     state.selectedObjectId,
     state.focusedObjectIds,
+  );
+  const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
+    state.objectSettingsByFile,
+    previewFile,
+    synced.settings,
   );
   const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, state.cutPlaneEnabled);
   const nextJointValues = syncJointValues(runResult, state.jointValues);
@@ -511,13 +570,15 @@ function buildRunState(
       jointAnimationProgress: nextAnimationState.progress,
       jointAnimationPlaying: nextAnimationState.playing,
       hoveredJointName: syncHoveredJointName(runResult, state.hoveredJointName),
+      previewFile,
       objectSettings: synced.settings,
+      objectSettingsByFile: nextObjectSettingsByFile,
       selectedObjectId: synced.selectedObjectId,
       focusedObjectIds: synced.focusedObjectIds,
       cutPlaneEnabled: nextCutPlaneEnabled,
     },
     nextCutPlaneEnabled,
-    nextObjectSettings: synced.settings,
+    nextObjectSettingsByFile,
   };
 }
 
@@ -538,6 +599,9 @@ const writeViewPreferences = (patch: Partial<ViewPreferencesState>): void => {
   if (typeof window === 'undefined') return;
   try {
     const next = { ...readViewPreferences(), ...patch };
+    if ('objectSettingsByFile' in patch) {
+      delete (next as { objectSettings?: unknown }).objectSettings;
+    }
     localStorage.setItem(VIEW_PREFERENCES_KEY, JSON.stringify(next));
   } catch {
     // Ignore storage failures (private mode, quota, etc.)
@@ -545,6 +609,17 @@ const writeViewPreferences = (patch: Partial<ViewPreferencesState>): void => {
 };
 
 const initialViewPreferences = readViewPreferences();
+const initialPreviewFile = resolvePreviewFile(initialActive, INITIAL_FILES);
+const initialObjectSettingsByFile: ObjectSettingsByFile = (() => {
+  const viewPreferences = initialViewPreferences as Partial<ViewPreferencesState> & { objectSettings?: ObjectSettingsMap };
+  if (viewPreferences.objectSettingsByFile && typeof viewPreferences.objectSettingsByFile === 'object') {
+    return viewPreferences.objectSettingsByFile;
+  }
+  if (initialPreviewFile && viewPreferences.objectSettings && typeof viewPreferences.objectSettings === 'object') {
+    return { [initialPreviewFile]: viewPreferences.objectSettings };
+  }
+  return {};
+})();
 
 export const useForgeStore = create<ForgeStore>((set, get) => ({
   files: { ...INITIAL_FILES },
@@ -611,7 +686,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set({ folders: next });
   },
   deleteFile: (name) => {
-    const { files, savedFiles, activeFile } = get();
+    const { files, savedFiles, activeFile, objectSettingsByFile } = get();
     const remaining = { ...files };
     delete remaining[name];
     const remainingSaved = { ...savedFiles };
@@ -619,10 +694,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const names = Object.keys(remaining);
     if (names.length === 0) return;
     const newActive = name === activeFile ? names[0] : activeFile;
+    const nextObjectSettingsByFile = removeObjectSettingsForFile(objectSettingsByFile, name);
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
     set({
       files: remaining,
       savedFiles: remainingSaved,
       activeFile: newActive,
+      objectSettingsByFile: nextObjectSettingsByFile,
       paramOverrides: {},
       jointValues: {},
       jointAnimationClip: null,
@@ -635,7 +713,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   renameFile: (oldName, newName) => {
     const normalized = normalizePath(newName);
     if (!normalized || normalized === oldName) return;
-    const { files, savedFiles, activeFile } = get();
+    const { files, savedFiles, activeFile, objectSettingsByFile } = get();
     const code = files[oldName];
     if (!code) return;
     if (files[normalized]) return;
@@ -648,11 +726,14 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     // But we should remove the old name from savedFiles
     const remainingSaved = { ...savedFiles };
     delete remainingSaved[oldName];
+    const nextObjectSettingsByFile = remapObjectSettingsByFile(objectSettingsByFile, oldName, normalized);
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
 
     set({
       files: remaining,
       savedFiles: remainingSaved,
       activeFile: oldName === activeFile ? normalized : activeFile,
+      objectSettingsByFile: nextObjectSettingsByFile,
       folders: Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort(),
     });
   },
@@ -661,7 +742,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const normalizedNew = normalizePath(newPath);
     if (!normalizedOld || !normalizedNew) return;
     if (normalizedOld === normalizedNew) return;
-    const { files, savedFiles, activeFile, folders } = get();
+    const { files, savedFiles, activeFile, folders, objectSettingsByFile } = get();
     if (!folders.includes(normalizedOld)) return;
     if (files[normalizedNew]) return;
     if (folders.includes(normalizedNew)) return;
@@ -694,12 +775,15 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const nextActive = activeFile && activeFile.startsWith(`${normalizedOld}/`)
       ? movePath(activeFile, normalizedOld, normalizedNew)
       : activeFile;
+    const nextObjectSettingsByFile = remapObjectSettingsByFile(objectSettingsByFile, normalizedOld, normalizedNew);
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
 
     set({
       files: updatedFiles,
       savedFiles: updatedSaved,
       folders: updatedFolders,
       activeFile: nextActive,
+      objectSettingsByFile: nextObjectSettingsByFile,
       paramOverrides: {},
       jointValues: {},
       jointAnimationClip: null,
@@ -763,7 +847,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     } = get();
     const previewFile = resolvePreviewFile(activeFile, files);
     if (!previewFile) {
-      set({ result: null, consoleLogs: [], params: [] });
+      set({ result: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
       return;
     }
     const code = files[previewFile];
@@ -772,9 +856,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const runResult = isNotebookFile(previewFile)
       ? runNotebookPreview(previewFile, code, files, runQuality)
       : runScript(code, previewFile, files, { quality: runQuality });
-    const applied = buildRunState(runResult, get());
+    const applied = buildRunState(previewFile, runResult, get());
     set(applied.nextState);
-    writeViewPreferences({ objectSettings: applied.nextObjectSettings, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+    writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
   },
 
   setParam: (name, value) => {
@@ -788,7 +872,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     } = get();
     const previewFile = resolvePreviewFile(activeFile, files);
     if (!previewFile) {
-      set({ result: null, consoleLogs: [], params: [] });
+      set({ result: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
       return;
     }
     const code = files[previewFile];
@@ -796,9 +880,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const runResult = isNotebookFile(previewFile)
       ? runNotebookPreview(previewFile, code, files, runQuality)
       : runScript(code, previewFile, files, { quality: runQuality });
-    const applied = buildRunState(runResult, get());
+    const applied = buildRunState(previewFile, runResult, get());
     set(applied.nextState);
-    writeViewPreferences({ objectSettings: applied.nextObjectSettings, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+    writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
   },
 
   setJointValue: (name, value) => set((state) => {
@@ -901,12 +985,22 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     writeViewPreferences({ showPerformanceInfo: enabled });
     set({ showPerformanceInfo: enabled });
   },
-  objectSettings: initialViewPreferences.objectSettings ?? {},
+  previewFile: initialPreviewFile,
+  objectSettingsByFile: initialObjectSettingsByFile,
+  objectSettings: getObjectSettingsForPreviewFile(initialObjectSettingsByFile, initialPreviewFile),
   setObjectVisibility: (id, visible) => set((s) => {
     const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
     const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, visible } };
-    writeViewPreferences({ objectSettings: nextObjectSettings });
-    return { objectSettings: nextObjectSettings };
+    const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
+      s.objectSettingsByFile,
+      s.previewFile,
+      nextObjectSettings,
+    );
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+    return {
+      objectSettings: nextObjectSettings,
+      objectSettingsByFile: nextObjectSettingsByFile,
+    };
   }),
   showAllObjects: () => set((state) => {
     const objectMetaById = new Map((state.result?.objects ?? []).map((obj) => [obj.id, obj]));
@@ -928,8 +1022,16 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     });
 
     if (!changed) return state;
-    writeViewPreferences({ objectSettings: nextObjectSettings });
-    return { objectSettings: nextObjectSettings };
+    const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
+      state.objectSettingsByFile,
+      state.previewFile,
+      nextObjectSettings,
+    );
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+    return {
+      objectSettings: nextObjectSettings,
+      objectSettingsByFile: nextObjectSettingsByFile,
+    };
   }),
   setObjectsVisibility: (ids, visible) => set((s) => {
     if (ids.length === 0) return {} as Partial<ForgeStore>;
@@ -944,20 +1046,44 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     });
 
     if (!changed) return {} as Partial<ForgeStore>;
-    writeViewPreferences({ objectSettings: nextObjectSettings });
-    return { objectSettings: nextObjectSettings };
+    const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
+      s.objectSettingsByFile,
+      s.previewFile,
+      nextObjectSettings,
+    );
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+    return {
+      objectSettings: nextObjectSettings,
+      objectSettingsByFile: nextObjectSettingsByFile,
+    };
   }),
   setObjectOpacity: (id, opacity) => set((s) => {
     const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
     const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, opacity } };
-    writeViewPreferences({ objectSettings: nextObjectSettings });
-    return { objectSettings: nextObjectSettings };
+    const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
+      s.objectSettingsByFile,
+      s.previewFile,
+      nextObjectSettings,
+    );
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+    return {
+      objectSettings: nextObjectSettings,
+      objectSettingsByFile: nextObjectSettingsByFile,
+    };
   }),
   setObjectColor: (id, color) => set((s) => {
     const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
     const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, color } };
-    writeViewPreferences({ objectSettings: nextObjectSettings });
-    return { objectSettings: nextObjectSettings };
+    const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
+      s.objectSettingsByFile,
+      s.previewFile,
+      nextObjectSettings,
+    );
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+    return {
+      objectSettings: nextObjectSettings,
+      objectSettingsByFile: nextObjectSettingsByFile,
+    };
   }),
   selectedObjectId: null,
   selectObject: (id) => set({ selectedObjectId: id }),
@@ -1075,11 +1201,15 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 
   newProject: () => {
+    writeViewPreferences({ objectSettingsByFile: initialObjectSettingsByFile });
     set({
       files: { ...INITIAL_FILES },
       savedFiles: { ...INITIAL_SAVED },
       folders: [],
       activeFile: initialActive,
+      previewFile: initialPreviewFile,
+      objectSettings: getObjectSettingsForPreviewFile(initialObjectSettingsByFile, initialPreviewFile),
+      objectSettingsByFile: initialObjectSettingsByFile,
       fileHandle: null,
       dirty: false,
       paramOverrides: {},
@@ -1196,6 +1326,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       activeFile: normalized,
       fileHandle: null,
       dirty: false,
+      previewFile: null,
+      objectSettings: {},
       paramOverrides: {},
       jointValues: {},
       jointAnimationClip: null,
@@ -1242,7 +1374,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         return;
       }
       const serverFiles: Record<string, string> = await response.json();
-      const { files, savedFiles, activeFile } = get();
+      const { files, savedFiles, activeFile, objectSettingsByFile } = get();
 
       const dirtyFiles = new Set<string>();
       Object.keys(files).forEach((path) => {
@@ -1286,6 +1418,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
             || availableFiles[0]));
 
       const nextDirty = Object.keys(nextFiles).some((path) => nextSaved[path] !== nextFiles[path]);
+      const nextObjectSettingsByFile = Object.fromEntries(
+        Object.entries(objectSettingsByFile).filter(([file]) => file in nextFiles),
+      ) as ObjectSettingsByFile;
+      writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
 
       set({
         files: nextFiles,
@@ -1293,6 +1429,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         folders: Array.from(newFolders).sort(),
         activeFile: newActiveFile,
         dirty: nextDirty,
+        objectSettingsByFile: nextObjectSettingsByFile,
       });
 
       if (newActiveFile && newActiveFile !== activeFile) {
