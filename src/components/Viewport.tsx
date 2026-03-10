@@ -22,7 +22,12 @@ import {
   createResolvedExplodeConfig,
   explodeAdd,
   explodeBoundsCenter,
+  explodeLeafFanStage,
   explodeMergeBounds,
+  explodeMul,
+  hasExplodeOverride,
+  resolveExplodeDirective,
+  resolveExplodeLocalFanDirection,
 } from '@forge/explodeCore';
 import {
   registerOrbitGifExporter,
@@ -787,16 +792,26 @@ const computeExplodeTreeOffsets = (
     parentDirection: [number, number, number] | undefined,
   ) => {
     const center = explodeBoundsCenter(node.bounds) ?? parentCenter;
-    const motion = computeExplodeMotion({
-      pathKeys: [node.path.join('/')],
-      seed: node.key,
-      depth,
-      center,
-      originCenter: parentCenter,
-      inheritedDirection: parentDirection,
-      name: node.label,
-      config,
-    });
+    const directive = resolveExplodeDirective([node.path.join('/')], node.label, undefined, config);
+    const motion = depth > 1 && node.children.length === 0 && !hasExplodeOverride(directive)
+      ? (() => {
+          const direction = resolveExplodeLocalFanDirection(center, parentCenter, parentDirection, node.key);
+          return {
+            direction,
+            branchDirection: parentDirection ?? direction,
+            offset: explodeMul(direction, config.amount * explodeLeafFanStage(config, depth)),
+          };
+        })()
+      : computeExplodeMotion({
+          pathKeys: [node.path.join('/')],
+          seed: node.key,
+          depth,
+          center,
+          originCenter: parentCenter,
+          inheritedDirection: parentDirection,
+          name: node.label,
+          config,
+        });
     const total = explodeAdd(inherited, motion.offset);
     node.objectIds.forEach((objectId) => {
       offsets[objectId] = total;

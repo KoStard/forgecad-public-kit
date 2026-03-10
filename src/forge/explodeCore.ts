@@ -51,6 +51,8 @@ export interface ResolvedExplodeMotion {
   offset: [number, number, number];
 }
 
+const DEFAULT_LEAF_FAN_RATIO = 0.35;
+
 export function createResolvedExplodeConfig(options: ExplodeConfigOptions = {}): ResolvedExplodeConfig {
   const stages = options.stages ?? [];
   return {
@@ -76,6 +78,14 @@ export function mergeExplodeDirectives(...directives: (ExplodeDirective | undefi
     if (directive.axisLock !== undefined) out.axisLock = directive.axisLock;
   });
   return out;
+}
+
+export function hasExplodeOverride(directive: ExplodeDirective | undefined): boolean {
+  return !!directive && (
+    directive.stage !== undefined
+    || directive.direction !== undefined
+    || directive.axisLock !== undefined
+  );
 }
 
 export function resolveExplodeDirective(
@@ -148,6 +158,10 @@ export function computeExplodeMotion({
 
 export function computeExplodeOffset(input: ExplodeMotionInput): [number, number, number] {
   return computeExplodeMotion(input).offset;
+}
+
+export function explodeLeafFanStage(config: ResolvedExplodeConfig, depth: number): number {
+  return config.stageForDepth(depth) * DEFAULT_LEAF_FAN_RATIO;
 }
 
 export function explodeMergeBounds(a: ExplodeBounds | null, b: ExplodeBounds | null): ExplodeBounds | null {
@@ -325,6 +339,32 @@ function resolveNestedExplodeDirection(
 
   if (explodeLength(fan) <= 1e-8) return resolvedDirection;
   return fan;
+}
+
+export function resolveExplodeLocalFanDirection(
+  center: [number, number, number],
+  originCenter: [number, number, number],
+  branchDirection: [number, number, number] | undefined,
+  seed: string,
+): [number, number, number] {
+  const local = [
+    center[0] - originCenter[0],
+    center[1] - originCenter[1],
+    center[2] - originCenter[2],
+  ] as [number, number, number];
+
+  if (!branchDirection) {
+    return explodeNormalize(local, explodeFallbackVector(`${seed}|leaf-fan`));
+  }
+
+  const branch = explodeNormalize(
+    branchDirection,
+    explodeFallbackVector(`${seed}|leaf-branch`),
+  );
+  return explodeNormalize(
+    explodeProjectPerpendicular(local, branch),
+    explodeProjectPerpendicular(explodeFallbackVector(`${seed}|leaf-fan`), branch),
+  );
 }
 
 export function applyExplodeAxisLock(

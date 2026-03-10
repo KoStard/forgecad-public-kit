@@ -23,7 +23,12 @@ import {
   createResolvedExplodeConfig,
   explodeAdd,
   explodeBoundsCenter,
+  explodeLeafFanStage,
   explodeMergeBounds,
+  explodeMul,
+  hasExplodeOverride,
+  resolveExplodeDirective,
+  resolveExplodeLocalFanDirection,
 } from './explodeCore';
 
 /** M-series bolt hole (through-hole) */
@@ -624,6 +629,28 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     });
   };
 
+  const leafMotion = (
+    node: unknown,
+    path: string,
+    depth: number,
+    originCenter: [number, number, number],
+    inheritedDirection: [number, number, number] | undefined,
+    name?: string,
+    local?: ExplodeDirective,
+  ) => {
+    const directive = resolveExplodeDirective([path], name, local, config);
+    if (depth > 1 && !hasExplodeOverride(directive)) {
+      const center = centerForNode(node, originCenter);
+      const direction = resolveExplodeLocalFanDirection(center, originCenter, inheritedDirection, path);
+      return {
+        direction,
+        branchDirection: inheritedDirection ?? direction,
+        offset: explodeMul(direction, config.amount * explodeLeafFanStage(config, depth)),
+      };
+    }
+    return nodeMotion(node, path, depth, originCenter, inheritedDirection, name, local);
+  };
+
   const explodeLeaf = (
     leaf: Shape | Sketch | TrackedShape,
     offset: [number, number, number],
@@ -652,7 +679,7 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     return new ShapeGroup(grp.children.map((child, i) => {
       const p = childPath(path, i, grp.childName(i));
       if (child instanceof ShapeGroup) return explodeGroup(child, p, depth + 1, total, groupCenter, motion.branchDirection);
-      return explodeLeaf(child, explodeAdd(total, nodeMotion(child, p, depth + 1, groupCenter, motion.branchDirection).offset));
+      return explodeLeaf(child, explodeAdd(total, leafMotion(child, p, depth + 1, groupCenter, motion.branchDirection).offset));
     }), grp.childNames);
   };
 
@@ -666,7 +693,7 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
   ): ExplodeItem => {
     if (item instanceof ShapeGroup) return explodeGroup(item, path, depth, inherited, parentCenter, parentDirection);
     if (item instanceof TrackedShape || item instanceof Shape || item instanceof Sketch) {
-      return explodeLeaf(item, explodeAdd(inherited, nodeMotion(item, path, depth, parentCenter, parentDirection).offset));
+      return explodeLeaf(item, explodeAdd(inherited, leafMotion(item, path, depth, parentCenter, parentDirection).offset));
     }
     if (!isExplodeNamedItem(item)) return item;
 
