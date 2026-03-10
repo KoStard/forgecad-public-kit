@@ -20,17 +20,21 @@ export function CommandPalette() {
   const open = useForgeStore((s) => s.commandPaletteOpen);
   const close = useForgeStore((s) => s.closeCommandPalette);
   const openPalette = useForgeStore((s) => s.openCommandPalette);
+  const showAllObjects = useForgeStore((s) => s.showAllObjects);
   const setTheme = useForgeStore((s) => s.setTheme);
   const theme = useForgeStore((s) => s.theme);
   const result = useForgeStore((s) => s.result);
   const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
   const setShowPerformanceInfo = useForgeStore((s) => s.setShowPerformanceInfo);
+  const objectSettings = useForgeStore((s) => s.objectSettings);
 
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const [subCommands, setSubCommands] = useState<Command[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasShapes = (result?.objects?.some((obj) => Boolean(obj.shape)) ?? false);
+  const hiddenObjectCount = (result?.objects ?? []).filter((obj) => !(objectSettings[obj.id]?.visible ?? true)).length;
+  const hasObjectCommands = (result?.objects?.length ?? 0) > 0 || Object.keys(objectSettings).length > 0;
 
   const themeChoices: Command[] = (['dark', 'light', 'gruvbox', 'tokyo-night', 'kanagawa-lotus'] as const).map((t) => ({
     id: `theme-${t}`,
@@ -74,6 +78,16 @@ export function CommandPalette() {
   ];
 
   const rootCommands: Command[] = [
+    ...(hasObjectCommands
+      ? [{
+        id: 'show-all-objects',
+        label: hiddenObjectCount > 0 ? `Show All Objects (${hiddenObjectCount} hidden)` : 'Show All Objects',
+        action: () => {
+          showAllObjects();
+          close();
+        },
+      } satisfies Command]
+      : []),
     {
       id: 'toggle-performance-info',
       label: `${showPerformanceInfo ? 'Hide' : 'Show'} Performance Info`,

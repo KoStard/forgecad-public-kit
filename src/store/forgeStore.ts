@@ -216,6 +216,7 @@ interface ForgeStore {
   setShowPerformanceInfo: (enabled: boolean) => void;
   objectSettings: Record<string, ObjectSettings>;
   setObjectVisibility: (id: string, visible: boolean) => void;
+  showAllObjects: () => void;
   setObjectOpacity: (id: string, opacity: number) => void;
   setObjectColor: (id: string, color: string) => void;
   selectedObjectId: string | null;
@@ -903,6 +904,30 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   setObjectVisibility: (id, visible) => set((s) => {
     const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
     const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, visible } };
+    writeViewPreferences({ objectSettings: nextObjectSettings });
+    return { objectSettings: nextObjectSettings };
+  }),
+  showAllObjects: () => set((state) => {
+    const objectMetaById = new Map((state.result?.objects ?? []).map((obj) => [obj.id, obj]));
+    const ids = new Set([
+      ...Object.keys(state.objectSettings),
+      ...objectMetaById.keys(),
+    ]);
+
+    if (ids.size === 0) return state;
+
+    let changed = false;
+    const nextObjectSettings = { ...state.objectSettings };
+    ids.forEach((id) => {
+      const objectMeta = objectMetaById.get(id);
+      const fallbackColor = objectMeta?.color || DEFAULT_OBJECT_COLOR;
+      const current = nextObjectSettings[id] ?? { visible: true, opacity: 1, color: fallbackColor };
+      if (!current.visible) changed = true;
+      nextObjectSettings[id] = { ...current, visible: true };
+    });
+
+    if (!changed) return state;
+
     writeViewPreferences({ objectSettings: nextObjectSettings });
     return { objectSettings: nextObjectSettings };
   }),
