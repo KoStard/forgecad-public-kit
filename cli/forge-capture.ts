@@ -22,7 +22,12 @@ import { createServer } from 'net';
 import { PNG } from 'pngjs';
 import gifenc from 'gifenc';
 import { collectProjectFiles } from './collect-files';
-import { parseCameraCliSpec, type ViewportCameraState } from '../src/capture/cameraState';
+import { parseCameraCliSpec } from '../src/capture/cameraState';
+import {
+  mergeViewportRenderSceneStates,
+  parseRenderSceneCliSpec,
+  type ViewportRenderSceneState,
+} from '../src/capture/renderSceneState';
 
 const { GIFEncoder, quantize, applyPalette } = gifenc;
 
@@ -60,7 +65,7 @@ interface CliOptions {
   port: number;
   chromePath?: string;
   ffmpegPath?: string;
-  camera?: ViewportCameraState;
+  scene?: ViewportRenderSceneState;
   listOnly: boolean;
 }
 
@@ -168,6 +173,7 @@ Options:
   --animation-loops <n>        Repeat the selected clip this many times (default: ${DEFAULTS.animationLoops})
   --cut-plane <name>           Enable a named cut plane (repeatable)
   --camera <spec>              Camera spec, e.g. proj=perspective;pos=120,80,120;target=0,0,0;up=0,0,1
+  --scene <json>               Scene state JSON copied from the viewport; includes camera and object overrides
   --render-mode <solid|wireframe>
                                Primary render mode (default: solid)
   --include-wireframe-pass     Append a second wireframe pass
@@ -265,7 +271,7 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
   let port = DEFAULTS.port;
   let chromePath = process.env.CHROME_PATH;
   let ffmpegPath = process.env.FFMPEG_PATH;
-  let camera: ViewportCameraState | undefined;
+  let scene: ViewportRenderSceneState | undefined;
   let listOnly = false;
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -297,7 +303,14 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
       continue;
     }
     if (arg === '--camera') {
-      camera = parseCameraCliSpec(readValue(argv, i, arg));
+      scene = mergeViewportRenderSceneStates(scene, {
+        camera: parseCameraCliSpec(readValue(argv, i, arg)),
+      }) ?? undefined;
+      i += 1;
+      continue;
+    }
+    if (arg === '--scene') {
+      scene = mergeViewportRenderSceneStates(scene, parseRenderSceneCliSpec(readValue(argv, i, arg))) ?? undefined;
       i += 1;
       continue;
     }
@@ -470,7 +483,7 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
     port,
     chromePath,
     ffmpegPath,
-    camera,
+    scene,
     listOnly,
   };
 }
@@ -936,8 +949,12 @@ function printSummary(options: CliOptions, init: BrowserCaptureInitResult, encod
   if (options.cutPlanes.length > 0) {
     lines.push(`  cut-planes=${options.cutPlanes.join(', ')}`);
   }
-  if (options.camera) {
-    lines.push(`  camera=custom (${options.camera.projectionMode})`);
+  if (options.scene?.camera) {
+    lines.push(`  camera=custom (${options.scene.camera.projectionMode})`);
+  }
+  const objectOverrideCount = Object.keys(options.scene?.objects ?? {}).length;
+  if (objectOverrideCount > 0) {
+    lines.push(`  object-overrides=${objectOverrideCount}`);
   }
   if (options.capture === 'orbit') {
     lines.push(`  orbit-frames=${options.framesPerTurn} hold=${options.holdFrames} pitch=${options.pitchDeg ?? 'auto'}°`);
@@ -1042,7 +1059,7 @@ export async function runCaptureCli(config: CaptureCliEntryConfig): Promise<void
         fileName,
         background: options.background,
         enabledCutPlanes: options.cutPlanes,
-        camera: options.camera ?? null,
+        sceneState: options.scene ?? null,
         animationName: options.animationName ?? null,
         capture: options.capture,
       },
