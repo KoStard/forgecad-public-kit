@@ -9,9 +9,15 @@ import { assembly } from '../src/forge/assembly';
 import { box, initKernel } from '../src/forge/kernel';
 import { group } from '../src/forge/group';
 import { bevelGear } from '../src/forge/library';
+import { resolveJointAnimation } from '../src/forge/jointAnimation';
 import { runScript } from '../src/forge/runner';
 import { Transform } from '../src/forge/transform';
-import { resolveJointViewValues, type JointViewCouplingDef, type JointViewDef } from '../src/forge/jointsView';
+import {
+  resolveJointViewValues,
+  type JointViewAnimationDef,
+  type JointViewCouplingDef,
+  type JointViewDef,
+} from '../src/forge/jointsView';
 
 const EPS = 1e-6;
 
@@ -411,6 +417,47 @@ function testRuntimeJointCouplingResolution() {
   assert(approx(values.Motor, -200), `Expected Motor=-200 after clamp, got ${values.Motor}`);
 }
 
+function testContinuousRuntimeJointAnimation() {
+  const joints: JointViewDef[] = [
+    {
+      name: 'Input Drive',
+      child: 'Input Drive',
+      type: 'revolute',
+      axis: [0, 0, 1],
+      pivot: [0, 0, 0],
+      min: -1440,
+      max: 1440,
+      defaultValue: 0,
+      unit: '°',
+    },
+  ];
+
+  const clip: JointViewAnimationDef = {
+    name: 'Continuous Spin',
+    duration: 4.6,
+    loop: true,
+    continuous: true,
+    keyframes: [
+      { at: 0, values: { 'Input Drive': 0 } },
+      { at: 1, values: { 'Input Drive': 720 } },
+    ],
+  };
+
+  const firstCycle = resolveJointAnimation(clip, 0.25);
+  const secondCycle = resolveJointAnimation(clip, 1.25);
+  const thirdCycle = resolveJointAnimation(clip, 2.5);
+
+  assert(approx(firstCycle['Input Drive'], 180), `Expected first-cycle drive=180, got ${firstCycle['Input Drive']}`);
+  assert(approx(secondCycle['Input Drive'], 900), `Expected second-cycle drive=900, got ${secondCycle['Input Drive']}`);
+  assert(approx(thirdCycle['Input Drive'], 1800), `Expected third-cycle drive=1800, got ${thirdCycle['Input Drive']}`);
+
+  const clamped = resolveJointViewValues(joints, [], thirdCycle);
+  const unclamped = resolveJointViewValues(joints, [], thirdCycle, { clamp: false });
+
+  assert(approx(clamped['Input Drive'], 1440), `Expected clamped drive=1440, got ${clamped['Input Drive']}`);
+  assert(approx(unclamped['Input Drive'], 1800), `Expected unclamped drive=1800, got ${unclamped['Input Drive']}`);
+}
+
 function testBevelGearTopSectionCircularity() {
   const gear = bevelGear({
     module: 2,
@@ -444,6 +491,7 @@ async function main() {
   testAssemblyJointCouplings();
   testAssemblyGearCouplings();
   testRuntimeJointCouplingResolution();
+  testContinuousRuntimeJointAnimation();
   testBevelGearTopSectionCircularity();
   console.log('✓ Transform and assembly invariants passed');
 }
