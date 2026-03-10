@@ -47,6 +47,7 @@ export interface ExplodeMotionInput extends ExplodeOffsetInput {
 
 export interface ResolvedExplodeMotion {
   direction: [number, number, number];
+  branchDirection: [number, number, number];
   offset: [number, number, number];
 }
 
@@ -106,16 +107,41 @@ export function computeExplodeMotion({
   const merged = resolveExplodeDirective(pathKeys, name, local, config);
   const stage = merged.stage ?? config.stageForDepth(depth);
   const effectiveDirection = merged.direction ?? config.defaultMode;
-  const direction = resolveExplodeDirection(
+  const resolvedDirection = resolveExplodeDirection(
     effectiveDirection,
     center,
     originCenter,
     seed,
   );
-  const branched = applyExplodeTreeBias(direction, effectiveDirection, inheritedDirection, seed);
-  const locked = applyExplodeAxisLock(branched, merged.axisLock ?? config.defaultAxisLock, seed);
+  const explicitDirectionProvided = merged.direction !== undefined;
+  const branchSource = applyExplodeTreeBias(
+    resolvedDirection,
+    effectiveDirection,
+    inheritedDirection,
+    seed,
+  );
+  const branchDirection = applyExplodeAxisLock(
+    branchSource,
+    merged.axisLock ?? config.defaultAxisLock,
+    `${seed}|branch`,
+  );
+  const nestedDirection = resolveNestedExplodeDirection(
+    resolvedDirection,
+    effectiveDirection,
+    inheritedDirection,
+    originCenter,
+    center,
+    explicitDirectionProvided,
+    seed,
+  );
+  const locked = applyExplodeAxisLock(
+    nestedDirection ?? branchDirection,
+    merged.axisLock ?? config.defaultAxisLock,
+    seed,
+  );
   return {
     direction: locked,
+    branchDirection,
     offset: explodeMul(locked, config.amount * stage),
   };
 }
@@ -270,6 +296,35 @@ export function applyExplodeTreeBias(
     ],
     direction,
   );
+}
+
+function resolveNestedExplodeDirection(
+  resolvedDirection: [number, number, number],
+  mode: ExplodeDirection,
+  inheritedDirection: [number, number, number] | undefined,
+  originCenter: [number, number, number],
+  center: [number, number, number],
+  explicitDirectionProvided: boolean,
+  seed: string,
+): [number, number, number] | null {
+  if (!inheritedDirection || explicitDirectionProvided || mode === 'radial') return null;
+
+  const branch = explodeNormalize(
+    inheritedDirection,
+    explodeFallbackVector(`${seed}|nested-branch`),
+  );
+  const local = [
+    center[0] - originCenter[0],
+    center[1] - originCenter[1],
+    center[2] - originCenter[2],
+  ] as [number, number, number];
+  const fan = explodeNormalize(
+    explodeProjectPerpendicular(local, branch),
+    explodeProjectPerpendicular(explodeFallbackVector(`${seed}|nested-fan`), branch),
+  );
+
+  if (explodeLength(fan) <= 1e-8) return resolvedDirection;
+  return fan;
 }
 
 export function applyExplodeAxisLock(

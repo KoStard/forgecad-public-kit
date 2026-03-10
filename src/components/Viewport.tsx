@@ -801,7 +801,7 @@ const computeExplodeTreeOffsets = (
     node.objectIds.forEach((objectId) => {
       offsets[objectId] = total;
     });
-    node.children.forEach((child) => walk(child, depth + 1, total, center, motion.direction));
+    node.children.forEach((child) => walk(child, depth + 1, total, center, motion.branchDirection));
   };
 
   root.children.forEach((child) => walk(child, 1, [0, 0, 0], rootCenter, undefined));
