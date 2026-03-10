@@ -617,9 +617,11 @@ type ExplodeItem = Shape | Sketch | TrackedShape | ShapeGroup | ExplodeNamedItem
 type ExplodeViewOptions = {
   enabled?: boolean;
   amountScale?: number;
+  stages?: number[];
   mode?: ExplodeDirection;
   axisLock?: ExplodeAxis;
   byName?: Record<string, ExplodeDirective>;
+  byPath?: Record<string, ExplodeDirective>;
 };
 type JointViewType = 'revolute' | 'prismatic';
 type JointViewDef = {

@@ -634,7 +634,7 @@ export function ViewPanel() {
           />
         </div>
         <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
-          Always on. Set to 0 for assembled view.
+          Uses scene hierarchy when available. Set to 0 for assembled view.
         </div>
       </div>
 

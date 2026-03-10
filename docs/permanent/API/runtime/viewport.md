@@ -35,22 +35,37 @@ Notes:
 
 Override how the viewport explode slider offsets returned objects.
 
+Explode offsets are resolved from the returned object tree, not from a flat list.
+In `radial` mode each node follows its parent branch direction, then adds a smaller
+local fan from the immediate parent/subassembly center, so nested assemblies peel
+apart level by level without losing their branch structure.
+
+In fixed-axis or fixed-vector modes, the branch itself follows that axis/vector, but
+nested descendants fan out perpendicular to the branch by default so deep trees do
+not keep stacking farther along the same axis.
+
+By default this is container-oriented: named groups/subassemblies advance along the
+tree, while plain leaves inside a group stay much closer and mostly fan locally
+around their parent cluster unless you override them explicitly.
+
 **Parameters:**
 - `enabled` (boolean) - disable explode offsets for this script when `false`
 - `amountScale` (number) - multiply the UI explode amount
+- `stages` (number[]) - per-depth multipliers (depth 1 = first level, defaults to `1, 1/2, 1/3, ...`)
 - `mode` (`'radial' | 'x' | 'y' | 'z' | [x, y, z]`) - default explode direction
 - `axisLock` (`'x' | 'y' | 'z'`) - optional global axis lock
 - `byName` (`Record<string, { stage?, direction?, axisLock? }>`)- per-object overrides keyed by returned object `name`
+- `byPath` (`Record<string, { stage?, direction?, axisLock? }>`)- per-tree-path overrides using slash-separated object tree paths such as `"Drive/Shaft"`
 
 **Returns:** `void`
 
 ```javascript
 explodeView({
   amountScale: 1.2,
+  stages: [0.35, 0.8],
   mode: 'radial',
-  byName: {
-    "Shaft": { direction: [1, 0, 0], stage: 1.6 },
-    "Housing": { stage: 0.4 },
+  byPath: {
+    "Drive/Shaft": { direction: [1, 0, 0], stage: 1.6 },
   },
 });
 ```
@@ -168,6 +183,17 @@ viewConfig({
 ## `lib.explode(items, options?)`
 
 Apply deterministic exploded-view offsets to an assembly tree while preserving names, colors, and nesting.
+
+`radial` separation is branch-aware and parent-relative: each child follows the
+direction of its parent branch, then fans out locally inside that branch. This keeps
+subassemblies visually grouped while still letting their internals break apart.
+
+For non-radial fixed-axis or fixed-vector modes, nested descendants keep the branch
+offset but spread perpendicular to it by default.
+
+Default behavior is tree-like rather than flat: containers separate recursively,
+while unconfigured leaves inside a container use a smaller local fan so sibling parts
+stay visually associated with their parent group.
 
 Works with:
 - arrays of shapes/sketches/named items
