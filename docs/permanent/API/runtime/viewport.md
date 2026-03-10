@@ -40,6 +40,10 @@ In `radial` mode each node follows its parent branch direction, then adds a smal
 local fan from the immediate parent/subassembly center, so nested assemblies peel
 apart level by level without losing their branch structure.
 
+In fixed-axis or fixed-vector modes, the branch itself follows that axis/vector, but
+nested descendants fan out perpendicular to the branch by default so deep trees do
+not keep stacking farther along the same axis.
+
 **Parameters:**
 - `enabled` (boolean) - disable explode offsets for this script when `false`
 - `amountScale` (number) - multiply the UI explode amount
@@ -179,6 +183,9 @@ Apply deterministic exploded-view offsets to an assembly tree while preserving n
 `radial` separation is branch-aware and parent-relative: each child follows the
 direction of its parent branch, then fans out locally inside that branch. This keeps
 subassemblies visually grouped while still letting their internals break apart.
+
+For non-radial fixed-axis or fixed-vector modes, nested descendants keep the branch
+offset but spread perpendicular to it by default.
 
 Works with:
 - arrays of shapes/sketches/named items
