@@ -24,7 +24,12 @@ import {
   type RunResult,
   type SceneObject,
 } from '../src/forge/headless';
-import type { ViewportCameraState } from '../src/capture/cameraState';
+import { parseCameraCliSpec, type ViewportCameraState } from '../src/capture/cameraState';
+import {
+  mergeViewportRenderSceneStates,
+  parseRenderSceneCliSpec,
+  type ViewportRenderSceneState,
+} from '../src/capture/renderSceneState';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const exportCanvas = document.createElement('canvas');
@@ -50,6 +55,9 @@ interface OrbitInitOptions {
   quality?: ForgeQualityPreset;
   enabledCutPlanes?: string[];
   camera?: ViewportCameraState | null;
+  cameraSpec?: string | null;
+  sceneState?: ViewportRenderSceneState | null;
+  sceneSpec?: string | null;
   animationName?: string | null;
   capture?: 'orbit' | 'animation';
 }
@@ -439,6 +447,22 @@ function buildBaseJointValues(joints: JointViewDef[]): Record<string, number> {
   return out;
 }
 
+function resolveRequestedSceneState(opts?: OrbitInitOptions): ViewportRenderSceneState | null {
+  let sceneState = opts?.sceneState ?? null;
+
+  if (opts?.sceneSpec) {
+    sceneState = mergeViewportRenderSceneStates(sceneState, parseRenderSceneCliSpec(opts.sceneSpec));
+  }
+  if (opts?.camera) {
+    sceneState = mergeViewportRenderSceneStates(sceneState, { camera: opts.camera });
+  }
+  if (opts?.cameraSpec) {
+    sceneState = mergeViewportRenderSceneStates(sceneState, { camera: parseCameraCliSpec(opts.cameraSpec) });
+  }
+
+  return sceneState;
+}
+
 function resolveRenderableJointNodeName(
   obj: SceneObject,
   joints: JointViewDef[],
@@ -525,6 +549,14 @@ function createSession(
   const size = opts?.size ?? 1024;
   const pixelRatio = opts?.pixelRatio ?? 1;
   const r = getRenderer(size, pixelRatio);
+  let requestedSceneState: ViewportRenderSceneState | null = null;
+
+  try {
+    requestedSceneState = resolveRequestedSceneState(opts);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
   const result: RunResult = runScript(
     code,
     opts?.fileName || 'main.forge.js',
@@ -540,20 +572,31 @@ function createSession(
     .map((obj) => ({
       source: obj,
       shape: obj.shape || (obj.sketch ? obj.sketch.extrude(1) : null),
-      color: obj.color,
+      color: requestedSceneState?.objects?.[obj.id]?.color ?? obj.color,
+      opacity: THREE.MathUtils.clamp(requestedSceneState?.objects?.[obj.id]?.opacity ?? 1, 0, 1),
+      visible: requestedSceneState?.objects?.[obj.id]?.visible !== false,
     }))
-    .filter((entry): entry is { source: SceneObject; shape: NonNullable<typeof entry.shape>; color?: string } => entry.shape != null);
+    .filter((entry): entry is {
+      source: SceneObject;
+      shape: NonNullable<typeof entry.shape>;
+      color?: string;
+      opacity: number;
+      visible: boolean;
+    } => entry.shape != null);
 
   if (objs.length === 0) {
     return { ok: false, error: 'No shape returned' };
   }
+
+  const visibleObjs = objs.filter((entry) => entry.visible);
+  const boundsObjs = visibleObjs.length > 0 ? visibleObjs : objs;
 
   const scene = new THREE.Scene();
   scene.background = parseColor(opts?.background, DEFAULT_BACKGROUND);
   scene.environment = getStudioEnvironment(r);
   addDefaultLights(scene);
 
-  const allShape = objs.slice(1).reduce((acc, cur) => acc.add(cur.shape), objs[0].shape);
+  const allShape = boundsObjs.slice(1).reduce((acc, cur) => acc.add(cur.shape), boundsObjs[0].shape);
   const shapeBB = allShape.boundingBox();
   const bbox = {
     min: [shapeBB.min[0], shapeBB.min[1], shapeBB.min[2]] as [number, number, number],
@@ -608,7 +651,7 @@ function createSession(
   const activeCutPlanes = availableCutPlanes.filter((cp) => enabledCutPlanes.has(cp.name));
   const renderables: RenderableObject[] = [];
 
-  for (const obj of objs) {
+  for (const obj of visibleObjs) {
     const geo = shapeToGeometry(obj.shape);
     const solidMaterialProps = {
       ...CAD_MATERIAL_PROPS,
@@ -619,13 +662,16 @@ function createSession(
       .map(toClippingPlane);
     const solidMaterial = new THREE.MeshPhysicalMaterial({
       ...solidMaterialProps,
+      transparent: obj.opacity < 1,
+      opacity: obj.opacity,
       clippingPlanes: applicableCutPlanes,
     });
     const solid = new THREE.Mesh(geo.solid, solidMaterial);
     const wireMaterial = new THREE.LineBasicMaterial({
       ...EDGE_MATERIAL_PROPS,
       color: parseColor(obj.color, EDGE_MATERIAL_PROPS.color),
-      opacity: 0.9,
+      transparent: obj.opacity < 1,
+      opacity: obj.opacity,
       clippingPlanes: applicableCutPlanes,
     });
     const wire = new THREE.LineSegments(geo.edges, wireMaterial);
@@ -648,7 +694,7 @@ function createSession(
     });
   }
 
-  const cameraRig = buildCameraRig(center, distance, maxDim, opts?.camera);
+  const cameraRig = buildCameraRig(center, distance, maxDim, requestedSceneState?.camera);
   const session: CaptureSession = {
     scene,
     camera: cameraRig.camera,
@@ -696,6 +742,10 @@ async function setup() {
     allFiles?: Record<string, string>;
     fileName?: string;
     background?: string;
+    camera?: ViewportCameraState | null;
+    cameraSpec?: string | null;
+    sceneState?: ViewportRenderSceneState | null;
+    sceneSpec?: string | null;
   },
 ) {
   const angles = opts?.angles || ['front', 'side', 'top', 'iso'];
@@ -706,6 +756,10 @@ async function setup() {
     allFiles: opts?.allFiles,
     fileName: opts?.fileName,
     background: opts?.background,
+    camera: opts?.camera,
+    cameraSpec: opts?.cameraSpec,
+    sceneState: opts?.sceneState,
+    sceneSpec: opts?.sceneSpec,
     capture: 'orbit',
   });
   if (!built.ok) {

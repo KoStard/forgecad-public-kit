@@ -5,7 +5,8 @@ import type { CutPlaneDef } from '@forge/cutPlane';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
 import { resolveJointViewValues } from '@forge/jointsView';
 import { animationSpeedToSlider, formatAnimationSpeed, sliderToAnimationSpeed } from '../animationSpeed';
-import { formatCameraCliSpec, getCameraForwardVector } from '../capture/cameraState';
+import { getCameraForwardVector, type ViewportCameraState } from '../capture/cameraState';
+import { formatRenderSceneCliSpec, type ViewportRenderSceneState } from '../capture/renderSceneState';
 
 const btnStyle = (active = false): CSSProperties => ({
   padding: '4px 8px',
@@ -51,6 +52,34 @@ const formatVector = (value: [number, number, number]): string => (
 );
 
 const DEFAULT_OBJECT_SETTINGS = { visible: true, opacity: 1, color: '#5b9bd5' } as const;
+
+const shellQuoteArg = (value: string): string => `'${value.replace(/'/g, `'\"'\"'`)}'`;
+
+const buildViewportRenderSceneState = (
+  camera: ViewportCameraState,
+  objects: SceneObject[],
+  objectSettings: Record<string, { visible: boolean; opacity: number; color: string }>,
+): ViewportRenderSceneState => {
+  const objectOverrides: NonNullable<ViewportRenderSceneState['objects']> = {};
+
+  objects.forEach((object) => {
+    const settings = objectSettings[object.id] ?? DEFAULT_OBJECT_SETTINGS;
+    const baseColor = object.color || DEFAULT_OBJECT_SETTINGS.color;
+    const override: NonNullable<ViewportRenderSceneState['objects']>[string] = {};
+
+    if (!settings.visible) override.visible = false;
+    if (Math.abs(settings.opacity - 1) > 1e-6) override.opacity = settings.opacity;
+    if (settings.color !== baseColor) override.color = settings.color;
+
+    if (Object.keys(override).length > 0) {
+      objectOverrides[object.id] = override;
+    }
+  });
+
+  return Object.keys(objectOverrides).length > 0
+    ? { camera, objects: objectOverrides }
+    : { camera };
+};
 
 type ObjectVisibilityState = 'none' | 'mixed' | 'all';
 
@@ -280,8 +309,8 @@ export function ViewPanel() {
     [jointCouplings],
   );
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
-  const [cameraCopyStatus, setCameraCopyStatus] = useState<string | null>(null);
-  const cameraCopyTimeoutRef = useRef<number | null>(null);
+  const [sceneCopyStatus, setSceneCopyStatus] = useState<string | null>(null);
+  const sceneCopyTimeoutRef = useRef<number | null>(null);
   const cameraForward = useMemo(
     () => (viewportCameraState ? getCameraForwardVector(viewportCameraState) : null),
     [viewportCameraState],
@@ -297,6 +326,14 @@ export function ViewPanel() {
   }, [hoveredJointName, joints, setHoveredJointName]);
 
   const objects = result?.objects ?? [];
+  const cliSceneState = useMemo(
+    () => (viewportCameraState ? buildViewportRenderSceneState(viewportCameraState, objects, objectSettings) : null),
+    [objectSettings, objects, viewportCameraState],
+  );
+  const sceneObjectOverrideCount = useMemo(
+    () => Object.keys(cliSceneState?.objects ?? {}).length,
+    [cliSceneState],
+  );
   const objectTree = useMemo(() => buildObjectTree(objects), [objects]);
   const selectedObject = objects.find((obj) => obj.id === selectedObjectId) ?? null;
   const objectItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -319,32 +356,32 @@ export function ViewPanel() {
 
   useEffect(() => {
     return () => {
-      if (cameraCopyTimeoutRef.current !== null) {
-        window.clearTimeout(cameraCopyTimeoutRef.current);
+      if (sceneCopyTimeoutRef.current !== null) {
+        window.clearTimeout(sceneCopyTimeoutRef.current);
       }
     };
   }, []);
 
-  const setCameraCopyFeedback = (message: string): void => {
-    setCameraCopyStatus(message);
-    if (cameraCopyTimeoutRef.current !== null) {
-      window.clearTimeout(cameraCopyTimeoutRef.current);
+  const setSceneCopyFeedback = (message: string): void => {
+    setSceneCopyStatus(message);
+    if (sceneCopyTimeoutRef.current !== null) {
+      window.clearTimeout(sceneCopyTimeoutRef.current);
     }
-    cameraCopyTimeoutRef.current = window.setTimeout(() => {
-      cameraCopyTimeoutRef.current = null;
-      setCameraCopyStatus(null);
+    sceneCopyTimeoutRef.current = window.setTimeout(() => {
+      sceneCopyTimeoutRef.current = null;
+      setSceneCopyStatus(null);
     }, 1800);
   };
 
-  const copyCameraCliArg = async (): Promise<void> => {
-    if (!viewportCameraState) return;
-    const text = `--camera "${formatCameraCliSpec(viewportCameraState)}"`;
+  const copySceneCliArg = async (): Promise<void> => {
+    if (!cliSceneState) return;
+    const text = `--scene ${shellQuoteArg(formatRenderSceneCliSpec(cliSceneState))}`;
     try {
       await navigator.clipboard.writeText(text);
-      setCameraCopyFeedback('CLI camera copied');
+      setSceneCopyFeedback('CLI scene copied');
     } catch (err) {
-      console.error('Failed to copy camera spec:', err);
-      setCameraCopyFeedback('Clipboard failed');
+      console.error('Failed to copy scene spec:', err);
+      setSceneCopyFeedback('Clipboard failed');
     }
   };
 
@@ -532,7 +569,7 @@ export function ViewPanel() {
         {viewportCameraState ? (
           <>
             <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 8 }}>
-              Copy this pose into the CLI to reproduce the current viewport framing.
+              Copy this scene into the CLI to reproduce the current viewport framing and object overrides.
             </div>
             <div
               style={{
@@ -555,12 +592,16 @@ export function ViewPanel() {
             </div>
             <button
               style={{ ...btnStyle(), width: '100%', marginTop: 8 }}
-              onClick={() => { void copyCameraCliArg(); }}
+              onClick={() => { void copySceneCliArg(); }}
             >
-              Copy CLI `--camera`
+              Copy CLI `--scene`
             </button>
             <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
-              {cameraCopyStatus ?? 'Tracks the live viewport camera.'}
+              {sceneCopyStatus ?? (
+                sceneObjectOverrideCount > 0
+                  ? `Includes camera + ${sceneObjectOverrideCount} object override${sceneObjectOverrideCount === 1 ? '' : 's'}.`
+                  : 'Includes the live viewport camera only.'
+              )}
             </div>
           </>
         ) : (

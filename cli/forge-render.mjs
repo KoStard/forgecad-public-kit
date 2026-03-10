@@ -31,36 +31,155 @@ const CHROME_PATHS = [
   '/Applications/Chromium.app/Contents/MacOS/Chromium',
   '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
 ];
-const chromePath = process.env.CHROME_PATH || CHROME_PATHS.find(p => existsSync(p));
-if (!chromePath) {
-  console.error('No Chrome found. Set CHROME_PATH env variable.');
-  process.exit(1);
+const DEFAULT_PORT = parseInt(process.env.FORGE_PORT || '5173', 10);
+const DEFAULT_SIZE = parseInt(process.env.FORGE_SIZE || '1024', 10);
+const DEFAULT_ANGLES = (process.env.FORGE_ANGLES || 'front,side,top,iso').split(',').map(s => s.trim()).filter(Boolean);
+
+function resolveChromePath(explicitPath) {
+  if (explicitPath && existsSync(explicitPath)) return explicitPath;
+  return CHROME_PATHS.find(p => existsSync(p)) || null;
 }
 
-const PORT = parseInt(process.env.FORGE_PORT || '5173');
-const SIZE = parseInt(process.env.FORGE_SIZE || '1024');
-const ANGLES = (process.env.FORGE_ANGLES || 'front,side,top,iso').split(',').map(s => s.trim());
+function usage() {
+  return `ForgeCAD Renderer
 
-// --- Args ---
+Usage:
+  node cli/forge-render.mjs <script.forge.js> [output.png] [options]
 
-const scriptPath = process.argv[2];
-if (!scriptPath) {
-  console.error(`ForgeCAD Renderer
-
-Usage: node cli/forge-render.mjs <script.forge.js> [output.png]
-
-Renders a ForgeCAD script to PNG image(s) with metadata.
-Multiple angles are rendered by default (front, side, top, isometric).
+Options:
+  --angles <front,side,top,iso>   Which standard angles to render (default: ${DEFAULT_ANGLES.join(',')})
+  --size <px>                     Image size in pixels (default: ${DEFAULT_SIZE})
+  --port <n>                      Vite dev server port (default: ${DEFAULT_PORT})
+  --camera <spec>                 Camera spec, e.g. proj=perspective;pos=120,80,120;target=0,0,0;up=0,0,1
+  --scene <json>                  Scene state JSON copied from the viewport; includes camera and object overrides
+  --background <color>            Canvas background override
+  --chrome-path <path>            Chrome executable path
+  -h, --help                      Show this help
 
 Environment variables:
-  FORGE_ANGLES=front,side,top,iso   Angles to render (default: all)
-  FORGE_SIZE=1024                    Image size in pixels
-  FORGE_PORT=5173                    Vite dev server port
-  CHROME_PATH=/path/to/chrome        Chrome executable path`);
+  FORGE_ANGLES=front,side,top,iso
+  FORGE_SIZE=1024
+  FORGE_PORT=5173
+  CHROME_PATH=/path/to/chrome`;
+}
+
+function readValue(argv, idx, flag) {
+  const next = argv[idx + 1];
+  if (!next || next.startsWith('--')) {
+    throw new Error(`Missing value for ${flag}`);
+  }
+  return next;
+}
+
+function parseCli(argv) {
+  if (argv.length === 0 || argv.includes('-h') || argv.includes('--help')) {
+    console.log(usage());
+    process.exit(0);
+  }
+
+  let scriptPath;
+  let outputBase;
+  let angles = DEFAULT_ANGLES;
+  let size = DEFAULT_SIZE;
+  let port = DEFAULT_PORT;
+  let chromePath = process.env.CHROME_PATH;
+  let cameraSpec;
+  let sceneSpec;
+  let background;
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--angles') {
+      angles = readValue(argv, i, arg).split(',').map(s => s.trim()).filter(Boolean);
+      i += 1;
+      continue;
+    }
+    if (arg === '--size') {
+      size = parseInt(readValue(argv, i, arg), 10);
+      i += 1;
+      continue;
+    }
+    if (arg === '--port') {
+      port = parseInt(readValue(argv, i, arg), 10);
+      i += 1;
+      continue;
+    }
+    if (arg === '--camera') {
+      cameraSpec = readValue(argv, i, arg);
+      i += 1;
+      continue;
+    }
+    if (arg === '--scene') {
+      sceneSpec = readValue(argv, i, arg);
+      i += 1;
+      continue;
+    }
+    if (arg === '--background') {
+      background = readValue(argv, i, arg);
+      i += 1;
+      continue;
+    }
+    if (arg === '--chrome-path') {
+      chromePath = readValue(argv, i, arg);
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      throw new Error(`Unknown option: ${arg}`);
+    }
+
+    if (!scriptPath) {
+      scriptPath = arg;
+    } else if (!outputBase) {
+      outputBase = arg;
+    } else {
+      throw new Error(`Unexpected argument: ${arg}`);
+    }
+  }
+
+  if (!scriptPath) {
+    throw new Error('Missing input .forge.js path');
+  }
+  if (!Number.isFinite(size) || size < 128 || size > 4096) {
+    throw new Error(`--size must be between 128 and 4096 (got ${size})`);
+  }
+  if (!Number.isFinite(port) || port < 1 || port > 65535) {
+    throw new Error(`--port must be between 1 and 65535 (got ${port})`);
+  }
+  if (angles.length === 0) {
+    throw new Error('At least one render angle is required.');
+  }
+
+  return {
+    scriptPath,
+    outputBase: outputBase || scriptPath.replace(/\.(forge\.)?js$/, '.png'),
+    angles,
+    size,
+    port,
+    chromePath: resolveChromePath(chromePath),
+    cameraSpec,
+    sceneSpec,
+    background,
+  };
+}
+
+let options;
+try {
+  options = parseCli(process.argv.slice(2));
+} catch (err) {
+  console.error(String(err));
+  console.error('');
+  console.error(usage());
   process.exit(1);
 }
 
-const outputBase = process.argv[3] || scriptPath.replace(/\.(forge\.)?js$/, '.png');
+if (!options.chromePath) {
+  console.error('No Chrome found. Set CHROME_PATH env variable or pass --chrome-path.');
+  process.exit(1);
+}
+
+const scriptPath = options.scriptPath;
+const outputBase = options.outputBase;
 const code = await readFile(resolve(scriptPath), 'utf-8');
 
 // Collect all project files recursively with correct relative paths
@@ -122,13 +241,13 @@ async function isPortOpen(port) {
 
 let viteProcess = null;
 
-async function ensureDevServer() {
-  const portFree = await isPortOpen(PORT);
+async function ensureDevServer(port) {
+  const portFree = await isPortOpen(port);
   if (!portFree) return; // already running
 
   console.log('Starting Vite dev server...');
   const projectRoot = resolve(dirname(new URL(import.meta.url).pathname), '..');
-  viteProcess = spawn('npx', ['vite', '--port', String(PORT)], {
+  viteProcess = spawn('npx', ['vite', '--port', String(port)], {
     cwd: projectRoot,
     stdio: 'pipe',
     detached: false,
@@ -157,25 +276,39 @@ function stopDevServer() {
 // --- Main ---
 
 try {
-  await ensureDevServer();
+  await ensureDevServer(options.port);
 
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath: chromePath,
+    executablePath: options.chromePath,
     args: ['--no-sandbox', '--disable-gpu-sandbox'],
   });
 
   const page = await browser.newPage();
 
   try {
-    const url = `http://localhost:${PORT}/cli/render.html`;
+    const url = `http://localhost:${options.port}/cli/render.html`;
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 15000 });
     await page.waitForFunction('window.__forgeReady === true', { timeout: 10000 });
 
     // Execute script and get renders for all angles
-    const result = await page.evaluate((scriptCode, files, scriptName, angles, size) => {
-      return window.__forgeRender(scriptCode, { angles, size, allFiles: files, fileName: scriptName });
-    }, code, allFiles, scriptFileName, ANGLES, SIZE);
+    const result = await page.evaluate((scriptCode, files, scriptName, renderOptions) => {
+      return window.__forgeRender(scriptCode, {
+        angles: renderOptions.angles,
+        size: renderOptions.size,
+        allFiles: files,
+        fileName: scriptName,
+        cameraSpec: renderOptions.cameraSpec,
+        sceneSpec: renderOptions.sceneSpec,
+        background: renderOptions.background,
+      });
+    }, code, allFiles, scriptFileName, {
+      angles: options.angles,
+      size: options.size,
+      cameraSpec: options.cameraSpec || null,
+      sceneSpec: options.sceneSpec || null,
+      background: options.background || null,
+    });
 
     if (!result.ok) {
       console.error('Script error:', result.error);
@@ -185,10 +318,11 @@ try {
     // Save images
     const ext = extname(outputBase) || '.png';
     const base = outputBase.endsWith(ext) ? outputBase.slice(0, -ext.length) : outputBase;
+    const renderAngles = Object.keys(result.renders);
 
     const savedFiles = [];
     for (const [angle, png] of Object.entries(result.renders)) {
-      const filename = result.renders.length === 1
+      const filename = renderAngles.length === 1
         ? outputBase
         : `${base}_${angle}${ext}`;
       const b64 = png.replace(/^data:image\/png;base64,/, '');
