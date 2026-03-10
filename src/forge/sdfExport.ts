@@ -380,6 +380,25 @@ function keyboardPluginXml(cmdVelTopic: string, linearStep: number, angularStep:
   </plugin>`).join('\n');
 }
 
+function keyboardGuiPluginXml(): string {
+  return `    <gui>
+      <plugin filename="KeyPublisher" name="Key publisher">
+        <gz-gui>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+    </gui>
+`;
+}
+
 function demoWorldXml(
   worldName: string,
   modelName: string,
@@ -399,12 +418,14 @@ function demoWorldXml(
   const keyboardEnabled = world?.keyboardTeleop?.enabled ?? true;
   const linearStep = world?.keyboardTeleop?.linearStep ?? 0.9;
   const angularStep = world?.keyboardTeleop?.angularStep ?? 1.2;
+  const keyboardGui = keyboardEnabled && cmdVelTopic ? keyboardGuiPluginXml() : '';
   const keyboardPlugins = keyboardEnabled && cmdVelTopic
     ? `${keyboardPluginXml(cmdVelTopic, linearStep, angularStep)}\n`
     : '';
 
   return `<sdf version="1.10">
   <world name="${escapeXml(worldName)}">
+${keyboardGui}
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
     <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
     <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
