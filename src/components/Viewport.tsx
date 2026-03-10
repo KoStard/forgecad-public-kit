@@ -1214,11 +1214,11 @@ vec4 diffuseColor = vec4(sectionColor, opacity);`,
       position={[surface.position.x, surface.position.y, surface.position.z]}
       quaternion={surface.quaternion}
     >
-      <mesh geometry={surface.geometry} renderOrder={12}>
+      <mesh geometry={surface.geometry} renderOrder={24}>
         <primitive object={material} attach="material" />
       </mesh>
       {surface.outlineGeometries.map((geometry, index) => (
-        <lineLoop key={index} geometry={geometry} renderOrder={13}>
+        <lineLoop key={index} geometry={geometry} renderOrder={25}>
           <lineBasicMaterial
             color={outlineColor}
             transparent={opacity < 1}
