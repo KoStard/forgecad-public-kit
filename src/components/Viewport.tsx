@@ -806,12 +806,14 @@ function ForgeObject({
   onClick?: (event: ThreeEvent<MouseEvent>) => void;
   onDoubleClick?: (event: ThreeEvent<MouseEvent>) => void;
 }) {
+  const hasCutPlanes = (cutPlanes?.length ?? 0) > 0;
+  const clippingTransformKey = hasCutPlanes ? matrix : null;
   const { solidGeo, edgesGeo, useFallbackClipping } = useMemo(() => {
     if (!obj.shape) return { solidGeo: null, edgesGeo: null, useFallbackClipping: false };
     let shapeForRender = obj.shape;
     let fallbackToGpuClip = false;
 
-    if ((cutPlanes?.length ?? 0) > 0) {
+    if (hasCutPlanes) {
       try {
         // Cut planes are defined in world space, so convert each plane into this object's
         // local coordinates before trimming to keep sectioning aligned with animated transforms.
@@ -850,7 +852,7 @@ function ForgeObject({
       const { solid, edges } = shapeToGeometry(shapeForRender);
       return { solidGeo: solid, edgesGeo: edges, useFallbackClipping: fallbackToGpuClip };
     } catch {
-      if (!fallbackToGpuClip && (cutPlanes?.length ?? 0) > 0) {
+      if (!fallbackToGpuClip && hasCutPlanes) {
         try {
           const { solid, edges } = shapeToGeometry(obj.shape);
           return { solidGeo: solid, edgesGeo: edges, useFallbackClipping: true };
@@ -860,7 +862,7 @@ function ForgeObject({
       }
       return { solidGeo: null, edgesGeo: null, useFallbackClipping: false };
     }
-  }, [cutPlanes, matrix, obj.shape]);
+  }, [clippingTransformKey, cutPlanes, hasCutPlanes, obj.shape]);
 
   useEffect(() => {
     return () => {
@@ -2722,7 +2724,15 @@ export function Viewport() {
     };
   }, [activeJointAnimation, jointAnimationPlaying, jointAnimationSpeed, setJointAnimationPlaying, setJointAnimationProgress]);
 
+  const sectionGuideBoundsKey = sectionPlaneGuidesEnabled && activeCutPlaneDefs.length > 0
+    ? objectMatrices
+    : null;
+
   const sectionGuideSize = useMemo(() => {
+    if (!sectionPlaneGuidesEnabled || activeCutPlaneDefs.length === 0) {
+      return Math.max(60, gridSize * 8);
+    }
+
     const bounds = new THREE.Box3();
     let hasBounds = false;
 
@@ -2760,7 +2770,7 @@ export function Viewport() {
     bounds.getSize(size);
     const diagonal = Math.max(1, size.length());
     return Math.max(60, diagonal * 1.35, gridSize * 6);
-  }, [gridSize, objectMatrices, objects]);
+  }, [activeCutPlaneDefs.length, gridSize, objects, sectionGuideBoundsKey, sectionPlaneGuidesEnabled]);
 
   const jointOverlayBaseSize = useMemo(() => {
     const bounds = new THREE.Box3();
