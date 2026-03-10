@@ -407,10 +407,14 @@ function buildCameraRig(
 } {
   const fixedCameraState = spec ?? createDefaultCameraState(center, distance);
   const nearFar = Math.max(1000, distance * 10);
-  const span = Math.max(1, maxDim) * 1.9;
+
+  // Use a consistent base frustum size for orthographic cameras (matching the UI's approach)
+  // The UI (@react-three/drei OrthographicCamera) uses a fixed-size frustum and relies on zoom
+  const ORTHO_BASE_SIZE = 100;
+  const orthoSpan = ORTHO_BASE_SIZE;
 
   const camera = fixedCameraState.projectionMode === 'orthographic'
-    ? new THREE.OrthographicCamera(-span * 0.5, span * 0.5, span * 0.5, -span * 0.5, -nearFar, nearFar)
+    ? new THREE.OrthographicCamera(-orthoSpan * 0.5, orthoSpan * 0.5, orthoSpan * 0.5, -orthoSpan * 0.5, -nearFar, nearFar)
     : new THREE.PerspectiveCamera(45, 1, 0.1, Math.max(10, distance * 10));
   camera.aspect = 1;
   applyCameraPose(camera, fixedCameraState);
