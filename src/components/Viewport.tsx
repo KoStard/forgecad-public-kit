@@ -23,6 +23,7 @@ import {
   type OrbitGifMode,
 } from './exportActions';
 import { parseViewportCameraState, type ViewportCameraState } from '../capture/cameraState';
+import { getShortcutKey, hasPrimaryModifier } from '../editorShortcuts';
 import { themes } from '../theme';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -69,6 +70,18 @@ interface ViewportPerformanceInfo {
 const OBJECT_CONTEXT_MENU_WIDTH = 144;
 const OBJECT_CONTEXT_MENU_HEIGHT = 42;
 const OBJECT_CONTEXT_MENU_MARGIN = 8;
+const NON_TEXT_INPUT_TYPES = new Set([
+  'button',
+  'checkbox',
+  'color',
+  'file',
+  'hidden',
+  'image',
+  'radio',
+  'range',
+  'reset',
+  'submit',
+]);
 
 interface PlaneTransform {
   center: THREE.Vector3;
@@ -217,6 +230,73 @@ function polygonArea2D(points: THREE.Vector2[]): number {
     area += current.x * next.y - next.x * current.y;
   }
   return area * 0.5;
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.closest('[data-fc-editor-surface]')) return false;
+  if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true;
+  if (target instanceof HTMLInputElement) {
+    return !NON_TEXT_INPUT_TYPES.has(target.type.toLowerCase());
+  }
+
+  let current: HTMLElement | null = target;
+  while (current) {
+    if (current.isContentEditable) return true;
+    current = current.parentElement;
+  }
+
+  return false;
+}
+
+function computeSceneObjectBounds(
+  obj: SceneObject,
+  objectMatrices: Record<string, THREE.Matrix4>,
+): THREE.Box3 | null {
+  const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
+  if (obj.shape) {
+    try {
+      const { solid } = shapeToGeometry(obj.shape);
+      solid.computeBoundingBox();
+      const bounds = solid.boundingBox ?? null;
+      if (!bounds) return null;
+      const out = new THREE.Box3();
+      expandBoundsByTransformedAabb(
+        out,
+        [bounds.min.x, bounds.min.y, bounds.min.z],
+        [bounds.max.x, bounds.max.y, bounds.max.z],
+        matrix,
+      );
+      return out;
+    } catch {
+      return null;
+    }
+  }
+  if (obj.sketch) {
+    try {
+      const polys = obj.sketch.toPolygons();
+      const box = new THREE.Box3();
+      let hasPoint = false;
+      polys.forEach((contour) => {
+        contour.forEach((p) => {
+          box.expandByPoint(new THREE.Vector3(p[0], p[1], 0));
+          hasPoint = true;
+        });
+      });
+      if (!hasPoint) return null;
+      const out = new THREE.Box3();
+      expandBoundsByTransformedAabb(
+        out,
+        [box.min.x, box.min.y, box.min.z],
+        [box.max.x, box.max.y, box.max.z],
+        matrix,
+      );
+      return out;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 function pointInPolygon2D(point: THREE.Vector2, polygon: THREE.Vector2[]): boolean {
@@ -2437,6 +2517,7 @@ function ViewController({
   objects,
   objectMatrices,
   settings,
+  focusedObjectIds,
   clearCommand,
 }: {
   controlsRef: MutableRefObject<OrbitControlsImpl | null>;
@@ -2444,6 +2525,7 @@ function ViewController({
   objects: SceneObject[];
   objectMatrices: Record<string, THREE.Matrix4>;
   settings: Record<string, ObjectSettings>;
+  focusedObjectIds: string[];
   clearCommand: () => void;
 }) {
   const { camera, size } = useThree();
@@ -2451,61 +2533,19 @@ function ViewController({
   useEffect(() => {
     if (!command) return;
     const visibleObjects = objects.filter((obj) => settings[obj.id]?.visible);
+    const focusedIdSet = new Set(focusedObjectIds);
+    const focusedVisibleObjects = focusedIdSet.size > 0
+      ? visibleObjects.filter((obj) => focusedIdSet.has(obj.id))
+      : [];
+    const useFocusedScope = !command.targetId && focusedVisibleObjects.length > 0;
     const targetObjects = command.targetId
       ? visibleObjects.filter((obj) => obj.id === command.targetId)
-      : visibleObjects;
-
-    const computeBounds = (obj: SceneObject): THREE.Box3 | null => {
-      const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
-      if (obj.shape) {
-        try {
-          const { solid } = shapeToGeometry(obj.shape);
-          solid.computeBoundingBox();
-          const bounds = solid.boundingBox ?? null;
-          if (!bounds) return null;
-          const out = new THREE.Box3();
-          expandBoundsByTransformedAabb(
-            out,
-            [bounds.min.x, bounds.min.y, bounds.min.z],
-            [bounds.max.x, bounds.max.y, bounds.max.z],
-            matrix,
-          );
-          return out;
-        } catch {
-          return null;
-        }
-      }
-      if (obj.sketch) {
-        try {
-          const polys = obj.sketch.toPolygons();
-          const box = new THREE.Box3();
-          let hasPoint = false;
-          polys.forEach((contour) => {
-            contour.forEach((p) => {
-              box.expandByPoint(new THREE.Vector3(p[0], p[1], 0));
-              hasPoint = true;
-            });
-          });
-          if (!hasPoint) return null;
-          const out = new THREE.Box3();
-          expandBoundsByTransformedAabb(
-            out,
-            [box.min.x, box.min.y, box.min.z],
-            [box.max.x, box.max.y, box.max.z],
-            matrix,
-          );
-          return out;
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    };
+      : (useFocusedScope ? focusedVisibleObjects : visibleObjects);
 
     const bounds = new THREE.Box3();
     let hasBounds = false;
     targetObjects.forEach((obj) => {
-      const box = computeBounds(obj);
+      const box = computeSceneObjectBounds(obj, objectMatrices);
       if (box) {
         if (!hasBounds) bounds.copy(box);
         else bounds.union(box);
@@ -2524,10 +2564,12 @@ function ViewController({
     bounds.getSize(sizeVec);
     const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z, 1);
 
-    // "snap" (Home) targets origin; "fit"/"zoom" target model center
-    const target = command.type === 'snap' ? new THREE.Vector3(0, 0, 0) : center;
-    // Distance must cover model extent + offset from target
-    const maxReach = command.type === 'snap'
+    const snapUsesScopedCenter = command.type === 'snap' && useFocusedScope;
+
+    // "snap" (Home / standard views) targets origin unless focus mode scopes it to a subset.
+    const target = command.type === 'snap' && !snapUsesScopedCenter ? new THREE.Vector3(0, 0, 0) : center;
+    // Distance must cover model extent + offset from target.
+    const maxReach = command.type === 'snap' && !snapUsesScopedCenter
       ? Math.max(
           sizeVec.x / 2 + Math.abs(center.x),
           sizeVec.y / 2 + Math.abs(center.y),
@@ -2587,7 +2629,7 @@ function ViewController({
     }
 
     clearCommand();
-  }, [camera, clearCommand, command, controlsRef, objectMatrices, objects, settings, size.height, size.width]);
+  }, [camera, clearCommand, command, controlsRef, focusedObjectIds, objectMatrices, objects, settings, size.height, size.width]);
 
   return null;
 }
@@ -3381,6 +3423,28 @@ export function Viewport() {
   }, [clearFocusedObject, closeObjectContextMenu, objectContextMenu]);
 
   useEffect(() => {
+    const handleViewShortcut = (event: KeyboardEvent) => {
+      if (event.isComposing || event.repeat) return;
+      if (event.altKey || !event.shiftKey || !hasPrimaryModifier(event)) return;
+      if (isTextEntryTarget(event.target)) return;
+
+      const key = getShortcutKey(event);
+      if (key === 'f') {
+        event.preventDefault();
+        requestViewCommand({ type: 'fit' });
+        return;
+      }
+      if (key === 'h') {
+        event.preventDefault();
+        requestViewCommand({ type: 'snap', view: 'iso' });
+      }
+    };
+
+    window.addEventListener('keydown', handleViewShortcut, true);
+    return () => window.removeEventListener('keydown', handleViewShortcut, true);
+  }, [requestViewCommand]);
+
+  useEffect(() => {
     if (!objectContextMenu) return;
 
     const handleWindowPointerDown = (event: PointerEvent) => {
@@ -3667,6 +3731,7 @@ export function Viewport() {
           objects={objects}
           objectMatrices={objectMatrices}
           settings={objectSettings}
+          focusedObjectIds={focusedObjectIds}
           clearCommand={clearViewCommand}
         />
       </Canvas>
