@@ -17,6 +17,7 @@ const docs = {
   positioning: "docs/permanent/API/model-building/positioning.md",
   entities: "docs/permanent/API/model-building/entities.md",
   assembly: "docs/permanent/API/model-building/assembly.md",
+  viewport: "docs/permanent/API/runtime/viewport.md",
   sketchCore: "docs/permanent/API/model-building/sketch-core.md",
   sketchPrimitives: "docs/permanent/API/model-building/sketch-primitives.md",
   sketchPath: "docs/permanent/API/model-building/sketch-path.md",
@@ -67,12 +68,17 @@ const docGroups = [
     paths: [docs.assembly],
   },
   {
-    title: "6. Recipes and Debugging (for patterns and troubleshooting)",
+    title: "6. Runtime Viewport APIs (for cut planes, jointsView, and animation playback)",
+    guidance: "Viewer-only APIs such as cutPlane, explodeView, jointsView, and animation behavior.",
+    paths: [docs.viewport],
+  },
+  {
+    title: "7. Recipes and Debugging (for patterns and troubleshooting)",
     guidance: "Modeling patterns, debugging tactics, copyable snippets.",
     paths: [docs.modelingRecipes],
   },
   {
-    title: "7. CLI and Exports (for validation/render/export tasks)",
+    title: "8. CLI and Exports (for validation/render/export tasks)",
     guidance: "Test-run, notebook execution, export pipelines, debug flags.",
     paths: [docs.cli],
   },
@@ -118,6 +124,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 4. Default to a concrete first pass — easy iteration beats speculative design review.
 5. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
 6. Validate with \`npm run test-run -- <file>\` (add \`--debug-imports\` for import chain issues).
+7. For \`jointsView()\` animations, keep wrapped revolute tracks continuous across branch cuts; do not assume the viewport will auto-fix \`-180/180\` jumps.
 
 ### Import and Composition
 

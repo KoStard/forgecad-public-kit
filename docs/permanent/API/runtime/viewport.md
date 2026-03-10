@@ -60,6 +60,10 @@ Register viewport-only mechanism controls that animate returned objects without 
 
 Use this when you want interactive articulation in the viewer but the geometry itself stays fixed.
 
+Animation values are interpolated linearly between keyframes. Forge does **not**
+auto-wrap revolute values across `-180/180` or `0/360` for you, because doing
+that globally would break intentional multi-turn tracks.
+
 **Key options:**
 - `enabled`
 - `joints`: `{ name, child, parent?, type?, axis?, pivot?, min?, max?, default?, unit? }[]`
@@ -96,6 +100,43 @@ jointsView({
   ],
 });
 ```
+
+### Animation continuity for revolute joints
+
+If an animation channel comes from `atan2(...)`, `normalizeAngleDeg(...)`, or
+any other wrapped angle source, keep the sampled keyframes continuous before
+passing them to `jointsView()`.
+
+Bad branch-cut sample stream:
+
+```javascript
+keyframes: [
+  { at: 0.48, values: { "Power Rod": -171 } },
+  { at: 0.50, values: { "Power Rod": -180 } },
+  { at: 0.52, values: { "Power Rod": 171 } },
+]
+```
+
+That `-180 -> 171` jump is interpreted literally and the viewer will spin the
+part the long way around.
+
+Good continuous sample stream:
+
+```javascript
+keyframes: [
+  { at: 0.48, values: { "Power Rod": -171 } },
+  { at: 0.50, values: { "Power Rod": -180 } },
+  { at: 0.52, values: { "Power Rod": -189 } },
+]
+```
+
+Guidelines:
+- Keep high-speed multi-turn joints authored as continuous angles (`0`, `360`,
+  `720`, etc.).
+- Only unwrap channels that represent cyclic angles. Do not apply angle
+  unwrapping blindly to prismatic or other scalar values.
+- If you build sampled helper utilities, let them unwrap a named set of joints
+  instead of guessing from every numeric channel.
 
 ## `viewConfig(options?)`
 

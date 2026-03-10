@@ -15,6 +15,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 4. Default to a concrete first pass — easy iteration beats speculative design review.
 5. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
 6. Validate with `npm run test-run -- <file>` (add `--debug-imports` for import chain issues).
+7. For `jointsView()` animations, keep wrapped revolute tracks continuous across branch cuts; do not assume the viewport will auto-fix `-180/180` jumps.
 
 ### Import and Composition
 
@@ -70,13 +71,19 @@ Assembly graph, joint types, couplings, validation, robot export.
 
 - `docs/permanent/API/model-building/assembly.md`
 
-### 6. Recipes and Debugging (for patterns and troubleshooting)
+### 6. Runtime Viewport APIs (for cut planes, jointsView, and animation playback)
+
+Viewer-only APIs such as cutPlane, explodeView, jointsView, and animation behavior.
+
+- `docs/permanent/API/runtime/viewport.md`
+
+### 7. Recipes and Debugging (for patterns and troubleshooting)
 
 Modeling patterns, debugging tactics, copyable snippets.
 
 - `docs/permanent/API/guides/modeling-recipes.md`
 
-### 7. CLI and Exports (for validation/render/export tasks)
+### 8. CLI and Exports (for validation/render/export tasks)
 
 Test-run, notebook execution, export pipelines, debug flags.
 

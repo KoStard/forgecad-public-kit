@@ -7,6 +7,7 @@ The ForgeCAD skill at `skills/forgecad/` is generated from repo docs and example
 The generated skill inlines these paths:
 
 - `docs/permanent/API/model-building/`
+- `docs/permanent/API/runtime/viewport.md`
 - `docs/permanent/API/guides/modeling-recipes.md`
 - `docs/permanent/CLI.md`
 - `examples/api/`
