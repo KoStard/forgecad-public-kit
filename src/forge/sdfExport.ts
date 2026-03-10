@@ -363,16 +363,21 @@ function demoWorldName(world: RobotWorldOptions | null, modelName: string): stri
 
 function keyboardPluginXml(cmdVelTopic: string, linearStep: number, angularStep: number): string {
   const bindings = [
-    { key: 16777235, twist: `linear: {x: ${formatNumber(linearStep, 3)}}` },
-    { key: 16777237, twist: `linear: {x: ${formatNumber(-linearStep, 3)}}` },
-    { key: 16777234, twist: `angular: {z: ${formatNumber(angularStep, 3)}}` },
-    { key: 16777236, twist: `angular: {z: ${formatNumber(-angularStep, 3)}}` },
-    { key: 32, twist: 'linear: {x: 0.0}\n      angular: {z: 0.0}' },
+    { key: 87, twist: `linear: {x: ${formatNumber(linearStep, 3)}}, angular: {z: 0.0}` },
+    { key: 88, twist: `linear: {x: ${formatNumber(-linearStep, 3)}}, angular: {z: 0.0}` },
+    { key: 65, twist: `linear: {x: 0.0}, angular: {z: ${formatNumber(angularStep, 3)}}` },
+    { key: 68, twist: `linear: {x: 0.0}, angular: {z: ${formatNumber(-angularStep, 3)}}` },
+    { key: 81, twist: `linear: {x: ${formatNumber(linearStep, 3)}}, angular: {z: ${formatNumber(angularStep, 3)}}` },
+    { key: 69, twist: `linear: {x: ${formatNumber(linearStep, 3)}}, angular: {z: ${formatNumber(-angularStep, 3)}}` },
+    { key: 90, twist: `linear: {x: ${formatNumber(-linearStep, 3)}}, angular: {z: ${formatNumber(angularStep, 3)}}` },
+    { key: 67, twist: `linear: {x: ${formatNumber(-linearStep, 3)}}, angular: {z: ${formatNumber(-angularStep, 3)}}` },
+    { key: 83, twist: 'linear: {x: 0.0}, angular: {z: 0.0}' },
+    { key: 32, twist: 'linear: {x: 0.0}, angular: {z: 0.0}' },
   ];
 
   return bindings.map((binding) => `  <plugin filename="gz-sim-triggered-publisher-system" name="gz::sim::systems::TriggeredPublisher">
     <input type="gz.msgs.Int32" topic="/keyboard/keypress">
-      data: ${binding.key}
+      <match field="data">${binding.key}</match>
     </input>
     <output type="gz.msgs.Twist" topic="${escapeXml(cmdVelTopic)}">
       ${binding.twist}

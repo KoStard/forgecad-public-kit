@@ -174,7 +174,7 @@ gz sim -g out/forge_scout/worlds/forge_scout_trial.sdf
 Notes:
 
 - On macOS, use the split `-s` / `-g` flow above. `gz sim <world.sdf>` is not supported there.
-- Click the 3D view so it has keyboard focus, then use arrow keys to drive and `Space` to stop.
+- Click the 3D view so it has keyboard focus, then use `W` / `X` for forward / reverse, `A` / `D` to rotate, `Q` / `E` / `Z` / `C` for diagonals, and `S` or `Space` to stop.
 - For older exports created before the GUI plugin was added, load `Key Publisher` manually from the Gazebo GUI plugins menu.
 
 Current behavior:

@@ -7,7 +7,7 @@
 //   gz sim -s -r examples/api/sdf-rover-demo.forge.sdfpkg/worlds/forge_scout_trial.sdf
 //   gz sim -g examples/api/sdf-rover-demo.forge.sdfpkg/worlds/forge_scout_trial.sdf
 //
-// Click the 3D view and use the arrow keys to drive. Space stops the rover.
+// Click the 3D view and use W/X/A/D or Q/E/Z/C to drive. S or Space stops the rover.
 
 const chassisLength = 430;
 const chassisWidth = 260;
