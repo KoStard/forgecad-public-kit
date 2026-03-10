@@ -92,11 +92,11 @@ const mech = assembly("Spur Stage")
 - `pair` (`lib.gearPair(...)`, `lib.bevelGearPair(...)`, or `lib.faceGearPair(...)` result using `pair.jointRatio`)
 - `driverTeeth` + `drivenTeeth` (auto ratio; `internal` mesh is positive, `external`/`bevel`/`face` are negative)
 
-For bevel/face stages, pairing helpers also return placement aids:
+For bevel stages, pairing helpers also return placement aids:
 - `pinionAxis`, `gearAxis`
 - `pinionCenter`, `gearCenter`
 
-These vectors are useful when wiring joints in `jointsView(...)` or setting up assembly joint frames.
+For face stages, use `centerDistance` and `meshPlaneZ` from `lib.faceGearPair(...)`; with `place: true`, the face gear stays on the Z axis and the vertical spur is placed at `[centerDistance, 0, meshPlaneZ]`.
 
 ## Joint frames
 

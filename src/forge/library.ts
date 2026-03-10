@@ -1240,13 +1240,17 @@ interface GearMeta {
   rootRadius: number;
   faceWidth: number;
   backlash: number;
+  toothHeight?: number;
+  toothSide?: 'top' | 'bottom';
+  toothMinZ?: number;
+  toothMaxZ?: number;
+  meshPlaneZ?: number;
   centered?: boolean;
   pitchAngleDeg?: number;
   pitchAngleRad?: number;
   shaftAngleDeg?: number;
   coneDistance?: number;
   topScale?: number;
-  toothHeight?: number;
 }
 
 function clamp01(value: number): number {
@@ -1298,6 +1302,16 @@ function attachGearMeta(shape: Shape, meta: GearMeta): Shape {
 function readGearMeta(shape: Shape): GearMeta | null {
   const meta = (shape as Shape & { [GEAR_META_KEY]?: GearMeta })[GEAR_META_KEY];
   return meta ?? null;
+}
+
+function remapErrorPrefix(error: unknown, sourcePrefix: string, targetPrefix: string): never {
+  if (error instanceof Error) {
+    if (error.message.startsWith(`${sourcePrefix}:`)) {
+      throw new Error(`${targetPrefix}:${error.message.slice(sourcePrefix.length + 1)}`);
+    }
+    throw error;
+  }
+  throw error;
 }
 
 export interface SpurGearOptions {
@@ -1469,6 +1483,137 @@ export function spurGear(options: SpurGearOptions): Shape {
 
   const shape = sketchExtrude(profile, normalized.faceWidth, { center: normalized.center }).toShape();
   return attachGearMeta(shape, meta);
+}
+
+export interface SideGearOptions extends SpurGearOptions {
+  side?: 'top' | 'bottom';
+  toothHeight?: number;
+}
+
+export interface FaceGearOptions extends SideGearOptions {}
+
+interface NormalizedSideGearOptions extends NormalizedSpurGearOptions {
+  side: 'top' | 'bottom';
+  toothHeight: number;
+}
+
+function normalizeSideGearOptions(options: SideGearOptions): NormalizedSideGearOptions {
+  let normalizedSpur: NormalizedSpurGearOptions;
+  try {
+    normalizedSpur = normalizeSpurGearOptions(options);
+  } catch (error) {
+    remapErrorPrefix(error, 'spurGear', 'sideGear');
+  }
+
+  const side = options.side ?? 'top';
+  if (side !== 'top' && side !== 'bottom') {
+    throw new Error('sideGear: "side" must be "top" or "bottom"');
+  }
+
+  const toothHeight = options.toothHeight ?? options.module;
+  if (!isFinitePositive(toothHeight)) {
+    throw new Error('sideGear: "toothHeight" must be > 0');
+  }
+
+  return {
+    ...normalizedSpur,
+    side,
+    toothHeight,
+  };
+}
+
+function resolveSideGearZBands(options: NormalizedSideGearOptions): {
+  bodyMinZ: number;
+  bodyMaxZ: number;
+  toothMinZ: number;
+  toothMaxZ: number;
+  meshPlaneZ: number;
+} {
+  const bodyMinZ = options.center ? -options.faceWidth * 0.5 : 0;
+  const bodyMaxZ = bodyMinZ + options.faceWidth;
+
+  if (options.side === 'top') {
+    const toothMinZ = bodyMaxZ;
+    const toothMaxZ = toothMinZ + options.toothHeight;
+    return {
+      bodyMinZ,
+      bodyMaxZ,
+      toothMinZ,
+      toothMaxZ,
+      meshPlaneZ: (toothMinZ + toothMaxZ) * 0.5,
+    };
+  }
+
+  const toothMaxZ = bodyMinZ;
+  const toothMinZ = toothMaxZ - options.toothHeight;
+  return {
+    bodyMinZ,
+    bodyMaxZ,
+    toothMinZ,
+    toothMaxZ,
+    meshPlaneZ: (toothMinZ + toothMaxZ) * 0.5,
+  };
+}
+
+/**
+ * Crown/face style gear where the teeth project from one side of the disk
+ * instead of the outer cylindrical rim.
+ */
+export function sideGear(options: SideGearOptions): Shape {
+  const normalized = normalizeSideGearOptions(options);
+
+  let spurMeta: GearMeta;
+  try {
+    spurMeta = buildSpurGearMeta(normalized);
+  } catch (error) {
+    remapErrorPrefix(error, 'spurGear', 'sideGear');
+  }
+
+  const zBands = resolveSideGearZBands(normalized);
+  const meta: GearMeta = {
+    ...spurMeta,
+    kind: 'face',
+    toothHeight: normalized.toothHeight,
+    toothSide: normalized.side,
+    toothMinZ: zBands.toothMinZ,
+    toothMaxZ: zBands.toothMaxZ,
+    meshPlaneZ: zBands.meshPlaneZ,
+  };
+
+  const segments = Math.max(48, normalized.teeth * normalized.segmentsPerTooth);
+  const rootDisk = cylinder(normalized.faceWidth, meta.rootRadius, undefined, segments, normalized.center);
+  const profile = buildSpurGearProfile(spurMeta, normalized.segmentsPerTooth);
+  const toothBandProfile = difference2d(
+    profile,
+    circle2d(meta.rootRadius, Math.max(48, normalized.teeth * 2)),
+  ).simplify(1e-6);
+
+  const teethBand = sketchExtrude(toothBandProfile, normalized.toothHeight, { center: false })
+    .toShape()
+    .translate(0, 0, zBands.toothMinZ);
+
+  let shape = union(rootDisk, teethBand);
+  if (normalized.boreDiameter > 0) {
+    const zMin = Math.min(zBands.bodyMinZ, zBands.toothMinZ);
+    const zMax = Math.max(zBands.bodyMaxZ, zBands.toothMaxZ);
+    const bore = cylinder(
+      (zMax - zMin) + 2,
+      normalized.boreDiameter * 0.5,
+      undefined,
+      Math.max(48, normalized.teeth * 2),
+    ).translate(0, 0, zMin - 1);
+    shape = shape.subtract(bore);
+  }
+
+  return attachGearMeta(shape, meta);
+}
+
+export function faceGear(options: FaceGearOptions): Shape {
+  try {
+    return sideGear(options);
+  } catch (error) {
+    remapErrorPrefix(error, 'sideGear', 'faceGear');
+  }
 }
 
 export interface RingGearOptions {
@@ -1856,205 +2001,6 @@ export function bevelGear(options: BevelGearOptions): Shape {
   });
 }
 
-export interface FaceGearOptions {
-  module: number;
-  teeth: number;
-  pressureAngleDeg?: number;
-  faceWidth: number;
-  backlash?: number;
-  clearance?: number;
-  addendum?: number;
-  dedendum?: number;
-  toothHeight?: number;
-  rimWidth?: number;
-  boreDiameter?: number;
-  center?: boolean;
-  segmentsPerTooth?: number;
-}
-
-interface NormalizedFaceGearOptions {
-  module: number;
-  teeth: number;
-  pressureAngleDeg: number;
-  pressureAngleRad: number;
-  faceWidth: number;
-  backlash: number;
-  addendum: number;
-  dedendum: number;
-  toothHeight: number;
-  rimWidth: number;
-  boreDiameter: number;
-  center: boolean;
-  segmentsPerTooth: number;
-  pitchRadius: number;
-  rootRadius: number;
-  tipRadius: number;
-  bodyRadius: number;
-  toothHalfAngleRoot: number;
-  toothHalfAngleTip: number;
-}
-
-function normalizeFaceGearOptions(options: FaceGearOptions): NormalizedFaceGearOptions {
-  if (!isFinitePositive(options.module)) throw new Error('faceGear: "module" must be > 0');
-  if (!Number.isInteger(options.teeth) || options.teeth < 8) {
-    throw new Error('faceGear: "teeth" must be an integer >= 8');
-  }
-  if (!isFinitePositive(options.faceWidth)) throw new Error('faceGear: "faceWidth" must be > 0');
-
-  const pressureAngleDeg = options.pressureAngleDeg ?? 20;
-  if (!isFinitePositive(pressureAngleDeg) || pressureAngleDeg >= 60) {
-    throw new Error('faceGear: "pressureAngleDeg" must be in (0, 60)');
-  }
-  const pressureAngleRad = pressureAngleDeg * Math.PI / 180;
-
-  const module = options.module;
-  const circularPitch = Math.PI * module;
-  const backlash = options.backlash ?? 0;
-  if (!Number.isFinite(backlash) || backlash < 0 || backlash >= circularPitch * 0.45) {
-    throw new Error(`faceGear: "backlash" must be in [0, ${(circularPitch * 0.45).toFixed(3)})`);
-  }
-
-  const clearance = options.clearance ?? module * 0.25;
-  if (!Number.isFinite(clearance) || clearance < 0) {
-    throw new Error('faceGear: "clearance" must be >= 0');
-  }
-
-  const addendum = options.addendum ?? module;
-  if (!isFinitePositive(addendum)) throw new Error('faceGear: "addendum" must be > 0');
-  const dedendum = options.dedendum ?? addendum + clearance;
-  if (!isFinitePositive(dedendum)) throw new Error('faceGear: "dedendum" must be > 0');
-
-  const toothHeight = options.toothHeight ?? Math.max(module * 0.75, addendum * 0.9);
-  if (!isFinitePositive(toothHeight)) throw new Error('faceGear: "toothHeight" must be > 0');
-
-  const rimWidth = options.rimWidth ?? module * 1.6;
-  if (!isFinitePositive(rimWidth)) throw new Error('faceGear: "rimWidth" must be > 0');
-
-  const boreDiameter = options.boreDiameter ?? 0;
-  if (!Number.isFinite(boreDiameter) || boreDiameter < 0) {
-    throw new Error('faceGear: "boreDiameter" must be >= 0');
-  }
-
-  const pitchRadius = module * options.teeth * 0.5;
-  const rootRadius = Math.max(EPSILON, pitchRadius - dedendum);
-  const tipRadius = pitchRadius + addendum;
-  const bodyRadius = tipRadius + rimWidth;
-
-  if (boreDiameter > 0 && boreDiameter * 0.5 >= rootRadius - EPSILON) {
-    throw new Error('faceGear: bore is too large for the computed root radius');
-  }
-
-  const thicknessAtPitch = circularPitch * 0.5 - backlash;
-  if (thicknessAtPitch <= EPSILON) {
-    throw new Error('faceGear: backlash leaves no tooth thickness at pitch circle');
-  }
-  const halfPitch = thicknessAtPitch * 0.5;
-  const halfRoot = halfPitch + dedendum * Math.tan(pressureAngleRad);
-  const halfTip = halfPitch - addendum * Math.tan(pressureAngleRad);
-  if (halfTip <= EPSILON) {
-    throw new Error('faceGear: tooth tip collapsed (reduce addendum/pressure angle)');
-  }
-
-  const maxHalfAngle = (Math.PI / options.teeth) * 0.95;
-  const toothHalfAngleRoot = halfRoot / rootRadius;
-  const toothHalfAngleTip = halfTip / tipRadius;
-  if (toothHalfAngleRoot >= maxHalfAngle || toothHalfAngleTip >= maxHalfAngle) {
-    throw new Error('faceGear: tooth geometry overlaps neighboring teeth');
-  }
-
-  return {
-    module,
-    teeth: options.teeth,
-    pressureAngleDeg,
-    pressureAngleRad,
-    faceWidth: options.faceWidth,
-    backlash,
-    addendum,
-    dedendum,
-    toothHeight,
-    rimWidth,
-    boreDiameter,
-    center: options.center ?? true,
-    segmentsPerTooth: Math.max(4, Math.floor(options.segmentsPerTooth ?? 10)),
-    pitchRadius,
-    rootRadius,
-    tipRadius,
-    bodyRadius,
-    toothHalfAngleRoot,
-    toothHalfAngleTip,
-  };
-}
-
-function createFaceGearToothSketch(options: NormalizedFaceGearOptions): Sketch {
-  const arcSteps = Math.max(3, Math.ceil(options.segmentsPerTooth * 0.75));
-  const pts: [number, number][] = [];
-  pts.push([
-    options.rootRadius * Math.cos(options.toothHalfAngleRoot),
-    options.rootRadius * Math.sin(options.toothHalfAngleRoot),
-  ]);
-  pts.push([
-    options.tipRadius * Math.cos(options.toothHalfAngleTip),
-    options.tipRadius * Math.sin(options.toothHalfAngleTip),
-  ]);
-  addArcPoints(pts, options.tipRadius, options.toothHalfAngleTip, -options.toothHalfAngleTip, arcSteps);
-  pts.push([
-    options.rootRadius * Math.cos(-options.toothHalfAngleRoot),
-    options.rootRadius * Math.sin(-options.toothHalfAngleRoot),
-  ]);
-  addArcPoints(pts, options.rootRadius, -options.toothHalfAngleRoot, options.toothHalfAngleRoot, arcSteps);
-  return polygon(pts);
-}
-
-export function faceGear(options: FaceGearOptions): Shape {
-  const normalized = normalizeFaceGearOptions(options);
-  const radialSegments = Math.max(64, normalized.teeth * 2, normalized.teeth * normalized.segmentsPerTooth);
-  const body = cylinder(normalized.faceWidth, normalized.bodyRadius, undefined, radialSegments, normalized.center);
-
-  const tooth = createFaceGearToothSketch(normalized);
-  const toothSketches: Sketch[] = [];
-  for (let i = 0; i < normalized.teeth; i++) {
-    toothSketches.push(sketchRotate(tooth, (360 / normalized.teeth) * i));
-  }
-  const toothProfile = union2d(...toothSketches);
-
-  const toothZ = normalized.center ? normalized.faceWidth * 0.5 : normalized.faceWidth;
-  const teeth = sketchExtrude(toothProfile, normalized.toothHeight, { center: false })
-    .toShape()
-    .translate(0, 0, toothZ);
-
-  let shape = union(body, teeth);
-  if (normalized.boreDiameter > 0) {
-    const cutterHeight = normalized.faceWidth + normalized.toothHeight + 2;
-    const cutterCenterZ = normalized.center
-      ? normalized.toothHeight * 0.5
-      : (normalized.faceWidth + normalized.toothHeight) * 0.5;
-    const cutter = cylinder(cutterHeight, normalized.boreDiameter * 0.5, undefined, 72, true)
-      .translate(0, 0, cutterCenterZ);
-    shape = shape.subtract(cutter);
-  }
-
-  const meta: GearMeta = {
-    kind: 'face',
-    module: normalized.module,
-    pressureAngleDeg: normalized.pressureAngleDeg,
-    pressureAngleRad: normalized.pressureAngleRad,
-    teeth: normalized.teeth,
-    pitchRadius: normalized.pitchRadius,
-    baseRadius: normalized.pitchRadius * Math.cos(normalized.pressureAngleRad),
-    addendum: normalized.addendum,
-    dedendum: normalized.dedendum,
-    outerRadius: normalized.tipRadius,
-    rootRadius: normalized.rootRadius,
-    faceWidth: normalized.faceWidth,
-    backlash: normalized.backlash,
-    centered: normalized.center,
-    pitchAngleDeg: 90,
-    pitchAngleRad: Math.PI * 0.5,
-    toothHeight: normalized.toothHeight,
-  };
-  return attachGearMeta(shape, meta);
-}
-
 export interface GearPairSpec {
   module: number;
   teeth: number;
@@ -2275,6 +2221,23 @@ export interface BevelGearPairOptions {
   phaseDeg?: number;
 }
 
+export interface SideGearSpec extends GearPairSpec {
+  side?: 'top' | 'bottom';
+  toothHeight?: number;
+}
+
+export interface FaceGearSpec extends SideGearSpec {}
+
+export interface SideGearPairOptions {
+  side: Shape | SideGearSpec;
+  vertical: Shape | GearPairSpec;
+  backlash?: number;
+  centerDistance?: number;
+  meshPlaneZ?: number;
+  place?: boolean;
+  phaseDeg?: number;
+}
+
 export interface BevelGearPairResult extends GearMeshPlacement {
   pinion: Shape;
   gear: Shape;
@@ -2283,6 +2246,46 @@ export interface BevelGearPairResult extends GearMeshPlacement {
   gearPitchAngleDeg: number;
   coneDistance: number;
   backlash: number;
+  jointRatio: number;
+  speedReduction: number;
+  diagnostics: GearPairDiagnostic[];
+  status: 'ok' | 'warn' | 'error';
+}
+
+export interface SideGearPairResult {
+  side: Shape;
+  vertical: Shape;
+  centerDistance: number;
+  centerDistanceNominal: number;
+  backlash: number;
+  pressureAngleDeg: number;
+  meshPlaneZ: number;
+  radialOverlap: number;
+  jointRatio: number;
+  speedReduction: number;
+  diagnostics: GearPairDiagnostic[];
+  status: 'ok' | 'warn' | 'error';
+}
+
+export interface FaceGearPairOptions {
+  face: Shape | FaceGearSpec;
+  vertical: Shape | GearPairSpec;
+  backlash?: number;
+  centerDistance?: number;
+  meshPlaneZ?: number;
+  place?: boolean;
+  phaseDeg?: number;
+}
+
+export interface FaceGearPairResult {
+  face: Shape;
+  vertical: Shape;
+  centerDistance: number;
+  centerDistanceNominal: number;
+  backlash: number;
+  pressureAngleDeg: number;
+  meshPlaneZ: number;
+  radialOverlap: number;
   jointRatio: number;
   speedReduction: number;
   diagnostics: GearPairDiagnostic[];
@@ -2452,50 +2455,43 @@ export function bevelGearPair(options: BevelGearPairOptions): BevelGearPairResul
   };
 }
 
-export interface FaceGearPairSpec {
-  module: number;
-  teeth: number;
-  pressureAngleDeg?: number;
-  faceWidth?: number;
-  backlash?: number;
-  clearance?: number;
-  addendum?: number;
-  dedendum?: number;
-  toothHeight?: number;
-  rimWidth?: number;
-  boreDiameter?: number;
-  segmentsPerTooth?: number;
-}
-
-export interface FaceGearPairOptions {
-  pinion: Shape | GearPairSpec;
-  gear: Shape | FaceGearPairSpec;
-  shaftAngleDeg?: number;
-  backlash?: number;
-  place?: boolean;
-  phaseDeg?: number;
-}
-
-export interface FaceGearPairResult extends GearMeshPlacement {
-  pinion: Shape;
-  gear: Shape;
-  shaftAngleDeg: number;
-  meshRadius: number;
-  backlash: number;
-  jointRatio: number;
-  speedReduction: number;
-  diagnostics: GearPairDiagnostic[];
-  status: 'ok' | 'warn' | 'error';
-}
-
-function resolveFacePairPinionMember(
-  value: Shape | GearPairSpec,
-  label: 'pinion',
-): { shape: Shape; meta: GearMeta } {
+function resolveSideGearPairSideMember(value: Shape | SideGearSpec): { shape: Shape; meta: GearMeta } {
   if (value instanceof Shape) {
     const meta = readGearMeta(value);
-    if (!meta || (meta.kind !== 'spur' && meta.kind !== 'bevel')) {
-      throw new Error(`faceGearPair: "${label}" shape must be a spurGear(...) or bevelGear(...) result`);
+    if (!meta || meta.kind !== 'face') {
+      throw new Error('sideGearPair: "side" shape has no side-gear metadata; pass a sideGear(...) result or SideGearSpec');
+    }
+    return { shape: value.clone(), meta };
+  }
+
+  const fallbackFaceWidth = Math.max(2, value.module * 5);
+  const shape = sideGear({
+    module: value.module,
+    teeth: value.teeth,
+    pressureAngleDeg: value.pressureAngleDeg,
+    faceWidth: value.faceWidth ?? fallbackFaceWidth,
+    backlash: value.backlash,
+    clearance: value.clearance,
+    addendum: value.addendum,
+    dedendum: value.dedendum,
+    boreDiameter: value.boreDiameter,
+    center: true,
+    segmentsPerTooth: value.segmentsPerTooth,
+    side: value.side,
+    toothHeight: value.toothHeight,
+  });
+  const meta = readGearMeta(shape);
+  if (!meta || meta.kind !== 'face') {
+    throw new Error('sideGearPair: failed to derive side-gear metadata for "side"');
+  }
+  return { shape, meta };
+}
+
+function resolveSideGearPairVerticalMember(value: Shape | GearPairSpec): { shape: Shape; meta: GearMeta } {
+  if (value instanceof Shape) {
+    const meta = readGearMeta(value);
+    if (!meta || meta.kind !== 'spur') {
+      throw new Error('sideGearPair: "vertical" shape has no spur-gear metadata; pass a spurGear(...) result or GearPairSpec');
     }
     return { shape: value.clone(), meta };
   }
@@ -2516,119 +2512,178 @@ function resolveFacePairPinionMember(
   });
   const meta = readGearMeta(shape);
   if (!meta || meta.kind !== 'spur') {
-    throw new Error('faceGearPair: failed to derive pinion metadata');
+    throw new Error('sideGearPair: failed to derive spur-gear metadata for "vertical"');
   }
   return { shape, meta };
 }
 
-function resolveFacePairGearMember(
-  value: Shape | FaceGearPairSpec,
-  label: 'gear',
-): { shape: Shape; meta: GearMeta } {
-  if (value instanceof Shape) {
-    const meta = readGearMeta(value);
-    if (!meta || meta.kind !== 'face') {
-      throw new Error(`faceGearPair: "${label}" shape has no face-gear metadata; pass faceGear(...) or FaceGearPairSpec`);
-    }
-    return { shape: value.clone(), meta };
+function defaultSideMeshPlaneZ(meta: GearMeta): number {
+  if (meta.meshPlaneZ != null) return meta.meshPlaneZ;
+  if (meta.toothSide === 'bottom') {
+    return -(meta.faceWidth * 0.5 + (meta.toothHeight ?? meta.module) * 0.5);
   }
-
-  const fallbackFaceWidth = Math.max(2, value.module * 3);
-  const shape = faceGear({
-    module: value.module,
-    teeth: value.teeth,
-    pressureAngleDeg: value.pressureAngleDeg,
-    faceWidth: value.faceWidth ?? fallbackFaceWidth,
-    backlash: value.backlash,
-    clearance: value.clearance,
-    addendum: value.addendum,
-    dedendum: value.dedendum,
-    toothHeight: value.toothHeight,
-    rimWidth: value.rimWidth,
-    boreDiameter: value.boreDiameter,
-    center: true,
-    segmentsPerTooth: value.segmentsPerTooth,
-  });
-  const meta = readGearMeta(shape);
-  if (!meta || meta.kind !== 'face') {
-    throw new Error('faceGearPair: failed to derive face-gear metadata');
-  }
-  return { shape, meta };
+  return meta.faceWidth * 0.5 + (meta.toothHeight ?? meta.module) * 0.5;
 }
 
-export function faceGearPair(options: FaceGearPairOptions): FaceGearPairResult {
-  const pinion = resolveFacePairPinionMember(options.pinion, 'pinion');
-  const gear = resolveFacePairGearMember(options.gear, 'gear');
+/**
+ * Pair helper for side (crown/face) gear + perpendicular "vertical" spur gear.
+ * Auto-placement rotates the spur around +Y and positions it to mesh at the side tooth band.
+ */
+export function sideGearPair(options: SideGearPairOptions): SideGearPairResult {
+  const side = resolveSideGearPairSideMember(options.side);
+  const vertical = resolveSideGearPairVerticalMember(options.vertical);
   const diagnostics: GearPairDiagnostic[] = [];
 
-  if (Math.abs(pinion.meta.module - gear.meta.module) > 1e-6) {
+  if (Math.abs(side.meta.module - vertical.meta.module) > 1e-6) {
     diagnostics.push({
       level: 'error',
-      code: 'face.module_mismatch',
-      message: `Module mismatch: pinion=${pinion.meta.module}, gear=${gear.meta.module}`,
-    });
-  }
-  if (Math.abs(pinion.meta.pressureAngleDeg - gear.meta.pressureAngleDeg) > 1e-4) {
-    diagnostics.push({
-      level: 'error',
-      code: 'face.pressure_angle_mismatch',
-      message: `Pressure-angle mismatch: pinion=${pinion.meta.pressureAngleDeg.toFixed(3)}deg, gear=${gear.meta.pressureAngleDeg.toFixed(3)}deg`,
+      code: 'sidegear.module_mismatch',
+      message: `Module mismatch: side=${side.meta.module}, vertical=${vertical.meta.module}`,
     });
   }
 
-  const shaftAngleDeg = normalizeShaftAngle('faceGearPair', options.shaftAngleDeg ?? 90);
-  if (Math.abs(shaftAngleDeg - 90) > 1e-3) {
+  const pressureAngleDeg = side.meta.pressureAngleDeg;
+  if (Math.abs(pressureAngleDeg - vertical.meta.pressureAngleDeg) > 1e-4) {
+    diagnostics.push({
+      level: 'error',
+      code: 'sidegear.pressure_angle_mismatch',
+      message: `Pressure-angle mismatch: side=${pressureAngleDeg.toFixed(3)}deg, vertical=${vertical.meta.pressureAngleDeg.toFixed(3)}deg`,
+    });
+  }
+
+  const module = side.meta.module;
+  const nominalCenterDistance = side.meta.pitchRadius + vertical.meta.pitchRadius;
+  const requestedBacklash = options.backlash ?? Math.max(side.meta.backlash, vertical.meta.backlash, 0);
+  const centerDistance = options.centerDistance ?? (nominalCenterDistance + requestedBacklash * 0.5);
+  if (!Number.isFinite(centerDistance) || centerDistance <= 0) {
+    throw new Error('sideGearPair: centerDistance must be > 0');
+  }
+
+  const sideBandMin = side.meta.rootRadius;
+  const sideBandMax = side.meta.outerRadius;
+  const verticalBandMin = centerDistance - vertical.meta.outerRadius;
+  const verticalBandMax = centerDistance - vertical.meta.rootRadius;
+  const radialOverlap = Math.min(sideBandMax, verticalBandMax) - Math.max(sideBandMin, verticalBandMin);
+
+  if (verticalBandMin < sideBandMin - 1e-6) {
+    diagnostics.push({
+      level: 'error',
+      code: 'sidegear.root_collision',
+      message: `Center distance ${centerDistance.toFixed(4)} drives the vertical tooth below side root radius ${sideBandMin.toFixed(4)}`,
+    });
+  }
+
+  if (radialOverlap <= 1e-6) {
+    diagnostics.push({
+      level: 'error',
+      code: 'sidegear.no_contact',
+      message: `No radial tooth-band overlap at center distance ${centerDistance.toFixed(4)}`,
+    });
+  } else if (radialOverlap < module * 0.35) {
     diagnostics.push({
       level: 'warn',
-      code: 'face.shaft_angle_approx',
-      message: 'faceGearPair auto-placement is tuned for 90° shafts; non-90° values are approximate.',
+      code: 'sidegear.low_overlap',
+      message: `Radial overlap ${radialOverlap.toFixed(4)} is low for module ${module}`,
     });
   }
 
-  const shaftAngleRad = shaftAngleDeg * Math.PI / 180;
-  const pinionAxis: [number, number, number] = [Math.sin(shaftAngleRad), 0, Math.cos(shaftAngleRad)];
-  const gearAxis: [number, number, number] = [0, 0, 1];
-
-  const meshRadius = gear.meta.pitchRadius;
-  const toothHeight = gear.meta.toothHeight ?? gear.meta.addendum;
-  const faceTopZ = gear.meta.centered === false ? gear.meta.faceWidth : gear.meta.faceWidth * 0.5;
-  const meshPlaneZ = faceTopZ + toothHeight * 0.5;
-  const pinionCenter: [number, number, number] = [0, meshRadius, meshPlaneZ + pinion.meta.pitchRadius];
-  const gearCenter: [number, number, number] = [0, 0, 0];
-
-  const place = options.place ?? true;
-  const phaseDeg = options.phaseDeg ?? (180 / gear.meta.teeth);
-
-  let pinionShape = pinion.shape.clone();
-  let gearShape = gear.shape.clone();
-  if (place) {
-    pinionShape = pinionShape.rotate(0, shaftAngleDeg, 0);
-    if (Math.abs(phaseDeg) > EPSILON) {
-      pinionShape = pinionShape.rotateAround(pinionAxis, phaseDeg, [0, 0, 0]);
-    }
-    pinionShape = pinionShape.translate(pinionCenter[0], pinionCenter[1], pinionCenter[2]);
+  const impliedBacklash = 2 * (centerDistance - nominalCenterDistance);
+  if (impliedBacklash < -1e-6) {
+    diagnostics.push({
+      level: 'error',
+      code: 'sidegear.negative_backlash',
+      message: `Computed backlash ${impliedBacklash.toFixed(4)} is negative`,
+    });
+  } else if (impliedBacklash < module * 0.01) {
+    diagnostics.push({
+      level: 'warn',
+      code: 'sidegear.tight_backlash',
+      message: `Backlash ${impliedBacklash.toFixed(4)} is very tight for module ${module}`,
+    });
   }
 
+  const sideToothHeight = side.meta.toothHeight ?? module;
+  if (sideToothHeight < module * 0.5) {
+    diagnostics.push({
+      level: 'warn',
+      code: 'sidegear.shallow_tooth_height',
+      message: `toothHeight ${sideToothHeight.toFixed(4)} is shallow; target >= ${(module * 0.5).toFixed(4)}`,
+    });
+  }
+
+  const meshPlaneZ = options.meshPlaneZ ?? defaultSideMeshPlaneZ(side.meta);
+  if (!Number.isFinite(meshPlaneZ)) {
+    throw new Error('sideGearPair: meshPlaneZ must be finite');
+  }
+  if (side.meta.toothMinZ != null && side.meta.toothMaxZ != null
+    && (meshPlaneZ < side.meta.toothMinZ - 1e-6 || meshPlaneZ > side.meta.toothMaxZ + 1e-6)) {
+    diagnostics.push({
+      level: 'error',
+      code: 'sidegear.mesh_plane_out_of_band',
+      message: `meshPlaneZ ${meshPlaneZ.toFixed(4)} is outside side tooth band [${side.meta.toothMinZ.toFixed(4)}, ${side.meta.toothMaxZ.toFixed(4)}]`,
+    });
+  }
+
+  const place = options.place ?? true;
+  const sideShape = place ? side.shape : side.shape.clone();
+  const phaseDeg = options.phaseDeg ?? (180 / vertical.meta.teeth);
+  const verticalShape = place
+    ? vertical.shape.rotate(0, 0, phaseDeg).rotate(-90, 0, 0).translate(centerDistance, 0, meshPlaneZ)
+    : vertical.shape;
   const status = pairStatusFromDiagnostics(diagnostics);
-  const backlash = options.backlash ?? Math.max(pinion.meta.backlash, gear.meta.backlash, 0);
 
   return {
-    pinion: pinionShape,
-    gear: gearShape,
-    shaftAngleDeg,
-    meshRadius,
-    backlash,
-    jointRatio: -(pinion.meta.teeth / gear.meta.teeth),
-    speedReduction: gear.meta.teeth / pinion.meta.teeth,
-    pinionAxis,
-    gearAxis,
-    pinionCenter,
-    gearCenter,
+    side: sideShape,
+    vertical: verticalShape,
+    centerDistance,
+    centerDistanceNominal: nominalCenterDistance,
+    backlash: impliedBacklash,
+    pressureAngleDeg,
+    meshPlaneZ,
+    radialOverlap,
+    jointRatio: -(side.meta.teeth / vertical.meta.teeth),
+    speedReduction: vertical.meta.teeth / side.meta.teeth,
     diagnostics,
     status,
   };
 }
 
+export function faceGearPair(options: FaceGearPairOptions): FaceGearPairResult {
+  let pair: SideGearPairResult;
+  try {
+    pair = sideGearPair({
+      side: options.face,
+      vertical: options.vertical,
+      backlash: options.backlash,
+      centerDistance: options.centerDistance,
+      meshPlaneZ: options.meshPlaneZ,
+      place: options.place,
+      phaseDeg: options.phaseDeg,
+    });
+  } catch (error) {
+    remapErrorPrefix(error, 'sideGearPair', 'faceGearPair');
+  }
+
+  const diagnostics = pair.diagnostics.map((d) => ({
+    ...d,
+    code: d.code.startsWith('sidegear.') ? `facegear.${d.code.slice('sidegear.'.length)}` : d.code,
+  }));
+
+  return {
+    face: pair.side,
+    vertical: pair.vertical,
+    centerDistance: pair.centerDistance,
+    centerDistanceNominal: pair.centerDistanceNominal,
+    backlash: pair.backlash,
+    pressureAngleDeg: pair.pressureAngleDeg,
+    meshPlaneZ: pair.meshPlaneZ,
+    radialOverlap: pair.radialOverlap,
+    jointRatio: pair.jointRatio,
+    speedReduction: pair.speedReduction,
+    diagnostics,
+    status: pairStatusFromDiagnostics(diagnostics),
+  };
+}
 /** All library parts, keyed by name */
 export const partLibrary = {
   boltHole,
@@ -2653,11 +2708,13 @@ export const partLibrary = {
   spurGear,
   bevelGear,
   faceGear,
+  sideGear,
   ringGear,
   rackGear,
   gearPair,
   bevelGearPair,
   faceGearPair,
+  sideGearPair,
 };
 
 // --- Thread / Fastener library ---

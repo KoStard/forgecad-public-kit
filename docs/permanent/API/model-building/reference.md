@@ -426,8 +426,8 @@ const bevel = lib.bevelGearPair({
 });
 
 const face = lib.faceGearPair({
-  pinion: { module: 1.5, teeth: 16, faceWidth: 8 },
-  gear: { module: 1.5, teeth: 48, faceWidth: 7, toothHeight: 1.2 },
+  face: { module: 1.5, teeth: 44, faceWidth: 7, toothHeight: 1.2, side: 'top' },
+  vertical: { module: 1.5, teeth: 16, faceWidth: 8 },
 });
 
 mech.addGearCoupling("Bevel Driven", "Bevel Driver", { pair: bevel });
@@ -1606,6 +1606,29 @@ const pinion = lib.spurGear({
 });
 ```
 
+### `lib.faceGear(options)`
+Face gear (crown style) where teeth are on one face (`top` or `bottom`) instead of the outer rim.
+
+Uses the same involute tooth sizing inputs as `lib.spurGear(...)`, then projects the tooth band axially from one side.
+
+**Options:**
+- all `lib.spurGear(...)` options, plus:
+- `side` (`'top' | 'bottom'`, optional) - Which face gets the teeth. Default: `'top'`
+- `toothHeight` (number, optional) - Tooth projection height from the selected face. Default: `module`
+
+```javascript
+const face = lib.faceGear({
+  module: 1.25,
+  teeth: 36,
+  faceWidth: 8,
+  toothHeight: 1.2,
+  side: 'top',
+  boreDiameter: 8,
+});
+```
+
+`lib.sideGear(...)` is kept as a compatibility alias.
+
 ### `lib.ringGear(options)`
 Internal ring gear with involute-derived tooth spaces.
 
@@ -1686,34 +1709,6 @@ const bevelPinion = lib.bevelGear({
 });
 ```
 
-### `lib.faceGear(options)`
-Face/crown-style gear: radial teeth on the top face of a disk.
-
-**Options:**
-- `module` (number)
-- `teeth` (integer, >= 8)
-- `faceWidth` (number) - Base disk thickness
-- `pressureAngleDeg` (number, optional) - Default: `20`
-- `backlash` (number, optional) - Default: `0`
-- `clearance` (number, optional) - Default: `0.25 * module`
-- `addendum` (number, optional) - Default: `module`
-- `dedendum` (number, optional) - Default: `addendum + clearance`
-- `toothHeight` (number, optional) - Axial tooth protrusion above disk
-- `rimWidth` (number, optional) - Extra radius outside tooth tips
-- `boreDiameter` (number, optional)
-- `center` (boolean, optional) - Default: `true`
-- `segmentsPerTooth` (number, optional) - Default: `10`
-
-```javascript
-const face = lib.faceGear({
-  module: 1.5,
-  teeth: 48,
-  faceWidth: 7,
-  toothHeight: 1.2,
-  boreDiameter: 10,
-});
-```
-
 ### `lib.gearPair(options)`
 Build or validate a spur-gear pair and return ratio/backlash/mesh diagnostics.
 
@@ -1781,33 +1776,43 @@ const bevelPair = lib.bevelGearPair({
 ```
 
 ### `lib.faceGearPair(options)`
-Build or validate a face-gear stage (face gear + pinion) and return ratio diagnostics plus recommended joint placement vectors.
+Build or validate a perpendicular pair between a face gear and a vertical spur gear.
 
-Accepts:
-- `pinion`: spur/bevel gear shape or `GearPairSpec`
-- `gear`: face gear shape or `FaceGearPairSpec`
+Accepts either:
+- face gear shapes produced by `lib.faceGear(...)` or face-gear specs (`{ module, teeth, ... }`)
+- vertical spur shapes produced by `lib.spurGear(...)` or spur specs (`{ module, teeth, ... }`)
 
 **Options:**
-- `pinion` (`Shape | GearPairSpec`)
-- `gear` (`Shape | FaceGearPairSpec`)
-- `shaftAngleDeg` (number, optional) - Default: `90` (`90` is the calibrated auto-placement case)
-- `backlash` (number, optional)
-- `place` (boolean, optional) - Apply recommended transforms to returned shapes. Default: `true`
-- `phaseDeg` (number, optional) - Extra phase around pinion axis
+- `face` (`Shape | FaceGearSpec`) - face/crown gear member
+- `vertical` (`Shape | GearPairSpec`) - mating perpendicular spur gear
+- `backlash` (number, optional) - target radial backlash for auto center distance
+- `centerDistance` (number, optional) - override center distance directly
+- `meshPlaneZ` (number, optional) - override the Z plane where the vertical gear is placed
+- `place` (boolean, optional) - auto-place `vertical`. Default: `true`
+- `phaseDeg` (number, optional) - phase rotation applied before perpendicular placement
 
 **Returns:** `FaceGearPairResult` with:
-- `pinion`, `gear` (shapes)
+- `face`, `vertical` (shapes)
 - `jointRatio`, `speedReduction`
-- `shaftAngleDeg`, `meshRadius`
-- `pinionAxis`, `gearAxis`, `pinionCenter`, `gearCenter` (joint setup helpers)
+- `centerDistance`, `centerDistanceNominal`, `backlash`
+- `meshPlaneZ`, `radialOverlap`
 - `diagnostics[]` and `status` (`ok | warn | error`)
 
 ```javascript
-const facePair = lib.faceGearPair({
-  pinion: { module: 1.5, teeth: 16, faceWidth: 8 },
-  gear: { module: 1.5, teeth: 48, faceWidth: 7, toothHeight: 1.2 },
+const pair = lib.faceGearPair({
+  face: { module: 1.25, teeth: 36, faceWidth: 8, toothHeight: 1.2, side: 'top' },
+  vertical: { module: 1.25, teeth: 12, faceWidth: 8 },
+  backlash: 0.05,
 });
+
+if (pair.status !== 'ok') {
+  console.warn(pair.diagnostics);
+}
+
+return [pair.face, pair.vertical];
 ```
+
+`lib.sideGearPair(...)` is kept as a compatibility alias.
 
 ### `lib.tSlotProfile(options?)`
 Build a 2D T-slot cross-section sketch.

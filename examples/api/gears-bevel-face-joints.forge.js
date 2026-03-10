@@ -5,6 +5,7 @@ const moduleSize = param("Module", 1.4, { min: 0.8, max: 3.0, step: 0.05 });
 const bevelInput = param("Bevel Driver", 30, { min: -360, max: 360, step: 1, unit: "°" });
 const faceInput = param("Face Driver", 20, { min: -360, max: 360, step: 1, unit: "°" });
 const shaftAngle = param("Bevel Shaft", 90, { min: 60, max: 120, step: 1, unit: "°" });
+const stageBacklash = moduleSize * 0.05;
 
 const bevelStage = lib.bevelGearPair({
   pinion: {
@@ -20,23 +21,26 @@ const bevelStage = lib.bevelGearPair({
     boreDiameter: 8,
   },
   shaftAngleDeg: shaftAngle,
+  backlash: stageBacklash,
   place: true,
 });
 
 const faceStage = lib.faceGearPair({
-  pinion: {
+  face: {
+    module: moduleSize,
+    teeth: 44,
+    faceWidth: 7,
+    toothHeight: moduleSize * 0.9,
+    side: "top",
+    boreDiameter: 10,
+  },
+  vertical: {
     module: moduleSize,
     teeth: 14,
     faceWidth: 8,
     boreDiameter: 5,
   },
-  gear: {
-    module: moduleSize,
-    teeth: 44,
-    faceWidth: 7,
-    toothHeight: moduleSize * 0.9,
-    boreDiameter: 10,
-  },
+  backlash: stageBacklash,
   place: true,
 });
 
@@ -58,8 +62,8 @@ const faceOffset = [110, 0, 0];
 
 const bevelPinionPivot = addOffset(bevelStage.pinionCenter, bevelOffset);
 const bevelGearPivot = addOffset(bevelStage.gearCenter, bevelOffset);
-const facePinionPivot = addOffset(faceStage.pinionCenter, faceOffset);
-const faceGearPivot = addOffset(faceStage.gearCenter, faceOffset);
+const faceGearPivot = addOffset([0, 0, 0], faceOffset);
+const faceVerticalPivot = addOffset([faceStage.centerDistance, 0, faceStage.meshPlaneZ], faceOffset);
 
 jointsView({
   joints: [
@@ -87,10 +91,10 @@ jointsView({
     },
     {
       name: "Face Driver",
-      child: "Face Pinion",
+      child: "Face Gear",
       type: "revolute",
-      axis: faceStage.pinionAxis,
-      pivot: facePinionPivot,
+      axis: [0, 0, 1],
+      pivot: faceGearPivot,
       min: -1080,
       max: 1080,
       default: faceInput,
@@ -98,10 +102,10 @@ jointsView({
     },
     {
       name: "Face Driven",
-      child: "Face Gear",
+      child: "Face Vertical",
       type: "revolute",
-      axis: faceStage.gearAxis,
-      pivot: faceGearPivot,
+      axis: [0, 1, 0],
+      pivot: faceVerticalPivot,
       min: -1080,
       max: 1080,
       default: 0,
@@ -143,11 +147,11 @@ return [
     shape: bevelStage.gear.translate(bevelOffset[0], bevelOffset[1], bevelOffset[2]).color("#8ea8be"),
   },
   {
-    name: "Face Pinion",
-    shape: faceStage.pinion.translate(faceOffset[0], faceOffset[1], faceOffset[2]).color("#c98f5a"),
+    name: "Face Gear",
+    shape: faceStage.face.translate(faceOffset[0], faceOffset[1], faceOffset[2]).color("#6f8795"),
   },
   {
-    name: "Face Gear",
-    shape: faceStage.gear.translate(faceOffset[0], faceOffset[1], faceOffset[2]).color("#6f8795"),
+    name: "Face Vertical",
+    shape: faceStage.vertical.translate(faceOffset[0], faceOffset[1], faceOffset[2]).color("#c98f5a"),
   },
 ];

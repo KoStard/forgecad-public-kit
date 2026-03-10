@@ -717,6 +717,11 @@ type SpurGearOptions = {
   center?: boolean;
   segmentsPerTooth?: number;
 };
+type SideGearOptions = SpurGearOptions & {
+  side?: 'top' | 'bottom';
+  toothHeight?: number;
+};
+type FaceGearOptions = SideGearOptions;
 type RingGearOptions = {
   module: number;
   teeth: number;
@@ -759,21 +764,6 @@ type BevelGearOptions = {
   center?: boolean;
   segmentsPerTooth?: number;
 };
-type FaceGearOptions = {
-  module: number;
-  teeth: number;
-  pressureAngleDeg?: number;
-  faceWidth: number;
-  backlash?: number;
-  clearance?: number;
-  addendum?: number;
-  dedendum?: number;
-  toothHeight?: number;
-  rimWidth?: number;
-  boreDiameter?: number;
-  center?: boolean;
-  segmentsPerTooth?: number;
-};
 type GearPairSpec = {
   module: number;
   teeth: number;
@@ -786,6 +776,11 @@ type GearPairSpec = {
   boreDiameter?: number;
   segmentsPerTooth?: number;
 };
+type SideGearSpec = GearPairSpec & {
+  side?: 'top' | 'bottom';
+  toothHeight?: number;
+};
+type FaceGearSpec = SideGearSpec;
 type GearPairDiagnostic = {
   level: 'info' | 'warn' | 'error';
   code: string;
@@ -824,26 +819,29 @@ type BevelGearPairResult = GearMeshPlacement & {
   diagnostics: GearPairDiagnostic[];
   status: 'ok' | 'warn' | 'error';
 };
-type FaceGearPairSpec = {
-  module: number;
-  teeth: number;
-  pressureAngleDeg?: number;
-  faceWidth?: number;
-  backlash?: number;
-  clearance?: number;
-  addendum?: number;
-  dedendum?: number;
-  toothHeight?: number;
-  rimWidth?: number;
-  boreDiameter?: number;
-  segmentsPerTooth?: number;
-};
-type FaceGearPairResult = GearMeshPlacement & {
-  pinion: Shape;
-  gear: Shape;
-  shaftAngleDeg: number;
-  meshRadius: number;
+type SideGearPairResult = {
+  side: Shape;
+  vertical: Shape;
+  centerDistance: number;
+  centerDistanceNominal: number;
   backlash: number;
+  pressureAngleDeg: number;
+  meshPlaneZ: number;
+  radialOverlap: number;
+  jointRatio: number;
+  speedReduction: number;
+  diagnostics: GearPairDiagnostic[];
+  status: 'ok' | 'warn' | 'error';
+};
+type FaceGearPairResult = {
+  face: Shape;
+  vertical: Shape;
+  centerDistance: number;
+  centerDistanceNominal: number;
+  backlash: number;
+  pressureAngleDeg: number;
+  meshPlaneZ: number;
+  radialOverlap: number;
   jointRatio: number;
   speedReduction: number;
   diagnostics: GearPairDiagnostic[];
@@ -908,20 +906,24 @@ declare const lib: {
   elbow(pipeRadius: number, bendRadius: number, options: { from?: [number, number, number]; to?: [number, number, number]; wall?: number; segments?: number }): Shape;
   /** Involute external spur gear (2D involute profile + extrusion). */
   spurGear(options: SpurGearOptions): Shape;
+  /** Face gear (crown style): teeth project from the top or bottom face. */
+  faceGear(options: FaceGearOptions): Shape;
+  /** Side/crown gear: teeth project from the top or bottom face. */
+  sideGear(options: SideGearOptions): Shape;
   /** Internal ring gear with involute-derived tooth spaces. */
   ringGear(options: RingGearOptions): Shape;
   /** Linear rack gear with parametric pressure-angle flanks. */
   rackGear(options: RackGearOptions): Shape;
   /** Bevel gear from a tapered involute extrusion (conical approximation). */
   bevelGear(options: BevelGearOptions): Shape;
-  /** Face/crown-style gear with radial teeth on the top face. */
-  faceGear(options: FaceGearOptions): Shape;
   /** Pair-level ratio/backlash/contact diagnostics with optional auto-placement. */
   gearPair(options: { pinion: Shape | GearPairSpec; gear: Shape | GearPairSpec; backlash?: number; centerDistance?: number; place?: boolean; phaseDeg?: number }): GearPairResult;
   /** Bevel gear pair helper with ratio diagnostics and recommended joint placement axes/centers. */
   bevelGearPair(options: { pinion: Shape | GearPairSpec; gear: Shape | GearPairSpec; shaftAngleDeg?: number; backlash?: number; place?: boolean; phaseDeg?: number }): BevelGearPairResult;
-  /** Face gear + pinion helper with ratio diagnostics and recommended joint placement axes/centers. */
-  faceGearPair(options: { pinion: Shape | GearPairSpec; gear: Shape | FaceGearPairSpec; shaftAngleDeg?: number; backlash?: number; place?: boolean; phaseDeg?: number }): FaceGearPairResult;
+  /** Perpendicular pair helper for faceGear + vertical spur gear. */
+  faceGearPair(options: { face: Shape | FaceGearSpec; vertical: Shape | GearPairSpec; backlash?: number; centerDistance?: number; meshPlaneZ?: number; place?: boolean; phaseDeg?: number }): FaceGearPairResult;
+  /** Perpendicular pair helper for sideGear + vertical spur gear. */
+  sideGearPair(options: { side: Shape | SideGearSpec; vertical: Shape | GearPairSpec; backlash?: number; centerDistance?: number; meshPlaneZ?: number; place?: boolean; phaseDeg?: number }): SideGearPairResult;
 };
 
 // --- Dimensions (visual annotations) ---
