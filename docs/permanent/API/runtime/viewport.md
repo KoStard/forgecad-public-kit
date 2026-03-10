@@ -35,22 +35,28 @@ Notes:
 
 Override how the viewport explode slider offsets returned objects.
 
+Explode offsets are resolved from the returned object tree, not from a flat list.
+In `radial` mode each node separates from its immediate parent/subassembly center,
+so nested assemblies peel apart level by level instead of all drifting away from the global centroid.
+
 **Parameters:**
 - `enabled` (boolean) - disable explode offsets for this script when `false`
 - `amountScale` (number) - multiply the UI explode amount
+- `stages` (number[]) - per-depth multipliers (depth 1 = first level, defaults to `1, 2, 3, ...`)
 - `mode` (`'radial' | 'x' | 'y' | 'z' | [x, y, z]`) - default explode direction
 - `axisLock` (`'x' | 'y' | 'z'`) - optional global axis lock
 - `byName` (`Record<string, { stage?, direction?, axisLock? }>`)- per-object overrides keyed by returned object `name`
+- `byPath` (`Record<string, { stage?, direction?, axisLock? }>`)- per-tree-path overrides using slash-separated object tree paths such as `"Drive/Shaft"`
 
 **Returns:** `void`
 
 ```javascript
 explodeView({
   amountScale: 1.2,
+  stages: [0.35, 0.8],
   mode: 'radial',
-  byName: {
-    "Shaft": { direction: [1, 0, 0], stage: 1.6 },
-    "Housing": { stage: 0.4 },
+  byPath: {
+    "Drive/Shaft": { direction: [1, 0, 0], stage: 1.6 },
   },
 });
 ```
@@ -168,6 +174,10 @@ viewConfig({
 ## `lib.explode(items, options?)`
 
 Apply deterministic exploded-view offsets to an assembly tree while preserving names, colors, and nesting.
+
+`radial` separation is parent-relative: each child moves away from the center of the
+subassembly it belongs to, which produces a much more natural nested explode than a
+single root-relative offset.
 
 Works with:
 - arrays of shapes/sketches/named items
