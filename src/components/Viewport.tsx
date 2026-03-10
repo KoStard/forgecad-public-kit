@@ -50,6 +50,7 @@ const SECTION_HATCH_MAX_LINE_WIDTH = 0.9;
 const SECTION_SURFACE_INSET_MIN = 0.001;
 const SECTION_SURFACE_INSET_MAX = 0.05;
 const SECTION_SURFACE_INSET_SCALE = 1e-4;
+const PLANE_TRANSFORM_EPS = 1e-8;
 
 interface PlaneTransform {
   center: THREE.Vector3;
@@ -138,23 +139,45 @@ function hashString(value: string): number {
   return Math.abs(hash);
 }
 
+function buildPlaneSpaceRotation(normalLike: [number, number, number]): { normal: THREE.Vector3; rotationToPlane: THREE.Matrix4 } | null {
+  const normal = new THREE.Vector3(normalLike[0], normalLike[1], normalLike[2]);
+  if (normal.lengthSq() < PLANE_TRANSFORM_EPS) return null;
+  normal.normalize();
+
+  const dot = normal.z;
+  if (dot > 1 - PLANE_TRANSFORM_EPS) {
+    return { normal, rotationToPlane: new THREE.Matrix4() };
+  }
+
+  let axis = new THREE.Vector3(1, 0, 0);
+  let angle = Math.PI;
+
+  if (dot >= -1 + PLANE_TRANSFORM_EPS) {
+    axis = new THREE.Vector3(normal.y, -normal.x, 0);
+    const axisLength = axis.length();
+    if (axisLength <= PLANE_TRANSFORM_EPS) {
+      return { normal, rotationToPlane: new THREE.Matrix4() };
+    }
+    axis.multiplyScalar(1 / axisLength);
+    angle = Math.acos(THREE.MathUtils.clamp(dot, -1, 1));
+  }
+
+  return {
+    normal,
+    rotationToPlane: new THREE.Matrix4().makeRotationAxis(axis, angle),
+  };
+}
+
 function resolvePlaneTransform(
   normalLike: [number, number, number],
   offset: number,
   normalDisplacement = 0,
 ): PlaneTransform | null {
-  const normal = new THREE.Vector3(normalLike[0], normalLike[1], normalLike[2]);
-  if (normal.lengthSq() < 1e-8) return null;
-  normal.normalize();
-
+  const planeSpace = buildPlaneSpaceRotation(normalLike);
+  if (!planeSpace) return null;
+  const { normal, rotationToPlane } = planeSpace;
   const center = normal.clone().multiplyScalar(offset + normalDisplacement);
-  const ref = Math.abs(normal.z) < 0.95 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
-  const tangent = new THREE.Vector3().crossVectors(ref, normal).normalize();
-  if (tangent.lengthSq() < 1e-8) tangent.set(1, 0, 0);
-  const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
-  const quaternion = new THREE.Quaternion().setFromRotationMatrix(
-    new THREE.Matrix4().makeBasis(tangent, bitangent, normal),
-  );
+  const quaternion = new THREE.Quaternion().setFromRotationMatrix(rotationToPlane.clone().invert());
 
   return { center, quaternion };
 }
