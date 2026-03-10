@@ -2721,13 +2721,34 @@ export function Viewport() {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const initialFitRequestedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const hoverTooltipRef = useRef<HTMLDivElement | null>(null);
+  const hoverTooltipIdRef = useRef<string | null>(null);
   const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
-  const [hoverLabel, setHoverLabel] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
   const [isViewportInteracting, setIsViewportInteracting] = useState(false);
   const themeName = useForgeStore((s) => s.theme);
   const t = themes[themeName];
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
   const canvasDpr: number | [number, number] = isViewportInteracting ? 1 : [1, 2];
+
+  const hideHoverTooltip = useCallback((id?: string | null) => {
+    if (id !== undefined && hoverTooltipIdRef.current !== id) return;
+    hoverTooltipIdRef.current = null;
+    const tooltip = hoverTooltipRef.current;
+    if (!tooltip) return;
+    tooltip.style.visibility = 'hidden';
+    tooltip.style.opacity = '0';
+  }, []);
+
+  const showHoverTooltip = useCallback((label: { id: string; name: string; x: number; y: number }) => {
+    hoverTooltipIdRef.current = label.id;
+    const tooltip = hoverTooltipRef.current;
+    if (!tooltip) return;
+    if (tooltip.textContent !== label.name) tooltip.textContent = label.name;
+    tooltip.style.left = `${label.x}px`;
+    tooltip.style.top = `${label.y}px`;
+    tooltip.style.visibility = 'visible';
+    tooltip.style.opacity = '1';
+  }, []);
 
   const handleViewPersistenceResolved = useCallback((restored: boolean) => {
     if (restored) {
@@ -2747,15 +2768,9 @@ export function Viewport() {
 
   useEffect(() => {
     if (objectPickSyncEnabled) return;
-    setHoverLabel(null);
+    hideHoverTooltip();
     setHoveredObjectId(null);
-  }, [objectPickSyncEnabled, setHoveredObjectId]);
-
-  useEffect(() => {
-    if (!isViewportInteracting) return;
-    setHoverLabel(null);
-    setHoveredObjectId(null);
-  }, [isViewportInteracting, setHoveredObjectId]);
+  }, [hideHoverTooltip, objectPickSyncEnabled, setHoveredObjectId]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -2768,30 +2783,45 @@ export function Viewport() {
   }, [clearFocusedObject]);
 
   const updateHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
-    if (!objectPickSyncEnabled || measureMode || isViewportInteracting) return;
+    if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
     event.stopPropagation();
     setHoveredObjectId(obj.id);
     const hoverName = resolveHoverObjectName(obj.name, knownFileNames);
     if (!hoverName) {
-      setHoverLabel(null);
+      hideHoverTooltip(obj.id);
       return;
     }
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setHoverLabel({
+    showHoverTooltip({
       id: obj.id,
       name: hoverName,
       x: event.clientX - rect.left + 10,
       y: event.clientY - rect.top + 12,
     });
-  }, [isViewportInteracting, knownFileNames, measureMode, objectPickSyncEnabled, setHoveredObjectId]);
+  }, [
+    hideHoverTooltip,
+    isViewportInteracting,
+    knownFileNames,
+    measureMode,
+    objectPickSyncEnabled,
+    setHoveredObjectId,
+    showHoverTooltip,
+  ]);
 
   const clearHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
-    if (!objectPickSyncEnabled || measureMode || isViewportInteracting) return;
+    if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
     event.stopPropagation();
     if (hoveredObjectId === obj.id) setHoveredObjectId(null);
-    setHoverLabel((prev) => (prev?.id === obj.id ? null : prev));
-  }, [hoveredObjectId, isViewportInteracting, measureMode, objectPickSyncEnabled, setHoveredObjectId]);
+    hideHoverTooltip(obj.id);
+  }, [
+    hideHoverTooltip,
+    hoveredObjectId,
+    isViewportInteracting,
+    measureMode,
+    objectPickSyncEnabled,
+    setHoveredObjectId,
+  ]);
 
   const handleObjectClick = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
     if (!objectPickSyncEnabled || measureMode || isViewportInteracting) return;
@@ -2999,12 +3029,13 @@ export function Viewport() {
         </div>
       )}
 
-      {objectPickSyncEnabled && hoverLabel && !measureMode && (
+      {objectPickSyncEnabled && !measureMode && (
         <div
+          ref={hoverTooltipRef}
           style={{
             position: 'absolute',
-            left: hoverLabel.x,
-            top: hoverLabel.y,
+            left: 0,
+            top: 0,
             background: '#111111d9',
             color: '#f2f2f2',
             padding: '3px 7px',
@@ -3015,9 +3046,10 @@ export function Viewport() {
             pointerEvents: 'none',
             whiteSpace: 'nowrap',
             transform: 'translate(0, -100%)',
+            visibility: 'hidden',
+            opacity: 0,
           }}
         >
-          {hoverLabel.name}
         </div>
       )}
     </div>
