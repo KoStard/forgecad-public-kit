@@ -44,6 +44,10 @@ In fixed-axis or fixed-vector modes, the branch itself follows that axis/vector,
 nested descendants fan out perpendicular to the branch by default so deep trees do
 not keep stacking farther along the same axis.
 
+By default this is container-oriented: named groups/subassemblies advance along the
+tree, while plain leaves inside a group stay much closer and mostly fan locally
+around their parent cluster unless you override them explicitly.
+
 **Parameters:**
 - `enabled` (boolean) - disable explode offsets for this script when `false`
 - `amountScale` (number) - multiply the UI explode amount
@@ -186,6 +190,10 @@ subassemblies visually grouped while still letting their internals break apart.
 
 For non-radial fixed-axis or fixed-vector modes, nested descendants keep the branch
 offset but spread perpendicular to it by default.
+
+Default behavior is tree-like rather than flat: containers separate recursively,
+while unconfigured leaves inside a container use a smaller local fan so sibling parts
+stay visually associated with their parent group.
 
 Works with:
 - arrays of shapes/sketches/named items
