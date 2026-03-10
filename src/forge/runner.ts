@@ -122,6 +122,8 @@ export interface SceneObject {
   sketchMeta?: SketchConstraintMeta;
   /** If this object belongs to a named group (assembly), the group name */
   groupName?: string;
+  /** Full object-tree path including ancestor groups and this object's local label. */
+  treePath?: string[];
 }
 
 export interface LogEntry {
@@ -1302,6 +1304,7 @@ export function runScript(
       groupName?: string,
       color?: string,
       geometryInfo?: GeometryInfo,
+      treePath?: string[],
     ) => {
       const objectId = `obj-${objects.length + 1}`;
       objects.push({
@@ -1312,6 +1315,7 @@ export function runScript(
         color: color || shape.colorHex,
         geometryInfo: geometryInfo ?? shape.geometryInfo(),
         groupName,
+        treePath: treePath && treePath.length > 0 ? [...treePath] : [name],
       });
 
       const dims = getShapeDimensions(shape) as unknown as DimensionDef[];
@@ -1336,7 +1340,7 @@ export function runScript(
         });
       }
     };
-    const pushSketch = (sketch: Sketch, name: string, groupName?: string) => {
+    const pushSketch = (sketch: Sketch, name: string, groupName?: string, treePath?: string[]) => {
       const meta = sketch instanceof ConstraintSketch ? sketch.constraintMeta : undefined;
       objects.push({
         id: `obj-${objects.length + 1}`,
@@ -1347,6 +1351,7 @@ export function runScript(
         sketchMeta: meta,
         color: sketch.colorHex,
         groupName,
+        treePath: treePath && treePath.length > 0 ? [...treePath] : [name],
       });
     };
 
@@ -1354,65 +1359,104 @@ export function runScript(
       return !!item && typeof item === 'object' && 'name' in item;
     };
 
-    const groupChildLabel = (grp: ShapeGroup, parentLabel: string, index: number): string => {
+    const shapeGroupChildSegment = (grp: ShapeGroup, index: number, root = false): string => {
       const childName = grp.childName(index);
-      return childName ? `${parentLabel}.${childName}` : `${parentLabel}.${index + 1}`;
+      if (childName) return childName;
+      return root ? `Object ${index + 1}` : `${index + 1}`;
+    };
+
+    const groupChildLabel = (grp: ShapeGroup, parentLabel: string, index: number): string => {
+      return `${parentLabel}.${shapeGroupChildSegment(grp, index)}`;
     };
 
     const rootGroupChildLabel = (grp: ShapeGroup, index: number): string => {
-      return grp.childName(index) ?? `Object ${index + 1}`;
+      return shapeGroupChildSegment(grp, index, true);
     };
 
-    const flattenGroupChild = (child: Shape | Sketch | TrackedShape | ShapeGroup, label: string, groupName?: string) => {
+    const flattenGroupChild = (
+      child: Shape | Sketch | TrackedShape | ShapeGroup,
+      label: string,
+      groupName?: string,
+      treePath?: string[],
+    ) => {
+      const resolvedTreePath = treePath && treePath.length > 0 ? treePath : [label];
       if (child instanceof ShapeGroup) {
         child.children.forEach((nested, i) => {
-          flattenGroupChild(nested, groupChildLabel(child, label, i), groupName);
+          flattenGroupChild(
+            nested,
+            groupChildLabel(child, label, i),
+            groupName,
+            [...resolvedTreePath, shapeGroupChildSegment(child, i)],
+          );
         });
         return;
       }
       if (child instanceof TrackedShape) {
-        pushShape(child.toShape(), label, groupName, undefined, child.geometryInfo());
+        pushShape(child.toShape(), label, groupName, undefined, child.geometryInfo(), resolvedTreePath);
       } else if (child instanceof Shape) {
-        pushShape(child, label, groupName);
+        pushShape(child, label, groupName, undefined, undefined, resolvedTreePath);
       } else if (child instanceof Sketch) {
-        pushSketch(child, label, groupName);
+        pushSketch(child, label, groupName, resolvedTreePath);
       }
     };
 
     /** Process a named object item (from array return format), optionally within a parent group */
-    const processNamedItem = (item: any, fallbackLabel: string, parentGroup?: string) => {
+    const processNamedItem = (
+      item: any,
+      fallbackLabel: string,
+      fallbackSegment: string,
+      parentGroup?: string,
+      parentTreePath: string[] = [],
+    ) => {
       const name = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : fallbackLabel;
+      const localSegment = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : fallbackSegment;
+      const treePath = [...parentTreePath, localSegment];
       const grp = parentGroup;
 
       // Handle { name, group: [...] } — nested assembly group
       if (Array.isArray(item.group)) {
         item.group.forEach((child: any, i: number) => {
           const childLabel = `${name}.${i + 1}`;
+          const childTreePath = [...treePath, `${i + 1}`];
           if (child instanceof ShapeGroup) {
-            flattenGroupChild(child, childLabel, name);
+            child.children.forEach((nested: any, nestedIndex: number) => {
+              flattenGroupChild(
+                nested,
+                groupChildLabel(child, name, nestedIndex),
+                name,
+                [...treePath, shapeGroupChildSegment(child, nestedIndex)],
+              );
+            });
           } else if (child instanceof TrackedShape) {
-            pushShape(child.toShape(), childLabel, name, undefined, child.geometryInfo());
+            pushShape(child.toShape(), childLabel, name, undefined, child.geometryInfo(), childTreePath);
           } else if (child instanceof Shape) {
-            pushShape(child, childLabel, name);
+            pushShape(child, childLabel, name, undefined, undefined, childTreePath);
           } else if (child instanceof Sketch) {
-            pushSketch(child, childLabel, name);
+            pushSketch(child, childLabel, name, childTreePath);
           } else if (isNamedObject(child)) {
-            processNamedItem(child, childLabel, name);
+            processNamedItem(child, childLabel, `${i + 1}`, name, treePath);
           }
         });
         return;
       }
 
       if (item.shape instanceof ShapeGroup) {
-        item.shape.children.forEach((child: any, i: number) => flattenGroupChild(child, groupChildLabel(item.shape, name, i), name));
+        item.shape.children.forEach((child: any, i: number) => (
+          flattenGroupChild(
+            child,
+            groupChildLabel(item.shape, name, i),
+            name,
+            [...treePath, shapeGroupChildSegment(item.shape, i)],
+          )
+        ));
         return;
       }
       if (item.shape instanceof TrackedShape) {
-        pushShape(item.shape.toShape(), name, grp, item.color, item.shape.geometryInfo());
+        pushShape(item.shape.toShape(), name, grp, item.color, item.shape.geometryInfo(), treePath);
         return;
       }
       if (item.shape instanceof Shape) {
-        pushShape(item.shape, name, grp, item.color);
+        pushShape(item.shape, name, grp, item.color, undefined, treePath);
         return;
       }
       if (item.sketch instanceof Sketch) {
@@ -1426,44 +1470,55 @@ export function runScript(
           sketchMeta: meta,
           color: item.color || item.sketch.colorHex,
           groupName: grp,
+          treePath,
         });
         return;
       }
     };
 
     if (result instanceof ShapeGroup) {
-      result.children.forEach((child, i) => flattenGroupChild(child, rootGroupChildLabel(result, i), undefined));
+      result.children.forEach((child, i) => {
+        const label = rootGroupChildLabel(result, i);
+        flattenGroupChild(child, label, undefined, [label]);
+      });
     } else if (Array.isArray(result)) {
       result.forEach((item, index) => {
         const label = `Object ${index + 1}`;
         if (item instanceof ShapeGroup) {
-          item.children.forEach((child, i) => flattenGroupChild(child, groupChildLabel(item, label, i)));
+          item.children.forEach((child, i) => {
+            flattenGroupChild(
+              child,
+              groupChildLabel(item, label, i),
+              undefined,
+              [label, shapeGroupChildSegment(item, i)],
+            );
+          });
           return;
         }
         if (item instanceof TrackedShape) {
-          pushShape(item.toShape(), label, undefined, undefined, item.geometryInfo());
+          pushShape(item.toShape(), label, undefined, undefined, item.geometryInfo(), [label]);
           return;
         }
         if (item instanceof Shape) {
-          pushShape(item, label);
+          pushShape(item, label, undefined, undefined, undefined, [label]);
           return;
         }
         if (item instanceof Sketch) {
-          pushSketch(item, label);
+          pushSketch(item, label, undefined, [label]);
           return;
         }
         if (isNamedObject(item)) {
-          processNamedItem(item, label);
+          processNamedItem(item, label, label);
           return;
         }
         throw new Error('Array results must contain Shape/Sketch items');
       });
     } else if (result instanceof TrackedShape) {
-      pushShape(result.toShape(), fileName, undefined, undefined, result.geometryInfo());
+      pushShape(result.toShape(), fileName, undefined, undefined, result.geometryInfo(), [fileName]);
     } else if (result instanceof Shape) {
-      pushShape(result, fileName);
+      pushShape(result, fileName, undefined, undefined, undefined, [fileName]);
     } else if (result instanceof Sketch) {
-      pushSketch(result, fileName);
+      pushSketch(result, fileName, undefined, [fileName]);
     }
 
     const shape = objects.length === 1 ? objects[0].shape : null;

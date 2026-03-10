@@ -216,6 +216,7 @@ interface ForgeStore {
   setShowPerformanceInfo: (enabled: boolean) => void;
   objectSettings: Record<string, ObjectSettings>;
   setObjectVisibility: (id: string, visible: boolean) => void;
+  setObjectsVisibility: (ids: string[], visible: boolean) => void;
   setObjectOpacity: (id: string, opacity: number) => void;
   setObjectColor: (id: string, color: string) => void;
   selectedObjectId: string | null;
@@ -903,6 +904,22 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   setObjectVisibility: (id, visible) => set((s) => {
     const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
     const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, visible } };
+    writeViewPreferences({ objectSettings: nextObjectSettings });
+    return { objectSettings: nextObjectSettings };
+  }),
+  setObjectsVisibility: (ids, visible) => set((s) => {
+    if (ids.length === 0) return {} as Partial<ForgeStore>;
+
+    let changed = false;
+    const nextObjectSettings = { ...s.objectSettings };
+    ids.forEach((id) => {
+      const current = nextObjectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
+      if (current.visible === visible) return;
+      nextObjectSettings[id] = { ...current, visible };
+      changed = true;
+    });
+
+    if (!changed) return {} as Partial<ForgeStore>;
     writeViewPreferences({ objectSettings: nextObjectSettings });
     return { objectSettings: nextObjectSettings };
   }),
