@@ -29,6 +29,7 @@ Notes:
 - planes are registered per script run
 - viewport toggle state persists across parameter changes
 - clipping is applied to returned named objects, so `exclude` only works when names are stable
+- newly exposed section faces render with a hatched overlay; pre-existing coplanar boundary faces are left unhatched
 
 ## `explodeView(options?)`
 

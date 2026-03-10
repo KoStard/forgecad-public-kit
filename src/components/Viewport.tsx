@@ -2,7 +2,7 @@ import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObjec
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, Lightformer, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
-import { DEFAULT_VIEW_CONFIG } from '@forge/index';
+import { DEFAULT_VIEW_CONFIG, intersectWithPlane } from '@forge/index';
 import type {
   SceneObject,
   RunResult,
@@ -43,6 +43,15 @@ const GIF_DEFAULT_PITCH_DEG = 18;
 const FOCUS_MODE_DIM_OPACITY = 0.1;
 const PERFORMANCE_SAMPLE_INTERVAL_SEC = 0.25;
 const INTEGER_FORMATTER = new Intl.NumberFormat('en-US');
+const SECTION_HATCH_MIN_SPACING = 1.6;
+const SECTION_HATCH_MAX_SPACING = 8;
+const SECTION_HATCH_SPACING_SCALE = 0.12;
+const SECTION_HATCH_MIN_LINE_WIDTH = 0.18;
+const SECTION_HATCH_MAX_LINE_WIDTH = 0.9;
+const SECTION_SURFACE_LIFT_MIN = 0.0005;
+const SECTION_SURFACE_LIFT_MAX = 0.01;
+const SECTION_SURFACE_LIFT_SCALE = 5e-5;
+const PLANE_TRANSFORM_EPS = 1e-8;
 
 interface ViewportPerformanceInfo {
   fps: number;
@@ -60,6 +69,23 @@ interface ViewportPerformanceInfo {
 const OBJECT_CONTEXT_MENU_WIDTH = 144;
 const OBJECT_CONTEXT_MENU_HEIGHT = 42;
 const OBJECT_CONTEXT_MENU_MARGIN = 8;
+
+interface PlaneTransform {
+  center: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+}
+
+interface CutSurfaceDef {
+  id: string;
+  geometry: THREE.BufferGeometry;
+  outlineGeometries: THREE.BufferGeometry[];
+  sourcePlaneIndex: number;
+  position: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+  hatchAngleRad: number;
+  hatchSpacing: number;
+  hatchLineWidth: number;
+}
 
 const waitForAnimationFrame = (): Promise<void> => (
   new Promise((resolve) => {
@@ -130,6 +156,206 @@ function addExportLights(scene: THREE.Scene): void {
   scene.add(dir2);
 
   scene.add(new THREE.HemisphereLight(0xb1e1ff, 0x444444, 0.4));
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function buildPlaneSpaceRotation(normalLike: [number, number, number]): { normal: THREE.Vector3; rotationToPlane: THREE.Matrix4 } | null {
+  const normal = new THREE.Vector3(normalLike[0], normalLike[1], normalLike[2]);
+  if (normal.lengthSq() < PLANE_TRANSFORM_EPS) return null;
+  normal.normalize();
+
+  const dot = normal.z;
+  if (dot > 1 - PLANE_TRANSFORM_EPS) {
+    return { normal, rotationToPlane: new THREE.Matrix4() };
+  }
+
+  let axis = new THREE.Vector3(1, 0, 0);
+  let angle = Math.PI;
+
+  if (dot >= -1 + PLANE_TRANSFORM_EPS) {
+    axis = new THREE.Vector3(normal.y, -normal.x, 0);
+    const axisLength = axis.length();
+    if (axisLength <= PLANE_TRANSFORM_EPS) {
+      return { normal, rotationToPlane: new THREE.Matrix4() };
+    }
+    axis.multiplyScalar(1 / axisLength);
+    angle = Math.acos(THREE.MathUtils.clamp(dot, -1, 1));
+  }
+
+  return {
+    normal,
+    rotationToPlane: new THREE.Matrix4().makeRotationAxis(axis, angle),
+  };
+}
+
+function resolvePlaneTransform(
+  normalLike: [number, number, number],
+  offset: number,
+  normalDisplacement = 0,
+): PlaneTransform | null {
+  const planeSpace = buildPlaneSpaceRotation(normalLike);
+  if (!planeSpace) return null;
+  const { normal, rotationToPlane } = planeSpace;
+  const center = normal.clone().multiplyScalar(offset + normalDisplacement);
+  const quaternion = new THREE.Quaternion().setFromRotationMatrix(rotationToPlane.clone().invert());
+
+  return { center, quaternion };
+}
+
+function polygonArea2D(points: THREE.Vector2[]): number {
+  let area = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const current = points[i];
+    const next = points[(i + 1) % points.length];
+    area += current.x * next.y - next.x * current.y;
+  }
+  return area * 0.5;
+}
+
+function pointInPolygon2D(point: THREE.Vector2, polygon: THREE.Vector2[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+    const intersects = ((yi > point.y) !== (yj > point.y))
+      && (point.x < ((xj - xi) * (point.y - yi)) / ((yj - yi) || 1e-9) + xi);
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function buildPathFromPoints(points: THREE.Vector2[]): THREE.Path {
+  const path = new THREE.Path();
+  path.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) {
+    path.lineTo(points[i].x, points[i].y);
+  }
+  path.closePath();
+  return path;
+}
+
+function buildShapeFromPoints(points: THREE.Vector2[]): THREE.Shape {
+  const shape = new THREE.Shape();
+  shape.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) {
+    shape.lineTo(points[i].x, points[i].y);
+  }
+  shape.closePath();
+  return shape;
+}
+
+function buildFilledGeometryFromPolygons(polygons: number[][][]): THREE.BufferGeometry | null {
+  const loops = polygons
+    .filter((polygon) => polygon.length >= 3)
+    .map((polygon) => {
+      const points = polygon.map((point) => new THREE.Vector2(point[0], point[1]));
+      const area = Math.abs(polygonArea2D(points));
+      return { points, area };
+    })
+    .filter((loop) => loop.area > 1e-8)
+    .sort((a, b) => b.area - a.area);
+
+  if (loops.length === 0) return null;
+
+  const parents = new Array<number>(loops.length).fill(-1);
+  const depths = new Array<number>(loops.length).fill(0);
+
+  for (let i = 0; i < loops.length; i += 1) {
+    const probe = loops[i].points[0];
+    let bestParent = -1;
+    let bestArea = Number.POSITIVE_INFINITY;
+    for (let j = 0; j < i; j += 1) {
+      if (loops[j].area >= bestArea) continue;
+      if (!pointInPolygon2D(probe, loops[j].points)) continue;
+      bestParent = j;
+      bestArea = loops[j].area;
+    }
+    parents[i] = bestParent;
+    depths[i] = bestParent >= 0 ? depths[bestParent] + 1 : 0;
+  }
+
+  const shapesByLoop = new Map<number, THREE.Shape>();
+  const shapes: THREE.Shape[] = [];
+
+  loops.forEach((loop, index) => {
+    if (depths[index] % 2 === 1) return;
+    const shape = buildShapeFromPoints(loop.points);
+    shapesByLoop.set(index, shape);
+    shapes.push(shape);
+  });
+
+  loops.forEach((loop, index) => {
+    if (depths[index] % 2 === 0) return;
+    const parent = parents[index];
+    const outerShape = parent >= 0 ? shapesByLoop.get(parent) : null;
+    if (!outerShape) return;
+    outerShape.holes.push(buildPathFromPoints(loop.points));
+  });
+
+  if (shapes.length === 0) return null;
+  return new THREE.ShapeGeometry(shapes);
+}
+
+function buildOutlineGeometriesFromPolygons(polygons: number[][][]): THREE.BufferGeometry[] {
+  return polygons
+    .filter((polygon) => polygon.length >= 2)
+    .map((polygon) => new THREE.BufferGeometry().setFromPoints(
+      polygon.map((point) => new THREE.Vector3(point[0], point[1], 0)),
+    ));
+}
+
+function resolveSectionSurfaceLift(shape: SceneObject['shape'] | undefined): number {
+  if (!shape) return SECTION_SURFACE_LIFT_MIN;
+  try {
+    const bb = shape.boundingBox();
+    const dx = bb.max[0] - bb.min[0];
+    const dy = bb.max[1] - bb.min[1];
+    const dz = bb.max[2] - bb.min[2];
+    const diagonal = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    return THREE.MathUtils.clamp(
+      diagonal * SECTION_SURFACE_LIFT_SCALE,
+      SECTION_SURFACE_LIFT_MIN,
+      SECTION_SURFACE_LIFT_MAX,
+    );
+  } catch {
+    return SECTION_SURFACE_LIFT_MIN;
+  }
+}
+
+function resolveSectionHatchMetrics(geometry: THREE.BufferGeometry): { spacing: number; lineWidth: number } {
+  geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox;
+  if (!bounds) {
+    return {
+      spacing: SECTION_HATCH_MIN_SPACING,
+      lineWidth: SECTION_HATCH_MIN_LINE_WIDTH,
+    };
+  }
+  const size = new THREE.Vector3();
+  bounds.getSize(size);
+  const span = Math.max(1, size.x, size.y);
+  const spacing = THREE.MathUtils.clamp(
+    span * SECTION_HATCH_SPACING_SCALE,
+    SECTION_HATCH_MIN_SPACING,
+    SECTION_HATCH_MAX_SPACING,
+  );
+  return {
+    spacing,
+    lineWidth: THREE.MathUtils.clamp(
+      spacing * 0.18,
+      SECTION_HATCH_MIN_LINE_WIDTH,
+      SECTION_HATCH_MAX_LINE_WIDTH,
+    ),
+  };
 }
 
 function setOverrideSessionMode(session: OrbitGifOverrideSession, mode: OrbitGifMode): void {
@@ -794,7 +1020,7 @@ function ForgeObject({
   matrix,
   isHovered,
   cutPlanes,
-  fallbackClippingPlanes,
+  clippingPlanes,
   onPointerEnter,
   onPointerMove,
   onPointerLeave,
@@ -809,7 +1035,7 @@ function ForgeObject({
   matrix: THREE.Matrix4;
   isHovered?: boolean;
   cutPlanes?: CutPlaneDef[];
-  fallbackClippingPlanes?: THREE.Plane[];
+  clippingPlanes?: THREE.Plane[];
   onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
@@ -819,17 +1045,26 @@ function ForgeObject({
 }) {
   const hasCutPlanes = (cutPlanes?.length ?? 0) > 0;
   const clippingTransformKey = hasCutPlanes ? matrix : null;
-  const { solidGeo, edgesGeo, useFallbackClipping } = useMemo(() => {
-    if (!obj.shape) return { solidGeo: null, edgesGeo: null, useFallbackClipping: false };
+  const { solidGeo, edgesGeo, cutSurfaces, useFallbackClipping } = useMemo(() => {
+    if (!obj.shape) {
+      return {
+        solidGeo: null,
+        edgesGeo: null,
+        cutSurfaces: [] as CutSurfaceDef[],
+        useFallbackClipping: false,
+      };
+    }
     let shapeForRender = obj.shape;
+    const nextCutSurfaces: CutSurfaceDef[] = [];
     let fallbackToGpuClip = false;
 
     if (hasCutPlanes) {
       try {
         // Cut planes are defined in world space, so convert each plane into this object's
-        // local coordinates before trimming to keep sectioning aligned with animated transforms.
+        // local coordinates before sectioning to keep everything aligned with animated transforms.
         const inverseMatrix = matrix.clone().invert();
-        cutPlanes?.forEach((cutPlaneDef) => {
+        const surfaceLift = resolveSectionSurfaceLift(obj.shape);
+        cutPlanes?.forEach((cutPlaneDef, planeIndex) => {
           const worldNormal = new THREE.Vector3(
             cutPlaneDef.normal[0],
             cutPlaneDef.normal[1],
@@ -850,10 +1085,51 @@ function ForgeObject({
             localPlane.normal.z * invNormalLength,
           ];
           const localOffset = -localPlane.constant * invNormalLength;
-          shapeForRender = shapeForRender.trimByPlane(localNormal, localOffset);
+          const [insideShape, outsideShape] = shapeForRender.splitByPlane(localNormal, localOffset);
+          shapeForRender = insideShape;
+
+          if (!outsideShape.isEmpty()) {
+            try {
+              const sectionSketch = intersectWithPlane(outsideShape, {
+                origin: [
+                  localNormal[0] * localOffset,
+                  localNormal[1] * localOffset,
+                  localNormal[2] * localOffset,
+                ],
+                normal: localNormal,
+              });
+              const polygons = sectionSketch.toPolygons();
+              const geometry = buildFilledGeometryFromPolygons(polygons);
+              const transform = resolvePlaneTransform(localNormal, localOffset, surfaceLift);
+              if (geometry && transform) {
+                const outlineGeometries = buildOutlineGeometriesFromPolygons(polygons);
+                const hatch = resolveSectionHatchMetrics(geometry);
+                const angleSeed = hashString(`${obj.name}:${cutPlaneDef.name}:${planeIndex}`);
+                nextCutSurfaces.push({
+                  id: `${cutPlaneDef.name}:${planeIndex}`,
+                  geometry,
+                  outlineGeometries,
+                  sourcePlaneIndex: planeIndex,
+                  position: transform.center,
+                  quaternion: transform.quaternion,
+                  hatchAngleRad: THREE.MathUtils.degToRad(35 + (angleSeed % 2) * 55),
+                  hatchSpacing: hatch.spacing,
+                  hatchLineWidth: hatch.lineWidth,
+                });
+              } else {
+                geometry?.dispose();
+              }
+            } catch {
+              // Ignore cap-only failures; keep the solid trim result if it succeeded.
+            }
+          }
         });
       } catch {
         // If boolean trimming fails on pathological geometry, fall back to GPU clipping.
+        nextCutSurfaces.forEach((surface) => {
+          surface.geometry.dispose();
+          surface.outlineGeometries.forEach((outline) => outline.dispose());
+        });
         shapeForRender = obj.shape;
         fallbackToGpuClip = true;
       }
@@ -861,26 +1137,62 @@ function ForgeObject({
 
     try {
       const { solid, edges } = shapeToGeometry(shapeForRender);
-      return { solidGeo: solid, edgesGeo: edges, useFallbackClipping: fallbackToGpuClip };
+      return {
+        solidGeo: solid,
+        edgesGeo: edges,
+        cutSurfaces: fallbackToGpuClip ? [] : nextCutSurfaces,
+        useFallbackClipping: fallbackToGpuClip,
+      };
     } catch {
       if (!fallbackToGpuClip && hasCutPlanes) {
         try {
           const { solid, edges } = shapeToGeometry(obj.shape);
-          return { solidGeo: solid, edgesGeo: edges, useFallbackClipping: true };
+          nextCutSurfaces.forEach((surface) => {
+            surface.geometry.dispose();
+            surface.outlineGeometries.forEach((outline) => outline.dispose());
+          });
+          return {
+            solidGeo: solid,
+            edgesGeo: edges,
+            cutSurfaces: [] as CutSurfaceDef[],
+            useFallbackClipping: true,
+          };
         } catch {
-          return { solidGeo: null, edgesGeo: null, useFallbackClipping: false };
+          nextCutSurfaces.forEach((surface) => {
+            surface.geometry.dispose();
+            surface.outlineGeometries.forEach((outline) => outline.dispose());
+          });
+          return {
+            solidGeo: null,
+            edgesGeo: null,
+            cutSurfaces: [] as CutSurfaceDef[],
+            useFallbackClipping: false,
+          };
         }
       }
-      return { solidGeo: null, edgesGeo: null, useFallbackClipping: false };
+      nextCutSurfaces.forEach((surface) => {
+        surface.geometry.dispose();
+        surface.outlineGeometries.forEach((outline) => outline.dispose());
+      });
+      return {
+        solidGeo: null,
+        edgesGeo: null,
+        cutSurfaces: [] as CutSurfaceDef[],
+        useFallbackClipping: false,
+      };
     }
-  }, [clippingTransformKey, cutPlanes, hasCutPlanes, obj.shape]);
+  }, [clippingTransformKey, cutPlanes, hasCutPlanes, matrix, obj.name, obj.shape]);
 
   useEffect(() => {
     return () => {
       solidGeo?.dispose();
       edgesGeo?.dispose();
+      cutSurfaces.forEach((surface) => {
+        surface.geometry.dispose();
+        surface.outlineGeometries.forEach((outline) => outline.dispose());
+      });
     };
-  }, [edgesGeo, solidGeo]);
+  }, [cutSurfaces, edgesGeo, solidGeo]);
 
   if (!solidGeo || !settings.visible) return null;
 
@@ -889,7 +1201,7 @@ function ForgeObject({
   const showSolid = effectiveRenderMode !== 'wireframe';
   const showEdges = effectiveRenderMode === 'overlay';
   const showWire = effectiveRenderMode === 'wireframe';
-  const activeClippingPlanes = useFallbackClipping ? (fallbackClippingPlanes ?? []) : [];
+  const fallbackSolidClippingPlanes = useFallbackClipping ? (clippingPlanes ?? []) : [];
 
   return (
     <group
@@ -916,18 +1228,27 @@ function ForgeObject({
             opacity={meshOpacity}
             emissive={isHovered ? settings.color : '#000000'}
             emissiveIntensity={isHovered ? 0.3 : 0}
-            clippingPlanes={activeClippingPlanes}
+            clippingPlanes={fallbackSolidClippingPlanes}
           />
         </mesh>
       )}
+      {showSolid && cutSurfaces.map((surface) => (
+        <SectionCutSurface
+          key={surface.id}
+          surface={surface}
+          color={settings.color}
+          opacity={meshOpacity}
+          clippingPlanes={clippingPlanes ?? []}
+        />
+      ))}
       {showWire && edgesGeo && (
         <lineSegments geometry={edgesGeo}>
-          <lineBasicMaterial color={settings.color} transparent={meshOpacity < 1} opacity={meshOpacity} clippingPlanes={activeClippingPlanes} />
+          <lineBasicMaterial color={settings.color} transparent={meshOpacity < 1} opacity={meshOpacity} clippingPlanes={fallbackSolidClippingPlanes} />
         </lineSegments>
       )}
       {showEdges && edgesGeo && (
         <lineSegments geometry={edgesGeo}>
-          <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={Math.min(1, meshOpacity + 0.1)} clippingPlanes={activeClippingPlanes} />
+          <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={Math.min(1, meshOpacity + 0.1)} clippingPlanes={fallbackSolidClippingPlanes} />
         </lineSegments>
       )}
     </group>
@@ -942,13 +1263,113 @@ interface SectionPlaneGuideStyle {
 }
 
 const colorFromName = (name: string): string => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) {
-    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
-  }
-  const hue = Math.abs(hash) % 360;
+  const hue = hashString(name) % 360;
   return `hsl(${hue}, 72%, 58%)`;
 };
+
+function SectionCutSurface({
+  surface,
+  color,
+  opacity,
+  clippingPlanes,
+}: {
+  surface: CutSurfaceDef;
+  color: string;
+  opacity: number;
+  clippingPlanes: THREE.Plane[];
+}) {
+  const sectionClippingPlanes = useMemo(
+    () => clippingPlanes.filter((_, index) => index !== surface.sourcePlaneIndex),
+    [clippingPlanes, surface.sourcePlaneIndex],
+  );
+  const material = useMemo(() => {
+    const baseColor = parseExportColor(color, 0x5b9bd5).lerp(new THREE.Color('#ffffff'), 0.2);
+    const lineColor = parseExportColor(color, 0x5b9bd5).lerp(new THREE.Color('#101010'), 0.55);
+    const direction = new THREE.Vector2(Math.cos(surface.hatchAngleRad), Math.sin(surface.hatchAngleRad));
+    const mat = new THREE.MeshBasicMaterial({
+      color: '#ffffff',
+      side: THREE.DoubleSide,
+      transparent: opacity < 1,
+      opacity,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+      clippingPlanes: sectionClippingPlanes,
+      toneMapped: false,
+    });
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.hatchBaseColor = { value: baseColor };
+      shader.uniforms.hatchLineColor = { value: lineColor };
+      shader.uniforms.hatchDirection = { value: direction };
+      shader.uniforms.hatchSpacing = { value: surface.hatchSpacing };
+      shader.uniforms.hatchLineWidth = { value: surface.hatchLineWidth };
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nvarying vec2 vSectionPlanePosition;',
+        )
+        .replace(
+          '#include <begin_vertex>',
+          '#include <begin_vertex>\nvSectionPlanePosition = position.xy;',
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+varying vec2 vSectionPlanePosition;
+uniform vec3 hatchBaseColor;
+uniform vec3 hatchLineColor;
+uniform vec2 hatchDirection;
+uniform float hatchSpacing;
+uniform float hatchLineWidth;`,
+        )
+        .replace(
+          'vec4 diffuseColor = vec4( diffuse, opacity );',
+          `float planeCoord = dot(vSectionPlanePosition, hatchDirection);
+float stripeDistance = abs(fract(planeCoord / hatchSpacing + 0.5) - 0.5) * hatchSpacing;
+float aa = max(fwidth(planeCoord), 1e-4);
+float lineMask = 1.0 - smoothstep(hatchLineWidth - aa, hatchLineWidth + aa, stripeDistance);
+vec3 sectionColor = mix(hatchBaseColor, hatchLineColor, lineMask);
+vec4 diffuseColor = vec4(sectionColor, opacity);`,
+        );
+    };
+    mat.customProgramCacheKey = () => (
+      `section-hatch:${baseColor.getHexString()}:${lineColor.getHexString()}:`
+      + `${surface.hatchSpacing.toFixed(3)}:${surface.hatchLineWidth.toFixed(3)}:${surface.hatchAngleRad.toFixed(3)}`
+    );
+    return mat;
+  }, [color, opacity, sectionClippingPlanes, surface.hatchAngleRad, surface.hatchLineWidth, surface.hatchSpacing]);
+  const outlineColor = useMemo(
+    () => parseExportColor(color, 0x5b9bd5).lerp(new THREE.Color('#050505'), 0.68),
+    [color],
+  );
+
+  useEffect(() => () => material.dispose(), [material]);
+
+  return (
+    <group
+      position={[surface.position.x, surface.position.y, surface.position.z]}
+      quaternion={surface.quaternion}
+    >
+      <mesh geometry={surface.geometry} renderOrder={24}>
+        <primitive object={material} attach="material" />
+      </mesh>
+      {surface.outlineGeometries.map((geometry, index) => (
+        <lineLoop key={index} geometry={geometry} renderOrder={25}>
+          <lineBasicMaterial
+            color={outlineColor}
+            transparent={opacity < 1}
+            opacity={Math.min(1, opacity + 0.18)}
+            depthWrite={false}
+            clippingPlanes={sectionClippingPlanes}
+            toneMapped={false}
+          />
+        </lineLoop>
+      ))}
+    </group>
+  );
+}
 
 function SectionPlaneGuide({
   def,
@@ -959,22 +1380,10 @@ function SectionPlaneGuide({
   sectionSize: number;
   style: SectionPlaneGuideStyle;
 }) {
-  const transform = useMemo(() => {
-    const normal = new THREE.Vector3(def.normal[0], def.normal[1], def.normal[2]);
-    if (normal.lengthSq() < 1e-8) return null;
-    normal.normalize();
-
-    const center = normal.clone().multiplyScalar(def.offset);
-    const ref = Math.abs(normal.z) < 0.95 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
-    const tangent = new THREE.Vector3().crossVectors(ref, normal).normalize();
-    if (tangent.lengthSq() < 1e-8) tangent.set(1, 0, 0);
-    const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
-    const quaternion = new THREE.Quaternion().setFromRotationMatrix(
-      new THREE.Matrix4().makeBasis(tangent, bitangent, normal),
-    );
-
-    return { center, quaternion };
-  }, [def.normal, def.offset]);
+  const transform = useMemo(
+    () => resolvePlaneTransform(def.normal, def.offset),
+    [def.normal, def.offset],
+  );
 
   const borderGeometry = useMemo(() => {
     const half = sectionSize / 2;
@@ -3151,7 +3560,7 @@ export function Viewport() {
                 matrix={matrix}
                 isHovered={isHovered}
                 cutPlanes={objectCutPlanes}
-                fallbackClippingPlanes={objectClippingPlanes}
+                clippingPlanes={objectClippingPlanes}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
                 onPointerMove={(event) => updateHoverLabel(obj, event)}
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
