@@ -381,8 +381,7 @@ function keyboardPluginXml(cmdVelTopic: string, linearStep: number, angularStep:
 }
 
 function keyboardGuiPluginXml(): string {
-  return `    <gui>
-      <plugin filename="KeyPublisher" name="Key publisher">
+  return `      <plugin filename="KeyPublisher" name="Key publisher">
         <gz-gui>
           <anchors target="3D View">
             <line own="right" target="right"/>
@@ -394,7 +393,75 @@ function keyboardGuiPluginXml(): string {
           <property key="state" type="string">floating</property>
           <property key="showTitleBar" type="bool">false</property>
         </gz-gui>
+      </plugin>`;
+}
+
+function demoWorldGuiXml(keyboardEnabled: boolean): string {
+  const keyboardPlugin = keyboardEnabled ? `\n${keyboardGuiPluginXml()}` : '';
+  return `    <gui fullscreen="0">
+      <plugin filename="MinimalScene" name="3D View">
+        <gz-gui>
+          <title>3D View</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+        <engine>ogre2</engine>
+        <scene>scene</scene>
+        <ambient_light>0.4 0.4 0.4</ambient_light>
+        <background_color>0.8 0.8 0.8</background_color>
+        <camera_pose>-4.8 -3.2 2.8 0 0.38 0.62</camera_pose>
       </plugin>
+
+      <plugin filename="WorldControl" name="World control">
+        <gz-gui>
+          <title>World control</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="bool" key="resizable">false</property>
+          <property type="double" key="height">72</property>
+          <property type="double" key="z">1</property>
+          <property type="string" key="state">floating</property>
+          <anchors target="3D View">
+            <line own="left" target="left"/>
+            <line own="bottom" target="bottom"/>
+          </anchors>
+        </gz-gui>
+        <play_pause>true</play_pause>
+        <step>true</step>
+        <start_paused>false</start_paused>
+        <use_event>true</use_event>
+      </plugin>
+
+      <plugin filename="WorldStats" name="World stats">
+        <gz-gui>
+          <title>World stats</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="bool" key="resizable">false</property>
+          <property type="double" key="height">110</property>
+          <property type="double" key="width">290</property>
+          <property type="double" key="z">1</property>
+          <property type="string" key="state">floating</property>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="bottom" target="bottom"/>
+          </anchors>
+        </gz-gui>
+        <sim_time>true</sim_time>
+        <real_time>true</real_time>
+        <real_time_factor>true</real_time_factor>
+        <iterations>true</iterations>
+      </plugin>
+
+      <plugin filename="ComponentInspector" name="Component inspector">
+        <gz-gui>
+          <property type="string" key="state">docked_collapsed</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="EntityTree" name="Entity tree">
+        <gz-gui>
+          <property type="string" key="state">docked_collapsed</property>
+        </gz-gui>
+      </plugin>${keyboardPlugin}
     </gui>
 `;
 }
@@ -418,14 +485,14 @@ function demoWorldXml(
   const keyboardEnabled = world?.keyboardTeleop?.enabled ?? true;
   const linearStep = world?.keyboardTeleop?.linearStep ?? 0.9;
   const angularStep = world?.keyboardTeleop?.angularStep ?? 1.2;
-  const keyboardGui = keyboardEnabled && cmdVelTopic ? keyboardGuiPluginXml() : '';
+  const worldGui = demoWorldGuiXml(keyboardEnabled && !!cmdVelTopic);
   const keyboardPlugins = keyboardEnabled && cmdVelTopic
     ? `${keyboardPluginXml(cmdVelTopic, linearStep, angularStep)}\n`
     : '';
 
   return `<sdf version="1.10">
   <world name="${escapeXml(worldName)}">
-${keyboardGui}
+${worldGui}
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
     <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
     <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>

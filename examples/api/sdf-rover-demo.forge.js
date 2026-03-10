@@ -5,7 +5,7 @@
 // Then launch Gazebo against the generated package:
 //   export GZ_SIM_RESOURCE_PATH="examples/api/sdf-rover-demo.forge.sdfpkg/models${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}"
 //   gz sim -s -r examples/api/sdf-rover-demo.forge.sdfpkg/worlds/forge_scout_trial.sdf
-//   gz sim -g
+//   gz sim -g examples/api/sdf-rover-demo.forge.sdfpkg/worlds/forge_scout_trial.sdf
 //
 // Click the 3D view and use the arrow keys to drive. Space stops the rover.
 

@@ -159,7 +159,7 @@ When `world.generateDemoWorld` and `world.keyboardTeleop.enabled` are on, the ex
 - Gazebo's GUI `KeyPublisher` plugin
 - server-side `TriggeredPublisher` bindings that map arrow keys to the diff-drive `cmd_vel` topic
 
-Typical launch flow:
+Recommended launch flow:
 
 ```bash
 export GZ_SIM_RESOURCE_PATH="$PWD/out/forge_scout/models${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}"
@@ -167,13 +167,13 @@ export GZ_SIM_RESOURCE_PATH="$PWD/out/forge_scout/models${GZ_SIM_RESOURCE_PATH:+
 # Terminal 1: server
 gz sim -s -r out/forge_scout/worlds/forge_scout_trial.sdf
 
-# Terminal 2: GUI client
-gz sim -g
+# Terminal 2: GUI client using the same world layout
+gz sim -g out/forge_scout/worlds/forge_scout_trial.sdf
 ```
 
 Notes:
 
-- Run the GUI with `gz sim -g` after the server is already up; don't pass the world path again to the GUI process.
+- On macOS, use the split `-s` / `-g` flow above. `gz sim <world.sdf>` is not supported there.
 - Click the 3D view so it has keyboard focus, then use arrow keys to drive and `Space` to stop.
 - For older exports created before the GUI plugin was added, load `Key Publisher` manually from the Gazebo GUI plugins menu.
 
