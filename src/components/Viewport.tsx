@@ -60,6 +60,7 @@ interface PlaneTransform {
 interface CutSurfaceDef {
   id: string;
   geometry: THREE.BufferGeometry;
+  outlineGeometries: THREE.BufferGeometry[];
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
   hatchAngleRad: number;
@@ -276,6 +277,14 @@ function buildFilledGeometryFromPolygons(polygons: number[][][]): THREE.BufferGe
 
   if (shapes.length === 0) return null;
   return new THREE.ShapeGeometry(shapes);
+}
+
+function buildOutlineGeometriesFromPolygons(polygons: number[][][]): THREE.BufferGeometry[] {
+  return polygons
+    .filter((polygon) => polygon.length >= 2)
+    .map((polygon) => new THREE.BufferGeometry().setFromPoints(
+      polygon.map((point) => new THREE.Vector3(point[0], point[1], 0)),
+    ));
 }
 
 function resolveSectionSurfaceInset(shape: SceneObject['shape'] | undefined): number {
@@ -951,14 +960,17 @@ function ForgeObject({
                 ],
                 normal: localNormal,
               });
-              const geometry = buildFilledGeometryFromPolygons(sectionSketch.toPolygons());
+              const polygons = sectionSketch.toPolygons();
+              const geometry = buildFilledGeometryFromPolygons(polygons);
               const transform = resolvePlaneTransform(localNormal, localOffset, -surfaceInset);
               if (geometry && transform) {
+                const outlineGeometries = buildOutlineGeometriesFromPolygons(polygons);
                 const hatch = resolveSectionHatchMetrics(geometry);
                 const angleSeed = hashString(`${obj.name}:${cutPlaneDef.name}:${planeIndex}`);
                 nextCutSurfaces.push({
                   id: `${cutPlaneDef.name}:${planeIndex}`,
                   geometry,
+                  outlineGeometries,
                   position: transform.center,
                   quaternion: transform.quaternion,
                   hatchAngleRad: THREE.MathUtils.degToRad(35 + (angleSeed % 2) * 55),
@@ -975,7 +987,10 @@ function ForgeObject({
         });
       } catch {
         // If boolean trimming fails on pathological geometry, fall back to GPU clipping.
-        nextCutSurfaces.forEach((surface) => surface.geometry.dispose());
+        nextCutSurfaces.forEach((surface) => {
+          surface.geometry.dispose();
+          surface.outlineGeometries.forEach((outline) => outline.dispose());
+        });
         shapeForRender = obj.shape;
         fallbackToGpuClip = true;
       }
@@ -993,7 +1008,10 @@ function ForgeObject({
       if (!fallbackToGpuClip && (cutPlanes?.length ?? 0) > 0) {
         try {
           const { solid, edges } = shapeToGeometry(obj.shape);
-          nextCutSurfaces.forEach((surface) => surface.geometry.dispose());
+          nextCutSurfaces.forEach((surface) => {
+            surface.geometry.dispose();
+            surface.outlineGeometries.forEach((outline) => outline.dispose());
+          });
           return {
             solidGeo: solid,
             edgesGeo: edges,
@@ -1001,7 +1019,10 @@ function ForgeObject({
             useFallbackClipping: true,
           };
         } catch {
-          nextCutSurfaces.forEach((surface) => surface.geometry.dispose());
+          nextCutSurfaces.forEach((surface) => {
+            surface.geometry.dispose();
+            surface.outlineGeometries.forEach((outline) => outline.dispose());
+          });
           return {
             solidGeo: null,
             edgesGeo: null,
@@ -1010,7 +1031,10 @@ function ForgeObject({
           };
         }
       }
-      nextCutSurfaces.forEach((surface) => surface.geometry.dispose());
+      nextCutSurfaces.forEach((surface) => {
+        surface.geometry.dispose();
+        surface.outlineGeometries.forEach((outline) => outline.dispose());
+      });
       return {
         solidGeo: null,
         edgesGeo: null,
@@ -1024,7 +1048,10 @@ function ForgeObject({
     return () => {
       solidGeo?.dispose();
       edgesGeo?.dispose();
-      cutSurfaces.forEach((surface) => surface.geometry.dispose());
+      cutSurfaces.forEach((surface) => {
+        surface.geometry.dispose();
+        surface.outlineGeometries.forEach((outline) => outline.dispose());
+      });
     };
   }, [cutSurfaces, edgesGeo, solidGeo]);
 
@@ -1169,18 +1196,34 @@ vec4 diffuseColor = vec4(sectionColor, opacity);`,
     );
     return mat;
   }, [clippingPlanes, color, opacity, surface.hatchAngleRad, surface.hatchLineWidth, surface.hatchSpacing]);
+  const outlineColor = useMemo(
+    () => parseExportColor(color, 0x5b9bd5).lerp(new THREE.Color('#050505'), 0.68),
+    [color],
+  );
 
   useEffect(() => () => material.dispose(), [material]);
 
   return (
-    <mesh
-      geometry={surface.geometry}
+    <group
       position={[surface.position.x, surface.position.y, surface.position.z]}
       quaternion={surface.quaternion}
-      renderOrder={12}
     >
-      <primitive object={material} attach="material" />
-    </mesh>
+      <mesh geometry={surface.geometry} renderOrder={12}>
+        <primitive object={material} attach="material" />
+      </mesh>
+      {surface.outlineGeometries.map((geometry, index) => (
+        <lineLoop key={index} geometry={geometry} renderOrder={13}>
+          <lineBasicMaterial
+            color={outlineColor}
+            transparent={opacity < 1}
+            opacity={Math.min(1, opacity + 0.18)}
+            depthWrite={false}
+            clippingPlanes={clippingPlanes}
+            toneMapped={false}
+          />
+        </lineLoop>
+      ))}
+    </group>
   );
 }
 
