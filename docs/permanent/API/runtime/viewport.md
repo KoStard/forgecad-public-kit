@@ -36,13 +36,14 @@ Notes:
 Override how the viewport explode slider offsets returned objects.
 
 Explode offsets are resolved from the returned object tree, not from a flat list.
-In `radial` mode each node separates from its immediate parent/subassembly center,
-so nested assemblies peel apart level by level instead of all drifting away from the global centroid.
+In `radial` mode each node follows its parent branch direction, then adds a smaller
+local fan from the immediate parent/subassembly center, so nested assemblies peel
+apart level by level without losing their branch structure.
 
 **Parameters:**
 - `enabled` (boolean) - disable explode offsets for this script when `false`
 - `amountScale` (number) - multiply the UI explode amount
-- `stages` (number[]) - per-depth multipliers (depth 1 = first level, defaults to `1, 2, 3, ...`)
+- `stages` (number[]) - per-depth multipliers (depth 1 = first level, defaults to `1, 1/2, 1/3, ...`)
 - `mode` (`'radial' | 'x' | 'y' | 'z' | [x, y, z]`) - default explode direction
 - `axisLock` (`'x' | 'y' | 'z'`) - optional global axis lock
 - `byName` (`Record<string, { stage?, direction?, axisLock? }>`)- per-object overrides keyed by returned object `name`
@@ -175,9 +176,9 @@ viewConfig({
 
 Apply deterministic exploded-view offsets to an assembly tree while preserving names, colors, and nesting.
 
-`radial` separation is parent-relative: each child moves away from the center of the
-subassembly it belongs to, which produces a much more natural nested explode than a
-single root-relative offset.
+`radial` separation is branch-aware and parent-relative: each child follows the
+direction of its parent branch, then fans out locally inside that branch. This keeps
+subassemblies visually grouped while still letting their internals break apart.
 
 Works with:
 - arrays of shapes/sketches/named items
