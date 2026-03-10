@@ -182,45 +182,76 @@ Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to l
 
 **Camera angles:** `front` (−Y), `back` (+Y), `side` (+X), `top` (+Z), `iso` (diagonal)
 
-### Orbit GIF Render (requires Chrome)
+### Animated Capture (GIF or MP4, requires Chrome)
 
 ```bash
 npm run gif -- examples/cup.forge.js [output.gif]
+npm run record -- examples/cup.forge.js [output.mp4]
 
 # Or directly:
 npx tsx cli/forge-gif.ts examples/cup.forge.js
-npx tsx cli/forge-gif.ts examples/cup.forge.js output.gif --size 768 --fps 20 --frames-per-turn 72
+npx tsx cli/forge-record.ts examples/api/runtime-joints-view.forge.js out/step.mp4 --capture animation --animation Step
+npx tsx cli/forge-gif.ts examples/3d-printer.forge.js out/section.gif --cut-plane "Front Section"
 ```
 
-Creates one animated GIF with two full 360° passes:
-1. Solid pass (regular shaded view)
-2. Wireframe pass (same orbit path)
+Creates high-quality animated captures from the real Forge viewport renderer:
+- Orbit captures with optional wireframe pass
+- Fixed-camera animation captures for `jointsView()` clips
+- Named cut-plane captures
+- Exact camera replay via `--camera`
 
 **How it works:**
 1. Auto-starts (or reuses) the Vite dev server.
 2. Loads `cli/render.html` in headless Chrome.
-3. Runs the script once, then captures orbit frames from the same scene for both render modes.
-4. Encodes all frames into a single GIF file (pure JS encoder, no ffmpeg/ImageMagick required).
+3. Runs the script once, then captures frames from the same scene while applying the selected animation, cut planes, and camera pose.
+4. Encodes with `ffmpeg` when available:
+   - GIF: palettegen/paletteuse for much better colors
+   - MP4: H.264 via `libx264`
+5. Falls back to the pure-JS GIF encoder only when `ffmpeg` is unavailable.
 
 **Options:**
-- `--size <px>` — frame resolution (default `720`)
-- `--fps <n>` — GIF frame rate (default `18`)
-- `--frames-per-turn <n>` — frames per full orbit pass (default `54`)
-- `--hold-frames <n>` — freeze frames before each pass (default `4`)
-- `--pitch <deg>` — camera elevation angle (default `18`)
+- `--format <gif|mp4>` — output format
+- `--capture <orbit|animation>` — moving orbit camera or fixed animation camera
+- `--animation <name>` — select one `jointsView()` clip
+- `--animation-loops <n>` — repeat the chosen clip
+- `--cut-plane <name>` — enable a named cut plane (repeatable)
+- `--camera <spec>` — exact camera pose, e.g. `proj=perspective;pos=120,80,120;target=0,0,0;up=0,0,1`
+- `--render-mode <solid|wireframe>` — primary render mode
+- `--include-wireframe-pass` / `--no-wireframe-pass` — control the extra wireframe pass
+- `--size <px>` — output frame resolution (default `960`)
+- `--pixel-ratio <n>` — render supersampling factor (default `2`)
+- `--fps <n>` — capture frame rate (default `24`)
+- `--frames-per-turn <n>` — frames per full orbit pass (default `72`)
+- `--hold-frames <n>` — freeze frames before each pass (default `6`)
+- `--pitch <deg>` — orbit elevation override
 - `--background <color>` — background color (default `#252526`)
+- `--quality <default|live|high>` — Forge geometry quality preset for export (default `high`)
+- `--encoder <auto|ffmpeg|js>` — GIF encoder strategy
+- `--crf <n>` — MP4 quality for `libx264` (default `18`)
+- `--list` — print the script's available animation clips and cut planes
 - `--port <n>` — Vite port (default `5173`)
 - `--chrome-path <path>` — Chrome executable path override
+- `--ffmpeg-path <path>` — ffmpeg executable path override
 
 **Environment variables:**
-- `FORGE_GIF_SIZE`
-- `FORGE_GIF_FPS`
-- `FORGE_GIF_FRAMES_PER_TURN`
-- `FORGE_GIF_HOLD_FRAMES`
-- `FORGE_GIF_PITCH_DEG`
-- `FORGE_GIF_BACKGROUND`
+- `FORGE_CAPTURE_SIZE`
+- `FORGE_CAPTURE_PIXEL_RATIO`
+- `FORGE_CAPTURE_FPS`
+- `FORGE_CAPTURE_FRAMES_PER_TURN`
+- `FORGE_CAPTURE_HOLD_FRAMES`
+- `FORGE_CAPTURE_PITCH_DEG`
+- `FORGE_CAPTURE_BACKGROUND`
+- `FORGE_CAPTURE_QUALITY`
+- `FORGE_CAPTURE_ANIMATION_LOOPS`
+- `FORGE_CAPTURE_CRF`
+- `FFMPEG_PATH`
+- Legacy `FORGE_GIF_*` vars are still honored as fallbacks
 - `FORGE_PORT`
 - `CHROME_PATH`
+
+**UI camera handoff:**
+- The View Panel now exposes a `Camera` section.
+- Use `Copy CLI --camera` to grab the current viewport framing and paste it directly into the capture command.
 
 ### PDF Report (2D drawing pack)
 

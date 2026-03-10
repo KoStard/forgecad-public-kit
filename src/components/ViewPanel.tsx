@@ -1,9 +1,10 @@
 import { useForgeStore } from '../store/forgeStore';
-import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
 import { resolveJointViewValues } from '@forge/jointsView';
 import { animationSpeedToSlider, formatAnimationSpeed, sliderToAnimationSpeed } from '../animationSpeed';
+import { formatCameraCliSpec, getCameraForwardVector } from '../capture/cameraState';
 
 const btnStyle = (active = false): CSSProperties => ({
   padding: '4px 8px',
@@ -44,6 +45,10 @@ const resolveJointRange = (type: 'revolute' | 'prismatic', min?: number, max?: n
   max: max ?? (type === 'prismatic' ? 100 : 360),
 });
 
+const formatVector = (value: [number, number, number]): string => (
+  value.map((entry) => entry.toFixed(3)).join(', ')
+);
+
 export function ViewPanel() {
   const renderMode = useForgeStore((s) => s.renderMode);
   const setRenderMode = useForgeStore((s) => s.setRenderMode);
@@ -69,6 +74,7 @@ export function ViewPanel() {
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
   const measureSnapPx = useForgeStore((s) => s.measureSnapPx);
   const setMeasureSnapPx = useForgeStore((s) => s.setMeasureSnapPx);
+  const viewportCameraState = useForgeStore((s) => s.viewportCameraState);
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
   const toggleDimensions = useForgeStore((s) => s.toggleDimensions);
   const explodeAmount = useForgeStore((s) => s.explodeAmount);
@@ -123,6 +129,12 @@ export function ViewPanel() {
     [jointCouplings],
   );
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
+  const [cameraCopyStatus, setCameraCopyStatus] = useState<string | null>(null);
+  const cameraCopyTimeoutRef = useRef<number | null>(null);
+  const cameraForward = useMemo(
+    () => (viewportCameraState ? getCameraForwardVector(viewportCameraState) : null),
+    [viewportCameraState],
+  );
 
   useEffect(() => {
     if (!hoveredJointName) return;
@@ -149,6 +161,37 @@ export function ViewPanel() {
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [objectPickSyncEnabled, selectedObjectId]);
+
+  useEffect(() => {
+    return () => {
+      if (cameraCopyTimeoutRef.current !== null) {
+        window.clearTimeout(cameraCopyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const setCameraCopyFeedback = (message: string): void => {
+    setCameraCopyStatus(message);
+    if (cameraCopyTimeoutRef.current !== null) {
+      window.clearTimeout(cameraCopyTimeoutRef.current);
+    }
+    cameraCopyTimeoutRef.current = window.setTimeout(() => {
+      cameraCopyTimeoutRef.current = null;
+      setCameraCopyStatus(null);
+    }, 1800);
+  };
+
+  const copyCameraCliArg = async (): Promise<void> => {
+    if (!viewportCameraState) return;
+    const text = `--camera "${formatCameraCliSpec(viewportCameraState)}"`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCameraCopyFeedback('CLI camera copied');
+    } catch (err) {
+      console.error('Failed to copy camera spec:', err);
+      setCameraCopyFeedback('Clipboard failed');
+    }
+  };
 
   return (
     <div
@@ -203,6 +246,49 @@ export function ViewPanel() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={labelStyle}>Camera</div>
+        {viewportCameraState ? (
+          <>
+            <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 8 }}>
+              Copy this pose into the CLI to reproduce the current viewport framing.
+            </div>
+            <div
+              style={{
+                border: '1px solid var(--fc-borderLight)',
+                borderRadius: 6,
+                padding: '8px 9px',
+                background: 'var(--fc-bgOverlay)',
+                fontFamily: 'monospace',
+                fontSize: 11,
+                lineHeight: 1.5,
+                color: 'var(--fc-text)',
+                wordBreak: 'break-word',
+              }}
+            >
+              <div>Projection: {viewportCameraState.projectionMode}</div>
+              <div>Position: {formatVector(viewportCameraState.position)}</div>
+              <div>Target: {formatVector(viewportCameraState.target)}</div>
+              {cameraForward && <div>Forward: {formatVector(cameraForward)}</div>}
+              <div>Up: {formatVector(viewportCameraState.up)}</div>
+            </div>
+            <button
+              style={{ ...btnStyle(), width: '100%', marginTop: 8 }}
+              onClick={() => { void copyCameraCliArg(); }}
+            >
+              Copy CLI `--camera`
+            </button>
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
+              {cameraCopyStatus ?? 'Tracks the live viewport camera.'}
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: 11, color: 'var(--fc-textDim)' }}>
+            Move the viewport once to populate the CLI camera export.
+          </div>
+        )}
       </div>
 
       <div style={sectionStyle}>

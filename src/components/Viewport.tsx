@@ -22,18 +22,11 @@ import {
   type OrbitGifExportOptions,
   type OrbitGifMode,
 } from './exportActions';
+import { parseViewportCameraState, type ViewportCameraState } from '../capture/cameraState';
 import { themes } from '../theme';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
-
-interface PersistedViewportCameraState {
-  projectionMode: ProjectionMode;
-  position: [number, number, number];
-  target: [number, number, number];
-  up: [number, number, number];
-  orthoZoom?: number;
-}
 
 const VIEWPORT_CAMERA_STORAGE_KEY = 'fc-viewport-camera-v1';
 const GIF_DEFAULT_SIZE = 720;
@@ -239,41 +232,18 @@ function createOverrideSessionFromRunResult(
   return session;
 }
 
-const isVector3Tuple = (value: unknown): value is [number, number, number] => {
-  return Array.isArray(value)
-    && value.length === 3
-    && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry));
-};
-
-const parsePersistedViewportCameraState = (value: unknown): PersistedViewportCameraState | null => {
-  if (!value || typeof value !== 'object') return null;
-  const candidate = value as Partial<PersistedViewportCameraState>;
-  if (candidate.projectionMode !== 'perspective' && candidate.projectionMode !== 'orthographic') return null;
-  if (!isVector3Tuple(candidate.position)) return null;
-  if (!isVector3Tuple(candidate.target)) return null;
-  if (!isVector3Tuple(candidate.up)) return null;
-  if (candidate.orthoZoom !== undefined && (!Number.isFinite(candidate.orthoZoom) || candidate.orthoZoom <= 0)) return null;
-  return {
-    projectionMode: candidate.projectionMode,
-    position: candidate.position,
-    target: candidate.target,
-    up: candidate.up,
-    orthoZoom: candidate.orthoZoom,
-  };
-};
-
-const readPersistedViewportCameraState = (): PersistedViewportCameraState | null => {
+const readPersistedViewportCameraState = (): ViewportCameraState | null => {
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(VIEWPORT_CAMERA_STORAGE_KEY);
     if (!raw) return null;
-    return parsePersistedViewportCameraState(JSON.parse(raw));
+    return parseViewportCameraState(JSON.parse(raw));
   } catch {
     return null;
   }
 };
 
-const writePersistedViewportCameraState = (state: PersistedViewportCameraState): void => {
+const writePersistedViewportCameraState = (state: ViewportCameraState): void => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(VIEWPORT_CAMERA_STORAGE_KEY, JSON.stringify(state));
@@ -2097,9 +2067,10 @@ function ViewPersistence({
   const { camera } = useThree();
   const projectionMode = useForgeStore((s) => s.projectionMode);
   const setProjectionMode = useForgeStore((s) => s.setProjectionMode);
+  const setViewportCameraState = useForgeStore((s) => s.setViewportCameraState);
   const restoreStatusRef = useRef<'pending' | 'done'>('pending');
   const didResolveRef = useRef(false);
-  const savedStateRef = useRef<PersistedViewportCameraState | null>(readPersistedViewportCameraState());
+  const savedStateRef = useRef<ViewportCameraState | null>(readPersistedViewportCameraState());
   const persistTimeoutRef = useRef<number | null>(null);
 
   const resolve = useCallback((restored: boolean) => {
@@ -2161,7 +2132,7 @@ function ViewPersistence({
 
     const persistCamera = () => {
       const isOrtho = (camera as THREE.OrthographicCamera).isOrthographicCamera;
-      const nextState: PersistedViewportCameraState = {
+      const nextState: ViewportCameraState = {
         projectionMode,
         position: [camera.position.x, camera.position.y, camera.position.z],
         target: [controls.target.x, controls.target.y, controls.target.z],
@@ -2169,6 +2140,7 @@ function ViewPersistence({
         orthoZoom: isOrtho ? Math.max(0.1, (camera as THREE.OrthographicCamera).zoom) : undefined,
       };
       writePersistedViewportCameraState(nextState);
+      setViewportCameraState(nextState);
     };
 
     const schedulePersistCamera = () => {
@@ -2191,7 +2163,7 @@ function ViewPersistence({
         persistCamera();
       }
     };
-  }, [camera, controlsRef, isSketchOnly, projectionMode]);
+  }, [camera, controlsRef, isSketchOnly, projectionMode, setViewportCameraState]);
 
   return null;
 }

@@ -16,6 +16,7 @@ import { isNotebookFile, parseNotebook, resolveNotebookPreviewCellId, serializeN
 import { runNotebook } from '../notebook/runtime';
 import { type ThemeName, applyTheme } from '../theme';
 import { clampAnimationSpeed } from '../animationSpeed';
+import type { ViewportCameraState } from '../capture/cameraState';
 
 const EMPTY_FILE: Record<string, string> = {
   'untitled.forge.js': '// New part\n\nreturn box(50, 30, 10);\n',
@@ -229,6 +230,8 @@ interface ForgeStore {
   viewCommand: ViewCommand | null;
   requestViewCommand: (command: Omit<ViewCommand, 'id'>) => void;
   clearViewCommand: () => void;
+  viewportCameraState: ViewportCameraState | null;
+  setViewportCameraState: (state: ViewportCameraState | null) => void;
 
   measureMode: boolean;
   toggleMeasure: () => void;
@@ -930,6 +933,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   viewCommand: null,
   requestViewCommand: (command) => set({ viewCommand: { ...command, id: Date.now() } }),
   clearViewCommand: () => set({ viewCommand: null }),
+  viewportCameraState: null,
+  setViewportCameraState: (state) => set({ viewportCameraState: state }),
 
   measureMode: false,
   toggleMeasure: () => {
