@@ -409,8 +409,9 @@ function buildCameraRig(
   const nearFar = Math.max(1000, distance * 10);
 
   // Use a consistent base frustum size for orthographic cameras (matching the UI's approach)
-  // The UI (@react-three/drei OrthographicCamera) uses a fixed-size frustum and relies on zoom
-  const ORTHO_BASE_SIZE = 100;
+  // The UI (@react-three/drei OrthographicCamera) uses pixel-based frustum: size.width/2, size.height/2
+  // For a typical 960px canvas, that's ~480. We use 960 to match the default capture resolution.
+  const ORTHO_BASE_SIZE = 960;
   const orthoSpan = ORTHO_BASE_SIZE;
 
   const camera = fixedCameraState.projectionMode === 'orthographic'
