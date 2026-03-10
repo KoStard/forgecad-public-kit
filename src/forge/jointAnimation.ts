@@ -5,6 +5,41 @@ export function clampAnimationProgress(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+function sanitizeAnimationProgress(
+  clip: JointViewAnimationDef | null | undefined,
+  value: number,
+): number {
+  if (!Number.isFinite(value)) return 0;
+  if (clip?.loop && clip.continuous) return Math.max(0, value);
+  return clampAnimationProgress(value);
+}
+
+function sampleJointValueAt(
+  clip: JointViewAnimationDef,
+  jointName: string,
+  t: number,
+): number | null {
+  let prev: { at: number; value: number } | null = null;
+  let next: { at: number; value: number } | null = null;
+
+  for (const keyframe of clip.keyframes) {
+    if (!Object.prototype.hasOwnProperty.call(keyframe.values, jointName)) continue;
+    const value = keyframe.values[jointName];
+    if (keyframe.at <= t) prev = { at: keyframe.at, value };
+    if (keyframe.at >= t) {
+      next = { at: keyframe.at, value };
+      break;
+    }
+  }
+
+  if (!prev && !next) return null;
+  if (!prev) return next!.value;
+  if (!next) return prev.value;
+  if (Math.abs(next.at - prev.at) <= 1e-8) return next.value;
+  const alpha = (t - prev.at) / (next.at - prev.at);
+  return prev.value + (next.value - prev.value) * alpha;
+}
+
 export function findJointAnimationClip(
   clips: JointViewAnimationDef[],
   clipName: string | null | undefined,
@@ -21,7 +56,10 @@ export function resolveJointAnimation(
   if (!clip) return { ...baseValues };
   if (clip.keyframes.length === 0) return { ...baseValues };
 
-  const t = clampAnimationProgress(progress);
+  const safeProgress = sanitizeAnimationProgress(clip, progress);
+  const continuous = clip.loop && clip.continuous;
+  const cycle = continuous ? Math.floor(safeProgress) : 0;
+  const t = continuous ? (safeProgress - cycle) : clampAnimationProgress(safeProgress);
   const out: Record<string, number> = { ...baseValues };
   const jointNames = new Set<string>();
   clip.keyframes.forEach((keyframe) => {
@@ -29,34 +67,21 @@ export function resolveJointAnimation(
   });
 
   jointNames.forEach((jointName) => {
-    let prev: { at: number; value: number } | null = null;
-    let next: { at: number; value: number } | null = null;
-
-    for (const keyframe of clip.keyframes) {
-      if (!Object.prototype.hasOwnProperty.call(keyframe.values, jointName)) continue;
-      const value = keyframe.values[jointName];
-      if (keyframe.at <= t) prev = { at: keyframe.at, value };
-      if (keyframe.at >= t) {
-        next = { at: keyframe.at, value };
-        break;
-      }
+    const value = sampleJointValueAt(clip, jointName, t);
+    if (value === null) return;
+    if (!continuous || cycle === 0) {
+      out[jointName] = value;
+      return;
     }
 
-    if (!prev && !next) return;
-    if (!prev) {
-      out[jointName] = next!.value;
+    const startValue = sampleJointValueAt(clip, jointName, 0);
+    const endValue = sampleJointValueAt(clip, jointName, 1);
+    if (startValue === null || endValue === null) {
+      out[jointName] = value;
       return;
     }
-    if (!next) {
-      out[jointName] = prev.value;
-      return;
-    }
-    if (Math.abs(next.at - prev.at) <= 1e-8) {
-      out[jointName] = next.value;
-      return;
-    }
-    const alpha = (t - prev.at) / (next.at - prev.at);
-    out[jointName] = prev.value + (next.value - prev.value) * alpha;
+
+    out[jointName] = value + cycle * (endValue - startValue);
   });
 
   return out;

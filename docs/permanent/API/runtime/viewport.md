@@ -68,7 +68,7 @@ that globally would break intentional multi-turn tracks.
 - `enabled`
 - `joints`: `{ name, child, parent?, type?, axis?, pivot?, min?, max?, default?, unit? }[]`
 - `couplings`: `{ joint, terms, offset? }[]`
-- `animations`: `{ name, duration?, loop?, keyframes }[]`
+- `animations`: `{ name, duration?, loop?, continuous?, keyframes }[]`
 - `defaultAnimation`
 
 ```javascript
@@ -100,6 +100,10 @@ jointsView({
   ],
 });
 ```
+
+`continuous: true` is for looping tracks that should keep accumulating across
+cycles instead of snapping back to the first keyframe each time. Use it for
+monotonic multi-turn drives such as `0 -> 360 -> 720`.
 
 ### Animation continuity for revolute joints
 

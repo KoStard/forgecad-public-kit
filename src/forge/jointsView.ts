@@ -23,6 +23,7 @@ export interface JointViewAnimationInput {
   name: string;
   duration?: number;
   loop?: boolean;
+  continuous?: boolean;
   keyframes: JointViewAnimationKeyframeInput[];
 }
 
@@ -59,6 +60,7 @@ export interface JointViewAnimationDef {
   name: string;
   duration: number;
   loop: boolean;
+  continuous: boolean;
   keyframes: JointViewAnimationKeyframeDef[];
 }
 
@@ -201,6 +203,10 @@ const normalizeAnimation = (animation: JointViewAnimationInput): JointViewAnimat
   }
   const duration = animation.duration ?? 2;
   const loop = animation.loop ?? true;
+  if (animation.continuous !== undefined && typeof animation.continuous !== 'boolean') {
+    throw new Error(`jointsView animation "${name}" continuous must be a boolean`);
+  }
+  const continuous = animation.continuous ?? false;
 
   if (!Array.isArray(animation.keyframes) || animation.keyframes.length === 0) {
     throw new Error(`jointsView animation "${name}" keyframes must be a non-empty array`);
@@ -236,6 +242,7 @@ const normalizeAnimation = (animation: JointViewAnimationInput): JointViewAnimat
     name,
     duration,
     loop,
+    continuous,
     keyframes,
   };
 };

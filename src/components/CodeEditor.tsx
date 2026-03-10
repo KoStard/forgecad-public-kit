@@ -642,6 +642,7 @@ type JointAnimationClip = {
   name: string;
   duration?: number;
   loop?: boolean;
+  continuous?: boolean;
   keyframes: JointAnimationKeyframe[];
 };
 type JointCouplingTerm = {

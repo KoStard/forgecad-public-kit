@@ -137,6 +137,9 @@ export function ViewPanel() {
     () => (viewportCameraState ? getCameraForwardVector(viewportCameraState) : null),
     [viewportCameraState],
   );
+  const displayedAnimationProgress = activeAnimationClip?.loop && activeAnimationClip.continuous
+    ? jointAnimationProgress - Math.floor(jointAnimationProgress)
+    : Math.max(0, Math.min(1, jointAnimationProgress));
 
   useEffect(() => {
     if (!hoveredJointName) return;
@@ -349,13 +352,13 @@ export function ViewPanel() {
               min={0}
               max={1}
               step={0.001}
-              value={jointAnimationProgress}
+              value={displayedAnimationProgress}
               disabled={!activeAnimationClip}
               onChange={(event) => setJointAnimationProgress(Number(event.target.value))}
               style={{ flex: 1 }}
             />
             <span style={{ fontSize: 11, color: 'var(--fc-textDim)', width: 36, textAlign: 'right' }}>
-              {Math.round(jointAnimationProgress * 100)}%
+              {Math.round(displayedAnimationProgress * 100)}%
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
@@ -375,7 +378,7 @@ export function ViewPanel() {
           </div>
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
             {activeAnimationClip
-              ? `Duration ${activeAnimationClip.duration.toFixed(2)}s${activeAnimationClip.loop ? ' • Loop' : ''}`
+              ? `Duration ${activeAnimationClip.duration.toFixed(2)}s${activeAnimationClip.loop ? ' • Loop' : ''}${activeAnimationClip.continuous ? ' • Continuous' : ''}`
               : 'Select a clip for coordinated joint motion.'}
           </div>
         </div>

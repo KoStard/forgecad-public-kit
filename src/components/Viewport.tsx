@@ -2704,10 +2704,11 @@ export function Viewport() {
       const step = (dtSec * jointAnimationSpeed) / Math.max(1e-6, activeJointAnimation.duration);
       let next = useForgeStore.getState().jointAnimationProgress + step;
       if (next >= 1) {
-        if (activeJointAnimation.loop) next = next % 1;
-        else {
+        if (!activeJointAnimation.loop) {
           next = 1;
           setJointAnimationPlaying(false);
+        } else if (!activeJointAnimation.continuous) {
+          next = next % 1;
         }
       }
       setJointAnimationProgress(next);

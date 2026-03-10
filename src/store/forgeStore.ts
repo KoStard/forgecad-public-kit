@@ -370,6 +370,15 @@ const clampAnimationProgress = (value: number): number => {
   return Math.max(0, Math.min(1, value));
 };
 
+const sanitizeAnimationProgress = (
+  value: number,
+  clip?: { loop: boolean; continuous?: boolean } | null,
+): number => {
+  if (!Number.isFinite(value)) return 0;
+  if (clip?.loop && clip.continuous) return Math.max(0, value);
+  return clampAnimationProgress(value);
+};
+
 const syncJointValues = (
   result: RunResult,
   prev: Record<string, number>,
@@ -416,7 +425,8 @@ const syncJointAnimationState = (
     if (preferred && clipNames.has(preferred)) clip = preferred;
   }
 
-  const progress = previousStillValid ? clampAnimationProgress(prevProgress) : 0;
+  const activeClip = clip ? clips.find((entry) => entry.name === clip) ?? null : null;
+  const progress = previousStillValid ? sanitizeAnimationProgress(prevProgress, activeClip) : 0;
   const playing = clip ? prevPlaying : false;
   return { clip, progress, playing };
 };
@@ -820,7 +830,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   }),
 
   setJointAnimationProgress: (value) => set({
-    jointAnimationProgress: clampAnimationProgress(value),
+    jointAnimationProgress: sanitizeAnimationProgress(
+      value,
+      get().result?.jointsView?.animations.find((clip) => clip.name === get().jointAnimationClip) ?? null,
+    ),
   }),
 
   setJointAnimationPlaying: (playing) => set((state) => {
