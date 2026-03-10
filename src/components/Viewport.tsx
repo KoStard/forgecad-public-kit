@@ -28,6 +28,12 @@ import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
+interface ObjectContextMenuState {
+  objectId: string;
+  x: number;
+  y: number;
+}
+
 const VIEWPORT_CAMERA_STORAGE_KEY = 'fc-viewport-camera-v1';
 const GIF_DEFAULT_SIZE = 720;
 const GIF_DEFAULT_FPS = 18;
@@ -51,6 +57,9 @@ interface ViewportPerformanceInfo {
   memoryTextures: number;
   programCount: number;
 }
+const OBJECT_CONTEXT_MENU_WIDTH = 144;
+const OBJECT_CONTEXT_MENU_HEIGHT = 42;
+const OBJECT_CONTEXT_MENU_MARGIN = 8;
 
 const waitForAnimationFrame = (): Promise<void> => (
   new Promise((resolve) => {
@@ -791,6 +800,7 @@ function ForgeObject({
   onPointerLeave,
   onClick,
   onDoubleClick,
+  onContextMenu,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
@@ -805,6 +815,7 @@ function ForgeObject({
   onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
   onClick?: (event: ThreeEvent<MouseEvent>) => void;
   onDoubleClick?: (event: ThreeEvent<MouseEvent>) => void;
+  onContextMenu?: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const hasCutPlanes = (cutPlanes?.length ?? 0) > 0;
   const clippingTransformKey = hasCutPlanes ? matrix : null;
@@ -889,6 +900,7 @@ function ForgeObject({
       onPointerLeave={onPointerLeave}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      onContextMenu={onContextMenu}
     >
       {showSolid && (
         <mesh geometry={solidGeo}>
@@ -1284,6 +1296,7 @@ function SketchObject({
   onPointerLeave,
   onClick,
   onDoubleClick,
+  onContextMenu,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
@@ -1294,6 +1307,7 @@ function SketchObject({
   onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
   onClick?: (event: ThreeEvent<MouseEvent>) => void;
   onDoubleClick?: (event: ThreeEvent<MouseEvent>) => void;
+  onContextMenu?: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const { fillGeo, lineGeos, pointGeos } = useMemo(() => {
     if (!obj.sketch) return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
@@ -1424,6 +1438,7 @@ function SketchObject({
       onPointerLeave={onPointerLeave}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      onContextMenu={onContextMenu}
     >
       {fillGeo && showFill && (
         <mesh geometry={fillGeo}>
@@ -2520,6 +2535,7 @@ export function Viewport() {
   const gridSize = useForgeStore((s) => s.gridSize);
   const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
   const objectSettings = useForgeStore((s) => s.objectSettings);
+  const setObjectVisibility = useForgeStore((s) => s.setObjectVisibility);
   const hoveredObjectId = useForgeStore((s) => s.hoveredObjectId);
   const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
   const selectObject = useForgeStore((s) => s.selectObject);
@@ -2866,8 +2882,10 @@ export function Viewport() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hoverTooltipRef = useRef<HTMLDivElement | null>(null);
   const hoverTooltipIdRef = useRef<string | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
   const [isViewportInteracting, setIsViewportInteracting] = useState(false);
+  const [objectContextMenu, setObjectContextMenu] = useState<ObjectContextMenuState | null>(null);
   const themeName = useForgeStore((s) => s.theme);
   const t = themes[themeName];
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
@@ -2892,6 +2910,10 @@ export function Viewport() {
       visibleModelTriangles: nextVisibleModelTriangles,
     };
   }, [objectSettings, objects]);
+
+  const closeObjectContextMenu = useCallback(() => {
+    setObjectContextMenu(null);
+  }, []);
 
   const hideHoverTooltip = useCallback((id?: string | null) => {
     if (id !== undefined && hoverTooltipIdRef.current !== id) return;
@@ -2938,12 +2960,45 @@ export function Viewport() {
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (objectContextMenu) {
+        closeObjectContextMenu();
+        return;
+      }
       if (useForgeStore.getState().focusedObjectIds.length === 0) return;
       clearFocusedObject();
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [clearFocusedObject]);
+  }, [clearFocusedObject, closeObjectContextMenu, objectContextMenu]);
+
+  useEffect(() => {
+    if (!objectContextMenu) return;
+
+    const handleWindowPointerDown = (event: PointerEvent) => {
+      const menu = contextMenuRef.current;
+      if (menu && event.target instanceof Node && menu.contains(event.target)) return;
+      closeObjectContextMenu();
+    };
+    const handleWindowResize = () => closeObjectContextMenu();
+
+    window.addEventListener('pointerdown', handleWindowPointerDown);
+    window.addEventListener('resize', handleWindowResize);
+    return () => {
+      window.removeEventListener('pointerdown', handleWindowPointerDown);
+      window.removeEventListener('resize', handleWindowResize);
+    };
+  }, [closeObjectContextMenu, objectContextMenu]);
+
+  useEffect(() => {
+    if (!objectContextMenu) return;
+    if (measureMode || isViewportInteracting) {
+      closeObjectContextMenu();
+      return;
+    }
+    if (!objects.some((obj) => obj.id === objectContextMenu.objectId)) {
+      closeObjectContextMenu();
+    }
+  }, [closeObjectContextMenu, isViewportInteracting, measureMode, objectContextMenu, objects]);
 
   const updateHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
     if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
@@ -2999,6 +3054,30 @@ export function Viewport() {
     focusObject(obj.id, { additive });
   }, [focusObject, isViewportInteracting, measureMode]);
 
+  const handleObjectContextMenu = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
+    if (measureMode || isViewportInteracting) return;
+    event.stopPropagation();
+    event.nativeEvent.preventDefault();
+    selectObject(obj.id);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = Math.min(
+      Math.max(event.clientX - rect.left, OBJECT_CONTEXT_MENU_MARGIN),
+      Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.width - OBJECT_CONTEXT_MENU_WIDTH - OBJECT_CONTEXT_MENU_MARGIN),
+    );
+    const y = Math.min(
+      Math.max(event.clientY - rect.top, OBJECT_CONTEXT_MENU_MARGIN),
+      Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.height - OBJECT_CONTEXT_MENU_HEIGHT - OBJECT_CONTEXT_MENU_MARGIN),
+    );
+    setObjectContextMenu({ objectId: obj.id, x, y });
+  }, [isViewportInteracting, measureMode, selectObject]);
+
+  const handleHideObject = useCallback(() => {
+    if (!objectContextMenu) return;
+    setObjectVisibility(objectContextMenu.objectId, false);
+    closeObjectContextMenu();
+  }, [closeObjectContextMenu, objectContextMenu, setObjectVisibility]);
+
   const handleViewportPointerMissed = useCallback((event: MouseEvent) => {
     if (event.detail !== 2) return;
     if (measureMode) return;
@@ -3006,7 +3085,11 @@ export function Viewport() {
   }, [clearFocusedObject, measureMode]);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div
+      ref={containerRef}
+      style={{ width: '100%', height: '100%', position: 'relative' }}
+      onContextMenu={(event) => event.preventDefault()}
+    >
       <Canvas
         style={{ background: t.viewportBg, cursor: measureMode ? 'crosshair' : 'default' }}
         dpr={canvasDpr}
@@ -3074,6 +3157,7 @@ export function Viewport() {
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
                 onClick={(event) => handleObjectClick(obj, event)}
                 onDoubleClick={(event) => handleObjectDoubleClick(obj, event)}
+                onContextMenu={(event) => handleObjectContextMenu(obj, event)}
               />
             );
           }
@@ -3090,6 +3174,7 @@ export function Viewport() {
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
                 onClick={(event) => handleObjectClick(obj, event)}
                 onDoubleClick={(event) => handleObjectDoubleClick(obj, event)}
+                onContextMenu={(event) => handleObjectContextMenu(obj, event)}
               />
             );
           }
@@ -3218,6 +3303,44 @@ export function Viewport() {
             opacity: 0,
           }}
         >
+        </div>
+      )}
+
+      {objectContextMenu && (
+        <div
+          ref={contextMenuRef}
+          style={{
+            position: 'absolute',
+            left: objectContextMenu.x,
+            top: objectContextMenu.y,
+            width: OBJECT_CONTEXT_MENU_WIDTH,
+            background: 'var(--fc-bgPanel)',
+            border: '1px solid var(--fc-border)',
+            borderRadius: 8,
+            boxShadow: '0 12px 28px rgba(0, 0, 0, 0.28)',
+            padding: 6,
+            zIndex: 20,
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button
+            type="button"
+            onClick={handleHideObject}
+            style={{
+              width: '100%',
+              border: 'none',
+              borderRadius: 6,
+              padding: '8px 10px',
+              background: 'transparent',
+              color: 'var(--fc-text)',
+              textAlign: 'left',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            Hide
+          </button>
         </div>
       )}
     </div>
