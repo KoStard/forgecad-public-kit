@@ -35,12 +35,35 @@ const GIF_DEFAULT_FRAMES_PER_TURN = 54;
 const GIF_DEFAULT_HOLD_FRAMES = 4;
 const GIF_DEFAULT_PITCH_DEG = 18;
 const FOCUS_MODE_DIM_OPACITY = 0.1;
+const PERFORMANCE_SAMPLE_INTERVAL_SEC = 0.25;
+const INTEGER_FORMATTER = new Intl.NumberFormat('en-US');
+
+interface ViewportPerformanceInfo {
+  fps: number;
+  frameTimeMs: number;
+  sceneObjects: number;
+  modelTriangles: number;
+  drawCalls: number;
+  renderTriangles: number;
+  renderLines: number;
+  renderPoints: number;
+  memoryGeometries: number;
+  memoryTextures: number;
+  programCount: number;
+}
 
 const waitForAnimationFrame = (): Promise<void> => (
   new Promise((resolve) => {
     requestAnimationFrame(() => resolve());
   })
 );
+
+const formatPerformanceCount = (value: number): string => INTEGER_FORMATTER.format(Math.max(0, Math.round(value)));
+
+const getProgramCount = (gl: THREE.WebGLRenderer): number => {
+  const info = gl.info as typeof gl.info & { programs?: unknown[] };
+  return Array.isArray(info.programs) ? info.programs.length : 0;
+};
 
 const applyOrbitPose = (
   camera: THREE.Camera,
@@ -608,6 +631,137 @@ function LocalStudioEnvironment() {
         scale={[35, 35, 1]}
       />
     </Environment>
+  );
+}
+
+function PerformanceInfoHud({
+  enabled,
+  modelTriangles,
+  sceneObjects,
+}: {
+  enabled: boolean;
+  modelTriangles: number;
+  sceneObjects: number;
+}) {
+  const gl = useThree((s) => s.gl);
+  const [stats, setStats] = useState<ViewportPerformanceInfo | null>(null);
+  const sampleRef = useRef({
+    frames: 0,
+    elapsedSec: 0,
+    frameTimeMsTotal: 0,
+    sinceEmitSec: 0,
+  });
+
+  useEffect(() => {
+    sampleRef.current = {
+      frames: 0,
+      elapsedSec: 0,
+      frameTimeMsTotal: 0,
+      sinceEmitSec: 0,
+    };
+    if (!enabled) setStats(null);
+  }, [enabled, modelTriangles, sceneObjects]);
+
+  useFrame((_state, delta) => {
+    if (!enabled) return;
+
+    const sample = sampleRef.current;
+    sample.frames += 1;
+    sample.elapsedSec += delta;
+    sample.frameTimeMsTotal += delta * 1000;
+    sample.sinceEmitSec += delta;
+
+    if (sample.sinceEmitSec < PERFORMANCE_SAMPLE_INTERVAL_SEC) return;
+
+    const frameCount = Math.max(1, sample.frames);
+    setStats({
+      fps: frameCount / Math.max(sample.elapsedSec, 1e-6),
+      frameTimeMs: sample.frameTimeMsTotal / frameCount,
+      sceneObjects,
+      modelTriangles,
+      drawCalls: gl.info.render.calls,
+      renderTriangles: gl.info.render.triangles,
+      renderLines: gl.info.render.lines,
+      renderPoints: gl.info.render.points,
+      memoryGeometries: gl.info.memory.geometries,
+      memoryTextures: gl.info.memory.textures,
+      programCount: getProgramCount(gl),
+    });
+
+    sample.frames = 0;
+    sample.elapsedSec = 0;
+    sample.frameTimeMsTotal = 0;
+    sample.sinceEmitSec = 0;
+  });
+
+  if (!enabled) return null;
+
+  const rows = stats
+    ? [
+      ['FPS', stats.fps.toFixed(1)],
+      ['Frame ms', stats.frameTimeMs.toFixed(1)],
+      ['Objects', formatPerformanceCount(stats.sceneObjects)],
+      ['Model tris', formatPerformanceCount(stats.modelTriangles)],
+      ['Drawn tris', formatPerformanceCount(stats.renderTriangles)],
+      ['Draw calls', formatPerformanceCount(stats.drawCalls)],
+      ['Lines', formatPerformanceCount(stats.renderLines)],
+      ['Points', formatPerformanceCount(stats.renderPoints)],
+      ['Geometries', formatPerformanceCount(stats.memoryGeometries)],
+      ['Textures', formatPerformanceCount(stats.memoryTextures)],
+      ['Programs', formatPerformanceCount(stats.programCount)],
+    ]
+    : null;
+
+  return (
+    <Html fullscreen style={{ pointerEvents: 'none' }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          minWidth: 180,
+          padding: '10px 12px',
+          borderRadius: 8,
+          border: '1px solid var(--fc-border)',
+          background: 'var(--fc-bgPanel)',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.22)',
+          color: 'var(--fc-text)',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+          fontSize: 11,
+          lineHeight: 1.45,
+        }}
+      >
+        <div
+          style={{
+            marginBottom: 6,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+            color: 'var(--fc-textDim)',
+          }}
+        >
+          Performance
+        </div>
+        {!rows && (
+          <div style={{ color: 'var(--fc-textDim)' }}>Measuring...</div>
+        )}
+        {rows?.map(([label, value]) => (
+          <div
+            key={label}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <span style={{ color: 'var(--fc-textDim)' }}>{label}</span>
+            <span>{value}</span>
+          </div>
+        ))}
+      </div>
+    </Html>
   );
 }
 
@@ -2362,6 +2516,7 @@ export function Viewport() {
   const projectionMode = useForgeStore((s) => s.projectionMode);
   const gridEnabled = useForgeStore((s) => s.gridEnabled);
   const gridSize = useForgeStore((s) => s.gridSize);
+  const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
   const objectSettings = useForgeStore((s) => s.objectSettings);
   const hoveredObjectId = useForgeStore((s) => s.hoveredObjectId);
   const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
@@ -2701,6 +2856,26 @@ export function Viewport() {
   const t = themes[themeName];
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
   const canvasDpr: number | [number, number] = isViewportInteracting ? 1 : [1, 2];
+  const { visibleSceneObjectCount, visibleModelTriangles } = useMemo(() => {
+    let nextVisibleSceneObjectCount = 0;
+    let nextVisibleModelTriangles = 0;
+
+    objects.forEach((obj) => {
+      if (objectSettings[obj.id]?.visible === false) return;
+      nextVisibleSceneObjectCount += 1;
+      if (!obj.shape) return;
+      try {
+        nextVisibleModelTriangles += obj.shape.numTri();
+      } catch {
+        // Ignore broken triangle counts from partial/invalid geometry.
+      }
+    });
+
+    return {
+      visibleSceneObjectCount: nextVisibleSceneObjectCount,
+      visibleModelTriangles: nextVisibleModelTriangles,
+    };
+  }, [objectSettings, objects]);
 
   const hideHoverTooltip = useCallback((id?: string | null) => {
     if (id !== undefined && hoverTooltipIdRef.current !== id) return;
@@ -2909,6 +3084,11 @@ export function Viewport() {
           <DimensionAnnotation key={d.id} def={d} />
         ))}
         <MeasureTool />
+        <PerformanceInfoHud
+          enabled={showPerformanceInfo}
+          sceneObjects={visibleSceneObjectCount}
+          modelTriangles={visibleModelTriangles}
+        />
 
         {gridEnabled && !isSketchOnly && (
           <Grid
