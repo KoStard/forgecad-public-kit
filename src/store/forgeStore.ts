@@ -915,9 +915,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   }),
   clearFocusedObject: () => set({ focusedObjectIds: [] }),
   hoveredObjectId: null,
-  setHoveredObjectId: (id) => set({ hoveredObjectId: id }),
+  setHoveredObjectId: (id) => set((state) => (
+    state.hoveredObjectId === id ? state : { hoveredObjectId: id }
+  )),
   hoveredJointName: null,
-  setHoveredJointName: (name) => set({ hoveredJointName: name }),
+  setHoveredJointName: (name) => set((state) => (
+    state.hoveredJointName === name ? state : { hoveredJointName: name }
+  )),
   objectPickSyncEnabled: initialViewPreferences.objectPickSyncEnabled ?? true,
   setObjectPickSyncEnabled: (enabled) => {
     writeViewPreferences({ objectPickSyncEnabled: enabled });

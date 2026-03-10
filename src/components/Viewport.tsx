@@ -657,6 +657,7 @@ function ForgeObject({
   obj,
   settings,
   renderMode,
+  isInteracting,
   matrix,
   isHovered,
   cutPlanes,
@@ -670,6 +671,7 @@ function ForgeObject({
   obj: SceneObject;
   settings: ObjectSettings;
   renderMode: RenderMode;
+  isInteracting?: boolean;
   matrix: THREE.Matrix4;
   isHovered?: boolean;
   cutPlanes?: CutPlaneDef[];
@@ -745,10 +747,11 @@ function ForgeObject({
 
   if (!solidGeo || !settings.visible) return null;
 
+  const effectiveRenderMode = isInteracting && renderMode === 'overlay' ? 'solid' : renderMode;
   const meshOpacity = settings.opacity;
-  const showSolid = renderMode !== 'wireframe';
-  const showEdges = renderMode === 'overlay';
-  const showWire = renderMode === 'wireframe';
+  const showSolid = effectiveRenderMode !== 'wireframe';
+  const showEdges = effectiveRenderMode === 'overlay';
+  const showWire = effectiveRenderMode === 'wireframe';
   const activeClippingPlanes = useFallbackClipping ? (fallbackClippingPlanes ?? []) : [];
 
   return (
@@ -2097,6 +2100,7 @@ function ViewPersistence({
   const restoreStatusRef = useRef<'pending' | 'done'>('pending');
   const didResolveRef = useRef(false);
   const savedStateRef = useRef<PersistedViewportCameraState | null>(readPersistedViewportCameraState());
+  const persistTimeoutRef = useRef<number | null>(null);
 
   const resolve = useCallback((restored: boolean) => {
     if (didResolveRef.current) return;
@@ -2167,10 +2171,70 @@ function ViewPersistence({
       writePersistedViewportCameraState(nextState);
     };
 
+    const schedulePersistCamera = () => {
+      if (persistTimeoutRef.current !== null) {
+        window.clearTimeout(persistTimeoutRef.current);
+      }
+      persistTimeoutRef.current = window.setTimeout(() => {
+        persistTimeoutRef.current = null;
+        persistCamera();
+      }, 140);
+    };
+
     persistCamera();
-    controls.addEventListener('change', persistCamera);
-    return () => controls.removeEventListener('change', persistCamera);
+    controls.addEventListener('change', schedulePersistCamera);
+    return () => {
+      controls.removeEventListener('change', schedulePersistCamera);
+      if (persistTimeoutRef.current !== null) {
+        window.clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = null;
+        persistCamera();
+      }
+    };
   }, [camera, controlsRef, isSketchOnly, projectionMode]);
+
+  return null;
+}
+
+function ControlsInteractionBridge({
+  controlsRef,
+  onInteractionChange,
+}: {
+  controlsRef: MutableRefObject<OrbitControlsImpl | null>;
+  onInteractionChange: (active: boolean) => void;
+}) {
+  const idleTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    const markActive = () => {
+      onInteractionChange(true);
+      if (idleTimeoutRef.current !== null) {
+        window.clearTimeout(idleTimeoutRef.current);
+      }
+      idleTimeoutRef.current = window.setTimeout(() => {
+        idleTimeoutRef.current = null;
+        onInteractionChange(false);
+      }, 140);
+    };
+
+    controls.addEventListener('start', markActive);
+    controls.addEventListener('change', markActive);
+    controls.addEventListener('end', markActive);
+
+    return () => {
+      controls.removeEventListener('start', markActive);
+      controls.removeEventListener('change', markActive);
+      controls.removeEventListener('end', markActive);
+      if (idleTimeoutRef.current !== null) {
+        window.clearTimeout(idleTimeoutRef.current);
+        idleTimeoutRef.current = null;
+      }
+      onInteractionChange(false);
+    };
+  }, [controlsRef, onInteractionChange]);
 
   return null;
 }
@@ -2659,9 +2723,11 @@ export function Viewport() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
   const [hoverLabel, setHoverLabel] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
+  const [isViewportInteracting, setIsViewportInteracting] = useState(false);
   const themeName = useForgeStore((s) => s.theme);
   const t = themes[themeName];
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
+  const canvasDpr: number | [number, number] = isViewportInteracting ? 1 : [1, 2];
 
   const handleViewPersistenceResolved = useCallback((restored: boolean) => {
     if (restored) {
@@ -2686,6 +2752,12 @@ export function Viewport() {
   }, [objectPickSyncEnabled, setHoveredObjectId]);
 
   useEffect(() => {
+    if (!isViewportInteracting) return;
+    setHoverLabel(null);
+    setHoveredObjectId(null);
+  }, [isViewportInteracting, setHoveredObjectId]);
+
+  useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       if (useForgeStore.getState().focusedObjectIds.length === 0) return;
@@ -2696,7 +2768,7 @@ export function Viewport() {
   }, [clearFocusedObject]);
 
   const updateHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
-    if (!objectPickSyncEnabled || measureMode) return;
+    if (!objectPickSyncEnabled || measureMode || isViewportInteracting) return;
     event.stopPropagation();
     setHoveredObjectId(obj.id);
     const hoverName = resolveHoverObjectName(obj.name, knownFileNames);
@@ -2712,27 +2784,27 @@ export function Viewport() {
       x: event.clientX - rect.left + 10,
       y: event.clientY - rect.top + 12,
     });
-  }, [knownFileNames, measureMode, objectPickSyncEnabled, setHoveredObjectId]);
+  }, [isViewportInteracting, knownFileNames, measureMode, objectPickSyncEnabled, setHoveredObjectId]);
 
   const clearHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
-    if (!objectPickSyncEnabled || measureMode) return;
+    if (!objectPickSyncEnabled || measureMode || isViewportInteracting) return;
     event.stopPropagation();
     if (hoveredObjectId === obj.id) setHoveredObjectId(null);
     setHoverLabel((prev) => (prev?.id === obj.id ? null : prev));
-  }, [hoveredObjectId, measureMode, objectPickSyncEnabled, setHoveredObjectId]);
+  }, [hoveredObjectId, isViewportInteracting, measureMode, objectPickSyncEnabled, setHoveredObjectId]);
 
   const handleObjectClick = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
-    if (!objectPickSyncEnabled || measureMode) return;
+    if (!objectPickSyncEnabled || measureMode || isViewportInteracting) return;
     event.stopPropagation();
     selectObject(obj.id);
-  }, [measureMode, objectPickSyncEnabled, selectObject]);
+  }, [isViewportInteracting, measureMode, objectPickSyncEnabled, selectObject]);
 
   const handleObjectDoubleClick = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
-    if (measureMode) return;
+    if (measureMode || isViewportInteracting) return;
     event.stopPropagation();
     const additive = event.shiftKey || event.metaKey || event.ctrlKey;
     focusObject(obj.id, { additive });
-  }, [focusObject, measureMode]);
+  }, [focusObject, isViewportInteracting, measureMode]);
 
   const handleViewportPointerMissed = useCallback((event: MouseEvent) => {
     if (event.detail !== 2) return;
@@ -2744,7 +2816,7 @@ export function Viewport() {
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
         style={{ background: t.viewportBg, cursor: measureMode ? 'crosshair' : 'default' }}
-        dpr={[1, 2]}
+        dpr={canvasDpr}
         gl={{
           antialias: true,
           logarithmicDepthBuffer: true,
@@ -2799,6 +2871,7 @@ export function Viewport() {
                 obj={obj}
                 settings={effectiveSettings}
                 renderMode={renderMode}
+                isInteracting={isViewportInteracting}
                 matrix={matrix}
                 isHovered={isHovered}
                 cutPlanes={objectCutPlanes}
@@ -2876,6 +2949,11 @@ export function Viewport() {
           enableRotate={!isSketchOnly}
           mouseButtons={isSketchOnly ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN } : undefined}
           touches={isSketchOnly ? { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN } : undefined}
+        />
+
+        <ControlsInteractionBridge
+          controlsRef={controlsRef}
+          onInteractionChange={setIsViewportInteracting}
         />
 
         <ViewManager
