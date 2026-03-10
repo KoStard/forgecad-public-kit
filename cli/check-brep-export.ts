@@ -22,6 +22,7 @@ function runExactManifest(code: string) {
     `Expected exact export support, got: ${manifest.unsupported.map((item) => `${item.name}: ${item.reason}`).join('; ')}`,
   );
   assert.equal(manifest.objects.length, 1, `Expected exactly one export object, got ${manifest.objects.length}`);
+  assert.equal(manifest.objects[0].kind, 'exact', 'Expected exact export object');
   return manifest.objects[0].plan;
 }
 
@@ -324,19 +325,27 @@ return [
   assert.equal(manifest.skipped[0].name, 'Slot');
 }
 
-function checkChessSetExampleManifest(): void {
+function checkChessSetFacetedFallbackManifest(): void {
   const scriptPath = resolve('examples/chess-set.forge.js');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
   const result = runScript(allFiles[fileName], fileName, allFiles);
   assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
 
-  const manifest = buildBrepExportManifest(result.objects);
+  const exactManifest = buildBrepExportManifest(result.objects);
   assert.equal(
-    manifest.unsupported.length,
-    0,
-    `Chess set should stay fully exact-exportable, got: ${manifest.unsupported.map((item) => `${item.name}: ${item.reason}`).join('; ')}`,
+    exactManifest.unsupported.length,
+    4,
+    `Expected 4 exact-export blockers in chess set, got: ${exactManifest.unsupported.map((item) => item.name).join(', ')}`,
   );
+
+  const manifest = buildBrepExportManifest(result.objects, { allowFaceted: true });
+  assert.equal(manifest.unsupported.length, 0, 'Faceted fallback should eliminate chess-set blockers');
   assert.equal(manifest.objects.length, 37, `Expected all 37 chess-set solids to export, got ${manifest.objects.length}`);
+  assert.equal(manifest.fallbacks.length, 4, `Expected 4 faceted fallbacks, got ${manifest.fallbacks.length}`);
+  assert.deepEqual(
+    manifest.fallbacks.map((item) => item.name).sort(),
+    ['Black Knight 2', 'Black Knight 7', 'White Knight 2', 'White Knight 7'],
+  );
 }
 
 async function main() {
@@ -354,7 +363,7 @@ async function main() {
   checkRigidMatrixTransformPlan();
   checkPointAlongOnPrimitiveBoolean();
   checkMixedSketchAndSolidScenePolicy();
-  checkChessSetExampleManifest();
+  checkChessSetFacetedFallbackManifest();
   console.log('✓ BREP export invariants passed');
 }
 

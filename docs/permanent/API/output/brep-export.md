@@ -13,7 +13,8 @@ Update it whenever:
 
 - Export executor: `uv run cli/forge-brep-export.py`
 - Exact kernel backend: CadQuery on OpenCascade
-- Export policy: exact-subset only, never mesh-to-fake-BREP conversion
+- Default export policy: exact-subset only, never silent mesh-to-fake-BREP conversion
+- Optional CLI fallback: `--allow-faceted` exports closed mesh solids as explicit faceted OCCT solids for STEP/BREP; this is not exact replay
 
 ## Parity Table
 
@@ -58,7 +59,7 @@ Update it whenever:
 | `levelSet()` | Unsupported | No | Mesh/SDF output by design |
 | `smoothOut()` / `refine*()` / `simplify()` | Unsupported | No | Mesh post-processing, not exact BREP |
 | `warp()` | Unsupported | No | Deformation is mesh-domain today |
-| `hull3d()` | Unsupported | No | No exact convex-hull replay yet |
+| `hull3d()` | Partial | No | No exact convex-hull replay yet; `--allow-faceted` can export the triangulated result as a faceted solid |
 | `trimByPlane()` / `split*()` | Unsupported | No | Exact OCCT replay not implemented |
 | `TrackedShape` topology preservation | Partial | Synthetic only | Export succeeds for supported base solids, but named topology is not written to STEP/BREP |
 | Colors/materials in STEP/BREP | Partial | STEP only | Scene-object colors are written to STEP via CadQuery assembly export; `.brep` remains geometry-only |

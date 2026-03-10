@@ -110,15 +110,20 @@ npm run brep -- examples/api/brep-exportable.forge.js
 npm run step -- --output out/demo.step examples/api/brep-exportable.forge.js
 npm run step -- --python 3.11 examples/api/brep-exportable.forge.js
 npm run step -- --uv /custom/path/to/uv examples/api/brep-exportable.forge.js
+npm run step -- --allow-faceted examples/chess-set.forge.js
 ```
 
 This exporter is `uv`-first. `cli/forge-brep-export.py` carries inline dependency metadata, so `uv run` provisions CadQuery automatically for the exporter environment.
 
-This exporter is intentionally exact-subset only. It does **not** try to convert arbitrary triangle meshes back into fake BREP. Instead, Forge records an exact export plan only for operations that can be replayed robustly in OpenCascade via CadQuery.
+By default this exporter is exact-subset only. It does **not** silently convert arbitrary triangle meshes back into fake BREP. Instead, Forge records an exact export plan only for operations that can be replayed robustly in OpenCascade via CadQuery.
+
+If you pass `--allow-faceted`, unsupported closed mesh solids are exported as explicit faceted OCCT solids. This keeps hull-heavy designs exportable to STEP/BREP, but that fallback is tessellation-driven rather than exact replay.
 
 The maintained feature matrix lives in [`docs/permanent/API/output/brep-export.md`](API/output/brep-export.md).
 
 If any returned solid object falls outside the exact subset, the CLI fails with a reason instead of silently exporting degraded geometry. When a scene mixes solids and 2D sketches, the exact solids export and the sketch-only objects are skipped with a warning.
+
+With `--allow-faceted`, mesh-solid blockers that still lack an exact replay plan are exported as faceted solids instead of failing. The CLI prints which objects used the fallback.
 
 For coverage runs across many examples, use the `uv` matrix scripts:
 
