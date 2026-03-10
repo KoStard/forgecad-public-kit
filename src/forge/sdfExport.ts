@@ -409,7 +409,46 @@ function demoWorldGuiXml(keyboardEnabled: boolean): string {
         <scene>scene</scene>
         <ambient_light>0.4 0.4 0.4</ambient_light>
         <background_color>0.8 0.8 0.8</background_color>
-        <camera_pose>-4.8 -3.2 2.8 0 0.38 0.62</camera_pose>
+        <camera_pose>-6 0 6 0 0.5 0</camera_pose>
+      </plugin>
+
+      <plugin filename="EntityContextMenuPlugin" name="Entity context menu">
+        <gz-gui>
+          <property key="state" type="string">floating</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="GzSceneManager" name="Scene Manager">
+        <gz-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="InteractiveViewControl" name="Interactive view control">
+        <gz-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <plugin filename="CameraTracking" name="Camera Tracking">
+        <gz-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
       </plugin>
 
       <plugin filename="WorldControl" name="World control">
@@ -427,8 +466,7 @@ function demoWorldGuiXml(keyboardEnabled: boolean): string {
         </gz-gui>
         <play_pause>true</play_pause>
         <step>true</step>
-        <start_paused>false</start_paused>
-        <use_event>true</use_event>
+        <start_paused>true</start_paused>
       </plugin>
 
       <plugin filename="WorldStats" name="World stats">
@@ -451,15 +489,34 @@ function demoWorldGuiXml(keyboardEnabled: boolean): string {
         <iterations>true</iterations>
       </plugin>
 
-      <plugin filename="ComponentInspector" name="Component inspector">
+      <plugin filename="TransformControl" name="Transform control">
         <gz-gui>
-          <property type="string" key="state">docked_collapsed</property>
+          <title>Transform control</title>
+          <anchors target="3D View">
+            <line own="left" target="left"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">230</property>
+          <property key="height" type="double">50</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+          <property key="cardBackground" type="string">#666666</property>
         </gz-gui>
       </plugin>
 
-      <plugin filename="EntityTree" name="Entity tree">
+      <plugin filename="Shapes" name="Shapes">
         <gz-gui>
-          <property type="string" key="state">docked_collapsed</property>
+          <anchors target="Transform control">
+            <line own="left" target="right"/>
+            <line own="top" target="top"/>
+          </anchors>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">200</property>
+          <property key="height" type="double">50</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+          <property key="cardBackground" type="string">#666666</property>
         </gz-gui>
       </plugin>${keyboardPlugin}
     </gui>
