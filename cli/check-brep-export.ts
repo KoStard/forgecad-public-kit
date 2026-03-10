@@ -5,9 +5,11 @@
  * Focuses on plan recording and manifest eligibility for the exact STEP/BREP subset.
  */
 import assert from 'node:assert/strict';
+import { resolve } from 'node:path';
 import { init, runScript } from '../src/forge/headless';
 import { buildBrepExportManifest } from '../src/forge/brepExport';
 import type { BrepProfilePlan, BrepShapePlan, BrepShapeTransformStep } from '../src/forge/brepPlan';
+import { collectProjectFiles } from './collect-files';
 
 function runExactManifest(code: string) {
   const files: Record<string, string> = { 'main.forge.js': code };
@@ -322,6 +324,21 @@ return [
   assert.equal(manifest.skipped[0].name, 'Slot');
 }
 
+function checkChessSetExampleManifest(): void {
+  const scriptPath = resolve('examples/chess-set.forge.js');
+  const { allFiles, fileName } = collectProjectFiles(scriptPath);
+  const result = runScript(allFiles[fileName], fileName, allFiles);
+  assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
+
+  const manifest = buildBrepExportManifest(result.objects);
+  assert.equal(
+    manifest.unsupported.length,
+    0,
+    `Chess set should stay fully exact-exportable, got: ${manifest.unsupported.map((item) => `${item.name}: ${item.reason}`).join('; ')}`,
+  );
+  assert.equal(manifest.objects.length, 37, `Expected all 37 chess-set solids to export, got ${manifest.objects.length}`);
+}
+
 async function main() {
   await init();
   checkRoundedRectProfileTransforms();
@@ -337,6 +354,7 @@ async function main() {
   checkRigidMatrixTransformPlan();
   checkPointAlongOnPrimitiveBoolean();
   checkMixedSketchAndSolidScenePolicy();
+  checkChessSetExampleManifest();
   console.log('✓ BREP export invariants passed');
 }
 
