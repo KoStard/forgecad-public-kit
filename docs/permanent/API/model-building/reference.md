@@ -740,10 +740,10 @@ shape.refineToTolerance(0.1); // max deviation 0.1mm from smooth surface
 // Split by another shape → [inside, outside]
 const [inside, outside] = shape.split(cutter);
 
-// Split by infinite plane → [below, above]
-const [below, above] = shape.splitByPlane([0, 0, 1], 10);  // Z=10 plane
+// Split by infinite plane → [positive side, opposite side]
+const [above, below] = shape.splitByPlane([0, 0, 1], 10);  // Z=10 plane
 
-// Trim: keep only one side
+// Trim: keep the positive side of the plane
 const trimmed = shape.trimByPlane([0, 0, 1], 10);
 ```
 

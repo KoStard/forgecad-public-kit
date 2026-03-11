@@ -62,7 +62,7 @@ Update it whenever:
 | `smoothOut()` / `refine*()` / `simplify()` | Unsupported | No | Mesh post-processing, not exact BREP |
 | `warp()` | Unsupported | No | Deformation is mesh-domain today |
 | `hull3d()` / `Shape.hull()` / `hull2d()` / `Sketch.hull()` | Partial | No | Hull intent is now preserved in the Forge compile graph and reported explicitly, but there is still no exact convex-hull OCCT replay; `--allow-faceted` can export closed hull solids as faceted geometry |
-| `trimByPlane()` / `splitByPlane()` | Unsupported | No | Exact OCCT replay not implemented |
+| `trimByPlane()` / `splitByPlane()` | Supported | Yes | Replayed through an exact plane half-space trim in CadQuery/OCCT; `splitByPlane()` lowers to the pair of positive-side and opposite-side trims |
 | `TrackedShape` topology preservation | Partial | Synthetic only | Export succeeds for supported base solids, but named topology is not written to STEP/BREP |
 | Colors/materials in STEP/BREP | Partial | STEP only | Scene-object colors are written to STEP via CadQuery assembly export; `.brep` remains geometry-only |
 | STEP assembly structure/BOM metadata | Partial | Names only | STEP export writes a flat scene-object assembly to preserve names/colors; Forge assembly/BOM metadata is still not exported |
