@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url';
 import { stdin as input } from 'node:process';
 import { findProjectRoot } from './collect-files';
 import { exportNotebookToForgeScript, notebookDefaultScriptPath } from '../src/notebook/export';
+import { parseNotebook } from '../src/notebook/model';
+import { renderNotebookForTerminal } from '../src/notebook/terminal';
 
 type NotebookOutput =
   | {
@@ -38,10 +40,11 @@ interface NotebookResponse {
 }
 
 interface ParsedCli {
-  command: 'append' | 'run' | 'export';
+  command: 'append' | 'run' | 'export' | 'view';
   target: string;
   afterCellId?: string;
   cellId?: string;
+  cellSpecifier?: string;
   code?: string;
   filePath?: string;
   outputPath?: string;
@@ -64,16 +67,19 @@ function usage(exitCode = 0): never {
   npm run notebook -- <notebook.forge-notebook.json> --file /tmp/cell.js
   cat /tmp/cell.js | npm run notebook -- <notebook.forge-notebook.json>
   npm run notebook -- <notebook.forge-notebook.json>
+  npm run notebook -- view <notebook.forge-notebook.json> [cell-number|cell-id|preview]
   npm run notebook -- export <notebook.forge-notebook.json> [output.forge.js]
 
 Explicit subcommands are still available:
   npm run notebook -- append <notebook.forge-notebook.json> [--code "..."] [--file path] [--after cell-id]
   npm run notebook -- run <notebook.forge-notebook.json> [cell-id]
+  npm run notebook -- view <notebook.forge-notebook.json> [cell-number|cell-id|preview]
   npm run notebook -- export <notebook.forge-notebook.json> [output.forge.js]
 
 Notes:
   append auto-creates the notebook file if it does not exist yet
-  run/export require an existing notebook file
+  run/export/view require an existing notebook file
+  view is local and renders the notebook in the terminal without starting the server
 
 Options:
   --server <url>   Reuse an existing Forge server instead of auto-starting one
@@ -105,7 +111,7 @@ function parsePort(value: string | undefined): number {
 function parseCli(argv: string[]): ParsedCli {
   if (argv.length === 0 || hasFlag(argv, '-h') || hasFlag(argv, '--help')) usage();
 
-  const explicitCommand = argv[0] === 'append' || argv[0] === 'run' || argv[0] === 'export' ? argv[0] : null;
+  const explicitCommand = argv[0] === 'append' || argv[0] === 'run' || argv[0] === 'export' || argv[0] === 'view' ? argv[0] : null;
   const targetIndex = explicitCommand ? 1 : 0;
   const target = argv[targetIndex];
   if (!target || target.startsWith('--')) usage(1);
@@ -116,7 +122,7 @@ function parseCli(argv: string[]): ParsedCli {
   const filePath = getOption(argv, '--file');
   const afterCellId = getOption(argv, '--after');
 
-  let command: 'append' | 'run' | 'export';
+  let command: 'append' | 'run' | 'export' | 'view';
   if (explicitCommand) {
     command = explicitCommand;
   } else if (code || filePath || !process.stdin.isTTY) {
@@ -138,6 +144,7 @@ function parseCli(argv: string[]): ParsedCli {
     target,
     afterCellId: command === 'append' ? afterCellId : undefined,
     cellId,
+    cellSpecifier: command === 'view' ? positionalAfterTarget : undefined,
     code,
     filePath,
     outputPath: command === 'export' ? positionalAfterTarget : undefined,
@@ -334,10 +341,24 @@ function exportNotebook(cli: ParsedCli): void {
   console.log(`Script: ${outputPath}`);
 }
 
+function viewNotebook(cli: ParsedCli): void {
+  const notebookPath = resolve(cli.target);
+  const notebookText = readFileSync(notebookPath, 'utf-8');
+  const notebook = parseNotebook(notebookText);
+  process.stdout.write(renderNotebookForTerminal(notebook, {
+    filename: notebookPath,
+    cellSpecifier: cli.cellSpecifier,
+  }));
+}
+
 async function main() {
   const cli = parseCli(process.argv.slice(2));
   if (cli.command === 'export') {
     exportNotebook(cli);
+    return;
+  }
+  if (cli.command === 'view') {
+    viewNotebook(cli);
     return;
   }
   const server = await ensureServer(cli);
