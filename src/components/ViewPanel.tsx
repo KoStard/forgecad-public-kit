@@ -512,7 +512,10 @@ export function ViewPanel() {
   return (
     <div
       style={{
-        width: 280,
+        width: '100%',
+        minWidth: 0,
+        minHeight: 0,
+        flex: 1,
         background: 'var(--fc-bgPanel)',
         borderLeft: '1px solid var(--fc-border)',
         display: 'flex',
@@ -760,7 +763,7 @@ export function ViewPanel() {
         )}
       </div>
       <div
-        style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px' }}
+        style={{ flex: 1, minHeight: 180, overflowY: 'auto', padding: '0 12px 12px' }}
         onDoubleClick={(event) => {
           if (event.target !== event.currentTarget) return;
           clearFocusedObject();

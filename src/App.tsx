@@ -266,7 +266,7 @@ export function App() {
               maxWidth={maxViewPanelWidth}
               edge="left"
               handleLabel="Resize view panel"
-              panelStyle={{ overflowY: 'auto' }}
+              panelStyle={{ overflow: 'hidden' }}
             >
               <ViewPanel />
             </ResizablePanel>
