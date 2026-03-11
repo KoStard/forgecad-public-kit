@@ -115,7 +115,7 @@
               }
             ]
           },
-          "exactBrep": {
+          "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
             "plan": {
@@ -387,7 +387,7 @@
               }
             ]
           },
-          "exactBrep": {
+          "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
             "plan": {
@@ -571,14 +571,14 @@
             "height": 4,
             "center": false
           },
-          "exactBrep": {
+          "cadqueryOcct": {
             "supported": false,
             "diagnostics": [
               {
-                "target": "exact-brep",
-                "code": "exact-brep-segmented-circle profiles",
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-segmented-circle profiles",
                 "path": "$.profile",
-                "message": "Exact BREP lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+                "message": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
               }
             ],
             "plan": null
@@ -647,14 +647,14 @@
             "segments": 12,
             "center": false
           },
-          "exactBrep": {
+          "cadqueryOcct": {
             "supported": false,
             "diagnostics": [
               {
-                "target": "exact-brep",
-                "code": "exact-brep-segmented-cylinder",
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-segmented-cylinder",
                 "path": "$",
-                "message": "Exact BREP lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+                "message": "CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
               }
             ],
             "plan": null
@@ -743,14 +743,14 @@
             "degrees": 240,
             "segments": 24
           },
-          "exactBrep": {
+          "cadqueryOcct": {
             "supported": false,
             "diagnostics": [
               {
-                "target": "exact-brep",
-                "code": "exact-brep-segmented-revolve",
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-segmented-revolve",
                 "path": "$",
-                "message": "Exact BREP lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+                "message": "CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
               }
             ],
             "plan": null
@@ -806,15 +806,15 @@
         "unsupported": [
           {
             "name": "Segmented Disk",
-            "reason": "Exact BREP lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+            "reason": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
           },
           {
             "name": "Segmented Post",
-            "reason": "Exact BREP lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+            "reason": "CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
           },
           {
             "name": "Segmented Lathe",
-            "reason": "Exact BREP lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+            "reason": "CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
           }
         ],
         "skipped": [],
@@ -840,15 +840,15 @@
         "fallbacks": [
           {
             "name": "Segmented Disk",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Exact BREP lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
           },
           {
             "name": "Segmented Post",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Exact BREP lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
           },
           {
             "name": "Segmented Lathe",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Exact BREP lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
           }
         ]
       }
@@ -916,7 +916,7 @@
               }
             ]
           },
-          "exactBrepProfile": {
+          "cadqueryOcctProfile": {
             "supported": true,
             "diagnostics": [],
             "plan": {
@@ -1096,14 +1096,14 @@
               ]
             ]
           },
-          "exactBrep": {
+          "cadqueryOcct": {
             "supported": false,
             "diagnostics": [
               {
-                "target": "exact-brep",
-                "code": "exact-brep-unsupported-shape-hull",
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-unsupported-shape-hull",
                 "path": "$",
-                "message": "Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
               }
             ],
             "plan": null
@@ -1194,14 +1194,14 @@
             ],
             "points": []
           },
-          "exactBrep": {
+          "cadqueryOcct": {
             "supported": false,
             "diagnostics": [
               {
-                "target": "exact-brep",
-                "code": "exact-brep-unsupported-shape-hull",
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-unsupported-shape-hull",
                 "path": "$",
-                "message": "Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
               }
             ],
             "plan": null
@@ -1288,14 +1288,14 @@
               }
             ]
           },
-          "exactBrepProfile": {
+          "cadqueryOcctProfile": {
             "supported": false,
             "diagnostics": [
               {
-                "target": "exact-brep",
-                "code": "exact-brep-unsupported-profile-hull",
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-unsupported-profile-hull",
                 "path": "$",
-                "message": "Exact BREP lowering does not support Forge profile-hull intent at $ yet."
+                "message": "CadQuery/OCCT lowering does not support Forge profile-hull intent at $ yet."
               }
             ],
             "plan": null
@@ -1366,14 +1366,14 @@
             ],
             "transforms": []
           },
-          "exactBrepProfile": {
+          "cadqueryOcctProfile": {
             "supported": false,
             "diagnostics": [
               {
-                "target": "exact-brep",
-                "code": "exact-brep-unsupported-profile-hull",
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-unsupported-profile-hull",
                 "path": "$",
-                "message": "Exact BREP lowering does not support Forge profile-hull intent at $ yet."
+                "message": "CadQuery/OCCT lowering does not support Forge profile-hull intent at $ yet."
               }
             ],
             "plan": null
@@ -1417,11 +1417,11 @@
         "unsupported": [
           {
             "name": "Rib",
-            "reason": "Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
           },
           {
             "name": "Convex Post",
-            "reason": "Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
           }
         ],
         "skipped": [
@@ -1461,11 +1461,11 @@
         "fallbacks": [
           {
             "name": "Rib",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
           },
           {
             "name": "Convex Post",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
           }
         ]
       }
@@ -1500,7 +1500,7 @@
             "height": 8,
             "center": false
           },
-          "exactBrep": {
+          "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
             "plan": {
@@ -1613,7 +1613,7 @@
               }
             ]
           },
-          "exactBrepProfile": {
+          "cadqueryOcctProfile": {
             "supported": true,
             "diagnostics": [],
             "plan": {
@@ -1713,14 +1713,14 @@
             ]
           },
           "compilePlan": null,
-          "exactBrep": {
+          "cadqueryOcct": {
             "supported": false,
             "diagnostics": [
               {
-                "target": "exact-brep",
+                "target": "cadquery-occt",
                 "code": "missing-compile-plan",
                 "path": "$",
-                "message": "Forge compile intent is missing, so exact-brep lowering cannot replay this shape."
+                "message": "Forge compile intent is missing, so CadQuery/OCCT lowering cannot replay this shape."
               }
             ],
             "plan": null
@@ -1763,7 +1763,7 @@
         "unsupported": [
           {
             "name": "Warped",
-            "reason": "Forge compile intent is missing, so exact-brep lowering cannot replay this shape."
+            "reason": "Forge compile intent is missing, so CadQuery/OCCT lowering cannot replay this shape."
           }
         ],
         "skipped": [
@@ -1795,7 +1795,7 @@
         "fallbacks": [
           {
             "name": "Warped",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Forge compile intent is missing, so exact-brep lowering cannot replay this shape."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Forge compile intent is missing, so CadQuery/OCCT lowering cannot replay this shape."
           }
         ]
       }
@@ -1924,7 +1924,7 @@
               }
             ]
           },
-          "exactBrep": {
+          "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
             "plan": {

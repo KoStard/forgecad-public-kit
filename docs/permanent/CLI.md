@@ -135,7 +135,7 @@ forgecad export step examples/chess-set.forge.js --allow-faceted
 
 This exporter is `uv`-first. `cli/forge-brep-export.py` carries inline dependency metadata, so `uv run` provisions CadQuery automatically for the exporter environment.
 
-By default this exporter is exact-subset only. It does **not** silently convert arbitrary triangle meshes back into fake BREP. Instead, Forge records an exact export plan only for operations that can be replayed robustly in OpenCascade via CadQuery.
+By default this exporter is exact-subset only. It does **not** silently convert arbitrary triangle meshes back into fake BREP. Instead, Forge lowers compile-covered geometry into the `cadquery-occt` compiler target and exports that exact subset through CadQuery/OpenCascade.
 
 If you pass `--allow-faceted`, unsupported closed mesh solids are exported as explicit faceted OCCT solids. This keeps hull-heavy designs exportable to STEP/BREP, but that fallback is tessellation-driven rather than exact replay.
 
@@ -394,7 +394,7 @@ This is a unit-style invariant check, not just a debugger convenience.
 
 Each snapshot records:
 - Forge compile plans
-- exact BREP lowerings
+- CadQuery/OCCT lowerings
 - export routing decisions
 - quantized runtime Manifold mesh summaries
 - quantized compiler-lowered Manifold mesh summaries
@@ -457,7 +457,7 @@ forgecad debug compiler /path/to/file.forge.js --compact
 
 Prints JSON for the current script's compiler state, including:
 - per-object compile plans
-- exact BREP lowering diagnostics and lowered plans
+- CadQuery/OCCT lowering diagnostics and lowered plans
 - faceted fallback eligibility
 - runtime Manifold summaries
 - compiler-lowered Manifold summaries

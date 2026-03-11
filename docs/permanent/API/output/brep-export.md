@@ -12,6 +12,7 @@ Update it whenever:
 ## Current Backend
 
 - Export executor: `uv run cli/forge-brep-export.py`
+- Compiler target: `cadquery-occt`
 - Exact kernel backend: CadQuery on OpenCascade
 - Default export policy: exact-subset only, never silent mesh-to-fake-BREP conversion
 - Optional CLI fallback: `--allow-faceted` exports closed mesh solids as explicit faceted OCCT solids for STEP/BREP; this is not exact replay

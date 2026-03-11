@@ -158,16 +158,19 @@ After the first implementation slice for this mission, the minimum acceptable st
 - sectioning now uses shape/backend operations instead of reaching into `.manifold`.
 - scene-builder export payloads are isolated behind `src/forge/shapeBackendSceneBuilder.ts`.
 - `src/forge/compilePlan.ts` is now the canonical semantic plan module.
+- `src/forge/cadqueryPlan.ts` now names the exact target plan in CadQuery/OCCT terms.
 - `src/forge/brepPlan.ts` is now a compatibility bridge, not the architectural center.
-- `src/forge/compilePlanBrep.ts` is the explicit lowering boundary into exact BREP export plans.
+- `src/forge/compilePlanCadQuery.ts` is now the explicit lowering boundary into the CadQuery/OCCT exact subset.
+- `src/forge/compilePlanBrep.ts` is now a compatibility wrapper over the CadQuery/OCCT lowerer instead of the architectural implementation.
 - `src/forge/compilePlanManifold.ts` is now the executable lowering boundary into the Manifold runtime.
 - compile-covered primitives, sketch profiles, booleans, transforms, extrudes, and revolves now rebuild from Forge compile plans instead of manually restating the same Manifold calls at each callsite.
-- compile plans now carry runtime tessellation hints where Forge needs them, while the exact BREP lowerer explicitly rejects faceted runtime intent instead of silently upgrading it.
-- `src/forge/compilerReport.ts` now centralizes exact/faceted compiler routing for shapes.
+- compile plans now carry runtime tessellation hints where Forge needs them, while the CadQuery/OCCT lowerer explicitly rejects faceted runtime intent instead of silently upgrading it.
+- `src/forge/compilerReport.ts` now centralizes CadQuery/OCCT, runtime, and faceted compiler routing for shapes.
 - STEP/BREP export now routes through compiler reports instead of open-coding exact/fallback decisions in the export layer.
+- STEP/BREP export manifests now serialize the exact lowerer target explicitly as `cadquery-occt`, and the Python exporter validates that target instead of accepting anonymous "exact" plans.
 - `forgecad check compiler` now snapshots compile plans, exact lowerings, runtime Manifold summaries, and compiler-lowered Manifold summaries for curated cases.
 - the hull family (`hull3d()`, `Shape.hull()`, `hull2d()`, `Sketch.hull()`) now stays inside the Forge compile graph for the Manifold runtime instead of dropping straight to mesh-only execution.
-- the exact BREP lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
+- the CadQuery/OCCT lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
 - `forgecad debug compiler` now prints per-object compiler routing and lowered artifacts for investigation.
 - `forgecad check suite` and `npm test` now expose the repo's assertion-based invariant suite as a first-class test entrypoint instead of leaving the checks scattered across ad hoc commands.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
@@ -183,10 +186,10 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 5. Formalize a backend-neutral Forge compile graph | In progress | The compile plan is now executable for the current exact/runtime subset; broader feature coverage is still needed. |
 | 6. Route operations intentionally by backend capability | In progress | Exact-vs-faceted export routing now goes through compiler reports; richer multi-backend capability routing is still pending. |
 | 7. Add backend mismatch / conversion diagnostics | In progress | Exact BREP lowering now emits explicit diagnostics and compiler snapshot tooling preserves them. |
-| 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | Pending | After the runtime contract is stable. |
+| 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | In progress | The `cadquery-occt` target now exists explicitly in the compiler/report/export path; feature coverage is still narrow and export-driven. |
 | 9. Make both backends true lowerers from the same compile graph | Pending | This is now the active checkpoint. |
 | 10. Cover mainstream design-feature families across both lowerers | Pending | Target: most ordinary Fusion-style part modeling flows. |
-| 11. Push exact export fully behind the CadQuery/OCCT lowerer | Pending | Export should stop being a separate replay system. |
+| 11. Push exact export fully behind the CadQuery/OCCT lowerer | In progress | Export now consumes an explicit `cadquery-occt` compiler target, but the target still needs much broader feature coverage. |
 | 12. Add advanced hybrid-only feature families | Deferred | Sheet metal stays deferred until the active checkpoint is done. |
 
 ## Current Validation
@@ -194,7 +197,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 - `npm test` now runs the current assertion-based invariant suite for compiler/export/runtime/API behavior.
 - `forgecad check suite` is the CLI entrypoint for the same invariant suite.
 - `forgecad check compiler` snapshots canonical compiler cases and fails if runtime geometry drifts away from compiler-lowered Manifold output.
-- The snapshot baseline now includes compile plans, exact BREP lowerings, export routing decisions, and quantized Manifold mesh/polygon digests.
+- The snapshot baseline now includes compile plans, CadQuery/OCCT lowerings, export routing decisions, and quantized Manifold mesh/polygon digests.
 - The compiler check also asserts that exact/faceted export manifests stay consistent with the per-object compiler reports, not just with the saved JSON baseline.
 - `forgecad check brep` still guards the exact export subset separately.
 
@@ -252,7 +255,7 @@ This round is intentionally narrow:
 - introduce a runtime backend adapter
 - keep the adapter Manifold-backed for now
 - make the compile plan executable against the Manifold runtime
-- keep exact BREP export as a separate lowering with honest subset boundaries
+- keep exact STEP/BREP export routed through the compiler with honest subset boundaries
 
 This is enough to turn the hybrid backend plan from an idea into real runtime structure.
 
