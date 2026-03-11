@@ -9,15 +9,6 @@ import { init, runScript } from "../src/forge/headless";
 import { collectProjectFiles } from "./collect-files";
 import type { Shape } from "../src/forge/kernel";
 
-const args = process.argv.slice(2);
-const debugImports = args.includes('--debug-imports');
-const positional = args.filter((arg) => arg !== '--debug-imports');
-const scriptPath = positional[0];
-if (!scriptPath) {
-  console.error("Usage: npx tsx cli/test-run.ts [--debug-imports] <script.forge.js>");
-  process.exit(1);
-}
-
 type ShapeEntry = { name: string; shape: Shape; min: number[]; max: number[]; groupName?: string };
 
 function bboxOverlap(a: ShapeEntry, b: ShapeEntry): boolean {
@@ -157,7 +148,17 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
   return deduped;
 }
 
-async function main() {
+function usage(): never {
+  console.error("Usage: forgecad run <script.forge.js> [--debug-imports]");
+  process.exit(1);
+}
+
+export async function runScriptCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const debugImports = argv.includes('--debug-imports');
+  const positional = argv.filter((arg) => arg !== '--debug-imports');
+  const scriptPath = positional[0];
+  if (!scriptPath) usage();
+
   const code = readFileSync(resolve(scriptPath), "utf-8");
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
@@ -227,8 +228,3 @@ async function main() {
   console.log(`✓ Params: ${result.params.map((p) => p.name).join(", ")}`);
   console.log(`✓ Time: ${result.timeMs.toFixed(0)}ms`);
 }
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});

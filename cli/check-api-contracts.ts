@@ -180,7 +180,7 @@ return difference([base, hole1, hole2]);
   );
 }
 
-async function main() {
+export async function runCheckApiContractsCli(): Promise<void> {
   await init();
   checkShapeBooleanForms();
   checkTrackedShapeInterop();
@@ -189,8 +189,3 @@ async function main() {
   checkSandboxBindings();
   console.log('✓ Script API contract invariants passed');
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

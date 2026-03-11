@@ -1,57 +1,57 @@
 {
   "name": "forgecad",
   "version": "0.1.0",
-  "private": true,
+  "description": "Code-first parametric CAD for JavaScript/TypeScript, in the browser and CLI.",
+  "license": "BUSL-1.1",
   "type": "module",
+  "bin": {
+    "forgecad": "./dist-cli/forgecad.js"
+  },
+  "files": [
+    "dist-cli",
+    "cli",
+    "src",
+    "examples",
+    "index.html",
+    "vite.config.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite -- ./examples",
     "dev:blank": "vite",
-    "open": "vite --",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && npm run build:cli",
+    "build:cli": "tsup cli/forgecad.ts --format esm --platform node --target node20 --out-dir dist-cli --clean --sourcemap",
     "build:skill:forgecad": "node scripts/build-forgecad-skill.mjs",
+    "prepare": "npm run build:cli",
     "preview": "vite preview",
-    "render": "node cli/forge-render.mjs",
-    "gif": "npx tsx cli/forge-gif.ts",
-    "record": "npx tsx cli/forge-record.ts",
-    "report": "npx tsx cli/forge-report.ts",
-    "svg": "npx tsx cli/forge-svg.ts",
-    "sdf": "npx tsx cli/forge-sdf.ts",
-    "step": "npx tsx cli/forge-brep.ts --format step",
-    "brep": "npx tsx cli/forge-brep.ts --format brep",
-    "test-run": "npx tsx cli/test-run.ts",
-    "notebook": "npx tsx cli/forge-notebook.ts",
-    "param-check": "npx tsx cli/param-check.ts",
-    "check:transforms": "npx tsx cli/check-transforms.ts",
-    "check:brep": "npx tsx cli/check-brep-export.ts",
-    "check:placement": "npx tsx cli/check-placement-references.ts",
-    "check:js-modules": "npx tsx cli/check-js-modules.ts",
-    "check:dimensions": "npx tsx cli/check-dimensions.ts",
-    "check:api": "npx tsx cli/check-api-contracts.ts",
-    "debug:dimensions": "npx tsx cli/debug-dimensions.ts",
     "meta:init": "bash scripts/local-meta.sh init",
     "meta:status": "bash scripts/local-meta.sh status",
     "meta:path": "bash scripts/local-meta.sh path"
   },
   "dependencies": {
+    "@vitejs/plugin-react": "^4.5.2",
     "@monaco-editor/react": "^4.7.0",
     "@react-three/drei": "^10.0.6",
     "@react-three/fiber": "^9.1.2",
     "gifenc": "^1.0.3",
     "manifold-3d": "^3.3.2",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^24.37.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "three": "^0.175.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
     "zustand": "^5.0.5"
   },
   "devDependencies": {
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
     "@types/three": "^0.175.0",
-    "@vitejs/plugin-react": "^4.5.2",
-    "pngjs": "^7.0.0",
-    "puppeteer-core": "^24.37.2",
-    "tsx": "^4.19.0",
-    "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "tsup": "^8.5.0"
   }
 }

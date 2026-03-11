@@ -8,21 +8,21 @@
  * Uses the real forge engine — no code duplication.
  */
 
-import { readFileSync, readdirSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
-import { resolve, basename, dirname, join } from 'path';
-import { init, runScript, Sketch } from '../src/forge/headless';
+import { resolve, basename } from 'path';
+import { init, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
 
-const scriptPath = process.argv[2];
-if (!scriptPath) {
-  console.error('Usage: npx tsx cli/forge-svg.ts <script.sketch.js> [output.svg]');
+function usage(): never {
+  console.error('Usage: forgecad export svg <script.sketch.js> [output.svg]');
   process.exit(1);
 }
 
-const outputPath = process.argv[3] || scriptPath.replace(/\.sketch\.js$/, '.svg');
+export async function runSvgCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const scriptPath = argv[0];
+  if (!scriptPath) usage();
+  const outputPath = argv[1] || scriptPath.replace(/\.sketch\.js$/, '.svg');
 
-async function main() {
   // Read script
   const code = await readFile(resolve(scriptPath), 'utf-8');
 
@@ -84,8 +84,3 @@ ${paths}</svg>`;
     `✓ ${basename(outputPath)}  ${sz[0]} × ${sz[1]} mm  area=${sketch.area().toFixed(1)}mm²  verts=${sketch.numVert()}`,
   );
 }
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});

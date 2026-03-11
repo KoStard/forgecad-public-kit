@@ -348,7 +348,7 @@ function checkChessSetFacetedFallbackManifest(): void {
   );
 }
 
-async function main() {
+export async function runCheckBrepExportCli(): Promise<void> {
   await init();
   checkRoundedRectProfileTransforms();
   checkRoundedRectBooleanChain();
@@ -366,8 +366,3 @@ async function main() {
   checkChessSetFacetedFallbackManifest();
   console.log('✓ BREP export invariants passed');
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

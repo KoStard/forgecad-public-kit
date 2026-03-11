@@ -20,9 +20,10 @@
 import puppeteer from 'puppeteer-core';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { resolve, basename, dirname, join, extname } from 'path';
-import { existsSync } from 'fs';
-import { spawn, execSync } from 'child_process';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { execSync } from 'child_process';
 import { createServer } from 'net';
+import { packageRootFrom, spawnPackageVite } from './package-runtime';
 
 // --- Config ---
 
@@ -44,7 +45,7 @@ function usage() {
   return `ForgeCAD Renderer
 
 Usage:
-  node cli/forge-render.mjs <script.forge.js> [output.png] [options]
+  forgecad render <script.forge.js> [output.png] [options]
 
 Options:
   --angles <front,side,top,iso>   Which standard angles to render (default: ${DEFAULT_ANGLES.join(',')})
@@ -163,28 +164,8 @@ function parseCli(argv) {
   };
 }
 
-let options;
-try {
-  options = parseCli(process.argv.slice(2));
-} catch (err) {
-  console.error(String(err));
-  console.error('');
-  console.error(usage());
-  process.exit(1);
-}
-
-if (!options.chromePath) {
-  console.error('No Chrome found. Set CHROME_PATH env variable or pass --chrome-path.');
-  process.exit(1);
-}
-
-const scriptPath = options.scriptPath;
-const outputBase = options.outputBase;
-const code = await readFile(resolve(scriptPath), 'utf-8');
-
 // Collect all project files recursively with correct relative paths
 // (mirrors collect-files.ts logic for plain Node)
-import { readdirSync, readFileSync, statSync } from 'fs';
 
 const FORGE_EXTS = ['.forge.js', '.sketch.js', '.js', '.svg'];
 const isForgeFile = (f) => FORGE_EXTS.some(ext => f.endsWith(ext));
@@ -224,10 +205,6 @@ function findProjectRoot(sp) {
   return root;
 }
 
-const projectRoot = findProjectRoot(scriptPath);
-const allFiles = collectRec(projectRoot, projectRoot);
-const scriptFileName = resolve(scriptPath).slice(projectRoot.length + 1);
-
 // --- Dev server management ---
 
 async function isPortOpen(port) {
@@ -246,9 +223,8 @@ async function ensureDevServer(port) {
   if (!portFree) return; // already running
 
   console.log('Starting Vite dev server...');
-  const projectRoot = resolve(dirname(new URL(import.meta.url).pathname), '..');
-  viteProcess = spawn('npx', ['vite', '--port', String(port)], {
-    cwd: projectRoot,
+  viteProcess = spawnPackageVite(import.meta.url, ['--port', String(port)], {
+    cwd: packageRootFrom(import.meta.url),
     stdio: 'pipe',
     detached: false,
   });
@@ -273,89 +249,108 @@ function stopDevServer() {
   }
 }
 
-// --- Main ---
+export async function runRenderCli(argv = process.argv.slice(2)) {
+  let options;
+  try {
+    options = parseCli(argv);
+  } catch (err) {
+    console.error(String(err));
+    console.error('');
+    console.error(usage());
+    process.exit(1);
+  }
 
-try {
-  await ensureDevServer(options.port);
+  if (!options.chromePath) {
+    console.error('No Chrome found. Set CHROME_PATH env variable or pass --chrome-path.');
+    process.exit(1);
+  }
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: options.chromePath,
-    args: ['--no-sandbox', '--disable-gpu-sandbox'],
-  });
-
-  const page = await browser.newPage();
+  const scriptPath = options.scriptPath;
+  const outputBase = options.outputBase;
+  const code = await readFile(resolve(scriptPath), 'utf-8');
+  const projectRoot = findProjectRoot(scriptPath);
+  const allFiles = collectRec(projectRoot, projectRoot);
+  const scriptFileName = resolve(scriptPath).slice(projectRoot.length + 1);
 
   try {
-    const url = `http://localhost:${options.port}/cli/render.html`;
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 15000 });
-    await page.waitForFunction('window.__forgeReady === true', { timeout: 10000 });
+    await ensureDevServer(options.port);
 
-    // Execute script and get renders for all angles
-    const result = await page.evaluate((scriptCode, files, scriptName, renderOptions) => {
-      return window.__forgeRender(scriptCode, {
-        angles: renderOptions.angles,
-        size: renderOptions.size,
-        allFiles: files,
-        fileName: scriptName,
-        cameraSpec: renderOptions.cameraSpec,
-        sceneSpec: renderOptions.sceneSpec,
-        background: renderOptions.background,
-      });
-    }, code, allFiles, scriptFileName, {
-      angles: options.angles,
-      size: options.size,
-      cameraSpec: options.cameraSpec || null,
-      sceneSpec: options.sceneSpec || null,
-      background: options.background || null,
+    const browser = await puppeteer.launch({
+      headless: true,
+      executablePath: options.chromePath,
+      args: ['--no-sandbox', '--disable-gpu-sandbox'],
     });
 
-    if (!result.ok) {
-      console.error('Script error:', result.error);
-      process.exit(1);
-    }
+    const page = await browser.newPage();
 
-    // Save images
-    const ext = extname(outputBase) || '.png';
-    const base = outputBase.endsWith(ext) ? outputBase.slice(0, -ext.length) : outputBase;
-    const renderAngles = Object.keys(result.renders);
+    try {
+      const url = `http://localhost:${options.port}/cli/render.html`;
+      await page.goto(url, { waitUntil: 'networkidle0', timeout: 15000 });
+      await page.waitForFunction('window.__forgeReady === true', { timeout: 10000 });
 
-    const savedFiles = [];
-    for (const [angle, png] of Object.entries(result.renders)) {
-      const filename = renderAngles.length === 1
-        ? outputBase
-        : `${base}_${angle}${ext}`;
-      const b64 = png.replace(/^data:image\/png;base64,/, '');
-      await writeFile(resolve(filename), Buffer.from(b64, 'base64'));
-      savedFiles.push(basename(filename));
-    }
+      const result = await page.evaluate((scriptCode, files, scriptName, renderOptions) => {
+        return window.__forgeRender(scriptCode, {
+          angles: renderOptions.angles,
+          size: renderOptions.size,
+          allFiles: files,
+          fileName: scriptName,
+          cameraSpec: renderOptions.cameraSpec,
+          sceneSpec: renderOptions.sceneSpec,
+          background: renderOptions.background,
+        });
+      }, code, allFiles, scriptFileName, {
+        angles: options.angles,
+        size: options.size,
+        cameraSpec: options.cameraSpec || null,
+        sceneSpec: options.sceneSpec || null,
+        background: options.background || null,
+      });
 
-    // Print results
-    const bb = result.bbox;
-    const sz = [
-      (bb.max[0] - bb.min[0]).toFixed(1),
-      (bb.max[1] - bb.min[1]).toFixed(1),
-      (bb.max[2] - bb.min[2]).toFixed(1),
-    ];
-
-    console.log(`\n✓ ForgeCAD Render Complete`);
-    console.log(`  Script: ${basename(scriptPath)}`);
-    console.log(`  Images: ${savedFiles.join(', ')}`);
-    console.log(`  Size:   ${sz[0]} × ${sz[1]} × ${sz[2]} mm`);
-    console.log(`  Volume: ${result.volume.toFixed(1)} mm³`);
-    if (bb.min[0] != null) {
-      console.log(`  Bounds: [${bb.min.map(v => v.toFixed(1))}] → [${bb.max.map(v => v.toFixed(1))}]`);
-    }
-
-    if (result.params.length > 0) {
-      console.log(`  Params:`);
-      for (const p of result.params) {
-        console.log(`    ${p.name} = ${p.value}${p.unit ? ' ' + p.unit : ''} (${p.min}–${p.max})`);
+      if (!result.ok) {
+        console.error('Script error:', result.error);
+        process.exit(1);
       }
+
+      const ext = extname(outputBase) || '.png';
+      const base = outputBase.endsWith(ext) ? outputBase.slice(0, -ext.length) : outputBase;
+      const renderAngles = Object.keys(result.renders);
+
+      const savedFiles = [];
+      for (const [angle, png] of Object.entries(result.renders)) {
+        const filename = renderAngles.length === 1
+          ? outputBase
+          : `${base}_${angle}${ext}`;
+        const b64 = png.replace(/^data:image\/png;base64,/, '');
+        await writeFile(resolve(filename), Buffer.from(b64, 'base64'));
+        savedFiles.push(basename(filename));
+      }
+
+      const bb = result.bbox;
+      const sz = [
+        (bb.max[0] - bb.min[0]).toFixed(1),
+        (bb.max[1] - bb.min[1]).toFixed(1),
+        (bb.max[2] - bb.min[2]).toFixed(1),
+      ];
+
+      console.log(`\n✓ ForgeCAD Render Complete`);
+      console.log(`  Script: ${basename(scriptPath)}`);
+      console.log(`  Images: ${savedFiles.join(', ')}`);
+      console.log(`  Size:   ${sz[0]} × ${sz[1]} × ${sz[2]} mm`);
+      console.log(`  Volume: ${result.volume.toFixed(1)} mm³`);
+      if (bb.min[0] != null) {
+        console.log(`  Bounds: [${bb.min.map(v => v.toFixed(1))}] → [${bb.max.map(v => v.toFixed(1))}]`);
+      }
+
+      if (result.params.length > 0) {
+        console.log(`  Params:`);
+        for (const p of result.params) {
+          console.log(`    ${p.name} = ${p.value}${p.unit ? ' ' + p.unit : ''} (${p.min}–${p.max})`);
+        }
+      }
+    } finally {
+      await browser.close();
     }
   } finally {
-    await browser.close();
+    stopDevServer();
   }
-} finally {
-  stopDevServer();
 }

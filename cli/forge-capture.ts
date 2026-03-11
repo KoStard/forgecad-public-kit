@@ -17,11 +17,11 @@ import { once } from 'events';
 import { existsSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { resolve, dirname, basename, extname } from 'path';
-import { fileURLToPath } from 'url';
 import { createServer } from 'net';
 import { PNG } from 'pngjs';
 import gifenc from 'gifenc';
 import { collectProjectFiles } from './collect-files';
+import { packageRootFrom, spawnPackageVite } from './package-runtime';
 import { parseCameraCliSpec } from '../src/capture/cameraState';
 import {
   mergeViewportRenderSceneStates,
@@ -122,7 +122,7 @@ const DEFAULTS = {
   port: parseIntEnv(['FORGE_PORT'], 5173),
 };
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = packageRootFrom(import.meta.url);
 
 function parseIntEnv(names: string[], fallback: number): number {
   for (const name of names) {
@@ -164,7 +164,7 @@ function usage(config: CaptureCliEntryConfig): string {
   return `ForgeCAD Capture Renderer
 
 Usage:
-  npx tsx ${config.command} <script.forge.js> [output.${config.defaultFormat}] [options]
+  ${config.command} <script.forge.js> [output.${config.defaultFormat}] [options]
 
 Options:
   --format <gif|mp4>           Output format (default: ${config.defaultFormat})
@@ -196,10 +196,10 @@ Options:
   -h, --help                   Show this help
 
 Examples:
-  npm run gif -- examples/cup.forge.js
-  npm run record -- examples/api/runtime-joints-view.forge.js out/step.mp4 --capture animation --animation Step
-  npm run gif -- examples/3d-printer.forge.js out/section.gif --cut-plane "Front Section"
-  npm run record -- examples/cup.forge.js out/camera.mp4 --camera "proj=perspective;pos=200,-160,120;target=0,0,20;up=0,0,1"`;
+  forgecad capture gif examples/cup.forge.js
+  forgecad capture mp4 examples/api/runtime-joints-view.forge.js out/step.mp4 --capture animation --animation Step
+  forgecad capture gif examples/3d-printer.forge.js out/section.gif --cut-plane "Front Section"
+  forgecad capture mp4 examples/cup.forge.js out/camera.mp4 --camera "proj=perspective;pos=200,-160,120;target=0,0,20;up=0,0,1"`;
 }
 
 function parseFormat(value: string): OutputFormat {
@@ -603,7 +603,7 @@ async function loadCaptureRuntime(page: puppeteer.Page, port: number): Promise<b
 async function ensureDevServer(port: number): Promise<ChildProcess | null> {
   if (await fetchRenderHtml(port)) return null;
 
-  const proc = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['vite', '--port', String(port), '--strictPort'], {
+  const proc = spawnPackageVite(import.meta.url, ['--port', String(port), '--strictPort'], {
     cwd: repoRoot,
     stdio: 'pipe',
     detached: false,
@@ -963,11 +963,14 @@ function printSummary(options: CliOptions, init: BrowserCaptureInitResult, encod
   lines.forEach((line) => console.log(line));
 }
 
-export async function runCaptureCli(config: CaptureCliEntryConfig): Promise<void> {
+export async function runCaptureCli(
+  config: CaptureCliEntryConfig,
+  argv: string[] = process.argv.slice(2),
+): Promise<void> {
   let options: CliOptions;
 
   try {
-    options = parseCli(process.argv.slice(2), config);
+    options = parseCli(argv, config);
   } catch (err) {
     console.error(String(err));
     console.error('');
