@@ -15,6 +15,8 @@ The target is:
 
 This is the mission doc and tracker for that transition.
 
+For the short "explain it like a student" version, see `docs/temporary/projects/backend-compiler-explainer.md`.
+
 ## Active Checkpoint
 
 Current goal:
@@ -201,6 +203,9 @@ After the first implementation slice for this mission, the minimum acceptable st
 - the CadQuery/OCCT target now lowers compatible `loft` and `sweep` plans, and the Python exact exporter executes those plans end-to-end.
 - `src/forge/compiledScene.ts` now centralizes scene-level compiler routing so export policy, debug tooling, and future backend capability work consume one compiler-owned route layer instead of re-deriving decisions per caller.
 - sketches placed with `onFace()` now record semantic workplane/query metadata alongside the resolved placement matrix, which is the first explicit slice of the reference/workplane model instead of raw transform-only state.
+- downstream `extrude()` / `revolve()` features from `onFace()` sketches now preserve semantic workplane placement intent in the shape compile graph instead of immediately collapsing that placement back to a generic transform matrix.
+- `src/forge/kernel.ts` now exposes compiler-visible workplane placement inspection for downstream feature work, so later feature families can ask "what workplane/query produced this shape?" without reverse-engineering transforms.
+- both lowerers and the exact STEP exporter now execute that compiler-owned workplane placement step, and the invariant suite covers the end-to-end path.
 - the CadQuery/OCCT lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
 - `forgecad debug compiler` now prints per-object compiler routing and lowered artifacts for investigation.
 - `forgecad check suite` and `npm test` now expose the repo's assertion-based invariant suite as a first-class test entrypoint instead of leaving the checks scattered across ad hoc commands.
@@ -249,6 +254,7 @@ The current unit-style test strategy is:
 
 - The compile graph still does not cover important operation families including deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, `shell`, fillet/chamfer families, and richer projection/feature-pattern workflows. Those shapes still lose compile intent and fall back to mesh-only behavior.
 - The new sketch workplane metadata is a foundation step, not the full answer yet. Parent object identity, downstream query propagation, and compile-graph ownership of workplane/reference semantics are still missing.
+- The compiler now preserves `onFace()` workplane placement through `extrude()` / `revolve()`, which closes the first downstream-propagation gap. The remaining hard part is broader parent-body/query identity once features start depending on face ownership through booleans, shell, fillet/chamfer, projection, and patterned downstream edits.
 - The hull family is now compile-covered for the Manifold runtime, but exact OCCT replay is still missing. That means hull intent is preserved and diagnosable, but STEP/BREP still needs faceted fallback for those shapes.
 - `loft()` exact export is narrower than Forge's sampled loft semantics. Forge can interpolate aggressively across differing profile topology through SDF blending, while CadQuery/OCCT section lofting can still reject some extreme mixed-topology stacks.
 - `sweep()` exact export currently canonicalizes paths to sampled polyline points before lowering. That keeps runtime and exact export aligned, but it is not yet a true analytic spline-path representation for OCCT.

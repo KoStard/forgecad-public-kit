@@ -147,6 +147,19 @@ Initial slice:
 - sketches placed with `onFace()` should carry semantic workplane/query metadata, not just a resolved 4x4 matrix
 - downstream feature code should be able to ask "which workplane/query produced this?" without reverse-engineering transforms
 
+Current progress:
+
+- `onFace()` placements now record semantic workplane models on sketches
+- `extrude()` and `revolve()` now preserve that intent in the shape compile graph as a first-class workplane-placement transform instead of collapsing it to an anonymous rigid transform
+- downstream compiler-aware code can now inspect that preserved workplane placement directly
+- both lowerers now execute that preserved workplane-placement intent, and exact export regression tests exercise the CadQuery/OCCT path end-to-end
+
+Still missing:
+
+- durable parent-body identity across broader feature chains
+- query propagation through boolean/feature ownership changes
+- stable face/edge references beyond today's tracked/canonical face foundations
+
 ### Phase 3: Mainstream Feature Families
 
 Goal:
