@@ -15,6 +15,83 @@ The target is:
 
 This is the mission doc and tracker for that transition.
 
+## Active Checkpoint
+
+Current goal:
+
+- Forge has a true Manifold lowerer
+- Forge has a true CadQuery/OCCT lowerer
+- both lowerers consume the same Forge compile graph
+- together they cover most of the normal part-design feature surface people expect from Fusion 360's Design workspace
+
+In this document, "come back when it is done" means this checkpoint, not just another compiler slice.
+
+## Checkpoint Scope
+
+This checkpoint is about mainstream solid-modeling design work.
+
+In scope:
+
+- sketch primitives and profile construction
+- sketch transforms, booleans, offsets, mirroring, pattern-like repetition
+- extrude, revolve, sweep, loft
+- boolean solid ops
+- transform ops
+- shell
+- fillet and chamfer
+- hole-like and cut-like feature workflows
+- workplane / sketch-on-face / projection-driven feature flows
+- feature- and body-level mirror/pattern workflows
+- stable-enough topology/reference tracking for supported feature chains
+- exact STEP/BREP export through the same compiler-owned CadQuery/OCCT lowering
+
+Explicitly out of scope for this checkpoint:
+
+- CAM
+- simulation
+- rendering
+- generative tools
+- mesh sculpting as a primary modeling mode
+- sheet metal
+- T-spline/subD style surfacing
+- full assembly/mate parity with Fusion 360
+
+This is meant to cover "most regular design features", not literal product parity.
+
+## True Lowerer Definition
+
+A backend counts as a true lowerer only if all of the following are true:
+
+- Forge feature code records backend-neutral compile intent first
+- the backend is reached by lowering that intent, not by side-channel replay logic
+- feature behavior is not open-coded directly against backend APIs at callsites
+- compiler diagnostics can explain unsupported, degraded, or faceted routes
+- the same scene can be compiled intentionally to either backend for the supported subset
+
+By this definition, the current Manifold path is partway there and the current CadQuery/OCCT path is not there yet.
+
+## Checkpoint Exit Criteria
+
+We are done with this checkpoint only when all of the following are true:
+
+1. The Forge compile graph is the source of truth for the mainstream design feature set listed above.
+2. Manifold lowering and CadQuery/OCCT lowering both run from that graph.
+3. STEP/BREP export is just the CadQuery/OCCT compiler route, not a parallel export-only replay system.
+4. The supported subset is broad enough that a typical mechanical part modeled with ordinary Fusion-style Design tools usually stays inside compiler coverage.
+5. The repo has regression tests that compare backend lowerings and catch plan/route/output drift before release.
+6. Backend capability gaps are visible in diagnostics instead of hidden fallback behavior.
+
+## Practical Coverage Target
+
+To avoid vague "most features" language, the practical target is:
+
+- nearly all primitives, sketch construction, booleans, and transforms are dual-lowered
+- the main feature stack (`extrude`, `revolve`, `sweep`, `loft`, `shell`, `fillet`, `chamfer`, holes/cuts, patterns, mirrors, projections, sketch-on-face) is dual-lowered
+- face- and edge-driven downstream features are stable enough to build ordinary multi-step mechanical parts without constant reference breakage
+- compiler checks include curated multi-feature parts that lower successfully to both Manifold and CadQuery/OCCT
+
+If those are not true, the checkpoint is not done.
+
 ## Why This Exists
 
 ForgeCAD already proved the language and workflow are valuable:
@@ -107,7 +184,10 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 6. Route operations intentionally by backend capability | In progress | Exact-vs-faceted export routing now goes through compiler reports; richer multi-backend capability routing is still pending. |
 | 7. Add backend mismatch / conversion diagnostics | In progress | Exact BREP lowering now emits explicit diagnostics and compiler snapshot tooling preserves them. |
 | 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | Pending | After the runtime contract is stable. |
-| 9. Add feature families that benefit from hybrid lowering | Pending | Sheet metal is a strong candidate later. |
+| 9. Make both backends true lowerers from the same compile graph | Pending | This is now the active checkpoint. |
+| 10. Cover mainstream design-feature families across both lowerers | Pending | Target: most ordinary Fusion-style part modeling flows. |
+| 11. Push exact export fully behind the CadQuery/OCCT lowerer | Pending | Export should stop being a separate replay system. |
+| 12. Add advanced hybrid-only feature families | Deferred | Sheet metal stays deferred until the active checkpoint is done. |
 
 ## Current Validation
 
@@ -137,6 +217,8 @@ The current unit-style test strategy is:
 - Compiler snapshots use quantized mesh and polygon digests. That is strong enough to catch real regressions, but a Manifold upgrade or tessellation policy change can legitimately require baseline churn, so snapshot updates still need human review.
 - Topology and placement-reference semantics still live outside the compile graph. The compiler can replay geometry intent, but it does not yet own stable face/edge identity.
 - There is still no true OCCT/CadQuery lowerer driven from the compile graph. Exact export uses the compiler boundary, but not yet a second full geometry backend runtime.
+- "Most Fusion 360 regular design features" is only realistic if Forge owns stable references for face/edge-driven downstream features. Without that, feature coverage can look broad on paper while failing in real part workflows.
+- Manifold and CadQuery/OCCT do not have matching native capability sets. Some features will need a canonical Forge semantic representation that is richer than either backend's first-choice API.
 
 ## Principles
 
