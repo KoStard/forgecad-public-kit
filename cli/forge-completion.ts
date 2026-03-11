@@ -26,6 +26,7 @@ export type CompletionOptionDefinition = {
   name: string;
   description: string;
   argument?: 'none' | 'required' | 'optional';
+  valueLabel?: string;
   repeatable?: boolean;
   values?: CompletionItem[];
   valueKind?: CompletionValueKind;

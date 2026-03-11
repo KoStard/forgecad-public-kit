@@ -91,59 +91,59 @@ const ENCODER_VALUES: CompletionItem[] = [
 
 const STUDIO_OPTIONS: CompletionOptionDefinition[] = [
   { name: '--blank', description: 'Start without a project folder' },
-  { name: '--port', description: 'Bind Vite to a specific port', argument: 'required' },
-  { name: '--host', description: 'Expose the dev server on the network', argument: 'optional', values: HOST_VALUES },
+  { name: '--port', description: 'Bind Vite to a specific port', argument: 'required', valueLabel: '<n>' },
+  { name: '--host', description: 'Expose the dev server on the network', argument: 'optional', valueLabel: '[host]', values: HOST_VALUES },
   { name: '--open', description: 'Open a browser window automatically' },
   { name: '--strict-port', description: 'Fail instead of selecting another port' },
 ];
 
 const NOTEBOOK_SHARED_OPTIONS: CompletionOptionDefinition[] = [
-  { name: '--code', description: 'Append inline cell source', argument: 'required' },
-  { name: '--file', description: 'Read cell source from a file', argument: 'required', valueKind: 'path' },
-  { name: '--after', description: 'Insert after a specific cell id', argument: 'required' },
-  { name: '--server', description: 'Reuse an existing Forge server', argument: 'required', values: SERVER_VALUES },
-  { name: '--port', description: 'Preferred port when auto-starting the server', argument: 'required' },
+  { name: '--code', description: 'Append inline cell source', argument: 'required', valueLabel: '<code>' },
+  { name: '--file', description: 'Read cell source from a file', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
+  { name: '--after', description: 'Insert after a specific cell id', argument: 'required', valueLabel: '<cell-id>' },
+  { name: '--server', description: 'Reuse an existing Forge server', argument: 'required', valueLabel: '<url>', values: SERVER_VALUES },
+  { name: '--port', description: 'Preferred port when auto-starting the server', argument: 'required', valueLabel: '<n>' },
 ];
 
 const NOTEBOOK_RUN_OPTIONS: CompletionOptionDefinition[] = [
-  { name: '--server', description: 'Reuse an existing Forge server', argument: 'required', values: SERVER_VALUES },
-  { name: '--port', description: 'Preferred port when auto-starting the server', argument: 'required' },
+  { name: '--server', description: 'Reuse an existing Forge server', argument: 'required', valueLabel: '<url>', values: SERVER_VALUES },
+  { name: '--port', description: 'Preferred port when auto-starting the server', argument: 'required', valueLabel: '<n>' },
 ];
 
 const RENDER_OPTIONS: CompletionOptionDefinition[] = [
-  { name: '--angles', description: 'Comma-separated standard angles', argument: 'required', values: RENDER_ANGLE_VALUES, valueMode: 'csv' },
-  { name: '--size', description: 'Image size in pixels', argument: 'required' },
-  { name: '--port', description: 'Vite dev server port', argument: 'required' },
-  { name: '--camera', description: 'Exact camera spec', argument: 'required' },
-  { name: '--scene', description: 'Viewport scene state JSON', argument: 'required' },
-  { name: '--background', description: 'Canvas background override', argument: 'required' },
-  { name: '--chrome-path', description: 'Chrome or Chromium executable path', argument: 'required', valueKind: 'path' },
+  { name: '--angles', description: 'Comma-separated standard angles', argument: 'required', valueLabel: '<front,back,side,top,iso>', values: RENDER_ANGLE_VALUES, valueMode: 'csv' },
+  { name: '--size', description: 'Image size in pixels', argument: 'required', valueLabel: '<px>' },
+  { name: '--port', description: 'Vite dev server port', argument: 'required', valueLabel: '<n>' },
+  { name: '--camera', description: 'Exact camera spec', argument: 'required', valueLabel: '<spec>' },
+  { name: '--scene', description: 'Viewport scene state JSON', argument: 'required', valueLabel: '<json>' },
+  { name: '--background', description: 'Canvas background override', argument: 'required', valueLabel: '<color>' },
+  { name: '--chrome-path', description: 'Chrome or Chromium executable path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
 ];
 
 const CAPTURE_COMMON_OPTIONS: CompletionOptionDefinition[] = [
-  { name: '--format', description: 'Output format', argument: 'required', values: OUTPUT_FORMAT_VALUES },
-  { name: '--capture', description: 'Capture preset', argument: 'required', values: CAPTURE_TYPE_VALUES },
-  { name: '--animation', description: 'Named jointsView animation clip', argument: 'required' },
-  { name: '--animation-loops', description: 'Repeat the selected animation clip', argument: 'required' },
-  { name: '--cut-plane', description: 'Enable a named cut plane', argument: 'required', repeatable: true },
-  { name: '--camera', description: 'Exact camera spec', argument: 'required' },
-  { name: '--scene', description: 'Viewport scene state JSON', argument: 'required' },
-  { name: '--render-mode', description: 'Primary render mode', argument: 'required', values: RENDER_MODE_VALUES },
+  { name: '--format', description: 'Output format', argument: 'required', valueLabel: '<gif|mp4>', values: OUTPUT_FORMAT_VALUES },
+  { name: '--capture', description: 'Capture preset', argument: 'required', valueLabel: '<orbit|animation>', values: CAPTURE_TYPE_VALUES },
+  { name: '--animation', description: 'Named jointsView animation clip', argument: 'required', valueLabel: '<name>' },
+  { name: '--animation-loops', description: 'Repeat the selected animation clip', argument: 'required', valueLabel: '<n>' },
+  { name: '--cut-plane', description: 'Enable a named cut plane', argument: 'required', valueLabel: '<name>', repeatable: true },
+  { name: '--camera', description: 'Exact camera spec', argument: 'required', valueLabel: '<spec>' },
+  { name: '--scene', description: 'Viewport scene state JSON', argument: 'required', valueLabel: '<json>' },
+  { name: '--render-mode', description: 'Primary render mode', argument: 'required', valueLabel: '<solid|wireframe>', values: RENDER_MODE_VALUES },
   { name: '--include-wireframe-pass', description: 'Append an extra wireframe pass' },
   { name: '--no-wireframe-pass', description: 'Disable the extra wireframe pass' },
-  { name: '--size', description: 'Output frame size in pixels', argument: 'required' },
-  { name: '--pixel-ratio', description: 'Render supersampling factor', argument: 'required' },
-  { name: '--fps', description: 'Output frame rate', argument: 'required' },
-  { name: '--frames-per-turn', description: 'Frames for one orbit turn', argument: 'required' },
-  { name: '--hold-frames', description: 'Freeze frames before each pass', argument: 'required' },
-  { name: '--pitch', description: 'Orbit pitch override', argument: 'required' },
-  { name: '--background', description: 'Canvas background override', argument: 'required' },
-  { name: '--quality', description: 'Forge quality preset', argument: 'required', values: QUALITY_VALUES },
-  { name: '--encoder', description: 'GIF encoder strategy', argument: 'required', values: ENCODER_VALUES },
-  { name: '--crf', description: 'ffmpeg/libx264 quality', argument: 'required' },
-  { name: '--port', description: 'Vite dev server port', argument: 'required' },
-  { name: '--chrome-path', description: 'Chrome or Chromium executable path', argument: 'required', valueKind: 'path' },
-  { name: '--ffmpeg-path', description: 'ffmpeg executable path', argument: 'required', valueKind: 'path' },
+  { name: '--size', description: 'Output frame size in pixels', argument: 'required', valueLabel: '<px>' },
+  { name: '--pixel-ratio', description: 'Render supersampling factor', argument: 'required', valueLabel: '<n>' },
+  { name: '--fps', description: 'Output frame rate', argument: 'required', valueLabel: '<n>' },
+  { name: '--frames-per-turn', description: 'Frames for one orbit turn', argument: 'required', valueLabel: '<n>' },
+  { name: '--hold-frames', description: 'Freeze frames before each pass', argument: 'required', valueLabel: '<n>' },
+  { name: '--pitch', description: 'Orbit pitch override', argument: 'required', valueLabel: '<deg>' },
+  { name: '--background', description: 'Canvas background override', argument: 'required', valueLabel: '<color>' },
+  { name: '--quality', description: 'Forge quality preset', argument: 'required', valueLabel: '<default|live|high>', values: QUALITY_VALUES },
+  { name: '--encoder', description: 'GIF encoder strategy', argument: 'required', valueLabel: '<auto|ffmpeg|js>', values: ENCODER_VALUES },
+  { name: '--crf', description: 'ffmpeg/libx264 quality', argument: 'required', valueLabel: '<n>' },
+  { name: '--port', description: 'Vite dev server port', argument: 'required', valueLabel: '<n>' },
+  { name: '--chrome-path', description: 'Chrome or Chromium executable path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
+  { name: '--ffmpeg-path', description: 'ffmpeg executable path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
   { name: '--list', description: 'Print available animations and cut planes' },
 ];
 
@@ -414,9 +414,9 @@ const commands: CommandDefinition[] = [
     ],
     completion: {
       options: [
-        { name: '--output', description: 'Output STEP path', argument: 'required', valueKind: 'path' },
-        { name: '--python', description: 'Python interpreter for uv', argument: 'required', valueKind: 'path' },
-        { name: '--uv', description: 'uv executable path', argument: 'required', valueKind: 'path' },
+        { name: '--output', description: 'Output STEP path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
+        { name: '--python', description: 'Python interpreter for uv', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
+        { name: '--uv', description: 'uv executable path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
         { name: '--allow-faceted', description: 'Allow faceted fallback for closed mesh solids' },
       ],
       positionals: [
@@ -438,9 +438,9 @@ const commands: CommandDefinition[] = [
     ],
     completion: {
       options: [
-        { name: '--output', description: 'Output BREP path', argument: 'required', valueKind: 'path' },
-        { name: '--python', description: 'Python interpreter for uv', argument: 'required', valueKind: 'path' },
-        { name: '--uv', description: 'uv executable path', argument: 'required', valueKind: 'path' },
+        { name: '--output', description: 'Output BREP path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
+        { name: '--python', description: 'Python interpreter for uv', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
+        { name: '--uv', description: 'uv executable path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
         { name: '--allow-faceted', description: 'Allow faceted fallback for closed mesh solids' },
       ],
       positionals: [
@@ -460,7 +460,7 @@ const commands: CommandDefinition[] = [
     ],
     completion: {
       options: [
-        { name: '--output', description: 'Output package directory', argument: 'required', valueKind: 'directory' },
+        { name: '--output', description: 'Output package directory', argument: 'required', valueLabel: '<dir>', valueKind: 'directory' },
       ],
       positionals: [
         { description: 'Forge script', valueKind: 'forge-script' },
@@ -479,7 +479,7 @@ const commands: CommandDefinition[] = [
     ],
     completion: {
       options: [
-        { name: '--dim-angle-tol', description: 'Dimension routing tolerance in degrees', argument: 'required' },
+        { name: '--dim-angle-tol', description: 'Dimension routing tolerance in degrees', argument: 'required', valueLabel: '<deg>' },
       ],
       positionals: [
         { description: 'Forge script', valueKind: 'forge-script' },
@@ -499,7 +499,7 @@ const commands: CommandDefinition[] = [
     ],
     completion: {
       options: [
-        { name: '--samples', description: 'Number of samples per parameter', argument: 'required' },
+        { name: '--samples', description: 'Number of samples per parameter', argument: 'required', valueLabel: '<n>' },
       ],
       positionals: [
         { description: 'Forge script', valueKind: 'forge-script' },
@@ -567,7 +567,7 @@ const commands: CommandDefinition[] = [
     completion: {
       options: [
         { name: '--all', description: 'Print the full dimension list' },
-        { name: '--dim-angle-tol', description: 'Dimension routing tolerance in degrees', argument: 'required' },
+        { name: '--dim-angle-tol', description: 'Dimension routing tolerance in degrees', argument: 'required', valueLabel: '<deg>' },
       ],
       positionals: [
         { description: 'Forge script', valueKind: 'forge-script' },
@@ -592,6 +592,23 @@ function commandLabel(command: CommandDefinition): string {
 
 function padRight(value: string, width: number): string {
   return value.length >= width ? value : `${value}${' '.repeat(width - value.length)}`;
+}
+
+function defaultOptionValueLabel(option: CompletionOptionDefinition): string {
+  if (option.valueLabel) return option.valueLabel;
+  if (option.values && option.values.length > 0) {
+    const joined = option.values.map((item) => item.value).join('|');
+    return option.argument === 'optional' ? `[${joined}]` : `<${joined}>`;
+  }
+  if (option.valueKind === 'directory') return option.argument === 'optional' ? '[dir]' : '<dir>';
+  if (option.valueKind === 'path') return option.argument === 'optional' ? '[path]' : '<path>';
+  return option.argument === 'optional' ? '[value]' : '<value>';
+}
+
+function optionSynopsis(option: CompletionOptionDefinition): string {
+  const argumentMode = option.argument ?? 'none';
+  if (argumentMode === 'none') return option.name;
+  return `${option.name} ${defaultOptionValueLabel(option)}`;
 }
 
 function printGlobalHelp(exitCode = 0): never {
@@ -636,6 +653,14 @@ ${command.summary}
 
 Usage:`);
   command.usage.forEach((line) => console.log(`  ${line}`));
+  const options = command.completion?.options ?? [];
+  if (options.length > 0) {
+    const width = Math.max(...options.map((option) => optionSynopsis(option).length));
+    console.log('\nOptions:');
+    options.forEach((option) => {
+      console.log(`  ${padRight(optionSynopsis(option), width + 2)}${option.description}`);
+    });
+  }
   if (command.examples.length > 0) {
     console.log('\nExamples:');
     command.examples.forEach((line) => console.log(`  ${line}`));
