@@ -295,7 +295,7 @@ export function FileExplorer() {
 
   return (
     <div
-      style={{ width: 220, background: 'var(--fc-bgSurface)', borderRight: '1px solid var(--fc-border)', display: 'flex', flexDirection: 'column', fontSize: 13 }}
+      style={{ width: '100%', minWidth: 0, minHeight: 0, flex: 1, background: 'var(--fc-bgSurface)', borderRight: '1px solid var(--fc-border)', display: 'flex', flexDirection: 'column', fontSize: 13 }}
       onDrop={(e) => handleDropToFolder(e, '')}
       onDragOver={(e) => e.preventDefault()}
     >

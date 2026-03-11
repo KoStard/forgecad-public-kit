@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { initKernel } from '@forge/kernel';
 import { useForgeStore } from './store/forgeStore';
 import { CodeEditor } from './components/CodeEditor';
@@ -11,6 +11,7 @@ import { ViewPanel } from './components/ViewPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { FileSwitcher } from './components/FileSwitcher';
 import { ConsolePanel } from './components/ConsolePanel';
+import { ResizablePanel } from './components/ResizablePanel';
 import { isSaveShortcut, shouldBlockBrowserShortcut, type EditorSurface } from './editorShortcuts';
 import { isNotebookFile } from './notebook/model';
 
@@ -24,29 +25,9 @@ const btnStyle = (active = false): React.CSSProperties => ({
   fontSize: 12,
 });
 
+const FILE_EXPLORER_PANEL_WIDTH_KEY = 'fc-layout-file-panel-width-v1';
 const CODE_PANEL_WIDTH_KEY = 'fc-layout-code-panel-width-v1';
 const VIEW_PANEL_WIDTH_KEY = 'fc-layout-view-panel-width-v1';
-
-const readPanelWidth = (key: string, fallback: number, min: number, max: number): number => {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    const parsed = raw ? Number(raw) : NaN;
-    if (!Number.isFinite(parsed)) return fallback;
-    return Math.min(max, Math.max(min, parsed));
-  } catch {
-    return fallback;
-  }
-};
-
-const persistPanelWidth = (key: string, value: number): void => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(key, String(value));
-  } catch {
-    // Ignore storage failures (private mode, quota, etc.)
-  }
-};
 
 function Toolbar() {
   const activeFile = useForgeStore((s) => s.activeFile);
@@ -147,17 +128,12 @@ export function App() {
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
   const refreshFiles = useForgeStore((s) => s.refreshFiles);
   const saveFile = useForgeStore((s) => s.saveFile);
+  const minFileExplorerWidth = 220;
+  const maxFileExplorerWidth = 520;
   const minCodePanelWidth = 320;
   const maxCodePanelWidth = 860;
   const minViewPanelWidth = 220;
   const maxViewPanelWidth = 460;
-  const [codePanelWidth, setCodePanelWidth] = useState(() => (
-    readPanelWidth(CODE_PANEL_WIDTH_KEY, 520, minCodePanelWidth, maxCodePanelWidth)
-  ));
-  const [viewPanelWidth, setViewPanelWidth] = useState(() => (
-    readPanelWidth(VIEW_PANEL_WIDTH_KEY, 280, minViewPanelWidth, maxViewPanelWidth)
-  ));
-  const dragStateRef = useRef<{ type: 'code' | 'view'; startX: number; startWidth: number } | null>(null);
   const notebookMode = isNotebookFile(activeFile);
 
   useEffect(() => {
@@ -208,38 +184,6 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const handleMove = (e: MouseEvent) => {
-      const state = dragStateRef.current;
-      if (!state) return;
-      const delta = e.clientX - state.startX;
-      if (state.type === 'code') {
-        const next = Math.min(maxCodePanelWidth, Math.max(minCodePanelWidth, state.startWidth + delta));
-        setCodePanelWidth(next);
-      } else {
-        const next = Math.min(maxViewPanelWidth, Math.max(minViewPanelWidth, state.startWidth - delta));
-        setViewPanelWidth(next);
-      }
-    };
-    const handleUp = () => {
-      dragStateRef.current = null;
-    };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    };
-  }, []);
-
-  useEffect(() => {
-    persistPanelWidth(CODE_PANEL_WIDTH_KEY, codePanelWidth);
-  }, [codePanelWidth]);
-
-  useEffect(() => {
-    persistPanelWidth(VIEW_PANEL_WIDTH_KEY, viewPanelWidth);
-  }, [viewPanelWidth]);
-
-  useEffect(() => {
     const handleEditorShortcut = (event: KeyboardEvent) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
@@ -282,47 +226,50 @@ export function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }}>
       <Toolbar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {fileExplorerOpen && <FileExplorer />}
-        <div style={{ width: codePanelWidth, minWidth: minCodePanelWidth, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--fc-border)' }}>
+        {fileExplorerOpen && (
+          <ResizablePanel
+            storageKey={FILE_EXPLORER_PANEL_WIDTH_KEY}
+            defaultWidth={280}
+            minWidth={minFileExplorerWidth}
+            maxWidth={maxFileExplorerWidth}
+            edge="right"
+            handleLabel="Resize project files panel"
+          >
+            <FileExplorer />
+          </ResizablePanel>
+        )}
+        <ResizablePanel
+          storageKey={CODE_PANEL_WIDTH_KEY}
+          defaultWidth={520}
+          minWidth={minCodePanelWidth}
+          maxWidth={maxCodePanelWidth}
+          edge="right"
+          handleLabel="Resize code editor panel"
+          panelStyle={{ borderRight: '1px solid var(--fc-border)' }}
+        >
           <div style={{ flex: 1, minHeight: 0 }}>
             {notebookMode ? <NotebookEditor /> : <CodeEditor />}
           </div>
           <ParamPanel />
           <ConsolePanel />
           <ExportPanel />
-        </div>
-        <div
-          onMouseDown={(e) => {
-            dragStateRef.current = { type: 'code', startX: e.clientX, startWidth: codePanelWidth };
-          }}
-          style={{
-            width: 6,
-            cursor: 'col-resize',
-            background: 'var(--fc-bgOverlay)',
-            borderRight: '1px solid var(--fc-border)',
-          }}
-        />
+        </ResizablePanel>
         <div style={{ flex: 1, display: 'flex', minWidth: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <Viewport />
           </div>
           {viewPanelOpen && (
-            <>
-              <div
-                onMouseDown={(e) => {
-                  dragStateRef.current = { type: 'view', startX: e.clientX, startWidth: viewPanelWidth };
-                }}
-                style={{
-                  width: 6,
-                  cursor: 'col-resize',
-                  background: 'var(--fc-bgOverlay)',
-                  borderLeft: '1px solid var(--fc-border)',
-                }}
-              />
-              <div style={{ width: viewPanelWidth, minWidth: minViewPanelWidth, maxWidth: maxViewPanelWidth, overflowY: 'auto' }}>
-                <ViewPanel />
-              </div>
-            </>
+            <ResizablePanel
+              storageKey={VIEW_PANEL_WIDTH_KEY}
+              defaultWidth={280}
+              minWidth={minViewPanelWidth}
+              maxWidth={maxViewPanelWidth}
+              edge="left"
+              handleLabel="Resize view panel"
+              panelStyle={{ overflowY: 'auto' }}
+            >
+              <ViewPanel />
+            </ResizablePanel>
           )}
         </div>
       </div>
