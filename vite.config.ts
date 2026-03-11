@@ -294,20 +294,20 @@ function forgeProjectPlugin() {
 }
 
 function stripBrokenManifoldSourceMaps() {
-  const manifoldLibPattern = /[\\/]node_modules[\\/]manifold-3d[\\/]lib[\\/].+\.js(?:\?.*)?$/;
+  const manifoldLibPattern = /[\\/]node_modules[\\/]manifold-3d[\\/]lib[\\/].+\.js$/;
   const sourceMapTrailerPattern = /\n\/\/# sourceMappingURL=.*?\.map\s*$/gm;
 
   return {
     name: 'strip-broken-manifold-sourcemaps',
     enforce: 'pre' as const,
-    transform(code: string, id: string) {
-      if (!manifoldLibPattern.test(id)) return null;
-      if (!code.includes('sourceMappingURL=')) return null;
-      const sanitized = code.replace(sourceMapTrailerPattern, '');
-      return {
-        code: sanitized,
-        map: null,
-      };
+    // Vite extracts file sourcemaps before transform hooks, so intercept the load itself.
+    load(id: string) {
+      const cleanId = id.replace(/\?.*$/, '');
+      if (!manifoldLibPattern.test(cleanId)) return null;
+      const code = fs.readFileSync(cleanId, 'utf-8');
+      return code.includes('sourceMappingURL=')
+        ? code.replace(sourceMapTrailerPattern, '')
+        : code;
     },
   };
 }
