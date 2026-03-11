@@ -83,6 +83,9 @@ After the first implementation slice for this mission, the minimum acceptable st
 - `src/forge/compilePlan.ts` is now the canonical semantic plan module.
 - `src/forge/brepPlan.ts` is now a compatibility bridge, not the architectural center.
 - `src/forge/compilePlanBrep.ts` is the explicit lowering boundary into exact BREP export plans.
+- `src/forge/compilePlanManifold.ts` is now the executable lowering boundary into the Manifold runtime.
+- compile-covered primitives, sketch profiles, booleans, transforms, extrudes, and revolves now rebuild from Forge compile plans instead of manually restating the same Manifold calls at each callsite.
+- compile plans now carry runtime tessellation hints where Forge needs them, while the exact BREP lowerer explicitly rejects faceted runtime intent instead of silently upgrading it.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker
@@ -93,8 +96,8 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 2. Put a backend adapter behind `Shape` | Done | `Shape` now wraps a runtime backend payload instead of a raw Manifold field. |
 | 3. Replace implicit `.manifold` reach-through with backend-owned specializations | Done | Backend-specific paths moved behind backend modules. |
 | 4. Keep current Manifold runtime behavior stable through the adapter | Done | Build plus focused runtime/API checks passed. |
-| 5. Formalize a backend-neutral Forge compile graph | In progress | Canonical plan naming now lives in `compilePlan.ts`; the graph still needs broader feature coverage. |
-| 6. Route operations intentionally by backend capability | Pending | Especially booleans, shell, fillet, projection, export. |
+| 5. Formalize a backend-neutral Forge compile graph | In progress | The compile plan is now executable for the current exact/runtime subset; broader feature coverage is still needed. |
+| 6. Route operations intentionally by backend capability | In progress | Manifold runtime and exact BREP export now lower from the compile plan for covered features; broader capability routing is still pending. |
 | 7. Add backend mismatch / conversion diagnostics | Pending | No silent magic. |
 | 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | Pending | After the runtime contract is stable. |
 | 9. Add feature families that benefit from hybrid lowering | Pending | Sheet metal is a strong candidate later. |
@@ -130,7 +133,8 @@ This round is intentionally narrow:
 - make `Shape` stop depending on a raw Manifold field
 - introduce a runtime backend adapter
 - keep the adapter Manifold-backed for now
-- make the remaining Manifold-specific sites explicit
+- make the compile plan executable against the Manifold runtime
+- keep exact BREP export as a separate lowering with honest subset boundaries
 
 This is enough to turn the hybrid backend plan from an idea into real runtime structure.
 

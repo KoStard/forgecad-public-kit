@@ -1,13 +1,19 @@
-import { Sketch, copySketchPlacement3D, getSketchCompileProfilePlan, setSketchCompileProfilePlan } from './core';
+import {
+  buildSketchFromCompileProfilePlan,
+  Sketch,
+  copySketchPlacement3D,
+  getSketchCompileProfilePlan,
+  setSketchCompileProfilePlan,
+} from './core';
 import { buildOffsetProfileCompilePlan } from '../compilePlan';
 
 export function sketchOffset(sketch: Sketch, delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
+  const nextPlan = join === 'Round' ? buildOffsetProfileCompilePlan(getSketchCompileProfilePlan(sketch), delta, 'Round') : null;
   return copySketchPlacement3D(
     sketch,
-    setSketchCompileProfilePlan(
-      new Sketch(sketch.cross.offset(delta, join), sketch.colorHex),
-      join === 'Round' ? buildOffsetProfileCompilePlan(getSketchCompileProfilePlan(sketch), delta, 'Round') : null,
-    ),
+    nextPlan
+      ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
+      : setSketchCompileProfilePlan(new Sketch(sketch.cross.offset(delta, join), sketch.colorHex), null),
   );
 }
 

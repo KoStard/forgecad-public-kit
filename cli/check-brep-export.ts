@@ -348,6 +348,38 @@ function checkChessSetFacetedFallbackManifest(): void {
   );
 }
 
+function checkSegmentedRuntimeHintsStayOutOfExactSubset(): void {
+  const files: Record<string, string> = {
+    'main.forge.js': `
+const segmentedDisk = circle2d(12, 18).extrude(4);
+const segmentedPost = cylinder(20, 5, undefined, 12);
+const segmentedLathe = polygon([
+  [6, 0],
+  [10, 4],
+  [8, 12],
+  [0, 12],
+]).revolve(240, 24);
+
+return [
+  { name: 'Segmented Disk', shape: segmentedDisk },
+  { name: 'Segmented Post', shape: segmentedPost },
+  { name: 'Segmented Lathe', shape: segmentedLathe },
+];
+`,
+  };
+  const result = runScript(files['main.forge.js'], 'main.forge.js', files);
+  assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
+
+  const exactManifest = buildBrepExportManifest(result.objects);
+  assert.equal(exactManifest.objects.length, 0, 'Segmented runtime hints should not remain in exact export subset');
+  assert.equal(exactManifest.unsupported.length, 3, 'Expected segmented runtime-hint shapes to be rejected by exact export');
+
+  const facetedManifest = buildBrepExportManifest(result.objects, { allowFaceted: true });
+  assert.equal(facetedManifest.unsupported.length, 0, 'Faceted fallback should cover segmented runtime-hint shapes');
+  assert.equal(facetedManifest.objects.length, 3, 'Expected all segmented shapes to export as faceted objects');
+  assert.equal(facetedManifest.fallbacks.length, 3, 'Expected faceted fallbacks for all segmented runtime-hint shapes');
+}
+
 async function main() {
   await init();
   checkRoundedRectProfileTransforms();
@@ -364,6 +396,7 @@ async function main() {
   checkPointAlongOnPrimitiveBoolean();
   checkMixedSketchAndSolidScenePolicy();
   checkChessSetFacetedFallbackManifest();
+  checkSegmentedRuntimeHintsStayOutOfExactSubset();
   console.log('✓ BREP export invariants passed');
 }
 

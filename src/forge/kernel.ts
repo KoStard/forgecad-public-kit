@@ -37,6 +37,7 @@ import {
   requireManifoldShapeBackend,
   wrapManifoldShapeBackend,
 } from './shapeBackend';
+import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -610,6 +611,17 @@ export function setShapeCompilePlan(shape: Shape, plan: ShapeCompilePlan | null)
   return setShapeCompilePlanInternal(shape, plan);
 }
 
+export function buildShapeFromCompilePlan(
+  plan: ShapeCompilePlan,
+  color?: string,
+  geometryInfo?: Partial<GeometryInfo>,
+): Shape {
+  return setShapeCompilePlan(
+    new Shape(lowerShapeCompilePlanToShapeBackend(plan, getWasm()), color, geometryInfo),
+    plan,
+  );
+}
+
 export const getShapeBrepPlan = getShapeCompilePlan;
 export const setShapeBrepPlan = setShapeCompilePlan;
 
@@ -685,11 +697,14 @@ export class Shape {
   // --- Transforms (all return new Shape, immutable) ---
 
   translate(x: number, y: number, z: number): Shape {
+    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'translate', x, y, z });
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
-      new Shape(getShapeRuntimeBackendInternal(this).translate(x, y, z), this.colorHex),
+      nextPlan
+        ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+        : new Shape(getShapeRuntimeBackendInternal(this).translate(x, y, z), this.colorHex),
       Transform.translation(x, y, z).toArray(),
-    ), appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'translate', x, y, z }));
+    ), nextPlan);
   }
 
   /** Move so bounding box min corner is at the given global coordinate */
@@ -706,54 +721,70 @@ export class Shape {
   }
 
   rotate(x: number, y: number, z: number): Shape {
+    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'rotate', xDeg: x, yDeg: y, zDeg: z });
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
-      new Shape(getShapeRuntimeBackendInternal(this).rotate(x, y, z), this.colorHex),
+      nextPlan
+        ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+        : new Shape(getShapeRuntimeBackendInternal(this).rotate(x, y, z), this.colorHex),
       rotationEulerMatrix(x, y, z),
-    ), appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'rotate', xDeg: x, yDeg: y, zDeg: z }));
+    ), nextPlan);
   }
 
   /** Apply a 4x4 affine transform matrix (column-major) or a Transform object. */
   transform(m: Mat4 | Transform): Shape {
     const mat = m instanceof Transform ? m.toArray() : m;
+    const nextPlan = (() => {
+      const steps = rigidTransformStepsFromMatrix(mat);
+      if (steps == null) return null;
+      if (steps.length === 0) return getShapeCompilePlanInternal(this);
+      return appendShapeCompileTransforms(getShapeCompilePlanInternal(this), steps);
+    })();
     return setShapeCompilePlanInternal(
-      withTransformedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).transform(mat), this.colorHex), mat),
-      (() => {
-        const steps = rigidTransformStepsFromMatrix(mat);
-        if (steps == null) return null;
-        if (steps.length === 0) return getShapeCompilePlanInternal(this);
-        return appendShapeCompileTransforms(getShapeCompilePlanInternal(this), steps);
-      })(),
+      withTransformedDimensions(
+        this,
+        nextPlan
+          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+          : new Shape(getShapeRuntimeBackendInternal(this).transform(mat), this.colorHex),
+        mat,
+      ),
+      nextPlan,
     );
   }
 
   scale(v: number | [number, number, number]): Shape {
     const scale = normalizeShapeScale(v);
-    return setShapeCompilePlanInternal(withTransformedDimensions(
-      this,
-      new Shape(getShapeRuntimeBackendInternal(this).scale(v), this.colorHex),
-      Transform.scale(v).toArray(),
-    ), scale
+    const nextPlan = scale
       ? appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
           kind: 'scale',
           x: scale[0],
           y: scale[1],
           z: scale[2],
         })
-      : null);
+      : null;
+    return setShapeCompilePlanInternal(withTransformedDimensions(
+      this,
+      nextPlan
+        ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+        : new Shape(getShapeRuntimeBackendInternal(this).scale(v), this.colorHex),
+      Transform.scale(v).toArray(),
+    ), nextPlan);
   }
 
   mirror(normal: [number, number, number]): Shape {
-    return setShapeCompilePlanInternal(withTransformedDimensions(
-      this,
-      new Shape(getShapeRuntimeBackendInternal(this).mirror(normal), this.colorHex),
-      mirrorMatrix(normal),
-    ), appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
+    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
       kind: 'mirror',
       normalX: normal[0],
       normalY: normal[1],
       normalZ: normal[2],
-    }));
+    });
+    return setShapeCompilePlanInternal(withTransformedDimensions(
+      this,
+      nextPlan
+        ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+        : new Shape(getShapeRuntimeBackendInternal(this).mirror(normal), this.colorHex),
+      mirrorMatrix(normal),
+    ), nextPlan);
   }
 
   /**
@@ -797,18 +828,25 @@ export class Shape {
       axis[2] / len,
     ];
     const matrix = rotationAroundAxisMatrix(normalizedAxis, angleDeg, pivot);
+    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
+      kind: 'rotateAround',
+      axisX: normalizedAxis[0],
+      axisY: normalizedAxis[1],
+      axisZ: normalizedAxis[2],
+      degrees: angleDeg,
+      pivotX: pivot[0],
+      pivotY: pivot[1],
+      pivotZ: pivot[2],
+    });
     return setShapeCompilePlanInternal(
-      withTransformedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).transform(matrix), this.colorHex), matrix),
-      appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
-        kind: 'rotateAround',
-        axisX: normalizedAxis[0],
-        axisY: normalizedAxis[1],
-        axisZ: normalizedAxis[2],
-        degrees: angleDeg,
-        pivotX: pivot[0],
-        pivotY: pivot[1],
-        pivotZ: pivot[2],
-      }),
+      withTransformedDimensions(
+        this,
+        nextPlan
+          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+          : new Shape(getShapeRuntimeBackendInternal(this).transform(matrix), this.colorHex),
+        matrix,
+      ),
+      nextPlan,
     );
   }
 
@@ -889,10 +927,16 @@ export class Shape {
       1,
       'Use shape.add(other1, other2) or shape.add([other1, other2]).',
     )];
+    const nextPlan = buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(requireManifoldOperands('Shape.add()', shapes)), this.colorHex)),
+      withMergedDimensions(
+        shapes,
+        nextPlan
+          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+          : new Shape(getWasm().Manifold.union(requireManifoldOperands('Shape.add()', shapes)), this.colorHex),
+      ),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
-    ), buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape))));
+    ), nextPlan);
   }
 
   subtract(...others: ShapeOperandInput[]): Shape {
@@ -902,10 +946,16 @@ export class Shape {
       1,
       'Use shape.subtract(other1, other2) or shape.subtract([other1, other2]).',
     )];
+    const nextPlan = buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(getWasm().Manifold.difference(requireManifoldOperands('Shape.subtract()', shapes)), this.colorHex)),
+      withBaseDimensions(
+        this,
+        nextPlan
+          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+          : new Shape(getWasm().Manifold.difference(requireManifoldOperands('Shape.subtract()', shapes)), this.colorHex),
+      ),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
-    ), buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape))));
+    ), nextPlan);
   }
 
   intersect(...others: ShapeOperandInput[]): Shape {
@@ -915,10 +965,16 @@ export class Shape {
       1,
       'Use shape.intersect(other1, other2) or shape.intersect([other1, other2]).',
     )];
+    const nextPlan = buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(requireManifoldOperands('Shape.intersect()', shapes)), this.colorHex)),
+      withMergedDimensions(
+        shapes,
+        nextPlan
+          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+          : new Shape(getWasm().Manifold.intersection(requireManifoldOperands('Shape.intersect()', shapes)), this.colorHex),
+      ),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
-    ), buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape))));
+    ), nextPlan);
   }
 
   // --- Cutting ---
@@ -1116,10 +1172,11 @@ function resolveTargetAnchorLikePoint(
 // --- Primitive constructors ---
 
 export function box(x: number, y: number, z: number, center = false): Shape {
-  return setShapeCompilePlan(new Shape(getWasm().Manifold.cube([x, y, z], center), undefined, {
-    fidelity: 'kernel-native',
-    sources: ['primitive'],
-  }), { kind: 'box', x, y, z, center });
+  return buildShapeFromCompilePlan(
+    { kind: 'box', x, y, z, center },
+    undefined,
+    { fidelity: 'kernel-native', sources: ['primitive'] },
+  );
 }
 
 export function cylinder(
@@ -1129,27 +1186,26 @@ export function cylinder(
   segments?: number,
   center = false,
 ): Shape {
-  return setShapeCompilePlan(new Shape(
-    getWasm().Manifold.cylinder(height, radius, radiusTop ?? -1, segments ?? 0, center),
-    undefined,
-    {
-      fidelity: 'kernel-native',
-      sources: ['primitive'],
-    },
-  ), {
-    kind: 'cylinder',
+  return buildShapeFromCompilePlan({
+    kind: 'cylinder' as const,
     height,
     radius,
     radiusTop: radiusTop != null && radiusTop >= 0 ? radiusTop : undefined,
+    segments: segments != null && segments > 0 ? segments : undefined,
     center,
-  });
+  }, undefined, { fidelity: 'kernel-native', sources: ['primitive'] });
 }
 
 export function sphere(radius: number, segments?: number): Shape {
-  return setShapeCompilePlan(new Shape(getWasm().Manifold.sphere(radius, segments ?? 0), undefined, {
-    fidelity: 'kernel-native',
-    sources: ['primitive'],
-  }), { kind: 'sphere', radius });
+  return buildShapeFromCompilePlan(
+    {
+      kind: 'sphere',
+      radius,
+      segments: segments != null && segments > 0 ? segments : undefined,
+    },
+    undefined,
+    { fidelity: 'kernel-native', sources: ['primitive'] },
+  );
 }
 
 function normalizeShapeOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Shape[] {
@@ -1190,10 +1246,16 @@ export function union(...inputs: ShapeOperandInput[]): Shape {
   );
   if (shapes.length === 0) throw new Error('union requires at least one shape');
   if (shapes.length === 1) return shapes[0];
+  const nextPlan = buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-    withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(requireManifoldOperands('union()', shapes)), shapes[0].colorHex)),
+    withMergedDimensions(
+      shapes,
+      nextPlan
+        ? buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex)
+        : new Shape(getWasm().Manifold.union(requireManifoldOperands('union()', shapes)), shapes[0].colorHex),
+    ),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
-  ), buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape))));
+  ), nextPlan);
 }
 
 export function difference(...inputs: ShapeOperandInput[]): Shape {
@@ -1204,10 +1266,16 @@ export function difference(...inputs: ShapeOperandInput[]): Shape {
     'Use difference(base, cutter1, cutter2) or difference([base, cutter1, cutter2]).',
   );
   if (shapes.length < 2) throw new Error('difference requires at least two shapes');
+  const nextPlan = buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-    withBaseDimensions(shapes[0], new Shape(getWasm().Manifold.difference(requireManifoldOperands('difference()', shapes)), shapes[0].colorHex)),
+    withBaseDimensions(
+      shapes[0],
+      nextPlan
+        ? buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex)
+        : new Shape(getWasm().Manifold.difference(requireManifoldOperands('difference()', shapes)), shapes[0].colorHex),
+    ),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
-  ), buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape))));
+  ), nextPlan);
 }
 
 export function intersection(...inputs: ShapeOperandInput[]): Shape {
@@ -1218,10 +1286,16 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
     'Use intersection(shape1, shape2) or intersection([shape1, shape2]).',
   );
   if (shapes.length < 2) throw new Error('intersection requires at least two shapes');
+  const nextPlan = buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-    withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(requireManifoldOperands('intersection()', shapes)), shapes[0].colorHex)),
+    withMergedDimensions(
+      shapes,
+      nextPlan
+        ? buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex)
+        : new Shape(getWasm().Manifold.intersection(requireManifoldOperands('intersection()', shapes)), shapes[0].colorHex),
+    ),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
-  ), buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape))));
+  ), nextPlan);
 }
 
 /** Convex hull of multiple shapes and/or points. */

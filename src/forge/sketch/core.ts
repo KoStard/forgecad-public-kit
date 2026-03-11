@@ -1,9 +1,10 @@
 import type { CrossSection } from 'manifold-3d';
-import { Shape } from '../kernel';
+import { Shape, getWasm } from '../kernel';
 import type { ProfileCompilePlan } from '../compilePlan';
 import { cloneProfileCompilePlan } from '../compilePlan';
 import type { Mat4 } from '../transform';
 import type { FaceRef } from './topology';
+import { lowerProfileCompilePlanToCrossSection } from '../compilePlanManifold';
 
 type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type SketchPlacement3D = Mat4;
@@ -101,6 +102,13 @@ export function getSketchCompileProfilePlan(sketch: Sketch): ProfileCompilePlan 
 
 export function setSketchCompileProfilePlan(sketch: Sketch, plan: ProfileCompilePlan | null): Sketch {
   return setSketchCompileProfilePlanInternal(sketch, plan);
+}
+
+export function buildSketchFromCompileProfilePlan(plan: ProfileCompilePlan, color?: string): Sketch {
+  return setSketchCompileProfilePlan(
+    new Sketch(lowerProfileCompilePlanToCrossSection(plan, getWasm()), color),
+    plan,
+  );
 }
 
 export const getSketchBrepProfilePlan = getSketchCompileProfilePlan;

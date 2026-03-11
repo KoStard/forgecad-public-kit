@@ -23,6 +23,7 @@ export type ProfileCompilePlan =
   | {
       kind: 'circle';
       radius: number;
+      segments?: number;
       transforms: ProfileCompileTransformStep[];
     }
   | {
@@ -78,11 +79,13 @@ export type ShapeCompilePlan =
       height: number;
       radius: number;
       radiusTop?: number;
+      segments?: number;
       center: boolean;
     }
   | {
       kind: 'sphere';
       radius: number;
+      segments?: number;
     }
   | {
       kind: 'extrude';
@@ -95,6 +98,7 @@ export type ShapeCompilePlan =
       kind: 'revolve';
       profile: ProfileCompilePlan;
       degrees: number;
+      segments?: number;
     }
   | {
       kind: 'boolean';
@@ -183,6 +187,7 @@ export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): Profil
       return {
         kind: 'circle',
         radius: plan.radius,
+        segments: plan.segments,
         transforms: plan.transforms.map(cloneProfileTransform),
       };
     case 'polygon':
@@ -220,10 +225,11 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         height: plan.height,
         radius: plan.radius,
         radiusTop: plan.radiusTop,
+        segments: plan.segments,
         center: plan.center,
       };
     case 'sphere':
-      return { kind: 'sphere', radius: plan.radius };
+      return { kind: 'sphere', radius: plan.radius, segments: plan.segments };
     case 'extrude':
       return {
         kind: 'extrude',
@@ -237,6 +243,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         kind: 'revolve',
         profile: cloneProfileCompilePlan(plan.profile)!,
         degrees: plan.degrees,
+        segments: plan.segments,
       };
     case 'boolean':
       return {

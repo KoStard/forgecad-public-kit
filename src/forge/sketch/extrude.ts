@@ -1,5 +1,5 @@
 import { Sketch, getSketchCompileProfilePlan, getSketchPlacement3D } from './core';
-import { Shape, setShapeCompilePlan } from '../kernel';
+import { Shape, buildShapeFromCompilePlan, setShapeCompilePlan } from '../kernel';
 import { TrackedShape, transformTopology, type Topology, type FaceName, type FaceRef, type EdgeName, type EdgeRef } from './topology';
 
 function buildGenericExtrusionTopology(sketch: Sketch, height: number, center: boolean): Topology {
@@ -46,18 +46,7 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
   const scaleTop = typeof opts?.scaleTop === 'number'
     ? [opts.scaleTop, opts.scaleTop] as [number, number]
     : opts?.scaleTop;
-
-  const m = sketch.cross.extrude(
-    height,
-    opts?.divisions ?? 0,
-    opts?.twist ?? 0,
-    scaleTop as any,
-    opts?.center ?? false,
-  );
-  const shape = setShapeCompilePlan(new Shape(m, sketch.colorHex, {
-    fidelity: 'kernel-native',
-    sources: ['extrude'],
-  }), (
+  const plan = (
     opts?.twist == null || opts.twist === 0
   ) && (
     opts?.divisions == null || opts.divisions === 0
@@ -73,7 +62,22 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
           scaleTop,
         };
       })()
-    : null);
+    : null;
+  const shape = plan
+    ? buildShapeFromCompilePlan(plan, sketch.colorHex, {
+        fidelity: 'kernel-native',
+        sources: ['extrude'],
+      })
+    : setShapeCompilePlan(new Shape(sketch.cross.extrude(
+      height,
+      opts?.divisions ?? 0,
+      opts?.twist ?? 0,
+      scaleTop as any,
+      opts?.center ?? false,
+    ), sketch.colorHex, {
+      fidelity: 'kernel-native',
+      sources: ['extrude'],
+    }), null);
   const topo = buildGenericExtrusionTopology(sketch, height, opts?.center ?? false);
   const placed = new TrackedShape(shape, topo, 0, true);
   const placement = getSketchPlacement3D(sketch);
@@ -82,19 +86,25 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
 }
 
 export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number): Shape {
-  const revolved = setShapeCompilePlan(new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex, {
-    fidelity: 'kernel-native',
-    sources: ['revolve'],
-  }), (() => {
-    if (segments != null && segments > 0) return null;
+  const plan = (() => {
     const profile = getSketchCompileProfilePlan(sketch);
     if (!profile) return null;
     return {
       kind: 'revolve' as const,
       profile,
       degrees,
+      segments: segments != null && segments > 0 ? segments : undefined,
     };
-  })());
+  })();
+  const revolved = plan
+    ? buildShapeFromCompilePlan(plan, sketch.colorHex, {
+        fidelity: 'kernel-native',
+        sources: ['revolve'],
+      })
+    : setShapeCompilePlan(new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex, {
+      fidelity: 'kernel-native',
+      sources: ['revolve'],
+    }), null);
   const placement = getSketchPlacement3D(sketch);
   if (!placement) return revolved;
   return revolved.transform(placement);
