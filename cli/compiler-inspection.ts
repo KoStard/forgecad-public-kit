@@ -3,9 +3,13 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import type { CrossSection } from 'manifold-3d';
 import { buildBrepExportManifest, type BrepExportManifest } from '../src/forge/brepExport';
+import {
+  buildCompiledSceneReport,
+  type CompiledSceneObjectReport,
+} from '../src/forge/compiledScene';
 import { lowerProfileCompilePlanToCadQueryResult } from '../src/forge/compilePlanCadQuery';
 import { lowerProfileCompilePlanToCrossSection, lowerShapeCompilePlanToShapeBackend } from '../src/forge/compilePlanManifold';
-import { buildShapeCompilerReport, type ShapeCompilerReport } from '../src/forge/compilerReport';
+import type { ShapeCompilerReport } from '../src/forge/compilerReport';
 import type { ProfileCompilePlan, ShapeCompilePlan } from '../src/forge/compilePlan';
 import type { CadQueryProfilePlan, CadQueryShapePlan } from '../src/forge/cadqueryPlan';
 import { getWasm, type GeometryInfo, type Shape } from '../src/forge/kernel';
@@ -44,11 +48,25 @@ export interface SketchRuntimeSummary {
   polygonDigest: string;
 }
 
+export interface CompilerRouteInspection {
+  kind: 'exact' | 'faceted' | 'skipped' | 'unsupported';
+  target?: 'cadquery-occt' | 'faceted-mesh';
+  reason?: string;
+  diagnostics?: Array<{
+    target: string;
+    code: string;
+    path: string;
+    message: string;
+  }>;
+}
+
 export interface CompilerShapeInspection {
   kind: 'shape';
   name: string;
   geometryInfo: GeometryInfo;
   compilePlan: ShapeCompilePlan | null;
+  exactRoute: CompilerRouteInspection;
+  facetedRoute: CompilerRouteInspection;
   cadqueryOcct: {
     supported: boolean;
     diagnostics: ShapeCompilerReport['cadqueryOcct']['diagnostics'];
@@ -68,6 +86,8 @@ export interface CompilerSketchInspection {
   kind: 'sketch';
   name: string;
   compilePlan: ProfileCompilePlan | null;
+  exactRoute: CompilerRouteInspection;
+  facetedRoute: CompilerRouteInspection;
   cadqueryOcctProfile: {
     supported: boolean;
     diagnostics: ReturnType<typeof lowerProfileCompilePlanToCadQueryResult>['diagnostics'];
@@ -155,8 +175,55 @@ function summarizeManifest(manifest: BrepExportManifest): CompilerManifestSummar
   };
 }
 
-function inspectShapeObject(object: SceneObject & { shape: NonNullable<SceneObject['shape']> }): CompilerShapeInspection {
-  const report = buildShapeCompilerReport(object.shape);
+function summarizeRoute(route: CompiledSceneObjectReport['routes']['exact']): CompilerRouteInspection {
+  switch (route.kind) {
+    case 'exact':
+      return {
+        kind: 'exact',
+        target: route.target,
+        diagnostics: route.diagnostics.map((diagnostic) => ({
+          target: diagnostic.target,
+          code: diagnostic.code,
+          path: diagnostic.path,
+          message: diagnostic.message,
+        })),
+      };
+    case 'faceted':
+      return {
+        kind: 'faceted',
+        target: route.target,
+        reason: route.reason,
+        diagnostics: route.diagnostics.map((diagnostic) => ({
+          target: diagnostic.target,
+          code: diagnostic.code,
+          path: diagnostic.path,
+          message: diagnostic.message,
+        })),
+      };
+    case 'skipped':
+      return {
+        kind: 'skipped',
+        reason: route.reason,
+      };
+    case 'unsupported':
+      return {
+        kind: 'unsupported',
+        reason: route.reason,
+        diagnostics: route.diagnostics.map((diagnostic) => ({
+          target: diagnostic.target,
+          code: diagnostic.code,
+          path: diagnostic.path,
+          message: diagnostic.message,
+        })),
+      };
+  }
+}
+
+function inspectShapeObject(
+  object: SceneObject & { shape: NonNullable<SceneObject['shape']> },
+  compiled: Extract<CompiledSceneObjectReport, { kind: 'shape' }>,
+): CompilerShapeInspection {
+  const report = compiled.compiler;
   const runtime = summarizeShapeRuntime(object.shape);
   const loweredRuntime = (() => {
     if (!report.compilePlan) return { summary: null, error: null as string | null };
@@ -178,6 +245,8 @@ function inspectShapeObject(object: SceneObject & { shape: NonNullable<SceneObje
     name: object.name,
     geometryInfo: report.geometryInfo,
     compilePlan: report.compilePlan,
+    exactRoute: summarizeRoute(compiled.routes.exact),
+    facetedRoute: summarizeRoute(compiled.routes.faceted),
     cadqueryOcct: {
       supported: report.cadqueryOcct.supported,
       diagnostics: report.cadqueryOcct.diagnostics,
@@ -194,7 +263,10 @@ function inspectShapeObject(object: SceneObject & { shape: NonNullable<SceneObje
   };
 }
 
-function inspectSketchObject(object: SceneObject & { sketch: NonNullable<SceneObject['sketch']> }): CompilerSketchInspection {
+function inspectSketchObject(
+  object: SceneObject & { sketch: NonNullable<SceneObject['sketch']> },
+  compiled: Extract<CompiledSceneObjectReport, { kind: 'sketch' }>,
+): CompilerSketchInspection {
   const compilePlan = getSketchCompileProfilePlan(object.sketch);
   const runtime = summarizeCrossSectionRuntime(object.sketch.cross);
   const cadqueryOcctProfile = lowerProfileCompilePlanToCadQueryResult(compilePlan);
@@ -217,6 +289,8 @@ function inspectSketchObject(object: SceneObject & { sketch: NonNullable<SceneOb
     kind: 'sketch',
     name: object.name,
     compilePlan,
+    exactRoute: summarizeRoute(compiled.routes.exact),
+    facetedRoute: summarizeRoute(compiled.routes.faceted),
     cadqueryOcctProfile: {
       supported: cadqueryOcctProfile.ok,
       diagnostics: cadqueryOcctProfile.diagnostics,
@@ -234,17 +308,25 @@ export function inspectCompilerScene(input: CompilerInspectionInput): CompilerSc
   if (result.error) {
     throw new Error(`${input.displayPath}: ${result.error}`);
   }
+  const compiledSceneReport = buildCompiledSceneReport(result.objects);
+  const compiledById = new Map(compiledSceneReport.objects.map((object) => [object.id, object]));
 
   const objects: CompilerObjectInspection[] = result.objects.flatMap((object) => {
-    if (object.shape) return [inspectShapeObject(object as SceneObject & { shape: NonNullable<SceneObject['shape']> })];
-    if (object.sketch) return [inspectSketchObject(object as SceneObject & { sketch: NonNullable<SceneObject['sketch']> })];
+    const compiled = compiledById.get(object.id);
+    if (!compiled) return [];
+    if (object.shape && compiled.kind === 'shape') {
+      return [inspectShapeObject(object as SceneObject & { shape: NonNullable<SceneObject['shape']> }, compiled)];
+    }
+    if (object.sketch && compiled.kind === 'sketch') {
+      return [inspectSketchObject(object as SceneObject & { sketch: NonNullable<SceneObject['sketch']> }, compiled)];
+    }
     return [];
   });
 
   return {
     objects,
-    exactExport: summarizeManifest(buildBrepExportManifest(result.objects)),
-    facetedExport: summarizeManifest(buildBrepExportManifest(result.objects, { allowFaceted: true })),
+    exactExport: summarizeManifest(buildBrepExportManifest(result.objects, { compiledSceneReport })),
+    facetedExport: summarizeManifest(buildBrepExportManifest(result.objects, { allowFaceted: true, compiledSceneReport })),
   };
 }
 

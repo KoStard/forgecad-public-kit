@@ -115,6 +115,16 @@
               }
             ]
           },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
           "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
@@ -387,6 +397,16 @@
               }
             ]
           },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
           "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
@@ -597,6 +617,16 @@
               }
             ]
           },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
           "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
@@ -730,6 +760,16 @@
                 ]
               }
             ]
+          },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
           },
           "cadqueryOcct": {
             "supported": true,
@@ -881,6 +921,16 @@
             "normalZ": 1,
             "originOffset": 0
           },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
           "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
@@ -971,6 +1021,16 @@
             "normalZ": 1,
             "originOffset": 0
           },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
           "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
@@ -1060,6 +1120,16 @@
             "normalY": 0,
             "normalZ": -1,
             "originOffset": 0
+          },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
           },
           "cadqueryOcct": {
             "supported": true,
@@ -1227,6 +1297,16 @@
             ],
             "edgeLength": 0.35,
             "boundsPadding": 1.68
+          },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
           },
           "cadqueryOcct": {
             "supported": true,
@@ -1418,6 +1498,16 @@
               1
             ]
           },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
           "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
@@ -1573,6 +1663,31 @@
             "height": 4,
             "center": false
           },
+          "exactRoute": {
+            "kind": "unsupported",
+            "reason": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-segmented-circle profiles",
+                "path": "$.profile",
+                "message": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+              }
+            ]
+          },
+          "facetedRoute": {
+            "kind": "faceted",
+            "target": "faceted-mesh",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-segmented-circle profiles",
+                "path": "$.profile",
+                "message": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+              }
+            ]
+          },
           "cadqueryOcct": {
             "supported": false,
             "diagnostics": [
@@ -1648,6 +1763,31 @@
             "radius": 5,
             "segments": 12,
             "center": false
+          },
+          "exactRoute": {
+            "kind": "unsupported",
+            "reason": "CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-segmented-cylinder",
+                "path": "$",
+                "message": "CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+              }
+            ]
+          },
+          "facetedRoute": {
+            "kind": "faceted",
+            "target": "faceted-mesh",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-segmented-cylinder",
+                "path": "$",
+                "message": "CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+              }
+            ]
           },
           "cadqueryOcct": {
             "supported": false,
@@ -1744,6 +1884,31 @@
             },
             "degrees": 240,
             "segments": 24
+          },
+          "exactRoute": {
+            "kind": "unsupported",
+            "reason": "CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-segmented-revolve",
+                "path": "$",
+                "message": "CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+              }
+            ]
+          },
+          "facetedRoute": {
+            "kind": "faceted",
+            "target": "faceted-mesh",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-segmented-revolve",
+                "path": "$",
+                "message": "CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+              }
+            ]
           },
           "cadqueryOcct": {
             "supported": false,
@@ -1917,6 +2082,14 @@
                 "y": -3
               }
             ]
+          },
+          "exactRoute": {
+            "kind": "skipped",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          },
+          "facetedRoute": {
+            "kind": "skipped",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
           },
           "cadqueryOcctProfile": {
             "supported": true,
@@ -2098,6 +2271,31 @@
               ]
             ]
           },
+          "exactRoute": {
+            "kind": "unsupported",
+            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-unsupported-shape-hull",
+                "path": "$",
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+              }
+            ]
+          },
+          "facetedRoute": {
+            "kind": "faceted",
+            "target": "faceted-mesh",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-unsupported-shape-hull",
+                "path": "$",
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+              }
+            ]
+          },
           "cadqueryOcct": {
             "supported": false,
             "diagnostics": [
@@ -2196,6 +2394,31 @@
             ],
             "points": []
           },
+          "exactRoute": {
+            "kind": "unsupported",
+            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-unsupported-shape-hull",
+                "path": "$",
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+              }
+            ]
+          },
+          "facetedRoute": {
+            "kind": "faceted",
+            "target": "faceted-mesh",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "cadquery-occt-unsupported-shape-hull",
+                "path": "$",
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+              }
+            ]
+          },
           "cadqueryOcct": {
             "supported": false,
             "diagnostics": [
@@ -2290,6 +2513,14 @@
               }
             ]
           },
+          "exactRoute": {
+            "kind": "skipped",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          },
+          "facetedRoute": {
+            "kind": "skipped",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          },
           "cadqueryOcctProfile": {
             "supported": false,
             "diagnostics": [
@@ -2367,6 +2598,14 @@
               }
             ],
             "transforms": []
+          },
+          "exactRoute": {
+            "kind": "skipped",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          },
+          "facetedRoute": {
+            "kind": "skipped",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
           },
           "cadqueryOcctProfile": {
             "supported": false,
@@ -2502,6 +2741,16 @@
             "height": 8,
             "center": false
           },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
           "cadqueryOcct": {
             "supported": true,
             "diagnostics": [],
@@ -2615,6 +2864,14 @@
               }
             ]
           },
+          "exactRoute": {
+            "kind": "skipped",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          },
+          "facetedRoute": {
+            "kind": "skipped",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          },
           "cadqueryOcctProfile": {
             "supported": true,
             "diagnostics": [],
@@ -2715,6 +2972,31 @@
             ]
           },
           "compilePlan": null,
+          "exactRoute": {
+            "kind": "unsupported",
+            "reason": "Forge compile intent is missing, so CadQuery/OCCT lowering cannot replay this shape.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "missing-compile-plan",
+                "path": "$",
+                "message": "Forge compile intent is missing, so CadQuery/OCCT lowering cannot replay this shape."
+              }
+            ]
+          },
+          "facetedRoute": {
+            "kind": "faceted",
+            "target": "faceted-mesh",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Forge compile intent is missing, so CadQuery/OCCT lowering cannot replay this shape.",
+            "diagnostics": [
+              {
+                "target": "cadquery-occt",
+                "code": "missing-compile-plan",
+                "path": "$",
+                "message": "Forge compile intent is missing, so CadQuery/OCCT lowering cannot replay this shape."
+              }
+            ]
+          },
           "cadqueryOcct": {
             "supported": false,
             "diagnostics": [
@@ -2925,6 +3207,16 @@
                 ]
               }
             ]
+          },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
           },
           "cadqueryOcct": {
             "supported": true,

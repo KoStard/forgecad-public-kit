@@ -325,38 +325,76 @@ function assertCompilerRoutingIntegrity(snapshots: CompilerCaseSnapshot[]): void
         const exactExportObject = exactObjects.get(object.name);
         const facetedExportObject = facetedObjects.get(object.name);
 
-        if (object.cadqueryOcct.supported) {
+        if (object.exactRoute.kind === 'exact') {
+          if (!object.cadqueryOcct.supported) {
+            issues.push(`${snapshot.id}/${object.name}: exact route is exact but CadQuery/OCCT target is unsupported`);
+          }
           if (!exactExportObject || exactExportObject.kind !== 'exact') {
             issues.push(`${snapshot.id}/${object.name}: exact-exportable shape missing from exact export manifest`);
           }
-          if (!facetedExportObject || facetedExportObject.kind !== 'exact') {
-            issues.push(`${snapshot.id}/${object.name}: exact-exportable shape missing from allow-faceted export manifest as exact`);
+          if (exactUnsupported.has(object.name)) {
+            issues.push(`${snapshot.id}/${object.name}: exact-route shape still reported as unsupported in exact manifest`);
           }
-          if (exactUnsupported.has(object.name) || facetedFallbacks.has(object.name) || facetedUnsupported.has(object.name)) {
-            issues.push(`${snapshot.id}/${object.name}: exact-exportable shape still reported as unsupported or fallback`);
+        } else if (object.exactRoute.kind === 'unsupported') {
+          if (object.cadqueryOcct.supported) {
+            issues.push(`${snapshot.id}/${object.name}: exact route is unsupported but CadQuery/OCCT target is marked supported`);
           }
-          continue;
+          if (!exactUnsupported.has(object.name)) {
+            issues.push(`${snapshot.id}/${object.name}: exact-unsupported shape missing from exact export blockers`);
+          }
+        } else {
+          issues.push(`${snapshot.id}/${object.name}: unexpected exact route kind for shape (${object.exactRoute.kind})`);
         }
 
-        if (!exactUnsupported.has(object.name)) {
-          issues.push(`${snapshot.id}/${object.name}: exact-unsupported shape missing from exact export blockers`);
-        }
-        if (object.facetedMesh.supported) {
-          if (!facetedExportObject) {
-            issues.push(`${snapshot.id}/${object.name}: faceted-exportable shape missing from allow-faceted manifest`);
-          }
-          if (!facetedFallbacks.has(object.name) && facetedExportObject?.kind === 'faceted') {
-            issues.push(`${snapshot.id}/${object.name}: faceted export object missing fallback record`);
-          }
-          if (facetedUnsupported.has(object.name)) {
-            issues.push(`${snapshot.id}/${object.name}: faceted-exportable shape still marked unsupported with allow-faceted`);
-          }
-        } else if (facetedExportObject || facetedFallbacks.has(object.name)) {
-          issues.push(`${snapshot.id}/${object.name}: faceted-ineligible shape leaked into allow-faceted export manifest`);
+        switch (object.facetedRoute.kind) {
+          case 'exact':
+            if (!facetedExportObject || facetedExportObject.kind !== 'exact') {
+              issues.push(`${snapshot.id}/${object.name}: exact-route shape missing from allow-faceted export manifest as exact`);
+            }
+            if (facetedFallbacks.has(object.name) || facetedUnsupported.has(object.name)) {
+              issues.push(`${snapshot.id}/${object.name}: exact-route shape still reported as fallback or unsupported with allow-faceted`);
+            }
+            break;
+          case 'faceted':
+            if (object.cadqueryOcct.supported) {
+              issues.push(`${snapshot.id}/${object.name}: faceted route selected even though CadQuery/OCCT target is supported`);
+            }
+            if (!object.facetedMesh.supported) {
+              issues.push(`${snapshot.id}/${object.name}: faceted route selected but faceted mesh target is unsupported`);
+            }
+            if (!facetedExportObject || facetedExportObject.kind !== 'faceted') {
+              issues.push(`${snapshot.id}/${object.name}: faceted-route shape missing from allow-faceted manifest`);
+            }
+            if (!facetedFallbacks.has(object.name)) {
+              issues.push(`${snapshot.id}/${object.name}: faceted-route shape missing fallback record`);
+            }
+            if (facetedUnsupported.has(object.name)) {
+              issues.push(`${snapshot.id}/${object.name}: faceted-route shape still marked unsupported with allow-faceted`);
+            }
+            break;
+          case 'unsupported':
+            if (object.facetedMesh.supported && !object.cadqueryOcct.supported) {
+              issues.push(`${snapshot.id}/${object.name}: allow-faceted route stayed unsupported despite faceted mesh support`);
+            }
+            if (!facetedUnsupported.has(object.name)) {
+              issues.push(`${snapshot.id}/${object.name}: allow-faceted unsupported shape missing from manifest blockers`);
+            }
+            if (facetedExportObject || facetedFallbacks.has(object.name)) {
+              issues.push(`${snapshot.id}/${object.name}: allow-faceted unsupported shape leaked into manifest objects/fallbacks`);
+            }
+            break;
+          default:
+            issues.push(`${snapshot.id}/${object.name}: unexpected allow-faceted route kind for shape (${object.facetedRoute.kind})`);
         }
         continue;
       }
 
+      if (object.exactRoute.kind !== 'skipped') {
+        issues.push(`${snapshot.id}/${object.name}: sketch exact route should be skipped, got ${object.exactRoute.kind}`);
+      }
+      if (object.facetedRoute.kind !== 'skipped') {
+        issues.push(`${snapshot.id}/${object.name}: sketch allow-faceted route should be skipped, got ${object.facetedRoute.kind}`);
+      }
       if (!skippedObjects.has(object.name)) {
         issues.push(`${snapshot.id}/${object.name}: sketch missing from export skip list`);
       }

@@ -1,7 +1,7 @@
 import type { GeometryInfo, Shape } from './kernel';
+import { buildCompiledSceneReport, type CompiledSceneReport } from './compiledScene';
 import type { SceneObject } from './runner';
 import type { CadQueryShapePlan } from './cadqueryPlan';
-import { buildShapeCompilerReport, summarizeCompilerDiagnostics } from './compilerReport';
 
 export interface BrepMesh {
   vertices: [number, number, number][];
@@ -51,6 +51,7 @@ export interface BrepExportManifest {
 
 export interface BuildBrepExportOptions {
   allowFaceted?: boolean;
+  compiledSceneReport?: CompiledSceneReport;
 }
 
 function serializeShapeMesh(shape: Shape): BrepMesh {
@@ -83,6 +84,7 @@ export function buildBrepExportManifest(
   objects: SceneObject[],
   options: BuildBrepExportOptions = {},
 ): BrepExportManifest {
+  const compiledSceneReport = options.compiledSceneReport ?? buildCompiledSceneReport(objects);
   const manifest: BrepExportManifest = {
     objects: [],
     unsupported: [],
@@ -90,27 +92,36 @@ export function buildBrepExportManifest(
     fallbacks: [],
   };
 
-  for (const object of objects) {
-    if (object.sketch) {
-      manifest.skipped.push({
-        name: object.name,
-        reason: 'Sketch objects are skipped for STEP/BREP export.',
-      });
-      continue;
-    }
-    if (!object.shape) {
-      manifest.unsupported.push({
-        name: object.name,
-        reason: 'Object has no shape payload.',
-        geometryInfo: object.geometryInfo ?? null,
-      });
-      continue;
-    }
+  for (const object of compiledSceneReport.objects) {
+    const route = options.allowFaceted ? object.routes.faceted : object.routes.exact;
 
-    const report = buildShapeCompilerReport(object.shape);
-    const geometryInfo = object.geometryInfo ?? report.geometryInfo;
-    if (!report.cadqueryOcct.supported) {
-      if (options.allowFaceted && report.facetedMesh.supported) {
+    switch (route.kind) {
+      case 'skipped':
+        manifest.skipped.push({
+          name: object.name,
+          reason: route.reason,
+        });
+        break;
+      case 'unsupported':
+        manifest.unsupported.push({
+          name: object.name,
+          reason: route.reason,
+          geometryInfo: route.geometryInfo ?? ('geometryInfo' in object ? object.geometryInfo ?? null : null),
+        });
+        break;
+      case 'exact':
+        manifest.objects.push({
+          kind: 'exact',
+          target: 'cadquery-occt',
+          name: object.name,
+          color: object.color,
+          plan: route.plan as CadQueryShapePlan,
+        });
+        break;
+      case 'faceted':
+        if (object.kind !== 'shape') {
+          throw new Error(`Faceted route requires a shape payload (${object.name})`);
+        }
         manifest.objects.push({
           kind: 'faceted',
           name: object.name,
@@ -119,32 +130,11 @@ export function buildBrepExportManifest(
         });
         manifest.fallbacks.push({
           name: object.name,
-          reason: `Using faceted mesh fallback because exact BREP lowering failed: ${summarizeCompilerDiagnostics(
-            report.cadqueryOcct.diagnostics,
-            'geometry is outside exact BREP coverage.',
-          )}`,
-          geometryInfo,
+          reason: route.reason,
+          geometryInfo: route.geometryInfo,
         });
-      } else {
-        manifest.unsupported.push({
-          name: object.name,
-          reason: summarizeCompilerDiagnostics(
-            report.cadqueryOcct.diagnostics,
-            'No exact BREP export plan is available for this geometry.',
-          ),
-          geometryInfo,
-        });
-      }
-      continue;
+        break;
     }
-
-    manifest.objects.push({
-      kind: 'exact',
-      target: 'cadquery-occt',
-      name: object.name,
-      color: object.color,
-      plan: report.cadqueryOcct.output as CadQueryShapePlan,
-    });
   }
 
   return manifest;
