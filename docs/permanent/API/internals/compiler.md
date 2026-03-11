@@ -142,6 +142,11 @@ Deliverables:
 
 This is the highest-leverage next layer. Without it, `shell`, fillet/chamfer, holes, projection, and sheet-metal-style features will all stay fragile.
 
+Initial slice:
+
+- sketches placed with `onFace()` should carry semantic workplane/query metadata, not just a resolved 4x4 matrix
+- downstream feature code should be able to ask "which workplane/query produced this?" without reverse-engineering transforms
+
 ### Phase 3: Mainstream Feature Families
 
 Goal:
