@@ -159,6 +159,16 @@ function lowerShapeHullCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'hull
   return wasm.Manifold.hull(items);
 }
 
+function lowerShapeTrimByPlaneCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'trimByPlane' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  return lowerShapeCompilePlanToManifold(plan.base, wasm).trimByPlane(
+    [plan.normalX, plan.normalY, plan.normalZ],
+    plan.originOffset,
+  );
+}
+
 export function lowerShapeCompilePlanToManifold(
   plan: ShapeCompilePlan,
   wasm: ManifoldToplevel,
@@ -186,6 +196,8 @@ export function lowerShapeCompilePlanToManifold(
       return applyShapeCompileTransforms(lowerShapeCompilePlanToManifold(plan.base, wasm), plan.steps);
     case 'hull':
       return lowerShapeHullCompilePlan(plan, wasm);
+    case 'trimByPlane':
+      return lowerShapeTrimByPlaneCompilePlan(plan, wasm);
   }
 }
 

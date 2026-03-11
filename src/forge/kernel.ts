@@ -29,6 +29,7 @@ import {
   appendShapeCompileTransforms,
   buildBooleanShapeCompilePlan,
   buildHullShapeCompilePlan,
+  buildTrimByPlaneShapeCompilePlan,
   cloneShapeCompilePlan,
 } from './compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from './apiArgs';
@@ -1018,22 +1019,42 @@ export class Shape {
     ];
   }
 
-  /** Split by infinite plane. Returns [below/inside, above/outside]. */
+  /** Split by infinite plane. Returns [positive-side, negative-side]. */
   splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
-    const [a, b] = getShapeRuntimeBackendInternal(this).splitByPlane(normal, originOffset);
     const info = deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' });
+    const firstPlan = buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), normal, originOffset);
+    const secondPlan = buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), [-normal[0], -normal[1], -normal[2]], -originOffset);
+    if (firstPlan && secondPlan) {
+      return [
+        setShapeCompilePlanInternal(
+          setShapeGeometryInfoInternal(withBaseDimensions(this, buildShapeFromCompilePlan(firstPlan, this.colorHex)), info),
+          firstPlan,
+        ),
+        setShapeCompilePlanInternal(
+          setShapeGeometryInfoInternal(withBaseDimensions(this, buildShapeFromCompilePlan(secondPlan, this.colorHex)), info),
+          secondPlan,
+        ),
+      ];
+    }
+    const [a, b] = getShapeRuntimeBackendInternal(this).splitByPlane(normal, originOffset);
     return [
       setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(a, this.colorHex)), info), null),
       setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(b, this.colorHex)), info), null),
     ];
   }
 
-  /** Cut away everything on the positive side of the plane. */
+  /** Keep the positive side of the plane and discard the opposite side. */
   trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
+    const nextPlan = buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), normal, originOffset);
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).trimByPlane(normal, originOffset), this.colorHex)),
+      withBaseDimensions(
+        this,
+        nextPlan
+          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+          : new Shape(getShapeRuntimeBackendInternal(this).trimByPlane(normal, originOffset), this.colorHex),
+      ),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' }),
-    ), null);
+    ), nextPlan);
   }
 
   // --- Hull ---

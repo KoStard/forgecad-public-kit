@@ -850,6 +850,322 @@
     }
   },
   {
+    "id": "plane-trim-exact",
+    "description": "Plane trims and split branches stay compiler-owned across both lowerers.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Trimmed",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "boolean",
+              "primitive"
+            ]
+          },
+          "compilePlan": {
+            "kind": "trimByPlane",
+            "base": {
+              "kind": "box",
+              "x": 40,
+              "y": 30,
+              "z": 20,
+              "center": true
+            },
+            "normalX": 0,
+            "normalY": 0,
+            "normalZ": 1,
+            "originOffset": 0
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "trimByPlane",
+              "base": {
+                "kind": "box",
+                "x": 40,
+                "y": 30,
+                "z": 20,
+                "center": true
+              },
+              "normalX": 0,
+              "normalY": 0,
+              "normalZ": 1,
+              "originOffset": 0
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -20,
+                -15,
+                0
+              ],
+              "max": [
+                20,
+                15,
+                10
+              ]
+            },
+            "volume": 12000,
+            "surfaceArea": 3800,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "691b1d00baa325cce9930ba6d4f80991c99e70dfdbfc6684cc1632ea89636456"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -20,
+                -15,
+                0
+              ],
+              "max": [
+                20,
+                15,
+                10
+              ]
+            },
+            "volume": 12000,
+            "surfaceArea": 3800,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "691b1d00baa325cce9930ba6d4f80991c99e70dfdbfc6684cc1632ea89636456"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        },
+        {
+          "kind": "shape",
+          "name": "Upper",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "boolean",
+              "primitive"
+            ]
+          },
+          "compilePlan": {
+            "kind": "trimByPlane",
+            "base": {
+              "kind": "box",
+              "x": 40,
+              "y": 30,
+              "z": 20,
+              "center": true
+            },
+            "normalX": 0,
+            "normalY": 0,
+            "normalZ": 1,
+            "originOffset": 0
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "trimByPlane",
+              "base": {
+                "kind": "box",
+                "x": 40,
+                "y": 30,
+                "z": 20,
+                "center": true
+              },
+              "normalX": 0,
+              "normalY": 0,
+              "normalZ": 1,
+              "originOffset": 0
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -20,
+                -15,
+                0
+              ],
+              "max": [
+                20,
+                15,
+                10
+              ]
+            },
+            "volume": 12000,
+            "surfaceArea": 3800,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "691b1d00baa325cce9930ba6d4f80991c99e70dfdbfc6684cc1632ea89636456"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -20,
+                -15,
+                0
+              ],
+              "max": [
+                20,
+                15,
+                10
+              ]
+            },
+            "volume": 12000,
+            "surfaceArea": 3800,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "691b1d00baa325cce9930ba6d4f80991c99e70dfdbfc6684cc1632ea89636456"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        },
+        {
+          "kind": "shape",
+          "name": "Lower",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "boolean",
+              "primitive"
+            ]
+          },
+          "compilePlan": {
+            "kind": "trimByPlane",
+            "base": {
+              "kind": "box",
+              "x": 40,
+              "y": 30,
+              "z": 20,
+              "center": true
+            },
+            "normalX": 0,
+            "normalY": 0,
+            "normalZ": -1,
+            "originOffset": 0
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "trimByPlane",
+              "base": {
+                "kind": "box",
+                "x": 40,
+                "y": 30,
+                "z": 20,
+                "center": true
+              },
+              "normalX": 0,
+              "normalY": 0,
+              "normalZ": -1,
+              "originOffset": 0
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -20,
+                -15,
+                -10
+              ],
+              "max": [
+                20,
+                15,
+                0
+              ]
+            },
+            "volume": 12000,
+            "surfaceArea": 3800,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "0a15f152f6308546d8f2ecd0ac546df04e1b742b3f610cd1e865717a7d10a660"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -20,
+                -15,
+                -10
+              ],
+              "max": [
+                20,
+                15,
+                0
+              ]
+            },
+            "volume": 12000,
+            "surfaceArea": 3800,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "0a15f152f6308546d8f2ecd0ac546df04e1b742b3f610cd1e865717a7d10a660"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Trimmed",
+            "kind": "exact"
+          },
+          {
+            "name": "Upper",
+            "kind": "exact"
+          },
+          {
+            "name": "Lower",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Trimmed",
+            "kind": "exact"
+          },
+          {
+            "name": "Upper",
+            "kind": "exact"
+          },
+          {
+            "name": "Lower",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  },
+  {
     "id": "segmented-runtime-hints",
     "description": "Segmented runtime intent stays runnable but outside the exact BREP subset.",
     "scene": {

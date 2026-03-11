@@ -198,6 +198,18 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
         steps: [...plan.steps],
       }, base.diagnostics);
     }
+    case 'trimByPlane': {
+      const base = lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
+      if (!base.ok) return compilerFailure(...base.diagnostics);
+      return compilerSuccess({
+        kind: 'trimByPlane',
+        base: base.value,
+        normalX: plan.normalX,
+        normalY: plan.normalY,
+        normalZ: plan.normalZ,
+        originOffset: plan.originOffset,
+      }, base.diagnostics);
+    }
     case 'hull':
       return compilerFailure(unsupportedNodeDiagnostic('shape-hull', path));
   }

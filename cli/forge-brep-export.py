@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 try:
     import cadquery as cq
     from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeHalfSpace
 except Exception as exc:
     raise SystemExit(
         "CadQuery is required for BREP export. Install it in the selected Python environment. "
@@ -131,6 +132,33 @@ def build_shape_scale_matrix(sx: float, sy: float, sz: float) -> "cq.Matrix":
         [0.0, sy, 0.0, 0.0],
         [0.0, 0.0, sz, 0.0],
     ])
+
+
+def normalize_plane(normal: tuple[float, float, float], origin_offset: float) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    nx, ny, nz = normal
+    length_sq = nx * nx + ny * ny + nz * nz
+    if length_sq < 1e-12:
+        raise ValueError("Plane normal must be non-zero")
+    length = math.sqrt(length_sq)
+    unit = (nx / length, ny / length, nz / length)
+    scale = origin_offset / length_sq
+    point = (nx * scale, ny * scale, nz * scale)
+    return unit, point
+
+
+def build_half_space(normal: tuple[float, float, float], origin_offset: float) -> "cq.Shape":
+    unit, point = normalize_plane(normal, origin_offset)
+    face = cq.Face.makePlane(basePnt=point, dir=unit)
+    ref_point = cq.Vector(
+        point[0] + unit[0],
+        point[1] + unit[1],
+        point[2] + unit[2],
+    ).toPnt()
+    return cq.Shape.cast(BRepPrimAPI_MakeHalfSpace(face.wrapped, ref_point).Solid())
+
+
+def trim_shape_by_plane(shape: "cq.Shape", normal: tuple[float, float, float], origin_offset: float) -> "cq.Shape":
+    return shape.intersect(build_half_space(normal, origin_offset)).clean()
 
 
 def build_polygon_sketch(points: List[List[float]]) -> "cq.Sketch":
@@ -314,6 +342,12 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
                 continue
             raise ValueError(f"Unsupported transform step: {step['kind']}")
         return result
+    if kind == "trimByPlane":
+        return trim_shape_by_plane(
+            build_shape(plan["base"]),
+            (float(plan["normalX"]), float(plan["normalY"]), float(plan["normalZ"])),
+            float(plan["originOffset"]),
+        )
     raise ValueError(f"Unsupported plan kind: {kind}")
 
 

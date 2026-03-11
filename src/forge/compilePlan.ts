@@ -119,6 +119,14 @@ export type ShapeCompilePlan =
       kind: 'hull';
       shapes: ShapeCompilePlan[];
       points: [number, number, number][];
+    }
+  | {
+      kind: 'trimByPlane';
+      base: ShapeCompilePlan;
+      normalX: number;
+      normalY: number;
+      normalZ: number;
+      originOffset: number;
     };
 
 function cloneProfileTransform(step: ProfileCompileTransformStep): ProfileCompileTransformStep {
@@ -132,6 +140,10 @@ function cloneProfileTransform(step: ProfileCompileTransformStep): ProfileCompil
     case 'mirror':
       return { kind: 'mirror', normalX: step.normalX, normalY: step.normalY };
   }
+}
+
+function canonicalNumber(value: number): number {
+  return Object.is(value, -0) ? 0 : value;
 }
 
 function cloneShapeTransform(step: ShapeCompileTransformStep): ShapeCompileTransformStep {
@@ -279,6 +291,15 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         shapes: plan.shapes.map((shape) => cloneShapeCompilePlan(shape)!),
         points: plan.points.map(([x, y, z]) => [x, y, z]),
       };
+    case 'trimByPlane':
+      return {
+        kind: 'trimByPlane',
+        base: cloneShapeCompilePlan(plan.base)!,
+        normalX: plan.normalX,
+        normalY: plan.normalY,
+        normalZ: plan.normalZ,
+        originOffset: plan.originOffset,
+      };
   }
 }
 
@@ -382,5 +403,21 @@ export function buildHullShapeCompilePlan(
     kind: 'hull',
     shapes: shapes.map((shape) => cloneShapeCompilePlan(shape)!),
     points: points.map(([x, y, z]) => [x, y, z]),
+  };
+}
+
+export function buildTrimByPlaneShapeCompilePlan(
+  base: ShapeCompilePlan | null,
+  normal: [number, number, number],
+  originOffset: number,
+): ShapeCompilePlan | null {
+  if (!base) return null;
+  return {
+    kind: 'trimByPlane',
+    base: cloneShapeCompilePlan(base)!,
+    normalX: canonicalNumber(normal[0]),
+    normalY: canonicalNumber(normal[1]),
+    normalZ: canonicalNumber(normal[2]),
+    originOffset: canonicalNumber(originOffset),
   };
 }

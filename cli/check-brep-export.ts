@@ -350,6 +350,29 @@ return [
   assert(manifest.objects.every((item) => item.kind !== 'exact' || item.target === 'cadquery-occt'), 'Expected split branches to use the CadQuery/OCCT lowerer');
 }
 
+function checkPlaneTrimAndSplitStayExactExportable(): void {
+  const files: Record<string, string> = {
+    'main.forge.js': `
+const body = box(40, 30, 20, true).toShape();
+const trimmed = body.trimByPlane([0, 0, 1], 0);
+const [upper, lower] = body.splitByPlane([0, 0, 1], 0);
+return [
+  { name: 'Trimmed', shape: trimmed },
+  { name: 'Upper', shape: upper },
+  { name: 'Lower', shape: lower },
+];
+`,
+  };
+  const result = runScript(files['main.forge.js'], 'main.forge.js', files);
+  assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
+
+  const manifest = buildBrepExportManifest(result.objects);
+  assert.equal(manifest.unsupported.length, 0, 'Plane trims and plane splits should stay exact-exportable');
+  assert.equal(manifest.objects.length, 3, `Expected trim plus split branches to export, got ${manifest.objects.length}`);
+  assert(manifest.objects.every((item) => item.kind === 'exact'), 'Expected plane trim and split branches to stay on the exact export route');
+  assert(manifest.objects.every((item) => item.kind !== 'exact' || item.target === 'cadquery-occt'), 'Expected plane trim and split branches to use the CadQuery/OCCT lowerer');
+}
+
 function checkChessSetFacetedFallbackManifest(): void {
   const scriptPath = resolve('examples/chess-set.forge.js');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
@@ -458,6 +481,7 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkPointAlongOnPrimitiveBoolean();
   checkMixedSketchAndSolidScenePolicy();
   checkSplitBranchesStayExactExportable();
+  checkPlaneTrimAndSplitStayExactExportable();
   checkChessSetFacetedFallbackManifest();
   checkSegmentedRuntimeHintsStayOutOfExactSubset();
   checkHullRuntimeIntentStaysOutOfExactSubset();

@@ -93,6 +93,20 @@ return [
 `,
   ),
   inlineCase(
+    'plane-trim-exact',
+    'Plane trims and split branches stay compiler-owned across both lowerers.',
+    `
+const body = box(40, 30, 20, true).toShape();
+const trimmed = body.trimByPlane([0, 0, 1], 0);
+const [upper, lower] = body.splitByPlane([0, 0, 1], 0);
+return [
+  { name: 'Trimmed', shape: trimmed },
+  { name: 'Upper', shape: upper },
+  { name: 'Lower', shape: lower },
+];
+`,
+  ),
+  inlineCase(
     'segmented-runtime-hints',
     'Segmented runtime intent stays runnable but outside the exact BREP subset.',
     `
