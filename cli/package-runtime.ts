@@ -1,4 +1,4 @@
-import { existsSync } from 'fs';
+import { existsSync, realpathSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { spawn, type ChildProcess, type SpawnOptions } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -12,7 +12,13 @@ export function resolvePackagePath(metaUrl: string, ...segments: string[]): stri
 }
 
 export function isDirectCliRun(metaUrl: string): boolean {
-  return Boolean(process.argv[1]) && resolve(process.argv[1]) === fileURLToPath(metaUrl);
+  if (!process.argv[1]) return false;
+
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(metaUrl));
+  } catch {
+    return resolve(process.argv[1]) === resolve(fileURLToPath(metaUrl));
+  }
 }
 
 export function viteBinPath(metaUrl: string): string {
