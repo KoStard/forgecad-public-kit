@@ -101,7 +101,8 @@ export interface CompilerCaseSnapshot {
 }
 
 function roundNumber(value: number, digits = 6): number {
-  return Number(value.toFixed(digits));
+  const rounded = Number(value.toFixed(digits));
+  return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 function stableDigest(value: unknown): string {

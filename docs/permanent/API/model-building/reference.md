@@ -827,7 +827,7 @@ const rail = spline3d(
 #### `loft(profiles, heights, options?)`
 Loft between multiple sketches along Z stations.
 
-This implementation interpolates signed-distance fields and meshes via level-set extraction, so profiles can differ in vertex count/topology.
+This implementation interpolates signed-distance fields and meshes via level-set extraction, so profiles can differ in vertex count/topology. Forge now records that loft intent in the compiler graph as well, and compatible loft stacks can export through the CadQuery/OCCT exact route even though viewport/runtime geometry remains sampled.
 
 Performance note: `loft()` is significantly heavier than primitive/extrude/revolve paths. Use loft only when profile interpolation is required. If your part is axis-symmetric (bottles, vases, knobs, lathe-style parts), prefer `revolve()` for much faster generation.
 
@@ -849,7 +849,7 @@ const body = loft(
 #### `sweep(profile, path, options?)`
 Sweep a 2D profile along a 3D path (`Curve3D` or point polyline).
 
-Performance note: `sweep()` also uses level-set meshing internally. Prefer direct primitives/extrude/revolve when they can express the same shape.
+Performance note: `sweep()` also uses level-set meshing internally. Prefer direct primitives/extrude/revolve when they can express the same shape. Forge records the sampled sweep path in the compiler graph, so compatible sweeps can export through the CadQuery/OCCT exact route using that canonical path representation.
 
 **Parameters:**
 - `profile` (`Sketch`) - Local cross-section in XY plane

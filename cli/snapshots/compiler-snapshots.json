@@ -1166,6 +1166,386 @@
     }
   },
   {
+    "id": "loft-exact",
+    "description": "Loft stays compiler-owned and lowerable to both Manifold and CadQuery/OCCT for compatible section stacks.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Loft",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "sampled",
+            "topology": "none",
+            "sources": [
+              "loft",
+              "level-set"
+            ]
+          },
+          "compilePlan": {
+            "kind": "loft",
+            "profiles": [
+              {
+                "kind": "roundedRect",
+                "width": 26,
+                "height": 16,
+                "radius": 3,
+                "center": true,
+                "transforms": [
+                  {
+                    "kind": "translate",
+                    "x": -1,
+                    "y": 0
+                  }
+                ]
+              },
+              {
+                "kind": "circle",
+                "radius": 8,
+                "transforms": []
+              },
+              {
+                "kind": "roundedRect",
+                "width": 18,
+                "height": 10,
+                "radius": 2,
+                "center": true,
+                "transforms": [
+                  {
+                    "kind": "translate",
+                    "x": 2,
+                    "y": -1
+                  }
+                ]
+              }
+            ],
+            "heights": [
+              0,
+              14,
+              28
+            ],
+            "edgeLength": 0.35,
+            "boundsPadding": 1.68
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "loft",
+              "profiles": [
+                {
+                  "kind": "roundedRect",
+                  "width": 26,
+                  "height": 16,
+                  "radius": 3,
+                  "center": true,
+                  "transforms": [
+                    {
+                      "kind": "translate",
+                      "x": -1,
+                      "y": 0
+                    }
+                  ]
+                },
+                {
+                  "kind": "circle",
+                  "radius": 8,
+                  "transforms": []
+                },
+                {
+                  "kind": "roundedRect",
+                  "width": 18,
+                  "height": 10,
+                  "radius": 2,
+                  "center": true,
+                  "transforms": [
+                    {
+                      "kind": "translate",
+                      "x": 2,
+                      "y": -1
+                    }
+                  ]
+                }
+              ],
+              "heights": [
+                0,
+                14,
+                28
+              ],
+              "edgeLength": 0.35,
+              "boundsPadding": 1.68
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -13.964929,
+                -7.999979,
+                0
+              ],
+              "max": [
+                11.976608,
+                7.999979,
+                28
+              ]
+            },
+            "volume": 6668.846884,
+            "surfaceArea": 2195.055879,
+            "numTri": 83390,
+            "vertexCount": 41697,
+            "meshDigest": "bf8cddd6798cbbe5970d23573a4dcf7aa4a21f01a43ebfe5e54a04f009a6290d"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -13.964929,
+                -7.999979,
+                0
+              ],
+              "max": [
+                11.976608,
+                7.999979,
+                28
+              ]
+            },
+            "volume": 6668.846884,
+            "surfaceArea": 2195.055879,
+            "numTri": 83390,
+            "vertexCount": 41697,
+            "meshDigest": "bf8cddd6798cbbe5970d23573a4dcf7aa4a21f01a43ebfe5e54a04f009a6290d"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Loft",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Loft",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  },
+  {
+    "id": "sweep-exact",
+    "description": "Sweep keeps its sampled path intent in the compile graph and exports through the exact lowerer.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Sweep",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "sampled",
+            "topology": "none",
+            "sources": [
+              "sweep",
+              "level-set"
+            ]
+          },
+          "compilePlan": {
+            "kind": "sweep",
+            "profile": {
+              "kind": "roundedRect",
+              "width": 8,
+              "height": 4,
+              "radius": 1.2,
+              "center": true,
+              "transforms": [
+                {
+                  "kind": "rotate",
+                  "degrees": 18
+                },
+                {
+                  "kind": "translate",
+                  "x": 1.5,
+                  "y": 0
+                }
+              ]
+            },
+            "path": {
+              "kind": "polyline",
+              "points": [
+                [
+                  0,
+                  0,
+                  0
+                ],
+                [
+                  18,
+                  0,
+                  0
+                ],
+                [
+                  28,
+                  8,
+                  4
+                ],
+                [
+                  40,
+                  12,
+                  10
+                ]
+              ]
+            },
+            "edgeLength": 0.5,
+            "boundsPadding": 6.606472642903361,
+            "up": [
+              0,
+              0,
+              1
+            ]
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "sweep",
+              "profile": {
+                "kind": "roundedRect",
+                "width": 8,
+                "height": 4,
+                "radius": 1.2,
+                "center": true,
+                "transforms": [
+                  {
+                    "kind": "rotate",
+                    "degrees": 18
+                  },
+                  {
+                    "kind": "translate",
+                    "x": 1.5,
+                    "y": 0
+                  }
+                ]
+              },
+              "path": {
+                "kind": "polyline",
+                "points": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    18,
+                    0,
+                    0
+                  ],
+                  [
+                    28,
+                    8,
+                    4
+                  ],
+                  [
+                    40,
+                    12,
+                    10
+                  ]
+                ]
+              },
+              "edgeLength": 0.5,
+              "boundsPadding": 6.606472642903361,
+              "up": [
+                0,
+                0,
+                1
+              ]
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                0,
+                -2.602183,
+                -2.807967
+              ],
+              "max": [
+                41.51545,
+                17.273065,
+                12.468143
+              ]
+            },
+            "volume": 1346.192499,
+            "surfaceArea": 1066.991847,
+            "numTri": 21636,
+            "vertexCount": 10818,
+            "meshDigest": "1cd8e45aa1c15a908065e15da5af7e5ee6d5ea25c09f18659be27ba28d080bba"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                0,
+                -2.602183,
+                -2.807967
+              ],
+              "max": [
+                41.51545,
+                17.273065,
+                12.468143
+              ]
+            },
+            "volume": 1346.192499,
+            "surfaceArea": 1066.991847,
+            "numTri": 21636,
+            "vertexCount": 10818,
+            "meshDigest": "1cd8e45aa1c15a908065e15da5af7e5ee6d5ea25c09f18659be27ba28d080bba"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Sweep",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Sweep",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  },
+  {
     "id": "segmented-runtime-hints",
     "description": "Segmented runtime intent stays runnable but outside the exact BREP subset.",
     "scene": {

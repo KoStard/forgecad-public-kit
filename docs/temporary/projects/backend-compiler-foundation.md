@@ -172,9 +172,13 @@ After the first implementation slice for this mission, the minimum acceptable st
 - the hull family (`hull3d()`, `Shape.hull()`, `hull2d()`, `Sketch.hull()`) now stays inside the Forge compile graph for the Manifold runtime instead of dropping straight to mesh-only execution.
 - `Shape.split(cutter)` now stays compiler-owned when both operands are compile-covered, and exact export can replay both returned branches through the existing boolean lowerers.
 - `trimByPlane()` and `splitByPlane()` now stay compiler-owned for compile-covered solids, and the CadQuery/OCCT target replays them through exact plane half-space trimming instead of faceted fallback.
+- `loft()` and `sweep()` now stay compiler-owned for compile-covered inputs instead of dropping directly to sampled runtime-only geometry.
+- the Manifold lowerer now rebuilds `loft`/`sweep` from shared compiler-owned sampled lowering helpers instead of relying on bespoke callsite geometry code.
+- the CadQuery/OCCT target now lowers compatible `loft` and `sweep` plans, and the Python exact exporter executes those plans end-to-end.
 - the CadQuery/OCCT lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
 - `forgecad debug compiler` now prints per-object compiler routing and lowered artifacts for investigation.
 - `forgecad check suite` and `npm test` now expose the repo's assertion-based invariant suite as a first-class test entrypoint instead of leaving the checks scattered across ad hoc commands.
+- the compiler and BREP regression suite now includes explicit `loft` / `sweep` plan invariants and an end-to-end STEP exporter check for those feature families.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker
@@ -185,10 +189,10 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 2. Put a backend adapter behind `Shape` | Done | `Shape` now wraps a runtime backend payload instead of a raw Manifold field. |
 | 3. Replace implicit `.manifold` reach-through with backend-owned specializations | Done | Backend-specific paths moved behind backend modules. |
 | 4. Keep current Manifold runtime behavior stable through the adapter | Done | Build plus focused runtime/API checks passed. |
-| 5. Formalize a backend-neutral Forge compile graph | In progress | The compile plan is now executable for the current exact/runtime subset; broader feature coverage is still needed. |
+| 5. Formalize a backend-neutral Forge compile graph | In progress | The compile plan now covers primitives, sketch profiles, booleans, transforms, extrudes, revolves, hulls, plane trims/splits, and sampled `loft` / `sweep`; broader feature coverage is still needed. |
 | 6. Route operations intentionally by backend capability | In progress | Exact-vs-faceted export routing now goes through compiler reports; richer multi-backend capability routing is still pending. |
 | 7. Add backend mismatch / conversion diagnostics | In progress | Exact BREP lowering now emits explicit diagnostics and compiler snapshot tooling preserves them. |
-| 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | In progress | The `cadquery-occt` target now exists explicitly in the compiler/report/export path; feature coverage is still narrow and export-driven. |
+| 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | In progress | The `cadquery-occt` target now covers the current exact subset plus compatible `loft` / `sweep` plans; feature coverage is still narrow and export-driven. |
 | 9. Make both backends true lowerers from the same compile graph | Pending | This is now the active checkpoint. |
 | 10. Cover mainstream design-feature families across both lowerers | Pending | Target: most ordinary Fusion-style part modeling flows. |
 | 11. Push exact export fully behind the CadQuery/OCCT lowerer | In progress | Export now consumes an explicit `cadquery-occt` compiler target, but the target still needs much broader feature coverage. |
@@ -216,12 +220,14 @@ The current unit-style test strategy is:
 
 ## Current Risks And Issues
 
-- The compile graph still does not cover important operation families including plane splits/trims, deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, and the sampled `loft`/`sweep` paths. Those shapes still lose compile intent and fall back to mesh-only behavior.
+- The compile graph still does not cover important operation families including deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, `shell`, fillet/chamfer families, and richer projection/feature-pattern workflows. Those shapes still lose compile intent and fall back to mesh-only behavior.
 - The hull family is now compile-covered for the Manifold runtime, but exact OCCT replay is still missing. That means hull intent is preserved and diagnosable, but STEP/BREP still needs faceted fallback for those shapes.
+- `loft()` exact export is narrower than Forge's sampled loft semantics. Forge can interpolate aggressively across differing profile topology through SDF blending, while CadQuery/OCCT section lofting can still reject some extreme mixed-topology stacks.
+- `sweep()` exact export currently canonicalizes paths to sampled polyline points before lowering. That keeps runtime and exact export aligned, but it is not yet a true analytic spline-path representation for OCCT.
 - Exact BREP lowering is intentionally narrower than runtime Manifold lowering. Segmented circles, segmented cylinders/spheres, and segmented revolves remain runtime-valid but exact-export-invalid by design.
 - Compiler snapshots use quantized mesh and polygon digests. That is strong enough to catch real regressions, but a Manifold upgrade or tessellation policy change can legitimately require baseline churn, so snapshot updates still need human review.
 - Topology and placement-reference semantics still live outside the compile graph. The compiler can replay geometry intent, but it does not yet own stable face/edge identity.
-- There is still no true OCCT/CadQuery lowerer driven from the compile graph. Exact export uses the compiler boundary, but not yet a second full geometry backend runtime.
+- There is still no true OCCT/CadQuery interactive runtime backend. Exact export now uses compiler-owned CadQuery lowering for a broader subset, but Forge still does not have a second full geometry runtime alongside Manifold.
 - "Most Fusion 360 regular design features" is only realistic if Forge owns stable references for face/edge-driven downstream features. Without that, feature coverage can look broad on paper while failing in real part workflows.
 - Manifold and CadQuery/OCCT do not have matching native capability sets. Some features will need a canonical Forge semantic representation that is richer than either backend's first-choice API.
 

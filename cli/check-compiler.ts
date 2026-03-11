@@ -107,6 +107,36 @@ return [
 `,
   ),
   inlineCase(
+    'loft-exact',
+    'Loft stays compiler-owned and lowerable to both Manifold and CadQuery/OCCT for compatible section stacks.',
+    `
+const body = loft(
+  [
+    roundedRect(26, 16, 3, true).translate(-1, 0),
+    circle2d(8),
+    roundedRect(18, 10, 2, true).translate(2, -1),
+  ],
+  [0, 14, 28],
+);
+return [{ name: 'Loft', shape: body }];
+`,
+  ),
+  inlineCase(
+    'sweep-exact',
+    'Sweep keeps its sampled path intent in the compile graph and exports through the exact lowerer.',
+    `
+const profile = roundedRect(8, 4, 1.2, true).rotate(18).translate(1.5, 0);
+const route = [
+  [0, 0, 0],
+  [18, 0, 0],
+  [28, 8, 4],
+  [40, 12, 10],
+];
+const body = sweep(profile, route, { up: [0, 0, 1], edgeLength: 0.5 });
+return [{ name: 'Sweep', shape: body }];
+`,
+  ),
+  inlineCase(
     'segmented-runtime-hints',
     'Segmented runtime intent stays runnable but outside the exact BREP subset.',
     `

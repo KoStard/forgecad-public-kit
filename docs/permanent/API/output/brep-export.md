@@ -56,8 +56,8 @@ Update it whenever:
 | Returned mixed sketch + solid scene | Supported | Yes | Exact solids export; sketch-only objects are skipped with a warning |
 | Sketch `mirror()` | Supported | Yes | Recorded as an exact profile reflection across the origin line normal |
 | arbitrary `warp()` | Unsupported | No | Not recorded in export plan |
-| `loft()` | Unsupported | No | Current Forge implementation is sampled/level-set |
-| `sweep()` | Unsupported | No | Current Forge implementation is sampled/level-set |
+| `loft()` | Partial | Yes | Forge now records loft intent in the compile graph and exports compatible section stacks through CadQuery/OCCT lofting, but runtime preview remains sampled/level-set and some mixed-topology stacks can still exceed OCCT loft compatibility |
+| `sweep()` | Partial | Yes | Forge now records sweep intent in the compile graph and exports compile-covered profiles along the canonical sampled polyline path; runtime preview remains sampled/level-set and `Curve3D` paths export through that sampled path representation |
 | `levelSet()` | Unsupported | No | Mesh/SDF output by design |
 | `smoothOut()` / `refine*()` / `simplify()` | Unsupported | No | Mesh post-processing, not exact BREP |
 | `warp()` | Unsupported | No | Deformation is mesh-domain today |

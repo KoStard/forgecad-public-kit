@@ -5,11 +5,15 @@
  * Focuses on plan recording and manifest eligibility for the exact STEP/BREP subset.
  */
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { init, runScript } from '../src/forge/headless';
 import { buildBrepExportManifest } from '../src/forge/brepExport';
 import type { CadQueryProfilePlan, CadQueryShapePlan, CadQueryShapeTransformStep } from '../src/forge/cadqueryPlan';
 import { collectProjectFiles } from './collect-files';
+import { resolvePackagePath } from './package-runtime';
 
 function runExactManifest(code: string) {
   const files: Record<string, string> = { 'main.forge.js': code };
@@ -35,10 +39,14 @@ function collectProfiles(plan: CadQueryShapePlan): CadQueryProfilePlan[] {
       return [];
     case 'extrude':
     case 'revolve':
+    case 'sweep':
       return [plan.profile];
+    case 'loft':
+      return [...plan.profiles];
     case 'boolean':
       return plan.shapes.flatMap(collectProfiles);
     case 'transform':
+    case 'trimByPlane':
       return collectProfiles(plan.base);
   }
 }
@@ -51,11 +59,49 @@ function collectShapeTransforms(plan: CadQueryShapePlan): CadQueryShapeTransform
       return [];
     case 'extrude':
     case 'revolve':
+    case 'loft':
+    case 'sweep':
       return [];
     case 'boolean':
       return plan.shapes.flatMap(collectShapeTransforms);
     case 'transform':
+    case 'trimByPlane':
       return [...plan.steps, ...collectShapeTransforms(plan.base)];
+  }
+}
+
+function exportExactManifest(code: string): void {
+  const files: Record<string, string> = { 'main.forge.js': code };
+  const result = runScript(code, 'main.forge.js', files);
+  assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
+
+  const manifest = buildBrepExportManifest(result.objects);
+  assert.equal(
+    manifest.unsupported.length,
+    0,
+    `Expected exact export support, got: ${manifest.unsupported.map((item) => `${item.name}: ${item.reason}`).join('; ')}`,
+  );
+
+  const tempDir = mkdtempSync(join(tmpdir(), 'forgecad-brep-'));
+  try {
+    const manifestPath = join(tempDir, 'manifest.json');
+    const outputPath = join(tempDir, 'out.step');
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf-8');
+
+    const exporterScript = resolvePackagePath(import.meta.url, 'cli', 'forge-brep-export.py');
+    const child = spawnSync(
+      'uv',
+      ['run', '--script', exporterScript, '--input', manifestPath, '--output', outputPath, '--format', 'step'],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      child.status,
+      0,
+      `Expected exact exporter to succeed, got status ${child.status}: ${child.stderr || child.stdout || 'no output'}`,
+    );
+    assert(statSync(outputPath).size > 0, 'Expected exact exporter to emit a non-empty STEP file');
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
   }
 }
 
@@ -304,6 +350,58 @@ return [{ name: 'Pipe Cut', shape: body }];
   assert.equal(rotateAround.degrees, 90);
 }
 
+function checkLoftPlan(): void {
+  const plan = runExactManifest(`
+const body = loft(
+  [
+    roundedRect(26, 16, 3, true).translate(-1, 0),
+    circle2d(8),
+    roundedRect(18, 10, 2, true).translate(2, -1),
+  ],
+  [0, 14, 28],
+);
+return [{ name: 'Loft', shape: body }];
+`);
+
+  assert.equal(plan.kind, 'loft', `Expected loft plan, got ${plan.kind}`);
+  assert.deepEqual(plan.heights, [0, 14, 28]);
+  assert.equal(plan.profiles.length, 3);
+  assert.equal(plan.profiles[0].kind, 'roundedRect');
+  assert.equal(plan.profiles[1].kind, 'circle');
+  assert.equal(plan.profiles[2].kind, 'roundedRect');
+  assert.deepEqual(plan.profiles[0].transforms, [{ kind: 'translate', x: -1, y: 0 }]);
+  assert.deepEqual(plan.profiles[2].transforms, [{ kind: 'translate', x: 2, y: -1 }]);
+}
+
+function checkSweepPlan(): void {
+  const plan = runExactManifest(`
+const profile = roundedRect(8, 4, 1.2, true).rotate(18).translate(1.5, 0);
+const route = [
+  [0, 0, 0],
+  [18, 0, 0],
+  [28, 8, 4],
+  [40, 12, 10],
+];
+const body = sweep(profile, route, { up: [0, 0, 1], edgeLength: 0.5 });
+return [{ name: 'Sweep', shape: body }];
+`);
+
+  assert.equal(plan.kind, 'sweep', `Expected sweep plan, got ${plan.kind}`);
+  assert.equal(plan.profile.kind, 'roundedRect');
+  assert.deepEqual(plan.profile.transforms, [
+    { kind: 'rotate', degrees: 18 },
+    { kind: 'translate', x: 1.5, y: 0 },
+  ]);
+  assert.equal(plan.path.kind, 'polyline');
+  assert.deepEqual(plan.path.points, [
+    [0, 0, 0],
+    [18, 0, 0],
+    [28, 8, 4],
+    [40, 12, 10],
+  ]);
+  assert.deepEqual(plan.up, [0, 0, 1]);
+}
+
 function checkMixedSketchAndSolidScenePolicy(): void {
   const files: Record<string, string> = {
     'main.forge.js': `
@@ -371,6 +469,33 @@ return [
   assert.equal(manifest.objects.length, 3, `Expected trim plus split branches to export, got ${manifest.objects.length}`);
   assert(manifest.objects.every((item) => item.kind === 'exact'), 'Expected plane trim and split branches to stay on the exact export route');
   assert(manifest.objects.every((item) => item.kind !== 'exact' || item.target === 'cadquery-occt'), 'Expected plane trim and split branches to use the CadQuery/OCCT lowerer');
+}
+
+function checkLoftAndSweepExportEndToEnd(): void {
+  exportExactManifest(`
+const lofted = loft(
+  [
+    roundedRect(22, 14, 2.5, true),
+    circle2d(7),
+    roundedRect(16, 10, 1.6, true).translate(2, -1),
+  ],
+  [0, 12, 24],
+);
+const swept = sweep(
+  roundedRect(7, 3.5, 1, true).rotate(12),
+  [
+    [0, 0, 0],
+    [14, 0, 0],
+    [24, 6, 3],
+    [34, 10, 8],
+  ],
+  { up: [0, 0, 1] },
+);
+return [
+  { name: 'Lofted', shape: lofted },
+  { name: 'Swept', shape: swept.translate(0, 24, 0) },
+];
+`);
 }
 
 function checkChessSetFacetedFallbackManifest(): void {
@@ -479,9 +604,12 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkMirroredSketchProfilePlan();
   checkRigidMatrixTransformPlan();
   checkPointAlongOnPrimitiveBoolean();
+  checkLoftPlan();
+  checkSweepPlan();
   checkMixedSketchAndSolidScenePolicy();
   checkSplitBranchesStayExactExportable();
   checkPlaneTrimAndSplitStayExactExportable();
+  checkLoftAndSweepExportEndToEnd();
   checkChessSetFacetedFallbackManifest();
   checkSegmentedRuntimeHintsStayOutOfExactSubset();
   checkHullRuntimeIntentStaysOutOfExactSubset();
