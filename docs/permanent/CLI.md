@@ -33,6 +33,39 @@ npm link
 
 After that, use `forgecad ...` directly from your shell.
 
+### Shell Autocomplete
+
+ForgeCAD now ships shell completion scripts in the usual modern-tool style:
+
+```bash
+forgecad completion bash
+forgecad completion zsh
+forgecad completion fish
+```
+
+Quick install:
+
+```bash
+# bash
+echo 'source <(forgecad completion bash)' >> ~/.bashrc
+
+# zsh
+mkdir -p ~/.zsh/completions
+forgecad completion zsh > ~/.zsh/completions/_forgecad
+echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+
+# fish
+mkdir -p ~/.config/fish/completions
+forgecad completion fish > ~/.config/fish/completions/forgecad.fish
+```
+
+The completions are contextual:
+
+- nested subcommands such as `forgecad notebook view` and `forgecad export step`
+- command-specific flags and common enum values
+- ForgeCAD file suggestions where a command expects `.forge.js`, `.sketch.js`, or `.forge-notebook.json`
+
 ## Available Commands
 
 ### Notebook Cells (server-backed)
