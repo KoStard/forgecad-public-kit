@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 
 import { readFileSync } from 'fs';
-import { basename } from 'path';
 import { runCheckApiContractsCli } from './check-api-contracts';
 import { runCheckBrepExportCli } from './check-brep-export';
 import { runCheckDimensionsCli } from './check-dimensions';
 import { runCheckJsModulesCli } from './check-js-modules';
 import { runCheckPlacementReferencesCli } from './check-placement-references';
 import { runCheckTransformsCli } from './check-transforms';
+import {
+  runCompletionCli,
+  runHiddenCompletionCli,
+  type CommandCompletionDefinition,
+  type CompletionItem,
+  type CompletionOptionDefinition,
+} from './forge-completion';
 import { runCaptureCli } from './forge-capture';
 import { runNotebookCli } from './forge-notebook';
 import { runReportCli } from './forge-report';
@@ -22,13 +28,124 @@ import { runScriptCli } from './test-run';
 import { runDebugDimensionsCli } from './debug-dimensions';
 
 type CommandDefinition = {
-  group: 'Studio' | 'Modeling' | 'Export' | 'Checks' | 'Debug';
+  group: 'Studio' | 'Shell' | 'Modeling' | 'Export' | 'Checks' | 'Debug';
   path: string[];
   summary: string;
   usage: string[];
   examples: string[];
+  hidden?: boolean;
+  completion?: CommandCompletionDefinition;
   run: (args: string[]) => Promise<void>;
 };
+
+const SHELL_VALUES: CompletionItem[] = [
+  { value: 'bash', description: 'Bash completion script' },
+  { value: 'zsh', description: 'Zsh completion script' },
+  { value: 'fish', description: 'Fish completion script' },
+];
+
+const HOST_VALUES: CompletionItem[] = [
+  { value: '0.0.0.0', description: 'Listen on all interfaces' },
+  { value: '127.0.0.1', description: 'Loopback only' },
+  { value: 'localhost', description: 'Loopback hostname' },
+];
+
+const SERVER_VALUES: CompletionItem[] = [
+  { value: 'http://localhost:5173', description: 'Default local Forge server' },
+];
+
+const RENDER_ANGLE_VALUES: CompletionItem[] = [
+  { value: 'front', description: 'View from -Y' },
+  { value: 'back', description: 'View from +Y' },
+  { value: 'side', description: 'View from +X' },
+  { value: 'top', description: 'View from +Z' },
+  { value: 'iso', description: 'Diagonal isometric view' },
+];
+
+const CAPTURE_TYPE_VALUES: CompletionItem[] = [
+  { value: 'orbit', description: 'Orbit the camera around the model' },
+  { value: 'animation', description: 'Play a jointsView clip with a fixed camera' },
+];
+
+const OUTPUT_FORMAT_VALUES: CompletionItem[] = [
+  { value: 'gif', description: 'Animated GIF' },
+  { value: 'mp4', description: 'H.264 MP4' },
+];
+
+const RENDER_MODE_VALUES: CompletionItem[] = [
+  { value: 'solid', description: 'Render solid shading' },
+  { value: 'wireframe', description: 'Render edges only' },
+];
+
+const QUALITY_VALUES: CompletionItem[] = [
+  { value: 'default', description: 'Forge default quality' },
+  { value: 'live', description: 'Fast viewport quality' },
+  { value: 'high', description: 'High quality export preset' },
+];
+
+const ENCODER_VALUES: CompletionItem[] = [
+  { value: 'auto', description: 'Pick the best available encoder' },
+  { value: 'ffmpeg', description: 'Force ffmpeg' },
+  { value: 'js', description: 'Force the pure-JS encoder' },
+];
+
+const STUDIO_OPTIONS: CompletionOptionDefinition[] = [
+  { name: '--blank', description: 'Start without a project folder' },
+  { name: '--port', description: 'Bind Vite to a specific port', argument: 'required' },
+  { name: '--host', description: 'Expose the dev server on the network', argument: 'optional', values: HOST_VALUES },
+  { name: '--open', description: 'Open a browser window automatically' },
+  { name: '--strict-port', description: 'Fail instead of selecting another port' },
+];
+
+const NOTEBOOK_SHARED_OPTIONS: CompletionOptionDefinition[] = [
+  { name: '--code', description: 'Append inline cell source', argument: 'required' },
+  { name: '--file', description: 'Read cell source from a file', argument: 'required', valueKind: 'path' },
+  { name: '--after', description: 'Insert after a specific cell id', argument: 'required' },
+  { name: '--server', description: 'Reuse an existing Forge server', argument: 'required', values: SERVER_VALUES },
+  { name: '--port', description: 'Preferred port when auto-starting the server', argument: 'required' },
+];
+
+const NOTEBOOK_RUN_OPTIONS: CompletionOptionDefinition[] = [
+  { name: '--server', description: 'Reuse an existing Forge server', argument: 'required', values: SERVER_VALUES },
+  { name: '--port', description: 'Preferred port when auto-starting the server', argument: 'required' },
+];
+
+const RENDER_OPTIONS: CompletionOptionDefinition[] = [
+  { name: '--angles', description: 'Comma-separated standard angles', argument: 'required', values: RENDER_ANGLE_VALUES, valueMode: 'csv' },
+  { name: '--size', description: 'Image size in pixels', argument: 'required' },
+  { name: '--port', description: 'Vite dev server port', argument: 'required' },
+  { name: '--camera', description: 'Exact camera spec', argument: 'required' },
+  { name: '--scene', description: 'Viewport scene state JSON', argument: 'required' },
+  { name: '--background', description: 'Canvas background override', argument: 'required' },
+  { name: '--chrome-path', description: 'Chrome or Chromium executable path', argument: 'required', valueKind: 'path' },
+];
+
+const CAPTURE_COMMON_OPTIONS: CompletionOptionDefinition[] = [
+  { name: '--format', description: 'Output format', argument: 'required', values: OUTPUT_FORMAT_VALUES },
+  { name: '--capture', description: 'Capture preset', argument: 'required', values: CAPTURE_TYPE_VALUES },
+  { name: '--animation', description: 'Named jointsView animation clip', argument: 'required' },
+  { name: '--animation-loops', description: 'Repeat the selected animation clip', argument: 'required' },
+  { name: '--cut-plane', description: 'Enable a named cut plane', argument: 'required', repeatable: true },
+  { name: '--camera', description: 'Exact camera spec', argument: 'required' },
+  { name: '--scene', description: 'Viewport scene state JSON', argument: 'required' },
+  { name: '--render-mode', description: 'Primary render mode', argument: 'required', values: RENDER_MODE_VALUES },
+  { name: '--include-wireframe-pass', description: 'Append an extra wireframe pass' },
+  { name: '--no-wireframe-pass', description: 'Disable the extra wireframe pass' },
+  { name: '--size', description: 'Output frame size in pixels', argument: 'required' },
+  { name: '--pixel-ratio', description: 'Render supersampling factor', argument: 'required' },
+  { name: '--fps', description: 'Output frame rate', argument: 'required' },
+  { name: '--frames-per-turn', description: 'Frames for one orbit turn', argument: 'required' },
+  { name: '--hold-frames', description: 'Freeze frames before each pass', argument: 'required' },
+  { name: '--pitch', description: 'Orbit pitch override', argument: 'required' },
+  { name: '--background', description: 'Canvas background override', argument: 'required' },
+  { name: '--quality', description: 'Forge quality preset', argument: 'required', values: QUALITY_VALUES },
+  { name: '--encoder', description: 'GIF encoder strategy', argument: 'required', values: ENCODER_VALUES },
+  { name: '--crf', description: 'ffmpeg/libx264 quality', argument: 'required' },
+  { name: '--port', description: 'Vite dev server port', argument: 'required' },
+  { name: '--chrome-path', description: 'Chrome or Chromium executable path', argument: 'required', valueKind: 'path' },
+  { name: '--ffmpeg-path', description: 'ffmpeg executable path', argument: 'required', valueKind: 'path' },
+  { name: '--list', description: 'Print available animations and cut planes' },
+];
 
 const commands: CommandDefinition[] = [
   {
@@ -45,6 +162,12 @@ const commands: CommandDefinition[] = [
       'forgecad studio ~/cad/gearbox',
       'forgecad studio --blank --port 4173',
     ],
+    completion: {
+      options: STUDIO_OPTIONS,
+      positionals: [
+        { description: 'project path', valueKind: 'directory' },
+      ],
+    },
     run: runStudioCli,
   },
   {
@@ -53,7 +176,39 @@ const commands: CommandDefinition[] = [
     summary: 'Alias for `forgecad studio`.',
     usage: ['forgecad open [project-path]'],
     examples: ['forgecad open ~/cad/gearbox'],
+    completion: {
+      options: STUDIO_OPTIONS,
+      positionals: [
+        { description: 'project path', valueKind: 'directory' },
+      ],
+    },
     run: runStudioCli,
+  },
+  {
+    group: 'Shell',
+    path: ['completion'],
+    summary: 'Generate shell completion scripts for bash, zsh, or fish.',
+    usage: ['forgecad completion <bash|zsh|fish>'],
+    examples: [
+      'source <(forgecad completion bash)',
+      'source <(forgecad completion zsh)',
+      'forgecad completion fish > ~/.config/fish/completions/forgecad.fish',
+    ],
+    completion: {
+      positionals: [
+        { description: 'shell', values: SHELL_VALUES },
+      ],
+    },
+    run: async (args) => runCompletionCli(args),
+  },
+  {
+    group: 'Shell',
+    path: ['__complete'],
+    summary: 'Internal shell completion hook.',
+    usage: [],
+    examples: [],
+    hidden: true,
+    run: async (args) => runHiddenCompletionCli(args, commands),
   },
   {
     group: 'Modeling',
@@ -65,6 +220,14 @@ const commands: CommandDefinition[] = [
       'forgecad run examples/api/notebook-iteration.forge-notebook.json',
       'forgecad run examples/cup.forge.js --debug-imports',
     ],
+    completion: {
+      options: [
+        { name: '--debug-imports', description: 'Print the import trace' },
+      ],
+      positionals: [
+        { description: 'Forge script or notebook', valueKind: 'renderable' },
+      ],
+    },
     run: runScriptCli,
   },
   {
@@ -85,7 +248,85 @@ const commands: CommandDefinition[] = [
       'cat /tmp/cell.js | forgecad notebook examples/demo.forge-notebook.json',
       'forgecad notebook export examples/demo.forge-notebook.json out/demo.forge.js',
     ],
+    completion: {
+      options: NOTEBOOK_SHARED_OPTIONS,
+      positionals: [
+        { description: 'notebook path', valueKind: 'notebook' },
+      ],
+    },
     run: runNotebookCli,
+  },
+  {
+    group: 'Modeling',
+    path: ['notebook', 'append'],
+    summary: 'Append a new code cell to a notebook, optionally auto-creating the file first.',
+    usage: ['forgecad notebook append <notebook.forge-notebook.json> [--code "..."] [--file path] [--after cell-id]'],
+    examples: [
+      'forgecad notebook append examples/demo.forge-notebook.json --code "show(box(40, 20, 10));"',
+      'forgecad notebook append examples/demo.forge-notebook.json --file /tmp/cell.js',
+    ],
+    completion: {
+      options: NOTEBOOK_SHARED_OPTIONS,
+      positionals: [
+        { description: 'notebook path', valueKind: 'notebook' },
+      ],
+    },
+    run: (args) => runNotebookCli(['append', ...args]),
+  },
+  {
+    group: 'Modeling',
+    path: ['notebook', 'run'],
+    summary: 'Run a notebook preview cell or a specific cell id.',
+    usage: ['forgecad notebook run <notebook.forge-notebook.json> [cell-id]'],
+    examples: [
+      'forgecad notebook run examples/api/notebook-iteration.forge-notebook.json',
+      'forgecad notebook run examples/api/notebook-iteration.forge-notebook.json preview-cell-id',
+    ],
+    completion: {
+      options: NOTEBOOK_RUN_OPTIONS,
+      positionals: [
+        { description: 'notebook path', valueKind: 'notebook' },
+        { description: 'cell id' },
+      ],
+    },
+    run: (args) => runNotebookCli(['run', ...args]),
+  },
+  {
+    group: 'Modeling',
+    path: ['notebook', 'view'],
+    summary: 'Render notebook cells and stored outputs directly in the terminal.',
+    usage: ['forgecad notebook view <notebook.forge-notebook.json> [cell-number|cell-id|preview]'],
+    examples: [
+      'forgecad notebook view examples/api/notebook-iteration.forge-notebook.json',
+      'forgecad notebook view examples/api/notebook-iteration.forge-notebook.json preview',
+    ],
+    completion: {
+      positionals: [
+        { description: 'notebook path', valueKind: 'notebook' },
+        {
+          description: 'cell number, cell id, or preview',
+          values: [{ value: 'preview', description: 'Notebook preview cell' }],
+        },
+      ],
+    },
+    run: (args) => runNotebookCli(['view', ...args]),
+  },
+  {
+    group: 'Modeling',
+    path: ['notebook', 'export'],
+    summary: 'Export a notebook into a plain `.forge.js` script.',
+    usage: ['forgecad notebook export <notebook.forge-notebook.json> [output.forge.js]'],
+    examples: [
+      'forgecad notebook export examples/demo.forge-notebook.json',
+      'forgecad notebook export examples/demo.forge-notebook.json out/demo.forge.js',
+    ],
+    completion: {
+      positionals: [
+        { description: 'notebook path', valueKind: 'notebook' },
+        { description: 'output Forge script path', valueKind: 'path' },
+      ],
+    },
+    run: (args) => runNotebookCli(['export', ...args]),
   },
   {
     group: 'Modeling',
@@ -97,6 +338,13 @@ const commands: CommandDefinition[] = [
       'forgecad render examples/api/notebook-iteration.forge-notebook.json',
       'forgecad render examples/cup.forge.js out/scene.png --angles iso',
     ],
+    completion: {
+      options: RENDER_OPTIONS,
+      positionals: [
+        { description: 'Forge script or notebook', valueKind: 'renderable' },
+        { description: 'output PNG path', valueKind: 'png' },
+      ],
+    },
     run: runRenderCli,
   },
   {
@@ -109,6 +357,13 @@ const commands: CommandDefinition[] = [
       'forgecad capture gif examples/api/notebook-assembly-debug.forge-notebook.json --list',
       'forgecad capture gif examples/3d-printer.forge.js out/section.gif --cut-plane "Front Section"',
     ],
+    completion: {
+      options: CAPTURE_COMMON_OPTIONS,
+      positionals: [
+        { description: 'Forge script or notebook', valueKind: 'renderable' },
+        { description: 'output GIF path', valueKind: 'gif' },
+      ],
+    },
     run: (args) => runCaptureCli({ command: 'forgecad capture gif', defaultFormat: 'gif' }, args),
   },
   {
@@ -120,6 +375,13 @@ const commands: CommandDefinition[] = [
       'forgecad capture mp4 examples/cup.forge.js',
       'forgecad capture mp4 examples/api/runtime-joints-view.forge.js out/step.mp4 --capture animation --animation Step',
     ],
+    completion: {
+      options: CAPTURE_COMMON_OPTIONS,
+      positionals: [
+        { description: 'Forge script or notebook', valueKind: 'renderable' },
+        { description: 'output MP4 path', valueKind: 'mp4' },
+      ],
+    },
     run: (args) => runCaptureCli({ command: 'forgecad capture mp4', defaultFormat: 'mp4' }, args),
   },
   {
@@ -131,6 +393,12 @@ const commands: CommandDefinition[] = [
       'forgecad export svg examples/frame.sketch.js',
       'forgecad export svg examples/frame.sketch.js out/frame.svg',
     ],
+    completion: {
+      positionals: [
+        { description: 'Sketch script', valueKind: 'sketch-script' },
+        { description: 'output SVG path', valueKind: 'svg' },
+      ],
+    },
     run: runSvgCli,
   },
   {
@@ -144,6 +412,17 @@ const commands: CommandDefinition[] = [
       'forgecad export step examples/api/brep-exportable.forge.js',
       'forgecad export step examples/chess-set.forge.js --allow-faceted',
     ],
+    completion: {
+      options: [
+        { name: '--output', description: 'Output STEP path', argument: 'required', valueKind: 'path' },
+        { name: '--python', description: 'Python interpreter for uv', argument: 'required', valueKind: 'path' },
+        { name: '--uv', description: 'uv executable path', argument: 'required', valueKind: 'path' },
+        { name: '--allow-faceted', description: 'Allow faceted fallback for closed mesh solids' },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+      ],
+    },
     run: (args) => runBrepCli(['--format', 'step', ...args]),
   },
   {
@@ -157,6 +436,17 @@ const commands: CommandDefinition[] = [
       'forgecad export brep examples/api/brep-exportable.forge.js',
       'forgecad export brep examples/chess-set.forge.js --allow-faceted',
     ],
+    completion: {
+      options: [
+        { name: '--output', description: 'Output BREP path', argument: 'required', valueKind: 'path' },
+        { name: '--python', description: 'Python interpreter for uv', argument: 'required', valueKind: 'path' },
+        { name: '--uv', description: 'uv executable path', argument: 'required', valueKind: 'path' },
+        { name: '--allow-faceted', description: 'Allow faceted fallback for closed mesh solids' },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+      ],
+    },
     run: (args) => runBrepCli(['--format', 'brep', ...args]),
   },
   {
@@ -168,6 +458,14 @@ const commands: CommandDefinition[] = [
       'forgecad export sdf examples/api/sdf-rover-demo.forge.js',
       'forgecad export sdf examples/api/sdf-rover-demo.forge.js --output out/forge_scout',
     ],
+    completion: {
+      options: [
+        { name: '--output', description: 'Output package directory', argument: 'required', valueKind: 'directory' },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+      ],
+    },
     run: runSdfCli,
   },
   {
@@ -179,6 +477,15 @@ const commands: CommandDefinition[] = [
       'forgecad export report examples/cup.forge.js',
       'forgecad export report examples/cup.forge.js out/cup.pdf --dim-angle-tol 18',
     ],
+    completion: {
+      options: [
+        { name: '--dim-angle-tol', description: 'Dimension routing tolerance in degrees', argument: 'required' },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+        { description: 'output PDF path', valueKind: 'pdf' },
+      ],
+    },
     run: runReportCli,
   },
   {
@@ -190,6 +497,14 @@ const commands: CommandDefinition[] = [
       'forgecad check params examples/shoe-rack-doors.forge.js',
       'forgecad check params path/to/model.forge.js --samples 12',
     ],
+    completion: {
+      options: [
+        { name: '--samples', description: 'Number of samples per parameter', argument: 'required' },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+      ],
+    },
     run: runParamCheckCli,
   },
   {
@@ -249,6 +564,15 @@ const commands: CommandDefinition[] = [
       'forgecad debug dimensions path/to/file.forge.js',
       'forgecad debug dimensions path/to/file.forge.js --all --dim-angle-tol 18',
     ],
+    completion: {
+      options: [
+        { name: '--all', description: 'Print the full dimension list' },
+        { name: '--dim-angle-tol', description: 'Dimension routing tolerance in degrees', argument: 'required' },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+      ],
+    },
     run: runDebugDimensionsCli,
   },
 ];
@@ -271,7 +595,8 @@ function padRight(value: string, width: number): string {
 }
 
 function printGlobalHelp(exitCode = 0): never {
-  const width = Math.max(...commands.map((command) => commandLabel(command).length));
+  const visibleCommands = commands.filter((command) => !command.hidden);
+  const width = Math.max(...visibleCommands.map((command) => commandLabel(command).length));
   console.log(`ForgeCAD ${readVersion()}
 
 Code-first parametric CAD for JavaScript/TypeScript.
@@ -285,9 +610,9 @@ Install for plain-shell usage from a checkout:
 
 Commands:`);
 
-  for (const group of ['Studio', 'Modeling', 'Export', 'Checks', 'Debug'] as const) {
+  for (const group of ['Studio', 'Shell', 'Modeling', 'Export', 'Checks', 'Debug'] as const) {
     console.log(`\n${group}`);
-    commands
+    visibleCommands
       .filter((command) => command.group === group)
       .forEach((command) => {
         console.log(`  ${padRight(commandLabel(command), width + 2)}${command.summary}`);
@@ -297,6 +622,7 @@ Commands:`);
   console.log(`
 Help:
   forgecad help
+  forgecad help completion
   forgecad help export step
   forgecad help notebook
   forgecad help capture gif`);
