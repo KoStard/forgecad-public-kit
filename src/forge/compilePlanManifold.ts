@@ -6,6 +6,7 @@ import type {
   ShapeCompileTransformStep,
 } from './compilePlan';
 import { wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
+import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './sketch/loftSweepLowering';
 import { Transform } from './transform';
 
 function applyProfileCompileTransform(
@@ -169,6 +170,34 @@ function lowerShapeTrimByPlaneCompilePlan(
   );
 }
 
+function lowerShapeLoftCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'loft' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const input = buildLoftLevelSetInput(
+    plan.profiles.map((profile) => lowerProfileCompilePlanToCrossSection(profile, wasm).toPolygons() as [number, number][][]),
+    plan.heights,
+    { edgeLength: plan.edgeLength, boundsPadding: plan.boundsPadding },
+  );
+  return wasm.Manifold.levelSet(input.sdf as any, input.bounds, input.edgeLength, 0);
+}
+
+function lowerShapeSweepCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'sweep' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const input = buildSweepLevelSetInput(
+    lowerProfileCompilePlanToCrossSection(plan.profile, wasm).toPolygons() as [number, number][][],
+    plan.path.points.map(([x, y, z]) => [x, y, z]),
+    {
+      edgeLength: plan.edgeLength,
+      boundsPadding: plan.boundsPadding,
+      up: [plan.up[0], plan.up[1], plan.up[2]],
+    },
+  );
+  return wasm.Manifold.levelSet(input.sdf as any, input.bounds, input.edgeLength, 0);
+}
+
 export function lowerShapeCompilePlanToManifold(
   plan: ShapeCompilePlan,
   wasm: ManifoldToplevel,
@@ -190,6 +219,10 @@ export function lowerShapeCompilePlanToManifold(
       );
     case 'revolve':
       return lowerProfileCompilePlanToCrossSection(plan.profile, wasm).revolve(plan.segments ?? 0, plan.degrees);
+    case 'loft':
+      return lowerShapeLoftCompilePlan(plan, wasm);
+    case 'sweep':
+      return lowerShapeSweepCompilePlan(plan, wasm);
     case 'boolean':
       return lowerShapeBooleanCompilePlan(plan, wasm);
     case 'transform':

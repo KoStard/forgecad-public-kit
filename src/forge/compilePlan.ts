@@ -71,6 +71,11 @@ export type ShapeCompileTransformStep =
       normalZ: number;
     };
 
+export type SweepPathCompilePlan = {
+  kind: 'polyline';
+  points: [number, number, number][];
+};
+
 export type ShapeCompilePlan =
   | {
       kind: 'box';
@@ -104,6 +109,21 @@ export type ShapeCompilePlan =
       profile: ProfileCompilePlan;
       degrees: number;
       segments?: number;
+    }
+  | {
+      kind: 'loft';
+      profiles: ProfileCompilePlan[];
+      heights: number[];
+      edgeLength: number;
+      boundsPadding: number;
+    }
+  | {
+      kind: 'sweep';
+      profile: ProfileCompilePlan;
+      path: SweepPathCompilePlan;
+      edgeLength: number;
+      boundsPadding: number;
+      up: [number, number, number];
     }
   | {
       kind: 'boolean';
@@ -183,6 +203,13 @@ function cloneShapeTransform(step: ShapeCompileTransformStep): ShapeCompileTrans
         normalZ: step.normalZ,
       };
   }
+}
+
+function cloneSweepPathCompilePlan(path: SweepPathCompilePlan): SweepPathCompilePlan {
+  return {
+    kind: path.kind,
+    points: path.points.map(([x, y, z]) => [x, y, z]),
+  };
 }
 
 export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): ProfileCompilePlan | null {
@@ -272,6 +299,23 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         profile: cloneProfileCompilePlan(plan.profile)!,
         degrees: plan.degrees,
         segments: plan.segments,
+      };
+    case 'loft':
+      return {
+        kind: 'loft',
+        profiles: plan.profiles.map((profile) => cloneProfileCompilePlan(profile)!),
+        heights: plan.heights.map((height) => height),
+        edgeLength: plan.edgeLength,
+        boundsPadding: plan.boundsPadding,
+      };
+    case 'sweep':
+      return {
+        kind: 'sweep',
+        profile: cloneProfileCompilePlan(plan.profile)!,
+        path: cloneSweepPathCompilePlan(plan.path),
+        edgeLength: plan.edgeLength,
+        boundsPadding: plan.boundsPadding,
+        up: [plan.up[0], plan.up[1], plan.up[2]],
       };
     case 'boolean':
       return {
@@ -419,5 +463,44 @@ export function buildTrimByPlaneShapeCompilePlan(
     normalY: canonicalNumber(normal[1]),
     normalZ: canonicalNumber(normal[2]),
     originOffset: canonicalNumber(originOffset),
+  };
+}
+
+export function buildLoftShapeCompilePlan(
+  profiles: Array<ProfileCompilePlan | null>,
+  heights: number[],
+  options: { edgeLength: number; boundsPadding: number },
+): ShapeCompilePlan | null {
+  if (profiles.some((profile) => profile == null)) return null;
+  return {
+    kind: 'loft',
+    profiles: profiles.map((profile) => cloneProfileCompilePlan(profile)!),
+    heights: heights.map((height) => canonicalNumber(height)),
+    edgeLength: canonicalNumber(options.edgeLength),
+    boundsPadding: canonicalNumber(options.boundsPadding),
+  };
+}
+
+export function buildSweepShapeCompilePlan(
+  profile: ProfileCompilePlan | null,
+  path: SweepPathCompilePlan,
+  options: {
+    edgeLength: number;
+    boundsPadding: number;
+    up: [number, number, number];
+  },
+): ShapeCompilePlan | null {
+  if (!profile) return null;
+  return {
+    kind: 'sweep',
+    profile: cloneProfileCompilePlan(profile)!,
+    path: cloneSweepPathCompilePlan(path),
+    edgeLength: canonicalNumber(options.edgeLength),
+    boundsPadding: canonicalNumber(options.boundsPadding),
+    up: [
+      canonicalNumber(options.up[0]),
+      canonicalNumber(options.up[1]),
+      canonicalNumber(options.up[2]),
+    ],
   };
 }

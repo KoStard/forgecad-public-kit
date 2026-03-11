@@ -134,6 +134,33 @@ def build_shape_scale_matrix(sx: float, sy: float, sz: float) -> "cq.Matrix":
     ])
 
 
+def vec3_sub(lhs: tuple[float, float, float], rhs: tuple[float, float, float]) -> tuple[float, float, float]:
+    return (lhs[0] - rhs[0], lhs[1] - rhs[1], lhs[2] - rhs[2])
+
+
+def vec3_dot(lhs: tuple[float, float, float], rhs: tuple[float, float, float]) -> float:
+    return lhs[0] * rhs[0] + lhs[1] * rhs[1] + lhs[2] * rhs[2]
+
+
+def vec3_cross(lhs: tuple[float, float, float], rhs: tuple[float, float, float]) -> tuple[float, float, float]:
+    return (
+        lhs[1] * rhs[2] - lhs[2] * rhs[1],
+        lhs[2] * rhs[0] - lhs[0] * rhs[2],
+        lhs[0] * rhs[1] - lhs[1] * rhs[0],
+    )
+
+
+def vec3_length(vec: tuple[float, float, float]) -> float:
+    return math.sqrt(vec3_dot(vec, vec))
+
+
+def vec3_normalize(vec: tuple[float, float, float]) -> tuple[float, float, float]:
+    length = vec3_length(vec)
+    if length < 1e-9:
+        return (0.0, 0.0, 1.0)
+    return (vec[0] / length, vec[1] / length, vec[2] / length)
+
+
 def normalize_plane(normal: tuple[float, float, float], origin_offset: float) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
     nx, ny, nz = normal
     length_sq = nx * nx + ny * ny + nz * nz
@@ -287,6 +314,84 @@ def build_revolved_profile(profile: Dict[str, Any], degrees: float) -> "cq.Shape
     return cq.Workplane("XY").placeSketch(sketch).revolve(degrees, (0, 0, 0), (0, 1, 0)).val()
 
 
+def build_lofted_profiles(profiles: List[Dict[str, Any]], heights: List[float]) -> "cq.Shape":
+    if len(profiles) < 2:
+        raise ValueError("Loft plan requires at least two profiles")
+    if len(profiles) != len(heights):
+        raise ValueError("Loft plan requires heights to match profiles")
+
+    sections = [
+        build_profile_sketch(profile).moved(cq.Location(cq.Vector(0, 0, float(height))))
+        for profile, height in zip(profiles, heights)
+    ]
+    return cq.Workplane("XY").placeSketch(*sections).loft().val()
+
+
+def make_sweep_frame(
+    tangent: tuple[float, float, float],
+    preferred_up: tuple[float, float, float],
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    up = vec3_normalize(preferred_up)
+    if abs(vec3_dot(up, tangent)) > 0.95:
+        up = (0.0, 0.0, 1.0) if abs(tangent[2]) < 0.95 else (0.0, 1.0, 0.0)
+
+    x_axis = vec3_normalize(vec3_cross(up, tangent))
+    if vec3_length(x_axis) < 1e-8:
+        fallback = (1.0, 0.0, 0.0) if abs(tangent[0]) < 0.9 else (0.0, 1.0, 0.0)
+        x_axis = vec3_normalize(vec3_cross(fallback, tangent))
+
+    y_axis = vec3_normalize(vec3_cross(tangent, x_axis))
+    return x_axis, y_axis
+
+
+def build_polyline_wire(points: List[List[float]]) -> "cq.Wire":
+    if len(points) < 2:
+        raise ValueError("Sweep path requires at least two points")
+
+    edges = []
+    start = tuple(float(entry) for entry in points[0])
+    for raw_end in points[1:]:
+        end = tuple(float(entry) for entry in raw_end)
+        if vec3_length(vec3_sub(end, start)) < 1e-9:
+            continue
+        edges.append(cq.Edge.makeLine(cq.Vector(*start), cq.Vector(*end)))
+        start = end
+
+    if not edges:
+        raise ValueError("Sweep path has no non-zero segments")
+    return cq.Wire.assembleEdges(edges)
+
+
+def build_swept_profile(
+    profile: Dict[str, Any],
+    path: Dict[str, Any],
+    up: List[float],
+) -> "cq.Shape":
+    if path.get("kind") != "polyline":
+        raise ValueError(f"Unsupported sweep path kind: {path.get('kind')}")
+
+    path_points = path.get("points", [])
+    wire = build_polyline_wire(path_points)
+
+    start = tuple(float(entry) for entry in path_points[0])
+    tangent = None
+    for index in range(len(path_points) - 1):
+        candidate = vec3_sub(
+            tuple(float(entry) for entry in path_points[index + 1]),
+            tuple(float(entry) for entry in path_points[index]),
+        )
+        if vec3_length(candidate) >= 1e-9:
+            tangent = vec3_normalize(candidate)
+            break
+    if tangent is None:
+        raise ValueError("Sweep path has no non-zero segments")
+
+    x_axis, _ = make_sweep_frame(tangent, tuple(float(entry) for entry in up))
+    plane = cq.Plane(cq.Vector(*start), cq.Vector(*x_axis), cq.Vector(*tangent))
+    sketch = build_profile_sketch(profile)
+    return cq.Workplane(plane).placeSketch(sketch).sweep(wire, multisection=False).val()
+
+
 def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
     kind = plan["kind"]
     if kind == "box":
@@ -306,6 +411,10 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
         return build_extruded_profile(plan["profile"], plan["height"], plan["center"], plan.get("scaleTop"))
     if kind == "revolve":
         return build_revolved_profile(plan["profile"], plan["degrees"])
+    if kind == "loft":
+        return build_lofted_profiles(plan["profiles"], plan["heights"])
+    if kind == "sweep":
+        return build_swept_profile(plan["profile"], plan["path"], plan["up"])
     if kind == "boolean":
         return combine_shapes(plan["op"], [build_shape(item) for item in plan["shapes"]])
     if kind == "transform":

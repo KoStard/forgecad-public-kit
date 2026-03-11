@@ -168,6 +168,44 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
         degrees: plan.degrees,
       }, profile.diagnostics);
     }
+    case 'loft': {
+      const profiles: CadQueryProfilePlan[] = [];
+      const diagnostics = [];
+      for (let index = 0; index < plan.profiles.length; index += 1) {
+        const lowered = lowerProfileCompilePlanToCadQueryResultAtPath(plan.profiles[index], `${path}.profiles[${index}]`);
+        if (!lowered.ok) {
+          diagnostics.push(...lowered.diagnostics);
+          continue;
+        }
+        diagnostics.push(...lowered.diagnostics);
+        profiles.push(lowered.value);
+      }
+      if (profiles.length !== plan.profiles.length) {
+        return compilerFailure(...diagnostics);
+      }
+      return compilerSuccess({
+        kind: 'loft',
+        profiles,
+        heights: [...plan.heights],
+        edgeLength: plan.edgeLength,
+        boundsPadding: plan.boundsPadding,
+      }, diagnostics);
+    }
+    case 'sweep': {
+      const profile = lowerProfileCompilePlanToCadQueryResultAtPath(plan.profile, `${path}.profile`);
+      if (!profile.ok) return compilerFailure(...profile.diagnostics);
+      return compilerSuccess({
+        kind: 'sweep',
+        profile: profile.value,
+        path: {
+          kind: plan.path.kind,
+          points: plan.path.points.map(([x, y, z]) => [x, y, z]),
+        },
+        edgeLength: plan.edgeLength,
+        boundsPadding: plan.boundsPadding,
+        up: [plan.up[0], plan.up[1], plan.up[2]],
+      }, profile.diagnostics);
+    }
     case 'boolean': {
       const shapes: CadQueryShapePlan[] = [];
       const diagnostics = [];
