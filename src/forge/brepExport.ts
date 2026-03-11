@@ -1,6 +1,7 @@
 import { getShapeCompilePlan, type GeometryInfo, type Shape } from './kernel';
 import type { SceneObject } from './runner';
-import type { ShapeCompilePlan } from './compilePlan';
+import type { BrepShapePlan } from './brepPlan';
+import { lowerShapeCompilePlanToBrepPlan } from './compilePlanBrep';
 
 export interface BrepMesh {
   vertices: [number, number, number][];
@@ -11,7 +12,7 @@ export interface BrepExactExportObject {
   kind: 'exact';
   name: string;
   color?: string;
-  plan: ShapeCompilePlan;
+  plan: BrepShapePlan;
 }
 
 export interface BrepFacetedExportObject {
@@ -106,7 +107,7 @@ export function buildBrepExportManifest(
     }
 
     const geometryInfo = object.geometryInfo ?? object.shape.geometryInfo();
-    const plan = getShapeCompilePlan(object.shape);
+    const plan = lowerShapeCompilePlanToBrepPlan(getShapeCompilePlan(object.shape));
     if (!plan) {
       const sources = geometryInfo.sources.join('+');
       if (options.allowFaceted && geometryInfo.representation === 'mesh-solid') {

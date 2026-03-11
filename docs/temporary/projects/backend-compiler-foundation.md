@@ -82,6 +82,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 - scene-builder export payloads are isolated behind `src/forge/shapeBackendSceneBuilder.ts`.
 - `src/forge/compilePlan.ts` is now the canonical semantic plan module.
 - `src/forge/brepPlan.ts` is now a compatibility bridge, not the architectural center.
+- `src/forge/compilePlanBrep.ts` is the explicit lowering boundary into exact BREP export plans.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker
