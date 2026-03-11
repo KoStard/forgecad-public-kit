@@ -8,10 +8,32 @@ import { lowerProfileCompilePlanToCrossSection } from '../compilePlanManifold';
 
 type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type SketchPlacement3D = Mat4;
+export type SketchFace3D = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom';
+export type SketchWorkplaneSource =
+  | { kind: 'canonical-face'; face: SketchFace3D }
+  | { kind: 'tracked-face'; faceName: string }
+  | { kind: 'face-ref'; faceName?: string };
+
+export interface SketchWorkplane {
+  origin: [number, number, number];
+  u: [number, number, number];
+  v: [number, number, number];
+  normal: [number, number, number];
+  source: SketchWorkplaneSource;
+}
+
+export interface SketchPlacementModel {
+  workplane: SketchWorkplane;
+  u: number;
+  v: number;
+  protrude: number;
+  selfAnchor: Anchor;
+}
 export type SketchOperandInput = Sketch | readonly Sketch[];
 
 const _sketchCompileProfilePlans = new WeakMap<Sketch, ProfileCompilePlan | null>();
 const _sketchPlacement3D = new WeakMap<Sketch, SketchPlacement3D | null>();
+const _sketchPlacementModels = new WeakMap<Sketch, SketchPlacementModel | null>();
 
 function setSketchCompileProfilePlanInternal(sketch: Sketch, plan: ProfileCompilePlan | null): Sketch {
   _sketchCompileProfilePlans.set(sketch, cloneProfileCompilePlan(plan));
@@ -27,6 +49,43 @@ function setSketchPlacement3DInternal(sketch: Sketch, placement: SketchPlacement
   return sketch;
 }
 
+function cloneSketchWorkplaneSource(source: SketchWorkplaneSource): SketchWorkplaneSource {
+  switch (source.kind) {
+    case 'canonical-face':
+      return { kind: 'canonical-face', face: source.face };
+    case 'tracked-face':
+      return { kind: 'tracked-face', faceName: source.faceName };
+    case 'face-ref':
+      return { kind: 'face-ref', faceName: source.faceName };
+  }
+}
+
+function cloneSketchWorkplane(workplane: SketchWorkplane): SketchWorkplane {
+  return {
+    origin: [workplane.origin[0], workplane.origin[1], workplane.origin[2]],
+    u: [workplane.u[0], workplane.u[1], workplane.u[2]],
+    v: [workplane.v[0], workplane.v[1], workplane.v[2]],
+    normal: [workplane.normal[0], workplane.normal[1], workplane.normal[2]],
+    source: cloneSketchWorkplaneSource(workplane.source),
+  };
+}
+
+function cloneSketchPlacementModel(model: SketchPlacementModel | null): SketchPlacementModel | null {
+  if (!model) return null;
+  return {
+    workplane: cloneSketchWorkplane(model.workplane),
+    u: model.u,
+    v: model.v,
+    protrude: model.protrude,
+    selfAnchor: model.selfAnchor,
+  };
+}
+
+function setSketchPlacementModelInternal(sketch: Sketch, model: SketchPlacementModel | null): Sketch {
+  _sketchPlacementModels.set(sketch, cloneSketchPlacementModel(model));
+  return sketch;
+}
+
 export class Sketch {
   public colorHex: string | undefined;
 
@@ -34,21 +93,28 @@ export class Sketch {
     this.colorHex = color;
     setSketchCompileProfilePlanInternal(this, null);
     setSketchPlacement3DInternal(this, null);
+    setSketchPlacementModelInternal(this, null);
   }
 
   /** Set the color of this sketch (hex string, e.g. "#ff0000") */
   color(value: string | undefined): Sketch {
-    return setSketchPlacement3DInternal(
-      setSketchCompileProfilePlanInternal(new Sketch(this.cross, value), getSketchCompileProfilePlan(this)),
-      getSketchPlacement3D(this),
+    return setSketchPlacementModelInternal(
+      setSketchPlacement3DInternal(
+        setSketchCompileProfilePlanInternal(new Sketch(this.cross, value), getSketchCompileProfilePlan(this)),
+        getSketchPlacement3D(this),
+      ),
+      getSketchPlacementModel(this),
     );
   }
 
   /** Return a new Sketch wrapper for explicit duplication in scripts. */
   clone(): Sketch {
-    return setSketchPlacement3DInternal(
-      setSketchCompileProfilePlanInternal(new Sketch(this.cross, this.colorHex), getSketchCompileProfilePlan(this)),
-      getSketchPlacement3D(this),
+    return setSketchPlacementModelInternal(
+      setSketchPlacement3DInternal(
+        setSketchCompileProfilePlanInternal(new Sketch(this.cross, this.colorHex), getSketchCompileProfilePlan(this)),
+        getSketchPlacement3D(this),
+      ),
+      getSketchPlacementModel(this),
     );
   }
 
@@ -122,8 +188,23 @@ export function setSketchPlacement3D(sketch: Sketch, placement: SketchPlacement3
   return setSketchPlacement3DInternal(sketch, placement);
 }
 
+export function getSketchPlacementModel(sketch: Sketch): SketchPlacementModel | null {
+  return cloneSketchPlacementModel(_sketchPlacementModels.get(sketch) ?? null);
+}
+
+export function setSketchPlacementModel(sketch: Sketch, model: SketchPlacementModel | null): Sketch {
+  return setSketchPlacementModelInternal(sketch, model);
+}
+
+export function getSketchWorkplane(sketch: Sketch): SketchWorkplane | null {
+  return cloneSketchPlacementModel(_sketchPlacementModels.get(sketch) ?? null)?.workplane ?? null;
+}
+
 export function copySketchPlacement3D(source: Sketch, target: Sketch): Sketch {
-  return setSketchPlacement3DInternal(target, getSketchPlacement3D(source));
+  return setSketchPlacementModelInternal(
+    setSketchPlacement3DInternal(target, getSketchPlacement3D(source)),
+    getSketchPlacementModel(source),
+  );
 }
 
 function matricesNearlyEqual(a: SketchPlacement3D | null, b: SketchPlacement3D | null, eps = 1e-8): boolean {
@@ -134,11 +215,50 @@ function matricesNearlyEqual(a: SketchPlacement3D | null, b: SketchPlacement3D |
   return true;
 }
 
+function workplanesNearlyEqual(a: SketchWorkplane | null, b: SketchWorkplane | null, eps = 1e-8): boolean {
+  if (a == null || b == null) return a == null && b == null;
+  if (a.source.kind !== b.source.kind) return false;
+  if (a.source.kind === 'canonical-face' && b.source.kind === 'canonical-face' && a.source.face !== b.source.face) return false;
+  if (a.source.kind === 'tracked-face' && b.source.kind === 'tracked-face' && a.source.faceName !== b.source.faceName) return false;
+  if (a.source.kind === 'face-ref' && b.source.kind === 'face-ref' && a.source.faceName !== b.source.faceName) return false;
+
+  const vectors = [
+    [a.origin, b.origin],
+    [a.u, b.u],
+    [a.v, b.v],
+    [a.normal, b.normal],
+  ] as const;
+  for (const [lhs, rhs] of vectors) {
+    for (let index = 0; index < lhs.length; index += 1) {
+      if (Math.abs(lhs[index] - rhs[index]) > eps) return false;
+    }
+  }
+  return true;
+}
+
+function placementModelsNearlyEqual(a: SketchPlacementModel | null, b: SketchPlacementModel | null, eps = 1e-8): boolean {
+  if (a == null || b == null) return a == null && b == null;
+  return workplanesNearlyEqual(a.workplane, b.workplane, eps)
+    && Math.abs(a.u - b.u) <= eps
+    && Math.abs(a.v - b.v) <= eps
+    && Math.abs(a.protrude - b.protrude) <= eps
+    && a.selfAnchor === b.selfAnchor;
+}
+
 export function mergeSketchPlacement3D(sketches: Sketch[]): SketchPlacement3D | null {
   if (sketches.length === 0) return null;
   const first = getSketchPlacement3D(sketches[0]);
   for (let i = 1; i < sketches.length; i += 1) {
     if (!matricesNearlyEqual(first, getSketchPlacement3D(sketches[i]))) return null;
+  }
+  return first;
+}
+
+export function mergeSketchPlacementModel(sketches: Sketch[]): SketchPlacementModel | null {
+  if (sketches.length === 0) return null;
+  const first = getSketchPlacementModel(sketches[0]);
+  for (let i = 1; i < sketches.length; i += 1) {
+    if (!placementModelsNearlyEqual(first, getSketchPlacementModel(sketches[i]))) return null;
   }
   return first;
 }

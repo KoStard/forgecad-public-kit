@@ -6,6 +6,8 @@
  */
 import { initKernel, box } from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
+import { rect, roundedRect } from '../src/forge/sketch';
+import { getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
 
 function fail(message: string): never {
   throw new Error(message);
@@ -118,10 +120,72 @@ return source.attachTo(target, 'left-front', 'front-left');
   expectVec(bb.max as [number, number, number], [-6, -1, 2], 'interop.attachTo.max');
 }
 
+function checkCanonicalFaceWorkplaneRecording(): void {
+  const target = box(20, 10, 6, true);
+  const sketch = rect(8, 4).onFace(target, 'front', {
+    u: 3,
+    v: -2,
+    protrude: 1,
+    selfAnchor: 'top-left',
+  });
+
+  const placement = getSketchPlacementModel(sketch);
+  const workplane = getSketchWorkplane(sketch);
+  expect(placement != null, 'canonical workplane placement should be recorded');
+  expect(workplane != null, 'canonical workplane should be available');
+  expect(placement!.workplane.source.kind === 'canonical-face', 'expected canonical face workplane source');
+  expect(placement!.workplane.source.face === 'front', 'expected canonical front face source');
+  expectVec(placement!.workplane.origin, target.referencePoint('front'), 'workplane.canonical.origin');
+  expectVec(placement!.workplane.normal, [0, -1, 0], 'workplane.canonical.normal');
+  expect(placement!.u === 3 && placement!.v === -2 && placement!.protrude === 1, 'canonical offsets should be preserved');
+  expect(placement!.selfAnchor === 'top-left', 'canonical selfAnchor should be preserved');
+  expect(JSON.stringify(workplane) === JSON.stringify(placement!.workplane), 'getSketchWorkplane should mirror placement model workplane');
+}
+
+function checkTrackedFaceWorkplaneRecording(): void {
+  const target = roundedRect(20, 12, 2, true).extrude(6, { center: true });
+  const sketch = rect(6, 4).onFace(target, 'top', {
+    u: 2,
+    v: 1,
+    protrude: 0.5,
+    selfAnchor: 'center',
+  });
+
+  const placement = getSketchPlacementModel(sketch);
+  expect(placement != null, 'tracked-face workplane placement should be recorded');
+  expect(placement!.workplane.source.kind === 'tracked-face', 'expected tracked-face workplane source');
+  expect(placement!.workplane.source.faceName === 'top', 'expected tracked top face source');
+  expectVec(placement!.workplane.origin, target.face('top').center, 'workplane.tracked.origin');
+  expectVec(placement!.workplane.normal, target.face('top').normal, 'workplane.tracked.normal');
+
+  const transformed = sketch.translate(4, -1).rotate(30);
+  expect(
+    JSON.stringify(getSketchPlacementModel(transformed)) === JSON.stringify(placement),
+    '2D sketch transforms should preserve semantic workplane placement',
+  );
+}
+
+function checkDirectFaceRefWorkplaneRecording(): void {
+  const target = roundedRect(18, 10, 1.5, true).extrude(5, { center: true });
+  const sketch = rect(4, 3).onFace(target.face('top'), {
+    u: -1,
+    v: 2,
+    protrude: 0.25,
+  });
+
+  const placement = getSketchPlacementModel(sketch);
+  expect(placement != null, 'direct face-ref workplane placement should be recorded');
+  expect(placement!.workplane.source.kind === 'face-ref', 'expected direct face-ref workplane source');
+  expect(placement!.workplane.source.faceName === 'top', 'expected face-ref source name to be preserved');
+}
+
 export async function runCheckPlacementReferencesCli(): Promise<void> {
   await initKernel();
   checkTransformAndPlacementHelpers();
   checkImportRuntimePropagation();
   checkShapeTrackedShapePlacementInterop();
+  checkCanonicalFaceWorkplaneRecording();
+  checkTrackedFaceWorkplaneRecording();
+  checkDirectFaceRefWorkplaneRecording();
   console.log('✓ Placement reference invariants passed');
 }

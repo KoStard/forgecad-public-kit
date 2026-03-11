@@ -3,9 +3,11 @@ import {
   Sketch,
   type SketchOperandInput,
   getSketchCompileProfilePlan,
+  mergeSketchPlacementModel,
   mergeSketchPlacement3D,
   setSketchCompileProfilePlan,
   setSketchPlacement3D,
+  setSketchPlacementModel,
 } from './core';
 import { getWasm } from '../kernel';
 import { buildBooleanProfileCompilePlan, buildHullProfileCompilePlan } from '../compilePlan';
@@ -33,11 +35,14 @@ export function sketchAdd(sketch: Sketch, ...others: SketchOperandInput[]): Sket
     'Use sketch.add(other1, other2) or sketch.add([other1, other2]).',
   )];
   const nextPlan = buildBooleanProfileCompilePlan('union', sketches.map((entry) => getSketchCompileProfilePlan(entry)));
-  return setSketchPlacement3D(
-    nextPlan
-      ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.union(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
-    mergeSketchPlacement3D(sketches),
+  return setSketchPlacementModel(
+    setSketchPlacement3D(
+      nextPlan
+        ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
+        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.union(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
+      mergeSketchPlacement3D(sketches),
+    ),
+    mergeSketchPlacementModel(sketches),
   );
 }
 
@@ -49,11 +54,14 @@ export function sketchSubtract(sketch: Sketch, ...others: SketchOperandInput[]):
     'Use sketch.subtract(other1, other2) or sketch.subtract([other1, other2]).',
   )];
   const nextPlan = buildBooleanProfileCompilePlan('difference', sketches.map((entry) => getSketchCompileProfilePlan(entry)));
-  return setSketchPlacement3D(
-    nextPlan
-      ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.difference(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
-    mergeSketchPlacement3D(sketches),
+  return setSketchPlacementModel(
+    setSketchPlacement3D(
+      nextPlan
+        ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
+        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.difference(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
+      mergeSketchPlacement3D(sketches),
+    ),
+    mergeSketchPlacementModel(sketches),
   );
 }
 
@@ -65,11 +73,14 @@ export function sketchIntersect(sketch: Sketch, ...others: SketchOperandInput[])
     'Use sketch.intersect(other1, other2) or sketch.intersect([other1, other2]).',
   )];
   const nextPlan = buildBooleanProfileCompilePlan('intersection', sketches.map((entry) => getSketchCompileProfilePlan(entry)));
-  return setSketchPlacement3D(
-    nextPlan
-      ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.intersection(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
-    mergeSketchPlacement3D(sketches),
+  return setSketchPlacementModel(
+    setSketchPlacement3D(
+      nextPlan
+        ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
+        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.intersection(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
+      mergeSketchPlacement3D(sketches),
+    ),
+    mergeSketchPlacementModel(sketches),
   );
 }
 
@@ -83,11 +94,14 @@ export function union2d(...inputs: SketchOperandInput[]): Sketch {
   if (sketches.length === 0) throw new Error('union2d requires at least one sketch');
   if (sketches.length === 1) return sketches[0];
   const nextPlan = buildBooleanProfileCompilePlan('union', sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
-  return setSketchPlacement3D(
-    nextPlan
-      ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-      : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.union(sketches.map(s => s.cross)), sketches[0].colorHex), null),
-    mergeSketchPlacement3D(sketches),
+  return setSketchPlacementModel(
+    setSketchPlacement3D(
+      nextPlan
+        ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
+        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.union(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+      mergeSketchPlacement3D(sketches),
+    ),
+    mergeSketchPlacementModel(sketches),
   );
 }
 
@@ -100,11 +114,14 @@ export function difference2d(...inputs: SketchOperandInput[]): Sketch {
   );
   if (sketches.length < 2) throw new Error('difference2d requires at least two sketches');
   const nextPlan = buildBooleanProfileCompilePlan('difference', sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
-  return setSketchPlacement3D(
-    nextPlan
-      ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-      : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.difference(sketches.map(s => s.cross)), sketches[0].colorHex), null),
-    mergeSketchPlacement3D(sketches),
+  return setSketchPlacementModel(
+    setSketchPlacement3D(
+      nextPlan
+        ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
+        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.difference(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+      mergeSketchPlacement3D(sketches),
+    ),
+    mergeSketchPlacementModel(sketches),
   );
 }
 
@@ -117,11 +134,14 @@ export function intersection2d(...inputs: SketchOperandInput[]): Sketch {
   );
   if (sketches.length < 2) throw new Error('intersection2d requires at least two sketches');
   const nextPlan = buildBooleanProfileCompilePlan('intersection', sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
-  return setSketchPlacement3D(
-    nextPlan
-      ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-      : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.intersection(sketches.map(s => s.cross)), sketches[0].colorHex), null),
-    mergeSketchPlacement3D(sketches),
+  return setSketchPlacementModel(
+    setSketchPlacement3D(
+      nextPlan
+        ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
+        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.intersection(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+      mergeSketchPlacement3D(sketches),
+    ),
+    mergeSketchPlacementModel(sketches),
   );
 }
 
@@ -134,11 +154,14 @@ export function hull2d(...inputs: SketchOperandInput[]): Sketch {
   );
   if (sketches.length === 0) throw new Error('hull2d requires at least one sketch');
   const nextPlan = buildHullProfileCompilePlan(sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
-  return setSketchPlacement3D(
-    nextPlan
-      ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-      : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.hull(sketches.map(s => s.cross)), sketches[0].colorHex), null),
-    mergeSketchPlacement3D(sketches),
+  return setSketchPlacementModel(
+    setSketchPlacement3D(
+      nextPlan
+        ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
+        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.hull(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+      mergeSketchPlacement3D(sketches),
+    ),
+    mergeSketchPlacementModel(sketches),
   );
 }
 
