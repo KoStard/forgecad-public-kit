@@ -221,6 +221,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 | Export exact BREP (supported subset only) | `npm run brep -- examples/api/brep-exportable.forge.js` |
 | Generate report PDF | `npm run report -- examples/cup.forge.js` |
 | Parameter robustness scan | `npm run param-check -- examples/shoe-rack-doors.forge.js --samples 10` |
+| Prune merged local-only branches | `npm run prune:branches` |
 | Transform invariants | `npm run check:transforms` |
 | Dimension propagation invariants | `npm run check:dimensions` |
 
@@ -232,6 +233,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 - `svg` runs fully in Node (no browser/Puppeteer).
 - `report` generates searchable-text PDF pages (overview, unique components, BOM, dimensions).
 - `param-check` samples parameter ranges and reports runtime errors, degenerates, and new collisions.
+- `prune:branches` is a `uv` + Rich utility that reviews local-only branches already merged into `mainline`, removes linked worktrees first, and asks before each deletion.
 
 ## Start with these examples
 

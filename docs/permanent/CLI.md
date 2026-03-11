@@ -407,6 +407,23 @@ Prints:
 - per-object approximate dimension ownership (both endpoints inside object bbox)
 - a dimension coordinate list (first 20 by default, `--all` for full dump)
 
+### Local Branch Cleanup
+
+```bash
+npm run prune:branches
+npm run prune:branches -- --dry-run
+npm run prune:branches -- --base mainline
+```
+
+This is a `uv`-backed Python utility for repository housekeeping. It finds local branches with no matching remote branch that are already merged into the selected base ref, shows them in a Rich terminal UI, then prompts one by one before deleting anything.
+
+Behavior:
+- Deletes with `git branch -d`, not force-delete
+- Removes linked worktrees first when the branch is checked out in a secondary worktree
+- Requires an explicit `force` choice if one of those linked worktrees is dirty
+- Refuses to touch the current worktree, the primary worktree, or prunable/missing worktree entries
+- `--path` lets you point at any location inside the target repository
+
 ## Adding New CLI Commands
 
 1. Create `cli/your-command.ts`

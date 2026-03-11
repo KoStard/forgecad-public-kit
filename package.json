@@ -28,6 +28,7 @@
     "check:dimensions": "npx tsx cli/check-dimensions.ts",
     "check:api": "npx tsx cli/check-api-contracts.ts",
     "debug:dimensions": "npx tsx cli/debug-dimensions.ts",
+    "prune:branches": "uv run cli/forge-prune-local-branches.py",
     "meta:init": "bash scripts/local-meta.sh init",
     "meta:status": "bash scripts/local-meta.sh status",
     "meta:path": "bash scripts/local-meta.sh path"
