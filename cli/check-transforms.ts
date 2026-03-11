@@ -479,7 +479,7 @@ function testBevelGearTopSectionCircularity() {
   );
 }
 
-async function main() {
+export async function runCheckTransformsCli(): Promise<void> {
   await initKernel();
   testTransformMulOrder();
   testAssemblyChainAgainstAnalytic();
@@ -495,8 +495,3 @@ async function main() {
   testBevelGearTopSectionCircularity();
   console.log('✓ Transform and assembly invariants passed');
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

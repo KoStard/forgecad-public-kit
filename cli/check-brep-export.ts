@@ -380,7 +380,7 @@ return [
   assert.equal(facetedManifest.fallbacks.length, 3, 'Expected faceted fallbacks for all segmented runtime-hint shapes');
 }
 
-async function main() {
+export async function runCheckBrepExportCli(): Promise<void> {
   await init();
   checkRoundedRectProfileTransforms();
   checkRoundedRectBooleanChain();
@@ -399,8 +399,3 @@ async function main() {
   checkSegmentedRuntimeHintsStayOutOfExactSubset();
   console.log('✓ BREP export invariants passed');
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

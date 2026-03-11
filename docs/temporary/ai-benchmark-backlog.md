@@ -31,7 +31,7 @@ Supports solid and hollow pipes, angle-based and direction-based orientation. Ad
 
 ## ✅ Done: Parameter Collision Detection (Static Analysis)
 
-New CLI tool: `npm run param-check -- script.forge.js [--samples N]`
+New CLI tool: `forgecad check params script.forge.js [--samples N]`
 
 Samples each parameter at N evenly-spaced values across its range (default 8) and checks for:
 1. Runtime errors at certain values

@@ -8,14 +8,14 @@ This file collects patterns, best practices, debugging tips, and example snippet
 - Default to a buildable first pass instead of a long proposal when the user clearly wants geometry changed.
 - Replace a broken or incoherent model wholesale when that is faster and cleaner than incremental patching.
 - Keep printed hardware structurally honest: use it for guides, spacers, retainers, and moderate-load mechanisms; use wood or metal for primary strength.
-- Validate early with `npm run test-run -- <file>` and refine from the actual runtime result.
+- Validate early with `forgecad run <file>` and refine from the actual runtime result.
 - Prefer a few clean part files over one giant script once a design has repeated hardware or a small mechanism.
 
 Notebook helpers worth using during iteration:
 
 - `show(...)` pins the current intermediate geometry in the viewport
-- `npm run notebook -- view <file> preview` prints the preview cell with stored outputs in the terminal
-- `npm run test-run -- <file>.forge-notebook.json` validates the preview cell and runs the usual spatial analysis
+- `forgecad notebook view <file> preview` prints the preview cell with stored outputs in the terminal
+- `forgecad run <file>.forge-notebook.json` validates the preview cell and runs the usual spatial analysis
 
 ## Common Patterns
 

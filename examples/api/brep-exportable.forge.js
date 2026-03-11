@@ -1,5 +1,5 @@
 // Exact-exportable subset demo for STEP/BREP.
-// Run: npm run step -- examples/api/brep-exportable.forge.js
+// Run: forgecad export step examples/api/brep-exportable.forge.js
 
 const plate = rect(120, 80, true).extrude(10).color('#748b99');
 const boss = cylinder(24, 18).translate(0, 0, 10).color('#b7c4cc');

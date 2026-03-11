@@ -5,15 +5,16 @@
 ### Building & Running
 ```bash
 npm install          # Install dependencies
-npm run dev          # Start dev server (localhost:5173)
+npm link             # Install the local forgecad binary
+forgecad studio      # Start the browser studio (localhost:5173)
 npm run build        # Production build
 npm run preview      # Preview production build
 ```
 
 ### CLI Tools
 ```bash
-npm run svg -- examples/frame.sketch.js          # Export sketch to SVG (Node, no browser)
-npm run render -- examples/cup.forge.js           # Render to PNG (Puppeteer + Chrome)
+forgecad export svg examples/frame.sketch.js     # Export sketch to SVG (Node, no browser)
+forgecad render examples/cup.forge.js            # Render to PNG (Puppeteer + Chrome)
 ```
 
 See [CLI.md](CLI.md) for full CLI documentation.
@@ -60,8 +61,8 @@ src/
 └── main.tsx              # React entry point
 
 cli/
+├── forgecad.ts           # Top-level CLI entrypoint and command routing
 ├── forge-svg.ts          # SVG export (uses real engine via headless.ts)
-├── forge-svg.mjs         # Legacy wrapper (redirects to .ts version)
 ├── forge-render.mjs      # PNG render launcher (Puppeteer)
 ├── render.ts             # Headless render entry (loaded in browser by Puppeteer)
 └── render.html           # HTML shell for headless render
@@ -139,9 +140,9 @@ Root cause: **missing, enforced transform/frame composition contract across code
 
 ### Enforcement
 - Any change touching transforms, joints, or assembly solving must run:
-  - `npm run check:transforms`
+  - `forgecad check transforms`
 - If the change affects user-facing geometry behavior, also run:
-  - `npm run test-run -- <affected-example>`
+  - `forgecad run <affected-example>`
 
 ## Editor Declaration Parity Standard (Required)
 
@@ -174,7 +175,7 @@ This standard is package-wide for any API exposed to user scripts.
 
 ### Enforcement
 - Any change to user-facing script APIs must run:
-  - `npm run check:api`
+  - `forgecad check api`
 - If the change also affects transforms, dimensions, placement refs, or geometry semantics, run the relevant existing invariant checks too.
 
 ## Git Workflow

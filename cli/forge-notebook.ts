@@ -2,13 +2,13 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { spawn, type ChildProcess } from 'child_process';
 import { createServer } from 'net';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { resolve } from 'path';
 import { stdin as input } from 'node:process';
 import { findProjectRoot } from './collect-files';
 import { exportNotebookToForgeScript, notebookDefaultScriptPath } from '../src/notebook/export';
 import { parseNotebook } from '../src/notebook/model';
 import { renderNotebookForTerminal } from '../src/notebook/terminal';
+import { packageRootFrom, spawnPackageVite } from './package-runtime';
 
 type NotebookOutput =
   | {
@@ -58,23 +58,23 @@ interface ServerHandle {
   requestTarget: string;
 }
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = packageRootFrom(import.meta.url);
 const DEFAULT_PORT = parseInt(process.env.FORGE_PORT || '5173', 10);
 
 function usage(exitCode = 0): never {
   console.error(`Usage:
-  npm run notebook -- <notebook.forge-notebook.json> --code "show(box(40, 20, 10));"
-  npm run notebook -- <notebook.forge-notebook.json> --file /tmp/cell.js
-  cat /tmp/cell.js | npm run notebook -- <notebook.forge-notebook.json>
-  npm run notebook -- <notebook.forge-notebook.json>
-  npm run notebook -- view <notebook.forge-notebook.json> [cell-number|cell-id|preview]
-  npm run notebook -- export <notebook.forge-notebook.json> [output.forge.js]
+  forgecad notebook <notebook.forge-notebook.json> --code "show(box(40, 20, 10));"
+  forgecad notebook <notebook.forge-notebook.json> --file /tmp/cell.js
+  cat /tmp/cell.js | forgecad notebook <notebook.forge-notebook.json>
+  forgecad notebook <notebook.forge-notebook.json>
+  forgecad notebook view <notebook.forge-notebook.json> [cell-number|cell-id|preview]
+  forgecad notebook export <notebook.forge-notebook.json> [output.forge.js]
 
 Explicit subcommands are still available:
-  npm run notebook -- append <notebook.forge-notebook.json> [--code "..."] [--file path] [--after cell-id]
-  npm run notebook -- run <notebook.forge-notebook.json> [cell-id]
-  npm run notebook -- view <notebook.forge-notebook.json> [cell-number|cell-id|preview]
-  npm run notebook -- export <notebook.forge-notebook.json> [output.forge.js]
+  forgecad notebook append <notebook.forge-notebook.json> [--code "..."] [--file path] [--after cell-id]
+  forgecad notebook run <notebook.forge-notebook.json> [cell-id]
+  forgecad notebook view <notebook.forge-notebook.json> [cell-number|cell-id|preview]
+  forgecad notebook export <notebook.forge-notebook.json> [output.forge.js]
 
 Notes:
   append auto-creates the notebook file if it does not exist yet
@@ -232,13 +232,12 @@ function parseLocalUrl(chunk: string): string | null {
 
 async function startServer(projectDir: string, preferredPort: number): Promise<Pick<ServerHandle, 'baseUrl' | 'process'>> {
   const localPortFree = await startPortProbe(preferredPort);
-  const args = ['vite', '--port', String(preferredPort), '--', projectDir];
-  const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const child = spawn(command, args, {
+  const child = spawnPackageVite(import.meta.url, ['--port', String(preferredPort)], {
     cwd: repoRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
+      FORGE_PROJECT: projectDir,
       FORCE_COLOR: '0',
     },
   });
@@ -351,8 +350,8 @@ function viewNotebook(cli: ParsedCli): void {
   }));
 }
 
-async function main() {
-  const cli = parseCli(process.argv.slice(2));
+export async function runNotebookCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const cli = parseCli(argv);
   if (cli.command === 'export') {
     exportNotebook(cli);
     return;
@@ -384,8 +383,3 @@ async function main() {
     stopServer(server);
   }
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

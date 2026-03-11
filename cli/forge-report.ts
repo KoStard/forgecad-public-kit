@@ -11,28 +11,28 @@ import { readFile, writeFile } from 'fs/promises';
 import { resolve, basename } from 'path';
 import { init, runScript, generateReportPdf } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
+function argValue(argv: string[], name: string): string | undefined {
+  const idx = argv.indexOf(name);
+  if (idx === -1) return undefined;
+  return argv[idx + 1];
+}
 
-const scriptPath = process.argv[2];
-if (!scriptPath) {
-  console.error('Usage: npx tsx cli/forge-report.ts <script.forge.js> [output.pdf] [--dim-angle-tol <deg>]');
+function usage(): never {
+  console.error('Usage: forgecad export report <script.forge.js> [output.pdf] [--dim-angle-tol <deg>]');
   process.exit(1);
 }
 
-const defaultOut = scriptPath.replace(/\.(forge\.)?js$/, '.report.pdf');
-const outputPath = process.argv[3] && !process.argv[3].startsWith('--')
-  ? process.argv[3]
-  : defaultOut;
+export async function runReportCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const scriptPath = argv[0];
+  if (!scriptPath) usage();
 
-const argValue = (name: string): string | undefined => {
-  const idx = process.argv.indexOf(name);
-  if (idx === -1) return undefined;
-  return process.argv[idx + 1];
-};
+  const defaultOut = scriptPath.replace(/\.(forge\.)?js$/, '.report.pdf');
+  const outputPath = argv[1] && !argv[1].startsWith('--')
+    ? argv[1]
+    : defaultOut;
+  const toleranceArg = argValue(argv, '--dim-angle-tol');
+  const dimAngleToleranceDeg = toleranceArg != null ? Number(toleranceArg) : undefined;
 
-const toleranceArg = argValue('--dim-angle-tol');
-const dimAngleToleranceDeg = toleranceArg != null ? Number(toleranceArg) : undefined;
-
-async function main() {
   const source = await readFile(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
@@ -64,8 +64,3 @@ async function main() {
     console.log(`  Dimension angle tolerance: ${dimAngleToleranceDeg}°`);
   }
 }
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
