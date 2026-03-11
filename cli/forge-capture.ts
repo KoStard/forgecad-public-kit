@@ -22,6 +22,10 @@ import { createServer } from 'net';
 import { PNG } from 'pngjs';
 import gifenc from 'gifenc';
 import { collectProjectFiles } from './collect-files';
+import {
+  materializeNotebookPreviewScript,
+  replaceRenderableInputExtension,
+} from './notebook-entry';
 import { parseCameraCliSpec } from '../src/capture/cameraState';
 import {
   mergeViewportRenderSceneStates,
@@ -164,7 +168,7 @@ function usage(config: CaptureCliEntryConfig): string {
   return `ForgeCAD Capture Renderer
 
 Usage:
-  npx tsx ${config.command} <script.forge.js> [output.${config.defaultFormat}] [options]
+  npx tsx ${config.command} <script.forge.js|notebook.forge-notebook.json> [output.${config.defaultFormat}] [options]
 
 Options:
   --format <gif|mp4>           Output format (default: ${config.defaultFormat})
@@ -240,7 +244,7 @@ function inferFormatFromPath(path: string | undefined): OutputFormat | null {
 
 function defaultOutputPath(scriptPath: string, format: OutputFormat, capture: CaptureType): string {
   const suffix = capture === 'animation' ? 'animation' : 'orbit';
-  return scriptPath.replace(/\.(forge\.)?js$/, `.${suffix}.${format}`);
+  return replaceRenderableInputExtension(scriptPath, `.${suffix}.${format}`);
 }
 
 function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
@@ -414,7 +418,7 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
   }
 
   if (!scriptPath) {
-    throw new Error('Missing input .forge.js path');
+    throw new Error('Missing input .forge.js or .forge-notebook.json path');
   }
 
   const inferredFormat = inferFormatFromPath(outputPath);
@@ -984,7 +988,8 @@ export async function runCaptureCli(config: CaptureCliEntryConfig): Promise<void
   const ffmpegPath = findFfmpegPath(options.ffmpegPath);
   const encoderMode = resolveEncoderMode(options.format, options.encoder, ffmpegPath);
 
-  const input = resolve(options.scriptPath);
+  const materialized = materializeNotebookPreviewScript(options.scriptPath);
+  const input = resolve(materialized.runnablePath);
   const source = await readFile(input, 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(input);
 
@@ -1107,5 +1112,6 @@ export async function runCaptureCli(config: CaptureCliEntryConfig): Promise<void
       await browser.close();
     }
     await stopDevServer(viteProc);
+    materialized.cleanup();
   }
 }

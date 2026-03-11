@@ -10,7 +10,7 @@
     "build": "tsc && vite build",
     "build:skill:forgecad": "node scripts/build-forgecad-skill.mjs",
     "preview": "vite preview",
-    "render": "node cli/forge-render.mjs",
+    "render": "npx tsx cli/forge-render.ts",
     "gif": "npx tsx cli/forge-gif.ts",
     "record": "npx tsx cli/forge-record.ts",
     "report": "npx tsx cli/forge-report.ts",

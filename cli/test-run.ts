@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * ForgeCAD CLI — Validate a .forge.js script (no browser needed)
- * Usage: npx tsx cli/test-run.ts [--debug-imports] <script.forge.js>
+ * ForgeCAD CLI — Validate a .forge.js or .forge-notebook.json input (no browser needed)
+ * Usage: npx tsx cli/test-run.ts [--debug-imports] <script.forge.js|notebook.forge-notebook.json>
  */
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { init, runScript } from "../src/forge/headless";
 import { collectProjectFiles } from "./collect-files";
+import { materializeNotebookPreviewScript } from "./notebook-entry";
 import type { Shape } from "../src/forge/kernel";
 
 const args = process.argv.slice(2);
@@ -14,7 +15,7 @@ const debugImports = args.includes('--debug-imports');
 const positional = args.filter((arg) => arg !== '--debug-imports');
 const scriptPath = positional[0];
 if (!scriptPath) {
-  console.error("Usage: npx tsx cli/test-run.ts [--debug-imports] <script.forge.js>");
+  console.error("Usage: npx tsx cli/test-run.ts [--debug-imports] <script.forge.js|notebook.forge-notebook.json>");
   process.exit(1);
 }
 
@@ -158,74 +159,80 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
 }
 
 async function main() {
-  const code = readFileSync(resolve(scriptPath), "utf-8");
-  const { allFiles, fileName } = collectProjectFiles(scriptPath);
+  const materialized = materializeNotebookPreviewScript(scriptPath);
 
-  await init();
-  const result = runScript(code, fileName, allFiles, { debugImports });
+  try {
+    const code = readFileSync(resolve(materialized.runnablePath), "utf-8");
+    const { allFiles, fileName } = collectProjectFiles(materialized.runnablePath);
 
-  if (result.error) {
-    console.error("ERROR:", result.error);
-    if (result.logs?.length) {
-      for (const log of result.logs) {
-        console.error(`  [${log.level}]`, ...log.args);
+    await init();
+    const result = runScript(code, fileName, allFiles, { debugImports });
+
+    if (result.error) {
+      console.error("ERROR:", result.error);
+      if (result.logs?.length) {
+        for (const log of result.logs) {
+          console.error(`  [${log.level}]`, ...log.args);
+        }
+      }
+      process.exit(1);
+    }
+
+    console.log(`✓ Objects: ${result.objects.length}`);
+    for (const obj of result.objects) {
+      const grpTag = obj.groupName ? ` [${obj.groupName}]` : '';
+      const geomTag = obj.geometryInfo
+        ? `  geom=${obj.geometryInfo.backend}/${obj.geometryInfo.representation}/${obj.geometryInfo.fidelity}/topology:${obj.geometryInfo.topology}/sources:${obj.geometryInfo.sources.join('+')}`
+        : '';
+      if (obj.shape) {
+        const bb = obj.shape.boundingBox();
+        console.log(
+          `  ${obj.name}${grpTag}: vol=${obj.shape.volume().toFixed(1)}mm³  bbox=[${bb.min.map((v: number) => v.toFixed(1))}] → [${bb.max.map((v: number) => v.toFixed(1))}]${geomTag}`
+        );
+      }
+      if (obj.sketch) {
+        console.log(`  ${obj.name}${grpTag}: area=${obj.sketch.area().toFixed(1)}mm²`);
       }
     }
-    process.exit(1);
-  }
 
-  console.log(`✓ Objects: ${result.objects.length}`);
-  for (const obj of result.objects) {
-    const grpTag = obj.groupName ? ` [${obj.groupName}]` : '';
-    const geomTag = obj.geometryInfo
-      ? `  geom=${obj.geometryInfo.backend}/${obj.geometryInfo.representation}/${obj.geometryInfo.fidelity}/topology:${obj.geometryInfo.topology}/sources:${obj.geometryInfo.sources.join('+')}`
-      : '';
-    if (obj.shape) {
-      const bb = obj.shape.boundingBox();
-      console.log(
-        `  ${obj.name}${grpTag}: vol=${obj.shape.volume().toFixed(1)}mm³  bbox=[${bb.min.map((v: number) => v.toFixed(1))}] → [${bb.max.map((v: number) => v.toFixed(1))}]${geomTag}`
-      );
+    const diagnostics = (result.logs || []).filter((log: any) => log.level === 'warn' || log.level === 'error');
+    if (diagnostics.length > 0) {
+      console.log(`\n⚠ Script diagnostics:`);
+      for (const log of diagnostics) {
+        console.log(`  [${log.level}] ${log.args.join(' ')}`);
+      }
     }
-    if (obj.sketch) {
-      console.log(`  ${obj.name}${grpTag}: area=${obj.sketch.area().toFixed(1)}mm²`);
+
+    if (debugImports) {
+      const importLogs = (result.logs || []).filter((log: any) => log.level === 'info' && log.args[0]?.startsWith('[import]'));
+      console.log(`\n✓ Import trace: ${importLogs.length} event(s)`);
+      for (const log of importLogs) {
+        console.log(`  ${log.args.join(' ')}`);
+      }
     }
-  }
 
-  const diagnostics = (result.logs || []).filter((log: any) => log.level === 'warn' || log.level === 'error');
-  if (diagnostics.length > 0) {
-    console.log(`\n⚠ Script diagnostics:`);
-    for (const log of diagnostics) {
-      console.log(`  [${log.level}] ${log.args.join(' ')}`);
+    // Spatial analysis
+    const entries: ShapeEntry[] = result.objects
+      .filter((o: any) => o.shape)
+      .map((o: any) => {
+        const bb = o.shape.boundingBox();
+        return { name: o.name, shape: o.shape, min: bb.min as number[], max: bb.max as number[], groupName: o.groupName };
+      });
+
+    if (entries.length > 1) {
+      console.log(`\n✓ Spatial analysis:`);
+      const spatialLines = analyzeSpatial(entries);
+      for (const line of spatialLines) console.log(line);
+      if (spatialLines.length === 0) {
+        console.log(`  (no collisions, all objects well-separated)`);
+      }
     }
+
+    console.log(`✓ Params: ${result.params.map((p) => p.name).join(", ")}`);
+    console.log(`✓ Time: ${result.timeMs.toFixed(0)}ms`);
+  } finally {
+    materialized.cleanup();
   }
-
-  if (debugImports) {
-    const importLogs = (result.logs || []).filter((log: any) => log.level === 'info' && log.args[0]?.startsWith('[import]'));
-    console.log(`\n✓ Import trace: ${importLogs.length} event(s)`);
-    for (const log of importLogs) {
-      console.log(`  ${log.args.join(' ')}`);
-    }
-  }
-
-  // Spatial analysis
-  const entries: ShapeEntry[] = result.objects
-    .filter((o: any) => o.shape)
-    .map((o: any) => {
-      const bb = o.shape.boundingBox();
-      return { name: o.name, shape: o.shape, min: bb.min as number[], max: bb.max as number[], groupName: o.groupName };
-    });
-
-  if (entries.length > 1) {
-    console.log(`\n✓ Spatial analysis:`);
-    const spatialLines = analyzeSpatial(entries);
-    for (const line of spatialLines) console.log(line);
-    if (spatialLines.length === 0) {
-      console.log(`  (no collisions, all objects well-separated)`);
-    }
-  }
-
-  console.log(`✓ Params: ${result.params.map((p) => p.name).join(", ")}`);
-  console.log(`✓ Time: ${result.timeMs.toFixed(0)}ms`);
 }
 
 main().catch((e) => {
