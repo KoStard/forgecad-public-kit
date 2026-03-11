@@ -1,6 +1,6 @@
-import { Sketch, type SketchOperandInput, getSketchBrepProfilePlan, mergeSketchPlacement3D, setSketchBrepProfilePlan, setSketchPlacement3D } from './core';
+import { Sketch, type SketchOperandInput, getSketchCompileProfilePlan, mergeSketchPlacement3D, setSketchCompileProfilePlan, setSketchPlacement3D } from './core';
 import { getWasm } from '../kernel';
-import { buildBrepBooleanProfilePlan } from '../brepPlan';
+import { buildBooleanProfileCompilePlan } from '../compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from '../apiArgs';
 
 function normalizeSketchOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Sketch[] {
@@ -25,9 +25,9 @@ export function sketchAdd(sketch: Sketch, ...others: SketchOperandInput[]): Sket
     'Use sketch.add(other1, other2) or sketch.add([other1, other2]).',
   )];
   return setSketchPlacement3D(
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(getWasm().CrossSection.union(sketches.map((entry) => entry.cross)), sketch.colorHex),
-      buildBrepBooleanProfilePlan('union', sketches.map((entry) => getSketchBrepProfilePlan(entry))),
+      buildBooleanProfileCompilePlan('union', sketches.map((entry) => getSketchCompileProfilePlan(entry))),
     ),
     mergeSketchPlacement3D(sketches),
   );
@@ -41,9 +41,9 @@ export function sketchSubtract(sketch: Sketch, ...others: SketchOperandInput[]):
     'Use sketch.subtract(other1, other2) or sketch.subtract([other1, other2]).',
   )];
   return setSketchPlacement3D(
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(getWasm().CrossSection.difference(sketches.map((entry) => entry.cross)), sketch.colorHex),
-      buildBrepBooleanProfilePlan('difference', sketches.map((entry) => getSketchBrepProfilePlan(entry))),
+      buildBooleanProfileCompilePlan('difference', sketches.map((entry) => getSketchCompileProfilePlan(entry))),
     ),
     mergeSketchPlacement3D(sketches),
   );
@@ -57,9 +57,9 @@ export function sketchIntersect(sketch: Sketch, ...others: SketchOperandInput[])
     'Use sketch.intersect(other1, other2) or sketch.intersect([other1, other2]).',
   )];
   return setSketchPlacement3D(
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(getWasm().CrossSection.intersection(sketches.map((entry) => entry.cross)), sketch.colorHex),
-      buildBrepBooleanProfilePlan('intersection', sketches.map((entry) => getSketchBrepProfilePlan(entry))),
+      buildBooleanProfileCompilePlan('intersection', sketches.map((entry) => getSketchCompileProfilePlan(entry))),
     ),
     mergeSketchPlacement3D(sketches),
   );
@@ -75,9 +75,9 @@ export function union2d(...inputs: SketchOperandInput[]): Sketch {
   if (sketches.length === 0) throw new Error('union2d requires at least one sketch');
   if (sketches.length === 1) return sketches[0];
   return setSketchPlacement3D(
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(getWasm().CrossSection.union(sketches.map(s => s.cross)), sketches[0].colorHex),
-      buildBrepBooleanProfilePlan('union', sketches.map((sketch) => getSketchBrepProfilePlan(sketch))),
+      buildBooleanProfileCompilePlan('union', sketches.map((sketch) => getSketchCompileProfilePlan(sketch))),
     ),
     mergeSketchPlacement3D(sketches),
   );
@@ -92,9 +92,9 @@ export function difference2d(...inputs: SketchOperandInput[]): Sketch {
   );
   if (sketches.length < 2) throw new Error('difference2d requires at least two sketches');
   return setSketchPlacement3D(
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(getWasm().CrossSection.difference(sketches.map(s => s.cross)), sketches[0].colorHex),
-      buildBrepBooleanProfilePlan('difference', sketches.map((sketch) => getSketchBrepProfilePlan(sketch))),
+      buildBooleanProfileCompilePlan('difference', sketches.map((sketch) => getSketchCompileProfilePlan(sketch))),
     ),
     mergeSketchPlacement3D(sketches),
   );
@@ -109,9 +109,9 @@ export function intersection2d(...inputs: SketchOperandInput[]): Sketch {
   );
   if (sketches.length < 2) throw new Error('intersection2d requires at least two sketches');
   return setSketchPlacement3D(
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(getWasm().CrossSection.intersection(sketches.map(s => s.cross)), sketches[0].colorHex),
-      buildBrepBooleanProfilePlan('intersection', sketches.map((sketch) => getSketchBrepProfilePlan(sketch))),
+      buildBooleanProfileCompilePlan('intersection', sketches.map((sketch) => getSketchCompileProfilePlan(sketch))),
     ),
     mergeSketchPlacement3D(sketches),
   );
@@ -126,7 +126,7 @@ export function hull2d(...inputs: SketchOperandInput[]): Sketch {
   );
   if (sketches.length === 0) throw new Error('hull2d requires at least one sketch');
   return setSketchPlacement3D(
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(getWasm().CrossSection.hull(sketches.map(s => s.cross)), sketches[0].colorHex),
       null,
     ),

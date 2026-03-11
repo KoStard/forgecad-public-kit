@@ -1,12 +1,12 @@
-import { Sketch, copySketchPlacement3D, getSketchBrepProfilePlan, setSketchBrepProfilePlan } from './core';
-import { appendBrepProfileTransform } from '../brepPlan';
+import { Sketch, copySketchPlacement3D, getSketchCompileProfilePlan, setSketchCompileProfilePlan } from './core';
+import { appendProfileCompileTransform } from '../compilePlan';
 
 export function sketchTranslate(sketch: Sketch, x: number, y = 0): Sketch {
   return copySketchPlacement3D(
     sketch,
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(sketch.cross.translate(x, y), sketch.colorHex),
-      appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), { kind: 'translate', x, y }),
+      appendProfileCompileTransform(getSketchCompileProfilePlan(sketch), { kind: 'translate', x, y }),
     ),
   );
 }
@@ -14,9 +14,9 @@ export function sketchTranslate(sketch: Sketch, x: number, y = 0): Sketch {
 export function sketchRotate(sketch: Sketch, degrees: number): Sketch {
   return copySketchPlacement3D(
     sketch,
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(sketch.cross.rotate(degrees), sketch.colorHex),
-      appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), { kind: 'rotate', degrees }),
+      appendProfileCompileTransform(getSketchCompileProfilePlan(sketch), { kind: 'rotate', degrees }),
     ),
   );
 }
@@ -29,9 +29,9 @@ export function sketchScale(sketch: Sketch, v: number | [number, number]): Sketc
   const scale = typeof v === 'number' ? [v, v] : v;
   return copySketchPlacement3D(
     sketch,
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(sketch.cross.scale(v as any), sketch.colorHex),
-      appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), { kind: 'scale', x: scale[0], y: scale[1] }),
+      appendProfileCompileTransform(getSketchCompileProfilePlan(sketch), { kind: 'scale', x: scale[0], y: scale[1] }),
     ),
   );
 }
@@ -39,9 +39,9 @@ export function sketchScale(sketch: Sketch, v: number | [number, number]): Sketc
 export function sketchMirror(sketch: Sketch, ax: [number, number]): Sketch {
   return copySketchPlacement3D(
     sketch,
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(sketch.cross.mirror(ax), sketch.colorHex),
-      appendBrepProfileTransform(getSketchBrepProfilePlan(sketch), {
+      appendProfileCompileTransform(getSketchCompileProfilePlan(sketch), {
         kind: 'mirror',
         normalX: ax[0],
         normalY: ax[1],

@@ -80,6 +80,8 @@ After the first implementation slice for this mission, the minimum acceptable st
 - `src/forge/shapeBackend.ts` now owns the Manifold runtime adapter.
 - sectioning now uses shape/backend operations instead of reaching into `.manifold`.
 - scene-builder export payloads are isolated behind `src/forge/shapeBackendSceneBuilder.ts`.
+- `src/forge/compilePlan.ts` is now the canonical semantic plan module.
+- `src/forge/brepPlan.ts` is now a compatibility bridge, not the architectural center.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker
@@ -90,7 +92,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 2. Put a backend adapter behind `Shape` | Done | `Shape` now wraps a runtime backend payload instead of a raw Manifold field. |
 | 3. Replace implicit `.manifold` reach-through with backend-owned specializations | Done | Backend-specific paths moved behind backend modules. |
 | 4. Keep current Manifold runtime behavior stable through the adapter | Done | Build plus focused runtime/API checks passed. |
-| 5. Formalize a backend-neutral Forge compile graph | Pending | This is broader than the current exact-export replay plan. |
+| 5. Formalize a backend-neutral Forge compile graph | In progress | Canonical plan naming now lives in `compilePlan.ts`; the graph still needs broader feature coverage. |
 | 6. Route operations intentionally by backend capability | Pending | Especially booleans, shell, fillet, projection, export. |
 | 7. Add backend mismatch / conversion diagnostics | Pending | No silent magic. |
 | 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | Pending | After the runtime contract is stable. |

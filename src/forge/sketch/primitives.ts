@@ -1,4 +1,4 @@
-import { Sketch, setSketchBrepProfilePlan } from './core';
+import { Sketch, setSketchCompileProfilePlan } from './core';
 import { getWasm } from '../kernel';
 import type { Point2D } from './entities';
 
@@ -20,14 +20,14 @@ function normalizePolygonPoints(points: ([number, number] | Point2D)[]): [number
 }
 
 export function rect(width: number, height: number, center = false): Sketch {
-  return setSketchBrepProfilePlan(
+  return setSketchCompileProfilePlan(
     new Sketch(getWasm().CrossSection.square([width, height], center)),
     { kind: 'rect', width, height, center, transforms: [] },
   );
 }
 
 export function circle2d(radius: number, segments?: number): Sketch {
-  return setSketchBrepProfilePlan(
+  return setSketchCompileProfilePlan(
     new Sketch(getWasm().CrossSection.circle(radius, segments ?? 0)),
     { kind: 'circle', radius, transforms: [] },
   );
@@ -37,7 +37,7 @@ export function roundedRect(width: number, height: number, radius: number, cente
   const r = Math.min(radius, width / 2, height / 2);
   const inner = getWasm().CrossSection.square([width - 2 * r, height - 2 * r], true)
     .translate(center ? 0 : width / 2, center ? 0 : height / 2);
-  return setSketchBrepProfilePlan(
+  return setSketchCompileProfilePlan(
     new Sketch(inner.offset(r, 'Round')),
     { kind: 'roundedRect', width, height, radius: r, center, transforms: [] },
   );
@@ -45,7 +45,7 @@ export function roundedRect(width: number, height: number, radius: number, cente
 
 export function polygon(points: ([number, number] | Point2D)[]): Sketch {
   const pts = normalizePolygonPoints(points);
-  return setSketchBrepProfilePlan(
+  return setSketchCompileProfilePlan(
     new Sketch(new (getWasm().CrossSection)([pts])),
     { kind: 'polygon', points: pts, transforms: [] },
   );

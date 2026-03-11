@@ -1,12 +1,12 @@
-import { Sketch, copySketchPlacement3D, getSketchBrepProfilePlan, setSketchBrepProfilePlan } from './core';
-import { buildBrepOffsetProfilePlan } from '../brepPlan';
+import { Sketch, copySketchPlacement3D, getSketchCompileProfilePlan, setSketchCompileProfilePlan } from './core';
+import { buildOffsetProfileCompilePlan } from '../compilePlan';
 
 export function sketchOffset(sketch: Sketch, delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
   return copySketchPlacement3D(
     sketch,
-    setSketchBrepProfilePlan(
+    setSketchCompileProfilePlan(
       new Sketch(sketch.cross.offset(delta, join), sketch.colorHex),
-      join === 'Round' ? buildBrepOffsetProfilePlan(getSketchBrepProfilePlan(sketch), delta, 'Round') : null,
+      join === 'Round' ? buildOffsetProfileCompilePlan(getSketchCompileProfilePlan(sketch), delta, 'Round') : null,
     ),
   );
 }

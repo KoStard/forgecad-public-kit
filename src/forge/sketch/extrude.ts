@@ -1,5 +1,5 @@
-import { Sketch, getSketchBrepProfilePlan, getSketchPlacement3D } from './core';
-import { Shape, setShapeBrepPlan } from '../kernel';
+import { Sketch, getSketchCompileProfilePlan, getSketchPlacement3D } from './core';
+import { Shape, setShapeCompilePlan } from '../kernel';
 import { TrackedShape, transformTopology, type Topology, type FaceName, type FaceRef, type EdgeName, type EdgeRef } from './topology';
 
 function buildGenericExtrusionTopology(sketch: Sketch, height: number, center: boolean): Topology {
@@ -54,7 +54,7 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
     scaleTop as any,
     opts?.center ?? false,
   );
-  const shape = setShapeBrepPlan(new Shape(m, sketch.colorHex, {
+  const shape = setShapeCompilePlan(new Shape(m, sketch.colorHex, {
     fidelity: 'kernel-native',
     sources: ['extrude'],
   }), (
@@ -63,7 +63,7 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
     opts?.divisions == null || opts.divisions === 0
   )
     ? (() => {
-        const profile = getSketchBrepProfilePlan(sketch);
+        const profile = getSketchCompileProfilePlan(sketch);
         if (!profile) return null;
         return {
           kind: 'extrude' as const,
@@ -82,12 +82,12 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
 }
 
 export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number): Shape {
-  const revolved = setShapeBrepPlan(new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex, {
+  const revolved = setShapeCompilePlan(new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex, {
     fidelity: 'kernel-native',
     sources: ['revolve'],
   }), (() => {
     if (segments != null && segments > 0) return null;
-    const profile = getSketchBrepProfilePlan(sketch);
+    const profile = getSketchCompileProfilePlan(sketch);
     if (!profile) return null;
     return {
       kind: 'revolve' as const,

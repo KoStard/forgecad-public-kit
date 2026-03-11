@@ -1,7 +1,7 @@
 import type { CrossSection } from 'manifold-3d';
 import { Shape } from '../kernel';
-import type { BrepProfilePlan } from '../brepPlan';
-import { cloneBrepProfilePlan } from '../brepPlan';
+import type { ProfileCompilePlan } from '../compilePlan';
+import { cloneProfileCompilePlan } from '../compilePlan';
 import type { Mat4 } from '../transform';
 import type { FaceRef } from './topology';
 
@@ -9,11 +9,11 @@ type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-righ
 type SketchPlacement3D = Mat4;
 export type SketchOperandInput = Sketch | readonly Sketch[];
 
-const _sketchBrepProfilePlans = new WeakMap<Sketch, BrepProfilePlan | null>();
+const _sketchCompileProfilePlans = new WeakMap<Sketch, ProfileCompilePlan | null>();
 const _sketchPlacement3D = new WeakMap<Sketch, SketchPlacement3D | null>();
 
-function setSketchBrepProfilePlanInternal(sketch: Sketch, plan: BrepProfilePlan | null): Sketch {
-  _sketchBrepProfilePlans.set(sketch, cloneBrepProfilePlan(plan));
+function setSketchCompileProfilePlanInternal(sketch: Sketch, plan: ProfileCompilePlan | null): Sketch {
+  _sketchCompileProfilePlans.set(sketch, cloneProfileCompilePlan(plan));
   return sketch;
 }
 
@@ -31,14 +31,14 @@ export class Sketch {
 
   constructor(public readonly cross: CrossSection, color?: string) {
     this.colorHex = color;
-    setSketchBrepProfilePlanInternal(this, null);
+    setSketchCompileProfilePlanInternal(this, null);
     setSketchPlacement3DInternal(this, null);
   }
 
   /** Set the color of this sketch (hex string, e.g. "#ff0000") */
   color(value: string | undefined): Sketch {
     return setSketchPlacement3DInternal(
-      setSketchBrepProfilePlanInternal(new Sketch(this.cross, value), getSketchBrepProfilePlan(this)),
+      setSketchCompileProfilePlanInternal(new Sketch(this.cross, value), getSketchCompileProfilePlan(this)),
       getSketchPlacement3D(this),
     );
   }
@@ -46,7 +46,7 @@ export class Sketch {
   /** Return a new Sketch wrapper for explicit duplication in scripts. */
   clone(): Sketch {
     return setSketchPlacement3DInternal(
-      setSketchBrepProfilePlanInternal(new Sketch(this.cross, this.colorHex), getSketchBrepProfilePlan(this)),
+      setSketchCompileProfilePlanInternal(new Sketch(this.cross, this.colorHex), getSketchCompileProfilePlan(this)),
       getSketchPlacement3D(this),
     );
   }
@@ -95,13 +95,16 @@ export class Sketch {
 
 export type { Anchor };
 
-export function getSketchBrepProfilePlan(sketch: Sketch): BrepProfilePlan | null {
-  return cloneBrepProfilePlan(_sketchBrepProfilePlans.get(sketch) ?? null);
+export function getSketchCompileProfilePlan(sketch: Sketch): ProfileCompilePlan | null {
+  return cloneProfileCompilePlan(_sketchCompileProfilePlans.get(sketch) ?? null);
 }
 
-export function setSketchBrepProfilePlan(sketch: Sketch, plan: BrepProfilePlan | null): Sketch {
-  return setSketchBrepProfilePlanInternal(sketch, plan);
+export function setSketchCompileProfilePlan(sketch: Sketch, plan: ProfileCompilePlan | null): Sketch {
+  return setSketchCompileProfilePlanInternal(sketch, plan);
 }
+
+export const getSketchBrepProfilePlan = getSketchCompileProfilePlan;
+export const setSketchBrepProfilePlan = setSketchCompileProfilePlan;
 
 export function getSketchPlacement3D(sketch: Sketch): SketchPlacement3D | null {
   return cloneSketchPlacement3D(_sketchPlacement3D.get(sketch) ?? null);
