@@ -29,7 +29,7 @@ function expectVec(actual: number[], expected: [number, number, number], label: 
   expect(ok, `${label} expected [${expected.join(', ')}], got [${actual.join(', ')}]`);
 }
 
-async function main() {
+export async function runCheckJsModulesCli(): Promise<void> {
   await init();
 
   const scriptPath = resolve('examples/api/js-module-imports.forge.js');
@@ -103,8 +103,3 @@ return answer;
 
   console.log('✓ JS module import invariants passed');
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

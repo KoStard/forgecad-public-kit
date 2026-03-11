@@ -14,12 +14,13 @@ TypeScript is the file format. The browser is the CAD system.
 
 ```bash
 npm install
-npm run dev
+npm link
+forgecad studio
 ```
 
 Then open `http://localhost:5173`.
 
-`npm run dev` opens the `./examples` project by default, so you can edit and save files immediately.
+`forgecad studio` opens the packaged `./examples` project by default, so you can edit and save files immediately.
 
 ## Why ForgeCAD
 
@@ -150,7 +151,8 @@ Latest benchmark iterations from `ForgeCADBenchmark/results/*` (`version_{n}.for
 
 ```bash
 npm install
-npm run dev
+npm link
+forgecad studio
 ```
 
 Open `http://localhost:5173`.
@@ -160,15 +162,15 @@ This starts ForgeCAD with the `./examples` folder loaded.
 ### Open your own project folder
 
 ```bash
-npm run open -- /path/to/your/project
+forgecad studio /path/to/your/project
 ```
 
-Use `--` before the path. ForgeCAD loads `.forge.js` and `.sketch.js` files from that folder, with disk-backed save.
+ForgeCAD loads `.forge.js` and `.sketch.js` files from that folder, with disk-backed save.
 
 ### Blank scratch mode (optional)
 
 ```bash
-npm run dev:blank
+forgecad studio --blank
 ```
 
 Starts ForgeCAD without a project folder (single in-memory scratch file).
@@ -209,31 +211,31 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 
 | Task | Command |
 | --- | --- |
-| Validate a script | `npm run test-run -- examples/cup.forge.js` |
-| Validate a notebook preview | `npm run test-run -- examples/api/notebook-iteration.forge-notebook.json` |
-| Inspect notebook cells in the terminal | `npm run notebook -- view examples/api/notebook-iteration.forge-notebook.json preview` |
-| Render PNG views | `npm run render -- examples/cup.forge.js` |
-| Render a notebook preview | `npm run render -- examples/api/notebook-iteration.forge-notebook.json` |
-| Render orbit GIF (solid + wireframe) | `npm run gif -- examples/cup.forge.js` |
-| List notebook capture options | `npm run gif -- examples/api/notebook-assembly-debug.forge-notebook.json --list` |
-| Export sketch SVG | `npm run svg -- examples/frame.sketch.js` |
-| Export exact STEP (supported subset only) | `npm run step -- examples/api/brep-exportable.forge.js` |
-| Export exact BREP (supported subset only) | `npm run brep -- examples/api/brep-exportable.forge.js` |
-| Generate report PDF | `npm run report -- examples/cup.forge.js` |
-| Parameter robustness scan | `npm run param-check -- examples/shoe-rack-doors.forge.js --samples 10` |
-| Prune merged local-only branches | `npm run prune:branches` |
-| Transform invariants | `npm run check:transforms` |
-| Dimension propagation invariants | `npm run check:dimensions` |
+| Validate a script | `forgecad run examples/cup.forge.js` |
+| Validate a notebook preview | `forgecad run examples/api/notebook-iteration.forge-notebook.json` |
+| Inspect notebook cells in the terminal | `forgecad notebook view examples/api/notebook-iteration.forge-notebook.json preview` |
+| Render PNG views | `forgecad render examples/cup.forge.js` |
+| Render a notebook preview | `forgecad render examples/api/notebook-iteration.forge-notebook.json` |
+| Render orbit GIF (solid + wireframe) | `forgecad capture gif examples/cup.forge.js` |
+| List notebook capture options | `forgecad capture gif examples/api/notebook-assembly-debug.forge-notebook.json --list` |
+| Export sketch SVG | `forgecad export svg examples/frame.sketch.js` |
+| Export exact STEP (supported subset only) | `forgecad export step examples/api/brep-exportable.forge.js` |
+| Export exact BREP (supported subset only) | `forgecad export brep examples/api/brep-exportable.forge.js` |
+| Generate report PDF | `forgecad export report examples/cup.forge.js` |
+| Parameter robustness scan | `forgecad check params examples/shoe-rack-doors.forge.js --samples 10` |
+| Prune merged local-only branches | `uv run cli/forge-prune-local-branches.py` |
+| Transform invariants | `forgecad check transforms` |
+| Dimension propagation invariants | `forgecad check dimensions` |
 
 ### CLI details
 
 - `render` outputs multi-angle PNGs (`front`, `side`, `top`, `iso`) by default.
-- For `npm run test-run`, `npm run render`, `npm run gif`, and `npm run record`, passing a `.forge-notebook.json` uses that notebook's preview cell.
-- `gif` outputs a single orbit animation with a full solid pass, then full wireframe pass.
-- `svg` runs fully in Node (no browser/Puppeteer).
-- `report` generates searchable-text PDF pages (overview, unique components, BOM, dimensions).
-- `param-check` samples parameter ranges and reports runtime errors, degenerates, and new collisions.
-- `prune:branches` is a `uv` + Rich utility that reviews local-only branches already merged into `mainline`, removes linked worktrees first, and asks before each deletion.
+- For `forgecad run`, `forgecad render`, `forgecad capture gif`, and `forgecad capture mp4`, passing a `.forge-notebook.json` uses that notebook's preview cell.
+- `capture gif` outputs a single orbit animation with a full solid pass, then full wireframe pass.
+- `export svg` runs fully in Node (no browser/Puppeteer).
+- `export report` generates searchable-text PDF pages (overview, unique components, BOM, dimensions).
+- `check params` samples parameter ranges and reports runtime errors, degenerates, and new collisions.
+- `uv run cli/forge-prune-local-branches.py` is a `uv` + Rich utility that reviews local-only branches already merged into `mainline`, removes linked worktrees first, and asks before each deletion.
 
 ## Start with these examples
 
@@ -298,15 +300,15 @@ Contributions are welcome. Good first contributions:
 Suggested local validation before opening a PR:
 
 ```bash
-npm run test-run -- examples/cup.forge.js
-npm run check:transforms
-npm run check:dimensions
+forgecad run examples/cup.forge.js
+forgecad check transforms
+forgecad check dimensions
 ```
 
 If your change is parametric-heavy, also run:
 
 ```bash
-npm run param-check -- path/to/your-example.forge.js --samples 10
+forgecad check params path/to/your-example.forge.js --samples 10
 ```
 
 ## Additional docs

@@ -13,17 +13,6 @@ import type { SceneObject } from '../src/forge/runner';
 import type { DimensionDef } from '../src/forge/sketch/dimensions';
 import { mapDimensionsToOwnerIds } from '../src/forge/reportDimensionOwnership';
 
-const scriptPath = process.argv[2];
-if (!scriptPath) {
-  console.error('Usage: npx tsx cli/debug-dimensions.ts <script.forge.js> [--all] [--dim-angle-tol 12]');
-  process.exit(1);
-}
-
-const showAll = process.argv.includes('--all');
-const tolFlagIndex = process.argv.indexOf('--dim-angle-tol');
-const tolValue = tolFlagIndex >= 0 ? Number(process.argv[tolFlagIndex + 1]) : NaN;
-const dimAngleTolDeg = Number.isFinite(tolValue) ? Math.max(0, tolValue) : 12;
-
 type Vec3 = [number, number, number];
 type ReportViewId = 'front' | 'right' | 'top' | 'iso';
 type ShapeObject = SceneObject & { shape: NonNullable<SceneObject['shape']> };
@@ -116,7 +105,20 @@ function mapDimensionsToOwners(
   return { combinedCount, byDimensionId };
 }
 
-async function main() {
+function usage(): never {
+  console.error('Usage: forgecad debug dimensions <script.forge.js> [--all] [--dim-angle-tol 12]');
+  process.exit(1);
+}
+
+export async function runDebugDimensionsCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const scriptPath = argv[0];
+  if (!scriptPath) usage();
+
+  const showAll = argv.includes('--all');
+  const tolFlagIndex = argv.indexOf('--dim-angle-tol');
+  const tolValue = tolFlagIndex >= 0 ? Number(argv[tolFlagIndex + 1]) : NaN;
+  const dimAngleTolDeg = Number.isFinite(tolValue) ? Math.max(0, tolValue) : 12;
+
   const abs = resolve(scriptPath);
   const code = readFileSync(abs, 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(abs);
@@ -184,8 +186,3 @@ async function main() {
     }
   }
 }
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});

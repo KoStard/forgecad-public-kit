@@ -209,7 +209,7 @@ return asm.solve().toScene();
   expect(owners.length === 0, `ambiguous grouped explicit component should stay unowned, got ${owners.length}`);
 }
 
-async function main() {
+export async function runCheckDimensionsCli(): Promise<void> {
   await initKernel();
   checkTransformPropagation();
   checkCopyLikeOps();
@@ -219,8 +219,3 @@ async function main() {
   checkAmbiguousGroupedExplicitOwnership();
   console.log('✓ Dimension propagation invariants passed');
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

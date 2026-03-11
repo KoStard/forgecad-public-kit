@@ -118,15 +118,10 @@ return source.attachTo(target, 'left-front', 'front-left');
   expectVec(bb.max as [number, number, number], [-6, -1, 2], 'interop.attachTo.max');
 }
 
-async function main() {
+export async function runCheckPlacementReferencesCli(): Promise<void> {
   await initKernel();
   checkTransformAndPlacementHelpers();
   checkImportRuntimePropagation();
   checkShapeTrackedShapePlacementInterop();
   console.log('✓ Placement reference invariants passed');
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

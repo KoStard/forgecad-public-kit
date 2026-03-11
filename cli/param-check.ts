@@ -17,15 +17,6 @@ import { collectProjectFiles } from './collect-files';
 import type { RunResult, SceneObject } from '../src/forge/runner';
 import type { Shape } from '../src/forge/kernel';
 
-const scriptPath = process.argv[2];
-if (!scriptPath) {
-  console.error('Usage: npx tsx cli/param-check.ts <script.forge.js> [--samples N]');
-  process.exit(1);
-}
-
-const samplesArg = process.argv.indexOf('--samples');
-const NUM_SAMPLES = samplesArg >= 0 ? parseInt(process.argv[samplesArg + 1], 10) : 8;
-
 interface Issue {
   param: string;
   value: number;
@@ -71,7 +62,17 @@ function findCollisions(entries: ShapeEntry[]): Map<string, number> {
   return collisions;
 }
 
-async function main() {
+function usage(): never {
+  console.error('Usage: forgecad check params <script.forge.js> [--samples N]');
+  process.exit(1);
+}
+
+export async function runParamCheckCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const scriptPath = argv[0];
+  if (!scriptPath) usage();
+
+  const samplesArg = argv.indexOf('--samples');
+  const numSamples = samplesArg >= 0 ? parseInt(argv[samplesArg + 1], 10) : 8;
   const code = readFileSync(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
@@ -112,15 +113,15 @@ async function main() {
 
   // 2. For each param, sample across its range
   const issues: Issue[] = [];
-  const totalRuns = params.length * NUM_SAMPLES;
+  const totalRuns = params.length * numSamples;
   let runCount = 0;
 
   for (const p of params) {
     const range = p.max - p.min;
     if (range <= 0) continue;
 
-    for (let s = 0; s < NUM_SAMPLES; s++) {
-      const t = s / (NUM_SAMPLES - 1); // 0..1
+    for (let s = 0; s < numSamples; s++) {
+      const t = s / (numSamples - 1); // 0..1
       let value = p.min + t * range;
       if (p.integer) value = Math.round(value);
       if (Math.abs(value - p.value) < (p.step || 0.01)) continue; // skip default
@@ -187,7 +188,7 @@ async function main() {
   setParamOverrides({});
 
   // 3. Report
-  console.log(`\n✓ Checked ${runCount} parameter samples (${NUM_SAMPLES} per param)`);
+  console.log(`\n✓ Checked ${runCount} parameter samples (${numSamples} per param)`);
 
   if (issues.length === 0) {
     console.log('✓ No issues found — all parameter values produce valid geometry.');
@@ -246,8 +247,3 @@ async function main() {
     console.log('');
   }
 }
-
-main().catch(e => {
-  console.error(e);
-  process.exit(1);
-});
