@@ -121,6 +121,8 @@ function applyShapeCompileTransform(manifold: Manifold, step: ShapeCompileTransf
       );
     case 'mirror':
       return manifold.mirror([step.normalX, step.normalY, step.normalZ]);
+    case 'workplanePlacement':
+      return manifold.transform(step.matrix);
   }
 }
 

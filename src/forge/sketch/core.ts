@@ -5,30 +5,15 @@ import { cloneProfileCompilePlan } from '../compilePlan';
 import type { Mat4 } from '../transform';
 import type { FaceRef } from './topology';
 import { lowerProfileCompilePlanToCrossSection } from '../compilePlanManifold';
+import {
+  cloneSketchPlacementModel,
+  type Anchor,
+  type SketchFace3D,
+  type SketchPlacementModel,
+  type SketchWorkplane,
+} from './workplaneModel';
 
-type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type SketchPlacement3D = Mat4;
-export type SketchFace3D = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom';
-export type SketchWorkplaneSource =
-  | { kind: 'canonical-face'; face: SketchFace3D }
-  | { kind: 'tracked-face'; faceName: string }
-  | { kind: 'face-ref'; faceName?: string };
-
-export interface SketchWorkplane {
-  origin: [number, number, number];
-  u: [number, number, number];
-  v: [number, number, number];
-  normal: [number, number, number];
-  source: SketchWorkplaneSource;
-}
-
-export interface SketchPlacementModel {
-  workplane: SketchWorkplane;
-  u: number;
-  v: number;
-  protrude: number;
-  selfAnchor: Anchor;
-}
 export type SketchOperandInput = Sketch | readonly Sketch[];
 
 const _sketchCompileProfilePlans = new WeakMap<Sketch, ProfileCompilePlan | null>();
@@ -47,38 +32,6 @@ function cloneSketchPlacement3D(placement: SketchPlacement3D | null): SketchPlac
 function setSketchPlacement3DInternal(sketch: Sketch, placement: SketchPlacement3D | null): Sketch {
   _sketchPlacement3D.set(sketch, cloneSketchPlacement3D(placement));
   return sketch;
-}
-
-function cloneSketchWorkplaneSource(source: SketchWorkplaneSource): SketchWorkplaneSource {
-  switch (source.kind) {
-    case 'canonical-face':
-      return { kind: 'canonical-face', face: source.face };
-    case 'tracked-face':
-      return { kind: 'tracked-face', faceName: source.faceName };
-    case 'face-ref':
-      return { kind: 'face-ref', faceName: source.faceName };
-  }
-}
-
-function cloneSketchWorkplane(workplane: SketchWorkplane): SketchWorkplane {
-  return {
-    origin: [workplane.origin[0], workplane.origin[1], workplane.origin[2]],
-    u: [workplane.u[0], workplane.u[1], workplane.u[2]],
-    v: [workplane.v[0], workplane.v[1], workplane.v[2]],
-    normal: [workplane.normal[0], workplane.normal[1], workplane.normal[2]],
-    source: cloneSketchWorkplaneSource(workplane.source),
-  };
-}
-
-function cloneSketchPlacementModel(model: SketchPlacementModel | null): SketchPlacementModel | null {
-  if (!model) return null;
-  return {
-    workplane: cloneSketchWorkplane(model.workplane),
-    u: model.u,
-    v: model.v,
-    protrude: model.protrude,
-    selfAnchor: model.selfAnchor,
-  };
 }
 
 function setSketchPlacementModelInternal(sketch: Sketch, model: SketchPlacementModel | null): Sketch {
@@ -160,7 +113,12 @@ export class Sketch {
   ): Sketch { throw new Error('Not implemented'); }
 }
 
-export type { Anchor };
+export type {
+  Anchor,
+  SketchFace3D,
+  SketchPlacementModel,
+  SketchWorkplane,
+} from './workplaneModel';
 
 export function getSketchCompileProfilePlan(sketch: Sketch): ProfileCompilePlan | null {
   return cloneProfileCompilePlan(_sketchCompileProfilePlans.get(sketch) ?? null);

@@ -1636,6 +1636,247 @@
     }
   },
   {
+    "id": "sketch-on-face-placement",
+    "description": "Downstream features keep semantic workplane placement intent in the compile graph instead of collapsing to a bare matrix.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Feature",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "extrude"
+            ]
+          },
+          "compilePlan": {
+            "kind": "transform",
+            "base": {
+              "kind": "extrude",
+              "profile": {
+                "kind": "rect",
+                "width": 6,
+                "height": 4,
+                "center": false,
+                "transforms": []
+              },
+              "height": 3,
+              "center": false
+            },
+            "steps": [
+              {
+                "kind": "workplanePlacement",
+                "matrix": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  -1,
+                  -1,
+                  3.5,
+                  1
+                ],
+                "placement": {
+                  "workplane": {
+                    "origin": [
+                      0,
+                      0,
+                      3
+                    ],
+                    "u": [
+                      1,
+                      0,
+                      0
+                    ],
+                    "v": [
+                      0,
+                      1,
+                      0
+                    ],
+                    "normal": [
+                      0,
+                      0,
+                      1
+                    ],
+                    "source": {
+                      "kind": "tracked-face",
+                      "faceName": "top"
+                    }
+                  },
+                  "u": 2,
+                  "v": 1,
+                  "protrude": 0.5,
+                  "selfAnchor": "center"
+                }
+              }
+            ]
+          },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "transform",
+              "base": {
+                "kind": "extrude",
+                "profile": {
+                  "kind": "rect",
+                  "width": 6,
+                  "height": 4,
+                  "center": false,
+                  "transforms": []
+                },
+                "height": 3,
+                "center": false
+              },
+              "steps": [
+                {
+                  "kind": "workplanePlacement",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    -1,
+                    -1,
+                    3.5,
+                    1
+                  ],
+                  "placement": {
+                    "workplane": {
+                      "origin": [
+                        0,
+                        0,
+                        3
+                      ],
+                      "u": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "v": [
+                        0,
+                        1,
+                        0
+                      ],
+                      "normal": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "source": {
+                        "kind": "tracked-face",
+                        "faceName": "top"
+                      }
+                    },
+                    "u": 2,
+                    "v": 1,
+                    "protrude": 0.5,
+                    "selfAnchor": "center"
+                  }
+                }
+              ]
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -1,
+                -1,
+                3.5
+              ],
+              "max": [
+                5,
+                3,
+                6.5
+              ]
+            },
+            "volume": 72,
+            "surfaceArea": 108,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "13672484313585ed855bedb7afac83d52256489a248e474b0d1b2abbe7a9ccd8"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -1,
+                -1,
+                3.5
+              ],
+              "max": [
+                5,
+                3,
+                6.5
+              ]
+            },
+            "volume": 72,
+            "surfaceArea": 108,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "13672484313585ed855bedb7afac83d52256489a248e474b0d1b2abbe7a9ccd8"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Feature",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Feature",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  },
+  {
     "id": "segmented-runtime-hints",
     "description": "Segmented runtime intent stays runnable but outside the exact BREP subset.",
     "scene": {

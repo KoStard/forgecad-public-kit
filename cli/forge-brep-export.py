@@ -134,6 +134,17 @@ def build_shape_scale_matrix(sx: float, sy: float, sz: float) -> "cq.Matrix":
     ])
 
 
+def build_shape_matrix(values: List[float]) -> "cq.Matrix":
+    if len(values) != 16:
+        raise ValueError(f"Expected a 4x4 matrix encoded as 16 values, got {len(values)}")
+    return cq.Matrix([
+        [float(values[0]), float(values[4]), float(values[8]), float(values[12])],
+        [float(values[1]), float(values[5]), float(values[9]), float(values[13])],
+        [float(values[2]), float(values[6]), float(values[10]), float(values[14])],
+        [float(values[3]), float(values[7]), float(values[11]), float(values[15])],
+    ])
+
+
 def vec3_sub(lhs: tuple[float, float, float], rhs: tuple[float, float, float]) -> tuple[float, float, float]:
     return (lhs[0] - rhs[0], lhs[1] - rhs[1], lhs[2] - rhs[2])
 
@@ -448,6 +459,9 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
                 continue
             if step["kind"] == "mirror":
                 result = result.mirror((step["normalX"], step["normalY"], step["normalZ"]))
+                continue
+            if step["kind"] == "workplanePlacement":
+                result = apply_shape_affine(result, build_shape_matrix(step["matrix"]))
                 continue
             raise ValueError(f"Unsupported transform step: {step['kind']}")
         return result

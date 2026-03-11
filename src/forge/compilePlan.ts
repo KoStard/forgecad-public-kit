@@ -1,3 +1,9 @@
+import type { Mat4 } from './transform';
+import {
+  cloneSketchPlacementModel,
+  type ShapeWorkplanePlacement,
+} from './sketch/workplaneModel';
+
 export type ProfileCompileTransformStep =
   | { kind: 'translate'; x: number; y: number }
   | { kind: 'rotate'; degrees: number }
@@ -69,6 +75,11 @@ export type ShapeCompileTransformStep =
       normalX: number;
       normalY: number;
       normalZ: number;
+    }
+  | {
+      kind: 'workplanePlacement';
+      matrix: Mat4;
+      placement: ShapeWorkplanePlacement['placement'];
     };
 
 export type SweepPathCompilePlan = {
@@ -166,6 +177,10 @@ function canonicalNumber(value: number): number {
   return Object.is(value, -0) ? 0 : value;
 }
 
+function cloneShapeTransformMatrix(matrix: Mat4): Mat4 {
+  return matrix.map((value) => canonicalNumber(value)) as Mat4;
+}
+
 function cloneShapeTransform(step: ShapeCompileTransformStep): ShapeCompileTransformStep {
   switch (step.kind) {
     case 'translate':
@@ -201,6 +216,12 @@ function cloneShapeTransform(step: ShapeCompileTransformStep): ShapeCompileTrans
         normalX: step.normalX,
         normalY: step.normalY,
         normalZ: step.normalZ,
+      };
+    case 'workplanePlacement':
+      return {
+        kind: 'workplanePlacement',
+        matrix: cloneShapeTransformMatrix(step.matrix),
+        placement: cloneSketchPlacementModel(step.placement)!,
       };
   }
 }
@@ -397,6 +418,38 @@ export function buildBooleanShapeCompilePlan(
     op,
     shapes: shapes.map((shape) => cloneShapeCompilePlan(shape)!),
   };
+}
+
+export function findShapeWorkplanePlacement(
+  plan: ShapeCompilePlan | null,
+): ShapeWorkplanePlacement | null {
+  if (!plan) return null;
+
+  switch (plan.kind) {
+    case 'transform': {
+      let current = findShapeWorkplanePlacement(plan.base);
+      for (const step of plan.steps) {
+        if (step.kind !== 'workplanePlacement') continue;
+        current = {
+          matrix: cloneShapeTransformMatrix(step.matrix),
+          placement: cloneSketchPlacementModel(step.placement)!,
+        };
+      }
+      return current;
+    }
+    case 'trimByPlane':
+      return findShapeWorkplanePlacement(plan.base);
+    case 'box':
+    case 'cylinder':
+    case 'sphere':
+    case 'extrude':
+    case 'revolve':
+    case 'loft':
+    case 'sweep':
+    case 'boolean':
+    case 'hull':
+      return null;
+  }
 }
 
 export function buildBooleanProfileCompilePlan(

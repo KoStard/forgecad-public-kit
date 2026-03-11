@@ -31,6 +31,7 @@ import {
   buildHullShapeCompilePlan,
   buildTrimByPlaneShapeCompilePlan,
   cloneShapeCompilePlan,
+  findShapeWorkplanePlacement,
 } from './compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from './apiArgs';
 import {
@@ -40,6 +41,7 @@ import {
   wrapManifoldShapeBackend,
 } from './shapeBackend';
 import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
+import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -611,6 +613,10 @@ export function getShapeCompilePlan(shape: Shape): ShapeCompilePlan | null {
 
 export function setShapeCompilePlan(shape: Shape, plan: ShapeCompilePlan | null): Shape {
   return setShapeCompilePlanInternal(shape, plan);
+}
+
+export function getShapeWorkplanePlacement(shape: Shape): ShapeWorkplanePlacement | null {
+  return findShapeWorkplanePlacement(getShapeCompilePlanInternal(shape));
 }
 
 export function buildShapeFromCompilePlan(

@@ -4,10 +4,10 @@
  *
  * Ensures named points/edges/surfaces/objects survive transforms and importPart().
  */
-import { initKernel, box } from '../src/forge/kernel';
+import { getShapeWorkplanePlacement, initKernel, box } from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
 import { rect, roundedRect } from '../src/forge/sketch';
-import { getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
+import { getSketchPlacement3D, getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
 
 function fail(message: string): never {
   throw new Error(message);
@@ -24,6 +24,13 @@ function close(a: number, b: number, eps = 1e-6): boolean {
 function expectVec(actual: [number, number, number], expected: [number, number, number], label: string): void {
   const ok = close(actual[0], expected[0]) && close(actual[1], expected[1]) && close(actual[2], expected[2]);
   expect(ok, `${label} expected [${expected.join(', ')}], got [${actual.join(', ')}]`);
+}
+
+function expectMatrix(actual: number[], expected: number[], label: string): void {
+  expect(actual.length === expected.length, `${label} expected matrix length ${expected.length}, got ${actual.length}`);
+  for (let index = 0; index < actual.length; index += 1) {
+    expect(close(actual[index], expected[index]), `${label}[${index}] expected ${expected[index]}, got ${actual[index]}`);
+  }
 }
 
 function checkTransformAndPlacementHelpers(): void {
@@ -179,6 +186,37 @@ function checkDirectFaceRefWorkplaneRecording(): void {
   expect(placement!.workplane.source.faceName === 'top', 'expected face-ref source name to be preserved');
 }
 
+function checkShapeWorkplanePlacementPropagation(): void {
+  const target = roundedRect(20, 12, 2, true).extrude(6, { center: true });
+
+  const extrudeSketch = rect(6, 4).onFace(target, 'top', {
+    u: 2,
+    v: 1,
+    protrude: 0.5,
+    selfAnchor: 'center',
+  });
+  const extruded = extrudeSketch.extrude(3).toShape();
+  const extrudePlacement = getShapeWorkplanePlacement(extruded);
+  expect(extrudePlacement != null, 'extrude() should preserve semantic workplane placement on the shape compile plan');
+  expect(extrudePlacement!.placement.workplane.source.kind === 'tracked-face', 'extrude() should preserve tracked-face placement source');
+  expect(extrudePlacement!.placement.workplane.source.faceName === 'top', 'extrude() should preserve tracked face name');
+  expectVec(extrudePlacement!.placement.workplane.origin, target.face('top').center, 'extrude.workplane.origin');
+  expectMatrix(extrudePlacement!.matrix, getSketchPlacement3D(extrudeSketch)!, 'extrude.workplane.matrix');
+
+  const revolveSketch = rect(4, 2).onFace(box(16, 10, 8, true), 'front', {
+    u: -3,
+    v: 2,
+    protrude: 0.25,
+    selfAnchor: 'bottom-left',
+  });
+  const revolved = revolveSketch.revolve(180);
+  const revolvePlacement = getShapeWorkplanePlacement(revolved);
+  expect(revolvePlacement != null, 'revolve() should preserve semantic workplane placement on the shape compile plan');
+  expect(revolvePlacement!.placement.workplane.source.kind === 'canonical-face', 'revolve() should preserve canonical-face placement source');
+  expect(revolvePlacement!.placement.workplane.source.face === 'front', 'revolve() should preserve canonical face name');
+  expectMatrix(revolvePlacement!.matrix, getSketchPlacement3D(revolveSketch)!, 'revolve.workplane.matrix');
+}
+
 export async function runCheckPlacementReferencesCli(): Promise<void> {
   await initKernel();
   checkTransformAndPlacementHelpers();
@@ -187,5 +225,6 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkCanonicalFaceWorkplaneRecording();
   checkTrackedFaceWorkplaneRecording();
   checkDirectFaceRefWorkplaneRecording();
+  checkShapeWorkplanePlacementPropagation();
   console.log('✓ Placement reference invariants passed');
 }

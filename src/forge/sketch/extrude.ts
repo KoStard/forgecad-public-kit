@@ -1,4 +1,5 @@
-import { Sketch, getSketchCompileProfilePlan, getSketchPlacement3D } from './core';
+import { appendShapeCompileTransform } from '../compilePlan';
+import { Sketch, getSketchCompileProfilePlan, getSketchPlacement3D, getSketchPlacementModel } from './core';
 import { Shape, buildShapeFromCompilePlan, setShapeCompilePlan } from '../kernel';
 import { TrackedShape, transformTopology, type Topology, type FaceName, type FaceRef, type EdgeName, type EdgeRef } from './topology';
 
@@ -46,7 +47,7 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
   const scaleTop = typeof opts?.scaleTop === 'number'
     ? [opts.scaleTop, opts.scaleTop] as [number, number]
     : opts?.scaleTop;
-  const plan = (
+  const basePlan = (
     opts?.twist == null || opts.twist === 0
   ) && (
     opts?.divisions == null || opts.divisions === 0
@@ -63,6 +64,15 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
         };
       })()
     : null;
+  const placement = getSketchPlacement3D(sketch);
+  const placementModel = getSketchPlacementModel(sketch);
+  const plan = basePlan && placement && placementModel
+    ? appendShapeCompileTransform(basePlan, {
+        kind: 'workplanePlacement',
+        matrix: placement,
+        placement: placementModel,
+      })
+    : basePlan;
   const shape = plan
     ? buildShapeFromCompilePlan(plan, sketch.colorHex, {
         fidelity: 'kernel-native',
@@ -79,14 +89,14 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
       sources: ['extrude'],
     }), null);
   const topo = buildGenericExtrusionTopology(sketch, height, opts?.center ?? false);
-  const placed = new TrackedShape(shape, topo, 0, true);
-  const placement = getSketchPlacement3D(sketch);
-  if (!placement) return placed;
-  return new TrackedShape(shape.transform(placement), transformTopology(topo, placement), 0, true);
+  if (!placement) return new TrackedShape(shape, topo, 0, true);
+  const transformedTopology = transformTopology(topo, placement);
+  if (plan && placementModel) return new TrackedShape(shape, transformedTopology, 0, true);
+  return new TrackedShape(shape.transform(placement), transformedTopology, 0, true);
 }
 
 export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number): Shape {
-  const plan = (() => {
+  const basePlan = (() => {
     const profile = getSketchCompileProfilePlan(sketch);
     if (!profile) return null;
     return {
@@ -96,6 +106,15 @@ export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number):
       segments: segments != null && segments > 0 ? segments : undefined,
     };
   })();
+  const placement = getSketchPlacement3D(sketch);
+  const placementModel = getSketchPlacementModel(sketch);
+  const plan = basePlan && placement && placementModel
+    ? appendShapeCompileTransform(basePlan, {
+        kind: 'workplanePlacement',
+        matrix: placement,
+        placement: placementModel,
+      })
+    : basePlan;
   const revolved = plan
     ? buildShapeFromCompilePlan(plan, sketch.colorHex, {
         fidelity: 'kernel-native',
@@ -105,8 +124,7 @@ export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number):
       fidelity: 'kernel-native',
       sources: ['revolve'],
     }), null);
-  const placement = getSketchPlacement3D(sketch);
-  if (!placement) return revolved;
+  if (!placement || (plan && placementModel)) return revolved;
   return revolved.transform(placement);
 }
 

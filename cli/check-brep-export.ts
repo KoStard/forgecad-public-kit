@@ -65,8 +65,9 @@ function collectShapeTransforms(plan: CadQueryShapePlan): CadQueryShapeTransform
     case 'boolean':
       return plan.shapes.flatMap(collectShapeTransforms);
     case 'transform':
-    case 'trimByPlane':
       return [...plan.steps, ...collectShapeTransforms(plan.base)];
+    case 'trimByPlane':
+      return collectShapeTransforms(plan.base);
   }
 }
 
@@ -402,6 +403,36 @@ return [{ name: 'Sweep', shape: body }];
   assert.deepEqual(plan.up, [0, 0, 1]);
 }
 
+function checkSketchOnFacePlacementPlan(): void {
+  const plan = runExactManifest(`
+const body = roundedRect(20, 12, 2, true).extrude(6, { center: true });
+const feature = rect(6, 4)
+  .onFace(body, 'top', { u: 2, v: 1, protrude: 0.5, selfAnchor: 'center' })
+  .extrude(3);
+return [{ name: 'Feature', shape: feature }];
+`);
+
+  const placement = collectShapeTransforms(plan).find((step) => step.kind === 'workplanePlacement');
+  assert(placement, 'Expected onFace() downstream features to preserve a semantic workplane placement transform');
+  assert.equal(placement.placement.workplane.source.kind, 'tracked-face');
+  assert.equal(placement.placement.workplane.source.faceName, 'top');
+  assert.equal(placement.placement.u, 2);
+  assert.equal(placement.placement.v, 1);
+  assert.equal(placement.placement.protrude, 0.5);
+  assert.equal(placement.placement.selfAnchor, 'center');
+  assert.equal(placement.matrix.length, 16, 'Expected workplane placement transform to carry a full matrix');
+}
+
+function checkSketchOnFacePlacementExportEndToEnd(): void {
+  exportExactManifest(`
+const body = roundedRect(20, 12, 2, true).extrude(6, { center: true });
+const boss = rect(6, 4)
+  .onFace(body, 'top', { u: 2, v: 1, protrude: 0.5, selfAnchor: 'center' })
+  .extrude(3);
+return [{ name: 'Boss', shape: boss }];
+`);
+}
+
 function checkMixedSketchAndSolidScenePolicy(): void {
   const files: Record<string, string> = {
     'main.forge.js': `
@@ -606,6 +637,8 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkPointAlongOnPrimitiveBoolean();
   checkLoftPlan();
   checkSweepPlan();
+  checkSketchOnFacePlacementPlan();
+  checkSketchOnFacePlacementExportEndToEnd();
   checkMixedSketchAndSolidScenePolicy();
   checkSplitBranchesStayExactExportable();
   checkPlaneTrimAndSplitStayExactExportable();

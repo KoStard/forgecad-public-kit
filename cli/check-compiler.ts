@@ -137,6 +137,17 @@ return [{ name: 'Sweep', shape: body }];
 `,
   ),
   inlineCase(
+    'sketch-on-face-placement',
+    'Downstream features keep semantic workplane placement intent in the compile graph instead of collapsing to a bare matrix.',
+    `
+const body = roundedRect(20, 12, 2, true).extrude(6, { center: true });
+const feature = rect(6, 4)
+  .onFace(body, 'top', { u: 2, v: 1, protrude: 0.5, selfAnchor: 'center' })
+  .extrude(3);
+return [{ name: 'Feature', shape: feature }];
+`,
+  ),
+  inlineCase(
     'segmented-runtime-hints',
     'Segmented runtime intent stays runnable but outside the exact BREP subset.',
     `
