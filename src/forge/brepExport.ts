@@ -1,7 +1,7 @@
-import { getShapeCompilePlan, type GeometryInfo, type Shape } from './kernel';
+import type { GeometryInfo, Shape } from './kernel';
 import type { SceneObject } from './runner';
 import type { BrepShapePlan } from './brepPlan';
-import { lowerShapeCompilePlanToBrepPlan } from './compilePlanBrep';
+import { buildShapeCompilerReport, summarizeCompilerDiagnostics } from './compilerReport';
 
 export interface BrepMesh {
   vertices: [number, number, number][];
@@ -106,11 +106,10 @@ export function buildBrepExportManifest(
       continue;
     }
 
-    const geometryInfo = object.geometryInfo ?? object.shape.geometryInfo();
-    const plan = lowerShapeCompilePlanToBrepPlan(getShapeCompilePlan(object.shape));
-    if (!plan) {
-      const sources = geometryInfo.sources.join('+');
-      if (options.allowFaceted && geometryInfo.representation === 'mesh-solid') {
+    const report = buildShapeCompilerReport(object.shape);
+    const geometryInfo = object.geometryInfo ?? report.geometryInfo;
+    if (!report.exactBrep.supported) {
+      if (options.allowFaceted && report.facetedMesh.supported) {
         manifest.objects.push({
           kind: 'faceted',
           name: object.name,
@@ -119,13 +118,19 @@ export function buildBrepExportManifest(
         });
         manifest.fallbacks.push({
           name: object.name,
-          reason: `Using faceted mesh fallback for geometry outside exact BREP coverage (sources: ${sources}).`,
+          reason: `Using faceted mesh fallback because exact BREP lowering failed: ${summarizeCompilerDiagnostics(
+            report.exactBrep.diagnostics,
+            'geometry is outside exact BREP coverage.',
+          )}`,
           geometryInfo,
         });
       } else {
         manifest.unsupported.push({
           name: object.name,
-          reason: `No exact BREP export plan is available for this geometry (sources: ${sources}).`,
+          reason: summarizeCompilerDiagnostics(
+            report.exactBrep.diagnostics,
+            'No exact BREP export plan is available for this geometry.',
+          ),
           geometryInfo,
         });
       }
@@ -136,7 +141,7 @@ export function buildBrepExportManifest(
       kind: 'exact',
       name: object.name,
       color: object.color,
-      plan,
+      plan: report.exactBrep.output as BrepShapePlan,
     });
   }
 

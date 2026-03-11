@@ -86,6 +86,10 @@ After the first implementation slice for this mission, the minimum acceptable st
 - `src/forge/compilePlanManifold.ts` is now the executable lowering boundary into the Manifold runtime.
 - compile-covered primitives, sketch profiles, booleans, transforms, extrudes, and revolves now rebuild from Forge compile plans instead of manually restating the same Manifold calls at each callsite.
 - compile plans now carry runtime tessellation hints where Forge needs them, while the exact BREP lowerer explicitly rejects faceted runtime intent instead of silently upgrading it.
+- `src/forge/compilerReport.ts` now centralizes exact/faceted compiler routing for shapes.
+- STEP/BREP export now routes through compiler reports instead of open-coding exact/fallback decisions in the export layer.
+- `forgecad check compiler` now snapshots compile plans, exact lowerings, runtime Manifold summaries, and compiler-lowered Manifold summaries for curated cases.
+- `forgecad debug compiler` now prints per-object compiler routing and lowered artifacts for investigation.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker
@@ -97,10 +101,24 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 3. Replace implicit `.manifold` reach-through with backend-owned specializations | Done | Backend-specific paths moved behind backend modules. |
 | 4. Keep current Manifold runtime behavior stable through the adapter | Done | Build plus focused runtime/API checks passed. |
 | 5. Formalize a backend-neutral Forge compile graph | In progress | The compile plan is now executable for the current exact/runtime subset; broader feature coverage is still needed. |
-| 6. Route operations intentionally by backend capability | In progress | Manifold runtime and exact BREP export now lower from the compile plan for covered features; broader capability routing is still pending. |
-| 7. Add backend mismatch / conversion diagnostics | Pending | No silent magic. |
+| 6. Route operations intentionally by backend capability | In progress | Exact-vs-faceted export routing now goes through compiler reports; richer multi-backend capability routing is still pending. |
+| 7. Add backend mismatch / conversion diagnostics | In progress | Exact BREP lowering now emits explicit diagnostics and compiler snapshot tooling preserves them. |
 | 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | Pending | After the runtime contract is stable. |
 | 9. Add feature families that benefit from hybrid lowering | Pending | Sheet metal is a strong candidate later. |
+
+## Current Validation
+
+- `forgecad check compiler` snapshots canonical compiler cases and fails if runtime geometry drifts away from compiler-lowered Manifold output.
+- The snapshot baseline now includes compile plans, exact BREP lowerings, export routing decisions, and quantized Manifold mesh digests.
+- `forgecad check brep` still guards the exact export subset separately.
+
+## Current Risks And Issues
+
+- The compile graph still does not cover important operation families including `hull3d`, plane splits/trims, deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, and the sampled `loft`/`sweep` paths. Those shapes still lose compile intent and fall back to mesh-only behavior.
+- Exact BREP lowering is intentionally narrower than runtime Manifold lowering. Segmented circles, segmented cylinders/spheres, and segmented revolves remain runtime-valid but exact-export-invalid by design.
+- Compiler snapshots use quantized mesh and polygon digests. That is strong enough to catch real regressions, but a Manifold upgrade or tessellation policy change can legitimately require baseline churn.
+- Topology and placement-reference semantics still live outside the compile graph. The compiler can replay geometry intent, but it does not yet own stable face/edge identity.
+- There is still no true OCCT/CadQuery lowerer driven from the compile graph. Exact export uses the compiler boundary, but not yet a second full geometry backend runtime.
 
 ## Principles
 

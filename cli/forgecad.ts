@@ -4,10 +4,12 @@ import { readFileSync } from 'fs';
 import { basename } from 'path';
 import { runCheckApiContractsCli } from './check-api-contracts';
 import { runCheckBrepExportCli } from './check-brep-export';
+import { runCheckCompilerCli } from './check-compiler';
 import { runCheckDimensionsCli } from './check-dimensions';
 import { runCheckJsModulesCli } from './check-js-modules';
 import { runCheckPlacementReferencesCli } from './check-placement-references';
 import { runCheckTransformsCli } from './check-transforms';
+import { runDebugCompilerCli } from './debug-compiler';
 import { runCaptureCli } from './forge-capture';
 import { runNotebookCli } from './forge-notebook';
 import { runReportCli } from './forge-report';
@@ -234,11 +236,38 @@ const commands: CommandDefinition[] = [
   },
   {
     group: 'Checks',
+    path: ['check', 'compiler'],
+    summary: 'Run compiler routing snapshots and runtime-vs-lowered invariants.',
+    usage: [
+      'forgecad check compiler',
+      'forgecad check compiler --case segmented-runtime-hints',
+      'forgecad check compiler --update',
+    ],
+    examples: [
+      'forgecad check compiler',
+      'forgecad check compiler --case example-brep-exportable',
+      'forgecad check compiler --update',
+    ],
+    run: runCheckCompilerCli,
+  },
+  {
+    group: 'Checks',
     path: ['check', 'api'],
     summary: 'Run script API contract invariants.',
     usage: ['forgecad check api'],
     examples: ['forgecad check api'],
     run: () => runCheckApiContractsCli(),
+  },
+  {
+    group: 'Debug',
+    path: ['debug', 'compiler'],
+    summary: 'Inspect compiler routes, lowered plans, and runtime snapshots for a script.',
+    usage: ['forgecad debug compiler <script.forge.js> [--compact]'],
+    examples: [
+      'forgecad debug compiler examples/api/brep-exportable.forge.js',
+      'forgecad debug compiler examples/chess-set.forge.js --compact',
+    ],
+    run: runDebugCompilerCli,
   },
   {
     group: 'Debug',

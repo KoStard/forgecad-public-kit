@@ -381,6 +381,25 @@ forgecad check transforms
 
 Runs fast math-level invariants to catch transform order and frame composition regressions before they leak into examples.
 
+### Compiler Snapshot Check
+
+```bash
+forgecad check compiler
+forgecad check compiler --case segmented-runtime-hints
+forgecad check compiler --update
+```
+
+Runs curated compiler regression cases and compares them against committed snapshots.
+
+Each snapshot records:
+- Forge compile plans
+- exact BREP lowerings
+- export routing decisions
+- quantized runtime Manifold mesh summaries
+- quantized compiler-lowered Manifold mesh summaries
+
+This check also fails if a plan-covered shape or sketch no longer matches its compiler-lowered runtime output, even before snapshot diffing.
+
 ### Dimension Propagation Invariant Check
 
 ```bash
@@ -407,6 +426,20 @@ Prints:
 - report ownership routing (`combined` vs `component:<name>`) per dimension
 - per-object approximate dimension ownership (both endpoints inside object bbox)
 - a dimension coordinate list (first 20 by default, `--all` for full dump)
+
+### Compiler Debugger
+
+```bash
+forgecad debug compiler /path/to/file.forge.js
+forgecad debug compiler /path/to/file.forge.js --compact
+```
+
+Prints JSON for the current script's compiler state, including:
+- per-object compile plans
+- exact BREP lowering diagnostics and lowered plans
+- faceted fallback eligibility
+- runtime Manifold summaries
+- compiler-lowered Manifold summaries
 
 ### Local Branch Cleanup
 

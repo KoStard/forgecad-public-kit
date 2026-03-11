@@ -1,0 +1,1666 @@
+[
+  {
+    "id": "exact-boolean-plate",
+    "description": "Exact boolean plate with profile booleans and tapered extrude stays on the exact route.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Plate",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "boolean",
+              "extrude"
+            ]
+          },
+          "compilePlan": {
+            "kind": "boolean",
+            "op": "union",
+            "shapes": [
+              {
+                "kind": "boolean",
+                "op": "difference",
+                "shapes": [
+                  {
+                    "kind": "extrude",
+                    "profile": {
+                      "kind": "roundedRect",
+                      "width": 96,
+                      "height": 66,
+                      "radius": 8,
+                      "center": true,
+                      "transforms": []
+                    },
+                    "height": 20,
+                    "center": false
+                  },
+                  {
+                    "kind": "transform",
+                    "base": {
+                      "kind": "extrude",
+                      "profile": {
+                        "kind": "roundedRect",
+                        "width": 88,
+                        "height": 58,
+                        "radius": 5,
+                        "center": true,
+                        "transforms": []
+                      },
+                      "height": 18,
+                      "center": false
+                    },
+                    "steps": [
+                      {
+                        "kind": "translate",
+                        "x": 0,
+                        "y": 0,
+                        "z": 2
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "transform",
+                "base": {
+                  "kind": "extrude",
+                  "profile": {
+                    "kind": "boolean",
+                    "op": "difference",
+                    "profiles": [
+                      {
+                        "kind": "roundedRect",
+                        "width": 90,
+                        "height": 60,
+                        "radius": 8,
+                        "center": true,
+                        "transforms": []
+                      },
+                      {
+                        "kind": "roundedRect",
+                        "width": 84,
+                        "height": 54,
+                        "radius": 5,
+                        "center": true,
+                        "transforms": []
+                      }
+                    ],
+                    "transforms": [
+                      {
+                        "kind": "scale",
+                        "x": 0.96,
+                        "y": 0.93
+                      }
+                    ]
+                  },
+                  "height": 4,
+                  "center": false,
+                  "scaleTop": [
+                    1.0416666666666667,
+                    1.075268817204301
+                  ]
+                },
+                "steps": [
+                  {
+                    "kind": "translate",
+                    "x": 0,
+                    "y": 0,
+                    "z": -4
+                  }
+                ]
+              }
+            ]
+          },
+          "exactBrep": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "boolean",
+              "op": "union",
+              "shapes": [
+                {
+                  "kind": "boolean",
+                  "op": "difference",
+                  "shapes": [
+                    {
+                      "kind": "extrude",
+                      "profile": {
+                        "kind": "roundedRect",
+                        "width": 96,
+                        "height": 66,
+                        "radius": 8,
+                        "center": true,
+                        "transforms": []
+                      },
+                      "height": 20,
+                      "center": false
+                    },
+                    {
+                      "kind": "transform",
+                      "base": {
+                        "kind": "extrude",
+                        "profile": {
+                          "kind": "roundedRect",
+                          "width": 88,
+                          "height": 58,
+                          "radius": 5,
+                          "center": true,
+                          "transforms": []
+                        },
+                        "height": 18,
+                        "center": false
+                      },
+                      "steps": [
+                        {
+                          "kind": "translate",
+                          "x": 0,
+                          "y": 0,
+                          "z": 2
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "extrude",
+                    "profile": {
+                      "kind": "boolean",
+                      "op": "difference",
+                      "profiles": [
+                        {
+                          "kind": "roundedRect",
+                          "width": 90,
+                          "height": 60,
+                          "radius": 8,
+                          "center": true,
+                          "transforms": []
+                        },
+                        {
+                          "kind": "roundedRect",
+                          "width": 84,
+                          "height": 54,
+                          "radius": 5,
+                          "center": true,
+                          "transforms": []
+                        }
+                      ],
+                      "transforms": [
+                        {
+                          "kind": "scale",
+                          "x": 0.96,
+                          "y": 0.93
+                        }
+                      ]
+                    },
+                    "height": 4,
+                    "center": false,
+                    "scaleTop": [
+                      1.0416666666666667,
+                      1.075268817204301
+                    ]
+                  },
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": 0,
+                      "y": 0,
+                      "z": -4
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -48,
+                -33,
+                -4
+              ],
+              "max": [
+                48,
+                33,
+                20
+              ]
+            },
+            "volume": 37277.597314,
+            "surfaceArea": 26183.838306,
+            "numTri": 1372,
+            "vertexCount": 688,
+            "meshDigest": "9037c0defde68c0965cec35ec359afbd6a538ab7126eb1fde414819ff141aed9"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -48,
+                -33,
+                -4
+              ],
+              "max": [
+                48,
+                33,
+                20
+              ]
+            },
+            "volume": 37277.597314,
+            "surfaceArea": 26183.838306,
+            "numTri": 1372,
+            "vertexCount": 688,
+            "meshDigest": "9037c0defde68c0965cec35ec359afbd6a538ab7126eb1fde414819ff141aed9"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Plate",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Plate",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  },
+  {
+    "id": "transform-heavy-solid",
+    "description": "Exact primitives keep transform intent and runtime lowering aligned.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Body",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "boolean",
+              "primitive"
+            ]
+          },
+          "compilePlan": {
+            "kind": "transform",
+            "base": {
+              "kind": "boolean",
+              "op": "difference",
+              "shapes": [
+                {
+                  "kind": "boolean",
+                  "op": "difference",
+                  "shapes": [
+                    {
+                      "kind": "box",
+                      "x": 30,
+                      "y": 30,
+                      "z": 30,
+                      "center": true
+                    },
+                    {
+                      "kind": "transform",
+                      "base": {
+                        "kind": "cylinder",
+                        "height": 60,
+                        "radius": 5,
+                        "center": false
+                      },
+                      "steps": [
+                        {
+                          "kind": "rotateAround",
+                          "axisX": -1,
+                          "axisY": 0,
+                          "axisZ": 0,
+                          "degrees": 90,
+                          "pivotX": 0,
+                          "pivotY": 0,
+                          "pivotZ": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "sphere",
+                    "radius": 6
+                  },
+                  "steps": [
+                    {
+                      "kind": "scale",
+                      "x": 1.2,
+                      "y": 0.8,
+                      "z": 0.5
+                    },
+                    {
+                      "kind": "translate",
+                      "x": 4,
+                      "y": -2,
+                      "z": 1
+                    }
+                  ]
+                }
+              ]
+            },
+            "steps": [
+              {
+                "kind": "mirror",
+                "normalX": 1,
+                "normalY": 0,
+                "normalZ": 0
+              },
+              {
+                "kind": "rotateAround",
+                "axisX": 0,
+                "axisY": 0,
+                "axisZ": 1,
+                "degrees": 20,
+                "pivotX": 0,
+                "pivotY": 0,
+                "pivotZ": 0
+              }
+            ]
+          },
+          "exactBrep": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "transform",
+              "base": {
+                "kind": "boolean",
+                "op": "difference",
+                "shapes": [
+                  {
+                    "kind": "boolean",
+                    "op": "difference",
+                    "shapes": [
+                      {
+                        "kind": "box",
+                        "x": 30,
+                        "y": 30,
+                        "z": 30,
+                        "center": true
+                      },
+                      {
+                        "kind": "transform",
+                        "base": {
+                          "kind": "cylinder",
+                          "height": 60,
+                          "radius": 5,
+                          "center": false
+                        },
+                        "steps": [
+                          {
+                            "kind": "rotateAround",
+                            "axisX": -1,
+                            "axisY": 0,
+                            "axisZ": 0,
+                            "degrees": 90,
+                            "pivotX": 0,
+                            "pivotY": 0,
+                            "pivotZ": 0
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "transform",
+                    "base": {
+                      "kind": "sphere",
+                      "radius": 6
+                    },
+                    "steps": [
+                      {
+                        "kind": "scale",
+                        "x": 1.2,
+                        "y": 0.8,
+                        "z": 0.5
+                      },
+                      {
+                        "kind": "translate",
+                        "x": 4,
+                        "y": -2,
+                        "z": 1
+                      }
+                    ]
+                  }
+                ]
+              },
+              "steps": [
+                {
+                  "kind": "mirror",
+                  "normalX": 1,
+                  "normalY": 0,
+                  "normalZ": 0
+                },
+                {
+                  "kind": "rotateAround",
+                  "axisX": 0,
+                  "axisY": 0,
+                  "axisZ": 1,
+                  "degrees": 20,
+                  "pivotX": 0,
+                  "pivotY": 0,
+                  "pivotZ": 0
+                }
+              ]
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -19.225691,
+                -19.225691,
+                -15
+              ],
+              "max": [
+                19.225691,
+                19.225691,
+                15
+              ]
+            },
+            "volume": 25443.3768,
+            "surfaceArea": 6086.488986,
+            "numTri": 2926,
+            "vertexCount": 1465,
+            "meshDigest": "2c4fe0a306f73e7be1e980e231bf9cf69ba43eeb7662ffe7c16151b3fbba7e50"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -19.225691,
+                -19.225691,
+                -15
+              ],
+              "max": [
+                19.225691,
+                19.225691,
+                15
+              ]
+            },
+            "volume": 25443.3768,
+            "surfaceArea": 6086.488986,
+            "numTri": 2926,
+            "vertexCount": 1465,
+            "meshDigest": "2c4fe0a306f73e7be1e980e231bf9cf69ba43eeb7662ffe7c16151b3fbba7e50"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Body",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Body",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  },
+  {
+    "id": "segmented-runtime-hints",
+    "description": "Segmented runtime intent stays runnable but outside the exact BREP subset.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Segmented Disk",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "extrude"
+            ]
+          },
+          "compilePlan": {
+            "kind": "extrude",
+            "profile": {
+              "kind": "circle",
+              "radius": 12,
+              "segments": 18,
+              "transforms": []
+            },
+            "height": 4,
+            "center": false
+          },
+          "exactBrep": {
+            "supported": false,
+            "diagnostics": [
+              {
+                "target": "exact-brep",
+                "code": "exact-brep-segmented-circle profiles",
+                "path": "$.profile",
+                "message": "Exact BREP lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+              }
+            ],
+            "plan": null
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -12,
+                -11.817693,
+                0
+              ],
+              "max": [
+                12,
+                11.817693,
+                4
+              ]
+            },
+            "volume": 1773.032423,
+            "surfaceArea": 1186.580263,
+            "numTri": 68,
+            "vertexCount": 36,
+            "meshDigest": "aab9487659ce1a6c145eff3979451185065d8e81f1d80c9bcb8b65f544555418"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -12,
+                -11.817693,
+                0
+              ],
+              "max": [
+                12,
+                11.817693,
+                4
+              ]
+            },
+            "volume": 1773.032423,
+            "surfaceArea": 1186.580263,
+            "numTri": 68,
+            "vertexCount": 36,
+            "meshDigest": "aab9487659ce1a6c145eff3979451185065d8e81f1d80c9bcb8b65f544555418"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        },
+        {
+          "kind": "shape",
+          "name": "Segmented Post",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "primitive"
+            ]
+          },
+          "compilePlan": {
+            "kind": "cylinder",
+            "height": 20,
+            "radius": 5,
+            "segments": 12,
+            "center": false
+          },
+          "exactBrep": {
+            "supported": false,
+            "diagnostics": [
+              {
+                "target": "exact-brep",
+                "code": "exact-brep-segmented-cylinder",
+                "path": "$",
+                "message": "Exact BREP lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+              }
+            ],
+            "plan": null
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -5,
+                -5,
+                0
+              ],
+              "max": [
+                5,
+                5,
+                20
+              ]
+            },
+            "volume": 1500,
+            "surfaceArea": 771.165708,
+            "numTri": 44,
+            "vertexCount": 24,
+            "meshDigest": "0d519e0582f99b3187eb63d2c39cf7bd0cb5a7a3446556de9567818564930d56"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -5,
+                -5,
+                0
+              ],
+              "max": [
+                5,
+                5,
+                20
+              ]
+            },
+            "volume": 1500,
+            "surfaceArea": 771.165708,
+            "numTri": 44,
+            "vertexCount": 24,
+            "meshDigest": "0d519e0582f99b3187eb63d2c39cf7bd0cb5a7a3446556de9567818564930d56"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        },
+        {
+          "kind": "shape",
+          "name": "Segmented Lathe",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "revolve"
+            ]
+          },
+          "compilePlan": {
+            "kind": "revolve",
+            "profile": {
+              "kind": "polygon",
+              "points": [
+                [
+                  6,
+                  0
+                ],
+                [
+                  10,
+                  4
+                ],
+                [
+                  8,
+                  12
+                ],
+                [
+                  0,
+                  12
+                ]
+              ],
+              "transforms": []
+            },
+            "degrees": 240,
+            "segments": 24
+          },
+          "exactBrep": {
+            "supported": false,
+            "diagnostics": [
+              {
+                "target": "exact-brep",
+                "code": "exact-brep-segmented-revolve",
+                "path": "$",
+                "message": "Exact BREP lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+              }
+            ],
+            "plan": null
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -10,
+                -8.660254,
+                0
+              ],
+              "max": [
+                10,
+                10,
+                12
+              ]
+            },
+            "volume": 1600.341605,
+            "surfaceArea": 936.989161,
+            "numTri": 148,
+            "vertexCount": 76,
+            "meshDigest": "a9926413d832ecfd00a84df81ff6502f58a4d47825874d34b6415c04218f9fb1"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -10,
+                -8.660254,
+                0
+              ],
+              "max": [
+                10,
+                10,
+                12
+              ]
+            },
+            "volume": 1600.341605,
+            "surfaceArea": 936.989161,
+            "numTri": 148,
+            "vertexCount": 76,
+            "meshDigest": "a9926413d832ecfd00a84df81ff6502f58a4d47825874d34b6415c04218f9fb1"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [],
+        "unsupported": [
+          {
+            "name": "Segmented Disk",
+            "reason": "Exact BREP lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+          },
+          {
+            "name": "Segmented Post",
+            "reason": "Exact BREP lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+          },
+          {
+            "name": "Segmented Lathe",
+            "reason": "Exact BREP lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+          }
+        ],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Segmented Disk",
+            "kind": "faceted"
+          },
+          {
+            "name": "Segmented Post",
+            "kind": "faceted"
+          },
+          {
+            "name": "Segmented Lathe",
+            "kind": "faceted"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": [
+          {
+            "name": "Segmented Disk",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Exact BREP lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+          },
+          {
+            "name": "Segmented Post",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Exact BREP lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+          },
+          {
+            "name": "Segmented Lathe",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Exact BREP lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "sketch-profile-chain",
+    "description": "Sketch-only profile chains keep profile lowering aligned with runtime cross-sections.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "sketch",
+          "name": "Profile",
+          "compilePlan": {
+            "kind": "offset",
+            "base": {
+              "kind": "boolean",
+              "op": "difference",
+              "profiles": [
+                {
+                  "kind": "roundedRect",
+                  "width": 80,
+                  "height": 50,
+                  "radius": 10,
+                  "center": true,
+                  "transforms": []
+                },
+                {
+                  "kind": "circle",
+                  "radius": 12,
+                  "transforms": [
+                    {
+                      "kind": "translate",
+                      "x": 18,
+                      "y": 0
+                    }
+                  ]
+                },
+                {
+                  "kind": "circle",
+                  "radius": 8,
+                  "transforms": [
+                    {
+                      "kind": "translate",
+                      "x": -18,
+                      "y": 0
+                    }
+                  ]
+                }
+              ],
+              "transforms": []
+            },
+            "delta": -2,
+            "join": "Round",
+            "transforms": [
+              {
+                "kind": "mirror",
+                "normalX": 1,
+                "normalY": 0
+              },
+              {
+                "kind": "translate",
+                "x": 5,
+                "y": -3
+              }
+            ]
+          },
+          "exactBrepProfile": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "offset",
+              "base": {
+                "kind": "boolean",
+                "op": "difference",
+                "profiles": [
+                  {
+                    "kind": "roundedRect",
+                    "width": 80,
+                    "height": 50,
+                    "radius": 10,
+                    "center": true,
+                    "transforms": []
+                  },
+                  {
+                    "kind": "circle",
+                    "radius": 12,
+                    "transforms": [
+                      {
+                        "kind": "translate",
+                        "x": 18,
+                        "y": 0
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "circle",
+                    "radius": 8,
+                    "transforms": [
+                      {
+                        "kind": "translate",
+                        "x": -18,
+                        "y": 0
+                      }
+                    ]
+                  }
+                ],
+                "transforms": []
+              },
+              "delta": -2,
+              "join": "Round",
+              "transforms": [
+                {
+                  "kind": "mirror",
+                  "normalX": 1,
+                  "normalY": 0
+                },
+                {
+                  "kind": "translate",
+                  "x": 5,
+                  "y": -3
+                }
+              ]
+            }
+          },
+          "runtime": {
+            "area": 2511.339643,
+            "bounds": {
+              "min": [
+                -33,
+                -26
+              ],
+              "max": [
+                43,
+                20
+              ]
+            },
+            "numVert": 636,
+            "polygonDigest": "6e817f6d5adcb55e8943b6df3bdcc1ae51cb17a154a1b0c0c1be8209d224a8f1"
+          },
+          "loweredRuntime": {
+            "area": 2511.339643,
+            "bounds": {
+              "min": [
+                -33,
+                -26
+              ],
+              "max": [
+                43,
+                20
+              ]
+            },
+            "numVert": 636,
+            "polygonDigest": "6e817f6d5adcb55e8943b6df3bdcc1ae51cb17a154a1b0c0c1be8209d224a8f1"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [],
+        "unsupported": [],
+        "skipped": [
+          {
+            "name": "Profile",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          }
+        ],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [],
+        "unsupported": [],
+        "skipped": [
+          {
+            "name": "Profile",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          }
+        ],
+        "fallbacks": []
+      }
+    }
+  },
+  {
+    "id": "mixed-scene-and-fallback",
+    "description": "Mixed scenes and compile-plan gaps route cleanly through exact and faceted decisions.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Plate",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "extrude"
+            ]
+          },
+          "compilePlan": {
+            "kind": "extrude",
+            "profile": {
+              "kind": "rect",
+              "width": 40,
+              "height": 24,
+              "center": false,
+              "transforms": []
+            },
+            "height": 8,
+            "center": false
+          },
+          "exactBrep": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "extrude",
+              "profile": {
+                "kind": "rect",
+                "width": 40,
+                "height": 24,
+                "center": false,
+                "transforms": []
+              },
+              "height": 8,
+              "center": false
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                0,
+                0,
+                0
+              ],
+              "max": [
+                40,
+                24,
+                8
+              ]
+            },
+            "volume": 7680,
+            "surfaceArea": 2944,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "bf2c68bac70f562d5ccca1bc1495562986c95ade139250e096480b5cbad670a1"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                0,
+                0,
+                0
+              ],
+              "max": [
+                40,
+                24,
+                8
+              ]
+            },
+            "volume": 7680,
+            "surfaceArea": 2944,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "bf2c68bac70f562d5ccca1bc1495562986c95ade139250e096480b5cbad670a1"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        },
+        {
+          "kind": "sketch",
+          "name": "Slot",
+          "compilePlan": {
+            "kind": "boolean",
+            "op": "union",
+            "profiles": [
+              {
+                "kind": "boolean",
+                "op": "union",
+                "profiles": [
+                  {
+                    "kind": "rect",
+                    "width": 12,
+                    "height": 6,
+                    "center": true,
+                    "transforms": []
+                  },
+                  {
+                    "kind": "circle",
+                    "radius": 3,
+                    "transforms": [
+                      {
+                        "kind": "translate",
+                        "x": -6,
+                        "y": 0
+                      }
+                    ]
+                  }
+                ],
+                "transforms": []
+              },
+              {
+                "kind": "circle",
+                "radius": 3,
+                "transforms": [
+                  {
+                    "kind": "translate",
+                    "x": 6,
+                    "y": 0
+                  }
+                ]
+              }
+            ],
+            "transforms": [
+              {
+                "kind": "translate",
+                "x": 0,
+                "y": -20
+              }
+            ]
+          },
+          "exactBrepProfile": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "boolean",
+              "op": "union",
+              "profiles": [
+                {
+                  "kind": "boolean",
+                  "op": "union",
+                  "profiles": [
+                    {
+                      "kind": "rect",
+                      "width": 12,
+                      "height": 6,
+                      "center": true,
+                      "transforms": []
+                    },
+                    {
+                      "kind": "circle",
+                      "radius": 3,
+                      "transforms": [
+                        {
+                          "kind": "translate",
+                          "x": -6,
+                          "y": 0
+                        }
+                      ]
+                    }
+                  ],
+                  "transforms": []
+                },
+                {
+                  "kind": "circle",
+                  "radius": 3,
+                  "transforms": [
+                    {
+                      "kind": "translate",
+                      "x": 6,
+                      "y": 0
+                    }
+                  ]
+                }
+              ],
+              "transforms": [
+                {
+                  "kind": "translate",
+                  "x": 0,
+                  "y": -20
+                }
+              ]
+            }
+          },
+          "runtime": {
+            "area": 100.158204,
+            "bounds": {
+              "min": [
+                -9,
+                -23
+              ],
+              "max": [
+                9,
+                -17
+              ]
+            },
+            "numVert": 42,
+            "polygonDigest": "f7b5f9063e6e1de3bddab47861fdf1732218950986ca15877e552d9dc2209de5"
+          },
+          "loweredRuntime": {
+            "area": 100.158204,
+            "bounds": {
+              "min": [
+                -9,
+                -23
+              ],
+              "max": [
+                9,
+                -17
+              ]
+            },
+            "numVert": 42,
+            "polygonDigest": "f7b5f9063e6e1de3bddab47861fdf1732218950986ca15877e552d9dc2209de5"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        },
+        {
+          "kind": "shape",
+          "name": "Warped",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "deformed",
+            "topology": "none",
+            "sources": [
+              "deform",
+              "primitive"
+            ]
+          },
+          "compilePlan": null,
+          "exactBrep": {
+            "supported": false,
+            "diagnostics": [
+              {
+                "target": "exact-brep",
+                "code": "missing-compile-plan",
+                "path": "$",
+                "message": "Forge compile intent is missing, so exact-brep lowering cannot replay this shape."
+              }
+            ],
+            "plan": null
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -8,
+                -8,
+                -8.096271
+              ],
+              "max": [
+                8,
+                8,
+                8.096271
+              ]
+            },
+            "volume": 2139.689122,
+            "surfaceArea": 805.211838,
+            "numTri": 5000,
+            "vertexCount": 2502,
+            "meshDigest": "b477f68ef6bb3af874246bdbbfa4151ee15c84558d619048f9e942a92db4c283"
+          },
+          "loweredRuntime": null,
+          "loweredRuntimeMatches": null,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Plate",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [
+          {
+            "name": "Warped",
+            "reason": "Forge compile intent is missing, so exact-brep lowering cannot replay this shape."
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Slot",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          }
+        ],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Plate",
+            "kind": "exact"
+          },
+          {
+            "name": "Warped",
+            "kind": "faceted"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [
+          {
+            "name": "Slot",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          }
+        ],
+        "fallbacks": [
+          {
+            "name": "Warped",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Forge compile intent is missing, so exact-brep lowering cannot replay this shape."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "example-brep-exportable",
+    "description": "The public BREP-exportable example stays on the exact compiler route.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Exact Export Demo",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "boolean",
+              "extrude",
+              "primitive"
+            ]
+          },
+          "compilePlan": {
+            "kind": "boolean",
+            "op": "difference",
+            "shapes": [
+              {
+                "kind": "boolean",
+                "op": "difference",
+                "shapes": [
+                  {
+                    "kind": "boolean",
+                    "op": "difference",
+                    "shapes": [
+                      {
+                        "kind": "boolean",
+                        "op": "union",
+                        "shapes": [
+                          {
+                            "kind": "extrude",
+                            "profile": {
+                              "kind": "rect",
+                              "width": 120,
+                              "height": 80,
+                              "center": true,
+                              "transforms": []
+                            },
+                            "height": 10,
+                            "center": false
+                          },
+                          {
+                            "kind": "transform",
+                            "base": {
+                              "kind": "cylinder",
+                              "height": 24,
+                              "radius": 18,
+                              "center": false
+                            },
+                            "steps": [
+                              {
+                                "kind": "translate",
+                                "x": 0,
+                                "y": 0,
+                                "z": 10
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "transform",
+                        "base": {
+                          "kind": "cylinder",
+                          "height": 18,
+                          "radius": 5,
+                          "center": false
+                        },
+                        "steps": [
+                          {
+                            "kind": "translate",
+                            "x": -34,
+                            "y": 0,
+                            "z": -4
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "transform",
+                    "base": {
+                      "kind": "cylinder",
+                      "height": 18,
+                      "radius": 5,
+                      "center": false
+                    },
+                    "steps": [
+                      {
+                        "kind": "translate",
+                        "x": 34,
+                        "y": 0,
+                        "z": -4
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "transform",
+                "base": {
+                  "kind": "cylinder",
+                  "height": 34,
+                  "radius": 8,
+                  "center": false
+                },
+                "steps": [
+                  {
+                    "kind": "translate",
+                    "x": 0,
+                    "y": 0,
+                    "z": 6
+                  }
+                ]
+              }
+            ]
+          },
+          "exactBrep": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "boolean",
+              "op": "difference",
+              "shapes": [
+                {
+                  "kind": "boolean",
+                  "op": "difference",
+                  "shapes": [
+                    {
+                      "kind": "boolean",
+                      "op": "difference",
+                      "shapes": [
+                        {
+                          "kind": "boolean",
+                          "op": "union",
+                          "shapes": [
+                            {
+                              "kind": "extrude",
+                              "profile": {
+                                "kind": "rect",
+                                "width": 120,
+                                "height": 80,
+                                "center": true,
+                                "transforms": []
+                              },
+                              "height": 10,
+                              "center": false
+                            },
+                            {
+                              "kind": "transform",
+                              "base": {
+                                "kind": "cylinder",
+                                "height": 24,
+                                "radius": 18,
+                                "center": false
+                              },
+                              "steps": [
+                                {
+                                  "kind": "translate",
+                                  "x": 0,
+                                  "y": 0,
+                                  "z": 10
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "transform",
+                          "base": {
+                            "kind": "cylinder",
+                            "height": 18,
+                            "radius": 5,
+                            "center": false
+                          },
+                          "steps": [
+                            {
+                              "kind": "translate",
+                              "x": -34,
+                              "y": 0,
+                              "z": -4
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "transform",
+                      "base": {
+                        "kind": "cylinder",
+                        "height": 18,
+                        "radius": 5,
+                        "center": false
+                      },
+                      "steps": [
+                        {
+                          "kind": "translate",
+                          "x": 34,
+                          "y": 0,
+                          "z": -4
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "cylinder",
+                    "height": 34,
+                    "radius": 8,
+                    "center": false
+                  },
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": 0,
+                      "y": 0,
+                      "z": 6
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -60,
+                -40,
+                0
+              ],
+              "max": [
+                60,
+                40,
+                34
+              ]
+            },
+            "volume": 113229.758977,
+            "surfaceArea": 27635.811638,
+            "numTri": 1652,
+            "vertexCount": 824,
+            "meshDigest": "d978c3495d5190563dba28b3e33b77723de826d3e7de7e230fcd1a29f465a2a1"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -60,
+                -40,
+                0
+              ],
+              "max": [
+                60,
+                40,
+                34
+              ]
+            },
+            "volume": 113229.758977,
+            "surfaceArea": 27635.811638,
+            "numTri": 1652,
+            "vertexCount": 824,
+            "meshDigest": "d978c3495d5190563dba28b3e33b77723de826d3e7de7e230fcd1a29f465a2a1"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Exact Export Demo",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Exact Export Demo",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  }
+]
