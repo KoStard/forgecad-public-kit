@@ -1,6 +1,6 @@
 import type { GeometryInfo, Shape } from './kernel';
 import type { SceneObject } from './runner';
-import type { BrepShapePlan } from './brepPlan';
+import type { CadQueryShapePlan } from './cadqueryPlan';
 import { buildShapeCompilerReport, summarizeCompilerDiagnostics } from './compilerReport';
 
 export interface BrepMesh {
@@ -10,9 +10,10 @@ export interface BrepMesh {
 
 export interface BrepExactExportObject {
   kind: 'exact';
+  target: 'cadquery-occt';
   name: string;
   color?: string;
-  plan: BrepShapePlan;
+  plan: CadQueryShapePlan;
 }
 
 export interface BrepFacetedExportObject {
@@ -108,7 +109,7 @@ export function buildBrepExportManifest(
 
     const report = buildShapeCompilerReport(object.shape);
     const geometryInfo = object.geometryInfo ?? report.geometryInfo;
-    if (!report.exactBrep.supported) {
+    if (!report.cadqueryOcct.supported) {
       if (options.allowFaceted && report.facetedMesh.supported) {
         manifest.objects.push({
           kind: 'faceted',
@@ -119,7 +120,7 @@ export function buildBrepExportManifest(
         manifest.fallbacks.push({
           name: object.name,
           reason: `Using faceted mesh fallback because exact BREP lowering failed: ${summarizeCompilerDiagnostics(
-            report.exactBrep.diagnostics,
+            report.cadqueryOcct.diagnostics,
             'geometry is outside exact BREP coverage.',
           )}`,
           geometryInfo,
@@ -128,7 +129,7 @@ export function buildBrepExportManifest(
         manifest.unsupported.push({
           name: object.name,
           reason: summarizeCompilerDiagnostics(
-            report.exactBrep.diagnostics,
+            report.cadqueryOcct.diagnostics,
             'No exact BREP export plan is available for this geometry.',
           ),
           geometryInfo,
@@ -139,9 +140,10 @@ export function buildBrepExportManifest(
 
     manifest.objects.push({
       kind: 'exact',
+      target: 'cadquery-occt',
       name: object.name,
       color: object.color,
-      plan: report.exactBrep.output as BrepShapePlan,
+      plan: report.cadqueryOcct.output as CadQueryShapePlan,
     });
   }
 

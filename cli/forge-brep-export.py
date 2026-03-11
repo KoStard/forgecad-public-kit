@@ -366,6 +366,9 @@ def build_export_shape(obj: Dict[str, Any]) -> "cq.Shape":
     kind = obj.get("kind", "exact")
     if kind == "faceted":
         return build_faceted_shape(obj["mesh"])
+    target = obj.get("target", "cadquery-occt")
+    if target != "cadquery-occt":
+        raise ValueError(f"Unsupported exact export target: {target}")
     return build_shape(obj["plan"])
 
 

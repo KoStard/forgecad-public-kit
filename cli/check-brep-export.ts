@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { init, runScript } from '../src/forge/headless';
 import { buildBrepExportManifest } from '../src/forge/brepExport';
-import type { BrepProfilePlan, BrepShapePlan, BrepShapeTransformStep } from '../src/forge/brepPlan';
+import type { CadQueryProfilePlan, CadQueryShapePlan, CadQueryShapeTransformStep } from '../src/forge/cadqueryPlan';
 import { collectProjectFiles } from './collect-files';
 
 function runExactManifest(code: string) {
@@ -23,10 +23,11 @@ function runExactManifest(code: string) {
   );
   assert.equal(manifest.objects.length, 1, `Expected exactly one export object, got ${manifest.objects.length}`);
   assert.equal(manifest.objects[0].kind, 'exact', 'Expected exact export object');
+  assert.equal(manifest.objects[0].target, 'cadquery-occt', 'Expected exact export object to use the CadQuery/OCCT lowerer');
   return manifest.objects[0].plan;
 }
 
-function collectProfiles(plan: BrepShapePlan): BrepProfilePlan[] {
+function collectProfiles(plan: CadQueryShapePlan): CadQueryProfilePlan[] {
   switch (plan.kind) {
     case 'box':
     case 'cylinder':
@@ -42,7 +43,7 @@ function collectProfiles(plan: BrepShapePlan): BrepProfilePlan[] {
   }
 }
 
-function collectShapeTransforms(plan: BrepShapePlan): BrepShapeTransformStep[] {
+function collectShapeTransforms(plan: CadQueryShapePlan): CadQueryShapeTransformStep[] {
   switch (plan.kind) {
     case 'box':
     case 'cylinder':

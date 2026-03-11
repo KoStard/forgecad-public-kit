@@ -253,11 +253,11 @@ function assertCompilerRoutingIntegrity(snapshots: CompilerCaseSnapshot[]): void
 
     for (const object of snapshot.scene.objects) {
       if (object.kind === 'shape') {
-        if (object.exactBrep.supported && object.exactBrep.plan == null) {
-          issues.push(`${snapshot.id}/${object.name}: exact BREP marked supported without a lowered plan`);
+        if (object.cadqueryOcct.supported && object.cadqueryOcct.plan == null) {
+          issues.push(`${snapshot.id}/${object.name}: CadQuery/OCCT target marked supported without a lowered plan`);
         }
-        if (!object.exactBrep.supported && object.exactBrep.diagnostics.length === 0) {
-          issues.push(`${snapshot.id}/${object.name}: exact BREP marked unsupported without diagnostics`);
+        if (!object.cadqueryOcct.supported && object.cadqueryOcct.diagnostics.length === 0) {
+          issues.push(`${snapshot.id}/${object.name}: CadQuery/OCCT target marked unsupported without diagnostics`);
         }
         if (object.compilePlan && object.loweredRuntime == null && object.loweredRuntimeError == null) {
           issues.push(`${snapshot.id}/${object.name}: compile-covered runtime object missing lowered runtime summary`);
@@ -266,7 +266,7 @@ function assertCompilerRoutingIntegrity(snapshots: CompilerCaseSnapshot[]): void
         const exactExportObject = exactObjects.get(object.name);
         const facetedExportObject = facetedObjects.get(object.name);
 
-        if (object.exactBrep.supported) {
+        if (object.cadqueryOcct.supported) {
           if (!exactExportObject || exactExportObject.kind !== 'exact') {
             issues.push(`${snapshot.id}/${object.name}: exact-exportable shape missing from exact export manifest`);
           }
@@ -304,11 +304,11 @@ function assertCompilerRoutingIntegrity(snapshots: CompilerCaseSnapshot[]): void
       if (!snapshot.scene.facetedExport.skipped.some((item) => item.name === object.name)) {
         issues.push(`${snapshot.id}/${object.name}: sketch missing from allow-faceted export skip list`);
       }
-      if (object.exactBrepProfile.supported && object.exactBrepProfile.plan == null) {
-        issues.push(`${snapshot.id}/${object.name}: exact profile marked supported without a lowered plan`);
+      if (object.cadqueryOcctProfile.supported && object.cadqueryOcctProfile.plan == null) {
+        issues.push(`${snapshot.id}/${object.name}: CadQuery/OCCT profile marked supported without a lowered plan`);
       }
-      if (!object.exactBrepProfile.supported && object.exactBrepProfile.diagnostics.length === 0) {
-        issues.push(`${snapshot.id}/${object.name}: exact profile marked unsupported without diagnostics`);
+      if (!object.cadqueryOcctProfile.supported && object.cadqueryOcctProfile.diagnostics.length === 0) {
+        issues.push(`${snapshot.id}/${object.name}: CadQuery/OCCT profile marked unsupported without diagnostics`);
       }
       if (object.compilePlan && object.loweredRuntime == null && object.loweredRuntimeError == null) {
         issues.push(`${snapshot.id}/${object.name}: compile-covered sketch missing lowered runtime summary`);

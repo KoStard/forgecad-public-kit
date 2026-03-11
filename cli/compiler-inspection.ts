@@ -3,11 +3,11 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import type { CrossSection } from 'manifold-3d';
 import { buildBrepExportManifest, type BrepExportManifest } from '../src/forge/brepExport';
-import { lowerProfileCompilePlanToBrepResult } from '../src/forge/compilePlanBrep';
+import { lowerProfileCompilePlanToCadQueryResult } from '../src/forge/compilePlanCadQuery';
 import { lowerProfileCompilePlanToCrossSection, lowerShapeCompilePlanToShapeBackend } from '../src/forge/compilePlanManifold';
 import { buildShapeCompilerReport, type ShapeCompilerReport } from '../src/forge/compilerReport';
 import type { ProfileCompilePlan, ShapeCompilePlan } from '../src/forge/compilePlan';
-import type { BrepProfilePlan, BrepShapePlan } from '../src/forge/brepPlan';
+import type { CadQueryProfilePlan, CadQueryShapePlan } from '../src/forge/cadqueryPlan';
 import { getWasm, type GeometryInfo, type Shape } from '../src/forge/kernel';
 import { runScript, type SceneObject } from '../src/forge/headless';
 import { getSketchCompileProfilePlan } from '../src/forge/sketch/core';
@@ -49,10 +49,10 @@ export interface CompilerShapeInspection {
   name: string;
   geometryInfo: GeometryInfo;
   compilePlan: ShapeCompilePlan | null;
-  exactBrep: {
+  cadqueryOcct: {
     supported: boolean;
-    diagnostics: ShapeCompilerReport['exactBrep']['diagnostics'];
-    plan: BrepShapePlan | null;
+    diagnostics: ShapeCompilerReport['cadqueryOcct']['diagnostics'];
+    plan: CadQueryShapePlan | null;
   };
   facetedMesh: {
     supported: boolean;
@@ -68,10 +68,10 @@ export interface CompilerSketchInspection {
   kind: 'sketch';
   name: string;
   compilePlan: ProfileCompilePlan | null;
-  exactBrepProfile: {
+  cadqueryOcctProfile: {
     supported: boolean;
-    diagnostics: ReturnType<typeof lowerProfileCompilePlanToBrepResult>['diagnostics'];
-    plan: BrepProfilePlan | null;
+    diagnostics: ReturnType<typeof lowerProfileCompilePlanToCadQueryResult>['diagnostics'];
+    plan: CadQueryProfilePlan | null;
   };
   runtime: SketchRuntimeSummary;
   loweredRuntime: SketchRuntimeSummary | null;
@@ -177,10 +177,10 @@ function inspectShapeObject(object: SceneObject & { shape: NonNullable<SceneObje
     name: object.name,
     geometryInfo: report.geometryInfo,
     compilePlan: report.compilePlan,
-    exactBrep: {
-      supported: report.exactBrep.supported,
-      diagnostics: report.exactBrep.diagnostics,
-      plan: report.exactBrep.output ?? null,
+    cadqueryOcct: {
+      supported: report.cadqueryOcct.supported,
+      diagnostics: report.cadqueryOcct.diagnostics,
+      plan: report.cadqueryOcct.output ?? null,
     },
     facetedMesh: {
       supported: report.facetedMesh.supported,
@@ -196,7 +196,7 @@ function inspectShapeObject(object: SceneObject & { shape: NonNullable<SceneObje
 function inspectSketchObject(object: SceneObject & { sketch: NonNullable<SceneObject['sketch']> }): CompilerSketchInspection {
   const compilePlan = getSketchCompileProfilePlan(object.sketch);
   const runtime = summarizeCrossSectionRuntime(object.sketch.cross);
-  const exactBrepProfile = lowerProfileCompilePlanToBrepResult(compilePlan);
+  const cadqueryOcctProfile = lowerProfileCompilePlanToCadQueryResult(compilePlan);
   const loweredRuntime = (() => {
     if (!compilePlan) return { summary: null, error: null as string | null };
     try {
@@ -216,10 +216,10 @@ function inspectSketchObject(object: SceneObject & { sketch: NonNullable<SceneOb
     kind: 'sketch',
     name: object.name,
     compilePlan,
-    exactBrepProfile: {
-      supported: exactBrepProfile.ok,
-      diagnostics: exactBrepProfile.diagnostics,
-      plan: exactBrepProfile.ok ? exactBrepProfile.value : null,
+    cadqueryOcctProfile: {
+      supported: cadqueryOcctProfile.ok,
+      diagnostics: cadqueryOcctProfile.diagnostics,
+      plan: cadqueryOcctProfile.ok ? cadqueryOcctProfile.value : null,
     },
     runtime,
     loweredRuntime: loweredRuntime.summary,

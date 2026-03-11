@@ -1,12 +1,13 @@
 import type { ShapeCompilePlan } from './compilePlan';
-import type { BrepShapePlan } from './brepPlan';
+import type { CadQueryShapePlan } from './cadqueryPlan';
 import {
   compilerDiagnostic,
+  describeCompilerTarget,
   primaryCompilerDiagnosticMessage,
   type CompilerDiagnostic,
   type CompilerTarget,
 } from './compilerDiagnostics';
-import { lowerShapeCompilePlanToBrepResult } from './compilePlanBrep';
+import { lowerShapeCompilePlanToCadQueryResult } from './compilePlanCadQuery';
 import { getShapeCompilePlan, type GeometryInfo, type Shape } from './kernel';
 
 export interface CompilerTargetReport<T> {
@@ -19,7 +20,7 @@ export interface CompilerTargetReport<T> {
 export interface ShapeCompilerReport {
   geometryInfo: GeometryInfo;
   compilePlan: ShapeCompilePlan | null;
-  exactBrep: CompilerTargetReport<BrepShapePlan>;
+  cadqueryOcct: CompilerTargetReport<CadQueryShapePlan>;
   facetedMesh: CompilerTargetReport<null>;
 }
 
@@ -52,7 +53,7 @@ function missingCompilePlanDiagnostic(target: CompilerTarget): CompilerDiagnosti
     target,
     'missing-compile-plan',
     '$',
-    `Forge compile intent is missing, so ${target} lowering cannot replay this shape.`,
+    `Forge compile intent is missing, so ${describeCompilerTarget(target)} lowering cannot replay this shape.`,
   );
 }
 
@@ -75,14 +76,14 @@ export function summarizeCompilerDiagnostics(
 export function buildShapeCompilerReport(shape: Shape): ShapeCompilerReport {
   const compilePlan = getShapeCompilePlan(shape);
   const geometryInfo = shape.geometryInfo();
-  const exactBrep = (() => {
+  const cadqueryOcct = (() => {
     if (!compilePlan) {
-      return unsupportedTargetReport<BrepShapePlan>('exact-brep', [missingCompilePlanDiagnostic('exact-brep')]);
+      return unsupportedTargetReport<CadQueryShapePlan>('cadquery-occt', [missingCompilePlanDiagnostic('cadquery-occt')]);
     }
-    const lowered = lowerShapeCompilePlanToBrepResult(compilePlan);
+    const lowered = lowerShapeCompilePlanToCadQueryResult(compilePlan);
     return lowered.ok
-      ? supportedTargetReport('exact-brep', lowered.value, lowered.diagnostics)
-      : unsupportedTargetReport<BrepShapePlan>('exact-brep', lowered.diagnostics);
+      ? supportedTargetReport('cadquery-occt', lowered.value, lowered.diagnostics)
+      : unsupportedTargetReport<CadQueryShapePlan>('cadquery-occt', lowered.diagnostics);
   })();
 
   const facetedMesh = geometryInfo.representation === 'mesh-solid'
@@ -92,7 +93,7 @@ export function buildShapeCompilerReport(shape: Shape): ShapeCompilerReport {
   return {
     geometryInfo,
     compilePlan,
-    exactBrep,
+    cadqueryOcct,
     facetedMesh,
   };
 }

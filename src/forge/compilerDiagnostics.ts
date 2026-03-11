@@ -1,4 +1,4 @@
-export type CompilerTarget = 'exact-brep' | 'runtime-manifold' | 'faceted-mesh';
+export type CompilerTarget = 'cadquery-occt' | 'runtime-manifold' | 'faceted-mesh';
 
 export interface CompilerDiagnostic {
   target: CompilerTarget;
@@ -10,6 +10,17 @@ export interface CompilerDiagnostic {
 export type CompileLoweringResult<T> =
   | { ok: true; value: T; diagnostics: CompilerDiagnostic[] }
   | { ok: false; diagnostics: CompilerDiagnostic[] };
+
+export function describeCompilerTarget(target: CompilerTarget): string {
+  switch (target) {
+    case 'cadquery-occt':
+      return 'CadQuery/OCCT';
+    case 'runtime-manifold':
+      return 'runtime Manifold';
+    case 'faceted-mesh':
+      return 'faceted mesh';
+  }
+}
 
 export function compilerDiagnostic(
   target: CompilerTarget,
