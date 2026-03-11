@@ -58,6 +58,17 @@ function lowerProfileBooleanCompilePlan(plan: Extract<ProfileCompilePlan, { kind
   return applyProfileCompileTransforms(combined, plan.transforms);
 }
 
+function lowerProfileHullCompilePlan(plan: Extract<ProfileCompilePlan, { kind: 'hull' }>, wasm: ManifoldToplevel): CrossSection {
+  const profiles = plan.profiles.map((profile) => lowerProfileCompilePlanToCrossSection(profile, wasm));
+  if (profiles.length === 0) {
+    throw new Error('Cannot lower empty profile hull');
+  }
+  if (profiles.length === 1) {
+    return applyProfileCompileTransforms(profiles[0], plan.transforms);
+  }
+  return applyProfileCompileTransforms(wasm.CrossSection.hull(profiles), plan.transforms);
+}
+
 export function lowerProfileCompilePlanToCrossSection(
   plan: ProfileCompilePlan,
   wasm: ManifoldToplevel,
@@ -86,6 +97,8 @@ export function lowerProfileCompilePlanToCrossSection(
         lowerProfileCompilePlanToCrossSection(plan.base, wasm).offset(plan.delta, plan.join),
         plan.transforms,
       );
+    case 'hull':
+      return lowerProfileHullCompilePlan(plan, wasm);
   }
 }
 
@@ -137,6 +150,15 @@ function lowerShapeBooleanCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'b
   }
 }
 
+function lowerShapeHullCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'hull' }>, wasm: ManifoldToplevel): Manifold {
+  const shapeItems = plan.shapes.map((shape) => lowerShapeCompilePlanToManifold(shape, wasm));
+  const items = [...shapeItems, ...plan.points.map(([x, y, z]) => [x, y, z] as [number, number, number])];
+  if (items.length === 0) {
+    throw new Error('Cannot lower empty shape hull');
+  }
+  return wasm.Manifold.hull(items);
+}
+
 export function lowerShapeCompilePlanToManifold(
   plan: ShapeCompilePlan,
   wasm: ManifoldToplevel,
@@ -162,6 +184,8 @@ export function lowerShapeCompilePlanToManifold(
       return lowerShapeBooleanCompilePlan(plan, wasm);
     case 'transform':
       return applyShapeCompileTransforms(lowerShapeCompilePlanToManifold(plan.base, wasm), plan.steps);
+    case 'hull':
+      return lowerShapeHullCompilePlan(plan, wasm);
   }
 }
 

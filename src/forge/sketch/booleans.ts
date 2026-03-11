@@ -8,7 +8,7 @@ import {
   setSketchPlacement3D,
 } from './core';
 import { getWasm } from '../kernel';
-import { buildBooleanProfileCompilePlan } from '../compilePlan';
+import { buildBooleanProfileCompilePlan, buildHullProfileCompilePlan } from '../compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from '../apiArgs';
 
 function normalizeSketchOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Sketch[] {
@@ -133,11 +133,11 @@ export function hull2d(...inputs: SketchOperandInput[]): Sketch {
     'Use hull2d(sketch1, sketch2) or hull2d([sketch1, sketch2]).',
   );
   if (sketches.length === 0) throw new Error('hull2d requires at least one sketch');
+  const nextPlan = buildHullProfileCompilePlan(sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
   return setSketchPlacement3D(
-    setSketchCompileProfilePlan(
-      new Sketch(getWasm().CrossSection.hull(sketches.map(s => s.cross)), sketches[0].colorHex),
-      null,
-    ),
+    nextPlan
+      ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
+      : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.hull(sketches.map(s => s.cross)), sketches[0].colorHex), null),
     mergeSketchPlacement3D(sketches),
   );
 }

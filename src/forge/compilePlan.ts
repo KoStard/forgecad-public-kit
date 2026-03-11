@@ -43,6 +43,11 @@ export type ProfileCompilePlan =
       delta: number;
       join: 'Round';
       transforms: ProfileCompileTransformStep[];
+    }
+  | {
+      kind: 'hull';
+      profiles: ProfileCompilePlan[];
+      transforms: ProfileCompileTransformStep[];
     };
 
 export type ShapeCompileTransformStep =
@@ -109,6 +114,11 @@ export type ShapeCompilePlan =
       kind: 'transform';
       base: ShapeCompilePlan;
       steps: ShapeCompileTransformStep[];
+    }
+  | {
+      kind: 'hull';
+      shapes: ShapeCompilePlan[];
+      points: [number, number, number][];
     };
 
 function cloneProfileTransform(step: ProfileCompileTransformStep): ProfileCompileTransformStep {
@@ -211,6 +221,12 @@ export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): Profil
         join: plan.join,
         transforms: plan.transforms.map(cloneProfileTransform),
       };
+    case 'hull':
+      return {
+        kind: 'hull',
+        profiles: plan.profiles.map((profile) => cloneProfileCompilePlan(profile)!),
+        transforms: plan.transforms.map(cloneProfileTransform),
+      };
   }
 }
 
@@ -256,6 +272,12 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         kind: 'transform',
         base: cloneShapeCompilePlan(plan.base)!,
         steps: plan.steps.map(cloneShapeTransform),
+      };
+    case 'hull':
+      return {
+        kind: 'hull',
+        shapes: plan.shapes.map((shape) => cloneShapeCompilePlan(shape)!),
+        points: plan.points.map(([x, y, z]) => [x, y, z]),
       };
   }
 }
@@ -337,5 +359,28 @@ export function buildOffsetProfileCompilePlan(
     delta,
     join,
     transforms: [],
+  };
+}
+
+export function buildHullProfileCompilePlan(
+  profiles: Array<ProfileCompilePlan | null>,
+): ProfileCompilePlan | null {
+  if (profiles.some((profile) => profile == null)) return null;
+  return {
+    kind: 'hull',
+    profiles: profiles.map((profile) => cloneProfileCompilePlan(profile)!),
+    transforms: [],
+  };
+}
+
+export function buildHullShapeCompilePlan(
+  shapes: Array<ShapeCompilePlan | null>,
+  points: [number, number, number][] = [],
+): ShapeCompilePlan | null {
+  if (shapes.some((shape) => shape == null)) return null;
+  return {
+    kind: 'hull',
+    shapes: shapes.map((shape) => cloneShapeCompilePlan(shape)!),
+    points: points.map(([x, y, z]) => [x, y, z]),
   };
 }

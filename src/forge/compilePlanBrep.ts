@@ -25,6 +25,15 @@ function segmentedShapeDiagnostic(kind: string, path: string) {
   );
 }
 
+function unsupportedExactNodeDiagnostic(kind: string, path: string) {
+  return compilerDiagnostic(
+    'exact-brep',
+    `exact-brep-unsupported-${kind}`,
+    path,
+    `Exact BREP lowering does not support Forge ${kind} intent at ${path} yet.`,
+  );
+}
+
 function missingCompilePlanDiagnostic(path: string) {
   return compilerDiagnostic(
     'exact-brep',
@@ -106,6 +115,8 @@ function lowerProfileCompilePlanToBrepResultAtPath(
         transforms: [...plan.transforms],
       }, base.diagnostics);
     }
+    case 'hull':
+      return compilerFailure(unsupportedExactNodeDiagnostic('profile-hull', path));
   }
 }
 
@@ -187,6 +198,8 @@ function lowerShapeCompilePlanToBrepResultAtPath(
         steps: [...plan.steps],
       }, base.diagnostics);
     }
+    case 'hull':
+      return compilerFailure(unsupportedExactNodeDiagnostic('shape-hull', path));
   }
 }
 

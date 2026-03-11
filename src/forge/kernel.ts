@@ -28,6 +28,7 @@ import {
   appendShapeCompileTransform,
   appendShapeCompileTransforms,
   buildBooleanShapeCompilePlan,
+  buildHullShapeCompilePlan,
   cloneShapeCompilePlan,
 } from './compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from './apiArgs';
@@ -1012,10 +1013,16 @@ export class Shape {
 
   /** Convex hull of this shape. */
   hull(): Shape {
+    const nextPlan = buildHullShapeCompilePlan([getShapeCompilePlanInternal(this)]);
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).hull(), this.colorHex)),
+      withBaseDimensions(
+        this,
+        nextPlan
+          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+          : new Shape(getShapeRuntimeBackendInternal(this).hull(), this.colorHex),
+      ),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'hull', { topology: 'none' }),
-    ), null);
+    ), nextPlan);
   }
 
   // --- Simplification ---
@@ -1301,21 +1308,27 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
 /** Convex hull of multiple shapes and/or points. */
 export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]): Shape {
   const shapeArgs: Shape[] = [];
+  const pointArgs: [number, number, number][] = [];
   const items = args.map((arg, index) => {
     if (arg instanceof Shape || (arg && typeof arg === 'object' && typeof (arg as { toShape?: unknown }).toShape === 'function')) {
       const shape = unwrapShapeLike(arg);
       shapeArgs.push(shape);
       return requireManifoldShapeBackend(getShapeRuntimeBackendInternal(shape), `hull3d() shape ${shapeArgs.length}`);
     }
-    return normalizePoint3(arg, 'hull3d()', index + 1);
+    const point = normalizePoint3(arg, 'hull3d()', index + 1);
+    pointArgs.push(point);
+    return point;
   });
-  const out = new Shape(getWasm().Manifold.hull(items), shapeArgs[0]?.colorHex);
+  const nextPlan = buildHullShapeCompilePlan(shapeArgs.map((shape) => getShapeCompilePlanInternal(shape)), pointArgs);
+  const out = nextPlan
+    ? buildShapeFromCompilePlan(nextPlan, shapeArgs[0]?.colorHex)
+    : new Shape(getWasm().Manifold.hull(items), shapeArgs[0]?.colorHex);
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(shapeArgs, out),
     shapeArgs.length > 0
       ? mergeGeometryInfos(shapeArgs.map((shape) => getShapeGeometryInfoInternal(shape)), 'hull', { topology: 'none' })
       : createGeometryInfo({ fidelity: 'kernel-native', sources: ['hull'] }),
-  ), null);
+  ), nextPlan);
 }
 
 /** Create shape from a signed distance function. Positive = inside. */
