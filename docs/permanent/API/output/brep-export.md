@@ -59,7 +59,7 @@ Update it whenever:
 | `levelSet()` | Unsupported | No | Mesh/SDF output by design |
 | `smoothOut()` / `refine*()` / `simplify()` | Unsupported | No | Mesh post-processing, not exact BREP |
 | `warp()` | Unsupported | No | Deformation is mesh-domain today |
-| `hull3d()` | Partial | No | No exact convex-hull replay yet; `--allow-faceted` can export the triangulated result as a faceted solid |
+| `hull3d()` / `Shape.hull()` / `hull2d()` / `Sketch.hull()` | Partial | No | Hull intent is now preserved in the Forge compile graph and reported explicitly, but there is still no exact convex-hull OCCT replay; `--allow-faceted` can export closed hull solids as faceted geometry |
 | `trimByPlane()` / `split*()` | Unsupported | No | Exact OCCT replay not implemented |
 | `TrackedShape` topology preservation | Partial | Synthetic only | Export succeeds for supported base solids, but named topology is not written to STEP/BREP |
 | Colors/materials in STEP/BREP | Partial | STEP only | Scene-object colors are written to STEP via CadQuery assembly export; `.brep` remains geometry-only |

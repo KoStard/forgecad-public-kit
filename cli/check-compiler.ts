@@ -2,9 +2,10 @@
 /**
  * Compiler invariants and snapshot check.
  *
- * Records the Forge compile plan, exact BREP lowering, and runtime/lowered
- * Manifold summaries for a curated set of cases so compiler regressions show up
- * as explicit snapshot diffs instead of silent geometry drift.
+ * This is a unit-style regression harness for the compiler surface. It records
+ * the Forge compile plan, exact BREP lowering, and runtime/lowered Manifold
+ * summaries for a curated set of cases so compiler regressions show up as
+ * explicit snapshot diffs instead of silent geometry drift.
  */
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -111,6 +112,36 @@ return [{ name: 'Profile', sketch: profile }];
 `,
   ),
   inlineCase(
+    'hull-runtime-boundary',
+    'Hull intent stays compiler-owned for Manifold lowering while exact export remains explicitly unsupported.',
+    `
+const rib = hull3d(
+  cylinder(20, 3).translate(-10, 0, 0),
+  cylinder(20, 3).translate(10, 0, 0),
+  [0, 0, 26],
+);
+const convexPost = box(12, 8, 20, true)
+  .toShape()
+  .rotateAround([0, 0, 1], 25, [0, 0, 0])
+  .hull();
+const tab = hull2d(
+  circle2d(6).translate(-10, 0),
+  circle2d(6).translate(10, 0),
+).translate(0, 4);
+const collar = polygon([
+  [0, 0],
+  [8, 0],
+  [4, 5],
+]).translate(0, 16).hull();
+return [
+  { name: 'Rib', shape: rib },
+  { name: 'Convex Post', shape: convexPost },
+  { name: 'Tab', sketch: tab },
+  { name: 'Collar', sketch: collar },
+];
+`,
+  ),
+  inlineCase(
     'mixed-scene-and-fallback',
     'Mixed scenes and compile-plan gaps route cleanly through exact and faceted decisions.',
     `
@@ -209,6 +240,89 @@ function assertLoweredRuntimeMatches(snapshots: CompilerCaseSnapshot[]): void {
   );
 }
 
+function assertCompilerRoutingIntegrity(snapshots: CompilerCaseSnapshot[]): void {
+  const issues: string[] = [];
+
+  for (const snapshot of snapshots) {
+    const exactObjects = new Map(snapshot.scene.exactExport.objects.map((object) => [object.name, object]));
+    const facetedObjects = new Map(snapshot.scene.facetedExport.objects.map((object) => [object.name, object]));
+    const exactUnsupported = new Set(snapshot.scene.exactExport.unsupported.map((item) => item.name));
+    const facetedUnsupported = new Set(snapshot.scene.facetedExport.unsupported.map((item) => item.name));
+    const facetedFallbacks = new Set(snapshot.scene.facetedExport.fallbacks.map((item) => item.name));
+    const skippedObjects = new Set(snapshot.scene.exactExport.skipped.map((item) => item.name));
+
+    for (const object of snapshot.scene.objects) {
+      if (object.kind === 'shape') {
+        if (object.exactBrep.supported && object.exactBrep.plan == null) {
+          issues.push(`${snapshot.id}/${object.name}: exact BREP marked supported without a lowered plan`);
+        }
+        if (!object.exactBrep.supported && object.exactBrep.diagnostics.length === 0) {
+          issues.push(`${snapshot.id}/${object.name}: exact BREP marked unsupported without diagnostics`);
+        }
+        if (object.compilePlan && object.loweredRuntime == null && object.loweredRuntimeError == null) {
+          issues.push(`${snapshot.id}/${object.name}: compile-covered runtime object missing lowered runtime summary`);
+        }
+
+        const exactExportObject = exactObjects.get(object.name);
+        const facetedExportObject = facetedObjects.get(object.name);
+
+        if (object.exactBrep.supported) {
+          if (!exactExportObject || exactExportObject.kind !== 'exact') {
+            issues.push(`${snapshot.id}/${object.name}: exact-exportable shape missing from exact export manifest`);
+          }
+          if (!facetedExportObject || facetedExportObject.kind !== 'exact') {
+            issues.push(`${snapshot.id}/${object.name}: exact-exportable shape missing from allow-faceted export manifest as exact`);
+          }
+          if (exactUnsupported.has(object.name) || facetedFallbacks.has(object.name) || facetedUnsupported.has(object.name)) {
+            issues.push(`${snapshot.id}/${object.name}: exact-exportable shape still reported as unsupported or fallback`);
+          }
+          continue;
+        }
+
+        if (!exactUnsupported.has(object.name)) {
+          issues.push(`${snapshot.id}/${object.name}: exact-unsupported shape missing from exact export blockers`);
+        }
+        if (object.facetedMesh.supported) {
+          if (!facetedExportObject) {
+            issues.push(`${snapshot.id}/${object.name}: faceted-exportable shape missing from allow-faceted manifest`);
+          }
+          if (!facetedFallbacks.has(object.name) && facetedExportObject?.kind === 'faceted') {
+            issues.push(`${snapshot.id}/${object.name}: faceted export object missing fallback record`);
+          }
+          if (facetedUnsupported.has(object.name)) {
+            issues.push(`${snapshot.id}/${object.name}: faceted-exportable shape still marked unsupported with allow-faceted`);
+          }
+        } else if (facetedExportObject || facetedFallbacks.has(object.name)) {
+          issues.push(`${snapshot.id}/${object.name}: faceted-ineligible shape leaked into allow-faceted export manifest`);
+        }
+        continue;
+      }
+
+      if (!skippedObjects.has(object.name)) {
+        issues.push(`${snapshot.id}/${object.name}: sketch missing from export skip list`);
+      }
+      if (!snapshot.scene.facetedExport.skipped.some((item) => item.name === object.name)) {
+        issues.push(`${snapshot.id}/${object.name}: sketch missing from allow-faceted export skip list`);
+      }
+      if (object.exactBrepProfile.supported && object.exactBrepProfile.plan == null) {
+        issues.push(`${snapshot.id}/${object.name}: exact profile marked supported without a lowered plan`);
+      }
+      if (!object.exactBrepProfile.supported && object.exactBrepProfile.diagnostics.length === 0) {
+        issues.push(`${snapshot.id}/${object.name}: exact profile marked unsupported without diagnostics`);
+      }
+      if (object.compilePlan && object.loweredRuntime == null && object.loweredRuntimeError == null) {
+        issues.push(`${snapshot.id}/${object.name}: compile-covered sketch missing lowered runtime summary`);
+      }
+    }
+  }
+
+  assert.equal(
+    issues.length,
+    0,
+    `Compiler routing integrity failed:\n${issues.map((line) => `- ${line}`).join('\n')}`,
+  );
+}
+
 function readStoredSnapshots(): CompilerCaseSnapshot[] {
   return JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf-8')) as CompilerCaseSnapshot[];
 }
@@ -224,6 +338,7 @@ export async function runCheckCompilerCli(argv: string[] = process.argv.slice(2)
 
   const generated = generateSnapshots(caseId);
   assertLoweredRuntimeMatches(generated);
+  assertCompilerRoutingIntegrity(generated);
 
   if (update) {
     writeSnapshots(generated);

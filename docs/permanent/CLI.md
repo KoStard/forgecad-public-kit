@@ -390,6 +390,7 @@ forgecad check compiler --update
 ```
 
 Runs curated compiler regression cases and compares them against committed snapshots.
+This is a unit-style invariant check, not just a debugger convenience.
 
 Each snapshot records:
 - Forge compile plans
@@ -398,7 +399,27 @@ Each snapshot records:
 - quantized runtime Manifold mesh summaries
 - quantized compiler-lowered Manifold mesh summaries
 
-This check also fails if a plan-covered shape or sketch no longer matches its compiler-lowered runtime output, even before snapshot diffing.
+This check also fails if:
+- a plan-covered shape or sketch no longer matches its compiler-lowered runtime output
+- export manifests drift away from the per-object compiler routing decisions
+- exact/faceted support claims stop matching the lowered artifacts and diagnostics
+
+### Invariant Test Suite
+
+```bash
+forgecad check suite
+npm test
+npm run test:compiler
+npm run test:compiler:update
+```
+
+ForgeCAD's current unit-test surface is assertion-based CLI checks, not a separate Vitest/Jest harness.
+
+The important entrypoints are:
+- `npm test` runs the repo invariant suite (`transforms`, `dimensions`, `placement`, `js-modules`, `brep`, `compiler`, `api`)
+- `npm run test:compiler` runs just the compiler snapshot/invariant suite
+- `npm run test:compiler:update` refreshes committed compiler snapshots after an intentional change
+- `forgecad check suite` is the CLI equivalent of the invariant suite runner
 
 ### Dimension Propagation Invariant Check
 

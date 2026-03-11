@@ -89,7 +89,10 @@ After the first implementation slice for this mission, the minimum acceptable st
 - `src/forge/compilerReport.ts` now centralizes exact/faceted compiler routing for shapes.
 - STEP/BREP export now routes through compiler reports instead of open-coding exact/fallback decisions in the export layer.
 - `forgecad check compiler` now snapshots compile plans, exact lowerings, runtime Manifold summaries, and compiler-lowered Manifold summaries for curated cases.
+- the hull family (`hull3d()`, `Shape.hull()`, `hull2d()`, `Sketch.hull()`) now stays inside the Forge compile graph for the Manifold runtime instead of dropping straight to mesh-only execution.
+- the exact BREP lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
 - `forgecad debug compiler` now prints per-object compiler routing and lowered artifacts for investigation.
+- `forgecad check suite` and `npm test` now expose the repo's assertion-based invariant suite as a first-class test entrypoint instead of leaving the checks scattered across ad hoc commands.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker
@@ -108,15 +111,30 @@ After the first implementation slice for this mission, the minimum acceptable st
 
 ## Current Validation
 
+- `npm test` now runs the current assertion-based invariant suite for compiler/export/runtime/API behavior.
+- `forgecad check suite` is the CLI entrypoint for the same invariant suite.
 - `forgecad check compiler` snapshots canonical compiler cases and fails if runtime geometry drifts away from compiler-lowered Manifold output.
-- The snapshot baseline now includes compile plans, exact BREP lowerings, export routing decisions, and quantized Manifold mesh digests.
+- The snapshot baseline now includes compile plans, exact BREP lowerings, export routing decisions, and quantized Manifold mesh/polygon digests.
+- The compiler check also asserts that exact/faceted export manifests stay consistent with the per-object compiler reports, not just with the saved JSON baseline.
 - `forgecad check brep` still guards the exact export subset separately.
+
+## Current Test Model
+
+ForgeCAD does not have a separate Vitest/Jest layer for this compiler work right now.
+
+The current unit-style test strategy is:
+
+- keep the checks as plain assertion-driven CLI runners
+- expose the curated suite through `npm test`
+- keep compiler regressions reviewable through committed JSON snapshots
+- keep routing/export invariants enforced with direct assertions so not every failure becomes "just update the snapshot"
 
 ## Current Risks And Issues
 
-- The compile graph still does not cover important operation families including `hull3d`, plane splits/trims, deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, and the sampled `loft`/`sweep` paths. Those shapes still lose compile intent and fall back to mesh-only behavior.
+- The compile graph still does not cover important operation families including plane splits/trims, deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, and the sampled `loft`/`sweep` paths. Those shapes still lose compile intent and fall back to mesh-only behavior.
+- The hull family is now compile-covered for the Manifold runtime, but exact OCCT replay is still missing. That means hull intent is preserved and diagnosable, but STEP/BREP still needs faceted fallback for those shapes.
 - Exact BREP lowering is intentionally narrower than runtime Manifold lowering. Segmented circles, segmented cylinders/spheres, and segmented revolves remain runtime-valid but exact-export-invalid by design.
-- Compiler snapshots use quantized mesh and polygon digests. That is strong enough to catch real regressions, but a Manifold upgrade or tessellation policy change can legitimately require baseline churn.
+- Compiler snapshots use quantized mesh and polygon digests. That is strong enough to catch real regressions, but a Manifold upgrade or tessellation policy change can legitimately require baseline churn, so snapshot updates still need human review.
 - Topology and placement-reference semantics still live outside the compile graph. The compiler can replay geometry intent, but it does not yet own stable face/edge identity.
 - There is still no true OCCT/CadQuery lowerer driven from the compile graph. Exact export uses the compiler boundary, but not yet a second full geometry backend runtime.
 

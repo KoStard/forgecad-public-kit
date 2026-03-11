@@ -1033,6 +1033,445 @@
     }
   },
   {
+    "id": "hull-runtime-boundary",
+    "description": "Hull intent stays compiler-owned for Manifold lowering while exact export remains explicitly unsupported.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Rib",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "hull",
+              "primitive"
+            ]
+          },
+          "compilePlan": {
+            "kind": "hull",
+            "shapes": [
+              {
+                "kind": "transform",
+                "base": {
+                  "kind": "cylinder",
+                  "height": 20,
+                  "radius": 3,
+                  "center": false
+                },
+                "steps": [
+                  {
+                    "kind": "translate",
+                    "x": -10,
+                    "y": 0,
+                    "z": 0
+                  }
+                ]
+              },
+              {
+                "kind": "transform",
+                "base": {
+                  "kind": "cylinder",
+                  "height": 20,
+                  "radius": 3,
+                  "center": false
+                },
+                "steps": [
+                  {
+                    "kind": "translate",
+                    "x": 10,
+                    "y": 0,
+                    "z": 0
+                  }
+                ]
+              }
+            ],
+            "points": [
+              [
+                0,
+                0,
+                26
+              ]
+            ]
+          },
+          "exactBrep": {
+            "supported": false,
+            "diagnostics": [
+              {
+                "target": "exact-brep",
+                "code": "exact-brep-unsupported-shape-hull",
+                "path": "$",
+                "message": "Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+              }
+            ],
+            "plan": null
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -13,
+                -3,
+                0
+              ],
+              "max": [
+                13,
+                3,
+                26
+              ]
+            },
+            "volume": 3259.480482,
+            "surfaceArea": 1565.048035,
+            "numTri": 166,
+            "vertexCount": 85,
+            "meshDigest": "26cdca29959c6b9bba2f4236ba27118b7a1c73ca3ba11a74fe3756f84afbb64f"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -13,
+                -3,
+                0
+              ],
+              "max": [
+                13,
+                3,
+                26
+              ]
+            },
+            "volume": 3259.480482,
+            "surfaceArea": 1565.048035,
+            "numTri": 166,
+            "vertexCount": 85,
+            "meshDigest": "26cdca29959c6b9bba2f4236ba27118b7a1c73ca3ba11a74fe3756f84afbb64f"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        },
+        {
+          "kind": "shape",
+          "name": "Convex Post",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "hull",
+              "primitive"
+            ]
+          },
+          "compilePlan": {
+            "kind": "hull",
+            "shapes": [
+              {
+                "kind": "transform",
+                "base": {
+                  "kind": "box",
+                  "x": 12,
+                  "y": 8,
+                  "z": 20,
+                  "center": true
+                },
+                "steps": [
+                  {
+                    "kind": "rotateAround",
+                    "axisX": 0,
+                    "axisY": 0,
+                    "axisZ": 1,
+                    "degrees": 25,
+                    "pivotX": 0,
+                    "pivotY": 0,
+                    "pivotZ": 0
+                  }
+                ]
+              }
+            ],
+            "points": []
+          },
+          "exactBrep": {
+            "supported": false,
+            "diagnostics": [
+              {
+                "target": "exact-brep",
+                "code": "exact-brep-unsupported-shape-hull",
+                "path": "$",
+                "message": "Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+              }
+            ],
+            "plan": null
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -7.12832,
+                -6.160941,
+                -10
+              ],
+              "max": [
+                7.12832,
+                6.160941,
+                10
+              ]
+            },
+            "volume": 1920,
+            "surfaceArea": 992,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "5dd4ef38c558b6ff3a32fdcbde33e7cfc75783ce460292e6a40b82e302f10d45"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -7.12832,
+                -6.160941,
+                -10
+              ],
+              "max": [
+                7.12832,
+                6.160941,
+                10
+              ]
+            },
+            "volume": 1920,
+            "surfaceArea": 992,
+            "numTri": 12,
+            "vertexCount": 8,
+            "meshDigest": "5dd4ef38c558b6ff3a32fdcbde33e7cfc75783ce460292e6a40b82e302f10d45"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        },
+        {
+          "kind": "sketch",
+          "name": "Tab",
+          "compilePlan": {
+            "kind": "hull",
+            "profiles": [
+              {
+                "kind": "circle",
+                "radius": 6,
+                "transforms": [
+                  {
+                    "kind": "translate",
+                    "x": -10,
+                    "y": 0
+                  }
+                ]
+              },
+              {
+                "kind": "circle",
+                "radius": 6,
+                "transforms": [
+                  {
+                    "kind": "translate",
+                    "x": 10,
+                    "y": 0
+                  }
+                ]
+              }
+            ],
+            "transforms": [
+              {
+                "kind": "translate",
+                "x": 0,
+                "y": 4
+              }
+            ]
+          },
+          "exactBrepProfile": {
+            "supported": false,
+            "diagnostics": [
+              {
+                "target": "exact-brep",
+                "code": "exact-brep-unsupported-profile-hull",
+                "path": "$",
+                "message": "Exact BREP lowering does not support Forge profile-hull intent at $ yet."
+              }
+            ],
+            "plan": null
+          },
+          "runtime": {
+            "area": 352.968545,
+            "bounds": {
+              "min": [
+                -16,
+                -2
+              ],
+              "max": [
+                16,
+                10
+              ]
+            },
+            "numVert": 78,
+            "polygonDigest": "a0eb5b6fce567a96f2e9d11e8259a02b6471b9e2be5b24c51f77efff24582396"
+          },
+          "loweredRuntime": {
+            "area": 352.968545,
+            "bounds": {
+              "min": [
+                -16,
+                -2
+              ],
+              "max": [
+                16,
+                10
+              ]
+            },
+            "numVert": 78,
+            "polygonDigest": "a0eb5b6fce567a96f2e9d11e8259a02b6471b9e2be5b24c51f77efff24582396"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        },
+        {
+          "kind": "sketch",
+          "name": "Collar",
+          "compilePlan": {
+            "kind": "hull",
+            "profiles": [
+              {
+                "kind": "polygon",
+                "points": [
+                  [
+                    0,
+                    0
+                  ],
+                  [
+                    8,
+                    0
+                  ],
+                  [
+                    4,
+                    5
+                  ]
+                ],
+                "transforms": [
+                  {
+                    "kind": "translate",
+                    "x": 0,
+                    "y": 16
+                  }
+                ]
+              }
+            ],
+            "transforms": []
+          },
+          "exactBrepProfile": {
+            "supported": false,
+            "diagnostics": [
+              {
+                "target": "exact-brep",
+                "code": "exact-brep-unsupported-profile-hull",
+                "path": "$",
+                "message": "Exact BREP lowering does not support Forge profile-hull intent at $ yet."
+              }
+            ],
+            "plan": null
+          },
+          "runtime": {
+            "area": 20,
+            "bounds": {
+              "min": [
+                0,
+                16
+              ],
+              "max": [
+                8,
+                21
+              ]
+            },
+            "numVert": 3,
+            "polygonDigest": "e45ab5a7ad1f7fe3f7d3e7a00684502d50b6378152751eb9e7ef2aca7c507c60"
+          },
+          "loweredRuntime": {
+            "area": 20,
+            "bounds": {
+              "min": [
+                0,
+                16
+              ],
+              "max": [
+                8,
+                21
+              ]
+            },
+            "numVert": 3,
+            "polygonDigest": "e45ab5a7ad1f7fe3f7d3e7a00684502d50b6378152751eb9e7ef2aca7c507c60"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [],
+        "unsupported": [
+          {
+            "name": "Rib",
+            "reason": "Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+          },
+          {
+            "name": "Convex Post",
+            "reason": "Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Tab",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          },
+          {
+            "name": "Collar",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          }
+        ],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Rib",
+            "kind": "faceted"
+          },
+          {
+            "name": "Convex Post",
+            "kind": "faceted"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [
+          {
+            "name": "Tab",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          },
+          {
+            "name": "Collar",
+            "reason": "Sketch objects are skipped for STEP/BREP export."
+          }
+        ],
+        "fallbacks": [
+          {
+            "name": "Rib",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+          },
+          {
+            "name": "Convex Post",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: Exact BREP lowering does not support Forge shape-hull intent at $ yet."
+          }
+        ]
+      }
+    }
+  },
+  {
     "id": "mixed-scene-and-fallback",
     "description": "Mixed scenes and compile-plan gaps route cleanly through exact and faceted decisions.",
     "scene": {

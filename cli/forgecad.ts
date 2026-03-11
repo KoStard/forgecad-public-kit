@@ -5,6 +5,7 @@ import { basename } from 'path';
 import { runCheckApiContractsCli } from './check-api-contracts';
 import { runCheckBrepExportCli } from './check-brep-export';
 import { runCheckCompilerCli } from './check-compiler';
+import { runCheckSuiteCli } from './check-suite';
 import { runCheckDimensionsCli } from './check-dimensions';
 import { runCheckJsModulesCli } from './check-js-modules';
 import { runCheckPlacementReferencesCli } from './check-placement-references';
@@ -193,6 +194,14 @@ const commands: CommandDefinition[] = [
       'forgecad check params path/to/model.forge.js --samples 12',
     ],
     run: runParamCheckCli,
+  },
+  {
+    group: 'Checks',
+    path: ['check', 'suite'],
+    summary: 'Run the repo invariant suite, including compiler snapshots and export/runtime contract checks.',
+    usage: ['forgecad check suite'],
+    examples: ['forgecad check suite'],
+    run: () => runCheckSuiteCli(),
   },
   {
     group: 'Checks',

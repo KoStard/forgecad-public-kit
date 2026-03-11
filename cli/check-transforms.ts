@@ -467,7 +467,7 @@ function testBevelGearTopSectionCircularity() {
   });
 
   const bb = gear.boundingBox();
-  const topSlice = gear.manifold.slice(bb.max[2] - 1e-4).bounds();
+  const topSlice = gear.slice(bb.max[2] - 1e-4).bounds();
   const spanX = topSlice.max[0] - topSlice.min[0];
   const spanY = topSlice.max[1] - topSlice.min[1];
 
