@@ -26,6 +26,30 @@ Current goal:
 
 In this document, "come back when it is done" means this checkpoint, not just another compiler slice.
 
+## Where We Succeed Or Fail
+
+This transition will likely succeed or fail on one layer:
+
+- Forge's semantic feature graph
+- the compiled-scene routing boundary
+- the reference / workplane / query model for downstream features
+
+If that layer stays clean:
+
+- new features are additive
+- backend behavior is diagnosable
+- export is just another compiler route
+- advanced workflows like sheet metal have a place to land later
+
+If that layer gets compromised:
+
+- backend-specific callsite code will spread
+- export-only feature logic will multiply
+- face/edge-driven features will become brittle
+- "supported" features will fail in ordinary multi-step parts
+
+That is the architectural pressure point.
+
 ## Checkpoint Scope
 
 This checkpoint is about mainstream solid-modeling design work.
@@ -175,6 +199,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 - `loft()` and `sweep()` now stay compiler-owned for compile-covered inputs instead of dropping directly to sampled runtime-only geometry.
 - the Manifold lowerer now rebuilds `loft`/`sweep` from shared compiler-owned sampled lowering helpers instead of relying on bespoke callsite geometry code.
 - the CadQuery/OCCT target now lowers compatible `loft` and `sweep` plans, and the Python exact exporter executes those plans end-to-end.
+- `src/forge/compiledScene.ts` now centralizes scene-level compiler routing so export policy, debug tooling, and future backend capability work consume one compiler-owned route layer instead of re-deriving decisions per caller.
 - the CadQuery/OCCT lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
 - `forgecad debug compiler` now prints per-object compiler routing and lowered artifacts for investigation.
 - `forgecad check suite` and `npm test` now expose the repo's assertion-based invariant suite as a first-class test entrypoint instead of leaving the checks scattered across ad hoc commands.
@@ -190,7 +215,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 3. Replace implicit `.manifold` reach-through with backend-owned specializations | Done | Backend-specific paths moved behind backend modules. |
 | 4. Keep current Manifold runtime behavior stable through the adapter | Done | Build plus focused runtime/API checks passed. |
 | 5. Formalize a backend-neutral Forge compile graph | In progress | The compile plan now covers primitives, sketch profiles, booleans, transforms, extrudes, revolves, hulls, plane trims/splits, and sampled `loft` / `sweep`; broader feature coverage is still needed. |
-| 6. Route operations intentionally by backend capability | In progress | Exact-vs-faceted export routing now goes through compiler reports; richer multi-backend capability routing is still pending. |
+| 6. Route operations intentionally by backend capability | In progress | Scene-level exact/faceted/skipped/unsupported routing is now centralized in `compiledScene.ts`; richer multi-backend capability routing is still pending. |
 | 7. Add backend mismatch / conversion diagnostics | In progress | Exact BREP lowering now emits explicit diagnostics and compiler snapshot tooling preserves them. |
 | 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | In progress | The `cadquery-occt` target now covers the current exact subset plus compatible `loft` / `sweep` plans; feature coverage is still narrow and export-driven. |
 | 9. Make both backends true lowerers from the same compile graph | Pending | This is now the active checkpoint. |
@@ -205,6 +230,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 - `forgecad check compiler` snapshots canonical compiler cases and fails if runtime geometry drifts away from compiler-lowered Manifold output.
 - The snapshot baseline now includes compile plans, CadQuery/OCCT lowerings, export routing decisions, and quantized Manifold mesh/polygon digests.
 - The compiler check also asserts that exact/faceted export manifests stay consistent with the per-object compiler reports, not just with the saved JSON baseline.
+- Scene-level route decisions are now part of the compiler inspection surface, so route drift becomes a reviewable regression instead of a hidden internal policy change.
 - `forgecad check brep` still guards the exact export subset separately.
 
 ## Current Test Model

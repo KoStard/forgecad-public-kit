@@ -74,3 +74,4 @@ This doesn't replace Fusion360 for everything. Interactive sketching, direct fac
 - **Build the parametric layer.** Constraints, named entities, topology tracking, sketch operations — this is where ForgeCAD's value lives.
 - **Expose Manifold's power.** Things like `smoothOut`, `refine`, `levelSet` (SDF), `warp` — make them accessible from user scripts with clean APIs.
 - **Stay extensible.** Users should be able to define new primitives, new operations, new patterns inside their scripts. The API should be a toolkit, not a cage.
+- **Make Forge semantics own the backends.** Manifold and CadQuery/OCCT should be lowerers for the same Forge modeling system, not competing authoring models. See [API/internals/compiler.md](API/internals/compiler.md).
