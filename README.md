@@ -70,13 +70,14 @@ When an AI model is asked to generate ForgeCAD models, require this workflow:
 1. Read `docs/permanent/API/model-building/README.md` first.
 2. Read every file listed there.
 3. Read the relevant files in `examples/api/` next.
-4. Only then generate or modify `.forge.js` / `.sketch.js` models.
-5. Read `docs/permanent/API/runtime/` or `docs/permanent/API/output/` only if the task explicitly needs viewport behavior, reporting, or export.
+4. If the task is exploratory, unfamiliar, or likely to need debugging, start in a `.forge-notebook.json` and iterate there first.
+5. Only then stabilize the result as `.forge.js` / `.sketch.js`, or keep using the notebook when iteration is still active.
+6. Read `docs/permanent/API/runtime/` or `docs/permanent/API/output/` only if the task explicitly needs viewport behavior, reporting, or export.
 
 Use this instruction in prompts to avoid missing API capabilities or producing invalid model code:
 
 ```text
-Before generating any ForgeCAD model code, read docs/permanent/API/model-building/README.md, then every file it lists, then the relevant files in examples/api/. Only read docs/permanent/API/runtime/ or docs/permanent/API/output/ if the task explicitly needs those areas. Then generate a runnable model using only documented ForgeCAD APIs and patterns from those files.
+Before generating any ForgeCAD model code, read docs/permanent/API/model-building/README.md, then every file it lists, then the relevant files in examples/api/. If the task is exploratory, unfamiliar, or likely to need debugging, start in a .forge-notebook.json and iterate there first. Only read docs/permanent/API/runtime/ or docs/permanent/API/output/ if the task explicitly needs those areas. Then generate a runnable model using only documented ForgeCAD APIs and patterns from those files.
 ```
 
 Example AI workflows:
@@ -209,8 +210,12 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 | Task | Command |
 | --- | --- |
 | Validate a script | `npm run test-run -- examples/cup.forge.js` |
+| Validate a notebook preview | `npm run test-run -- examples/api/notebook-iteration.forge-notebook.json` |
+| Inspect notebook cells in the terminal | `npm run notebook -- view examples/api/notebook-iteration.forge-notebook.json preview` |
 | Render PNG views | `npm run render -- examples/cup.forge.js` |
+| Render a notebook preview | `npm run render -- examples/api/notebook-iteration.forge-notebook.json` |
 | Render orbit GIF (solid + wireframe) | `npm run gif -- examples/cup.forge.js` |
+| List notebook capture options | `npm run gif -- examples/api/notebook-assembly-debug.forge-notebook.json --list` |
 | Export sketch SVG | `npm run svg -- examples/frame.sketch.js` |
 | Export exact STEP (supported subset only) | `npm run step -- examples/api/brep-exportable.forge.js` |
 | Export exact BREP (supported subset only) | `npm run brep -- examples/api/brep-exportable.forge.js` |
@@ -222,6 +227,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 ### CLI details
 
 - `render` outputs multi-angle PNGs (`front`, `side`, `top`, `iso`) by default.
+- For `npm run test-run`, `npm run render`, `npm run gif`, and `npm run record`, passing a `.forge-notebook.json` uses that notebook's preview cell.
 - `gif` outputs a single orbit animation with a full solid pass, then full wireframe pass.
 - `svg` runs fully in Node (no browser/Puppeteer).
 - `report` generates searchable-text PDF pages (overview, unique components, BOM, dimensions).
@@ -240,6 +246,8 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 - `examples/api/exploded-view.forge.js`: exploded layouts + cut-plane visualization
 - `examples/api/brep-exportable.forge.js`: exact-exportable STEP/BREP subset demo
 - `examples/api/geometry-info.forge.js`: inspect backend/provenance info for solids
+- `examples/api/notebook-iteration.forge-notebook.json`: stateful part exploration with pinned intermediate geometry
+- `examples/api/notebook-assembly-debug.forge-notebook.json`: assembly collision and sweep investigation in notebook cells
 
 BREP export support is intentionally tracked as a living parity table in [docs/permanent/API/output/brep-export.md](docs/permanent/API/output/brep-export.md).
 

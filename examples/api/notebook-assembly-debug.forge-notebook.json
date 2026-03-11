@@ -1,0 +1,90 @@
+{
+  "cells": [
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "mechanism-cell",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "const upperLen = 90;\n",
+        "const foreLen = 75;\n",
+        "\n",
+        "const mech = assembly(\"Notebook Debug Arm\")\n",
+        "  .addPart(\"Base\", box(44, 44, 18, true).color(\"#6e7f96\"))\n",
+        "  .addPart(\n",
+        "    \"Upper Arm\",\n",
+        "    box(upperLen, 18, 18).translate(0, -9, -9).color(\"#d0a24c\"),\n",
+        "  )\n",
+        "  .addPart(\n",
+        "    \"Forearm\",\n",
+        "    box(foreLen, 14, 14).translate(0, -7, -7).color(\"#b86656\"),\n",
+        "  )\n",
+        "  .addJoint(\"shoulder\", \"revolute\", \"Base\", \"Upper Arm\", {\n",
+        "    axis: [0, 1, 0],\n",
+        "    min: -45,\n",
+        "    max: 110,\n",
+        "    default: 25,\n",
+        "    frame: Transform.identity().translate(0, 0, 18),\n",
+        "  })\n",
+        "  .addJoint(\"elbow\", \"revolute\", \"Upper Arm\", \"Forearm\", {\n",
+        "    axis: [0, -1, 0],\n",
+        "    min: -10,\n",
+        "    max: 135,\n",
+        "    default: 35,\n",
+        "    frame: Transform.identity().translate(upperLen, 0, 0),\n",
+        "  });\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "collision-cell",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "const solved = mech.solve({ shoulder: 38, elbow: 72 });\n",
+        "const collisions = solved.collisionReport({\n",
+        "  minOverlapVolume: 0.5,\n",
+        "  ignorePairs: [[\"Upper Arm\", \"Forearm\"]],\n",
+        "});\n",
+        "\n",
+        "console.log(\"Collision report\", collisions);\n",
+        "show(solved.toScene());\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "preview-cell",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "const sweepFrames = mech.sweepJoint(\"elbow\", -10, 135, 14, { shoulder: 38 });\n",
+        "const collidingSteps = sweepFrames.filter((step) => step.collisions.length > 0).length;\n",
+        "\n",
+        "console.log(\"Sweep collisions\", collidingSteps, \"of\", sweepFrames.length);\n",
+        "show(mech.solve({ shoulder: 38, elbow: 90 }).toScene());\n"
+      ]
+    }
+  ],
+  "metadata": {
+    "forgecad": {
+      "format": "forgecad-notebook/v1",
+      "previewCellId": "preview-cell",
+      "title": "Notebook Assembly Debug"
+    },
+    "kernelspec": {
+      "display_name": "ForgeCAD",
+      "language": "javascript",
+      "name": "forgecad"
+    },
+    "language_info": {
+      "name": "javascript",
+      "file_extension": ".js",
+      "mimetype": "text/javascript"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}

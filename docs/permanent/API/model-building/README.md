@@ -13,10 +13,11 @@ This folder is partitioned so each API surface has one primary owner file. Avoid
 ## Read Plan
 
 1. Start with [reference.md](reference.md) plus [coordinate-system.md](coordinate-system.md), [geometry-conventions.md](geometry-conventions.md), and [positioning.md](positioning.md).
-2. Add sketch docs only when the task is sketch-heavy.
-3. Add [entities.md](entities.md) for topology-aware edits, constraints, or pattern helpers.
-4. Add [assembly.md](assembly.md) only for joint/coupling/mechanism work.
-5. Pull in guides and CLI docs only when you need recipes, troubleshooting, or command usage.
+2. If the task is exploratory, unfamiliar, or likely to need debugging, use a `.forge-notebook.json` during the first iteration instead of jumping straight to a final script layout.
+3. Add sketch docs only when the task is sketch-heavy.
+4. Add [entities.md](entities.md) for topology-aware edits, constraints, or pattern helpers.
+5. Add [assembly.md](assembly.md) only for joint/coupling/mechanism work.
+6. Pull in guides and CLI docs when you need recipes, notebook workflow guidance, troubleshooting, or command usage.
 
 ## Intentionally Excluded
 

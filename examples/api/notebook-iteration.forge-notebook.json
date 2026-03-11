@@ -1,0 +1,75 @@
+{
+  "cells": [
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "setup-cell",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "const width = param(\"Width\", 120, { min: 80, max: 180, unit: \"mm\" });\n",
+        "const depth = param(\"Depth\", 80, { min: 50, max: 140, unit: \"mm\" });\n",
+        "const height = param(\"Height\", 14, { min: 8, max: 30, unit: \"mm\" });\n",
+        "\n",
+        "const base = roundedRect(width, depth, 10)\n",
+        "  .extrude(height)\n",
+        "  .color(\"#5f87c6\");\n",
+        "\n",
+        "show(base);\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "inspect-pocket-cell",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "const pocket = roundedRect(width - 24, depth - 24, 8)\n",
+        "  .extrude(height - 3)\n",
+        "  .translate(12, 12, 3)\n",
+        "  .color(\"#d67a61\");\n",
+        "\n",
+        "show([\n",
+        "  { name: \"Base\", shape: base },\n",
+        "  { name: \"Pocket\", shape: pocket },\n",
+        "]);\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "preview-cell",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "const part = base.subtract(pocket);\n",
+        "\n",
+        "dim([0, 0, 0], [width, 0, 0], { label: \"Width\" });\n",
+        "dim([0, 0, 0], [0, depth, 0], { label: \"Depth\", offset: 14 });\n",
+        "cutPlane(\"Center Section\", [1, 0, 0], width / 2);\n",
+        "\n",
+        "return part;\n"
+      ]
+    }
+  ],
+  "metadata": {
+    "forgecad": {
+      "format": "forgecad-notebook/v1",
+      "previewCellId": "preview-cell",
+      "title": "Notebook Iteration"
+    },
+    "kernelspec": {
+      "display_name": "ForgeCAD",
+      "language": "javascript",
+      "name": "forgecad"
+    },
+    "language_info": {
+      "name": "javascript",
+      "file_extension": ".js",
+      "mimetype": "text/javascript"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}

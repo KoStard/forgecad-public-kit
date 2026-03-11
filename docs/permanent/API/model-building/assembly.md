@@ -117,6 +117,20 @@ This keeps kinematic chains declarative and avoids repeated manual pivot math.
 - `solved.minClearance("PartA", "PartB", 10)` computes minimum gap
 - `assembly.sweepJoint("elbow", -20, 140, 24)` samples motion and reports collisions
 
+Notebook-friendly pattern:
+
+```javascript
+const solved = mech.solve({ shoulder: 35, elbow: 60 });
+console.log("Collisions", solved.collisionReport());
+
+const sweep = mech.sweepJoint("elbow", -10, 135, 12, { shoulder: 35 });
+console.log("Sweep collisions", sweep.filter((step) => step.collisions.length > 0).length);
+
+show(solved.toScene());
+```
+
+That keeps mechanism setup in earlier cells and collision/sweep investigation in the current preview cell.
+
 ## Common pitfalls
 - If parts vanish in the viewport, check whether a cut plane is active before debugging kinematics. The viewer-side APIs live in [../runtime/viewport.md](../runtime/viewport.md).
 - If a returned object is empty, Forge logs a warning in script output.

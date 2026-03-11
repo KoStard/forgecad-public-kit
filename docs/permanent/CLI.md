@@ -85,14 +85,17 @@ Notebook cell behavior:
 - A trailing expression is also treated as the cell value
 - Cell outputs are written back into the notebook JSON, similar to Jupyter
 
+For the `npm run` entrypoints below, passing a `.forge-notebook.json` uses that notebook's preview cell. That means you can inspect with `view`, validate with `test-run`, and render or capture the current preview without exporting first.
+
 ### Script Validation
 
 ```bash
 npm run test-run -- examples/cup.forge.js
+npm run test-run -- examples/api/notebook-iteration.forge-notebook.json
 npm run test-run -- --debug-imports examples/cup.forge.js
 ```
 
-Runs a `.forge.js` or `.sketch.js` file in the real runtime and prints object stats, diagnostics, and execution time.
+Runs a `.forge.js`, `.sketch.js`, or notebook preview cell in the real runtime and prints object stats, diagnostics, and execution time.
 
 `--debug-imports` adds an import trace (source file, target file, overrides, return type, success/error phase), useful when debugging `importPart()`/`importSketch()` behavior.
 
@@ -200,10 +203,13 @@ Current behavior:
 
 ```bash
 npm run render -- examples/cup.forge.js [output.png]
+npm run render -- examples/api/notebook-iteration.forge-notebook.json [output.png]
 npm run render -- examples/cup.forge.js out/scene.png --scene '{"camera":{"projectionMode":"perspective","position":[200,-160,120],"target":[0,0,20],"up":[0,0,1]},"objects":{"obj-2":{"visible":false},"obj-3":{"opacity":0.35}}}'
 ```
 
 Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to launch headless Chrome with WebGL for Three.js rendering.
+
+When the input is a notebook, `npm run render` renders the notebook's preview cell.
 
 **How it works:**
 1. `cli/forge-render.mjs` — Node launcher script. Auto-starts Vite dev server if not running, launches Puppeteer.
@@ -235,6 +241,7 @@ Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to l
 ```bash
 npm run gif -- examples/cup.forge.js [output.gif]
 npm run record -- examples/cup.forge.js [output.mp4]
+npm run gif -- examples/api/notebook-assembly-debug.forge-notebook.json --list
 
 # Or directly:
 npx tsx cli/forge-gif.ts examples/cup.forge.js
@@ -248,6 +255,8 @@ Creates high-quality animated captures from the real Forge viewport renderer:
 - Named cut-plane captures
 - Exact camera replay via `--camera`
 - Full viewport scene replay via `--scene`
+
+When the input is a notebook, `npm run gif` / `npm run record` capture the notebook's preview cell.
 
 **How it works:**
 1. Auto-starts (or reuses) the Vite dev server.

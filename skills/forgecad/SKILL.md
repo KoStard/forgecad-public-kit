@@ -11,11 +11,12 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 1. Identify the artifact: `.forge.js`, `.sketch.js`, `.forge-notebook.json`, SVG asset, or CLI/export task.
 2. Load only the docs the task needs (see Source Map below). Start from the top group, add others as needed.
-3. Reuse patterns from `examples/api/` before inventing from scratch.
-4. Default to a concrete first pass — easy iteration beats speculative design review.
-5. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
-6. Validate with `npm run test-run -- <file>` (add `--debug-imports` for import chain issues).
-7. For `jointsView()` animations, keep wrapped revolute tracks continuous across branch cuts; do not assume the viewport will auto-fix `-180/180` jumps.
+3. If the task is unfamiliar, geometry-heavy, or likely to need debugging, start in a notebook first instead of committing to a final script shape too early.
+4. Reuse patterns from `examples/api/` before inventing from scratch.
+5. Default to a concrete first pass — easy iteration beats speculative design review.
+6. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
+7. Validate with `npm run test-run -- <file>` (add `--debug-imports` for import chain issues). This works for notebook preview cells too.
+8. For `jointsView()` animations, keep wrapped revolute tracks continuous across branch cuts; do not assume the viewport will auto-fix `-180/180` jumps.
 
 ### Import and Composition
 
@@ -25,7 +26,22 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 ### Notebooks
 
-Use `.forge-notebook.json` for stateful iteration and debugging. Cells share state, `show()` pins visible geometry. Export to `.forge.js` when done.
+Use `.forge-notebook.json` for stateful iteration and debugging. Cells share state, `show()` pins visible geometry, and the preview cell can be validated or rendered directly from the CLI.
+
+Prefer notebooks when:
+
+- the task is exploratory or the geometry strategy is still unclear
+- you are debugging booleans, placements, or assembly kinematics
+- you want to inspect intermediate shapes or sketches without rewriting the whole file
+
+Useful notebook loop:
+
+- keep stable setup in early cells and the current experiment in the preview cell
+- use `show(...)` for intermediate geometry you want pinned in the viewport
+- use `npm run notebook -- view <file> preview` to inspect the notebook from the terminal
+- use `npm run test-run -- <file>.forge-notebook.json` for preview-cell validation and spatial analysis
+- use `npm run render -- <file>.forge-notebook.json` or `npm run gif -- <file>.forge-notebook.json --list` to inspect the preview cell through the CLI
+- export to `.forge.js` when the exploratory phase is over and the structure is ready to stabilize
 
 ## Source Map
 
@@ -88,4 +104,3 @@ Modeling patterns, debugging tactics, copyable snippets.
 Test-run, notebook execution, export pipelines, debug flags.
 
 - `docs/permanent/CLI.md`
-
