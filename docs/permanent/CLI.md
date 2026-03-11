@@ -22,6 +22,17 @@ src/forge/headless.ts    ← Single entry point for all contexts
 
 The key function is `runScript(code, fileName, allFiles)` — it wraps user code in a `Function()` sandbox with the entire forge API injected, and transpiles project files so standard JS `import` / `export` / `require(...)` work for shared utility modules. CLI scripts just call `init()` + `runScript()` and work with the results.
 
+## Install
+
+Install the package and link the local binary once:
+
+```bash
+npm install
+npm link
+```
+
+After that, use `forgecad ...` directly from your shell.
+
 ## Available Commands
 
 ### Notebook Cells (server-backed)
@@ -33,7 +44,7 @@ The browser and CLI both use the Vite server for notebook execution. The CLI doe
 Append a new code cell and run it immediately in one command:
 
 ```bash
-npm run notebook -- examples/demo.forge-notebook.json --code "show(box(40, 20, 10));"
+forgecad notebook examples/demo.forge-notebook.json --code "show(box(40, 20, 10));"
 ```
 
 If the target notebook file does not exist yet, append mode auto-creates it first with the default ForgeCAD notebook structure, then adds the new cell.
@@ -41,14 +52,14 @@ If the target notebook file does not exist yet, append mode auto-creates it firs
 Or pipe a larger cell in through stdin:
 
 ```bash
-cat /tmp/cell.js | npm run notebook -- examples/demo.forge-notebook.json
+cat /tmp/cell.js | forgecad notebook examples/demo.forge-notebook.json
 ```
 
 Re-run the last preview cell, or a specific cell id:
 
 ```bash
-npm run notebook -- examples/demo.forge-notebook.json
-npm run notebook -- run examples/demo.forge-notebook.json <cell-id>
+forgecad notebook examples/demo.forge-notebook.json
+forgecad notebook run examples/demo.forge-notebook.json <cell-id>
 ```
 
 `run` expects the notebook file to already exist. Auto-creation only applies to append flows (`--code`, `--file`, stdin, or the explicit `append` subcommand).
@@ -56,14 +67,14 @@ npm run notebook -- run examples/demo.forge-notebook.json <cell-id>
 Export a notebook into a plain `.forge.js` script:
 
 ```bash
-npm run notebook -- export examples/demo.forge-notebook.json
-npm run notebook -- export examples/demo.forge-notebook.json out/demo-from-notebook.forge.js
+forgecad notebook export examples/demo.forge-notebook.json
+forgecad notebook export examples/demo.forge-notebook.json out/demo-from-notebook.forge.js
 ```
 
 If you already have a Forge server running, point the CLI at it:
 
 ```bash
-npm run notebook -- examples/demo.forge-notebook.json --server http://localhost:5173 --code "show(box(40, 20, 10));"
+forgecad notebook examples/demo.forge-notebook.json --server http://localhost:5173 --code "show(box(40, 20, 10));"
 ```
 
 Notebook paths are resolved from the shell working directory before the CLI calls the server, so the server's opened project root does not add an extra path prefix.
@@ -78,8 +89,8 @@ Notebook cell behavior:
 ### Script Validation
 
 ```bash
-npm run test-run -- examples/cup.forge.js
-npm run test-run -- --debug-imports examples/cup.forge.js
+forgecad run examples/cup.forge.js
+forgecad run examples/cup.forge.js --debug-imports
 ```
 
 Runs a `.forge.js` or `.sketch.js` file in the real runtime and prints object stats, diagnostics, and execution time.
@@ -89,11 +100,7 @@ Runs a `.forge.js` or `.sketch.js` file in the real runtime and prints object st
 ### SVG Export (no browser needed)
 
 ```bash
-npm run svg -- examples/frame.sketch.js [output.svg]
-
-# Or directly:
-npx tsx cli/forge-svg.ts examples/frame.sketch.js
-npx tsx cli/forge-svg.ts examples/frame.sketch.js output.svg
+forgecad export svg examples/frame.sketch.js [output.svg]
 ```
 
 Runs a `.sketch.js` script in Node.js using the real forge engine and outputs SVG. No browser, no Puppeteer — pure Node.
@@ -103,14 +110,14 @@ Runs a `.sketch.js` script in Node.js using the real forge engine and outputs SV
 ### STEP / BREP Export (exact subset, Python + CadQuery)
 
 ```bash
-npm run step -- examples/api/brep-exportable.forge.js
-npm run brep -- examples/api/brep-exportable.forge.js
+forgecad export step examples/api/brep-exportable.forge.js
+forgecad export brep examples/api/brep-exportable.forge.js
 
 # Optional overrides:
-npm run step -- --output out/demo.step examples/api/brep-exportable.forge.js
-npm run step -- --python 3.11 examples/api/brep-exportable.forge.js
-npm run step -- --uv /custom/path/to/uv examples/api/brep-exportable.forge.js
-npm run step -- --allow-faceted examples/chess-set.forge.js
+forgecad export step examples/api/brep-exportable.forge.js --output out/demo.step
+forgecad export step examples/api/brep-exportable.forge.js --python 3.11
+forgecad export step examples/api/brep-exportable.forge.js --uv /custom/path/to/uv
+forgecad export step examples/chess-set.forge.js --allow-faceted
 ```
 
 This exporter is `uv`-first. `cli/forge-brep-export.py` carries inline dependency metadata, so `uv run` provisions CadQuery automatically for the exporter environment.
@@ -138,10 +145,10 @@ These scripts use the repo-local `.venv-brep/.venv/bin/python` by default, run e
 ### SDF Robot Export (Gazebo package)
 
 ```bash
-npm run sdf -- examples/api/sdf-rover-demo.forge.js
+forgecad export sdf examples/api/sdf-rover-demo.forge.js
 
 # Optional output directory:
-npm run sdf -- --output out/forge_scout examples/api/sdf-rover-demo.forge.js
+forgecad export sdf examples/api/sdf-rover-demo.forge.js --output out/forge_scout
 ```
 
 This exporter writes a Gazebo-friendly package workspace:
@@ -189,8 +196,8 @@ Current behavior:
 ### PNG Render (requires Chrome)
 
 ```bash
-npm run render -- examples/cup.forge.js [output.png]
-npm run render -- examples/cup.forge.js out/scene.png --scene '{"camera":{"projectionMode":"perspective","position":[200,-160,120],"target":[0,0,20],"up":[0,0,1]},"objects":{"obj-2":{"visible":false},"obj-3":{"opacity":0.35}}}'
+forgecad render examples/cup.forge.js [output.png]
+forgecad render examples/cup.forge.js out/scene.png --scene '{"camera":{"projectionMode":"perspective","position":[200,-160,120],"target":[0,0,20],"up":[0,0,1]},"objects":{"obj-2":{"visible":false},"obj-3":{"opacity":0.35}}}'
 ```
 
 Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to launch headless Chrome with WebGL for Three.js rendering.
@@ -223,13 +230,10 @@ Renders 3D shapes to PNG images from multiple camera angles. Uses Puppeteer to l
 ### Animated Capture (GIF or MP4, requires Chrome)
 
 ```bash
-npm run gif -- examples/cup.forge.js [output.gif]
-npm run record -- examples/cup.forge.js [output.mp4]
-
-# Or directly:
-npx tsx cli/forge-gif.ts examples/cup.forge.js
-npx tsx cli/forge-record.ts examples/api/runtime-joints-view.forge.js out/step.mp4 --capture animation --animation Step
-npx tsx cli/forge-gif.ts examples/3d-printer.forge.js out/section.gif --cut-plane "Front Section"
+forgecad capture gif examples/cup.forge.js [output.gif]
+forgecad capture mp4 examples/cup.forge.js [output.mp4]
+forgecad capture mp4 examples/api/runtime-joints-view.forge.js out/step.mp4 --capture animation --animation Step
+forgecad capture gif examples/3d-printer.forge.js out/section.gif --cut-plane "Front Section"
 ```
 
 Creates high-quality animated captures from the real Forge viewport renderer:
@@ -291,13 +295,13 @@ Creates high-quality animated captures from the real Forge viewport renderer:
 
 **UI scene handoff:**
 - The View Panel exposes a `Camera` section.
-- Use `Copy CLI --scene` to grab the current viewport framing plus per-object scene overrides and paste it directly into `render`, `gif`, or `record`.
+- Use `Copy CLI --scene` to grab the current viewport framing plus per-object scene overrides and paste it directly into `render`, `capture gif`, or `capture mp4`.
 
 ### PDF Report (2D drawing pack)
 
 ```bash
-npm run report -- examples/cup.forge.js [output.pdf]
-npm run report -- examples/cup.forge.js [output.pdf] --dim-angle-tol 18
+forgecad export report examples/cup.forge.js [output.pdf]
+forgecad export report examples/cup.forge.js [output.pdf] --dim-angle-tol 18
 ```
 
 Generates a searchable-text PDF report with multiple projected drawing views:
@@ -330,7 +334,7 @@ STL export is available in the browser UI via the Export panel. Binary STL forma
 ### Parameter Validation
 
 ```bash
-npm run param-check -- examples/shoe-rack-doors.forge.js [--samples 10]
+forgecad check params examples/shoe-rack-doors.forge.js [--samples 10]
 ```
 
 Samples each parameter across its range and checks for runtime errors, degenerate geometry (volume ≈ 0), and new collisions between parts. Skips intra-group collisions when assembly groups are used.
@@ -353,7 +357,7 @@ Samples each parameter across its range and checks for runtime errors, degenerat
 ### Transform/Assembly Invariant Check
 
 ```bash
-npm run check:transforms
+forgecad check transforms
 ```
 
 Runs fast math-level invariants to catch transform order and frame composition regressions before they leak into examples.
@@ -361,7 +365,7 @@ Runs fast math-level invariants to catch transform order and frame composition r
 ### Dimension Propagation Invariant Check
 
 ```bash
-npm run check:dimensions
+forgecad check dimensions
 ```
 
 Runs shape-level invariants for dimension metadata propagation across:
@@ -373,11 +377,8 @@ Runs shape-level invariants for dimension metadata propagation across:
 ### Dimension Debugger
 
 ```bash
-npm run debug:dimensions -- /path/to/file.forge.js [--all]
-npm run debug:dimensions -- /path/to/file.forge.js [--all] [--dim-angle-tol 12]
-
-# Fallback runner (if npx/registry access is unavailable)
-bun cli/debug-dimensions.ts /path/to/file.forge.js [--all] [--dim-angle-tol 12]
+forgecad debug dimensions /path/to/file.forge.js [--all]
+forgecad debug dimensions /path/to/file.forge.js [--all] [--dim-angle-tol 12]
 ```
 
 Prints:
@@ -390,11 +391,11 @@ Prints:
 
 ## Adding New CLI Commands
 
-1. Create `cli/your-command.ts`
+1. Create or extend a module under `cli/`
 2. Import from `../src/forge/headless`
 3. Call `await init()` to load the WASM kernel
 4. Use `runScript(code, fileName, allFiles)` to execute user scripts
-5. Add a script to `package.json`: `"your-command": "npx tsx cli/your-command.ts"`
+5. Register the new subcommand in `cli/forgecad.ts`
 
 ### Minimal Example
 
@@ -452,7 +453,7 @@ Keep using `importPart()` / `importSketch()` for model/sketch files when you wan
 
 | Package | Purpose | Context |
 |---------|---------|---------|
-| `tsx` | Run TypeScript CLI scripts directly | Dev dependency |
-| `puppeteer-core` | Headless Chrome for PNG rendering | Dev dependency |
+| `forgecad` | Installable CLI binary (`forgecad ...`) | Runtime package |
+| `puppeteer-core` | Headless Chrome for PNG/GIF/MP4 rendering | Runtime dependency |
 | `manifold-3d` | Geometry kernel (WASM) | Works in both Node and browser |
 | `three` | 3D rendering (used by render.ts) | Loaded in browser context by Puppeteer |

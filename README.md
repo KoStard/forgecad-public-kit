@@ -14,12 +14,13 @@ TypeScript is the file format. The browser is the CAD system.
 
 ```bash
 npm install
-npm run dev
+npm link
+forgecad studio
 ```
 
 Then open `http://localhost:5173`.
 
-`npm run dev` opens the `./examples` project by default, so you can edit and save files immediately.
+`forgecad studio` opens the packaged `./examples` project by default, so you can edit and save files immediately.
 
 ## Why ForgeCAD
 
@@ -149,7 +150,8 @@ Latest benchmark iterations from `ForgeCADBenchmark/results/*` (`version_{n}.for
 
 ```bash
 npm install
-npm run dev
+npm link
+forgecad studio
 ```
 
 Open `http://localhost:5173`.
@@ -159,15 +161,15 @@ This starts ForgeCAD with the `./examples` folder loaded.
 ### Open your own project folder
 
 ```bash
-npm run open -- /path/to/your/project
+forgecad studio /path/to/your/project
 ```
 
-Use `--` before the path. ForgeCAD loads `.forge.js` and `.sketch.js` files from that folder, with disk-backed save.
+ForgeCAD loads `.forge.js` and `.sketch.js` files from that folder, with disk-backed save.
 
 ### Blank scratch mode (optional)
 
 ```bash
-npm run dev:blank
+forgecad studio --blank
 ```
 
 Starts ForgeCAD without a project folder (single in-memory scratch file).
@@ -208,16 +210,16 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 
 | Task | Command |
 | --- | --- |
-| Validate a script | `npm run test-run -- examples/cup.forge.js` |
-| Render PNG views | `npm run render -- examples/cup.forge.js` |
-| Render orbit GIF (solid + wireframe) | `npm run gif -- examples/cup.forge.js` |
-| Export sketch SVG | `npm run svg -- examples/frame.sketch.js` |
-| Export exact STEP (supported subset only) | `npm run step -- examples/api/brep-exportable.forge.js` |
-| Export exact BREP (supported subset only) | `npm run brep -- examples/api/brep-exportable.forge.js` |
-| Generate report PDF | `npm run report -- examples/cup.forge.js` |
-| Parameter robustness scan | `npm run param-check -- examples/shoe-rack-doors.forge.js --samples 10` |
-| Transform invariants | `npm run check:transforms` |
-| Dimension propagation invariants | `npm run check:dimensions` |
+| Validate a script | `forgecad run examples/cup.forge.js` |
+| Render PNG views | `forgecad render examples/cup.forge.js` |
+| Render orbit GIF (solid + wireframe) | `forgecad capture gif examples/cup.forge.js` |
+| Export sketch SVG | `forgecad export svg examples/frame.sketch.js` |
+| Export exact STEP (supported subset only) | `forgecad export step examples/api/brep-exportable.forge.js` |
+| Export exact BREP (supported subset only) | `forgecad export brep examples/api/brep-exportable.forge.js` |
+| Generate report PDF | `forgecad export report examples/cup.forge.js` |
+| Parameter robustness scan | `forgecad check params examples/shoe-rack-doors.forge.js --samples 10` |
+| Transform invariants | `forgecad check transforms` |
+| Dimension propagation invariants | `forgecad check dimensions` |
 
 ### CLI details
 
@@ -288,15 +290,15 @@ Contributions are welcome. Good first contributions:
 Suggested local validation before opening a PR:
 
 ```bash
-npm run test-run -- examples/cup.forge.js
-npm run check:transforms
-npm run check:dimensions
+forgecad run examples/cup.forge.js
+forgecad check transforms
+forgecad check dimensions
 ```
 
 If your change is parametric-heavy, also run:
 
 ```bash
-npm run param-check -- path/to/your-example.forge.js --samples 10
+forgecad check params path/to/your-example.forge.js --samples 10
 ```
 
 ## Additional docs

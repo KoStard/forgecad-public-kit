@@ -1,6 +1,6 @@
 // SDF export demo: four-wheel differential-drive rover with a demo world.
 // Run:
-//   npm run sdf -- examples/api/sdf-rover-demo.forge.js
+//   forgecad export sdf examples/api/sdf-rover-demo.forge.js
 //
 // Then launch Gazebo against the generated package:
 //   export GZ_SIM_RESOURCE_PATH="examples/api/sdf-rover-demo.forge.sdfpkg/models${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}"

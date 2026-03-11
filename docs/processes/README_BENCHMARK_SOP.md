@@ -433,7 +433,7 @@ Then rerun Step 2.
 
 ### Port collisions during GIF rendering
 
-`npm run gif` may try to use a busy port.
+`forgecad capture gif` may try to use a busy port.
 
 Set an alternate port:
 
