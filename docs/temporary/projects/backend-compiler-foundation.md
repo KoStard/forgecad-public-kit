@@ -170,6 +170,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 - STEP/BREP export manifests now serialize the exact lowerer target explicitly as `cadquery-occt`, and the Python exporter validates that target instead of accepting anonymous "exact" plans.
 - `forgecad check compiler` now snapshots compile plans, exact lowerings, runtime Manifold summaries, and compiler-lowered Manifold summaries for curated cases.
 - the hull family (`hull3d()`, `Shape.hull()`, `hull2d()`, `Sketch.hull()`) now stays inside the Forge compile graph for the Manifold runtime instead of dropping straight to mesh-only execution.
+- `Shape.split(cutter)` now stays compiler-owned when both operands are compile-covered, and exact export can replay both returned branches through the existing boolean lowerers.
 - the CadQuery/OCCT lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
 - `forgecad debug compiler` now prints per-object compiler routing and lowered artifacts for investigation.
 - `forgecad check suite` and `npm test` now expose the repo's assertion-based invariant suite as a first-class test entrypoint instead of leaving the checks scattered across ad hoc commands.
