@@ -983,8 +983,35 @@ export class Shape {
   /** Split into [inside, outside] by another shape. */
   split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
     const c = Shape._unwrap(cutter);
-    const [a, b] = getShapeRuntimeBackendInternal(this).split(getShapeRuntimeBackendInternal(c));
+    const insidePlan = buildBooleanShapeCompilePlan('intersection', [
+      getShapeCompilePlanInternal(this),
+      getShapeCompilePlanInternal(c),
+    ]);
+    const outsidePlan = buildBooleanShapeCompilePlan('difference', [
+      getShapeCompilePlanInternal(this),
+      getShapeCompilePlanInternal(c),
+    ]);
     const info = mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(c)], 'boolean', { topology: 'none' });
+    if (insidePlan && outsidePlan) {
+      return [
+        setShapeCompilePlanInternal(
+          setShapeGeometryInfoInternal(
+            withBaseDimensions(this, buildShapeFromCompilePlan(insidePlan, this.colorHex)),
+            info,
+          ),
+          insidePlan,
+        ),
+        setShapeCompilePlanInternal(
+          setShapeGeometryInfoInternal(
+            withBaseDimensions(this, buildShapeFromCompilePlan(outsidePlan, this.colorHex)),
+            info,
+          ),
+          outsidePlan,
+        ),
+      ];
+    }
+
+    const [a, b] = getShapeRuntimeBackendInternal(this).split(getShapeRuntimeBackendInternal(c));
     return [
       setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(a, this.colorHex)), info), null),
       setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(b, this.colorHex)), info), null),

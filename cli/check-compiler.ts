@@ -78,6 +78,21 @@ return [{ name: 'Body', shape: body }];
 `,
   ),
   inlineCase(
+    'split-solid-exact',
+    'Shape.split() keeps both branches inside compiler ownership when the cutter is compile-covered.',
+    `
+const stock = box(48, 24, 20, true).toShape();
+const cutter = cylinder(28, 8, undefined, undefined, true)
+  .translate(10, 0, 0)
+  .rotate(0, 90, 0);
+const [inside, outside] = stock.split(cutter);
+return [
+  { name: 'Inside', shape: inside },
+  { name: 'Outside', shape: outside },
+];
+`,
+  ),
+  inlineCase(
     'segmented-runtime-hints',
     'Segmented runtime intent stays runnable but outside the exact BREP subset.',
     `

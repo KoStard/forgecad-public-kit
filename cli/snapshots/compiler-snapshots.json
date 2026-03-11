@@ -544,6 +544,312 @@
     }
   },
   {
+    "id": "split-solid-exact",
+    "description": "Shape.split() keeps both branches inside compiler ownership when the cutter is compile-covered.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Inside",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "boolean",
+              "primitive"
+            ]
+          },
+          "compilePlan": {
+            "kind": "boolean",
+            "op": "intersection",
+            "shapes": [
+              {
+                "kind": "box",
+                "x": 48,
+                "y": 24,
+                "z": 20,
+                "center": true
+              },
+              {
+                "kind": "transform",
+                "base": {
+                  "kind": "cylinder",
+                  "height": 28,
+                  "radius": 8,
+                  "center": true
+                },
+                "steps": [
+                  {
+                    "kind": "translate",
+                    "x": 10,
+                    "y": 0,
+                    "z": 0
+                  },
+                  {
+                    "kind": "rotate",
+                    "xDeg": 0,
+                    "yDeg": 90,
+                    "zDeg": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "boolean",
+              "op": "intersection",
+              "shapes": [
+                {
+                  "kind": "box",
+                  "x": 48,
+                  "y": 24,
+                  "z": 20,
+                  "center": true
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "cylinder",
+                    "height": 28,
+                    "radius": 8,
+                    "center": true
+                  },
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": 10,
+                      "y": 0,
+                      "z": 0
+                    },
+                    {
+                      "kind": "rotate",
+                      "xDeg": 0,
+                      "yDeg": 90,
+                      "zDeg": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -14,
+                -8,
+                -10
+              ],
+              "max": [
+                14,
+                8,
+                -2
+              ]
+            },
+            "volume": 2813.015275,
+            "surfaceArea": 1352.530666,
+            "numTri": 200,
+            "vertexCount": 102,
+            "meshDigest": "eaf6b72557095d0c46c3c1eee977ea9f72ebff4521460658d0b1a09e9a5aee3c"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -14,
+                -8,
+                -10
+              ],
+              "max": [
+                14,
+                8,
+                -2
+              ]
+            },
+            "volume": 2813.015275,
+            "surfaceArea": 1352.530666,
+            "numTri": 200,
+            "vertexCount": 102,
+            "meshDigest": "eaf6b72557095d0c46c3c1eee977ea9f72ebff4521460658d0b1a09e9a5aee3c"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        },
+        {
+          "kind": "shape",
+          "name": "Outside",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "boolean",
+              "primitive"
+            ]
+          },
+          "compilePlan": {
+            "kind": "boolean",
+            "op": "difference",
+            "shapes": [
+              {
+                "kind": "box",
+                "x": 48,
+                "y": 24,
+                "z": 20,
+                "center": true
+              },
+              {
+                "kind": "transform",
+                "base": {
+                  "kind": "cylinder",
+                  "height": 28,
+                  "radius": 8,
+                  "center": true
+                },
+                "steps": [
+                  {
+                    "kind": "translate",
+                    "x": 10,
+                    "y": 0,
+                    "z": 0
+                  },
+                  {
+                    "kind": "rotate",
+                    "xDeg": 0,
+                    "yDeg": 90,
+                    "zDeg": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "boolean",
+              "op": "difference",
+              "shapes": [
+                {
+                  "kind": "box",
+                  "x": 48,
+                  "y": 24,
+                  "z": 20,
+                  "center": true
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "cylinder",
+                    "height": 28,
+                    "radius": 8,
+                    "center": true
+                  },
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": 10,
+                      "y": 0,
+                      "z": 0
+                    },
+                    {
+                      "kind": "rotate",
+                      "xDeg": 0,
+                      "yDeg": 90,
+                      "zDeg": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -24,
+                -12,
+                -10
+              ],
+              "max": [
+                24,
+                12,
+                10
+              ]
+            },
+            "volume": 20226.984725,
+            "surfaceArea": 5640.530666,
+            "numTri": 216,
+            "vertexCount": 110,
+            "meshDigest": "ee489754455958ea0a910f507d9c5a8dd415d6f3d11187ccc99aa5ecafee942b"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -24,
+                -12,
+                -10
+              ],
+              "max": [
+                24,
+                12,
+                10
+              ]
+            },
+            "volume": 20226.984725,
+            "surfaceArea": 5640.530666,
+            "numTri": 216,
+            "vertexCount": 110,
+            "meshDigest": "ee489754455958ea0a910f507d9c5a8dd415d6f3d11187ccc99aa5ecafee942b"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Inside",
+            "kind": "exact"
+          },
+          {
+            "name": "Outside",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Inside",
+            "kind": "exact"
+          },
+          {
+            "name": "Outside",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  },
+  {
     "id": "segmented-runtime-hints",
     "description": "Segmented runtime intent stays runnable but outside the exact BREP subset.",
     "scene": {

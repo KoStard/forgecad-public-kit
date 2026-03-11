@@ -326,6 +326,30 @@ return [
   assert.equal(manifest.skipped[0].name, 'Slot');
 }
 
+function checkSplitBranchesStayExactExportable(): void {
+  const files: Record<string, string> = {
+    'main.forge.js': `
+const stock = box(48, 24, 20, true).toShape();
+const cutter = cylinder(28, 8, undefined, undefined, true)
+  .translate(10, 0, 0)
+  .rotate(0, 90, 0);
+const [inside, outside] = stock.split(cutter);
+return [
+  { name: 'Inside', shape: inside },
+  { name: 'Outside', shape: outside },
+];
+`,
+  };
+  const result = runScript(files['main.forge.js'], 'main.forge.js', files);
+  assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
+
+  const manifest = buildBrepExportManifest(result.objects);
+  assert.equal(manifest.unsupported.length, 0, 'Split branches should stay exact-exportable');
+  assert.equal(manifest.objects.length, 2, `Expected both split branches to export, got ${manifest.objects.length}`);
+  assert(manifest.objects.every((item) => item.kind === 'exact'), 'Expected split branches to stay on the exact export route');
+  assert(manifest.objects.every((item) => item.kind !== 'exact' || item.target === 'cadquery-occt'), 'Expected split branches to use the CadQuery/OCCT lowerer');
+}
+
 function checkChessSetFacetedFallbackManifest(): void {
   const scriptPath = resolve('examples/chess-set.forge.js');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
@@ -433,6 +457,7 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkRigidMatrixTransformPlan();
   checkPointAlongOnPrimitiveBoolean();
   checkMixedSketchAndSolidScenePolicy();
+  checkSplitBranchesStayExactExportable();
   checkChessSetFacetedFallbackManifest();
   checkSegmentedRuntimeHintsStayOutOfExactSubset();
   checkHullRuntimeIntentStaysOutOfExactSubset();
