@@ -51,7 +51,17 @@ npm run notebook -- examples/demo.forge-notebook.json
 npm run notebook -- run examples/demo.forge-notebook.json <cell-id>
 ```
 
-`run` expects the notebook file to already exist. Auto-creation only applies to append flows (`--code`, `--file`, stdin, or the explicit `append` subcommand).
+View the notebook in the terminal without dumping raw JSON:
+
+```bash
+npm run notebook -- view examples/demo.forge-notebook.json
+npm run notebook -- view examples/demo.forge-notebook.json preview
+npm run notebook -- view examples/demo.forge-notebook.json 2
+```
+
+`view` is local-only. It parses the notebook JSON and renders notebook metadata, numbered source lines, and stored outputs for each cell. The optional selector accepts a 1-based cell number, an exact cell id, or `preview`.
+
+`run`/`view` expect the notebook file to already exist. Auto-creation only applies to append flows (`--code`, `--file`, stdin, or the explicit `append` subcommand).
 
 Export a notebook into a plain `.forge.js` script:
 
