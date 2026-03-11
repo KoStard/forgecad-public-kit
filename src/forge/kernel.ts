@@ -1,8 +1,8 @@
 /**
  * ForgeCAD Geometry Kernel
  *
- * Wraps Manifold WASM to provide a clean, chainable API.
- * Every Shape holds a Manifold internally and exposes transform/boolean ops.
+ * Wraps the current runtime geometry backend (today: Manifold WASM)
+ * behind a clean, chainable Shape API.
  */
 
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
@@ -31,6 +31,12 @@ import {
   cloneBrepShapePlan,
 } from './brepPlan';
 import { describeApiArg, normalizeVariadicArgs } from './apiArgs';
+import {
+  type ShapeBackend,
+  isShapeBackend,
+  requireManifoldShapeBackend,
+  wrapManifoldShapeBackend,
+} from './shapeBackend';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -113,6 +119,7 @@ const _shapeDimensions = new WeakMap<Shape, ShapeDimension[]>();
 const _shapeGeometryInfo = new WeakMap<Shape, GeometryInfo>();
 const _shapeBrepPlans = new WeakMap<Shape, BrepShapePlan | null>();
 const _shapePlacementRefs = new WeakMap<Shape, PlacementReferences>();
+const _shapeRuntimeBackends = new WeakMap<Shape, ShapeBackend>();
 let _shapeDimensionCounter = 0;
 
 const DEFAULT_GEOMETRY_INFO: GeometryInfo = {
@@ -159,6 +166,14 @@ function setShapeGeometryInfoInternal(shape: Shape, info: GeometryInfo): Shape {
   return shape;
 }
 
+type ShapeRuntimePayload = ShapeBackend | Manifold;
+
+function setShapeRuntimeBackendInternal(shape: Shape, payload: ShapeRuntimePayload): Shape {
+  const backend = isShapeBackend(payload) ? payload : wrapManifoldShapeBackend(payload);
+  _shapeRuntimeBackends.set(shape, backend);
+  return shape;
+}
+
 function setShapeBrepPlanInternal(shape: Shape, plan: BrepShapePlan | null): Shape {
   _shapeBrepPlans.set(shape, cloneBrepShapePlan(plan));
   return shape;
@@ -175,6 +190,12 @@ function setShapePlacementRefsInternal(shape: Shape, refs: PlacementReferences):
 
 function getShapeGeometryInfoInternal(shape: Shape): GeometryInfo {
   return cloneGeometryInfo(_shapeGeometryInfo.get(shape) ?? DEFAULT_GEOMETRY_INFO);
+}
+
+function getShapeRuntimeBackendInternal(shape: Shape): ShapeBackend {
+  const backend = _shapeRuntimeBackends.get(shape);
+  if (!backend) throw new Error('Runtime backend missing on Shape');
+  return backend;
 }
 
 function getShapeBrepPlanInternal(shape: Shape): BrepShapePlan | null {
@@ -562,6 +583,10 @@ export function getShapePlacementReferences(shape: Shape): PlacementReferences {
   return getShapePlacementRefsInternal(shape);
 }
 
+export function getShapeRuntimeBackend(shape: Shape): ShapeBackend {
+  return getShapeRuntimeBackendInternal(shape);
+}
+
 export function getShapeGeometryInfo(shape: Shape): GeometryInfo {
   return getShapeGeometryInfoInternal(shape);
 }
@@ -585,19 +610,20 @@ export function setShapeBrepPlan(shape: Shape, plan: BrepShapePlan | null): Shap
   return setShapeBrepPlanInternal(shape, plan);
 }
 
-/** Thin wrapper around Manifold with chainable API */
+/** Thin immutable wrapper around a runtime geometry backend payload. */
 export class Shape {
   public colorHex: string | undefined;
 
-  constructor(public readonly manifold: Manifold, color?: string, geometryInfo?: Partial<GeometryInfo>) {
+  constructor(payload: ShapeRuntimePayload, color?: string, geometryInfo?: Partial<GeometryInfo>) {
     this.colorHex = color;
+    setShapeRuntimeBackendInternal(this, payload);
     setShapeGeometryInfoInternal(this, createGeometryInfo(geometryInfo));
     setShapeBrepPlanInternal(this, null);
   }
 
   /** Set the color of this shape (hex string, e.g. "#ff0000") */
   setColor(value: string | undefined): Shape {
-    return withCopiedDimensions(this, new Shape(this.manifold, value));
+    return withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).clone(), value));
   }
 
   /** Alias for setColor */
@@ -607,7 +633,7 @@ export class Shape {
 
   /** Return a new Shape wrapper for explicit duplication in scripts. */
   clone(): Shape {
-    return withCopiedDimensions(this, new Shape(this.manifold, this.colorHex));
+    return withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).clone(), this.colorHex));
   }
 
   /** Alias for clone() */
@@ -658,7 +684,7 @@ export class Shape {
   translate(x: number, y: number, z: number): Shape {
     return setShapeBrepPlanInternal(withTransformedDimensions(
       this,
-      new Shape(this.manifold.translate(x, y, z), this.colorHex),
+      new Shape(getShapeRuntimeBackendInternal(this).translate(x, y, z), this.colorHex),
       Transform.translation(x, y, z).toArray(),
     ), appendBrepShapeTransform(getShapeBrepPlanInternal(this), { kind: 'translate', x, y, z }));
   }
@@ -679,7 +705,7 @@ export class Shape {
   rotate(x: number, y: number, z: number): Shape {
     return setShapeBrepPlanInternal(withTransformedDimensions(
       this,
-      new Shape(this.manifold.rotate(x, y, z), this.colorHex),
+      new Shape(getShapeRuntimeBackendInternal(this).rotate(x, y, z), this.colorHex),
       rotationEulerMatrix(x, y, z),
     ), appendBrepShapeTransform(getShapeBrepPlanInternal(this), { kind: 'rotate', xDeg: x, yDeg: y, zDeg: z }));
   }
@@ -688,7 +714,7 @@ export class Shape {
   transform(m: Mat4 | Transform): Shape {
     const mat = m instanceof Transform ? m.toArray() : m;
     return setShapeBrepPlanInternal(
-      withTransformedDimensions(this, new Shape(this.manifold.transform(mat), this.colorHex), mat),
+      withTransformedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).transform(mat), this.colorHex), mat),
       (() => {
         const steps = rigidTransformStepsFromMatrix(mat);
         if (steps == null) return null;
@@ -702,7 +728,7 @@ export class Shape {
     const scale = normalizeShapeScale(v);
     return setShapeBrepPlanInternal(withTransformedDimensions(
       this,
-      new Shape(this.manifold.scale(v as any), this.colorHex),
+      new Shape(getShapeRuntimeBackendInternal(this).scale(v), this.colorHex),
       Transform.scale(v).toArray(),
     ), scale
       ? appendBrepShapeTransform(getShapeBrepPlanInternal(this), {
@@ -717,7 +743,7 @@ export class Shape {
   mirror(normal: [number, number, number]): Shape {
     return setShapeBrepPlanInternal(withTransformedDimensions(
       this,
-      new Shape(this.manifold.mirror(normal), this.colorHex),
+      new Shape(getShapeRuntimeBackendInternal(this).mirror(normal), this.colorHex),
       mirrorMatrix(normal),
     ), appendBrepShapeTransform(getShapeBrepPlanInternal(this), {
       kind: 'mirror',
@@ -769,7 +795,7 @@ export class Shape {
     ];
     const matrix = rotationAroundAxisMatrix(normalizedAxis, angleDeg, pivot);
     return setShapeBrepPlanInternal(
-      withTransformedDimensions(this, new Shape(this.manifold.transform(matrix as any), this.colorHex), matrix),
+      withTransformedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).transform(matrix), this.colorHex), matrix),
       appendBrepShapeTransform(getShapeBrepPlanInternal(this), {
         kind: 'rotateAround',
         axisX: normalizedAxis[0],
@@ -805,7 +831,7 @@ export class Shape {
   /** Mark edges for smoothing based on angle. Call refine() after to apply. */
   smoothOut(minSharpAngle = 60, minSmoothness = 0): Shape {
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(this.manifold.smoothOut(minSharpAngle, minSmoothness), this.colorHex)),
+      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).smoothOut(minSharpAngle, minSmoothness), this.colorHex)),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
     ), null);
   }
@@ -815,7 +841,7 @@ export class Shape {
     const steps = scaleRefineSteps(n);
     if (steps <= 0) return this.clone();
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(this.manifold.refine(steps), this.colorHex)),
+      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).refine(steps), this.colorHex)),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
     ), null);
   }
@@ -824,7 +850,7 @@ export class Shape {
   refineToLength(length: number): Shape {
     const effectiveLength = scaleRefineToLength(length);
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(this.manifold.refineToLength(effectiveLength), this.colorHex)),
+      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).refineToLength(effectiveLength), this.colorHex)),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
     ), null);
   }
@@ -833,7 +859,7 @@ export class Shape {
   refineToTolerance(tolerance: number): Shape {
     const effectiveTolerance = scaleRefineToTolerance(tolerance);
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(this.manifold.refineToTolerance(effectiveTolerance), this.colorHex)),
+      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).refineToTolerance(effectiveTolerance), this.colorHex)),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
     ), null);
   }
@@ -841,7 +867,7 @@ export class Shape {
   /** Warp vertices with a function. */
   warp(fn: (vert: [number, number, number]) => void): Shape {
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(this.manifold.warp(fn as any), this.colorHex)),
+      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).warp(fn), this.colorHex)),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
     ), null);
   }
@@ -861,7 +887,7 @@ export class Shape {
       'Use shape.add(other1, other2) or shape.add([other1, other2]).',
     )];
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(shapes.map((shape) => shape.manifold)), this.colorHex)),
+      withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(requireManifoldOperands('Shape.add()', shapes)), this.colorHex)),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
     ), buildBrepBooleanPlan('union', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
   }
@@ -874,7 +900,7 @@ export class Shape {
       'Use shape.subtract(other1, other2) or shape.subtract([other1, other2]).',
     )];
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(getWasm().Manifold.difference(shapes.map((shape) => shape.manifold)), this.colorHex)),
+      withBaseDimensions(this, new Shape(getWasm().Manifold.difference(requireManifoldOperands('Shape.subtract()', shapes)), this.colorHex)),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
     ), buildBrepBooleanPlan('difference', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
   }
@@ -887,7 +913,7 @@ export class Shape {
       'Use shape.intersect(other1, other2) or shape.intersect([other1, other2]).',
     )];
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(shapes.map((shape) => shape.manifold)), this.colorHex)),
+      withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(requireManifoldOperands('Shape.intersect()', shapes)), this.colorHex)),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
     ), buildBrepBooleanPlan('intersection', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
   }
@@ -897,7 +923,7 @@ export class Shape {
   /** Split into [inside, outside] by another shape. */
   split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
     const c = Shape._unwrap(cutter);
-    const [a, b] = this.manifold.split(c.manifold);
+    const [a, b] = getShapeRuntimeBackendInternal(this).split(getShapeRuntimeBackendInternal(c));
     const info = mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(c)], 'boolean', { topology: 'none' });
     return [
       setShapeBrepPlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(a, this.colorHex)), info), null),
@@ -907,7 +933,7 @@ export class Shape {
 
   /** Split by infinite plane. Returns [below/inside, above/outside]. */
   splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
-    const [a, b] = this.manifold.splitByPlane(normal, originOffset);
+    const [a, b] = getShapeRuntimeBackendInternal(this).splitByPlane(normal, originOffset);
     const info = deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' });
     return [
       setShapeBrepPlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(a, this.colorHex)), info), null),
@@ -918,7 +944,7 @@ export class Shape {
   /** Cut away everything on the positive side of the plane. */
   trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(this.manifold.trimByPlane(normal, originOffset), this.colorHex)),
+      withBaseDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).trimByPlane(normal, originOffset), this.colorHex)),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' }),
     ), null);
   }
@@ -928,7 +954,7 @@ export class Shape {
   /** Convex hull of this shape. */
   hull(): Shape {
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(this.manifold.hull(), this.colorHex)),
+      withBaseDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).hull(), this.colorHex)),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'hull', { topology: 'none' }),
     ), null);
   }
@@ -938,7 +964,7 @@ export class Shape {
   /** Reduce mesh complexity. Vertices closer than tolerance are merged. */
   simplify(tolerance?: number): Shape {
     return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(this.manifold.simplify(tolerance), this.colorHex)),
+      withBaseDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).simplify(tolerance), this.colorHex)),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
     ), null);
   }
@@ -946,34 +972,44 @@ export class Shape {
   // --- Query ---
 
   boundingBox() {
-    return this.manifold.boundingBox();
+    return getShapeRuntimeBackendInternal(this).boundingBox();
   }
 
   volume(): number {
-    return this.manifold.volume();
+    return getShapeRuntimeBackendInternal(this).volume();
   }
 
   surfaceArea(): number {
-    return this.manifold.surfaceArea();
+    return getShapeRuntimeBackendInternal(this).surfaceArea();
   }
 
   /** Minimum distance between this shape and another. */
   minGap(other: Shape | { toShape(): Shape }, searchLength: number): number {
     const s = 'toShape' in other ? other.toShape() : other;
-    return this.manifold.minGap(s.manifold, searchLength);
+    return getShapeRuntimeBackendInternal(this).minGap(getShapeRuntimeBackendInternal(s), searchLength);
   }
 
   isEmpty(): boolean {
-    return this.manifold.isEmpty();
+    return getShapeRuntimeBackendInternal(this).isEmpty();
   }
 
   numTri(): number {
-    return this.manifold.numTri();
+    return getShapeRuntimeBackendInternal(this).numTri();
   }
 
   /** Extract triangle mesh for Three.js rendering */
   getMesh() {
-    return this.manifold.getMesh();
+    return getShapeRuntimeBackendInternal(this).getMesh();
+  }
+
+  /** Slice the runtime solid by a plane normal to local Z at the given offset. */
+  slice(offset = 0) {
+    return getShapeRuntimeBackendInternal(this).slice(offset);
+  }
+
+  /** Orthographically project the runtime solid onto the local XY plane. */
+  project() {
+    return getShapeRuntimeBackendInternal(this).project();
   }
 
   /** Position this shape relative to another using named 3D anchor points */
@@ -1135,6 +1171,11 @@ function normalizePoint3(value: unknown, apiName: string, index: number): [numbe
   throw new Error(`${apiName} argument ${index}: expected a [x, y, z] point, got ${describeApiArg(value)}`);
 }
 
+function requireManifoldOperands(apiName: string, shapes: Shape[]): Manifold[] {
+  return shapes.map((shape, index) =>
+    requireManifoldShapeBackend(getShapeRuntimeBackendInternal(shape), `${apiName} operand ${index + 1}`));
+}
+
 // --- Boolean helpers ---
 
 export function union(...inputs: ShapeOperandInput[]): Shape {
@@ -1147,7 +1188,7 @@ export function union(...inputs: ShapeOperandInput[]): Shape {
   if (shapes.length === 0) throw new Error('union requires at least one shape');
   if (shapes.length === 1) return shapes[0];
   return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-    withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(shapes.map((s) => s.manifold)), shapes[0].colorHex)),
+    withMergedDimensions(shapes, new Shape(getWasm().Manifold.union(requireManifoldOperands('union()', shapes)), shapes[0].colorHex)),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), buildBrepBooleanPlan('union', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
 }
@@ -1161,7 +1202,7 @@ export function difference(...inputs: ShapeOperandInput[]): Shape {
   );
   if (shapes.length < 2) throw new Error('difference requires at least two shapes');
   return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-    withBaseDimensions(shapes[0], new Shape(getWasm().Manifold.difference(shapes.map((s) => s.manifold)), shapes[0].colorHex)),
+    withBaseDimensions(shapes[0], new Shape(getWasm().Manifold.difference(requireManifoldOperands('difference()', shapes)), shapes[0].colorHex)),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), buildBrepBooleanPlan('difference', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
 }
@@ -1175,7 +1216,7 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
   );
   if (shapes.length < 2) throw new Error('intersection requires at least two shapes');
   return setShapeBrepPlanInternal(setShapeGeometryInfoInternal(
-    withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(shapes.map((s) => s.manifold)), shapes[0].colorHex)),
+    withMergedDimensions(shapes, new Shape(getWasm().Manifold.intersection(requireManifoldOperands('intersection()', shapes)), shapes[0].colorHex)),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), buildBrepBooleanPlan('intersection', shapes.map((shape) => getShapeBrepPlanInternal(shape))));
 }
@@ -1187,7 +1228,7 @@ export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]
     if (arg instanceof Shape || (arg && typeof arg === 'object' && typeof (arg as { toShape?: unknown }).toShape === 'function')) {
       const shape = unwrapShapeLike(arg);
       shapeArgs.push(shape);
-      return shape.manifold;
+      return requireManifoldShapeBackend(getShapeRuntimeBackendInternal(shape), `hull3d() shape ${shapeArgs.length}`);
     }
     return normalizePoint3(arg, 'hull3d()', index + 1);
   });

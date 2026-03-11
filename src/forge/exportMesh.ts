@@ -3,10 +3,10 @@ import {
   GLTFNode,
   GLTFNodesToGLTFDoc,
   cleanup as cleanupSceneBuilder,
-  setMaterial,
 } from 'manifold-3d/lib/scene-builder.js';
 import { strToU8, strFromU8, unzipSync, zipSync } from 'fflate';
 import type { Shape } from './kernel';
+import { buildSceneBuilderPayloadForShape } from './shapeBackendSceneBuilder';
 
 export interface MeshExportObject {
   name: string;
@@ -174,13 +174,10 @@ export async function build3mfBlob(
       node.name = escapeXml(obj.name || `Object ${index + 1}`);
 
       const rgb = obj.color ? parseHexColor(obj.color) : null;
-      if (rgb) {
-        node.manifold = setMaterial(obj.shape.manifold, {
-          baseColorFactor: [rgb.r / 255, rgb.g / 255, rgb.b / 255],
-        });
-      } else {
-        node.manifold = obj.shape.manifold;
-      }
+      node.manifold = buildSceneBuilderPayloadForShape(
+        obj.shape,
+        rgb ? { baseColorFactor: [rgb.r / 255, rgb.g / 255, rgb.b / 255] } : undefined,
+      );
 
       return node;
     });

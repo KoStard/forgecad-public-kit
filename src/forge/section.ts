@@ -82,7 +82,9 @@ function rotationToZ(normal: Vec3): Mat4 {
 function toPlaneSpace(shape: Shape, plane: PlaneSpec) {
   const { origin, normal } = resolvePlane(plane);
   const rotation = rotationToZ(normal);
-  return shape.manifold.translate(-origin[0], -origin[1], -origin[2]).transform(rotation);
+  return shape
+    .translate(-origin[0], -origin[1], -origin[2])
+    .transform(rotation);
 }
 
 export function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch {

@@ -65,23 +65,31 @@ Before this mission:
 - `geometryInfo()` already exists as a backend/provenance contract.
 - exact export already has a replay plan for a subset of operations.
 - `Shape` still stores a raw Manifold payload directly.
-- several runtime paths still reach into `.manifold` explicitly.
+- several runtime paths still depend on Manifold-specific behavior directly.
 
 After the first implementation slice for this mission, the minimum acceptable state is:
 
 - `Shape` is backend-agnostic in implementation
 - current runtime behavior stays intact through a Manifold adapter
-- direct raw-Manifold usage is reduced to explicit escape hatches
+- backend-specific behavior is isolated behind backend-owned modules
 - the repo has a concrete tracker for the remaining compiler work
+
+## Status After First Runtime Refactor
+
+- `Shape` no longer stores a raw Manifold payload directly.
+- `src/forge/shapeBackend.ts` now owns the Manifold runtime adapter.
+- sectioning now uses shape/backend operations instead of reaching into `.manifold`.
+- scene-builder export payloads are isolated behind `src/forge/shapeBackendSceneBuilder.ts`.
+- build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker
 
 | Step | Status | Notes |
 | --- | --- | --- |
 | 1. Define the mission and transition rules | Done | This document is the active tracker. |
-| 2. Put a backend adapter behind `Shape` | In progress | First mandatory runtime cut. |
-| 3. Replace implicit `.manifold` reach-through with explicit escape hatches | In progress | Keep the remaining backend-specific code obvious. |
-| 4. Keep current Manifold runtime behavior stable through the adapter | Pending | Must pass build/check flows. |
+| 2. Put a backend adapter behind `Shape` | Done | `Shape` now wraps a runtime backend payload instead of a raw Manifold field. |
+| 3. Replace implicit `.manifold` reach-through with backend-owned specializations | Done | Backend-specific paths moved behind backend modules. |
+| 4. Keep current Manifold runtime behavior stable through the adapter | Done | Build plus focused runtime/API checks passed. |
 | 5. Formalize a backend-neutral Forge compile graph | Pending | This is broader than the current exact-export replay plan. |
 | 6. Route operations intentionally by backend capability | Pending | Especially booleans, shell, fillet, projection, export. |
 | 7. Add backend mismatch / conversion diagnostics | Pending | No silent magic. |
