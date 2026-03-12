@@ -226,9 +226,11 @@ Supported today:
 - tracked vertical edges from compile-covered `box()` bodies
 - tracked vertical edges from `rectangle(...).extrude(...)`
 - rigid transforms between the tracked source body and the target shape
+- untouched sibling tracked vertical edges after earlier supported `filletEdge(...)` / `chamferEdge(...)` rewrites on the same body
 
 Still out of subset today:
-- post-shell / post-boolean / post-hole-cut / post-edge-finish edge selection
+- the selected edge after an earlier `filletEdge(...)` / `chamferEdge(...)` rewrite, because that edge is recorded as a merged descendant set
+- post-shell / post-boolean / post-hole-cut edge selection
 - generic sketch extrudes, tapered extrudes, and arbitrary feature-created edges
 
 Canonical quadrants for the supported rectangle/box edges:

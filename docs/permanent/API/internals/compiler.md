@@ -195,6 +195,7 @@ Current progress:
 - `shape.hole()` and `shape.cutout()` now form a compiler-owned hole/cut workflow slice anchored to the shared face-query/workplane model
 - through holes, blind holes, and simple face-anchored cutouts now lower through both Manifold and CadQuery/OCCT from that shared semantic node family
 - `filletEdge()` and `chamferEdge()` now form a first compiler-owned tracked-edge finishing slice for supported vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies
+- the post-rewrite edge-query layer now also defends untouched sibling vertical edges after those supported edge-finish rewrites, and records them as supported propagated-edge queries instead of treating every post-finish edge as equally ambiguous
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
 - regression coverage now also includes exact/runtime/export checks for the supported hole/cut workflow subset
 - regression coverage now also includes API, placement-owner, compiler-snapshot, exact-plan, and end-to-end export checks for the supported tracked-edge fillet/chamfer subset
@@ -208,7 +209,7 @@ Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings
 - `shape.hole()` v1 only covers circular through/blind holes, and `shape.cutout()` v1 only covers sketches already placed with `onFace(...)`
-- `filletEdge()` / `chamferEdge()` v1 only cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies before topology-changing rewrites
+- `filletEdge()` / `chamferEdge()` v1 cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies plus untouched sibling vertical edges after earlier supported edge-finish rewrites, but the selected rewritten edge itself still becomes an explicit merged-edge ambiguity
 - counterbores, countersinks, up-to-face extents, drafted cuts, and durable identity for hole/cut-created faces are still missing
 - repeated-feature ownership currently tracks repeated bodies and mirrored descendants, not durable per-face identity after merged pattern topology changes
 - shell, hole/cut, tracked-edge finishing, and repeated-feature workflows now preserve parent-body ownership lineage, but stable downstream face/edge ownership after topology-changing edits is still not solved, which is why broader projection-driven edits and richer fillet/chamfer workflows remain harder next layers
