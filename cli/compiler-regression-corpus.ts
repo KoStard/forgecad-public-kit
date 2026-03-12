@@ -44,11 +44,12 @@ export const COMPILER_REGRESSION_CORPUS: CompilerRegressionCorpusPart[] = [
     id: 'corpus-edge-finished-mount',
     name: 'Edge Finished Mount',
     description:
-      'A filleted mounting block keeps tracked-edge finishing, downstream face-driven edits, and a normal boolean cut chain aligned across both lowerers.',
+      'A finished mounting block keeps propagated edge-finish queries, mirrored add-ons, and downstream face-driven edits aligned across both lowerers.',
     guards: [
-      'tracked-edge fillet intent stays visible to both lowerers instead of collapsing back to mesh-only geometry',
+      'a preserved propagated edge can drive a later chamfer after an ordinary union instead of dropping back to mesh-only behavior',
+      'mirrored additive features stay exact-exportable while the selected propagated edge remains one defended lineage',
       'downstream hole/cutout features can still target the original tracked body owner after edge finishing',
-      'ordinary additive/subtractive edits remain exact-exportable after the edge-finish feature lands',
+      'ordinary additive/subtractive edits remain exact-exportable after the broadened edge-finish subset lands',
     ],
     scriptPath: corpusScriptPath('edge-finished-mount.forge.js'),
     objectName: 'Edge Finished Mount',

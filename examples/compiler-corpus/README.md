@@ -34,9 +34,9 @@ Guards:
 ### `edge-finished-mount.forge.js`
 
 Guards:
-- tracked-edge `filletEdge()` lowering on the supported vertical-edge subset
-- downstream `hole()` / `cutout()` edits that still target the original tracked body owner after edge finishing
-- ordinary add/subtract edits staying exact-exportable after the edge-finish feature node lands
+- tracked-edge `filletEdge()` plus later propagated-edge `chamferEdge()` lowering on the defended vertical-edge subset
+- mirrored additive features staying exact-exportable while the selected preserved edge keeps one unique propagated lineage
+- downstream `hole()` / `cutout()` edits that still target the original tracked body owner after the broadened edge-finish flow
 
 ### `trimmed-access-cover.forge.js`
 

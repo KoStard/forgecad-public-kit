@@ -19,7 +19,7 @@ import {
 } from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
 import { describeFaceQueryRef } from '../src/forge/queryModel';
-import { circle2d, filletEdge, linearPattern, rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
+import { chamferEdge, circle2d, filletEdge, linearPattern, rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
 import { getSketchPlacement3D, getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
 import { Transform } from '../src/forge/transform';
 
@@ -470,15 +470,39 @@ function checkEdgeFinishOwnerPropagation(): void {
   expect(ownerIds.has(baseOwner!.id), 'fillet result should retain the source body owner lineage');
   expect(ownerIds.has(filletOwner!.id), 'fillet result should include its own feature owner lineage');
 
-  const doubled = filletEdge(filleted, base.edge('vert-bl'), 3, [1, -1]);
+  const boss = roundedRect(12, 8, 1.5, true)
+    .onFace(base, 'top', { u: -12, v: 6, protrude: 0.25, selfAnchor: 'center' })
+    .extrude(5);
+  const widened = filleted.add(boss);
+  const widenedUnionOwner = getShapePrimaryQueryOwner(widened);
+  expect(widenedUnionOwner != null, 'union after a supported fillet should expose a primary query owner');
+  expect(
+    widenedUnionOwner!.operation === 'boolean:union',
+    `expected widened union owner operation "boolean:union", got ${widenedUnionOwner!.operation}`,
+  );
+
+  const doubled = filletEdge(widened, base.edge('vert-bl'), 3, [1, -1]);
   const doubledOwner = getShapePrimaryQueryOwner(doubled);
-  expect(doubledOwner != null, 'second fillet on a preserved sibling edge should expose a primary query owner');
+  expect(doubledOwner != null, 'second fillet on a preserved propagated edge should expose a primary query owner');
   expect(doubledOwner!.operation === 'fillet', `expected second fillet owner operation "fillet", got ${doubledOwner!.operation}`);
 
   const doubledOwnerIds = new Set(getShapeQueryOwners(doubled).map((owner) => owner.id));
   expect(doubledOwnerIds.has(baseOwner!.id), 'second fillet should still retain the original body owner lineage');
   expect(doubledOwnerIds.has(filletOwner!.id), 'second fillet should retain the earlier edge-finish owner lineage');
+  expect(doubledOwnerIds.has(widenedUnionOwner!.id), 'second fillet should retain the boolean-union owner lineage it finished on');
   expect(doubledOwnerIds.has(doubledOwner!.id), 'second fillet should include its own feature owner lineage');
+
+  const doubledPropagation = getShapeTopologyRewritePropagation(doubled);
+  expect(doubledPropagation != null, 'second fillet after a supported union should expose propagation metadata');
+  const mergedEdge = doubledPropagation!.preservedEdges.find((entry) => entry.status === 'ambiguous');
+  expect(mergedEdge != null, 'second fillet after a supported union should keep the selected edge ambiguity explicit');
+  expect(mergedEdge!.query.source.kind === 'propagated-edge', 'second fillet should record the selected edge against the propagated union query');
+  if (mergedEdge!.query.source.kind === 'propagated-edge') {
+    expect(
+      mergedEdge!.query.source.owner?.id === widenedUnionOwner!.id,
+      'second fillet should preserve the boolean-union owner on the selected propagated edge source',
+    );
+  }
 
   const drilled = doubled.hole(base.face('top'), { diameter: 5, u: -10, v: 6, depth: 8 });
   const holePlacement = getShapeWorkplanePlacement(drilled);
@@ -736,8 +760,41 @@ function checkTopologyRewritePropagationInspection(): void {
   expect(!resolvedMerged.ok, 'merged propagated-edge queries should stay explicitly unsupported');
   if (!resolvedMerged.ok) {
     expect(
-      /blended descendant set|merged rewritten descendants|untouched sibling vertical edges/.test(resolvedMerged.issue.reason),
+      /blended descendant set|merged rewritten descendants|merged into rewritten descendants|untouched sibling vertical edges/.test(resolvedMerged.issue.reason),
       `expected merged-edge diagnostic to stay explicit, got "${resolvedMerged.issue.reason}"`,
+    );
+  }
+
+  const boss = roundedRect(10, 6, 1.5, true)
+    .onFace(prism, 'top', { u: -8, v: 4, protrude: 0.25, selfAnchor: 'center' })
+    .extrude(4);
+  const widened = filleted.add(boss);
+  const widenedOwner = getShapePrimaryQueryOwner(widened);
+  expect(widenedOwner != null, 'union after a supported fillet should expose a primary owner');
+  expect(widenedOwner!.operation === 'boolean:union', `expected boolean-union propagation owner, got ${widenedOwner!.operation}`);
+  const widenedPropagation = getShapeTopologyRewritePropagation(widened);
+  expect(widenedPropagation != null, 'union after a supported fillet should expose propagation metadata');
+  expect(widenedPropagation!.operation === 'boolean:union', `expected widened propagation operation "boolean:union", got ${widenedPropagation!.operation}`);
+  const widenedSibling = widenedPropagation!.preservedEdges.find((entry) =>
+    entry.status === 'supported'
+      && entry.query.kind === 'propagated-edge'
+      && entry.query.source.kind === 'propagated-edge'
+      && entry.query.source.source.kind === 'tracked-edge'
+      && entry.query.source.source.edgeName === 'vert-bl',
+  );
+  expect(widenedSibling != null, 'union after a supported fillet should keep a supported propagated-edge entry for untouched siblings');
+  const resolvedWidenedSibling = resolveSupportedEdgeFeatureSelection(getShapeCompilePlan(widened), widenedSibling!.query);
+  expect(resolvedWidenedSibling.ok, `supported union propagated-edge queries should resolve for later finishing: ${resolvedWidenedSibling.ok ? '' : resolvedWidenedSibling.issue.reason}`);
+  const widenedFinished = chamferEdge(widened, prism.edge('vert-bl'), 2.5, [1, -1]);
+  const widenedFinishedPropagation = getShapeTopologyRewritePropagation(widenedFinished);
+  expect(widenedFinishedPropagation != null, 'chamfer after a supported union should expose propagation metadata');
+  const widenedMerged = widenedFinishedPropagation!.preservedEdges.find((entry) => entry.status === 'ambiguous');
+  expect(widenedMerged != null, 'chamfer after a supported union should keep the selected propagated edge ambiguity explicit');
+  expect(widenedMerged!.query.source.kind === 'propagated-edge', 'chamfer after a supported union should record the selected propagated union edge');
+  if (widenedMerged!.query.source.kind === 'propagated-edge') {
+    expect(
+      widenedMerged!.query.source.owner?.id === widenedOwner!.id,
+      'chamfer after a supported union should preserve the union owner on the selected propagated edge source',
     );
   }
 }

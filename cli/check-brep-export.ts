@@ -593,7 +593,7 @@ function checkFilletEdgeWorkflowPlan(): void {
   assert(fillets.every((node) => !!node.resolvedEdge), 'Expected both fillet nodes to include resolved edge selectors');
 
   const transforms = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
-  assert.equal(transforms.length, 2, `Expected two workplane placements after the fillet workflow (pocket + hole), got ${transforms.length}`);
+  assert.equal(transforms.length, 3, `Expected three workplane placements after the fillet workflow (boss + pocket + hole), got ${transforms.length}`);
   assert(
     transforms.every((step) => step.placement.workplane.source.owner),
     'Expected downstream fillet workflow placements to retain query-backed owners',
@@ -780,11 +780,19 @@ function checkCorpusEdgeFinishedMountPlan(): void {
   assert(fillet && fillet.kind === 'fillet', `Expected ${part.name} exact lowering to contain a fillet node`);
   assert.equal(fillet.radius, 6);
   assert(fillet.resolvedEdge, `Expected ${part.name} exact lowering to carry a resolved fillet edge selector`);
+  const chamfer = nodes.find((node) => node.kind === 'chamfer');
+  assert(chamfer && chamfer.kind === 'chamfer', `Expected ${part.name} exact lowering to contain a chamfer node`);
+  assert.equal(chamfer.size, 4);
+  assert(chamfer.resolvedEdge, `Expected ${part.name} exact lowering to carry a resolved chamfer edge selector`);
 
   const placements = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
   assert(
-    placements.length >= 2,
+    placements.length >= 4,
     `Expected ${part.name} exact lowering to preserve downstream feature placements after edge finishing`,
+  );
+  assert(
+    collectShapeTransforms(plan).some((step) => step.kind === 'mirror'),
+    `Expected ${part.name} exact lowering to preserve the mirrored additive feature transforms`,
   );
 }
 

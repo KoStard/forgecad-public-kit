@@ -201,10 +201,10 @@ Current progress:
 - through holes, blind holes, and simple face-anchored cutouts now lower through both Manifold and CadQuery/OCCT from that shared semantic node family
 - shell, hole, and cut now expose defended named created-face subsets on top of the topology-rewrite kernel, so downstream features can target inner shell walls, blind-hole floors, and supported cut walls/floors without falling back to anonymous runtime placement
 - `filletEdge()` and `chamferEdge()` now form a first compiler-owned tracked-edge finishing slice for supported vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies
-- the post-rewrite edge-query layer now also defends untouched sibling vertical edges after those supported edge-finish rewrites, and records them as supported propagated-edge queries instead of treating every post-finish edge as equally ambiguous
+- the post-rewrite edge-query layer now also defends untouched sibling vertical edges after those supported edge-finish rewrites, plus later supported boolean-union descendants when one preserved propagated-edge lineage stays explicit
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
 - regression coverage now also includes exact/runtime/export checks for the supported hole/cut workflow subset
-- regression coverage now also includes API, placement-owner, compiler-snapshot, exact-plan, and end-to-end export checks for the supported tracked-edge fillet/chamfer subset
+- regression coverage now also includes API, placement-owner, query-propagation, compiler-snapshot, exact-plan, corpus, and end-to-end export checks for the broadened tracked-edge fillet/chamfer subset
 - the regression suite now also includes a file-backed ordinary-parts corpus under `examples/compiler-corpus/`, so shell, workplane-driven cuts, mirrored ribs/feet, patterned holes, and boolean chains are exercised together instead of only as isolated unit slices
 - mirrored downstream features and helper-driven linear/circular repetition now preserve repeated-result ownership on top of the shared face-query backbone
 - supported boolean unions now also preserve owner-scoped canonical face queries from repeated descendants, and compiler regressions cover both explicit duplicate-owner merge ambiguity and later boolean chains that inherit those propagated queries
@@ -216,7 +216,7 @@ Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings, while defended named created faces currently cover the exact profile families Forge can model directly (`rect`, `roundedRect`, `circle`)
 - `shape.hole()` v1 only covers circular through/blind holes, and `shape.cutout()` v1 only covers sketches already placed with `onFace(...)`
-- `filletEdge()` / `chamferEdge()` v1 cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies plus untouched sibling vertical edges after earlier supported edge-finish rewrites, but the selected rewritten edge itself still becomes an explicit merged-edge ambiguity
+- `filletEdge()` / `chamferEdge()` v1 cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies plus preserved propagated sibling edges through supported edge-finish and boolean-union chains, but the selected rewritten edge itself still becomes an explicit merged-edge ambiguity
 - counterbores, countersinks, up-to-face extents, drafted cuts, and broader durable identity beyond today's defended shell/hole/cut created-face subset are still missing
 - boolean/pattern propagation currently defends owner-scoped canonical face lineage through supported unions, but post-merge durable face identity and post-difference/intersection face targets are still explicit ambiguity cases rather than one defended face
 - repeated-feature ownership currently tracks repeated bodies and mirrored descendants, not durable per-face identity after merged pattern topology changes

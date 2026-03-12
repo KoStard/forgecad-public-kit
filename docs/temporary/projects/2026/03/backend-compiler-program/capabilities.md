@@ -90,6 +90,7 @@ Why it is not fully true today:
 
 - Forge now has a shared edge-query contract plus tracked-edge selector propagation
 - Forge now has a first compiler-owned fillet/chamfer slice for tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies
+- preserved propagated sibling edges can now drive a later supported fillet/chamfer after an ordinary defended union on that same lineage
 - both lowerers and the exact exporter replay that subset from the same shared edge-query contract
 - durable edge identity after shell/boolean/hole/cut topology rewrites is still missing, so the finishing subset must stay intentionally narrow
 

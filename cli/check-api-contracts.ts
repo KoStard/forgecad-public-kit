@@ -14,10 +14,12 @@ import {
   intersection,
   rect,
   rectangle,
+  roundedRect,
   circle2d,
   union2d,
   difference2d,
   filletEdge,
+  chamferEdge,
   intersection2d,
   hull2d,
   runScript,
@@ -159,9 +161,24 @@ function checkBooleanErrors(): void {
 function checkEdgeFinishSubsetErrors(): void {
   const base = rectangle(-24, -16, 48, 32).extrude(18);
   const once = filletEdge(base.toShape(), base.edge('vert-br'), 4, [-1, -1]);
+  const boss = roundedRect(10, 6, 1.5, true)
+    .onFace(base, 'top', { u: -10, v: 4, protrude: 0.25, selfAnchor: 'center' })
+    .extrude(5);
+  const widened = once.add(boss);
   assert.doesNotThrow(
     () => filletEdge(once, base.edge('vert-bl'), 4, [1, -1]),
     'A preserved sibling tracked edge should stay finishable after one supported edge rewrite.',
+  );
+  assert.doesNotThrow(
+    () => filletEdge(widened, base.edge('vert-bl'), 4, [1, -1]),
+    'A preserved propagated edge should stay finishable after a supported boolean union.',
+  );
+
+  const chamferedOnce = chamferEdge(base.toShape(), base.edge('vert-tl'), 4, [1, 1]);
+  const chamferWidened = chamferedOnce.add(boss.translate(12, -4, 0));
+  assert.doesNotThrow(
+    () => chamferEdge(chamferWidened, base.edge('vert-br'), 3, [-1, -1]),
+    'Chamfer should accept the same propagated-edge subset after a supported union.',
   );
 
   assert.throws(
@@ -169,8 +186,21 @@ function checkEdgeFinishSubsetErrors(): void {
     /filletEdge\(\) currently supports vert-br only with quadrant \[-1, -1\]/,
   );
   assert.throws(
+    () => filletEdge(base.toShape().add(boss), base.edge('vert-bl'), 4, [1, -1]),
+    /already recorded as supported|supported subset/,
+  );
+  assert.throws(
     () => filletEdge(once, base.edge('vert-br'), 4, [-1, -1]),
-    /merged rewritten descendants|untouched sibling vertical edges/,
+    /merged rewritten descendants|merged into rewritten descendants|untouched sibling vertical edges/,
+  );
+  assert.throws(
+    () => filletEdge(
+      widened.subtract(box(8, 8, 20, true).translate(-24, -16, 9)),
+      base.edge('vert-bl'),
+      4,
+      [1, -1],
+    ),
+    /split or erase|clipped descendant subset|stable edge target/,
   );
 }
 

@@ -267,19 +267,20 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
   ),
   inlineCase(
     'fillet-edge-workflow',
-    'Fillet workflows preserve the defended merged-edge query while downstream hole/cut created faces stay visible as boolean-split descendants in one chain.',
+    'Fillet workflows keep a preserved propagated edge finishable after an ordinary union while downstream hole/cut created faces stay visible in one chain.',
     FILLET_EDGE_WORKFLOW_CODE,
     [
       {
         name: 'Filleted Body',
         exactRouteKind: 'exact',
         facetedRouteKind: 'exact',
-        operations: ['boolean:difference', 'cut', 'hole', 'fillet', 'fillet'],
+        operations: ['boolean:difference', 'cut', 'hole', 'fillet', 'boolean:union', 'fillet'],
         requiredDiagnosticCodes: [
           'boolean-difference-face-split-ambiguous',
           'boolean-difference-edge-propagation-unsupported',
           'cut-source-face-split-ambiguous',
           'hole-source-face-split-ambiguous',
+          'boolean-union-edge-inherited-ambiguity',
           'fillet-selected-edge-merged-ambiguous',
           'fillet-created-face-propagation-unsupported',
         ],
@@ -288,21 +289,21 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'propagated-face(split <- created-face(cut:wall-right)',
         ],
         requiredPreservedEdgeQueries: [
-          'propagated-edge(merged <- tracked-edge(vert-br#edge)',
+          'propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge)',
         ],
       },
     ],
   ),
   inlineCase(
     'chamfer-edge-workflow',
-    'Chamfer workflows keep the defended merged-edge query visible alongside upstream boolean and hole rewrite diagnostics.',
+    'Chamfer workflows keep a preserved propagated edge finishable after an ordinary union alongside upstream hole rewrite diagnostics.',
     CHAMFER_EDGE_WORKFLOW_CODE,
     [
       {
         name: 'Chamfered Body',
         exactRouteKind: 'exact',
         facetedRouteKind: 'exact',
-        operations: ['hole', 'boolean:union', 'chamfer', 'chamfer'],
+        operations: ['hole', 'chamfer', 'boolean:union', 'chamfer'],
         requiredDiagnosticCodes: [
           'hole-source-face-split-ambiguous',
           'hole-created-edge-propagation-unsupported',
@@ -311,7 +312,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'chamfer-created-face-propagation-unsupported',
         ],
         requiredPreservedEdgeQueries: [
-          'propagated-edge(merged <- tracked-edge(vert-br#edge)',
+          'propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge)',
         ],
       },
     ],
@@ -380,18 +381,21 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         name: 'Edge Finished Mount',
         exactRouteKind: 'exact',
         facetedRouteKind: 'exact',
-        operations: ['boolean:difference', 'cut', 'hole', 'boolean:union', 'fillet'],
+        operations: ['boolean:difference', 'cut', 'hole', 'chamfer', 'boolean:union', 'fillet', 'boolean:union'],
         requiredDiagnosticCodes: [
           'boolean-difference-face-split-ambiguous',
           'boolean-difference-edge-propagation-unsupported',
           'cut-source-face-split-ambiguous',
           'hole-source-face-split-ambiguous',
+          'boolean-union-edge-propagation-unsupported',
           'boolean-union-edge-inherited-ambiguity',
           'fillet-selected-edge-merged-ambiguous',
           'fillet-created-face-propagation-unsupported',
+          'chamfer-selected-edge-merged-ambiguous',
+          'chamfer-created-face-propagation-unsupported',
         ],
         requiredPreservedEdgeQueries: [
-          'propagated-edge(merged <- tracked-edge(vert-br#edge)',
+          'propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge)',
         ],
       },
     ],

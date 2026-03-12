@@ -206,12 +206,12 @@ return [{ name: 'Shell', shape: body }];
   ),
   inlineCase(
     'fillet-edge-workflow',
-    'Tracked vertical edge finishing stays compiler-owned, preserves untouched sibling edge meaning across supported rewrites, and still accepts downstream face-driven edits on the base-owner lineage.',
+    'Tracked vertical edge finishing stays compiler-owned through an ordinary union, preserves the selected propagated edge lineage, and still accepts downstream face-driven edits on the base-owner lineage.',
     FILLET_EDGE_WORKFLOW_CODE,
   ),
   inlineCase(
     'chamfer-edge-workflow',
-    'Tracked vertical chamfers lower through both backends, preserve untouched sibling edge meaning across supported rewrites, and still compose with additive and hole-driven edits.',
+    'Tracked vertical chamfers lower through both backends after a supported union, preserve the selected propagated edge lineage, and still compose with additive and hole-driven edits.',
     CHAMFER_EDGE_WORKFLOW_CODE,
   ),
   inlineCase(
@@ -411,6 +411,7 @@ function parseArgs(argv: string[]) {
 
 function stripUndefinedDeep<T>(value: T): T {
   if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return null as T;
     return (Object.is(value, -0) ? 0 : value) as T;
   }
   if (Array.isArray(value)) {

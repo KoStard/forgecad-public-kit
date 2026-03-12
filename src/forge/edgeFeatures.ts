@@ -62,7 +62,7 @@ function requireCompatibleEdgeOwner(target: Shape, edge: EdgeRef, label: string)
 function createOwnedTopologyRewritePlan(
   plan: ShapeCompilePlan | null,
   operation: 'fillet' | 'chamfer',
-  edge: EdgeRef,
+  edgeQuery: EdgeRef['query'],
   preservedEdges: EdgeRef['query'][],
 ): ShapeCompilePlan | null {
   if (!plan) return null;
@@ -70,7 +70,7 @@ function createOwnedTopologyRewritePlan(
   return wrapShapeCompilePlanWithQueryOwner(
     attachTopologyRewritePropagation(
       plan,
-      buildEdgeFeatureTopologyRewritePropagation(operation, owner, edge.query, preservedEdges.filter((query): query is NonNullable<typeof query> => query != null)),
+      buildEdgeFeatureTopologyRewritePropagation(operation, owner, edgeQuery, preservedEdges.filter((query): query is NonNullable<typeof query> => query != null)),
     ),
     owner,
   );
@@ -139,9 +139,9 @@ export function filletEdge(
   }
 
   const plan = createOwnedTopologyRewritePlan(
-    buildFilletShapeCompilePlan(basePlan, edge.query, radius, normalizedQuadrant, Math.round(segments)),
+    buildFilletShapeCompilePlan(basePlan, selection.query, radius, normalizedQuadrant, Math.round(segments)),
     'fillet',
-    edge,
+    selection.query,
     preservedEdges,
   );
   return buildEdgeFeatureResult(target, plan, 'fillet');
@@ -181,9 +181,9 @@ export function chamferEdge(
   }
 
   const plan = createOwnedTopologyRewritePlan(
-    buildChamferShapeCompilePlan(basePlan, edge.query, size, normalizedQuadrant),
+    buildChamferShapeCompilePlan(basePlan, selection.query, size, normalizedQuadrant),
     'chamfer',
-    edge,
+    selection.query,
     preservedEdges,
   );
   return buildEdgeFeatureResult(target, plan, 'chamfer');
