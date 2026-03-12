@@ -52,3 +52,4 @@ Can start immediately after task 160. Safe to run in parallel with:
 
 ## Status and log
 - 2026-03-12: Created for the first post-160 parallel wave.
+- 2026-03-12: Completed. Added defended propagated-edge support for untouched sibling vertical edges across supported fillet/chamfer rewrites, kept merged selected-edge cases explicit and unsupported, expanded placement/API/BREP/compiler regression coverage, and updated the permanent docs to spell out the current defended subset.

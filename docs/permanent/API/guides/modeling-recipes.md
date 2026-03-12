@@ -241,6 +241,6 @@ const holes = circularPattern(
 return result.subtract(holes);
 ```
 
-Use the original tracked body (`base`) when you need semantic faces/edges after edge finishing. The current fillet/chamfer slice preserves owner lineage for downstream features, but it does not create new durable tracked topology on the finished result.
+Use the original tracked body (`base`) when you need semantic faces after edge finishing, and keep using its untouched sibling vertical tracked edges if you apply another supported fillet/chamfer later. The currently selected finished edge is still recorded as a merged descendant set, so Forge does not claim a new durable tracked edge for that rewritten corner yet.
 
 For larger runnable examples, read `examples/api/`.

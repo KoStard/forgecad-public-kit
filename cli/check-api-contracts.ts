@@ -159,14 +159,18 @@ function checkBooleanErrors(): void {
 function checkEdgeFinishSubsetErrors(): void {
   const base = rectangle(-24, -16, 48, 32).extrude(18);
   const once = filletEdge(base.toShape(), base.edge('vert-br'), 4, [-1, -1]);
+  assert.doesNotThrow(
+    () => filletEdge(once, base.edge('vert-bl'), 4, [1, -1]),
+    'A preserved sibling tracked edge should stay finishable after one supported edge rewrite.',
+  );
 
   assert.throws(
     () => filletEdge(base.toShape(), base.edge('vert-br'), 4, [1, -1]),
     /filletEdge\(\) currently supports vert-br only with quadrant \[-1, -1\]/,
   );
   assert.throws(
-    () => filletEdge(once, base.edge('vert-bl'), 4, [1, -1]),
-    /does not claim durable edge identity after shell\/boolean\/hole\/cut\/edge-finish rewrites/,
+    () => filletEdge(once, base.edge('vert-br'), 4, [-1, -1]),
+    /merged rewritten descendants|untouched sibling vertical edges/,
   );
 }
 
