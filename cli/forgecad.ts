@@ -5,6 +5,7 @@ import { basename } from 'path';
 import { runCheckApiContractsCli } from './check-api-contracts';
 import { runCheckBrepExportCli } from './check-brep-export';
 import { runCheckCompilerCli } from './check-compiler';
+import { runCheckQueryPropagationCli } from './check-query-propagation';
 import { runCheckSuiteCli } from './check-suite';
 import { runCheckDimensionsCli } from './check-dimensions';
 import { runCheckJsModulesCli } from './check-js-modules';
@@ -258,6 +259,22 @@ const commands: CommandDefinition[] = [
       'forgecad check compiler --update',
     ],
     run: runCheckCompilerCli,
+  },
+  {
+    group: 'Checks',
+    path: ['check', 'query-propagation'],
+    summary: 'Run focused topology-rewrite query-propagation snapshots and invariants.',
+    usage: [
+      'forgecad check query-propagation',
+      'forgecad check query-propagation --case hull-runtime-boundary',
+      'forgecad check query-propagation --update',
+    ],
+    examples: [
+      'forgecad check query-propagation',
+      'forgecad check query-propagation --case corpus-edge-finished-mount',
+      'forgecad check query-propagation --update',
+    ],
+    run: runCheckQueryPropagationCli,
   },
   {
     group: 'Checks',

@@ -1,0 +1,652 @@
+#!/usr/bin/env node
+/**
+ * Query-propagation regression snapshots.
+ *
+ * This keeps topology-rewrite query propagation reviewable without colliding
+ * with the broader compiler-routing snapshots.
+ */
+import assert from 'node:assert/strict';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { dirname } from 'path';
+import { init } from '../src/forge/headless';
+import {
+  describeEdgeQueryRef,
+  describeFaceQueryRef,
+  type EdgeQueryRef,
+  type FaceQueryRef,
+  type ShapeQueryOwner,
+  type TopologyRewritePropagation,
+} from '../src/forge/queryModel';
+import type {
+  CompilerInspectionInput,
+  CompilerRouteInspection,
+  CompilerShapeInspection,
+} from './compiler-inspection';
+import { inspectCompilerScene, loadCompilerInspectionInput } from './compiler-inspection';
+import { getCompilerRegressionCorpusPart } from './compiler-regression-corpus';
+import { CHAMFER_EDGE_WORKFLOW_CODE, FILLET_EDGE_WORKFLOW_CODE } from './edge-finish-fixtures';
+import { resolvePackagePath } from './package-runtime';
+
+type QueryPropagationRouteSnapshot = {
+  kind: CompilerRouteInspection['kind'];
+  target?: CompilerRouteInspection['target'];
+  reason?: string;
+  diagnosticCodes: string[];
+};
+
+type QueryPropagationEntrySnapshot = {
+  status?: 'supported' | 'ambiguous';
+  query: string;
+  note?: string;
+};
+
+type QueryPropagationDiagnosticSnapshot = {
+  code: string;
+  category: 'ambiguous' | 'unsupported';
+  queryKind: 'face' | 'edge';
+  source?: string;
+  query?: string;
+};
+
+type QueryPropagationSnapshot = {
+  rewriteId: string;
+  operation: string;
+  owner?: string;
+  preservedFaces: QueryPropagationEntrySnapshot[];
+  preservedEdges: QueryPropagationEntrySnapshot[];
+  createdFaces: QueryPropagationEntrySnapshot[];
+  createdEdges: QueryPropagationEntrySnapshot[];
+  diagnostics: QueryPropagationDiagnosticSnapshot[];
+};
+
+type QueryPropagationObjectSnapshot = {
+  name: string;
+  exactRoute: QueryPropagationRouteSnapshot;
+  facetedRoute: QueryPropagationRouteSnapshot;
+  propagationOps: string[];
+  propagations: QueryPropagationSnapshot[];
+};
+
+type QueryPropagationCaseSnapshot = {
+  id: string;
+  description: string;
+  objects: QueryPropagationObjectSnapshot[];
+};
+
+type QueryPropagationObjectExpectation = {
+  name: string;
+  exactRouteKind: QueryPropagationRouteSnapshot['kind'];
+  facetedRouteKind: QueryPropagationRouteSnapshot['kind'];
+  operations: string[];
+  requiredDiagnosticCodes: string[];
+  requiredRouteDiagnosticCodes?: string[];
+  requiredPreservedFaceQueries?: string[];
+  requiredPreservedEdgeQueries?: string[];
+  requiredCreatedFaceQueries?: string[];
+  requiredCreatedEdgeQueries?: string[];
+};
+
+type QueryPropagationCaseDefinition = {
+  id: string;
+  description: string;
+  input: CompilerInspectionInput;
+  expectedObjects: QueryPropagationObjectExpectation[];
+};
+
+const SNAPSHOT_PATH = resolvePackagePath(import.meta.url, 'cli', 'snapshots', 'query-propagation-snapshots.json');
+
+const HOLE_CUT_WORKFLOW_CODE = `
+const base = roundedRect(90, 60, 8, true).extrude(24);
+const topPocket = roundedRect(18, 10, 2, true)
+  .onFace(base, 'top', { u: 14, v: -8, selfAnchor: 'center' });
+const sideCut = roundedRect(16, 8, 2, true)
+  .onFace(base, 'right', { u: -4, v: 0, selfAnchor: 'center' });
+const body = base
+  .hole('front', { diameter: 8, u: 0, v: 2 })
+  .hole('top', { diameter: 6, u: -18, v: 10, depth: 10 })
+  .cutout(topPocket, { depth: 6 })
+  .cutout(sideCut);
+return [{ name: 'Workflow', shape: body }];
+`;
+
+const TRIM_AND_SPLIT_WORKFLOW_CODE = `
+const body = box(40, 30, 20, true).toShape();
+const trimmed = body.trimByPlane([0, 0, 1], 0);
+const [upper, lower] = body.splitByPlane([0, 0, 1], 0);
+return [
+  { name: 'Trimmed', shape: trimmed },
+  { name: 'Upper', shape: upper },
+  { name: 'Lower', shape: lower },
+];
+`;
+
+const HULL_RUNTIME_BOUNDARY_CODE = `
+const rib = hull3d(
+  cylinder(20, 3).translate(-10, 0, 0),
+  cylinder(20, 3).translate(10, 0, 0),
+  [0, 0, 26],
+);
+const convexPost = box(12, 8, 20, true)
+  .toShape()
+  .rotateAround([0, 0, 1], 25, [0, 0, 0])
+  .hull();
+const tab = hull2d(
+  circle2d(6).translate(-10, 0),
+  circle2d(6).translate(10, 0),
+).translate(0, 4);
+const collar = polygon([
+  [0, 0],
+  [8, 0],
+  [4, 5],
+]).translate(0, 16).hull();
+return [
+  { name: 'Rib', shape: rib },
+  { name: 'Convex Post', shape: convexPost },
+  { name: 'Tab', sketch: tab },
+  { name: 'Collar', sketch: collar },
+];
+`;
+
+function inlineCase(
+  id: string,
+  description: string,
+  code: string,
+  expectedObjects: QueryPropagationObjectExpectation[],
+): QueryPropagationCaseDefinition {
+  return {
+    id,
+    description,
+    input: {
+      displayPath: `inline:${id}`,
+      code,
+      fileName: 'main.forge.js',
+      allFiles: { 'main.forge.js': code },
+    },
+    expectedObjects,
+  };
+}
+
+function fileCase(
+  id: string,
+  description: string,
+  scriptPath: string,
+  expectedObjects: QueryPropagationObjectExpectation[],
+): QueryPropagationCaseDefinition {
+  return {
+    id,
+    description,
+    input: loadCompilerInspectionInput(scriptPath),
+    expectedObjects,
+  };
+}
+
+function compilerCorpusCase(
+  corpusId: string,
+  description: string,
+  expectedObjects: QueryPropagationObjectExpectation[],
+): QueryPropagationCaseDefinition {
+  const part = getCompilerRegressionCorpusPart(corpusId);
+  return fileCase(part.id, description, part.scriptPath, expectedObjects);
+}
+
+const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
+  inlineCase(
+    'trim-and-split-created-faces',
+    'Trim and split-by-plane workflows keep the defended plane-cap created-face query visible for each surviving branch.',
+    TRIM_AND_SPLIT_WORKFLOW_CODE,
+    [
+      {
+        name: 'Trimmed',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['trimByPlane'],
+        requiredDiagnosticCodes: [
+          'trim-by-plane-preserved-face-propagation-ambiguous',
+          'trim-by-plane-edge-propagation-ambiguous',
+        ],
+        requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
+      },
+      {
+        name: 'Upper',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['trimByPlane'],
+        requiredDiagnosticCodes: [
+          'trim-by-plane-preserved-face-propagation-ambiguous',
+          'trim-by-plane-edge-propagation-ambiguous',
+        ],
+        requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
+      },
+      {
+        name: 'Lower',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['trimByPlane'],
+        requiredDiagnosticCodes: [
+          'trim-by-plane-preserved-face-propagation-ambiguous',
+          'trim-by-plane-edge-propagation-ambiguous',
+        ],
+        requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
+      },
+    ],
+  ),
+  inlineCase(
+    'hole-cut-workflows',
+    'Hole and cut workflows record ambiguous preserved-face descendants plus explicit unsupported created-edge diagnostics.',
+    HOLE_CUT_WORKFLOW_CODE,
+    [
+      {
+        name: 'Workflow',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['cut', 'cut', 'hole', 'hole'],
+        requiredDiagnosticCodes: [
+          'cut-source-face-split-ambiguous',
+          'cut-created-edge-propagation-unsupported',
+          'hole-source-face-split-ambiguous',
+          'hole-created-edge-propagation-unsupported',
+        ],
+        requiredPreservedFaceQueries: [
+          'propagated-face(split <- canonical-face(right)',
+          'propagated-face(split <- tracked-face(top)',
+          'propagated-face(split <- canonical-face(top)',
+          'propagated-face(split <- canonical-face(front)',
+        ],
+      },
+    ],
+  ),
+  inlineCase(
+    'fillet-edge-workflow',
+    'Fillet workflows preserve the defended merged-edge query plus downstream hole/cut ambiguity diagnostics in one chain.',
+    FILLET_EDGE_WORKFLOW_CODE,
+    [
+      {
+        name: 'Filleted Body',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['boolean:difference', 'cut', 'hole', 'fillet'],
+        requiredDiagnosticCodes: [
+          'boolean-difference-face-propagation-ambiguous',
+          'cut-source-face-split-ambiguous',
+          'hole-source-face-split-ambiguous',
+          'fillet-selected-edge-merged-ambiguous',
+          'fillet-created-face-propagation-unsupported',
+        ],
+        requiredPreservedFaceQueries: [
+          'propagated-face(split <- tracked-face(top)',
+          'propagated-face(split <- face-ref(top)',
+        ],
+        requiredPreservedEdgeQueries: [
+          'propagated-edge(merged <- tracked-edge(vert-br#edge)',
+        ],
+      },
+    ],
+  ),
+  inlineCase(
+    'chamfer-edge-workflow',
+    'Chamfer workflows keep the defended merged-edge query visible alongside upstream boolean and hole rewrite diagnostics.',
+    CHAMFER_EDGE_WORKFLOW_CODE,
+    [
+      {
+        name: 'Chamfered Body',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['hole', 'boolean:union', 'chamfer'],
+        requiredDiagnosticCodes: [
+          'hole-source-face-split-ambiguous',
+          'hole-created-edge-propagation-unsupported',
+          'boolean-union-face-propagation-ambiguous',
+          'chamfer-selected-edge-merged-ambiguous',
+          'chamfer-created-face-propagation-unsupported',
+        ],
+        requiredPreservedEdgeQueries: [
+          'propagated-edge(merged <- tracked-edge(vert-tl#edge)',
+        ],
+      },
+    ],
+  ),
+  inlineCase(
+    'hull-runtime-boundary',
+    'Hull stays an explicit unsupported propagation boundary instead of pretending to preserve durable post-rewrite queries.',
+    HULL_RUNTIME_BOUNDARY_CODE,
+    [
+      {
+        name: 'Rib',
+        exactRouteKind: 'unsupported',
+        facetedRouteKind: 'faceted',
+        operations: ['hull'],
+        requiredDiagnosticCodes: [
+          'hull-face-propagation-unsupported',
+          'hull-edge-propagation-unsupported',
+        ],
+        requiredRouteDiagnosticCodes: ['cadquery-occt-unsupported-shape-hull'],
+      },
+      {
+        name: 'Convex Post',
+        exactRouteKind: 'unsupported',
+        facetedRouteKind: 'faceted',
+        operations: ['hull'],
+        requiredDiagnosticCodes: [
+          'hull-face-propagation-unsupported',
+          'hull-edge-propagation-unsupported',
+        ],
+        requiredRouteDiagnosticCodes: ['cadquery-occt-unsupported-shape-hull'],
+      },
+    ],
+  ),
+  compilerCorpusCase(
+    'corpus-enclosure-shell-cuts',
+    'The enclosure corpus keeps shell ambiguity and later boolean rewrite boundaries reviewable inside a normal product-style part.',
+    [
+      {
+        name: 'Enclosure Shell Cuts',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: [
+          'boolean:difference',
+          'boolean:difference',
+          'boolean:union',
+          'shell',
+          'boolean:union',
+          'boolean:union',
+        ],
+        requiredDiagnosticCodes: [
+          'boolean-difference-face-propagation-ambiguous',
+          'boolean-union-face-propagation-ambiguous',
+          'shell-face-propagation-ambiguous',
+          'shell-edge-propagation-ambiguous',
+        ],
+      },
+    ],
+  ),
+  compilerCorpusCase(
+    'corpus-edge-finished-mount',
+    'The edge-finished mount corpus keeps fillet, hole, cut, and later boolean rewrite diagnostics aligned through one ordinary workflow.',
+    [
+      {
+        name: 'Edge Finished Mount',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['boolean:difference', 'cut', 'hole', 'boolean:union', 'fillet'],
+        requiredDiagnosticCodes: [
+          'boolean-difference-face-propagation-ambiguous',
+          'cut-source-face-split-ambiguous',
+          'hole-source-face-split-ambiguous',
+          'boolean-union-face-propagation-ambiguous',
+          'fillet-selected-edge-merged-ambiguous',
+          'fillet-created-face-propagation-unsupported',
+        ],
+        requiredPreservedEdgeQueries: [
+          'propagated-edge(merged <- tracked-edge(vert-br#edge)',
+        ],
+      },
+    ],
+  ),
+];
+
+function parseArgs(argv: string[]) {
+  let update = false;
+  let caseId: string | undefined;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--update') {
+      update = true;
+      continue;
+    }
+    if (arg === '--case') {
+      caseId = argv[index + 1];
+      if (!caseId) throw new Error('--case requires an id');
+      index += 1;
+      continue;
+    }
+    throw new Error(`Unknown flag: ${arg}`);
+  }
+
+  return { update, caseId };
+}
+
+function stripUndefinedDeep<T>(value: T): T {
+  if (typeof value === 'number') {
+    return (Object.is(value, -0) ? 0 : value) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => stripUndefinedDeep(entry)) as T;
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entry]) => entry !== undefined)
+        .map(([key, entry]) => [key, stripUndefinedDeep(entry)]),
+    ) as T;
+  }
+  return value;
+}
+
+function describeOwner(owner: ShapeQueryOwner | undefined): string | undefined {
+  if (!owner) return undefined;
+  return `${owner.operation}:${owner.id}`;
+}
+
+function describeQuery(
+  queryKind: 'face' | 'edge',
+  query: FaceQueryRef | EdgeQueryRef | undefined,
+): string | undefined {
+  if (!query) return undefined;
+  return queryKind === 'face'
+    ? describeFaceQueryRef(query as FaceQueryRef)
+    : describeEdgeQueryRef(query as EdgeQueryRef);
+}
+
+function summarizeRoute(route: CompilerRouteInspection): QueryPropagationRouteSnapshot {
+  return {
+    kind: route.kind,
+    target: route.target,
+    reason: route.reason,
+    diagnosticCodes: route.diagnostics?.map((diagnostic) => diagnostic.code) ?? [],
+  };
+}
+
+function summarizePropagation(propagation: TopologyRewritePropagation): QueryPropagationSnapshot {
+  return {
+    rewriteId: propagation.rewriteId,
+    operation: propagation.operation,
+    owner: describeOwner(propagation.owner),
+    preservedFaces: propagation.preservedFaces.map((entry) => ({
+      status: entry.status,
+      query: describeFaceQueryRef(entry.query),
+      note: entry.note,
+    })),
+    preservedEdges: propagation.preservedEdges.map((entry) => ({
+      status: entry.status,
+      query: describeEdgeQueryRef(entry.query),
+      note: entry.note,
+    })),
+    createdFaces: propagation.createdFaces.map((entry) => ({
+      query: describeFaceQueryRef(entry.query),
+      note: entry.note,
+    })),
+    createdEdges: propagation.createdEdges.map((entry) => ({
+      query: describeEdgeQueryRef(entry.query),
+      note: entry.note,
+    })),
+    diagnostics: propagation.diagnostics.map((diagnostic) => ({
+      code: diagnostic.code,
+      category: diagnostic.category,
+      queryKind: diagnostic.queryKind,
+      source: describeQuery(diagnostic.queryKind, diagnostic.source as FaceQueryRef | EdgeQueryRef | undefined),
+      query: describeQuery(diagnostic.queryKind, diagnostic.query as FaceQueryRef | EdgeQueryRef | undefined),
+    })),
+  };
+}
+
+function summarizeShapeObject(object: CompilerShapeInspection): QueryPropagationObjectSnapshot {
+  return {
+    name: object.name,
+    exactRoute: summarizeRoute(object.exactRoute),
+    facetedRoute: summarizeRoute(object.facetedRoute),
+    propagationOps: object.topologyRewritePropagations.map((entry) => entry.operation),
+    propagations: object.topologyRewritePropagations.map((entry) => summarizePropagation(entry)),
+  };
+}
+
+function generateSnapshots(caseId?: string): QueryPropagationCaseSnapshot[] {
+  const selected = caseId
+    ? QUERY_PROPAGATION_CASES.filter((entry) => entry.id === caseId)
+    : QUERY_PROPAGATION_CASES;
+  if (selected.length === 0) {
+    throw new Error(`Unknown query-propagation snapshot case: ${caseId}`);
+  }
+
+  return selected.map((entry) => {
+    const scene = inspectCompilerScene(entry.input);
+    const objects = scene.objects
+      .filter((object): object is CompilerShapeInspection => object.kind === 'shape' && object.topologyRewritePropagations.length > 0)
+      .map((object) => summarizeShapeObject(object));
+
+    return stripUndefinedDeep({
+      id: entry.id,
+      description: entry.description,
+      objects,
+    });
+  });
+}
+
+function collectEntryQueries(
+  objects: QueryPropagationObjectSnapshot,
+  key: 'preservedFaces' | 'preservedEdges' | 'createdFaces' | 'createdEdges',
+): string[] {
+  return objects.propagations.flatMap((propagation) => propagation[key].map((entry) => entry.query));
+}
+
+function assertIncludesAll(
+  caseId: string,
+  objectName: string,
+  label: string,
+  actual: string[],
+  expectedFragments: string[] | undefined,
+): void {
+  if (!expectedFragments || expectedFragments.length === 0) return;
+  for (const fragment of expectedFragments) {
+    assert(
+      actual.some((value) => value.includes(fragment)),
+      `${caseId}/${objectName}: missing ${label} fragment "${fragment}" in ${JSON.stringify(actual)}`,
+    );
+  }
+}
+
+function assertExpectedCoverage(snapshots: QueryPropagationCaseSnapshot[]): void {
+  const definitions = new Map(QUERY_PROPAGATION_CASES.map((entry) => [entry.id, entry]));
+
+  for (const snapshot of snapshots) {
+    const definition = definitions.get(snapshot.id);
+    assert(definition, `Missing definition for query-propagation case ${snapshot.id}`);
+    assert.equal(
+      snapshot.objects.length,
+      definition.expectedObjects.length,
+      `${snapshot.id}: expected ${definition.expectedObjects.length} shape object(s) with propagation, got ${snapshot.objects.length}`,
+    );
+
+    for (const expected of definition.expectedObjects) {
+      const object = snapshot.objects.find((entry) => entry.name === expected.name);
+      assert(object, `${snapshot.id}: missing propagated shape "${expected.name}"`);
+      assert.equal(
+        object!.exactRoute.kind,
+        expected.exactRouteKind,
+        `${snapshot.id}/${expected.name}: expected exact route ${expected.exactRouteKind}, got ${object!.exactRoute.kind}`,
+      );
+      assert.equal(
+        object!.facetedRoute.kind,
+        expected.facetedRouteKind,
+        `${snapshot.id}/${expected.name}: expected allow-faceted route ${expected.facetedRouteKind}, got ${object!.facetedRoute.kind}`,
+      );
+      assert.deepEqual(
+        object!.propagationOps,
+        expected.operations,
+        `${snapshot.id}/${expected.name}: propagation ordering changed`,
+      );
+
+      const diagnosticCodes = object!.propagations.flatMap((propagation) =>
+        propagation.diagnostics.map((diagnostic) => diagnostic.code),
+      );
+      for (const code of expected.requiredDiagnosticCodes) {
+        assert(
+          diagnosticCodes.includes(code),
+          `${snapshot.id}/${expected.name}: missing propagation diagnostic ${code}`,
+        );
+      }
+
+      for (const code of expected.requiredRouteDiagnosticCodes ?? []) {
+        assert(
+          object!.exactRoute.diagnosticCodes.includes(code) || object!.facetedRoute.diagnosticCodes.includes(code),
+          `${snapshot.id}/${expected.name}: missing route diagnostic ${code}`,
+        );
+      }
+
+      assertIncludesAll(
+        snapshot.id,
+        expected.name,
+        'preserved-face query',
+        collectEntryQueries(object!, 'preservedFaces'),
+        expected.requiredPreservedFaceQueries,
+      );
+      assertIncludesAll(
+        snapshot.id,
+        expected.name,
+        'preserved-edge query',
+        collectEntryQueries(object!, 'preservedEdges'),
+        expected.requiredPreservedEdgeQueries,
+      );
+      assertIncludesAll(
+        snapshot.id,
+        expected.name,
+        'created-face query',
+        collectEntryQueries(object!, 'createdFaces'),
+        expected.requiredCreatedFaceQueries,
+      );
+      assertIncludesAll(
+        snapshot.id,
+        expected.name,
+        'created-edge query',
+        collectEntryQueries(object!, 'createdEdges'),
+        expected.requiredCreatedEdgeQueries,
+      );
+    }
+  }
+}
+
+function readStoredSnapshots(): QueryPropagationCaseSnapshot[] {
+  return JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf-8')) as QueryPropagationCaseSnapshot[];
+}
+
+function writeSnapshots(snapshots: QueryPropagationCaseSnapshot[]): void {
+  mkdirSync(dirname(SNAPSHOT_PATH), { recursive: true });
+  writeFileSync(SNAPSHOT_PATH, `${JSON.stringify(snapshots, null, 2)}\n`, 'utf-8');
+}
+
+export async function runCheckQueryPropagationCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const { update, caseId } = parseArgs(argv);
+  await init();
+
+  const generated = generateSnapshots(caseId);
+  assertExpectedCoverage(generated);
+
+  if (update) {
+    writeSnapshots(generated);
+    console.log(`✓ Updated query-propagation snapshots at ${SNAPSHOT_PATH}`);
+    return;
+  }
+
+  const stored = readStoredSnapshots();
+  const expected = caseId
+    ? stored.filter((entry) => entry.id === caseId)
+    : stored;
+
+  assert.deepEqual(
+    generated,
+    expected,
+    `Query-propagation snapshots changed. Re-run with "forgecad check query-propagation --update${caseId ? ` --case ${caseId}` : ''}" after reviewing the diff.`,
+  );
+
+  console.log(`✓ Query-propagation snapshots passed (${generated.length} case${generated.length === 1 ? '' : 's'})`);
+}
