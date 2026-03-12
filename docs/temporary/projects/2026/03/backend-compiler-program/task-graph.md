@@ -16,6 +16,11 @@ Completed foundations and slices:
 - [tasks/130-fillet-and-chamfer-dual-lowering.md](../../../../../../tasks/130-fillet-and-chamfer-dual-lowering.md)
 - [tasks/140-pattern-and-mirror-feature-ownership.md](../../../../../../tasks/140-pattern-and-mirror-feature-ownership.md)
 - [tasks/150-compiler-regression-corpus.md](../../../../../../tasks/150-compiler-regression-corpus.md)
+- [tasks/160-topology-rewrite-query-propagation.md](../../../../../../tasks/160-topology-rewrite-query-propagation.md)
+- [tasks/170-shell-hole-cut-face-ownership.md](../../../../../../tasks/170-shell-hole-cut-face-ownership.md)
+- [tasks/180-boolean-pattern-query-propagation.md](../../../../../../tasks/180-boolean-pattern-query-propagation.md)
+- [tasks/190-post-rewrite-edge-queries.md](../../../../../../tasks/190-post-rewrite-edge-queries.md)
+- [tasks/195-query-propagation-regression-suite.md](../../../../../../tasks/195-query-propagation-regression-suite.md)
 
 What that gives the next lane:
 
@@ -25,13 +30,15 @@ What that gives the next lane:
 
 This is the base that task 130 consumed instead of inventing new provenance or regression surfaces locally.
 
-## Next Core Lane
+## Current Wave
 
-The deepest next piece is:
+The topology-rewrite backbone and the first post-160 parallel wave are now landed.
 
-- [tasks/160-topology-rewrite-query-propagation.md](../../../../../../tasks/160-topology-rewrite-query-propagation.md)
+The active wave is:
 
-This is the next single-threaded architectural lane. Do not start the broader feature wave before this lands.
+- [tasks/200-richer-hole-and-cut-variants.md](../../../../../../tasks/200-richer-hole-and-cut-variants.md)
+- [tasks/210-projection-and-sketch-on-face-expansion.md](../../../../../../tasks/210-projection-and-sketch-on-face-expansion.md)
+- [tasks/220-broader-fillet-and-chamfer.md](../../../../../../tasks/220-broader-fillet-and-chamfer.md)
 
 ## Dependency Graph
 
@@ -88,44 +95,32 @@ graph TD
 
 ## Program State
 
-- Landed: 100, 105, 110, 120, 125, 130, 140, and 150.
-- Active next lane: 160.
-- Immediate parallel wave after 160: 170, 180, 190, 195.
-- Second wave after that: 200, 210, 220.
+- Landed: 100, 105, 110, 120, 125, 130, 140, 150, 160, 170, 180, 190, and 195.
+- Active parallel wave: 200, 210, 220.
 - MLP closeout lane: 230.
 
 ## Next Up
 
-1. [tasks/160-topology-rewrite-query-propagation.md](../../../../../../tasks/160-topology-rewrite-query-propagation.md)
-2. After 160 lands, start in parallel:
-   - [tasks/170-shell-hole-cut-face-ownership.md](../../../../../../tasks/170-shell-hole-cut-face-ownership.md)
-   - [tasks/180-boolean-pattern-query-propagation.md](../../../../../../tasks/180-boolean-pattern-query-propagation.md)
-   - [tasks/190-post-rewrite-edge-queries.md](../../../../../../tasks/190-post-rewrite-edge-queries.md)
-   - [tasks/195-query-propagation-regression-suite.md](../../../../../../tasks/195-query-propagation-regression-suite.md)
-3. After the first parallel wave, start in parallel:
+1. Start in parallel:
    - [tasks/200-richer-hole-and-cut-variants.md](../../../../../../tasks/200-richer-hole-and-cut-variants.md)
    - [tasks/210-projection-and-sketch-on-face-expansion.md](../../../../../../tasks/210-projection-and-sketch-on-face-expansion.md)
    - [tasks/220-broader-fillet-and-chamfer.md](../../../../../../tasks/220-broader-fillet-and-chamfer.md)
-4. Close the wave with:
+2. Close the wave with:
    - [tasks/230-mlp-corpus-and-doc-closeout.md](../../../../../../tasks/230-mlp-corpus-and-doc-closeout.md)
 
 ## Parallel Starts
 
-Nothing in the new wave should start before task 160. That is the one deep dependency.
+These three can now run in parallel:
 
-Once task 160 lands, these four can start immediately and in parallel:
+- task 200
+- task 210
+- task 220
 
-- task 170
-- task 180
-- task 190
-- task 195
+They are separated by logic:
 
-Those tasks were chosen to minimize shared logic:
-
-- task 170 stays in shell/hole/cut created-face semantics
-- task 180 stays in boolean/pattern descendant propagation
-- task 190 stays in propagated edge-query semantics
-- task 195 stays in regression/corpus/check surfaces
+- task 200 stays in richer hole/cut family behavior
+- task 210 stays in projection/sketch-on-face expansion
+- task 220 stays in broader finishing on defended propagated edges
 
 ## Merge Strategy
 
@@ -154,12 +149,11 @@ Core integrator lane:
 
 Next feature lane:
 
-- Core query lane: task 160
-- First parallel wave after that: tasks 170, 180, 190, 195
+- Active feature wave: tasks 200, 210, 220
 
 Quality support:
 
-- Task 195 is the dedicated support lane for the next reference/query wave
+- Task 195 is landed, and task 230 is the next truthfulness/corpus closeout lane after the active feature wave
 
 ## File-Ownership Guidance
 

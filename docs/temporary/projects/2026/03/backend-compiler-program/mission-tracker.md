@@ -52,13 +52,9 @@ Current estimate from 2026-03-12:
 
 Near-term path to that MLP:
 
-1. Land task 160 so topology-changing features have one compiler-owned query propagation backbone instead of local rewrite rules.
-2. After task 160, run the first parallel wave:
-   - task 170 for shell/hole/cut created-face ownership
-   - task 180 for boolean/pattern descendant propagation
-   - task 190 for propagated post-rewrite edge queries
-   - task 195 for the dedicated query-propagation regression surface
-3. Then run the second feature wave:
+1. Task 160 is landed: topology-changing features now share one compiler-owned query propagation backbone instead of local rewrite rules.
+2. Tasks 170, 180, 190, and 195 are landed: created-face targeting, boolean/pattern propagation, defended propagated-edge support, and the dedicated query-propagation regression surface are now in.
+3. The active feature wave is now:
    - task 200 for richer hole/cut variants
    - task 210 for broader projection/sketch-on-face flows
    - task 220 for broader fillet/chamfer on defended propagated edges

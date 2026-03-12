@@ -17,10 +17,14 @@ The landed base for the next feature lane is:
 - compiler-owned hole/cut v1, projection replay v1, repeated-result ownership, and tracked-edge finishing v1 slices
 - curated compiler corpus coverage in `examples/compiler-corpus/`
 
-Task 130 is now landed on top of that base.
+Tasks 160, 170, 180, 190, and 195 are now landed on top of that base.
 
-The next program move is task 160:
+The active program move is the second feature wave:
 
-- [tasks/160-topology-rewrite-query-propagation.md](../../../../../../tasks/160-topology-rewrite-query-propagation.md)
+- [tasks/200-richer-hole-and-cut-variants.md](../../../../../../tasks/200-richer-hole-and-cut-variants.md)
+- [tasks/210-projection-and-sketch-on-face-expansion.md](../../../../../../tasks/210-projection-and-sketch-on-face-expansion.md)
+- [tasks/220-broader-fillet-and-chamfer.md](../../../../../../tasks/220-broader-fillet-and-chamfer.md)
 
-That is the core lane the next feature wave depends on.
+After that wave, close with:
+
+- [tasks/230-mlp-corpus-and-doc-closeout.md](../../../../../../tasks/230-mlp-corpus-and-doc-closeout.md)
