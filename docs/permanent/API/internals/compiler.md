@@ -175,6 +175,17 @@ Priority order:
 - projection and sketch-on-face refinement
 - mirror / pattern workflows driven by semantic references
 
+Current progress:
+
+- `shell()` is now compiler-owned as the first mainstream exact feature-family slice instead of being left for exporter-only logic
+- both lowerers consume the same semantic `shell` node and rewrite supported cases into backend-native boolean/extrude/cylinder plans
+- regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
+
+Current limits:
+
+- `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings
+- stable downstream face ownership after shelling is still not solved, which is why fillet/chamfer, holes, and projection-driven edits are still the harder next layer
+
 ### Phase 4: Higher-Order Workflows
 
 Goal:

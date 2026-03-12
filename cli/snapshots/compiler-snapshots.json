@@ -1636,6 +1636,199 @@
     }
   },
   {
+    "id": "shell-exact",
+    "description": "Shell keeps semantic intent in the compile graph while exact lowering rewrites it into the supported boolean/extrude subset.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Shell",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "shell",
+              "extrude"
+            ]
+          },
+          "compilePlan": {
+            "kind": "shell",
+            "base": {
+              "kind": "transform",
+              "base": {
+                "kind": "extrude",
+                "profile": {
+                  "kind": "roundedRect",
+                  "width": 80,
+                  "height": 50,
+                  "radius": 6,
+                  "center": true,
+                  "transforms": []
+                },
+                "height": 30,
+                "center": false
+              },
+              "steps": [
+                {
+                  "kind": "translate",
+                  "x": 4,
+                  "y": -3,
+                  "z": 2
+                }
+              ]
+            },
+            "thickness": 2.5,
+            "openFaces": [
+              "top"
+            ]
+          },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "transform",
+              "base": {
+                "kind": "boolean",
+                "op": "difference",
+                "shapes": [
+                  {
+                    "kind": "extrude",
+                    "profile": {
+                      "kind": "roundedRect",
+                      "width": 80,
+                      "height": 50,
+                      "radius": 6,
+                      "center": true,
+                      "transforms": []
+                    },
+                    "height": 30,
+                    "center": false
+                  },
+                  {
+                    "kind": "transform",
+                    "base": {
+                      "kind": "extrude",
+                      "profile": {
+                        "kind": "offset",
+                        "base": {
+                          "kind": "roundedRect",
+                          "width": 80,
+                          "height": 50,
+                          "radius": 6,
+                          "center": true,
+                          "transforms": []
+                        },
+                        "delta": -2.5,
+                        "join": "Round",
+                        "transforms": []
+                      },
+                      "height": 27.5,
+                      "center": false
+                    },
+                    "steps": [
+                      {
+                        "kind": "translate",
+                        "x": 0,
+                        "y": 0,
+                        "z": 2.5
+                      }
+                    ]
+                  }
+                ]
+              },
+              "steps": [
+                {
+                  "kind": "translate",
+                  "x": 4,
+                  "y": -3,
+                  "z": 2
+                }
+              ]
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -36,
+                -28,
+                2
+              ],
+              "max": [
+                44,
+                22,
+                32
+              ]
+            },
+            "volume": 26548.240406,
+            "surfaceArea": 21862.813262,
+            "numTri": 636,
+            "vertexCount": 320,
+            "meshDigest": "7a4d3e69d84728f334d1c48e3538db7a886fc2983e3d0da518e1d436c68fb273"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -36,
+                -28,
+                2
+              ],
+              "max": [
+                44,
+                22,
+                32
+              ]
+            },
+            "volume": 26548.240406,
+            "surfaceArea": 21862.813262,
+            "numTri": 636,
+            "vertexCount": 320,
+            "meshDigest": "7a4d3e69d84728f334d1c48e3538db7a886fc2983e3d0da518e1d436c68fb273"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Shell",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Shell",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  },
+  {
     "id": "sketch-on-face-placement",
     "description": "Downstream features keep semantic workplane placement intent in the compile graph and propagate it through later shape transforms.",
     "scene": {

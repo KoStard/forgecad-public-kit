@@ -137,6 +137,17 @@ return [{ name: 'Sweep', shape: body }];
 `,
   ),
   inlineCase(
+    'shell-exact',
+    'Shell keeps semantic intent in the compile graph while exact lowering rewrites it into the supported boolean/extrude subset.',
+    `
+const body = roundedRect(80, 50, 6, true)
+  .extrude(30)
+  .translate(4, -3, 2)
+  .shell(2.5, { openFaces: ['top'] });
+return [{ name: 'Shell', shape: body }];
+`,
+  ),
+  inlineCase(
     'sketch-on-face-placement',
     'Downstream features keep semantic workplane placement intent in the compile graph and propagate it through later shape transforms.',
     `

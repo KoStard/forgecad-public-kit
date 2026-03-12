@@ -403,6 +403,36 @@ return [{ name: 'Sweep', shape: body }];
   assert.deepEqual(plan.up, [0, 0, 1]);
 }
 
+function checkShellPlan(): void {
+  const plan = runExactManifest(`
+const body = roundedRect(80, 50, 6, true)
+  .extrude(30)
+  .translate(4, -3, 2)
+  .shell(2.5, { openFaces: ['top'] });
+return [{ name: 'Shell', shape: body }];
+`);
+
+  assert.equal(plan.kind, 'transform', `Expected transformed shell exact plan, got ${plan.kind}`);
+  assert.equal(plan.base.kind, 'boolean', `Expected shell exact lowering to rewrite into a boolean plan, got ${plan.base.kind}`);
+  assert.equal(plan.base.op, 'difference');
+  assert.equal(plan.base.shapes.length, 2);
+  const profiles = collectProfiles(plan);
+  assert(
+    profiles.some((profile) => profile.kind === 'offset' && profile.delta === -2.5),
+    'Expected shell exact lowering to contain the inward offset profile for the cavity',
+  );
+}
+
+function checkShellExportEndToEnd(): void {
+  exportExactManifest(`
+const body = roundedRect(80, 50, 6, true)
+  .extrude(30)
+  .translate(4, -3, 2)
+  .shell(2.5, { openFaces: ['top'] });
+return [{ name: 'Shell', shape: body }];
+`);
+}
+
 function checkSketchOnFacePlacementPlan(): void {
   const plan = runExactManifest(`
 const body = roundedRect(20, 12, 2, true).extrude(6, { center: true });
@@ -646,6 +676,8 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkPointAlongOnPrimitiveBoolean();
   checkLoftPlan();
   checkSweepPlan();
+  checkShellPlan();
+  checkShellExportEndToEnd();
   checkSketchOnFacePlacementPlan();
   checkSketchOnFacePlacementExportEndToEnd();
   checkMixedSketchAndSolidScenePolicy();

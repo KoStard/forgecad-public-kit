@@ -199,6 +199,7 @@ declare class Shape {
   split(cutter: Shape): [Shape, Shape];
   splitByPlane(normal: [number, number, number], offset?: number): [Shape, Shape];
   trimByPlane(normal: [number, number, number], offset?: number): Shape;
+  shell(thickness: number, opts?: { openFaces?: Array<'top' | 'bottom'> }): Shape;
   hull(): Shape;
 
   // Deformation
@@ -391,6 +392,7 @@ declare class TrackedShape {
   add(...others: ShapeBooleanOperandInput[]): Shape;
   subtract(...others: ShapeBooleanOperandInput[]): Shape;
   intersect(...others: ShapeBooleanOperandInput[]): Shape;
+  shell(thickness: number, opts?: { openFaces?: Array<'top' | 'bottom'> }): Shape;
   toShape(): Shape;
 }
 

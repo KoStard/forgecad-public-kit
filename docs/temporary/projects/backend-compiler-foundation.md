@@ -49,7 +49,7 @@ Current estimate from 2026-03-12:
 Near-term path to that MLP:
 
 1. Finish reference/workplane propagation so semantic placement stays truthful through downstream feature chains.
-2. Land the first serious exact feature family cleanly, likely `shell` plus hole/cut workflows.
+2. Land the first serious exact feature family cleanly. `shell()` v1 is now in for compile-covered `box()`, `cylinder()`, and straight `extrude()` bases; hole/cut workflows are the next piece.
 3. Tighten projection/sketch-on-face/pattern flows around the same query/reference model.
 4. Promote curated multi-feature parts into the compiler and exact-export regression suite.
 
@@ -232,10 +232,14 @@ After the first implementation slice for this mission, the minimum acceptable st
 - compiler-visible workplane placement now propagates through later shape transforms, so provenance inspection stays truthful after downstream `translate` / `rotate` / `scale` style edits instead of freezing at feature creation time.
 - `src/forge/kernel.ts` now exposes compiler-visible workplane placement inspection for downstream feature work, so later feature families can ask "what workplane/query produced this shape?" without reverse-engineering transforms.
 - both lowerers and the exact STEP exporter now execute that compiler-owned workplane placement step, and the invariant suite covers the end-to-end path.
+- `Shape.shell()` now records semantic shell intent in the Forge compile graph instead of bypassing the compiler, and both lowerers consume that same node.
+- shell v1 is intentionally narrow: compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings plus rigid transforms before shelling.
+- both lowerers rewrite supported shell plans into backend-native boolean/extrude/cylinder plans, so exact STEP/BREP export uses the same compiler path instead of exporter-only shell logic.
 - the CadQuery/OCCT lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
 - `forgecad debug compiler` now prints per-object compiler routing and lowered artifacts for investigation.
 - `forgecad check suite` and `npm test` now expose the repo's assertion-based invariant suite as a first-class test entrypoint instead of leaving the checks scattered across ad hoc commands.
 - the compiler and BREP regression suite now includes explicit `loft` / `sweep` plan invariants and an end-to-end STEP exporter check for those feature families.
+- the compiler and BREP regression suite now also covers `shell()` lowering, route policy, and end-to-end exact export for the supported shell subset.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker
@@ -246,12 +250,12 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 2. Put a backend adapter behind `Shape` | Done | `Shape` now wraps a runtime backend payload instead of a raw Manifold field. |
 | 3. Replace implicit `.manifold` reach-through with backend-owned specializations | Done | Backend-specific paths moved behind backend modules. |
 | 4. Keep current Manifold runtime behavior stable through the adapter | Done | Build plus focused runtime/API checks passed. |
-| 5. Formalize a backend-neutral Forge compile graph | In progress | The compile plan now covers primitives, sketch profiles, booleans, transforms, extrudes, revolves, hulls, plane trims/splits, and sampled `loft` / `sweep`; broader feature coverage is still needed. |
+| 5. Formalize a backend-neutral Forge compile graph | In progress | The compile plan now covers primitives, sketch profiles, booleans, transforms, extrudes, revolves, hulls, plane trims/splits, sampled `loft` / `sweep`, and shell v1; broader feature coverage is still needed. |
 | 6. Route operations intentionally by backend capability | In progress | Scene-level exact/faceted/skipped/unsupported routing is now centralized in `compiledScene.ts`; richer multi-backend capability routing is still pending. |
 | 7. Add backend mismatch / conversion diagnostics | In progress | Exact BREP lowering now emits explicit diagnostics and compiler snapshot tooling preserves them. |
-| 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | In progress | The `cadquery-occt` target now covers the current exact subset plus compatible `loft` / `sweep` plans; feature coverage is still narrow and export-driven. |
-| 9. Make both backends true lowerers from the same compile graph | Pending | This is now the active checkpoint. |
-| 10. Cover mainstream design-feature families across both lowerers | Pending | Target: most ordinary Fusion-style part modeling flows. |
+| 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | In progress | The `cadquery-occt` target now covers the current exact subset plus compatible `loft` / `sweep` plans and shell v1; feature coverage is still narrow and export-driven. |
+| 9. Make both backends true lowerers from the same compile graph | In progress | Shared lowering now reaches farther into mainstream features, but the checkpoint still depends on broader feature families and stronger reference stability. |
+| 10. Cover mainstream design-feature families across both lowerers | In progress | Shell v1 is in; fillet/chamfer, holes/cuts, projections, and pattern-driven downstream features still remain. |
 | 11. Push exact export fully behind the CadQuery/OCCT lowerer | In progress | Export now consumes an explicit `cadquery-occt` compiler target, but the target still needs much broader feature coverage. |
 | 12. Add advanced hybrid-only feature families | Deferred | Sheet metal stays deferred until the active checkpoint is done. |
 
@@ -278,9 +282,10 @@ The current unit-style test strategy is:
 
 ## Current Risks And Issues
 
-- The compile graph still does not cover important operation families including deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, `shell`, fillet/chamfer families, and richer projection/feature-pattern workflows. Those shapes still lose compile intent and fall back to mesh-only behavior.
+- The compile graph still does not cover important operation families including deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, fillet/chamfer families, hole/cut workflows, and richer projection/feature-pattern workflows. Those shapes still lose compile intent and fall back to mesh-only behavior.
 - The new sketch workplane metadata is a foundation step, not the full answer yet. Parent object identity, downstream query propagation, and compile-graph ownership of workplane/reference semantics are still missing.
 - The compiler now preserves `onFace()` workplane placement through `extrude()` / `revolve()`, which closes the first downstream-propagation gap. The remaining hard part is broader parent-body/query identity once features start depending on face ownership through booleans, shell, fillet/chamfer, projection, and patterned downstream edits.
+- `shell()` is now compiler-owned, but only for compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with rigid pre-shell transforms. Broader shell semantics will need parent-body/query ownership to stay clean once downstream edits depend on shell-created faces.
 - The hull family is now compile-covered for the Manifold runtime, but exact OCCT replay is still missing. That means hull intent is preserved and diagnosable, but STEP/BREP still needs faceted fallback for those shapes.
 - `loft()` exact export is narrower than Forge's sampled loft semantics. Forge can interpolate aggressively across differing profile topology through SDF blending, while CadQuery/OCCT section lofting can still reject some extreme mixed-topology stacks.
 - `sweep()` exact export currently canonicalizes paths to sampled polyline points before lowering. That keeps runtime and exact export aligned, but it is not yet a true analytic spline-path representation for OCCT.

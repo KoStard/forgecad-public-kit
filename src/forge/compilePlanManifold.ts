@@ -5,6 +5,7 @@ import type {
   ShapeCompilePlan,
   ShapeCompileTransformStep,
 } from './compilePlan';
+import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
 import { wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './sketch/loftSweepLowering';
 import { Transform } from './transform';
@@ -219,6 +220,11 @@ export function lowerShapeCompilePlanToManifold(
         plan.scaleTop as [number, number] | undefined,
         plan.center,
       );
+    case 'shell': {
+      const lowered = lowerShellShapeCompilePlanToConcretePlan(plan);
+      if (!lowered.ok) throw new Error(lowered.reason);
+      return lowerShapeCompilePlanToManifold(lowered.plan, wasm);
+    }
     case 'revolve':
       return lowerProfileCompilePlanToCrossSection(plan.profile, wasm).revolve(plan.segments ?? 0, plan.degrees);
     case 'loft':

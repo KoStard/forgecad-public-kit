@@ -42,6 +42,7 @@ import {
 } from './shapeBackend';
 import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
+import { buildShellShapeCompilePlan } from './shellCompilePlan';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -77,6 +78,7 @@ export type GeometrySource =
   | 'extrude'
   | 'revolve'
   | 'boolean'
+  | 'shell'
   | 'hull'
   | 'level-set'
   | 'loft'
@@ -1060,6 +1062,26 @@ export class Shape {
           : new Shape(getShapeRuntimeBackendInternal(this).trimByPlane(normal, originOffset), this.colorHex),
       ),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' }),
+    ), nextPlan);
+  }
+
+  /** Hollow out compile-covered boxes, cylinders, and straight extrudes. */
+  shell(
+    thickness: number,
+    opts: { openFaces?: Array<'top' | 'bottom'> } = {},
+  ): Shape {
+    const nextPlan = buildShellShapeCompilePlan(getShapeCompilePlanInternal(this), thickness, opts.openFaces);
+    if (!nextPlan) {
+      throw new Error(
+        'Shape.shell() currently supports compile-covered box(), cylinder(), and straight extrude() solids with optional top/bottom openings and rigid transforms.',
+      );
+    }
+    return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
+      withBaseDimensions(
+        this,
+        buildShapeFromCompilePlan(nextPlan, this.colorHex),
+      ),
+      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'shell', { topology: 'none' }),
     ), nextPlan);
   }
 

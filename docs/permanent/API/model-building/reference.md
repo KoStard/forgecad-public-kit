@@ -747,6 +747,31 @@ const [above, below] = shape.splitByPlane([0, 0, 1], 10);  // Z=10 plane
 const trimmed = shape.trimByPlane([0, 0, 1], 10);
 ```
 
+#### `shape.shell(thickness, options?)`
+Hollow out a supported solid by keeping the outside wall and subtracting an inward cavity.
+
+Current compiler-backed `shell()` support is intentionally narrow:
+
+- compile-covered `box()`, `cylinder()`, and straight `Sketch.extrude()` solids
+- optional `openFaces: ['top' | 'bottom']`
+- rigid transforms before shelling are preserved through both lowerers
+
+Not supported yet:
+
+- tapered extrudes (`scaleTop`)
+- scale transforms before shelling
+- already-shelled results
+- general boolean, `revolve()`, `loft()`, `sweep()`, `sphere()`, hull, and plane-trim bases
+
+Forge keeps `shell` as semantic compiler intent, then lowers it into backend-supported boolean/extrude/cylinder plans for both Manifold and CadQuery/OCCT.
+
+```javascript
+const cup = roundedRect(80, 50, 6, true)
+  .extrude(30)
+  .translate(4, -3, 2)
+  .shell(2.5, { openFaces: ['top'] });
+```
+
 ### Warping
 
 ```javascript

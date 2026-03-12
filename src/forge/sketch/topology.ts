@@ -362,6 +362,14 @@ export class TrackedShape {
     return this.shape.intersect(...others);
   }
 
+  /** Shelling returns a plain Shape because tracked topology is not preserved. */
+  shell(
+    thickness: number,
+    opts: { openFaces?: Array<'top' | 'bottom'> } = {},
+  ): Shape {
+    return this.shape.shell(thickness, opts);
+  }
+
   boundingBox() {
     return this.shape.boundingBox();
   }

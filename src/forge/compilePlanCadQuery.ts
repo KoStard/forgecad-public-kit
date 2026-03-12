@@ -1,5 +1,6 @@
 import type { ProfileCompilePlan, ShapeCompilePlan } from './compilePlan';
 import type { CadQueryProfilePlan, CadQueryShapePlan } from './cadqueryPlan';
+import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
 import {
   compilerDiagnostic,
   compilerFailure,
@@ -31,6 +32,15 @@ function unsupportedNodeDiagnostic(kind: string, path: string) {
     `cadquery-occt-unsupported-${kind}`,
     path,
     `CadQuery/OCCT lowering does not support Forge ${kind} intent at ${path} yet.`,
+  );
+}
+
+function unsupportedShellDiagnostic(path: string, reason: string) {
+  return compilerDiagnostic(
+    'cadquery-occt',
+    'cadquery-occt-unsupported-shell',
+    path,
+    `CadQuery/OCCT lowering cannot replay Forge shell intent at ${path}: ${reason}`,
   );
 }
 
@@ -155,6 +165,11 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
         center: plan.center,
         scaleTop: plan.scaleTop ? [plan.scaleTop[0], plan.scaleTop[1]] : undefined,
       }, profile.diagnostics);
+    }
+    case 'shell': {
+      const lowered = lowerShellShapeCompilePlanToConcretePlan(plan);
+      if (!lowered.ok) return compilerFailure(unsupportedShellDiagnostic(path, lowered.reason));
+      return lowerShapeCompilePlanToCadQueryResultAtPath(lowered.plan, path);
     }
     case 'revolve': {
       if (plan.segments != null && plan.segments > 0) {

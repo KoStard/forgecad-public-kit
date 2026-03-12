@@ -116,6 +116,12 @@ export type ShapeCompilePlan =
       scaleTop?: [number, number];
     }
   | {
+      kind: 'shell';
+      base: ShapeCompilePlan;
+      thickness: number;
+      openFaces: Array<'top' | 'bottom'>;
+    }
+  | {
       kind: 'revolve';
       profile: ProfileCompilePlan;
       degrees: number;
@@ -403,6 +409,13 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         center: plan.center,
         scaleTop: plan.scaleTop ? [plan.scaleTop[0], plan.scaleTop[1]] : undefined,
       };
+    case 'shell':
+      return {
+        kind: 'shell',
+        base: cloneShapeCompilePlan(plan.base)!,
+        thickness: plan.thickness,
+        openFaces: [...plan.openFaces],
+      };
     case 'revolve':
       return {
         kind: 'revolve',
@@ -530,17 +543,19 @@ export function findShapeWorkplanePlacement(
       }
       return current;
     }
+    case 'shell':
+      return findShapeWorkplanePlacement(plan.base);
     case 'trimByPlane':
       return findShapeWorkplanePlacement(plan.base);
     case 'box':
     case 'cylinder':
     case 'sphere':
     case 'extrude':
-    case 'revolve':
     case 'loft':
     case 'sweep':
     case 'boolean':
     case 'hull':
+    case 'revolve':
       return null;
   }
 }
