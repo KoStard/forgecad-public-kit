@@ -195,6 +195,8 @@ function lowerBaseShellPlanToConcretePlan(
         reason: 'Shape.shell() v1 does not support shelling an already-shelled result yet.',
       };
     case 'sphere':
+    case 'hole':
+    case 'cut':
     case 'revolve':
     case 'loft':
     case 'sweep':

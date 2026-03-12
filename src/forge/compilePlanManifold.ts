@@ -5,6 +5,10 @@ import type {
   ShapeCompilePlan,
   ShapeCompileTransformStep,
 } from './compilePlan';
+import {
+  lowerCutShapeCompilePlanToConcretePlan,
+  lowerHoleShapeCompilePlanToConcretePlan,
+} from './holeCutCompilePlan';
 import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
 import { wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './sketch/loftSweepLowering';
@@ -222,6 +226,16 @@ export function lowerShapeCompilePlanToManifold(
       );
     case 'shell': {
       const lowered = lowerShellShapeCompilePlanToConcretePlan(plan);
+      if (!lowered.ok) throw new Error(lowered.reason);
+      return lowerShapeCompilePlanToManifold(lowered.plan, wasm);
+    }
+    case 'hole': {
+      const lowered = lowerHoleShapeCompilePlanToConcretePlan(plan);
+      if (!lowered.ok) throw new Error(lowered.reason);
+      return lowerShapeCompilePlanToManifold(lowered.plan, wasm);
+    }
+    case 'cut': {
+      const lowered = lowerCutShapeCompilePlanToConcretePlan(plan);
       if (!lowered.ok) throw new Error(lowered.reason);
       return lowerShapeCompilePlanToManifold(lowered.plan, wasm);
     }

@@ -1,5 +1,9 @@
 import type { ProfileCompilePlan, ShapeCompilePlan } from './compilePlan';
 import type { CadQueryProfilePlan, CadQueryShapePlan } from './cadqueryPlan';
+import {
+  lowerCutShapeCompilePlanToConcretePlan,
+  lowerHoleShapeCompilePlanToConcretePlan,
+} from './holeCutCompilePlan';
 import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
 import {
   compilerDiagnostic,
@@ -41,6 +45,15 @@ function unsupportedShellDiagnostic(path: string, reason: string) {
     'cadquery-occt-unsupported-shell',
     path,
     `CadQuery/OCCT lowering cannot replay Forge shell intent at ${path}: ${reason}`,
+  );
+}
+
+function unsupportedHoleCutDiagnostic(kind: 'hole' | 'cut', path: string, reason: string) {
+  return compilerDiagnostic(
+    'cadquery-occt',
+    `cadquery-occt-unsupported-${kind}`,
+    path,
+    `CadQuery/OCCT lowering cannot replay Forge ${kind} intent at ${path}: ${reason}`,
   );
 }
 
@@ -169,6 +182,16 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
     case 'shell': {
       const lowered = lowerShellShapeCompilePlanToConcretePlan(plan);
       if (!lowered.ok) return compilerFailure(unsupportedShellDiagnostic(path, lowered.reason));
+      return lowerShapeCompilePlanToCadQueryResultAtPath(lowered.plan, path);
+    }
+    case 'hole': {
+      const lowered = lowerHoleShapeCompilePlanToConcretePlan(plan);
+      if (!lowered.ok) return compilerFailure(unsupportedHoleCutDiagnostic('hole', path, lowered.reason));
+      return lowerShapeCompilePlanToCadQueryResultAtPath(lowered.plan, path);
+    }
+    case 'cut': {
+      const lowered = lowerCutShapeCompilePlanToConcretePlan(plan);
+      if (!lowered.ok) return compilerFailure(unsupportedHoleCutDiagnostic('cut', path, lowered.reason));
       return lowerShapeCompilePlanToCadQueryResultAtPath(lowered.plan, path);
     }
     case 'revolve': {
