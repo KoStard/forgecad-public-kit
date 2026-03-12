@@ -155,7 +155,8 @@ Current progress:
 - that compiler-visible workplane placement now propagates through later shape transforms, so provenance inspection stays aligned with the current transformed feature state
 - both lowerers now execute that preserved workplane-placement intent, and exact export regression tests exercise the CadQuery/OCCT path end-to-end
 - compile-covered feature results now carry compiler-owned query-owner lineage, so parent-body ownership is no longer implicit runtime state
-- workplane sources and `FaceRef` values now record the parent body's compiler-owned owner identity when that provenance exists
+- `src/forge/queryModel.ts` now defines the shared query/reference contract for face provenance instead of letting workplane and topology code drift separately
+- workplane sources and `FaceRef` values now share that face-query contract when compiler-owned provenance exists
 - booleans, shell, split/trim flows, and downstream workplane-driven features now preserve that owner lineage through the compile graph instead of erasing it at each feature boundary
 - placement and exact-export invariants now check that owner lineage survives ordinary shell-plus-cut-plus-boolean style part workflows
 

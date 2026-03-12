@@ -86,6 +86,7 @@ The current foundation work is pushing Forge toward:
 
 - compiler-owned feature intent
 - centralized scene routing
+- a shared query/reference backbone for workplane and topology provenance
 - workplane/reference semantics that survive downstream feature lowering
 
 That is the path to a real multi-backend CAD system instead of a collection of backend-specific code paths.

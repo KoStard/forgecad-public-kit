@@ -15,7 +15,11 @@ The target is:
 
 This is the mission doc and tracker for that transition.
 
-For the short "explain it like a student" version, see `docs/temporary/projects/backend-compiler-explainer.md`.
+Program docs:
+
+- `explainer.md`
+- `capabilities.md`
+- `task-graph.md`
 
 ## Active Checkpoint
 
@@ -52,6 +56,12 @@ Near-term path to that MLP:
 2. Land the next serious exact feature family cleanly. `shell()` v1 is now in for compile-covered `box()`, `cylinder()`, and straight `extrude()` bases; hole/cut workflows are the next piece.
 3. Tighten richer face/edge-driven flows around the same query/reference model instead of letting those features invent their own ownership rules.
 4. Promote curated multi-feature parts into the compiler and exact-export regression suite.
+
+Deepest completed prerequisite:
+
+- `src/forge/queryModel.ts` is now the central shared query/reference contract for parent-body owners and face queries.
+- Workplane provenance and tracked topology now share that contract instead of carrying separate internal representations.
+- This does not solve stable face/edge identity by itself, but it gives future feature work one canonical place to extend.
 
 ## Where We Succeed Or Fail
 
