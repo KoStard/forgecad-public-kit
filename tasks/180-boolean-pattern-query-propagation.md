@@ -48,3 +48,4 @@ Can start immediately after task 160. Safe to run in parallel with:
 
 ## Status and log
 - 2026-03-12: Created for the first post-160 parallel wave.
+- 2026-03-12: Completed. Added boolean/repetition propagation helpers that lift supported operand face/edge queries into explicit boolean rewrite metadata, preserve distinct repeated-result canonical-face lineage through supported unions, report duplicate-owner merges plus difference/intersection descendants as explicit ambiguity diagnostics, and cover the new behavior in placement/compiler regressions plus permanent docs.

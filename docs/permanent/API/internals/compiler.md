@@ -165,12 +165,13 @@ Current progress:
 - topology-changing compile nodes now also carry an explicit backend-neutral `queryPropagation` contract for preserved/created query meaning instead of leaving post-rewrite semantics implicit
 - that shared propagation contract now models propagated face/edge queries, feature-created query slots, and explicit ambiguity/unsupported diagnostics on rewrite-producing results
 - trim/split-by-plane now use that contract to expose the first defended created-face slice (`plane-cap`), while hole/cut host-face splits and fillet/chamfer edge merges are recorded explicitly as ambiguous preserved-query outcomes instead of silent fallbacks
+- boolean rewrites now consume that same contract: supported unions preserve operand canonical-face/query lineage when the source owners stay distinct, while duplicate-owner merges plus later difference/intersection descendants are recorded explicitly as ambiguous propagated queries instead of a generic "pending" bucket
 - `src/forge/kernel.ts` and the compiler inspection surface now expose collected topology-rewrite propagation contracts directly, and the placement/compiler invariants assert that those contracts stay inspectable and deterministic through later transforms
 
 Still missing:
 
 - durable face/edge identity across topology-changing operations
-- feature-family-specific created-face/query support for shell, hole/cut, booleans/patterns, and projection-driven descendants still needs to be layered on top of the propagation kernel
+- feature-family-specific created-face/query support for shell, hole/cut, and projection-driven descendants still needs to be layered on top of the propagation kernel
 - shared edge-query selectors exist for tracked topology, but topology-changing features still do not produce durable compiler-owned edge identity after shell/boolean/fillet-style edits
 - stable downstream face/edge references beyond today's tracked/canonical face foundations still need the follow-on work in tasks 170, 180, 190, and 195
 
@@ -200,6 +201,7 @@ Current progress:
 - regression coverage now also includes API, placement-owner, compiler-snapshot, exact-plan, and end-to-end export checks for the supported tracked-edge fillet/chamfer subset
 - the regression suite now also includes a file-backed ordinary-parts corpus under `examples/compiler-corpus/`, so shell, workplane-driven cuts, mirrored ribs/feet, patterned holes, and boolean chains are exercised together instead of only as isolated unit slices
 - mirrored downstream features and helper-driven linear/circular repetition now preserve repeated-result ownership on top of the shared face-query backbone
+- supported boolean unions now also preserve owner-scoped canonical face queries from repeated descendants, and compiler regressions cover both explicit duplicate-owner merge ambiguity and later boolean chains that inherit those propagated queries
 - exact export regression coverage now includes a repeated-feature part where a mirrored descendant drives a downstream workplane feature inside a boolean chain
 - `projectToPlane()` sketches now keep an explicit projection node in the compiler graph instead of collapsing immediately to anonymous runtime geometry
 - the supported exact subset can replay projection-driven follow-on features when the source is a straight placed extrusion and the target plane stays parallel to that captured workplane placement
@@ -210,7 +212,7 @@ Current limits:
 - `shape.hole()` v1 only covers circular through/blind holes, and `shape.cutout()` v1 only covers sketches already placed with `onFace(...)`
 - `filletEdge()` / `chamferEdge()` v1 only cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies before topology-changing rewrites
 - counterbores, countersinks, up-to-face extents, drafted cuts, and durable identity for hole/cut-created faces are still missing
-- repeated-feature ownership currently tracks repeated bodies and mirrored descendants, not durable per-face identity after merged pattern topology changes
+- boolean/pattern propagation currently defends owner-scoped canonical face lineage through supported unions, but post-merge durable face identity and post-difference/intersection face targets are still explicit ambiguity cases rather than one defended face
 - shell, hole/cut, tracked-edge finishing, and repeated-feature workflows now preserve parent-body ownership lineage, but stable downstream face/edge ownership after topology-changing edits is still not solved, which is why broader projection-driven edits and richer fillet/chamfer workflows remain harder next layers
 - projection replay still only covers the parallel-workplane subset; richer projection-driven edits remain outside the exact subset today
 
