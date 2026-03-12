@@ -13,35 +13,31 @@ import { init, runScript } from '../src/forge/headless';
 import { buildBrepExportManifest } from '../src/forge/brepExport';
 import type { CadQueryProfilePlan, CadQueryShapePlan, CadQueryShapeTransformStep } from '../src/forge/cadqueryPlan';
 import { collectProjectFiles } from './collect-files';
+import { COMPILER_REGRESSION_CORPUS, getCompilerRegressionCorpusPart } from './compiler-regression-corpus';
 import { resolvePackagePath } from './package-runtime';
 
-const MULTI_FEATURE_ENCLOSURE_CODE = `
-const base = roundedRect(120, 80, 10, true).extrude(36);
-const shell = base.shell(3, { openFaces: ['top'] });
-const ventCut = roundedRect(32, 12, 3, true)
-  .onFace(base, 'front', { u: 0, v: 6, protrude: 0.25, selfAnchor: 'center' })
-  .extrude(10);
-const cableCut = circle2d(7)
-  .onFace(base, 'right', { u: -10, v: -6, protrude: 0.25, selfAnchor: 'center' })
-  .extrude(10);
-const foot = roundedRect(18, 18, 4, true)
-  .onFace(base, 'bottom', { u: 36, v: 20, protrude: 0, selfAnchor: 'center' })
-  .extrude(6);
-const feet = union(
-  foot,
-  foot.mirror([1, 0, 0]),
-  foot.mirror([0, 1, 0]),
-  foot.mirror([1, 0, 0]).mirror([0, 1, 0]),
-);
-const body = union(shell, feet)
-  .subtract(ventCut)
-  .subtract(cableCut);
-return [{ name: 'Enclosure', shape: body }];
-`;
+type LoadedProjectScript = {
+  code: string;
+  fileName: string;
+  allFiles: Record<string, string>;
+};
 
-function runExactManifest(code: string) {
-  const files: Record<string, string> = { 'main.forge.js': code };
-  const result = runScript(code, 'main.forge.js', files);
+function loadProjectScript(scriptPath: string): LoadedProjectScript {
+  const { allFiles, fileName } = collectProjectFiles(scriptPath);
+  return {
+    code: allFiles[fileName],
+    fileName,
+    allFiles,
+  };
+}
+
+function runExactManifestForFiles(
+  code: string,
+  fileName: string,
+  allFiles: Record<string, string>,
+  expectedObjectCount = 1,
+) {
+  const result = runScript(code, fileName, allFiles);
   assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
   const manifest = buildBrepExportManifest(result.objects);
   assert.equal(
@@ -49,10 +45,33 @@ function runExactManifest(code: string) {
     0,
     `Expected exact export support, got: ${manifest.unsupported.map((item) => `${item.name}: ${item.reason}`).join('; ')}`,
   );
-  assert.equal(manifest.objects.length, 1, `Expected exactly one export object, got ${manifest.objects.length}`);
-  assert.equal(manifest.objects[0].kind, 'exact', 'Expected exact export object');
-  assert.equal(manifest.objects[0].target, 'cadquery-occt', 'Expected exact export object to use the CadQuery/OCCT lowerer');
-  return manifest.objects[0].plan;
+  assert.equal(
+    manifest.objects.length,
+    expectedObjectCount,
+    `Expected exactly ${expectedObjectCount} export object${expectedObjectCount === 1 ? '' : 's'}, got ${manifest.objects.length}`,
+  );
+
+  return {
+    manifest,
+    plans: manifest.objects.map((object, index) => {
+      assert.equal(object.kind, 'exact', `Expected export object ${index} to be exact, got ${object.kind}`);
+      assert.equal(
+        object.target,
+        'cadquery-occt',
+        `Expected export object ${index} to use the CadQuery/OCCT lowerer`,
+      );
+      return object.plan;
+    }),
+  };
+}
+
+function runExactManifest(code: string) {
+  return runExactManifestForFiles(code, 'main.forge.js', { 'main.forge.js': code }).plans[0];
+}
+
+function runExactManifestScript(scriptPath: string) {
+  const script = loadProjectScript(scriptPath);
+  return runExactManifestForFiles(script.code, script.fileName, script.allFiles).plans[0];
 }
 
 function collectProfiles(plan: CadQueryShapePlan): CadQueryProfilePlan[] {
@@ -98,17 +117,32 @@ function collectShapeTransforms(plan: CadQueryShapePlan): CadQueryShapeTransform
   }
 }
 
-function exportExactManifest(code: string): void {
-  const files: Record<string, string> = { 'main.forge.js': code };
-  const result = runScript(code, 'main.forge.js', files);
-  assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
+function collectShapes(plan: CadQueryShapePlan): CadQueryShapePlan[] {
+  switch (plan.kind) {
+    case 'box':
+    case 'cylinder':
+    case 'sphere':
+    case 'extrude':
+    case 'revolve':
+    case 'loft':
+    case 'sweep':
+      return [plan];
+    case 'boolean':
+      return [plan, ...plan.shapes.flatMap(collectShapes)];
+    case 'transform':
+    case 'queryOwner':
+    case 'trimByPlane':
+      return [plan, ...collectShapes(plan.base)];
+  }
+}
 
-  const manifest = buildBrepExportManifest(result.objects);
-  assert.equal(
-    manifest.unsupported.length,
-    0,
-    `Expected exact export support, got: ${manifest.unsupported.map((item) => `${item.name}: ${item.reason}`).join('; ')}`,
-  );
+function exportExactManifestForFiles(
+  code: string,
+  fileName: string,
+  allFiles: Record<string, string>,
+  expectedObjectCount = 1,
+): void {
+  const { manifest } = runExactManifestForFiles(code, fileName, allFiles, expectedObjectCount);
 
   const tempDir = mkdtempSync(join(tmpdir(), 'forgecad-brep-'));
   try {
@@ -131,6 +165,15 @@ function exportExactManifest(code: string): void {
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+}
+
+function exportExactManifest(code: string, expectedObjectCount = 1): void {
+  exportExactManifestForFiles(code, 'main.forge.js', { 'main.forge.js': code }, expectedObjectCount);
+}
+
+function exportExactManifestScript(scriptPath: string): void {
+  const script = loadProjectScript(scriptPath);
+  exportExactManifestForFiles(script.code, script.fileName, script.allFiles);
 }
 
 function checkRoundedRectProfileTransforms(): void {
@@ -460,27 +503,49 @@ return [{ name: 'Shell', shape: body }];
 `);
 }
 
-function checkMultiFeatureEnclosurePlan(): void {
-  const plan = runExactManifest(MULTI_FEATURE_ENCLOSURE_CODE);
+function checkCorpusEnclosureShellCutsPlan(): void {
+  const part = getCompilerRegressionCorpusPart('corpus-enclosure-shell-cuts');
+  const plan = runExactManifestScript(part.scriptPath);
 
-  assert.equal(plan.kind, 'boolean', `Expected enclosure plan to remain a boolean tree, got ${plan.kind}`);
+  assert.equal(plan.kind, 'boolean', `Expected ${part.name} plan to remain a boolean tree, got ${plan.kind}`);
   const transforms = collectShapeTransforms(plan);
   assert(
     transforms.some((step) => step.kind === 'workplanePlacement'),
-    'Expected multi-feature enclosure exact lowering to preserve workplanePlacement transforms',
+    `Expected ${part.name} exact lowering to preserve workplanePlacement transforms`,
   );
-  const firstPlacement = transforms.find((step) => step.kind === 'workplanePlacement');
-  assert(firstPlacement, 'Expected multi-feature enclosure exact lowering to contain a workplanePlacement transform');
-  assert(firstPlacement.placement.workplane.source.owner, 'Expected workplanePlacement provenance to include a parent body owner');
+  assert(
+    transforms.some((step) => step.kind === 'mirror'),
+    `Expected ${part.name} exact lowering to preserve mirrored foot transforms`,
+  );
   const profiles = collectProfiles(plan);
   assert(
     profiles.some((profile) => profile.kind === 'offset' && profile.delta === -3),
-    'Expected multi-feature enclosure exact lowering to contain the shell cavity offset profile',
+    `Expected ${part.name} exact lowering to contain the shell cavity offset profile`,
   );
 }
 
-function checkMultiFeatureEnclosureExportEndToEnd(): void {
-  exportExactManifest(MULTI_FEATURE_ENCLOSURE_CODE);
+function checkCorpusMotorMountPlatePlan(): void {
+  const part = getCompilerRegressionCorpusPart('corpus-motor-mount-plate');
+  const plan = runExactManifestScript(part.scriptPath);
+
+  assert.equal(plan.kind, 'boolean', `Expected ${part.name} plan to remain a boolean tree, got ${plan.kind}`);
+  const transforms = collectShapeTransforms(plan);
+  assert(
+    transforms.some((step) => step.kind === 'mirror'),
+    `Expected ${part.name} exact lowering to preserve mirrored ear transforms`,
+  );
+  const zRotations = transforms.filter(
+    (step) => step.kind === 'rotate' && step.xDeg === 0 && step.yDeg === 0 && step.zDeg !== 0,
+  );
+  assert(
+    zRotations.length >= 3,
+    `Expected ${part.name} exact lowering to preserve the non-trivial bolt-circle rotations`,
+  );
+  const cylinders = collectShapes(plan).filter((shape) => shape.kind === 'cylinder');
+  assert(
+    cylinders.length >= 5,
+    `Expected ${part.name} exact lowering to contain the center bore plus patterned cylindrical hole cutters`,
+  );
 }
 
 function checkSketchOnFacePlacementPlan(): void {
@@ -522,6 +587,45 @@ const boss = rect(6, 4)
   .rotate(0, 0, 90);
 return [{ name: 'Boss', shape: boss }];
 `);
+}
+
+function checkCorpusSensorBracketPlan(): void {
+  const part = getCompilerRegressionCorpusPart('corpus-sensor-bracket');
+  const plan = runExactManifestScript(part.scriptPath);
+
+  assert.equal(plan.kind, 'boolean', `Expected ${part.name} plan to remain a boolean tree, got ${plan.kind}`);
+  const transforms = collectShapeTransforms(plan);
+  assert(
+    transforms.some((step) => step.kind === 'mirror'),
+    `Expected ${part.name} exact lowering to preserve mirrored rib transforms`,
+  );
+  const placements = transforms.filter((step) => step.kind === 'workplanePlacement');
+  assert(
+    placements.length >= 3,
+    `Expected ${part.name} exact lowering to preserve several semantic workplane placements`,
+  );
+  assert(
+    placements.some(
+      (step) =>
+        step.placement.workplane.source.kind === 'canonical-face' &&
+        step.placement.workplane.source.face === 'front',
+    ),
+    `Expected ${part.name} exact lowering to preserve front-face feature provenance`,
+  );
+  assert(
+    placements.some(
+      (step) =>
+        step.placement.workplane.source.kind === 'canonical-face' &&
+        step.placement.workplane.source.face === 'right',
+    ),
+    `Expected ${part.name} exact lowering to preserve right-face feature provenance`,
+  );
+}
+
+function checkCompilerRegressionCorpusExportEndToEnd(): void {
+  for (const part of COMPILER_REGRESSION_CORPUS) {
+    exportExactManifestScript(part.scriptPath);
+  }
 }
 
 function checkMixedSketchAndSolidScenePolicy(): void {
@@ -617,7 +721,7 @@ return [
   { name: 'Lofted', shape: lofted },
   { name: 'Swept', shape: swept.translate(0, 24, 0) },
 ];
-`);
+`, 2);
 }
 
 function checkChessSetFacetedFallbackManifest(): void {
@@ -730,10 +834,12 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkSweepPlan();
   checkShellPlan();
   checkShellExportEndToEnd();
-  checkMultiFeatureEnclosurePlan();
-  checkMultiFeatureEnclosureExportEndToEnd();
+  checkCorpusEnclosureShellCutsPlan();
+  checkCorpusMotorMountPlatePlan();
   checkSketchOnFacePlacementPlan();
   checkSketchOnFacePlacementExportEndToEnd();
+  checkCorpusSensorBracketPlan();
+  checkCompilerRegressionCorpusExportEndToEnd();
   checkMixedSketchAndSolidScenePolicy();
   checkSplitBranchesStayExactExportable();
   checkPlaneTrimAndSplitStayExactExportable();

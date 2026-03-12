@@ -7,12 +7,10 @@ const upright = roundedRect(100, 10, 4, true)
 const rib = box(10, 24, 36, true).translate(36, 10, 28);
 const ribs = mirrorCopy(rib, [1, 0, 0]);
 
-const mountHole = lib.fastenerHole({
-  size: 'M4',
-  fit: 'normal',
-  depth: 14,
-  counterbore: { depth: 3.5 },
-}).translate(28, 0, 5);
+const mountHole = union(
+  cylinder(14, 2.25, undefined, undefined, true),
+  cylinder(3.5, 4.25, undefined, undefined, true).translate(0, 0, 5.25),
+).translate(28, 0, 5);
 const mountHoles = mirrorCopy(mountHole, [1, 0, 0]);
 
 const sensorWindow = roundedRect(36, 16, 3, true)

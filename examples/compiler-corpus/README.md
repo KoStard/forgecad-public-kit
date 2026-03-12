@@ -20,7 +20,7 @@ Guards:
 
 Guards:
 - `circularPattern()` around a real bolt circle instead of a toy transform demo
-- `lib.fastenerHole()` counterbore cutters inside an exact-exportable part
+- analytic counterbore cutters inside an exact-exportable part
 - mirrored tabs and center pocket booleans that must remain deterministic
 
 ### `sensor-bracket.forge.js`

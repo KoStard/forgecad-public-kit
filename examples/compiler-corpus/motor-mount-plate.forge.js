@@ -6,13 +6,12 @@ const ear = roundedRect(28, 42, 8, true)
   .translate(0, 62, 0);
 const body = union(plate, mirrorCopy(ear, [0, 1, 0]));
 
+const counterboredHole = union(
+  cylinder(14, 2.25, undefined, undefined, true),
+  cylinder(4, 4.25, undefined, undefined, true).translate(0, 0, 5),
+);
 const centerBore = cylinder(14, 24, undefined, undefined, true);
-const bolt = lib.fastenerHole({
-  size: 'M4',
-  fit: 'normal',
-  depth: 14,
-  counterbore: { depth: 4 },
-}).translate(32, 0, 0);
+const bolt = counterboredHole.translate(32, 0, 0);
 const boltCircle = circularPattern(bolt, 4);
 
 const earSlot = roundedRect(16, 8, 3, true)

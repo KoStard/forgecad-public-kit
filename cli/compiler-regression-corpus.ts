@@ -31,10 +31,10 @@ export const COMPILER_REGRESSION_CORPUS: CompilerRegressionCorpusPart[] = [
     id: 'corpus-motor-mount-plate',
     name: 'Motor Mount Plate',
     description:
-      'A motor mount plate keeps circular-pattern holes, mirrored ears, and multi-stage boolean cuts exact-exportable as an ordinary mechanical part.',
+      'A motor mount plate keeps circular-pattern counterbored holes, mirrored ears, and multi-stage boolean cuts exact-exportable as an ordinary mechanical part.',
     guards: [
       'circularPattern() stays aligned with exact export instead of degrading into ad hoc transforms',
-      'lib.fastenerHole() counterbore cutters remain replayable through the compiler-owned subset',
+      'analytic counterbore cutters remain replayable through the compiler-owned exact subset',
       'mirrored tabs and center pockets keep boolean lowering deterministic',
     ],
     scriptPath: corpusScriptPath('motor-mount-plate.forge.js'),
@@ -48,7 +48,7 @@ export const COMPILER_REGRESSION_CORPUS: CompilerRegressionCorpusPart[] = [
     guards: [
       'mirrorCopy() reinforcements preserve exact transform intent inside a larger boolean tree',
       'onFace() cuts on an upright wall keep workplane placement semantics visible to exact export',
-      'repeated front-face detail cuts stay deterministic after base-hole booleans',
+      'repeated front-face detail cuts stay deterministic after counterbored base-hole booleans',
     ],
     scriptPath: corpusScriptPath('sensor-bracket.forge.js'),
     objectName: 'Sensor Bracket',
