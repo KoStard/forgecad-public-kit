@@ -985,10 +985,11 @@ export class Shape {
       1,
       'Use shape.add(other1, other2) or shape.add([other1, other2]).',
     )];
+    const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
     const nextPlan = createOwnedTopologyRewritePlan(
-      buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+      buildBooleanShapeCompilePlan('union', operandPlans),
       'boolean:union',
-      (owner) => buildBooleanTopologyRewritePropagation('union', owner),
+      (owner) => buildBooleanTopologyRewritePropagation('union', owner, operandPlans),
     );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withMergedDimensions(
@@ -1008,10 +1009,11 @@ export class Shape {
       1,
       'Use shape.subtract(other1, other2) or shape.subtract([other1, other2]).',
     )];
+    const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
     const nextPlan = createOwnedTopologyRewritePlan(
-      buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+      buildBooleanShapeCompilePlan('difference', operandPlans),
       'boolean:difference',
-      (owner) => buildBooleanTopologyRewritePropagation('difference', owner),
+      (owner) => buildBooleanTopologyRewritePropagation('difference', owner, operandPlans),
     );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
@@ -1031,10 +1033,11 @@ export class Shape {
       1,
       'Use shape.intersect(other1, other2) or shape.intersect([other1, other2]).',
     )];
+    const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
     const nextPlan = createOwnedTopologyRewritePlan(
-      buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+      buildBooleanShapeCompilePlan('intersection', operandPlans),
       'boolean:intersection',
-      (owner) => buildBooleanTopologyRewritePropagation('intersection', owner),
+      (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, operandPlans),
     );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withMergedDimensions(
@@ -1052,21 +1055,23 @@ export class Shape {
   /** Split into [inside, outside] by another shape. */
   split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
     const c = Shape._unwrap(cutter);
+    const insideOperandPlans = [
+      getShapeCompilePlanInternal(this),
+      getShapeCompilePlanInternal(c),
+    ];
     const insidePlan = createOwnedTopologyRewritePlan(
-      buildBooleanShapeCompilePlan('intersection', [
-        getShapeCompilePlanInternal(this),
-        getShapeCompilePlanInternal(c),
-      ]),
+      buildBooleanShapeCompilePlan('intersection', insideOperandPlans),
       'split:inside',
-      (owner) => buildBooleanTopologyRewritePropagation('intersection', owner),
+      (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, insideOperandPlans),
     );
+    const outsideOperandPlans = [
+      getShapeCompilePlanInternal(this),
+      getShapeCompilePlanInternal(c),
+    ];
     const outsidePlan = createOwnedTopologyRewritePlan(
-      buildBooleanShapeCompilePlan('difference', [
-        getShapeCompilePlanInternal(this),
-        getShapeCompilePlanInternal(c),
-      ]),
+      buildBooleanShapeCompilePlan('difference', outsideOperandPlans),
       'split:outside',
-      (owner) => buildBooleanTopologyRewritePropagation('difference', owner),
+      (owner) => buildBooleanTopologyRewritePropagation('difference', owner, outsideOperandPlans),
     );
     const info = mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(c)], 'boolean', { topology: 'none' });
     if (insidePlan && outsidePlan) {
@@ -1417,10 +1422,11 @@ export function union(...inputs: ShapeOperandInput[]): Shape {
   );
   if (shapes.length === 0) throw new Error('union requires at least one shape');
   if (shapes.length === 1) return shapes[0];
+  const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
   const nextPlan = createOwnedTopologyRewritePlan(
-    buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+    buildBooleanShapeCompilePlan('union', operandPlans),
     'boolean:union',
-    (owner) => buildBooleanTopologyRewritePropagation('union', owner),
+    (owner) => buildBooleanTopologyRewritePropagation('union', owner, operandPlans),
   );
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(
@@ -1441,10 +1447,11 @@ export function difference(...inputs: ShapeOperandInput[]): Shape {
     'Use difference(base, cutter1, cutter2) or difference([base, cutter1, cutter2]).',
   );
   if (shapes.length < 2) throw new Error('difference requires at least two shapes');
+  const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
   const nextPlan = createOwnedTopologyRewritePlan(
-    buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+    buildBooleanShapeCompilePlan('difference', operandPlans),
     'boolean:difference',
-    (owner) => buildBooleanTopologyRewritePropagation('difference', owner),
+    (owner) => buildBooleanTopologyRewritePropagation('difference', owner, operandPlans),
   );
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withBaseDimensions(
@@ -1465,10 +1472,11 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
     'Use intersection(shape1, shape2) or intersection([shape1, shape2]).',
   );
   if (shapes.length < 2) throw new Error('intersection requires at least two shapes');
+  const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
   const nextPlan = createOwnedTopologyRewritePlan(
-    buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+    buildBooleanShapeCompilePlan('intersection', operandPlans),
     'boolean:intersection',
-    (owner) => buildBooleanTopologyRewritePropagation('intersection', owner),
+    (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, operandPlans),
   );
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(

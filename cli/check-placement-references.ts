@@ -16,6 +16,7 @@ import {
   union,
 } from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
+import { describeFaceQueryRef } from '../src/forge/queryModel';
 import { circle2d, filletEdge, linearPattern, rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
 import { getSketchPlacement3D, getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
 import { Transform } from '../src/forge/transform';
@@ -451,6 +452,72 @@ function checkRepeatedFeatureOwnershipPropagation(): void {
   expect(slotOwners.some((owner) => owner.id === slotOwner!.id), 'patterned result should retain the seed feature lineage');
 }
 
+function checkBooleanAndRepeatedQueryPropagation(): void {
+  const seed = roundedRect(16, 12, 2, true).extrude(10).toShape();
+  const seedOwner = getShapePrimaryQueryOwner(seed);
+  expect(seedOwner != null, 'duplicate-union seed should expose a primary owner');
+
+  const duplicated = union(
+    seed,
+    seed.clone().translate(28, 0, 0),
+  );
+  const duplicatePropagation = getShapeTopologyRewritePropagation(duplicated);
+  expect(duplicatePropagation != null, 'boolean union should expose propagation metadata for duplicated-owner operands');
+  const duplicateTop = duplicatePropagation!.preservedFaces.find((entry) =>
+    entry.query.source.kind === 'canonical-face'
+      && entry.query.source.face === 'top'
+      && entry.query.source.owner?.id === seedOwner!.id,
+  );
+  expect(duplicateTop != null, 'duplicated-owner union should keep an explicit top-face propagation entry');
+  expect(duplicateTop!.status === 'ambiguous', 'duplicated-owner union top-face propagation should be ambiguous');
+  expect(duplicateTop!.query.outcome === 'merged', 'duplicated-owner union top-face propagation should record a merged outcome');
+  expect(
+    duplicatePropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'boolean-union-face-merged-ambiguous'),
+    'duplicated-owner union should emit an explicit merged-face ambiguity diagnostic',
+  );
+
+  const plate = roundedRect(84, 48, 4, true).extrude(12);
+  const bossSeed = roundedRect(12, 10, 1.5, true)
+    .onFace(plate, 'top', { u: -24, v: 0, protrude: 0.5, selfAnchor: 'center' })
+    .extrude(8);
+  const bosses = linearPattern(bossSeed, 3, 24, 0, 0);
+  const bossPropagation = getShapeTopologyRewritePropagation(bosses);
+  expect(bossPropagation != null, 'pattern unions should expose boolean propagation metadata');
+  expect(bossPropagation!.operation === 'boolean:union', `expected pattern union propagation operation, got ${bossPropagation!.operation}`);
+  const bossTopFaces = bossPropagation!.preservedFaces.filter((entry) =>
+    entry.status === 'supported'
+      && entry.query.outcome === 'preserved'
+      && entry.query.source.kind === 'canonical-face'
+      && entry.query.source.face === 'top'
+      && entry.query.source.owner?.operation.startsWith('pattern:linear:'),
+  );
+  expect(bossTopFaces.length === 3, `expected 3 supported patterned top-face entries, got ${bossTopFaces.length}`);
+  expect(
+    new Set(bossTopFaces.map((entry) => entry.query.source.owner!.operation)).size === 3,
+    'patterned top-face propagation should preserve distinct repeated-result owner operations',
+  );
+
+  const bossPlate = union(plate, bosses);
+  const trimmedBossPlate = bossPlate.subtract(
+    box(18, 10, 24, true).translate(0, 0, 8),
+  );
+  const trimmedPropagation = getShapeTopologyRewritePropagation(trimmedBossPlate);
+  expect(trimmedPropagation != null, 'later boolean differences should keep repeated-result propagation metadata visible');
+  const trimmedPatternFaces = trimmedPropagation!.preservedFaces.filter((entry) =>
+    entry.status === 'ambiguous'
+      && entry.query.outcome === 'split'
+      && describeFaceQueryRef(entry.query.source).includes('pattern:linear:'),
+  );
+  expect(
+    trimmedPatternFaces.length >= 3,
+    `expected later boolean differences to keep patterned descendant face lineage visible, got ${trimmedPatternFaces.length} matching entries`,
+  );
+  expect(
+    trimmedPropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'boolean-difference-face-split-ambiguous'),
+    'later boolean differences should emit explicit split-face ambiguity diagnostics for preserved descendants',
+  );
+}
+
 function checkTopologyRewritePropagationInspection(): void {
   const base = roundedRect(36, 22, 3, true).extrude(14);
 
@@ -541,6 +608,7 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkHoleCutFeaturePlacement();
   checkEdgeFinishOwnerPropagation();
   checkRepeatedFeatureOwnershipPropagation();
+  checkBooleanAndRepeatedQueryPropagation();
   checkTopologyRewritePropagationInspection();
   console.log('✓ Placement reference invariants passed');
 }

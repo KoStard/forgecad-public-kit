@@ -1,22 +1,20 @@
 import type { ShapeCompilePlan } from './compilePlan';
 import {
-  cloneEdgeQueryRef,
-  cloneFaceQueryRef,
-  cloneShapeQueryOwner,
   cloneTopologyRewritePropagation,
-  type CreatedEdgeQueryRef,
-  type CreatedFaceQueryRef,
   type EdgeQueryRef,
-  type FaceQueryRef,
-  type PropagatedEdgeQueryRef,
-  type PropagatedFaceQueryRef,
   type ShapeQueryOwner,
   type TopologyRewritePropagation,
-  type TopologyRewritePropagationDiagnostic,
-  type TopologyRewriteQueryKind,
-  type TopologyRewriteQueryOutcome,
 } from './queryModel';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
+import {
+  createCreatedEdgeQueryRef,
+  createCreatedFaceQueryRef,
+  createPropagatedEdgeQueryRef,
+  createPropagatedFaceQueryRef,
+  createTopologyRewritePropagation,
+  createTopologyRewritePropagationDiagnostic,
+} from './queryPropagationCore';
+export { buildBooleanTopologyRewritePropagation } from './booleanQueryPropagation';
 
 type TopologyRewriteNodeKind =
   | 'shell'
@@ -30,114 +28,20 @@ type TopologyRewriteNodeKind =
 
 type TopologyRewriteShapeCompilePlan = Extract<ShapeCompilePlan, { kind: TopologyRewriteNodeKind }>;
 
-function createPropagation(operation: string, owner: ShapeQueryOwner): TopologyRewritePropagation {
-  return {
-    rewriteId: owner.id,
-    operation,
-    owner: cloneShapeQueryOwner(owner),
-    preservedFaces: [],
-    preservedEdges: [],
-    createdFaces: [],
-    createdEdges: [],
-    diagnostics: [],
-  };
-}
-
-function createDiagnostic(
-  code: string,
-  category: TopologyRewritePropagationDiagnostic['category'],
-  queryKind: TopologyRewriteQueryKind,
-  message: string,
-  source?: FaceQueryRef | EdgeQueryRef,
-  query?: FaceQueryRef | EdgeQueryRef,
-): TopologyRewritePropagationDiagnostic {
-  return {
-    code,
-    category,
-    queryKind,
-    message,
-    source: queryKind === 'face'
-      ? cloneFaceQueryRef(source as FaceQueryRef | undefined)
-      : cloneEdgeQueryRef(source as EdgeQueryRef | undefined),
-    query: queryKind === 'face'
-      ? cloneFaceQueryRef(query as FaceQueryRef | undefined)
-      : cloneEdgeQueryRef(query as EdgeQueryRef | undefined),
-  };
-}
-
-export function createPropagatedFaceQueryRef(
-  source: FaceQueryRef,
-  owner: ShapeQueryOwner,
-  outcome: TopologyRewriteQueryOutcome,
-): PropagatedFaceQueryRef {
-  return {
-    kind: 'propagated-face',
-    rewriteId: owner.id,
-    outcome,
-    source: cloneFaceQueryRef(source)!,
-    owner: cloneShapeQueryOwner(owner),
-  };
-}
-
-export function createCreatedFaceQueryRef(
-  owner: ShapeQueryOwner,
-  operation: string,
-  slot: string,
-): CreatedFaceQueryRef {
-  return {
-    kind: 'created-face',
-    rewriteId: owner.id,
-    operation,
-    slot,
-    owner: cloneShapeQueryOwner(owner),
-  };
-}
-
-export function createPropagatedEdgeQueryRef(
-  source: EdgeQueryRef,
-  owner: ShapeQueryOwner,
-  outcome: TopologyRewriteQueryOutcome,
-): PropagatedEdgeQueryRef {
-  return {
-    kind: 'propagated-edge',
-    rewriteId: owner.id,
-    outcome,
-    source: cloneEdgeQueryRef(source)!,
-    selector: source.selector,
-    owner: cloneShapeQueryOwner(owner),
-  };
-}
-
-export function createCreatedEdgeQueryRef(
-  owner: ShapeQueryOwner,
-  operation: string,
-  slot: string,
-  selector: EdgeQueryRef['selector'] = 'edge',
-): CreatedEdgeQueryRef {
-  return {
-    kind: 'created-edge',
-    rewriteId: owner.id,
-    operation,
-    slot,
-    selector,
-    owner: cloneShapeQueryOwner(owner),
-  };
-}
-
 export function buildShellTopologyRewritePropagation(
   owner: ShapeQueryOwner,
   openFaces: Array<'top' | 'bottom'>,
 ): TopologyRewritePropagation {
-  const propagation = createPropagation('shell', owner);
+  const propagation = createTopologyRewritePropagation('shell', owner);
   const openingText = openFaces.length > 0 ? ` Open faces: ${openFaces.join(', ')}.` : '';
   propagation.diagnostics.push(
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       'shell-face-propagation-ambiguous',
       'ambiguous',
       'face',
       `Shell rewrites result faces, but durable face-query propagation is not defended yet.${openingText}`,
     ),
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       'shell-edge-propagation-ambiguous',
       'ambiguous',
       'edge',
@@ -151,7 +55,7 @@ export function buildHoleTopologyRewritePropagation(
   owner: ShapeQueryOwner,
   placement: ShapeWorkplanePlacement['placement'],
 ): TopologyRewritePropagation {
-  const propagation = createPropagation('hole', owner);
+  const propagation = createTopologyRewritePropagation('hole', owner);
   const propagated = createPropagatedFaceQueryRef(placement.workplane.source, owner, 'split');
   propagation.preservedFaces.push({
     query: propagated,
@@ -159,7 +63,7 @@ export function buildHoleTopologyRewritePropagation(
     note: 'The selected host face survives only as a split descendant set after the hole lands.',
   });
   propagation.diagnostics.push(
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       'hole-source-face-split-ambiguous',
       'ambiguous',
       'face',
@@ -167,7 +71,7 @@ export function buildHoleTopologyRewritePropagation(
       placement.workplane.source,
       propagated,
     ),
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       'hole-created-edge-propagation-unsupported',
       'unsupported',
       'edge',
@@ -181,7 +85,7 @@ export function buildCutTopologyRewritePropagation(
   owner: ShapeQueryOwner,
   placement: ShapeWorkplanePlacement['placement'],
 ): TopologyRewritePropagation {
-  const propagation = createPropagation('cut', owner);
+  const propagation = createTopologyRewritePropagation('cut', owner);
   const propagated = createPropagatedFaceQueryRef(placement.workplane.source, owner, 'split');
   propagation.preservedFaces.push({
     query: propagated,
@@ -189,7 +93,7 @@ export function buildCutTopologyRewritePropagation(
     note: 'The selected host face is split by the cut profile, so the surviving descendants are still ambiguous.',
   });
   propagation.diagnostics.push(
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       'cut-source-face-split-ambiguous',
       'ambiguous',
       'face',
@@ -197,7 +101,7 @@ export function buildCutTopologyRewritePropagation(
       placement.workplane.source,
       propagated,
     ),
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       'cut-created-edge-propagation-unsupported',
       'unsupported',
       'edge',
@@ -207,38 +111,16 @@ export function buildCutTopologyRewritePropagation(
   return propagation;
 }
 
-export function buildBooleanTopologyRewritePropagation(
-  op: 'union' | 'difference' | 'intersection',
-  owner: ShapeQueryOwner,
-): TopologyRewritePropagation {
-  const propagation = createPropagation(`boolean:${op}`, owner);
-  propagation.diagnostics.push(
-    createDiagnostic(
-      `boolean-${op}-face-propagation-ambiguous`,
-      'ambiguous',
-      'face',
-      `Boolean ${op} records an explicit topology-rewrite boundary, but durable face-query propagation is still pending.`,
-    ),
-    createDiagnostic(
-      `boolean-${op}-edge-propagation-ambiguous`,
-      'ambiguous',
-      'edge',
-      `Boolean ${op} records an explicit topology-rewrite boundary, but durable edge-query propagation is still pending.`,
-    ),
-  );
-  return propagation;
-}
-
 export function buildHullTopologyRewritePropagation(owner: ShapeQueryOwner): TopologyRewritePropagation {
-  const propagation = createPropagation('hull', owner);
+  const propagation = createTopologyRewritePropagation('hull', owner);
   propagation.diagnostics.push(
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       'hull-face-propagation-unsupported',
       'unsupported',
       'face',
       'Hull combines source solids through a full topology rewrite, so face-query propagation is not defended yet.',
     ),
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       'hull-edge-propagation-unsupported',
       'unsupported',
       'edge',
@@ -249,19 +131,19 @@ export function buildHullTopologyRewritePropagation(owner: ShapeQueryOwner): Top
 }
 
 export function buildTrimByPlaneTopologyRewritePropagation(owner: ShapeQueryOwner): TopologyRewritePropagation {
-  const propagation = createPropagation('trimByPlane', owner);
+  const propagation = createTopologyRewritePropagation('trimByPlane', owner);
   propagation.createdFaces.push({
     query: createCreatedFaceQueryRef(owner, 'trimByPlane', 'plane-cap'),
     note: 'The kept side of the trim introduces one deterministic cap face on the trim plane.',
   });
   propagation.diagnostics.push(
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       'trim-by-plane-preserved-face-propagation-ambiguous',
       'ambiguous',
       'face',
       'Trim-by-plane now exposes its created plane-cap face, but preserved non-cap face propagation is still ambiguous.',
     ),
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       'trim-by-plane-edge-propagation-ambiguous',
       'ambiguous',
       'edge',
@@ -276,7 +158,7 @@ export function buildEdgeFeatureTopologyRewritePropagation(
   owner: ShapeQueryOwner,
   edge: EdgeQueryRef | undefined,
 ): TopologyRewritePropagation {
-  const propagation = createPropagation(operation, owner);
+  const propagation = createTopologyRewritePropagation(operation, owner);
   if (edge) {
     const propagated = createPropagatedEdgeQueryRef(edge, owner, 'merged');
     propagation.preservedEdges.push({
@@ -285,7 +167,7 @@ export function buildEdgeFeatureTopologyRewritePropagation(
       note: `${operation} rewrites the selected edge into a blended descendant set rather than one defended edge target.`,
     });
     propagation.diagnostics.push(
-      createDiagnostic(
+      createTopologyRewritePropagationDiagnostic(
         `${operation}-selected-edge-merged-ambiguous`,
         'ambiguous',
         'edge',
@@ -296,7 +178,7 @@ export function buildEdgeFeatureTopologyRewritePropagation(
     );
   }
   propagation.diagnostics.push(
-    createDiagnostic(
+    createTopologyRewritePropagationDiagnostic(
       `${operation}-created-face-propagation-unsupported`,
       'unsupported',
       'face',
