@@ -52,10 +52,17 @@ Current estimate from 2026-03-12:
 
 Near-term path to that MLP:
 
-1. Start fillet/chamfer from the shared edge-query backbone with the tracked-edge supported subset explicit from day one.
-2. Widen projection replay and downstream query propagation beyond today's parallel-workplane subset.
-3. Widen hole/cut and repeated-feature semantics without letting those families invent their own provenance rules.
-4. Keep growing the curated multi-feature corpus so each new lane proves ordinary part workflows, not just isolated toy cases.
+1. Land task 160 so topology-changing features have one compiler-owned query propagation backbone instead of local rewrite rules.
+2. After task 160, run the first parallel wave:
+   - task 170 for shell/hole/cut created-face ownership
+   - task 180 for boolean/pattern descendant propagation
+   - task 190 for propagated post-rewrite edge queries
+   - task 195 for the dedicated query-propagation regression surface
+3. Then run the second feature wave:
+   - task 200 for richer hole/cut variants
+   - task 210 for broader projection/sketch-on-face flows
+   - task 220 for broader fillet/chamfer on defended propagated edges
+4. Close the wave with task 230 so the corpus, capability docs, and MLP state are all honest and reviewable.
 
 Deepest completed prerequisite:
 

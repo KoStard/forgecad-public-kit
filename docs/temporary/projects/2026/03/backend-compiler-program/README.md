@@ -14,9 +14,13 @@ Read in this order:
 The landed base for the next feature lane is:
 
 - shared face and edge query/reference contracts in `src/forge/queryModel.ts`
-- compiler-owned hole/cut v1, projection replay v1, and repeated-result ownership slices
+- compiler-owned hole/cut v1, projection replay v1, repeated-result ownership, and tracked-edge finishing v1 slices
 - curated compiler corpus coverage in `examples/compiler-corpus/`
 
 Task 130 is now landed on top of that base.
 
-The next program move is to define the post-topology-change reference lane that broader fillet/chamfer, richer hole/cut variants, and wider projection workflows will all depend on.
+The next program move is task 160:
+
+- [tasks/160-topology-rewrite-query-propagation.md](../../../../../../tasks/160-topology-rewrite-query-propagation.md)
+
+That is the core lane the next feature wave depends on.
