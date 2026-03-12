@@ -70,6 +70,7 @@ function collectProfiles(plan: CadQueryShapePlan): CadQueryProfilePlan[] {
     case 'boolean':
       return plan.shapes.flatMap(collectProfiles);
     case 'transform':
+    case 'queryOwner':
     case 'trimByPlane':
       return collectProfiles(plan.base);
   }
@@ -90,6 +91,8 @@ function collectShapeTransforms(plan: CadQueryShapePlan): CadQueryShapeTransform
       return plan.shapes.flatMap(collectShapeTransforms);
     case 'transform':
       return [...plan.steps, ...collectShapeTransforms(plan.base)];
+    case 'queryOwner':
+      return collectShapeTransforms(plan.base);
     case 'trimByPlane':
       return collectShapeTransforms(plan.base);
   }
@@ -466,6 +469,9 @@ function checkMultiFeatureEnclosurePlan(): void {
     transforms.some((step) => step.kind === 'workplanePlacement'),
     'Expected multi-feature enclosure exact lowering to preserve workplanePlacement transforms',
   );
+  const firstPlacement = transforms.find((step) => step.kind === 'workplanePlacement');
+  assert(firstPlacement, 'Expected multi-feature enclosure exact lowering to contain a workplanePlacement transform');
+  assert(firstPlacement.placement.workplane.source.owner, 'Expected workplanePlacement provenance to include a parent body owner');
   const profiles = collectProfiles(plan);
   assert(
     profiles.some((profile) => profile.kind === 'offset' && profile.delta === -3),
@@ -492,6 +498,8 @@ return [{ name: 'Feature', shape: feature }];
   assert(placement, 'Expected onFace() downstream features to preserve a semantic workplane placement transform');
   assert.equal(placement.placement.workplane.source.kind, 'tracked-face');
   assert.equal(placement.placement.workplane.source.faceName, 'top');
+  assert(placement.placement.workplane.source.owner, 'Expected workplane placement provenance to include a parent body owner');
+  assert.equal(placement.placement.workplane.source.owner.operation, 'extrude');
   assert.equal(placement.placement.u, 2);
   assert.equal(placement.placement.v, 1);
   assert.equal(placement.placement.protrude, 0.5);

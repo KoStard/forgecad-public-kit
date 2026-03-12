@@ -4,6 +4,7 @@ import {
   buildBooleanShapeCompilePlan,
   buildOffsetProfileCompilePlan,
   cloneShapeCompilePlan,
+  wrapShapeCompilePlanWithQueryOwner,
 } from './compilePlan';
 
 export type ShellOpenFace = 'top' | 'bottom';
@@ -156,6 +157,14 @@ function lowerBaseShellPlanToConcretePlan(
   openFaces: readonly ShellOpenFace[],
 ): ShellCompilePlanLoweringResult {
   switch (plan.kind) {
+    case 'queryOwner': {
+      const lowered = lowerBaseShellPlanToConcretePlan(plan.base, thickness, openFaces);
+      if (!lowered.ok) return lowered;
+      return {
+        ok: true,
+        plan: wrapShapeCompilePlanWithQueryOwner(lowered.plan, plan.owner)!,
+      };
+    }
     case 'transform': {
       if (!plan.steps.every(isRigidShellTransformStep)) {
         return {

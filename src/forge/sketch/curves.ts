@@ -1,7 +1,7 @@
 import { Sketch, getSketchCompileProfilePlan } from './core';
 import { polygon } from './primitives';
 import { stroke } from './path';
-import { buildLoftShapeCompilePlan, buildSweepShapeCompilePlan } from '../compilePlan';
+import { buildLoftShapeCompilePlan, buildSweepShapeCompilePlan, createOwnedShapeCompilePlan } from '../compilePlan';
 import { buildShapeFromCompilePlan, levelSet, setShapeGeometryInfo, type Shape } from '../kernel';
 import {
   scaleLevelSetBoundsPadding,
@@ -335,8 +335,9 @@ export function loft(
     zs,
     { edgeLength, boundsPadding: pad },
   );
-  if (plan) {
-    return buildShapeFromCompilePlan(plan, pairs[0]?.profile.colorHex, {
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'loft');
+  if (ownedPlan) {
+    return buildShapeFromCompilePlan(ownedPlan, pairs[0]?.profile.colorHex, {
       fidelity: 'sampled',
       sources: ['loft', 'level-set'],
     });
@@ -416,8 +417,9 @@ export function sweep(
     },
     { edgeLength, boundsPadding: pad, up },
   );
-  if (plan) {
-    return buildShapeFromCompilePlan(plan, profile.colorHex, {
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'sweep');
+  if (ownedPlan) {
+    return buildShapeFromCompilePlan(ownedPlan, profile.colorHex, {
       fidelity: 'sampled',
       sources: ['sweep', 'level-set'],
     });

@@ -24,6 +24,7 @@ import {
   type GeometryInfo,
 } from './kernel';
 import type { Anchor3D } from './kernel';
+import { resetShapeQueryOwnerIds } from './compilePlan';
 import { intersectWithPlane, projectToPlane } from './section';
 import {
   Sketch,
@@ -1275,6 +1276,7 @@ export function runScript(
   options: RunScriptOptions = {},
 ): RunResult {
   resetParams();
+  resetShapeQueryOwnerIds();
   resetDimensions();
   resetBom();
   resetRobotExport();

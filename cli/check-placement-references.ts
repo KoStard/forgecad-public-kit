@@ -4,7 +4,7 @@
  *
  * Ensures named points/edges/surfaces/objects survive transforms and importPart().
  */
-import { getShapeWorkplanePlacement, initKernel, box } from '../src/forge/kernel';
+import { getShapePrimaryQueryOwner, getShapeQueryOwners, getShapeWorkplanePlacement, initKernel, box } from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
 import { rect, roundedRect } from '../src/forge/sketch';
 import { getSketchPlacement3D, getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
@@ -185,10 +185,16 @@ function checkDirectFaceRefWorkplaneRecording(): void {
   expect(placement != null, 'direct face-ref workplane placement should be recorded');
   expect(placement!.workplane.source.kind === 'face-ref', 'expected direct face-ref workplane source');
   expect(placement!.workplane.source.faceName === 'top', 'expected face-ref source name to be preserved');
+  expect(
+    placement!.workplane.source.owner?.id === getShapePrimaryQueryOwner(target.toShape())?.id,
+    'direct face-ref workplane source should preserve the parent body owner',
+  );
 }
 
 function checkShapeWorkplanePlacementPropagation(): void {
   const target = roundedRect(20, 12, 2, true).extrude(6, { center: true });
+  const targetOwner = getShapePrimaryQueryOwner(target.toShape());
+  expect(targetOwner != null, 'compile-covered target should expose a primary query owner');
 
   const extrudeSketch = rect(6, 4).onFace(target, 'top', {
     u: 2,
@@ -201,6 +207,7 @@ function checkShapeWorkplanePlacementPropagation(): void {
   expect(extrudePlacement != null, 'extrude() should preserve semantic workplane placement on the shape compile plan');
   expect(extrudePlacement!.placement.workplane.source.kind === 'tracked-face', 'extrude() should preserve tracked-face placement source');
   expect(extrudePlacement!.placement.workplane.source.faceName === 'top', 'extrude() should preserve tracked face name');
+  expect(extrudePlacement!.placement.workplane.source.owner?.id === targetOwner!.id, 'extrude() should preserve parent-body query ownership');
   expectVec(extrudePlacement!.placement.workplane.origin, target.face('top').center, 'extrude.workplane.origin');
   expectMatrix(extrudePlacement!.matrix, getSketchPlacement3D(extrudeSketch)!, 'extrude.workplane.matrix');
 
@@ -246,6 +253,42 @@ function checkShapeWorkplanePlacementPropagation(): void {
   );
 }
 
+function checkShapeQueryOwnerPropagation(): void {
+  const base = roundedRect(40, 24, 3, true).extrude(12);
+  const baseOwner = getShapePrimaryQueryOwner(base.toShape());
+  expect(baseOwner != null, 'base extrude should expose a primary query owner');
+  expect(baseOwner!.operation === 'extrude', `expected base owner operation "extrude", got ${baseOwner!.operation}`);
+
+  const cup = base.shell(2, { openFaces: ['top'] });
+  const cupOwner = getShapePrimaryQueryOwner(cup);
+  expect(cupOwner != null, 'shell result should expose a primary query owner');
+  expect(cupOwner!.operation === 'shell', `expected shell owner operation "shell", got ${cupOwner!.operation}`);
+
+  const vent = roundedRect(10, 6, 1.5, true)
+    .onFace(base, 'front', { u: 0, v: 2, protrude: 0.25, selfAnchor: 'center' })
+    .extrude(4);
+  const ventPlacement = getShapeWorkplanePlacement(vent.toShape());
+  expect(ventPlacement != null, 'downstream cut feature should preserve workplane placement');
+  expect(ventPlacement!.placement.workplane.source.owner?.id === baseOwner!.id, 'downstream cut should preserve the base owner query');
+
+  const foot = roundedRect(8, 8, 1.5, true)
+    .onFace(base, 'bottom', { u: 10, v: 6, protrude: 0, selfAnchor: 'center' })
+    .extrude(4);
+  const footOwner = getShapePrimaryQueryOwner(foot.toShape());
+  expect(footOwner != null, 'downstream support feature should expose a primary query owner');
+
+  const body = cup.add(foot).subtract(vent);
+  const bodyOwner = getShapePrimaryQueryOwner(body);
+  expect(bodyOwner != null, 'boolean result should expose a primary query owner');
+  expect(bodyOwner!.operation === 'boolean:difference', `expected boolean owner operation, got ${bodyOwner!.operation}`);
+
+  const ownerIds = new Set(getShapeQueryOwners(body).map((owner) => owner.id));
+  expect(ownerIds.has(baseOwner!.id), 'boolean result should retain the base owner lineage');
+  expect(ownerIds.has(cupOwner!.id), 'boolean result should retain the shell owner lineage');
+  expect(ownerIds.has(footOwner!.id), 'boolean result should retain the added feature owner lineage');
+  expect(ownerIds.has(bodyOwner!.id), 'boolean result should include its own owner');
+}
+
 export async function runCheckPlacementReferencesCli(): Promise<void> {
   await initKernel();
   checkTransformAndPlacementHelpers();
@@ -255,5 +298,6 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkTrackedFaceWorkplaneRecording();
   checkDirectFaceRefWorkplaneRecording();
   checkShapeWorkplanePlacementPropagation();
+  checkShapeQueryOwnerPropagation();
   console.log('✓ Placement reference invariants passed');
 }

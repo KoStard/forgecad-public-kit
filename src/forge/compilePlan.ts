@@ -1,6 +1,8 @@
 import { Transform, type Mat4, type Vec3 } from './transform';
 import {
   cloneSketchPlacementModel,
+  cloneShapeQueryOwner,
+  type ShapeQueryOwner,
   type ShapeWorkplanePlacement,
 } from './sketch/workplaneModel';
 
@@ -153,6 +155,11 @@ export type ShapeCompilePlan =
       steps: ShapeCompileTransformStep[];
     }
   | {
+      kind: 'queryOwner';
+      owner: ShapeQueryOwner;
+      base: ShapeCompilePlan;
+    }
+  | {
       kind: 'hull';
       shapes: ShapeCompilePlan[];
       points: [number, number, number][];
@@ -202,6 +209,28 @@ function cloneShapeWorkplanePlacementValue(
     matrix: cloneShapeTransformMatrix(placement.matrix),
     placement: cloneSketchPlacementModel(placement.placement)!,
   };
+}
+
+function cloneShapeQueryOwnerValue(owner: ShapeQueryOwner): ShapeQueryOwner {
+  return cloneShapeQueryOwner(owner)!;
+}
+
+let _shapeQueryOwnerCounter = 0;
+
+function normalizeQueryOwnerOperation(operation: string): string {
+  return operation.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'shape';
+}
+
+export function createShapeQueryOwner(operation: string): ShapeQueryOwner {
+  _shapeQueryOwnerCounter += 1;
+  return {
+    id: `shape-query-${normalizeQueryOwnerOperation(operation)}-${_shapeQueryOwnerCounter}`,
+    operation,
+  };
+}
+
+export function resetShapeQueryOwnerIds(): void {
+  _shapeQueryOwnerCounter = 0;
 }
 
 function mirrorTransformMatrix(normal: [number, number, number]): Mat4 {
@@ -452,6 +481,12 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         base: cloneShapeCompilePlan(plan.base)!,
         steps: plan.steps.map(cloneShapeTransform),
       };
+    case 'queryOwner':
+      return {
+        kind: 'queryOwner',
+        owner: cloneShapeQueryOwnerValue(plan.owner),
+        base: cloneShapeCompilePlan(plan.base)!,
+      };
     case 'hull':
       return {
         kind: 'hull',
@@ -510,6 +545,26 @@ export function appendShapeCompileTransforms(
   return out;
 }
 
+export function wrapShapeCompilePlanWithQueryOwner(
+  plan: ShapeCompilePlan | null,
+  owner: ShapeQueryOwner,
+): ShapeCompilePlan | null {
+  if (!plan) return null;
+  return {
+    kind: 'queryOwner',
+    owner: cloneShapeQueryOwnerValue(owner),
+    base: cloneShapeCompilePlan(plan)!,
+  };
+}
+
+export function createOwnedShapeCompilePlan(
+  plan: ShapeCompilePlan | null,
+  operation: string,
+): ShapeCompilePlan | null {
+  if (!plan) return null;
+  return wrapShapeCompilePlanWithQueryOwner(plan, createShapeQueryOwner(operation));
+}
+
 export function buildBooleanShapeCompilePlan(
   op: 'union' | 'difference' | 'intersection',
   shapes: Array<ShapeCompilePlan | null>,
@@ -522,12 +577,76 @@ export function buildBooleanShapeCompilePlan(
   };
 }
 
+export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan | null): ShapeQueryOwner | null {
+  if (!plan) return null;
+  switch (plan.kind) {
+    case 'queryOwner':
+      return cloneShapeQueryOwnerValue(plan.owner);
+    case 'transform':
+    case 'shell':
+    case 'trimByPlane':
+      return findShapePrimaryQueryOwner(plan.base);
+    case 'box':
+    case 'cylinder':
+    case 'sphere':
+    case 'extrude':
+    case 'revolve':
+    case 'loft':
+    case 'sweep':
+    case 'boolean':
+    case 'hull':
+      return null;
+  }
+}
+
+export function collectShapeQueryOwners(plan: ShapeCompilePlan | null): ShapeQueryOwner[] {
+  const out: ShapeQueryOwner[] = [];
+  const seen = new Set<string>();
+
+  function visit(current: ShapeCompilePlan | null): void {
+    if (!current) return;
+    switch (current.kind) {
+      case 'queryOwner':
+        if (!seen.has(current.owner.id)) {
+          seen.add(current.owner.id);
+          out.push(cloneShapeQueryOwnerValue(current.owner));
+        }
+        visit(current.base);
+        return;
+      case 'transform':
+      case 'shell':
+      case 'trimByPlane':
+        visit(current.base);
+        return;
+      case 'boolean':
+        for (const shape of current.shapes) visit(shape);
+        return;
+      case 'hull':
+        for (const shape of current.shapes) visit(shape);
+        return;
+      case 'box':
+      case 'cylinder':
+      case 'sphere':
+      case 'extrude':
+      case 'revolve':
+      case 'loft':
+      case 'sweep':
+        return;
+    }
+  }
+
+  visit(plan);
+  return out;
+}
+
 export function findShapeWorkplanePlacement(
   plan: ShapeCompilePlan | null,
 ): ShapeWorkplanePlacement | null {
   if (!plan) return null;
 
   switch (plan.kind) {
+    case 'queryOwner':
+      return findShapeWorkplanePlacement(plan.base);
     case 'transform': {
       let current = findShapeWorkplanePlacement(plan.base);
       for (const step of plan.steps) {

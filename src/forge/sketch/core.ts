@@ -179,6 +179,10 @@ function workplanesNearlyEqual(a: SketchWorkplane | null, b: SketchWorkplane | n
   if (a.source.kind === 'canonical-face' && b.source.kind === 'canonical-face' && a.source.face !== b.source.face) return false;
   if (a.source.kind === 'tracked-face' && b.source.kind === 'tracked-face' && a.source.faceName !== b.source.faceName) return false;
   if (a.source.kind === 'face-ref' && b.source.kind === 'face-ref' && a.source.faceName !== b.source.faceName) return false;
+  const ownerA = a.source.owner;
+  const ownerB = b.source.owner;
+  if ((ownerA == null) !== (ownerB == null)) return false;
+  if (ownerA && ownerB && (ownerA.id !== ownerB.id || ownerA.operation !== ownerB.operation)) return false;
 
   const vectors = [
     [a.origin, b.origin],

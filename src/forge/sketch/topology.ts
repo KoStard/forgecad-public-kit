@@ -10,6 +10,7 @@
 
 import {
   Shape,
+  getShapePrimaryQueryOwner,
   resolveAnchor3D,
   setShapePlacementReferences,
   type ShapeOperandInput,
@@ -18,6 +19,7 @@ import {
 } from '../kernel';
 import { Transform, normalizeAxis, type Mat4, type RotateAroundToOptions } from '../transform';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
+import { cloneShapeQueryOwner, type ShapeQueryOwner } from './workplaneModel';
 
 export type FaceName = string;
 export type EdgeName = string;
@@ -28,6 +30,8 @@ export interface FaceRef {
   normal: [number, number, number];
   /** Center point of the face */
   center: [number, number, number];
+  /** Compiler-owned parent body identity when available. */
+  owner?: ShapeQueryOwner;
   /** True when the face can host a 2D sketch placement frame */
   planar?: boolean;
   /** Face-local horizontal axis for planar faces */
@@ -70,7 +74,15 @@ export class TrackedShape {
       const available = [...this.topology.faces.keys()].join(', ');
       throw new Error(`Face "${name}" not found. Available: ${available}`);
     }
-    return f;
+    const owner = getShapePrimaryQueryOwner(this.shape);
+    return {
+      ...f,
+      normal: [f.normal[0], f.normal[1], f.normal[2]],
+      center: [f.center[0], f.center[1], f.center[2]],
+      owner: cloneShapeQueryOwner(owner ?? f.owner),
+      uAxis: f.uAxis ? [f.uAxis[0], f.uAxis[1], f.uAxis[2]] : undefined,
+      vAxis: f.vAxis ? [f.vAxis[0], f.vAxis[1], f.vAxis[2]] : undefined,
+    };
   }
 
   /** Get a named edge */
@@ -385,6 +397,7 @@ function offsetTopology(topo: Topology, dx: number, dy: number, dz: number): Top
     faces.set(name, {
       ...face,
       center: [face.center[0] + dx, face.center[1] + dy, face.center[2] + dz],
+      owner: cloneShapeQueryOwner(face.owner),
       uAxis: face.uAxis ? [face.uAxis[0], face.uAxis[1], face.uAxis[2]] : undefined,
       vAxis: face.vAxis ? [face.vAxis[0], face.vAxis[1], face.vAxis[2]] : undefined,
     });
@@ -407,6 +420,7 @@ function cloneTopology(topo: Topology): Topology {
       ...face,
       normal: [face.normal[0], face.normal[1], face.normal[2]],
       center: [face.center[0], face.center[1], face.center[2]],
+      owner: cloneShapeQueryOwner(face.owner),
       uAxis: face.uAxis ? [face.uAxis[0], face.uAxis[1], face.uAxis[2]] : undefined,
       vAxis: face.vAxis ? [face.vAxis[0], face.vAxis[1], face.vAxis[2]] : undefined,
     });
@@ -430,6 +444,7 @@ export function transformTopology(topo: Topology, m: Mat4 | Transform): Topology
       ...face,
       normal: normalizeAxis(tx.vector(face.normal)),
       center: tx.point(face.center),
+      owner: cloneShapeQueryOwner(face.owner),
       uAxis: face.uAxis ? normalizeAxis(tx.vector(face.uAxis)) : undefined,
       vAxis: face.vAxis ? normalizeAxis(tx.vector(face.vAxis)) : undefined,
     });

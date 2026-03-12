@@ -18,102 +18,137 @@
             ]
           },
           "compilePlan": {
-            "kind": "boolean",
-            "op": "union",
-            "shapes": [
-              {
-                "kind": "boolean",
-                "op": "difference",
-                "shapes": [
-                  {
-                    "kind": "extrude",
-                    "profile": {
-                      "kind": "roundedRect",
-                      "width": 96,
-                      "height": 66,
-                      "radius": 8,
-                      "center": true,
-                      "transforms": []
-                    },
-                    "height": 20,
-                    "center": false
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-boolean-union-5",
+              "operation": "boolean:union"
+            },
+            "base": {
+              "kind": "boolean",
+              "op": "union",
+              "shapes": [
+                {
+                  "kind": "queryOwner",
+                  "owner": {
+                    "id": "shape-query-boolean-difference-4",
+                    "operation": "boolean:difference"
                   },
-                  {
-                    "kind": "transform",
+                  "base": {
+                    "kind": "boolean",
+                    "op": "difference",
+                    "shapes": [
+                      {
+                        "kind": "queryOwner",
+                        "owner": {
+                          "id": "shape-query-extrude-2",
+                          "operation": "extrude"
+                        },
+                        "base": {
+                          "kind": "extrude",
+                          "profile": {
+                            "kind": "roundedRect",
+                            "width": 96,
+                            "height": 66,
+                            "radius": 8,
+                            "center": true,
+                            "transforms": []
+                          },
+                          "height": 20,
+                          "center": false
+                        }
+                      },
+                      {
+                        "kind": "transform",
+                        "base": {
+                          "kind": "queryOwner",
+                          "owner": {
+                            "id": "shape-query-extrude-3",
+                            "operation": "extrude"
+                          },
+                          "base": {
+                            "kind": "extrude",
+                            "profile": {
+                              "kind": "roundedRect",
+                              "width": 88,
+                              "height": 58,
+                              "radius": 5,
+                              "center": true,
+                              "transforms": []
+                            },
+                            "height": 18,
+                            "center": false
+                          }
+                        },
+                        "steps": [
+                          {
+                            "kind": "translate",
+                            "x": 0,
+                            "y": 0,
+                            "z": 2
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "queryOwner",
+                    "owner": {
+                      "id": "shape-query-extrude-1",
+                      "operation": "extrude"
+                    },
                     "base": {
                       "kind": "extrude",
                       "profile": {
-                        "kind": "roundedRect",
-                        "width": 88,
-                        "height": 58,
-                        "radius": 5,
-                        "center": true,
-                        "transforms": []
+                        "kind": "boolean",
+                        "op": "difference",
+                        "profiles": [
+                          {
+                            "kind": "roundedRect",
+                            "width": 90,
+                            "height": 60,
+                            "radius": 8,
+                            "center": true,
+                            "transforms": []
+                          },
+                          {
+                            "kind": "roundedRect",
+                            "width": 84,
+                            "height": 54,
+                            "radius": 5,
+                            "center": true,
+                            "transforms": []
+                          }
+                        ],
+                        "transforms": [
+                          {
+                            "kind": "scale",
+                            "x": 0.96,
+                            "y": 0.93
+                          }
+                        ]
                       },
-                      "height": 18,
-                      "center": false
-                    },
-                    "steps": [
-                      {
-                        "kind": "translate",
-                        "x": 0,
-                        "y": 0,
-                        "z": 2
-                      }
-                    ]
-                  }
-                ]
-              },
-              {
-                "kind": "transform",
-                "base": {
-                  "kind": "extrude",
-                  "profile": {
-                    "kind": "boolean",
-                    "op": "difference",
-                    "profiles": [
-                      {
-                        "kind": "roundedRect",
-                        "width": 90,
-                        "height": 60,
-                        "radius": 8,
-                        "center": true,
-                        "transforms": []
-                      },
-                      {
-                        "kind": "roundedRect",
-                        "width": 84,
-                        "height": 54,
-                        "radius": 5,
-                        "center": true,
-                        "transforms": []
-                      }
-                    ],
-                    "transforms": [
-                      {
-                        "kind": "scale",
-                        "x": 0.96,
-                        "y": 0.93
-                      }
-                    ]
+                      "height": 4,
+                      "center": false,
+                      "scaleTop": [
+                        1.0416666666666667,
+                        1.075268817204301
+                      ]
+                    }
                   },
-                  "height": 4,
-                  "center": false,
-                  "scaleTop": [
-                    1.0416666666666667,
-                    1.075268817204301
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": 0,
+                      "y": 0,
+                      "z": -4
+                    }
                   ]
-                },
-                "steps": [
-                  {
-                    "kind": "translate",
-                    "x": 0,
-                    "y": 0,
-                    "z": -4
-                  }
-                ]
-              }
-            ]
+                }
+              ]
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -318,65 +353,100 @@
           "compilePlan": {
             "kind": "transform",
             "base": {
-              "kind": "boolean",
-              "op": "difference",
-              "shapes": [
-                {
-                  "kind": "boolean",
-                  "op": "difference",
-                  "shapes": [
-                    {
-                      "kind": "box",
-                      "x": 30,
-                      "y": 30,
-                      "z": 30,
-                      "center": true
+              "kind": "queryOwner",
+              "owner": {
+                "id": "shape-query-boolean-difference-5",
+                "operation": "boolean:difference"
+              },
+              "base": {
+                "kind": "boolean",
+                "op": "difference",
+                "shapes": [
+                  {
+                    "kind": "queryOwner",
+                    "owner": {
+                      "id": "shape-query-boolean-difference-4",
+                      "operation": "boolean:difference"
                     },
-                    {
-                      "kind": "transform",
-                      "base": {
-                        "kind": "cylinder",
-                        "height": 60,
-                        "radius": 5,
-                        "center": false
-                      },
-                      "steps": [
+                    "base": {
+                      "kind": "boolean",
+                      "op": "difference",
+                      "shapes": [
                         {
-                          "kind": "rotateAround",
-                          "axisX": -1,
-                          "axisY": 0,
-                          "axisZ": 0,
-                          "degrees": 90,
-                          "pivotX": 0,
-                          "pivotY": 0,
-                          "pivotZ": 0
+                          "kind": "queryOwner",
+                          "owner": {
+                            "id": "shape-query-primitive-box-3",
+                            "operation": "primitive:box"
+                          },
+                          "base": {
+                            "kind": "box",
+                            "x": 30,
+                            "y": 30,
+                            "z": 30,
+                            "center": true
+                          }
+                        },
+                        {
+                          "kind": "transform",
+                          "base": {
+                            "kind": "queryOwner",
+                            "owner": {
+                              "id": "shape-query-primitive-cylinder-1",
+                              "operation": "primitive:cylinder"
+                            },
+                            "base": {
+                              "kind": "cylinder",
+                              "height": 60,
+                              "radius": 5,
+                              "center": false
+                            }
+                          },
+                          "steps": [
+                            {
+                              "kind": "rotateAround",
+                              "axisX": -1,
+                              "axisY": 0,
+                              "axisZ": 0,
+                              "degrees": 90,
+                              "pivotX": 0,
+                              "pivotY": 0,
+                              "pivotZ": 0
+                            }
+                          ]
                         }
                       ]
                     }
-                  ]
-                },
-                {
-                  "kind": "transform",
-                  "base": {
-                    "kind": "sphere",
-                    "radius": 6
                   },
-                  "steps": [
-                    {
-                      "kind": "scale",
-                      "x": 1.2,
-                      "y": 0.8,
-                      "z": 0.5
+                  {
+                    "kind": "transform",
+                    "base": {
+                      "kind": "queryOwner",
+                      "owner": {
+                        "id": "shape-query-primitive-sphere-2",
+                        "operation": "primitive:sphere"
+                      },
+                      "base": {
+                        "kind": "sphere",
+                        "radius": 6
+                      }
                     },
-                    {
-                      "kind": "translate",
-                      "x": 4,
-                      "y": -2,
-                      "z": 1
-                    }
-                  ]
-                }
-              ]
+                    "steps": [
+                      {
+                        "kind": "scale",
+                        "x": 1.2,
+                        "y": 0.8,
+                        "z": 0.5
+                      },
+                      {
+                        "kind": "translate",
+                        "x": 4,
+                        "y": -2,
+                        "z": 1
+                      }
+                    ]
+                  }
+                ]
+              }
             },
             "steps": [
               {
@@ -582,40 +652,61 @@
             ]
           },
           "compilePlan": {
-            "kind": "boolean",
-            "op": "intersection",
-            "shapes": [
-              {
-                "kind": "box",
-                "x": 48,
-                "y": 24,
-                "z": 20,
-                "center": true
-              },
-              {
-                "kind": "transform",
-                "base": {
-                  "kind": "cylinder",
-                  "height": 28,
-                  "radius": 8,
-                  "center": true
-                },
-                "steps": [
-                  {
-                    "kind": "translate",
-                    "x": 10,
-                    "y": 0,
-                    "z": 0
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-split-inside-3",
+              "operation": "split:inside"
+            },
+            "base": {
+              "kind": "boolean",
+              "op": "intersection",
+              "shapes": [
+                {
+                  "kind": "queryOwner",
+                  "owner": {
+                    "id": "shape-query-primitive-box-1",
+                    "operation": "primitive:box"
                   },
-                  {
-                    "kind": "rotate",
-                    "xDeg": 0,
-                    "yDeg": 90,
-                    "zDeg": 0
+                  "base": {
+                    "kind": "box",
+                    "x": 48,
+                    "y": 24,
+                    "z": 20,
+                    "center": true
                   }
-                ]
-              }
-            ]
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "queryOwner",
+                    "owner": {
+                      "id": "shape-query-primitive-cylinder-2",
+                      "operation": "primitive:cylinder"
+                    },
+                    "base": {
+                      "kind": "cylinder",
+                      "height": 28,
+                      "radius": 8,
+                      "center": true
+                    }
+                  },
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": 10,
+                      "y": 0,
+                      "z": 0
+                    },
+                    {
+                      "kind": "rotate",
+                      "xDeg": 0,
+                      "yDeg": 90,
+                      "zDeg": 0
+                    }
+                  ]
+                }
+              ]
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -726,40 +817,61 @@
             ]
           },
           "compilePlan": {
-            "kind": "boolean",
-            "op": "difference",
-            "shapes": [
-              {
-                "kind": "box",
-                "x": 48,
-                "y": 24,
-                "z": 20,
-                "center": true
-              },
-              {
-                "kind": "transform",
-                "base": {
-                  "kind": "cylinder",
-                  "height": 28,
-                  "radius": 8,
-                  "center": true
-                },
-                "steps": [
-                  {
-                    "kind": "translate",
-                    "x": 10,
-                    "y": 0,
-                    "z": 0
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-split-outside-4",
+              "operation": "split:outside"
+            },
+            "base": {
+              "kind": "boolean",
+              "op": "difference",
+              "shapes": [
+                {
+                  "kind": "queryOwner",
+                  "owner": {
+                    "id": "shape-query-primitive-box-1",
+                    "operation": "primitive:box"
                   },
-                  {
-                    "kind": "rotate",
-                    "xDeg": 0,
-                    "yDeg": 90,
-                    "zDeg": 0
+                  "base": {
+                    "kind": "box",
+                    "x": 48,
+                    "y": 24,
+                    "z": 20,
+                    "center": true
                   }
-                ]
-              }
-            ]
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "queryOwner",
+                    "owner": {
+                      "id": "shape-query-primitive-cylinder-2",
+                      "operation": "primitive:cylinder"
+                    },
+                    "base": {
+                      "kind": "cylinder",
+                      "height": 28,
+                      "radius": 8,
+                      "center": true
+                    }
+                  },
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": 10,
+                      "y": 0,
+                      "z": 0
+                    },
+                    {
+                      "kind": "rotate",
+                      "xDeg": 0,
+                      "yDeg": 90,
+                      "zDeg": 0
+                    }
+                  ]
+                }
+              ]
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -908,18 +1020,32 @@
             ]
           },
           "compilePlan": {
-            "kind": "trimByPlane",
-            "base": {
-              "kind": "box",
-              "x": 40,
-              "y": 30,
-              "z": 20,
-              "center": true
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-trimbyplane-2",
+              "operation": "trimByPlane"
             },
-            "normalX": 0,
-            "normalY": 0,
-            "normalZ": 1,
-            "originOffset": 0
+            "base": {
+              "kind": "trimByPlane",
+              "base": {
+                "kind": "queryOwner",
+                "owner": {
+                  "id": "shape-query-primitive-box-1",
+                  "operation": "primitive:box"
+                },
+                "base": {
+                  "kind": "box",
+                  "x": 40,
+                  "y": 30,
+                  "z": 20,
+                  "center": true
+                }
+              },
+              "normalX": 0,
+              "normalY": 0,
+              "normalZ": 1,
+              "originOffset": 0
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -1008,18 +1134,32 @@
             ]
           },
           "compilePlan": {
-            "kind": "trimByPlane",
-            "base": {
-              "kind": "box",
-              "x": 40,
-              "y": 30,
-              "z": 20,
-              "center": true
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-splitbyplane-positive-3",
+              "operation": "splitByPlane:positive"
             },
-            "normalX": 0,
-            "normalY": 0,
-            "normalZ": 1,
-            "originOffset": 0
+            "base": {
+              "kind": "trimByPlane",
+              "base": {
+                "kind": "queryOwner",
+                "owner": {
+                  "id": "shape-query-primitive-box-1",
+                  "operation": "primitive:box"
+                },
+                "base": {
+                  "kind": "box",
+                  "x": 40,
+                  "y": 30,
+                  "z": 20,
+                  "center": true
+                }
+              },
+              "normalX": 0,
+              "normalY": 0,
+              "normalZ": 1,
+              "originOffset": 0
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -1108,18 +1248,32 @@
             ]
           },
           "compilePlan": {
-            "kind": "trimByPlane",
-            "base": {
-              "kind": "box",
-              "x": 40,
-              "y": 30,
-              "z": 20,
-              "center": true
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-splitbyplane-opposite-4",
+              "operation": "splitByPlane:opposite"
             },
-            "normalX": 0,
-            "normalY": 0,
-            "normalZ": -1,
-            "originOffset": 0
+            "base": {
+              "kind": "trimByPlane",
+              "base": {
+                "kind": "queryOwner",
+                "owner": {
+                  "id": "shape-query-primitive-box-1",
+                  "operation": "primitive:box"
+                },
+                "base": {
+                  "kind": "box",
+                  "x": 40,
+                  "y": 30,
+                  "z": 20,
+                  "center": true
+                }
+              },
+              "normalX": 0,
+              "normalY": 0,
+              "normalZ": -1,
+              "originOffset": 0
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -1254,49 +1408,56 @@
             ]
           },
           "compilePlan": {
-            "kind": "loft",
-            "profiles": [
-              {
-                "kind": "roundedRect",
-                "width": 26,
-                "height": 16,
-                "radius": 3,
-                "center": true,
-                "transforms": [
-                  {
-                    "kind": "translate",
-                    "x": -1,
-                    "y": 0
-                  }
-                ]
-              },
-              {
-                "kind": "circle",
-                "radius": 8,
-                "transforms": []
-              },
-              {
-                "kind": "roundedRect",
-                "width": 18,
-                "height": 10,
-                "radius": 2,
-                "center": true,
-                "transforms": [
-                  {
-                    "kind": "translate",
-                    "x": 2,
-                    "y": -1
-                  }
-                ]
-              }
-            ],
-            "heights": [
-              0,
-              14,
-              28
-            ],
-            "edgeLength": 0.35,
-            "boundsPadding": 1.68
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-loft-1",
+              "operation": "loft"
+            },
+            "base": {
+              "kind": "loft",
+              "profiles": [
+                {
+                  "kind": "roundedRect",
+                  "width": 26,
+                  "height": 16,
+                  "radius": 3,
+                  "center": true,
+                  "transforms": [
+                    {
+                      "kind": "translate",
+                      "x": -1,
+                      "y": 0
+                    }
+                  ]
+                },
+                {
+                  "kind": "circle",
+                  "radius": 8,
+                  "transforms": []
+                },
+                {
+                  "kind": "roundedRect",
+                  "width": 18,
+                  "height": 10,
+                  "radius": 2,
+                  "center": true,
+                  "transforms": [
+                    {
+                      "kind": "translate",
+                      "x": 2,
+                      "y": -1
+                    }
+                  ]
+                }
+              ],
+              "heights": [
+                0,
+                14,
+                28
+              ],
+              "edgeLength": 0.35,
+              "boundsPadding": 1.68
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -1446,57 +1607,64 @@
             ]
           },
           "compilePlan": {
-            "kind": "sweep",
-            "profile": {
-              "kind": "roundedRect",
-              "width": 8,
-              "height": 4,
-              "radius": 1.2,
-              "center": true,
-              "transforms": [
-                {
-                  "kind": "rotate",
-                  "degrees": 18
-                },
-                {
-                  "kind": "translate",
-                  "x": 1.5,
-                  "y": 0
-                }
-              ]
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-sweep-1",
+              "operation": "sweep"
             },
-            "path": {
-              "kind": "polyline",
-              "points": [
-                [
-                  0,
-                  0,
-                  0
-                ],
-                [
-                  18,
-                  0,
-                  0
-                ],
-                [
-                  28,
-                  8,
-                  4
-                ],
-                [
-                  40,
-                  12,
-                  10
+            "base": {
+              "kind": "sweep",
+              "profile": {
+                "kind": "roundedRect",
+                "width": 8,
+                "height": 4,
+                "radius": 1.2,
+                "center": true,
+                "transforms": [
+                  {
+                    "kind": "rotate",
+                    "degrees": 18
+                  },
+                  {
+                    "kind": "translate",
+                    "x": 1.5,
+                    "y": 0
+                  }
                 ]
+              },
+              "path": {
+                "kind": "polyline",
+                "points": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    18,
+                    0,
+                    0
+                  ],
+                  [
+                    28,
+                    8,
+                    4
+                  ],
+                  [
+                    40,
+                    12,
+                    10
+                  ]
+                ]
+              },
+              "edgeLength": 0.5,
+              "boundsPadding": 6.606472642903361,
+              "up": [
+                0,
+                0,
+                1
               ]
-            },
-            "edgeLength": 0.5,
-            "boundsPadding": 6.606472642903361,
-            "up": [
-              0,
-              0,
-              1
-            ]
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -1654,35 +1822,49 @@
             ]
           },
           "compilePlan": {
-            "kind": "shell",
-            "base": {
-              "kind": "transform",
-              "base": {
-                "kind": "extrude",
-                "profile": {
-                  "kind": "roundedRect",
-                  "width": 80,
-                  "height": 50,
-                  "radius": 6,
-                  "center": true,
-                  "transforms": []
-                },
-                "height": 30,
-                "center": false
-              },
-              "steps": [
-                {
-                  "kind": "translate",
-                  "x": 4,
-                  "y": -3,
-                  "z": 2
-                }
-              ]
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-shell-2",
+              "operation": "shell"
             },
-            "thickness": 2.5,
-            "openFaces": [
-              "top"
-            ]
+            "base": {
+              "kind": "shell",
+              "base": {
+                "kind": "transform",
+                "base": {
+                  "kind": "queryOwner",
+                  "owner": {
+                    "id": "shape-query-extrude-1",
+                    "operation": "extrude"
+                  },
+                  "base": {
+                    "kind": "extrude",
+                    "profile": {
+                      "kind": "roundedRect",
+                      "width": 80,
+                      "height": 50,
+                      "radius": 6,
+                      "center": true,
+                      "transforms": []
+                    },
+                    "height": 30,
+                    "center": false
+                  }
+                },
+                "steps": [
+                  {
+                    "kind": "translate",
+                    "x": 4,
+                    "y": -3,
+                    "z": 2
+                  }
+                ]
+              },
+              "thickness": 2.5,
+              "openFaces": [
+                "top"
+              ]
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -1848,363 +2030,550 @@
             ]
           },
           "compilePlan": {
-            "kind": "boolean",
-            "op": "difference",
-            "shapes": [
-              {
-                "kind": "boolean",
-                "op": "difference",
-                "shapes": [
-                  {
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-boolean-difference-9",
+              "operation": "boolean:difference"
+            },
+            "base": {
+              "kind": "boolean",
+              "op": "difference",
+              "shapes": [
+                {
+                  "kind": "queryOwner",
+                  "owner": {
+                    "id": "shape-query-boolean-difference-8",
+                    "operation": "boolean:difference"
+                  },
+                  "base": {
                     "kind": "boolean",
-                    "op": "union",
+                    "op": "difference",
                     "shapes": [
                       {
-                        "kind": "shell",
-                        "base": {
-                          "kind": "extrude",
-                          "profile": {
-                            "kind": "roundedRect",
-                            "width": 120,
-                            "height": 80,
-                            "radius": 10,
-                            "center": true,
-                            "transforms": []
-                          },
-                          "height": 36,
-                          "center": false
+                        "kind": "queryOwner",
+                        "owner": {
+                          "id": "shape-query-boolean-union-7",
+                          "operation": "boolean:union"
                         },
-                        "thickness": 3,
-                        "openFaces": [
-                          "top"
-                        ]
+                        "base": {
+                          "kind": "boolean",
+                          "op": "union",
+                          "shapes": [
+                            {
+                              "kind": "queryOwner",
+                              "owner": {
+                                "id": "shape-query-shell-2",
+                                "operation": "shell"
+                              },
+                              "base": {
+                                "kind": "shell",
+                                "base": {
+                                  "kind": "queryOwner",
+                                  "owner": {
+                                    "id": "shape-query-extrude-1",
+                                    "operation": "extrude"
+                                  },
+                                  "base": {
+                                    "kind": "extrude",
+                                    "profile": {
+                                      "kind": "roundedRect",
+                                      "width": 120,
+                                      "height": 80,
+                                      "radius": 10,
+                                      "center": true,
+                                      "transforms": []
+                                    },
+                                    "height": 36,
+                                    "center": false
+                                  }
+                                },
+                                "thickness": 3,
+                                "openFaces": [
+                                  "top"
+                                ]
+                              }
+                            },
+                            {
+                              "kind": "queryOwner",
+                              "owner": {
+                                "id": "shape-query-boolean-union-6",
+                                "operation": "boolean:union"
+                              },
+                              "base": {
+                                "kind": "boolean",
+                                "op": "union",
+                                "shapes": [
+                                  {
+                                    "kind": "queryOwner",
+                                    "owner": {
+                                      "id": "shape-query-extrude-5",
+                                      "operation": "extrude"
+                                    },
+                                    "base": {
+                                      "kind": "transform",
+                                      "base": {
+                                        "kind": "extrude",
+                                        "profile": {
+                                          "kind": "roundedRect",
+                                          "width": 18,
+                                          "height": 18,
+                                          "radius": 4,
+                                          "center": true,
+                                          "transforms": []
+                                        },
+                                        "height": 6,
+                                        "center": false
+                                      },
+                                      "steps": [
+                                        {
+                                          "kind": "workplanePlacement",
+                                          "matrix": [
+                                            1,
+                                            0,
+                                            0,
+                                            0,
+                                            0,
+                                            -1,
+                                            0,
+                                            0,
+                                            0,
+                                            0,
+                                            -1,
+                                            0,
+                                            36,
+                                            -20,
+                                            0,
+                                            1
+                                          ],
+                                          "placement": {
+                                            "workplane": {
+                                              "origin": [
+                                                0,
+                                                0,
+                                                0
+                                              ],
+                                              "u": [
+                                                1,
+                                                0,
+                                                0
+                                              ],
+                                              "v": [
+                                                0,
+                                                -1,
+                                                0
+                                              ],
+                                              "normal": [
+                                                0,
+                                                0,
+                                                -1
+                                              ],
+                                              "source": {
+                                                "kind": "tracked-face",
+                                                "faceName": "bottom",
+                                                "owner": {
+                                                  "id": "shape-query-extrude-1",
+                                                  "operation": "extrude"
+                                                }
+                                              }
+                                            },
+                                            "u": 36,
+                                            "v": 20,
+                                            "protrude": 0,
+                                            "selfAnchor": "center"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "kind": "transform",
+                                    "base": {
+                                      "kind": "queryOwner",
+                                      "owner": {
+                                        "id": "shape-query-extrude-5",
+                                        "operation": "extrude"
+                                      },
+                                      "base": {
+                                        "kind": "transform",
+                                        "base": {
+                                          "kind": "extrude",
+                                          "profile": {
+                                            "kind": "roundedRect",
+                                            "width": 18,
+                                            "height": 18,
+                                            "radius": 4,
+                                            "center": true,
+                                            "transforms": []
+                                          },
+                                          "height": 6,
+                                          "center": false
+                                        },
+                                        "steps": [
+                                          {
+                                            "kind": "workplanePlacement",
+                                            "matrix": [
+                                              1,
+                                              0,
+                                              0,
+                                              0,
+                                              0,
+                                              -1,
+                                              0,
+                                              0,
+                                              0,
+                                              0,
+                                              -1,
+                                              0,
+                                              36,
+                                              -20,
+                                              0,
+                                              1
+                                            ],
+                                            "placement": {
+                                              "workplane": {
+                                                "origin": [
+                                                  0,
+                                                  0,
+                                                  0
+                                                ],
+                                                "u": [
+                                                  1,
+                                                  0,
+                                                  0
+                                                ],
+                                                "v": [
+                                                  0,
+                                                  -1,
+                                                  0
+                                                ],
+                                                "normal": [
+                                                  0,
+                                                  0,
+                                                  -1
+                                                ],
+                                                "source": {
+                                                  "kind": "tracked-face",
+                                                  "faceName": "bottom",
+                                                  "owner": {
+                                                    "id": "shape-query-extrude-1",
+                                                    "operation": "extrude"
+                                                  }
+                                                }
+                                              },
+                                              "u": 36,
+                                              "v": 20,
+                                              "protrude": 0,
+                                              "selfAnchor": "center"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "steps": [
+                                      {
+                                        "kind": "mirror",
+                                        "normalX": 1,
+                                        "normalY": 0,
+                                        "normalZ": 0
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "kind": "transform",
+                                    "base": {
+                                      "kind": "queryOwner",
+                                      "owner": {
+                                        "id": "shape-query-extrude-5",
+                                        "operation": "extrude"
+                                      },
+                                      "base": {
+                                        "kind": "transform",
+                                        "base": {
+                                          "kind": "extrude",
+                                          "profile": {
+                                            "kind": "roundedRect",
+                                            "width": 18,
+                                            "height": 18,
+                                            "radius": 4,
+                                            "center": true,
+                                            "transforms": []
+                                          },
+                                          "height": 6,
+                                          "center": false
+                                        },
+                                        "steps": [
+                                          {
+                                            "kind": "workplanePlacement",
+                                            "matrix": [
+                                              1,
+                                              0,
+                                              0,
+                                              0,
+                                              0,
+                                              -1,
+                                              0,
+                                              0,
+                                              0,
+                                              0,
+                                              -1,
+                                              0,
+                                              36,
+                                              -20,
+                                              0,
+                                              1
+                                            ],
+                                            "placement": {
+                                              "workplane": {
+                                                "origin": [
+                                                  0,
+                                                  0,
+                                                  0
+                                                ],
+                                                "u": [
+                                                  1,
+                                                  0,
+                                                  0
+                                                ],
+                                                "v": [
+                                                  0,
+                                                  -1,
+                                                  0
+                                                ],
+                                                "normal": [
+                                                  0,
+                                                  0,
+                                                  -1
+                                                ],
+                                                "source": {
+                                                  "kind": "tracked-face",
+                                                  "faceName": "bottom",
+                                                  "owner": {
+                                                    "id": "shape-query-extrude-1",
+                                                    "operation": "extrude"
+                                                  }
+                                                }
+                                              },
+                                              "u": 36,
+                                              "v": 20,
+                                              "protrude": 0,
+                                              "selfAnchor": "center"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "steps": [
+                                      {
+                                        "kind": "mirror",
+                                        "normalX": 0,
+                                        "normalY": 1,
+                                        "normalZ": 0
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "kind": "transform",
+                                    "base": {
+                                      "kind": "queryOwner",
+                                      "owner": {
+                                        "id": "shape-query-extrude-5",
+                                        "operation": "extrude"
+                                      },
+                                      "base": {
+                                        "kind": "transform",
+                                        "base": {
+                                          "kind": "extrude",
+                                          "profile": {
+                                            "kind": "roundedRect",
+                                            "width": 18,
+                                            "height": 18,
+                                            "radius": 4,
+                                            "center": true,
+                                            "transforms": []
+                                          },
+                                          "height": 6,
+                                          "center": false
+                                        },
+                                        "steps": [
+                                          {
+                                            "kind": "workplanePlacement",
+                                            "matrix": [
+                                              1,
+                                              0,
+                                              0,
+                                              0,
+                                              0,
+                                              -1,
+                                              0,
+                                              0,
+                                              0,
+                                              0,
+                                              -1,
+                                              0,
+                                              36,
+                                              -20,
+                                              0,
+                                              1
+                                            ],
+                                            "placement": {
+                                              "workplane": {
+                                                "origin": [
+                                                  0,
+                                                  0,
+                                                  0
+                                                ],
+                                                "u": [
+                                                  1,
+                                                  0,
+                                                  0
+                                                ],
+                                                "v": [
+                                                  0,
+                                                  -1,
+                                                  0
+                                                ],
+                                                "normal": [
+                                                  0,
+                                                  0,
+                                                  -1
+                                                ],
+                                                "source": {
+                                                  "kind": "tracked-face",
+                                                  "faceName": "bottom",
+                                                  "owner": {
+                                                    "id": "shape-query-extrude-1",
+                                                    "operation": "extrude"
+                                                  }
+                                                }
+                                              },
+                                              "u": 36,
+                                              "v": 20,
+                                              "protrude": 0,
+                                              "selfAnchor": "center"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "steps": [
+                                      {
+                                        "kind": "mirror",
+                                        "normalX": 1,
+                                        "normalY": 0,
+                                        "normalZ": 0
+                                      },
+                                      {
+                                        "kind": "mirror",
+                                        "normalX": 0,
+                                        "normalY": 1,
+                                        "normalZ": 0
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
                       },
                       {
-                        "kind": "boolean",
-                        "op": "union",
-                        "shapes": [
-                          {
-                            "kind": "transform",
-                            "base": {
-                              "kind": "extrude",
-                              "profile": {
-                                "kind": "roundedRect",
-                                "width": 18,
-                                "height": 18,
-                                "radius": 4,
-                                "center": true,
-                                "transforms": []
-                              },
-                              "height": 6,
-                              "center": false
+                        "kind": "queryOwner",
+                        "owner": {
+                          "id": "shape-query-extrude-3",
+                          "operation": "extrude"
+                        },
+                        "base": {
+                          "kind": "transform",
+                          "base": {
+                            "kind": "extrude",
+                            "profile": {
+                              "kind": "roundedRect",
+                              "width": 32,
+                              "height": 12,
+                              "radius": 3,
+                              "center": true,
+                              "transforms": []
                             },
-                            "steps": [
-                              {
-                                "kind": "workplanePlacement",
-                                "matrix": [
-                                  1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  -1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  -1,
-                                  0,
-                                  36,
-                                  -20,
-                                  0,
-                                  1
-                                ],
-                                "placement": {
-                                  "workplane": {
-                                    "origin": [
-                                      0,
-                                      0,
-                                      0
-                                    ],
-                                    "u": [
-                                      1,
-                                      0,
-                                      0
-                                    ],
-                                    "v": [
-                                      0,
-                                      -1,
-                                      0
-                                    ],
-                                    "normal": [
-                                      0,
-                                      0,
-                                      -1
-                                    ],
-                                    "source": {
-                                      "kind": "tracked-face",
-                                      "faceName": "bottom"
-                                    }
-                                  },
-                                  "u": 36,
-                                  "v": 20,
-                                  "protrude": 0,
-                                  "selfAnchor": "center"
-                                }
-                              }
-                            ]
+                            "height": 10,
+                            "center": false
                           },
-                          {
-                            "kind": "transform",
-                            "base": {
-                              "kind": "extrude",
-                              "profile": {
-                                "kind": "roundedRect",
-                                "width": 18,
-                                "height": 18,
-                                "radius": 4,
-                                "center": true,
-                                "transforms": []
-                              },
-                              "height": 6,
-                              "center": false
-                            },
-                            "steps": [
-                              {
-                                "kind": "workplanePlacement",
-                                "matrix": [
-                                  1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  -1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  -1,
-                                  0,
-                                  36,
-                                  -20,
-                                  0,
-                                  1
-                                ],
-                                "placement": {
-                                  "workplane": {
-                                    "origin": [
-                                      0,
-                                      0,
-                                      0
-                                    ],
-                                    "u": [
-                                      1,
-                                      0,
-                                      0
-                                    ],
-                                    "v": [
-                                      0,
-                                      -1,
-                                      0
-                                    ],
-                                    "normal": [
-                                      0,
-                                      0,
-                                      -1
-                                    ],
-                                    "source": {
-                                      "kind": "tracked-face",
-                                      "faceName": "bottom"
+                          "steps": [
+                            {
+                              "kind": "workplanePlacement",
+                              "matrix": [
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                -1,
+                                0,
+                                0,
+                                0,
+                                -40.25,
+                                24,
+                                1
+                              ],
+                              "placement": {
+                                "workplane": {
+                                  "origin": [
+                                    0,
+                                    -40,
+                                    18
+                                  ],
+                                  "u": [
+                                    1,
+                                    0,
+                                    0
+                                  ],
+                                  "v": [
+                                    0,
+                                    0,
+                                    1
+                                  ],
+                                  "normal": [
+                                    0,
+                                    -1,
+                                    0
+                                  ],
+                                  "source": {
+                                    "kind": "canonical-face",
+                                    "face": "front",
+                                    "owner": {
+                                      "id": "shape-query-extrude-1",
+                                      "operation": "extrude"
                                     }
-                                  },
-                                  "u": 36,
-                                  "v": 20,
-                                  "protrude": 0,
-                                  "selfAnchor": "center"
-                                }
-                              },
-                              {
-                                "kind": "mirror",
-                                "normalX": 1,
-                                "normalY": 0,
-                                "normalZ": 0
+                                  }
+                                },
+                                "u": 0,
+                                "v": 6,
+                                "protrude": 0.25,
+                                "selfAnchor": "center"
                               }
-                            ]
-                          },
-                          {
-                            "kind": "transform",
-                            "base": {
-                              "kind": "extrude",
-                              "profile": {
-                                "kind": "roundedRect",
-                                "width": 18,
-                                "height": 18,
-                                "radius": 4,
-                                "center": true,
-                                "transforms": []
-                              },
-                              "height": 6,
-                              "center": false
-                            },
-                            "steps": [
-                              {
-                                "kind": "workplanePlacement",
-                                "matrix": [
-                                  1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  -1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  -1,
-                                  0,
-                                  36,
-                                  -20,
-                                  0,
-                                  1
-                                ],
-                                "placement": {
-                                  "workplane": {
-                                    "origin": [
-                                      0,
-                                      0,
-                                      0
-                                    ],
-                                    "u": [
-                                      1,
-                                      0,
-                                      0
-                                    ],
-                                    "v": [
-                                      0,
-                                      -1,
-                                      0
-                                    ],
-                                    "normal": [
-                                      0,
-                                      0,
-                                      -1
-                                    ],
-                                    "source": {
-                                      "kind": "tracked-face",
-                                      "faceName": "bottom"
-                                    }
-                                  },
-                                  "u": 36,
-                                  "v": 20,
-                                  "protrude": 0,
-                                  "selfAnchor": "center"
-                                }
-                              },
-                              {
-                                "kind": "mirror",
-                                "normalX": 0,
-                                "normalY": 1,
-                                "normalZ": 0
-                              }
-                            ]
-                          },
-                          {
-                            "kind": "transform",
-                            "base": {
-                              "kind": "extrude",
-                              "profile": {
-                                "kind": "roundedRect",
-                                "width": 18,
-                                "height": 18,
-                                "radius": 4,
-                                "center": true,
-                                "transforms": []
-                              },
-                              "height": 6,
-                              "center": false
-                            },
-                            "steps": [
-                              {
-                                "kind": "workplanePlacement",
-                                "matrix": [
-                                  1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  -1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  -1,
-                                  0,
-                                  36,
-                                  -20,
-                                  0,
-                                  1
-                                ],
-                                "placement": {
-                                  "workplane": {
-                                    "origin": [
-                                      0,
-                                      0,
-                                      0
-                                    ],
-                                    "u": [
-                                      1,
-                                      0,
-                                      0
-                                    ],
-                                    "v": [
-                                      0,
-                                      -1,
-                                      0
-                                    ],
-                                    "normal": [
-                                      0,
-                                      0,
-                                      -1
-                                    ],
-                                    "source": {
-                                      "kind": "tracked-face",
-                                      "faceName": "bottom"
-                                    }
-                                  },
-                                  "u": 36,
-                                  "v": 20,
-                                  "protrude": 0,
-                                  "selfAnchor": "center"
-                                }
-                              },
-                              {
-                                "kind": "mirror",
-                                "normalX": 1,
-                                "normalY": 0,
-                                "normalZ": 0
-                              },
-                              {
-                                "kind": "mirror",
-                                "normalX": 0,
-                                "normalY": 1,
-                                "normalZ": 0
-                              }
-                            ]
-                          }
-                        ]
+                            }
+                          ]
+                        }
                       }
                     ]
+                  }
+                },
+                {
+                  "kind": "queryOwner",
+                  "owner": {
+                    "id": "shape-query-extrude-4",
+                    "operation": "extrude"
                   },
-                  {
+                  "base": {
                     "kind": "transform",
                     "base": {
                       "kind": "extrude",
                       "profile": {
-                        "kind": "roundedRect",
-                        "width": 32,
-                        "height": 12,
-                        "radius": 3,
-                        "center": true,
+                        "kind": "circle",
+                        "radius": 7,
                         "transforms": []
                       },
                       "height": 10,
@@ -2214,33 +2583,33 @@
                       {
                         "kind": "workplanePlacement",
                         "matrix": [
-                          1,
-                          0,
-                          0,
-                          0,
-                          0,
                           0,
                           1,
                           0,
                           0,
-                          -1,
+                          0,
+                          0,
+                          1,
+                          0,
+                          1,
                           0,
                           0,
                           0,
-                          -40.25,
-                          24,
+                          60.25,
+                          -10,
+                          12,
                           1
                         ],
                         "placement": {
                           "workplane": {
                             "origin": [
+                              60,
                               0,
-                              -40,
                               18
                             ],
                             "u": [
-                              1,
                               0,
+                              1,
                               0
                             ],
                             "v": [
@@ -2249,94 +2618,30 @@
                               1
                             ],
                             "normal": [
+                              1,
                               0,
-                              -1,
                               0
                             ],
                             "source": {
                               "kind": "canonical-face",
-                              "face": "front"
+                              "face": "right",
+                              "owner": {
+                                "id": "shape-query-extrude-1",
+                                "operation": "extrude"
+                              }
                             }
                           },
-                          "u": 0,
-                          "v": 6,
+                          "u": -10,
+                          "v": -6,
                           "protrude": 0.25,
                           "selfAnchor": "center"
                         }
                       }
                     ]
                   }
-                ]
-              },
-              {
-                "kind": "transform",
-                "base": {
-                  "kind": "extrude",
-                  "profile": {
-                    "kind": "circle",
-                    "radius": 7,
-                    "transforms": []
-                  },
-                  "height": 10,
-                  "center": false
-                },
-                "steps": [
-                  {
-                    "kind": "workplanePlacement",
-                    "matrix": [
-                      0,
-                      1,
-                      0,
-                      0,
-                      0,
-                      0,
-                      1,
-                      0,
-                      1,
-                      0,
-                      0,
-                      0,
-                      60.25,
-                      -10,
-                      12,
-                      1
-                    ],
-                    "placement": {
-                      "workplane": {
-                        "origin": [
-                          60,
-                          0,
-                          18
-                        ],
-                        "u": [
-                          0,
-                          1,
-                          0
-                        ],
-                        "v": [
-                          0,
-                          0,
-                          1
-                        ],
-                        "normal": [
-                          1,
-                          0,
-                          0
-                        ],
-                        "source": {
-                          "kind": "canonical-face",
-                          "face": "right"
-                        }
-                      },
-                      "u": -10,
-                      "v": -6,
-                      "protrude": 0.25,
-                      "selfAnchor": "center"
-                    }
-                  }
-                ]
-              }
-            ]
+                }
+              ]
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -2476,7 +2781,11 @@
                                       ],
                                       "source": {
                                         "kind": "tracked-face",
-                                        "faceName": "bottom"
+                                        "faceName": "bottom",
+                                        "owner": {
+                                          "id": "shape-query-extrude-1",
+                                          "operation": "extrude"
+                                        }
                                       }
                                     },
                                     "u": 36,
@@ -2490,72 +2799,81 @@
                             {
                               "kind": "transform",
                               "base": {
-                                "kind": "extrude",
-                                "profile": {
-                                  "kind": "roundedRect",
-                                  "width": 18,
-                                  "height": 18,
-                                  "radius": 4,
-                                  "center": true,
-                                  "transforms": []
+                                "kind": "transform",
+                                "base": {
+                                  "kind": "extrude",
+                                  "profile": {
+                                    "kind": "roundedRect",
+                                    "width": 18,
+                                    "height": 18,
+                                    "radius": 4,
+                                    "center": true,
+                                    "transforms": []
+                                  },
+                                  "height": 6,
+                                  "center": false
                                 },
-                                "height": 6,
-                                "center": false
+                                "steps": [
+                                  {
+                                    "kind": "workplanePlacement",
+                                    "matrix": [
+                                      1,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      -1,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      -1,
+                                      0,
+                                      36,
+                                      -20,
+                                      0,
+                                      1
+                                    ],
+                                    "placement": {
+                                      "workplane": {
+                                        "origin": [
+                                          0,
+                                          0,
+                                          0
+                                        ],
+                                        "u": [
+                                          1,
+                                          0,
+                                          0
+                                        ],
+                                        "v": [
+                                          0,
+                                          -1,
+                                          0
+                                        ],
+                                        "normal": [
+                                          0,
+                                          0,
+                                          -1
+                                        ],
+                                        "source": {
+                                          "kind": "tracked-face",
+                                          "faceName": "bottom",
+                                          "owner": {
+                                            "id": "shape-query-extrude-1",
+                                            "operation": "extrude"
+                                          }
+                                        }
+                                      },
+                                      "u": 36,
+                                      "v": 20,
+                                      "protrude": 0,
+                                      "selfAnchor": "center"
+                                    }
+                                  }
+                                ]
                               },
                               "steps": [
-                                {
-                                  "kind": "workplanePlacement",
-                                  "matrix": [
-                                    1,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    -1,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    -1,
-                                    0,
-                                    36,
-                                    -20,
-                                    0,
-                                    1
-                                  ],
-                                  "placement": {
-                                    "workplane": {
-                                      "origin": [
-                                        0,
-                                        0,
-                                        0
-                                      ],
-                                      "u": [
-                                        1,
-                                        0,
-                                        0
-                                      ],
-                                      "v": [
-                                        0,
-                                        -1,
-                                        0
-                                      ],
-                                      "normal": [
-                                        0,
-                                        0,
-                                        -1
-                                      ],
-                                      "source": {
-                                        "kind": "tracked-face",
-                                        "faceName": "bottom"
-                                      }
-                                    },
-                                    "u": 36,
-                                    "v": 20,
-                                    "protrude": 0,
-                                    "selfAnchor": "center"
-                                  }
-                                },
                                 {
                                   "kind": "mirror",
                                   "normalX": 1,
@@ -2567,72 +2885,81 @@
                             {
                               "kind": "transform",
                               "base": {
-                                "kind": "extrude",
-                                "profile": {
-                                  "kind": "roundedRect",
-                                  "width": 18,
-                                  "height": 18,
-                                  "radius": 4,
-                                  "center": true,
-                                  "transforms": []
+                                "kind": "transform",
+                                "base": {
+                                  "kind": "extrude",
+                                  "profile": {
+                                    "kind": "roundedRect",
+                                    "width": 18,
+                                    "height": 18,
+                                    "radius": 4,
+                                    "center": true,
+                                    "transforms": []
+                                  },
+                                  "height": 6,
+                                  "center": false
                                 },
-                                "height": 6,
-                                "center": false
+                                "steps": [
+                                  {
+                                    "kind": "workplanePlacement",
+                                    "matrix": [
+                                      1,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      -1,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      -1,
+                                      0,
+                                      36,
+                                      -20,
+                                      0,
+                                      1
+                                    ],
+                                    "placement": {
+                                      "workplane": {
+                                        "origin": [
+                                          0,
+                                          0,
+                                          0
+                                        ],
+                                        "u": [
+                                          1,
+                                          0,
+                                          0
+                                        ],
+                                        "v": [
+                                          0,
+                                          -1,
+                                          0
+                                        ],
+                                        "normal": [
+                                          0,
+                                          0,
+                                          -1
+                                        ],
+                                        "source": {
+                                          "kind": "tracked-face",
+                                          "faceName": "bottom",
+                                          "owner": {
+                                            "id": "shape-query-extrude-1",
+                                            "operation": "extrude"
+                                          }
+                                        }
+                                      },
+                                      "u": 36,
+                                      "v": 20,
+                                      "protrude": 0,
+                                      "selfAnchor": "center"
+                                    }
+                                  }
+                                ]
                               },
                               "steps": [
-                                {
-                                  "kind": "workplanePlacement",
-                                  "matrix": [
-                                    1,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    -1,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    -1,
-                                    0,
-                                    36,
-                                    -20,
-                                    0,
-                                    1
-                                  ],
-                                  "placement": {
-                                    "workplane": {
-                                      "origin": [
-                                        0,
-                                        0,
-                                        0
-                                      ],
-                                      "u": [
-                                        1,
-                                        0,
-                                        0
-                                      ],
-                                      "v": [
-                                        0,
-                                        -1,
-                                        0
-                                      ],
-                                      "normal": [
-                                        0,
-                                        0,
-                                        -1
-                                      ],
-                                      "source": {
-                                        "kind": "tracked-face",
-                                        "faceName": "bottom"
-                                      }
-                                    },
-                                    "u": 36,
-                                    "v": 20,
-                                    "protrude": 0,
-                                    "selfAnchor": "center"
-                                  }
-                                },
                                 {
                                   "kind": "mirror",
                                   "normalX": 0,
@@ -2644,72 +2971,81 @@
                             {
                               "kind": "transform",
                               "base": {
-                                "kind": "extrude",
-                                "profile": {
-                                  "kind": "roundedRect",
-                                  "width": 18,
-                                  "height": 18,
-                                  "radius": 4,
-                                  "center": true,
-                                  "transforms": []
+                                "kind": "transform",
+                                "base": {
+                                  "kind": "extrude",
+                                  "profile": {
+                                    "kind": "roundedRect",
+                                    "width": 18,
+                                    "height": 18,
+                                    "radius": 4,
+                                    "center": true,
+                                    "transforms": []
+                                  },
+                                  "height": 6,
+                                  "center": false
                                 },
-                                "height": 6,
-                                "center": false
+                                "steps": [
+                                  {
+                                    "kind": "workplanePlacement",
+                                    "matrix": [
+                                      1,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      -1,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      -1,
+                                      0,
+                                      36,
+                                      -20,
+                                      0,
+                                      1
+                                    ],
+                                    "placement": {
+                                      "workplane": {
+                                        "origin": [
+                                          0,
+                                          0,
+                                          0
+                                        ],
+                                        "u": [
+                                          1,
+                                          0,
+                                          0
+                                        ],
+                                        "v": [
+                                          0,
+                                          -1,
+                                          0
+                                        ],
+                                        "normal": [
+                                          0,
+                                          0,
+                                          -1
+                                        ],
+                                        "source": {
+                                          "kind": "tracked-face",
+                                          "faceName": "bottom",
+                                          "owner": {
+                                            "id": "shape-query-extrude-1",
+                                            "operation": "extrude"
+                                          }
+                                        }
+                                      },
+                                      "u": 36,
+                                      "v": 20,
+                                      "protrude": 0,
+                                      "selfAnchor": "center"
+                                    }
+                                  }
+                                ]
                               },
                               "steps": [
-                                {
-                                  "kind": "workplanePlacement",
-                                  "matrix": [
-                                    1,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    -1,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    -1,
-                                    0,
-                                    36,
-                                    -20,
-                                    0,
-                                    1
-                                  ],
-                                  "placement": {
-                                    "workplane": {
-                                      "origin": [
-                                        0,
-                                        0,
-                                        0
-                                      ],
-                                      "u": [
-                                        1,
-                                        0,
-                                        0
-                                      ],
-                                      "v": [
-                                        0,
-                                        -1,
-                                        0
-                                      ],
-                                      "normal": [
-                                        0,
-                                        0,
-                                        -1
-                                      ],
-                                      "source": {
-                                        "kind": "tracked-face",
-                                        "faceName": "bottom"
-                                      }
-                                    },
-                                    "u": 36,
-                                    "v": 20,
-                                    "protrude": 0,
-                                    "selfAnchor": "center"
-                                  }
-                                },
                                 {
                                   "kind": "mirror",
                                   "normalX": 1,
@@ -2788,7 +3124,11 @@
                               ],
                               "source": {
                                 "kind": "canonical-face",
-                                "face": "front"
+                                "face": "front",
+                                "owner": {
+                                  "id": "shape-query-extrude-1",
+                                  "operation": "extrude"
+                                }
                               }
                             },
                             "u": 0,
@@ -2858,7 +3198,11 @@
                           ],
                           "source": {
                             "kind": "canonical-face",
-                            "face": "right"
+                            "face": "right",
+                            "owner": {
+                              "id": "shape-query-extrude-1",
+                              "operation": "extrude"
+                            }
                           }
                         },
                         "u": -10,
@@ -2962,71 +3306,87 @@
           "compilePlan": {
             "kind": "transform",
             "base": {
-              "kind": "extrude",
-              "profile": {
-                "kind": "rect",
-                "width": 6,
-                "height": 4,
-                "center": false,
-                "transforms": []
+              "kind": "queryOwner",
+              "owner": {
+                "id": "shape-query-extrude-2",
+                "operation": "extrude"
               },
-              "height": 3,
-              "center": false
-            },
-            "steps": [
-              {
-                "kind": "workplanePlacement",
-                "matrix": [
-                  1,
-                  0,
-                  0,
-                  0,
-                  0,
-                  1,
-                  0,
-                  0,
-                  0,
-                  0,
-                  1,
-                  0,
-                  -1,
-                  -1,
-                  3.5,
-                  1
-                ],
-                "placement": {
-                  "workplane": {
-                    "origin": [
-                      0,
-                      0,
-                      3
-                    ],
-                    "u": [
+              "base": {
+                "kind": "transform",
+                "base": {
+                  "kind": "extrude",
+                  "profile": {
+                    "kind": "rect",
+                    "width": 6,
+                    "height": 4,
+                    "center": false,
+                    "transforms": []
+                  },
+                  "height": 3,
+                  "center": false
+                },
+                "steps": [
+                  {
+                    "kind": "workplanePlacement",
+                    "matrix": [
                       1,
                       0,
-                      0
-                    ],
-                    "v": [
+                      0,
+                      0,
                       0,
                       1,
-                      0
-                    ],
-                    "normal": [
                       0,
                       0,
+                      0,
+                      0,
+                      1,
+                      0,
+                      -1,
+                      -1,
+                      3.5,
                       1
                     ],
-                    "source": {
-                      "kind": "tracked-face",
-                      "faceName": "top"
+                    "placement": {
+                      "workplane": {
+                        "origin": [
+                          0,
+                          0,
+                          3
+                        ],
+                        "u": [
+                          1,
+                          0,
+                          0
+                        ],
+                        "v": [
+                          0,
+                          1,
+                          0
+                        ],
+                        "normal": [
+                          0,
+                          0,
+                          1
+                        ],
+                        "source": {
+                          "kind": "tracked-face",
+                          "faceName": "top",
+                          "owner": {
+                            "id": "shape-query-extrude-1",
+                            "operation": "extrude"
+                          }
+                        }
+                      },
+                      "u": 2,
+                      "v": 1,
+                      "protrude": 0.5,
+                      "selfAnchor": "center"
                     }
-                  },
-                  "u": 2,
-                  "v": 1,
-                  "protrude": 0.5,
-                  "selfAnchor": "center"
-                }
-              },
+                  }
+                ]
+              }
+            },
+            "steps": [
               {
                 "kind": "translate",
                 "x": 10,
@@ -3057,71 +3417,80 @@
             "plan": {
               "kind": "transform",
               "base": {
-                "kind": "extrude",
-                "profile": {
-                  "kind": "rect",
-                  "width": 6,
-                  "height": 4,
-                  "center": false,
-                  "transforms": []
+                "kind": "transform",
+                "base": {
+                  "kind": "extrude",
+                  "profile": {
+                    "kind": "rect",
+                    "width": 6,
+                    "height": 4,
+                    "center": false,
+                    "transforms": []
+                  },
+                  "height": 3,
+                  "center": false
                 },
-                "height": 3,
-                "center": false
+                "steps": [
+                  {
+                    "kind": "workplanePlacement",
+                    "matrix": [
+                      1,
+                      0,
+                      0,
+                      0,
+                      0,
+                      1,
+                      0,
+                      0,
+                      0,
+                      0,
+                      1,
+                      0,
+                      -1,
+                      -1,
+                      3.5,
+                      1
+                    ],
+                    "placement": {
+                      "workplane": {
+                        "origin": [
+                          0,
+                          0,
+                          3
+                        ],
+                        "u": [
+                          1,
+                          0,
+                          0
+                        ],
+                        "v": [
+                          0,
+                          1,
+                          0
+                        ],
+                        "normal": [
+                          0,
+                          0,
+                          1
+                        ],
+                        "source": {
+                          "kind": "tracked-face",
+                          "faceName": "top",
+                          "owner": {
+                            "id": "shape-query-extrude-1",
+                            "operation": "extrude"
+                          }
+                        }
+                      },
+                      "u": 2,
+                      "v": 1,
+                      "protrude": 0.5,
+                      "selfAnchor": "center"
+                    }
+                  }
+                ]
               },
               "steps": [
-                {
-                  "kind": "workplanePlacement",
-                  "matrix": [
-                    1,
-                    0,
-                    0,
-                    0,
-                    0,
-                    1,
-                    0,
-                    0,
-                    0,
-                    0,
-                    1,
-                    0,
-                    -1,
-                    -1,
-                    3.5,
-                    1
-                  ],
-                  "placement": {
-                    "workplane": {
-                      "origin": [
-                        0,
-                        0,
-                        3
-                      ],
-                      "u": [
-                        1,
-                        0,
-                        0
-                      ],
-                      "v": [
-                        0,
-                        1,
-                        0
-                      ],
-                      "normal": [
-                        0,
-                        0,
-                        1
-                      ],
-                      "source": {
-                        "kind": "tracked-face",
-                        "faceName": "top"
-                      }
-                    },
-                    "u": 2,
-                    "v": 1,
-                    "protrude": 0.5,
-                    "selfAnchor": "center"
-                  }
-                },
                 {
                   "kind": "translate",
                   "x": 10,
@@ -3225,38 +3594,45 @@
             ]
           },
           "compilePlan": {
-            "kind": "extrude",
-            "profile": {
-              "kind": "circle",
-              "radius": 12,
-              "segments": 18,
-              "transforms": []
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-extrude-1",
+              "operation": "extrude"
             },
-            "height": 4,
-            "center": false
+            "base": {
+              "kind": "extrude",
+              "profile": {
+                "kind": "circle",
+                "radius": 12,
+                "segments": 18,
+                "transforms": []
+              },
+              "height": 4,
+              "center": false
+            }
           },
           "exactRoute": {
             "kind": "unsupported",
-            "reason": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback.",
+            "reason": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.base.profile; use the analytic form or faceted fallback.",
             "diagnostics": [
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-segmented-circle profiles",
-                "path": "$.profile",
-                "message": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+                "path": "$.base.profile",
+                "message": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.base.profile; use the analytic form or faceted fallback."
               }
             ]
           },
           "facetedRoute": {
             "kind": "faceted",
             "target": "faceted-mesh",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback.",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.base.profile; use the analytic form or faceted fallback.",
             "diagnostics": [
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-segmented-circle profiles",
-                "path": "$.profile",
-                "message": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+                "path": "$.base.profile",
+                "message": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.base.profile; use the analytic form or faceted fallback."
               }
             ]
           },
@@ -3266,8 +3642,8 @@
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-segmented-circle profiles",
-                "path": "$.profile",
-                "message": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+                "path": "$.base.profile",
+                "message": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.base.profile; use the analytic form or faceted fallback."
               }
             ],
             "plan": null
@@ -3330,34 +3706,41 @@
             ]
           },
           "compilePlan": {
-            "kind": "cylinder",
-            "height": 20,
-            "radius": 5,
-            "segments": 12,
-            "center": false
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-primitive-cylinder-2",
+              "operation": "primitive:cylinder"
+            },
+            "base": {
+              "kind": "cylinder",
+              "height": 20,
+              "radius": 5,
+              "segments": 12,
+              "center": false
+            }
           },
           "exactRoute": {
             "kind": "unsupported",
-            "reason": "CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback.",
+            "reason": "CadQuery/OCCT lowering does not support segmented cylinder solids at $.base; use the analytic form or faceted fallback.",
             "diagnostics": [
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-segmented-cylinder",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support segmented cylinder solids at $.base; use the analytic form or faceted fallback."
               }
             ]
           },
           "facetedRoute": {
             "kind": "faceted",
             "target": "faceted-mesh",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback.",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented cylinder solids at $.base; use the analytic form or faceted fallback.",
             "diagnostics": [
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-segmented-cylinder",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support segmented cylinder solids at $.base; use the analytic form or faceted fallback."
               }
             ]
           },
@@ -3367,8 +3750,8 @@
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-segmented-cylinder",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support segmented cylinder solids at $.base; use the analytic form or faceted fallback."
               }
             ],
             "plan": null
@@ -3431,54 +3814,61 @@
             ]
           },
           "compilePlan": {
-            "kind": "revolve",
-            "profile": {
-              "kind": "polygon",
-              "points": [
-                [
-                  6,
-                  0
-                ],
-                [
-                  10,
-                  4
-                ],
-                [
-                  8,
-                  12
-                ],
-                [
-                  0,
-                  12
-                ]
-              ],
-              "transforms": []
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-revolve-3",
+              "operation": "revolve"
             },
-            "degrees": 240,
-            "segments": 24
+            "base": {
+              "kind": "revolve",
+              "profile": {
+                "kind": "polygon",
+                "points": [
+                  [
+                    6,
+                    0
+                  ],
+                  [
+                    10,
+                    4
+                  ],
+                  [
+                    8,
+                    12
+                  ],
+                  [
+                    0,
+                    12
+                  ]
+                ],
+                "transforms": []
+              },
+              "degrees": 240,
+              "segments": 24
+            }
           },
           "exactRoute": {
             "kind": "unsupported",
-            "reason": "CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback.",
+            "reason": "CadQuery/OCCT lowering does not support segmented revolve solids at $.base; use the analytic form or faceted fallback.",
             "diagnostics": [
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-segmented-revolve",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support segmented revolve solids at $.base; use the analytic form or faceted fallback."
               }
             ]
           },
           "facetedRoute": {
             "kind": "faceted",
             "target": "faceted-mesh",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback.",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented revolve solids at $.base; use the analytic form or faceted fallback.",
             "diagnostics": [
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-segmented-revolve",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support segmented revolve solids at $.base; use the analytic form or faceted fallback."
               }
             ]
           },
@@ -3488,8 +3878,8 @@
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-segmented-revolve",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support segmented revolve solids at $.base; use the analytic form or faceted fallback."
               }
             ],
             "plan": null
@@ -3545,15 +3935,15 @@
         "unsupported": [
           {
             "name": "Segmented Disk",
-            "reason": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+            "reason": "CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.base.profile; use the analytic form or faceted fallback."
           },
           {
             "name": "Segmented Post",
-            "reason": "CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+            "reason": "CadQuery/OCCT lowering does not support segmented cylinder solids at $.base; use the analytic form or faceted fallback."
           },
           {
             "name": "Segmented Lathe",
-            "reason": "CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+            "reason": "CadQuery/OCCT lowering does not support segmented revolve solids at $.base; use the analytic form or faceted fallback."
           }
         ],
         "skipped": [],
@@ -3579,15 +3969,15 @@
         "fallbacks": [
           {
             "name": "Segmented Disk",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.profile; use the analytic form or faceted fallback."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented circle profiles geometry at $.base.profile; use the analytic form or faceted fallback."
           },
           {
             "name": "Segmented Post",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented cylinder solids at $; use the analytic form or faceted fallback."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented cylinder solids at $.base; use the analytic form or faceted fallback."
           },
           {
             "name": "Segmented Lathe",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented revolve solids at $; use the analytic form or faceted fallback."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support segmented revolve solids at $.base; use the analytic form or faceted fallback."
           }
         ]
       }
@@ -3798,73 +4188,94 @@
             ]
           },
           "compilePlan": {
-            "kind": "hull",
-            "shapes": [
-              {
-                "kind": "transform",
-                "base": {
-                  "kind": "cylinder",
-                  "height": 20,
-                  "radius": 3,
-                  "center": false
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-hull-3",
+              "operation": "hull"
+            },
+            "base": {
+              "kind": "hull",
+              "shapes": [
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "queryOwner",
+                    "owner": {
+                      "id": "shape-query-primitive-cylinder-1",
+                      "operation": "primitive:cylinder"
+                    },
+                    "base": {
+                      "kind": "cylinder",
+                      "height": 20,
+                      "radius": 3,
+                      "center": false
+                    }
+                  },
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": -10,
+                      "y": 0,
+                      "z": 0
+                    }
+                  ]
                 },
-                "steps": [
-                  {
-                    "kind": "translate",
-                    "x": -10,
-                    "y": 0,
-                    "z": 0
-                  }
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "queryOwner",
+                    "owner": {
+                      "id": "shape-query-primitive-cylinder-2",
+                      "operation": "primitive:cylinder"
+                    },
+                    "base": {
+                      "kind": "cylinder",
+                      "height": 20,
+                      "radius": 3,
+                      "center": false
+                    }
+                  },
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": 10,
+                      "y": 0,
+                      "z": 0
+                    }
+                  ]
+                }
+              ],
+              "points": [
+                [
+                  0,
+                  0,
+                  26
                 ]
-              },
-              {
-                "kind": "transform",
-                "base": {
-                  "kind": "cylinder",
-                  "height": 20,
-                  "radius": 3,
-                  "center": false
-                },
-                "steps": [
-                  {
-                    "kind": "translate",
-                    "x": 10,
-                    "y": 0,
-                    "z": 0
-                  }
-                ]
-              }
-            ],
-            "points": [
-              [
-                0,
-                0,
-                26
               ]
-            ]
+            }
           },
           "exactRoute": {
             "kind": "unsupported",
-            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet.",
+            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet.",
             "diagnostics": [
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-unsupported-shape-hull",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet."
               }
             ]
           },
           "facetedRoute": {
             "kind": "faceted",
             "target": "faceted-mesh",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet.",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet.",
             "diagnostics": [
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-unsupported-shape-hull",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet."
               }
             ]
           },
@@ -3874,8 +4285,8 @@
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-unsupported-shape-hull",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet."
               }
             ],
             "plan": null
@@ -3939,55 +4350,69 @@
             ]
           },
           "compilePlan": {
-            "kind": "hull",
-            "shapes": [
-              {
-                "kind": "transform",
-                "base": {
-                  "kind": "box",
-                  "x": 12,
-                  "y": 8,
-                  "z": 20,
-                  "center": true
-                },
-                "steps": [
-                  {
-                    "kind": "rotateAround",
-                    "axisX": 0,
-                    "axisY": 0,
-                    "axisZ": 1,
-                    "degrees": 25,
-                    "pivotX": 0,
-                    "pivotY": 0,
-                    "pivotZ": 0
-                  }
-                ]
-              }
-            ],
-            "points": []
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-hull-5",
+              "operation": "hull"
+            },
+            "base": {
+              "kind": "hull",
+              "shapes": [
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "queryOwner",
+                    "owner": {
+                      "id": "shape-query-primitive-box-4",
+                      "operation": "primitive:box"
+                    },
+                    "base": {
+                      "kind": "box",
+                      "x": 12,
+                      "y": 8,
+                      "z": 20,
+                      "center": true
+                    }
+                  },
+                  "steps": [
+                    {
+                      "kind": "rotateAround",
+                      "axisX": 0,
+                      "axisY": 0,
+                      "axisZ": 1,
+                      "degrees": 25,
+                      "pivotX": 0,
+                      "pivotY": 0,
+                      "pivotZ": 0
+                    }
+                  ]
+                }
+              ],
+              "points": []
+            }
           },
           "exactRoute": {
             "kind": "unsupported",
-            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet.",
+            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet.",
             "diagnostics": [
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-unsupported-shape-hull",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet."
               }
             ]
           },
           "facetedRoute": {
             "kind": "faceted",
             "target": "faceted-mesh",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet.",
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet.",
             "diagnostics": [
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-unsupported-shape-hull",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet."
               }
             ]
           },
@@ -3997,8 +4422,8 @@
               {
                 "target": "cadquery-occt",
                 "code": "cadquery-occt-unsupported-shape-hull",
-                "path": "$",
-                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+                "path": "$.base",
+                "message": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet."
               }
             ],
             "plan": null
@@ -4230,11 +4655,11 @@
         "unsupported": [
           {
             "name": "Rib",
-            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet."
           },
           {
             "name": "Convex Post",
-            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+            "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet."
           }
         ],
         "skipped": [
@@ -4274,11 +4699,11 @@
         "fallbacks": [
           {
             "name": "Rib",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet."
           },
           {
             "name": "Convex Post",
-            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $ yet."
+            "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet."
           }
         ]
       }
@@ -4302,16 +4727,23 @@
             ]
           },
           "compilePlan": {
-            "kind": "extrude",
-            "profile": {
-              "kind": "rect",
-              "width": 40,
-              "height": 24,
-              "center": false,
-              "transforms": []
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-extrude-1",
+              "operation": "extrude"
             },
-            "height": 8,
-            "center": false
+            "base": {
+              "kind": "extrude",
+              "profile": {
+                "kind": "rect",
+                "width": 40,
+                "height": 24,
+                "center": false,
+                "transforms": []
+              },
+              "height": 8,
+              "center": false
+            }
           },
           "exactRoute": {
             "kind": "exact",
@@ -4677,108 +5109,171 @@
             ]
           },
           "compilePlan": {
-            "kind": "boolean",
-            "op": "difference",
-            "shapes": [
-              {
-                "kind": "boolean",
-                "op": "difference",
-                "shapes": [
-                  {
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-boolean-difference-9",
+              "operation": "boolean:difference"
+            },
+            "base": {
+              "kind": "boolean",
+              "op": "difference",
+              "shapes": [
+                {
+                  "kind": "queryOwner",
+                  "owner": {
+                    "id": "shape-query-boolean-difference-8",
+                    "operation": "boolean:difference"
+                  },
+                  "base": {
                     "kind": "boolean",
                     "op": "difference",
                     "shapes": [
                       {
-                        "kind": "boolean",
-                        "op": "union",
-                        "shapes": [
-                          {
-                            "kind": "extrude",
-                            "profile": {
-                              "kind": "rect",
-                              "width": 120,
-                              "height": 80,
-                              "center": true,
-                              "transforms": []
-                            },
-                            "height": 10,
-                            "center": false
-                          },
-                          {
-                            "kind": "transform",
-                            "base": {
-                              "kind": "cylinder",
-                              "height": 24,
-                              "radius": 18,
-                              "center": false
-                            },
-                            "steps": [
-                              {
-                                "kind": "translate",
-                                "x": 0,
-                                "y": 0,
-                                "z": 10
+                        "kind": "queryOwner",
+                        "owner": {
+                          "id": "shape-query-boolean-difference-7",
+                          "operation": "boolean:difference"
+                        },
+                        "base": {
+                          "kind": "boolean",
+                          "op": "difference",
+                          "shapes": [
+                            {
+                              "kind": "queryOwner",
+                              "owner": {
+                                "id": "shape-query-boolean-union-6",
+                                "operation": "boolean:union"
+                              },
+                              "base": {
+                                "kind": "boolean",
+                                "op": "union",
+                                "shapes": [
+                                  {
+                                    "kind": "queryOwner",
+                                    "owner": {
+                                      "id": "shape-query-extrude-1",
+                                      "operation": "extrude"
+                                    },
+                                    "base": {
+                                      "kind": "extrude",
+                                      "profile": {
+                                        "kind": "rect",
+                                        "width": 120,
+                                        "height": 80,
+                                        "center": true,
+                                        "transforms": []
+                                      },
+                                      "height": 10,
+                                      "center": false
+                                    }
+                                  },
+                                  {
+                                    "kind": "transform",
+                                    "base": {
+                                      "kind": "queryOwner",
+                                      "owner": {
+                                        "id": "shape-query-primitive-cylinder-2",
+                                        "operation": "primitive:cylinder"
+                                      },
+                                      "base": {
+                                        "kind": "cylinder",
+                                        "height": 24,
+                                        "radius": 18,
+                                        "center": false
+                                      }
+                                    },
+                                    "steps": [
+                                      {
+                                        "kind": "translate",
+                                        "x": 0,
+                                        "y": 0,
+                                        "z": 10
+                                      }
+                                    ]
+                                  }
+                                ]
                               }
-                            ]
-                          }
-                        ]
+                            },
+                            {
+                              "kind": "transform",
+                              "base": {
+                                "kind": "queryOwner",
+                                "owner": {
+                                  "id": "shape-query-primitive-cylinder-3",
+                                  "operation": "primitive:cylinder"
+                                },
+                                "base": {
+                                  "kind": "cylinder",
+                                  "height": 18,
+                                  "radius": 5,
+                                  "center": false
+                                }
+                              },
+                              "steps": [
+                                {
+                                  "kind": "translate",
+                                  "x": -34,
+                                  "y": 0,
+                                  "z": -4
+                                }
+                              ]
+                            }
+                          ]
+                        }
                       },
                       {
                         "kind": "transform",
                         "base": {
-                          "kind": "cylinder",
-                          "height": 18,
-                          "radius": 5,
-                          "center": false
+                          "kind": "queryOwner",
+                          "owner": {
+                            "id": "shape-query-primitive-cylinder-4",
+                            "operation": "primitive:cylinder"
+                          },
+                          "base": {
+                            "kind": "cylinder",
+                            "height": 18,
+                            "radius": 5,
+                            "center": false
+                          }
                         },
                         "steps": [
                           {
                             "kind": "translate",
-                            "x": -34,
+                            "x": 34,
                             "y": 0,
                             "z": -4
                           }
                         ]
                       }
                     ]
-                  },
-                  {
-                    "kind": "transform",
+                  }
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "queryOwner",
+                    "owner": {
+                      "id": "shape-query-primitive-cylinder-5",
+                      "operation": "primitive:cylinder"
+                    },
                     "base": {
                       "kind": "cylinder",
-                      "height": 18,
-                      "radius": 5,
+                      "height": 34,
+                      "radius": 8,
                       "center": false
-                    },
-                    "steps": [
-                      {
-                        "kind": "translate",
-                        "x": 34,
-                        "y": 0,
-                        "z": -4
-                      }
-                    ]
-                  }
-                ]
-              },
-              {
-                "kind": "transform",
-                "base": {
-                  "kind": "cylinder",
-                  "height": 34,
-                  "radius": 8,
-                  "center": false
-                },
-                "steps": [
-                  {
-                    "kind": "translate",
-                    "x": 0,
-                    "y": 0,
-                    "z": 6
-                  }
-                ]
-              }
-            ]
+                    }
+                  },
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": 0,
+                      "y": 0,
+                      "z": 6
+                    }
+                  ]
+                }
+              ]
+            }
           },
           "exactRoute": {
             "kind": "exact",

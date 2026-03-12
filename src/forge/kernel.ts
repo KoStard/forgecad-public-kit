@@ -31,6 +31,9 @@ import {
   buildHullShapeCompilePlan,
   buildTrimByPlaneShapeCompilePlan,
   cloneShapeCompilePlan,
+  collectShapeQueryOwners,
+  createOwnedShapeCompilePlan,
+  findShapePrimaryQueryOwner,
   findShapeWorkplanePlacement,
 } from './compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from './apiArgs';
@@ -41,7 +44,7 @@ import {
   wrapManifoldShapeBackend,
 } from './shapeBackend';
 import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
-import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
+import type { ShapeQueryOwner, ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 
 export type { Anchor3D } from './anchors';
@@ -617,6 +620,14 @@ export function setShapeCompilePlan(shape: Shape, plan: ShapeCompilePlan | null)
   return setShapeCompilePlanInternal(shape, plan);
 }
 
+export function getShapePrimaryQueryOwner(shape: Shape): ShapeQueryOwner | null {
+  return findShapePrimaryQueryOwner(getShapeCompilePlanInternal(shape));
+}
+
+export function getShapeQueryOwners(shape: Shape): ShapeQueryOwner[] {
+  return collectShapeQueryOwners(getShapeCompilePlanInternal(shape));
+}
+
 export function getShapeWorkplanePlacement(shape: Shape): ShapeWorkplanePlacement | null {
   return findShapeWorkplanePlacement(getShapeCompilePlanInternal(shape));
 }
@@ -937,7 +948,10 @@ export class Shape {
       1,
       'Use shape.add(other1, other2) or shape.add([other1, other2]).',
     )];
-    const nextPlan = buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+    const nextPlan = createOwnedShapeCompilePlan(
+      buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+      'boolean:union',
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withMergedDimensions(
         shapes,
@@ -956,7 +970,10 @@ export class Shape {
       1,
       'Use shape.subtract(other1, other2) or shape.subtract([other1, other2]).',
     )];
-    const nextPlan = buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+    const nextPlan = createOwnedShapeCompilePlan(
+      buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+      'boolean:difference',
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
         this,
@@ -975,7 +992,10 @@ export class Shape {
       1,
       'Use shape.intersect(other1, other2) or shape.intersect([other1, other2]).',
     )];
-    const nextPlan = buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+    const nextPlan = createOwnedShapeCompilePlan(
+      buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+      'boolean:intersection',
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withMergedDimensions(
         shapes,
@@ -992,14 +1012,14 @@ export class Shape {
   /** Split into [inside, outside] by another shape. */
   split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
     const c = Shape._unwrap(cutter);
-    const insidePlan = buildBooleanShapeCompilePlan('intersection', [
+    const insidePlan = createOwnedShapeCompilePlan(buildBooleanShapeCompilePlan('intersection', [
       getShapeCompilePlanInternal(this),
       getShapeCompilePlanInternal(c),
-    ]);
-    const outsidePlan = buildBooleanShapeCompilePlan('difference', [
+    ]), 'split:inside');
+    const outsidePlan = createOwnedShapeCompilePlan(buildBooleanShapeCompilePlan('difference', [
       getShapeCompilePlanInternal(this),
       getShapeCompilePlanInternal(c),
-    ]);
+    ]), 'split:outside');
     const info = mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(c)], 'boolean', { topology: 'none' });
     if (insidePlan && outsidePlan) {
       return [
@@ -1030,8 +1050,14 @@ export class Shape {
   /** Split by infinite plane. Returns [positive-side, negative-side]. */
   splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
     const info = deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' });
-    const firstPlan = buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), normal, originOffset);
-    const secondPlan = buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), [-normal[0], -normal[1], -normal[2]], -originOffset);
+    const firstPlan = createOwnedShapeCompilePlan(
+      buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), normal, originOffset),
+      'splitByPlane:positive',
+    );
+    const secondPlan = createOwnedShapeCompilePlan(
+      buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), [-normal[0], -normal[1], -normal[2]], -originOffset),
+      'splitByPlane:opposite',
+    );
     if (firstPlan && secondPlan) {
       return [
         setShapeCompilePlanInternal(
@@ -1053,7 +1079,10 @@ export class Shape {
 
   /** Keep the positive side of the plane and discard the opposite side. */
   trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
-    const nextPlan = buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), normal, originOffset);
+    const nextPlan = createOwnedShapeCompilePlan(
+      buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), normal, originOffset),
+      'trimByPlane',
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
         this,
@@ -1070,7 +1099,10 @@ export class Shape {
     thickness: number,
     opts: { openFaces?: Array<'top' | 'bottom'> } = {},
   ): Shape {
-    const nextPlan = buildShellShapeCompilePlan(getShapeCompilePlanInternal(this), thickness, opts.openFaces);
+    const nextPlan = createOwnedShapeCompilePlan(
+      buildShellShapeCompilePlan(getShapeCompilePlanInternal(this), thickness, opts.openFaces),
+      'shell',
+    );
     if (!nextPlan) {
       throw new Error(
         'Shape.shell() currently supports compile-covered box(), cylinder(), and straight extrude() solids with optional top/bottom openings and rigid transforms.',
@@ -1089,7 +1121,10 @@ export class Shape {
 
   /** Convex hull of this shape. */
   hull(): Shape {
-    const nextPlan = buildHullShapeCompilePlan([getShapeCompilePlanInternal(this)]);
+    const nextPlan = createOwnedShapeCompilePlan(
+      buildHullShapeCompilePlan([getShapeCompilePlanInternal(this)]),
+      'hull',
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
         this,
@@ -1256,7 +1291,7 @@ function resolveTargetAnchorLikePoint(
 
 export function box(x: number, y: number, z: number, center = false): Shape {
   return buildShapeFromCompilePlan(
-    { kind: 'box', x, y, z, center },
+    createOwnedShapeCompilePlan({ kind: 'box', x, y, z, center }, 'primitive:box')!,
     undefined,
     { fidelity: 'kernel-native', sources: ['primitive'] },
   );
@@ -1269,23 +1304,23 @@ export function cylinder(
   segments?: number,
   center = false,
 ): Shape {
-  return buildShapeFromCompilePlan({
+  return buildShapeFromCompilePlan(createOwnedShapeCompilePlan({
     kind: 'cylinder' as const,
     height,
     radius,
     radiusTop: radiusTop != null && radiusTop >= 0 ? radiusTop : undefined,
     segments: segments != null && segments > 0 ? segments : undefined,
     center,
-  }, undefined, { fidelity: 'kernel-native', sources: ['primitive'] });
+  }, 'primitive:cylinder')!, undefined, { fidelity: 'kernel-native', sources: ['primitive'] });
 }
 
 export function sphere(radius: number, segments?: number): Shape {
   return buildShapeFromCompilePlan(
-    {
+    createOwnedShapeCompilePlan({
       kind: 'sphere',
       radius,
       segments: segments != null && segments > 0 ? segments : undefined,
-    },
+    }, 'primitive:sphere')!,
     undefined,
     { fidelity: 'kernel-native', sources: ['primitive'] },
   );
@@ -1329,7 +1364,10 @@ export function union(...inputs: ShapeOperandInput[]): Shape {
   );
   if (shapes.length === 0) throw new Error('union requires at least one shape');
   if (shapes.length === 1) return shapes[0];
-  const nextPlan = buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+  const nextPlan = createOwnedShapeCompilePlan(
+    buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+    'boolean:union',
+  );
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(
       shapes,
@@ -1349,7 +1387,10 @@ export function difference(...inputs: ShapeOperandInput[]): Shape {
     'Use difference(base, cutter1, cutter2) or difference([base, cutter1, cutter2]).',
   );
   if (shapes.length < 2) throw new Error('difference requires at least two shapes');
-  const nextPlan = buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+  const nextPlan = createOwnedShapeCompilePlan(
+    buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+    'boolean:difference',
+  );
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withBaseDimensions(
       shapes[0],
@@ -1369,7 +1410,10 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
     'Use intersection(shape1, shape2) or intersection([shape1, shape2]).',
   );
   if (shapes.length < 2) throw new Error('intersection requires at least two shapes');
-  const nextPlan = buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+  const nextPlan = createOwnedShapeCompilePlan(
+    buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape))),
+    'boolean:intersection',
+  );
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(
       shapes,
@@ -1395,7 +1439,10 @@ export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]
     pointArgs.push(point);
     return point;
   });
-  const nextPlan = buildHullShapeCompilePlan(shapeArgs.map((shape) => getShapeCompilePlanInternal(shape)), pointArgs);
+  const nextPlan = createOwnedShapeCompilePlan(
+    buildHullShapeCompilePlan(shapeArgs.map((shape) => getShapeCompilePlanInternal(shape)), pointArgs),
+    'hull',
+  );
   const out = nextPlan
     ? buildShapeFromCompilePlan(nextPlan, shapeArgs[0]?.colorHex)
     : new Shape(getWasm().Manifold.hull(items), shapeArgs[0]?.colorHex);

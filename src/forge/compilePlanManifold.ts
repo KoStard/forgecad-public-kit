@@ -235,6 +235,8 @@ export function lowerShapeCompilePlanToManifold(
       return lowerShapeBooleanCompilePlan(plan, wasm);
     case 'transform':
       return applyShapeCompileTransforms(lowerShapeCompilePlanToManifold(plan.base, wasm), plan.steps);
+    case 'queryOwner':
+      return lowerShapeCompilePlanToManifold(plan.base, wasm);
     case 'hull':
       return lowerShapeHullCompilePlan(plan, wasm);
     case 'trimByPlane':

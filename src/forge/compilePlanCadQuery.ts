@@ -251,6 +251,8 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
         steps: [...plan.steps],
       }, base.diagnostics);
     }
+    case 'queryOwner':
+      return lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
     case 'trimByPlane': {
       const base = lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
       if (!base.ok) return compilerFailure(...base.diagnostics);

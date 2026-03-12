@@ -1,4 +1,4 @@
-import { appendShapeCompileTransform } from '../compilePlan';
+import { appendShapeCompileTransform, createOwnedShapeCompilePlan } from '../compilePlan';
 import { Sketch, getSketchCompileProfilePlan, getSketchPlacement3D, getSketchPlacementModel } from './core';
 import { Shape, buildShapeFromCompilePlan, setShapeCompilePlan } from '../kernel';
 import { TrackedShape, transformTopology, type Topology, type FaceName, type FaceRef, type EdgeName, type EdgeRef } from './topology';
@@ -73,8 +73,9 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
         placement: placementModel,
       })
     : basePlan;
-  const shape = plan
-    ? buildShapeFromCompilePlan(plan, sketch.colorHex, {
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'extrude');
+  const shape = ownedPlan
+    ? buildShapeFromCompilePlan(ownedPlan, sketch.colorHex, {
         fidelity: 'kernel-native',
         sources: ['extrude'],
       })
@@ -91,7 +92,7 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
   const topo = buildGenericExtrusionTopology(sketch, height, opts?.center ?? false);
   if (!placement) return new TrackedShape(shape, topo, 0, true);
   const transformedTopology = transformTopology(topo, placement);
-  if (plan && placementModel) return new TrackedShape(shape, transformedTopology, 0, true);
+  if (ownedPlan && placementModel) return new TrackedShape(shape, transformedTopology, 0, true);
   return new TrackedShape(shape.transform(placement), transformedTopology, 0, true);
 }
 
@@ -115,8 +116,9 @@ export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number):
         placement: placementModel,
       })
     : basePlan;
-  const revolved = plan
-    ? buildShapeFromCompilePlan(plan, sketch.colorHex, {
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'revolve');
+  const revolved = ownedPlan
+    ? buildShapeFromCompilePlan(ownedPlan, sketch.colorHex, {
         fidelity: 'kernel-native',
         sources: ['revolve'],
       })
@@ -124,7 +126,7 @@ export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number):
       fidelity: 'kernel-native',
       sources: ['revolve'],
     }), null);
-  if (!placement || (plan && placementModel)) return revolved;
+  if (!placement || (ownedPlan && placementModel)) return revolved;
   return revolved.transform(placement);
 }
 

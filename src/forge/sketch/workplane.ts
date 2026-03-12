@@ -1,4 +1,4 @@
-import { resolveAnchor3D, type Shape } from '../kernel';
+import { getShapePrimaryQueryOwner, resolveAnchor3D, type Shape } from '../kernel';
 import { Transform, type Mat4, type Vec3 } from '../transform';
 import {
   Sketch,
@@ -7,6 +7,7 @@ import {
   type SketchPlacementModel,
   type SketchWorkplane,
 } from './core';
+import { cloneShapeQueryOwner, type ShapeQueryOwner } from './workplaneModel';
 import { TrackedShape, type FaceRef } from './topology';
 
 export type ShapeAnchorTarget = Shape | TrackedShape | { _bbox(): { min: number[]; max: number[] } };
@@ -41,6 +42,15 @@ function resolveTargetFaceCenter(target: ShapeAnchorTarget, face: SketchFace3D):
   const shapeTarget = target as Shape | TrackedShape;
   const shape: Shape = 'toShape' in shapeTarget ? shapeTarget.toShape() : shapeTarget;
   return shape.referencePoint(face);
+}
+
+function resolveTargetQueryOwner(target: ShapeAnchorTarget): ShapeQueryOwner | undefined {
+  if (typeof (target as { _bbox?: unknown })._bbox === 'function') {
+    return undefined;
+  }
+  const shapeTarget = target as Shape | TrackedShape;
+  const shape: Shape = 'toShape' in shapeTarget ? shapeTarget.toShape() : shapeTarget;
+  return cloneShapeQueryOwner(getShapePrimaryQueryOwner(shape) ?? undefined);
 }
 
 function isCanonicalFace(face: string): face is SketchFace3D {
@@ -87,12 +97,21 @@ function resolvePlanarFaceWorkplane(face: FaceRef): SketchWorkplane {
     u: [face.uAxis[0], face.uAxis[1], face.uAxis[2]],
     v: [face.vAxis[0], face.vAxis[1], face.vAxis[2]],
     normal: [face.normal[0], face.normal[1], face.normal[2]],
-    source: { kind: 'face-ref', faceName: face.name },
+    source: { kind: 'face-ref', faceName: face.name, owner: cloneShapeQueryOwner(face.owner) },
   };
 }
 
 function resolveNamedTrackedFace(parent: TrackedShape, face: string): FaceRef | null {
-  return parent.topology.faces.get(face) ?? null;
+  const trackedFace = parent.topology.faces.get(face);
+  if (!trackedFace) return null;
+  return {
+    ...trackedFace,
+    normal: [trackedFace.normal[0], trackedFace.normal[1], trackedFace.normal[2]],
+    center: [trackedFace.center[0], trackedFace.center[1], trackedFace.center[2]],
+    owner: cloneShapeQueryOwner(getShapePrimaryQueryOwner(parent.toShape()) ?? trackedFace.owner),
+    uAxis: trackedFace.uAxis ? [trackedFace.uAxis[0], trackedFace.uAxis[1], trackedFace.uAxis[2]] : undefined,
+    vAxis: trackedFace.vAxis ? [trackedFace.vAxis[0], trackedFace.vAxis[1], trackedFace.vAxis[2]] : undefined,
+  };
 }
 
 function availablePlanarFaceNames(parent: TrackedShape): string[] {
@@ -128,7 +147,7 @@ export function resolveSketchWorkplane(
       const workplane = resolvePlanarFaceWorkplane(trackedFace);
       return {
         ...workplane,
-        source: { kind: 'tracked-face', faceName: face },
+        source: { kind: 'tracked-face', faceName: face, owner: cloneShapeQueryOwner(trackedFace.owner) },
       };
     }
   }
@@ -140,7 +159,7 @@ export function resolveSketchWorkplane(
       u: basis.u,
       v: basis.v,
       normal: basis.normal,
-      source: { kind: 'canonical-face', face },
+      source: { kind: 'canonical-face', face, owner: resolveTargetQueryOwner(parentOrFace) },
     };
   }
 
