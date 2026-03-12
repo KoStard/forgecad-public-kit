@@ -1,13 +1,22 @@
 # Fillet And Chamfer Dual Lowering
 ## Problem Definition
-Fillet/chamfer are part of the normal design-tool stack, but they are not safe to land until Forge has a shared edge-query backbone. Without that, the feature will either overfit to brittle edge names or diverge between backends.
+Fillet/chamfer are part of the normal design-tool stack, and Forge now has the edge-query backbone needed to start them. But durable edge identity after topology-changing operations is still not solved, so this task must target an honest first subset instead of pretending to solve the whole problem.
 
 ## Description
-Implement compiler-owned fillet/chamfer semantics after the edge-query backbone exists.
+Implement the first compiler-owned fillet/chamfer slice on top of shared edge-query contracts.
+
+Scope this task to the subset Forge can currently defend:
+
+- tracked-edge queries on compile-covered bodies
+- edges that come from tracked topology before shell/boolean/hole/cut topology rewriting
+- explicit exact/runtime diagnostics when the selected edge set falls outside that supported subset
+
+Do not claim durable downstream identity for post-shell, post-boolean, or otherwise topology-rewritten edges in this task.
 
 Primary dependencies:
 
 - task 105
+- task 125 to sync the repo/task state before the next feature lane starts
 - task 150 for regression corpus support
 
 Primary files:
@@ -19,10 +28,11 @@ Primary files:
 ## Requirements
 - Consume shared edge-query contracts rather than raw edge names.
 - Lower through both backends for the supported subset.
-- Add regression cases that prove ordinary downstream part edits still work after edge finishing.
+- Start with an explicit constrained subset rather than vague "general fillet/chamfer support".
+- Add regression cases that prove ordinary tracked-topology part edits still work after edge finishing for that subset.
 - Document exact capability gaps explicitly.
 
 ## Status and log
-- 2026-03-12: Blocked on task 105.
+- 2026-03-12: Initially blocked on task 105.
+- 2026-03-12: Re-scoped after multi-agent review. Edge-query groundwork is in, but this task remains blocked on task 125 so the program state and capability claims are cleaned up before the next feature lane starts.
 - 2026-03-12: Not started.
-
