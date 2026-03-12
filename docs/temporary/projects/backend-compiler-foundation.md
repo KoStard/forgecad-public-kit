@@ -28,6 +28,31 @@ Current goal:
 
 In this document, "come back when it is done" means this checkpoint, not just another compiler slice.
 
+## MLP Target
+
+Short-term target:
+
+- reach a minimum lovable product for the compiler transition before the full checkpoint is done
+
+For this document, MLP means:
+
+- the Forge compile graph is the source of truth for the common part-design stack already in flight
+- both Manifold and CadQuery/OCCT lower from that graph for ordinary daily workflows
+- workplane/query provenance is stable enough that normal downstream edits do not feel brittle immediately
+- exact export is just the CadQuery/OCCT route for that supported subset
+- the regression suite protects multi-feature parts, not just isolated toy operations
+
+Current estimate from 2026-03-12:
+
+- about 6 to 10 focused weeks for one strong full-time engineer
+
+Near-term path to that MLP:
+
+1. Finish reference/workplane propagation so semantic placement stays truthful through downstream feature chains.
+2. Land the first serious exact feature family cleanly, likely `shell` plus hole/cut workflows.
+3. Tighten projection/sketch-on-face/pattern flows around the same query/reference model.
+4. Promote curated multi-feature parts into the compiler and exact-export regression suite.
+
 ## Where We Succeed Or Fail
 
 This transition will likely succeed or fail on one layer:
@@ -204,6 +229,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 - `src/forge/compiledScene.ts` now centralizes scene-level compiler routing so export policy, debug tooling, and future backend capability work consume one compiler-owned route layer instead of re-deriving decisions per caller.
 - sketches placed with `onFace()` now record semantic workplane/query metadata alongside the resolved placement matrix, which is the first explicit slice of the reference/workplane model instead of raw transform-only state.
 - downstream `extrude()` / `revolve()` features from `onFace()` sketches now preserve semantic workplane placement intent in the shape compile graph instead of immediately collapsing that placement back to a generic transform matrix.
+- compiler-visible workplane placement now propagates through later shape transforms, so provenance inspection stays truthful after downstream `translate` / `rotate` / `scale` style edits instead of freezing at feature creation time.
 - `src/forge/kernel.ts` now exposes compiler-visible workplane placement inspection for downstream feature work, so later feature families can ask "what workplane/query produced this shape?" without reverse-engineering transforms.
 - both lowerers and the exact STEP exporter now execute that compiler-owned workplane placement step, and the invariant suite covers the end-to-end path.
 - the CadQuery/OCCT lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
