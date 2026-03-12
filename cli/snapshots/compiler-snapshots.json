@@ -2011,6 +2011,773 @@
     }
   },
   {
+    "id": "hole-cut-workflows",
+    "description": "Through holes, blind holes, and face-anchored cutouts stay compiler-owned and exact-exportable from one semantic workflow family.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Workflow",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "boolean",
+              "extrude"
+            ]
+          },
+          "compilePlan": {
+            "kind": "queryOwner",
+            "owner": {
+              "id": "shape-query-cut-5",
+              "operation": "cut"
+            },
+            "base": {
+              "kind": "cut",
+              "base": {
+                "kind": "queryOwner",
+                "owner": {
+                  "id": "shape-query-cut-4",
+                  "operation": "cut"
+                },
+                "base": {
+                  "kind": "cut",
+                  "base": {
+                    "kind": "queryOwner",
+                    "owner": {
+                      "id": "shape-query-hole-3",
+                      "operation": "hole"
+                    },
+                    "base": {
+                      "kind": "hole",
+                      "base": {
+                        "kind": "queryOwner",
+                        "owner": {
+                          "id": "shape-query-hole-2",
+                          "operation": "hole"
+                        },
+                        "base": {
+                          "kind": "hole",
+                          "base": {
+                            "kind": "queryOwner",
+                            "owner": {
+                              "id": "shape-query-extrude-1",
+                              "operation": "extrude"
+                            },
+                            "base": {
+                              "kind": "extrude",
+                              "profile": {
+                                "kind": "roundedRect",
+                                "width": 90,
+                                "height": 60,
+                                "radius": 8,
+                                "center": true,
+                                "transforms": []
+                              },
+                              "height": 24,
+                              "center": false
+                            }
+                          },
+                          "placement": {
+                            "matrix": [
+                              1,
+                              0,
+                              0,
+                              0,
+                              0,
+                              0,
+                              1,
+                              0,
+                              0,
+                              -1,
+                              0,
+                              0,
+                              0,
+                              -30,
+                              14,
+                              1
+                            ],
+                            "placement": {
+                              "workplane": {
+                                "origin": [
+                                  0,
+                                  -30,
+                                  12
+                                ],
+                                "u": [
+                                  1,
+                                  0,
+                                  0
+                                ],
+                                "v": [
+                                  0,
+                                  0,
+                                  1
+                                ],
+                                "normal": [
+                                  0,
+                                  -1,
+                                  0
+                                ],
+                                "source": {
+                                  "kind": "canonical-face",
+                                  "face": "front",
+                                  "owner": {
+                                    "id": "shape-query-extrude-1",
+                                    "operation": "extrude"
+                                  }
+                                }
+                              },
+                              "u": 0,
+                              "v": 2,
+                              "protrude": 0,
+                              "selfAnchor": "center"
+                            }
+                          },
+                          "radius": 4,
+                          "extent": {
+                            "kind": "through",
+                            "depth": 60
+                          }
+                        }
+                      },
+                      "placement": {
+                        "matrix": [
+                          1,
+                          0,
+                          0,
+                          0,
+                          0,
+                          1,
+                          0,
+                          0,
+                          0,
+                          0,
+                          1,
+                          0,
+                          -18,
+                          10,
+                          24,
+                          1
+                        ],
+                        "placement": {
+                          "workplane": {
+                            "origin": [
+                              0,
+                              0,
+                              24
+                            ],
+                            "u": [
+                              1,
+                              0,
+                              0
+                            ],
+                            "v": [
+                              0,
+                              1,
+                              0
+                            ],
+                            "normal": [
+                              0,
+                              0,
+                              1
+                            ],
+                            "source": {
+                              "kind": "canonical-face",
+                              "face": "top",
+                              "owner": {
+                                "id": "shape-query-hole-2",
+                                "operation": "hole"
+                              }
+                            }
+                          },
+                          "u": -18,
+                          "v": 10,
+                          "protrude": 0,
+                          "selfAnchor": "center"
+                        }
+                      },
+                      "radius": 3,
+                      "extent": {
+                        "kind": "blind",
+                        "depth": 10
+                      }
+                    }
+                  },
+                  "placement": {
+                    "matrix": [
+                      1,
+                      0,
+                      0,
+                      0,
+                      0,
+                      1,
+                      0,
+                      0,
+                      0,
+                      0,
+                      1,
+                      0,
+                      14,
+                      -8,
+                      24,
+                      1
+                    ],
+                    "placement": {
+                      "workplane": {
+                        "origin": [
+                          0,
+                          0,
+                          24
+                        ],
+                        "u": [
+                          1,
+                          0,
+                          0
+                        ],
+                        "v": [
+                          0,
+                          1,
+                          0
+                        ],
+                        "normal": [
+                          0,
+                          0,
+                          1
+                        ],
+                        "source": {
+                          "kind": "tracked-face",
+                          "faceName": "top",
+                          "owner": {
+                            "id": "shape-query-extrude-1",
+                            "operation": "extrude"
+                          }
+                        }
+                      },
+                      "u": 14,
+                      "v": -8,
+                      "protrude": 0,
+                      "selfAnchor": "center"
+                    }
+                  },
+                  "profile": {
+                    "kind": "roundedRect",
+                    "width": 18,
+                    "height": 10,
+                    "radius": 2,
+                    "center": true,
+                    "transforms": []
+                  },
+                  "extent": {
+                    "kind": "blind",
+                    "depth": 6
+                  }
+                }
+              },
+              "placement": {
+                "matrix": [
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  45,
+                  -4,
+                  12,
+                  1
+                ],
+                "placement": {
+                  "workplane": {
+                    "origin": [
+                      45,
+                      0,
+                      12
+                    ],
+                    "u": [
+                      0,
+                      1,
+                      0
+                    ],
+                    "v": [
+                      0,
+                      0,
+                      1
+                    ],
+                    "normal": [
+                      1,
+                      0,
+                      0
+                    ],
+                    "source": {
+                      "kind": "canonical-face",
+                      "face": "right",
+                      "owner": {
+                        "id": "shape-query-extrude-1",
+                        "operation": "extrude"
+                      }
+                    }
+                  },
+                  "u": -4,
+                  "v": 0,
+                  "protrude": 0,
+                  "selfAnchor": "center"
+                }
+              },
+              "profile": {
+                "kind": "roundedRect",
+                "width": 16,
+                "height": 8,
+                "radius": 2,
+                "center": true,
+                "transforms": []
+              },
+              "extent": {
+                "kind": "through",
+                "depth": 90
+              }
+            }
+          },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "boolean",
+              "op": "difference",
+              "shapes": [
+                {
+                  "kind": "boolean",
+                  "op": "difference",
+                  "shapes": [
+                    {
+                      "kind": "boolean",
+                      "op": "difference",
+                      "shapes": [
+                        {
+                          "kind": "boolean",
+                          "op": "difference",
+                          "shapes": [
+                            {
+                              "kind": "extrude",
+                              "profile": {
+                                "kind": "roundedRect",
+                                "width": 90,
+                                "height": 60,
+                                "radius": 8,
+                                "center": true,
+                                "transforms": []
+                              },
+                              "height": 24,
+                              "center": false
+                            },
+                            {
+                              "kind": "transform",
+                              "base": {
+                                "kind": "cylinder",
+                                "height": 60.5,
+                                "radius": 4,
+                                "center": false
+                              },
+                              "steps": [
+                                {
+                                  "kind": "translate",
+                                  "x": 0,
+                                  "y": 0,
+                                  "z": -60.25
+                                },
+                                {
+                                  "kind": "workplanePlacement",
+                                  "matrix": [
+                                    1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    1,
+                                    0,
+                                    0,
+                                    -1,
+                                    0,
+                                    0,
+                                    0,
+                                    -30,
+                                    14,
+                                    1
+                                  ],
+                                  "placement": {
+                                    "workplane": {
+                                      "origin": [
+                                        0,
+                                        -30,
+                                        12
+                                      ],
+                                      "u": [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      "v": [
+                                        0,
+                                        0,
+                                        1
+                                      ],
+                                      "normal": [
+                                        0,
+                                        -1,
+                                        0
+                                      ],
+                                      "source": {
+                                        "kind": "canonical-face",
+                                        "face": "front",
+                                        "owner": {
+                                          "id": "shape-query-extrude-1",
+                                          "operation": "extrude"
+                                        }
+                                      }
+                                    },
+                                    "u": 0,
+                                    "v": 2,
+                                    "protrude": 0,
+                                    "selfAnchor": "center"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "transform",
+                          "base": {
+                            "kind": "cylinder",
+                            "height": 10.2,
+                            "radius": 3,
+                            "center": false
+                          },
+                          "steps": [
+                            {
+                              "kind": "translate",
+                              "x": 0,
+                              "y": 0,
+                              "z": -10.1
+                            },
+                            {
+                              "kind": "workplanePlacement",
+                              "matrix": [
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                -18,
+                                10,
+                                24,
+                                1
+                              ],
+                              "placement": {
+                                "workplane": {
+                                  "origin": [
+                                    0,
+                                    0,
+                                    24
+                                  ],
+                                  "u": [
+                                    1,
+                                    0,
+                                    0
+                                  ],
+                                  "v": [
+                                    0,
+                                    1,
+                                    0
+                                  ],
+                                  "normal": [
+                                    0,
+                                    0,
+                                    1
+                                  ],
+                                  "source": {
+                                    "kind": "canonical-face",
+                                    "face": "top",
+                                    "owner": {
+                                      "id": "shape-query-hole-2",
+                                      "operation": "hole"
+                                    }
+                                  }
+                                },
+                                "u": -18,
+                                "v": 10,
+                                "protrude": 0,
+                                "selfAnchor": "center"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "transform",
+                      "base": {
+                        "kind": "extrude",
+                        "profile": {
+                          "kind": "roundedRect",
+                          "width": 18,
+                          "height": 10,
+                          "radius": 2,
+                          "center": true,
+                          "transforms": []
+                        },
+                        "height": 6.12,
+                        "center": false
+                      },
+                      "steps": [
+                        {
+                          "kind": "translate",
+                          "x": 0,
+                          "y": 0,
+                          "z": -6.06
+                        },
+                        {
+                          "kind": "workplanePlacement",
+                          "matrix": [
+                            1,
+                            0,
+                            0,
+                            0,
+                            0,
+                            1,
+                            0,
+                            0,
+                            0,
+                            0,
+                            1,
+                            0,
+                            14,
+                            -8,
+                            24,
+                            1
+                          ],
+                          "placement": {
+                            "workplane": {
+                              "origin": [
+                                0,
+                                0,
+                                24
+                              ],
+                              "u": [
+                                1,
+                                0,
+                                0
+                              ],
+                              "v": [
+                                0,
+                                1,
+                                0
+                              ],
+                              "normal": [
+                                0,
+                                0,
+                                1
+                              ],
+                              "source": {
+                                "kind": "tracked-face",
+                                "faceName": "top",
+                                "owner": {
+                                  "id": "shape-query-extrude-1",
+                                  "operation": "extrude"
+                                }
+                              }
+                            },
+                            "u": 14,
+                            "v": -8,
+                            "protrude": 0,
+                            "selfAnchor": "center"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "extrude",
+                    "profile": {
+                      "kind": "roundedRect",
+                      "width": 16,
+                      "height": 8,
+                      "radius": 2,
+                      "center": true,
+                      "transforms": []
+                    },
+                    "height": 90.5,
+                    "center": false
+                  },
+                  "steps": [
+                    {
+                      "kind": "translate",
+                      "x": 0,
+                      "y": 0,
+                      "z": -90.25
+                    },
+                    {
+                      "kind": "workplanePlacement",
+                      "matrix": [
+                        0,
+                        1,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        0,
+                        1,
+                        0,
+                        0,
+                        0,
+                        45,
+                        -4,
+                        12,
+                        1
+                      ],
+                      "placement": {
+                        "workplane": {
+                          "origin": [
+                            45,
+                            0,
+                            12
+                          ],
+                          "u": [
+                            0,
+                            1,
+                            0
+                          ],
+                          "v": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "normal": [
+                            1,
+                            0,
+                            0
+                          ],
+                          "source": {
+                            "kind": "canonical-face",
+                            "face": "right",
+                            "owner": {
+                              "id": "shape-query-extrude-1",
+                              "operation": "extrude"
+                            }
+                          }
+                        },
+                        "u": -4,
+                        "v": 0,
+                        "protrude": 0,
+                        "selfAnchor": "center"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -45,
+                -30,
+                0
+              ],
+              "max": [
+                45,
+                30,
+                24
+              ]
+            },
+            "volume": 113347.218882,
+            "surfaceArea": 22790.960042,
+            "numTri": 1244,
+            "vertexCount": 618,
+            "meshDigest": "b7ae174c01b7b62d58baedcb6d58fdaef07b8372a6ff4b6c042e7029b5d4dd5e"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -45,
+                -30,
+                0
+              ],
+              "max": [
+                45,
+                30,
+                24
+              ]
+            },
+            "volume": 113347.218882,
+            "surfaceArea": 22790.960042,
+            "numTri": 1244,
+            "vertexCount": 618,
+            "meshDigest": "b7ae174c01b7b62d58baedcb6d58fdaef07b8372a6ff4b6c042e7029b5d4dd5e"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Workflow",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Workflow",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  },
+  {
     "id": "multi-feature-enclosure",
     "description": "A curated enclosure-style part keeps shell, workplane-driven cuts, mirrors, and booleans aligned across both lowerers.",
     "scene": {

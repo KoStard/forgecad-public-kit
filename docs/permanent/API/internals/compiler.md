@@ -187,13 +187,18 @@ Current progress:
 
 - `shell()` is now compiler-owned as the first mainstream exact feature-family slice instead of being left for exporter-only logic
 - both lowerers consume the same semantic `shell` node and rewrite supported cases into backend-native boolean/extrude/cylinder plans
+- `shape.hole()` and `shape.cutout()` now form a compiler-owned hole/cut workflow slice anchored to the shared face-query/workplane model
+- through holes, blind holes, and simple face-anchored cutouts now lower through both Manifold and CadQuery/OCCT from that shared semantic node family
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
+- regression coverage now also includes exact/runtime/export checks for the supported hole/cut workflow subset
 - the regression suite now also includes a curated enclosure-style multi-feature part so shell, workplane-driven cuts, mirrors, and booleans are exercised together instead of only as isolated unit slices
 
 Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings
-- shelling now preserves parent-body ownership lineage, but stable downstream face ownership after shell-created topology changes is still not solved, which is why fillet/chamfer, holes, and projection-driven edits are still the harder next layer
+- `shape.hole()` v1 only covers circular through/blind holes, and `shape.cutout()` v1 only covers sketches already placed with `onFace(...)`
+- counterbores, countersinks, up-to-face extents, drafted cuts, and durable identity for hole/cut-created faces are still missing
+- shelling and hole/cut workflows now preserve parent-body ownership lineage, but stable downstream face ownership after topology-changing edits is still not solved, which is why projection-driven edits, patterns, and fillet/chamfer remain the harder next layers
 
 ### Phase 4: Higher-Order Workflows
 

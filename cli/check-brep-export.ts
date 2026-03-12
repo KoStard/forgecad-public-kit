@@ -39,6 +39,20 @@ const body = union(shell, feet)
 return [{ name: 'Enclosure', shape: body }];
 `;
 
+const HOLE_CUT_WORKFLOW_CODE = `
+const base = roundedRect(90, 60, 8, true).extrude(24);
+const topPocket = roundedRect(18, 10, 2, true)
+  .onFace(base, 'top', { u: 14, v: -8, selfAnchor: 'center' });
+const sideCut = roundedRect(16, 8, 2, true)
+  .onFace(base, 'right', { u: -4, v: 0, selfAnchor: 'center' });
+const body = base
+  .hole('front', { diameter: 8, u: 0, v: 2 })
+  .hole('top', { diameter: 6, u: -18, v: 10, depth: 10 })
+  .cutout(topPocket, { depth: 6 })
+  .cutout(sideCut);
+return [{ name: 'Workflow', shape: body }];
+`;
+
 function runExactManifest(code: string) {
   const files: Record<string, string> = { 'main.forge.js': code };
   const result = runScript(code, 'main.forge.js', files);
@@ -95,6 +109,27 @@ function collectShapeTransforms(plan: CadQueryShapePlan): CadQueryShapeTransform
       return collectShapeTransforms(plan.base);
     case 'trimByPlane':
       return collectShapeTransforms(plan.base);
+  }
+}
+
+function collectShapeNodes(plan: CadQueryShapePlan): CadQueryShapePlan[] {
+  switch (plan.kind) {
+    case 'box':
+    case 'cylinder':
+    case 'sphere':
+    case 'extrude':
+    case 'revolve':
+    case 'loft':
+    case 'sweep':
+      return [plan];
+    case 'boolean':
+      return [plan, ...plan.shapes.flatMap(collectShapeNodes)];
+    case 'transform':
+      return [plan, ...collectShapeNodes(plan.base)];
+    case 'queryOwner':
+      return [plan, ...collectShapeNodes(plan.base)];
+    case 'trimByPlane':
+      return [plan, ...collectShapeNodes(plan.base)];
   }
 }
 
@@ -460,6 +495,39 @@ return [{ name: 'Shell', shape: body }];
 `);
 }
 
+function checkHoleCutWorkflowPlan(): void {
+  const plan = runExactManifest(HOLE_CUT_WORKFLOW_CODE);
+
+  assert.equal(plan.kind, 'boolean', `Expected hole/cut workflow exact lowering to produce a boolean tree, got ${plan.kind}`);
+
+  const transforms = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
+  assert.equal(transforms.length, 4, `Expected four workplane placements (2 holes + 2 cutouts), got ${transforms.length}`);
+  assert(
+    transforms.every((step) => step.placement.workplane.source.owner),
+    'Expected every lowered hole/cut placement to retain a query-backed workplane owner',
+  );
+
+  const nodes = collectShapeNodes(plan);
+  assert(
+    nodes.filter((node) => node.kind === 'cylinder').length >= 2,
+    'Expected lowered hole workflows to introduce analytic cylinder cutters',
+  );
+  assert(
+    nodes.filter((node) => node.kind === 'extrude').length >= 3,
+    'Expected lowered cutout workflows to remain extrude-based in the exact plan',
+  );
+
+  const profiles = collectProfiles(plan);
+  assert(
+    profiles.some((profile) => profile.kind === 'roundedRect' && profile.width === 18 && profile.height === 10),
+    'Expected the blind pocket rounded-rectangle profile to survive exact lowering',
+  );
+}
+
+function checkHoleCutWorkflowExportEndToEnd(): void {
+  exportExactManifest(HOLE_CUT_WORKFLOW_CODE);
+}
+
 function checkMultiFeatureEnclosurePlan(): void {
   const plan = runExactManifest(MULTI_FEATURE_ENCLOSURE_CODE);
 
@@ -730,6 +798,8 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkSweepPlan();
   checkShellPlan();
   checkShellExportEndToEnd();
+  checkHoleCutWorkflowPlan();
+  checkHoleCutWorkflowExportEndToEnd();
   checkMultiFeatureEnclosurePlan();
   checkMultiFeatureEnclosureExportEndToEnd();
   checkSketchOnFacePlacementPlan();

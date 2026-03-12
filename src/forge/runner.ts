@@ -8,6 +8,7 @@
  */
 
 import * as ts from 'typescript';
+import './holeCut';
 import {
   Shape,
   box,

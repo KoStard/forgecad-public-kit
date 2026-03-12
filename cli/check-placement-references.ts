@@ -4,6 +4,7 @@
  *
  * Ensures named points/edges/surfaces/objects survive transforms and importPart().
  */
+import '../src/forge/holeCut';
 import { getShapePrimaryQueryOwner, getShapeQueryOwners, getShapeWorkplanePlacement, initKernel, box } from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
 import { rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
@@ -350,6 +351,31 @@ function checkShapeQueryOwnerPropagation(): void {
   expect(ownerIds.has(bodyOwner!.id), 'boolean result should include its own owner');
 }
 
+function checkHoleCutFeaturePlacement(): void {
+  const base = roundedRect(48, 30, 4, true).extrude(18);
+  const baseOwner = getShapePrimaryQueryOwner(base.toShape());
+  expect(baseOwner != null, 'hole/cut base should expose a primary query owner');
+
+  const drilled = base.hole('top', { diameter: 6, u: 8, v: -4, depth: 9 });
+  const holePlacement = getShapeWorkplanePlacement(drilled);
+  expect(holePlacement != null, 'Shape.hole() should preserve its semantic workplane placement on the result');
+  expect(holePlacement!.placement.workplane.source.kind === 'tracked-face', 'Shape.hole() should prefer tracked planar faces when available');
+  expect(holePlacement!.placement.workplane.source.faceName === 'top', 'Shape.hole() should preserve the selected tracked face name');
+  expect(holePlacement!.placement.workplane.source.owner?.id === baseOwner!.id, 'Shape.hole() should keep the parent body owner on the face query');
+  expect(holePlacement!.placement.u === 8, 'Shape.hole() should preserve the feature u offset');
+  expect(holePlacement!.placement.v === -4, 'Shape.hole() should preserve the feature v offset');
+
+  const pocket = roundedRect(12, 8, 2, true)
+    .onFace(base, 'front', { u: 0, v: 3, selfAnchor: 'center' });
+  const cut = drilled.cutout(pocket, { depth: 5 });
+  const cutPlacement = getShapeWorkplanePlacement(cut);
+  expect(cutPlacement != null, 'Shape.cutout() should preserve its semantic workplane placement on the result');
+  expect(cutPlacement!.placement.workplane.source.kind === 'canonical-face', 'Shape.cutout() should preserve canonical face queries when the source sketch used them');
+  expect(cutPlacement!.placement.workplane.source.face === 'front', 'Shape.cutout() should preserve the selected canonical face');
+  expect(cutPlacement!.placement.workplane.source.owner?.id === baseOwner!.id, 'Shape.cutout() should retain the originating body owner lineage');
+  expect(cutPlacement!.placement.selfAnchor === 'center', 'Shape.cutout() should preserve the source sketch anchor');
+}
+
 export async function runCheckPlacementReferencesCli(): Promise<void> {
   await initKernel();
   checkTransformAndPlacementHelpers();
@@ -361,5 +387,6 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkTrackedEdgeQueryPropagation();
   checkShapeWorkplanePlacementPropagation();
   checkShapeQueryOwnerPropagation();
+  checkHoleCutFeaturePlacement();
   console.log('✓ Placement reference invariants passed');
 }

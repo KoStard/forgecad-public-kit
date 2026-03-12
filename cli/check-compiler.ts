@@ -23,6 +23,20 @@ type CompilerCaseDefinition = {
 
 const SNAPSHOT_PATH = resolvePackagePath(import.meta.url, 'cli', 'snapshots', 'compiler-snapshots.json');
 
+const HOLE_CUT_WORKFLOW_CODE = `
+const base = roundedRect(90, 60, 8, true).extrude(24);
+const topPocket = roundedRect(18, 10, 2, true)
+  .onFace(base, 'top', { u: 14, v: -8, selfAnchor: 'center' });
+const sideCut = roundedRect(16, 8, 2, true)
+  .onFace(base, 'right', { u: -4, v: 0, selfAnchor: 'center' });
+const body = base
+  .hole('front', { diameter: 8, u: 0, v: 2 })
+  .hole('top', { diameter: 6, u: -18, v: 10, depth: 10 })
+  .cutout(topPocket, { depth: 6 })
+  .cutout(sideCut);
+return [{ name: 'Workflow', shape: body }];
+`;
+
 function inlineCase(id: string, description: string, code: string): CompilerCaseDefinition {
   return {
     id,
@@ -146,6 +160,11 @@ const body = roundedRect(80, 50, 6, true)
   .shell(2.5, { openFaces: ['top'] });
 return [{ name: 'Shell', shape: body }];
 `,
+  ),
+  inlineCase(
+    'hole-cut-workflows',
+    'Through holes, blind holes, and face-anchored cutouts stay compiler-owned and exact-exportable from one semantic workflow family.',
+    HOLE_CUT_WORKFLOW_CODE,
   ),
   inlineCase(
     'multi-feature-enclosure',

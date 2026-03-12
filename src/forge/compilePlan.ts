@@ -4,6 +4,7 @@ import {
   type ShapeQueryOwner,
 } from './queryModel';
 import {
+  cloneShapeWorkplanePlacement,
   cloneSketchPlacementModel,
   type ShapeWorkplanePlacement,
 } from './sketch/workplaneModel';
@@ -91,6 +92,10 @@ export type SweepPathCompilePlan = {
   points: [number, number, number][];
 };
 
+export type FeatureCutExtent =
+  | { kind: 'through'; depth: number }
+  | { kind: 'blind'; depth: number };
+
 export type ShapeCompilePlan =
   | {
       kind: 'box';
@@ -124,6 +129,20 @@ export type ShapeCompilePlan =
       base: ShapeCompilePlan;
       thickness: number;
       openFaces: Array<'top' | 'bottom'>;
+    }
+  | {
+      kind: 'hole';
+      base: ShapeCompilePlan;
+      placement: ShapeWorkplanePlacement;
+      radius: number;
+      extent: FeatureCutExtent;
+    }
+  | {
+      kind: 'cut';
+      base: ShapeCompilePlan;
+      placement: ShapeWorkplanePlacement;
+      profile: ProfileCompilePlan;
+      extent: FeatureCutExtent;
     }
   | {
       kind: 'revolve';
@@ -207,14 +226,21 @@ function canonicalVec3(vec: Vec3): Vec3 {
 function cloneShapeWorkplanePlacementValue(
   placement: ShapeWorkplanePlacement,
 ): ShapeWorkplanePlacement {
-  return {
+  return cloneShapeWorkplanePlacement({
     matrix: cloneShapeTransformMatrix(placement.matrix),
     placement: cloneSketchPlacementModel(placement.placement)!,
-  };
+  })!;
 }
 
 function cloneShapeQueryOwnerValue(owner: ShapeQueryOwner): ShapeQueryOwner {
   return cloneShapeQueryOwner(owner)!;
+}
+
+function cloneFeatureCutExtent(extent: FeatureCutExtent): FeatureCutExtent {
+  return {
+    kind: extent.kind,
+    depth: canonicalNumber(extent.depth),
+  };
 }
 
 let _shapeQueryOwnerCounter = 0;
@@ -447,6 +473,22 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         thickness: plan.thickness,
         openFaces: [...plan.openFaces],
       };
+    case 'hole':
+      return {
+        kind: 'hole',
+        base: cloneShapeCompilePlan(plan.base)!,
+        placement: cloneShapeWorkplanePlacementValue(plan.placement),
+        radius: plan.radius,
+        extent: cloneFeatureCutExtent(plan.extent),
+      };
+    case 'cut':
+      return {
+        kind: 'cut',
+        base: cloneShapeCompilePlan(plan.base)!,
+        placement: cloneShapeWorkplanePlacementValue(plan.placement),
+        profile: cloneProfileCompilePlan(plan.profile)!,
+        extent: cloneFeatureCutExtent(plan.extent),
+      };
     case 'revolve':
       return {
         kind: 'revolve',
@@ -586,6 +628,8 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan | null): Shape
       return cloneShapeQueryOwnerValue(plan.owner);
     case 'transform':
     case 'shell':
+    case 'hole':
+    case 'cut':
     case 'trimByPlane':
       return findShapePrimaryQueryOwner(plan.base);
     case 'box':
@@ -617,6 +661,8 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan | null): ShapeQue
         return;
       case 'transform':
       case 'shell':
+      case 'hole':
+      case 'cut':
       case 'trimByPlane':
         visit(current.base);
         return;
@@ -666,6 +712,9 @@ export function findShapeWorkplanePlacement(
     }
     case 'shell':
       return findShapeWorkplanePlacement(plan.base);
+    case 'hole':
+    case 'cut':
+      return cloneShapeWorkplanePlacementValue(plan.placement);
     case 'trimByPlane':
       return findShapeWorkplanePlacement(plan.base);
     case 'box':
