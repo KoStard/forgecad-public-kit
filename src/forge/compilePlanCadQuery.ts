@@ -1,5 +1,5 @@
 import type { ProfileCompilePlan, ShapeCompilePlan } from './compilePlan';
-import type { CadQueryProfilePlan, CadQueryShapePlan } from './cadqueryPlan';
+import { appendCadQueryProfileTransform, type CadQueryProfilePlan, type CadQueryShapePlan } from './cadqueryPlan';
 import {
   lowerCutShapeCompilePlanToConcretePlan,
   lowerHoleShapeCompilePlanToConcretePlan,
@@ -36,6 +36,15 @@ function unsupportedNodeDiagnostic(kind: string, path: string) {
     `cadquery-occt-unsupported-${kind}`,
     path,
     `CadQuery/OCCT lowering does not support Forge ${kind} intent at ${path} yet.`,
+  );
+}
+
+function unsupportedProjectDiagnostic(path: string, reason: string) {
+  return compilerDiagnostic(
+    'cadquery-occt',
+    'cadquery-occt-unsupported-project',
+    path,
+    `CadQuery/OCCT lowering cannot replay Forge projection intent at ${path}: ${reason}`,
   );
 }
 
@@ -137,6 +146,23 @@ function lowerProfileCompilePlanToCadQueryResultAtPath(
         join: plan.join,
         transforms: [...plan.transforms],
       }, base.diagnostics);
+    }
+    case 'project': {
+      if (!plan.replayProfile) {
+        return compilerFailure(unsupportedProjectDiagnostic(
+          path,
+          plan.replayReason ?? 'projection replay metadata is missing.',
+        ));
+      }
+
+      const replay = lowerProfileCompilePlanToCadQueryResultAtPath(plan.replayProfile, `${path}.replayProfile`);
+      if (!replay.ok) return compilerFailure(...replay.diagnostics);
+
+      let lowered = replay.value;
+      for (const transform of plan.transforms) {
+        lowered = appendCadQueryProfileTransform(lowered, transform)!;
+      }
+      return compilerSuccess(lowered, replay.diagnostics);
     }
     case 'hull':
       return compilerFailure(unsupportedNodeDiagnostic('profile-hull', path));

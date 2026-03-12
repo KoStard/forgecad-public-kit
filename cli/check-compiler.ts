@@ -231,6 +231,25 @@ return [{ name: 'Feature', shape: feature }];
 `,
   ),
   inlineCase(
+    'projection-downstream-gasket',
+    'Projection-driven downstream sketching keeps explicit projection intent on the sketch and still lowers follow-on face features through both compiler paths.',
+    `
+const base = roundedRect(40, 24, 4, true).extrude(8, { center: true });
+const badge = roundedRect(18, 8, 2, true)
+  .onFace(base, 'top', { u: 5, v: -2, protrude: 0.25, selfAnchor: 'center' })
+  .extrude(2);
+const projected = projectToPlane(badge.toShape(), { plane: 'XY' });
+const gasket = projected
+  .offset(1.25)
+  .onFace(base, 'top', { protrude: 0.25, selfAnchor: 'center' })
+  .extrude(0.8);
+return [
+  { name: 'Projected Badge', sketch: projected },
+  { name: 'Gasket', shape: gasket },
+];
+`,
+  ),
+  inlineCase(
     'segmented-runtime-hints',
     'Segmented runtime intent stays runnable but outside the exact BREP subset.',
     `

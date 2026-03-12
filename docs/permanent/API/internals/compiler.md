@@ -195,15 +195,17 @@ Current progress:
 - the regression suite now also includes a curated enclosure-style multi-feature part so shell, workplane-driven cuts, mirrors, and booleans are exercised together instead of only as isolated unit slices
 - mirrored downstream features and helper-driven linear/circular repetition now preserve repeated-result ownership on top of the shared face-query backbone
 - exact export regression coverage now includes a repeated-feature part where a mirrored descendant drives a downstream workplane feature inside a boolean chain
+- `projectToPlane()` sketches now keep an explicit projection node in the compiler graph instead of collapsing immediately to anonymous runtime geometry
+- the supported exact subset can replay projection-driven follow-on features when the source is a straight placed extrusion and the target plane stays parallel to that captured workplane placement
 
 Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings
 - `shape.hole()` v1 only covers circular through/blind holes, and `shape.cutout()` v1 only covers sketches already placed with `onFace(...)`
 - counterbores, countersinks, up-to-face extents, drafted cuts, and durable identity for hole/cut-created faces are still missing
-- shelling and hole/cut workflows now preserve parent-body ownership lineage, but stable downstream face ownership after topology-changing edits is still not solved, which is why projection-driven edits, patterns, and fillet/chamfer remain the harder next layers
 - repeated-feature ownership currently tracks repeated bodies and mirrored descendants, not durable per-face identity after merged pattern topology changes
 - shell, hole/cut, and repeated-feature workflows now preserve parent-body ownership lineage, but stable downstream face ownership after topology-changing edits is still not solved, which is why projection-driven edits and fillet/chamfer remain the harder next layers
+- projection replay still only covers the parallel-workplane subset; richer projection-driven edits remain outside the exact subset today
 
 ### Phase 4: Higher-Order Workflows
 

@@ -1,4 +1,5 @@
 import { Transform, type Mat4, type Vec3 } from './transform';
+import type { PlaneFrame } from './planeFrame';
 import {
   cloneShapeQueryOwner,
   type ShapeQueryOwner,
@@ -58,6 +59,15 @@ export type ProfileCompilePlan =
   | {
       kind: 'hull';
       profiles: ProfileCompilePlan[];
+      transforms: ProfileCompileTransformStep[];
+    }
+  | {
+      kind: 'project';
+      sourceShape: ShapeCompilePlan;
+      plane: PlaneFrame;
+      sourcePlacement?: ShapeWorkplanePlacement['placement'];
+      replayProfile?: ProfileCompilePlan;
+      replayReason?: string;
       transforms: ProfileCompileTransformStep[];
     };
 
@@ -437,6 +447,21 @@ export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): Profil
       return {
         kind: 'hull',
         profiles: plan.profiles.map((profile) => cloneProfileCompilePlan(profile)!),
+        transforms: plan.transforms.map(cloneProfileTransform),
+      };
+    case 'project':
+      return {
+        kind: 'project',
+        sourceShape: cloneShapeCompilePlan(plan.sourceShape)!,
+        plane: {
+          origin: [plan.plane.origin[0], plan.plane.origin[1], plan.plane.origin[2]],
+          u: [plan.plane.u[0], plan.plane.u[1], plan.plane.u[2]],
+          v: [plan.plane.v[0], plan.plane.v[1], plan.plane.v[2]],
+          normal: [plan.plane.normal[0], plan.plane.normal[1], plan.plane.normal[2]],
+        },
+        sourcePlacement: plan.sourcePlacement ? cloneSketchPlacementModel(plan.sourcePlacement)! : undefined,
+        replayProfile: plan.replayProfile ? cloneProfileCompilePlan(plan.replayProfile)! : undefined,
+        replayReason: plan.replayReason,
         transforms: plan.transforms.map(cloneProfileTransform),
       };
   }
