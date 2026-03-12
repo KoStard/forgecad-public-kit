@@ -170,12 +170,12 @@ return [{ name: 'Shell', shape: body }];
   ),
   inlineCase(
     'fillet-edge-workflow',
-    'A tracked vertical fillet stays compiler-owned and still accepts ordinary downstream face-driven edits on the preserved base-owner lineage.',
+    'Tracked vertical edge finishing stays compiler-owned, preserves untouched sibling edge meaning across supported rewrites, and still accepts downstream face-driven edits on the base-owner lineage.',
     FILLET_EDGE_WORKFLOW_CODE,
   ),
   inlineCase(
     'chamfer-edge-workflow',
-    'A tracked vertical chamfer lowers through both backends and still composes with normal additive and hole-driven edits.',
+    'Tracked vertical chamfers lower through both backends, preserve untouched sibling edge meaning across supported rewrites, and still compose with additive and hole-driven edits.',
     CHAMFER_EDGE_WORKFLOW_CODE,
   ),
   inlineCase(

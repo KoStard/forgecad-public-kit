@@ -275,8 +275,16 @@ export function buildEdgeFeatureTopologyRewritePropagation(
   operation: 'fillet' | 'chamfer',
   owner: ShapeQueryOwner,
   edge: EdgeQueryRef | undefined,
+  preservedEdges: EdgeQueryRef[] = [],
 ): TopologyRewritePropagation {
   const propagation = createPropagation(operation, owner);
+  for (const source of preservedEdges) {
+    propagation.preservedEdges.push({
+      query: createPropagatedEdgeQueryRef(source, owner, 'preserved'),
+      status: 'supported',
+      note: `${operation} leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset.`,
+    });
+  }
   if (edge) {
     const propagated = createPropagatedEdgeQueryRef(edge, owner, 'merged');
     propagation.preservedEdges.push({

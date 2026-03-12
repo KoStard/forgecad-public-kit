@@ -583,11 +583,14 @@ function checkFilletEdgeWorkflowPlan(): void {
 
   assert.equal(plan.kind, 'boolean', `Expected fillet workflow exact plan to remain a boolean tree, got ${plan.kind}`);
   const nodes = collectShapes(plan);
-  const fillet = nodes.find((node) => node.kind === 'fillet');
-  assert(fillet && fillet.kind === 'fillet', 'Expected fillet workflow exact lowering to contain a fillet node');
-  assert.equal(fillet.radius, 6);
-  assert.deepEqual(fillet.quadrant, [-1, -1]);
-  assert(fillet.resolvedEdge, 'Expected fillet exact plan to include a resolved edge selector');
+  const fillets = nodes.filter((node) => node.kind === 'fillet');
+  assert.equal(fillets.length, 2, `Expected fillet workflow exact lowering to contain two fillet nodes, got ${fillets.length}`);
+  assert.deepEqual(fillets.map((node) => node.radius).sort((a, b) => a - b), [4, 6]);
+  assert.deepEqual(
+    fillets.map((node) => node.quadrant.join(',')).sort(),
+    ['-1,-1', '1,-1'],
+  );
+  assert(fillets.every((node) => !!node.resolvedEdge), 'Expected both fillet nodes to include resolved edge selectors');
 
   const transforms = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
   assert.equal(transforms.length, 2, `Expected two workplane placements after the fillet workflow (pocket + hole), got ${transforms.length}`);
@@ -606,11 +609,14 @@ function checkChamferEdgeWorkflowPlan(): void {
 
   assert.equal(plan.kind, 'boolean', `Expected chamfer workflow exact plan to remain a boolean tree, got ${plan.kind}`);
   const nodes = collectShapes(plan);
-  const chamfer = nodes.find((node) => node.kind === 'chamfer');
-  assert(chamfer && chamfer.kind === 'chamfer', 'Expected chamfer workflow exact lowering to contain a chamfer node');
-  assert.equal(chamfer.size, 4);
-  assert.deepEqual(chamfer.quadrant, [1, 1]);
-  assert(chamfer.resolvedEdge, 'Expected chamfer exact plan to include a resolved edge selector');
+  const chamfers = nodes.filter((node) => node.kind === 'chamfer');
+  assert.equal(chamfers.length, 2, `Expected chamfer workflow exact lowering to contain two chamfer nodes, got ${chamfers.length}`);
+  assert.deepEqual(chamfers.map((node) => node.size).sort((a, b) => a - b), [3, 4]);
+  assert.deepEqual(
+    chamfers.map((node) => node.quadrant.join(',')).sort(),
+    ['-1,-1', '1,1'],
+  );
+  assert(chamfers.every((node) => !!node.resolvedEdge), 'Expected both chamfer nodes to include resolved edge selectors');
 
   const placements = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
   assert.equal(placements.length, 2, `Expected two workplane placements after the chamfer workflow (rib + hole), got ${placements.length}`);

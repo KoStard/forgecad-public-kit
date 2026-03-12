@@ -1,9 +1,18 @@
 import type { ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
-import { shapeQueryOwnersEqual, type EdgeQueryRef, type ShapeQueryOwner } from './queryModel';
+import {
+  cloneShapeQueryOwner,
+  edgeQueryRefsEqual,
+  shapeQueryOwnersEqual,
+  type EdgeQueryRef,
+  type PropagatedEdgeQueryRef,
+  type ShapeQueryOwner,
+} from './queryModel';
 import { Transform, type Vec3 } from './transform';
 import type { EdgeFeatureResolvedSelector, ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
 
 const EPS = 1e-8;
+const SUPPORTED_VERTICAL_EDGE_NAMES = ['vert-bl', 'vert-br', 'vert-tr', 'vert-tl'] as const;
+type SupportedVerticalEdgeName = typeof SUPPORTED_VERTICAL_EDGE_NAMES[number];
 
 type EdgeFeatureIssueCode =
   | 'missing-edge-query'
@@ -12,6 +21,9 @@ type EdgeFeatureIssueCode =
   | 'missing-edge-owner'
   | 'edge-owner-not-found'
   | 'edge-query-crosses-topology-rewrite'
+  | 'edge-query-propagation-mismatch'
+  | 'edge-query-ambiguous-after-rewrite'
+  | 'edge-query-unsupported-after-rewrite'
   | 'unsupported-edge-transform'
   | 'unsupported-edge-base'
   | 'unsupported-edge-name'
@@ -26,10 +38,24 @@ type EdgeFeatureResolutionResult =
   | { ok: true; selection: ResolvedEdgeFeatureSelection }
   | { ok: false; issue: EdgeFeatureResolutionIssue };
 
+type TopologyRewritePlan = Extract<
+  ShapeCompilePlan,
+  { kind: 'shell' | 'hole' | 'cut' | 'boolean' | 'hull' | 'trimByPlane' | 'fillet' | 'chamfer' }
+>;
+
+type OwnerSearchStep =
+  | {
+      kind: 'transform';
+      steps: ShapeCompileTransformStep[];
+    }
+  | {
+      kind: 'rewrite';
+      plan: TopologyRewritePlan;
+    };
+
 interface OwnerSearchMatch {
   base: ShapeCompilePlan;
-  transform: Transform;
-  crossedRewrite: boolean;
+  steps: OwnerSearchStep[];
 }
 
 function midpoint(start: Vec3, end: Vec3): Vec3 {
@@ -52,6 +78,28 @@ function subtract(a: Vec3, b: Vec3): Vec3 {
 
 function edgeIssue(code: EdgeFeatureIssueCode, reason: string): EdgeFeatureResolutionResult {
   return { ok: false, issue: { code, reason } };
+}
+
+function isSupportedVerticalEdgeName(value: string): value is SupportedVerticalEdgeName {
+  return (SUPPORTED_VERTICAL_EDGE_NAMES as readonly string[]).includes(value);
+}
+
+function rewriteOperationLabel(plan: TopologyRewritePlan): string {
+  switch (plan.kind) {
+    case 'boolean':
+      return `boolean ${plan.op}`;
+    case 'trimByPlane':
+      return 'trimByPlane';
+    default:
+      return plan.kind;
+  }
+}
+
+function appendOwnerSearchStep(match: OwnerSearchMatch, step: OwnerSearchStep): OwnerSearchMatch {
+  return {
+    base: match.base,
+    steps: [...match.steps, step],
+  };
 }
 
 function rigidTransformForEdgeStep(step: ShapeCompileTransformStep): Transform | null {
@@ -113,8 +161,6 @@ function accumulateRigidTransform(
 function searchOwnerMatch(
   plan: ShapeCompilePlan | null,
   owner: ShapeQueryOwner,
-  transform: Transform = Transform.identity(),
-  crossedRewrite = false,
 ): { match?: OwnerSearchMatch; issue?: EdgeFeatureResolutionIssue } {
   if (!plan) {
     return {
@@ -131,28 +177,33 @@ function searchOwnerMatch(
         return {
           match: {
             base: plan.base,
-            transform,
-            crossedRewrite,
+            steps: [],
           },
         };
       }
-      return searchOwnerMatch(plan.base, owner, transform, crossedRewrite);
+      return searchOwnerMatch(plan.base, owner);
     case 'transform': {
-      const accumulated = accumulateRigidTransform(transform, plan.steps);
-      if (!accumulated.transform) return { issue: accumulated.issue };
-      return searchOwnerMatch(plan.base, owner, accumulated.transform, crossedRewrite);
+      const found = searchOwnerMatch(plan.base, owner);
+      if (!found.match) return found;
+      return { match: appendOwnerSearchStep(found.match, { kind: 'transform', steps: plan.steps }) };
     }
     case 'shell':
     case 'hole':
     case 'cut':
     case 'fillet':
     case 'chamfer':
-    case 'trimByPlane':
-      return searchOwnerMatch(plan.base, owner, transform, true);
+    case 'trimByPlane': {
+      const found = searchOwnerMatch(plan.base, owner);
+      if (!found.match) return found;
+      return { match: appendOwnerSearchStep(found.match, { kind: 'rewrite', plan }) };
+    }
     case 'boolean': {
       for (const shape of plan.shapes) {
-        const found = searchOwnerMatch(shape, owner, transform, true);
-        if (found.match || found.issue?.code === 'unsupported-edge-transform') return found;
+        const found = searchOwnerMatch(shape, owner);
+        if (found.match) {
+          return { match: appendOwnerSearchStep(found.match, { kind: 'rewrite', plan }) };
+        }
+        if (found.issue?.code === 'unsupported-edge-transform') return found;
       }
       return {
         issue: {
@@ -163,8 +214,11 @@ function searchOwnerMatch(
     }
     case 'hull': {
       for (const shape of plan.shapes) {
-        const found = searchOwnerMatch(shape, owner, transform, true);
-        if (found.match || found.issue?.code === 'unsupported-edge-transform') return found;
+        const found = searchOwnerMatch(shape, owner);
+        if (found.match) {
+          return { match: appendOwnerSearchStep(found.match, { kind: 'rewrite', plan }) };
+        }
+        if (found.issue?.code === 'unsupported-edge-transform') return found;
       }
       return {
         issue: {
@@ -186,6 +240,201 @@ function searchOwnerMatch(
           reason: 'The selected tracked edge is not owned by this target shape or any preserved query ancestor.',
         },
       };
+  }
+}
+
+function applyTransformStepsToSelection(
+  selection: ResolvedEdgeFeatureSelection,
+  steps: ShapeCompileTransformStep[],
+): EdgeFeatureResolutionResult {
+  const accumulated = accumulateRigidTransform(Transform.identity(), steps);
+  if (!accumulated.transform) return edgeIssue(accumulated.issue!.code, accumulated.issue!.reason);
+  return {
+    ok: true,
+    selection: applySelectionTransform(selection, accumulated.transform),
+  };
+}
+
+function resolveEdgeQueryAtOwnerBase(
+  ownerBase: ShapeCompilePlan,
+  ref: EdgeQueryRef,
+): EdgeFeatureResolutionResult {
+  switch (ref.kind) {
+    case 'tracked-edge':
+      return resolveSelectionFromOwnerBase(ownerBase, ref.edgeName);
+    case 'propagated-edge':
+      return resolvePropagatedEdgeQueryAtOwnerBase(ownerBase, ref);
+    case 'created-edge':
+      return edgeIssue(
+        'unsupported-edge-query-kind',
+        'Edge finishing does not yet support created-edge queries from topology rewrites.',
+      );
+    case 'edge-ref':
+      return edgeIssue(
+        'unsupported-edge-query-kind',
+        'Edge finishing v1 supports tracked/propagated compiler-owned edge queries only, not direct edge refs.',
+      );
+  }
+}
+
+function resolvePropagatedEdgeQueryAtOwnerBase(
+  ownerBase: ShapeCompilePlan,
+  ref: PropagatedEdgeQueryRef,
+): EdgeFeatureResolutionResult {
+  if (
+    ownerBase.kind === 'box'
+    || ownerBase.kind === 'cylinder'
+    || ownerBase.kind === 'sphere'
+    || ownerBase.kind === 'extrude'
+    || ownerBase.kind === 'revolve'
+    || ownerBase.kind === 'loft'
+    || ownerBase.kind === 'sweep'
+    || ownerBase.kind === 'transform'
+    || ownerBase.kind === 'queryOwner'
+  ) {
+    return edgeIssue(
+      'edge-query-propagation-mismatch',
+      'The selected propagated edge query does not point at a topology-rewrite result on this target shape.',
+    );
+  }
+
+  const propagation = ownerBase.queryPropagation;
+  if (!propagation || propagation.rewriteId !== ref.rewriteId) {
+    return edgeIssue(
+      'edge-query-propagation-mismatch',
+      'The selected propagated edge query does not match the target shape\'s recorded rewrite propagation contract.',
+    );
+  }
+
+  const preservedEntry = propagation.preservedEdges.find((entry) => edgeQueryRefsEqual(entry.query, ref));
+  if (!preservedEntry) {
+    return edgeIssue(
+      'edge-query-propagation-mismatch',
+      `The selected propagated edge query is not part of the recorded ${rewriteOperationLabel(ownerBase)} propagation subset for this target shape.`,
+    );
+  }
+  if (preservedEntry.status !== 'supported' || ref.outcome !== 'preserved') {
+    return edgeIssue(
+      'edge-query-ambiguous-after-rewrite',
+      preservedEntry.note
+        ?? `The selected propagated edge query is recorded as ${preservedEntry.status} after ${rewriteOperationLabel(ownerBase)} and does not resolve to one defended edge target.`,
+    );
+  }
+
+  let sourceBase: ShapeCompilePlan;
+  switch (ownerBase.kind) {
+    case 'fillet':
+    case 'chamfer':
+    case 'shell':
+    case 'hole':
+    case 'cut':
+    case 'trimByPlane':
+      sourceBase = ownerBase.base;
+      break;
+    case 'boolean':
+    case 'hull':
+      return edgeIssue(
+        'edge-query-unsupported-after-rewrite',
+        `Edge finishing does not yet defend durable propagated edge queries through ${rewriteOperationLabel(ownerBase)} rewrites.`,
+      );
+  }
+
+  const sourceSelection = resolveSupportedEdgeFeatureSelection(sourceBase, ref.source);
+  if (!sourceSelection.ok) return sourceSelection;
+  return propagateSelectionAcrossRewrite(ownerBase, sourceSelection.selection);
+}
+
+function propagateSelectionAcrossEdgeFinish(
+  plan: Extract<TopologyRewritePlan, { kind: 'fillet' | 'chamfer' }>,
+  selection: ResolvedEdgeFeatureSelection,
+): EdgeFeatureResolutionResult {
+  const selected = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
+  if (!selected.ok) {
+    return edgeIssue(
+      'edge-query-unsupported-after-rewrite',
+      `Could not resolve the source edge for an earlier ${plan.kind} while checking propagated edge meaning: ${selected.issue.reason}`,
+    );
+  }
+  if (selected.selection.edgeName === selection.edgeName) {
+    return edgeIssue(
+      'edge-query-ambiguous-after-rewrite',
+      `This edge was the target of an earlier ${plan.kind} and is recorded as merged rewritten descendants; only untouched sibling vertical edges stay queryable after supported edge-finish rewrites.`,
+    );
+  }
+  return { ok: true, selection };
+}
+
+function propagateSelectionAcrossRewrite(
+  plan: TopologyRewritePlan,
+  selection: ResolvedEdgeFeatureSelection,
+): EdgeFeatureResolutionResult {
+  switch (plan.kind) {
+    case 'fillet':
+    case 'chamfer':
+      return propagateSelectionAcrossEdgeFinish(plan, selection);
+    case 'shell':
+      return edgeIssue(
+        'edge-query-unsupported-after-rewrite',
+        'Edge finishing does not yet defend durable edge queries through shell rewrites.',
+      );
+    case 'hole':
+      return edgeIssue(
+        'edge-query-unsupported-after-rewrite',
+        'Edge finishing does not yet defend durable edge queries through hole rewrites.',
+      );
+    case 'cut':
+      return edgeIssue(
+        'edge-query-unsupported-after-rewrite',
+        'Edge finishing does not yet defend durable edge queries through cut rewrites.',
+      );
+    case 'boolean':
+      return edgeIssue(
+        'edge-query-unsupported-after-rewrite',
+        `Edge finishing does not yet defend durable edge queries through ${rewriteOperationLabel(plan)} rewrites.`,
+      );
+    case 'hull':
+      return edgeIssue(
+        'edge-query-unsupported-after-rewrite',
+        'Edge finishing does not yet defend durable edge queries through hull rewrites.',
+      );
+    case 'trimByPlane':
+      return edgeIssue(
+        'edge-query-unsupported-after-rewrite',
+        'Edge finishing does not yet defend durable edge queries through trimByPlane rewrites.',
+      );
+  }
+}
+
+function applyOwnerSearchSteps(
+  selection: ResolvedEdgeFeatureSelection,
+  steps: OwnerSearchStep[],
+): EdgeFeatureResolutionResult {
+  let current: EdgeFeatureResolutionResult = { ok: true, selection };
+  for (const step of steps) {
+    if (!current.ok) return current;
+    current = step.kind === 'transform'
+      ? applyTransformStepsToSelection(current.selection, step.steps)
+      : propagateSelectionAcrossRewrite(step.plan, current.selection);
+  }
+  return current;
+}
+
+function deepestTrackedVerticalEdgeSource(
+  ref: EdgeQueryRef | undefined,
+): { owner: ShapeQueryOwner; edgeName: SupportedVerticalEdgeName } | null {
+  if (!ref) return null;
+  switch (ref.kind) {
+    case 'tracked-edge':
+      if (ref.selector !== 'edge' || !ref.owner || !isSupportedVerticalEdgeName(ref.edgeName)) return null;
+      return {
+        owner: cloneShapeQueryOwner(ref.owner)!,
+        edgeName: ref.edgeName,
+      };
+    case 'propagated-edge':
+      return deepestTrackedVerticalEdgeSource(ref.source);
+    case 'created-edge':
+    case 'edge-ref':
+      return null;
   }
 }
 
@@ -410,16 +659,18 @@ export function resolveSupportedEdgeFeatureSelection(
       'Edge finishing currently requires a tracked edge query from a compile-covered target body.',
     );
   }
-  if (ref.kind !== 'tracked-edge') {
-    return edgeIssue(
-      'unsupported-edge-query-kind',
-      'Edge finishing v1 supports only tracked-edge queries from tracked topology, not direct edge refs.',
-    );
-  }
   if (ref.selector !== 'edge') {
     return edgeIssue(
       'unsupported-edge-selector',
       'Edge finishing v1 currently supports whole-edge selections only; use shape.edge(name), not .start/.end/.midpoint selectors.',
+    );
+  }
+  if (ref.kind !== 'tracked-edge' && ref.kind !== 'propagated-edge') {
+    return edgeIssue(
+      'unsupported-edge-query-kind',
+      ref.kind === 'created-edge'
+        ? 'Edge finishing does not yet support created-edge queries from topology rewrites.'
+        : 'Edge finishing v1 supports compiler-owned tracked-edge and propagated-edge queries only, not direct edge refs.',
     );
   }
   if (!ref.owner) {
@@ -437,19 +688,32 @@ export function resolveSupportedEdgeFeatureSelection(
       'The selected tracked edge is not owned by this target shape or any preserved query ancestor.',
     );
   }
-  if (found.match.crossedRewrite) {
-    return edgeIssue(
-      'edge-query-crosses-topology-rewrite',
-      'Edge finishing v1 does not claim durable edge identity after shell/boolean/hole/cut/edge-finish rewrites; select the edge on the original tracked body before those edits.',
-    );
-  }
-
-  const base = resolveSelectionFromOwnerBase(found.match.base, ref.edgeName);
+  const base = resolveEdgeQueryAtOwnerBase(found.match.base, ref);
   if (!base.ok) return base;
-  return {
-    ok: true,
-    selection: applySelectionTransform(base.selection, found.match.transform),
-  };
+  return applyOwnerSearchSteps(base.selection, found.match.steps);
+}
+
+export function collectSupportedEdgeFinishPreservedSources(
+  plan: ShapeCompilePlan | null,
+  selected: EdgeQueryRef | undefined,
+): EdgeQueryRef[] {
+  if (!plan) return [];
+  const trackedSource = deepestTrackedVerticalEdgeSource(selected);
+  if (!trackedSource) return [];
+
+  const out: EdgeQueryRef[] = [];
+  for (const edgeName of SUPPORTED_VERTICAL_EDGE_NAMES) {
+    if (edgeName === trackedSource.edgeName) continue;
+    const candidate: EdgeQueryRef = {
+      kind: 'tracked-edge',
+      edgeName,
+      selector: 'edge',
+      owner: cloneShapeQueryOwner(trackedSource.owner),
+    };
+    const resolved = resolveSupportedEdgeFeatureSelection(plan, candidate);
+    if (resolved.ok) out.push(candidate);
+  }
+  return out;
 }
 
 export function selectionToResolvedSelector(

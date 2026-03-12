@@ -22,7 +22,10 @@ import {
   attachTopologyRewritePropagation,
   buildEdgeFeatureTopologyRewritePropagation,
 } from './queryPropagation';
-import { resolveSupportedEdgeFeatureSelection } from './edgeFeatureResolution';
+import {
+  collectSupportedEdgeFinishPreservedSources,
+  resolveSupportedEdgeFeatureSelection,
+} from './edgeFeatureResolution';
 import { TrackedShape, type EdgeRef } from './sketch/topology';
 
 type ShapeArg = Shape | TrackedShape;
@@ -60,11 +63,15 @@ function createOwnedTopologyRewritePlan(
   plan: ShapeCompilePlan | null,
   operation: 'fillet' | 'chamfer',
   edge: EdgeRef,
+  preservedEdges: EdgeRef['query'][],
 ): ShapeCompilePlan | null {
   if (!plan) return null;
   const owner = createShapeQueryOwner(operation);
   return wrapShapeCompilePlanWithQueryOwner(
-    attachTopologyRewritePropagation(plan, buildEdgeFeatureTopologyRewritePropagation(operation, owner, edge.query)),
+    attachTopologyRewritePropagation(
+      plan,
+      buildEdgeFeatureTopologyRewritePropagation(operation, owner, edge.query, preservedEdges.filter((query): query is NonNullable<typeof query> => query != null)),
+    ),
     owner,
   );
 }
@@ -121,6 +128,7 @@ export function filletEdge(
   if (!selection.ok) {
     throw new Error(`filletEdge(): ${selection.issue.reason}`);
   }
+  const preservedEdges = collectSupportedEdgeFinishPreservedSources(basePlan, edge.query);
   if (
     selection.selection.quadrant[0] !== normalizedQuadrant[0]
     || selection.selection.quadrant[1] !== normalizedQuadrant[1]
@@ -134,6 +142,7 @@ export function filletEdge(
     buildFilletShapeCompilePlan(basePlan, edge.query, radius, normalizedQuadrant, Math.round(segments)),
     'fillet',
     edge,
+    preservedEdges,
   );
   return buildEdgeFeatureResult(target, plan, 'fillet');
 }
@@ -161,6 +170,7 @@ export function chamferEdge(
   if (!selection.ok) {
     throw new Error(`chamferEdge(): ${selection.issue.reason}`);
   }
+  const preservedEdges = collectSupportedEdgeFinishPreservedSources(basePlan, edge.query);
   if (
     selection.selection.quadrant[0] !== normalizedQuadrant[0]
     || selection.selection.quadrant[1] !== normalizedQuadrant[1]
@@ -174,6 +184,7 @@ export function chamferEdge(
     buildChamferShapeCompilePlan(basePlan, edge.query, size, normalizedQuadrant),
     'chamfer',
     edge,
+    preservedEdges,
   );
   return buildEdgeFeatureResult(target, plan, 'chamfer');
 }

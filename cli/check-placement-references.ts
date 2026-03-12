@@ -5,8 +5,10 @@
  * Ensures named points/edges/surfaces/objects survive transforms and importPart().
  */
 import '../src/forge/holeCut';
+import { resolveSupportedEdgeFeatureSelection } from '../src/forge/edgeFeatureResolution';
 import {
   box,
+  getShapeCompilePlan,
   getShapePrimaryQueryOwner,
   getShapeQueryOwners,
   getShapeTopologyRewritePropagation,
@@ -399,7 +401,17 @@ function checkEdgeFinishOwnerPropagation(): void {
   expect(ownerIds.has(baseOwner!.id), 'fillet result should retain the source body owner lineage');
   expect(ownerIds.has(filletOwner!.id), 'fillet result should include its own feature owner lineage');
 
-  const drilled = filleted.hole(base.face('top'), { diameter: 5, u: -10, v: 6, depth: 8 });
+  const doubled = filletEdge(filleted, base.edge('vert-bl'), 3, [1, -1]);
+  const doubledOwner = getShapePrimaryQueryOwner(doubled);
+  expect(doubledOwner != null, 'second fillet on a preserved sibling edge should expose a primary query owner');
+  expect(doubledOwner!.operation === 'fillet', `expected second fillet owner operation "fillet", got ${doubledOwner!.operation}`);
+
+  const doubledOwnerIds = new Set(getShapeQueryOwners(doubled).map((owner) => owner.id));
+  expect(doubledOwnerIds.has(baseOwner!.id), 'second fillet should still retain the original body owner lineage');
+  expect(doubledOwnerIds.has(filletOwner!.id), 'second fillet should retain the earlier edge-finish owner lineage');
+  expect(doubledOwnerIds.has(doubledOwner!.id), 'second fillet should include its own feature owner lineage');
+
+  const drilled = doubled.hole(base.face('top'), { diameter: 5, u: -10, v: 6, depth: 8 });
   const holePlacement = getShapeWorkplanePlacement(drilled);
   expect(holePlacement != null, 'downstream hole after edge finishing should preserve semantic workplane placement');
   expect(
@@ -515,16 +527,40 @@ function checkTopologyRewritePropagationInspection(): void {
   const filletPropagation = getShapeTopologyRewritePropagation(filleted);
   expect(filletPropagation != null, 'fillet results should expose a topology-rewrite propagation contract');
   expect(filletPropagation!.operation === 'fillet', `expected fillet propagation operation, got ${filletPropagation!.operation}`);
-  expect(filletPropagation!.preservedEdges.length === 1, `expected one preserved edge entry for fillet propagation, got ${filletPropagation!.preservedEdges.length}`);
-  const mergedEdge = filletPropagation!.preservedEdges[0];
-  expect(mergedEdge.status === 'ambiguous', 'fillet selected-edge propagation should be marked ambiguous today');
-  expect(mergedEdge.query.kind === 'propagated-edge', 'fillet propagation should expose a propagated-edge query');
-  expect(mergedEdge.query.outcome === 'merged', 'fillet selected-edge propagation should record a merged outcome');
-  expect(mergedEdge.query.source.kind === 'tracked-edge', 'fillet propagation should preserve the tracked source edge query');
+  expect(filletPropagation!.preservedEdges.length === 4, `expected four preserved-edge records for fillet propagation, got ${filletPropagation!.preservedEdges.length}`);
+  const supportedEdges = filletPropagation!.preservedEdges.filter((entry) => entry.status === 'supported');
+  expect(supportedEdges.length === 3, `expected three supported preserved sibling edges, got ${supportedEdges.length}`);
+  const mergedEdge = filletPropagation!.preservedEdges.find((entry) => entry.status === 'ambiguous');
+  expect(mergedEdge != null, 'fillet propagation should keep the selected merged edge as an explicit ambiguous entry');
+  expect(mergedEdge!.status === 'ambiguous', 'fillet selected-edge propagation should be marked ambiguous today');
+  expect(mergedEdge!.query.kind === 'propagated-edge', 'fillet propagation should expose a propagated-edge query');
+  expect(mergedEdge!.query.outcome === 'merged', 'fillet selected-edge propagation should record a merged outcome');
+  expect(mergedEdge!.query.source.kind === 'tracked-edge', 'fillet propagation should preserve the tracked source edge query');
   expect(
     filletPropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'fillet-selected-edge-merged-ambiguous'),
     'fillet propagation should expose an explicit merged-edge ambiguity diagnostic',
   );
+
+  const supportedSibling = supportedEdges.find((entry) =>
+    entry.query.kind === 'propagated-edge'
+    && entry.query.source.kind === 'tracked-edge'
+    && entry.query.source.edgeName === 'vert-bl',
+  );
+  expect(supportedSibling != null, 'fillet propagation should expose a supported propagated-edge query for an untouched sibling edge');
+  const resolvedSibling = resolveSupportedEdgeFeatureSelection(getShapeCompilePlan(filleted), supportedSibling!.query);
+  expect(resolvedSibling.ok, `supported propagated-edge queries should resolve after fillet rewrites: ${resolvedSibling.ok ? '' : resolvedSibling.issue.reason}`);
+  if (resolvedSibling.ok) {
+    expect(resolvedSibling.selection.edgeName === 'vert-bl', `expected supported sibling propagated-edge to resolve vert-bl, got ${resolvedSibling.selection.edgeName}`);
+  }
+
+  const resolvedMerged = resolveSupportedEdgeFeatureSelection(getShapeCompilePlan(filleted), mergedEdge!.query);
+  expect(!resolvedMerged.ok, 'merged propagated-edge queries should stay explicitly unsupported');
+  if (!resolvedMerged.ok) {
+    expect(
+      /blended descendant set|merged rewritten descendants|untouched sibling vertical edges/.test(resolvedMerged.issue.reason),
+      `expected merged-edge diagnostic to stay explicit, got "${resolvedMerged.issue.reason}"`,
+    );
+  }
 }
 
 export async function runCheckPlacementReferencesCli(): Promise<void> {
