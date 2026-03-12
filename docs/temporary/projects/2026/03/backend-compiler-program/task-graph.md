@@ -8,7 +8,7 @@ This is the multi-agent execution plan for the backend compiler program.
 
 Completed:
 
-- [tasks/100-query-reference-backbone.md](/Users/kostard/.codex/worktrees/c2b2/ForgeCAD/tasks/100-query-reference-backbone.md)
+- [tasks/100-query-reference-backbone.md](../../../../../../tasks/100-query-reference-backbone.md)
 
 What it gives the team:
 
@@ -43,15 +43,15 @@ graph TD
 
 These can start now from the current program tip:
 
-- [tasks/105-edge-query-backbone.md](/Users/kostard/.codex/worktrees/c2b2/ForgeCAD/tasks/105-edge-query-backbone.md)
-- [tasks/110-hole-and-cut-workflows.md](/Users/kostard/.codex/worktrees/c2b2/ForgeCAD/tasks/110-hole-and-cut-workflows.md)
-- [tasks/120-projection-and-sketch-on-face-downstream.md](/Users/kostard/.codex/worktrees/c2b2/ForgeCAD/tasks/120-projection-and-sketch-on-face-downstream.md)
-- [tasks/140-pattern-and-mirror-feature-ownership.md](/Users/kostard/.codex/worktrees/c2b2/ForgeCAD/tasks/140-pattern-and-mirror-feature-ownership.md)
-- [tasks/150-compiler-regression-corpus.md](/Users/kostard/.codex/worktrees/c2b2/ForgeCAD/tasks/150-compiler-regression-corpus.md)
+- [tasks/105-edge-query-backbone.md](../../../../../../tasks/105-edge-query-backbone.md)
+- [tasks/110-hole-and-cut-workflows.md](../../../../../../tasks/110-hole-and-cut-workflows.md)
+- [tasks/120-projection-and-sketch-on-face-downstream.md](../../../../../../tasks/120-projection-and-sketch-on-face-downstream.md)
+- [tasks/140-pattern-and-mirror-feature-ownership.md](../../../../../../tasks/140-pattern-and-mirror-feature-ownership.md)
+- [tasks/150-compiler-regression-corpus.md](../../../../../../tasks/150-compiler-regression-corpus.md)
 
 Blocked until edge-query work lands:
 
-- [tasks/130-fillet-and-chamfer-dual-lowering.md](/Users/kostard/.codex/worktrees/c2b2/ForgeCAD/tasks/130-fillet-and-chamfer-dual-lowering.md)
+- [tasks/130-fillet-and-chamfer-dual-lowering.md](../../../../../../tasks/130-fillet-and-chamfer-dual-lowering.md)
 
 ## Merge Strategy
 
@@ -115,4 +115,3 @@ Task 150:
 
 - should mostly live in `examples/`, `cli/check-*.ts`, and snapshot baselines
 - should avoid core semantic changes
-
