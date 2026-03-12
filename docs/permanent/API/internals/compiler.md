@@ -162,13 +162,17 @@ Current progress:
 - booleans, shell, split/trim flows, and downstream workplane-driven features now preserve that owner lineage through the compile graph instead of erasing it at each feature boundary
 - mirrored results plus `linearPattern()` / `circularPattern()` helper copies now get fresh compiler-owned repeated-result owners when their source shapes stay compile-covered
 - placement and exact-export invariants now check that owner lineage survives ordinary shell-plus-cut-plus-boolean style part workflows
+- topology-changing compile nodes now also carry an explicit backend-neutral `queryPropagation` contract for preserved/created query meaning instead of leaving post-rewrite semantics implicit
+- that shared propagation contract now models propagated face/edge queries, feature-created query slots, and explicit ambiguity/unsupported diagnostics on rewrite-producing results
+- trim/split-by-plane now use that contract to expose the first defended created-face slice (`plane-cap`), while hole/cut host-face splits and fillet/chamfer edge merges are recorded explicitly as ambiguous preserved-query outcomes instead of silent fallbacks
+- `src/forge/kernel.ts` and the compiler inspection surface now expose collected topology-rewrite propagation contracts directly, and the placement/compiler invariants assert that those contracts stay inspectable and deterministic through later transforms
 
 Still missing:
 
 - durable face/edge identity across topology-changing operations
+- feature-family-specific created-face/query support for shell, hole/cut, booleans/patterns, and projection-driven descendants still needs to be layered on top of the propagation kernel
 - shared edge-query selectors exist for tracked topology, but topology-changing features still do not produce durable compiler-owned edge identity after shell/boolean/fillet-style edits
-- richer query propagation rules for shell-created faces, fillet/chamfer ownership, projection targets, and merged patterned descendants
-- stable face/edge references beyond today's tracked/canonical face foundations
+- stable downstream face/edge references beyond today's tracked/canonical face foundations still need the follow-on work in tasks 170, 180, 190, and 195
 
 ### Phase 3: Mainstream Feature Families
 

@@ -67,3 +67,4 @@ After this task lands, the following tasks can start in parallel without redefin
 
 ## Status and log
 - 2026-03-12: Created as the next deepest backend-compiler lane after task 130.
+- 2026-03-12: Completed. Added a shared topology-rewrite propagation contract in `src/forge/queryModel.ts` plus new `src/forge/queryPropagation.ts` helpers, threaded explicit preserved/created query metadata and ambiguity diagnostics through rewrite-producing compile nodes, exposed kernel/compiler inspection helpers, locked the backbone down with placement/compiler invariants and snapshot coverage, and updated the architecture plus mission docs for the follow-on task wave.
