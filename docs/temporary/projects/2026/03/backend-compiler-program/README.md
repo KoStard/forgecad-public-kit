@@ -9,8 +9,9 @@ Read in this order:
 1. `explainer.md` - simple overview of the mission
 2. `capabilities.md` - concrete capabilities we want and why they are blocked today
 3. `mlp-readiness-review.md` - current MLP verdict, proof surface, and remaining blockers
-4. `mission-tracker.md` - living implementation tracker
-5. `task-graph.md` - multi-agent task breakdown, dependencies, and execution plan
+4. `post-mlp-example-phase.md` - the example architecture gate, manifest split, and post-MLP example boundary
+5. `mission-tracker.md` - living implementation tracker
+6. `task-graph.md` - multi-agent task breakdown, dependencies, and execution plan
 
 The landed MLP closeout package is:
 

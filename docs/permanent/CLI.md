@@ -429,11 +429,53 @@ This check also fails if:
 - a known unsupported rewrite stops reporting its explicit diagnostic boundary
 - a multi-feature corpus part stops surfacing the expected rewrite ordering
 
+### Example Architecture Gate
+
+```bash
+forgecad check examples
+forgecad check examples --family api-parts --family compiler-corpus
+forgecad check examples --example examples/api/brep-exportable.forge.js
+```
+
+Runs the checked example manifest for the entire `examples/` tree.
+
+The manifest currently lives in `cli/example-manifest/` and covers every:
+
+- `.forge.js`
+- `.sketch.js`
+- `.forge-notebook.json`
+
+The command always verifies manifest coverage first, so it fails if:
+
+- a new example file was added without classification
+- a checked manifest entry points at a missing file
+- an example's assigned validation path fails
+- a `part` example's declared route expectation no longer matches the compiler report
+
+Current example classes:
+
+- `part`: runtime execution plus optional exact/faceted route assertions on the selected primary shapes
+- `assembly`: runtime solve + scene emission, not exact-route parity
+- `runtime-scene`: viewport/report/runtime examples that still need to execute successfully
+- `sketch`: sketch payload validation via the sketch export path
+- `notebook`: preview-cell validation for `.forge-notebook.json`
+- `experimental`: temporary fenced examples that still have to run
+
+Current part route states:
+
+- `exact`: selected primary shapes must stay on the exact compiler route
+- `faceted`: exact must stay blocked and allow-faceted must succeed with diagnostics
+- `holdout`: runtime-checked, but intentionally outside the exact-route claim until a follow-up migration task lands
+
+Use `--family` when a task owns only one manifest lane, and `--example` when you
+want to debug a single checked artifact.
+
 ### Invariant Test Suite
 
 ```bash
 forgecad check suite
 npm test
+npm run test:examples
 npm run test:compiler
 npm run test:compiler:update
 npm run test:query-propagation
@@ -443,7 +485,8 @@ npm run test:query-propagation:update
 ForgeCAD's current unit-test surface is assertion-based CLI checks, not a separate Vitest/Jest harness.
 
 The important entrypoints are:
-- `npm test` runs the repo invariant suite (`transforms`, `dimensions`, `placement`, `js-modules`, `brep`, `compiler`, `api`)
+- `npm test` runs the repo invariant suite (`transforms`, `dimensions`, `placement`, `js-modules`, `brep`, `compiler`, `query-propagation`, `examples`, `api`)
+- `npm run test:examples` runs the example architecture gate across the checked `examples/` manifest
 - `npm run test:compiler` runs just the compiler snapshot/invariant suite
 - `npm run test:compiler:update` refreshes committed compiler snapshots after an intentional change
 - `npm run test:query-propagation` runs the focused topology-rewrite query-propagation snapshots
