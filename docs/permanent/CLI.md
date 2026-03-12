@@ -391,6 +391,7 @@ forgecad check compiler --update
 
 Runs curated compiler regression cases and compares them against committed snapshots.
 This is a unit-style invariant check, not just a debugger convenience.
+The ordinary multi-feature part corpus lives in [`examples/compiler-corpus/README.md`](../../examples/compiler-corpus/README.md).
 
 Each snapshot records:
 - Forge compile plans

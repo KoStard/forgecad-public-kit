@@ -192,7 +192,7 @@ Current progress:
 - through holes, blind holes, and simple face-anchored cutouts now lower through both Manifold and CadQuery/OCCT from that shared semantic node family
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
 - regression coverage now also includes exact/runtime/export checks for the supported hole/cut workflow subset
-- the regression suite now also includes a curated enclosure-style multi-feature part so shell, workplane-driven cuts, mirrors, and booleans are exercised together instead of only as isolated unit slices
+- the regression suite now also includes a file-backed ordinary-parts corpus under `examples/compiler-corpus/`, so shell, workplane-driven cuts, mirrored ribs/feet, patterned holes, and boolean chains are exercised together instead of only as isolated unit slices
 - mirrored downstream features and helper-driven linear/circular repetition now preserve repeated-result ownership on top of the shared face-query backbone
 - exact export regression coverage now includes a repeated-feature part where a mirrored descendant drives a downstream workplane feature inside a boolean chain
 - `projectToPlane()` sketches now keep an explicit projection node in the compiler graph instead of collapsing immediately to anonymous runtime geometry
