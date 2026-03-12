@@ -14,7 +14,8 @@ import type { ProfileCompilePlan, ShapeCompilePlan } from '../src/forge/compileP
 import type { CadQueryProfilePlan, CadQueryShapePlan } from '../src/forge/cadqueryPlan';
 import { getWasm, type GeometryInfo, type Shape } from '../src/forge/kernel';
 import { runScript, type SceneObject } from '../src/forge/headless';
-import { getSketchCompileProfilePlan } from '../src/forge/sketch/core';
+import { getSketchCompileProfilePlan, getSketchPlacementModel } from '../src/forge/sketch/core';
+import type { SketchPlacementModel } from '../src/forge/sketch/core';
 import { collectProjectFiles } from './collect-files';
 
 type ShapeRuntimeLike = Pick<Shape, 'boundingBox' | 'getMesh' | 'numTri' | 'surfaceArea' | 'volume'>;
@@ -86,6 +87,7 @@ export interface CompilerSketchInspection {
   kind: 'sketch';
   name: string;
   compilePlan: ProfileCompilePlan | null;
+  placementModel: SketchPlacementModel | null;
   exactRoute: CompilerRouteInspection;
   facetedRoute: CompilerRouteInspection;
   cadqueryOcctProfile: {
@@ -289,6 +291,7 @@ function inspectSketchObject(
     kind: 'sketch',
     name: object.name,
     compilePlan,
+    placementModel: getSketchPlacementModel(object.sketch),
     exactRoute: summarizeRoute(compiled.routes.exact),
     facetedRoute: summarizeRoute(compiled.routes.faceted),
     cadqueryOcctProfile: {

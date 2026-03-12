@@ -9,6 +9,7 @@ import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
 import { wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './sketch/loftSweepLowering';
 import { Transform } from './transform';
+import { planeFrameToWorldToPlaneMatrix } from './planeFrame';
 
 function applyProfileCompileTransform(
   crossSection: CrossSection,
@@ -101,6 +102,12 @@ export function lowerProfileCompilePlanToCrossSection(
       );
     case 'hull':
       return lowerProfileHullCompilePlan(plan, wasm);
+    case 'project': {
+      const projected = lowerShapeCompilePlanToManifold(plan.sourceShape, wasm)
+        .transform(planeFrameToWorldToPlaneMatrix(plan.plane))
+        .project();
+      return applyProfileCompileTransforms(projected, plan.transforms);
+    }
   }
 }
 

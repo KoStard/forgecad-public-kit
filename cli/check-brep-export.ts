@@ -524,6 +524,47 @@ return [{ name: 'Boss', shape: boss }];
 `);
 }
 
+function checkProjectionDownstreamPlan(): void {
+  const plan = runExactManifest(`
+const base = roundedRect(40, 24, 4, true).extrude(8, { center: true });
+const badge = roundedRect(18, 8, 2, true)
+  .onFace(base, 'top', { u: 5, v: -2, protrude: 0.25, selfAnchor: 'center' })
+  .extrude(2);
+const projected = projectToPlane(badge.toShape(), { plane: 'XY' });
+const gasket = projected
+  .offset(1.25)
+  .onFace(base, 'top', { protrude: 0.25, selfAnchor: 'center' })
+  .extrude(0.8);
+return [{ name: 'Gasket', shape: gasket }];
+`);
+
+  const placement = collectShapeTransforms(plan).find((step) => step.kind === 'workplanePlacement');
+  assert(placement, 'Expected projection-derived downstream feature to preserve a workplanePlacement transform');
+  assert.equal(placement.placement.workplane.source.kind, 'tracked-face');
+  assert.equal(placement.placement.workplane.source.faceName, 'top');
+  assert(placement.placement.workplane.source.owner, 'Expected projection-derived downstream feature to keep face-query owner lineage');
+  const profiles = collectProfiles(plan);
+  assert(
+    profiles.some((profile) => profile.kind === 'offset' && profile.delta === 1.25),
+    'Expected projection-derived downstream exact lowering to retain the offset profile chain',
+  );
+}
+
+function checkProjectionDownstreamExportEndToEnd(): void {
+  exportExactManifest(`
+const base = roundedRect(40, 24, 4, true).extrude(8, { center: true });
+const badge = roundedRect(18, 8, 2, true)
+  .onFace(base, 'top', { u: 5, v: -2, protrude: 0.25, selfAnchor: 'center' })
+  .extrude(2);
+const projected = projectToPlane(badge.toShape(), { plane: 'XY' });
+const gasket = projected
+  .offset(1.25)
+  .onFace(base, 'top', { protrude: 0.25, selfAnchor: 'center' })
+  .extrude(0.8);
+return [{ name: 'Gasket', shape: gasket }];
+`);
+}
+
 function checkMixedSketchAndSolidScenePolicy(): void {
   const files: Record<string, string> = {
     'main.forge.js': `
@@ -734,6 +775,8 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkMultiFeatureEnclosureExportEndToEnd();
   checkSketchOnFacePlacementPlan();
   checkSketchOnFacePlacementExportEndToEnd();
+  checkProjectionDownstreamPlan();
+  checkProjectionDownstreamExportEndToEnd();
   checkMixedSketchAndSolidScenePolicy();
   checkSplitBranchesStayExactExportable();
   checkPlaneTrimAndSplitStayExactExportable();
