@@ -2379,6 +2379,430 @@
     ]
   },
   {
+    "id": "corpus-fastener-plate-variants",
+    "description": "The fastener-plate corpus keeps counterbore/countersink created faces and up-to-face split diagnostics reviewable through one ordinary richer hole workflow.",
+    "objects": [
+      {
+        "name": "Fastener Plate Variants",
+        "exactRoute": {
+          "kind": "exact",
+          "target": "cadquery-occt",
+          "diagnosticCodes": []
+        },
+        "facetedRoute": {
+          "kind": "exact",
+          "target": "cadquery-occt",
+          "diagnosticCodes": []
+        },
+        "propagationOps": [
+          "cut",
+          "hole",
+          "hole",
+          "hole",
+          "hole"
+        ],
+        "propagations": [
+          {
+            "rewriteId": "shape-query-cut-6",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-6",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
+                "note": "The selected up-to-face termination face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall-bottom) @cut:shape-query-cut-6",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-right) @cut:shape-query-cut-6",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-top) @cut:shape-query-cut-6",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-left) @cut:shape-query-cut-6",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "canonical-face(front) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- canonical-face(front) @extrude:shape-query-extrude-1) @cut:shape-query-cut-6"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              },
+              {
+                "code": "cut-up-to-face-target-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(side-top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(side-top) @extrude:shape-query-extrude-1) @cut:shape-query-cut-6"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-hole-5",
+            "operation": "hole",
+            "owner": "hole:shape-query-hole-5",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
+                "note": "This face stays queryable through the hole rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(hole:wall) @hole:shape-query-hole-5",
+                "note": "Hole results create a defended wall-face query."
+              },
+              {
+                "query": "created-face(hole:countersink-wall) @hole:shape-query-hole-5",
+                "note": "Countersunk holes create a defended countersink wall-face query."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "hole-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "canonical-face(top) @hole:shape-query-hole-4",
+                "query": "propagated-face(split <- canonical-face(top) @hole:shape-query-hole-4) @hole:shape-query-hole-5"
+              },
+              {
+                "code": "hole-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              },
+              {
+                "code": "hole-up-to-face-target-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-5"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-hole-4",
+            "operation": "hole",
+            "owner": "hole:shape-query-hole-4",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(hole:wall) @hole:shape-query-hole-4",
+                "note": "Hole results create a defended wall-face query."
+              },
+              {
+                "query": "created-face(hole:countersink-wall) @hole:shape-query-hole-4",
+                "note": "Countersunk holes create a defended countersink wall-face query."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "hole-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "canonical-face(top) @hole:shape-query-hole-3",
+                "query": "propagated-face(split <- canonical-face(top) @hole:shape-query-hole-3) @hole:shape-query-hole-4"
+              },
+              {
+                "code": "hole-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              },
+              {
+                "code": "hole-up-to-face-target-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-4"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-hole-3",
+            "operation": "hole",
+            "owner": "hole:shape-query-hole-3",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "This face stays queryable through the hole rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(hole:wall) @hole:shape-query-hole-3",
+                "note": "Hole results create a defended wall-face query."
+              },
+              {
+                "query": "created-face(hole:counterbore-wall) @hole:shape-query-hole-3",
+                "note": "Counterbored holes create a defended counterbore wall-face query."
+              },
+              {
+                "query": "created-face(hole:counterbore-floor) @hole:shape-query-hole-3",
+                "note": "Counterbored holes create a defended planar shoulder face."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "hole-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "canonical-face(top) @hole:shape-query-hole-2",
+                "query": "propagated-face(split <- canonical-face(top) @hole:shape-query-hole-2) @hole:shape-query-hole-3"
+              },
+              {
+                "code": "hole-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              },
+              {
+                "code": "hole-up-to-face-target-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-3"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-hole-2",
+            "operation": "hole",
+            "owner": "hole:shape-query-hole-2",
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2",
+                "note": "The selected up-to-face termination face is rewritten by the hole result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2",
+                "note": "The selected host face is rewritten by the hole result and is not a defended named target."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(hole:wall) @hole:shape-query-hole-2",
+                "note": "Hole results create a defended wall-face query."
+              },
+              {
+                "query": "created-face(hole:counterbore-wall) @hole:shape-query-hole-2",
+                "note": "Counterbored holes create a defended counterbore wall-face query."
+              },
+              {
+                "query": "created-face(hole:counterbore-floor) @hole:shape-query-hole-2",
+                "note": "Counterbored holes create a defended planar shoulder face."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "hole-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "tracked-face(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2"
+              },
+              {
+                "code": "hole-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              },
+              {
+                "code": "hole-up-to-face-target-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
     "id": "corpus-trimmed-access-cover",
     "description": "The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable while earlier hole/cut created faces and preserved canonical faces flow through later unions.",
     "objects": [

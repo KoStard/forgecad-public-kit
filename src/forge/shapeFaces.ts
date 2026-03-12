@@ -1,6 +1,7 @@
 import {
   findShapePrimaryQueryOwner,
   type FeatureCutExtent,
+  type HoleCompilePlan,
   type ProfileCompilePlan,
   type ProfileCompileTransformStep,
   type ShapeCompilePlan,
@@ -33,6 +34,13 @@ interface FaceTable {
 export interface NamedShapeFaceQuery {
   name: string;
   query: FaceQueryRef;
+}
+
+export type FeatureBlockedFaceReason = 'host' | 'through-exit' | 'up-to-face-target';
+
+export interface BlockedShapeFaceEntry {
+  name: string;
+  reason: FeatureBlockedFaceReason;
 }
 
 function emptyFaceTable(): FaceTable {
@@ -486,8 +494,16 @@ function shellCreatedFaceNames(basePlan: ShapeCompilePlan, openFaces: Array<'top
   return created;
 }
 
-function holeCreatedFaceNames(extent: FeatureCutExtent): string[] {
-  return extent.kind === 'blind' ? ['wall', 'floor'] : ['wall'];
+function holeCreatedFaceNames(hole: HoleCompilePlan, extent: FeatureCutExtent): string[] {
+  const names = ['wall'];
+  if (hole.counterbore) {
+    names.push('counterbore-wall', 'counterbore-floor');
+  }
+  if (hole.countersink) {
+    names.push('countersink-wall');
+  }
+  if (extent.kind === 'blind') names.push('floor');
+  return names;
 }
 
 function cutCreatedFaceNames(profile: ProfileCompilePlan, extent: FeatureCutExtent): string[] {
@@ -560,6 +576,74 @@ function oppositeFaceNames(name: string, available: Set<string>): string[] {
   }
 }
 
+function featureBlockedFaceReason(operation: 'hole' | 'cut', reason: FeatureBlockedFaceReason): string {
+  switch (reason) {
+    case 'host':
+      return `This selected host face is rewritten by the ${operation} result and is not a defended named face target.`;
+    case 'through-exit':
+      return `This opposite face is pierced by the through-${operation} and is not a defended named face target.`;
+    case 'up-to-face-target':
+      return `This selected up-to-face termination face is rewritten by the ${operation} result and is not a defended named face target.`;
+  }
+}
+
+function blockedFaceReasonPriority(reason: FeatureBlockedFaceReason): number {
+  switch (reason) {
+    case 'host':
+      return 3;
+    case 'up-to-face-target':
+      return 2;
+    case 'through-exit':
+      return 1;
+  }
+}
+
+function holeHeadDepth(hole: HoleCompilePlan): number {
+  return hole.counterbore?.depth ?? hole.countersink?.depth ?? 0;
+}
+
+function holeWallMidDepth(hole: HoleCompilePlan, extent: FeatureCutExtent): number {
+  const entryDepth = holeHeadDepth(hole);
+  return entryDepth + Math.max(extent.depth - entryDepth, 0) / 2;
+}
+
+export function blockedShapeFacesForFeature(
+  basePlan: ShapeCompilePlan | null,
+  source: FaceQueryRef | undefined,
+  extent: FeatureCutExtent,
+): BlockedShapeFaceEntry[] {
+  if (!basePlan) return [];
+  const table = resolveShapeFaceTable(basePlan);
+  const available = new Set(table.faces.keys());
+  const blocked = new Map<string, FeatureBlockedFaceReason>();
+  const register = (name: string, reason: FeatureBlockedFaceReason) => {
+    const existing = blocked.get(name);
+    if (!existing || blockedFaceReasonPriority(reason) > blockedFaceReasonPriority(existing)) {
+      blocked.set(name, reason);
+    }
+  };
+
+  const selectedNames = selectedFaceNamesFromQuery(table, source);
+  for (const name of selectedNames) {
+    register(name, 'host');
+    if (extent.kind === 'through') {
+      for (const opposite of oppositeFaceNames(name, available)) {
+        register(opposite, 'through-exit');
+      }
+    }
+  }
+
+  if (extent.kind === 'upToFace') {
+    for (const name of selectedFaceNamesFromQuery(table, extent.face)) {
+      register(name, 'up-to-face-target');
+    }
+  }
+
+  return Array.from(blocked.entries())
+    .map(([name, reason]) => ({ name, reason }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: ShapeQueryOwner | null): FaceTable {
   if (!plan) return emptyFaceTable();
 
@@ -608,15 +692,8 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
     }
     case 'hole': {
       const table = cloneFaceTable(resolveShapeFaceTableInternal(plan.base, owner));
-      const selectedNames = selectedFaceNamesFromQuery(table, plan.placement.placement.workplane.source);
-      const available = new Set(table.faces.keys());
-      for (const name of selectedNames) {
-        blockNamedFace(table, name, 'This selected host face is rewritten by the hole result and is not a defended named face target.');
-        if (plan.extent.kind === 'through') {
-          for (const opposite of oppositeFaceNames(name, available)) {
-            blockNamedFace(table, opposite, 'This opposite face is pierced by the through-hole and is not a defended named face target.');
-          }
-        }
+      for (const blocked of blockedShapeFacesForFeature(plan.base, plan.placement.placement.workplane.source, plan.extent)) {
+        blockNamedFace(table, blocked.name, featureBlockedFaceReason('hole', blocked.reason));
       }
       for (const [name, face] of table.faces.entries()) {
         const propagated = findPreservedFaceQuery(plan.queryPropagation, face.query);
@@ -628,16 +705,63 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       const inward: Vec3 = [-workplane.normal[0], -workplane.normal[1], -workplane.normal[2]];
       const wallQuery = findCreatedFaceQuery(plan.queryPropagation, 'wall');
       if (wallQuery) {
+        const wallMidDepth = holeWallMidDepth(plan.hole, plan.extent);
         registerFace(table, {
           name: 'wall',
           normal: [-workplane.u[0], -workplane.u[1], -workplane.u[2]],
           center: [
-            origin[0] + workplane.u[0] * plan.radius + inward[0] * (plan.extent.depth / 2),
-            origin[1] + workplane.u[1] * plan.radius + inward[1] * (plan.extent.depth / 2),
-            origin[2] + workplane.u[2] * plan.radius + inward[2] * (plan.extent.depth / 2),
+            origin[0] + workplane.u[0] * plan.hole.radius + inward[0] * wallMidDepth,
+            origin[1] + workplane.u[1] * plan.hole.radius + inward[1] * wallMidDepth,
+            origin[2] + workplane.u[2] * plan.hole.radius + inward[2] * wallMidDepth,
           ],
           planar: false,
           query: wallQuery,
+        });
+      }
+      const counterboreWallQuery = findCreatedFaceQuery(plan.queryPropagation, 'counterbore-wall');
+      if (counterboreWallQuery && plan.hole.counterbore) {
+        registerFace(table, {
+          name: 'counterbore-wall',
+          normal: [-workplane.u[0], -workplane.u[1], -workplane.u[2]],
+          center: [
+            origin[0] + workplane.u[0] * plan.hole.counterbore.radius + inward[0] * (plan.hole.counterbore.depth / 2),
+            origin[1] + workplane.u[1] * plan.hole.counterbore.radius + inward[1] * (plan.hole.counterbore.depth / 2),
+            origin[2] + workplane.u[2] * plan.hole.counterbore.radius + inward[2] * (plan.hole.counterbore.depth / 2),
+          ],
+          planar: false,
+          query: counterboreWallQuery,
+        });
+      }
+      const counterboreFloorQuery = findCreatedFaceQuery(plan.queryPropagation, 'counterbore-floor');
+      if (counterboreFloorQuery && plan.hole.counterbore) {
+        registerFace(table, {
+          name: 'counterbore-floor',
+          normal: cloneVec3(workplane.normal),
+          center: [
+            origin[0] + inward[0] * plan.hole.counterbore.depth,
+            origin[1] + inward[1] * plan.hole.counterbore.depth,
+            origin[2] + inward[2] * plan.hole.counterbore.depth,
+          ],
+          planar: true,
+          uAxis: cloneVec3(workplane.u),
+          vAxis: cloneVec3(workplane.v),
+          query: counterboreFloorQuery,
+        });
+      }
+      const countersinkWallQuery = findCreatedFaceQuery(plan.queryPropagation, 'countersink-wall');
+      if (countersinkWallQuery && plan.hole.countersink) {
+        const sinkMidDepth = plan.hole.countersink.depth / 2;
+        const sinkMidRadius = (plan.hole.radius + plan.hole.countersink.radius) / 2;
+        registerFace(table, {
+          name: 'countersink-wall',
+          normal: [-workplane.u[0], -workplane.u[1], -workplane.u[2]],
+          center: [
+            origin[0] + workplane.u[0] * sinkMidRadius + inward[0] * sinkMidDepth,
+            origin[1] + workplane.u[1] * sinkMidRadius + inward[1] * sinkMidDepth,
+            origin[2] + workplane.u[2] * sinkMidRadius + inward[2] * sinkMidDepth,
+          ],
+          planar: false,
+          query: countersinkWallQuery,
         });
       }
       const floorQuery = findCreatedFaceQuery(plan.queryPropagation, 'floor');
@@ -660,15 +784,8 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
     }
     case 'cut': {
       const table = cloneFaceTable(resolveShapeFaceTableInternal(plan.base, owner));
-      const selectedNames = selectedFaceNamesFromQuery(table, plan.placement.placement.workplane.source);
-      const available = new Set(table.faces.keys());
-      for (const name of selectedNames) {
-        blockNamedFace(table, name, 'This selected host face is rewritten by the cut result and is not a defended named face target.');
-        if (plan.extent.kind === 'through') {
-          for (const opposite of oppositeFaceNames(name, available)) {
-            blockNamedFace(table, opposite, 'This opposite face is pierced by the through-cut and is not a defended named face target.');
-          }
-        }
+      for (const blocked of blockedShapeFacesForFeature(plan.base, plan.placement.placement.workplane.source, plan.extent)) {
+        blockNamedFace(table, blocked.name, featureBlockedFaceReason('cut', blocked.reason));
       }
       for (const [name, face] of table.faces.entries()) {
         const propagated = findPreservedFaceQuery(plan.queryPropagation, face.query);
@@ -857,8 +974,11 @@ export function supportedShellCreatedFaceNames(
   return shellCreatedFaceNames(basePlan, openFaces).sort();
 }
 
-export function supportedHoleCreatedFaceNames(extent: FeatureCutExtent): string[] {
-  return holeCreatedFaceNames(extent);
+export function supportedHoleCreatedFaceNames(
+  hole: HoleCompilePlan,
+  extent: FeatureCutExtent,
+): string[] {
+  return holeCreatedFaceNames(hole, extent);
 }
 
 export function supportedCutCreatedFaceNames(
@@ -879,18 +999,7 @@ export function blockedShapeFaceNamesForFeature(
   source: FaceQueryRef | undefined,
   extent: FeatureCutExtent,
 ): string[] {
-  if (!basePlan) return [];
-  const table = resolveShapeFaceTable(basePlan);
-  const blocked = new Set(selectedFaceNamesFromQuery(table, source));
-  if (extent.kind === 'through') {
-    const available = new Set(table.faces.keys());
-    for (const name of [...blocked]) {
-      for (const opposite of oppositeFaceNames(name, available)) {
-        blocked.add(opposite);
-      }
-    }
-  }
-  return [...blocked].sort();
+  return blockedShapeFacesForFeature(basePlan, source, extent).map((entry) => entry.name);
 }
 
 export function selectedShapeFaceNamesForQuery(

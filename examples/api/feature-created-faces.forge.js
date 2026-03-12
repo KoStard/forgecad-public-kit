@@ -14,6 +14,21 @@ const floorBoss = circle2d(3)
   .toShape()
   .color('#d46452');
 
+const counterboreBase = roundedRect(72, 44, 5, true).extrude(20);
+const counterboreExitFace = counterboreBase.face('bottom');
+const counterbored = counterboreBase.hole('top', {
+  diameter: 6,
+  u: -14,
+  v: 10,
+  upToFace: counterboreExitFace,
+  counterbore: { diameter: 10, depth: 4 },
+}).color('#748498');
+const shoulderPad = rect(4, 3)
+  .onFace(counterbored, 'counterbore-floor', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
+  .extrude(0.9)
+  .toShape()
+  .color('#f0c36c');
+
 const cutBase = roundedRect(78, 46, 5, true).extrude(22);
 const pocket = roundedRect(20, 12, 2, true)
   .onFace(cutBase, 'front', { u: 0, v: 4, selfAnchor: 'center' });
@@ -25,7 +40,8 @@ const wallTab = rect(5, 4)
   .color('#5ba6d6');
 
 return [
-  { name: 'Shell Inner Wall Pad', shape: union(cup, innerWallPad).translate(-110, 0, 0) },
-  { name: 'Blind Hole Floor Boss', shape: union(drilled, floorBoss) },
-  { name: 'Cut Wall Tab', shape: union(cut, wallTab).translate(110, 0, 0) },
+  { name: 'Shell Inner Wall Pad', shape: union(cup, innerWallPad).translate(-165, 0, 0) },
+  { name: 'Blind Hole Floor Boss', shape: union(drilled, floorBoss).translate(-55, 0, 0) },
+  { name: 'Counterbore Shoulder Pad', shape: union(counterbored, shoulderPad).translate(55, 0, 0) },
+  { name: 'Cut Wall Tab', shape: union(cut, wallTab).translate(165, 0, 0) },
 ];
