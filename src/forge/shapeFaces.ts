@@ -734,7 +734,11 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
     case 'extrude':
       return buildExtrudeFaceTable(plan, owner);
     case 'shell': {
-      const baseTable = cloneFaceTable(resolveShapeFaceTableInternal(plan.base, owner));
+      // Rewrite results must inherit the base shape's existing defended query
+      // table before layering new propagation on top. Rebasing the base table
+      // under the current rewrite owner collapses preserved lineage between
+      // stacked rewrites.
+      const baseTable = cloneFaceTable(resolveShapeFaceTable(plan.base));
       for (const [name, face] of baseTable.faces.entries()) {
         const propagated = findPreservedFaceQuery(plan.queryPropagation, face.query);
         if (propagated) setFaceQuery(baseTable, name, propagated, face.query);
@@ -761,7 +765,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       return baseTable;
     }
     case 'hole': {
-      const table = cloneFaceTable(resolveShapeFaceTableInternal(plan.base, owner));
+      const table = cloneFaceTable(resolveShapeFaceTable(plan.base));
       for (const blocked of blockedShapeFacesForFeature(plan.base, plan.placement.placement.workplane.source, plan.extent)) {
         blockNamedFace(table, blocked.name, featureBlockedFaceReason('hole', blocked.reason));
       }
@@ -853,7 +857,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       return table;
     }
     case 'cut': {
-      const table = cloneFaceTable(resolveShapeFaceTableInternal(plan.base, owner));
+      const table = cloneFaceTable(resolveShapeFaceTable(plan.base));
       for (const blocked of blockedShapeFacesForFeature(plan.base, plan.placement.placement.workplane.source, plan.extent)) {
         blockNamedFace(table, blocked.name, featureBlockedFaceReason('cut', blocked.reason));
       }

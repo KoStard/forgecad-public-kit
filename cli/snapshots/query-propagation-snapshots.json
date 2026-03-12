@@ -364,8 +364,8 @@
                 "code": "hole-source-face-split-ambiguous",
                 "category": "ambiguous",
                 "queryKind": "face",
-                "source": "canonical-face(top) @hole:shape-query-hole-2",
-                "query": "propagated-face(split <- canonical-face(top) @hole:shape-query-hole-2) @hole:shape-query-hole-3"
+                "source": "propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2",
+                "query": "propagated-face(split <- propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3"
               },
               {
                 "code": "hole-created-edge-propagation-unsupported",
@@ -2748,8 +2748,8 @@
                 "code": "hole-source-face-split-ambiguous",
                 "category": "ambiguous",
                 "queryKind": "face",
-                "source": "canonical-face(top) @hole:shape-query-hole-4",
-                "query": "propagated-face(split <- canonical-face(top) @hole:shape-query-hole-4) @hole:shape-query-hole-5"
+                "source": "face-ref(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-5"
               },
               {
                 "code": "hole-created-edge-propagation-unsupported",
@@ -2823,8 +2823,8 @@
                 "code": "hole-source-face-split-ambiguous",
                 "category": "ambiguous",
                 "queryKind": "face",
-                "source": "canonical-face(top) @hole:shape-query-hole-3",
-                "query": "propagated-face(split <- canonical-face(top) @hole:shape-query-hole-3) @hole:shape-query-hole-4"
+                "source": "face-ref(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-4"
               },
               {
                 "code": "hole-created-edge-propagation-unsupported",
@@ -2902,8 +2902,8 @@
                 "code": "hole-source-face-split-ambiguous",
                 "category": "ambiguous",
                 "queryKind": "face",
-                "source": "canonical-face(top) @hole:shape-query-hole-2",
-                "query": "propagated-face(split <- canonical-face(top) @hole:shape-query-hole-2) @hole:shape-query-hole-3"
+                "source": "face-ref(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-3"
               },
               {
                 "code": "hole-created-edge-propagation-unsupported",
@@ -2976,8 +2976,8 @@
                 "code": "hole-source-face-split-ambiguous",
                 "category": "ambiguous",
                 "queryKind": "face",
-                "source": "tracked-face(top) @extrude:shape-query-extrude-1",
-                "query": "propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2"
+                "source": "face-ref(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2"
               },
               {
                 "code": "hole-created-edge-propagation-unsupported",
