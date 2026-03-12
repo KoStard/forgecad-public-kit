@@ -50,3 +50,4 @@ Can start after task 170 lands. Safe to run in parallel with:
 
 ## Status and log
 - 2026-03-12: Created for the second post-160 feature wave.
+- 2026-03-12: Completed. Added compiler-owned counterbore/countersink `Shape.hole()` variants plus planar `upToFace` hole/cut extents, reused topology-rewrite propagation for the defended new created-face slots and termination-face ambiguity diagnostics, expanded placement/compiler/query-propagation/BREP/corpus coverage around the richer subset, and updated the permanent docs plus examples to describe the supported and unsupported workflows honestly.
