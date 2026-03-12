@@ -6,6 +6,7 @@ This supports:
 - canonical body faces: `front`, `back`, `left`, `right`, `top`, `bottom`
 - tracked planar faces on `TrackedShape`, like `side-left`
 - direct `FaceRef` targets from `tracked.face('top')`
+- supported compiler-owned created faces on `shell()` / `hole()` / `cutout()` results, such as `inner-side-right`, `floor`, and `wall-right`
 
 ## `.onFace(parent, face, opts?)`
 
@@ -24,7 +25,7 @@ Places a sketch onto a parent face using face-local coordinates.
 
 ## `.onFace(faceRef, opts?)`
 
-Places a sketch directly from a tracked planar `FaceRef`.
+Places a sketch directly from a tracked or compiler-owned planar `FaceRef`.
 
 This is useful when the script has already selected a face semantically:
 
@@ -37,6 +38,16 @@ const panel = Rectangle2D.from3Points(
 
 const cap = circle2d(5)
   .onFace(panel.face('top'), { u: 12, protrude: 0.05 })
+  .extrude(1.2);
+```
+
+```javascript
+const cup = roundedRect(70, 42, 5, true)
+  .extrude(22)
+  .shell(2, { openFaces: ['top'] });
+
+const rib = rect(6, 4)
+  .onFace(cup, 'inner-side-right', { u: 0, v: 0, protrude: 0.05 })
   .extrude(1.2);
 ```
 
@@ -64,6 +75,7 @@ return [
   - side faces of extruded rectangles: `u` follows the source edge, `v = Z`
   - tracked `top` / `bottom` faces follow the source sketch axes
   - direct `FaceRef` placement uses that face's `uAxis` / `vAxis`
+  - supported shell inner walls, blind-hole floors, and defended cut walls reuse compiler-owned local frames for downstream workplanes
 
 The sketch's local `+Z` becomes the face normal, so `extrude(positive)` goes outward from that face.
 
@@ -71,6 +83,7 @@ The sketch's local `+Z` becomes the face normal, so `extrude(positive)` goes out
 
 - This is a planar face-placement feature, not arbitrary curved-surface projection.
 - Tracked curved faces like `cylinder(...).face('side')` are rejected because they do not have a planar sketch frame.
+- Supported created-face names on compiler-owned feature results are intentionally narrow. If a named host face is rewritten ambiguously, `shape.face(name)` rejects it explicitly instead of guessing.
 - The placed sketch still supports normal 2D operations like `translate`, `rotate`, `scale`, and sketch booleans before extrusion.
 - If multiple sketches share the same face placement, their 2D booleans preserve that shared placement.
 - If booleans mix sketches with different 3D placements, the result drops back to an unplaced sketch.

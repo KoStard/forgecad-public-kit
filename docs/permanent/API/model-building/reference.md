@@ -755,6 +755,7 @@ Current compiler-backed `shell()` support is intentionally narrow:
 - compile-covered `box()`, `cylinder()`, and straight `Sketch.extrude()` solids
 - optional `openFaces: ['top' | 'bottom']`
 - rigid transforms before shelling are preserved through both lowerers
+- defended named-face queries on the resulting outer shell faces plus created inner faces where Forge can model them exactly
 
 Not supported yet:
 
@@ -764,6 +765,13 @@ Not supported yet:
 - general boolean, `revolve()`, `loft()`, `sweep()`, `sphere()`, hull, and plane-trim bases
 
 Forge keeps `shell` as semantic compiler intent, then lowers it into backend-supported boolean/extrude/cylinder plans for both Manifold and CadQuery/OCCT.
+
+Supported named-face subset on the shell result:
+
+- preserved outer faces stay queryable on defended bases
+- created inner faces use names like `inner-top`, `inner-bottom`, `inner-side`, or `inner-side-right`
+- downstream `onFace(result, 'inner-side-right', ...)` placement is defended on the planar members of that subset
+- generic straight extrudes still shell exactly, but named created-face support is currently limited to the defended profile families Forge can model directly (`rect`, `roundedRect`, `circle`)
 
 ```javascript
 const cup = roundedRect(80, 50, 6, true)
@@ -793,12 +801,15 @@ Supported v1:
 - canonical faces, tracked planar faces, and `FaceRef` targets
 - through and blind circular holes
 - exact lowering through both Manifold and CadQuery/OCCT
+- created hole faces in the defended subset:
+  - `wall` on through or blind holes
+  - `floor` on blind holes
+- preserved non-host faces stay queryable where Forge can defend them, while rewritten host/exit faces are rejected explicitly
 
 Not supported yet:
 
 - counterbore / countersink / taper / thread semantics
 - segmented polygonal hole cutters
-- stable downstream identity for hole-created faces
 - runtime-only target bodies without compiler intent
 
 #### `shape.cutout(sketch, options?)`
@@ -821,12 +832,17 @@ Supported v1:
 - compile-covered sketch profiles that CadQuery/OCCT already supports
 - sketches placed on queried faces via `onFace(...)`
 - exact/runtime parity through the shared compiler node family
+- created cut faces in the defended subset:
+  - `floor` on blind cuts
+  - `wall` on circular cuts
+  - `wall-bottom`, `wall-right`, `wall-top`, `wall-left` on rectangular and rounded-rectangle cuts
+- preserved non-host faces stay queryable where Forge can defend them, while rewritten host/exit faces are rejected explicitly
 
 Not supported yet:
 
 - free-floating sketches without face/workplane provenance
 - draft/taper angles, two-sided extents, "up to face", or non-planar targets
-- stable downstream identity for faces created by the cut result
+- named created-wall support for arbitrary boolean/offset/projected cut profiles
 
 ### Warping
 

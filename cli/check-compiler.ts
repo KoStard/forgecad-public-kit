@@ -39,6 +39,37 @@ const body = base
 return [{ name: 'Workflow', shape: body }];
 `;
 
+const CREATED_FACE_DOWNSTREAM_CODE = `
+const shellBase = roundedRect(70, 42, 5, true).extrude(22);
+const cup = shellBase.shell(2, { openFaces: ['top'] });
+const shellPad = rect(6, 4)
+  .onFace(cup, 'inner-side-right', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
+  .extrude(1.2)
+  .toShape();
+
+const holeBase = roundedRect(62, 38, 4, true).extrude(18);
+const drilled = holeBase.hole('top', { diameter: 7, u: 12, v: -6, depth: 8 });
+const floorButton = circle2d(2.5)
+  .onFace(drilled, 'floor', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
+  .extrude(1)
+  .toShape();
+
+const cutBase = roundedRect(68, 40, 4, true).extrude(20);
+const pocket = roundedRect(18, 10, 2, true)
+  .onFace(cutBase, 'front', { u: 0, v: 2, selfAnchor: 'center' });
+const cut = cutBase.cutout(pocket, { depth: 7 });
+const wallTab = rect(4, 3)
+  .onFace(cut, 'wall-right', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
+  .extrude(0.9)
+  .toShape();
+
+return [
+  { name: 'Shell Inner Pad', shape: shellPad },
+  { name: 'Hole Floor Button', shape: floorButton },
+  { name: 'Cut Wall Tab', shape: wallTab },
+];
+`;
+
 function inlineCase(id: string, description: string, code: string): CompilerCaseDefinition {
   return {
     id,
@@ -167,6 +198,11 @@ return [{ name: 'Shell', shape: body }];
     'hole-cut-workflows',
     'Through holes, blind holes, and face-anchored cutouts stay compiler-owned and exact-exportable from one semantic workflow family.',
     HOLE_CUT_WORKFLOW_CODE,
+  ),
+  inlineCase(
+    'created-face-downstream',
+    'Shell inner walls, blind-hole floors, and cut-created walls stay queryable enough to drive downstream exact-exportable features.',
+    CREATED_FACE_DOWNSTREAM_CODE,
   ),
   inlineCase(
     'fillet-edge-workflow',

@@ -50,3 +50,4 @@ Can start immediately after task 160. Safe to run in parallel with:
 
 ## Status and log
 - 2026-03-12: Created for the first post-160 parallel wave.
+- 2026-03-12: Completed. Added compiler-owned shell/hole/cut face resolution plus propagation-backed `Shape.face()` support for defended created-face subsets, routed non-canonical `onFace(shape, '...')` placement through those named faces, rejected ambiguous rewritten host faces explicitly, added placement/compiler regressions for shell inner walls, blind-hole floors, and cut-created walls, and updated the permanent docs plus examples to describe the supported subset honestly.

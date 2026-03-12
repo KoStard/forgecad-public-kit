@@ -166,15 +166,18 @@ Current progress:
 - that shared propagation contract now models propagated face/edge queries, feature-created query slots, and explicit ambiguity/unsupported diagnostics on rewrite-producing results
 - trim/split-by-plane now use that contract to expose the first defended created-face slice (`plane-cap`), while hole/cut host-face splits and fillet/chamfer edge merges are recorded explicitly as ambiguous preserved-query outcomes instead of silent fallbacks
 - boolean rewrites now consume that same contract: supported unions preserve operand canonical-face/query lineage when the source owners stay distinct, while duplicate-owner merges plus later difference/intersection descendants are recorded explicitly as ambiguous propagated queries instead of a generic "pending" bucket
+- shell, hole, and cut now layer defended created-face slots on top of that propagation kernel instead of leaving all post-rewrite face meaning as placeholders
+- compile-covered `Shape.face(name)` resolution now reads from the compile graph, so supported shell inner walls, blind-hole floors, and cut-created walls can produce real `FaceRef` values after topology rewrites
+- non-canonical `onFace(shape, 'inner-side-right', ...)` placement now routes through that same compiler-owned face resolver, while direct `FaceRef` placements preserve created-face/propagated-face provenance instead of collapsing everything back to anonymous refs
 - `src/forge/kernel.ts` and the compiler inspection surface now expose collected topology-rewrite propagation contracts directly, and the placement/compiler invariants assert that those contracts stay inspectable and deterministic through later transforms
 - `forgecad check query-propagation` now snapshots that propagation surface directly, so supported plane-cap created faces, defended merged-edge cases, and explicit unsupported rewrite boundaries stay reviewable without wading through the full compiler-scene baseline
 
 Still missing:
 
 - durable face/edge identity across topology-changing operations
-- feature-family-specific created-face/query support for shell, hole/cut, and projection-driven descendants still needs to be layered on top of the propagation kernel
+- booleans/patterns and projection-driven descendants still need their own created-face/query layers on top of the propagation kernel
 - shared edge-query selectors exist for tracked topology, but topology-changing features still do not produce durable compiler-owned edge identity after shell/boolean/fillet-style edits
-- stable downstream face/edge references beyond today's tracked/canonical face foundations still need the follow-on work in tasks 170, 180, 190, and 195
+- stable downstream face/edge references beyond today's tracked/canonical face foundations still need the follow-on work in tasks 180, 190, and 195
 
 ### Phase 3: Mainstream Feature Families
 
@@ -196,6 +199,7 @@ Current progress:
 - both lowerers consume the same semantic `shell` node and rewrite supported cases into backend-native boolean/extrude/cylinder plans
 - `shape.hole()` and `shape.cutout()` now form a compiler-owned hole/cut workflow slice anchored to the shared face-query/workplane model
 - through holes, blind holes, and simple face-anchored cutouts now lower through both Manifold and CadQuery/OCCT from that shared semantic node family
+- shell, hole, and cut now expose defended named created-face subsets on top of the topology-rewrite kernel, so downstream features can target inner shell walls, blind-hole floors, and supported cut walls/floors without falling back to anonymous runtime placement
 - `filletEdge()` and `chamferEdge()` now form a first compiler-owned tracked-edge finishing slice for supported vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies
 - the post-rewrite edge-query layer now also defends untouched sibling vertical edges after those supported edge-finish rewrites, and records them as supported propagated-edge queries instead of treating every post-finish edge as equally ambiguous
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
@@ -210,11 +214,12 @@ Current progress:
 
 Current limits:
 
-- `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings
+- `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings, while defended named created faces currently cover the exact profile families Forge can model directly (`rect`, `roundedRect`, `circle`)
 - `shape.hole()` v1 only covers circular through/blind holes, and `shape.cutout()` v1 only covers sketches already placed with `onFace(...)`
 - `filletEdge()` / `chamferEdge()` v1 cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies plus untouched sibling vertical edges after earlier supported edge-finish rewrites, but the selected rewritten edge itself still becomes an explicit merged-edge ambiguity
-- counterbores, countersinks, up-to-face extents, drafted cuts, and durable identity for hole/cut-created faces are still missing
+- counterbores, countersinks, up-to-face extents, drafted cuts, and broader durable identity beyond today's defended shell/hole/cut created-face subset are still missing
 - boolean/pattern propagation currently defends owner-scoped canonical face lineage through supported unions, but post-merge durable face identity and post-difference/intersection face targets are still explicit ambiguity cases rather than one defended face
+- repeated-feature ownership currently tracks repeated bodies and mirrored descendants, not durable per-face identity after merged pattern topology changes
 - shell, hole/cut, tracked-edge finishing, and repeated-feature workflows now preserve parent-body ownership lineage, but stable downstream face/edge ownership after topology-changing edits is still not solved, which is why broader projection-driven edits and richer fillet/chamfer workflows remain harder next layers
 - projection replay still only covers the parallel-workplane subset; richer projection-driven edits remain outside the exact subset today
 
