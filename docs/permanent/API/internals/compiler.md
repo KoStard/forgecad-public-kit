@@ -180,6 +180,7 @@ Current progress:
 - `shell()` is now compiler-owned as the first mainstream exact feature-family slice instead of being left for exporter-only logic
 - both lowerers consume the same semantic `shell` node and rewrite supported cases into backend-native boolean/extrude/cylinder plans
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
+- the regression suite now also includes a curated enclosure-style multi-feature part so shell, workplane-driven cuts, mirrors, and booleans are exercised together instead of only as isolated unit slices
 
 Current limits:
 

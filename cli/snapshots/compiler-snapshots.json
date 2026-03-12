@@ -1829,6 +1829,1120 @@
     }
   },
   {
+    "id": "multi-feature-enclosure",
+    "description": "A curated enclosure-style part keeps shell, workplane-driven cuts, mirrors, and booleans aligned across both lowerers.",
+    "scene": {
+      "objects": [
+        {
+          "kind": "shape",
+          "name": "Enclosure",
+          "geometryInfo": {
+            "backend": "manifold",
+            "representation": "mesh-solid",
+            "fidelity": "kernel-native",
+            "topology": "none",
+            "sources": [
+              "boolean",
+              "shell",
+              "extrude"
+            ]
+          },
+          "compilePlan": {
+            "kind": "boolean",
+            "op": "difference",
+            "shapes": [
+              {
+                "kind": "boolean",
+                "op": "difference",
+                "shapes": [
+                  {
+                    "kind": "boolean",
+                    "op": "union",
+                    "shapes": [
+                      {
+                        "kind": "shell",
+                        "base": {
+                          "kind": "extrude",
+                          "profile": {
+                            "kind": "roundedRect",
+                            "width": 120,
+                            "height": 80,
+                            "radius": 10,
+                            "center": true,
+                            "transforms": []
+                          },
+                          "height": 36,
+                          "center": false
+                        },
+                        "thickness": 3,
+                        "openFaces": [
+                          "top"
+                        ]
+                      },
+                      {
+                        "kind": "boolean",
+                        "op": "union",
+                        "shapes": [
+                          {
+                            "kind": "transform",
+                            "base": {
+                              "kind": "extrude",
+                              "profile": {
+                                "kind": "roundedRect",
+                                "width": 18,
+                                "height": 18,
+                                "radius": 4,
+                                "center": true,
+                                "transforms": []
+                              },
+                              "height": 6,
+                              "center": false
+                            },
+                            "steps": [
+                              {
+                                "kind": "workplanePlacement",
+                                "matrix": [
+                                  1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  -1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  -1,
+                                  0,
+                                  36,
+                                  -20,
+                                  0,
+                                  1
+                                ],
+                                "placement": {
+                                  "workplane": {
+                                    "origin": [
+                                      0,
+                                      0,
+                                      0
+                                    ],
+                                    "u": [
+                                      1,
+                                      0,
+                                      0
+                                    ],
+                                    "v": [
+                                      0,
+                                      -1,
+                                      0
+                                    ],
+                                    "normal": [
+                                      0,
+                                      0,
+                                      -1
+                                    ],
+                                    "source": {
+                                      "kind": "tracked-face",
+                                      "faceName": "bottom"
+                                    }
+                                  },
+                                  "u": 36,
+                                  "v": 20,
+                                  "protrude": 0,
+                                  "selfAnchor": "center"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "kind": "transform",
+                            "base": {
+                              "kind": "extrude",
+                              "profile": {
+                                "kind": "roundedRect",
+                                "width": 18,
+                                "height": 18,
+                                "radius": 4,
+                                "center": true,
+                                "transforms": []
+                              },
+                              "height": 6,
+                              "center": false
+                            },
+                            "steps": [
+                              {
+                                "kind": "workplanePlacement",
+                                "matrix": [
+                                  1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  -1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  -1,
+                                  0,
+                                  36,
+                                  -20,
+                                  0,
+                                  1
+                                ],
+                                "placement": {
+                                  "workplane": {
+                                    "origin": [
+                                      0,
+                                      0,
+                                      0
+                                    ],
+                                    "u": [
+                                      1,
+                                      0,
+                                      0
+                                    ],
+                                    "v": [
+                                      0,
+                                      -1,
+                                      0
+                                    ],
+                                    "normal": [
+                                      0,
+                                      0,
+                                      -1
+                                    ],
+                                    "source": {
+                                      "kind": "tracked-face",
+                                      "faceName": "bottom"
+                                    }
+                                  },
+                                  "u": 36,
+                                  "v": 20,
+                                  "protrude": 0,
+                                  "selfAnchor": "center"
+                                }
+                              },
+                              {
+                                "kind": "mirror",
+                                "normalX": 1,
+                                "normalY": 0,
+                                "normalZ": 0
+                              }
+                            ]
+                          },
+                          {
+                            "kind": "transform",
+                            "base": {
+                              "kind": "extrude",
+                              "profile": {
+                                "kind": "roundedRect",
+                                "width": 18,
+                                "height": 18,
+                                "radius": 4,
+                                "center": true,
+                                "transforms": []
+                              },
+                              "height": 6,
+                              "center": false
+                            },
+                            "steps": [
+                              {
+                                "kind": "workplanePlacement",
+                                "matrix": [
+                                  1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  -1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  -1,
+                                  0,
+                                  36,
+                                  -20,
+                                  0,
+                                  1
+                                ],
+                                "placement": {
+                                  "workplane": {
+                                    "origin": [
+                                      0,
+                                      0,
+                                      0
+                                    ],
+                                    "u": [
+                                      1,
+                                      0,
+                                      0
+                                    ],
+                                    "v": [
+                                      0,
+                                      -1,
+                                      0
+                                    ],
+                                    "normal": [
+                                      0,
+                                      0,
+                                      -1
+                                    ],
+                                    "source": {
+                                      "kind": "tracked-face",
+                                      "faceName": "bottom"
+                                    }
+                                  },
+                                  "u": 36,
+                                  "v": 20,
+                                  "protrude": 0,
+                                  "selfAnchor": "center"
+                                }
+                              },
+                              {
+                                "kind": "mirror",
+                                "normalX": 0,
+                                "normalY": 1,
+                                "normalZ": 0
+                              }
+                            ]
+                          },
+                          {
+                            "kind": "transform",
+                            "base": {
+                              "kind": "extrude",
+                              "profile": {
+                                "kind": "roundedRect",
+                                "width": 18,
+                                "height": 18,
+                                "radius": 4,
+                                "center": true,
+                                "transforms": []
+                              },
+                              "height": 6,
+                              "center": false
+                            },
+                            "steps": [
+                              {
+                                "kind": "workplanePlacement",
+                                "matrix": [
+                                  1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  -1,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  -1,
+                                  0,
+                                  36,
+                                  -20,
+                                  0,
+                                  1
+                                ],
+                                "placement": {
+                                  "workplane": {
+                                    "origin": [
+                                      0,
+                                      0,
+                                      0
+                                    ],
+                                    "u": [
+                                      1,
+                                      0,
+                                      0
+                                    ],
+                                    "v": [
+                                      0,
+                                      -1,
+                                      0
+                                    ],
+                                    "normal": [
+                                      0,
+                                      0,
+                                      -1
+                                    ],
+                                    "source": {
+                                      "kind": "tracked-face",
+                                      "faceName": "bottom"
+                                    }
+                                  },
+                                  "u": 36,
+                                  "v": 20,
+                                  "protrude": 0,
+                                  "selfAnchor": "center"
+                                }
+                              },
+                              {
+                                "kind": "mirror",
+                                "normalX": 1,
+                                "normalY": 0,
+                                "normalZ": 0
+                              },
+                              {
+                                "kind": "mirror",
+                                "normalX": 0,
+                                "normalY": 1,
+                                "normalZ": 0
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "transform",
+                    "base": {
+                      "kind": "extrude",
+                      "profile": {
+                        "kind": "roundedRect",
+                        "width": 32,
+                        "height": 12,
+                        "radius": 3,
+                        "center": true,
+                        "transforms": []
+                      },
+                      "height": 10,
+                      "center": false
+                    },
+                    "steps": [
+                      {
+                        "kind": "workplanePlacement",
+                        "matrix": [
+                          1,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          1,
+                          0,
+                          0,
+                          -1,
+                          0,
+                          0,
+                          0,
+                          -40.25,
+                          24,
+                          1
+                        ],
+                        "placement": {
+                          "workplane": {
+                            "origin": [
+                              0,
+                              -40,
+                              18
+                            ],
+                            "u": [
+                              1,
+                              0,
+                              0
+                            ],
+                            "v": [
+                              0,
+                              0,
+                              1
+                            ],
+                            "normal": [
+                              0,
+                              -1,
+                              0
+                            ],
+                            "source": {
+                              "kind": "canonical-face",
+                              "face": "front"
+                            }
+                          },
+                          "u": 0,
+                          "v": 6,
+                          "protrude": 0.25,
+                          "selfAnchor": "center"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "transform",
+                "base": {
+                  "kind": "extrude",
+                  "profile": {
+                    "kind": "circle",
+                    "radius": 7,
+                    "transforms": []
+                  },
+                  "height": 10,
+                  "center": false
+                },
+                "steps": [
+                  {
+                    "kind": "workplanePlacement",
+                    "matrix": [
+                      0,
+                      1,
+                      0,
+                      0,
+                      0,
+                      0,
+                      1,
+                      0,
+                      1,
+                      0,
+                      0,
+                      0,
+                      60.25,
+                      -10,
+                      12,
+                      1
+                    ],
+                    "placement": {
+                      "workplane": {
+                        "origin": [
+                          60,
+                          0,
+                          18
+                        ],
+                        "u": [
+                          0,
+                          1,
+                          0
+                        ],
+                        "v": [
+                          0,
+                          0,
+                          1
+                        ],
+                        "normal": [
+                          1,
+                          0,
+                          0
+                        ],
+                        "source": {
+                          "kind": "canonical-face",
+                          "face": "right"
+                        }
+                      },
+                      "u": -10,
+                      "v": -6,
+                      "protrude": 0.25,
+                      "selfAnchor": "center"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "exactRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "facetedRoute": {
+            "kind": "exact",
+            "target": "cadquery-occt",
+            "diagnostics": []
+          },
+          "cadqueryOcct": {
+            "supported": true,
+            "diagnostics": [],
+            "plan": {
+              "kind": "boolean",
+              "op": "difference",
+              "shapes": [
+                {
+                  "kind": "boolean",
+                  "op": "difference",
+                  "shapes": [
+                    {
+                      "kind": "boolean",
+                      "op": "union",
+                      "shapes": [
+                        {
+                          "kind": "boolean",
+                          "op": "difference",
+                          "shapes": [
+                            {
+                              "kind": "extrude",
+                              "profile": {
+                                "kind": "roundedRect",
+                                "width": 120,
+                                "height": 80,
+                                "radius": 10,
+                                "center": true,
+                                "transforms": []
+                              },
+                              "height": 36,
+                              "center": false
+                            },
+                            {
+                              "kind": "transform",
+                              "base": {
+                                "kind": "extrude",
+                                "profile": {
+                                  "kind": "offset",
+                                  "base": {
+                                    "kind": "roundedRect",
+                                    "width": 120,
+                                    "height": 80,
+                                    "radius": 10,
+                                    "center": true,
+                                    "transforms": []
+                                  },
+                                  "delta": -3,
+                                  "join": "Round",
+                                  "transforms": []
+                                },
+                                "height": 33,
+                                "center": false
+                              },
+                              "steps": [
+                                {
+                                  "kind": "translate",
+                                  "x": 0,
+                                  "y": 0,
+                                  "z": 3
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "boolean",
+                          "op": "union",
+                          "shapes": [
+                            {
+                              "kind": "transform",
+                              "base": {
+                                "kind": "extrude",
+                                "profile": {
+                                  "kind": "roundedRect",
+                                  "width": 18,
+                                  "height": 18,
+                                  "radius": 4,
+                                  "center": true,
+                                  "transforms": []
+                                },
+                                "height": 6,
+                                "center": false
+                              },
+                              "steps": [
+                                {
+                                  "kind": "workplanePlacement",
+                                  "matrix": [
+                                    1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    -1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    -1,
+                                    0,
+                                    36,
+                                    -20,
+                                    0,
+                                    1
+                                  ],
+                                  "placement": {
+                                    "workplane": {
+                                      "origin": [
+                                        0,
+                                        0,
+                                        0
+                                      ],
+                                      "u": [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      "v": [
+                                        0,
+                                        -1,
+                                        0
+                                      ],
+                                      "normal": [
+                                        0,
+                                        0,
+                                        -1
+                                      ],
+                                      "source": {
+                                        "kind": "tracked-face",
+                                        "faceName": "bottom"
+                                      }
+                                    },
+                                    "u": 36,
+                                    "v": 20,
+                                    "protrude": 0,
+                                    "selfAnchor": "center"
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "kind": "transform",
+                              "base": {
+                                "kind": "extrude",
+                                "profile": {
+                                  "kind": "roundedRect",
+                                  "width": 18,
+                                  "height": 18,
+                                  "radius": 4,
+                                  "center": true,
+                                  "transforms": []
+                                },
+                                "height": 6,
+                                "center": false
+                              },
+                              "steps": [
+                                {
+                                  "kind": "workplanePlacement",
+                                  "matrix": [
+                                    1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    -1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    -1,
+                                    0,
+                                    36,
+                                    -20,
+                                    0,
+                                    1
+                                  ],
+                                  "placement": {
+                                    "workplane": {
+                                      "origin": [
+                                        0,
+                                        0,
+                                        0
+                                      ],
+                                      "u": [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      "v": [
+                                        0,
+                                        -1,
+                                        0
+                                      ],
+                                      "normal": [
+                                        0,
+                                        0,
+                                        -1
+                                      ],
+                                      "source": {
+                                        "kind": "tracked-face",
+                                        "faceName": "bottom"
+                                      }
+                                    },
+                                    "u": 36,
+                                    "v": 20,
+                                    "protrude": 0,
+                                    "selfAnchor": "center"
+                                  }
+                                },
+                                {
+                                  "kind": "mirror",
+                                  "normalX": 1,
+                                  "normalY": 0,
+                                  "normalZ": 0
+                                }
+                              ]
+                            },
+                            {
+                              "kind": "transform",
+                              "base": {
+                                "kind": "extrude",
+                                "profile": {
+                                  "kind": "roundedRect",
+                                  "width": 18,
+                                  "height": 18,
+                                  "radius": 4,
+                                  "center": true,
+                                  "transforms": []
+                                },
+                                "height": 6,
+                                "center": false
+                              },
+                              "steps": [
+                                {
+                                  "kind": "workplanePlacement",
+                                  "matrix": [
+                                    1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    -1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    -1,
+                                    0,
+                                    36,
+                                    -20,
+                                    0,
+                                    1
+                                  ],
+                                  "placement": {
+                                    "workplane": {
+                                      "origin": [
+                                        0,
+                                        0,
+                                        0
+                                      ],
+                                      "u": [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      "v": [
+                                        0,
+                                        -1,
+                                        0
+                                      ],
+                                      "normal": [
+                                        0,
+                                        0,
+                                        -1
+                                      ],
+                                      "source": {
+                                        "kind": "tracked-face",
+                                        "faceName": "bottom"
+                                      }
+                                    },
+                                    "u": 36,
+                                    "v": 20,
+                                    "protrude": 0,
+                                    "selfAnchor": "center"
+                                  }
+                                },
+                                {
+                                  "kind": "mirror",
+                                  "normalX": 0,
+                                  "normalY": 1,
+                                  "normalZ": 0
+                                }
+                              ]
+                            },
+                            {
+                              "kind": "transform",
+                              "base": {
+                                "kind": "extrude",
+                                "profile": {
+                                  "kind": "roundedRect",
+                                  "width": 18,
+                                  "height": 18,
+                                  "radius": 4,
+                                  "center": true,
+                                  "transforms": []
+                                },
+                                "height": 6,
+                                "center": false
+                              },
+                              "steps": [
+                                {
+                                  "kind": "workplanePlacement",
+                                  "matrix": [
+                                    1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    -1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    -1,
+                                    0,
+                                    36,
+                                    -20,
+                                    0,
+                                    1
+                                  ],
+                                  "placement": {
+                                    "workplane": {
+                                      "origin": [
+                                        0,
+                                        0,
+                                        0
+                                      ],
+                                      "u": [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      "v": [
+                                        0,
+                                        -1,
+                                        0
+                                      ],
+                                      "normal": [
+                                        0,
+                                        0,
+                                        -1
+                                      ],
+                                      "source": {
+                                        "kind": "tracked-face",
+                                        "faceName": "bottom"
+                                      }
+                                    },
+                                    "u": 36,
+                                    "v": 20,
+                                    "protrude": 0,
+                                    "selfAnchor": "center"
+                                  }
+                                },
+                                {
+                                  "kind": "mirror",
+                                  "normalX": 1,
+                                  "normalY": 0,
+                                  "normalZ": 0
+                                },
+                                {
+                                  "kind": "mirror",
+                                  "normalX": 0,
+                                  "normalY": 1,
+                                  "normalZ": 0
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "transform",
+                      "base": {
+                        "kind": "extrude",
+                        "profile": {
+                          "kind": "roundedRect",
+                          "width": 32,
+                          "height": 12,
+                          "radius": 3,
+                          "center": true,
+                          "transforms": []
+                        },
+                        "height": 10,
+                        "center": false
+                      },
+                      "steps": [
+                        {
+                          "kind": "workplanePlacement",
+                          "matrix": [
+                            1,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            1,
+                            0,
+                            0,
+                            -1,
+                            0,
+                            0,
+                            0,
+                            -40.25,
+                            24,
+                            1
+                          ],
+                          "placement": {
+                            "workplane": {
+                              "origin": [
+                                0,
+                                -40,
+                                18
+                              ],
+                              "u": [
+                                1,
+                                0,
+                                0
+                              ],
+                              "v": [
+                                0,
+                                0,
+                                1
+                              ],
+                              "normal": [
+                                0,
+                                -1,
+                                0
+                              ],
+                              "source": {
+                                "kind": "canonical-face",
+                                "face": "front"
+                              }
+                            },
+                            "u": 0,
+                            "v": 6,
+                            "protrude": 0.25,
+                            "selfAnchor": "center"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "kind": "transform",
+                  "base": {
+                    "kind": "extrude",
+                    "profile": {
+                      "kind": "circle",
+                      "radius": 7,
+                      "transforms": []
+                    },
+                    "height": 10,
+                    "center": false
+                  },
+                  "steps": [
+                    {
+                      "kind": "workplanePlacement",
+                      "matrix": [
+                        0,
+                        1,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        0,
+                        1,
+                        0,
+                        0,
+                        0,
+                        60.25,
+                        -10,
+                        12,
+                        1
+                      ],
+                      "placement": {
+                        "workplane": {
+                          "origin": [
+                            60,
+                            0,
+                            18
+                          ],
+                          "u": [
+                            0,
+                            1,
+                            0
+                          ],
+                          "v": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "normal": [
+                            1,
+                            0,
+                            0
+                          ],
+                          "source": {
+                            "kind": "canonical-face",
+                            "face": "right"
+                          }
+                        },
+                        "u": -10,
+                        "v": -6,
+                        "protrude": 0.25,
+                        "selfAnchor": "center"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "facetedMesh": {
+            "supported": true,
+            "diagnostics": []
+          },
+          "runtime": {
+            "boundingBox": {
+              "min": [
+                -60,
+                -40,
+                -6
+              ],
+              "max": [
+                60,
+                40,
+                36
+              ]
+            },
+            "volume": 72952.030501,
+            "surfaceArea": 46383.690403,
+            "numTri": 1948,
+            "vertexCount": 976,
+            "meshDigest": "b1ca4ac3b0c315f14570811561d3fa5cca640453794bf8d1b7fd2b4f99b433dc"
+          },
+          "loweredRuntime": {
+            "boundingBox": {
+              "min": [
+                -60,
+                -40,
+                -6
+              ],
+              "max": [
+                60,
+                40,
+                36
+              ]
+            },
+            "volume": 72952.030501,
+            "surfaceArea": 46383.690403,
+            "numTri": 1948,
+            "vertexCount": 976,
+            "meshDigest": "b1ca4ac3b0c315f14570811561d3fa5cca640453794bf8d1b7fd2b4f99b433dc"
+          },
+          "loweredRuntimeMatches": true,
+          "loweredRuntimeError": null
+        }
+      ],
+      "exactExport": {
+        "objects": [
+          {
+            "name": "Enclosure",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      },
+      "facetedExport": {
+        "objects": [
+          {
+            "name": "Enclosure",
+            "kind": "exact"
+          }
+        ],
+        "unsupported": [],
+        "skipped": [],
+        "fallbacks": []
+      }
+    }
+  },
+  {
     "id": "sketch-on-face-placement",
     "description": "Downstream features keep semantic workplane placement intent in the compile graph and propagate it through later shape transforms.",
     "scene": {

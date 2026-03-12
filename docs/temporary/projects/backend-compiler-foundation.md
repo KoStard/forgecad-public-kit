@@ -240,6 +240,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 - `forgecad check suite` and `npm test` now expose the repo's assertion-based invariant suite as a first-class test entrypoint instead of leaving the checks scattered across ad hoc commands.
 - the compiler and BREP regression suite now includes explicit `loft` / `sweep` plan invariants and an end-to-end STEP exporter check for those feature families.
 - the compiler and BREP regression suite now also covers `shell()` lowering, route policy, and end-to-end exact export for the supported shell subset.
+- the regression suite now includes a curated enclosure-style multi-feature part that combines shell, workplane-driven cuts, mirrored support feet, and booleans in one exact-exportable flow.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker

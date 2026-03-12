@@ -148,6 +148,33 @@ return [{ name: 'Shell', shape: body }];
 `,
   ),
   inlineCase(
+    'multi-feature-enclosure',
+    'A curated enclosure-style part keeps shell, workplane-driven cuts, mirrors, and booleans aligned across both lowerers.',
+    `
+const base = roundedRect(120, 80, 10, true).extrude(36);
+const shell = base.shell(3, { openFaces: ['top'] });
+const ventCut = roundedRect(32, 12, 3, true)
+  .onFace(base, 'front', { u: 0, v: 6, protrude: 0.25, selfAnchor: 'center' })
+  .extrude(10);
+const cableCut = circle2d(7)
+  .onFace(base, 'right', { u: -10, v: -6, protrude: 0.25, selfAnchor: 'center' })
+  .extrude(10);
+const foot = roundedRect(18, 18, 4, true)
+  .onFace(base, 'bottom', { u: 36, v: 20, protrude: 0, selfAnchor: 'center' })
+  .extrude(6);
+const feet = union(
+  foot,
+  foot.mirror([1, 0, 0]),
+  foot.mirror([0, 1, 0]),
+  foot.mirror([1, 0, 0]).mirror([0, 1, 0]),
+);
+const body = union(shell, feet)
+  .subtract(ventCut)
+  .subtract(cableCut);
+return [{ name: 'Enclosure', shape: body }];
+`,
+  ),
+  inlineCase(
     'sketch-on-face-placement',
     'Downstream features keep semantic workplane placement intent in the compile graph and propagate it through later shape transforms.',
     `

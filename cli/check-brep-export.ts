@@ -15,6 +15,30 @@ import type { CadQueryProfilePlan, CadQueryShapePlan, CadQueryShapeTransformStep
 import { collectProjectFiles } from './collect-files';
 import { resolvePackagePath } from './package-runtime';
 
+const MULTI_FEATURE_ENCLOSURE_CODE = `
+const base = roundedRect(120, 80, 10, true).extrude(36);
+const shell = base.shell(3, { openFaces: ['top'] });
+const ventCut = roundedRect(32, 12, 3, true)
+  .onFace(base, 'front', { u: 0, v: 6, protrude: 0.25, selfAnchor: 'center' })
+  .extrude(10);
+const cableCut = circle2d(7)
+  .onFace(base, 'right', { u: -10, v: -6, protrude: 0.25, selfAnchor: 'center' })
+  .extrude(10);
+const foot = roundedRect(18, 18, 4, true)
+  .onFace(base, 'bottom', { u: 36, v: 20, protrude: 0, selfAnchor: 'center' })
+  .extrude(6);
+const feet = union(
+  foot,
+  foot.mirror([1, 0, 0]),
+  foot.mirror([0, 1, 0]),
+  foot.mirror([1, 0, 0]).mirror([0, 1, 0]),
+);
+const body = union(shell, feet)
+  .subtract(ventCut)
+  .subtract(cableCut);
+return [{ name: 'Enclosure', shape: body }];
+`;
+
 function runExactManifest(code: string) {
   const files: Record<string, string> = { 'main.forge.js': code };
   const result = runScript(code, 'main.forge.js', files);
@@ -433,6 +457,26 @@ return [{ name: 'Shell', shape: body }];
 `);
 }
 
+function checkMultiFeatureEnclosurePlan(): void {
+  const plan = runExactManifest(MULTI_FEATURE_ENCLOSURE_CODE);
+
+  assert.equal(plan.kind, 'boolean', `Expected enclosure plan to remain a boolean tree, got ${plan.kind}`);
+  const transforms = collectShapeTransforms(plan);
+  assert(
+    transforms.some((step) => step.kind === 'workplanePlacement'),
+    'Expected multi-feature enclosure exact lowering to preserve workplanePlacement transforms',
+  );
+  const profiles = collectProfiles(plan);
+  assert(
+    profiles.some((profile) => profile.kind === 'offset' && profile.delta === -3),
+    'Expected multi-feature enclosure exact lowering to contain the shell cavity offset profile',
+  );
+}
+
+function checkMultiFeatureEnclosureExportEndToEnd(): void {
+  exportExactManifest(MULTI_FEATURE_ENCLOSURE_CODE);
+}
+
 function checkSketchOnFacePlacementPlan(): void {
   const plan = runExactManifest(`
 const body = roundedRect(20, 12, 2, true).extrude(6, { center: true });
@@ -678,6 +722,8 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkSweepPlan();
   checkShellPlan();
   checkShellExportEndToEnd();
+  checkMultiFeatureEnclosurePlan();
+  checkMultiFeatureEnclosureExportEndToEnd();
   checkSketchOnFacePlacementPlan();
   checkSketchOnFacePlacementExportEndToEnd();
   checkMixedSketchAndSolidScenePolicy();
