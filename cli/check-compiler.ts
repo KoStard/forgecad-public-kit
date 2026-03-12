@@ -378,6 +378,52 @@ function generateSnapshots(caseId?: string): CompilerCaseSnapshot[] {
   }));
 }
 
+function isFaceQueryKind(kind: unknown): boolean {
+  return kind === 'canonical-face'
+    || kind === 'tracked-face'
+    || kind === 'face-ref'
+    || kind === 'propagated-face'
+    || kind === 'created-face';
+}
+
+function isEdgeQueryKind(kind: unknown): boolean {
+  return kind === 'tracked-edge'
+    || kind === 'edge-ref'
+    || kind === 'propagated-edge'
+    || kind === 'created-edge';
+}
+
+function assertPropagationQueryShape(
+  snapshotId: string,
+  objectName: string,
+  rewriteId: string,
+  label: string,
+  queryKind: 'face' | 'edge',
+  query: unknown,
+  issues: string[],
+): void {
+  if (!query || typeof query !== 'object') {
+    issues.push(`${snapshotId}/${objectName}: ${label} is missing a query object`);
+    return;
+  }
+
+  const candidate = query as { kind?: unknown; rewriteId?: unknown };
+  if (queryKind === 'face' && !isFaceQueryKind(candidate.kind)) {
+    issues.push(`${snapshotId}/${objectName}: ${label} should carry a face-query ref, got ${String(candidate.kind)}`);
+    return;
+  }
+  if (queryKind === 'edge' && !isEdgeQueryKind(candidate.kind)) {
+    issues.push(`${snapshotId}/${objectName}: ${label} should carry an edge-query ref, got ${String(candidate.kind)}`);
+    return;
+  }
+  if ((candidate.kind === 'propagated-face' || candidate.kind === 'created-face' || candidate.kind === 'propagated-edge' || candidate.kind === 'created-edge')
+    && candidate.rewriteId !== rewriteId) {
+    issues.push(
+      `${snapshotId}/${objectName}: ${label} rewriteId ${String(candidate.rewriteId)} does not match parent propagation ${rewriteId}`,
+    );
+  }
+}
+
 function assertLoweredRuntimeMatches(snapshots: CompilerCaseSnapshot[]): void {
   const mismatches: string[] = [];
 
@@ -524,6 +570,88 @@ function assertCompilerRoutingIntegrity(snapshots: CompilerCaseSnapshot[]): void
   );
 }
 
+function assertTopologyRewritePropagationIntegrity(snapshots: CompilerCaseSnapshot[]): void {
+  const issues: string[] = [];
+
+  for (const snapshot of snapshots) {
+    for (const object of snapshot.scene.objects) {
+      if (object.kind !== 'shape') continue;
+      if (!object.compilePlan && object.topologyRewritePropagations.length > 0) {
+        issues.push(`${snapshot.id}/${object.name}: propagation metadata exists without a compile plan`);
+      }
+
+      const seenRewriteIds = new Set<string>();
+      for (const propagation of object.topologyRewritePropagations) {
+        if (seenRewriteIds.has(propagation.rewriteId)) {
+          issues.push(`${snapshot.id}/${object.name}: duplicate topology-rewrite id ${propagation.rewriteId}`);
+        }
+        seenRewriteIds.add(propagation.rewriteId);
+
+        if (propagation.owner && propagation.owner.id !== propagation.rewriteId) {
+          issues.push(
+            `${snapshot.id}/${object.name}: propagation ${propagation.operation} owner id ${propagation.owner.id} should match rewriteId ${propagation.rewriteId}`,
+          );
+        }
+
+        for (const entry of propagation.preservedFaces) {
+          assertPropagationQueryShape(snapshot.id, object.name, propagation.rewriteId, 'preservedFaces[]', 'face', entry.query, issues);
+          if ((entry.query as { kind: string }).kind !== 'propagated-face') {
+            issues.push(`${snapshot.id}/${object.name}: preserved face entries must use propagated-face queries`);
+          }
+        }
+        for (const entry of propagation.preservedEdges) {
+          assertPropagationQueryShape(snapshot.id, object.name, propagation.rewriteId, 'preservedEdges[]', 'edge', entry.query, issues);
+          if ((entry.query as { kind: string }).kind !== 'propagated-edge') {
+            issues.push(`${snapshot.id}/${object.name}: preserved edge entries must use propagated-edge queries`);
+          }
+        }
+        for (const entry of propagation.createdFaces) {
+          assertPropagationQueryShape(snapshot.id, object.name, propagation.rewriteId, 'createdFaces[]', 'face', entry.query, issues);
+          if ((entry.query as { kind: string }).kind !== 'created-face') {
+            issues.push(`${snapshot.id}/${object.name}: created face entries must use created-face queries`);
+          }
+        }
+        for (const entry of propagation.createdEdges) {
+          assertPropagationQueryShape(snapshot.id, object.name, propagation.rewriteId, 'createdEdges[]', 'edge', entry.query, issues);
+          if ((entry.query as { kind: string }).kind !== 'created-edge') {
+            issues.push(`${snapshot.id}/${object.name}: created edge entries must use created-edge queries`);
+          }
+        }
+        for (const diagnostic of propagation.diagnostics) {
+          if (diagnostic.source) {
+            assertPropagationQueryShape(
+              snapshot.id,
+              object.name,
+              propagation.rewriteId,
+              `diagnostic(${diagnostic.code}).source`,
+              diagnostic.queryKind,
+              diagnostic.source,
+              issues,
+            );
+          }
+          if (diagnostic.query) {
+            assertPropagationQueryShape(
+              snapshot.id,
+              object.name,
+              propagation.rewriteId,
+              `diagnostic(${diagnostic.code}).query`,
+              diagnostic.queryKind,
+              diagnostic.query,
+              issues,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  assert.equal(
+    issues.length,
+    0,
+    `Topology-rewrite propagation integrity failed:\n${issues.map((line) => `- ${line}`).join('\n')}`,
+  );
+}
+
 function readStoredSnapshots(): CompilerCaseSnapshot[] {
   return JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf-8')) as CompilerCaseSnapshot[];
 }
@@ -540,6 +668,7 @@ export async function runCheckCompilerCli(argv: string[] = process.argv.slice(2)
   const generated = generateSnapshots(caseId);
   assertLoweredRuntimeMatches(generated);
   assertCompilerRoutingIntegrity(generated);
+  assertTopologyRewritePropagationIntegrity(generated);
 
   if (update) {
     writeSnapshots(generated);

@@ -1,7 +1,9 @@
 import {
   buildChamferShapeCompilePlan,
   buildFilletShapeCompilePlan,
-  createOwnedShapeCompilePlan,
+  createShapeQueryOwner,
+  type ShapeCompilePlan,
+  wrapShapeCompilePlanWithQueryOwner,
 } from './compilePlan';
 import {
   Shape,
@@ -16,6 +18,10 @@ import {
   setShapePlacementReferences,
 } from './kernel';
 import { shapeQueryOwnersEqual, type ShapeQueryOwner } from './queryModel';
+import {
+  attachTopologyRewritePropagation,
+  buildEdgeFeatureTopologyRewritePropagation,
+} from './queryPropagation';
 import { resolveSupportedEdgeFeatureSelection } from './edgeFeatureResolution';
 import { TrackedShape, type EdgeRef } from './sketch/topology';
 
@@ -50,11 +56,20 @@ function requireCompatibleEdgeOwner(target: Shape, edge: EdgeRef, label: string)
   );
 }
 
-function buildEdgeFeatureResult(
-  target: Shape,
-  plan: ReturnType<typeof createOwnedShapeCompilePlan>,
-  source: 'fillet' | 'chamfer',
-): Shape {
+function createOwnedTopologyRewritePlan(
+  plan: ShapeCompilePlan | null,
+  operation: 'fillet' | 'chamfer',
+  edge: EdgeRef,
+): ShapeCompilePlan | null {
+  if (!plan) return null;
+  const owner = createShapeQueryOwner(operation);
+  return wrapShapeCompilePlanWithQueryOwner(
+    attachTopologyRewritePropagation(plan, buildEdgeFeatureTopologyRewritePropagation(operation, owner, edge.query)),
+    owner,
+  );
+}
+
+function buildEdgeFeatureResult(target: Shape, plan: ShapeCompilePlan | null, source: 'fillet' | 'chamfer'): Shape {
   if (!plan) {
     throw new Error(`Could not record compiler intent for ${source} on this target shape.`);
   }
@@ -115,9 +130,10 @@ export function filletEdge(
     );
   }
 
-  const plan = createOwnedShapeCompilePlan(
+  const plan = createOwnedTopologyRewritePlan(
     buildFilletShapeCompilePlan(basePlan, edge.query, radius, normalizedQuadrant, Math.round(segments)),
     'fillet',
+    edge,
   );
   return buildEdgeFeatureResult(target, plan, 'fillet');
 }
@@ -154,9 +170,10 @@ export function chamferEdge(
     );
   }
 
-  const plan = createOwnedShapeCompilePlan(
+  const plan = createOwnedTopologyRewritePlan(
     buildChamferShapeCompilePlan(basePlan, edge.query, size, normalizedQuadrant),
     'chamfer',
+    edge,
   );
   return buildEdgeFeatureResult(target, plan, 'chamfer');
 }

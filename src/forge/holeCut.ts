@@ -1,6 +1,8 @@
 import {
   type FeatureCutExtent,
-  createOwnedShapeCompilePlan,
+  createShapeQueryOwner,
+  type ShapeCompilePlan,
+  wrapShapeCompilePlanWithQueryOwner,
 } from './compilePlan';
 import {
   buildCutShapeCompilePlan,
@@ -19,6 +21,11 @@ import {
   setShapePlacementReferences,
 } from './kernel';
 import { shapeQueryOwnersEqual, type ShapeQueryOwner } from './queryModel';
+import {
+  attachTopologyRewritePropagation,
+  buildCutTopologyRewritePropagation,
+  buildHoleTopologyRewritePropagation,
+} from './queryPropagation';
 import { Sketch, getSketchCompileProfilePlan, getSketchPlacement3D, getSketchPlacementModel } from './sketch/core';
 import { TrackedShape, type FaceRef } from './sketch/topology';
 import { resolveSketchWorkplane, type SketchFaceTarget } from './sketch/workplane';
@@ -138,7 +145,20 @@ function resolveFeatureExtent(
   return { kind: 'blind', depth };
 }
 
-function buildFeatureResult(target: Shape, plan: ReturnType<typeof createOwnedShapeCompilePlan>): Shape {
+function createOwnedTopologyRewritePlan(
+  plan: ShapeCompilePlan | null,
+  operation: 'hole' | 'cut',
+  buildPropagation: (owner: ShapeQueryOwner) => ReturnType<typeof buildHoleTopologyRewritePropagation>,
+): ShapeCompilePlan | null {
+  if (!plan) return null;
+  const owner = createShapeQueryOwner(operation);
+  return wrapShapeCompilePlanWithQueryOwner(
+    attachTopologyRewritePropagation(plan, buildPropagation(owner)),
+    owner,
+  );
+}
+
+function buildFeatureResult(target: Shape, plan: ShapeCompilePlan | null): Shape {
   if (!plan) {
     throw new Error('Hole/cut feature could not record compiler intent for this target.');
   }
@@ -209,9 +229,10 @@ function shapeHole(target: Shape, targetForResolution: Shape | TrackedShape, fac
   }
 
   const { placement, extent } = resolveHolePlacement(targetForResolution, target, faceOrRef, opts);
-  const plan = createOwnedShapeCompilePlan(
+  const plan = createOwnedTopologyRewritePlan(
     buildHoleShapeCompilePlan(basePlan, placement, opts.diameter / 2, extent),
     'hole',
+    (owner) => buildHoleTopologyRewritePropagation(owner, placement.placement),
   );
   return buildFeatureResult(target, plan);
 }
@@ -235,7 +256,7 @@ function shapeCutout(target: Shape, sketch: Sketch, opts: ShapeCutoutOptions = {
 
   requireCompatibleFeatureOwner(target, placementModel.workplane.source.owner, 'Shape.cutout()');
 
-  const plan = createOwnedShapeCompilePlan(
+  const plan = createOwnedTopologyRewritePlan(
     buildCutShapeCompilePlan(
       basePlan,
       {
@@ -251,6 +272,7 @@ function shapeCutout(target: Shape, sketch: Sketch, opts: ShapeCutoutOptions = {
       ),
     ),
     'cut',
+    (owner) => buildCutTopologyRewritePropagation(owner, placementModel),
   );
   return buildFeatureResult(target, plan);
 }

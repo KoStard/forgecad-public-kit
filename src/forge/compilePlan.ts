@@ -3,8 +3,10 @@ import type { PlaneFrame } from './planeFrame';
 import {
   cloneEdgeQueryRef,
   cloneShapeQueryOwner,
+  cloneTopologyRewritePropagation,
   type EdgeQueryRef,
   type ShapeQueryOwner,
+  type TopologyRewritePropagation,
 } from './queryModel';
 import {
   cloneShapeWorkplanePlacement,
@@ -146,6 +148,7 @@ export type ShapeCompilePlan =
       base: ShapeCompilePlan;
       thickness: number;
       openFaces: Array<'top' | 'bottom'>;
+      queryPropagation?: TopologyRewritePropagation;
     }
   | {
       kind: 'hole';
@@ -153,6 +156,7 @@ export type ShapeCompilePlan =
       placement: ShapeWorkplanePlacement;
       radius: number;
       extent: FeatureCutExtent;
+      queryPropagation?: TopologyRewritePropagation;
     }
   | {
       kind: 'cut';
@@ -160,6 +164,7 @@ export type ShapeCompilePlan =
       placement: ShapeWorkplanePlacement;
       profile: ProfileCompilePlan;
       extent: FeatureCutExtent;
+      queryPropagation?: TopologyRewritePropagation;
     }
   | {
       kind: 'revolve';
@@ -186,6 +191,7 @@ export type ShapeCompilePlan =
       kind: 'boolean';
       op: 'union' | 'difference' | 'intersection';
       shapes: ShapeCompilePlan[];
+      queryPropagation?: TopologyRewritePropagation;
     }
   | {
       kind: 'transform';
@@ -201,6 +207,7 @@ export type ShapeCompilePlan =
       kind: 'hull';
       shapes: ShapeCompilePlan[];
       points: [number, number, number][];
+      queryPropagation?: TopologyRewritePropagation;
     }
   | {
       kind: 'trimByPlane';
@@ -209,6 +216,7 @@ export type ShapeCompilePlan =
       normalY: number;
       normalZ: number;
       originOffset: number;
+      queryPropagation?: TopologyRewritePropagation;
     }
   | {
       kind: 'fillet';
@@ -218,6 +226,7 @@ export type ShapeCompilePlan =
       quadrant: [number, number];
       segments: number;
       resolvedEdge?: EdgeFeatureResolvedSelector;
+      queryPropagation?: TopologyRewritePropagation;
     }
   | {
       kind: 'chamfer';
@@ -226,6 +235,7 @@ export type ShapeCompilePlan =
       size: number;
       quadrant: [number, number];
       resolvedEdge?: EdgeFeatureResolvedSelector;
+      queryPropagation?: TopologyRewritePropagation;
     };
 
 function cloneProfileTransform(step: ProfileCompileTransformStep): ProfileCompileTransformStep {
@@ -521,6 +531,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         base: cloneShapeCompilePlan(plan.base)!,
         thickness: plan.thickness,
         openFaces: [...plan.openFaces],
+        queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
     case 'hole':
       return {
@@ -529,6 +540,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         placement: cloneShapeWorkplanePlacementValue(plan.placement),
         radius: plan.radius,
         extent: cloneFeatureCutExtent(plan.extent),
+        queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
     case 'cut':
       return {
@@ -537,6 +549,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         placement: cloneShapeWorkplanePlacementValue(plan.placement),
         profile: cloneProfileCompilePlan(plan.profile)!,
         extent: cloneFeatureCutExtent(plan.extent),
+        queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
     case 'revolve':
       return {
@@ -567,6 +580,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         kind: 'boolean',
         op: plan.op,
         shapes: plan.shapes.map((shape) => cloneShapeCompilePlan(shape)!),
+        queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
     case 'transform':
       return {
@@ -585,6 +599,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         kind: 'hull',
         shapes: plan.shapes.map((shape) => cloneShapeCompilePlan(shape)!),
         points: plan.points.map(([x, y, z]) => [x, y, z]),
+        queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
     case 'trimByPlane':
       return {
@@ -594,6 +609,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         normalY: plan.normalY,
         normalZ: plan.normalZ,
         originOffset: plan.originOffset,
+        queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
     case 'fillet':
       return {
@@ -604,6 +620,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         quadrant: cloneEdgeFinishQuadrant(plan.quadrant)!,
         segments: plan.segments,
         resolvedEdge: cloneEdgeFeatureResolvedSelector(plan.resolvedEdge),
+        queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
     case 'chamfer':
       return {
@@ -613,6 +630,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         size: plan.size,
         quadrant: cloneEdgeFinishQuadrant(plan.quadrant)!,
         resolvedEdge: cloneEdgeFeatureResolvedSelector(plan.resolvedEdge),
+        queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
   }
 }

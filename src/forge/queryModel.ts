@@ -5,16 +5,132 @@ export interface ShapeQueryOwner {
   operation: string;
 }
 
+export type TopologyRewriteQueryOutcome = 'preserved' | 'split' | 'merged';
+export type TopologyRewriteDiagnosticCategory = 'ambiguous' | 'unsupported';
+export type TopologyRewriteQueryKind = 'face' | 'edge';
+
+export interface CanonicalFaceQueryRef {
+  kind: 'canonical-face';
+  face: SketchFace3D;
+  owner?: ShapeQueryOwner;
+}
+
+export interface TrackedFaceQueryRef {
+  kind: 'tracked-face';
+  faceName: string;
+  owner?: ShapeQueryOwner;
+}
+
+export interface DirectFaceQueryRef {
+  kind: 'face-ref';
+  faceName?: string;
+  owner?: ShapeQueryOwner;
+}
+
+export interface PropagatedFaceQueryRef {
+  kind: 'propagated-face';
+  rewriteId: string;
+  outcome: TopologyRewriteQueryOutcome;
+  source: FaceQueryRef;
+  owner?: ShapeQueryOwner;
+}
+
+export interface CreatedFaceQueryRef {
+  kind: 'created-face';
+  rewriteId: string;
+  operation: string;
+  slot: string;
+  owner?: ShapeQueryOwner;
+}
+
 export type FaceQueryRef =
-  | { kind: 'canonical-face'; face: SketchFace3D; owner?: ShapeQueryOwner }
-  | { kind: 'tracked-face'; faceName: string; owner?: ShapeQueryOwner }
-  | { kind: 'face-ref'; faceName?: string; owner?: ShapeQueryOwner };
+  | CanonicalFaceQueryRef
+  | TrackedFaceQueryRef
+  | DirectFaceQueryRef
+  | PropagatedFaceQueryRef
+  | CreatedFaceQueryRef;
 
 export type EdgeQuerySelector = 'edge' | 'start' | 'end' | 'midpoint';
 
+export interface TrackedEdgeQueryRef {
+  kind: 'tracked-edge';
+  edgeName: string;
+  selector: EdgeQuerySelector;
+  owner?: ShapeQueryOwner;
+}
+
+export interface DirectEdgeQueryRef {
+  kind: 'edge-ref';
+  edgeName?: string;
+  selector: EdgeQuerySelector;
+  owner?: ShapeQueryOwner;
+}
+
+export interface PropagatedEdgeQueryRef {
+  kind: 'propagated-edge';
+  rewriteId: string;
+  outcome: TopologyRewriteQueryOutcome;
+  source: EdgeQueryRef;
+  selector: EdgeQuerySelector;
+  owner?: ShapeQueryOwner;
+}
+
+export interface CreatedEdgeQueryRef {
+  kind: 'created-edge';
+  rewriteId: string;
+  operation: string;
+  slot: string;
+  selector: EdgeQuerySelector;
+  owner?: ShapeQueryOwner;
+}
+
 export type EdgeQueryRef =
-  | { kind: 'tracked-edge'; edgeName: string; selector: EdgeQuerySelector; owner?: ShapeQueryOwner }
-  | { kind: 'edge-ref'; edgeName?: string; selector: EdgeQuerySelector; owner?: ShapeQueryOwner };
+  | TrackedEdgeQueryRef
+  | DirectEdgeQueryRef
+  | PropagatedEdgeQueryRef
+  | CreatedEdgeQueryRef;
+
+export interface TopologyRewritePreservedFaceQuery {
+  query: PropagatedFaceQueryRef;
+  status: 'supported' | 'ambiguous';
+  note?: string;
+}
+
+export interface TopologyRewritePreservedEdgeQuery {
+  query: PropagatedEdgeQueryRef;
+  status: 'supported' | 'ambiguous';
+  note?: string;
+}
+
+export interface TopologyRewriteCreatedFaceQuery {
+  query: CreatedFaceQueryRef;
+  note?: string;
+}
+
+export interface TopologyRewriteCreatedEdgeQuery {
+  query: CreatedEdgeQueryRef;
+  note?: string;
+}
+
+export interface TopologyRewritePropagationDiagnostic {
+  code: string;
+  category: TopologyRewriteDiagnosticCategory;
+  queryKind: TopologyRewriteQueryKind;
+  message: string;
+  source?: FaceQueryRef | EdgeQueryRef;
+  query?: FaceQueryRef | EdgeQueryRef;
+}
+
+export interface TopologyRewritePropagation {
+  rewriteId: string;
+  operation: string;
+  owner?: ShapeQueryOwner;
+  preservedFaces: TopologyRewritePreservedFaceQuery[];
+  preservedEdges: TopologyRewritePreservedEdgeQuery[];
+  createdFaces: TopologyRewriteCreatedFaceQuery[];
+  createdEdges: TopologyRewriteCreatedEdgeQuery[];
+  diagnostics: TopologyRewritePropagationDiagnostic[];
+}
 
 export function cloneShapeQueryOwner(owner: ShapeQueryOwner | undefined): ShapeQueryOwner | undefined {
   if (!owner) return undefined;
@@ -41,6 +157,22 @@ export function cloneFaceQueryRef(ref: FaceQueryRef | undefined): FaceQueryRef |
       return { kind: 'tracked-face', faceName: ref.faceName, owner: cloneShapeQueryOwner(ref.owner) };
     case 'face-ref':
       return { kind: 'face-ref', faceName: ref.faceName, owner: cloneShapeQueryOwner(ref.owner) };
+    case 'propagated-face':
+      return {
+        kind: 'propagated-face',
+        rewriteId: ref.rewriteId,
+        outcome: ref.outcome,
+        source: cloneFaceQueryRef(ref.source)!,
+        owner: cloneShapeQueryOwner(ref.owner),
+      };
+    case 'created-face':
+      return {
+        kind: 'created-face',
+        rewriteId: ref.rewriteId,
+        operation: ref.operation,
+        slot: ref.slot,
+        owner: cloneShapeQueryOwner(ref.owner),
+      };
   }
 }
 
@@ -61,7 +193,66 @@ export function cloneEdgeQueryRef(ref: EdgeQueryRef | undefined): EdgeQueryRef |
         selector: ref.selector,
         owner: cloneShapeQueryOwner(ref.owner),
       };
+    case 'propagated-edge':
+      return {
+        kind: 'propagated-edge',
+        rewriteId: ref.rewriteId,
+        outcome: ref.outcome,
+        source: cloneEdgeQueryRef(ref.source)!,
+        selector: ref.selector,
+        owner: cloneShapeQueryOwner(ref.owner),
+      };
+    case 'created-edge':
+      return {
+        kind: 'created-edge',
+        rewriteId: ref.rewriteId,
+        operation: ref.operation,
+        slot: ref.slot,
+        selector: ref.selector,
+        owner: cloneShapeQueryOwner(ref.owner),
+      };
   }
+}
+
+export function cloneTopologyRewritePropagation(
+  propagation: TopologyRewritePropagation | undefined,
+): TopologyRewritePropagation | undefined {
+  if (!propagation) return undefined;
+  return {
+    rewriteId: propagation.rewriteId,
+    operation: propagation.operation,
+    owner: cloneShapeQueryOwner(propagation.owner),
+    preservedFaces: propagation.preservedFaces.map((entry) => ({
+      query: cloneFaceQueryRef(entry.query)! as PropagatedFaceQueryRef,
+      status: entry.status,
+      note: entry.note,
+    })),
+    preservedEdges: propagation.preservedEdges.map((entry) => ({
+      query: cloneEdgeQueryRef(entry.query)! as PropagatedEdgeQueryRef,
+      status: entry.status,
+      note: entry.note,
+    })),
+    createdFaces: propagation.createdFaces.map((entry) => ({
+      query: cloneFaceQueryRef(entry.query)! as CreatedFaceQueryRef,
+      note: entry.note,
+    })),
+    createdEdges: propagation.createdEdges.map((entry) => ({
+      query: cloneEdgeQueryRef(entry.query)! as CreatedEdgeQueryRef,
+      note: entry.note,
+    })),
+    diagnostics: propagation.diagnostics.map((diagnostic) => ({
+      code: diagnostic.code,
+      category: diagnostic.category,
+      queryKind: diagnostic.queryKind,
+      message: diagnostic.message,
+      source: diagnostic.queryKind === 'face'
+        ? cloneFaceQueryRef(diagnostic.source as FaceQueryRef | undefined)
+        : cloneEdgeQueryRef(diagnostic.source as EdgeQueryRef | undefined),
+      query: diagnostic.queryKind === 'face'
+        ? cloneFaceQueryRef(diagnostic.query as FaceQueryRef | undefined)
+        : cloneEdgeQueryRef(diagnostic.query as EdgeQueryRef | undefined),
+    })),
+  };
 }
 
 export function faceQueryRefsEqual(
@@ -83,6 +274,18 @@ export function faceQueryRefsEqual(
       return b.kind === 'face-ref'
         && a.faceName === b.faceName
         && shapeQueryOwnersEqual(a.owner, b.owner);
+    case 'propagated-face':
+      return b.kind === 'propagated-face'
+        && a.rewriteId === b.rewriteId
+        && a.outcome === b.outcome
+        && faceQueryRefsEqual(a.source, b.source)
+        && shapeQueryOwnersEqual(a.owner, b.owner);
+    case 'created-face':
+      return b.kind === 'created-face'
+        && a.rewriteId === b.rewriteId
+        && a.operation === b.operation
+        && a.slot === b.slot
+        && shapeQueryOwnersEqual(a.owner, b.owner);
   }
 }
 
@@ -103,6 +306,20 @@ export function edgeQueryRefsEqual(
         && a.edgeName === b.edgeName
         && a.selector === b.selector
         && shapeQueryOwnersEqual(a.owner, b.owner);
+    case 'propagated-edge':
+      return b.kind === 'propagated-edge'
+        && a.rewriteId === b.rewriteId
+        && a.outcome === b.outcome
+        && a.selector === b.selector
+        && edgeQueryRefsEqual(a.source, b.source)
+        && shapeQueryOwnersEqual(a.owner, b.owner);
+    case 'created-edge':
+      return b.kind === 'created-edge'
+        && a.rewriteId === b.rewriteId
+        && a.operation === b.operation
+        && a.slot === b.slot
+        && a.selector === b.selector
+        && shapeQueryOwnersEqual(a.owner, b.owner);
   }
 }
 
@@ -116,6 +333,10 @@ export function describeFaceQueryRef(ref: FaceQueryRef | undefined | null): stri
       return `tracked-face(${ref.faceName})${owner}`;
     case 'face-ref':
       return `face-ref(${ref.faceName ?? 'unnamed'})${owner}`;
+    case 'propagated-face':
+      return `propagated-face(${ref.outcome} <- ${describeFaceQueryRef(ref.source)})${owner}`;
+    case 'created-face':
+      return `created-face(${ref.operation}:${ref.slot})${owner}`;
   }
 }
 
@@ -128,5 +349,9 @@ export function describeEdgeQueryRef(ref: EdgeQueryRef | undefined | null): stri
       return `tracked-edge(${ref.edgeName}${selector})${owner}`;
     case 'edge-ref':
       return `edge-ref(${ref.edgeName ?? 'unnamed'}${selector})${owner}`;
+    case 'propagated-edge':
+      return `propagated-edge(${ref.outcome} <- ${describeEdgeQueryRef(ref.source)}${selector})${owner}`;
+    case 'created-edge':
+      return `created-edge(${ref.operation}:${ref.slot}${selector})${owner}`;
   }
 }

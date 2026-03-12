@@ -5,7 +5,16 @@
  * Ensures named points/edges/surfaces/objects survive transforms and importPart().
  */
 import '../src/forge/holeCut';
-import { getShapePrimaryQueryOwner, getShapeQueryOwners, getShapeWorkplanePlacement, initKernel, box } from '../src/forge/kernel';
+import {
+  box,
+  getShapePrimaryQueryOwner,
+  getShapeQueryOwners,
+  getShapeTopologyRewritePropagation,
+  getShapeTopologyRewritePropagations,
+  getShapeWorkplanePlacement,
+  initKernel,
+  union,
+} from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
 import { circle2d, filletEdge, linearPattern, rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
 import { getSketchPlacement3D, getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
@@ -442,6 +451,82 @@ function checkRepeatedFeatureOwnershipPropagation(): void {
   expect(slotOwners.some((owner) => owner.id === slotOwner!.id), 'patterned result should retain the seed feature lineage');
 }
 
+function checkTopologyRewritePropagationInspection(): void {
+  const base = roundedRect(36, 22, 3, true).extrude(14);
+
+  const shelled = base.shell(2, { openFaces: ['top'] });
+  const shellPropagation = getShapeTopologyRewritePropagation(shelled);
+  expect(shellPropagation != null, 'shell results should expose a topology-rewrite propagation contract');
+  expect(shellPropagation!.operation === 'shell', `expected shell propagation operation, got ${shellPropagation!.operation}`);
+  expect(
+    shellPropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'shell-face-propagation-ambiguous'),
+    'shell propagation should expose explicit face ambiguity diagnostics instead of silently dropping them',
+  );
+
+  const drilled = base.hole('top', { diameter: 6, u: 4, v: -3, depth: 8 });
+  const drilledOwner = getShapePrimaryQueryOwner(drilled);
+  expect(drilledOwner != null, 'hole results should expose a primary owner');
+  const holePropagation = getShapeTopologyRewritePropagation(drilled);
+  expect(holePropagation != null, 'hole results should expose a topology-rewrite propagation contract');
+  expect(holePropagation!.operation === 'hole', `expected hole propagation operation, got ${holePropagation!.operation}`);
+  expect(holePropagation!.preservedFaces.length === 1, `expected one preserved face entry for hole propagation, got ${holePropagation!.preservedFaces.length}`);
+  const splitFace = holePropagation!.preservedFaces[0];
+  expect(splitFace.status === 'ambiguous', 'hole source-face propagation should be marked ambiguous today');
+  expect(splitFace.query.kind === 'propagated-face', 'hole propagation should expose a propagated-face query');
+  expect(splitFace.query.outcome === 'split', 'hole source-face propagation should record a split outcome');
+  expect(splitFace.query.owner?.id === drilledOwner!.id, 'hole propagated-face queries should target the hole result owner');
+  expect(splitFace.query.source.kind === 'tracked-face', 'hole propagated-face queries should preserve the tracked source face');
+  if (splitFace.query.source.kind === 'tracked-face') {
+    expect(splitFace.query.source.faceName === 'top', `expected top source face, got ${splitFace.query.source.faceName}`);
+  }
+  expect(
+    holePropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'hole-source-face-split-ambiguous'),
+    'hole propagation should expose an explicit split-face ambiguity diagnostic',
+  );
+
+  const trimmed = drilled.trimByPlane([0, 0, 1], 0);
+  const trimmedOwner = getShapePrimaryQueryOwner(trimmed);
+  expect(trimmedOwner != null, 'trimByPlane results should expose a primary owner');
+  const trimPropagation = getShapeTopologyRewritePropagation(trimmed);
+  expect(trimPropagation != null, 'trimByPlane results should expose a topology-rewrite propagation contract');
+  expect(trimPropagation!.operation === 'trimByPlane', `expected trimByPlane propagation operation, got ${trimPropagation!.operation}`);
+  expect(trimPropagation!.createdFaces.length === 1, `expected one created face query for trimByPlane, got ${trimPropagation!.createdFaces.length}`);
+  const planeCap = trimPropagation!.createdFaces[0].query;
+  expect(planeCap.kind === 'created-face', 'trimByPlane should expose a created-face query for the plane cap');
+  expect(planeCap.operation === 'trimByPlane', `expected trimByPlane created-face operation, got ${planeCap.operation}`);
+  expect(planeCap.slot === 'plane-cap', `expected trimByPlane created-face slot "plane-cap", got ${planeCap.slot}`);
+  expect(planeCap.owner?.id === trimmedOwner!.id, 'trimByPlane created-face queries should target the trim result owner');
+
+  const shiftedTrim = trimmed.translate(8, -3, 2);
+  expect(
+    JSON.stringify(getShapeTopologyRewritePropagation(shiftedTrim)) === JSON.stringify(trimPropagation),
+    'later rigid transforms should preserve the inspected topology-rewrite propagation contract',
+  );
+
+  const joined = union(trimmed, box(8, 8, 6, true).translate(0, 0, 8));
+  const propagationOps = getShapeTopologyRewritePropagations(joined).map((entry) => entry.operation);
+  expect(
+    propagationOps.join('|') === 'boolean:union|trimByPlane|hole',
+    `expected deterministic propagation ordering "boolean:union|trimByPlane|hole", got "${propagationOps.join('|')}"`,
+  );
+
+  const prism = rectangle(-16, -10, 32, 20).extrude(12);
+  const filleted = filletEdge(prism.toShape(), prism.edge('vert-br'), 4, [-1, -1]);
+  const filletPropagation = getShapeTopologyRewritePropagation(filleted);
+  expect(filletPropagation != null, 'fillet results should expose a topology-rewrite propagation contract');
+  expect(filletPropagation!.operation === 'fillet', `expected fillet propagation operation, got ${filletPropagation!.operation}`);
+  expect(filletPropagation!.preservedEdges.length === 1, `expected one preserved edge entry for fillet propagation, got ${filletPropagation!.preservedEdges.length}`);
+  const mergedEdge = filletPropagation!.preservedEdges[0];
+  expect(mergedEdge.status === 'ambiguous', 'fillet selected-edge propagation should be marked ambiguous today');
+  expect(mergedEdge.query.kind === 'propagated-edge', 'fillet propagation should expose a propagated-edge query');
+  expect(mergedEdge.query.outcome === 'merged', 'fillet selected-edge propagation should record a merged outcome');
+  expect(mergedEdge.query.source.kind === 'tracked-edge', 'fillet propagation should preserve the tracked source edge query');
+  expect(
+    filletPropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'fillet-selected-edge-merged-ambiguous'),
+    'fillet propagation should expose an explicit merged-edge ambiguity diagnostic',
+  );
+}
+
 export async function runCheckPlacementReferencesCli(): Promise<void> {
   await initKernel();
   checkTransformAndPlacementHelpers();
@@ -456,5 +541,6 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkHoleCutFeaturePlacement();
   checkEdgeFinishOwnerPropagation();
   checkRepeatedFeatureOwnershipPropagation();
+  checkTopologyRewritePropagationInspection();
   console.log('✓ Placement reference invariants passed');
 }

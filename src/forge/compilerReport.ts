@@ -8,7 +8,9 @@ import {
   type CompilerTarget,
 } from './compilerDiagnostics';
 import { lowerShapeCompilePlanToCadQueryResult } from './compilePlanCadQuery';
+import { collectShapeTopologyRewritePropagations } from './queryPropagation';
 import { getShapeCompilePlan, type GeometryInfo, type Shape } from './kernel';
+import type { TopologyRewritePropagation } from './queryModel';
 
 export interface CompilerTargetReport<T> {
   target: CompilerTarget;
@@ -20,6 +22,7 @@ export interface CompilerTargetReport<T> {
 export interface ShapeCompilerReport {
   geometryInfo: GeometryInfo;
   compilePlan: ShapeCompilePlan | null;
+  topologyRewritePropagations: TopologyRewritePropagation[];
   cadqueryOcct: CompilerTargetReport<CadQueryShapePlan>;
   facetedMesh: CompilerTargetReport<null>;
 }
@@ -93,6 +96,7 @@ export function buildShapeCompilerReport(shape: Shape): ShapeCompilerReport {
   return {
     geometryInfo,
     compilePlan,
+    topologyRewritePropagations: collectShapeTopologyRewritePropagations(compilePlan),
     cadqueryOcct,
     facetedMesh,
   };

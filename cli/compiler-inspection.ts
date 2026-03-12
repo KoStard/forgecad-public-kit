@@ -66,6 +66,7 @@ export interface CompilerShapeInspection {
   name: string;
   geometryInfo: GeometryInfo;
   compilePlan: ShapeCompilePlan | null;
+  topologyRewritePropagations: ShapeCompilerReport['topologyRewritePropagations'];
   exactRoute: CompilerRouteInspection;
   facetedRoute: CompilerRouteInspection;
   cadqueryOcct: {
@@ -247,6 +248,7 @@ function inspectShapeObject(
     name: object.name,
     geometryInfo: report.geometryInfo,
     compilePlan: report.compilePlan,
+    topologyRewritePropagations: report.topologyRewritePropagations,
     exactRoute: summarizeRoute(compiled.routes.exact),
     facetedRoute: summarizeRoute(compiled.routes.faceted),
     cadqueryOcct: {
