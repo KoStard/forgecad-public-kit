@@ -47,3 +47,4 @@ Can start after tasks 170 and 180 land. Safe to run in parallel with:
 
 ## Status and log
 - 2026-03-12: Created for the second post-160 feature wave.
+- 2026-03-12: Completed. Broadened projection replay to defended shell/hole/cut/union sources, routed `Sketch.onFace(shape, name)` through compile-owned propagated face tables before heuristic fallback, added explicit outside-subset diagnostics, and landed compiler/BREP/corpus/docs coverage for the expanded slice.

@@ -211,19 +211,21 @@ Current progress:
 - supported boolean unions now also preserve owner-scoped canonical face queries from repeated descendants, and compiler regressions cover both explicit duplicate-owner merge ambiguity and later boolean chains that inherit those propagated queries
 - exact export regression coverage now includes a repeated-feature part where a mirrored descendant drives a downstream workplane feature inside a boolean chain
 - `projectToPlane()` sketches now keep an explicit projection node in the compiler graph instead of collapsing immediately to anonymous runtime geometry
-- the supported exact subset can replay projection-driven follow-on features when the source is a straight placed extrusion and the target plane stays parallel to that captured workplane placement
+- compile-covered `Sketch.onFace(shape, name)` resolution now prefers the defended face-query table on `Shape` targets, so supported boolean-preserved names and explicit repeated-descendant `FaceRef`s stay visible to later features instead of falling back to anonymous canonical heuristics
+- the supported exact subset can now replay projection-driven follow-on features when the source reduces to one defended planar projection basis: placed straight extrusions, compatible shell/hole/cut descendants, and boolean unions of compatible projected operands all stay aligned on matching parallel target planes
 
 Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings, while defended named created faces currently cover the exact profile families Forge can model directly (`rect`, `roundedRect`, `circle`)
 - `shape.hole()` still only covers circular holes, and `shape.cutout()` still only covers sketches already placed with `onFace(...)`
+- `shape.hole()` still only covers circular holes, and `shape.cutout()` still only covers sketches already placed with `onFace(...)`
 - `filletEdge()` / `chamferEdge()` v1 cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies plus preserved propagated sibling edges through supported edge-finish and boolean-union chains, but the selected rewritten edge itself still becomes an explicit merged-edge ambiguity
 - drafted cuts, two-sided extents, combined counterbore+countersink heads, threaded holes, and broader durable identity beyond today's defended shell/hole/cut created-face subset are still missing
 - `upToFace` currently requires a planar termination face parallel to the feature direction, and reusing that stop plane through later split results should use a saved `FaceRef` instead of re-querying the rewritten face name
-- boolean/pattern propagation currently defends owner-scoped canonical face lineage through supported unions, but post-merge durable face identity and post-difference/intersection face targets are still explicit ambiguity cases rather than one defended face
+- boolean/pattern propagation currently defends owner-scoped canonical face lineage through supported unions, but post-merge durable face identity and post-difference/intersection face targets are still explicit ambiguity cases rather than one defended face name
 - repeated-feature ownership currently tracks repeated bodies and mirrored descendants, not durable per-face identity after merged pattern topology changes
-- shell, hole/cut, tracked-edge finishing, and repeated-feature workflows now preserve parent-body ownership lineage, but stable downstream face/edge ownership after topology-changing edits is still not solved, which is why broader projection-driven edits and richer fillet/chamfer workflows remain harder next layers
-- projection replay still only covers the parallel-workplane subset; richer projection-driven edits remain outside the exact subset today
+- shell, hole/cut, tracked-edge finishing, and repeated-feature workflows now preserve parent-body ownership lineage, but stable downstream face/edge ownership after topology-changing edits is still not solved, which is why richer boolean-difference/intersection targets and broader fillet/chamfer workflows remain harder next layers
+- projection replay still rejects boolean difference/intersection sources, trim/fillet/chamfer silhouette changes, and non-parallel projection bases with explicit compiler diagnostics instead of silently pretending those paths are exact-safe
 
 ### Phase 4: Higher-Order Workflows
 

@@ -45,6 +45,13 @@ Guards:
 - `upToFace` hole/cut extents lowering through both Manifold and CadQuery/OCCT from the shared feature family
 - defended created-face/query semantics staying inspectable after multiple richer hole rewrites
 
+### `projection-relay-cover.forge.js`
+
+Guards:
+- `projectToPlane()` replay after a repeated top-edge boss chain has already been merged through a supported union
+- projection-driven downstream lips staying exact-exportable instead of collapsing back to runtime-only geometry
+- downstream placement still using defended face-query lineage from the base plate instead of anonymous heuristics
+
 ### `trimmed-access-cover.forge.js`
 
 Guards:

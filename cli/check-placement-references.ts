@@ -15,6 +15,7 @@ import {
   getShapeTopologyRewritePropagations,
   getShapeWorkplanePlacement,
   initKernel,
+  sphere,
   union,
 } from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
@@ -225,6 +226,33 @@ function checkDirectFaceRefWorkplaneRecording(): void {
     placement!.workplane.source.owner?.id === getShapePrimaryQueryOwner(target.toShape())?.id,
     'direct face-ref workplane source should preserve the parent body owner',
   );
+}
+
+function checkBooleanFacePlacementResolution(): void {
+  const plate = roundedRect(40, 24, 3, true).extrude(10).toShape();
+  const cover = union(
+    plate,
+    sphere(4).translate(0, 0, 11),
+  );
+
+  const topFace = cover.face('top');
+  expect(topFace.query?.kind === 'propagated-face', 'supported boolean-preserved top faces should resolve to propagated-face queries');
+  if (topFace.query?.kind === 'propagated-face') {
+    expect(topFace.query.source.kind === 'canonical-face', 'boolean-preserved top faces should point back to canonical-face lineage');
+    expect(topFace.query.source.face === 'top', `expected propagated top face source "top", got "${topFace.query.source.face}"`);
+  }
+
+  const sketch = rect(6, 4).onFace(cover, 'top', {
+    u: 3,
+    v: -2,
+    protrude: 0.25,
+    selfAnchor: 'center',
+  });
+  const placement = getSketchPlacementModel(sketch);
+  expect(placement != null, 'compile-covered boolean results should resolve named preserved faces for Sketch.onFace()');
+  expect(placement!.workplane.source.kind === 'propagated-face', 'Sketch.onFace(booleanResult, "top") should preserve propagated face provenance');
+  expectVec(placement!.workplane.origin, topFace.center, 'boolean.onFace.origin');
+  expectVec(placement!.workplane.normal, topFace.normal, 'boolean.onFace.normal');
 }
 
 function checkTrackedEdgeQueryPropagation(): void {
@@ -656,6 +684,31 @@ function checkRepeatedFeatureOwnershipPropagation(): void {
   expect(slotOwners.some((owner) => owner.id === slotOwner!.id), 'patterned result should retain the seed feature lineage');
 }
 
+function checkRepeatedBooleanTargetFaceQuerySupport(): void {
+  const base = roundedRect(64, 42, 4, true).extrude(12);
+  const boss = roundedRect(14, 10, 2, true)
+    .onFace(base, 'top', { u: 16, v: 10, protrude: 0.5, selfAnchor: 'center' })
+    .extrude(6);
+  const mirroredBoss = boss.toShape().mirror([1, 0, 0]);
+  const mirroredOwner = getShapePrimaryQueryOwner(mirroredBoss);
+  expect(mirroredOwner != null, 'mirrored descendant should expose a repeated-result owner');
+
+  const body = union(base.toShape(), mirroredBoss);
+  const drilled = body.hole(mirroredBoss.face('top'), {
+    diameter: 3,
+    u: 0,
+    v: 0,
+    depth: 4,
+  });
+  const placement = getShapeWorkplanePlacement(drilled);
+  expect(placement != null, 'boolean targets should accept defended face queries from repeated descendants');
+  expect(placement!.placement.workplane.source.kind === 'face-ref', 'direct repeated-descendant face targets should preserve a face-ref workplane source');
+  expect(
+    placement!.placement.workplane.source.owner?.id === mirroredOwner!.id,
+    'boolean-target downstream features should keep the repeated descendant owner lineage on direct face refs',
+  );
+}
+
 function checkBooleanAndRepeatedQueryPropagation(): void {
   const seed = roundedRect(16, 12, 2, true).extrude(10).toShape();
   const seedOwner = getShapePrimaryQueryOwner(seed);
@@ -719,6 +772,20 @@ function checkBooleanAndRepeatedQueryPropagation(): void {
   expect(
     trimmedPropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'boolean-difference-face-split-ambiguous'),
     'later boolean differences should emit explicit split-face ambiguity diagnostics for preserved descendants',
+  );
+}
+
+function checkBooleanTargetAmbiguityDiagnostics(): void {
+  const base = roundedRect(52, 34, 4, true).extrude(14);
+  const topFace = base.face('top');
+  const carved = base.toShape().subtract(
+    box(20, 12, 24, true).translate(0, 0, 6),
+  );
+
+  expectThrows(
+    () => carved.hole(topFace, { diameter: 4, depth: 4 }),
+    /ambiguous|defended named-face subset|defended face subset/i,
+    'boolean-difference.face-query',
   );
 }
 
@@ -907,6 +974,7 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkCanonicalFaceWorkplaneRecording();
   checkTrackedFaceWorkplaneRecording();
   checkDirectFaceRefWorkplaneRecording();
+  checkBooleanFacePlacementResolution();
   checkTrackedEdgeQueryPropagation();
   checkShapeWorkplanePlacementPropagation();
   checkShapeQueryOwnerPropagation();
@@ -914,7 +982,9 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkRicherHoleCutVariants();
   checkEdgeFinishOwnerPropagation();
   checkRepeatedFeatureOwnershipPropagation();
+  checkRepeatedBooleanTargetFaceQuerySupport();
   checkBooleanAndRepeatedQueryPropagation();
+  checkBooleanTargetAmbiguityDiagnostics();
   checkTopologyRewritePropagationInspection();
   console.log('✓ Placement reference invariants passed');
 }
