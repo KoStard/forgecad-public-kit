@@ -48,3 +48,4 @@ Can start immediately after task 160. Safe to run in parallel with:
 
 ## Status and log
 - 2026-03-12: Created as the quality/support lane for the next compiler wave.
+- 2026-03-12: Completed. Added a dedicated `forgecad check query-propagation` snapshot runner with focused rewrite/query expectations, expanded the corpus with `trimmed-access-cover.forge.js`, documented the guarded propagation scenarios, and kept the new snapshots deterministic and reviewable.

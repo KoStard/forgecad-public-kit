@@ -1,9 +1,10 @@
 # Compiler Regression Corpus
 
-These parts are the curated multi-feature corpus behind `forgecad check compiler`
-and the exact-export invariants. They are intentionally ordinary mechanical parts
-instead of isolated geometry tricks, so lowerer regressions show up in workflows
-that look like real product-design code.
+These parts are the curated multi-feature corpus behind `forgecad check compiler`,
+the focused `forgecad check query-propagation` snapshots, and the exact-export
+invariants. They are intentionally ordinary mechanical parts instead of isolated
+geometry tricks, so lowerer regressions show up in workflows that look like real
+product-design code.
 
 Each file is deterministic: no randomness, no params, one named solid result.
 
@@ -36,3 +37,10 @@ Guards:
 - tracked-edge `filletEdge()` lowering on the supported vertical-edge subset
 - downstream `hole()` / `cutout()` edits that still target the original tracked body owner after edge finishing
 - ordinary add/subtract edits staying exact-exportable after the edge-finish feature node lands
+
+### `trimmed-access-cover.forge.js`
+
+Guards:
+- `trimByPlane()` exposing the defended `plane-cap` created-face query inside a normal cover-style workflow
+- earlier `hole()` / `cutout()` rewrites still surfacing explicit split-face ambiguity and unsupported created-edge diagnostics
+- later union edits staying reviewable after the trim-created face lands

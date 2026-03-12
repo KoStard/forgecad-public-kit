@@ -405,6 +405,30 @@ This check also fails if:
 - export manifests drift away from the per-object compiler routing decisions
 - exact/faceted support claims stop matching the lowered artifacts and diagnostics
 
+### Query Propagation Snapshot Check
+
+```bash
+forgecad check query-propagation
+forgecad check query-propagation --case hull-runtime-boundary
+forgecad check query-propagation --update
+```
+
+Runs focused topology-rewrite query-propagation snapshots without dumping the
+entire compiler scene. This keeps supported, ambiguous, and intentionally
+unsupported rewrite semantics reviewable as the propagation layer evolves.
+
+Each snapshot records:
+- the propagated shape objects that actually carry topology-rewrite metadata
+- exact versus faceted routing outcomes for those objects
+- deterministic rewrite-operation ordering
+- preserved and created query summaries
+- explicit ambiguity/unsupported diagnostic codes
+
+This check also fails if:
+- a defended propagation case loses the expected preserved or created query shape
+- a known unsupported rewrite stops reporting its explicit diagnostic boundary
+- a multi-feature corpus part stops surfacing the expected rewrite ordering
+
 ### Invariant Test Suite
 
 ```bash
@@ -412,6 +436,8 @@ forgecad check suite
 npm test
 npm run test:compiler
 npm run test:compiler:update
+npm run test:query-propagation
+npm run test:query-propagation:update
 ```
 
 ForgeCAD's current unit-test surface is assertion-based CLI checks, not a separate Vitest/Jest harness.
@@ -420,6 +446,8 @@ The important entrypoints are:
 - `npm test` runs the repo invariant suite (`transforms`, `dimensions`, `placement`, `js-modules`, `brep`, `compiler`, `api`)
 - `npm run test:compiler` runs just the compiler snapshot/invariant suite
 - `npm run test:compiler:update` refreshes committed compiler snapshots after an intentional change
+- `npm run test:query-propagation` runs the focused topology-rewrite query-propagation snapshots
+- `npm run test:query-propagation:update` refreshes those query-propagation snapshots after an intentional change
 - `forgecad check suite` is the CLI equivalent of the invariant suite runner
 
 ### Dimension Propagation Invariant Check

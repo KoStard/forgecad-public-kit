@@ -166,6 +166,7 @@ Current progress:
 - that shared propagation contract now models propagated face/edge queries, feature-created query slots, and explicit ambiguity/unsupported diagnostics on rewrite-producing results
 - trim/split-by-plane now use that contract to expose the first defended created-face slice (`plane-cap`), while hole/cut host-face splits and fillet/chamfer edge merges are recorded explicitly as ambiguous preserved-query outcomes instead of silent fallbacks
 - `src/forge/kernel.ts` and the compiler inspection surface now expose collected topology-rewrite propagation contracts directly, and the placement/compiler invariants assert that those contracts stay inspectable and deterministic through later transforms
+- `forgecad check query-propagation` now snapshots that propagation surface directly, so supported plane-cap created faces, defended merged-edge cases, and explicit unsupported rewrite boundaries stay reviewable without wading through the full compiler-scene baseline
 
 Still missing:
 

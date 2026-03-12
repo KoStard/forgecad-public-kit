@@ -925,5 +925,159 @@
         ]
       }
     ]
+  },
+  {
+    "id": "corpus-trimmed-access-cover",
+    "description": "The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable after earlier boolean, hole, and cut rewrites.",
+    "objects": [
+      {
+        "name": "Trimmed Access Cover",
+        "exactRoute": {
+          "kind": "exact",
+          "target": "cadquery-occt",
+          "diagnosticCodes": []
+        },
+        "facetedRoute": {
+          "kind": "exact",
+          "target": "cadquery-occt",
+          "diagnosticCodes": []
+        },
+        "propagationOps": [
+          "boolean:union",
+          "trimByPlane",
+          "cut",
+          "hole",
+          "boolean:union"
+        ],
+        "propagations": [
+          {
+            "rewriteId": "shape-query-boolean-union-8",
+            "operation": "boolean:union",
+            "owner": "boolean:union:shape-query-boolean-union-8",
+            "preservedFaces": [],
+            "preservedEdges": [],
+            "createdFaces": [],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "boolean-union-face-propagation-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face"
+              },
+              {
+                "code": "boolean-union-edge-propagation-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "edge"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-trimbyplane-6",
+            "operation": "trimByPlane",
+            "owner": "trimByPlane:shape-query-trimbyplane-6",
+            "preservedFaces": [],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(trimByPlane:plane-cap) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "The kept side of the trim introduces one deterministic cap face on the trim plane."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "trim-by-plane-preserved-face-propagation-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face"
+              },
+              {
+                "code": "trim-by-plane-edge-propagation-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "edge"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-5",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-5",
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @cut:shape-query-cut-5",
+                "note": "The selected host face is split by the cut profile, so the surviving descendants are still ambiguous."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "tracked-face(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @cut:shape-query-cut-5"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-hole-4",
+            "operation": "hole",
+            "owner": "hole:shape-query-hole-4",
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- face-ref(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-4",
+                "note": "The selected host face survives only as a split descendant set after the hole lands."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "hole-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-4"
+              },
+              {
+                "code": "hole-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-boolean-union-3",
+            "operation": "boolean:union",
+            "owner": "boolean:union:shape-query-boolean-union-3",
+            "preservedFaces": [],
+            "preservedEdges": [],
+            "createdFaces": [],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "boolean-union-face-propagation-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face"
+              },
+              {
+                "code": "boolean-union-edge-propagation-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "edge"
+              }
+            ]
+          }
+        ]
+      }
+    ]
   }
 ]

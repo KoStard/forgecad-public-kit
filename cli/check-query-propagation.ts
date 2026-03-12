@@ -189,6 +189,10 @@ function compilerCorpusCase(
   return fileCase(part.id, description, part.scriptPath, expectedObjects);
 }
 
+function queryPropagationCorpusPath(fileName: string): string {
+  return resolvePackagePath(import.meta.url, 'examples', 'compiler-corpus', fileName);
+}
+
 const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
   inlineCase(
     'trim-and-split-created-faces',
@@ -378,6 +382,33 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         ],
         requiredPreservedEdgeQueries: [
           'propagated-edge(merged <- tracked-edge(vert-br#edge)',
+        ],
+      },
+    ],
+  ),
+  fileCase(
+    'corpus-trimmed-access-cover',
+    'The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable after earlier boolean, hole, and cut rewrites.',
+    queryPropagationCorpusPath('trimmed-access-cover.forge.js'),
+    [
+      {
+        name: 'Trimmed Access Cover',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['boolean:union', 'trimByPlane', 'cut', 'hole', 'boolean:union'],
+        requiredDiagnosticCodes: [
+          'boolean-union-face-propagation-ambiguous',
+          'trim-by-plane-preserved-face-propagation-ambiguous',
+          'trim-by-plane-edge-propagation-ambiguous',
+          'cut-source-face-split-ambiguous',
+          'cut-created-edge-propagation-unsupported',
+          'hole-source-face-split-ambiguous',
+          'hole-created-edge-propagation-unsupported',
+        ],
+        requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
+        requiredPreservedFaceQueries: [
+          'propagated-face(split <- tracked-face(top)',
+          'propagated-face(split <- face-ref(top)',
         ],
       },
     ],
