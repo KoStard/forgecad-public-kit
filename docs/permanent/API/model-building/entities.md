@@ -205,7 +205,7 @@ const half = box(50, 30, 10);
 const full = mirrorCopy(half, [1, 0, 0]);  // Mirror across YZ plane
 ```
 
-For compile-covered source shapes, repeated instances created by `linearPattern`, `circularPattern`, `Shape.mirror()`, and `mirrorCopy()` keep distinct compiler owner lineage. The returned union is still a merged body, so patterned descendants do not yet expose durable per-face references after topology changes.
+For compile-covered source shapes, repeated instances created by `linearPattern`, `circularPattern`, `Shape.mirror()`, and `mirrorCopy()` keep distinct compiler owner lineage. Supported boolean unions now preserve owner-scoped canonical face queries for those repeated descendants, so later compiler inspections can still trace which repeated instance a preserved face came from. Durable post-merge face identity is still narrower than full CAD-style topology naming: reusing the same owner lineage twice without a fresh mirror/pattern owner is reported as ambiguous, and downstream subtract/intersect rewrites still record split descendants explicitly instead of guessing.
 
 ## Utility Functions
 

@@ -300,38 +300,46 @@
           "boolean:difference",
           "cut",
           "hole",
+          "fillet",
           "fillet"
         ],
         "propagations": [
           {
-            "rewriteId": "shape-query-boolean-difference-6",
+            "rewriteId": "shape-query-boolean-difference-7",
             "operation": "boolean:difference",
-            "owner": "boolean:difference:shape-query-boolean-difference-6",
-            "preservedFaces": [],
+            "owner": "boolean:difference:shape-query-boolean-difference-7",
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @cut:shape-query-cut-5) @boolean:difference:shape-query-boolean-difference-7"
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-difference-face-propagation-ambiguous",
+                "code": "boolean-difference-face-split-ambiguous",
                 "category": "ambiguous",
-                "queryKind": "face"
+                "queryKind": "face",
+                "source": "propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @cut:shape-query-cut-5",
+                "query": "propagated-face(split <- propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @cut:shape-query-cut-5) @boolean:difference:shape-query-boolean-difference-7"
               },
               {
-                "code": "boolean-difference-edge-propagation-ambiguous",
-                "category": "ambiguous",
+                "code": "boolean-difference-edge-propagation-unsupported",
+                "category": "unsupported",
                 "queryKind": "edge"
               }
             ]
           },
           {
-            "rewriteId": "shape-query-cut-4",
+            "rewriteId": "shape-query-cut-5",
             "operation": "cut",
-            "owner": "cut:shape-query-cut-4",
+            "owner": "cut:shape-query-cut-5",
             "preservedFaces": [
               {
                 "status": "ambiguous",
-                "query": "propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @cut:shape-query-cut-4",
+                "query": "propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @cut:shape-query-cut-5",
                 "note": "The selected host face is split by the cut profile, so the surviving descendants are still ambiguous."
               }
             ],
@@ -344,7 +352,7 @@
                 "category": "ambiguous",
                 "queryKind": "face",
                 "source": "tracked-face(top) @primitive:box:shape-query-primitive-box-1",
-                "query": "propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @cut:shape-query-cut-4"
+                "query": "propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @cut:shape-query-cut-5"
               },
               {
                 "code": "cut-created-edge-propagation-unsupported",
@@ -354,13 +362,13 @@
             ]
           },
           {
-            "rewriteId": "shape-query-hole-3",
+            "rewriteId": "shape-query-hole-4",
             "operation": "hole",
-            "owner": "hole:shape-query-hole-3",
+            "owner": "hole:shape-query-hole-4",
             "preservedFaces": [
               {
                 "status": "ambiguous",
-                "query": "propagated-face(split <- face-ref(top) @primitive:box:shape-query-primitive-box-1) @hole:shape-query-hole-3",
+                "query": "propagated-face(split <- face-ref(top) @primitive:box:shape-query-primitive-box-1) @hole:shape-query-hole-4",
                 "note": "The selected host face survives only as a split descendant set after the hole lands."
               }
             ],
@@ -373,7 +381,7 @@
                 "category": "ambiguous",
                 "queryKind": "face",
                 "source": "face-ref(top) @primitive:box:shape-query-primitive-box-1",
-                "query": "propagated-face(split <- face-ref(top) @primitive:box:shape-query-primitive-box-1) @hole:shape-query-hole-3"
+                "query": "propagated-face(split <- face-ref(top) @primitive:box:shape-query-primitive-box-1) @hole:shape-query-hole-4"
               },
               {
                 "code": "hole-created-edge-propagation-unsupported",
@@ -383,11 +391,65 @@
             ]
           },
           {
+            "rewriteId": "shape-query-fillet-3",
+            "operation": "fillet",
+            "owner": "fillet:shape-query-fillet-3",
+            "preservedFaces": [],
+            "preservedEdges": [
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3",
+                "note": "fillet leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3",
+                "note": "fillet leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-edge(merged <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3",
+                "note": "fillet rewrites the selected edge into a blended descendant set rather than one defended edge target."
+              }
+            ],
+            "createdFaces": [],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "fillet-selected-edge-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "edge",
+                "source": "tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1",
+                "query": "propagated-edge(merged <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3"
+              },
+              {
+                "code": "fillet-created-face-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "face"
+              }
+            ]
+          },
+          {
             "rewriteId": "shape-query-fillet-2",
             "operation": "fillet",
             "owner": "fillet:shape-query-fillet-2",
             "preservedFaces": [],
             "preservedEdges": [
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-2",
+                "note": "fillet leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-2",
+                "note": "fillet leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-2",
+                "note": "fillet leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
               {
                 "status": "ambiguous",
                 "query": "propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-2",
@@ -434,17 +496,18 @@
         "propagationOps": [
           "hole",
           "boolean:union",
+          "chamfer",
           "chamfer"
         ],
         "propagations": [
           {
-            "rewriteId": "shape-query-hole-5",
+            "rewriteId": "shape-query-hole-6",
             "operation": "hole",
-            "owner": "hole:shape-query-hole-5",
+            "owner": "hole:shape-query-hole-6",
             "preservedFaces": [
               {
                 "status": "ambiguous",
-                "query": "propagated-face(split <- face-ref(top) @primitive:box:shape-query-primitive-box-1) @hole:shape-query-hole-5",
+                "query": "propagated-face(split <- face-ref(top) @primitive:box:shape-query-primitive-box-1) @hole:shape-query-hole-6",
                 "note": "The selected host face survives only as a split descendant set after the hole lands."
               }
             ],
@@ -457,7 +520,7 @@
                 "category": "ambiguous",
                 "queryKind": "face",
                 "source": "face-ref(top) @primitive:box:shape-query-primitive-box-1",
-                "query": "propagated-face(split <- face-ref(top) @primitive:box:shape-query-primitive-box-1) @hole:shape-query-hole-5"
+                "query": "propagated-face(split <- face-ref(top) @primitive:box:shape-query-primitive-box-1) @hole:shape-query-hole-6"
               },
               {
                 "code": "hole-created-edge-propagation-unsupported",
@@ -467,23 +530,97 @@
             ]
           },
           {
-            "rewriteId": "shape-query-boolean-union-4",
+            "rewriteId": "shape-query-boolean-union-5",
             "operation": "boolean:union",
-            "owner": "boolean:union:shape-query-boolean-union-4",
-            "preservedFaces": [],
-            "preservedEdges": [],
+            "owner": "boolean:union:shape-query-boolean-union-5",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5"
+              }
+            ],
+            "preservedEdges": [
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-4#edge) @boolean:union:shape-query-boolean-union-5"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-4#edge) @boolean:union:shape-query-boolean-union-5"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-edge(preserved <- propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-4#edge) @boolean:union:shape-query-boolean-union-5"
+              }
+            ],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-union-face-propagation-ambiguous",
+                "code": "boolean-union-edge-inherited-ambiguity",
                 "category": "ambiguous",
-                "queryKind": "face"
+                "queryKind": "edge",
+                "source": "propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-4",
+                "query": "propagated-edge(preserved <- propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-4#edge) @boolean:union:shape-query-boolean-union-5"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-chamfer-4",
+            "operation": "chamfer",
+            "owner": "chamfer:shape-query-chamfer-4",
+            "preservedFaces": [],
+            "preservedEdges": [
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-4",
+                "note": "chamfer leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
               },
               {
-                "code": "boolean-union-edge-propagation-ambiguous",
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-4",
+                "note": "chamfer leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-4",
+                "note": "chamfer rewrites the selected edge into a blended descendant set rather than one defended edge target."
+              }
+            ],
+            "createdFaces": [],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "chamfer-selected-edge-merged-ambiguous",
                 "category": "ambiguous",
-                "queryKind": "edge"
+                "queryKind": "edge",
+                "source": "tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1",
+                "query": "propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-4"
+              },
+              {
+                "code": "chamfer-created-face-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "face"
               }
             ]
           },
@@ -493,6 +630,21 @@
             "owner": "chamfer:shape-query-chamfer-3",
             "preservedFaces": [],
             "preservedEdges": [
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3",
+                "note": "chamfer leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3",
+                "note": "chamfer leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3",
+                "note": "chamfer leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
               {
                 "status": "ambiguous",
                 "query": "propagated-edge(merged <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3",
@@ -643,19 +795,147 @@
             "rewriteId": "shape-query-boolean-difference-12",
             "operation": "boolean:difference",
             "owner": "boolean:difference:shape-query-boolean-difference-12",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-difference-face-propagation-ambiguous",
+                "code": "boolean-difference-face-split-ambiguous",
                 "category": "ambiguous",
-                "queryKind": "face"
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
               },
               {
-                "code": "boolean-difference-edge-propagation-ambiguous",
+                "code": "boolean-difference-face-split-ambiguous",
                 "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12"
+              },
+              {
+                "code": "boolean-difference-edge-propagation-unsupported",
+                "category": "unsupported",
                 "queryKind": "edge"
               }
             ]
@@ -664,19 +944,147 @@
             "rewriteId": "shape-query-boolean-difference-11",
             "operation": "boolean:difference",
             "owner": "boolean:difference:shape-query-boolean-difference-11",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-difference-face-propagation-ambiguous",
+                "code": "boolean-difference-face-split-ambiguous",
                 "category": "ambiguous",
-                "queryKind": "face"
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
               },
               {
-                "code": "boolean-difference-edge-propagation-ambiguous",
+                "code": "boolean-difference-face-split-ambiguous",
                 "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11"
+              },
+              {
+                "code": "boolean-difference-edge-propagation-unsupported",
+                "category": "unsupported",
                 "queryKind": "edge"
               }
             ]
@@ -685,19 +1093,147 @@
             "rewriteId": "shape-query-boolean-union-10",
             "operation": "boolean:union",
             "owner": "boolean:union:shape-query-boolean-union-10",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-union-face-propagation-ambiguous",
+                "code": "boolean-union-face-inherited-ambiguity",
                 "category": "ambiguous",
-                "queryKind": "face"
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
               },
               {
-                "code": "boolean-union-edge-propagation-ambiguous",
+                "code": "boolean-union-face-inherited-ambiguity",
                 "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9",
+                "query": "propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10"
+              },
+              {
+                "code": "boolean-union-edge-propagation-unsupported",
+                "category": "unsupported",
                 "queryKind": "edge"
               }
             ]
@@ -727,19 +1263,147 @@
             "rewriteId": "shape-query-boolean-union-9",
             "operation": "boolean:union",
             "owner": "boolean:union:shape-query-boolean-union-9",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-union-face-propagation-ambiguous",
+                "code": "boolean-union-face-merged-ambiguous",
                 "category": "ambiguous",
-                "queryKind": "face"
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
               },
               {
-                "code": "boolean-union-edge-propagation-ambiguous",
+                "code": "boolean-union-face-merged-ambiguous",
                 "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-face-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-face-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-face-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-face-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-face-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-face-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-face-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-face-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-face-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-face-merged-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7",
+                "query": "propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9"
+              },
+              {
+                "code": "boolean-union-edge-propagation-unsupported",
+                "category": "unsupported",
                 "queryKind": "edge"
               }
             ]
@@ -748,19 +1412,63 @@
             "rewriteId": "shape-query-boolean-union-7",
             "operation": "boolean:union",
             "owner": "boolean:union:shape-query-boolean-union-7",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7"
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-union-face-propagation-ambiguous",
-                "category": "ambiguous",
-                "queryKind": "face"
-              },
-              {
-                "code": "boolean-union-edge-propagation-ambiguous",
-                "category": "ambiguous",
+                "code": "boolean-union-edge-propagation-unsupported",
+                "category": "unsupported",
                 "queryKind": "edge"
               }
             ]
@@ -797,19 +1505,26 @@
             "rewriteId": "shape-query-boolean-difference-8",
             "operation": "boolean:difference",
             "owner": "boolean:difference:shape-query-boolean-difference-8",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @cut:shape-query-cut-6) @boolean:difference:shape-query-boolean-difference-8"
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-difference-face-propagation-ambiguous",
+                "code": "boolean-difference-face-split-ambiguous",
                 "category": "ambiguous",
-                "queryKind": "face"
+                "queryKind": "face",
+                "source": "propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @cut:shape-query-cut-6",
+                "query": "propagated-face(split <- propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @cut:shape-query-cut-6) @boolean:difference:shape-query-boolean-difference-8"
               },
               {
-                "code": "boolean-difference-edge-propagation-ambiguous",
-                "category": "ambiguous",
+                "code": "boolean-difference-edge-propagation-unsupported",
+                "category": "unsupported",
                 "queryKind": "edge"
               }
             ]
@@ -876,20 +1591,59 @@
             "rewriteId": "shape-query-boolean-union-4",
             "operation": "boolean:union",
             "owner": "boolean:union:shape-query-boolean-union-4",
-            "preservedFaces": [],
-            "preservedEdges": [],
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4"
+              }
+            ],
+            "preservedEdges": [
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-edge(preserved <- propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4"
+              }
+            ],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-union-face-propagation-ambiguous",
+                "code": "boolean-union-edge-inherited-ambiguity",
                 "category": "ambiguous",
-                "queryKind": "face"
-              },
-              {
-                "code": "boolean-union-edge-propagation-ambiguous",
-                "category": "ambiguous",
-                "queryKind": "edge"
+                "queryKind": "edge",
+                "source": "propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3",
+                "query": "propagated-edge(preserved <- propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4"
               }
             ]
           },
@@ -899,6 +1653,21 @@
             "owner": "fillet:shape-query-fillet-3",
             "preservedFaces": [],
             "preservedEdges": [
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3",
+                "note": "fillet leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3",
+                "note": "fillet leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-edge(preserved <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3",
+                "note": "fillet leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset."
+              },
               {
                 "status": "ambiguous",
                 "query": "propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3",
@@ -954,19 +1723,43 @@
             "rewriteId": "shape-query-boolean-union-8",
             "operation": "boolean:union",
             "owner": "boolean:union:shape-query-boolean-union-8",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(trimByPlane:plane-cap) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8"
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-union-face-propagation-ambiguous",
-                "category": "ambiguous",
-                "queryKind": "face"
-              },
-              {
-                "code": "boolean-union-edge-propagation-ambiguous",
-                "category": "ambiguous",
+                "code": "boolean-union-edge-propagation-unsupported",
+                "category": "unsupported",
                 "queryKind": "edge"
               }
             ]
@@ -1059,19 +1852,63 @@
             "rewriteId": "shape-query-boolean-union-3",
             "operation": "boolean:union",
             "owner": "boolean:union:shape-query-boolean-union-3",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3"
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [],
             "createdEdges": [],
             "diagnostics": [
               {
-                "code": "boolean-union-face-propagation-ambiguous",
-                "category": "ambiguous",
-                "queryKind": "face"
-              },
-              {
-                "code": "boolean-union-edge-propagation-ambiguous",
-                "category": "ambiguous",
+                "code": "boolean-union-edge-propagation-unsupported",
+                "category": "unsupported",
                 "queryKind": "edge"
               }
             ]

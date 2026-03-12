@@ -203,6 +203,33 @@ return [{ name: 'Repeated Feature Plate', shape: body }];
 `,
   ),
   inlineCase(
+    'boolean-pattern-query-propagation',
+    'Boolean propagation keeps repeated-result descendants reviewable through supported unions and reports duplicate-owner merges explicitly.',
+    `
+const duplicateSeed = roundedRect(16, 12, 2, true).extrude(10).toShape();
+const duplicateUnion = union(
+  duplicateSeed,
+  duplicateSeed.clone().translate(28, 0, 0),
+);
+
+const plate = roundedRect(84, 48, 4, true).extrude(12);
+const bossSeed = roundedRect(12, 10, 1.5, true)
+  .onFace(plate, 'top', { u: -24, v: 0, protrude: 0.5, selfAnchor: 'center' })
+  .extrude(8);
+const bosses = linearPattern(bossSeed, 3, 24, 0, 0);
+const bossPlate = union(plate, bosses);
+const trimmedBossPlate = bossPlate.subtract(
+  box(18, 10, 24, true).translate(0, 0, 8),
+);
+
+return [
+  { name: 'Duplicate Owner Union', shape: duplicateUnion },
+  { name: 'Pattern Bosses', shape: bosses },
+  { name: 'Trimmed Boss Plate', shape: trimmedBossPlate },
+];
+`,
+  ),
+  inlineCase(
     'sketch-on-face-placement',
     'Downstream features keep semantic workplane placement intent in the compile graph and propagate it through later shape transforms.',
     `
@@ -401,6 +428,7 @@ function assertPropagationQueryShape(
   queryKind: 'face' | 'edge',
   query: unknown,
   issues: string[],
+  enforceRewriteId = true,
 ): void {
   if (!query || typeof query !== 'object') {
     issues.push(`${snapshotId}/${objectName}: ${label} is missing a query object`);
@@ -416,7 +444,8 @@ function assertPropagationQueryShape(
     issues.push(`${snapshotId}/${objectName}: ${label} should carry an edge-query ref, got ${String(candidate.kind)}`);
     return;
   }
-  if ((candidate.kind === 'propagated-face' || candidate.kind === 'created-face' || candidate.kind === 'propagated-edge' || candidate.kind === 'created-edge')
+  if (enforceRewriteId
+    && (candidate.kind === 'propagated-face' || candidate.kind === 'created-face' || candidate.kind === 'propagated-edge' || candidate.kind === 'created-edge')
     && candidate.rewriteId !== rewriteId) {
     issues.push(
       `${snapshotId}/${objectName}: ${label} rewriteId ${String(candidate.rewriteId)} does not match parent propagation ${rewriteId}`,
@@ -627,6 +656,7 @@ function assertTopologyRewritePropagationIntegrity(snapshots: CompilerCaseSnapsh
               diagnostic.queryKind,
               diagnostic.source,
               issues,
+              false,
             );
           }
           if (diagnostic.query) {
