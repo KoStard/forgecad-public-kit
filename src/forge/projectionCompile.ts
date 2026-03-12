@@ -64,6 +64,8 @@ function unwrapStraightExtrudeProfile(plan: ShapeCompilePlan | null): ProfileCom
     case 'shell':
     case 'hole':
     case 'cut':
+    case 'fillet':
+    case 'chamfer':
     case 'revolve':
     case 'loft':
     case 'sweep':

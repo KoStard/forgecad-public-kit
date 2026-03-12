@@ -172,6 +172,14 @@ def vec3_normalize(vec: tuple[float, float, float]) -> tuple[float, float, float
     return (vec[0] / length, vec[1] / length, vec[2] / length)
 
 
+def points_close(
+    lhs: tuple[float, float, float],
+    rhs: tuple[float, float, float],
+    tolerance: float = 1e-5,
+) -> bool:
+    return vec3_length(vec3_sub(lhs, rhs)) <= tolerance
+
+
 def normalize_plane(normal: tuple[float, float, float], origin_offset: float) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
     nx, ny, nz = normal
     length_sq = nx * nx + ny * ny + nz * nz
@@ -403,6 +411,37 @@ def build_swept_profile(
     return cq.Workplane(plane).placeSketch(sketch).sweep(wire, multisection=False).val()
 
 
+def find_resolved_edge(shape: "cq.Shape", selector: Dict[str, Any]) -> "cq.Edge":
+    if selector.get("kind") != "line-segment":
+        raise ValueError(f"Unsupported edge selector kind: {selector.get('kind')}")
+
+    target_start = tuple(float(entry) for entry in selector["start"])
+    target_end = tuple(float(entry) for entry in selector["end"])
+    target_midpoint = tuple(float(entry) for entry in selector["midpoint"])
+
+    matches = []
+    for edge in shape.Edges():
+        if edge.geomType() != "LINE":
+            continue
+        start = tuple(float(entry) for entry in edge.startPoint().toTuple())
+        end = tuple(float(entry) for entry in edge.endPoint().toTuple())
+        midpoint = tuple(float(entry) for entry in edge.positionAt(0.5).toTuple())
+        same_direction = points_close(start, target_start) and points_close(end, target_end)
+        reversed_direction = points_close(start, target_end) and points_close(end, target_start)
+        if (same_direction or reversed_direction) and points_close(midpoint, target_midpoint):
+            matches.append(edge)
+
+    if not matches:
+        raise ValueError(
+            f"Could not resolve line edge {selector.get('edgeName', '(unnamed)')} on the lowered exact shape"
+        )
+    if len(matches) > 1:
+        raise ValueError(
+            f"Resolved line edge {selector.get('edgeName', '(unnamed)')} matched multiple exact edges"
+        )
+    return matches[0]
+
+
 def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
     kind = plan["kind"]
     if kind == "box":
@@ -465,6 +504,18 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
                 continue
             raise ValueError(f"Unsupported transform step: {step['kind']}")
         return result
+    if kind == "fillet":
+        base = build_shape(plan["base"])
+        selector = plan.get("resolvedEdge")
+        if not selector:
+            raise ValueError("Exact fillet plan is missing its resolved edge selector")
+        return base.fillet(float(plan["radius"]), [find_resolved_edge(base, selector)]).clean()
+    if kind == "chamfer":
+        base = build_shape(plan["base"])
+        selector = plan.get("resolvedEdge")
+        if not selector:
+            raise ValueError("Exact chamfer plan is missing its resolved edge selector")
+        return base.chamfer(float(plan["size"]), None, [find_resolved_edge(base, selector)]).clean()
     if kind == "trimByPlane":
         return trim_shape_by_plane(
             build_shape(plan["base"]),

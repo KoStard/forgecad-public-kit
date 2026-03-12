@@ -14,6 +14,7 @@ import { buildBrepExportManifest } from '../src/forge/brepExport';
 import type { CadQueryProfilePlan, CadQueryShapePlan, CadQueryShapeTransformStep } from '../src/forge/cadqueryPlan';
 import { collectProjectFiles } from './collect-files';
 import { COMPILER_REGRESSION_CORPUS, getCompilerRegressionCorpusPart } from './compiler-regression-corpus';
+import { CHAMFER_EDGE_WORKFLOW_CODE, FILLET_EDGE_WORKFLOW_CODE } from './edge-finish-fixtures';
 import { resolvePackagePath } from './package-runtime';
 
 type LoadedProjectScript = {
@@ -125,6 +126,8 @@ function collectProfiles(plan: CadQueryShapePlan): CadQueryProfilePlan[] {
       return plan.shapes.flatMap(collectProfiles);
     case 'transform':
     case 'queryOwner':
+    case 'fillet':
+    case 'chamfer':
     case 'trimByPlane':
       return collectProfiles(plan.base);
   }
@@ -146,6 +149,8 @@ function collectShapeTransforms(plan: CadQueryShapePlan): CadQueryShapeTransform
     case 'transform':
       return [...plan.steps, ...collectShapeTransforms(plan.base)];
     case 'queryOwner':
+    case 'fillet':
+    case 'chamfer':
       return collectShapeTransforms(plan.base);
     case 'trimByPlane':
       return collectShapeTransforms(plan.base);
@@ -166,6 +171,8 @@ function collectShapes(plan: CadQueryShapePlan): CadQueryShapePlan[] {
       return [plan, ...plan.shapes.flatMap(collectShapes)];
     case 'transform':
     case 'queryOwner':
+    case 'fillet':
+    case 'chamfer':
     case 'trimByPlane':
       return [plan, ...collectShapes(plan.base)];
   }
@@ -571,6 +578,52 @@ function checkHoleCutWorkflowExportEndToEnd(): void {
   exportExactManifest(HOLE_CUT_WORKFLOW_CODE);
 }
 
+function checkFilletEdgeWorkflowPlan(): void {
+  const plan = runExactManifest(FILLET_EDGE_WORKFLOW_CODE);
+
+  assert.equal(plan.kind, 'boolean', `Expected fillet workflow exact plan to remain a boolean tree, got ${plan.kind}`);
+  const nodes = collectShapes(plan);
+  const fillet = nodes.find((node) => node.kind === 'fillet');
+  assert(fillet && fillet.kind === 'fillet', 'Expected fillet workflow exact lowering to contain a fillet node');
+  assert.equal(fillet.radius, 6);
+  assert.deepEqual(fillet.quadrant, [-1, -1]);
+  assert(fillet.resolvedEdge, 'Expected fillet exact plan to include a resolved edge selector');
+
+  const transforms = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
+  assert.equal(transforms.length, 2, `Expected two workplane placements after the fillet workflow (pocket + hole), got ${transforms.length}`);
+  assert(
+    transforms.every((step) => step.placement.workplane.source.owner),
+    'Expected downstream fillet workflow placements to retain query-backed owners',
+  );
+}
+
+function checkFilletEdgeWorkflowExportEndToEnd(): void {
+  exportExactManifest(FILLET_EDGE_WORKFLOW_CODE);
+}
+
+function checkChamferEdgeWorkflowPlan(): void {
+  const plan = runExactManifest(CHAMFER_EDGE_WORKFLOW_CODE);
+
+  assert.equal(plan.kind, 'boolean', `Expected chamfer workflow exact plan to remain a boolean tree, got ${plan.kind}`);
+  const nodes = collectShapes(plan);
+  const chamfer = nodes.find((node) => node.kind === 'chamfer');
+  assert(chamfer && chamfer.kind === 'chamfer', 'Expected chamfer workflow exact lowering to contain a chamfer node');
+  assert.equal(chamfer.size, 4);
+  assert.deepEqual(chamfer.quadrant, [1, 1]);
+  assert(chamfer.resolvedEdge, 'Expected chamfer exact plan to include a resolved edge selector');
+
+  const placements = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
+  assert.equal(placements.length, 2, `Expected two workplane placements after the chamfer workflow (rib + hole), got ${placements.length}`);
+  assert(
+    placements.every((step) => step.placement.workplane.source.owner),
+    'Expected downstream chamfer workflow placements to retain query-backed owners',
+  );
+}
+
+function checkChamferEdgeWorkflowExportEndToEnd(): void {
+  exportExactManifest(CHAMFER_EDGE_WORKFLOW_CODE);
+}
+
 function checkCorpusEnclosureShellCutsPlan(): void {
   const part = getCompilerRegressionCorpusPart('corpus-enclosure-shell-cuts');
   const plan = runExactManifestScript(part.scriptPath);
@@ -708,6 +761,24 @@ function checkCorpusSensorBracketPlan(): void {
         step.placement.workplane.source.face === 'right',
     ),
     `Expected ${part.name} exact lowering to preserve right-face feature provenance`,
+  );
+}
+
+function checkCorpusEdgeFinishedMountPlan(): void {
+  const part = getCompilerRegressionCorpusPart('corpus-edge-finished-mount');
+  const plan = runExactManifestScript(part.scriptPath);
+
+  assert.equal(plan.kind, 'boolean', `Expected ${part.name} plan to remain a boolean tree, got ${plan.kind}`);
+  const nodes = collectShapes(plan);
+  const fillet = nodes.find((node) => node.kind === 'fillet');
+  assert(fillet && fillet.kind === 'fillet', `Expected ${part.name} exact lowering to contain a fillet node`);
+  assert.equal(fillet.radius, 6);
+  assert(fillet.resolvedEdge, `Expected ${part.name} exact lowering to carry a resolved fillet edge selector`);
+
+  const placements = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
+  assert(
+    placements.length >= 2,
+    `Expected ${part.name} exact lowering to preserve downstream feature placements after edge finishing`,
   );
 }
 
@@ -966,12 +1037,17 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkShellExportEndToEnd();
   checkHoleCutWorkflowPlan();
   checkHoleCutWorkflowExportEndToEnd();
+  checkFilletEdgeWorkflowPlan();
+  checkFilletEdgeWorkflowExportEndToEnd();
+  checkChamferEdgeWorkflowPlan();
+  checkChamferEdgeWorkflowExportEndToEnd();
   checkCorpusEnclosureShellCutsPlan();
   checkCorpusMotorMountPlatePlan();
   checkRepeatedFeatureOwnershipPlan();
   checkRepeatedFeatureOwnershipExportEndToEnd();
   checkSketchOnFacePlacementPlan();
   checkSketchOnFacePlacementExportEndToEnd();
+  checkCorpusEdgeFinishedMountPlan();
   checkCorpusSensorBracketPlan();
   checkCompilerRegressionCorpusExportEndToEnd();
   checkProjectionDownstreamPlan();

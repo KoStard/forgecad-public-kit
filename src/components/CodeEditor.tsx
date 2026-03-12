@@ -404,8 +404,8 @@ declare function mirrorCopy(shape: Shape, normal: [number, number, number]): Sha
 // --- Fillets & Chamfers ---
 type FilletCornerSpec = { index: number; radius: number; segments?: number };
 declare function filletCorners(points: ([number, number] | Point2D)[], corners: FilletCornerSpec[]): Sketch;
-declare function filletEdge(shape: TrackedShape, edge: any, radius: number, quadrant?: [number, number], segments?: number): TrackedShape;
-declare function chamferEdge(shape: TrackedShape, edge: any, size: number, quadrant?: [number, number]): TrackedShape;
+declare function filletEdge(shape: Shape | TrackedShape, edge: any, radius: number, quadrant?: [number, number], segments?: number): Shape;
+declare function chamferEdge(shape: Shape | TrackedShape, edge: any, size: number, quadrant?: [number, number]): Shape;
 
 // --- Arc Bridge ---
 declare function arcBridgeBetweenRects(rectA: any, rectB: any, segments?: number): Shape;

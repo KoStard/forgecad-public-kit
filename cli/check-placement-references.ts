@@ -7,7 +7,7 @@
 import '../src/forge/holeCut';
 import { getShapePrimaryQueryOwner, getShapeQueryOwners, getShapeWorkplanePlacement, initKernel, box } from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
-import { circle2d, linearPattern, rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
+import { circle2d, filletEdge, linearPattern, rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
 import { getSketchPlacement3D, getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
 import { Transform } from '../src/forge/transform';
 
@@ -376,6 +376,29 @@ function checkHoleCutFeaturePlacement(): void {
   expect(cutPlacement!.placement.selfAnchor === 'center', 'Shape.cutout() should preserve the source sketch anchor');
 }
 
+function checkEdgeFinishOwnerPropagation(): void {
+  const base = rectangle(-32, -20, 64, 40).extrude(20);
+  const baseOwner = getShapePrimaryQueryOwner(base.toShape());
+  expect(baseOwner != null, 'edge-finish base should expose a primary query owner');
+
+  const filleted = filletEdge(base.toShape(), base.edge('vert-br'), 5, [-1, -1]);
+  const filletOwner = getShapePrimaryQueryOwner(filleted);
+  expect(filletOwner != null, 'fillet result should expose a primary query owner');
+  expect(filletOwner!.operation === 'fillet', `expected fillet owner operation "fillet", got ${filletOwner!.operation}`);
+
+  const ownerIds = new Set(getShapeQueryOwners(filleted).map((owner) => owner.id));
+  expect(ownerIds.has(baseOwner!.id), 'fillet result should retain the source body owner lineage');
+  expect(ownerIds.has(filletOwner!.id), 'fillet result should include its own feature owner lineage');
+
+  const drilled = filleted.hole(base.face('top'), { diameter: 5, u: -10, v: 6, depth: 8 });
+  const holePlacement = getShapeWorkplanePlacement(drilled);
+  expect(holePlacement != null, 'downstream hole after edge finishing should preserve semantic workplane placement');
+  expect(
+    holePlacement!.placement.workplane.source.owner?.id === baseOwner!.id,
+    'downstream hole after edge finishing should keep targeting the original base owner lineage',
+  );
+}
+
 function checkRepeatedFeatureOwnershipPropagation(): void {
   const base = roundedRect(72, 44, 4, true).extrude(12);
 
@@ -431,6 +454,7 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkShapeWorkplanePlacementPropagation();
   checkShapeQueryOwnerPropagation();
   checkHoleCutFeaturePlacement();
+  checkEdgeFinishOwnerPropagation();
   checkRepeatedFeatureOwnershipPropagation();
   console.log('✓ Placement reference invariants passed');
 }

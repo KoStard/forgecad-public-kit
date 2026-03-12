@@ -41,6 +41,19 @@ export const COMPILER_REGRESSION_CORPUS: CompilerRegressionCorpusPart[] = [
     objectName: 'Motor Mount Plate',
   },
   {
+    id: 'corpus-edge-finished-mount',
+    name: 'Edge Finished Mount',
+    description:
+      'A filleted mounting block keeps tracked-edge finishing, downstream face-driven edits, and a normal boolean cut chain aligned across both lowerers.',
+    guards: [
+      'tracked-edge fillet intent stays visible to both lowerers instead of collapsing back to mesh-only geometry',
+      'downstream hole/cutout features can still target the original tracked body owner after edge finishing',
+      'ordinary additive/subtractive edits remain exact-exportable after the edge-finish feature lands',
+    ],
+    scriptPath: corpusScriptPath('edge-finished-mount.forge.js'),
+    objectName: 'Edge Finished Mount',
+  },
+  {
     id: 'corpus-sensor-bracket',
     name: 'Sensor Bracket',
     description:

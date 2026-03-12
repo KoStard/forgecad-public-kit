@@ -14,6 +14,8 @@ import { wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './sketch/loftSweepLowering';
 import { Transform } from './transform';
 import { planeFrameToWorldToPlaneMatrix } from './planeFrame';
+import { resolveSupportedEdgeFeatureSelection } from './edgeFeatureResolution';
+import { applyChamferSelectionToManifold, applyFilletSelectionToManifold } from './edgeFeatureRuntime';
 
 function applyProfileCompileTransform(
   crossSection: CrossSection,
@@ -212,6 +214,51 @@ function lowerShapeSweepCompilePlan(
   return wasm.Manifold.levelSet(input.sdf as any, input.bounds, input.edgeLength, 0);
 }
 
+function lowerShapeFilletCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'fillet' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
+  if (!selection.ok) throw new Error(selection.issue.reason);
+  if (
+    selection.selection.quadrant[0] !== plan.quadrant[0]
+    || selection.selection.quadrant[1] !== plan.quadrant[1]
+  ) {
+    throw new Error(
+      `filletEdge() currently supports ${selection.selection.edgeName} only with quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
+    );
+  }
+  return applyFilletSelectionToManifold(
+    lowerShapeCompilePlanToManifold(plan.base, wasm),
+    selection.selection,
+    plan.radius,
+    plan.segments,
+    wasm,
+  );
+}
+
+function lowerShapeChamferCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'chamfer' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
+  if (!selection.ok) throw new Error(selection.issue.reason);
+  if (
+    selection.selection.quadrant[0] !== plan.quadrant[0]
+    || selection.selection.quadrant[1] !== plan.quadrant[1]
+  ) {
+    throw new Error(
+      `chamferEdge() currently supports ${selection.selection.edgeName} only with quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
+    );
+  }
+  return applyChamferSelectionToManifold(
+    lowerShapeCompilePlanToManifold(plan.base, wasm),
+    selection.selection,
+    plan.size,
+    wasm,
+  );
+}
+
 export function lowerShapeCompilePlanToManifold(
   plan: ShapeCompilePlan,
   wasm: ManifoldToplevel,
@@ -258,6 +305,10 @@ export function lowerShapeCompilePlanToManifold(
       return applyShapeCompileTransforms(lowerShapeCompilePlanToManifold(plan.base, wasm), plan.steps);
     case 'queryOwner':
       return lowerShapeCompilePlanToManifold(plan.base, wasm);
+    case 'fillet':
+      return lowerShapeFilletCompilePlan(plan, wasm);
+    case 'chamfer':
+      return lowerShapeChamferCompilePlan(plan, wasm);
     case 'hull':
       return lowerShapeHullCompilePlan(plan, wasm);
     case 'trimByPlane':

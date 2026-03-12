@@ -14,6 +14,7 @@ import { init } from '../src/forge/headless';
 import type { CompilerCaseSnapshot, CompilerInspectionInput } from './compiler-inspection';
 import { COMPILER_REGRESSION_CORPUS } from './compiler-regression-corpus';
 import { inspectCompilerScene, loadCompilerInspectionInput } from './compiler-inspection';
+import { CHAMFER_EDGE_WORKFLOW_CODE, FILLET_EDGE_WORKFLOW_CODE } from './edge-finish-fixtures';
 import { resolvePackagePath } from './package-runtime';
 
 type CompilerCaseDefinition = {
@@ -166,6 +167,16 @@ return [{ name: 'Shell', shape: body }];
     'hole-cut-workflows',
     'Through holes, blind holes, and face-anchored cutouts stay compiler-owned and exact-exportable from one semantic workflow family.',
     HOLE_CUT_WORKFLOW_CODE,
+  ),
+  inlineCase(
+    'fillet-edge-workflow',
+    'A tracked vertical fillet stays compiler-owned and still accepts ordinary downstream face-driven edits on the preserved base-owner lineage.',
+    FILLET_EDGE_WORKFLOW_CODE,
+  ),
+  inlineCase(
+    'chamfer-edge-workflow',
+    'A tracked vertical chamfer lowers through both backends and still composes with normal additive and hole-driven edits.',
+    CHAMFER_EDGE_WORKFLOW_CODE,
   ),
   inlineCase(
     'repeated-feature-ownership',

@@ -29,3 +29,10 @@ Guards:
 - mirrored reinforcement ribs inside a larger bracket union
 - front/side face cuts placed with `onFace()` on an upright wall
 - repeated indicator-hole cutters plus raw mounting bores in the same boolean tree
+
+### `edge-finished-mount.forge.js`
+
+Guards:
+- tracked-edge `filletEdge()` lowering on the supported vertical-edge subset
+- downstream `hole()` / `cutout()` edits that still target the original tracked body owner after edge finishing
+- ordinary add/subtract edits staying exact-exportable after the edge-finish feature node lands

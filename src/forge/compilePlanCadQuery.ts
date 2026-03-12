@@ -11,6 +11,7 @@ import {
   compilerSuccess,
   type CompileLoweringResult,
 } from './compilerDiagnostics';
+import { resolveSupportedEdgeFeatureSelection, selectionToResolvedSelector } from './edgeFeatureResolution';
 
 function segmentedProfileDiagnostic(kind: string, path: string) {
   return compilerDiagnostic(
@@ -58,6 +59,15 @@ function unsupportedShellDiagnostic(path: string, reason: string) {
 }
 
 function unsupportedHoleCutDiagnostic(kind: 'hole' | 'cut', path: string, reason: string) {
+  return compilerDiagnostic(
+    'cadquery-occt',
+    `cadquery-occt-unsupported-${kind}`,
+    path,
+    `CadQuery/OCCT lowering cannot replay Forge ${kind} intent at ${path}: ${reason}`,
+  );
+}
+
+function unsupportedEdgeFeatureDiagnostic(kind: 'fillet' | 'chamfer', path: string, reason: string) {
   return compilerDiagnostic(
     'cadquery-occt',
     `cadquery-occt-unsupported-${kind}`,
@@ -302,6 +312,59 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
     }
     case 'queryOwner':
       return lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
+    case 'fillet': {
+      const base = lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
+      if (!base.ok) return compilerFailure(...base.diagnostics);
+      const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
+      if (!selection.ok) {
+        return compilerFailure(unsupportedEdgeFeatureDiagnostic('fillet', path, selection.issue.reason));
+      }
+      if (
+        selection.selection.quadrant[0] !== plan.quadrant[0]
+        || selection.selection.quadrant[1] !== plan.quadrant[1]
+      ) {
+        return compilerFailure(unsupportedEdgeFeatureDiagnostic(
+          'fillet',
+          path,
+          `supported ${selection.selection.edgeName} queries currently require quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
+        ));
+      }
+      return compilerSuccess({
+        kind: 'fillet',
+        base: base.value,
+        edge: plan.edge,
+        radius: plan.radius,
+        quadrant: [plan.quadrant[0], plan.quadrant[1]],
+        segments: plan.segments,
+        resolvedEdge: selectionToResolvedSelector(selection.selection),
+      }, base.diagnostics);
+    }
+    case 'chamfer': {
+      const base = lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
+      if (!base.ok) return compilerFailure(...base.diagnostics);
+      const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
+      if (!selection.ok) {
+        return compilerFailure(unsupportedEdgeFeatureDiagnostic('chamfer', path, selection.issue.reason));
+      }
+      if (
+        selection.selection.quadrant[0] !== plan.quadrant[0]
+        || selection.selection.quadrant[1] !== plan.quadrant[1]
+      ) {
+        return compilerFailure(unsupportedEdgeFeatureDiagnostic(
+          'chamfer',
+          path,
+          `supported ${selection.selection.edgeName} queries currently require quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
+        ));
+      }
+      return compilerSuccess({
+        kind: 'chamfer',
+        base: base.value,
+        edge: plan.edge,
+        size: plan.size,
+        quadrant: [plan.quadrant[0], plan.quadrant[1]],
+        resolvedEdge: selectionToResolvedSelector(selection.selection),
+      }, base.diagnostics);
+    }
     case 'trimByPlane': {
       const base = lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
       if (!base.ok) return compilerFailure(...base.diagnostics);

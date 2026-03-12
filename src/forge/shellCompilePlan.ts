@@ -194,6 +194,12 @@ function lowerBaseShellPlanToConcretePlan(
         ok: false,
         reason: 'Shape.shell() v1 does not support shelling an already-shelled result yet.',
       };
+    case 'fillet':
+    case 'chamfer':
+      return {
+        ok: false,
+        reason: 'Shape.shell() v1 does not support edge-finished bodies yet.',
+      };
     case 'sphere':
     case 'hole':
     case 'cut':

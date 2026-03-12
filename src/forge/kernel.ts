@@ -84,6 +84,8 @@ export type GeometrySource =
   | 'revolve'
   | 'boolean'
   | 'shell'
+  | 'fillet'
+  | 'chamfer'
   | 'hull'
   | 'level-set'
   | 'loft'

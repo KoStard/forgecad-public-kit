@@ -1,7 +1,9 @@
 import { Transform, type Mat4, type Vec3 } from './transform';
 import type { PlaneFrame } from './planeFrame';
 import {
+  cloneEdgeQueryRef,
   cloneShapeQueryOwner,
+  type EdgeQueryRef,
   type ShapeQueryOwner,
 } from './queryModel';
 import {
@@ -9,6 +11,11 @@ import {
   cloneSketchPlacementModel,
   type ShapeWorkplanePlacement,
 } from './sketch/workplaneModel';
+import {
+  cloneEdgeFeatureResolvedSelector,
+  cloneEdgeFinishQuadrant,
+  type EdgeFeatureResolvedSelector,
+} from './edgeFeatureModel';
 
 export type ProfileCompileTransformStep =
   | { kind: 'translate'; x: number; y: number }
@@ -202,6 +209,23 @@ export type ShapeCompilePlan =
       normalY: number;
       normalZ: number;
       originOffset: number;
+    }
+  | {
+      kind: 'fillet';
+      base: ShapeCompilePlan;
+      edge: EdgeQueryRef;
+      radius: number;
+      quadrant: [number, number];
+      segments: number;
+      resolvedEdge?: EdgeFeatureResolvedSelector;
+    }
+  | {
+      kind: 'chamfer';
+      base: ShapeCompilePlan;
+      edge: EdgeQueryRef;
+      size: number;
+      quadrant: [number, number];
+      resolvedEdge?: EdgeFeatureResolvedSelector;
     };
 
 function cloneProfileTransform(step: ProfileCompileTransformStep): ProfileCompileTransformStep {
@@ -571,6 +595,25 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         normalZ: plan.normalZ,
         originOffset: plan.originOffset,
       };
+    case 'fillet':
+      return {
+        kind: 'fillet',
+        base: cloneShapeCompilePlan(plan.base)!,
+        edge: cloneEdgeQueryRef(plan.edge)!,
+        radius: plan.radius,
+        quadrant: cloneEdgeFinishQuadrant(plan.quadrant)!,
+        segments: plan.segments,
+        resolvedEdge: cloneEdgeFeatureResolvedSelector(plan.resolvedEdge),
+      };
+    case 'chamfer':
+      return {
+        kind: 'chamfer',
+        base: cloneShapeCompilePlan(plan.base)!,
+        edge: cloneEdgeQueryRef(plan.edge)!,
+        size: plan.size,
+        quadrant: cloneEdgeFinishQuadrant(plan.quadrant)!,
+        resolvedEdge: cloneEdgeFeatureResolvedSelector(plan.resolvedEdge),
+      };
   }
 }
 
@@ -655,6 +698,8 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan | null): Shape
     case 'shell':
     case 'hole':
     case 'cut':
+    case 'fillet':
+    case 'chamfer':
     case 'trimByPlane':
       return findShapePrimaryQueryOwner(plan.base);
     case 'box':
@@ -688,6 +733,8 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan | null): ShapeQue
       case 'shell':
       case 'hole':
       case 'cut':
+      case 'fillet':
+      case 'chamfer':
       case 'trimByPlane':
         visit(current.base);
         return;
@@ -736,6 +783,8 @@ export function findShapeWorkplanePlacement(
       return current;
     }
     case 'shell':
+    case 'fillet':
+    case 'chamfer':
       return findShapeWorkplanePlacement(plan.base);
     case 'hole':
     case 'cut':
@@ -819,6 +868,43 @@ export function buildTrimByPlaneShapeCompilePlan(
     normalY: canonicalNumber(normal[1]),
     normalZ: canonicalNumber(normal[2]),
     originOffset: canonicalNumber(originOffset),
+  };
+}
+
+export function buildFilletShapeCompilePlan(
+  base: ShapeCompilePlan | null,
+  edge: EdgeQueryRef | undefined,
+  radius: number,
+  quadrant: [number, number],
+  segments: number,
+): ShapeCompilePlan | null {
+  if (!base || !edge) return null;
+  if (!Number.isFinite(radius) || !(radius > 0)) return null;
+  if (!Number.isFinite(segments) || segments < 2) return null;
+  return {
+    kind: 'fillet',
+    base: cloneShapeCompilePlan(base)!,
+    edge: cloneEdgeQueryRef(edge)!,
+    radius: canonicalNumber(radius),
+    quadrant: cloneEdgeFinishQuadrant(quadrant)!,
+    segments: Math.max(2, Math.round(segments)),
+  };
+}
+
+export function buildChamferShapeCompilePlan(
+  base: ShapeCompilePlan | null,
+  edge: EdgeQueryRef | undefined,
+  size: number,
+  quadrant: [number, number],
+): ShapeCompilePlan | null {
+  if (!base || !edge) return null;
+  if (!Number.isFinite(size) || !(size > 0)) return null;
+  return {
+    kind: 'chamfer',
+    base: cloneShapeCompilePlan(base)!,
+    edge: cloneEdgeQueryRef(edge)!,
+    size: canonicalNumber(size),
+    quadrant: cloneEdgeFinishQuadrant(quadrant)!,
   };
 }
 

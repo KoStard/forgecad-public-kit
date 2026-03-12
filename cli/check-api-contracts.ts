@@ -13,9 +13,11 @@ import {
   difference,
   intersection,
   rect,
+  rectangle,
   circle2d,
   union2d,
   difference2d,
+  filletEdge,
   intersection2d,
   hull2d,
   runScript,
@@ -154,6 +156,20 @@ function checkBooleanErrors(): void {
   );
 }
 
+function checkEdgeFinishSubsetErrors(): void {
+  const base = rectangle(-24, -16, 48, 32).extrude(18);
+  const once = filletEdge(base.toShape(), base.edge('vert-br'), 4, [-1, -1]);
+
+  assert.throws(
+    () => filletEdge(base.toShape(), base.edge('vert-br'), 4, [1, -1]),
+    /filletEdge\(\) currently supports vert-br only with quadrant \[-1, -1\]/,
+  );
+  assert.throws(
+    () => filletEdge(once, base.edge('vert-bl'), 4, [1, -1]),
+    /does not claim durable edge identity after shell\/boolean\/hole\/cut\/edge-finish rewrites/,
+  );
+}
+
 function checkSandboxBindings(): void {
   const okScript = `
 const base = box(40, 40, 10);
@@ -186,6 +202,7 @@ export async function runCheckApiContractsCli(): Promise<void> {
   checkTrackedShapeInterop();
   checkSketchBooleanForms();
   checkBooleanErrors();
+  checkEdgeFinishSubsetErrors();
   checkSandboxBindings();
   console.log('✓ Script API contract invariants passed');
 }
