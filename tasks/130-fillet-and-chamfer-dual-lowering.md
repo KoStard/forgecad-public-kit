@@ -35,4 +35,4 @@ Primary files:
 ## Status and log
 - 2026-03-12: Initially blocked on task 105.
 - 2026-03-12: Re-scoped after multi-agent review. Edge-query groundwork is in, but this task remains blocked on task 125 so the program state and capability claims are cleaned up before the next feature lane starts.
-- 2026-03-12: Not started.
+- 2026-03-12: Next up. Task 125 synced the repo state and capability docs, so this is now the next backend-compiler lane to assign with the constrained tracked-edge subset described above.

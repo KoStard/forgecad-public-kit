@@ -52,7 +52,7 @@ If Forge owns the semantic model:
 - export becomes just another compile target
 - diagnostics become honest
 - tests can compare compiler intent against backend output
-- future features like shell, fillet, chamfer, patterns, and sheet metal have a clean place to land
+- current shell/pattern slices and future families like fillet/chamfer and sheet metal have a clean place to land
 
 ## The Hard Part
 

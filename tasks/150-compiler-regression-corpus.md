@@ -25,4 +25,4 @@ Isolation rule:
 
 ## Status and log
 - 2026-03-12: Ready after task 100.
-- 2026-03-12: Not started.
+- 2026-03-12: Completed. Added the curated `examples/compiler-corpus/` part set, wired those parts into the compiler and exact-export checks, kept the snapshots deterministic/reviewable, and documented what each corpus part is meant to guard.

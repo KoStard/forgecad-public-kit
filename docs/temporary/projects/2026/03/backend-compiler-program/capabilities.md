@@ -24,8 +24,9 @@ Why this matters:
 
 Why it is not fully true today:
 
-- the compiler covers a growing subset, but not the normal full part-design stack yet
-- hole workflows, projection-driven edits, fillet/chamfer, and pattern ownership are still missing or partial
+- the compiler covers a growing but still intentionally bounded subset of the part-design stack
+- hole/cut workflows, projection-driven edits, and repeated mirror/pattern ownership now have first compiler-owned slices, but each is still narrower than the end-state target
+- fillet/chamfer lowering and durable post-topology-change reference stability are still missing
 - OCCT/CadQuery is still broader in export than in ordinary feature coverage
 
 ## Capability 2: Face-Driven Detail Features Without Brittle Attachment
@@ -73,9 +74,9 @@ Target:
 
 Why it is not fully true today:
 
-- `projectToPlane()` exists as a runtime utility, but not as a compiler-owned downstream feature flow
-- projection intent is not yet a first-class semantic node that survives through both backends
-- this makes projection-based design patterns hard to trust and hard to export exactly
+- `projectToPlane()` now keeps explicit projection intent for a narrow compiler-owned downstream subset
+- the supported replay path currently covers follow-on features when the source is a straight placed extrusion and the target plane stays parallel to the source workplane placement
+- richer projection targets, topology-changing sources, and broader downstream projection edits still fall back to runtime-only behavior or explicit diagnostics
 
 ## Capability 5: Edge-Driven Finishing Features
 
@@ -87,22 +88,24 @@ Target:
 
 Why it is not fully true today:
 
-- Forge does not yet have a shared edge-query contract comparable to the new face-query backbone
-- without stable edge lineage, fillet/chamfer will look broader on paper than they are in real parts
+- Forge now has a shared edge-query contract plus tracked-edge selector propagation
+- fillet/chamfer lowering itself is still not landed yet
+- durable edge identity after shell/boolean/hole/cut topology rewrites is still missing, so the finishing subset must stay intentionally narrow
 
 ## Honest Current State
 
 What is already real:
 
 - compiler-owned primitives, booleans, transforms, extrude, revolve, hull, trims/splits, loft/sweep, shell v1
-- dual lowering to Manifold and CadQuery/OCCT for the supported subset
-- centralized compiler routing and regression coverage
-- compiler-owned workplane placement and parent-body face-query provenance
+- hole/cut v1 plus repeated mirror/pattern ownership for the supported subset
+- narrow projection replay for compiler-visible `projectToPlane()` downstream flows
+- shared face and edge query/reference contracts with centralized compiler routing and regression coverage
+- curated multi-feature compiler corpus plus exact-export invariants
 
 What is still impossible or not yet clean:
 
 - a complete ordinary Fusion-style part workflow staying inside compiler coverage end to end
-- exact hole workflows as first-class features
-- projection-driven feature chains with durable semantic ownership
-- reliable edge-driven fillet/chamfer flows
+- counterbores, countersinks, patterned/up-to-face hole-cut variants, and durable feature-created face ownership
+- broad projection-driven feature chains beyond today's parallel-workplane replay slice
+- reliable edge-driven fillet/chamfer flows on durable downstream edge identity
 - claiming "most regular design features" without caveats

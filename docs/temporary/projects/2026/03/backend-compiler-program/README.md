@@ -11,11 +11,10 @@ Read in this order:
 3. `mission-tracker.md` - living implementation tracker
 4. `task-graph.md` - multi-agent task breakdown, dependencies, and execution plan
 
-The deepest completed prerequisite so far is the shared query/reference backbone:
+The landed base for the next feature lane is:
 
-- compiler-owned parent-body owner lineage
-- a shared `FaceQueryRef` contract in `src/forge/queryModel.ts`
-- workplane and topology provenance now routed through the same query model
+- shared face and edge query/reference contracts in `src/forge/queryModel.ts`
+- compiler-owned hole/cut v1, projection replay v1, and repeated-result ownership slices
+- curated compiler corpus coverage in `examples/compiler-corpus/`
 
-That is the current base for downstream feature work.
-
+The next queue item is task 130, which should build on that base instead of reopening the cleanup lane.

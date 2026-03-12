@@ -24,5 +24,4 @@ Isolation rule:
 
 ## Status and log
 - 2026-03-12: Ready after task 100.
-- 2026-03-12: Not started.
-
+- 2026-03-12: Completed. Added compiler-owned `Shape.hole()` / `Shape.cutout()` support for the v1 subset, lowered circular through/blind holes plus `onFace()`-anchored through/blind cutouts through both backends, and covered the supported/unsupported cases with runtime, exact-export, and documentation updates.

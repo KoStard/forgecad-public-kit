@@ -24,5 +24,4 @@ Isolation rule:
 
 ## Status and log
 - 2026-03-12: Ready after task 100.
-- 2026-03-12: Not started.
-
+- 2026-03-12: Completed. Added compiler-visible projection intent for the supported `projectToPlane()` downstream subset, preserved inspectable projection/workplane provenance through both lowerers, and added compiler/BREP/docs coverage for the exact-safe parallel-workplane replay slice plus explicit diagnostics outside it.

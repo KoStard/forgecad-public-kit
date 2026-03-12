@@ -4,19 +4,25 @@ Date: 2026-03-12
 
 This is the multi-agent execution plan for the backend compiler program.
 
-## Deepest Completed Prerequisite
+## Current Landed Base
 
-Completed:
+Completed foundations and slices:
 
 - [tasks/100-query-reference-backbone.md](../../../../../../tasks/100-query-reference-backbone.md)
+- [tasks/105-edge-query-backbone.md](../../../../../../tasks/105-edge-query-backbone.md)
+- [tasks/110-hole-and-cut-workflows.md](../../../../../../tasks/110-hole-and-cut-workflows.md)
+- [tasks/120-projection-and-sketch-on-face-downstream.md](../../../../../../tasks/120-projection-and-sketch-on-face-downstream.md)
+- [tasks/125-backend-compiler-cleanup-and-sync.md](../../../../../../tasks/125-backend-compiler-cleanup-and-sync.md)
+- [tasks/140-pattern-and-mirror-feature-ownership.md](../../../../../../tasks/140-pattern-and-mirror-feature-ownership.md)
+- [tasks/150-compiler-regression-corpus.md](../../../../../../tasks/150-compiler-regression-corpus.md)
 
-What it gives the team:
+What that gives the next lane:
 
-- one shared `ShapeQueryOwner` contract
-- one shared `FaceQueryRef` contract
-- workplane provenance and tracked topology now use the same query model
+- shared face and edge query/reference contracts
+- hole/cut v1, projection replay v1, and repeated-result ownership in the compiler-owned subset
+- curated multi-feature corpus coverage in compiler and exact-export checks
 
-This is the base that downstream feature agents should consume instead of inventing their own face/body provenance rules.
+This is the base that task 130 should consume instead of inventing new provenance or regression surfaces locally.
 
 ## Dependency Graph
 
@@ -44,24 +50,16 @@ graph TD
   T125 --> T130
 ```
 
-## Completed In The First Agent Wave
+## Program State
 
-- [tasks/100-query-reference-backbone.md](../../../../../../tasks/100-query-reference-backbone.md)
-- [tasks/105-edge-query-backbone.md](../../../../../../tasks/105-edge-query-backbone.md)
-- [tasks/110-hole-and-cut-workflows.md](../../../../../../tasks/110-hole-and-cut-workflows.md)
-- [tasks/120-projection-and-sketch-on-face-downstream.md](../../../../../../tasks/120-projection-and-sketch-on-face-downstream.md)
-- [tasks/140-pattern-and-mirror-feature-ownership.md](../../../../../../tasks/140-pattern-and-mirror-feature-ownership.md)
-- [tasks/150-compiler-regression-corpus.md](../../../../../../tasks/150-compiler-regression-corpus.md)
+- Landed: 100, 105, 110, 120, 125, 140, and 150.
+- Remaining queued lane in this slice: 130.
 
-## Can Start Immediately
-
-The next ready coordination task is:
-
-- [tasks/125-backend-compiler-cleanup-and-sync.md](../../../../../../tasks/125-backend-compiler-cleanup-and-sync.md)
-
-Blocked until cleanup lands:
+## Next Up
 
 - [tasks/130-fillet-and-chamfer-dual-lowering.md](../../../../../../tasks/130-fillet-and-chamfer-dual-lowering.md)
+
+Task 125 is complete. Task 130 is now the active next lane for the backend-compiler program.
 
 ## Merge Strategy
 
@@ -88,14 +86,13 @@ Core integrator lane:
 - reviews query/lowering contracts
 - batches the thin shared-file integration edits
 
-Feature lanes:
+Next feature lane:
 
-- Cleanup lane: task 125
-- Edge/Finishing lane: task 130 after cleanup
+- Edge/Finishing lane: task 130
 
-Quality lane:
+Quality support:
 
-- Regression corpus lane: task 150 is landed; task 125 must sync its claims/docs before the next feature wave
+- Extend the existing compiler corpus/checks as task 130 lands instead of spinning up a separate queue item first
 
 ## File-Ownership Guidance
 
