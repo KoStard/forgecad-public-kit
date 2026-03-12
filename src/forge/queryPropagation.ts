@@ -253,7 +253,7 @@ export function buildEdgeFeatureTopologyRewritePropagation(
     propagation.preservedEdges.push({
       query: createPropagatedEdgeQueryRef(source, owner, 'preserved'),
       status: 'supported',
-      note: `${operation} leaves this sibling tracked vertical edge unchanged in the defended post-rewrite subset.`,
+      note: `${operation} leaves this supported propagated vertical edge lineage unchanged in the defended post-rewrite subset.`,
     });
   }
   if (edge) {
