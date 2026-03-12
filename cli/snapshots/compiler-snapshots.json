@@ -1637,7 +1637,7 @@
   },
   {
     "id": "sketch-on-face-placement",
-    "description": "Downstream features keep semantic workplane placement intent in the compile graph instead of collapsing to a bare matrix.",
+    "description": "Downstream features keep semantic workplane placement intent in the compile graph and propagate it through later shape transforms.",
     "scene": {
       "objects": [
         {
@@ -1719,6 +1719,18 @@
                   "protrude": 0.5,
                   "selfAnchor": "center"
                 }
+              },
+              {
+                "kind": "translate",
+                "x": 10,
+                "y": -2,
+                "z": 5
+              },
+              {
+                "kind": "rotate",
+                "xDeg": 0,
+                "yDeg": 0,
+                "zDeg": 90
               }
             ]
           },
@@ -1802,6 +1814,18 @@
                     "protrude": 0.5,
                     "selfAnchor": "center"
                   }
+                },
+                {
+                  "kind": "translate",
+                  "x": 10,
+                  "y": -2,
+                  "z": 5
+                },
+                {
+                  "kind": "rotate",
+                  "xDeg": 0,
+                  "yDeg": 0,
+                  "zDeg": 90
                 }
               ]
             }
@@ -1814,39 +1838,39 @@
             "boundingBox": {
               "min": [
                 -1,
-                -1,
-                3.5
+                9,
+                8.5
               ],
               "max": [
-                5,
                 3,
-                6.5
+                15,
+                11.5
               ]
             },
             "volume": 72,
             "surfaceArea": 108,
             "numTri": 12,
             "vertexCount": 8,
-            "meshDigest": "13672484313585ed855bedb7afac83d52256489a248e474b0d1b2abbe7a9ccd8"
+            "meshDigest": "9caccffb2e6a5073a8d3b9f9453952432c5a27954a0f2e6bc4ff5265aed0038f"
           },
           "loweredRuntime": {
             "boundingBox": {
               "min": [
                 -1,
-                -1,
-                3.5
+                9,
+                8.5
               ],
               "max": [
-                5,
                 3,
-                6.5
+                15,
+                11.5
               ]
             },
             "volume": 72,
             "surfaceArea": 108,
             "numTri": 12,
             "vertexCount": 8,
-            "meshDigest": "13672484313585ed855bedb7afac83d52256489a248e474b0d1b2abbe7a9ccd8"
+            "meshDigest": "9caccffb2e6a5073a8d3b9f9453952432c5a27954a0f2e6bc4ff5265aed0038f"
           },
           "loweredRuntimeMatches": true,
           "loweredRuntimeError": null

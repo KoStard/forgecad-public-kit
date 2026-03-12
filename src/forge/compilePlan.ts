@@ -1,4 +1,4 @@
-import type { Mat4 } from './transform';
+import { Transform, type Mat4, type Vec3 } from './transform';
 import {
   cloneSketchPlacementModel,
   type ShapeWorkplanePlacement,
@@ -179,6 +179,95 @@ function canonicalNumber(value: number): number {
 
 function cloneShapeTransformMatrix(matrix: Mat4): Mat4 {
   return matrix.map((value) => canonicalNumber(value)) as Mat4;
+}
+
+function canonicalVec3(vec: Vec3): Vec3 {
+  return [
+    canonicalNumber(vec[0]),
+    canonicalNumber(vec[1]),
+    canonicalNumber(vec[2]),
+  ];
+}
+
+function cloneShapeWorkplanePlacementValue(
+  placement: ShapeWorkplanePlacement,
+): ShapeWorkplanePlacement {
+  return {
+    matrix: cloneShapeTransformMatrix(placement.matrix),
+    placement: cloneSketchPlacementModel(placement.placement)!,
+  };
+}
+
+function mirrorTransformMatrix(normal: [number, number, number]): Mat4 {
+  const [nx0, ny0, nz0] = normal;
+  const len = Math.hypot(nx0, ny0, nz0);
+  if (len < 1e-12) return Transform.identity().toArray();
+  const nx = nx0 / len;
+  const ny = ny0 / len;
+  const nz = nz0 / len;
+
+  const m00 = 1 - 2 * nx * nx;
+  const m01 = -2 * nx * ny;
+  const m02 = -2 * nx * nz;
+  const m10 = -2 * ny * nx;
+  const m11 = 1 - 2 * ny * ny;
+  const m12 = -2 * ny * nz;
+  const m20 = -2 * nz * nx;
+  const m21 = -2 * nz * ny;
+  const m22 = 1 - 2 * nz * nz;
+
+  return [
+    m00, m10, m20, 0,
+    m01, m11, m21, 0,
+    m02, m12, m22, 0,
+    0, 0, 0, 1,
+  ];
+}
+
+function shapeTransformStepMatrix(step: Exclude<ShapeCompileTransformStep, { kind: 'workplanePlacement' }>): Mat4 {
+  switch (step.kind) {
+    case 'translate':
+      return Transform.translation(step.x, step.y, step.z).toArray();
+    case 'rotate':
+      return Transform.identity()
+        .rotateAxis([1, 0, 0], step.xDeg)
+        .rotateAxis([0, 1, 0], step.yDeg)
+        .rotateAxis([0, 0, 1], step.zDeg)
+        .toArray();
+    case 'scale':
+      return Transform.scale([step.x, step.y, step.z]).toArray();
+    case 'rotateAround':
+      return Transform.rotationAxis(
+        [step.axisX, step.axisY, step.axisZ],
+        step.degrees,
+        [step.pivotX, step.pivotY, step.pivotZ],
+      ).toArray();
+    case 'mirror':
+      return mirrorTransformMatrix([step.normalX, step.normalY, step.normalZ]);
+  }
+}
+
+function applyShapeTransformToWorkplanePlacement(
+  placement: ShapeWorkplanePlacement,
+  step: Exclude<ShapeCompileTransformStep, { kind: 'workplanePlacement' }>,
+): ShapeWorkplanePlacement {
+  const stepMatrix = shapeTransformStepMatrix(step);
+  const transform = Transform.from(stepMatrix);
+  const current = cloneShapeWorkplanePlacementValue(placement);
+
+  return {
+    matrix: cloneShapeTransformMatrix(Transform.from(current.matrix).mul(stepMatrix).toArray()),
+    placement: {
+      ...current.placement,
+      workplane: {
+        ...current.placement.workplane,
+        origin: canonicalVec3(transform.point(current.placement.workplane.origin)),
+        u: canonicalVec3(transform.vector(current.placement.workplane.u)),
+        v: canonicalVec3(transform.vector(current.placement.workplane.v)),
+        normal: canonicalVec3(transform.vector(current.placement.workplane.normal)),
+      },
+    },
+  };
 }
 
 function cloneShapeTransform(step: ShapeCompileTransformStep): ShapeCompileTransformStep {
@@ -429,11 +518,15 @@ export function findShapeWorkplanePlacement(
     case 'transform': {
       let current = findShapeWorkplanePlacement(plan.base);
       for (const step of plan.steps) {
-        if (step.kind !== 'workplanePlacement') continue;
-        current = {
-          matrix: cloneShapeTransformMatrix(step.matrix),
-          placement: cloneSketchPlacementModel(step.placement)!,
-        };
+        if (step.kind === 'workplanePlacement') {
+          current = cloneShapeWorkplanePlacementValue({
+            matrix: step.matrix,
+            placement: step.placement,
+          });
+          continue;
+        }
+        if (!current) continue;
+        current = applyShapeTransformToWorkplanePlacement(current, step);
       }
       return current;
     }

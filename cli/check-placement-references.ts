@@ -8,6 +8,7 @@ import { getShapeWorkplanePlacement, initKernel, box } from '../src/forge/kernel
 import { runScript } from '../src/forge/headless';
 import { rect, roundedRect } from '../src/forge/sketch';
 import { getSketchPlacement3D, getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
+import { Transform } from '../src/forge/transform';
 
 function fail(message: string): never {
   throw new Error(message);
@@ -203,6 +204,20 @@ function checkShapeWorkplanePlacementPropagation(): void {
   expectVec(extrudePlacement!.placement.workplane.origin, target.face('top').center, 'extrude.workplane.origin');
   expectMatrix(extrudePlacement!.matrix, getSketchPlacement3D(extrudeSketch)!, 'extrude.workplane.matrix');
 
+  const shiftedExtrude = extrudeSketch.extrude(3).translate(10, -2, 5).toShape();
+  const shiftedExtrudePlacement = getShapeWorkplanePlacement(shiftedExtrude);
+  expect(shiftedExtrudePlacement != null, 'workplane placement should survive later shape translations');
+  expectMatrix(
+    shiftedExtrudePlacement!.matrix,
+    Transform.from(getSketchPlacement3D(extrudeSketch)!).translate(10, -2, 5).toArray(),
+    'extrude.workplane.matrix.translate',
+  );
+  expectVec(
+    shiftedExtrudePlacement!.placement.workplane.origin,
+    Transform.translation(10, -2, 5).point(target.face('top').center),
+    'extrude.workplane.origin.translate',
+  );
+
   const revolveSketch = rect(4, 2).onFace(box(16, 10, 8, true), 'front', {
     u: -3,
     v: 2,
@@ -215,6 +230,20 @@ function checkShapeWorkplanePlacementPropagation(): void {
   expect(revolvePlacement!.placement.workplane.source.kind === 'canonical-face', 'revolve() should preserve canonical-face placement source');
   expect(revolvePlacement!.placement.workplane.source.face === 'front', 'revolve() should preserve canonical face name');
   expectMatrix(revolvePlacement!.matrix, getSketchPlacement3D(revolveSketch)!, 'revolve.workplane.matrix');
+
+  const rotatedRevolve = revolved.rotate(0, 0, 90);
+  const rotatedRevolvePlacement = getShapeWorkplanePlacement(rotatedRevolve);
+  expect(rotatedRevolvePlacement != null, 'workplane placement should survive later shape rotations');
+  expectMatrix(
+    rotatedRevolvePlacement!.matrix,
+    Transform.from(getSketchPlacement3D(revolveSketch)!).rotateAxis([0, 0, 1], 90).toArray(),
+    'revolve.workplane.matrix.rotate',
+  );
+  expectVec(
+    rotatedRevolvePlacement!.placement.workplane.normal,
+    Transform.rotationAxis([0, 0, 1], 90).vector([0, -1, 0]),
+    'revolve.workplane.normal.rotate',
+  );
 }
 
 export async function runCheckPlacementReferencesCli(): Promise<void> {

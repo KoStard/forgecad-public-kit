@@ -138,12 +138,14 @@ return [{ name: 'Sweep', shape: body }];
   ),
   inlineCase(
     'sketch-on-face-placement',
-    'Downstream features keep semantic workplane placement intent in the compile graph instead of collapsing to a bare matrix.',
+    'Downstream features keep semantic workplane placement intent in the compile graph and propagate it through later shape transforms.',
     `
 const body = roundedRect(20, 12, 2, true).extrude(6, { center: true });
 const feature = rect(6, 4)
   .onFace(body, 'top', { u: 2, v: 1, protrude: 0.5, selfAnchor: 'center' })
-  .extrude(3);
+  .extrude(3)
+  .translate(10, -2, 5)
+  .rotate(0, 0, 90);
 return [{ name: 'Feature', shape: feature }];
 `,
   ),
