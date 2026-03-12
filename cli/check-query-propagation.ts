@@ -236,7 +236,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
   ),
   inlineCase(
     'hole-cut-workflows',
-    'Hole and cut workflows record ambiguous preserved-face descendants plus explicit unsupported created-edge diagnostics.',
+    'Hole and cut workflows record ambiguous preserved-face descendants, defended created-face slots, and explicit unsupported created-edge diagnostics.',
     HOLE_CUT_WORKFLOW_CODE,
     [
       {
@@ -251,17 +251,23 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'hole-created-edge-propagation-unsupported',
         ],
         requiredPreservedFaceQueries: [
-          'propagated-face(split <- canonical-face(right)',
-          'propagated-face(split <- tracked-face(top)',
-          'propagated-face(split <- canonical-face(top)',
-          'propagated-face(split <- canonical-face(front)',
+          'propagated-face(split <- tracked-face(side-bottom)',
+          'propagated-face(split <- tracked-face(side-top)',
+          'propagated-face(split <- propagated-face(preserved <- tracked-face(top)',
+          'propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right)',
+        ],
+        requiredCreatedFaceQueries: [
+          'created-face(hole:wall)',
+          'created-face(hole:floor)',
+          'created-face(cut:floor)',
+          'created-face(cut:wall-right)',
         ],
       },
     ],
   ),
   inlineCase(
     'fillet-edge-workflow',
-    'Fillet workflows preserve the defended merged-edge query plus downstream hole/cut ambiguity diagnostics in one chain.',
+    'Fillet workflows preserve the defended merged-edge query while downstream hole/cut created faces stay visible as boolean-split descendants in one chain.',
     FILLET_EDGE_WORKFLOW_CODE,
     [
       {
@@ -278,8 +284,8 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'fillet-created-face-propagation-unsupported',
         ],
         requiredPreservedFaceQueries: [
-          'propagated-face(split <- tracked-face(top)',
-          'propagated-face(split <- face-ref(top)',
+          'propagated-face(split <- propagated-face(preserved <- created-face(hole:floor)',
+          'propagated-face(split <- created-face(cut:wall-right)',
         ],
         requiredPreservedEdgeQueries: [
           'propagated-edge(merged <- tracked-edge(vert-br#edge)',
@@ -341,7 +347,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
   ),
   compilerCorpusCase(
     'corpus-enclosure-shell-cuts',
-    'The enclosure corpus keeps shell ambiguity and later boolean rewrite boundaries reviewable inside a normal product-style part.',
+    'The enclosure corpus keeps defended shell ownership plus later boolean rewrite boundaries reviewable inside a normal product-style part.',
     [
       {
         name: 'Enclosure Shell Cuts',
@@ -361,7 +367,6 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'boolean-union-face-inherited-ambiguity',
           'boolean-union-face-merged-ambiguous',
           'boolean-union-edge-propagation-unsupported',
-          'shell-face-propagation-ambiguous',
           'shell-edge-propagation-ambiguous',
         ],
       },
@@ -393,7 +398,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
   ),
   fileCase(
     'corpus-trimmed-access-cover',
-    'The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable after earlier boolean, hole, and cut rewrites.',
+    'The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable while earlier hole/cut created faces and preserved canonical faces flow through later unions.',
     queryPropagationCorpusPath('trimmed-access-cover.forge.js'),
     [
       {
@@ -413,8 +418,8 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
         requiredPreservedFaceQueries: [
           'propagated-face(preserved <- created-face(trimByPlane:plane-cap)',
-          'propagated-face(split <- tracked-face(top)',
-          'propagated-face(split <- face-ref(top)',
+          'propagated-face(preserved <- canonical-face(top)',
+          'propagated-face(preserved <- created-face(hole:floor)',
         ],
       },
     ],
