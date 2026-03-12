@@ -20,8 +20,10 @@ import {
 import { Transform, normalizeAxis, type Mat4, type RotateAroundToOptions } from '../transform';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
 import {
+  cloneEdgeQueryRef,
   cloneFaceQueryRef,
   cloneShapeQueryOwner,
+  type EdgeQueryRef,
   type FaceQueryRef,
 } from '../queryModel';
 
@@ -50,11 +52,30 @@ export interface EdgeRef {
   start: [number, number, number];
   /** End point */
   end: [number, number, number];
+  /** Compiler-owned edge query when available. */
+  query?: EdgeQueryRef;
 }
 
 export interface Topology {
   faces: Map<FaceName, FaceRef>;
   edges: Map<EdgeName, EdgeRef>;
+}
+
+function createTrackedEdgeRef(
+  name: EdgeName,
+  start: [number, number, number],
+  end: [number, number, number],
+): EdgeRef {
+  return {
+    name,
+    start,
+    end,
+    query: {
+      kind: 'tracked-edge',
+      edgeName: name,
+      selector: 'edge',
+    },
+  };
 }
 
 /**
@@ -100,7 +121,18 @@ export class TrackedShape {
       const available = [...this.topology.edges.keys()].join(', ');
       throw new Error(`Edge "${name}" not found. Available: ${available}`);
     }
-    return e;
+    const owner = getShapePrimaryQueryOwner(this.shape);
+    return {
+      ...e,
+      start: [e.start[0], e.start[1], e.start[2]],
+      end: [e.end[0], e.end[1], e.end[2]],
+      query: cloneEdgeQueryRef({
+        kind: 'tracked-edge',
+        edgeName: name,
+        selector: 'edge',
+        owner: cloneShapeQueryOwner(owner ?? e.query?.owner),
+      }),
+    };
   }
 
   /** List all face names */
@@ -416,6 +448,7 @@ function offsetTopology(topo: Topology, dx: number, dy: number, dz: number): Top
       ...edge,
       start: [edge.start[0] + dx, edge.start[1] + dy, edge.start[2] + dz],
       end: [edge.end[0] + dx, edge.end[1] + dy, edge.end[2] + dz],
+      query: cloneEdgeQueryRef(edge.query),
     });
   }
   return { faces, edges };
@@ -439,6 +472,7 @@ function cloneTopology(topo: Topology): Topology {
       ...edge,
       start: [edge.start[0], edge.start[1], edge.start[2]],
       end: [edge.end[0], edge.end[1], edge.end[2]],
+      query: cloneEdgeQueryRef(edge.query),
     });
   }
   return { faces, edges };
@@ -464,6 +498,7 @@ export function transformTopology(topo: Topology, m: Mat4 | Transform): Topology
       ...edge,
       start: tx.point(edge.start),
       end: tx.point(edge.end),
+      query: cloneEdgeQueryRef(edge.query),
     });
   }
 
@@ -561,22 +596,22 @@ export function buildRectExtrusionTopology(
   }
 
   // Bottom edges (at z=zBot)
-  edges.set('bottom-bottom', { name: 'bottom-bottom', start: [bl.x, bl.y, zBot], end: [br.x, br.y, zBot] });
-  edges.set('bottom-right', { name: 'bottom-right', start: [br.x, br.y, zBot], end: [tr.x, tr.y, zBot] });
-  edges.set('bottom-top', { name: 'bottom-top', start: [tr.x, tr.y, zBot], end: [tl.x, tl.y, zBot] });
-  edges.set('bottom-left', { name: 'bottom-left', start: [tl.x, tl.y, zBot], end: [bl.x, bl.y, zBot] });
+  edges.set('bottom-bottom', createTrackedEdgeRef('bottom-bottom', [bl.x, bl.y, zBot], [br.x, br.y, zBot]));
+  edges.set('bottom-right', createTrackedEdgeRef('bottom-right', [br.x, br.y, zBot], [tr.x, tr.y, zBot]));
+  edges.set('bottom-top', createTrackedEdgeRef('bottom-top', [tr.x, tr.y, zBot], [tl.x, tl.y, zBot]));
+  edges.set('bottom-left', createTrackedEdgeRef('bottom-left', [tl.x, tl.y, zBot], [bl.x, bl.y, zBot]));
 
   // Top edges (at z=zTop)
-  edges.set('top-bottom', { name: 'top-bottom', start: [bl.x, bl.y, zTop], end: [br.x, br.y, zTop] });
-  edges.set('top-right', { name: 'top-right', start: [br.x, br.y, zTop], end: [tr.x, tr.y, zTop] });
-  edges.set('top-top', { name: 'top-top', start: [tr.x, tr.y, zTop], end: [tl.x, tl.y, zTop] });
-  edges.set('top-left', { name: 'top-left', start: [tl.x, tl.y, zTop], end: [bl.x, bl.y, zTop] });
+  edges.set('top-bottom', createTrackedEdgeRef('top-bottom', [bl.x, bl.y, zTop], [br.x, br.y, zTop]));
+  edges.set('top-right', createTrackedEdgeRef('top-right', [br.x, br.y, zTop], [tr.x, tr.y, zTop]));
+  edges.set('top-top', createTrackedEdgeRef('top-top', [tr.x, tr.y, zTop], [tl.x, tl.y, zTop]));
+  edges.set('top-left', createTrackedEdgeRef('top-left', [tl.x, tl.y, zTop], [bl.x, bl.y, zTop]));
 
   // Vertical edges
-  edges.set('vert-bl', { name: 'vert-bl', start: [bl.x, bl.y, zBot], end: [bl.x, bl.y, zTop] });
-  edges.set('vert-br', { name: 'vert-br', start: [br.x, br.y, zBot], end: [br.x, br.y, zTop] });
-  edges.set('vert-tr', { name: 'vert-tr', start: [tr.x, tr.y, zBot], end: [tr.x, tr.y, zTop] });
-  edges.set('vert-tl', { name: 'vert-tl', start: [tl.x, tl.y, zBot], end: [tl.x, tl.y, zTop] });
+  edges.set('vert-bl', createTrackedEdgeRef('vert-bl', [bl.x, bl.y, zBot], [bl.x, bl.y, zTop]));
+  edges.set('vert-br', createTrackedEdgeRef('vert-br', [br.x, br.y, zBot], [br.x, br.y, zTop]));
+  edges.set('vert-tr', createTrackedEdgeRef('vert-tr', [tr.x, tr.y, zBot], [tr.x, tr.y, zTop]));
+  edges.set('vert-tl', createTrackedEdgeRef('vert-tl', [tl.x, tl.y, zBot], [tl.x, tl.y, zTop]));
 
   return { faces, edges };
 }
@@ -621,8 +656,8 @@ export function buildCircleExtrusionTopology(
   });
 
   // Top and bottom rim edges (represented as a single named reference at 0°)
-  edges.set('top-rim', { name: 'top-rim', start: [cx + topRadius, cy, zTop], end: [cx, cy + topRadius, zTop] });
-  edges.set('bottom-rim', { name: 'bottom-rim', start: [cx + circ.radius, cy, zBot], end: [cx, cy + circ.radius, zBot] });
+  edges.set('top-rim', createTrackedEdgeRef('top-rim', [cx + topRadius, cy, zTop], [cx, cy + topRadius, zTop]));
+  edges.set('bottom-rim', createTrackedEdgeRef('bottom-rim', [cx + circ.radius, cy, zBot], [cx, cy + circ.radius, zBot]));
 
   return { faces, edges };
 }

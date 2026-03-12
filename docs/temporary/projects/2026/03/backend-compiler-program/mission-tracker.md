@@ -283,6 +283,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 - Scene-level route decisions are now part of the compiler inspection surface, so route drift becomes a reviewable regression instead of a hidden internal policy change.
 - Query-owner IDs now reset per script run before compiler inspection, so snapshot diffs stay deterministic instead of depending on earlier checks in the same process.
 - Placement/reference invariants now assert owner-lineage propagation, not just matrix equivalence.
+- Placement/reference invariants now also assert tracked-edge query propagation plus `start` / `end` / `midpoint` selector alignment for tracked-topology flows.
 - `forgecad check brep` still guards the exact export subset separately.
 
 ## Current Test Model
@@ -299,7 +300,7 @@ The current unit-style test strategy is:
 ## Current Risks And Issues
 
 - The compile graph still does not cover important operation families including deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, fillet/chamfer families, hole/cut workflows, and richer projection/feature-pattern workflows. Those shapes still lose compile intent and fall back to mesh-only behavior.
-- The new sketch workplane metadata plus `queryOwner` lineage are a meaningful foundation step, but not the full answer yet. Forge now owns parent-body identity for compile-covered feature chains, but it still does not own durable face/edge identity through topology-changing edits.
+- The new sketch workplane metadata plus face/edge query lineage are a meaningful foundation step, but not the full answer yet. Forge now owns parent-body identity and tracked-topology query selectors for compile-covered feature chains, but it still does not own durable face/edge identity through topology-changing edits.
 - The compiler now preserves `onFace()` workplane placement and parent-body ownership through `extrude()` / `revolve()`, booleans, shell, split/trim, and downstream transforms. The remaining hard part is richer query propagation once features start depending on shell-created faces, projection targets, patterned children, and fillet/chamfer-owned topology.
 - `shell()` is now compiler-owned, but only for compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with rigid pre-shell transforms. Broader shell semantics will still need stable face/edge identity once downstream edits depend on shell-created faces rather than just parent-body lineage.
 - The hull family is now compile-covered for the Manifold runtime, but exact OCCT replay is still missing. That means hull intent is preserved and diagnosable, but STEP/BREP still needs faceted fallback for those shapes.
@@ -307,7 +308,7 @@ The current unit-style test strategy is:
 - `sweep()` exact export currently canonicalizes paths to sampled polyline points before lowering. That keeps runtime and exact export aligned, but it is not yet a true analytic spline-path representation for OCCT.
 - Exact BREP lowering is intentionally narrower than runtime Manifold lowering. Segmented circles, segmented cylinders/spheres, and segmented revolves remain runtime-valid but exact-export-invalid by design.
 - Compiler snapshots use quantized mesh and polygon digests. That is strong enough to catch real regressions, but a Manifold upgrade or tessellation policy change can legitimately require baseline churn, so snapshot updates still need human review.
-- Topology and placement-reference semantics are only partially compiler-owned. Forge now owns workplane placement plus parent-body owner lineage for compile-covered feature chains, but it still does not own stable face/edge identity.
+- Topology and placement-reference semantics are only partially compiler-owned. Forge now owns workplane placement plus shared face/edge query metadata for compile-covered tracked-topology flows, but it still does not own stable face/edge identity after topology-changing operations.
 - There is still no true OCCT/CadQuery interactive runtime backend. Exact export now uses compiler-owned CadQuery lowering for a broader subset, but Forge still does not have a second full geometry runtime alongside Manifold.
 - "Most Fusion 360 regular design features" is only realistic if Forge owns stable references for face/edge-driven downstream features. Without that, feature coverage can look broad on paper while failing in real part workflows.
 - Manifold and CadQuery/OCCT do not have matching native capability sets. Some features will need a canonical Forge semantic representation that is richer than either backend's first-choice API.

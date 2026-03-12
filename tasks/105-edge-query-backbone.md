@@ -21,6 +21,7 @@ This task should stop at the backbone. Do not implement fillet/chamfer behavior 
 - Update the compiler architecture docs with the new contract and its limits.
 
 ## Status and log
+- 2026-03-12: Claimed by Codex.
+- 2026-03-12: In progress. Extending the shared query model to cover tracked edges and selector semantics, then locking the propagation down with placement invariants.
+- 2026-03-12: Completed. Added shared `EdgeQueryRef`/selector contracts in `src/forge/queryModel.ts`, preserved them through tracked-topology flows in `src/forge/sketch/topology.ts`, and covered them in placement invariants plus the compiler architecture docs.
 - 2026-03-12: Ready after task 100.
-- 2026-03-12: Not started.
-

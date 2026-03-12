@@ -157,12 +157,15 @@ Current progress:
 - compile-covered feature results now carry compiler-owned query-owner lineage, so parent-body ownership is no longer implicit runtime state
 - `src/forge/queryModel.ts` now defines the shared query/reference contract for face provenance instead of letting workplane and topology code drift separately
 - workplane sources and `FaceRef` values now share that face-query contract when compiler-owned provenance exists
+- `src/forge/queryModel.ts` now also defines the shared edge-query contract for tracked edges and direct edge refs, including selector semantics for whole-edge vs. `start` / `end` / `midpoint` references
+- tracked-topology flows now preserve that edge-query metadata through clone/translate/workplane-placement transforms, and placement invariants assert that tracked edge selectors stay aligned with the actual transformed edge geometry
 - booleans, shell, split/trim flows, and downstream workplane-driven features now preserve that owner lineage through the compile graph instead of erasing it at each feature boundary
 - placement and exact-export invariants now check that owner lineage survives ordinary shell-plus-cut-plus-boolean style part workflows
 
 Still missing:
 
 - durable face/edge identity across topology-changing operations
+- shared edge-query selectors exist for tracked topology, but topology-changing features still do not produce durable compiler-owned edge identity after shell/boolean/fillet-style edits
 - richer query propagation rules for shell-created faces, fillet/chamfer ownership, patterned features, and projection targets
 - stable face/edge references beyond today's tracked/canonical face foundations
 

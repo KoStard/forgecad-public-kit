@@ -10,6 +10,12 @@ export type FaceQueryRef =
   | { kind: 'tracked-face'; faceName: string; owner?: ShapeQueryOwner }
   | { kind: 'face-ref'; faceName?: string; owner?: ShapeQueryOwner };
 
+export type EdgeQuerySelector = 'edge' | 'start' | 'end' | 'midpoint';
+
+export type EdgeQueryRef =
+  | { kind: 'tracked-edge'; edgeName: string; selector: EdgeQuerySelector; owner?: ShapeQueryOwner }
+  | { kind: 'edge-ref'; edgeName?: string; selector: EdgeQuerySelector; owner?: ShapeQueryOwner };
+
 export function cloneShapeQueryOwner(owner: ShapeQueryOwner | undefined): ShapeQueryOwner | undefined {
   if (!owner) return undefined;
   return {
@@ -38,6 +44,26 @@ export function cloneFaceQueryRef(ref: FaceQueryRef | undefined): FaceQueryRef |
   }
 }
 
+export function cloneEdgeQueryRef(ref: EdgeQueryRef | undefined): EdgeQueryRef | undefined {
+  if (!ref) return undefined;
+  switch (ref.kind) {
+    case 'tracked-edge':
+      return {
+        kind: 'tracked-edge',
+        edgeName: ref.edgeName,
+        selector: ref.selector,
+        owner: cloneShapeQueryOwner(ref.owner),
+      };
+    case 'edge-ref':
+      return {
+        kind: 'edge-ref',
+        edgeName: ref.edgeName,
+        selector: ref.selector,
+        owner: cloneShapeQueryOwner(ref.owner),
+      };
+  }
+}
+
 export function faceQueryRefsEqual(
   a: FaceQueryRef | undefined,
   b: FaceQueryRef | undefined,
@@ -60,6 +86,26 @@ export function faceQueryRefsEqual(
   }
 }
 
+export function edgeQueryRefsEqual(
+  a: EdgeQueryRef | undefined,
+  b: EdgeQueryRef | undefined,
+): boolean {
+  if (a == null || b == null) return a == null && b == null;
+  if (a.kind !== b.kind) return false;
+  switch (a.kind) {
+    case 'tracked-edge':
+      return b.kind === 'tracked-edge'
+        && a.edgeName === b.edgeName
+        && a.selector === b.selector
+        && shapeQueryOwnersEqual(a.owner, b.owner);
+    case 'edge-ref':
+      return b.kind === 'edge-ref'
+        && a.edgeName === b.edgeName
+        && a.selector === b.selector
+        && shapeQueryOwnersEqual(a.owner, b.owner);
+  }
+}
+
 export function describeFaceQueryRef(ref: FaceQueryRef | undefined | null): string {
   if (!ref) return 'none';
   const owner = ref.owner ? ` @${ref.owner.operation}:${ref.owner.id}` : '';
@@ -70,5 +116,17 @@ export function describeFaceQueryRef(ref: FaceQueryRef | undefined | null): stri
       return `tracked-face(${ref.faceName})${owner}`;
     case 'face-ref':
       return `face-ref(${ref.faceName ?? 'unnamed'})${owner}`;
+  }
+}
+
+export function describeEdgeQueryRef(ref: EdgeQueryRef | undefined | null): string {
+  if (!ref) return 'none';
+  const owner = ref.owner ? ` @${ref.owner.operation}:${ref.owner.id}` : '';
+  const selector = `#${ref.selector}`;
+  switch (ref.kind) {
+    case 'tracked-edge':
+      return `tracked-edge(${ref.edgeName}${selector})${owner}`;
+    case 'edge-ref':
+      return `edge-ref(${ref.edgeName ?? 'unnamed'}${selector})${owner}`;
   }
 }

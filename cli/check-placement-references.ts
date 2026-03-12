@@ -6,7 +6,7 @@
  */
 import { getShapePrimaryQueryOwner, getShapeQueryOwners, getShapeWorkplanePlacement, initKernel, box } from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
-import { rect, roundedRect } from '../src/forge/sketch';
+import { rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
 import { getSketchPlacement3D, getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
 import { Transform } from '../src/forge/transform';
 
@@ -32,6 +32,14 @@ function expectMatrix(actual: number[], expected: number[], label: string): void
   for (let index = 0; index < actual.length; index += 1) {
     expect(close(actual[index], expected[index]), `${label}[${index}] expected ${expected[index]}, got ${actual[index]}`);
   }
+}
+
+function midpoint(start: [number, number, number], end: [number, number, number]): [number, number, number] {
+  return [
+    (start[0] + end[0]) / 2,
+    (start[1] + end[1]) / 2,
+    (start[2] + end[2]) / 2,
+  ];
 }
 
 function checkTransformAndPlacementHelpers(): void {
@@ -196,6 +204,54 @@ function checkDirectFaceRefWorkplaneRecording(): void {
   );
 }
 
+function checkTrackedEdgeQueryPropagation(): void {
+  const target = rectangle(-10, -6, 20, 12).extrude(6);
+  const targetOwner = getShapePrimaryQueryOwner(target.toShape());
+  expect(targetOwner != null, 'tracked-edge targets should expose a primary query owner');
+
+  const topEdge = target.edge('top-bottom');
+  expect(topEdge.query != null, 'tracked edges should expose a shared edge-query reference');
+  expect(topEdge.query!.kind === 'tracked-edge', 'tracked edges should expose tracked-edge queries');
+  expect(topEdge.query!.edgeName === 'top-bottom', 'tracked edge queries should preserve the edge name');
+  expect(topEdge.query!.selector === 'edge', 'tracked edge queries should default to the whole edge selector');
+  expect(topEdge.query!.owner?.id === targetOwner!.id, 'tracked edge queries should reuse the parent body owner');
+  expectVec(target.referencePoint('edges.top-bottom'), midpoint(topEdge.start, topEdge.end), 'edgeSelector.midpoint');
+  expectVec(target.referencePoint('edges.top-bottom.start'), topEdge.start, 'edgeSelector.start');
+  expectVec(target.referencePoint('edges.top-bottom.end'), topEdge.end, 'edgeSelector.end');
+
+  const shifted = target.translate(4, -3, 2);
+  const shiftedStoredQuery = shifted.topology.edges.get('top-bottom')?.query;
+  expect(shiftedStoredQuery != null, 'tracked-topology translations should preserve stored edge-query metadata');
+  expect(shiftedStoredQuery!.kind === 'tracked-edge', 'stored edge-query metadata should remain tracked-edge');
+  expect(shiftedStoredQuery!.edgeName === 'top-bottom', 'stored edge-query metadata should preserve the edge name');
+  expect(shiftedStoredQuery!.selector === 'edge', 'stored edge-query metadata should preserve the selector');
+  const shiftedEdge = shifted.edge('top-bottom');
+  expect(shiftedEdge.query?.owner?.id === targetOwner!.id, 'translated tracked edges should preserve owner lineage');
+  expectVec(shifted.referencePoint('edges.top-bottom.start'), shiftedEdge.start, 'translatedEdge.start');
+  expectVec(shifted.referencePoint('edges.top-bottom.end'), shiftedEdge.end, 'translatedEdge.end');
+
+  const placedSketch = rect(6, 4)
+    .onFace(box(16, 10, 8, true), 'front', {
+      u: 2,
+      v: -1,
+      protrude: 0.5,
+      selfAnchor: 'center',
+    });
+  const placement = getSketchPlacement3D(placedSketch);
+  expect(placement != null, 'tracked-edge workplane transform check should have a placement matrix');
+  const transformedTopology = transformTopology(target.topology, placement!);
+  const transformedStoredQuery = transformedTopology.edges.get('top-bottom')?.query;
+  expect(transformedStoredQuery != null, 'workplane-placed tracked topology should preserve edge-query metadata');
+  expect(transformedStoredQuery!.kind === 'tracked-edge', 'workplane-placed edge queries should remain tracked-edge');
+  expect(transformedStoredQuery!.edgeName === 'top-bottom', 'workplane-placed edge queries should preserve the edge name');
+  expect(transformedStoredQuery!.selector === 'edge', 'workplane-placed edge queries should preserve the selector');
+  expectVec(
+    transformedTopology.edges.get('top-bottom')!.start,
+    Transform.from(placement!).point(topEdge.start),
+    'workplaneEdge.start',
+  );
+}
+
 function checkShapeWorkplanePlacementPropagation(): void {
   const target = roundedRect(20, 12, 2, true).extrude(6, { center: true });
   const targetOwner = getShapePrimaryQueryOwner(target.toShape());
@@ -302,6 +358,7 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkCanonicalFaceWorkplaneRecording();
   checkTrackedFaceWorkplaneRecording();
   checkDirectFaceRefWorkplaneRecording();
+  checkTrackedEdgeQueryPropagation();
   checkShapeWorkplanePlacementPropagation();
   checkShapeQueryOwnerPropagation();
   console.log('✓ Placement reference invariants passed');
