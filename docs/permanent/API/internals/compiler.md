@@ -190,8 +190,10 @@ Current progress:
 - both lowerers consume the same semantic `shell` node and rewrite supported cases into backend-native boolean/extrude/cylinder plans
 - `shape.hole()` and `shape.cutout()` now form a compiler-owned hole/cut workflow slice anchored to the shared face-query/workplane model
 - through holes, blind holes, and simple face-anchored cutouts now lower through both Manifold and CadQuery/OCCT from that shared semantic node family
+- `filletEdge()` and `chamferEdge()` now form a first compiler-owned tracked-edge finishing slice for supported vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
 - regression coverage now also includes exact/runtime/export checks for the supported hole/cut workflow subset
+- regression coverage now also includes API, placement-owner, compiler-snapshot, exact-plan, and end-to-end export checks for the supported tracked-edge fillet/chamfer subset
 - the regression suite now also includes a file-backed ordinary-parts corpus under `examples/compiler-corpus/`, so shell, workplane-driven cuts, mirrored ribs/feet, patterned holes, and boolean chains are exercised together instead of only as isolated unit slices
 - mirrored downstream features and helper-driven linear/circular repetition now preserve repeated-result ownership on top of the shared face-query backbone
 - exact export regression coverage now includes a repeated-feature part where a mirrored descendant drives a downstream workplane feature inside a boolean chain
@@ -202,9 +204,10 @@ Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings
 - `shape.hole()` v1 only covers circular through/blind holes, and `shape.cutout()` v1 only covers sketches already placed with `onFace(...)`
+- `filletEdge()` / `chamferEdge()` v1 only cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies before topology-changing rewrites
 - counterbores, countersinks, up-to-face extents, drafted cuts, and durable identity for hole/cut-created faces are still missing
 - repeated-feature ownership currently tracks repeated bodies and mirrored descendants, not durable per-face identity after merged pattern topology changes
-- shell, hole/cut, and repeated-feature workflows now preserve parent-body ownership lineage, but stable downstream face ownership after topology-changing edits is still not solved, which is why projection-driven edits and fillet/chamfer remain the harder next layers
+- shell, hole/cut, tracked-edge finishing, and repeated-feature workflows now preserve parent-body ownership lineage, but stable downstream face/edge ownership after topology-changing edits is still not solved, which is why broader projection-driven edits and richer fillet/chamfer workflows remain harder next layers
 - projection replay still only covers the parallel-workplane subset; richer projection-driven edits remain outside the exact subset today
 
 ### Phase 4: Higher-Order Workflows

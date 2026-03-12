@@ -36,3 +36,4 @@ Primary files:
 - 2026-03-12: Initially blocked on task 105.
 - 2026-03-12: Re-scoped after multi-agent review. Edge-query groundwork is in, but this task remains blocked on task 125 so the program state and capability claims are cleaned up before the next feature lane starts.
 - 2026-03-12: Next up. Task 125 synced the repo state and capability docs, so this is now the next backend-compiler lane to assign with the constrained tracked-edge subset described above.
+- 2026-03-12: Completed. Added compiler-owned `filletEdge()` / `chamferEdge()` nodes for the defended tracked vertical-edge subset, lowered them through both Manifold and CadQuery/OCCT with explicit unsupported-subset diagnostics, expanded exact/runtime regression coverage, and added an edge-finished corpus part plus capability/doc updates that spell out the remaining post-topology-rewrite limits.

@@ -230,15 +230,17 @@ return [
 const baseRect = rectangle(0, 0, 80, 60);
 const base = baseRect.extrude(20);
 
-let result = filletEdge(base, base.edge('vert-br'), 8, [-1, -1]);
-result = filletEdge(result, base.edge('vert-bl'), 8, [1, -1]);
+const result = filletEdge(base.toShape(), base.edge('vert-br'), 8, [-1, -1])
+  .hole(base.face('top'), { diameter: 6, u: -16, v: 10, depth: 8 });
 
 const holes = circularPattern(
   cylinder(25, 4).translate(40, 30, -1),
   4, 40, 30,
 );
 
-return result.toShape().subtract(holes);
+return result.subtract(holes);
 ```
+
+Use the original tracked body (`base`) when you need semantic faces/edges after edge finishing. The current fillet/chamfer slice preserves owner lineage for downstream features, but it does not create new durable tracked topology on the finished result.
 
 For larger runnable examples, read `examples/api/`.

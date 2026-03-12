@@ -64,6 +64,7 @@ Update it whenever:
 | `hull3d()` / `Shape.hull()` / `hull2d()` / `Sketch.hull()` | Partial | No | Hull intent is now preserved in the Forge compile graph and reported explicitly, but there is still no exact convex-hull OCCT replay; `--allow-faceted` can export closed hull solids as faceted geometry |
 | `trimByPlane()` / `splitByPlane()` | Supported | Yes | Replayed through an exact plane half-space trim in CadQuery/OCCT; `splitByPlane()` lowers to the pair of positive-side and opposite-side trims |
 | `Shape.shell(thickness, { openFaces })` | Partial | Yes | Compiler-owned shell v1 rewrites compatible `box()`, `cylinder()`, and straight `extrude()` bases plus rigid transforms into exact boolean/extrude/cylinder plans; tapered extrudes, scale transforms, and general boolean/revolve/loft/sweep/hull/trim bases are still unsupported |
+| `filletEdge()` / `chamferEdge()` | Partial | Yes | Compiler-owned tracked-edge subset only: vertical edges from compile-covered `box()` bodies and `rectangle(...).extrude(...)` flows before topology-changing rewrites; exact replay uses the shared edge-query contract plus a lowered geometric selector for that narrow subset |
 | `TrackedShape` topology preservation | Partial | Synthetic only | Export succeeds for supported base solids, but named topology is not written to STEP/BREP |
 | Colors/materials in STEP/BREP | Partial | STEP only | Scene-object colors are written to STEP via CadQuery assembly export; `.brep` remains geometry-only |
 | STEP assembly structure/BOM metadata | Partial | Names only | STEP export writes a flat scene-object assembly to preserve names/colors; Forge assembly/BOM metadata is still not exported |
@@ -72,5 +73,5 @@ Update it whenever:
 
 1. Exact provenance-preserving replay for library helpers such as `lib.elbow()`, `lib.bolt()`, and related fastener/tube builders
 2. Safe exact affine scale replay where OCCT can preserve exact solids, especially scaled-sphere / pad workflows
-3. Broader exact OCCT-native feature coverage where BREP matters most: wider `shell()` coverage, precise fillet/chamfer, richer face-driven feature ops
+3. Broader exact OCCT-native feature coverage where BREP matters most: wider `shell()` coverage, broader fillet/chamfer coverage, richer face-driven feature ops
 4. Optional STEP product structure and metadata export

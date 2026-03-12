@@ -220,19 +220,34 @@ radians(Math.PI / 4);    // 45 (converts radians to degrees)
 ## Fillets & Chamfers
 
 ### `filletEdge(shape, edge, radius, quadrant?, segments?)`
-Fillet a vertical edge (subtract corner, add quarter-cylinder).
+Compiler-owned edge fillet for the current tracked-edge subset.
+
+Supported today:
+- tracked vertical edges from compile-covered `box()` bodies
+- tracked vertical edges from `rectangle(...).extrude(...)`
+- rigid transforms between the tracked source body and the target shape
+
+Still out of subset today:
+- post-shell / post-boolean / post-hole-cut / post-edge-finish edge selection
+- generic sketch extrudes, tapered extrudes, and arbitrary feature-created edges
+
+Canonical quadrants for the supported rectangle/box edges:
+- `vert-bl` -> `[1, -1]`
+- `vert-br` -> `[-1, -1]`
+- `vert-tr` -> `[-1, 1]`
+- `vert-tl` -> `[1, 1]`
 
 ```javascript
 const b = rectangle(0, 0, 50, 50).extrude(20);
-const filleted = filletEdge(b, b.edge('vert-br'), 5, [-1, -1]);
+const filleted = filletEdge(b.toShape(), b.edge('vert-br'), 5, [-1, -1]);
 ```
 
 ### `chamferEdge(shape, edge, size, quadrant?)`
-Chamfer a vertical edge (subtract triangular prism).
+Compiler-owned edge chamfer for the same tracked vertical-edge subset as `filletEdge(...)`.
 
 ```javascript
 const b = rectangle(0, 0, 50, 50).extrude(20);
-const chamfered = chamferEdge(b, b.edge('vert-br'), 3, [-1, -1]);
+const chamfered = chamferEdge(b.toShape(), b.edge('vert-br'), 3, [-1, -1]);
 ```
 
 ## Arc Bridge

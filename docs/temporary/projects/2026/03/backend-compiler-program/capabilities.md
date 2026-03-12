@@ -26,7 +26,7 @@ Why it is not fully true today:
 
 - the compiler covers a growing but still intentionally bounded subset of the part-design stack
 - hole/cut workflows, projection-driven edits, and repeated mirror/pattern ownership now have first compiler-owned slices, but each is still narrower than the end-state target
-- fillet/chamfer lowering and durable post-topology-change reference stability are still missing
+- fillet/chamfer now have a first compiler-owned tracked-edge subset, but durable post-topology-change reference stability is still missing
 - OCCT/CadQuery is still broader in export than in ordinary feature coverage
 
 ## Capability 2: Face-Driven Detail Features Without Brittle Attachment
@@ -89,7 +89,8 @@ Target:
 Why it is not fully true today:
 
 - Forge now has a shared edge-query contract plus tracked-edge selector propagation
-- fillet/chamfer lowering itself is still not landed yet
+- Forge now has a first compiler-owned fillet/chamfer slice for tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies
+- both lowerers and the exact exporter replay that subset from the same shared edge-query contract
 - durable edge identity after shell/boolean/hole/cut topology rewrites is still missing, so the finishing subset must stay intentionally narrow
 
 ## Honest Current State
@@ -97,7 +98,7 @@ Why it is not fully true today:
 What is already real:
 
 - compiler-owned primitives, booleans, transforms, extrude, revolve, hull, trims/splits, loft/sweep, shell v1
-- hole/cut v1 plus repeated mirror/pattern ownership for the supported subset
+- hole/cut v1, tracked-edge fillet/chamfer v1, plus repeated mirror/pattern ownership for the supported subset
 - narrow projection replay for compiler-visible `projectToPlane()` downstream flows
 - shared face and edge query/reference contracts with centralized compiler routing and regression coverage
 - curated multi-feature compiler corpus plus exact-export invariants
@@ -107,5 +108,5 @@ What is still impossible or not yet clean:
 - a complete ordinary Fusion-style part workflow staying inside compiler coverage end to end
 - counterbores, countersinks, patterned/up-to-face hole-cut variants, and durable feature-created face ownership
 - broad projection-driven feature chains beyond today's parallel-workplane replay slice
-- reliable edge-driven fillet/chamfer flows on durable downstream edge identity
+- broad edge-driven fillet/chamfer flows on durable downstream edge identity
 - claiming "most regular design features" without caveats

@@ -253,6 +253,8 @@ After the first implementation slice for this mission, the minimum acceptable st
 - both lowerers rewrite supported shell plans into backend-native boolean/extrude/cylinder plans, so exact STEP/BREP export uses the same compiler path instead of exporter-only shell logic.
 - `Shape.hole()` and `Shape.cutout()` now record compiler-owned hole/cut intent instead of requiring users to hand-build raw subtractive cutters for ordinary face-driven workflows.
 - the supported hole/cut v1 subset covers circular through/blind holes plus `onFace()`-anchored through/blind cutouts, and both lowerers replay that subset from the same semantic node family.
+- `filletEdge()` and `chamferEdge()` now record compiler-owned edge-finish intent for the tracked vertical-edge subset instead of staying runtime-only mesh helpers.
+- the supported edge-finish v1 subset covers tracked vertical edges on compile-covered `box()` bodies and `rectangle(...).extrude(...)` flows, and both lowerers plus the Python exact exporter replay that subset from the shared edge-query contract.
 - `projectToPlane()` sketches now keep explicit projection intent in the compiler graph instead of collapsing immediately to anonymous runtime geometry.
 - the supported projection replay subset can lower follow-on features when the source is a straight placed extrusion and the target plane stays parallel to the captured workplane placement.
 - the CadQuery/OCCT lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
@@ -263,7 +265,8 @@ After the first implementation slice for this mission, the minimum acceptable st
 - the compiler and BREP regression suite now also covers the supported hole/cut workflow subset, including exact-plan inspection and end-to-end STEP export.
 - the regression suite now includes a curated enclosure-style multi-feature part that combines shell, workplane-driven cuts, mirrored support feet, and booleans in one exact-exportable flow.
 - the regression suite now also includes a repeated-feature plate where mirrored descendants, patterned cuts, booleans, and downstream workplane details stay aligned across the compiler and exact-export checks.
-- `examples/compiler-corpus/` now holds the curated enclosure, motor-mount, and sensor-bracket parts that both check suites use to guard ordinary multi-feature workflows.
+- the regression suite now also covers the supported fillet/chamfer subset, including API-contract errors, placement-owner propagation, compiler snapshots, exact-plan inspection, and end-to-end STEP export.
+- `examples/compiler-corpus/` now holds the curated enclosure, motor-mount, edge-finished mount, and sensor-bracket parts that both check suites use to guard ordinary multi-feature workflows.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker
@@ -279,7 +282,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 7. Add backend mismatch / conversion diagnostics | In progress | Exact BREP lowering now emits explicit diagnostics and compiler snapshot tooling preserves them. |
 | 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | In progress | The `cadquery-occt` target now covers the current exact subset plus compatible `loft` / `sweep` plans and shell v1; feature coverage is still narrow and export-driven. |
 | 9. Make both backends true lowerers from the same compile graph | In progress | Shared lowering now reaches farther into mainstream features, but the checkpoint still depends on broader feature families and stronger reference stability. |
-| 10. Cover mainstream design-feature families across both lowerers | In progress | Shell v1, hole/cut v1, repeated mirror/pattern ownership, and a narrow projection downstream slice are in; fillet/chamfer, richer hole/cut variants, broader projection replay, and durable post-topology-change ownership still remain. |
+| 10. Cover mainstream design-feature families across both lowerers | In progress | Shell v1, hole/cut v1, tracked-edge fillet/chamfer v1, repeated mirror/pattern ownership, and a narrow projection downstream slice are in; broader hole/cut variants, broader projection replay, and durable post-topology-change ownership still remain. |
 | 11. Push exact export fully behind the CadQuery/OCCT lowerer | In progress | Export now consumes an explicit `cadquery-occt` compiler target, but the target still needs much broader feature coverage. |
 | 12. Add advanced hybrid-only feature families | Deferred | Sheet metal stays deferred until the active checkpoint is done. |
 
@@ -310,9 +313,9 @@ The current unit-style test strategy is:
 
 ## Current Risks And Issues
 
-- The compile graph still does not fully cover important operation families including deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, fillet/chamfer families, richer hole/cut variants (counterbores, countersinks, up-to-face logic), and broader projection/feature-pattern workflows. Those unsupported shapes still lose compile intent and fall back to mesh-only behavior.
+- The compile graph still does not fully cover important operation families including deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, broader fillet/chamfer families, richer hole/cut variants (counterbores, countersinks, up-to-face logic), and broader projection/feature-pattern workflows. Those unsupported shapes still lose compile intent and fall back to mesh-only behavior.
 - The new sketch workplane metadata plus shared face/edge query lineage are a meaningful foundation step, but not the full answer yet. Forge now owns parent-body identity and tracked-topology query selectors for compile-covered feature chains, but it still does not own durable face/edge identity through topology-changing edits.
-- The compiler now preserves `onFace()` workplane placement, parent-body ownership, and a narrow projection replay path through `extrude()` / `revolve()`, booleans, shell, split/trim, downstream transforms, and repeated-result owners for mirrored/helper-patterned descendants. The remaining hard part is richer query propagation once features start depending on shell-created faces, broader projection targets, merged patterned children, and fillet/chamfer-owned topology.
+- The compiler now preserves `onFace()` workplane placement, parent-body ownership, a first tracked-edge finishing slice, and a narrow projection replay path through `extrude()` / `revolve()`, booleans, shell, split/trim, downstream transforms, and repeated-result owners for mirrored/helper-patterned descendants. The remaining hard part is richer query propagation once features start depending on shell-created faces, broader projection targets, merged patterned children, and durable fillet/chamfer-owned topology.
 - `shell()` is now compiler-owned, but only for compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with rigid pre-shell transforms. Broader shell semantics will still need stable face/edge identity once downstream edits depend on shell-created faces rather than just parent-body lineage.
 - The hull family is now compile-covered for the Manifold runtime, but exact OCCT replay is still missing. That means hull intent is preserved and diagnosable, but STEP/BREP still needs faceted fallback for those shapes.
 - `loft()` exact export is narrower than Forge's sampled loft semantics. Forge can interpolate aggressively across differing profile topology through SDF blending, while CadQuery/OCCT section lofting can still reject some extreme mixed-topology stacks.
