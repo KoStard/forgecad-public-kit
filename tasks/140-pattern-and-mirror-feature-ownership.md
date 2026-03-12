@@ -24,5 +24,4 @@ Isolation rule:
 
 ## Status and log
 - 2026-03-12: Ready after task 100.
-- 2026-03-12: Not started.
-
+- 2026-03-12: Completed. Added compiler-owned repeated-result ownership for `Shape.mirror()`, `linearPattern()`, and `circularPattern()`, plus repeated-feature placement/BREP/compiler regressions and honest docs for the supported subset.

@@ -205,6 +205,8 @@ const half = box(50, 30, 10);
 const full = mirrorCopy(half, [1, 0, 0]);  // Mirror across YZ plane
 ```
 
+For compile-covered source shapes, repeated instances created by `linearPattern`, `circularPattern`, `Shape.mirror()`, and `mirrorCopy()` keep distinct compiler owner lineage. The returned union is still a merged body, so patterned descendants do not yet expose durable per-face references after topology changes.
+
 ## Utility Functions
 
 ### `degrees(deg)` / `radians(rad)`

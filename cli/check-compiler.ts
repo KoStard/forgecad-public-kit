@@ -175,6 +175,30 @@ return [{ name: 'Enclosure', shape: body }];
 `,
   ),
   inlineCase(
+    'repeated-feature-ownership',
+    'Mirrored descendants and patterned cuts keep repeated-result ownership visible through booleans and downstream workplanes.',
+    `
+const plate = roundedRect(90, 56, 6, true).extrude(14);
+const boss = roundedRect(18, 12, 3, true)
+  .onFace(plate, 'top', { u: -22, v: 12, protrude: 0.5, selfAnchor: 'center' })
+  .extrude(10);
+const mirroredBoss = boss.toShape().mirror([1, 0, 0]);
+const mirroredDrill = circle2d(3)
+  .onFace(mirroredBoss, 'top', { u: 0, v: 0, protrude: 0.25, selfAnchor: 'center' })
+  .extrude(14);
+const slotSeed = roundedRect(12, 4, 1.5, true)
+  .onFace(plate, 'top', { u: -24, v: -14, protrude: 0.5, selfAnchor: 'center' })
+  .extrude(8);
+const slotCuts = linearPattern(slotSeed, 3, 24, 0, 0);
+const body = union(
+  plate,
+  boss,
+  mirroredBoss,
+).subtract(mirroredDrill).subtract(slotCuts);
+return [{ name: 'Repeated Feature Plate', shape: body }];
+`,
+  ),
+  inlineCase(
     'sketch-on-face-placement',
     'Downstream features keep semantic workplane placement intent in the compile graph and propagate it through later shape transforms.',
     `

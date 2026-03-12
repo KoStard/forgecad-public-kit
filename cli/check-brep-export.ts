@@ -39,6 +39,27 @@ const body = union(shell, feet)
 return [{ name: 'Enclosure', shape: body }];
 `;
 
+const REPEATED_FEATURE_OWNERSHIP_CODE = `
+const plate = roundedRect(90, 56, 6, true).extrude(14);
+const boss = roundedRect(18, 12, 3, true)
+  .onFace(plate, 'top', { u: -22, v: 12, protrude: 0.5, selfAnchor: 'center' })
+  .extrude(10);
+const mirroredBoss = boss.toShape().mirror([1, 0, 0]);
+const mirroredDrill = circle2d(3)
+  .onFace(mirroredBoss, 'top', { u: 0, v: 0, protrude: 0.25, selfAnchor: 'center' })
+  .extrude(14);
+const slotSeed = roundedRect(12, 4, 1.5, true)
+  .onFace(plate, 'top', { u: -24, v: -14, protrude: 0.5, selfAnchor: 'center' })
+  .extrude(8);
+const slotCuts = linearPattern(slotSeed, 3, 24, 0, 0);
+const body = union(
+  plate,
+  boss,
+  mirroredBoss,
+).subtract(mirroredDrill).subtract(slotCuts);
+return [{ name: 'Repeated Feature Plate', shape: body }];
+`;
+
 function runExactManifest(code: string) {
   const files: Record<string, string> = { 'main.forge.js': code };
   const result = runScript(code, 'main.forge.js', files);
@@ -483,6 +504,27 @@ function checkMultiFeatureEnclosureExportEndToEnd(): void {
   exportExactManifest(MULTI_FEATURE_ENCLOSURE_CODE);
 }
 
+function checkRepeatedFeatureOwnershipPlan(): void {
+  const plan = runExactManifest(REPEATED_FEATURE_OWNERSHIP_CODE);
+
+  assert.equal(plan.kind, 'boolean', `Expected repeated-feature plan to remain a boolean tree, got ${plan.kind}`);
+  const transforms = collectShapeTransforms(plan);
+  assert(
+    transforms.some((step) => step.kind === 'mirror'),
+    'Expected repeated-feature exact lowering to preserve mirror transforms',
+  );
+  const repeatedPlacement = transforms.find(
+    (step) => step.kind === 'workplanePlacement' && step.placement.workplane.source.owner?.operation === 'mirror',
+  );
+  assert(repeatedPlacement, 'Expected mirrored downstream features to keep mirror-owned workplane provenance through exact lowering');
+  assert.equal(repeatedPlacement.placement.workplane.source.kind, 'canonical-face');
+  assert.equal(repeatedPlacement.placement.workplane.source.face, 'top');
+}
+
+function checkRepeatedFeatureOwnershipExportEndToEnd(): void {
+  exportExactManifest(REPEATED_FEATURE_OWNERSHIP_CODE);
+}
+
 function checkSketchOnFacePlacementPlan(): void {
   const plan = runExactManifest(`
 const body = roundedRect(20, 12, 2, true).extrude(6, { center: true });
@@ -732,6 +774,8 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkShellExportEndToEnd();
   checkMultiFeatureEnclosurePlan();
   checkMultiFeatureEnclosureExportEndToEnd();
+  checkRepeatedFeatureOwnershipPlan();
+  checkRepeatedFeatureOwnershipExportEndToEnd();
   checkSketchOnFacePlacementPlan();
   checkSketchOnFacePlacementExportEndToEnd();
   checkMixedSketchAndSolidScenePolicy();

@@ -3,11 +3,19 @@
  * Produces arrays of shapes that can be unioned together.
  */
 
-import { Shape, union } from '../kernel';
+import { Shape, getShapeCompilePlan, setShapeCompilePlan, union } from '../kernel';
+import { buildPatternOwnershipOperation, wrapRepeatedShapeCompilePlan } from '../repetitionOwnership';
 import { TrackedShape } from './topology';
 
 type ShapeArg = Shape | TrackedShape;
 const unwrap = (s: ShapeArg): Shape => s instanceof TrackedShape ? s.toShape() : s;
+
+function withPatternOwnership(shape: Shape, kind: 'linear' | 'circular', index: number): Shape {
+  return setShapeCompilePlan(
+    shape,
+    wrapRepeatedShapeCompilePlan(getShapeCompilePlan(shape), buildPatternOwnershipOperation(kind, index)),
+  );
+}
 
 /** Repeat a shape along a direction vector */
 export function linearPattern(
@@ -20,7 +28,10 @@ export function linearPattern(
   const base = unwrap(shape);
   const copies: Shape[] = [];
   for (let i = 0; i < count; i++) {
-    copies.push(base.translate(dx * i, dy * i, dz * i));
+    const copy = i === 0
+      ? base.clone()
+      : base.translate(dx * i, dy * i, dz * i);
+    copies.push(withPatternOwnership(copy, 'linear', i));
   }
   return union(...copies);
 }
@@ -36,13 +47,13 @@ export function circularPattern(
   const step = 360 / count;
   const copies: Shape[] = [];
   for (let i = 0; i < count; i++) {
-    const angle = step * i;
-    copies.push(
-      base
+    const copy = i === 0
+      ? base.clone()
+      : base
         .translate(-centerX, -centerY, 0)
-        .rotate(0, 0, angle)
-        .translate(centerX, centerY, 0),
-    );
+        .rotate(0, 0, step * i)
+        .translate(centerX, centerY, 0);
+    copies.push(withPatternOwnership(copy, 'circular', i));
   }
   return union(...copies);
 }
