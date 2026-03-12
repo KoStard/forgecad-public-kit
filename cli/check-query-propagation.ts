@@ -189,10 +189,6 @@ function compilerCorpusCase(
   return fileCase(part.id, description, part.scriptPath, expectedObjects);
 }
 
-function queryPropagationCorpusPath(fileName: string): string {
-  return resolvePackagePath(import.meta.url, 'examples', 'compiler-corpus', fileName);
-}
-
 const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
   inlineCase(
     'trim-and-split-created-faces',
@@ -428,10 +424,41 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
       },
     ],
   ),
-  fileCase(
+  compilerCorpusCase(
+    'corpus-service-panel-cover',
+    'The service-panel cover corpus keeps repeated-boss unions, richer hole/cut rewrites, and the later projection-driven union reviewable in one ordinary cover workflow.',
+    [
+      {
+        name: 'Service Panel Cover',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['boolean:union', 'cut', 'hole', 'hole', 'hole', 'hole', 'boolean:union', 'boolean:union'],
+        requiredDiagnosticCodes: [
+          'boolean-union-edge-propagation-unsupported',
+          'cut-source-face-split-ambiguous',
+          'cut-created-edge-propagation-unsupported',
+          'hole-source-face-split-ambiguous',
+          'hole-up-to-face-target-split-ambiguous',
+          'hole-created-edge-propagation-unsupported',
+        ],
+        requiredCreatedFaceQueries: [
+          'created-face(hole:counterbore-floor)',
+          'created-face(hole:counterbore-wall)',
+          'created-face(hole:countersink-wall)',
+          'created-face(cut:wall-right)',
+          'created-face(cut:floor)',
+        ],
+        requiredPreservedFaceQueries: [
+          'propagated-face(preserved <- created-face(hole:counterbore-floor)',
+          'propagated-face(preserved <- created-face(hole:countersink-wall)',
+          'propagated-face(preserved <- created-face(cut:floor)',
+        ],
+      },
+    ],
+  ),
+  compilerCorpusCase(
     'corpus-trimmed-access-cover',
     'The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable while earlier hole/cut created faces and preserved canonical faces flow through later unions.',
-    queryPropagationCorpusPath('trimmed-access-cover.forge.js'),
     [
       {
         name: 'Trimmed Access Cover',

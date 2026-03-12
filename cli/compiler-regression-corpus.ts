@@ -93,6 +93,32 @@ export const COMPILER_REGRESSION_CORPUS: CompilerRegressionCorpusPart[] = [
     scriptPath: corpusScriptPath('projection-relay-cover.forge.js'),
     objectName: 'Projection Relay Cover',
   },
+  {
+    id: 'corpus-service-panel-cover',
+    name: 'Service Panel Cover',
+    description:
+      'A service-panel cover keeps repeated bosses, richer hole/cut details, and projection-driven gasket geometry aligned across both lowerers.',
+    guards: [
+      'patterned additive bosses remain compiler-owned before later richer hole/cut rewrites land on the same part',
+      'counterbores, countersinks, and a face-driven service pocket stay exact-exportable in one ordinary cover workflow',
+      'projection replay stays exact on a hole/cut/union source instead of only on a toy badge or single-body silhouette',
+    ],
+    scriptPath: corpusScriptPath('service-panel-cover.forge.js'),
+    objectName: 'Service Panel Cover',
+  },
+  {
+    id: 'corpus-trimmed-access-cover',
+    name: 'Trimmed Access Cover',
+    description:
+      'A trimmed access cover keeps plane-cap trim ownership, upstream hole/cut rewrites, and later union edits reviewable across both lowerers.',
+    guards: [
+      'trimByPlane() exact lowering stays reviewable inside a normal access-cover workflow',
+      'upstream hole/cut created faces still surface explicit rewrite semantics before the trim boundary lands',
+      'later latch-union edits remain deterministic after the trim-created plane cap enters the part history',
+    ],
+    scriptPath: corpusScriptPath('trimmed-access-cover.forge.js'),
+    objectName: 'Trimmed Access Cover',
+  },
 ];
 
 export function getCompilerRegressionCorpusPart(id: string): CompilerRegressionCorpusPart {

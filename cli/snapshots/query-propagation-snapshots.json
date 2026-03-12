@@ -2998,6 +2998,588 @@
     ]
   },
   {
+    "id": "corpus-service-panel-cover",
+    "description": "The service-panel cover corpus keeps repeated-boss unions, richer hole/cut rewrites, and the later projection-driven union reviewable in one ordinary cover workflow.",
+    "objects": [
+      {
+        "name": "Service Panel Cover",
+        "exactRoute": {
+          "kind": "exact",
+          "target": "cadquery-occt",
+          "diagnosticCodes": []
+        },
+        "facetedRoute": {
+          "kind": "exact",
+          "target": "cadquery-occt",
+          "diagnosticCodes": []
+        },
+        "propagationOps": [
+          "boolean:union",
+          "cut",
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "boolean:union",
+          "boolean:union"
+        ],
+        "propagations": [
+          {
+            "rewriteId": "shape-query-boolean-union-14",
+            "operation": "boolean:union",
+            "owner": "boolean:union:shape-query-boolean-union-14",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:floor) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14"
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "boolean-union-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-12",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-12",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall-bottom) @cut:shape-query-cut-12",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-right) @cut:shape-query-cut-12",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-top) @cut:shape-query-cut-12",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-left) @cut:shape-query-cut-12",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:floor) @cut:shape-query-cut-12",
+                "note": "Blind cutouts create a defended planar floor face."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "tracked-face(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @cut:shape-query-cut-12"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-hole-11",
+            "operation": "hole",
+            "owner": "hole:shape-query-hole-11",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
+                "note": "This face stays queryable through the hole rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(hole:wall) @hole:shape-query-hole-11",
+                "note": "Hole results create a defended wall-face query."
+              },
+              {
+                "query": "created-face(hole:counterbore-wall) @hole:shape-query-hole-11",
+                "note": "Counterbored holes create a defended counterbore wall-face query."
+              },
+              {
+                "query": "created-face(hole:counterbore-floor) @hole:shape-query-hole-11",
+                "note": "Counterbored holes create a defended planar shoulder face."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "hole-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-11"
+              },
+              {
+                "code": "hole-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              },
+              {
+                "code": "hole-up-to-face-target-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-11"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-hole-10",
+            "operation": "hole",
+            "owner": "hole:shape-query-hole-10",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10",
+                "note": "This face stays queryable through the hole rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(hole:wall) @hole:shape-query-hole-10",
+                "note": "Hole results create a defended wall-face query."
+              },
+              {
+                "query": "created-face(hole:counterbore-wall) @hole:shape-query-hole-10",
+                "note": "Counterbored holes create a defended counterbore wall-face query."
+              },
+              {
+                "query": "created-face(hole:counterbore-floor) @hole:shape-query-hole-10",
+                "note": "Counterbored holes create a defended planar shoulder face."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "hole-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-10"
+              },
+              {
+                "code": "hole-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              },
+              {
+                "code": "hole-up-to-face-target-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-10"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-hole-9",
+            "operation": "hole",
+            "owner": "hole:shape-query-hole-9",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-8) @hole:shape-query-hole-9",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-8) @hole:shape-query-hole-9",
+                "note": "This face stays queryable through the hole rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(hole:wall) @hole:shape-query-hole-9",
+                "note": "Hole results create a defended wall-face query."
+              },
+              {
+                "query": "created-face(hole:countersink-wall) @hole:shape-query-hole-9",
+                "note": "Countersunk holes create a defended countersink wall-face query."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "hole-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-9"
+              },
+              {
+                "code": "hole-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              },
+              {
+                "code": "hole-up-to-face-target-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-9"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-hole-8",
+            "operation": "hole",
+            "owner": "hole:shape-query-hole-8",
+            "preservedFaces": [],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(hole:wall) @hole:shape-query-hole-8",
+                "note": "Hole results create a defended wall-face query."
+              },
+              {
+                "query": "created-face(hole:countersink-wall) @hole:shape-query-hole-8",
+                "note": "Countersunk holes create a defended countersink wall-face query."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "hole-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(top) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-8"
+              },
+              {
+                "code": "hole-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              },
+              {
+                "code": "hole-up-to-face-target-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
+                "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-8"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-boolean-union-7",
+            "operation": "boolean:union",
+            "owner": "boolean:union:shape-query-boolean-union-7",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(top) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(bottom) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(top) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(bottom) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(top) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(bottom) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7"
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "boolean-union-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ]
+          },
+          {
+            "rewriteId": "shape-query-boolean-union-6",
+            "operation": "boolean:union",
+            "owner": "boolean:union:shape-query-boolean-union-6",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(front) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(back) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(left) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(right) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(top) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- canonical-face(bottom) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6"
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "boolean-union-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
     "id": "corpus-trimmed-access-cover",
     "description": "The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable while earlier hole/cut created faces and preserved canonical faces flow through later unions.",
     "objects": [

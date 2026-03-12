@@ -841,6 +841,64 @@ function checkCorpusProjectionRelayCoverPlan(): void {
   assert.equal(lipProfile.base.op, 'union', `Expected ${part.name} projected lip to replay the union silhouette, got ${lipProfile.base.op}`);
 }
 
+function checkCorpusServicePanelCoverPlan(): void {
+  const part = getCompilerRegressionCorpusPart('corpus-service-panel-cover');
+  const plan = runExactManifestScript(part.scriptPath);
+
+  assert.equal(plan.kind, 'boolean', `Expected ${part.name} plan to remain a boolean tree, got ${plan.kind}`);
+  const placements = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
+  assert.equal(
+    placements.length,
+    9,
+    `Expected ${part.name} exact lowering to preserve nine semantic workplane placements (3 bosses + 4 holes + 1 cutout + 1 gasket), got ${placements.length}`,
+  );
+  assert(
+    placements.every((step) => !!step.placement.workplane.source.owner),
+    `Expected ${part.name} workplane placements to retain query-backed owners`,
+  );
+
+  const profiles = collectProfiles(plan);
+  const lipProfile = profiles.find((profile) => profile.kind === 'offset' && profile.delta === 1.8);
+  assert(lipProfile && lipProfile.kind === 'offset', `Expected ${part.name} exact lowering to keep the projected gasket offset profile`);
+  assert.equal(lipProfile.base.kind, 'boolean', `Expected ${part.name} projected gasket base to stay a boolean profile, got ${lipProfile.base.kind}`);
+  assert.equal(lipProfile.base.op, 'union', `Expected ${part.name} projected gasket to replay the union silhouette, got ${lipProfile.base.op}`);
+  assert(
+    profiles.some((profile) => profile.kind === 'roundedRect' && profile.width === 30 && profile.height === 14),
+    `Expected ${part.name} exact lowering to retain the service-pocket sketch profile`,
+  );
+
+  const cylinders = collectShapes(plan).filter((shape) => shape.kind === 'cylinder');
+  assert(
+    cylinders.length >= 10,
+    `Expected ${part.name} exact lowering to contain the richer hole-variant cutter stack, got ${cylinders.length} cylinders`,
+  );
+  assert(
+    cylinders.some((shape) => shape.radiusTop != null && Math.abs(shape.radiusTop - shape.radius) > 1e-9),
+    `Expected ${part.name} exact lowering to contain tapered countersink cylinder plans`,
+  );
+}
+
+function checkCorpusTrimmedAccessCoverPlan(): void {
+  const part = getCompilerRegressionCorpusPart('corpus-trimmed-access-cover');
+  const plan = runExactManifestScript(part.scriptPath);
+
+  assert.equal(plan.kind, 'boolean', `Expected ${part.name} plan to remain a boolean tree, got ${plan.kind}`);
+  assert(
+    collectShapes(plan).some((shape) => shape.kind === 'trimByPlane'),
+    `Expected ${part.name} exact lowering to retain a trimByPlane node`,
+  );
+  assert(
+    collectProfiles(plan).some((profile) => profile.kind === 'roundedRect' && profile.width === 22 && profile.height === 12),
+    `Expected ${part.name} exact lowering to retain the pre-trim service-pocket profile`,
+  );
+  assert(
+    collectShapeTransforms(plan).some(
+      (step) => step.kind === 'translate' && step.x === 0 && step.y === 28 && step.z === 8,
+    ),
+    `Expected ${part.name} exact lowering to retain the later latch placement after the trim`,
+  );
+}
+
 function checkCompilerRegressionCorpusExportEndToEnd(): void {
   for (const part of COMPILER_REGRESSION_CORPUS) {
     exportExactManifestScript(part.scriptPath);
@@ -1150,6 +1208,7 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkCorpusEnclosureShellCutsPlan();
   checkCorpusMotorMountPlatePlan();
   checkCorpusProjectionRelayCoverPlan();
+  checkCorpusServicePanelCoverPlan();
   checkRepeatedFeatureOwnershipPlan();
   checkRepeatedFeatureOwnershipExportEndToEnd();
   checkSketchOnFacePlacementPlan();
@@ -1157,6 +1216,7 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkCorpusEdgeFinishedMountPlan();
   checkCorpusSensorBracketPlan();
   checkCorpusFastenerPlateVariantsPlan();
+  checkCorpusTrimmedAccessCoverPlan();
   checkCompilerRegressionCorpusExportEndToEnd();
   checkProjectionDownstreamPlan();
   checkProjectionRewriteSourcePlan();

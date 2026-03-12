@@ -1,12 +1,25 @@
 # Compiler Regression Corpus
 
 These parts are the curated multi-feature corpus behind `forgecad check compiler`,
-the focused `forgecad check query-propagation` snapshots, and the exact-export
-invariants. They are intentionally ordinary mechanical parts instead of isolated
-geometry tricks, so lowerer regressions show up in workflows that look like real
+the focused `forgecad check query-propagation` snapshots, and `forgecad check brep`.
+They are intentionally ordinary mechanical parts instead of isolated geometry
+tricks, so lowerer regressions show up in workflows that look like real
 product-design code.
 
 Each file is deterministic: no randomness, no params, one named solid result.
+
+## Coverage Map
+
+| Part | Main workflow families |
+| --- | --- |
+| `enclosure-shell-cuts.forge.js` | `shell()`, face-driven cuts, mirrored feet, boolean chain |
+| `motor-mount-plate.forge.js` | circular pattern, mirrored ears, deterministic boolean pockets |
+| `sensor-bracket.forge.js` | mirrored ribs, upright `onFace()` cuts, repeated detail holes |
+| `edge-finished-mount.forge.js` | tracked-edge fillet/chamfer, downstream hole/cut edits, boolean chain |
+| `fastener-plate-variants.forge.js` | counterbores, countersinks, planar `upToFace`, created-face propagation |
+| `projection-relay-cover.forge.js` | `projectToPlane()` replay from repeated union descendants |
+| `service-panel-cover.forge.js` | repeated bosses plus richer hole/cut details plus projection replay |
+| `trimmed-access-cover.forge.js` | `trimByPlane()`, plane-cap ownership, later union edits |
 
 ## Parts
 
@@ -51,6 +64,13 @@ Guards:
 - `projectToPlane()` replay after a repeated top-edge boss chain has already been merged through a supported union
 - projection-driven downstream lips staying exact-exportable instead of collapsing back to runtime-only geometry
 - downstream placement still using defended face-query lineage from the base plate instead of anonymous heuristics
+
+### `service-panel-cover.forge.js`
+
+Guards:
+- repeated top-side bosses staying compiler-owned before later richer hole/cut rewrites hit the same part
+- counterbores, countersinks, and a face-driven display pocket remaining exact-exportable in one ordinary service-cover workflow
+- projection-driven gasket geometry replaying from a hole/cut/union source instead of dropping back to runtime-only silhouette logic
 
 ### `trimmed-access-cover.forge.js`
 
