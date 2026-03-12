@@ -158,12 +158,13 @@ Current progress:
 - `src/forge/queryModel.ts` now defines the shared query/reference contract for face provenance instead of letting workplane and topology code drift separately
 - workplane sources and `FaceRef` values now share that face-query contract when compiler-owned provenance exists
 - booleans, shell, split/trim flows, and downstream workplane-driven features now preserve that owner lineage through the compile graph instead of erasing it at each feature boundary
+- mirrored results plus `linearPattern()` / `circularPattern()` helper copies now get fresh compiler-owned repeated-result owners when their source shapes stay compile-covered
 - placement and exact-export invariants now check that owner lineage survives ordinary shell-plus-cut-plus-boolean style part workflows
 
 Still missing:
 
 - durable face/edge identity across topology-changing operations
-- richer query propagation rules for shell-created faces, fillet/chamfer ownership, patterned features, and projection targets
+- richer query propagation rules for shell-created faces, fillet/chamfer ownership, projection targets, and merged patterned descendants
 - stable face/edge references beyond today's tracked/canonical face foundations
 
 ### Phase 3: Mainstream Feature Families
@@ -186,10 +187,13 @@ Current progress:
 - both lowerers consume the same semantic `shell` node and rewrite supported cases into backend-native boolean/extrude/cylinder plans
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
 - the regression suite now also includes a curated enclosure-style multi-feature part so shell, workplane-driven cuts, mirrors, and booleans are exercised together instead of only as isolated unit slices
+- mirrored downstream features and helper-driven linear/circular repetition now preserve repeated-result ownership on top of the shared face-query backbone
+- exact export regression coverage now includes a repeated-feature part where a mirrored descendant drives a downstream workplane feature inside a boolean chain
 
 Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings
+- repeated-feature ownership currently tracks repeated bodies and mirrored descendants, not durable per-face identity after merged pattern topology changes
 - shelling now preserves parent-body ownership lineage, but stable downstream face ownership after shell-created topology changes is still not solved, which is why fillet/chamfer, holes, and projection-driven edits are still the harder next layer
 
 ### Phase 4: Higher-Order Workflows
