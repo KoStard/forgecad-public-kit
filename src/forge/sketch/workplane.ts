@@ -3,7 +3,7 @@ import {
   cloneShapeQueryOwner,
   type ShapeQueryOwner,
 } from '../queryModel';
-import { getShapePrimaryQueryOwner, resolveAnchor3D, type Shape } from '../kernel';
+import { Shape, getShapePrimaryQueryOwner, resolveAnchor3D } from '../kernel';
 import { Transform, type Mat4, type Vec3 } from '../transform';
 import {
   Sketch,
@@ -96,13 +96,19 @@ function resolvePlanarFaceWorkplane(face: FaceRef): SketchWorkplane {
   if (face.planar === false || !face.uAxis || !face.vAxis) {
     throw new Error(`Face "${face.name}" is not planar and cannot host a sketch.`);
   }
-  const owner = cloneShapeQueryOwner(face.query?.owner);
+  const source = (() => {
+    if (face.query && face.query.kind !== 'tracked-face' && face.query.kind !== 'canonical-face') {
+      return cloneFaceQueryRef(face.query)!;
+    }
+    const owner = cloneShapeQueryOwner(face.query?.owner);
+    return { kind: 'face-ref', faceName: face.name, owner } as const;
+  })();
   return {
     origin: [face.center[0], face.center[1], face.center[2]],
     u: [face.uAxis[0], face.uAxis[1], face.uAxis[2]],
     v: [face.vAxis[0], face.vAxis[1], face.vAxis[2]],
     normal: [face.normal[0], face.normal[1], face.normal[2]],
-    source: { kind: 'face-ref', faceName: face.name, owner },
+    source,
   };
 }
 
@@ -167,6 +173,10 @@ export function resolveSketchWorkplane(
       normal: basis.normal,
       source: { kind: 'canonical-face', face, owner: resolveTargetQueryOwner(parentOrFace) },
     };
+  }
+
+  if (parentOrFace instanceof Shape) {
+    return resolvePlanarFaceWorkplane(parentOrFace.face(face));
   }
 
   if (parentOrFace instanceof TrackedShape) {

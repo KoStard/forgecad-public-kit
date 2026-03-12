@@ -59,6 +59,7 @@ import {
 import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
+import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './shapeFaces';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -733,6 +734,19 @@ export class Shape {
     return resolveAnchorLikePoint(this, ref);
   }
 
+  /** Resolve a defended semantic face by name on compile-covered shapes. */
+  face(name: string) {
+    const plan = getShapeCompilePlanInternal(this);
+    const face = resolveShapeFace(plan, name);
+    if (face) return face;
+    throw new Error(explainMissingShapeFace(plan, name));
+  }
+
+  /** List defended semantic face names currently available on this shape. */
+  faceNames(): string[] {
+    return listShapeFaceNames(getShapeCompilePlanInternal(this));
+  }
+
   /** Translate the shape so the given reference lands on the target coordinate. */
   placeReference(
     ref: PlacementAnchorLike,
@@ -1155,10 +1169,11 @@ export class Shape {
     thickness: number,
     opts: { openFaces?: Array<'top' | 'bottom'> } = {},
   ): Shape {
+    const basePlan = getShapeCompilePlanInternal(this);
     const nextPlan = createOwnedTopologyRewritePlan(
-      buildShellShapeCompilePlan(getShapeCompilePlanInternal(this), thickness, opts.openFaces),
+      buildShellShapeCompilePlan(basePlan, thickness, opts.openFaces),
       'shell',
-      (owner) => buildShellTopologyRewritePropagation(owner, opts.openFaces ?? []),
+      (owner) => buildShellTopologyRewritePropagation(owner, basePlan!, opts.openFaces ?? []),
     );
     if (!nextPlan) {
       throw new Error(

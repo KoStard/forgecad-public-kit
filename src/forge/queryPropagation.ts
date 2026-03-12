@@ -1,11 +1,10 @@
-import type { ShapeCompilePlan } from './compilePlan';
+import type { FeatureCutExtent, ProfileCompilePlan, ShapeCompilePlan } from './compilePlan';
 import {
   cloneTopologyRewritePropagation,
   type EdgeQueryRef,
   type ShapeQueryOwner,
   type TopologyRewritePropagation,
 } from './queryModel';
-import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import {
   createCreatedEdgeQueryRef,
   createCreatedFaceQueryRef,
@@ -14,6 +13,16 @@ import {
   createTopologyRewritePropagation,
   createTopologyRewritePropagationDiagnostic,
 } from './queryPropagationCore';
+import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
+import {
+  blockedShapeFaceNamesForFeature,
+  preservedShapeFaceQueries,
+  selectedShapeFaceNamesForQuery,
+  supportedCutCreatedFaceNames,
+  supportedHoleCreatedFaceNames,
+  supportedShellCreatedFaceNames,
+} from './shapeFaces';
+
 export { buildBooleanTopologyRewritePropagation } from './booleanQueryPropagation';
 
 type TopologyRewriteNodeKind =
@@ -30,17 +39,39 @@ type TopologyRewriteShapeCompilePlan = Extract<ShapeCompilePlan, { kind: Topolog
 
 export function buildShellTopologyRewritePropagation(
   owner: ShapeQueryOwner,
+  base: ShapeCompilePlan,
   openFaces: Array<'top' | 'bottom'>,
 ): TopologyRewritePropagation {
   const propagation = createTopologyRewritePropagation('shell', owner);
-  const openingText = openFaces.length > 0 ? ` Open faces: ${openFaces.join(', ')}.` : '';
+  const preserved = preservedShapeFaceQueries(base);
+  const created = supportedShellCreatedFaceNames(base, openFaces);
+
+  for (const entry of preserved) {
+    propagation.preservedFaces.push({
+      query: createPropagatedFaceQueryRef(entry.query, owner, 'preserved'),
+      status: 'supported',
+      note: 'The outer shell face survives as a defended preserved-face query on the shelled result.',
+    });
+  }
+  for (const name of created) {
+    propagation.createdFaces.push({
+      query: createCreatedFaceQueryRef(owner, 'shell', name),
+      note: 'This shell-created inner face is part of the defended named-face subset.',
+    });
+  }
+
+  if (preserved.length === 0 && created.length === 0) {
+    const openingText = openFaces.length > 0 ? ` Open faces: ${openFaces.join(', ')}.` : '';
+    propagation.diagnostics.push(
+      createTopologyRewritePropagationDiagnostic(
+        'shell-face-propagation-unsupported',
+        'unsupported',
+        'face',
+        `Shell exact lowering is supported here, but compiler-owned face propagation is not defended for this shell base.${openingText}`,
+      ),
+    );
+  }
   propagation.diagnostics.push(
-    createTopologyRewritePropagationDiagnostic(
-      'shell-face-propagation-ambiguous',
-      'ambiguous',
-      'face',
-      `Shell rewrites result faces, but durable face-query propagation is not defended yet.${openingText}`,
-    ),
     createTopologyRewritePropagationDiagnostic(
       'shell-edge-propagation-ambiguous',
       'ambiguous',
@@ -53,23 +84,46 @@ export function buildShellTopologyRewritePropagation(
 
 export function buildHoleTopologyRewritePropagation(
   owner: ShapeQueryOwner,
+  base: ShapeCompilePlan,
   placement: ShapeWorkplanePlacement['placement'],
+  extent: FeatureCutExtent,
 ): TopologyRewritePropagation {
   const propagation = createTopologyRewritePropagation('hole', owner);
-  const propagated = createPropagatedFaceQueryRef(placement.workplane.source, owner, 'split');
-  propagation.preservedFaces.push({
-    query: propagated,
-    status: 'ambiguous',
-    note: 'The selected host face survives only as a split descendant set after the hole lands.',
-  });
+  const blocked = new Set(blockedShapeFaceNamesForFeature(base, placement.workplane.source, extent));
+  const selected = new Set(selectedShapeFaceNamesForQuery(base, placement.workplane.source));
+  for (const entry of preservedShapeFaceQueries(base)) {
+    if (blocked.has(entry.name)) {
+      propagation.preservedFaces.push({
+        query: createPropagatedFaceQueryRef(entry.query, owner, 'split'),
+        status: 'ambiguous',
+        note: selected.has(entry.name)
+          ? 'The selected host face is rewritten by the hole result and is not a defended named target.'
+          : 'This opposite face is pierced by the through-hole and is not a defended named target.',
+      });
+      continue;
+    }
+    propagation.preservedFaces.push({
+      query: createPropagatedFaceQueryRef(entry.query, owner, 'preserved'),
+      status: 'supported',
+      note: 'This face stays queryable through the hole rewrite.',
+    });
+  }
+  for (const name of supportedHoleCreatedFaceNames(extent)) {
+    propagation.createdFaces.push({
+      query: createCreatedFaceQueryRef(owner, 'hole', name),
+      note: name === 'floor'
+        ? 'Blind holes create a defended planar floor face.'
+        : 'Hole results create a defended wall-face query.',
+    });
+  }
   propagation.diagnostics.push(
     createTopologyRewritePropagationDiagnostic(
       'hole-source-face-split-ambiguous',
       'ambiguous',
       'face',
-      'Hole intent records that the selected host face is split, but the surviving descendants are not uniquely queryable yet.',
+      'Hole intent records which rewritten host/exit faces are ambiguous instead of silently accepting them.',
       placement.workplane.source,
-      propagated,
+      createPropagatedFaceQueryRef(placement.workplane.source, owner, 'split'),
     ),
     createTopologyRewritePropagationDiagnostic(
       'hole-created-edge-propagation-unsupported',
@@ -83,23 +137,48 @@ export function buildHoleTopologyRewritePropagation(
 
 export function buildCutTopologyRewritePropagation(
   owner: ShapeQueryOwner,
+  base: ShapeCompilePlan,
   placement: ShapeWorkplanePlacement['placement'],
+  profile: ProfileCompilePlan,
+  extent: FeatureCutExtent,
 ): TopologyRewritePropagation {
   const propagation = createTopologyRewritePropagation('cut', owner);
-  const propagated = createPropagatedFaceQueryRef(placement.workplane.source, owner, 'split');
-  propagation.preservedFaces.push({
-    query: propagated,
-    status: 'ambiguous',
-    note: 'The selected host face is split by the cut profile, so the surviving descendants are still ambiguous.',
-  });
+  const blocked = new Set(blockedShapeFaceNamesForFeature(base, placement.workplane.source, extent));
+  const selected = new Set(selectedShapeFaceNamesForQuery(base, placement.workplane.source));
+  for (const entry of preservedShapeFaceQueries(base)) {
+    if (blocked.has(entry.name)) {
+      propagation.preservedFaces.push({
+        query: createPropagatedFaceQueryRef(entry.query, owner, 'split'),
+        status: 'ambiguous',
+        note: selected.has(entry.name)
+          ? 'The selected host face is rewritten by the cut result and is not a defended named target.'
+          : 'This opposite face is pierced by the through-cut and is not a defended named target.',
+      });
+      continue;
+    }
+    propagation.preservedFaces.push({
+      query: createPropagatedFaceQueryRef(entry.query, owner, 'preserved'),
+      status: 'supported',
+      note: 'This face stays queryable through the cut rewrite.',
+    });
+  }
+  const createdNames = supportedCutCreatedFaceNames(profile, extent);
+  for (const name of createdNames) {
+    propagation.createdFaces.push({
+      query: createCreatedFaceQueryRef(owner, 'cut', name),
+      note: name === 'floor'
+        ? 'Blind cutouts create a defended planar floor face.'
+        : 'This cut-created wall face is part of the defended named-face subset.',
+    });
+  }
   propagation.diagnostics.push(
     createTopologyRewritePropagationDiagnostic(
       'cut-source-face-split-ambiguous',
       'ambiguous',
       'face',
-      'Cut intent records that the selected host face is split, but the surviving descendants are not uniquely queryable yet.',
+      'Cut intent records which rewritten host/exit faces are ambiguous instead of silently accepting them.',
       placement.workplane.source,
-      propagated,
+      createPropagatedFaceQueryRef(placement.workplane.source, owner, 'split'),
     ),
     createTopologyRewritePropagationDiagnostic(
       'cut-created-edge-propagation-unsupported',
@@ -108,6 +187,16 @@ export function buildCutTopologyRewritePropagation(
       'Cut-created edge semantics are not part of the topology-rewrite kernel yet.',
     ),
   );
+  if (createdNames.length === 0) {
+    propagation.diagnostics.push(
+      createTopologyRewritePropagationDiagnostic(
+        'cut-created-face-subset-unsupported',
+        'unsupported',
+        'face',
+        'This cut profile does not fall inside the defended cut-created face subset yet.',
+      ),
+    );
+  }
   return propagation;
 }
 

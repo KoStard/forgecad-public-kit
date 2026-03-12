@@ -47,6 +47,16 @@ function expectMatrix(actual: number[], expected: number[], label: string): void
   }
 }
 
+function expectThrows(fn: () => void, pattern: RegExp, label: string): void {
+  try {
+    fn();
+    fail(`${label} expected an error matching ${pattern}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    expect(pattern.test(message), `${label} expected error ${pattern}, got "${message}"`);
+  }
+}
+
 function midpoint(start: [number, number, number], end: [number, number, number]): [number, number, number] {
   return [
     (start[0] + end[0]) / 2,
@@ -369,6 +379,8 @@ function checkHoleCutFeaturePlacement(): void {
   expect(baseOwner != null, 'hole/cut base should expose a primary query owner');
 
   const drilled = base.hole('top', { diameter: 6, u: 8, v: -4, depth: 9 });
+  const drilledOwner = getShapePrimaryQueryOwner(drilled);
+  expect(drilledOwner != null, 'blind-hole result should expose a primary owner');
   const holePlacement = getShapeWorkplanePlacement(drilled);
   expect(holePlacement != null, 'Shape.hole() should preserve its semantic workplane placement on the result');
   expect(holePlacement!.placement.workplane.source.kind === 'tracked-face', 'Shape.hole() should prefer tracked planar faces when available');
@@ -376,16 +388,72 @@ function checkHoleCutFeaturePlacement(): void {
   expect(holePlacement!.placement.workplane.source.owner?.id === baseOwner!.id, 'Shape.hole() should keep the parent body owner on the face query');
   expect(holePlacement!.placement.u === 8, 'Shape.hole() should preserve the feature u offset');
   expect(holePlacement!.placement.v === -4, 'Shape.hole() should preserve the feature v offset');
+  expect(drilled.faceNames().includes('floor'), 'blind-hole results should expose a defended floor face name');
+  expect(drilled.faceNames().includes('wall'), 'hole results should expose a defended wall face name');
+  const holeFloor = drilled.face('floor');
+  expect(holeFloor.query?.kind === 'created-face', 'hole floor should expose a created-face query');
+  if (holeFloor.query?.kind === 'created-face') {
+    expect(holeFloor.query.slot === 'floor', `expected blind-hole floor slot "floor", got ${holeFloor.query.slot}`);
+    expect(holeFloor.query.owner?.id === drilledOwner!.id, 'blind-hole floor queries should target the hole owner');
+  }
+  expectThrows(
+    () => drilled.face('top'),
+    /selected host face is rewritten by the hole result/,
+    'hole.hostFace',
+  );
+
+  const floorBadge = rect(4, 3)
+    .onFace(drilled, 'floor', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
+    .extrude(1)
+    .toShape();
+  const floorPlacement = getShapeWorkplanePlacement(floorBadge);
+  expect(floorPlacement != null, 'downstream features should preserve workplane placement from blind-hole floor faces');
+  expect(floorPlacement!.placement.workplane.source.kind === 'created-face', 'blind-hole floor placement should preserve a created-face query source');
+  if (floorPlacement!.placement.workplane.source.kind === 'created-face') {
+    expect(floorPlacement!.placement.workplane.source.slot === 'floor', `expected blind-hole floor placement slot "floor", got ${floorPlacement!.placement.workplane.source.slot}`);
+    expect(
+      floorPlacement!.placement.workplane.source.owner?.id === drilledOwner!.id,
+      'blind-hole floor placement should target the hole owner lineage',
+    );
+  }
 
   const pocket = roundedRect(12, 8, 2, true)
     .onFace(base, 'front', { u: 0, v: 3, selfAnchor: 'center' });
   const cut = drilled.cutout(pocket, { depth: 5 });
+  const cutOwner = getShapePrimaryQueryOwner(cut);
+  expect(cutOwner != null, 'cut results should expose a primary owner');
   const cutPlacement = getShapeWorkplanePlacement(cut);
   expect(cutPlacement != null, 'Shape.cutout() should preserve its semantic workplane placement on the result');
   expect(cutPlacement!.placement.workplane.source.kind === 'canonical-face', 'Shape.cutout() should preserve canonical face queries when the source sketch used them');
   expect(cutPlacement!.placement.workplane.source.face === 'front', 'Shape.cutout() should preserve the selected canonical face');
   expect(cutPlacement!.placement.workplane.source.owner?.id === baseOwner!.id, 'Shape.cutout() should retain the originating body owner lineage');
   expect(cutPlacement!.placement.selfAnchor === 'center', 'Shape.cutout() should preserve the source sketch anchor');
+  expect(cut.faceNames().includes('floor'), 'blind cutouts should expose a defended floor face name');
+  expect(cut.faceNames().includes('wall-right'), 'rounded-rect cutouts should expose named wall faces');
+  const cutWall = cut.face('wall-right');
+  expect(cutWall.query?.kind === 'created-face', 'cut wall should expose a created-face query');
+  if (cutWall.query?.kind === 'created-face') {
+    expect(cutWall.query.slot === 'wall-right', `expected cut wall slot "wall-right", got ${cutWall.query.slot}`);
+    expect(cutWall.query.owner?.id === cutOwner!.id, 'cut wall queries should target the cut owner');
+  }
+
+  const cutBadge = rect(3, 2)
+    .onFace(cut, 'wall-right', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
+    .extrude(0.8)
+    .toShape();
+  const cutWallPlacement = getShapeWorkplanePlacement(cutBadge);
+  expect(cutWallPlacement != null, 'downstream features should preserve workplane placement from cut-created wall faces');
+  expect(cutWallPlacement!.placement.workplane.source.kind === 'created-face', 'cut-created wall placement should preserve a created-face query source');
+  if (cutWallPlacement!.placement.workplane.source.kind === 'created-face') {
+    expect(
+      cutWallPlacement!.placement.workplane.source.slot === 'wall-right',
+      `expected cut wall placement slot "wall-right", got ${cutWallPlacement!.placement.workplane.source.slot}`,
+    );
+    expect(
+      cutWallPlacement!.placement.workplane.source.owner?.id === cutOwner!.id,
+      'cut-created wall placement should target the cut owner lineage',
+    );
+  }
 }
 
 function checkEdgeFinishOwnerPropagation(): void {
@@ -534,13 +602,47 @@ function checkTopologyRewritePropagationInspection(): void {
   const base = roundedRect(36, 22, 3, true).extrude(14);
 
   const shelled = base.shell(2, { openFaces: ['top'] });
+  const shelledOwner = getShapePrimaryQueryOwner(shelled);
+  expect(shelledOwner != null, 'shell results should expose a primary owner');
   const shellPropagation = getShapeTopologyRewritePropagation(shelled);
   expect(shellPropagation != null, 'shell results should expose a topology-rewrite propagation contract');
   expect(shellPropagation!.operation === 'shell', `expected shell propagation operation, got ${shellPropagation!.operation}`);
+  expect(shellPropagation!.preservedFaces.length === 6, `expected 6 preserved shell faces, got ${shellPropagation!.preservedFaces.length}`);
+  expect(shellPropagation!.createdFaces.length === 5, `expected 5 created shell faces for an open-top rounded shell, got ${shellPropagation!.createdFaces.length}`);
   expect(
-    shellPropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'shell-face-propagation-ambiguous'),
-    'shell propagation should expose explicit face ambiguity diagnostics instead of silently dropping them',
+    shellPropagation!.createdFaces.some((entry) => entry.query.slot === 'inner-side-right'),
+    'shell propagation should expose the defended inner wall created-face slots',
   );
+  expect(
+    shellPropagation!.createdFaces.every((entry) => entry.query.owner?.id === shelledOwner!.id),
+    'shell created-face queries should target the shell owner',
+  );
+  expect(
+    shellPropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'shell-edge-propagation-ambiguous'),
+    'shell propagation should still expose explicit unsupported edge semantics instead of silently dropping them',
+  );
+
+  expect(shelled.faceNames().includes('inner-side-right'), 'shell results should expose defended inner wall face names');
+  const innerWall = shelled.face('inner-side-right');
+  expect(innerWall.query?.kind === 'created-face', 'shell inner walls should expose created-face queries');
+  if (innerWall.query?.kind === 'created-face') {
+    expect(innerWall.query.slot === 'inner-side-right', `expected shell inner wall slot "inner-side-right", got ${innerWall.query.slot}`);
+    expect(innerWall.query.owner?.id === shelledOwner!.id, 'shell inner wall queries should target the shell owner');
+  }
+
+  const shellFeature = rect(4, 3)
+    .onFace(shelled, 'inner-side-right', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
+    .extrude(1)
+    .toShape();
+  const shellFeaturePlacement = getShapeWorkplanePlacement(shellFeature);
+  expect(shellFeaturePlacement != null, 'downstream features should preserve workplane placement from shell-created wall faces');
+  expect(shellFeaturePlacement!.placement.workplane.source.kind === 'created-face', 'shell-created wall placement should preserve a created-face query source');
+  if (shellFeaturePlacement!.placement.workplane.source.kind === 'created-face') {
+    expect(
+      shellFeaturePlacement!.placement.workplane.source.slot === 'inner-side-right',
+      `expected shell-created wall placement slot "inner-side-right", got ${shellFeaturePlacement!.placement.workplane.source.slot}`,
+    );
+  }
 
   const drilled = base.hole('top', { diameter: 6, u: 4, v: -3, depth: 8 });
   const drilledOwner = getShapePrimaryQueryOwner(drilled);
@@ -548,16 +650,26 @@ function checkTopologyRewritePropagationInspection(): void {
   const holePropagation = getShapeTopologyRewritePropagation(drilled);
   expect(holePropagation != null, 'hole results should expose a topology-rewrite propagation contract');
   expect(holePropagation!.operation === 'hole', `expected hole propagation operation, got ${holePropagation!.operation}`);
-  expect(holePropagation!.preservedFaces.length === 1, `expected one preserved face entry for hole propagation, got ${holePropagation!.preservedFaces.length}`);
-  const splitFace = holePropagation!.preservedFaces[0];
-  expect(splitFace.status === 'ambiguous', 'hole source-face propagation should be marked ambiguous today');
-  expect(splitFace.query.kind === 'propagated-face', 'hole propagation should expose a propagated-face query');
-  expect(splitFace.query.outcome === 'split', 'hole source-face propagation should record a split outcome');
-  expect(splitFace.query.owner?.id === drilledOwner!.id, 'hole propagated-face queries should target the hole result owner');
-  expect(splitFace.query.source.kind === 'tracked-face', 'hole propagated-face queries should preserve the tracked source face');
-  if (splitFace.query.source.kind === 'tracked-face') {
-    expect(splitFace.query.source.faceName === 'top', `expected top source face, got ${splitFace.query.source.faceName}`);
+  expect(holePropagation!.preservedFaces.length === 6, `expected 6 preserved-face entries for hole propagation, got ${holePropagation!.preservedFaces.length}`);
+  const splitFace = holePropagation!.preservedFaces.find((entry) =>
+    entry.query.kind === 'propagated-face'
+      && entry.query.source.kind === 'tracked-face'
+      && entry.query.source.faceName === 'top',
+  );
+  expect(splitFace != null, 'hole propagation should expose an explicit ambiguous entry for the rewritten host face');
+  expect(splitFace!.status === 'ambiguous', 'hole source-face propagation should still mark the host face ambiguous');
+  expect(splitFace!.query.kind === 'propagated-face', 'hole propagation should expose a propagated-face query');
+  expect(splitFace!.query.outcome === 'split', 'hole source-face propagation should record a split outcome');
+  expect(splitFace!.query.owner?.id === drilledOwner!.id, 'hole propagated-face queries should target the hole result owner');
+  expect(splitFace!.query.source.kind === 'tracked-face', 'hole propagated-face queries should preserve the tracked source face');
+  if (splitFace!.query.source.kind === 'tracked-face') {
+    expect(splitFace!.query.source.faceName === 'top', `expected top source face, got ${splitFace!.query.source.faceName}`);
   }
+  expect(holePropagation!.createdFaces.length === 2, `expected 2 created faces for a blind hole, got ${holePropagation!.createdFaces.length}`);
+  expect(
+    holePropagation!.createdFaces.some((entry) => entry.query.slot === 'floor'),
+    'hole propagation should expose the blind-hole floor created-face slot',
+  );
   expect(
     holePropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'hole-source-face-split-ambiguous'),
     'hole propagation should expose an explicit split-face ambiguity diagnostic',
