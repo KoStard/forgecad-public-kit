@@ -154,11 +154,15 @@ Current progress:
 - downstream compiler-aware code can now inspect that preserved workplane placement directly
 - that compiler-visible workplane placement now propagates through later shape transforms, so provenance inspection stays aligned with the current transformed feature state
 - both lowerers now execute that preserved workplane-placement intent, and exact export regression tests exercise the CadQuery/OCCT path end-to-end
+- compile-covered feature results now carry compiler-owned query-owner lineage, so parent-body ownership is no longer implicit runtime state
+- workplane sources and `FaceRef` values now record the parent body's compiler-owned owner identity when that provenance exists
+- booleans, shell, split/trim flows, and downstream workplane-driven features now preserve that owner lineage through the compile graph instead of erasing it at each feature boundary
+- placement and exact-export invariants now check that owner lineage survives ordinary shell-plus-cut-plus-boolean style part workflows
 
 Still missing:
 
-- durable parent-body identity across broader feature chains
-- query propagation through boolean/feature ownership changes
+- durable face/edge identity across topology-changing operations
+- richer query propagation rules for shell-created faces, fillet/chamfer ownership, patterned features, and projection targets
 - stable face/edge references beyond today's tracked/canonical face foundations
 
 ### Phase 3: Mainstream Feature Families
@@ -185,7 +189,7 @@ Current progress:
 Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings
-- stable downstream face ownership after shelling is still not solved, which is why fillet/chamfer, holes, and projection-driven edits are still the harder next layer
+- shelling now preserves parent-body ownership lineage, but stable downstream face ownership after shell-created topology changes is still not solved, which is why fillet/chamfer, holes, and projection-driven edits are still the harder next layer
 
 ### Phase 4: Higher-Order Workflows
 
