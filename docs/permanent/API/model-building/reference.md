@@ -772,6 +772,62 @@ const cup = roundedRect(80, 50, 6, true)
   .shell(2.5, { openFaces: ['top'] });
 ```
 
+#### `shape.hole(face, options)`
+Compiler-owned circular hole workflow anchored to a face/workplane query.
+
+- `depth` omitted = through-hole
+- `depth` provided = blind hole
+- `u` / `v` place the hole in face-local coordinates
+
+```javascript
+const block = roundedRect(90, 60, 8, true).extrude(24);
+
+const body = block
+  .hole('front', { diameter: 8, u: 0, v: 2 })          // through
+  .hole('top', { diameter: 6, u: -18, v: 10, depth: 10 }); // blind
+```
+
+Supported v1:
+
+- compile-covered target bodies
+- canonical faces, tracked planar faces, and `FaceRef` targets
+- through and blind circular holes
+- exact lowering through both Manifold and CadQuery/OCCT
+
+Not supported yet:
+
+- counterbore / countersink / taper / thread semantics
+- segmented polygonal hole cutters
+- stable downstream identity for hole-created faces
+- runtime-only target bodies without compiler intent
+
+#### `shape.cutout(sketch, options?)`
+Compiler-owned cut-extrude workflow using a sketch already placed with `Sketch.onFace(...)`.
+
+- `depth` omitted = through-cut
+- `depth` provided = blind cut
+- the sketch must carry semantic workplane placement from `onFace(...)`
+
+```javascript
+const block = roundedRect(90, 60, 8, true).extrude(24);
+const pocket = roundedRect(18, 10, 2, true)
+  .onFace(block, 'top', { u: 14, v: -8, selfAnchor: 'center' });
+
+const body = block.cutout(pocket, { depth: 6 });
+```
+
+Supported v1:
+
+- compile-covered sketch profiles that CadQuery/OCCT already supports
+- sketches placed on queried faces via `onFace(...)`
+- exact/runtime parity through the shared compiler node family
+
+Not supported yet:
+
+- free-floating sketches without face/workplane provenance
+- draft/taper angles, two-sided extents, "up to face", or non-planar targets
+- stable downstream identity for faces created by the cut result
+
 ### Warping
 
 ```javascript

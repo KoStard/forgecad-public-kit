@@ -60,9 +60,9 @@ Target:
 
 Why it is not fully true today:
 
-- users can hand-build cuts from sketches and booleans
-- Forge does not yet have a compiler-owned hole/cut feature family
-- there is no dedicated exact/runtime lowering family for holes yet
+- Forge now has a first compiler-owned hole/cut slice (`shape.hole()` + `shape.cutout()`) for circular through/blind holes and simple `onFace()`-anchored cutouts
+- but richer workflows such as counterbores, countersinks, patterned cuts, up-to-face extents, and durable ownership for feature-created faces are still missing
+- this is now a narrow supported subset, not the full ordinary part-design stack yet
 
 ## Capability 4: Projection-Driven Downstream Sketching
 
@@ -106,4 +106,3 @@ What is still impossible or not yet clean:
 - projection-driven feature chains with durable semantic ownership
 - reliable edge-driven fillet/chamfer flows
 - claiming "most regular design features" without caveats
-
