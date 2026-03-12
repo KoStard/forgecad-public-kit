@@ -54,3 +54,4 @@ This task is intentionally single-owner because it touches the boundary between 
 
 ## Status and log
 - 2026-03-12: Created to reconcile the post-200 wave before the MLP closeout lane starts.
+- 2026-03-12: Completed. Restored stacked hole/cut face-propagation lineage in the defended query contract, refreshed the focused query-propagation snapshots after reviewing the regression, and synced the backend-compiler temporary docs plus task 220 status so task 230 is the next clear lane.

@@ -46,3 +46,4 @@ Can start after tasks 180 and 190 land. Safe to run in parallel with:
 
 ## Status and log
 - 2026-03-12: Created for the second post-160 feature wave.
+- 2026-03-12: Completed. Broadened compiler-owned fillet/chamfer support to defended preserved propagated sibling vertical edges through supported finishing and boolean-union chains, kept merged selected-edge cases explicit with propagation diagnostics, expanded API/placement/query-propagation/compiler/BREP/corpus coverage, and updated the permanent docs to describe the supported and unsupported subset honestly.

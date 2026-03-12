@@ -54,11 +54,8 @@ Near-term path to that MLP:
 
 1. Task 160 is landed: topology-changing features now share one compiler-owned query propagation backbone instead of local rewrite rules.
 2. Tasks 170, 180, 190, and 195 are landed: created-face targeting, boolean/pattern propagation, defended propagated-edge support, and the dedicated query-propagation regression surface are now in.
-3. The active feature wave is now:
-   - task 200 for richer hole/cut variants
-   - task 210 for broader projection/sketch-on-face flows
-   - task 220 for broader fillet/chamfer on defended propagated edges
-4. Close the wave with task 230 so the corpus, capability docs, and MLP state are all honest and reviewable.
+3. Tasks 200, 210, and 220 are landed: richer hole/cut variants, broader projection/sketch-on-face flows, and broader fillet/chamfer on defended propagated edges are now in.
+4. Task 230 is the next active lane so the corpus, capability docs, and MLP state become honest and reviewable together.
 
 Deepest completed prerequisite:
 
@@ -288,7 +285,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 7. Add backend mismatch / conversion diagnostics | In progress | Exact BREP lowering now emits explicit diagnostics and compiler snapshot tooling preserves them. |
 | 8. Introduce an OCCT/CadQuery lowering path beyond export-only replay | In progress | The `cadquery-occt` target now covers the current exact subset plus compatible `loft` / `sweep` plans and shell v1; feature coverage is still narrow and export-driven. |
 | 9. Make both backends true lowerers from the same compile graph | In progress | Shared lowering now reaches farther into mainstream features, and topology-rewrite propagation contracts are now compiler-owned; broader feature families and stronger downstream reference stability are still the remaining checkpoint. |
-| 10. Cover mainstream design-feature families across both lowerers | In progress | Shell v1, hole/cut v1, tracked-edge fillet/chamfer v1, repeated mirror/pattern ownership, a narrow projection downstream slice, and the topology-rewrite propagation backbone are in; broader hole/cut variants, broader projection replay, and durable post-topology-change ownership still remain. |
+| 10. Cover mainstream design-feature families across both lowerers | In progress | Shell v1, richer hole/cut workflows, broader projection replay, a broader tracked-edge fillet/chamfer subset, repeated mirror/pattern ownership, and the topology-rewrite propagation backbone are in; durable post-topology-change ownership and broader unsupported families still remain. |
 | 11. Push exact export fully behind the CadQuery/OCCT lowerer | In progress | Export now consumes an explicit `cadquery-occt` compiler target, but the target still needs much broader feature coverage. |
 | 12. Add advanced hybrid-only feature families | Deferred | Sheet metal stays deferred until the active checkpoint is done. |
 
@@ -321,9 +318,9 @@ The current unit-style test strategy is:
 
 ## Current Risks And Issues
 
-- The compile graph still does not fully cover important operation families including deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, broader fillet/chamfer families, richer hole/cut variants (counterbores, countersinks, up-to-face logic), and broader projection/feature-pattern workflows. Those unsupported shapes still lose compile intent and fall back to mesh-only behavior.
+- The compile graph still does not fully cover important operation families including deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, patterned/drafted/two-sided hole-cut variants, broader projection/feature-pattern workflows, and durable downstream fillet/chamfer ownership beyond today's defended propagated-edge subset. Those unsupported shapes still lose compile intent and fall back to mesh-only behavior.
 - The new sketch workplane metadata plus shared face/edge query lineage are a meaningful foundation step, and the topology-rewrite propagation kernel is now in place, but that is still not the full answer yet. Forge now owns parent-body identity, tracked-topology query selectors, and explicit rewrite-propagation diagnostics for compile-covered feature chains, but it still does not own durable face/edge identity through topology-changing edits.
-- The compiler now preserves `onFace()` workplane placement, parent-body ownership, a first tracked-edge finishing slice, a topology-rewrite propagation contract, and a narrow projection replay path through `extrude()` / `revolve()`, booleans, shell, split/trim, downstream transforms, and repeated-result owners for mirrored/helper-patterned descendants. The remaining hard part is feature-family-specific query support once features start depending on shell-created faces, broader projection targets, merged patterned children, and durable fillet/chamfer-owned topology.
+- The compiler now preserves `onFace()` workplane placement, parent-body ownership, a broader tracked-edge finishing slice, a topology-rewrite propagation contract, and a broader but still defended projection replay path through `extrude()` / `revolve()`, booleans, shell, hole/cut, split/trim, downstream transforms, and repeated-result owners for mirrored/helper-patterned descendants. The remaining hard part is feature-family-specific query support once features start depending on shell-created faces, broader projection targets, merged patterned children, and durable fillet/chamfer-owned topology.
 - `shell()` is now compiler-owned, but only for compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with rigid pre-shell transforms. Broader shell semantics will still need stable face/edge identity once downstream edits depend on shell-created faces rather than just parent-body lineage.
 - The hull family is now compile-covered for the Manifold runtime, but exact OCCT replay is still missing. That means hull intent is preserved and diagnosable, but STEP/BREP still needs faceted fallback for those shapes.
 - `loft()` exact export is narrower than Forge's sampled loft semantics. Forge can interpolate aggressively across differing profile topology through SDF blending, while CadQuery/OCCT section lofting can still reject some extreme mixed-topology stacks.

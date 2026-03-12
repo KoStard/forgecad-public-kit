@@ -25,20 +25,24 @@ Completed foundations and slices:
 What that gives the next lane:
 
 - shared face and edge query/reference contracts
-- hole/cut v1, projection replay v1, repeated-result ownership, and tracked-edge finishing v1 in the compiler-owned subset
+- richer hole/cut workflows, broader projection replay, repeated-result ownership, and broader tracked-edge finishing in the compiler-owned subset
 - curated multi-feature corpus coverage in compiler and exact-export checks
 
-This is the base that task 130 consumed instead of inventing new provenance or regression surfaces locally.
+This is the landed base that task 230 now closes out instead of inventing new provenance or regression surfaces locally.
 
 ## Current Wave
 
 The topology-rewrite backbone and the first post-160 parallel wave are now landed.
 
-The active wave is:
+That landed second wave was:
 
 - [tasks/200-richer-hole-and-cut-variants.md](../../../../../../tasks/200-richer-hole-and-cut-variants.md)
 - [tasks/210-projection-and-sketch-on-face-expansion.md](../../../../../../tasks/210-projection-and-sketch-on-face-expansion.md)
 - [tasks/220-broader-fillet-and-chamfer.md](../../../../../../tasks/220-broader-fillet-and-chamfer.md)
+
+The next active lane is:
+
+- [tasks/230-mlp-corpus-and-doc-closeout.md](../../../../../../tasks/230-mlp-corpus-and-doc-closeout.md)
 
 ## Dependency Graph
 
@@ -95,22 +99,18 @@ graph TD
 
 ## Program State
 
-- Landed: 100, 105, 110, 120, 125, 130, 140, 150, 160, 170, 180, 190, and 195.
-- Active parallel wave: 200, 210, 220.
-- MLP closeout lane: 230.
+- Landed: 100, 105, 110, 120, 125, 130, 140, 150, 160, 170, 180, 190, 195, 200, 210, and 220.
+- Landed second wave: 200, 210, 220.
+- Next closeout lane: 230.
 
 ## Next Up
 
-1. Start in parallel:
-   - [tasks/200-richer-hole-and-cut-variants.md](../../../../../../tasks/200-richer-hole-and-cut-variants.md)
-   - [tasks/210-projection-and-sketch-on-face-expansion.md](../../../../../../tasks/210-projection-and-sketch-on-face-expansion.md)
-   - [tasks/220-broader-fillet-and-chamfer.md](../../../../../../tasks/220-broader-fillet-and-chamfer.md)
-2. Close the wave with:
+1. Close the landed second wave with:
    - [tasks/230-mlp-corpus-and-doc-closeout.md](../../../../../../tasks/230-mlp-corpus-and-doc-closeout.md)
 
 ## Parallel Starts
 
-These three can now run in parallel:
+These three were intentionally parallel and are now landed:
 
 - task 200
 - task 210
@@ -149,11 +149,11 @@ Core integrator lane:
 
 Next feature lane:
 
-- Active feature wave: tasks 200, 210, 220
+- MLP closeout lane: task 230
 
 Quality support:
 
-- Task 195 is landed, and task 230 is the next truthfulness/corpus closeout lane after the active feature wave
+- Task 195 is landed, and task 230 is now the active truthfulness/corpus closeout lane after the landed second wave
 
 ## File-Ownership Guidance
 

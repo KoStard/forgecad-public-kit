@@ -24,9 +24,9 @@ Why this matters:
 
 Why it is not fully true today:
 
-- the compiler covers a growing but still intentionally bounded subset of the part-design stack
-- hole/cut workflows, projection-driven edits, and repeated mirror/pattern ownership now have first compiler-owned slices, but each is still narrower than the end-state target
-- fillet/chamfer now have a first compiler-owned tracked-edge subset, but durable post-topology-change reference stability is still missing
+- the compiler covers a broader but still intentionally bounded subset of the part-design stack
+- richer hole/cut variants, broader projection-driven edits, repeated mirror/pattern ownership, and broader tracked-edge finishing are now compiler-owned for defended subsets, but each remains narrower than the end-state target
+- durable post-topology-change face/edge reference stability is still missing
 - OCCT/CadQuery is still broader in export than in ordinary feature coverage
 
 ## Capability 2: Face-Driven Detail Features Without Brittle Attachment
@@ -61,8 +61,8 @@ Target:
 
 Why it is not fully true today:
 
-- Forge now has a first compiler-owned hole/cut slice (`shape.hole()` + `shape.cutout()`) for circular through/blind holes and simple `onFace()`-anchored cutouts
-- but richer workflows such as counterbores, countersinks, patterned cuts, up-to-face extents, and durable ownership for feature-created faces are still missing
+- Forge now has compiler-owned hole/cut workflows for circular through/blind holes, counterbores, countersinks, and planar `upToFace` hole/cut extents, with defended created-face slots where Forge can model them directly
+- patterned cut workflows, drafted/two-sided extents, and broader durable ownership beyond today's defended created-face subset are still missing
 - this is now a narrow supported subset, not the full ordinary part-design stack yet
 
 ## Capability 4: Projection-Driven Downstream Sketching
@@ -74,8 +74,8 @@ Target:
 
 Why it is not fully true today:
 
-- `projectToPlane()` now keeps explicit projection intent for a narrow compiler-owned downstream subset
-- the supported replay path currently covers follow-on features when the source is a straight placed extrusion and the target plane stays parallel to the source workplane placement
+- `projectToPlane()` now keeps explicit projection intent for a broader but still defended compiler-owned downstream subset
+- the supported replay path now covers follow-on features when the source reduces to one defended planar basis: straight placed extrusions, compatible shell/hole/cut descendants, and compatible boolean unions on matching parallel target planes
 - richer projection targets, topology-changing sources, and broader downstream projection edits still fall back to runtime-only behavior or explicit diagnostics
 
 ## Capability 5: Edge-Driven Finishing Features
@@ -89,25 +89,24 @@ Target:
 Why it is not fully true today:
 
 - Forge now has a shared edge-query contract plus tracked-edge selector propagation
-- Forge now has a first compiler-owned fillet/chamfer slice for tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies
-- preserved propagated sibling edges can now drive a later supported fillet/chamfer after an ordinary defended union on that same lineage
+- Forge now has a broader compiler-owned fillet/chamfer subset for tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies, plus preserved propagated sibling edges through supported edge-finish and boolean-union chains
 - both lowerers and the exact exporter replay that subset from the same shared edge-query contract
-- durable edge identity after shell/boolean/hole/cut topology rewrites is still missing, so the finishing subset must stay intentionally narrow
+- the selected rewritten edge, shell/boolean/hole/cut descendants, and durable edge identity after topology rewrites are still missing, so the finishing subset must stay intentionally narrow
 
 ## Honest Current State
 
 What is already real:
 
 - compiler-owned primitives, booleans, transforms, extrude, revolve, hull, trims/splits, loft/sweep, shell v1
-- hole/cut v1, tracked-edge fillet/chamfer v1, plus repeated mirror/pattern ownership for the supported subset
-- narrow projection replay for compiler-visible `projectToPlane()` downstream flows
+- richer hole/cut workflows, a broader tracked-edge fillet/chamfer subset, and repeated mirror/pattern ownership for the supported subset
+- broader projection replay for compiler-visible `projectToPlane()` downstream flows
 - shared face and edge query/reference contracts with centralized compiler routing and regression coverage
 - curated multi-feature compiler corpus plus exact-export invariants
 
 What is still impossible or not yet clean:
 
 - a complete ordinary Fusion-style part workflow staying inside compiler coverage end to end
-- counterbores, countersinks, patterned/up-to-face hole-cut variants, and durable feature-created face ownership
-- broad projection-driven feature chains beyond today's parallel-workplane replay slice
+- patterned, drafted, or two-sided hole/cut workflows beyond today's defended subset
+- broad projection-driven feature chains beyond today's shell/hole/cut/union-compatible replay slice
 - broad edge-driven fillet/chamfer flows on durable downstream edge identity
 - claiming "most regular design features" without caveats
