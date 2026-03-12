@@ -227,10 +227,11 @@ Supported today:
 - tracked vertical edges from `rectangle(...).extrude(...)`
 - rigid transforms between the tracked source body and the target shape
 - untouched sibling tracked vertical edges after earlier supported `filletEdge(...)` / `chamferEdge(...)` rewrites on the same body
+- preserved propagated vertical-edge queries after those supported edge-finish rewrites when a later supported boolean union keeps one defended edge lineage
 
 Still out of subset today:
 - the selected edge after an earlier `filletEdge(...)` / `chamferEdge(...)` rewrite, because that edge is recorded as a merged descendant set
-- post-shell / post-boolean / post-hole-cut edge selection
+- edge descendants after shell, hole/cut, trim, boolean difference/intersection, or boolean unions that did not already record one supported propagated edge lineage for the selection
 - generic sketch extrudes, tapered extrudes, and arbitrary feature-created edges
 
 Canonical quadrants for the supported rectangle/box edges:
