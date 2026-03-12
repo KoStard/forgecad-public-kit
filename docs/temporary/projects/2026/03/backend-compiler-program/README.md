@@ -17,4 +17,6 @@ The landed base for the next feature lane is:
 - compiler-owned hole/cut v1, projection replay v1, and repeated-result ownership slices
 - curated compiler corpus coverage in `examples/compiler-corpus/`
 
-The next queue item is task 130, which should build on that base instead of reopening the cleanup lane.
+Task 130 is now landed on top of that base.
+
+The next program move is to define the post-topology-change reference lane that broader fillet/chamfer, richer hole/cut variants, and wider projection workflows will all depend on.

@@ -22,7 +22,7 @@ What that gives the next lane:
 - hole/cut v1, projection replay v1, and repeated-result ownership in the compiler-owned subset
 - curated multi-feature corpus coverage in compiler and exact-export checks
 
-This is the base that task 130 should consume instead of inventing new provenance or regression surfaces locally.
+This is the base that task 130 consumed instead of inventing new provenance or regression surfaces locally.
 
 ## Dependency Graph
 
@@ -52,14 +52,13 @@ graph TD
 
 ## Program State
 
-- Landed: 100, 105, 110, 120, 125, 140, and 150.
-- Remaining queued lane in this slice: 130.
+- Landed: 100, 105, 110, 120, 125, 130, 140, and 150.
+- Remaining queued lane in this slice: none yet. The next lane needs to be defined from the current architectural bottleneck, not guessed from the old queue.
 
 ## Next Up
 
-- [tasks/130-fillet-and-chamfer-dual-lowering.md](../../../../../../tasks/130-fillet-and-chamfer-dual-lowering.md)
-
-Task 125 is complete. Task 130 is now the active next lane for the backend-compiler program.
+- Define the next core lane around durable post-topology-change reference/query propagation.
+- Build that lane as the foundation for broader fillet/chamfer, richer hole/cut variants, and wider projection-driven downstream workflows.
 
 ## Merge Strategy
 
@@ -88,11 +87,11 @@ Core integrator lane:
 
 Next feature lane:
 
-- Edge/Finishing lane: task 130
+- To be defined next: durable post-topology-change reference/query propagation
 
 Quality support:
 
-- Extend the existing compiler corpus/checks as task 130 lands instead of spinning up a separate queue item first
+- Extend the existing compiler corpus/checks as the next reference/query lane lands instead of spinning up a separate queue item first
 
 ## File-Ownership Guidance
 
