@@ -55,13 +55,20 @@ Near-term path to that MLP:
 1. Task 160 is landed: topology-changing features now share one compiler-owned query propagation backbone instead of local rewrite rules.
 2. Tasks 170, 180, 190, and 195 are landed: created-face targeting, boolean/pattern propagation, defended propagated-edge support, and the dedicated query-propagation regression surface are now in.
 3. Tasks 200, 210, and 220 are landed: richer hole/cut variants, broader projection/sketch-on-face flows, and broader fillet/chamfer on defended propagated edges are now in.
-4. Task 230 is the next active lane so the corpus, capability docs, and MLP state become honest and reviewable together.
+4. Task 230 is landed: the corpus, capability docs, permanent compiler/export parity docs, and the MLP review surface are now synchronized.
 
 Deepest completed prerequisite:
 
 - `src/forge/queryModel.ts` is now the central shared query/reference contract for parent-body owners plus face and edge queries.
 - Workplane provenance and tracked topology now share that contract instead of carrying separate internal representations.
 - This does not solve durable face/edge identity through topology-changing edits by itself, but it gives task 130 one canonical contract to extend instead of redefining edge semantics again.
+
+## MLP Closeout Status
+
+- Task 230 is landed for the defended supported subset.
+- `mlp-readiness-review.md` is now the one-file summary for what MLP proves and what it does not.
+- `examples/compiler-corpus/README.md` plus the compiler/query-propagation/BREP checks make the current MLP state reviewable from the repo.
+- The next checkpoint is still the larger mainstream-part coverage target from this tracker, not "MLP plus optimistic wording".
 
 ## Where We Succeed Or Fail
 
@@ -259,17 +266,18 @@ After the first implementation slice for this mission, the minimum acceptable st
 - `filletEdge()` and `chamferEdge()` now record compiler-owned edge-finish intent for the tracked vertical-edge subset instead of staying runtime-only mesh helpers.
 - the supported edge-finish v1 subset covers tracked vertical edges on compile-covered `box()` bodies and `rectangle(...).extrude(...)` flows, and both lowerers plus the Python exact exporter replay that subset from the shared edge-query contract.
 - `projectToPlane()` sketches now keep explicit projection intent in the compiler graph instead of collapsing immediately to anonymous runtime geometry.
-- the supported projection replay subset can lower follow-on features when the source is a straight placed extrusion and the target plane stays parallel to the captured workplane placement.
+- the supported projection replay subset can now lower follow-on features when the source reduces to one defended planar basis: straight placed extrusions, compatible shell/hole/cut descendants, and compatible boolean unions on matching parallel target planes.
 - the CadQuery/OCCT lowerer now rejects hull intent explicitly with targeted diagnostics instead of a generic missing-plan failure.
 - `forgecad debug compiler` now prints per-object compiler routing and lowered artifacts for investigation.
 - `forgecad check suite` and `npm test` now expose the repo's assertion-based invariant suite as a first-class test entrypoint instead of leaving the checks scattered across ad hoc commands.
+- `mlp-readiness-review.md` now gives the repo-local verdict for the current defended subset instead of leaving MLP status as tribal knowledge.
 - the compiler and BREP regression suite now includes explicit `loft` / `sweep` plan invariants and an end-to-end STEP exporter check for those feature families.
 - the compiler and BREP regression suite now also covers `shell()` lowering, route policy, and end-to-end exact export for the supported shell subset.
 - the compiler and BREP regression suite now also covers the supported hole/cut workflow subset, including exact-plan inspection and end-to-end STEP export.
 - the regression suite now includes a curated enclosure-style multi-feature part that combines shell, workplane-driven cuts, mirrored support feet, and booleans in one exact-exportable flow.
 - the regression suite now also includes a repeated-feature plate where mirrored descendants, patterned cuts, booleans, and downstream workplane details stay aligned across the compiler and exact-export checks.
 - the regression suite now also covers the supported fillet/chamfer subset, including API-contract errors, placement-owner propagation, compiler snapshots, exact-plan inspection, and end-to-end STEP export.
-- `examples/compiler-corpus/` now holds the curated enclosure, motor-mount, edge-finished mount, and sensor-bracket parts that both check suites use to guard ordinary multi-feature workflows.
+- `examples/compiler-corpus/` now holds curated enclosure, motor-mount, edge-finished mount, fastener-plate, projection-relay, service-panel, sensor-bracket, and trimmed-access-cover parts so the post-160 subset is exercised through ordinary covers, brackets, and plates instead of only through fixtures.
 - build and focused runtime/API checks pass on the Manifold-backed runtime.
 
 ## Tracker
@@ -297,7 +305,7 @@ After the first implementation slice for this mission, the minimum acceptable st
 - The snapshot baseline now includes compile plans, CadQuery/OCCT lowerings, export routing decisions, and quantized Manifold mesh/polygon digests.
 - The compiler check also asserts that exact/faceted export manifests stay consistent with the per-object compiler reports, not just with the saved JSON baseline.
 - Scene-level route decisions are now part of the compiler inspection surface, so route drift becomes a reviewable regression instead of a hidden internal policy change.
-- The compiler and BREP checks both pull curated multi-feature parts from `examples/compiler-corpus/`, so ordinary enclosure/bracket/plate workflows stay under regression instead of living only in isolated unit-style cases.
+- The compiler and BREP checks both pull curated multi-feature parts from `examples/compiler-corpus/`, and the query-propagation suite now pulls the rewrite-heavy subset from that same corpus, so ordinary enclosure/bracket/plate/cover workflows stay under regression instead of living only in isolated unit-style cases.
 - Query-owner IDs now reset per script run before compiler inspection, so snapshot diffs stay deterministic instead of depending on earlier checks in the same process.
 - Placement/reference invariants now assert owner-lineage propagation, not just matrix equivalence.
 - Placement/reference invariants now also assert tracked-edge query propagation plus `start` / `end` / `midpoint` selector alignment for tracked-topology flows.

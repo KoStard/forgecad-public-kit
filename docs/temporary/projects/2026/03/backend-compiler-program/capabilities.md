@@ -110,3 +110,11 @@ What is still impossible or not yet clean:
 - broad projection-driven feature chains beyond today's shell/hole/cut/union-compatible replay slice
 - broad edge-driven fillet/chamfer flows on durable downstream edge identity
 - claiming "most regular design features" without caveats
+
+## Reviewable Proof Right Now
+
+The current MLP proof surface is intentionally repo-visible instead of tribal knowledge:
+
+- `mlp-readiness-review.md` is the short verdict plus blocker summary
+- `examples/compiler-corpus/README.md` maps the curated ordinary-parts corpus to the workflow families it guards
+- `npm run test:compiler`, `npm run test:query-propagation`, and `npm run test:brep` are the review commands for the current supported subset

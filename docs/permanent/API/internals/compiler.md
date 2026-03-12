@@ -206,7 +206,8 @@ Current progress:
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
 - regression coverage now also includes exact/runtime/export checks for the supported hole/cut workflow subset
 - regression coverage now also includes API, placement-owner, query-propagation, compiler-snapshot, exact-plan, corpus, and end-to-end export checks for the broadened tracked-edge fillet/chamfer subset
-- the regression suite now also includes a file-backed ordinary-parts corpus under `examples/compiler-corpus/`, so shell, workplane-driven cuts, mirrored ribs/feet, patterned holes, and boolean chains are exercised together instead of only as isolated unit slices
+- the regression suite now also includes a file-backed ordinary-parts corpus under `examples/compiler-corpus/`, so shell, richer hole/cut workflows, projection replay, trim-created faces, repeated descendants, and finishing flows are exercised together instead of only as isolated unit slices
+- the MLP closeout review surface now lives in that corpus plus `forgecad check compiler`, `forgecad check query-propagation`, and `forgecad check brep`, so the defended subset is reviewable from the repo instead of from tribal knowledge
 - mirrored downstream features and helper-driven linear/circular repetition now preserve repeated-result ownership on top of the shared face-query backbone
 - supported boolean unions now also preserve owner-scoped canonical face queries from repeated descendants, and compiler regressions cover both explicit duplicate-owner merge ambiguity and later boolean chains that inherit those propagated queries
 - exact export regression coverage now includes a repeated-feature part where a mirrored descendant drives a downstream workplane feature inside a boolean chain
@@ -217,7 +218,6 @@ Current progress:
 Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings, while defended named created faces currently cover the exact profile families Forge can model directly (`rect`, `roundedRect`, `circle`)
-- `shape.hole()` still only covers circular holes, and `shape.cutout()` still only covers sketches already placed with `onFace(...)`
 - `shape.hole()` still only covers circular holes, and `shape.cutout()` still only covers sketches already placed with `onFace(...)`
 - `filletEdge()` / `chamferEdge()` v1 cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies plus preserved propagated sibling edges through supported edge-finish and boolean-union chains, but the selected rewritten edge itself still becomes an explicit merged-edge ambiguity
 - drafted cuts, two-sided extents, combined counterbore+countersink heads, threaded holes, and broader durable identity beyond today's defended shell/hole/cut created-face subset are still missing

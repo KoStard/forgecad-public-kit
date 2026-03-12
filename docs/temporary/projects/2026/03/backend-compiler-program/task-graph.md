@@ -28,7 +28,7 @@ What that gives the next lane:
 - richer hole/cut workflows, broader projection replay, repeated-result ownership, and broader tracked-edge finishing in the compiler-owned subset
 - curated multi-feature corpus coverage in compiler and exact-export checks
 
-This is the landed base that task 230 now closes out instead of inventing new provenance or regression surfaces locally.
+This is the landed base that task 230 closed out instead of inventing new provenance or regression surfaces locally.
 
 ## Current Wave
 
@@ -40,7 +40,7 @@ That landed second wave was:
 - [tasks/210-projection-and-sketch-on-face-expansion.md](../../../../../../tasks/210-projection-and-sketch-on-face-expansion.md)
 - [tasks/220-broader-fillet-and-chamfer.md](../../../../../../tasks/220-broader-fillet-and-chamfer.md)
 
-The next active lane is:
+The closeout lane that finished this wave was:
 
 - [tasks/230-mlp-corpus-and-doc-closeout.md](../../../../../../tasks/230-mlp-corpus-and-doc-closeout.md)
 
@@ -99,14 +99,16 @@ graph TD
 
 ## Program State
 
-- Landed: 100, 105, 110, 120, 125, 130, 140, 150, 160, 170, 180, 190, 195, 200, 210, and 220.
+- Landed: 100, 105, 110, 120, 125, 130, 140, 150, 160, 170, 180, 190, 195, 200, 210, 220, and 230.
 - Landed second wave: 200, 210, 220.
-- Next closeout lane: 230.
+- Landed closeout lane: 230.
 
 ## Next Up
 
-1. Close the landed second wave with:
-   - [tasks/230-mlp-corpus-and-doc-closeout.md](../../../../../../tasks/230-mlp-corpus-and-doc-closeout.md)
+1. Scope the next checkpoint around the blockers the MLP closeout made explicit:
+   - durable post-topology-change face/edge identity
+   - broader hole/cut, projection, and fillet/chamfer coverage beyond today's defended subset
+   - enough ordinary-part coverage to satisfy the full checkpoint exit criteria without caveats
 
 ## Parallel Starts
 
@@ -147,13 +149,13 @@ Core integrator lane:
 - reviews query/lowering contracts
 - batches the thin shared-file integration edits
 
-Next feature lane:
+Next planning lane:
 
-- MLP closeout lane: task 230
+- scope the post-MLP checkpoint from the blocker list in `mlp-readiness-review.md`
 
 Quality support:
 
-- Task 195 is landed, and task 230 is now the active truthfulness/corpus closeout lane after the landed second wave
+- Tasks 195 and 230 are both landed, and the active truthfulness surface is now the corpus plus MLP review package rather than a still-open closeout lane
 
 ## File-Ownership Guidance
 

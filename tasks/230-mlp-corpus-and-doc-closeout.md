@@ -47,3 +47,4 @@ Should start after the second feature wave is mostly landed.
 
 ## Status and log
 - 2026-03-12: Created as the MLP closeout lane for the post-160 wave.
+- 2026-03-12: Completed. Added the integrated `service-panel-cover` corpus part, promoted `trimmed-access-cover` into the shared compiler/BREP corpus, expanded compiler/query-propagation/BREP closeout coverage and snapshots, added a repo-local MLP readiness review, and synced the temporary plus permanent docs to the defended supported subset and the remaining checkpoint blockers.
