@@ -75,3 +75,4 @@ The sketch's local `+Z` becomes the face normal, so `extrude(positive)` goes out
 - If multiple sketches share the same face placement, their 2D booleans preserve that shared placement.
 - If booleans mix sketches with different 3D placements, the result drops back to an unplaced sketch.
 - Extruding a placed sketch keeps the tracked `top` / `bottom` / `side` metadata from that extrusion, transformed into world space.
+- Projection-driven follow-on sketches now keep compiler-visible provenance when you `projectToPlane()` a placed straight extrusion back onto a matching parallel plane. That exact replay subset is intentionally limited; arbitrary projection targets still stay runtime-only.

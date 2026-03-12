@@ -186,11 +186,13 @@ Current progress:
 - both lowerers consume the same semantic `shell` node and rewrite supported cases into backend-native boolean/extrude/cylinder plans
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
 - the regression suite now also includes a curated enclosure-style multi-feature part so shell, workplane-driven cuts, mirrors, and booleans are exercised together instead of only as isolated unit slices
+- `projectToPlane()` sketches now keep an explicit projection node in the compiler graph instead of collapsing immediately to anonymous runtime geometry
+- the supported exact subset can replay projection-driven follow-on features when the source is a straight placed extrusion and the target plane stays parallel to that captured workplane placement
 
 Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings
-- shelling now preserves parent-body ownership lineage, but stable downstream face ownership after shell-created topology changes is still not solved, which is why fillet/chamfer, holes, and projection-driven edits are still the harder next layer
+- shelling now preserves parent-body ownership lineage, but stable downstream face ownership after shell-created topology changes is still not solved, and projection replay still only covers the parallel-workplane subset, which is why fillet/chamfer, holes, and richer projection-driven edits remain the harder next layer
 
 ### Phase 4: Higher-Order Workflows
 

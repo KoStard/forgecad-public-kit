@@ -796,6 +796,12 @@ const section = intersectWithPlane(shape, { plane: 'XY', offset: 10 });
 const shadow = projectToPlane(shape, { origin: [0, 0, 0], normal: [0, 0, 1] });
 ```
 
+`projectToPlane()` always works as a runtime modeling utility.
+
+Compiler-owned replay is narrower today:
+- supported for downstream exact export when the projected source is a straight `extrude()` that still carries compiler-visible workplane placement (for example from `Sketch.onFace()`), and the target plane stays parallel to that placement without introducing in-plane shear
+- unsupported cases still return a usable runtime sketch, but exact export falls back to compiler diagnostics instead of pretending the projection is exact-safe
+
 ## 2D Sketches
 
 This file intentionally avoids repeating full 2D API signatures that already live in dedicated docs.
