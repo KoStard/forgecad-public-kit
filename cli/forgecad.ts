@@ -5,6 +5,7 @@ import { basename } from 'path';
 import { runCheckApiContractsCli } from './check-api-contracts';
 import { runCheckBrepExportCli } from './check-brep-export';
 import { runCheckCompilerCli } from './check-compiler';
+import { runCheckExamplesCli } from './check-examples';
 import { runCheckQueryPropagationCli } from './check-query-propagation';
 import { runCheckSuiteCli } from './check-suite';
 import { runCheckDimensionsCli } from './check-dimensions';
@@ -275,6 +276,22 @@ const commands: CommandDefinition[] = [
       'forgecad check query-propagation --update',
     ],
     run: runCheckQueryPropagationCli,
+  },
+  {
+    group: 'Checks',
+    path: ['check', 'examples'],
+    summary: 'Run the example architecture gate across the checked manifest for `examples/`.',
+    usage: [
+      'forgecad check examples',
+      'forgecad check examples --family api-parts --family compiler-corpus',
+      'forgecad check examples --example examples/api/brep-exportable.forge.js',
+    ],
+    examples: [
+      'forgecad check examples',
+      'forgecad check examples --family non-part',
+      'forgecad check examples --example examples/chess-set.forge.js',
+    ],
+    run: runCheckExamplesCli,
   },
   {
     group: 'Checks',

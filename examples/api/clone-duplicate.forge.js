@@ -17,12 +17,12 @@ const slotL = slotProfile.clone().translate(-spacing / 2, -35);
 const slotR = slotProfile.duplicate().translate(spacing / 2, -35);
 
 // --- ShapeGroup clone (with named children) ---
-const module = group(
+const moduleGroup = group(
   { name: "Block", shape: block },
   { name: "Post", shape: post.attachTo(block, "top", "bottom") }
 );
-const moduleL = module.clone().translate(-spacing / 2, 95, 0);
-const moduleR = module.duplicate().translate(spacing / 2, 95, 0).color("#c85a54");
+const moduleL = moduleGroup.clone().translate(-spacing / 2, 95, 0);
+const moduleR = moduleGroup.duplicate().translate(spacing / 2, 95, 0).color("#c85a54");
 
 return [
   { name: "Shape clone/duplicate", group: [

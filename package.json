@@ -31,6 +31,7 @@
     "test:compiler:update": "npm run test:prepare && node dist-cli/forgecad.js check compiler --update",
     "test:query-propagation": "npm run test:prepare && node dist-cli/forgecad.js check query-propagation",
     "test:query-propagation:update": "npm run test:prepare && node dist-cli/forgecad.js check query-propagation --update",
+    "test:examples": "npm run test:prepare && node dist-cli/forgecad.js check examples",
     "test:brep": "npm run test:prepare && node dist-cli/forgecad.js check brep",
     "test:api": "npm run test:prepare && node dist-cli/forgecad.js check api",
     "build:skill:forgecad": "node scripts/build-forgecad-skill.mjs",
