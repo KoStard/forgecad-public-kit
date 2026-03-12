@@ -785,30 +785,49 @@ Compiler-owned circular hole workflow anchored to a face/workplane query.
 
 - `depth` omitted = through-hole
 - `depth` provided = blind hole
+- `upToFace` = stop on a queried planar face parallel to the hole direction
 - `u` / `v` place the hole in face-local coordinates
+- `counterbore: { diameter, depth }` adds a wider cylindrical recess at the entry
+- `countersink: { diameter, angleDeg? }` adds a conical entry (default `90°`)
+- `depth` and `upToFace` are mutually exclusive
+- `counterbore` and `countersink` are mutually exclusive
 
 ```javascript
 const block = roundedRect(90, 60, 8, true).extrude(24);
+const exitFace = block.face('bottom');
 
 const body = block
   .hole('front', { diameter: 8, u: 0, v: 2 })          // through
-  .hole('top', { diameter: 6, u: -18, v: 10, depth: 10 }); // blind
+  .hole('top', { diameter: 6, u: -18, v: 10, depth: 10 }) // blind
+  .hole('top', {
+    diameter: 5,
+    u: 18,
+    v: 10,
+    upToFace: exitFace,
+    counterbore: { diameter: 9, depth: 4 },
+  });
 ```
 
-Supported v1:
+Supported subset:
 
 - compile-covered target bodies
 - canonical faces, tracked planar faces, and `FaceRef` targets
-- through and blind circular holes
+- through, blind, and planar `upToFace` circular holes
+- counterbore and countersink entry variants on those hole extents
 - exact lowering through both Manifold and CadQuery/OCCT
 - created hole faces in the defended subset:
-  - `wall` on through or blind holes
+  - `wall` on all supported hole variants
   - `floor` on blind holes
+  - `counterbore-wall` and `counterbore-floor` on counterbored holes
+  - `countersink-wall` on countersunk holes
 - preserved non-host faces stay queryable where Forge can defend them, while rewritten host/exit faces are rejected explicitly
+- reusing the same `upToFace` stop plane through later rewrites is supported when you keep a `FaceRef` from the earlier face (`const exitFace = block.face('bottom')`)
 
 Not supported yet:
 
-- counterbore / countersink / taper / thread semantics
+- non-planar or non-parallel `upToFace` termination faces
+- drafted/tapered main holes, threads, or combined counterbore+countersink heads
+- re-querying a split `upToFace` termination face by name on the rewritten result instead of using a saved `FaceRef`
 - segmented polygonal hole cutters
 - runtime-only target bodies without compiler intent
 
@@ -817,31 +836,36 @@ Compiler-owned cut-extrude workflow using a sketch already placed with `Sketch.o
 
 - `depth` omitted = through-cut
 - `depth` provided = blind cut
+- `upToFace` = stop on a queried planar face parallel to the cut direction
 - the sketch must carry semantic workplane placement from `onFace(...)`
 
 ```javascript
 const block = roundedRect(90, 60, 8, true).extrude(24);
+const exitFace = block.face('bottom');
 const pocket = roundedRect(18, 10, 2, true)
   .onFace(block, 'top', { u: 14, v: -8, selfAnchor: 'center' });
 
-const body = block.cutout(pocket, { depth: 6 });
+const body = block.cutout(pocket, { upToFace: exitFace });
 ```
 
-Supported v1:
+Supported subset:
 
 - compile-covered sketch profiles that CadQuery/OCCT already supports
 - sketches placed on queried faces via `onFace(...)`
+- through, blind, and planar `upToFace` cut extents
 - exact/runtime parity through the shared compiler node family
 - created cut faces in the defended subset:
   - `floor` on blind cuts
   - `wall` on circular cuts
   - `wall-bottom`, `wall-right`, `wall-top`, `wall-left` on rectangular and rounded-rectangle cuts
 - preserved non-host faces stay queryable where Forge can defend them, while rewritten host/exit faces are rejected explicitly
+- reusing the same `upToFace` stop plane through later rewrites is supported when you keep a `FaceRef` from the earlier face
 
 Not supported yet:
 
 - free-floating sketches without face/workplane provenance
-- draft/taper angles, two-sided extents, "up to face", or non-planar targets
+- non-planar or non-parallel `upToFace` termination faces
+- draft/taper angles, two-sided extents, or re-querying a split `upToFace` termination face by name on the rewritten result
 - named created-wall support for arbitrary boolean/offset/projected cut profiles
 
 ### Warping

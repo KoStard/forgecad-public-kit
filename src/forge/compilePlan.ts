@@ -2,9 +2,11 @@ import { Transform, type Mat4, type Vec3 } from './transform';
 import type { PlaneFrame } from './planeFrame';
 import {
   cloneEdgeQueryRef,
+  cloneFaceQueryRef,
   cloneShapeQueryOwner,
   cloneTopologyRewritePropagation,
   type EdgeQueryRef,
+  type FaceQueryRef,
   type ShapeQueryOwner,
   type TopologyRewritePropagation,
 } from './queryModel';
@@ -111,9 +113,27 @@ export type SweepPathCompilePlan = {
   points: [number, number, number][];
 };
 
+export interface HoleCounterboreCompilePlan {
+  radius: number;
+  depth: number;
+}
+
+export interface HoleCountersinkCompilePlan {
+  radius: number;
+  angleDeg: number;
+  depth: number;
+}
+
+export interface HoleCompilePlan {
+  radius: number;
+  counterbore?: HoleCounterboreCompilePlan;
+  countersink?: HoleCountersinkCompilePlan;
+}
+
 export type FeatureCutExtent =
   | { kind: 'through'; depth: number }
-  | { kind: 'blind'; depth: number };
+  | { kind: 'blind'; depth: number }
+  | { kind: 'upToFace'; depth: number; face: FaceQueryRef };
 
 export type ShapeCompilePlan =
   | {
@@ -154,7 +174,7 @@ export type ShapeCompilePlan =
       kind: 'hole';
       base: ShapeCompilePlan;
       placement: ShapeWorkplanePlacement;
-      radius: number;
+      hole: HoleCompilePlan;
       extent: FeatureCutExtent;
       queryPropagation?: TopologyRewritePropagation;
     }
@@ -280,11 +300,44 @@ function cloneShapeQueryOwnerValue(owner: ShapeQueryOwner): ShapeQueryOwner {
   return cloneShapeQueryOwner(owner)!;
 }
 
-function cloneFeatureCutExtent(extent: FeatureCutExtent): FeatureCutExtent {
+function cloneHoleCounterboreCompilePlan(plan: HoleCounterboreCompilePlan): HoleCounterboreCompilePlan {
   return {
-    kind: extent.kind,
-    depth: canonicalNumber(extent.depth),
+    radius: canonicalNumber(plan.radius),
+    depth: canonicalNumber(plan.depth),
   };
+}
+
+function cloneHoleCountersinkCompilePlan(plan: HoleCountersinkCompilePlan): HoleCountersinkCompilePlan {
+  return {
+    radius: canonicalNumber(plan.radius),
+    angleDeg: canonicalNumber(plan.angleDeg),
+    depth: canonicalNumber(plan.depth),
+  };
+}
+
+function cloneHoleCompilePlanValue(plan: HoleCompilePlan): HoleCompilePlan {
+  return {
+    radius: canonicalNumber(plan.radius),
+    counterbore: plan.counterbore ? cloneHoleCounterboreCompilePlan(plan.counterbore) : undefined,
+    countersink: plan.countersink ? cloneHoleCountersinkCompilePlan(plan.countersink) : undefined,
+  };
+}
+
+function cloneFeatureCutExtent(extent: FeatureCutExtent): FeatureCutExtent {
+  switch (extent.kind) {
+    case 'through':
+    case 'blind':
+      return {
+        kind: extent.kind,
+        depth: canonicalNumber(extent.depth),
+      };
+    case 'upToFace':
+      return {
+        kind: 'upToFace',
+        depth: canonicalNumber(extent.depth),
+        face: cloneFaceQueryRef(extent.face)!,
+      };
+  }
 }
 
 let _shapeQueryOwnerCounter = 0;
@@ -538,7 +591,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         kind: 'hole',
         base: cloneShapeCompilePlan(plan.base)!,
         placement: cloneShapeWorkplanePlacementValue(plan.placement),
-        radius: plan.radius,
+        hole: cloneHoleCompilePlanValue(plan.hole),
         extent: cloneFeatureCutExtent(plan.extent),
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };

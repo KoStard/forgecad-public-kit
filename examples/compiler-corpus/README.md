@@ -38,6 +38,13 @@ Guards:
 - mirrored additive features staying exact-exportable while the selected preserved edge keeps one unique propagated lineage
 - downstream `hole()` / `cutout()` edits that still target the original tracked body owner after the broadened edge-finish flow
 
+### `fastener-plate-variants.forge.js`
+
+Guards:
+- compiler-owned counterbore and countersink holes inside a normal fastener-plate workflow
+- `upToFace` hole/cut extents lowering through both Manifold and CadQuery/OCCT from the shared feature family
+- defended created-face/query semantics staying inspectable after multiple richer hole rewrites
+
 ### `trimmed-access-cover.forge.js`
 
 Guards:

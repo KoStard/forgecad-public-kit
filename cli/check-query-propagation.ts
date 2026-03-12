@@ -400,6 +400,34 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
       },
     ],
   ),
+  compilerCorpusCase(
+    'corpus-fastener-plate-variants',
+    'The fastener-plate corpus keeps counterbore/countersink created faces and up-to-face split diagnostics reviewable through one ordinary richer hole workflow.',
+    [
+      {
+        name: 'Fastener Plate Variants',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['cut', 'hole', 'hole', 'hole', 'hole'],
+        requiredDiagnosticCodes: [
+          'cut-source-face-split-ambiguous',
+          'cut-up-to-face-target-split-ambiguous',
+          'cut-created-edge-propagation-unsupported',
+          'hole-source-face-split-ambiguous',
+          'hole-up-to-face-target-split-ambiguous',
+          'hole-created-edge-propagation-unsupported',
+        ],
+        requiredCreatedFaceQueries: [
+          'created-face(hole:counterbore-floor)',
+          'created-face(hole:counterbore-wall)',
+          'created-face(hole:countersink-wall)',
+        ],
+        requiredPreservedFaceQueries: [
+          'propagated-face(preserved <- created-face(hole:counterbore-floor)',
+        ],
+      },
+    ],
+  ),
   fileCase(
     'corpus-trimmed-access-cover',
     'The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable while earlier hole/cut created faces and preserved canonical faces flow through later unions.',

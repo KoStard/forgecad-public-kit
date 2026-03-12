@@ -1,5 +1,6 @@
 import {
   type FeatureCutExtent,
+  type HoleCompilePlan,
   createShapeQueryOwner,
   type ShapeCompilePlan,
   wrapShapeCompilePlanWithQueryOwner,
@@ -20,7 +21,7 @@ import {
   setShapeGeometryInfo,
   setShapePlacementReferences,
 } from './kernel';
-import { shapeQueryOwnersEqual, type ShapeQueryOwner } from './queryModel';
+import { shapeQueryOwnersEqual, type FaceQueryRef, type ShapeQueryOwner } from './queryModel';
 import {
   attachTopologyRewritePropagation,
   buildCutTopologyRewritePropagation,
@@ -39,12 +40,22 @@ import {
 export interface ShapeHoleOptions {
   diameter: number;
   depth?: number;
+  upToFace?: SketchFaceTarget | FaceRef;
   u?: number;
   v?: number;
+  counterbore?: {
+    diameter: number;
+    depth: number;
+  };
+  countersink?: {
+    diameter: number;
+    angleDeg?: number;
+  };
 }
 
 export interface ShapeCutoutOptions {
   depth?: number;
+  upToFace?: SketchFaceTarget | FaceRef;
 }
 
 function isFaceRef(value: unknown): value is FaceRef {
@@ -61,6 +72,14 @@ function isFinitePositive(value: number): boolean {
 
 function dot3(a: [number, number, number], b: [number, number, number]): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function normalizeVec3(vec: [number, number, number]): [number, number, number] {
+  const length = Math.hypot(vec[0], vec[1], vec[2]);
+  if (length < 1e-12) {
+    throw new Error('Hole/cut feature direction could not be normalized.');
+  }
+  return [vec[0] / length, vec[1] / length, vec[2] / length];
 }
 
 function featurePlacementMatrix(placement: ShapeWorkplanePlacement['placement']): ShapeWorkplanePlacement['matrix'] {
@@ -122,7 +141,7 @@ function bboxCorners(shape: Shape): Array<[number, number, number]> {
 }
 
 function computeThroughDepth(shape: Shape, origin: [number, number, number], normal: [number, number, number]): number {
-  const inward: [number, number, number] = [-normal[0], -normal[1], -normal[2]];
+  const inward = normalizeVec3([-normal[0], -normal[1], -normal[2]]);
   let maxDepth = 0;
   for (const corner of bboxCorners(shape)) {
     const offset: [number, number, number] = [
@@ -142,12 +161,87 @@ function computeThroughDepth(shape: Shape, origin: [number, number, number], nor
   return Math.max(Math.hypot(dx, dy, dz), 1);
 }
 
+function resolveFeatureFaceRef(
+  targetForResolution: Shape | TrackedShape,
+  faceOrRef: SketchFaceTarget | FaceRef,
+): FaceRef {
+  if (isFaceRef(faceOrRef)) return faceOrRef;
+  return targetForResolution.face(faceOrRef);
+}
+
+function resolveFeatureFaceTarget(
+  targetForResolution: Shape | TrackedShape,
+  targetForOwnership: Shape,
+  faceOrRef: SketchFaceTarget | FaceRef,
+  label: string,
+  opts: { requireDefendedQuery: boolean } = { requireDefendedQuery: true },
+): { face: FaceRef; query: FaceQueryRef } {
+  const workplane = isFaceRef(faceOrRef)
+    ? resolveSketchWorkplane(faceOrRef)
+    : resolveSketchWorkplane(targetForResolution, faceOrRef);
+
+  requireCompatibleFeatureOwner(targetForOwnership, workplane.source.owner, label);
+  if (opts.requireDefendedQuery) {
+    requireCompatibleFeatureFaceQuery(targetForOwnership, label, workplane.source);
+  }
+
+  return {
+    face: resolveFeatureFaceRef(targetForResolution, faceOrRef),
+    query: workplane.source,
+  };
+}
+
+function computeUpToFaceDepth(
+  origin: [number, number, number],
+  normal: [number, number, number],
+  face: FaceRef,
+  label: string,
+): number {
+  if (face.planar === false || !face.uAxis || !face.vAxis) {
+    throw new Error(`${label} upToFace currently requires a planar termination face.`);
+  }
+
+  const hostNormal = normalizeVec3(normal);
+  const targetNormal = normalizeVec3(face.normal);
+  if (Math.abs(Math.abs(dot3(hostNormal, targetNormal)) - 1) > 1e-6) {
+    throw new Error(`${label} upToFace currently requires a termination face parallel to the feature direction.`);
+  }
+
+  const inward: [number, number, number] = [-hostNormal[0], -hostNormal[1], -hostNormal[2]];
+  const offset: [number, number, number] = [
+    face.center[0] - origin[0],
+    face.center[1] - origin[1],
+    face.center[2] - origin[2],
+  ];
+  const depth = dot3(offset, inward);
+  if (!(depth > 1e-6)) {
+    throw new Error(`${label} upToFace requires the termination face to lie in the feature direction.`);
+  }
+  return depth;
+}
+
 function resolveFeatureExtent(
+  targetForResolution: Shape | TrackedShape,
   target: Shape,
   origin: [number, number, number],
   normal: [number, number, number],
   depth: number | undefined,
+  upToFace: SketchFaceTarget | FaceRef | undefined,
+  label: string,
 ): FeatureCutExtent {
+  if (depth != null && upToFace != null) {
+    throw new Error(`${label} accepts either depth or upToFace, not both.`);
+  }
+  if (upToFace != null) {
+    const targetFace = resolveFeatureFaceTarget(targetForResolution, target, upToFace, label, {
+      requireDefendedQuery: false,
+    });
+    return {
+      kind: 'upToFace',
+      depth: computeUpToFaceDepth(origin, normal, targetFace.face, label),
+      face: targetFace.query,
+    };
+  }
   if (depth == null) {
     return {
       kind: 'through',
@@ -155,9 +249,65 @@ function resolveFeatureExtent(
     };
   }
   if (!isFinitePositive(depth)) {
-    throw new Error('Hole/cut features require a positive finite blind depth.');
+    throw new Error(`${label} requires a positive finite blind depth.`);
   }
   return { kind: 'blind', depth };
+}
+
+function resolveHoleCompilePlan(opts: ShapeHoleOptions): HoleCompilePlan {
+  const hole: HoleCompilePlan = {
+    radius: opts.diameter / 2,
+  };
+
+  if (opts.counterbore && opts.countersink) {
+    throw new Error('Shape.hole() currently supports either counterbore or countersink, not both at once.');
+  }
+
+  if (opts.counterbore) {
+    if (!isFinitePositive(opts.counterbore.diameter) || opts.counterbore.diameter <= opts.diameter) {
+      throw new Error('Shape.hole() counterbore diameter must be greater than the hole diameter.');
+    }
+    if (!isFinitePositive(opts.counterbore.depth)) {
+      throw new Error('Shape.hole() counterbore depth must be a positive finite value.');
+    }
+    hole.counterbore = {
+      radius: opts.counterbore.diameter / 2,
+      depth: opts.counterbore.depth,
+    };
+  }
+
+  if (opts.countersink) {
+    if (!isFinitePositive(opts.countersink.diameter) || opts.countersink.diameter <= opts.diameter) {
+      throw new Error('Shape.hole() countersink diameter must be greater than the hole diameter.');
+    }
+    const angleDeg = opts.countersink.angleDeg ?? 90;
+    if (!Number.isFinite(angleDeg) || angleDeg <= 0 || angleDeg >= 180) {
+      throw new Error('Shape.hole() countersink angleDeg must be between 0 and 180 degrees.');
+    }
+    const halfAngleRad = (angleDeg * Math.PI) / 360;
+    const tangent = Math.tan(halfAngleRad);
+    if (!(tangent > 1e-9)) {
+      throw new Error('Shape.hole() countersink angleDeg is too small to form a defended taper.');
+    }
+    hole.countersink = {
+      radius: opts.countersink.diameter / 2,
+      angleDeg,
+      depth: ((opts.countersink.diameter - opts.diameter) / 2) / tangent,
+    };
+  }
+
+  return hole;
+}
+
+function validateHoleExtentCompatibility(hole: HoleCompilePlan, extent: FeatureCutExtent): void {
+  const headDepth = hole.counterbore?.depth ?? hole.countersink?.depth ?? 0;
+  if (headDepth <= 0) return;
+  if (headDepth >= extent.depth - 1e-6) {
+    if (hole.counterbore) {
+      throw new Error('Shape.hole() counterbore depth must leave some straight hole depth below the bore.');
+    }
+    throw new Error('Shape.hole() countersink diameter/angle must leave some straight hole depth below the sink.');
+  }
 }
 
 function createOwnedTopologyRewritePlan(
@@ -230,7 +380,15 @@ function resolveHolePlacement(
 
   return {
     placement,
-    extent: resolveFeatureExtent(targetForOwnership, workplane.origin, workplane.normal, opts.depth),
+    extent: resolveFeatureExtent(
+      targetForResolution,
+      targetForOwnership,
+      workplane.origin,
+      workplane.normal,
+      opts.depth,
+      opts.upToFace,
+      'Shape.hole()',
+    ),
   };
 }
 
@@ -245,10 +403,12 @@ function shapeHole(target: Shape, targetForResolution: Shape | TrackedShape, fac
   }
 
   const { placement, extent } = resolveHolePlacement(targetForResolution, target, faceOrRef, opts);
+  const hole = resolveHoleCompilePlan(opts);
+  validateHoleExtentCompatibility(hole, extent);
   const plan = createOwnedTopologyRewritePlan(
-    buildHoleShapeCompilePlan(basePlan, placement, opts.diameter / 2, extent),
+    buildHoleShapeCompilePlan(basePlan, placement, hole, extent),
     'hole',
-    (owner) => buildHoleTopologyRewritePropagation(owner, basePlan, placement.placement, extent),
+    (owner) => buildHoleTopologyRewritePropagation(owner, basePlan, placement.placement, hole, extent),
   );
   return buildFeatureResult(target, plan);
 }
@@ -275,9 +435,12 @@ function shapeCutout(target: Shape, sketch: Sketch, opts: ShapeCutoutOptions = {
 
   const extent = resolveFeatureExtent(
     target,
+    target,
     placementModel.workplane.origin,
     placementModel.workplane.normal,
     opts.depth,
+    opts.upToFace,
+    'Shape.cutout()',
   );
 
   const plan = createOwnedTopologyRewritePlan(

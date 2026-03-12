@@ -6,7 +6,7 @@ This supports:
 - canonical body faces: `front`, `back`, `left`, `right`, `top`, `bottom`
 - tracked planar faces on `TrackedShape`, like `side-left`
 - direct `FaceRef` targets from `tracked.face('top')`
-- supported compiler-owned created faces on `shell()` / `hole()` / `cutout()` results, such as `inner-side-right`, `floor`, and `wall-right`
+- supported compiler-owned created faces on `shell()` / `hole()` / `cutout()` results, such as `inner-side-right`, `floor`, `counterbore-floor`, and `wall-right`
 
 ## `.onFace(parent, face, opts?)`
 
@@ -75,7 +75,7 @@ return [
   - side faces of extruded rectangles: `u` follows the source edge, `v = Z`
   - tracked `top` / `bottom` faces follow the source sketch axes
   - direct `FaceRef` placement uses that face's `uAxis` / `vAxis`
-  - supported shell inner walls, blind-hole floors, and defended cut walls reuse compiler-owned local frames for downstream workplanes
+  - supported shell inner walls, blind-hole floors, counterbore shoulder floors, and defended cut walls reuse compiler-owned local frames for downstream workplanes
 
 The sketch's local `+Z` becomes the face normal, so `extrude(positive)` goes outward from that face.
 

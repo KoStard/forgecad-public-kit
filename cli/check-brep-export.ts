@@ -770,6 +770,39 @@ function checkCorpusSensorBracketPlan(): void {
   );
 }
 
+function checkCorpusFastenerPlateVariantsPlan(): void {
+  const part = getCompilerRegressionCorpusPart('corpus-fastener-plate-variants');
+  const plan = runExactManifestScript(part.scriptPath);
+
+  assert.equal(plan.kind, 'boolean', `Expected ${part.name} plan to remain a boolean tree, got ${plan.kind}`);
+  const placements = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
+  assert.equal(
+    placements.length,
+    5,
+    `Expected ${part.name} exact lowering to preserve five workplane placements (4 holes + 1 cutout), got ${placements.length}`,
+  );
+  assert(
+    placements.every((step) => !!step.placement.workplane.source.owner),
+    `Expected ${part.name} workplane placements to retain query-backed owners`,
+  );
+
+  const cylinders = collectShapes(plan).filter((shape) => shape.kind === 'cylinder');
+  assert(
+    cylinders.some((shape) => shape.radiusTop != null && Math.abs(shape.radiusTop - shape.radius) > 1e-9),
+    `Expected ${part.name} exact lowering to contain tapered countersink cylinder plans`,
+  );
+  assert(
+    cylinders.length >= 10,
+    `Expected ${part.name} exact lowering to contain several analytic cylinder cutters for the richer hole variants`,
+  );
+
+  const profiles = collectProfiles(plan);
+  assert(
+    profiles.some((profile) => profile.kind === 'roundedRect' && profile.width === 34 && profile.height === 18),
+    `Expected ${part.name} exact lowering to retain the up-to-face service-pocket profile`,
+  );
+}
+
 function checkCorpusEdgeFinishedMountPlan(): void {
   const part = getCompilerRegressionCorpusPart('corpus-edge-finished-mount');
   const plan = runExactManifestScript(part.scriptPath);
@@ -1063,6 +1096,7 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkSketchOnFacePlacementExportEndToEnd();
   checkCorpusEdgeFinishedMountPlan();
   checkCorpusSensorBracketPlan();
+  checkCorpusFastenerPlateVariantsPlan();
   checkCompilerRegressionCorpusExportEndToEnd();
   checkProjectionDownstreamPlan();
   checkProjectionDownstreamExportEndToEnd();

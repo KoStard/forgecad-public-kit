@@ -456,6 +456,106 @@ function checkHoleCutFeaturePlacement(): void {
   }
 }
 
+function checkRicherHoleCutVariants(): void {
+  const base = roundedRect(54, 34, 4, true).extrude(18);
+  const exitFace = base.face('bottom');
+
+  const counterbored = base.hole('top', {
+    diameter: 6,
+    u: -10,
+    v: 8,
+    upToFace: exitFace,
+    counterbore: { diameter: 10, depth: 4 },
+  });
+  const counterboredOwner = getShapePrimaryQueryOwner(counterbored);
+  expect(counterboredOwner != null, 'counterbore result should expose a primary owner');
+  expect(counterbored.faceNames().includes('counterbore-floor'), 'counterbore results should expose a defended shoulder face name');
+  expect(counterbored.faceNames().includes('counterbore-wall'), 'counterbore results should expose a defended counterbore wall face name');
+  expect(!counterbored.faceNames().includes('floor'), 'up-to-face counterbores should not expose a blind-hole floor face');
+  const counterboreFloor = counterbored.face('counterbore-floor');
+  expect(counterboreFloor.query?.kind === 'created-face', 'counterbore floor should expose a created-face query');
+  if (counterboreFloor.query?.kind === 'created-face') {
+    expect(
+      counterboreFloor.query.slot === 'counterbore-floor',
+      `expected counterbore floor slot "counterbore-floor", got ${counterboreFloor.query.slot}`,
+    );
+    expect(
+      counterboreFloor.query.owner?.id === counterboredOwner!.id,
+      'counterbore floor queries should target the counterbore owner',
+    );
+  }
+  expectThrows(
+    () => counterbored.face('bottom'),
+    /selected up-to-face termination face is rewritten by the hole result/,
+    'counterbore.upToFaceTermination',
+  );
+
+  const counterboreBadge = rect(3, 2)
+    .onFace(counterbored, 'counterbore-floor', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
+    .extrude(0.8)
+    .toShape();
+  const counterboreBadgePlacement = getShapeWorkplanePlacement(counterboreBadge);
+  expect(counterboreBadgePlacement != null, 'counterbore shoulder features should preserve workplane placement');
+  expect(
+    counterboreBadgePlacement!.placement.workplane.source.kind === 'created-face',
+    'counterbore shoulder placement should preserve a created-face query source',
+  );
+  if (counterboreBadgePlacement!.placement.workplane.source.kind === 'created-face') {
+    expect(
+      counterboreBadgePlacement!.placement.workplane.source.slot === 'counterbore-floor',
+      `expected counterbore shoulder placement slot "counterbore-floor", got ${counterboreBadgePlacement!.placement.workplane.source.slot}`,
+    );
+  }
+
+  const counterborePropagation = getShapeTopologyRewritePropagation(counterbored);
+  expect(counterborePropagation != null, 'counterbore results should expose a topology-rewrite propagation contract');
+  expect(
+    counterborePropagation!.createdFaces.some((entry) => entry.query.slot === 'counterbore-floor'),
+    'counterbore propagation should expose the shoulder created-face slot',
+  );
+  expect(
+    counterborePropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'hole-up-to-face-target-split-ambiguous'),
+    'counterbore propagation should expose an explicit up-to-face termination ambiguity diagnostic',
+  );
+
+  const countersunk = base.hole('top', {
+    diameter: 4.2,
+    u: 12,
+    v: 8,
+    upToFace: exitFace,
+    countersink: { diameter: 9, angleDeg: 90 },
+  });
+  const countersinkWall = countersunk.face('countersink-wall');
+  expect(countersinkWall.query?.kind === 'created-face', 'countersink walls should expose created-face queries');
+  if (countersinkWall.query?.kind === 'created-face') {
+    expect(
+      countersinkWall.query.slot === 'countersink-wall',
+      `expected countersink wall slot "countersink-wall", got ${countersinkWall.query.slot}`,
+    );
+  }
+  expectThrows(
+    () => rect(2, 2).onFace(countersunk, 'countersink-wall', { u: 0, v: 0 }),
+    /not planar and cannot host a sketch/,
+    'countersink.nonPlanarPlacement',
+  );
+
+  const pocket = roundedRect(18, 10, 2, true)
+    .onFace(base, 'top', { u: 0, v: -6, selfAnchor: 'center' });
+  const cut = base.cutout(pocket, { upToFace: exitFace });
+  const cutPropagation = getShapeTopologyRewritePropagation(cut);
+  expect(cutPropagation != null, 'up-to-face cuts should expose a topology-rewrite propagation contract');
+  expect(!cut.faceNames().includes('floor'), 'up-to-face cuts should not expose a blind-cut floor face');
+  expect(
+    cutPropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'cut-up-to-face-target-split-ambiguous'),
+    'up-to-face cuts should expose an explicit termination-face ambiguity diagnostic',
+  );
+  expectThrows(
+    () => cut.face('bottom'),
+    /selected up-to-face termination face is rewritten by the cut result/,
+    'cut.upToFaceTermination',
+  );
+}
+
 function checkEdgeFinishOwnerPropagation(): void {
   const base = rectangle(-32, -20, 64, 40).extrude(20);
   const baseOwner = getShapePrimaryQueryOwner(base.toShape());
@@ -811,6 +911,7 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkShapeWorkplanePlacementPropagation();
   checkShapeQueryOwnerPropagation();
   checkHoleCutFeaturePlacement();
+  checkRicherHoleCutVariants();
   checkEdgeFinishOwnerPropagation();
   checkRepeatedFeatureOwnershipPropagation();
   checkBooleanAndRepeatedQueryPropagation();

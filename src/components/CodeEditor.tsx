@@ -181,6 +181,10 @@ declare class Shape {
   referenceNames(kind?: 'points' | 'edges' | 'surfaces' | 'objects'): string[];
   /** Resolve a built-in anchor or named placement reference to a world-space point. */
   referencePoint(ref: AnchorTarget3D): [number, number, number];
+  /** Resolve a defended semantic face by name on compile-covered shapes. */
+  face(name: string): FaceRef;
+  /** List defended semantic face names currently available on this shape. */
+  faceNames(): string[];
   /** Translate this shape so the given anchor/reference lands on the target coordinate. */
   placeReference(ref: AnchorTarget3D, target: [number, number, number], offset?: [number, number, number]): Shape;
 
@@ -200,6 +204,25 @@ declare class Shape {
   splitByPlane(normal: [number, number, number], offset?: number): [Shape, Shape];
   trimByPlane(normal: [number, number, number], offset?: number): Shape;
   shell(thickness: number, opts?: { openFaces?: Array<'top' | 'bottom'> }): Shape;
+  hole(
+    faceOrRef: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef,
+    opts: {
+      diameter: number;
+      depth?: number;
+      upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+      u?: number;
+      v?: number;
+      counterbore?: { diameter: number; depth: number };
+      countersink?: { diameter: number; angleDeg?: number };
+    },
+  ): Shape;
+  cutout(
+    sketch: Sketch,
+    opts?: {
+      depth?: number;
+      upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+    },
+  ): Shape;
   hull(): Shape;
 
   // Deformation
@@ -393,6 +416,25 @@ declare class TrackedShape {
   subtract(...others: ShapeBooleanOperandInput[]): Shape;
   intersect(...others: ShapeBooleanOperandInput[]): Shape;
   shell(thickness: number, opts?: { openFaces?: Array<'top' | 'bottom'> }): Shape;
+  hole(
+    faceOrRef: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef,
+    opts: {
+      diameter: number;
+      depth?: number;
+      upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+      u?: number;
+      v?: number;
+      counterbore?: { diameter: number; depth: number };
+      countersink?: { diameter: number; angleDeg?: number };
+    },
+  ): Shape;
+  cutout(
+    sketch: Sketch,
+    opts?: {
+      depth?: number;
+      upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+    },
+  ): Shape;
   toShape(): Shape;
 }
 
