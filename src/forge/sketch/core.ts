@@ -5,6 +5,7 @@ import { cloneProfileCompilePlan } from '../compilePlan';
 import type { Mat4 } from '../transform';
 import type { FaceRef } from './topology';
 import { lowerProfileCompilePlanToCrossSection } from '../compilePlanManifold';
+import { faceQueryRefsEqual } from '../queryModel';
 import {
   cloneSketchPlacementModel,
   type Anchor,
@@ -175,14 +176,7 @@ function matricesNearlyEqual(a: SketchPlacement3D | null, b: SketchPlacement3D |
 
 function workplanesNearlyEqual(a: SketchWorkplane | null, b: SketchWorkplane | null, eps = 1e-8): boolean {
   if (a == null || b == null) return a == null && b == null;
-  if (a.source.kind !== b.source.kind) return false;
-  if (a.source.kind === 'canonical-face' && b.source.kind === 'canonical-face' && a.source.face !== b.source.face) return false;
-  if (a.source.kind === 'tracked-face' && b.source.kind === 'tracked-face' && a.source.faceName !== b.source.faceName) return false;
-  if (a.source.kind === 'face-ref' && b.source.kind === 'face-ref' && a.source.faceName !== b.source.faceName) return false;
-  const ownerA = a.source.owner;
-  const ownerB = b.source.owner;
-  if ((ownerA == null) !== (ownerB == null)) return false;
-  if (ownerA && ownerB && (ownerA.id !== ownerB.id || ownerA.operation !== ownerB.operation)) return false;
+  if (!faceQueryRefsEqual(a.source, b.source)) return false;
 
   const vectors = [
     [a.origin, b.origin],

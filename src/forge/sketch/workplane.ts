@@ -1,3 +1,8 @@
+import {
+  cloneFaceQueryRef,
+  cloneShapeQueryOwner,
+  type ShapeQueryOwner,
+} from '../queryModel';
 import { getShapePrimaryQueryOwner, resolveAnchor3D, type Shape } from '../kernel';
 import { Transform, type Mat4, type Vec3 } from '../transform';
 import {
@@ -7,7 +12,6 @@ import {
   type SketchPlacementModel,
   type SketchWorkplane,
 } from './core';
-import { cloneShapeQueryOwner, type ShapeQueryOwner } from './workplaneModel';
 import { TrackedShape, type FaceRef } from './topology';
 
 export type ShapeAnchorTarget = Shape | TrackedShape | { _bbox(): { min: number[]; max: number[] } };
@@ -92,23 +96,25 @@ function resolvePlanarFaceWorkplane(face: FaceRef): SketchWorkplane {
   if (face.planar === false || !face.uAxis || !face.vAxis) {
     throw new Error(`Face "${face.name}" is not planar and cannot host a sketch.`);
   }
+  const owner = cloneShapeQueryOwner(face.query?.owner);
   return {
     origin: [face.center[0], face.center[1], face.center[2]],
     u: [face.uAxis[0], face.uAxis[1], face.uAxis[2]],
     v: [face.vAxis[0], face.vAxis[1], face.vAxis[2]],
     normal: [face.normal[0], face.normal[1], face.normal[2]],
-    source: { kind: 'face-ref', faceName: face.name, owner: cloneShapeQueryOwner(face.owner) },
+    source: { kind: 'face-ref', faceName: face.name, owner },
   };
 }
 
 function resolveNamedTrackedFace(parent: TrackedShape, face: string): FaceRef | null {
   const trackedFace = parent.topology.faces.get(face);
   if (!trackedFace) return null;
+  const owner = getShapePrimaryQueryOwner(parent.toShape()) ?? trackedFace.query?.owner;
   return {
     ...trackedFace,
     normal: [trackedFace.normal[0], trackedFace.normal[1], trackedFace.normal[2]],
     center: [trackedFace.center[0], trackedFace.center[1], trackedFace.center[2]],
-    owner: cloneShapeQueryOwner(getShapePrimaryQueryOwner(parent.toShape()) ?? trackedFace.owner),
+    query: cloneFaceQueryRef({ kind: 'tracked-face', faceName: face, owner: cloneShapeQueryOwner(owner ?? undefined) }),
     uAxis: trackedFace.uAxis ? [trackedFace.uAxis[0], trackedFace.uAxis[1], trackedFace.uAxis[2]] : undefined,
     vAxis: trackedFace.vAxis ? [trackedFace.vAxis[0], trackedFace.vAxis[1], trackedFace.vAxis[2]] : undefined,
   };
@@ -147,7 +153,7 @@ export function resolveSketchWorkplane(
       const workplane = resolvePlanarFaceWorkplane(trackedFace);
       return {
         ...workplane,
-        source: { kind: 'tracked-face', faceName: face, owner: cloneShapeQueryOwner(trackedFace.owner) },
+        source: cloneFaceQueryRef(trackedFace.query) ?? { kind: 'tracked-face', faceName: face },
       };
     }
   }

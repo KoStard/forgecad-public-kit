@@ -37,6 +37,7 @@ import {
   findShapeWorkplanePlacement,
 } from './compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from './apiArgs';
+import type { ShapeQueryOwner } from './queryModel';
 import {
   type ShapeBackend,
   isShapeBackend,
@@ -44,7 +45,7 @@ import {
   wrapManifoldShapeBackend,
 } from './shapeBackend';
 import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
-import type { ShapeQueryOwner, ShapeWorkplanePlacement } from './sketch/workplaneModel';
+import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 
 export type { Anchor3D } from './anchors';

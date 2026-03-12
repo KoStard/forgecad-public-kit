@@ -1,4 +1,8 @@
 import type { Mat4 } from '../transform';
+import {
+  cloneFaceQueryRef,
+  type FaceQueryRef,
+} from '../queryModel';
 
 export type Anchor =
   | 'center'
@@ -11,17 +15,8 @@ export type Anchor =
   | 'left'
   | 'right';
 
-export type SketchFace3D = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom';
-
-export interface ShapeQueryOwner {
-  id: string;
-  operation: string;
-}
-
-export type SketchWorkplaneSource =
-  | { kind: 'canonical-face'; face: SketchFace3D; owner?: ShapeQueryOwner }
-  | { kind: 'tracked-face'; faceName: string; owner?: ShapeQueryOwner }
-  | { kind: 'face-ref'; faceName?: string; owner?: ShapeQueryOwner };
+export type SketchWorkplaneSource = FaceQueryRef;
+export type { FaceQueryRef, ShapeQueryOwner, SketchFace3D } from '../queryModel';
 
 export interface SketchWorkplane {
   origin: [number, number, number];
@@ -44,23 +39,8 @@ export interface ShapeWorkplanePlacement {
   placement: SketchPlacementModel;
 }
 
-export function cloneShapeQueryOwner(owner: ShapeQueryOwner | undefined): ShapeQueryOwner | undefined {
-  if (!owner) return undefined;
-  return {
-    id: owner.id,
-    operation: owner.operation,
-  };
-}
-
 export function cloneSketchWorkplaneSource(source: SketchWorkplaneSource): SketchWorkplaneSource {
-  switch (source.kind) {
-    case 'canonical-face':
-      return { kind: 'canonical-face', face: source.face, owner: cloneShapeQueryOwner(source.owner) };
-    case 'tracked-face':
-      return { kind: 'tracked-face', faceName: source.faceName, owner: cloneShapeQueryOwner(source.owner) };
-    case 'face-ref':
-      return { kind: 'face-ref', faceName: source.faceName, owner: cloneShapeQueryOwner(source.owner) };
-  }
+  return cloneFaceQueryRef(source)!;
 }
 
 export function cloneSketchWorkplane(workplane: SketchWorkplane): SketchWorkplane {

@@ -1,8 +1,10 @@
 import { Transform, type Mat4, type Vec3 } from './transform';
 import {
-  cloneSketchPlacementModel,
   cloneShapeQueryOwner,
   type ShapeQueryOwner,
+} from './queryModel';
+import {
+  cloneSketchPlacementModel,
   type ShapeWorkplanePlacement,
 } from './sketch/workplaneModel';
 

@@ -152,6 +152,10 @@ function checkCanonicalFaceWorkplaneRecording(): void {
 
 function checkTrackedFaceWorkplaneRecording(): void {
   const target = roundedRect(20, 12, 2, true).extrude(6, { center: true });
+  const faceQuery = target.face('top').query;
+  expect(faceQuery != null, 'tracked faces should expose a shared face-query reference');
+  expect(faceQuery!.kind === 'tracked-face', 'tracked faces should expose tracked-face queries');
+  expect(faceQuery!.faceName === 'top', 'tracked face queries should preserve the face name');
   const sketch = rect(6, 4).onFace(target, 'top', {
     u: 2,
     v: 1,
@@ -163,6 +167,7 @@ function checkTrackedFaceWorkplaneRecording(): void {
   expect(placement != null, 'tracked-face workplane placement should be recorded');
   expect(placement!.workplane.source.kind === 'tracked-face', 'expected tracked-face workplane source');
   expect(placement!.workplane.source.faceName === 'top', 'expected tracked top face source');
+  expect(placement!.workplane.source.owner?.id === faceQuery!.owner?.id, 'tracked-face workplane should reuse the face query owner');
   expectVec(placement!.workplane.origin, target.face('top').center, 'workplane.tracked.origin');
   expectVec(placement!.workplane.normal, target.face('top').normal, 'workplane.tracked.normal');
 
