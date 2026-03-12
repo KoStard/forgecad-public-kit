@@ -7,7 +7,7 @@
 import '../src/forge/holeCut';
 import { getShapePrimaryQueryOwner, getShapeQueryOwners, getShapeWorkplanePlacement, initKernel, box } from '../src/forge/kernel';
 import { runScript } from '../src/forge/headless';
-import { rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
+import { circle2d, linearPattern, rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
 import { getSketchPlacement3D, getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
 import { Transform } from '../src/forge/transform';
 
@@ -376,6 +376,49 @@ function checkHoleCutFeaturePlacement(): void {
   expect(cutPlacement!.placement.selfAnchor === 'center', 'Shape.cutout() should preserve the source sketch anchor');
 }
 
+function checkRepeatedFeatureOwnershipPropagation(): void {
+  const base = roundedRect(72, 44, 4, true).extrude(12);
+
+  const boss = roundedRect(16, 12, 2, true)
+    .onFace(base, 'top', { u: -18, v: 10, protrude: 0.5, selfAnchor: 'center' })
+    .extrude(8);
+  const bossOwner = getShapePrimaryQueryOwner(boss.toShape());
+  expect(bossOwner != null, 'seed downstream feature should expose a primary query owner');
+
+  const mirroredBoss = boss.toShape().mirror([1, 0, 0]);
+  const mirroredOwner = getShapePrimaryQueryOwner(mirroredBoss);
+  expect(mirroredOwner != null, 'mirrored downstream feature should expose a primary query owner');
+  expect(mirroredOwner!.operation === 'mirror', `expected mirrored feature owner operation "mirror", got ${mirroredOwner!.operation}`);
+  expect(mirroredOwner!.id !== bossOwner!.id, 'mirrored downstream feature should get its own repeated-result owner');
+
+  const mirroredHole = circle2d(2.4)
+    .onFace(mirroredBoss, 'top', { u: 0, v: 0, protrude: 0.25, selfAnchor: 'center' })
+    .extrude(10);
+  const mirroredHolePlacement = getShapeWorkplanePlacement(mirroredHole.toShape());
+  expect(mirroredHolePlacement != null, 'downstream feature on mirrored result should preserve workplane placement');
+  expect(
+    mirroredHolePlacement!.placement.workplane.source.owner?.id === mirroredOwner!.id,
+    'downstream feature on mirrored result should target the mirrored owner lineage',
+  );
+
+  const slotSeed = roundedRect(12, 4, 1.5, true)
+    .onFace(base, 'top', { u: -22, v: -12, protrude: 0.5, selfAnchor: 'center' })
+    .extrude(6);
+  const slotOwner = getShapePrimaryQueryOwner(slotSeed.toShape());
+  expect(slotOwner != null, 'pattern seed feature should expose a primary query owner');
+
+  const slots = linearPattern(slotSeed, 3, 22, 0, 0);
+  const slotOwners = getShapeQueryOwners(slots);
+  const patternedOwners = slotOwners.filter((owner) => owner.operation.startsWith('pattern:linear:'));
+  expect(patternedOwners.length === 3, `expected 3 linear-pattern owners, got ${patternedOwners.length}`);
+  expect(new Set(patternedOwners.map((owner) => owner.id)).size === 3, 'linear-pattern instances should keep distinct owner ids');
+  expect(
+    patternedOwners.some((owner) => owner.operation === 'pattern:linear:0'),
+    'linear-pattern ownership should keep the seed instance visible as pattern:linear:0',
+  );
+  expect(slotOwners.some((owner) => owner.id === slotOwner!.id), 'patterned result should retain the seed feature lineage');
+}
+
 export async function runCheckPlacementReferencesCli(): Promise<void> {
   await initKernel();
   checkTransformAndPlacementHelpers();
@@ -388,5 +431,6 @@ export async function runCheckPlacementReferencesCli(): Promise<void> {
   checkShapeWorkplanePlacementPropagation();
   checkShapeQueryOwnerPropagation();
   checkHoleCutFeaturePlacement();
+  checkRepeatedFeatureOwnershipPropagation();
   console.log('✓ Placement reference invariants passed');
 }

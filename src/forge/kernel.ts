@@ -38,6 +38,7 @@ import {
 } from './compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from './apiArgs';
 import type { ShapeQueryOwner } from './queryModel';
+import { wrapRepeatedShapeCompilePlan } from './repetitionOwnership';
 import {
   type ShapeBackend,
   isShapeBackend,
@@ -794,12 +795,13 @@ export class Shape {
   }
 
   mirror(normal: [number, number, number]): Shape {
-    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
+    const transformedPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
       kind: 'mirror',
       normalX: normal[0],
       normalY: normal[1],
       normalZ: normal[2],
     });
+    const nextPlan = wrapRepeatedShapeCompilePlan(transformedPlan, 'mirror');
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
       nextPlan

@@ -160,13 +160,14 @@ Current progress:
 - `src/forge/queryModel.ts` now also defines the shared edge-query contract for tracked edges and direct edge refs, including selector semantics for whole-edge vs. `start` / `end` / `midpoint` references
 - tracked-topology flows now preserve that edge-query metadata through clone/translate/workplane-placement transforms, and placement invariants assert that tracked edge selectors stay aligned with the actual transformed edge geometry
 - booleans, shell, split/trim flows, and downstream workplane-driven features now preserve that owner lineage through the compile graph instead of erasing it at each feature boundary
+- mirrored results plus `linearPattern()` / `circularPattern()` helper copies now get fresh compiler-owned repeated-result owners when their source shapes stay compile-covered
 - placement and exact-export invariants now check that owner lineage survives ordinary shell-plus-cut-plus-boolean style part workflows
 
 Still missing:
 
 - durable face/edge identity across topology-changing operations
 - shared edge-query selectors exist for tracked topology, but topology-changing features still do not produce durable compiler-owned edge identity after shell/boolean/fillet-style edits
-- richer query propagation rules for shell-created faces, fillet/chamfer ownership, patterned features, and projection targets
+- richer query propagation rules for shell-created faces, fillet/chamfer ownership, projection targets, and merged patterned descendants
 - stable face/edge references beyond today's tracked/canonical face foundations
 
 ### Phase 3: Mainstream Feature Families
@@ -192,6 +193,8 @@ Current progress:
 - regression coverage now includes compiler snapshots plus exact-export invariants for `shell()`
 - regression coverage now also includes exact/runtime/export checks for the supported hole/cut workflow subset
 - the regression suite now also includes a curated enclosure-style multi-feature part so shell, workplane-driven cuts, mirrors, and booleans are exercised together instead of only as isolated unit slices
+- mirrored downstream features and helper-driven linear/circular repetition now preserve repeated-result ownership on top of the shared face-query backbone
+- exact export regression coverage now includes a repeated-feature part where a mirrored descendant drives a downstream workplane feature inside a boolean chain
 
 Current limits:
 
@@ -199,6 +202,8 @@ Current limits:
 - `shape.hole()` v1 only covers circular through/blind holes, and `shape.cutout()` v1 only covers sketches already placed with `onFace(...)`
 - counterbores, countersinks, up-to-face extents, drafted cuts, and durable identity for hole/cut-created faces are still missing
 - shelling and hole/cut workflows now preserve parent-body ownership lineage, but stable downstream face ownership after topology-changing edits is still not solved, which is why projection-driven edits, patterns, and fillet/chamfer remain the harder next layers
+- repeated-feature ownership currently tracks repeated bodies and mirrored descendants, not durable per-face identity after merged pattern topology changes
+- shell, hole/cut, and repeated-feature workflows now preserve parent-body ownership lineage, but stable downstream face ownership after topology-changing edits is still not solved, which is why projection-driven edits and fillet/chamfer remain the harder next layers
 
 ### Phase 4: Higher-Order Workflows
 
