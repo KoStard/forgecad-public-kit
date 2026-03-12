@@ -688,8 +688,8 @@ function checkRepeatedFeatureOwnershipPlan(): void {
     (step) => step.kind === 'workplanePlacement' && step.placement.workplane.source.owner?.operation === 'mirror',
   );
   assert(repeatedPlacement, 'Expected mirrored downstream features to keep mirror-owned workplane provenance through exact lowering');
-  assert.equal(repeatedPlacement.placement.workplane.source.kind, 'canonical-face');
-  assert.equal(repeatedPlacement.placement.workplane.source.face, 'top');
+  assert.equal(repeatedPlacement.placement.workplane.source.kind, 'face-ref');
+  assert.equal(repeatedPlacement.placement.workplane.source.faceName, 'top');
 }
 
 function checkRepeatedFeatureOwnershipExportEndToEnd(): void {
@@ -788,6 +788,18 @@ function checkCorpusEdgeFinishedMountPlan(): void {
   );
 }
 
+function checkCorpusProjectionRelayCoverPlan(): void {
+  const part = getCompilerRegressionCorpusPart('corpus-projection-relay-cover');
+  const plan = runExactManifestScript(part.scriptPath);
+
+  assert.equal(plan.kind, 'boolean', `Expected ${part.name} plan to remain a boolean tree, got ${plan.kind}`);
+  const profiles = collectProfiles(plan);
+  const lipProfile = profiles.find((profile) => profile.kind === 'offset' && profile.delta === 2);
+  assert(lipProfile && lipProfile.kind === 'offset', `Expected ${part.name} exact lowering to keep the projected lip offset profile`);
+  assert.equal(lipProfile.base.kind, 'boolean', `Expected ${part.name} projected lip base to stay a boolean profile, got ${lipProfile.base.kind}`);
+  assert.equal(lipProfile.base.op, 'union', `Expected ${part.name} projected lip to replay the union silhouette, got ${lipProfile.base.op}`);
+}
+
 function checkCompilerRegressionCorpusExportEndToEnd(): void {
   for (const part of COMPILER_REGRESSION_CORPUS) {
     exportExactManifestScript(part.scriptPath);
@@ -833,6 +845,53 @@ const gasket = projected
   .extrude(0.8);
 return [{ name: 'Gasket', shape: gasket }];
 `);
+}
+
+function checkProjectionRewriteSourcePlan(): void {
+  const plan = runExactManifest(`
+const plate = roundedRect(54, 34, 4, true).extrude(12);
+const drilled = plate.hole('top', { diameter: 8, u: 0, v: -6 });
+const projected = projectToPlane(drilled, { plane: 'XY' });
+const lip = projected
+  .offset(1.5)
+  .onFace(plate.face('top'), { protrude: 0.5, selfAnchor: 'center' })
+  .extrude(0.8);
+return [{ name: 'Hole Shadow Lip', shape: lip }];
+`);
+
+  const offset = collectProfiles(plan).find((profile) => profile.kind === 'offset' && profile.delta === 1.5);
+  assert(offset && offset.kind === 'offset', 'Expected projected through-hole replay to preserve the downstream offset profile');
+  assert.equal(offset.base.kind, 'boolean', `Expected through-hole projection replay to reduce to a boolean profile, got ${offset.base.kind}`);
+  assert.equal(offset.base.op, 'difference', `Expected through-hole projection replay to subtract the hole silhouette, got ${offset.base.op}`);
+  assert(
+    offset.base.profiles.some((profile) => profile.kind === 'circle' && profile.radius === 4),
+    'Expected through-hole projection replay to keep the hole circle inside the boolean profile chain',
+  );
+}
+
+function checkProjectionUnsupportedDifferenceDiagnostic(): void {
+  const code = `
+const plate = roundedRect(48, 30, 4, true).extrude(10);
+const carved = plate.toShape().subtract(
+  box(16, 10, 22, true).translate(0, 0, 4),
+);
+const projected = projectToPlane(carved, { plane: 'XY' });
+const lip = projected
+  .offset(1.2)
+  .onFace(plate.face('top'), { protrude: 0.5, selfAnchor: 'center' })
+  .extrude(0.8);
+return [{ name: 'Unsupported Projection', shape: lip }];
+`;
+
+  const result = runScript(code, 'main.forge.js', { 'main.forge.js': code });
+  assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
+  const manifest = buildBrepExportManifest(result.objects);
+  assert.equal(manifest.objects.length, 0, 'Unsupported projection replay should not appear in the exact object list');
+  assert.equal(manifest.unsupported.length, 1, `Expected one unsupported projection object, got ${manifest.unsupported.length}`);
+  assert(
+    /boolean difference|supports boolean union sources only/i.test(manifest.unsupported[0].reason),
+    `Expected the unsupported projection diagnostic to explain the defended subset, got "${manifest.unsupported[0].reason}"`,
+  );
 }
 
 function checkMixedSketchAndSolidScenePolicy(): void {
@@ -1049,6 +1108,7 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkChamferEdgeWorkflowExportEndToEnd();
   checkCorpusEnclosureShellCutsPlan();
   checkCorpusMotorMountPlatePlan();
+  checkCorpusProjectionRelayCoverPlan();
   checkRepeatedFeatureOwnershipPlan();
   checkRepeatedFeatureOwnershipExportEndToEnd();
   checkSketchOnFacePlacementPlan();
@@ -1057,7 +1117,9 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkCorpusSensorBracketPlan();
   checkCompilerRegressionCorpusExportEndToEnd();
   checkProjectionDownstreamPlan();
+  checkProjectionRewriteSourcePlan();
   checkProjectionDownstreamExportEndToEnd();
+  checkProjectionUnsupportedDifferenceDiagnostic();
   checkMixedSketchAndSolidScenePolicy();
   checkSplitBranchesStayExactExportable();
   checkPlaneTrimAndSplitStayExactExportable();

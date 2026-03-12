@@ -3,7 +3,12 @@ import {
   cloneShapeQueryOwner,
   type ShapeQueryOwner,
 } from '../queryModel';
-import { Shape, getShapePrimaryQueryOwner, resolveAnchor3D } from '../kernel';
+import {
+  Shape,
+  getShapeCompilePlan,
+  getShapePrimaryQueryOwner,
+  resolveAnchor3D,
+} from '../kernel';
 import { Transform, type Mat4, type Vec3 } from '../transform';
 import {
   Sketch,
@@ -133,6 +138,12 @@ function availablePlanarFaceNames(parent: TrackedShape): string[] {
   });
 }
 
+function isGenericMissingFaceError(error: unknown, face: string): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message === `Face "${face}" is not available. Supported faces: none`
+    || message.startsWith(`Face "${face}" is not available. Supported faces: `);
+}
+
 export function resolveSketchWorkplane(
   parentOrFace: ShapeAnchorTarget | FaceRef,
   face?: SketchFaceTarget,
@@ -164,6 +175,16 @@ export function resolveSketchWorkplane(
     }
   }
 
+  if (parentOrFace instanceof Shape && getShapeCompilePlan(parentOrFace)) {
+    try {
+      return resolvePlanarFaceWorkplane(parentOrFace.face(face));
+    } catch (error) {
+      if (!isCanonicalFace(face) || !isGenericMissingFaceError(error, face)) {
+        throw error;
+      }
+    }
+  }
+
   if (isCanonicalFace(face)) {
     const basis = buildCanonicalFaceBasis(face);
     return {
@@ -173,10 +194,6 @@ export function resolveSketchWorkplane(
       normal: basis.normal,
       source: { kind: 'canonical-face', face, owner: resolveTargetQueryOwner(parentOrFace) },
     };
-  }
-
-  if (parentOrFace instanceof Shape) {
-    return resolvePlanarFaceWorkplane(parentOrFace.face(face));
   }
 
   if (parentOrFace instanceof TrackedShape) {

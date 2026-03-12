@@ -38,6 +38,13 @@ Guards:
 - downstream `hole()` / `cutout()` edits that still target the original tracked body owner after edge finishing
 - ordinary add/subtract edits staying exact-exportable after the edge-finish feature node lands
 
+### `projection-relay-cover.forge.js`
+
+Guards:
+- `projectToPlane()` replay after a repeated top-edge boss chain has already been merged through a supported union
+- projection-driven downstream lips staying exact-exportable instead of collapsing back to runtime-only geometry
+- downstream placement still using defended face-query lineage from the base plate instead of anonymous heuristics
+
 ### `trimmed-access-cover.forge.js`
 
 Guards:

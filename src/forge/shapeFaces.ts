@@ -9,6 +9,7 @@ import {
 import {
   cloneFaceQueryRef,
   faceQueryRefsEqual,
+  shapeQueryOwnersEqual,
   type FaceQueryRef,
   type ShapeQueryOwner,
 } from './queryModel';
@@ -21,6 +22,11 @@ type Vec2 = [number, number];
 interface BlockedFaceQuery {
   query: FaceQueryRef;
   reason: string;
+}
+
+interface FaceMatch {
+  name: string;
+  face: FaceRef;
 }
 
 interface FaceTable {
@@ -118,6 +124,13 @@ function blockNamedFace(table: FaceTable, name: string, reason: string): void {
   if (face) {
     removeSupportedQuery(table, face.query);
     registerBlockedQuery(table, face.query, reason);
+    table.faces.delete(name);
+  }
+  table.blockedNames.set(name, reason);
+}
+
+function maskNamedFace(table: FaceTable, name: string, reason: string): void {
+  if (table.faces.has(name)) {
     table.faces.delete(name);
   }
   table.blockedNames.set(name, reason);
@@ -560,12 +573,69 @@ function oppositeFaceNames(name: string, available: Set<string>): string[] {
   }
 }
 
+function faceOwnerMatches(face: FaceRef, owner: ShapeQueryOwner | undefined): boolean {
+  if (!owner) return true;
+  return shapeQueryOwnersEqual(face.query?.owner, owner);
+}
+
+function faceMatchesQuery(table: FaceTable, name: string, face: FaceRef, query: FaceQueryRef): boolean {
+  switch (query.kind) {
+    case 'tracked-face':
+      return name === query.faceName && faceOwnerMatches(face, query.owner);
+    case 'face-ref':
+      return (query.faceName == null || name === query.faceName) && faceOwnerMatches(face, query.owner);
+    case 'canonical-face':
+      return selectedFaceNamesFromQuery(table, query).includes(name) && faceOwnerMatches(face, query.owner);
+    case 'created-face':
+      return name === query.slot && faceOwnerMatches(face, query.owner);
+    case 'propagated-face':
+      return faceQueryRefsEqual(face.query, query) || faceMatchesQuery(table, name, face, query.source);
+  }
+}
+
+function faceMatchesForQuery(table: FaceTable, query: FaceQueryRef | undefined): FaceMatch[] {
+  if (!query) return [];
+  const seen = new Set<string>();
+  const matches: FaceMatch[] = [];
+  for (const [name, face] of table.faces.entries()) {
+    if (seen.has(name)) continue;
+    if (!faceMatchesQuery(table, name, face, query)) continue;
+    seen.add(name);
+    matches.push({
+      name,
+      face: cloneFaceRefValue(face),
+    });
+  }
+  return matches;
+}
+
+function findBooleanPropagationMatches(
+  operandTables: FaceTable[],
+  query: FaceQueryRef | undefined,
+): FaceMatch[] {
+  return operandTables.flatMap((table) => faceMatchesForQuery(table, query));
+}
+
+function sharedMatchName(matches: FaceMatch[]): string | null {
+  if (matches.length === 0) return null;
+  const names = [...new Set(matches.map((match) => match.name))];
+  return names.length === 1 ? names[0] : null;
+}
+
+function booleanNamedFaceConflictReason(name: string): string {
+  return `Multiple defended propagated descendants now answer to "${name}", so Forge requires an explicit FaceRef/query target instead of guessing one named face.`;
+}
+
+function booleanBlockedFaceReason(note: string | undefined, fallback: string): string {
+  return note ?? fallback;
+}
+
 function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: ShapeQueryOwner | null): FaceTable {
   if (!plan) return emptyFaceTable();
 
   switch (plan.kind) {
     case 'queryOwner':
-      return resolveShapeFaceTableInternal(plan.base, plan.owner);
+      return resolveShapeFaceTableInternal(plan.base, owner ?? plan.owner);
     case 'transform': {
       let table = resolveShapeFaceTableInternal(plan.base, owner);
       for (const step of plan.steps) {
@@ -785,12 +855,71 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
     case 'revolve':
     case 'loft':
     case 'sweep':
-    case 'boolean':
     case 'hull':
     case 'trimByPlane':
     case 'fillet':
     case 'chamfer':
       return emptyFaceTable();
+    case 'boolean': {
+      const table = emptyFaceTable();
+      const operandTables = plan.shapes.map((shape) => resolveShapeFaceTable(shape));
+      const propagation = plan.queryPropagation;
+      if (!propagation) return table;
+
+      for (const entry of propagation.preservedFaces) {
+        const query = cloneFaceQueryRef(entry.query)!;
+        const matches = findBooleanPropagationMatches(operandTables, entry.query.source);
+        const name = sharedMatchName(matches);
+        if (entry.status === 'ambiguous') {
+          const reason = booleanBlockedFaceReason(
+            entry.note,
+            'This propagated boolean face lineage is ambiguous and is not part of the defended named-face subset.',
+          );
+          for (const match of matches) {
+            registerBlockedQuery(table, match.face.query, reason);
+          }
+          if (name) {
+            maskNamedFace(table, name, reason);
+          }
+          registerBlockedQuery(table, entry.query, reason);
+          registerBlockedQuery(table, entry.query.kind === 'propagated-face' ? entry.query.source : undefined, reason);
+          continue;
+        }
+
+        registerSupportedQuery(table, query);
+        if (entry.query.kind === 'propagated-face') {
+          registerSupportedQuery(table, entry.query.source);
+        }
+        for (const match of matches) {
+          registerSupportedQuery(table, match.face.query);
+        }
+
+        if (matches.length !== 1) {
+          if (name) {
+            maskNamedFace(table, name, booleanNamedFaceConflictReason(name));
+          }
+          continue;
+        }
+
+        const candidate = matches[0];
+        const existing = table.faces.get(candidate.name);
+        if (existing && !faceQueryRefsEqual(existing.query, query)) {
+          maskNamedFace(table, candidate.name, booleanNamedFaceConflictReason(candidate.name));
+          continue;
+        }
+
+        registerFace(table, {
+          ...candidate.face,
+          name: candidate.name,
+          query,
+        });
+        if (entry.query.kind === 'propagated-face') {
+          registerSupportedQuery(table, entry.query.source);
+        }
+      }
+
+      return table;
+    }
   }
 }
 

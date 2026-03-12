@@ -66,6 +66,19 @@ export const COMPILER_REGRESSION_CORPUS: CompilerRegressionCorpusPart[] = [
     scriptPath: corpusScriptPath('sensor-bracket.forge.js'),
     objectName: 'Sensor Bracket',
   },
+  {
+    id: 'corpus-projection-relay-cover',
+    name: 'Projection Relay Cover',
+    description:
+      'A relay-cover style plate projects a repeated top-edge boss chain back into a downstream lip feature, keeping projection replay and boolean target queries aligned across both lowerers.',
+    guards: [
+      'projectToPlane() can replay a compatible union-of-patterned descendants instead of only a single placed extrusion',
+      'projection-driven downstream lips keep exact/export parity after the projected source body already went through supported union and repetition flows',
+      'the downstream workplane target can still use defended face-query lineage instead of anonymous placement heuristics',
+    ],
+    scriptPath: corpusScriptPath('projection-relay-cover.forge.js'),
+    objectName: 'Projection Relay Cover',
+  },
 ];
 
 export function getCompilerRegressionCorpusPart(id: string): CompilerRegressionCorpusPart {
