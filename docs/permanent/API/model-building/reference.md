@@ -871,8 +871,14 @@ const shadow = projectToPlane(shape, { origin: [0, 0, 0], normal: [0, 0, 1] });
 `projectToPlane()` always works as a runtime modeling utility.
 
 Compiler-owned replay is narrower today:
-- supported for downstream exact export when the projected source is a straight `extrude()` that still carries compiler-visible workplane placement (for example from `Sketch.onFace()`), and the target plane stays parallel to that placement without introducing in-plane shear
-- unsupported cases still return a usable runtime sketch, but exact export falls back to compiler diagnostics instead of pretending the projection is exact-safe
+- supported for downstream exact export when the projected source reduces to one defended planar projection basis:
+  - plain `extrude()` / `box()` / `cylinder()` sources in their native XY basis
+  - `Sketch.onFace()`-placed straight extrusions on a matching parallel target plane
+  - compatible `shell()` / through-`hole()` / through-`cutout()` descendants aligned to that same basis
+  - boolean `union()` combinations of compatible projected operands, including mirrored/patterned descendants
+- aligned blind holes/cuts keep the same replayed silhouette, while aligned through holes/cuts subtract their projected profile from it
+- the target plane still has to stay parallel to that defended basis without introducing in-plane shear
+- boolean `difference()` / `intersection()` sources, trim/fillet/chamfer silhouette changes, and non-parallel host workplanes still return a usable runtime sketch but fall back to explicit compiler diagnostics instead of pretending the projection is exact-safe
 
 ## 2D Sketches
 
