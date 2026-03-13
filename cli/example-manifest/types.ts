@@ -21,6 +21,20 @@ export type ExampleValidationPath =
   | 'notebook-preview'
   | 'experimental-runtime';
 
+export interface NonPartValidationExpectations {
+  minObjectCount?: number;
+  minShapeObjects?: number;
+  minSketchObjects?: number;
+  minUniqueGroups?: number;
+  minBomEntries?: number;
+  minCutPlanes?: number;
+  minJoints?: number;
+  minAnimations?: number;
+  requireRobotExport?: boolean;
+  minRobotParts?: number;
+  minRobotJoints?: number;
+}
+
 export type PartRouteExpectation =
   | {
       kind: 'exact';
@@ -56,21 +70,25 @@ export interface PartExampleManifestEntry extends ExampleManifestEntryBase {
 export interface AssemblyExampleManifestEntry extends ExampleManifestEntryBase {
   class: 'assembly';
   validation: 'assembly-runtime';
+  expect?: NonPartValidationExpectations;
 }
 
 export interface RuntimeSceneExampleManifestEntry extends ExampleManifestEntryBase {
   class: 'runtime-scene';
   validation: 'runtime-scene';
+  expect?: NonPartValidationExpectations;
 }
 
 export interface SketchExampleManifestEntry extends ExampleManifestEntryBase {
   class: 'sketch';
   validation: 'sketch-svg';
+  expect?: NonPartValidationExpectations;
 }
 
 export interface NotebookExampleManifestEntry extends ExampleManifestEntryBase {
   class: 'notebook';
   validation: 'notebook-preview';
+  expect?: NonPartValidationExpectations;
 }
 
 export interface ExperimentalExampleManifestEntry extends ExampleManifestEntryBase {
@@ -118,43 +136,63 @@ export function partExample(
   };
 }
 
-export function assemblyExample(path: string, note?: string): AssemblyExampleManifestEntry {
+export function assemblyExample(
+  path: string,
+  note?: string,
+  expect?: NonPartValidationExpectations,
+): AssemblyExampleManifestEntry {
   return {
     path,
     family: 'non-part',
     class: 'assembly',
     validation: 'assembly-runtime',
     note,
+    expect,
   };
 }
 
-export function runtimeSceneExample(path: string, note?: string): RuntimeSceneExampleManifestEntry {
+export function runtimeSceneExample(
+  path: string,
+  note?: string,
+  expect?: NonPartValidationExpectations,
+): RuntimeSceneExampleManifestEntry {
   return {
     path,
     family: 'non-part',
     class: 'runtime-scene',
     validation: 'runtime-scene',
     note,
+    expect,
   };
 }
 
-export function sketchExample(path: string, note?: string): SketchExampleManifestEntry {
+export function sketchExample(
+  path: string,
+  note?: string,
+  expect?: NonPartValidationExpectations,
+): SketchExampleManifestEntry {
   return {
     path,
     family: 'non-part',
     class: 'sketch',
     validation: 'sketch-svg',
     note,
+    expect,
   };
 }
 
-export function notebookExample(path: string, note?: string): NotebookExampleManifestEntry {
+export function notebookExample(
+  path: string,
+  note?: string,
+  expect?: NonPartValidationExpectations,
+): NotebookExampleManifestEntry {
   return {
     path,
     family: 'non-part',
     class: 'notebook',
     validation: 'notebook-preview',
     note,
+    expect,
   };
 }
 

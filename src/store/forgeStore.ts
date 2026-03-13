@@ -498,6 +498,7 @@ function createErrorRunResult(message: string, quality: ForgeQualityPreset): Run
     explodeView: null,
     jointsView: null,
     viewConfig: null,
+    robotExport: null,
     quality,
     error: message,
     timeMs: 0,

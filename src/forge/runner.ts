@@ -89,7 +89,12 @@ import { partLibrary } from './library';
 import { ShapeGroup, group } from './group';
 import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
 import { bom, resetBom, getCollectedBom, type BomDef } from './bom';
-import { robotExport, resetRobotExport } from './robotExport';
+import {
+  robotExport,
+  resetRobotExport,
+  getCollectedRobotExport,
+  type CollectedRobotExport,
+} from './robotExport';
 import {
   explodeView,
   resetExplodeView,
@@ -145,6 +150,7 @@ export interface RunResult {
   explodeView: ExplodeViewOptions | null;
   jointsView: CollectedJointsView | null;
   viewConfig: ViewConfig | null;
+  robotExport: CollectedRobotExport | null;
   quality: ForgeQualityPreset;
   error: string | null;
   timeMs: number;
@@ -1538,6 +1544,7 @@ export function runScript(
         explodeView: getCollectedExplodeView(),
         jointsView: getCollectedJointsView(),
         viewConfig: getCollectedViewConfig(),
+        robotExport: getCollectedRobotExport(),
         quality,
         error: objects.length > 0 || options.allowEmptyResult ? null : 'Script must return a Shape or Sketch',
         timeMs: performance.now() - t0,
@@ -1566,6 +1573,7 @@ export function runScript(
       explodeView: getCollectedExplodeView(),
       jointsView: getCollectedJointsView(),
       viewConfig: getCollectedViewConfig(),
+      robotExport: getCollectedRobotExport(),
       quality,
       error: `${msg}${lineInfo}`,
       timeMs: performance.now() - t0,

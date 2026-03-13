@@ -3,31 +3,46 @@
  * Example architecture gate.
  *
  * Inventories every runnable example artifact under `examples/`, verifies that
- * each one is classified in the checked manifest, and runs the validation path
- * assigned to that class. Part examples can additionally opt into exact or
- * faceted route assertions; holdouts still have to execute successfully but are
- * kept outside the exact-route contract until their migration task lands.
+ * each one is classified in the checked manifest, and runs the declared
+ * validation path for that entry. Part examples can additionally opt into exact
+ * or faceted route assertions; holdouts still have to execute successfully but
+ * are kept outside the exact-route contract until their migration task lands.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { init, runScript } from '../src/forge/headless';
+import { init, runScript, type RunResult } from '../src/forge/headless';
 import { buildCompiledSceneReport } from '../src/forge/compiledScene';
 import { collectProjectFiles } from './collect-files';
 import { EXAMPLE_MANIFEST, EXAMPLE_MANIFEST_FAMILIES, listExampleArtifacts } from './example-manifest';
 import type {
+  AssemblyExampleManifestEntry,
   ExampleManifestEntry,
   ExampleManifestFamily,
+  ExampleValidationClass,
+  ExampleValidationPath,
   ExperimentalExampleManifestEntry,
+  NonPartValidationExpectations,
   NotebookExampleManifestEntry,
   PartExampleManifestEntry,
+  RuntimeSceneExampleManifestEntry,
   SketchExampleManifestEntry,
 } from './example-manifest/types';
 import { materializeNotebookPreviewScript } from './notebook-entry';
+import { buildSketchSvgDocument } from './sketch-svg';
 
 type ParsedArgs = {
   families: ExampleManifestFamily[];
   examples: string[];
+};
+
+const VALIDATION_PATH_BY_CLASS: Record<ExampleValidationClass, ExampleValidationPath> = {
+  part: 'part-runtime',
+  assembly: 'assembly-runtime',
+  'runtime-scene': 'runtime-scene',
+  sketch: 'sketch-svg',
+  notebook: 'notebook-preview',
+  experimental: 'experimental-runtime',
 };
 
 function normalizeManifestPath(path: string): string {
@@ -92,6 +107,12 @@ function assertManifestCoverage(entries: ExampleManifestEntry[]): void {
 }
 
 function assertManifestEntryIntegrity(entry: ExampleManifestEntry): void {
+  assert.equal(
+    entry.validation,
+    VALIDATION_PATH_BY_CLASS[entry.class],
+    `${entry.path}: manifest validation path "${entry.validation}" does not match class "${entry.class}"`,
+  );
+
   if (entry.class === 'part' && entry.route.kind === 'holdout') {
     assert(entry.route.blocker.trim().length > 0, `${entry.path}: part holdouts must declare a blocker`);
     assert(entry.route.taskRef.trim().length > 0, `${entry.path}: part holdouts must declare a follow-up task`);
@@ -123,7 +144,7 @@ function selectEntries(entries: ExampleManifestEntry[], args: ParsedArgs): Examp
   return selected;
 }
 
-function executeExample(entry: ExampleManifestEntry) {
+function executeExample(entry: ExampleManifestEntry): RunResult {
   const materialized = materializeNotebookPreviewScript(entry.path);
   try {
     const runnablePath = resolve(materialized.runnablePath);
@@ -140,18 +161,79 @@ function executeExample(entry: ExampleManifestEntry) {
   }
 }
 
+function assertMinimum(entryPath: string, actual: number, minimum: number | undefined, label: string): void {
+  if (minimum == null) return;
+  assert(actual >= minimum, `${entryPath}: expected at least ${minimum} ${label}, got ${actual}`);
+}
+
+function applyNonPartExpectations(
+  entryPath: string,
+  result: RunResult,
+  expectations: NonPartValidationExpectations | undefined,
+): void {
+  if (!expectations) return;
+
+  const objectCount = result.objects.length;
+  const shapeCount = result.objects.filter((object) => object.shape).length;
+  const sketchCount = result.objects.filter((object) => object.sketch).length;
+  const uniqueGroups = new Set(
+    result.objects
+      .map((object) => object.groupName)
+      .filter((groupName): groupName is string => typeof groupName === 'string' && groupName.length > 0),
+  ).size;
+  const jointCount = result.jointsView?.joints.length ?? 0;
+  const animationCount = result.jointsView?.animations.length ?? 0;
+
+  assertMinimum(entryPath, objectCount, expectations.minObjectCount, 'scene object(s)');
+  assertMinimum(entryPath, shapeCount, expectations.minShapeObjects, 'shape object(s)');
+  assertMinimum(entryPath, sketchCount, expectations.minSketchObjects, 'sketch object(s)');
+  assertMinimum(entryPath, uniqueGroups, expectations.minUniqueGroups, 'named group(s)');
+  assertMinimum(entryPath, result.bom.length, expectations.minBomEntries, 'BOM entrie(s)');
+  assertMinimum(entryPath, result.cutPlanes.length, expectations.minCutPlanes, 'cut plane(s)');
+  assertMinimum(entryPath, jointCount, expectations.minJoints, 'jointsView joint(s)');
+  assertMinimum(entryPath, animationCount, expectations.minAnimations, 'jointsView animation(s)');
+
+  if (
+    expectations.requireRobotExport
+    || expectations.minRobotParts != null
+    || expectations.minRobotJoints != null
+  ) {
+    assert(result.robotExport, `${entryPath}: expected robotExport(...) data to stay available to the example gate`);
+    if (!result.robotExport) return;
+    assertMinimum(entryPath, result.robotExport.assembly.parts.length, expectations.minRobotParts, 'robot part(s)');
+    assertMinimum(entryPath, result.robotExport.assembly.joints.length, expectations.minRobotJoints, 'robot joint(s)');
+  }
+}
+
+function validateAssemblyEntry(entry: AssemblyExampleManifestEntry): void {
+  const result = executeExample(entry);
+  const shapeCount = result.objects.filter((object) => object.shape).length;
+  assert(shapeCount >= 2, `${entry.path}: assembly validation expected at least two shape objects in the solved scene`);
+  applyNonPartExpectations(entry.path, result, entry.expect);
+}
+
+function validateRuntimeSceneEntry(entry: RuntimeSceneExampleManifestEntry): void {
+  const result = executeExample(entry);
+  applyNonPartExpectations(entry.path, result, entry.expect);
+}
+
 function validateSketchEntry(entry: SketchExampleManifestEntry): void {
   const result = executeExample(entry);
-  const sketchObject = result.objects.find((object) => object.sketch);
-  assert(sketchObject?.sketch, `${entry.path}: sketch validation requires a returned Sketch object`);
-  const polygons = sketchObject.sketch.toPolygons();
-  assert(polygons.length > 0, `${entry.path}: sketch validation expected at least one polygon`);
+  const sketchEntries = result.objects
+    .filter((object): object is typeof object & { sketch: NonNullable<typeof object.sketch> } => object.sketch != null)
+    .map((object) => ({ name: object.name, sketch: object.sketch }));
+
+  assert(sketchEntries.length > 0, `${entry.path}: sketch validation requires at least one returned Sketch object`);
+  const svgDocument = buildSketchSvgDocument(sketchEntries);
+  assert(svgDocument.pathCount > 0, `${entry.path}: sketch SVG validation expected at least one rendered SVG path`);
+  applyNonPartExpectations(entry.path, result, entry.expect);
 }
 
 function validateNotebookEntry(entry: NotebookExampleManifestEntry): void {
   const result = executeExample(entry);
   const hasRenderablePayload = result.objects.some((object) => object.shape || object.sketch);
   assert(hasRenderablePayload, `${entry.path}: notebook preview validation expected at least one shape or sketch`);
+  applyNonPartExpectations(entry.path, result, entry.expect);
 }
 
 function validatePartEntry(entry: PartExampleManifestEntry): void {
@@ -224,26 +306,29 @@ function validatePartEntry(entry: PartExampleManifestEntry): void {
 }
 
 function validateEntry(entry: ExampleManifestEntry): void {
-  switch (entry.class) {
-    case 'part':
+  switch (entry.validation) {
+    case 'part-runtime':
+      assert.equal(entry.class, 'part', `${entry.path}: part-runtime entries must use the part class`);
       validatePartEntry(entry);
       return;
-    case 'assembly': {
-      const result = executeExample(entry);
-      const shapeCount = result.objects.filter((object) => object.shape).length;
-      assert(shapeCount >= 2, `${entry.path}: assembly validation expected at least two shape objects in the solved scene`);
+    case 'assembly-runtime':
+      assert.equal(entry.class, 'assembly', `${entry.path}: assembly-runtime entries must use the assembly class`);
+      validateAssemblyEntry(entry);
       return;
-    }
     case 'runtime-scene':
-      executeExample(entry);
+      assert.equal(entry.class, 'runtime-scene', `${entry.path}: runtime-scene validation must use the runtime-scene class`);
+      validateRuntimeSceneEntry(entry);
       return;
-    case 'sketch':
+    case 'sketch-svg':
+      assert.equal(entry.class, 'sketch', `${entry.path}: sketch-svg entries must use the sketch class`);
       validateSketchEntry(entry);
       return;
-    case 'notebook':
+    case 'notebook-preview':
+      assert.equal(entry.class, 'notebook', `${entry.path}: notebook-preview entries must use the notebook class`);
       validateNotebookEntry(entry);
       return;
-    case 'experimental':
+    case 'experimental-runtime':
+      assert.equal(entry.class, 'experimental', `${entry.path}: experimental-runtime entries must use the experimental class`);
       executeExample(entry);
       return;
   }
