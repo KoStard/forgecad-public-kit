@@ -32,6 +32,48 @@ const flat = cover.flatPattern();
 
 The maintained proof artifact is [`examples/api/folded-service-panel-cover.forge.js`](../../../../examples/api/folded-service-panel-cover.forge.js).
 
+## Practical First Pass
+
+If the goal is "open docs and make a cover/bracket quickly," the most reliable current workflow is:
+
+1. Build the base panel plus flanges first.
+2. Validate `folded()` and `flatPattern()` before adding any cutouts.
+3. Add panel cutouts before flange cutouts.
+4. Add flange cutouts one region at a time instead of decorating every flange at once.
+5. Re-run validation after each new region so cutout complexity stays easy to localize.
+
+This keeps failures narrow and makes it obvious whether the issue is:
+
+- the sheet-metal setup itself
+- one specific region
+- one specific cutout pattern
+
+## Current Practical Cutout Lane
+
+The defended API surface is wider than the current "fast to author" lane.
+
+For quick, low-drama iteration, prefer:
+
+- `circle2d(...)`
+- `rect(...)`
+- `roundedRect(...)`
+
+These simple compile-covered sketches are the current safest first choice for panel and flange cutouts.
+
+Decorative language still works best when expressed as several individually placed simple cutouts rather than one heavily composed art sketch. In practice, fewer larger apertures are more reliable than many tiny details when you are still exploring the part.
+
+If runtime spikes or validation stops feeling immediate, simplify first by:
+
+- reducing cutout count
+- replacing composed motifs with simple repeated cutouts
+- validating one region before mirroring the same detail to other flanges
+
+## Placement Tips
+
+- `selfAnchor: 'center'` is the easiest default for early iterations because it keeps panel and flange placement intent readable.
+- Flange-local placement is easy to misread, especially on side flanges. Place one obvious asymmetric test cutout on one flange first, validate it, then mirror or repeat once the orientation is confirmed.
+- Keep cutouts off bend regions for v1. The defended cutout lane is planar panel and flange regions only.
+
 ## API Surface
 
 ### `sheetMetal(options)`
@@ -67,6 +109,25 @@ Adds a planar cutout on a supported sheet-metal region.
 - `sketch` must be an unplaced compile-covered 2D sketch
 - `options.u` / `options.v` place the sketch in region-local coordinates
 - `options.selfAnchor` works like other planar placement APIs
+
+For exploratory authoring, prefer a loop like:
+
+```javascript
+let part = sheetMetal({
+  panel: { width: 180, height: 110 },
+  thickness: 1.5,
+  bendRadius: 2,
+  bendAllowance: { kFactor: 0.42 },
+  cornerRelief: { size: 4 },
+})
+  .flange('top', { length: 18 })
+  .flange('right', { length: 18 });
+
+part = part.cutout('panel', roundedRect(40, 10, 5, true), { selfAnchor: 'center' });
+part = part.cutout('flange-right', circle2d(3), { u: 0, v: 0, selfAnchor: 'center' });
+```
+
+That authoring style keeps each downstream cutout step explicit and easy to debug.
 
 ### `part.regionNames()`
 
