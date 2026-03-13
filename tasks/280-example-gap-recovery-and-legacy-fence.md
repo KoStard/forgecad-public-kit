@@ -55,3 +55,4 @@ Starts after the first example migration wave settles.
 
 ## Status and log
 - 2026-03-12: Created as the holdout-resolution lane after the main example migration wave.
+- 2026-03-13: Recovered the three mixed-route part holdouts into scoped `faceted` contracts, left only the fenced experimental probes outside the active architecture phase, and taught the example gate to print the remaining temporary fence list directly.

@@ -10,8 +10,9 @@ Read in this order:
 2. `capabilities.md` - concrete capabilities we want and why they are blocked today
 3. `mlp-readiness-review.md` - current MLP verdict, proof surface, and remaining blockers
 4. `post-mlp-example-phase.md` - the example architecture gate, manifest split, and post-MLP example boundary
-5. `mission-tracker.md` - living implementation tracker
-6. `task-graph.md` - multi-agent task breakdown, dependencies, and execution plan
+5. `example-gap-recovery.md` - task 280 recovery notes, remaining temporary fences, and route-truthfulness closeout
+6. `mission-tracker.md` - living implementation tracker
+7. `task-graph.md` - multi-agent task breakdown, dependencies, and execution plan
 
 The landed MLP closeout package is:
 
@@ -30,5 +31,6 @@ The MLP closeout task is:
 The next program move is the larger checkpoint after MLP, not another truthfulness lane. The current blocker summary lives in:
 
 - `mlp-readiness-review.md`
+- `example-gap-recovery.md`
 - `mission-tracker.md`
 - `task-graph.md`

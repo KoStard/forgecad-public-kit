@@ -127,7 +127,7 @@ When an example mixes helper solids with one primary blocker, the manifest can
 name `primaryShapes` explicitly so the route contract applies to the intended
 shape objects instead of every returned solid.
 
-## Current State After Tasks 250 And 260
+## Current State After Tasks 250, 260, And 280
 
 The landed starting inventory is:
 
@@ -136,26 +136,37 @@ The landed starting inventory is:
 - 8 compiler-corpus parts
 - 34 product/demo part examples
 - 21 non-part artifacts
-- 2 experimental holdouts
+- 2 experimental fences
 
 Current part-route counts:
 
 - 63 `exact`
-- 7 `faceted`
-- 3 `holdout`
+- 10 `faceted`
+- 0 `holdout`
 
 The migrated example families now contribute:
 
 - 24 API part examples on `exact`
-- 5 API part examples on `faceted`
-- 2 API part examples left as explicit holdouts because they still mix incompatible route outcomes in one scene
+- 7 API part examples on `faceted`
 - all 8 compiler-corpus parts on `exact`
 - 31 product/demo part examples on `exact`
-- 2 product/demo part examples on `faceted`
-- 1 product/demo part example left as an explicit holdout because the chess-set knights still mix `hull3d()` blockers into an otherwise exact scene
+- 3 product/demo part examples on `faceted`
 
-The remaining holdouts are now concentrated in:
+Task 280 closed the ambiguous mixed-route holdout lane by scoping route
+contracts onto the blocked primary shapes inside those galleries:
 
-- mixed-route API galleries such as `extrude-options` and `gears-tier1`
-- `examples/chess-set.forge.js`, where the knight bodies still rely on `hull3d()`
-- any later recovery/fencing decisions owned by task 280
+- `examples/api/extrude-options.forge.js`
+  - `Twisted` and `Twist + Taper` now carry the faceted contract.
+  - The plain, tapered, and centered variants remain exact companions in the same gallery.
+- `examples/api/gears-tier1.forge.js`
+  - `Spur Pinion`, `Spur Gear`, and `Ring Gear` now carry the faceted contract.
+  - `Rack Gear` remains an exact companion in the same gallery.
+- `examples/chess-set.forge.js`
+  - The four knight bodies now carry the faceted contract because they still rely on `hull3d()`.
+  - The board and all non-knight pieces remain exact companions in the same scene.
+
+The only examples still outside the active architecture phase are now the two
+temporary experimental fences:
+
+- `examples/sandbox.forge.js`
+- `examples/test-colors.forge.js`

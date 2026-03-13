@@ -363,6 +363,60 @@ function routeBreakdown(entries: ExampleManifestEntry[]): string {
   return `  part routes: exact:${counts.exact}, faceted:${counts.faceted}, holdout:${counts.holdout}`;
 }
 
+type TemporaryFenceSummary = {
+  kind: 'holdout' | 'experimental';
+  path: string;
+  blocker: string;
+  taskRef: string;
+  note?: string;
+};
+
+function collectTemporaryFences(entries: ExampleManifestEntry[]): TemporaryFenceSummary[] {
+  return entries.flatMap((entry) => {
+    if (entry.class === 'part' && entry.route.kind === 'holdout') {
+      return [{
+        kind: 'holdout',
+        path: entry.path,
+        blocker: entry.route.blocker,
+        taskRef: entry.route.taskRef,
+        note: entry.route.note ?? entry.note,
+      }];
+    }
+    if (entry.class === 'experimental') {
+      return [{
+        kind: 'experimental',
+        path: entry.path,
+        blocker: entry.blocker,
+        taskRef: entry.taskRef,
+        note: entry.note,
+      }];
+    }
+    return [];
+  });
+}
+
+function temporaryFenceBreakdown(entries: ExampleManifestEntry[]): string[] {
+  const temporaryFences = collectTemporaryFences(entries);
+  if (temporaryFences.length === 0) {
+    return ['  temporary fences: none'];
+  }
+
+  return [
+    `  temporary fences: ${temporaryFences.length}`,
+    ...temporaryFences.flatMap((entry) => {
+      const lines = [
+        `    - ${entry.kind}: ${entry.path}`,
+        `      blocker: ${entry.blocker}`,
+        `      follow-up: ${entry.taskRef}`,
+      ];
+      if (entry.note) {
+        lines.push(`      note: ${entry.note}`);
+      }
+      return lines;
+    }),
+  ];
+}
+
 export async function runCheckExamplesCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
 
@@ -384,4 +438,7 @@ export async function runCheckExamplesCli(argv: string[] = process.argv.slice(2)
     console.log(line);
   }
   console.log(routeBreakdown(selected));
+  for (const line of temporaryFenceBreakdown(selected)) {
+    console.log(line);
+  }
 }

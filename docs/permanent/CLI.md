@@ -479,7 +479,11 @@ Current part route states:
 
 - `exact`: selected primary shapes must stay on the exact compiler route
 - `faceted`: exact must stay blocked and allow-faceted must succeed with diagnostics
-- `holdout`: runtime-checked, but intentionally outside the exact-route claim because the example still mixes route outcomes or depends on a documented unsupported capability
+- `holdout`: runtime-checked, but intentionally outside the exact-route claim because the example still mixes route outcomes or depends on a documented unsupported capability; this is a temporary recovery state and should normally trend back to zero
+
+Successful runs also print the current temporary fence list, including each
+remaining `holdout` or `experimental` entry's blocker and follow-up task, so
+the command output can be used directly in a phase-entry review.
 
 Use `--family` when a task owns only one manifest lane, and `--example` when you
 want to debug a single checked artifact.

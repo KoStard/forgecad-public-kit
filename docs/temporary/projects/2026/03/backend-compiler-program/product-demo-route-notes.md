@@ -2,12 +2,12 @@
 
 Date: 2026-03-13
 
-Task 260 moved the product-demo family from a blanket holdout fence to explicit
-route ownership:
+Tasks 260 and 280 moved the product-demo family from a blanket holdout fence to
+explicit route ownership:
 
 - 31 `exact`
-- 2 `faceted`
-- 1 `holdout`
+- 3 `faceted`
+- 0 `holdout`
 
 ## Exact With Scoped Primary Shapes
 
@@ -31,11 +31,8 @@ contract is explicit and the remaining helper blocker is documented.
 - `examples/iphone.forge.js`
   - The rounded-body workflow still depends on `smoothOut().refine()` runtime
     geometry without defended exact compile intent.
-
-## Remaining Holdout
-
 - `examples/chess-set.forge.js`
-  - The knight pieces still depend on `hull3d()` body construction while the
-    board and other pieces stay exact.
-  - This is the only remaining product-demo example that still needs the
-    temporary mixed-route holdout classification after task 260.
+  - The route contract now focuses on the four knight bodies, which still
+    depend on `hull3d()` body construction.
+  - The board and every non-knight piece stay exact as scoped companions in the
+    same scene.
