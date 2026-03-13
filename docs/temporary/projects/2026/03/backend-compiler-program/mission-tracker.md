@@ -297,6 +297,38 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 11. Push exact export fully behind the CadQuery/OCCT lowerer | In progress | Export now consumes an explicit `cadquery-occt` compiler target, but the target still needs much broader feature coverage. |
 | 12. Add advanced hybrid-only feature families | Deferred | Sheet metal stays deferred until the active checkpoint is done. |
 
+## Post-MLP Next Wave
+
+The next core lane is now explicit:
+
+- task 300 is the deepest remaining blocker because it turns lineage and rewrite notes into developer-friendly durable descendant resolution
+
+The first higher-order proof lane is also explicit:
+
+- task 310 uses that stronger topology/reference model to build a defended sheet-metal semantic v1 with one concrete proof model
+
+After that, the next achievable compiler-era CAD families are:
+
+- task 320 richer hole/cut variants
+- task 330 broader shell workflows
+- task 340 broader fillet/chamfer workflows
+- task 350 broader projection/sketch-on-face expansion
+- task 360 manufacturing outputs and flat patterns
+- task 370 toolbox/library feature families
+- task 380 assembly metadata and exact export boundary
+- task 390 legacy architecture fence and cleanup
+
+These are the lanes that still fit the current architecture directly.
+
+Still a bigger leap than the current compiler wave:
+
+- arbitrary direct editing over imported/rewrite-heavy BReps
+- advanced surfacing/subD workflows
+- CAM
+- simulation / FEA
+- full enterprise document/PDM systems
+- full mate-solver and large-assembly parity
+
 ## Current Validation
 
 - `npm test` now runs the current assertion-based invariant suite for compiler/export/runtime/API behavior.

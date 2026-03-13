@@ -110,6 +110,98 @@ graph TD
    - broader hole/cut, projection, and fillet/chamfer coverage beyond today's defended subset
    - enough ordinary-part coverage to satisfy the full checkpoint exit criteria without caveats
 
+## Planned Next Wave
+
+The next planned wave after the MLP closeout and example-phase work is:
+
+```mermaid
+graph TD
+  T300["300 Durable Descendant Resolution"]
+  T310["310 Sheet Metal Semantic V1 And Demo"]
+  T320["320 Richer Hole And Cut Variants"]
+  T330["330 Broader Shell Workflows"]
+  T340["340 Broader Fillet And Chamfer Workflows"]
+  T350["350 Projection And Sketch-On-Face Expansion V2"]
+  T360["360 Manufacturing Outputs And Flat Patterns"]
+  T370["370 Toolbox Fasteners And Library Features"]
+  T380["380 Assembly Metadata And Exact Export Boundary"]
+  T390["390 Legacy Architecture Fence And Cleanup"]
+
+  T290 --> T300
+  T300 --> T310
+  T300 --> T320
+  T300 --> T330
+  T300 --> T340
+  T300 --> T350
+  T300 --> T370
+  T300 --> T380
+  T310 --> T360
+  T310 --> T390
+  T320 --> T390
+  T330 --> T390
+  T340 --> T390
+  T350 --> T390
+  T360 --> T390
+  T370 --> T390
+  T380 --> T390
+```
+
+### Recommended Execution Order
+
+1. Start task 300 first. It is the deepest remaining shared blocker.
+2. After task 300 lands, these lanes can run largely in parallel:
+   - task 310
+   - task 320
+   - task 330
+   - task 340
+   - task 350
+   - task 370
+   - task 380
+3. Start task 360 after task 310.
+4. Use task 390 as the retirement lane after the replacement paths are real.
+
+### Isolation Notes
+
+Task 300:
+
+- is the central contract lane and will touch the most shared files
+
+Task 310:
+
+- should prefer new sheet-metal modules and one strong demo instead of widening generic solid APIs carelessly
+
+Task 320:
+
+- should stay centered on hole/cut modules, descendant usage, and targeted regression cases
+
+Task 330:
+
+- should stay centered on shell semantics and shell-created face ownership
+
+Task 340:
+
+- should stay centered on finishing and edge-chain descendant handling
+
+Task 350:
+
+- should stay centered on projection and sketch-on-face semantics
+
+Task 360:
+
+- should stay mostly in export/CLI/docs/regression surfaces once task 310 exists
+
+Task 370:
+
+- should mostly live in library/example/documentation surfaces and compose existing semantic features
+
+Task 380:
+
+- should stay focused on assembly metadata and composition boundaries, not part-feature internals
+
+Task 390:
+
+- is the cleanup lane and should not be started until the replacement paths are real
+
 ## Parallel Starts
 
 These three were intentionally parallel and are now landed:
@@ -228,3 +320,47 @@ Task 220:
 
 - should stay centered on broader finishing after tasks 180 and 190
 - should avoid reworking hole/cut or projection logic
+
+Task 300:
+
+- is the shared descendant-resolution contract lane and should avoid getting widened into general feature breadth
+
+Task 310:
+
+- should stay centered on the dedicated sheet-metal semantic family and its proof model
+
+Task 320:
+
+- should stay centered on richer hole/cut variants after task 300
+- should avoid projection and finishing internals where possible
+
+Task 330:
+
+- should stay centered on broader shell semantics and shell-created face ownership after task 300
+
+Task 340:
+
+- should stay centered on broader finishing after task 300
+- should avoid reworking hole/cut or projection logic
+
+Task 350:
+
+- should stay centered on broader projection/sketch-on-face semantics after task 300
+- should avoid hole/cut and finishing internals where possible
+
+Task 360:
+
+- should stay centered on manufacturing-oriented outputs after task 310
+- should avoid inventing exporter-only geometry behavior
+
+Task 370:
+
+- should mostly live in library/example/docs surfaces and compose supported semantic features
+
+Task 380:
+
+- should stay focused on assembly metadata/export boundary rather than full mate-system work
+
+Task 390:
+
+- should inventory and fence legacy architecture paths only after the compiler-owned replacements are real

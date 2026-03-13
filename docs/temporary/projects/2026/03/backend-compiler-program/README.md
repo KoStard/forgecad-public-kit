@@ -34,3 +34,16 @@ The next program move is the larger checkpoint after MLP, not another truthfulne
 - `example-gap-recovery.md`
 - `mission-tracker.md`
 - `task-graph.md`
+
+The planned next lanes on top of that checkpoint are:
+
+- [tasks/300-durable-descendant-resolution-and-topology-ownership.md](../../../../../../tasks/300-durable-descendant-resolution-and-topology-ownership.md)
+- [tasks/310-sheet-metal-semantic-v1-and-demo.md](../../../../../../tasks/310-sheet-metal-semantic-v1-and-demo.md)
+- [tasks/320-richer-hole-and-cut-variants.md](../../../../../../tasks/320-richer-hole-and-cut-variants.md)
+- [tasks/330-broader-shell-workflows.md](../../../../../../tasks/330-broader-shell-workflows.md)
+- [tasks/340-broader-fillet-and-chamfer-workflows.md](../../../../../../tasks/340-broader-fillet-and-chamfer-workflows.md)
+- [tasks/350-projection-and-sketch-on-face-expansion-v2.md](../../../../../../tasks/350-projection-and-sketch-on-face-expansion-v2.md)
+- [tasks/360-manufacturing-outputs-and-flat-patterns.md](../../../../../../tasks/360-manufacturing-outputs-and-flat-patterns.md)
+- [tasks/370-toolbox-fasteners-and-library-features.md](../../../../../../tasks/370-toolbox-fasteners-and-library-features.md)
+- [tasks/380-assembly-metadata-and-exact-export-boundary.md](../../../../../../tasks/380-assembly-metadata-and-exact-export-boundary.md)
+- [tasks/390-legacy-architecture-fence-and-cleanup.md](../../../../../../tasks/390-legacy-architecture-fence-and-cleanup.md)

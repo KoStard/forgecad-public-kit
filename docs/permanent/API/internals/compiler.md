@@ -247,3 +247,45 @@ Forge scripts
 ```
 
 Future feature work should strengthen this boundary, not route around it.
+
+## Next Achievable CAD Families
+
+Once the descendant-resolution layer is in place, the next credible expansion lanes are:
+
+- richer hole and cut variants
+- broader shell workflows
+- broader fillet/chamfer workflows
+- stronger projection and sketch-on-face flows
+- sheet metal as a dedicated semantic family
+- manufacturing outputs such as flat patterns and DXF/SVG profile export
+- toolbox and library feature families
+- stronger assembly metadata and exact/faceted route visibility
+
+These are all good fits for the compiler architecture because they can be expressed as Forge-owned semantic intent and lowered intentionally into both backends.
+
+## Bigger Leap Areas
+
+Some CAD-adjacent areas are still important, but they are a bigger leap than the current compiler program:
+
+- arbitrary direct editing over imported or heavily rewritten BReps
+- advanced surfacing or subD/T-spline workflows
+- CAM
+- simulation / FEA
+- full enterprise document/PDM systems
+- full large-assembly and mate-solver parity with major desktop CAD tools
+
+Keep these visible, but do not plan them as if they were just another feature module on the current part-design stack.
+
+## Legacy Cleanup Rule
+
+Yes, the old architecture needs cleanup.
+
+No, that should not happen as a single flag-day rewrite.
+
+The rule is:
+
+1. add compiler-owned replacements first
+2. fence old bypass paths so new work cannot extend them
+3. retire legacy shims once supported features and examples no longer need them
+
+That keeps the repo honest without destabilizing active work.

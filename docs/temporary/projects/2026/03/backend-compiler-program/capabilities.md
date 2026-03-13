@@ -118,3 +118,44 @@ The current MLP proof surface is intentionally repo-visible instead of tribal kn
 - `mlp-readiness-review.md` is the short verdict plus blocker summary
 - `examples/compiler-corpus/README.md` maps the curated ordinary-parts corpus to the workflow families it guards
 - `npm run test:compiler`, `npm run test:query-propagation`, and `npm run test:brep` are the review commands for the current supported subset
+
+## Next Achievable CAD Families
+
+These are the next real CAD families that fit the current architecture if we stay disciplined about compiler-owned intent first:
+
+- durable descendant resolution for preserved and created surfaces, edge chains, and later vertex-level ownership
+- richer hole and cut variants including drafted and two-sided extents, thread intent, and broader defended `upToFace` stopping
+- broader shell workflows with downstream ownership of shell-created faces
+- broader finishing workflows that operate on defended post-rewrite edge chains
+- projection and sketch-on-face expansion over descendant regions instead of only simple canonical faces
+- sheet metal v1 as a dedicated semantic family, not inferred from arbitrary solids
+- manufacturing-oriented outputs such as flat patterns and DXF/SVG profile export from compiler-owned exact intent
+- toolbox and library feature families built from the same semantic core
+- stronger assembly metadata and exact/faceted boundary visibility
+
+These are achievable because they extend the same semantic-feature plus dual-lowerer pattern that the compiler work is already building.
+
+## Bigger Leap Boundary
+
+These areas are still real CAD territory, but they are not the next straightforward compiler wave:
+
+- arbitrary direct editing over imported or heavily rewritten BReps
+- advanced surfacing, Class-A workflows, or subD/T-spline style modeling
+- CAM and toolpath generation
+- simulation / FEA
+- full enterprise document/PDM workflows
+- full mate-solver and large-assembly parity with major CAD systems
+
+We should keep these visible in planning, but we should not pretend they are "just another feature lane" on top of the current part-design compiler work.
+
+## Old Architecture Cleanup
+
+Yes, the old architecture needs cleanup, but not as a risky flag day.
+
+The right move is:
+
+1. land compiler-owned replacements for defended feature families
+2. fence old bypass paths so new work cannot extend them
+3. retire legacy modules and shims once the supported example surface no longer depends on them
+
+That is why legacy cleanup is a dedicated task, not an improvised side effect.
