@@ -60,6 +60,7 @@ import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './shapeFaces';
+import { traceFaceTransformationHistory, type FaceTransformationHistory } from './faceHistory';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -68,6 +69,7 @@ export type {
   PlacementReferenceKind,
   PlacementReferences,
 } from './placement';
+export type { FaceTransformationHistory, TransformationStep } from './faceHistory';
 
 let _wasm: ManifoldToplevel | null = null;
 
@@ -746,6 +748,16 @@ export class Shape {
   /** List defended semantic face names currently available on this shape. */
   faceNames(): string[] {
     return listShapeFaceNames(getShapeCompilePlanInternal(this));
+  }
+
+  /** Get the transformation history for a specific face. */
+  faceHistory(name: string): FaceTransformationHistory {
+    const plan = getShapeCompilePlanInternal(this);
+    const face = resolveShapeFace(plan, name);
+    if (!face) {
+      throw new Error(explainMissingShapeFace(plan, name));
+    }
+    return traceFaceTransformationHistory(plan, face);
   }
 
   /** Translate the shape so the given reference lands on the target coordinate. */

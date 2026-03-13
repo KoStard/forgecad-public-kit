@@ -44,6 +44,8 @@ export type {
   PlacementReferenceInput,
   PlacementReferenceKind,
   PlacementReferences,
+  FaceTransformationHistory,
+  TransformationStep,
 } from './kernel';
 export { Transform, composeChain } from './transform';
 export type { Mat4, Vec3, TransformInput, RotateAroundToMode, RotateAroundToOptions } from './transform';

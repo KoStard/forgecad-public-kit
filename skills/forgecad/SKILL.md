@@ -43,6 +43,36 @@ Useful notebook loop:
 - use `forgecad render <file>.forge-notebook.json` or `forgecad capture gif <file>.forge-notebook.json --list` to inspect the preview cell through the CLI
 - export to `.forge.js` when the exploratory phase is over and the structure is ready to stabilize
 
+```
+forgecad notebook --help
+forgecad notebook
+
+Append, execute, inspect, and export `.forge-notebook.json` files.
+
+Usage:
+  forgecad notebook <notebook.forge-notebook.json>
+  forgecad notebook <notebook.forge-notebook.json> --code "show(box(40, 20, 10));"
+  forgecad notebook append <notebook.forge-notebook.json> --file /tmp/cell.js
+  forgecad notebook run <notebook.forge-notebook.json> [cell-id]
+  forgecad notebook view <notebook.forge-notebook.json> [cell-number|cell-id|preview]
+  forgecad notebook export <notebook.forge-notebook.json> [output.forge.js]
+
+Options:
+  --code <code>      Append inline cell source
+  --file <path>      Read cell source from a file
+  --after <cell-id>  Insert after a specific cell id
+  --server <url>     Reuse an existing Forge server
+  --port <n>         Preferred port when auto-starting the server
+
+Examples:
+  forgecad notebook examples/demo.forge-notebook.json --code "show(box(40, 20, 10));"
+  forgecad notebook view examples/api/notebook-iteration.forge-notebook.json preview
+  cat /tmp/cell.js | forgecad notebook examples/demo.forge-notebook.json
+  forgecad notebook export examples/demo.forge-notebook.json out/demo.forge.js
+```
+
+Don't write the `.forge-notebook.json` manually.
+
 ## Source Map
 
 Load groups top-to-bottom, stopping when you have what the task needs.

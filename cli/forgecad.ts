@@ -19,6 +19,7 @@ import {
   type CompletionOptionDefinition,
 } from './forge-completion';
 import { runDebugCompilerCli } from './debug-compiler';
+import { runDebugFaceHistoryCli } from './debug-face-history';
 import { runCaptureCli } from './forge-capture';
 import { runNotebookCli } from './forge-notebook';
 import { runReportCli } from './forge-report';
@@ -646,6 +647,23 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: runDebugDimensionsCli,
+  },
+  {
+    group: 'Debug',
+    path: ['debug', 'faces'],
+    summary: 'Inspect face transformation histories for a script.',
+    usage: ['forgecad debug faces <script.forge.js> [face-name]'],
+    examples: [
+      'forgecad debug faces examples/api/face-transformation-history.forge.js',
+      'forgecad debug faces examples/api/face-transformation-history.forge.js floor',
+    ],
+    completion: {
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+        { description: 'Optional face name to filter', valueKind: 'string' },
+      ],
+    },
+    run: runDebugFaceHistoryCli,
   },
 ];
 
