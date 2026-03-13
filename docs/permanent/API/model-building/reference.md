@@ -740,12 +740,184 @@ shape.refineToTolerance(0.1); // max deviation 0.1mm from smooth surface
 // Split by another shape → [inside, outside]
 const [inside, outside] = shape.split(cutter);
 
-// Split by infinite plane → [below, above]
-const [below, above] = shape.splitByPlane([0, 0, 1], 10);  // Z=10 plane
+// Split by infinite plane → [positive side, opposite side]
+const [above, below] = shape.splitByPlane([0, 0, 1], 10);  // Z=10 plane
 
-// Trim: keep only one side
+// Trim: keep the positive side of the plane
 const trimmed = shape.trimByPlane([0, 0, 1], 10);
 ```
+
+#### `shape.shell(thickness, options?)`
+Hollow out a supported solid by keeping the outside wall and subtracting an inward cavity.
+
+Current compiler-backed `shell()` support is intentionally narrow:
+
+- compile-covered `box()`, `cylinder()`, and straight `Sketch.extrude()` solids
+- optional `openFaces: ['top' | 'bottom']`
+- rigid transforms before shelling are preserved through both lowerers
+- defended named-face queries on the resulting outer shell faces plus created inner faces where Forge can model them exactly
+
+Not supported yet:
+
+- tapered extrudes (`scaleTop`)
+- scale transforms before shelling
+- already-shelled results
+- general boolean, `revolve()`, `loft()`, `sweep()`, `sphere()`, hull, and plane-trim bases
+
+Forge keeps `shell` as semantic compiler intent, then lowers it into backend-supported boolean/extrude/cylinder plans for both Manifold and CadQuery/OCCT.
+
+Supported named-face subset on the shell result:
+
+- preserved outer faces stay queryable on defended bases
+- created inner faces use names like `inner-top`, `inner-bottom`, `inner-side`, or `inner-side-right`
+- downstream `onFace(result, 'inner-side-right', ...)` placement is defended on the planar members of that subset
+- generic straight extrudes still shell exactly, but named created-face support is currently limited to the defended profile families Forge can model directly (`rect`, `roundedRect`, `circle`)
+
+```javascript
+const cup = roundedRect(80, 50, 6, true)
+  .extrude(30)
+  .translate(4, -3, 2)
+  .shell(2.5, { openFaces: ['top'] });
+```
+
+#### `shape.hole(face, options)`
+Compiler-owned circular hole workflow anchored to a face/workplane query.
+
+- `depth` omitted = through-hole
+- `depth` provided = blind hole
+- `upToFace` = stop on a queried planar face parallel to the hole direction
+- `u` / `v` place the hole in face-local coordinates
+- `counterbore: { diameter, depth }` adds a wider cylindrical recess at the entry
+- `countersink: { diameter, angleDeg? }` adds a conical entry (default `90°`)
+- `depth` and `upToFace` are mutually exclusive
+- `counterbore` and `countersink` are mutually exclusive
+
+```javascript
+const block = roundedRect(90, 60, 8, true).extrude(24);
+const exitFace = block.face('bottom');
+
+const body = block
+  .hole('front', { diameter: 8, u: 0, v: 2 })          // through
+  .hole('top', { diameter: 6, u: -18, v: 10, depth: 10 }) // blind
+  .hole('top', {
+    diameter: 5,
+    u: 18,
+    v: 10,
+    upToFace: exitFace,
+    counterbore: { diameter: 9, depth: 4 },
+  });
+```
+
+Supported subset:
+
+- compile-covered target bodies
+- canonical faces, tracked planar faces, and `FaceRef` targets
+- through, blind, and planar `upToFace` circular holes
+- counterbore and countersink entry variants on those hole extents
+- exact lowering through both Manifold and CadQuery/OCCT
+- created hole faces in the defended subset:
+  - `wall` on all supported hole variants
+  - `floor` on blind holes
+  - `counterbore-wall` and `counterbore-floor` on counterbored holes
+  - `countersink-wall` on countersunk holes
+- preserved non-host faces stay queryable where Forge can defend them
+- rewritten host/exit faces now stay queryable as defended descendant regions when Forge can keep one stable source surface/frame
+- reusing the same `upToFace` stop plane through later rewrites is supported when you keep a `FaceRef` from the earlier face (`const exitFace = block.face('bottom')`)
+
+Not supported yet:
+
+- non-planar or non-parallel `upToFace` termination faces
+- drafted/tapered main holes, threads, or combined counterbore+countersink heads
+- segmented polygonal hole cutters
+- runtime-only target bodies without compiler intent
+
+#### `shape.cutout(sketch, options?)`
+Compiler-owned cut-extrude workflow using a sketch already placed with `Sketch.onFace(...)`.
+
+- `depth` omitted = through-cut
+- `depth` provided = blind cut
+- `upToFace` = stop on a queried planar face parallel to the cut direction
+- the sketch must carry semantic workplane placement from `onFace(...)`
+
+```javascript
+const block = roundedRect(90, 60, 8, true).extrude(24);
+const exitFace = block.face('bottom');
+const pocket = roundedRect(18, 10, 2, true)
+  .onFace(block, 'top', { u: 14, v: -8, selfAnchor: 'center' });
+
+const body = block.cutout(pocket, { upToFace: exitFace });
+```
+
+Supported subset:
+
+- compile-covered sketch profiles that CadQuery/OCCT already supports
+- sketches placed on queried faces via `onFace(...)`
+- through, blind, and planar `upToFace` cut extents
+- exact/runtime parity through the shared compiler node family
+- created cut faces in the defended subset:
+  - `floor` on blind cuts
+  - `wall` on circular cuts
+  - `wall-bottom`, `wall-right`, `wall-top`, `wall-left` on rectangular and rounded-rectangle cuts
+- preserved non-host faces stay queryable where Forge can defend them
+- rewritten host/exit faces now stay queryable as defended descendant regions when Forge can keep one stable source surface/frame
+- reusing the same `upToFace` stop plane through later rewrites is supported when you keep a `FaceRef` from the earlier face
+
+Not supported yet:
+
+- free-floating sketches without face/workplane provenance
+- non-planar or non-parallel `upToFace` termination faces
+- draft/taper angles or two-sided extents
+- named created-wall support for arbitrary boolean/offset/projected cut profiles
+
+#### `sheetMetal(options)`
+Compiler-owned sheet-metal v1 builder.
+
+`sheetMetal(...)` returns a `SheetMetalPart`, not a solid directly.
+
+Core flow:
+
+- define the base panel, thickness, bend radius, and explicit `kFactor`
+- add `90°` edge flanges with `.flange(...)`
+- add planar panel/flange cutouts with `.cutout(...)`
+- materialize either `.folded()` or `.flatPattern()`
+
+```javascript
+const cover = sheetMetal({
+  panel: { width: 180, height: 110 },
+  thickness: 1.5,
+  bendRadius: 2,
+  bendAllowance: { kFactor: 0.42 },
+  cornerRelief: { size: 4 },
+})
+  .flange('top', { length: 18 })
+  .flange('right', { length: 18 })
+  .flange('bottom', { length: 18 })
+  .flange('left', { length: 18 })
+  .cutout('panel', rect(72, 36, true), { selfAnchor: 'center' })
+  .cutout('flange-right', roundedRect(26, 10, 5, true), { selfAnchor: 'center' });
+
+const folded = cover.folded();
+const flat = cover.flatPattern();
+```
+
+Supported v1 subset:
+
+- one base panel
+- up to four `90°` edge flanges
+- constant thickness
+- explicit bend radius plus explicit K-factor bend metadata
+- rectangular corner reliefs
+- planar cutouts on the panel and existing flange regions
+- defended semantic regions such as `panel`, `flange-right`, and `bend-right`
+
+Not supported yet:
+
+- arbitrary solid conversion into sheet metal
+- hems, jogs, lofted bends, or broader miter-corner logic
+- nonuniform thickness
+- cutouts directly on bend regions
+
+Use [sheet-metal.md](sheet-metal.md) for the full sheet-metal contract and the maintained `folded-service-panel-cover` proof model.
 
 ### Warping
 
@@ -770,6 +942,18 @@ const section = intersectWithPlane(shape, { plane: 'XY', offset: 10 });
 // Project: flatten shape onto a plane → Sketch
 const shadow = projectToPlane(shape, { origin: [0, 0, 0], normal: [0, 0, 1] });
 ```
+
+`projectToPlane()` always works as a runtime modeling utility.
+
+Compiler-owned replay is narrower today:
+- supported for downstream exact export when the projected source reduces to one defended planar projection basis:
+  - plain `extrude()` / `box()` / `cylinder()` sources in their native XY basis
+  - `Sketch.onFace()`-placed straight extrusions on a matching parallel target plane
+  - compatible `shell()` / through-`hole()` / through-`cutout()` descendants aligned to that same basis
+  - boolean `union()` combinations of compatible projected operands, including mirrored/patterned descendants
+- aligned blind holes/cuts keep the same replayed silhouette, while aligned through holes/cuts subtract their projected profile from it
+- the target plane still has to stay parallel to that defended basis without introducing in-plane shear
+- boolean `difference()` / `intersection()` sources, trim/fillet/chamfer silhouette changes, and non-parallel host workplanes still return a usable runtime sketch but fall back to explicit compiler diagnostics instead of pretending the projection is exact-safe
 
 ## 2D Sketches
 
@@ -827,7 +1011,7 @@ const rail = spline3d(
 #### `loft(profiles, heights, options?)`
 Loft between multiple sketches along Z stations.
 
-This implementation interpolates signed-distance fields and meshes via level-set extraction, so profiles can differ in vertex count/topology.
+This implementation interpolates signed-distance fields and meshes via level-set extraction, so profiles can differ in vertex count/topology. Forge now records that loft intent in the compiler graph as well, and compatible loft stacks can export through the CadQuery/OCCT exact route even though viewport/runtime geometry remains sampled.
 
 Performance note: `loft()` is significantly heavier than primitive/extrude/revolve paths. Use loft only when profile interpolation is required. If your part is axis-symmetric (bottles, vases, knobs, lathe-style parts), prefer `revolve()` for much faster generation.
 
@@ -849,7 +1033,7 @@ const body = loft(
 #### `sweep(profile, path, options?)`
 Sweep a 2D profile along a 3D path (`Curve3D` or point polyline).
 
-Performance note: `sweep()` also uses level-set meshing internally. Prefer direct primitives/extrude/revolve when they can express the same shape.
+Performance note: `sweep()` also uses level-set meshing internally. Prefer direct primitives/extrude/revolve when they can express the same shape. Forge records the sampled sweep path in the compiler graph, so compatible sweeps can export through the CadQuery/OCCT exact route using that canonical path representation.
 
 **Parameters:**
 - `profile` (`Sketch`) - Local cross-section in XY plane

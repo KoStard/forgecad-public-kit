@@ -5,7 +5,7 @@ import {
   getSketchCompileProfilePlan,
   setSketchCompileProfilePlan,
 } from './core';
-import { buildOffsetProfileCompilePlan } from '../compilePlan';
+import { buildHullProfileCompilePlan, buildOffsetProfileCompilePlan } from '../compilePlan';
 
 export function sketchOffset(sketch: Sketch, delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
   const nextPlan = join === 'Round' ? buildOffsetProfileCompilePlan(getSketchCompileProfilePlan(sketch), delta, 'Round') : null;
@@ -18,7 +18,13 @@ export function sketchOffset(sketch: Sketch, delta: number, join: 'Square' | 'Ro
 }
 
 export function sketchHull(sketch: Sketch): Sketch {
-  return copySketchPlacement3D(sketch, new Sketch(sketch.cross.hull(), sketch.colorHex));
+  const nextPlan = buildHullProfileCompilePlan([getSketchCompileProfilePlan(sketch)]);
+  return copySketchPlacement3D(
+    sketch,
+    nextPlan
+      ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
+      : setSketchCompileProfilePlan(new Sketch(sketch.cross.hull(), sketch.colorHex), null),
+  );
 }
 
 export function sketchSimplify(sketch: Sketch, epsilon = 1e-6): Sketch {

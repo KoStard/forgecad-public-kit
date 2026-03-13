@@ -55,7 +55,7 @@ const showerArm = cylinder(armLen, 12)
   .translate(showerArmX, roomD - wallT, showerArmZ);
 
 // Shower head — disc at end of arm
-const showerHead = cylinder(15, 55, 55, 32)
+const showerHead = cylinder(15, 55, 55)
   .translate(showerArmX, roomD - wallT - armLen, showerArmZ - 7);
 
 const shower = union(showerArm, showerHead);
@@ -73,8 +73,8 @@ const toiletCY = toiletY + toiletD * 0.4; // bowl center forward of midpoint
 
 // Bowl — tapered cylinder, hollowed
 const bowlR = toiletW / 2;
-const bowlOuter = cylinder(toiletH, bowlR, bowlR * 0.85, 32);
-const bowlInner = cylinder(toiletH - 40, bowlR - 30, bowlR * 0.85 - 30, 32)
+const bowlOuter = cylinder(toiletH, bowlR, bowlR * 0.85);
+const bowlInner = cylinder(toiletH - 40, bowlR - 30, bowlR * 0.85 - 30)
   .translate(0, 0, 40);
 const bowl = bowlOuter.subtract(bowlInner)
   .translate(toiletCX, toiletCY, wallT);
@@ -91,8 +91,8 @@ const lid = box(tankW + 10, tankD + 10, 15, true)
   .translate(toiletCX, toiletY + toiletD - tankD / 2 - 10, wallT + toiletH / 2 + tankH - 80 + 7);
 
 // Seat — flat ring on top of bowl
-const seatOuter = cylinder(18, bowlR - 5, bowlR * 0.85 - 5, 32);
-const seatInner = cylinder(20, bowlR - 30, bowlR * 0.85 - 30, 32).translate(0, 0, -1);
+const seatOuter = cylinder(18, bowlR - 5, bowlR * 0.85 - 5);
+const seatInner = cylinder(20, bowlR - 30, bowlR * 0.85 - 30).translate(0, 0, -1);
 const seat = seatOuter.subtract(seatInner)
   .translate(toiletCX, toiletCY, wallT + toiletH - 18);
 

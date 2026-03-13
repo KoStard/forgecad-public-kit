@@ -45,7 +45,7 @@ const armY = clampDepth * 0.6 - thick;
 // The profile sits at X = hookCurveR (distance from revolution axis = Y)
 // revolve() goes around Y axis, so profile X = radial, profile Y = height
 const curveProfile = rect(thick, width).translate(hookCurveR, 0);
-const curvePiece = curveProfile.revolve(90, 24)
+const curvePiece = curveProfile.revolve(90)
   // revolve produces shape around Y axis; rotate to align:
   // we need the arc to go from -Z (down) to +Y (forward)
   .rotate(90, 0, 90)   // align width along X
@@ -70,7 +70,7 @@ if (boltHoleD > 0) {
   const holeSpacing = width * 0.6;
   for (let i = -1; i <= 1; i += 2) {
     boltHoles.push(
-      cylinder(thick + 2, boltHoleD / 2, undefined, 24)
+      cylinder(thick + 2, boltHoleD / 2)
         .translate(width / 2 + i * holeSpacing / 2, clampDepth * 0.3, -1)
     );
   }

@@ -57,10 +57,10 @@ const backRotated = backPanel
 
 // --- Hinge cylinders (decorative pivots along X axis) ---
 const hingeLen = 10;
-const hingeLeft = cylinder(hingeLen, hingeR, hingeR, 24)
+const hingeLeft = cylinder(hingeLen, hingeR, hingeR)
   .rotate(0, 90, 0)
   .translate(-standW / 2 + 8, baseLen / 2, thick);
-const hingeRight = cylinder(hingeLen, hingeR, hingeR, 24)
+const hingeRight = cylinder(hingeLen, hingeR, hingeR)
   .rotate(0, 90, 0)
   .translate(standW / 2 - 8 - hingeLen, baseLen / 2, thick);
 

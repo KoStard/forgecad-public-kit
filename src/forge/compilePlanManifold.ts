@@ -5,8 +5,18 @@ import type {
   ShapeCompilePlan,
   ShapeCompileTransformStep,
 } from './compilePlan';
+import {
+  lowerCutShapeCompilePlanToConcretePlan,
+  lowerHoleShapeCompilePlanToConcretePlan,
+} from './holeCutCompilePlan';
+import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
+import { lowerSheetMetalBasePlan } from './sheetMetalModel';
 import { wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
+import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './sketch/loftSweepLowering';
 import { Transform } from './transform';
+import { planeFrameToWorldToPlaneMatrix } from './planeFrame';
+import { resolveSupportedEdgeFeatureSelection } from './edgeFeatureResolution';
+import { applyChamferSelectionToManifold, applyFilletSelectionToManifold } from './edgeFeatureRuntime';
 
 function applyProfileCompileTransform(
   crossSection: CrossSection,
@@ -58,6 +68,17 @@ function lowerProfileBooleanCompilePlan(plan: Extract<ProfileCompilePlan, { kind
   return applyProfileCompileTransforms(combined, plan.transforms);
 }
 
+function lowerProfileHullCompilePlan(plan: Extract<ProfileCompilePlan, { kind: 'hull' }>, wasm: ManifoldToplevel): CrossSection {
+  const profiles = plan.profiles.map((profile) => lowerProfileCompilePlanToCrossSection(profile, wasm));
+  if (profiles.length === 0) {
+    throw new Error('Cannot lower empty profile hull');
+  }
+  if (profiles.length === 1) {
+    return applyProfileCompileTransforms(profiles[0], plan.transforms);
+  }
+  return applyProfileCompileTransforms(wasm.CrossSection.hull(profiles), plan.transforms);
+}
+
 export function lowerProfileCompilePlanToCrossSection(
   plan: ProfileCompilePlan,
   wasm: ManifoldToplevel,
@@ -86,6 +107,14 @@ export function lowerProfileCompilePlanToCrossSection(
         lowerProfileCompilePlanToCrossSection(plan.base, wasm).offset(plan.delta, plan.join),
         plan.transforms,
       );
+    case 'hull':
+      return lowerProfileHullCompilePlan(plan, wasm);
+    case 'project': {
+      const projected = lowerShapeCompilePlanToManifold(plan.sourceShape, wasm)
+        .transform(planeFrameToWorldToPlaneMatrix(plan.plane))
+        .project();
+      return applyProfileCompileTransforms(projected, plan.transforms);
+    }
   }
 }
 
@@ -107,6 +136,8 @@ function applyShapeCompileTransform(manifold: Manifold, step: ShapeCompileTransf
       );
     case 'mirror':
       return manifold.mirror([step.normalX, step.normalY, step.normalZ]);
+    case 'workplanePlacement':
+      return manifold.transform(step.matrix);
   }
 }
 
@@ -137,6 +168,98 @@ function lowerShapeBooleanCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'b
   }
 }
 
+function lowerShapeHullCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'hull' }>, wasm: ManifoldToplevel): Manifold {
+  const shapeItems = plan.shapes.map((shape) => lowerShapeCompilePlanToManifold(shape, wasm));
+  const items = [...shapeItems, ...plan.points.map(([x, y, z]) => [x, y, z] as [number, number, number])];
+  if (items.length === 0) {
+    throw new Error('Cannot lower empty shape hull');
+  }
+  return wasm.Manifold.hull(items);
+}
+
+function lowerShapeTrimByPlaneCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'trimByPlane' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  return lowerShapeCompilePlanToManifold(plan.base, wasm).trimByPlane(
+    [plan.normalX, plan.normalY, plan.normalZ],
+    plan.originOffset,
+  );
+}
+
+function lowerShapeLoftCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'loft' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const input = buildLoftLevelSetInput(
+    plan.profiles.map((profile) => lowerProfileCompilePlanToCrossSection(profile, wasm).toPolygons() as [number, number][][]),
+    plan.heights,
+    { edgeLength: plan.edgeLength, boundsPadding: plan.boundsPadding },
+  );
+  return wasm.Manifold.levelSet(input.sdf as any, input.bounds, input.edgeLength, 0);
+}
+
+function lowerShapeSweepCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'sweep' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const input = buildSweepLevelSetInput(
+    lowerProfileCompilePlanToCrossSection(plan.profile, wasm).toPolygons() as [number, number][][],
+    plan.path.points.map(([x, y, z]) => [x, y, z]),
+    {
+      edgeLength: plan.edgeLength,
+      boundsPadding: plan.boundsPadding,
+      up: [plan.up[0], plan.up[1], plan.up[2]],
+    },
+  );
+  return wasm.Manifold.levelSet(input.sdf as any, input.bounds, input.edgeLength, 0);
+}
+
+function lowerShapeFilletCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'fillet' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
+  if (!selection.ok) throw new Error(selection.issue.reason);
+  if (
+    selection.selection.quadrant[0] !== plan.quadrant[0]
+    || selection.selection.quadrant[1] !== plan.quadrant[1]
+  ) {
+    throw new Error(
+      `filletEdge() currently supports ${selection.selection.edgeName} only with quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
+    );
+  }
+  return applyFilletSelectionToManifold(
+    lowerShapeCompilePlanToManifold(plan.base, wasm),
+    selection.selection,
+    plan.radius,
+    plan.segments,
+    wasm,
+  );
+}
+
+function lowerShapeChamferCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'chamfer' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
+  if (!selection.ok) throw new Error(selection.issue.reason);
+  if (
+    selection.selection.quadrant[0] !== plan.quadrant[0]
+    || selection.selection.quadrant[1] !== plan.quadrant[1]
+  ) {
+    throw new Error(
+      `chamferEdge() currently supports ${selection.selection.edgeName} only with quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
+    );
+  }
+  return applyChamferSelectionToManifold(
+    lowerShapeCompilePlanToManifold(plan.base, wasm),
+    selection.selection,
+    plan.size,
+    wasm,
+  );
+}
+
 export function lowerShapeCompilePlanToManifold(
   plan: ShapeCompilePlan,
   wasm: ManifoldToplevel,
@@ -156,12 +279,43 @@ export function lowerShapeCompilePlanToManifold(
         plan.scaleTop as [number, number] | undefined,
         plan.center,
       );
+    case 'sheetMetal':
+      return lowerShapeCompilePlanToManifold(lowerSheetMetalBasePlan(plan.model, plan.output), wasm);
+    case 'shell': {
+      const lowered = lowerShellShapeCompilePlanToConcretePlan(plan);
+      if (!lowered.ok) throw new Error(lowered.reason);
+      return lowerShapeCompilePlanToManifold(lowered.plan, wasm);
+    }
+    case 'hole': {
+      const lowered = lowerHoleShapeCompilePlanToConcretePlan(plan);
+      if (!lowered.ok) throw new Error(lowered.reason);
+      return lowerShapeCompilePlanToManifold(lowered.plan, wasm);
+    }
+    case 'cut': {
+      const lowered = lowerCutShapeCompilePlanToConcretePlan(plan);
+      if (!lowered.ok) throw new Error(lowered.reason);
+      return lowerShapeCompilePlanToManifold(lowered.plan, wasm);
+    }
     case 'revolve':
       return lowerProfileCompilePlanToCrossSection(plan.profile, wasm).revolve(plan.segments ?? 0, plan.degrees);
+    case 'loft':
+      return lowerShapeLoftCompilePlan(plan, wasm);
+    case 'sweep':
+      return lowerShapeSweepCompilePlan(plan, wasm);
     case 'boolean':
       return lowerShapeBooleanCompilePlan(plan, wasm);
     case 'transform':
       return applyShapeCompileTransforms(lowerShapeCompilePlanToManifold(plan.base, wasm), plan.steps);
+    case 'queryOwner':
+      return lowerShapeCompilePlanToManifold(plan.base, wasm);
+    case 'fillet':
+      return lowerShapeFilletCompilePlan(plan, wasm);
+    case 'chamfer':
+      return lowerShapeChamferCompilePlan(plan, wasm);
+    case 'hull':
+      return lowerShapeHullCompilePlan(plan, wasm);
+    case 'trimByPlane':
+      return lowerShapeTrimByPlaneCompilePlan(plan, wasm);
   }
 }
 

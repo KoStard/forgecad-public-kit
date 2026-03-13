@@ -1,17 +1,18 @@
-import { Sketch } from './core';
+import { Sketch, getSketchCompileProfilePlan } from './core';
 import { polygon } from './primitives';
 import { stroke } from './path';
-import { levelSet, setShapeGeometryInfo, type Shape } from '../kernel';
+import { buildLoftShapeCompilePlan, buildSweepShapeCompilePlan, createOwnedShapeCompilePlan } from '../compilePlan';
+import { buildShapeFromCompilePlan, levelSet, setShapeGeometryInfo, type Shape } from '../kernel';
 import {
   scaleLevelSetBoundsPadding,
   scaleLevelSetEdgeLength,
   scaleSplineSamples,
   scaleSweepPathSamples,
 } from '../quality';
+import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './loftSweepLowering';
 
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
-type Loop2D = Vec2[];
 
 export interface Spline2DOptions {
   /** Closed loop (default true). */
@@ -57,8 +58,6 @@ export interface SweepOptions {
   up?: Vec3;
 }
 
-type SignedLoop = { pts: Loop2D; area: number };
-
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -97,80 +96,6 @@ function vec3Norm(v: Vec3): Vec3 {
   return [v[0] / len, v[1] / len, v[2] / len];
 }
 
-function signedArea2D(loop: Loop2D): number {
-  let a = 0;
-  for (let i = 0; i < loop.length; i++) {
-    const [x1, y1] = loop[i];
-    const [x2, y2] = loop[(i + 1) % loop.length];
-    a += x1 * y2 - x2 * y1;
-  }
-  return a * 0.5;
-}
-
-function pointInLoop(p: Vec2, loop: Loop2D): boolean {
-  let inside = false;
-  const [px, py] = p;
-  for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
-    const [xi, yi] = loop[i];
-    const [xj, yj] = loop[j];
-    const intersect =
-      ((yi > py) !== (yj > py))
-      && (px < ((xj - xi) * (py - yi)) / (yj - yi + 1e-20) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
-function pointSegDist2D(p: Vec2, a: Vec2, b: Vec2): number {
-  const abx = b[0] - a[0];
-  const aby = b[1] - a[1];
-  const apx = p[0] - a[0];
-  const apy = p[1] - a[1];
-  const den = abx * abx + aby * aby;
-  const t = den < 1e-12 ? 0 : clamp((apx * abx + apy * aby) / den, 0, 1);
-  const qx = a[0] + abx * t;
-  const qy = a[1] + aby * t;
-  const dx = p[0] - qx;
-  const dy = p[1] - qy;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-function loopSignedDistance(p: Vec2, loop: Loop2D): number {
-  let minDist = Infinity;
-  for (let i = 0; i < loop.length; i++) {
-    const a = loop[i];
-    const b = loop[(i + 1) % loop.length];
-    minDist = Math.min(minDist, pointSegDist2D(p, a, b));
-  }
-  const inside = pointInLoop(p, loop);
-  return inside ? minDist : -minDist;
-}
-
-function compileSketchSdf(sketch: Sketch): (x: number, y: number) => number {
-  const loopsRaw = sketch.toPolygons() as number[][][];
-  const loops: SignedLoop[] = loopsRaw
-    .filter((loop) => Array.isArray(loop) && loop.length >= 3)
-    .map((loop) => {
-      const pts = loop.map(([x, y]) => [x, y] as Vec2);
-      return { pts, area: signedArea2D(pts) };
-    });
-
-  if (loops.length === 0) {
-    return () => -1;
-  }
-
-  return (x: number, y: number): number => {
-    const p: Vec2 = [x, y];
-    let field = -Infinity;
-    for (const loop of loops) {
-      const f = loopSignedDistance(p, loop.pts);
-      // Positive-area loops are additive regions; negative-area loops are holes.
-      if (loop.area >= 0) field = Math.max(field, f);
-      else field = Math.min(field, -f);
-    }
-    return field;
-  };
-}
 
 function catmullRom2D(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number, tension: number): Vec2 {
   const tt = t * t;
@@ -384,7 +309,6 @@ export function loft(
     }
   }
 
-  const sdfs = pairs.map((entry) => compileSketchSdf(entry.profile));
   const zs = pairs.map((entry) => entry.z);
 
   let minX = Infinity;
@@ -406,63 +330,28 @@ export function loft(
   const edgeLength = scaleLevelSetEdgeLength(requestedEdgeLength);
   const requestedPad = options.boundsPadding ?? Math.max(edgeLength * 3, span * 0.06, 1.5);
   const pad = scaleLevelSetBoundsPadding(requestedPad);
-
-  const sdfAt = (x: number, y: number, z: number): number => {
-    let crossField: number;
-    if (z <= zMin) {
-      crossField = sdfs[0](x, y);
-    } else if (z >= zMax) {
-      crossField = sdfs[sdfs.length - 1](x, y);
-    } else {
-      let seg = 0;
-      while (seg + 1 < zs.length && z > zs[seg + 1]) seg++;
-      const z0 = zs[seg];
-      const z1 = zs[seg + 1];
-      const t = (z - z0) / (z1 - z0);
-      const f0 = sdfs[seg](x, y);
-      const f1 = sdfs[seg + 1](x, y);
-      crossField = f0 * (1 - t) + f1 * t;
-    }
-
-    // Cap at start/end planes.
-    const zCap = Math.min(z - zMin, zMax - z);
-    return Math.min(crossField, zCap);
-  };
-
-  const shape = levelSet(
-    ([x, y, z]) => sdfAt(x, y, z),
-    {
-      min: [minX - pad, minY - pad, zMin - pad],
-      max: [maxX + pad, maxY + pad, zMax + pad],
-    },
-    edgeLength,
+  const plan = buildLoftShapeCompilePlan(
+    pairs.map((entry) => getSketchCompileProfilePlan(entry.profile)),
+    zs,
+    { edgeLength, boundsPadding: pad },
   );
-  return setShapeGeometryInfo(shape, {
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'loft');
+  if (ownedPlan) {
+    return buildShapeFromCompilePlan(ownedPlan, pairs[0]?.profile.colorHex, {
+      fidelity: 'sampled',
+      sources: ['loft', 'level-set'],
+    });
+  }
+
+  const input = buildLoftLevelSetInput(
+    pairs.map((entry) => entry.profile.toPolygons() as Vec2[][]),
+    zs,
+    { edgeLength, boundsPadding: pad },
+  );
+  return setShapeGeometryInfo(levelSet(input.sdf, input.bounds, input.edgeLength), {
     fidelity: 'sampled',
-    sources: ['loft', ...shape.geometryInfo().sources],
+    sources: ['loft', 'level-set'],
   });
-}
-
-interface SweepSegment {
-  a: Vec3;
-  t: Vec3;
-  x: Vec3;
-  y: Vec3;
-  len: number;
-}
-
-function makeSweepFrame(tangent: Vec3, preferredUp: Vec3): { x: Vec3; y: Vec3 } {
-  let up = vec3Norm(preferredUp);
-  if (Math.abs(vec3Dot(up, tangent)) > 0.95) {
-    up = Math.abs(tangent[2]) < 0.95 ? [0, 0, 1] : [0, 1, 0];
-  }
-  let x = vec3Norm(vec3Cross(up, tangent));
-  if (vec3Len(x) < 1e-8) {
-    const fallback: Vec3 = Math.abs(tangent[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-    x = vec3Norm(vec3Cross(fallback, tangent));
-  }
-  const y = vec3Norm(vec3Cross(tangent, x));
-  return { x, y };
 }
 
 /**
@@ -487,21 +376,7 @@ export function sweep(
 
   if (pathPts.length < 2) throw new Error('sweep requires a path with at least two points');
 
-  const profileSdf = compileSketchSdf(profile);
   const up = options.up ?? [0, 0, 1];
-
-  const segments: SweepSegment[] = [];
-  for (let i = 0; i < pathPts.length - 1; i++) {
-    const a = pathPts[i];
-    const b = pathPts[i + 1];
-    const d = vec3Sub(b, a);
-    const len = vec3Len(d);
-    if (len < 1e-6) continue;
-    const t = vec3Scale(d, 1 / len);
-    const frame = makeSweepFrame(t, up);
-    segments.push({ a, t, x: frame.x, y: frame.y, len });
-  }
-  if (segments.length === 0) throw new Error('sweep path has no non-zero segments');
 
   const pb = profile.bounds();
   const pr = Math.max(
@@ -534,31 +409,29 @@ export function sweep(
   const requestedPad = options.boundsPadding ?? Math.max(pr + edgeLength * 2, span * 0.04, 2);
   const pad = scaleLevelSetBoundsPadding(requestedPad);
 
-  const sweepSdf = (p: Vec3): number => {
-    let field = -Infinity;
-    for (const seg of segments) {
-      const v = vec3Sub(p, seg.a);
-      const w = vec3Dot(v, seg.t);
-      const u = vec3Dot(v, seg.x);
-      const q = vec3Dot(v, seg.y);
-      const profileField = profileSdf(u, q);
-      const capField = Math.min(w, seg.len - w);
-      const segField = Math.min(profileField, capField);
-      field = Math.max(field, segField);
-    }
-    return field;
-  };
-
-  const shape = levelSet(
-    (p) => sweepSdf(p as Vec3),
+  const plan = buildSweepShapeCompilePlan(
+    getSketchCompileProfilePlan(profile),
     {
-      min: [minX - pad, minY - pad, minZ - pad],
-      max: [maxX + pad, maxY + pad, maxZ + pad],
+      kind: 'polyline',
+      points: pathPts.map(([x, y, z]) => [x, y, z]),
     },
-    edgeLength,
+    { edgeLength, boundsPadding: pad, up },
   );
-  return setShapeGeometryInfo(shape, {
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'sweep');
+  if (ownedPlan) {
+    return buildShapeFromCompilePlan(ownedPlan, profile.colorHex, {
+      fidelity: 'sampled',
+      sources: ['sweep', 'level-set'],
+    });
+  }
+
+  const input = buildSweepLevelSetInput(
+    profile.toPolygons() as Vec2[][],
+    pathPts.map(([x, y, z]) => [x, y, z]),
+    { edgeLength, boundsPadding: pad, up },
+  );
+  return setShapeGeometryInfo(levelSet(input.sdf, input.bounds, input.edgeLength), {
     fidelity: 'sampled',
-    sources: ['sweep', ...shape.geometryInfo().sources],
+    sources: ['sweep', 'level-set'],
   });
 }

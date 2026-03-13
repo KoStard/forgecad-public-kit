@@ -20,7 +20,7 @@ if (edgeR > 0) {
   // minSharpAngle=80 catches the 90° edges but leaves shallow angles alone
   // minSmoothness controls how much rounding (0=sharp, 1=full round)
   const smoothness = Math.min(edgeR / 3, 1);
-  body = body.smoothOut(80, smoothness).refine(3);
+  body = body.toShape().smoothOut(80, smoothness).refine(3);
 }
 
 // === Screen cutout (inset from front face) ===
@@ -41,7 +41,7 @@ const camY = h / 2 - camSize / 2 - 4;
 const camProfile = roundedRect(camSize, camSize, camR, true).translate(camX, camY);
 let camIsland = camProfile.extrude(camBump).translate(0, 0, -d / 2 - camBump);
 if (edgeR > 0) {
-  camIsland = camIsland.smoothOut(80, 0.4).refine(2);
+  camIsland = camIsland.toShape().smoothOut(80, 0.4).refine(2);
 }
 
 // Camera lenses (3 in L-pattern)

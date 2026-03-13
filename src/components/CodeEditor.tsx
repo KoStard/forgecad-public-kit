@@ -63,6 +63,13 @@ type PlacementReferenceInput = {
   surfaces?: Record<string, { center: [number, number, number]; normal: [number, number, number] }>;
   objects?: Record<string, Shape | TrackedShape | ShapeGroup | { min: [number, number, number]; max: [number, number, number] }>;
 };
+type FaceDescendantMetadata = {
+  kind: 'single' | 'face-set';
+  semantic: 'face' | 'region' | 'set';
+  memberCount: number;
+  memberNames: string[];
+  coplanar: boolean;
+};
 type FaceRef = {
   name: string;
   normal: [number, number, number];
@@ -70,6 +77,7 @@ type FaceRef = {
   planar?: boolean;
   uAxis?: [number, number, number];
   vAxis?: [number, number, number];
+  descendant?: FaceDescendantMetadata;
 };
 /** Import a 2D sketch from another file. Supports ".sketch.js" and ".svg". */
 declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch;
@@ -134,6 +142,7 @@ type GeometrySource =
   | 'extrude'
   | 'revolve'
   | 'boolean'
+  | 'sheet-metal'
   | 'hull'
   | 'level-set'
   | 'loft'
@@ -149,6 +158,25 @@ type GeometryInfo = {
 };
 type RotateTarget3D = AnchorTarget3D | [number, number, number];
 type RotateAroundToOptions = { mode?: 'plane' | 'line' };
+type SheetMetalEdge = 'top' | 'right' | 'bottom' | 'left';
+type SheetMetalPlanarRegionName = 'panel' | 'flange-top' | 'flange-right' | 'flange-bottom' | 'flange-left';
+type SheetMetalRegionName = SheetMetalPlanarRegionName | 'bend-top' | 'bend-right' | 'bend-bottom' | 'bend-left';
+
+declare class SheetMetalPart {
+  flange(edge: SheetMetalEdge, options: { length: number; angleDeg?: number }): SheetMetalPart;
+  cutout(region: SheetMetalPlanarRegionName, sketch: Sketch, options?: { u?: number; v?: number; selfAnchor?: Anchor }): SheetMetalPart;
+  regionNames(): SheetMetalRegionName[];
+  folded(): Shape;
+  flatPattern(): Shape;
+}
+
+declare function sheetMetal(options: {
+  panel: { width: number; height: number };
+  thickness: number;
+  bendRadius: number;
+  bendAllowance: { kFactor: number };
+  cornerRelief?: { kind?: 'rect'; size: number };
+}): SheetMetalPart;
 
 declare class Shape {
   clone(): Shape;
@@ -181,6 +209,10 @@ declare class Shape {
   referenceNames(kind?: 'points' | 'edges' | 'surfaces' | 'objects'): string[];
   /** Resolve a built-in anchor or named placement reference to a world-space point. */
   referencePoint(ref: AnchorTarget3D): [number, number, number];
+  /** Resolve a defended semantic face by name on compile-covered shapes. */
+  face(name: string): FaceRef;
+  /** List defended semantic face names currently available on this shape. */
+  faceNames(): string[];
   /** Translate this shape so the given anchor/reference lands on the target coordinate. */
   placeReference(ref: AnchorTarget3D, target: [number, number, number], offset?: [number, number, number]): Shape;
 
@@ -199,6 +231,26 @@ declare class Shape {
   split(cutter: Shape): [Shape, Shape];
   splitByPlane(normal: [number, number, number], offset?: number): [Shape, Shape];
   trimByPlane(normal: [number, number, number], offset?: number): Shape;
+  shell(thickness: number, opts?: { openFaces?: Array<'top' | 'bottom'> }): Shape;
+  hole(
+    faceOrRef: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef,
+    opts: {
+      diameter: number;
+      depth?: number;
+      upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+      u?: number;
+      v?: number;
+      counterbore?: { diameter: number; depth: number };
+      countersink?: { diameter: number; angleDeg?: number };
+    },
+  ): Shape;
+  cutout(
+    sketch: Sketch,
+    opts?: {
+      depth?: number;
+      upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+    },
+  ): Shape;
   hull(): Shape;
 
   // Deformation
@@ -391,6 +443,26 @@ declare class TrackedShape {
   add(...others: ShapeBooleanOperandInput[]): Shape;
   subtract(...others: ShapeBooleanOperandInput[]): Shape;
   intersect(...others: ShapeBooleanOperandInput[]): Shape;
+  shell(thickness: number, opts?: { openFaces?: Array<'top' | 'bottom'> }): Shape;
+  hole(
+    faceOrRef: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef,
+    opts: {
+      diameter: number;
+      depth?: number;
+      upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+      u?: number;
+      v?: number;
+      counterbore?: { diameter: number; depth: number };
+      countersink?: { diameter: number; angleDeg?: number };
+    },
+  ): Shape;
+  cutout(
+    sketch: Sketch,
+    opts?: {
+      depth?: number;
+      upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+    },
+  ): Shape;
   toShape(): Shape;
 }
 
@@ -402,8 +474,8 @@ declare function mirrorCopy(shape: Shape, normal: [number, number, number]): Sha
 // --- Fillets & Chamfers ---
 type FilletCornerSpec = { index: number; radius: number; segments?: number };
 declare function filletCorners(points: ([number, number] | Point2D)[], corners: FilletCornerSpec[]): Sketch;
-declare function filletEdge(shape: TrackedShape, edge: any, radius: number, quadrant?: [number, number], segments?: number): TrackedShape;
-declare function chamferEdge(shape: TrackedShape, edge: any, size: number, quadrant?: [number, number]): TrackedShape;
+declare function filletEdge(shape: Shape | TrackedShape, edge: any, radius: number, quadrant?: [number, number], segments?: number): Shape;
+declare function chamferEdge(shape: Shape | TrackedShape, edge: any, size: number, quadrant?: [number, number]): Shape;
 
 // --- Arc Bridge ---
 declare function arcBridgeBetweenRects(rectA: any, rectB: any, segments?: number): Shape;

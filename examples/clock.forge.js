@@ -47,16 +47,16 @@ const innerRadius = radius - rimWidth;
 const handBaseZ = depth / 2 - 2;
 
 // === Clock Rim ===
-const outer = cylinder(depth, radius, undefined, 64, true);
-const inner = cylinder(depth + 2, innerRadius, undefined, 64, true);
+const outer = cylinder(depth, radius, undefined, undefined, true);
+const inner = cylinder(depth + 2, innerRadius, undefined, undefined, true);
 const rimBody = outer.subtract(inner);
 
 // Add subtle bevel to rim edge
-const bevel = cylinder(depth - 5, radius - 1, radius, 64, true);
+const bevel = cylinder(depth - 5, radius - 1, radius, undefined, true);
 const rim = union(rimBody, bevel).color(rimHex);
 
 // === Clock Face ===
-const face = cylinder(2, innerRadius - 1, undefined, 64, true)
+const face = cylinder(2, innerRadius - 1, undefined, undefined, true)
   .translate(0, 0, depth / 2 - 3)
   .color(faceHex);
 
@@ -133,11 +133,11 @@ if (showSecondHand > 0) {
 
 // === Center Cap ===
 const centerRadius = 6;
-const centerRing = cylinder(3, centerRadius + 2, undefined, 32, true)
+const centerRing = cylinder(3, centerRadius + 2, undefined, undefined, true)
   .translate(0, 0, handBaseZ + 13)
   .color(rimHex);
 
-const centerDot = cylinder(4, centerRadius, undefined, 32, true)
+const centerDot = cylinder(4, centerRadius, undefined, undefined, true)
   .translate(0, 0, handBaseZ + 13)
   .color(showSecondHand > 0 ? secondHandHex : "#444444");
 

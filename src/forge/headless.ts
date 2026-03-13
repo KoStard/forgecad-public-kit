@@ -49,6 +49,8 @@ export { Transform, composeChain } from './transform';
 export type { Mat4, Vec3, TransformInput, RotateAroundToMode, RotateAroundToOptions } from './transform';
 export { intersectWithPlane, projectToPlane } from './section';
 export type { PlaneSpec } from './section';
+export * from './holeCut';
+export * from './sheetMetal';
 export * from './sketch';
 export { param, resetParams, getCollectedParams, setParamOverrides } from './params';
 export type { ParamDef } from './params';

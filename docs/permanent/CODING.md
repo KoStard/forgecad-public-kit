@@ -96,6 +96,39 @@ This standard is package-wide for any new user-facing concept or API family.
 - Before adding a new API, state which domain owns it.
 - If a concept currently has no clean home, create one instead of spreading the first implementation across multiple files.
 
+## Backend Compiler Standard (Required)
+
+This standard is package-wide for any geometry feature that affects runtime lowering, exact export, or backend capability routing.
+
+Read [API/internals/compiler.md](API/internals/compiler.md) before changing this area.
+For large multi-agent migrations or architecture programs, also read [PROGRAM-LEAD.md](PROGRAM-LEAD.md).
+
+### Contract
+- Forge semantic intent comes first. Backends are lowerers, not the authoring model.
+- Scene-level capability routing must stay centralized. Do not re-derive export/runtime policy ad hoc in unrelated modules.
+- Public feature APIs must not hide backend-specific behavior directly in their callsites. Backend code belongs in the lowerers.
+- New backend limitations must surface as diagnostics, not silent fallback or silent exactness loss.
+
+### Enforcement
+- If a feature is compile-covered, update the canonical compile graph and the scene compiler.
+- If a feature is not yet dual-lowered, add explicit unsupported diagnostics for the missing backend rather than bypassing the compiler.
+- Any geometry feature change must update invariant coverage and the living backend-compiler tracker.
+
+## Multi-Agent Program Standard (Required For Large Migrations)
+
+For work that spans multiple agent branches or staged dependency waves, the Program Lead role in [PROGRAM-LEAD.md](PROGRAM-LEAD.md) is the default operating model.
+
+Use it when:
+
+- one missing foundation blocks several feature lanes
+- multiple agents need isolated tasks with dependency ordering
+- the repo needs a living task graph and capability tracker to stay truthful
+
+The key rule is simple:
+
+- solve the deepest shared prerequisite first
+- only then open the parallel wave that builds on top of it
+
 ### TypeScript
 - Use explicit types for function parameters and return values
 - Avoid `any` - use `unknown` or proper types

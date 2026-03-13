@@ -8,6 +8,7 @@
  */
 
 import * as ts from 'typescript';
+import './holeCut';
 import {
   Shape,
   box,
@@ -24,6 +25,7 @@ import {
   type GeometryInfo,
 } from './kernel';
 import type { Anchor3D } from './kernel';
+import { resetShapeQueryOwnerIds } from './compilePlan';
 import { intersectWithPlane, projectToPlane } from './section';
 import {
   Sketch,
@@ -87,7 +89,12 @@ import { partLibrary } from './library';
 import { ShapeGroup, group } from './group';
 import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
 import { bom, resetBom, getCollectedBom, type BomDef } from './bom';
-import { robotExport, resetRobotExport } from './robotExport';
+import {
+  robotExport,
+  resetRobotExport,
+  getCollectedRobotExport,
+  type CollectedRobotExport,
+} from './robotExport';
 import {
   explodeView,
   resetExplodeView,
@@ -111,6 +118,7 @@ import {
   runWithForgeQuality,
   type ForgeQualityPreset,
 } from './quality';
+import { sheetMetal, SheetMetalPart } from './sheetMetal';
 
 export interface SceneObject {
   id: string;
@@ -143,6 +151,7 @@ export interface RunResult {
   explodeView: ExplodeViewOptions | null;
   jointsView: CollectedJointsView | null;
   viewConfig: ViewConfig | null;
+  robotExport: CollectedRobotExport | null;
   quality: ForgeQualityPreset;
   error: string | null;
   timeMs: number;
@@ -1107,6 +1116,8 @@ function executeFile(
       spline3d,
       loft,
       sweep,
+      sheetMetal,
+      SheetMetalPart,
       param,
       Shape,
       Sketch,
@@ -1275,6 +1286,7 @@ export function runScript(
   options: RunScriptOptions = {},
 ): RunResult {
   resetParams();
+  resetShapeQueryOwnerIds();
   resetDimensions();
   resetBom();
   resetRobotExport();
@@ -1535,6 +1547,7 @@ export function runScript(
         explodeView: getCollectedExplodeView(),
         jointsView: getCollectedJointsView(),
         viewConfig: getCollectedViewConfig(),
+        robotExport: getCollectedRobotExport(),
         quality,
         error: objects.length > 0 || options.allowEmptyResult ? null : 'Script must return a Shape or Sketch',
         timeMs: performance.now() - t0,
@@ -1563,6 +1576,7 @@ export function runScript(
       explodeView: getCollectedExplodeView(),
       jointsView: getCollectedJointsView(),
       viewConfig: getCollectedViewConfig(),
+      robotExport: getCollectedRobotExport(),
       quality,
       error: `${msg}${lineInfo}`,
       timeMs: performance.now() - t0,

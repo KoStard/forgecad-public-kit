@@ -74,7 +74,7 @@ for (const [lx, ly] of legPositions) {
     if (pz > 0 && pz < legH) {
       // Through-hole in Y direction
       pinHoles.push(
-        cylinder(outerLeg + 2, pinHoleR, undefined, 12)
+        cylinder(outerLeg + 2, pinHoleR)
           .rotate(90, 0, 0)
           .translate(legCenterX, ly - 1, pz)
       );
@@ -104,13 +104,13 @@ const rightBrace = box(braceW, sideBraceLen, braceH)
 const shaftY = inset + outerLeg / 2;
 const shaftZ = legH - outerLegH + 25;
 const shaftLen = topW - 2 * inset;
-const shaft = cylinder(shaftLen, 0.8, undefined, 16)
+const shaft = cylinder(shaftLen, 0.8)
   .rotate(0, 90, 0)
   .translate(inset, shaftY, shaftZ);
 
 // Crank handle (on the right side)
 const handleX = topW - inset + 2;
-const crankArm = cylinder(crankR, 0.5, undefined, 12)
+const crankArm = cylinder(crankR, 0.5)
   .translate(handleX, shaftY, shaftZ);
 const crankKnob = sphere(1.2)
   .translate(handleX, shaftY, shaftZ + crankR);
@@ -120,7 +120,7 @@ const footPads = union(
   ...legPositions.map(([lx, ly]) => {
     const cx = lx + outerLeg / 2;
     const cy = ly + outerLeg / 2;
-    return cylinder(0.5, innerLeg / 2 + 0.5, undefined, 24)
+    return cylinder(0.5, innerLeg / 2 + 0.5)
       .translate(cx, cy, 0);
   })
 );

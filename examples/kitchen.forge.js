@@ -94,13 +94,13 @@ const drain = cylinder(sinkDepth + topT + 2, 20)
   .translate(sinkX, counterD / 2, counterH - sinkDepth - topT);
 
 // Faucet
-const faucetBase = cylinder(40, 15, undefined, 24)
+const faucetBase = cylinder(40, 15)
   .translate(sinkX, counterD * 0.15, counterH);
 const faucetArm = box(12, 180, 12, true)
   .translate(sinkX, counterD * 0.15 + 90, counterH + 40 + 6);
-const faucetNeck = cylinder(50, 6, undefined, 16)
+const faucetNeck = cylinder(50, 6)
   .translate(sinkX, counterD * 0.15, counterH);
-const faucetSpout = cylinder(30, 4, undefined, 12)
+const faucetSpout = cylinder(30, 4)
   .translate(sinkX, counterD / 2, counterH + 30);
 
 const faucet = union(faucetBase, faucetNeck, faucetArm, faucetSpout);
@@ -138,7 +138,7 @@ const burners = union(...burnerRings);
 const knobs = [];
 for (let i = 0; i < 4; i++) {
   knobs.push(
-    cylinder(8, 12, undefined, 24)
+    cylinder(8, 12)
       .translate(stoveX - 180 + i * 120, counterD + 5, counterH - topT + cabinetH * 0.92)
   );
 }

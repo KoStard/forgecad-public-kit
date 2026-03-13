@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 try:
     import cadquery as cq
     from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeHalfSpace
 except Exception as exc:
     raise SystemExit(
         "CadQuery is required for BREP export. Install it in the selected Python environment. "
@@ -131,6 +132,79 @@ def build_shape_scale_matrix(sx: float, sy: float, sz: float) -> "cq.Matrix":
         [0.0, sy, 0.0, 0.0],
         [0.0, 0.0, sz, 0.0],
     ])
+
+
+def build_shape_matrix(values: List[float]) -> "cq.Matrix":
+    if len(values) != 16:
+        raise ValueError(f"Expected a 4x4 matrix encoded as 16 values, got {len(values)}")
+    return cq.Matrix([
+        [float(values[0]), float(values[4]), float(values[8]), float(values[12])],
+        [float(values[1]), float(values[5]), float(values[9]), float(values[13])],
+        [float(values[2]), float(values[6]), float(values[10]), float(values[14])],
+        [float(values[3]), float(values[7]), float(values[11]), float(values[15])],
+    ])
+
+
+def vec3_sub(lhs: tuple[float, float, float], rhs: tuple[float, float, float]) -> tuple[float, float, float]:
+    return (lhs[0] - rhs[0], lhs[1] - rhs[1], lhs[2] - rhs[2])
+
+
+def vec3_dot(lhs: tuple[float, float, float], rhs: tuple[float, float, float]) -> float:
+    return lhs[0] * rhs[0] + lhs[1] * rhs[1] + lhs[2] * rhs[2]
+
+
+def vec3_cross(lhs: tuple[float, float, float], rhs: tuple[float, float, float]) -> tuple[float, float, float]:
+    return (
+        lhs[1] * rhs[2] - lhs[2] * rhs[1],
+        lhs[2] * rhs[0] - lhs[0] * rhs[2],
+        lhs[0] * rhs[1] - lhs[1] * rhs[0],
+    )
+
+
+def vec3_length(vec: tuple[float, float, float]) -> float:
+    return math.sqrt(vec3_dot(vec, vec))
+
+
+def vec3_normalize(vec: tuple[float, float, float]) -> tuple[float, float, float]:
+    length = vec3_length(vec)
+    if length < 1e-9:
+        return (0.0, 0.0, 1.0)
+    return (vec[0] / length, vec[1] / length, vec[2] / length)
+
+
+def points_close(
+    lhs: tuple[float, float, float],
+    rhs: tuple[float, float, float],
+    tolerance: float = 1e-5,
+) -> bool:
+    return vec3_length(vec3_sub(lhs, rhs)) <= tolerance
+
+
+def normalize_plane(normal: tuple[float, float, float], origin_offset: float) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    nx, ny, nz = normal
+    length_sq = nx * nx + ny * ny + nz * nz
+    if length_sq < 1e-12:
+        raise ValueError("Plane normal must be non-zero")
+    length = math.sqrt(length_sq)
+    unit = (nx / length, ny / length, nz / length)
+    scale = origin_offset / length_sq
+    point = (nx * scale, ny * scale, nz * scale)
+    return unit, point
+
+
+def build_half_space(normal: tuple[float, float, float], origin_offset: float) -> "cq.Shape":
+    unit, point = normalize_plane(normal, origin_offset)
+    face = cq.Face.makePlane(basePnt=point, dir=unit)
+    ref_point = cq.Vector(
+        point[0] + unit[0],
+        point[1] + unit[1],
+        point[2] + unit[2],
+    ).toPnt()
+    return cq.Shape.cast(BRepPrimAPI_MakeHalfSpace(face.wrapped, ref_point).Solid())
+
+
+def trim_shape_by_plane(shape: "cq.Shape", normal: tuple[float, float, float], origin_offset: float) -> "cq.Shape":
+    return shape.intersect(build_half_space(normal, origin_offset)).clean()
 
 
 def build_polygon_sketch(points: List[List[float]]) -> "cq.Sketch":
@@ -259,6 +333,115 @@ def build_revolved_profile(profile: Dict[str, Any], degrees: float) -> "cq.Shape
     return cq.Workplane("XY").placeSketch(sketch).revolve(degrees, (0, 0, 0), (0, 1, 0)).val()
 
 
+def build_lofted_profiles(profiles: List[Dict[str, Any]], heights: List[float]) -> "cq.Shape":
+    if len(profiles) < 2:
+        raise ValueError("Loft plan requires at least two profiles")
+    if len(profiles) != len(heights):
+        raise ValueError("Loft plan requires heights to match profiles")
+
+    sections = [
+        build_profile_sketch(profile).moved(cq.Location(cq.Vector(0, 0, float(height))))
+        for profile, height in zip(profiles, heights)
+    ]
+    return cq.Workplane("XY").placeSketch(*sections).loft().val()
+
+
+def make_sweep_frame(
+    tangent: tuple[float, float, float],
+    preferred_up: tuple[float, float, float],
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    up = vec3_normalize(preferred_up)
+    if abs(vec3_dot(up, tangent)) > 0.95:
+        up = (0.0, 0.0, 1.0) if abs(tangent[2]) < 0.95 else (0.0, 1.0, 0.0)
+
+    x_axis = vec3_normalize(vec3_cross(up, tangent))
+    if vec3_length(x_axis) < 1e-8:
+        fallback = (1.0, 0.0, 0.0) if abs(tangent[0]) < 0.9 else (0.0, 1.0, 0.0)
+        x_axis = vec3_normalize(vec3_cross(fallback, tangent))
+
+    y_axis = vec3_normalize(vec3_cross(tangent, x_axis))
+    return x_axis, y_axis
+
+
+def build_polyline_wire(points: List[List[float]]) -> "cq.Wire":
+    if len(points) < 2:
+        raise ValueError("Sweep path requires at least two points")
+
+    edges = []
+    start = tuple(float(entry) for entry in points[0])
+    for raw_end in points[1:]:
+        end = tuple(float(entry) for entry in raw_end)
+        if vec3_length(vec3_sub(end, start)) < 1e-9:
+            continue
+        edges.append(cq.Edge.makeLine(cq.Vector(*start), cq.Vector(*end)))
+        start = end
+
+    if not edges:
+        raise ValueError("Sweep path has no non-zero segments")
+    return cq.Wire.assembleEdges(edges)
+
+
+def build_swept_profile(
+    profile: Dict[str, Any],
+    path: Dict[str, Any],
+    up: List[float],
+) -> "cq.Shape":
+    if path.get("kind") != "polyline":
+        raise ValueError(f"Unsupported sweep path kind: {path.get('kind')}")
+
+    path_points = path.get("points", [])
+    wire = build_polyline_wire(path_points)
+
+    start = tuple(float(entry) for entry in path_points[0])
+    tangent = None
+    for index in range(len(path_points) - 1):
+        candidate = vec3_sub(
+            tuple(float(entry) for entry in path_points[index + 1]),
+            tuple(float(entry) for entry in path_points[index]),
+        )
+        if vec3_length(candidate) >= 1e-9:
+            tangent = vec3_normalize(candidate)
+            break
+    if tangent is None:
+        raise ValueError("Sweep path has no non-zero segments")
+
+    x_axis, _ = make_sweep_frame(tangent, tuple(float(entry) for entry in up))
+    plane = cq.Plane(cq.Vector(*start), cq.Vector(*x_axis), cq.Vector(*tangent))
+    sketch = build_profile_sketch(profile)
+    return cq.Workplane(plane).placeSketch(sketch).sweep(wire, multisection=False).val()
+
+
+def find_resolved_edge(shape: "cq.Shape", selector: Dict[str, Any]) -> "cq.Edge":
+    if selector.get("kind") != "line-segment":
+        raise ValueError(f"Unsupported edge selector kind: {selector.get('kind')}")
+
+    target_start = tuple(float(entry) for entry in selector["start"])
+    target_end = tuple(float(entry) for entry in selector["end"])
+    target_midpoint = tuple(float(entry) for entry in selector["midpoint"])
+
+    matches = []
+    for edge in shape.Edges():
+        if edge.geomType() != "LINE":
+            continue
+        start = tuple(float(entry) for entry in edge.startPoint().toTuple())
+        end = tuple(float(entry) for entry in edge.endPoint().toTuple())
+        midpoint = tuple(float(entry) for entry in edge.positionAt(0.5).toTuple())
+        same_direction = points_close(start, target_start) and points_close(end, target_end)
+        reversed_direction = points_close(start, target_end) and points_close(end, target_start)
+        if (same_direction or reversed_direction) and points_close(midpoint, target_midpoint):
+            matches.append(edge)
+
+    if not matches:
+        raise ValueError(
+            f"Could not resolve line edge {selector.get('edgeName', '(unnamed)')} on the lowered exact shape"
+        )
+    if len(matches) > 1:
+        raise ValueError(
+            f"Resolved line edge {selector.get('edgeName', '(unnamed)')} matched multiple exact edges"
+        )
+    return matches[0]
+
+
 def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
     kind = plan["kind"]
     if kind == "box":
@@ -278,6 +461,10 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
         return build_extruded_profile(plan["profile"], plan["height"], plan["center"], plan.get("scaleTop"))
     if kind == "revolve":
         return build_revolved_profile(plan["profile"], plan["degrees"])
+    if kind == "loft":
+        return build_lofted_profiles(plan["profiles"], plan["heights"])
+    if kind == "sweep":
+        return build_swept_profile(plan["profile"], plan["path"], plan["up"])
     if kind == "boolean":
         return combine_shapes(plan["op"], [build_shape(item) for item in plan["shapes"]])
     if kind == "transform":
@@ -312,8 +499,29 @@ def build_shape(plan: Dict[str, Any]) -> "cq.Shape":
             if step["kind"] == "mirror":
                 result = result.mirror((step["normalX"], step["normalY"], step["normalZ"]))
                 continue
+            if step["kind"] == "workplanePlacement":
+                result = apply_shape_affine(result, build_shape_matrix(step["matrix"]))
+                continue
             raise ValueError(f"Unsupported transform step: {step['kind']}")
         return result
+    if kind == "fillet":
+        base = build_shape(plan["base"])
+        selector = plan.get("resolvedEdge")
+        if not selector:
+            raise ValueError("Exact fillet plan is missing its resolved edge selector")
+        return base.fillet(float(plan["radius"]), [find_resolved_edge(base, selector)]).clean()
+    if kind == "chamfer":
+        base = build_shape(plan["base"])
+        selector = plan.get("resolvedEdge")
+        if not selector:
+            raise ValueError("Exact chamfer plan is missing its resolved edge selector")
+        return base.chamfer(float(plan["size"]), None, [find_resolved_edge(base, selector)]).clean()
+    if kind == "trimByPlane":
+        return trim_shape_by_plane(
+            build_shape(plan["base"]),
+            (float(plan["normalX"]), float(plan["normalY"]), float(plan["normalZ"])),
+            float(plan["originOffset"]),
+        )
     raise ValueError(f"Unsupported plan kind: {kind}")
 
 
@@ -366,6 +574,9 @@ def build_export_shape(obj: Dict[str, Any]) -> "cq.Shape":
     kind = obj.get("kind", "exact")
     if kind == "faceted":
         return build_faceted_shape(obj["mesh"])
+    target = obj.get("target", "cadquery-occt")
+    if target != "cadquery-occt":
+        raise ValueError(f"Unsupported exact export target: {target}")
     return build_shape(obj["plan"])
 
 

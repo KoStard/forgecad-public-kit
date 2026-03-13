@@ -1,7 +1,7 @@
-import { getShapeCompilePlan, type GeometryInfo, type Shape } from './kernel';
+import type { GeometryInfo, Shape } from './kernel';
+import { buildCompiledSceneReport, type CompiledSceneReport } from './compiledScene';
 import type { SceneObject } from './runner';
-import type { BrepShapePlan } from './brepPlan';
-import { lowerShapeCompilePlanToBrepPlan } from './compilePlanBrep';
+import type { CadQueryShapePlan } from './cadqueryPlan';
 
 export interface BrepMesh {
   vertices: [number, number, number][];
@@ -10,9 +10,10 @@ export interface BrepMesh {
 
 export interface BrepExactExportObject {
   kind: 'exact';
+  target: 'cadquery-occt';
   name: string;
   color?: string;
-  plan: BrepShapePlan;
+  plan: CadQueryShapePlan;
 }
 
 export interface BrepFacetedExportObject {
@@ -50,6 +51,7 @@ export interface BrepExportManifest {
 
 export interface BuildBrepExportOptions {
   allowFaceted?: boolean;
+  compiledSceneReport?: CompiledSceneReport;
 }
 
 function serializeShapeMesh(shape: Shape): BrepMesh {
@@ -82,6 +84,7 @@ export function buildBrepExportManifest(
   objects: SceneObject[],
   options: BuildBrepExportOptions = {},
 ): BrepExportManifest {
+  const compiledSceneReport = options.compiledSceneReport ?? buildCompiledSceneReport(objects);
   const manifest: BrepExportManifest = {
     objects: [],
     unsupported: [],
@@ -89,28 +92,36 @@ export function buildBrepExportManifest(
     fallbacks: [],
   };
 
-  for (const object of objects) {
-    if (object.sketch) {
-      manifest.skipped.push({
-        name: object.name,
-        reason: 'Sketch objects are skipped for STEP/BREP export.',
-      });
-      continue;
-    }
-    if (!object.shape) {
-      manifest.unsupported.push({
-        name: object.name,
-        reason: 'Object has no shape payload.',
-        geometryInfo: object.geometryInfo ?? null,
-      });
-      continue;
-    }
+  for (const object of compiledSceneReport.objects) {
+    const route = options.allowFaceted ? object.routes.faceted : object.routes.exact;
 
-    const geometryInfo = object.geometryInfo ?? object.shape.geometryInfo();
-    const plan = lowerShapeCompilePlanToBrepPlan(getShapeCompilePlan(object.shape));
-    if (!plan) {
-      const sources = geometryInfo.sources.join('+');
-      if (options.allowFaceted && geometryInfo.representation === 'mesh-solid') {
+    switch (route.kind) {
+      case 'skipped':
+        manifest.skipped.push({
+          name: object.name,
+          reason: route.reason,
+        });
+        break;
+      case 'unsupported':
+        manifest.unsupported.push({
+          name: object.name,
+          reason: route.reason,
+          geometryInfo: route.geometryInfo ?? ('geometryInfo' in object ? object.geometryInfo ?? null : null),
+        });
+        break;
+      case 'exact':
+        manifest.objects.push({
+          kind: 'exact',
+          target: 'cadquery-occt',
+          name: object.name,
+          color: object.color,
+          plan: route.plan as CadQueryShapePlan,
+        });
+        break;
+      case 'faceted':
+        if (object.kind !== 'shape') {
+          throw new Error(`Faceted route requires a shape payload (${object.name})`);
+        }
         manifest.objects.push({
           kind: 'faceted',
           name: object.name,
@@ -119,25 +130,11 @@ export function buildBrepExportManifest(
         });
         manifest.fallbacks.push({
           name: object.name,
-          reason: `Using faceted mesh fallback for geometry outside exact BREP coverage (sources: ${sources}).`,
-          geometryInfo,
+          reason: route.reason,
+          geometryInfo: route.geometryInfo,
         });
-      } else {
-        manifest.unsupported.push({
-          name: object.name,
-          reason: `No exact BREP export plan is available for this geometry (sources: ${sources}).`,
-          geometryInfo,
-        });
-      }
-      continue;
+        break;
     }
-
-    manifest.objects.push({
-      kind: 'exact',
-      name: object.name,
-      color: object.color,
-      plan,
-    });
   }
 
   return manifest;

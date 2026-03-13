@@ -3,6 +3,10 @@
 import { readFileSync } from 'fs';
 import { runCheckApiContractsCli } from './check-api-contracts';
 import { runCheckBrepExportCli } from './check-brep-export';
+import { runCheckCompilerCli } from './check-compiler';
+import { runCheckExamplesCli } from './check-examples';
+import { runCheckQueryPropagationCli } from './check-query-propagation';
+import { runCheckSuiteCli } from './check-suite';
 import { runCheckDimensionsCli } from './check-dimensions';
 import { runCheckJsModulesCli } from './check-js-modules';
 import { runCheckPlacementReferencesCli } from './check-placement-references';
@@ -14,6 +18,7 @@ import {
   type CompletionItem,
   type CompletionOptionDefinition,
 } from './forge-completion';
+import { runDebugCompilerCli } from './debug-compiler';
 import { runCaptureCli } from './forge-capture';
 import { runNotebookCli } from './forge-notebook';
 import { runReportCli } from './forge-report';
@@ -509,6 +514,14 @@ const commands: CommandDefinition[] = [
   },
   {
     group: 'Checks',
+    path: ['check', 'suite'],
+    summary: 'Run the repo invariant suite, including compiler snapshots and export/runtime contract checks.',
+    usage: ['forgecad check suite'],
+    examples: ['forgecad check suite'],
+    run: () => runCheckSuiteCli(),
+  },
+  {
+    group: 'Checks',
     path: ['check', 'transforms'],
     summary: 'Run transform and assembly invariants.',
     usage: ['forgecad check transforms'],
@@ -549,11 +562,70 @@ const commands: CommandDefinition[] = [
   },
   {
     group: 'Checks',
+    path: ['check', 'compiler'],
+    summary: 'Run compiler routing snapshots and runtime-vs-lowered invariants.',
+    usage: [
+      'forgecad check compiler',
+      'forgecad check compiler --case segmented-runtime-hints',
+      'forgecad check compiler --update',
+    ],
+    examples: [
+      'forgecad check compiler',
+      'forgecad check compiler --case example-brep-exportable',
+      'forgecad check compiler --update',
+    ],
+    run: runCheckCompilerCli,
+  },
+  {
+    group: 'Checks',
+    path: ['check', 'query-propagation'],
+    summary: 'Run focused topology-rewrite query-propagation snapshots and invariants.',
+    usage: [
+      'forgecad check query-propagation',
+      'forgecad check query-propagation --case hull-runtime-boundary',
+      'forgecad check query-propagation --update',
+    ],
+    examples: [
+      'forgecad check query-propagation',
+      'forgecad check query-propagation --case corpus-edge-finished-mount',
+      'forgecad check query-propagation --update',
+    ],
+    run: runCheckQueryPropagationCli,
+  },
+  {
+    group: 'Checks',
+    path: ['check', 'examples'],
+    summary: 'Run the example architecture gate across the checked manifest for `examples/`.',
+    usage: [
+      'forgecad check examples',
+      'forgecad check examples --family api-parts --family compiler-corpus',
+      'forgecad check examples --example examples/api/brep-exportable.forge.js',
+    ],
+    examples: [
+      'forgecad check examples',
+      'forgecad check examples --family non-part',
+      'forgecad check examples --example examples/chess-set.forge.js',
+    ],
+    run: runCheckExamplesCli,
+  },
+  {
+    group: 'Checks',
     path: ['check', 'api'],
     summary: 'Run script API contract invariants.',
     usage: ['forgecad check api'],
     examples: ['forgecad check api'],
     run: () => runCheckApiContractsCli(),
+  },
+  {
+    group: 'Debug',
+    path: ['debug', 'compiler'],
+    summary: 'Inspect compiler routes, lowered plans, and runtime snapshots for a script.',
+    usage: ['forgecad debug compiler <script.forge.js> [--compact]'],
+    examples: [
+      'forgecad debug compiler examples/api/brep-exportable.forge.js',
+      'forgecad debug compiler examples/chess-set.forge.js --compact',
+    ],
+    run: runDebugCompilerCli,
   },
   {
     group: 'Debug',

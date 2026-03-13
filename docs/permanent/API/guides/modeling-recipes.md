@@ -230,15 +230,17 @@ return [
 const baseRect = rectangle(0, 0, 80, 60);
 const base = baseRect.extrude(20);
 
-let result = filletEdge(base, base.edge('vert-br'), 8, [-1, -1]);
-result = filletEdge(result, base.edge('vert-bl'), 8, [1, -1]);
+const result = filletEdge(base.toShape(), base.edge('vert-br'), 8, [-1, -1])
+  .hole(base.face('top'), { diameter: 6, u: -16, v: 10, depth: 8 });
 
 const holes = circularPattern(
   cylinder(25, 4).translate(40, 30, -1),
   4, 40, 30,
 );
 
-return result.toShape().subtract(holes);
+return result.subtract(holes);
 ```
+
+Use the original tracked body (`base`) when you need semantic faces after edge finishing, and keep using its untouched sibling vertical tracked edges if you apply another supported fillet/chamfer later. Those sibling edges can now also survive a later supported union when the compiler still records one preserved propagated edge lineage for them. The currently selected finished edge is still recorded as a merged descendant set, so Forge does not claim a new durable tracked edge for that rewritten corner yet.
 
 For larger runnable examples, read `examples/api/`.

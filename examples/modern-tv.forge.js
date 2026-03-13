@@ -73,7 +73,7 @@ const bridge = box(legW * 2, legThick, standH, true)
 const stand = union(leftLeg, rightLeg, leftFoot, rightFoot, bridge);
 
 // --- Cable hole (through the bridge) ---
-const cableHole = cylinder(legThick + 2, 10, undefined, 24)
+const cableHole = cylinder(legThick + 2, 10)
   .rotate(90, 0, 0)
   .translate(0, 0, standH / 2);
 

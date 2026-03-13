@@ -168,7 +168,7 @@ forgecad export step examples/chess-set.forge.js --allow-faceted
 
 This exporter is `uv`-first. `cli/forge-brep-export.py` carries inline dependency metadata, so `uv run` provisions CadQuery automatically for the exporter environment.
 
-By default this exporter is exact-subset only. It does **not** silently convert arbitrary triangle meshes back into fake BREP. Instead, Forge records an exact export plan only for operations that can be replayed robustly in OpenCascade via CadQuery.
+By default this exporter is exact-subset only. It does **not** silently convert arbitrary triangle meshes back into fake BREP. Instead, Forge lowers compile-covered geometry into the `cadquery-occt` compiler target and exports that exact subset through CadQuery/OpenCascade.
 
 If you pass `--allow-faceted`, unsupported closed mesh solids are exported as explicit faceted OCCT solids. This keeps hull-heavy designs exportable to STEP/BREP, but that fallback is tessellation-driven rather than exact replay.
 
@@ -414,6 +414,136 @@ forgecad check transforms
 
 Runs fast math-level invariants to catch transform order and frame composition regressions before they leak into examples.
 
+### Compiler Snapshot Check
+
+```bash
+forgecad check compiler
+forgecad check compiler --case segmented-runtime-hints
+forgecad check compiler --update
+```
+
+Runs curated compiler regression cases and compares them against committed snapshots.
+This is a unit-style invariant check, not just a debugger convenience.
+The ordinary multi-feature part corpus lives in [`examples/compiler-corpus/README.md`](../../examples/compiler-corpus/README.md).
+
+Each snapshot records:
+- Forge compile plans
+- CadQuery/OCCT lowerings
+- export routing decisions
+- quantized runtime Manifold mesh summaries
+- quantized compiler-lowered Manifold mesh summaries
+
+This check also fails if:
+- a plan-covered shape or sketch no longer matches its compiler-lowered runtime output
+- export manifests drift away from the per-object compiler routing decisions
+- exact/faceted support claims stop matching the lowered artifacts and diagnostics
+
+### Query Propagation Snapshot Check
+
+```bash
+forgecad check query-propagation
+forgecad check query-propagation --case hull-runtime-boundary
+forgecad check query-propagation --update
+```
+
+Runs focused topology-rewrite query-propagation snapshots without dumping the
+entire compiler scene. This keeps supported, ambiguous, and intentionally
+unsupported rewrite semantics reviewable as the propagation layer evolves.
+
+Each snapshot records:
+- the propagated shape objects that actually carry topology-rewrite metadata
+- exact versus faceted routing outcomes for those objects
+- deterministic rewrite-operation ordering
+- preserved and created query summaries
+- explicit ambiguity/unsupported diagnostic codes
+
+This check also fails if:
+- a defended propagation case loses the expected preserved or created query shape
+- a known unsupported rewrite stops reporting its explicit diagnostic boundary
+- a multi-feature corpus part stops surfacing the expected rewrite ordering
+
+### Example Architecture Gate
+
+```bash
+forgecad check examples
+forgecad check examples --family api-parts --family compiler-corpus
+forgecad check examples --example examples/api/brep-exportable.forge.js
+```
+
+Runs the checked example manifest for the entire `examples/` tree.
+
+The manifest currently lives in `cli/example-manifest/` and covers every:
+
+- `.forge.js`
+- `.sketch.js`
+- `.forge-notebook.json`
+
+The command always verifies manifest coverage first, so it fails if:
+
+- a new example file was added without classification
+- a checked manifest entry points at a missing file
+- an example's assigned validation path fails
+- a `part` example's declared route expectation no longer matches the compiler report
+
+Current example classes:
+
+- `part`: runtime execution plus optional exact/faceted route assertions on the selected primary shapes
+- `assembly`: runtime solve + scene emission, not exact-route parity
+- `runtime-scene`: viewport/report/runtime examples that still need to execute successfully
+- `sketch`: sketch payload validation via the sketch export path
+- `notebook`: preview-cell validation for `.forge-notebook.json`
+- `experimental`: temporary fenced examples that still have to run
+
+The gate dispatches by declared validation path, not just by class label:
+
+- `part-runtime`: execute and then enforce any declared exact/faceted route contract
+- `assembly-runtime`: execute and validate solved-scene/assembly-owned runtime behavior
+- `runtime-scene`: execute as a viewport/report/runtime scene without treating it as part-route evidence
+- `sketch-svg`: render returned sketch payloads through the sketch SVG path
+- `notebook-preview`: materialize and execute the notebook preview cell
+- `experimental-runtime`: execute only, while the example stays outside the active architecture claim
+
+For non-part entries, the manifest can also pin specific runtime surfaces that
+must remain available to repo checks, such as BOM entries, cut planes,
+`jointsView()` controls, grouped scene structure, or collected
+`robotExport(...)` data.
+
+Current part route states:
+
+- `exact`: selected primary shapes must stay on the exact compiler route
+- `faceted`: exact must stay blocked and allow-faceted must succeed with diagnostics
+- `holdout`: runtime-checked, but intentionally outside the exact-route claim because the example still mixes route outcomes or depends on a documented unsupported capability; this is a temporary recovery state and should normally trend back to zero
+
+Successful runs also print the current temporary fence list, including each
+remaining `holdout` or `experimental` entry's blocker and follow-up task, so
+the command output can be used directly in a phase-entry review.
+
+Use `--family` when a task owns only one manifest lane, and `--example` when you
+want to debug a single checked artifact.
+
+### Invariant Test Suite
+
+```bash
+forgecad check suite
+npm test
+npm run test:examples
+npm run test:compiler
+npm run test:compiler:update
+npm run test:query-propagation
+npm run test:query-propagation:update
+```
+
+ForgeCAD's current unit-test surface is assertion-based CLI checks, not a separate Vitest/Jest harness.
+
+The important entrypoints are:
+- `npm test` runs the repo invariant suite (`transforms`, `dimensions`, `placement`, `js-modules`, `brep`, `compiler`, `query-propagation`, `examples`, `api`)
+- `npm run test:examples` runs the example architecture gate across the checked `examples/` manifest
+- `npm run test:compiler` runs just the compiler snapshot/invariant suite
+- `npm run test:compiler:update` refreshes committed compiler snapshots after an intentional change
+- `npm run test:query-propagation` runs the focused topology-rewrite query-propagation snapshots
+- `npm run test:query-propagation:update` refreshes those query-propagation snapshots after an intentional change
+- `forgecad check suite` is the CLI equivalent of the invariant suite runner
+
 ### Dimension Propagation Invariant Check
 
 ```bash
@@ -440,6 +570,20 @@ Prints:
 - report ownership routing (`combined` vs `component:<name>`) per dimension
 - per-object approximate dimension ownership (both endpoints inside object bbox)
 - a dimension coordinate list (first 20 by default, `--all` for full dump)
+
+### Compiler Debugger
+
+```bash
+forgecad debug compiler /path/to/file.forge.js
+forgecad debug compiler /path/to/file.forge.js --compact
+```
+
+Prints JSON for the current script's compiler state, including:
+- per-object compile plans
+- CadQuery/OCCT lowering diagnostics and lowered plans
+- faceted fallback eligibility
+- runtime Manifold summaries
+- compiler-lowered Manifold summaries
 
 ### Local Branch Cleanup
 

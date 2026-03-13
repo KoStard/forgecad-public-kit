@@ -28,9 +28,28 @@ import {
   appendShapeCompileTransform,
   appendShapeCompileTransforms,
   buildBooleanShapeCompilePlan,
+  buildHullShapeCompilePlan,
+  buildTrimByPlaneShapeCompilePlan,
   cloneShapeCompilePlan,
+  collectShapeQueryOwners,
+  createShapeQueryOwner,
+  createOwnedShapeCompilePlan,
+  findShapePrimaryQueryOwner,
+  findShapeWorkplanePlacement,
+  wrapShapeCompilePlanWithQueryOwner,
 } from './compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from './apiArgs';
+import type { ShapeQueryOwner, TopologyRewritePropagation } from './queryModel';
+import {
+  attachTopologyRewritePropagation,
+  buildBooleanTopologyRewritePropagation,
+  buildHullTopologyRewritePropagation,
+  buildShellTopologyRewritePropagation,
+  buildTrimByPlaneTopologyRewritePropagation,
+  collectShapeTopologyRewritePropagations,
+  findShapeTopologyRewritePropagation,
+} from './queryPropagation';
+import { wrapRepeatedShapeCompilePlan } from './repetitionOwnership';
 import {
   type ShapeBackend,
   isShapeBackend,
@@ -38,6 +57,9 @@ import {
   wrapManifoldShapeBackend,
 } from './shapeBackend';
 import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
+import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
+import { buildShellShapeCompilePlan } from './shellCompilePlan';
+import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './shapeFaces';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -73,6 +95,10 @@ export type GeometrySource =
   | 'extrude'
   | 'revolve'
   | 'boolean'
+  | 'sheet-metal'
+  | 'shell'
+  | 'fillet'
+  | 'chamfer'
   | 'hull'
   | 'level-set'
   | 'loft'
@@ -611,6 +637,26 @@ export function setShapeCompilePlan(shape: Shape, plan: ShapeCompilePlan | null)
   return setShapeCompilePlanInternal(shape, plan);
 }
 
+export function getShapePrimaryQueryOwner(shape: Shape): ShapeQueryOwner | null {
+  return findShapePrimaryQueryOwner(getShapeCompilePlanInternal(shape));
+}
+
+export function getShapeQueryOwners(shape: Shape): ShapeQueryOwner[] {
+  return collectShapeQueryOwners(getShapeCompilePlanInternal(shape));
+}
+
+export function getShapeWorkplanePlacement(shape: Shape): ShapeWorkplanePlacement | null {
+  return findShapeWorkplanePlacement(getShapeCompilePlanInternal(shape));
+}
+
+export function getShapeTopologyRewritePropagation(shape: Shape): TopologyRewritePropagation | null {
+  return findShapeTopologyRewritePropagation(getShapeCompilePlanInternal(shape));
+}
+
+export function getShapeTopologyRewritePropagations(shape: Shape): TopologyRewritePropagation[] {
+  return collectShapeTopologyRewritePropagations(getShapeCompilePlanInternal(shape));
+}
+
 export function buildShapeFromCompilePlan(
   plan: ShapeCompilePlan,
   color?: string,
@@ -624,6 +670,19 @@ export function buildShapeFromCompilePlan(
 
 export const getShapeBrepPlan = getShapeCompilePlan;
 export const setShapeBrepPlan = setShapeCompilePlan;
+
+function createOwnedTopologyRewritePlan(
+  plan: ShapeCompilePlan | null,
+  operation: string,
+  buildPropagation: (owner: ShapeQueryOwner) => TopologyRewritePropagation,
+): ShapeCompilePlan | null {
+  if (!plan) return null;
+  const owner = createShapeQueryOwner(operation);
+  return wrapShapeCompilePlanWithQueryOwner(
+    attachTopologyRewritePropagation(plan, buildPropagation(owner)),
+    owner,
+  );
+}
 
 /** Thin immutable wrapper around a runtime geometry backend payload. */
 export class Shape {
@@ -674,6 +733,19 @@ export class Shape {
   /** Resolve a named placement reference or built-in anchor to a 3D point. */
   referencePoint(ref: PlacementAnchorLike): [number, number, number] {
     return resolveAnchorLikePoint(this, ref);
+  }
+
+  /** Resolve a defended semantic face by name on compile-covered shapes. */
+  face(name: string) {
+    const plan = getShapeCompilePlanInternal(this);
+    const face = resolveShapeFace(plan, name);
+    if (face) return face;
+    throw new Error(explainMissingShapeFace(plan, name));
+  }
+
+  /** List defended semantic face names currently available on this shape. */
+  faceNames(): string[] {
+    return listShapeFaceNames(getShapeCompilePlanInternal(this));
   }
 
   /** Translate the shape so the given reference lands on the target coordinate. */
@@ -772,12 +844,13 @@ export class Shape {
   }
 
   mirror(normal: [number, number, number]): Shape {
-    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
+    const transformedPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
       kind: 'mirror',
       normalX: normal[0],
       normalY: normal[1],
       normalZ: normal[2],
     });
+    const nextPlan = wrapRepeatedShapeCompilePlan(transformedPlan, 'mirror');
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
       nextPlan
@@ -927,7 +1000,12 @@ export class Shape {
       1,
       'Use shape.add(other1, other2) or shape.add([other1, other2]).',
     )];
-    const nextPlan = buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+    const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
+    const nextPlan = createOwnedTopologyRewritePlan(
+      buildBooleanShapeCompilePlan('union', operandPlans),
+      'boolean:union',
+      (owner) => buildBooleanTopologyRewritePropagation('union', owner, operandPlans),
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withMergedDimensions(
         shapes,
@@ -946,7 +1024,12 @@ export class Shape {
       1,
       'Use shape.subtract(other1, other2) or shape.subtract([other1, other2]).',
     )];
-    const nextPlan = buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+    const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
+    const nextPlan = createOwnedTopologyRewritePlan(
+      buildBooleanShapeCompilePlan('difference', operandPlans),
+      'boolean:difference',
+      (owner) => buildBooleanTopologyRewritePropagation('difference', owner, operandPlans),
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
         this,
@@ -965,7 +1048,12 @@ export class Shape {
       1,
       'Use shape.intersect(other1, other2) or shape.intersect([other1, other2]).',
     )];
-    const nextPlan = buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+    const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
+    const nextPlan = createOwnedTopologyRewritePlan(
+      buildBooleanShapeCompilePlan('intersection', operandPlans),
+      'boolean:intersection',
+      (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, operandPlans),
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withMergedDimensions(
         shapes,
@@ -982,40 +1070,146 @@ export class Shape {
   /** Split into [inside, outside] by another shape. */
   split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
     const c = Shape._unwrap(cutter);
-    const [a, b] = getShapeRuntimeBackendInternal(this).split(getShapeRuntimeBackendInternal(c));
+    const insideOperandPlans = [
+      getShapeCompilePlanInternal(this),
+      getShapeCompilePlanInternal(c),
+    ];
+    const insidePlan = createOwnedTopologyRewritePlan(
+      buildBooleanShapeCompilePlan('intersection', insideOperandPlans),
+      'split:inside',
+      (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, insideOperandPlans),
+    );
+    const outsideOperandPlans = [
+      getShapeCompilePlanInternal(this),
+      getShapeCompilePlanInternal(c),
+    ];
+    const outsidePlan = createOwnedTopologyRewritePlan(
+      buildBooleanShapeCompilePlan('difference', outsideOperandPlans),
+      'split:outside',
+      (owner) => buildBooleanTopologyRewritePropagation('difference', owner, outsideOperandPlans),
+    );
     const info = mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(c)], 'boolean', { topology: 'none' });
+    if (insidePlan && outsidePlan) {
+      return [
+        setShapeCompilePlanInternal(
+          setShapeGeometryInfoInternal(
+            withBaseDimensions(this, buildShapeFromCompilePlan(insidePlan, this.colorHex)),
+            info,
+          ),
+          insidePlan,
+        ),
+        setShapeCompilePlanInternal(
+          setShapeGeometryInfoInternal(
+            withBaseDimensions(this, buildShapeFromCompilePlan(outsidePlan, this.colorHex)),
+            info,
+          ),
+          outsidePlan,
+        ),
+      ];
+    }
+
+    const [a, b] = getShapeRuntimeBackendInternal(this).split(getShapeRuntimeBackendInternal(c));
     return [
       setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(a, this.colorHex)), info), null),
       setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(b, this.colorHex)), info), null),
     ];
   }
 
-  /** Split by infinite plane. Returns [below/inside, above/outside]. */
+  /** Split by infinite plane. Returns [positive-side, negative-side]. */
   splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
-    const [a, b] = getShapeRuntimeBackendInternal(this).splitByPlane(normal, originOffset);
     const info = deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' });
+    const basePlan = getShapeCompilePlanInternal(this);
+    const firstPlan = createOwnedTopologyRewritePlan(
+      buildTrimByPlaneShapeCompilePlan(basePlan, normal, originOffset),
+      'splitByPlane:positive',
+      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan!),
+    );
+    const secondPlan = createOwnedTopologyRewritePlan(
+      buildTrimByPlaneShapeCompilePlan(basePlan, [-normal[0], -normal[1], -normal[2]], -originOffset),
+      'splitByPlane:opposite',
+      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan!),
+    );
+    if (firstPlan && secondPlan) {
+      return [
+        setShapeCompilePlanInternal(
+          setShapeGeometryInfoInternal(withBaseDimensions(this, buildShapeFromCompilePlan(firstPlan, this.colorHex)), info),
+          firstPlan,
+        ),
+        setShapeCompilePlanInternal(
+          setShapeGeometryInfoInternal(withBaseDimensions(this, buildShapeFromCompilePlan(secondPlan, this.colorHex)), info),
+          secondPlan,
+        ),
+      ];
+    }
+    const [a, b] = getShapeRuntimeBackendInternal(this).splitByPlane(normal, originOffset);
     return [
       setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(a, this.colorHex)), info), null),
       setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(b, this.colorHex)), info), null),
     ];
   }
 
-  /** Cut away everything on the positive side of the plane. */
+  /** Keep the positive side of the plane and discard the opposite side. */
   trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
+    const basePlan = getShapeCompilePlanInternal(this);
+    const nextPlan = createOwnedTopologyRewritePlan(
+      buildTrimByPlaneShapeCompilePlan(basePlan, normal, originOffset),
+      'trimByPlane',
+      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan!),
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).trimByPlane(normal, originOffset), this.colorHex)),
+      withBaseDimensions(
+        this,
+        nextPlan
+          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+          : new Shape(getShapeRuntimeBackendInternal(this).trimByPlane(normal, originOffset), this.colorHex),
+      ),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' }),
-    ), null);
+    ), nextPlan);
+  }
+
+  /** Hollow out compile-covered boxes, cylinders, and straight extrudes. */
+  shell(
+    thickness: number,
+    opts: { openFaces?: Array<'top' | 'bottom'> } = {},
+  ): Shape {
+    const basePlan = getShapeCompilePlanInternal(this);
+    const nextPlan = createOwnedTopologyRewritePlan(
+      buildShellShapeCompilePlan(basePlan, thickness, opts.openFaces),
+      'shell',
+      (owner) => buildShellTopologyRewritePropagation(owner, basePlan!, opts.openFaces ?? []),
+    );
+    if (!nextPlan) {
+      throw new Error(
+        'Shape.shell() currently supports compile-covered box(), cylinder(), and straight extrude() solids with optional top/bottom openings and rigid transforms.',
+      );
+    }
+    return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
+      withBaseDimensions(
+        this,
+        buildShapeFromCompilePlan(nextPlan, this.colorHex),
+      ),
+      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'shell', { topology: 'none' }),
+    ), nextPlan);
   }
 
   // --- Hull ---
 
   /** Convex hull of this shape. */
   hull(): Shape {
+    const nextPlan = createOwnedTopologyRewritePlan(
+      buildHullShapeCompilePlan([getShapeCompilePlanInternal(this)]),
+      'hull',
+      (owner) => buildHullTopologyRewritePropagation(owner),
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).hull(), this.colorHex)),
+      withBaseDimensions(
+        this,
+        nextPlan
+          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
+          : new Shape(getShapeRuntimeBackendInternal(this).hull(), this.colorHex),
+      ),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'hull', { topology: 'none' }),
-    ), null);
+    ), nextPlan);
   }
 
   // --- Simplification ---
@@ -1173,7 +1367,7 @@ function resolveTargetAnchorLikePoint(
 
 export function box(x: number, y: number, z: number, center = false): Shape {
   return buildShapeFromCompilePlan(
-    { kind: 'box', x, y, z, center },
+    createOwnedShapeCompilePlan({ kind: 'box', x, y, z, center }, 'primitive:box')!,
     undefined,
     { fidelity: 'kernel-native', sources: ['primitive'] },
   );
@@ -1186,23 +1380,23 @@ export function cylinder(
   segments?: number,
   center = false,
 ): Shape {
-  return buildShapeFromCompilePlan({
+  return buildShapeFromCompilePlan(createOwnedShapeCompilePlan({
     kind: 'cylinder' as const,
     height,
     radius,
     radiusTop: radiusTop != null && radiusTop >= 0 ? radiusTop : undefined,
     segments: segments != null && segments > 0 ? segments : undefined,
     center,
-  }, undefined, { fidelity: 'kernel-native', sources: ['primitive'] });
+  }, 'primitive:cylinder')!, undefined, { fidelity: 'kernel-native', sources: ['primitive'] });
 }
 
 export function sphere(radius: number, segments?: number): Shape {
   return buildShapeFromCompilePlan(
-    {
+    createOwnedShapeCompilePlan({
       kind: 'sphere',
       radius,
       segments: segments != null && segments > 0 ? segments : undefined,
-    },
+    }, 'primitive:sphere')!,
     undefined,
     { fidelity: 'kernel-native', sources: ['primitive'] },
   );
@@ -1246,7 +1440,12 @@ export function union(...inputs: ShapeOperandInput[]): Shape {
   );
   if (shapes.length === 0) throw new Error('union requires at least one shape');
   if (shapes.length === 1) return shapes[0];
-  const nextPlan = buildBooleanShapeCompilePlan('union', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+  const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
+  const nextPlan = createOwnedTopologyRewritePlan(
+    buildBooleanShapeCompilePlan('union', operandPlans),
+    'boolean:union',
+    (owner) => buildBooleanTopologyRewritePropagation('union', owner, operandPlans),
+  );
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(
       shapes,
@@ -1266,7 +1465,12 @@ export function difference(...inputs: ShapeOperandInput[]): Shape {
     'Use difference(base, cutter1, cutter2) or difference([base, cutter1, cutter2]).',
   );
   if (shapes.length < 2) throw new Error('difference requires at least two shapes');
-  const nextPlan = buildBooleanShapeCompilePlan('difference', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+  const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
+  const nextPlan = createOwnedTopologyRewritePlan(
+    buildBooleanShapeCompilePlan('difference', operandPlans),
+    'boolean:difference',
+    (owner) => buildBooleanTopologyRewritePropagation('difference', owner, operandPlans),
+  );
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withBaseDimensions(
       shapes[0],
@@ -1286,7 +1490,12 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
     'Use intersection(shape1, shape2) or intersection([shape1, shape2]).',
   );
   if (shapes.length < 2) throw new Error('intersection requires at least two shapes');
-  const nextPlan = buildBooleanShapeCompilePlan('intersection', shapes.map((shape) => getShapeCompilePlanInternal(shape)));
+  const operandPlans = shapes.map((shape) => getShapeCompilePlanInternal(shape));
+  const nextPlan = createOwnedTopologyRewritePlan(
+    buildBooleanShapeCompilePlan('intersection', operandPlans),
+    'boolean:intersection',
+    (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, operandPlans),
+  );
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(
       shapes,
@@ -1301,21 +1510,31 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
 /** Convex hull of multiple shapes and/or points. */
 export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]): Shape {
   const shapeArgs: Shape[] = [];
+  const pointArgs: [number, number, number][] = [];
   const items = args.map((arg, index) => {
     if (arg instanceof Shape || (arg && typeof arg === 'object' && typeof (arg as { toShape?: unknown }).toShape === 'function')) {
       const shape = unwrapShapeLike(arg);
       shapeArgs.push(shape);
       return requireManifoldShapeBackend(getShapeRuntimeBackendInternal(shape), `hull3d() shape ${shapeArgs.length}`);
     }
-    return normalizePoint3(arg, 'hull3d()', index + 1);
+    const point = normalizePoint3(arg, 'hull3d()', index + 1);
+    pointArgs.push(point);
+    return point;
   });
-  const out = new Shape(getWasm().Manifold.hull(items), shapeArgs[0]?.colorHex);
+  const nextPlan = createOwnedTopologyRewritePlan(
+    buildHullShapeCompilePlan(shapeArgs.map((shape) => getShapeCompilePlanInternal(shape)), pointArgs),
+    'hull',
+    (owner) => buildHullTopologyRewritePropagation(owner),
+  );
+  const out = nextPlan
+    ? buildShapeFromCompilePlan(nextPlan, shapeArgs[0]?.colorHex)
+    : new Shape(getWasm().Manifold.hull(items), shapeArgs[0]?.colorHex);
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(shapeArgs, out),
     shapeArgs.length > 0
       ? mergeGeometryInfos(shapeArgs.map((shape) => getShapeGeometryInfoInternal(shape)), 'hull', { topology: 'none' })
       : createGeometryInfo({ fidelity: 'kernel-native', sources: ['hull'] }),
-  ), null);
+  ), nextPlan);
 }
 
 /** Create shape from a signed distance function. Positive = inside. */

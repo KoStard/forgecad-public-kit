@@ -27,6 +27,8 @@ export {
   buildScene,
   generateReportPdf,
   init,
+  sheetMetal,
+  SheetMetalPart,
 } from './headless';
 export type { PlaneSpec } from './headless';
 export type { ParamDef } from './headless';
@@ -38,6 +40,16 @@ export type {
   GeometryTopology,
   GeometrySource,
   GeometryInfo,
+} from './headless';
+export type {
+  SheetMetalOptions,
+  SheetMetalFlangeOptions,
+  SheetMetalCutoutOptions,
+  SheetMetalEdge,
+  SheetMetalModel,
+  SheetMetalOutput,
+  SheetMetalRegionName,
+  SheetMetalPlanarRegionName,
 } from './headless';
 export type {
   AssemblyPart,

@@ -205,6 +205,8 @@ const half = box(50, 30, 10);
 const full = mirrorCopy(half, [1, 0, 0]);  // Mirror across YZ plane
 ```
 
+For compile-covered source shapes, repeated instances created by `linearPattern`, `circularPattern`, `Shape.mirror()`, and `mirrorCopy()` keep distinct compiler owner lineage. Supported boolean unions now preserve owner-scoped canonical face queries for those repeated descendants, so later compiler inspections can still trace which repeated instance a preserved face came from. Durable post-merge face identity is still narrower than full CAD-style topology naming: reusing the same owner lineage twice without a fresh mirror/pattern owner is reported as ambiguous, and downstream subtract/intersect rewrites still record split descendants explicitly instead of guessing.
+
 ## Utility Functions
 
 ### `degrees(deg)` / `radians(rad)`
@@ -218,19 +220,37 @@ radians(Math.PI / 4);    // 45 (converts radians to degrees)
 ## Fillets & Chamfers
 
 ### `filletEdge(shape, edge, radius, quadrant?, segments?)`
-Fillet a vertical edge (subtract corner, add quarter-cylinder).
+Compiler-owned edge fillet for the current tracked-edge subset.
+
+Supported today:
+- tracked vertical edges from compile-covered `box()` bodies
+- tracked vertical edges from `rectangle(...).extrude(...)`
+- rigid transforms between the tracked source body and the target shape
+- untouched sibling tracked vertical edges after earlier supported `filletEdge(...)` / `chamferEdge(...)` rewrites on the same body
+- preserved propagated vertical-edge queries after those supported edge-finish rewrites when a later supported boolean union keeps one defended edge lineage
+
+Still out of subset today:
+- the selected edge after an earlier `filletEdge(...)` / `chamferEdge(...)` rewrite as a new single finish target, because Forge now records that path as an explicit descendant edge-chain rather than pretending it stayed one edge
+- edge descendants after shell, hole/cut, trim, boolean difference/intersection, or boolean unions that did not already record one supported propagated edge lineage for the selection
+- generic sketch extrudes, tapered extrudes, and arbitrary feature-created edges
+
+Canonical quadrants for the supported rectangle/box edges:
+- `vert-bl` -> `[1, -1]`
+- `vert-br` -> `[-1, -1]`
+- `vert-tr` -> `[-1, 1]`
+- `vert-tl` -> `[1, 1]`
 
 ```javascript
 const b = rectangle(0, 0, 50, 50).extrude(20);
-const filleted = filletEdge(b, b.edge('vert-br'), 5, [-1, -1]);
+const filleted = filletEdge(b.toShape(), b.edge('vert-br'), 5, [-1, -1]);
 ```
 
 ### `chamferEdge(shape, edge, size, quadrant?)`
-Chamfer a vertical edge (subtract triangular prism).
+Compiler-owned edge chamfer for the same tracked vertical-edge subset as `filletEdge(...)`.
 
 ```javascript
 const b = rectangle(0, 0, 50, 50).extrude(20);
-const chamfered = chamferEdge(b, b.edge('vert-br'), 3, [-1, -1]);
+const chamfered = chamferEdge(b.toShape(), b.edge('vert-br'), 3, [-1, -1]);
 ```
 
 ## Arc Bridge
