@@ -1,4 +1,11 @@
-import type { FeatureCutExtent, HoleCompilePlan, ProfileCompilePlan, ShapeCompilePlan } from './compilePlan';
+import type {
+  CutTaperCompilePlan,
+  FeatureCutExtent,
+  HoleCompilePlan,
+  ProfileCompilePlan,
+  ShapeCompilePlan,
+} from './compilePlan';
+import { featureCutExtentForwardSide, featureCutExtentReverseSide } from './compilePlan';
 import {
   cloneTopologyRewritePropagation,
   type EdgeQueryRef,
@@ -22,7 +29,9 @@ import {
   type FeatureBlockedFaceReason,
   preservedShapeFaceQueries,
   supportedCutCreatedFaceNames,
+  supportedCutCreatedEdgeNames,
   supportedHoleCreatedFaceNames,
+  supportedHoleCreatedEdgeNames,
   supportedShellCreatedFaceNames,
 } from './shapeFaces';
 
@@ -48,6 +57,84 @@ function blockedFeatureFaceNote(operation: 'hole' | 'cut', reason: FeatureBlocke
       return `This opposite face is pierced by the through-${operation} and is not a defended named target.`;
     case 'up-to-face-target':
       return `The selected up-to-face termination face is rewritten by the ${operation} result and is not a defended named target.`;
+  }
+}
+
+function holeCreatedEdgeNote(name: string, hole: HoleCompilePlan, extent: FeatureCutExtent): string {
+  switch (name) {
+    case 'entry-rim':
+      return 'Hole results record the entry perimeter as a defended descendant edge chain on the host face.';
+    case 'forward-end-rim': {
+      const forward = featureCutExtentForwardSide(extent);
+      if (forward.kind === 'blind') return 'Blind holes record the floor perimeter as a defended descendant edge chain.';
+      if (forward.kind === 'upToFace') return 'Hole upToFace results record the termination perimeter as a defended descendant edge chain.';
+      return 'Through holes record the exit perimeter as a defended descendant edge chain.';
+    }
+    case 'reverse-end-rim': {
+      const reverse = featureCutExtentReverseSide(extent);
+      if (reverse?.kind === 'blind') return 'Reverse two-sided holes record the cap perimeter as a defended descendant edge chain.';
+      return 'Reverse two-sided hole termination stays visible as a defended descendant edge chain.';
+    }
+    case 'head-transition-rim':
+      return hole.counterbore
+        ? 'Counterbored holes record the shoulder transition as a defended descendant edge chain.'
+        : 'Countersunk holes record the sink-to-shaft transition as a defended descendant edge chain.';
+    default:
+      return 'This hole-created edge chain stays inspectable in the defended topology-rewrite subset.';
+  }
+}
+
+function cutCreatedEdgeNote(name: string, extent: FeatureCutExtent): string {
+  switch (name) {
+    case 'entry-rim':
+      return 'Cut results record the sketched entry perimeter as a defended descendant edge chain on the host face.';
+    case 'forward-end-rim': {
+      const forward = featureCutExtentForwardSide(extent);
+      if (forward.kind === 'blind') return 'Blind cutouts record the floor perimeter as a defended descendant edge chain.';
+      if (forward.kind === 'upToFace') return 'Cut upToFace results record the termination perimeter as a defended descendant edge chain.';
+      return 'Through cutouts record the exit perimeter as a defended descendant edge chain.';
+    }
+    case 'reverse-end-rim': {
+      const reverse = featureCutExtentReverseSide(extent);
+      if (reverse?.kind === 'blind') return 'Reverse two-sided cutouts record the cap perimeter as a defended descendant edge chain.';
+      return 'Reverse two-sided cut termination stays visible as a defended descendant edge chain.';
+    }
+    default:
+      return 'This cut-created edge chain stays inspectable in the defended topology-rewrite subset.';
+  }
+}
+
+function pushExtentUpToFaceDiagnostics(
+  propagation: TopologyRewritePropagation,
+  owner: ShapeQueryOwner,
+  operation: 'hole' | 'cut',
+  extent: FeatureCutExtent,
+): void {
+  const forward = featureCutExtentForwardSide(extent);
+  if (forward.kind === 'upToFace') {
+    propagation.diagnostics.push(
+      createTopologyRewritePropagationDiagnostic(
+        `${operation}-up-to-face-target-split-ambiguous`,
+        'ambiguous',
+        'face',
+        `${operation === 'hole' ? 'Hole' : 'Cut'} upToFace intent records the selected termination face as an explicit split-face ambiguity instead of silently keeping it queryable.`,
+        forward.face,
+        createPropagatedFaceQueryRef(forward.face!, owner, 'split'),
+      ),
+    );
+  }
+  const reverse = featureCutExtentReverseSide(extent);
+  if (reverse?.kind === 'upToFace') {
+    propagation.diagnostics.push(
+      createTopologyRewritePropagationDiagnostic(
+        `${operation}-reverse-up-to-face-target-split-ambiguous`,
+        'ambiguous',
+        'face',
+        `${operation === 'hole' ? 'Hole' : 'Cut'} reverse upToFace intent records the selected reverse termination face as an explicit split-face ambiguity instead of silently keeping it queryable.`,
+        reverse.face,
+        createPropagatedFaceQueryRef(reverse.face!, owner, 'split'),
+      ),
+    );
   }
 }
 
@@ -179,6 +266,19 @@ export function buildHoleTopologyRewritePropagation(
       }),
     );
   }
+  for (const name of supportedHoleCreatedEdgeNames(hole, extent)) {
+    const query = createCreatedEdgeQueryRef(owner, 'hole', name);
+    propagation.createdEdges.push({
+      query,
+      note: holeCreatedEdgeNote(name, hole, extent),
+    });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createEdgeDescendantContract('edge-chain', query, {
+        note: 'This hole-created edge query resolves to a defended descendant chain.',
+      }),
+    );
+  }
   propagation.diagnostics.push(
     createTopologyRewritePropagationDiagnostic(
       'hole-source-face-split-ambiguous',
@@ -188,25 +288,8 @@ export function buildHoleTopologyRewritePropagation(
       placement.workplane.source,
       createPropagatedFaceQueryRef(placement.workplane.source, owner, 'split'),
     ),
-    createTopologyRewritePropagationDiagnostic(
-      'hole-created-edge-propagation-unsupported',
-      'unsupported',
-      'edge',
-      'Hole-created edge semantics are not part of the topology-rewrite kernel yet.',
-    ),
   );
-  if (extent.kind === 'upToFace') {
-    propagation.diagnostics.push(
-      createTopologyRewritePropagationDiagnostic(
-        'hole-up-to-face-target-split-ambiguous',
-        'ambiguous',
-        'face',
-        'Hole upToFace intent records the selected termination face as an explicit split-face ambiguity instead of silently keeping it queryable.',
-        extent.face,
-        createPropagatedFaceQueryRef(extent.face, owner, 'split'),
-      ),
-    );
-  }
+  pushExtentUpToFaceDiagnostics(propagation, owner, 'hole', extent);
   return propagation;
 }
 
@@ -216,6 +299,7 @@ export function buildCutTopologyRewritePropagation(
   placement: ShapeWorkplanePlacement['placement'],
   profile: ProfileCompilePlan,
   extent: FeatureCutExtent,
+  taper?: CutTaperCompilePlan,
 ): TopologyRewritePropagation {
   const propagation = createTopologyRewritePropagation('cut', owner);
   const blocked = new Map(blockedShapeFacesForFeature(base, placement.workplane.source, extent)
@@ -268,6 +352,19 @@ export function buildCutTopologyRewritePropagation(
       }),
     );
   }
+  for (const name of supportedCutCreatedEdgeNames(profile, extent, taper)) {
+    const query = createCreatedEdgeQueryRef(owner, 'cut', name);
+    propagation.createdEdges.push({
+      query,
+      note: cutCreatedEdgeNote(name, extent),
+    });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createEdgeDescendantContract('edge-chain', query, {
+        note: 'This cut-created edge query resolves to a defended descendant chain.',
+      }),
+    );
+  }
   propagation.diagnostics.push(
     createTopologyRewritePropagationDiagnostic(
       'cut-source-face-split-ambiguous',
@@ -277,25 +374,8 @@ export function buildCutTopologyRewritePropagation(
       placement.workplane.source,
       createPropagatedFaceQueryRef(placement.workplane.source, owner, 'split'),
     ),
-    createTopologyRewritePropagationDiagnostic(
-      'cut-created-edge-propagation-unsupported',
-      'unsupported',
-      'edge',
-      'Cut-created edge semantics are not part of the topology-rewrite kernel yet.',
-    ),
   );
-  if (extent.kind === 'upToFace') {
-    propagation.diagnostics.push(
-      createTopologyRewritePropagationDiagnostic(
-        'cut-up-to-face-target-split-ambiguous',
-        'ambiguous',
-        'face',
-        'Cut upToFace intent records the selected termination face as an explicit split-face ambiguity instead of silently keeping it queryable.',
-        extent.face,
-        createPropagatedFaceQueryRef(extent.face, owner, 'split'),
-      ),
-    );
-  }
+  pushExtentUpToFaceDiagnostics(propagation, owner, 'cut', extent);
   if (createdNames.length === 0) {
     propagation.diagnostics.push(
       createTopologyRewritePropagationDiagnostic(

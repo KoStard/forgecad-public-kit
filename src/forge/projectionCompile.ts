@@ -3,6 +3,7 @@ import {
   buildBooleanProfileCompilePlan,
   cloneProfileCompilePlan,
   cloneShapeCompilePlan,
+  featureCutExtentForwardSide,
   type ProfileCompilePlan,
   type ShapeCompilePlan,
   type ShapeCompileTransformStep,
@@ -408,7 +409,13 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
     case 'hole': {
       const base = buildProjectionReplayContext(plan.base);
       if (!base.ok) return base;
-      if (plan.extent.kind !== 'through') {
+      if (plan.extent.kind === 'two-sided' && featureCutExtentForwardSide(plan.extent).kind === 'through') {
+        return {
+          ok: false,
+          reason: 'projection replay currently supports one-sided through holes only; reverse two-sided spans can change silhouette coverage outside the defended subset.',
+        };
+      }
+      if (featureCutExtentForwardSide(plan.extent).kind !== 'through') {
         return { ok: true, context: cloneProjectionReplayContext(base.context) };
       }
       return projectThroughHoleIntoContext(base.context, plan);
@@ -416,7 +423,19 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
     case 'cut': {
       const base = buildProjectionReplayContext(plan.base);
       if (!base.ok) return base;
-      if (plan.extent.kind !== 'through') {
+      if (plan.extent.kind === 'two-sided' && featureCutExtentForwardSide(plan.extent).kind === 'through') {
+        return {
+          ok: false,
+          reason: 'projection replay currently supports one-sided through cuts only; reverse two-sided spans can change silhouette coverage outside the defended subset.',
+        };
+      }
+      if (plan.taper || featureCutExtentForwardSide(plan.extent).kind !== 'through') {
+        if (plan.taper && featureCutExtentForwardSide(plan.extent).kind === 'through') {
+          return {
+            ok: false,
+            reason: 'projection replay currently supports straight through cuts without tapered side walls.',
+          };
+        }
         return { ok: true, context: cloneProjectionReplayContext(base.context) };
       }
       return projectThroughCutIntoContext(base.context, plan);

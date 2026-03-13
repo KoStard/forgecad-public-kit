@@ -798,6 +798,46 @@ function resolveEdgeChainAtOwnerBase(
   };
 }
 
+function resolveCreatedEdgeChainAtOwnerBase(
+  ownerBase: ShapeCompilePlan,
+  ref: Extract<EdgeQueryRef, { kind: 'created-edge' }>,
+): ShapeEdgeDescendantResolution {
+  if (
+    ownerBase.kind === 'box'
+    || ownerBase.kind === 'cylinder'
+    || ownerBase.kind === 'sphere'
+    || ownerBase.kind === 'extrude'
+    || ownerBase.kind === 'sheetMetal'
+    || ownerBase.kind === 'revolve'
+    || ownerBase.kind === 'loft'
+    || ownerBase.kind === 'sweep'
+    || ownerBase.kind === 'transform'
+    || ownerBase.kind === 'queryOwner'
+  ) {
+    return {
+      kind: 'unsupported',
+      query: cloneEdgeQueryRef(ref),
+      reason: 'The selected created-edge query does not point at a topology-rewrite result on this target shape.',
+    };
+  }
+
+  const contract = findEdgeDescendantContract(ownerBase, ref);
+  if (!contract || contract.kind !== 'edge-chain') {
+    return {
+      kind: 'unsupported',
+      query: cloneEdgeQueryRef(ref),
+      reason: 'This target shape does not record a defended descendant edge chain for the selected created-edge query.',
+    };
+  }
+
+  return {
+    kind: 'edge-chain',
+    semantic: 'chain',
+    query: cloneEdgeQueryRef(ref)!,
+    note: contract.note,
+  };
+}
+
 export function resolveShapeEdgeDescendant(
   plan: ShapeCompilePlan | null,
   ref: EdgeQueryRef | undefined,
@@ -815,13 +855,11 @@ export function resolveShapeEdgeDescendant(
       reason: 'Edge finishing v1 currently supports whole-edge selections only; use shape.edge(name), not .start/.end/.midpoint selectors.',
     };
   }
-  if (ref.kind !== 'tracked-edge' && ref.kind !== 'propagated-edge') {
+  if (ref.kind === 'edge-ref') {
     return {
       kind: 'unsupported',
       query: cloneEdgeQueryRef(ref),
-      reason: ref.kind === 'created-edge'
-        ? 'Edge finishing does not yet support created-edge queries from topology rewrites.'
-        : 'Edge finishing v1 supports compiler-owned tracked-edge and propagated-edge queries only, not direct edge refs.',
+      reason: 'Edge finishing v1 supports compiler-owned tracked-edge, propagated-edge, and inspectable created-edge queries only, not direct edge refs.',
     };
   }
   if (!ref.owner) {
@@ -840,6 +878,22 @@ export function resolveShapeEdgeDescendant(
       reason: found.issue?.reason
         ?? 'The selected tracked edge is not owned by this target shape or any preserved query ancestor.',
     };
+  }
+
+  if (ref.kind === 'created-edge') {
+    const chain = resolveCreatedEdgeChainAtOwnerBase(found.match.base, ref);
+    if (chain.kind === 'unsupported') return chain;
+    for (const step of found.match.steps) {
+      if (step.kind === 'rewrite') {
+        return {
+          kind: 'unsupported',
+          query: cloneEdgeQueryRef(ref),
+          reason: 'Later topology rewrites do not yet preserve this defended created-edge chain as a new downstream chain contract.',
+          note: chain.note,
+        };
+      }
+    }
+    return chain;
   }
 
   const base = resolveEdgeQueryAtOwnerBase(found.match.base, ref);
@@ -866,6 +920,9 @@ export function resolveShapeEdgeDescendant(
       let transformed = chain;
       for (const step of found.match.steps) {
         if (step.kind === 'transform') {
+          if (!transformed.selection) {
+            continue;
+          }
           const applied = applyTransformStepsToCandidate(
             { selection: transformed.selection, query: transformed.query },
             step.steps,

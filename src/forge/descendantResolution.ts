@@ -63,7 +63,7 @@ export interface EdgeChainDescendantResolution {
   kind: 'edge-chain';
   semantic: 'chain';
   query: EdgeQueryRef;
-  selection: ResolvedEdgeFeatureSelection;
+  selection?: ResolvedEdgeFeatureSelection;
   note?: string;
 }
 

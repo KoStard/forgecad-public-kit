@@ -129,16 +129,39 @@ export interface HoleCountersinkCompilePlan {
   depth: number;
 }
 
+export interface HoleThreadCompilePlan {
+  designation?: string;
+  pitch?: number;
+  class?: string;
+  handedness?: 'right' | 'left';
+  depth?: number;
+  modeled?: boolean;
+}
+
 export interface HoleCompilePlan {
   radius: number;
   counterbore?: HoleCounterboreCompilePlan;
   countersink?: HoleCountersinkCompilePlan;
+  thread?: HoleThreadCompilePlan;
+}
+
+export interface FeatureCutExtentSideCompilePlan {
+  kind: 'through' | 'blind' | 'upToFace';
+  depth: number;
+  face?: FaceQueryRef;
 }
 
 export type FeatureCutExtent =
-  | { kind: 'through'; depth: number }
-  | { kind: 'blind'; depth: number }
-  | { kind: 'upToFace'; depth: number; face: FaceQueryRef };
+  | FeatureCutExtentSideCompilePlan
+  | {
+      kind: 'two-sided';
+      forward: FeatureCutExtentSideCompilePlan;
+      reverse: Exclude<FeatureCutExtentSideCompilePlan, { kind: 'through' }>;
+    };
+
+export interface CutTaperCompilePlan {
+  scale: [number, number];
+}
 
 export type ShapeCompilePlan =
   | {
@@ -194,6 +217,7 @@ export type ShapeCompilePlan =
       placement: ShapeWorkplanePlacement;
       profile: ProfileCompilePlan;
       extent: FeatureCutExtent;
+      taper?: CutTaperCompilePlan;
       queryPropagation?: TopologyRewritePropagation;
     }
   | {
@@ -325,15 +349,27 @@ function cloneHoleCountersinkCompilePlan(plan: HoleCountersinkCompilePlan): Hole
   };
 }
 
+function cloneHoleThreadCompilePlan(plan: HoleThreadCompilePlan): HoleThreadCompilePlan {
+  return {
+    designation: plan.designation,
+    pitch: plan.pitch == null ? undefined : canonicalNumber(plan.pitch),
+    class: plan.class,
+    handedness: plan.handedness,
+    depth: plan.depth == null ? undefined : canonicalNumber(plan.depth),
+    modeled: plan.modeled,
+  };
+}
+
 function cloneHoleCompilePlanValue(plan: HoleCompilePlan): HoleCompilePlan {
   return {
     radius: canonicalNumber(plan.radius),
     counterbore: plan.counterbore ? cloneHoleCounterboreCompilePlan(plan.counterbore) : undefined,
     countersink: plan.countersink ? cloneHoleCountersinkCompilePlan(plan.countersink) : undefined,
+    thread: plan.thread ? cloneHoleThreadCompilePlan(plan.thread) : undefined,
   };
 }
 
-function cloneFeatureCutExtent(extent: FeatureCutExtent): FeatureCutExtent {
+function cloneFeatureCutExtentSide(extent: FeatureCutExtentSideCompilePlan): FeatureCutExtentSideCompilePlan {
   switch (extent.kind) {
     case 'through':
     case 'blind':
@@ -348,6 +384,39 @@ function cloneFeatureCutExtent(extent: FeatureCutExtent): FeatureCutExtent {
         face: cloneFaceQueryRef(extent.face)!,
       };
   }
+}
+
+function cloneFeatureCutExtent(extent: FeatureCutExtent): FeatureCutExtent {
+  if (extent.kind === 'two-sided') {
+    return {
+      kind: 'two-sided',
+      forward: cloneFeatureCutExtentSide(extent.forward),
+      reverse: cloneFeatureCutExtentSide(extent.reverse) as Exclude<FeatureCutExtentSideCompilePlan, { kind: 'through' }>,
+    };
+  }
+  return cloneFeatureCutExtentSide(extent);
+}
+
+function cloneCutTaperCompilePlan(plan: CutTaperCompilePlan): CutTaperCompilePlan {
+  return {
+    scale: [canonicalNumber(plan.scale[0]), canonicalNumber(plan.scale[1])],
+  };
+}
+
+export function featureCutExtentForwardSide(extent: FeatureCutExtent): FeatureCutExtentSideCompilePlan {
+  return extent.kind === 'two-sided' ? extent.forward : extent;
+}
+
+export function featureCutExtentReverseSide(
+  extent: FeatureCutExtent,
+): Exclude<FeatureCutExtentSideCompilePlan, { kind: 'through' }> | undefined {
+  return extent.kind === 'two-sided' ? extent.reverse : undefined;
+}
+
+export function featureCutExtentDepth(extent: FeatureCutExtent): number {
+  const forward = featureCutExtentForwardSide(extent).depth;
+  const reverse = featureCutExtentReverseSide(extent)?.depth ?? 0;
+  return forward + reverse;
 }
 
 let _shapeQueryOwnerCounter = 0;
@@ -618,6 +687,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         placement: cloneShapeWorkplanePlacementValue(plan.placement),
         profile: cloneProfileCompilePlan(plan.profile)!,
         extent: cloneFeatureCutExtent(plan.extent),
+        taper: plan.taper ? cloneCutTaperCompilePlan(plan.taper) : undefined,
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
     case 'revolve':

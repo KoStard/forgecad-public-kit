@@ -1,6 +1,9 @@
 import {
+  type CutTaperCompilePlan,
   type FeatureCutExtent,
+  type FeatureCutExtentSideCompilePlan,
   type HoleCompilePlan,
+  featureCutExtentForwardSide,
   createShapeQueryOwner,
   type ShapeCompilePlan,
   wrapShapeCompilePlanWithQueryOwner,
@@ -37,10 +40,31 @@ import {
   type ShapeWorkplanePlacement,
 } from './sketch/workplaneModel';
 
+export interface ShapeFeatureExtentSideOptions {
+  depth?: number;
+  upToFace?: SketchFaceTarget | FaceRef;
+  through?: boolean;
+}
+
+export interface ShapeFeatureExtentOptions {
+  forward: ShapeFeatureExtentSideOptions;
+  reverse?: ShapeFeatureExtentSideOptions;
+}
+
+export interface ShapeHoleThreadOptions {
+  designation?: string;
+  pitch?: number;
+  class?: string;
+  handedness?: 'right' | 'left';
+  depth?: number;
+  modeled?: boolean;
+}
+
 export interface ShapeHoleOptions {
   diameter: number;
   depth?: number;
   upToFace?: SketchFaceTarget | FaceRef;
+  extent?: ShapeFeatureExtentOptions;
   u?: number;
   v?: number;
   counterbore?: {
@@ -51,11 +75,14 @@ export interface ShapeHoleOptions {
     diameter: number;
     angleDeg?: number;
   };
+  thread?: ShapeHoleThreadOptions;
 }
 
 export interface ShapeCutoutOptions {
   depth?: number;
   upToFace?: SketchFaceTarget | FaceRef;
+  extent?: ShapeFeatureExtentOptions;
+  taperScale?: number | [number, number];
 }
 
 function isFaceRef(value: unknown): value is FaceRef {
@@ -140,8 +167,8 @@ function bboxCorners(shape: Shape): Array<[number, number, number]> {
   ];
 }
 
-function computeThroughDepth(shape: Shape, origin: [number, number, number], normal: [number, number, number]): number {
-  const inward = normalizeVec3([-normal[0], -normal[1], -normal[2]]);
+function computeThroughDepth(shape: Shape, origin: [number, number, number], direction: [number, number, number]): number {
+  const depthDirection = normalizeVec3(direction);
   let maxDepth = 0;
   for (const corner of bboxCorners(shape)) {
     const offset: [number, number, number] = [
@@ -149,7 +176,7 @@ function computeThroughDepth(shape: Shape, origin: [number, number, number], nor
       corner[1] - origin[1],
       corner[2] - origin[2],
     ];
-    maxDepth = Math.max(maxDepth, dot3(offset, inward));
+    maxDepth = Math.max(maxDepth, dot3(offset, depthDirection));
   }
 
   if (maxDepth > 1e-6) return maxDepth;
@@ -193,7 +220,7 @@ function resolveFeatureFaceTarget(
 
 function computeUpToFaceDepth(
   origin: [number, number, number],
-  normal: [number, number, number],
+  direction: [number, number, number],
   face: FaceRef,
   label: string,
 ): number {
@@ -201,23 +228,61 @@ function computeUpToFaceDepth(
     throw new Error(`${label} upToFace currently requires a planar termination face.`);
   }
 
-  const hostNormal = normalizeVec3(normal);
+  const hostDirection = normalizeVec3(direction);
   const targetNormal = normalizeVec3(face.normal);
-  if (Math.abs(Math.abs(dot3(hostNormal, targetNormal)) - 1) > 1e-6) {
+  if (Math.abs(Math.abs(dot3(hostDirection, targetNormal)) - 1) > 1e-6) {
     throw new Error(`${label} upToFace currently requires a termination face parallel to the feature direction.`);
   }
 
-  const inward: [number, number, number] = [-hostNormal[0], -hostNormal[1], -hostNormal[2]];
   const offset: [number, number, number] = [
     face.center[0] - origin[0],
     face.center[1] - origin[1],
     face.center[2] - origin[2],
   ];
-  const depth = dot3(offset, inward);
+  const depth = dot3(offset, hostDirection);
   if (!(depth > 1e-6)) {
     throw new Error(`${label} upToFace requires the termination face to lie in the feature direction.`);
   }
   return depth;
+}
+
+function resolveFeatureExtentSide(
+  targetForResolution: Shape | TrackedShape,
+  target: Shape,
+  origin: [number, number, number],
+  direction: [number, number, number],
+  options: ShapeFeatureExtentSideOptions,
+  label: string,
+  sideLabel: string,
+  opts: { allowThrough: boolean } = { allowThrough: true },
+): FeatureCutExtentSideCompilePlan {
+  const selectionCount = Number(options.depth != null) + Number(options.upToFace != null) + Number(options.through === true);
+  if (selectionCount !== 1) {
+    throw new Error(`${label} ${sideLabel} extent must specify exactly one of through, depth, or upToFace.`);
+  }
+  if (options.through) {
+    if (!opts.allowThrough) {
+      throw new Error(`${label} reverse two-sided extents do not support through termination yet.`);
+    }
+    return {
+      kind: 'through',
+      depth: computeThroughDepth(target, origin, direction),
+    };
+  }
+  if (options.upToFace != null) {
+    const targetFace = resolveFeatureFaceTarget(targetForResolution, target, options.upToFace, label, {
+      requireDefendedQuery: false,
+    });
+    return {
+      kind: 'upToFace',
+      depth: computeUpToFaceDepth(origin, direction, targetFace.face, label),
+      face: targetFace.query,
+    };
+  }
+  if (!isFinitePositive(options.depth!)) {
+    throw new Error(`${label} ${sideLabel} extent requires a positive finite blind depth.`);
+  }
+  return { kind: 'blind', depth: options.depth! };
 }
 
 function resolveFeatureExtent(
@@ -225,33 +290,80 @@ function resolveFeatureExtent(
   target: Shape,
   origin: [number, number, number],
   normal: [number, number, number],
-  depth: number | undefined,
-  upToFace: SketchFaceTarget | FaceRef | undefined,
+  options: { depth?: number; upToFace?: SketchFaceTarget | FaceRef; extent?: ShapeFeatureExtentOptions },
   label: string,
 ): FeatureCutExtent {
-  if (depth != null && upToFace != null) {
+  if (options.extent) {
+    if (options.depth != null || options.upToFace != null) {
+      throw new Error(`${label} accepts either top-level depth/upToFace or extent.forward/extent.reverse, not both.`);
+    }
+    if (!options.extent.forward) {
+      throw new Error(`${label} extent.forward is required when using structured feature extents.`);
+    }
+    const forward = resolveFeatureExtentSide(
+      targetForResolution,
+      target,
+      origin,
+      [-normal[0], -normal[1], -normal[2]],
+      options.extent.forward,
+      label,
+      'forward',
+    );
+    if (!options.extent.reverse) return forward;
+    const reverse = resolveFeatureExtentSide(
+      targetForResolution,
+      target,
+      origin,
+      normalizeVec3(normal),
+      options.extent.reverse,
+      label,
+      'reverse',
+      { allowThrough: false },
+    );
+    if (reverse.kind === 'through') {
+      throw new Error(`${label} reverse two-sided extents do not support through termination yet.`);
+    }
+    return {
+      kind: 'two-sided',
+      forward,
+      reverse,
+    };
+  }
+
+  if (options.depth != null && options.upToFace != null) {
     throw new Error(`${label} accepts either depth or upToFace, not both.`);
   }
-  if (upToFace != null) {
-    const targetFace = resolveFeatureFaceTarget(targetForResolution, target, upToFace, label, {
-      requireDefendedQuery: false,
-    });
-    return {
-      kind: 'upToFace',
-      depth: computeUpToFaceDepth(origin, normal, targetFace.face, label),
-      face: targetFace.query,
-    };
+  if (options.upToFace != null) {
+    return resolveFeatureExtentSide(
+      targetForResolution,
+      target,
+      origin,
+      [-normal[0], -normal[1], -normal[2]],
+      { upToFace: options.upToFace },
+      label,
+      'forward',
+    );
   }
-  if (depth == null) {
-    return {
-      kind: 'through',
-      depth: computeThroughDepth(target, origin, normal),
-    };
+  if (options.depth == null) {
+    return resolveFeatureExtentSide(
+      targetForResolution,
+      target,
+      origin,
+      [-normal[0], -normal[1], -normal[2]],
+      { through: true },
+      label,
+      'forward',
+    );
   }
-  if (!isFinitePositive(depth)) {
-    throw new Error(`${label} requires a positive finite blind depth.`);
-  }
-  return { kind: 'blind', depth };
+  return resolveFeatureExtentSide(
+    targetForResolution,
+    target,
+    origin,
+    [-normal[0], -normal[1], -normal[2]],
+    { depth: options.depth },
+    label,
+    'forward',
+  );
 }
 
 function resolveHoleCompilePlan(opts: ShapeHoleOptions): HoleCompilePlan {
@@ -296,18 +408,95 @@ function resolveHoleCompilePlan(opts: ShapeHoleOptions): HoleCompilePlan {
     };
   }
 
+  if (opts.thread) {
+    const designation = opts.thread.designation?.trim();
+    const threadClass = opts.thread.class?.trim();
+    if (designation === '') {
+      throw new Error('Shape.hole() thread.designation must be a non-empty string when provided.');
+    }
+    if (threadClass === '') {
+      throw new Error('Shape.hole() thread.class must be a non-empty string when provided.');
+    }
+    if (opts.thread.pitch != null && !isFinitePositive(opts.thread.pitch)) {
+      throw new Error('Shape.hole() thread.pitch must be a positive finite value when provided.');
+    }
+    if (opts.thread.depth != null && !isFinitePositive(opts.thread.depth)) {
+      throw new Error('Shape.hole() thread.depth must be a positive finite value when provided.');
+    }
+    if (opts.thread.modeled === true) {
+      throw new Error('Shape.hole() does not model helical threads yet; pass thread metadata with modeled omitted/false for deferred thread intent.');
+    }
+    if (
+      designation == null
+      && threadClass == null
+      && opts.thread.pitch == null
+      && opts.thread.depth == null
+      && opts.thread.handedness == null
+      && opts.thread.modeled == null
+    ) {
+      throw new Error('Shape.hole() thread metadata requires at least one designation, pitch, class, handedness, or depth value.');
+    }
+    hole.thread = {
+      designation,
+      pitch: opts.thread.pitch,
+      class: threadClass,
+      handedness: opts.thread.handedness,
+      depth: opts.thread.depth,
+      modeled: false,
+    };
+  }
+
   return hole;
 }
 
 function validateHoleExtentCompatibility(hole: HoleCompilePlan, extent: FeatureCutExtent): void {
+  if ((hole.counterbore || hole.countersink) && extent.kind === 'two-sided') {
+    throw new Error('Shape.hole() does not yet combine reverse two-sided extents with counterbore or countersink heads.');
+  }
+  const forward = featureCutExtentForwardSide(extent);
   const headDepth = hole.counterbore?.depth ?? hole.countersink?.depth ?? 0;
-  if (headDepth <= 0) return;
-  if (headDepth >= extent.depth - 1e-6) {
+  if (headDepth > 0 && headDepth >= forward.depth - 1e-6) {
     if (hole.counterbore) {
       throw new Error('Shape.hole() counterbore depth must leave some straight hole depth below the bore.');
     }
     throw new Error('Shape.hole() countersink diameter/angle must leave some straight hole depth below the sink.');
   }
+  if (hole.thread?.depth != null && hole.thread.depth > forward.depth + 1e-6) {
+    throw new Error('Shape.hole() thread.depth cannot exceed the primary forward hole depth.');
+  }
+}
+
+function resolveCutTaperCompilePlan(
+  profile: ReturnType<typeof getSketchCompileProfilePlan>,
+  opts: ShapeCutoutOptions,
+  extent: FeatureCutExtent,
+): CutTaperCompilePlan | undefined {
+  if (opts.taperScale == null) return undefined;
+  if (extent.kind === 'two-sided') {
+    throw new Error('Shape.cutout() does not yet combine taperScale with reverse two-sided extents.');
+  }
+  if (!profile) {
+    throw new Error('Shape.cutout() requires a compile-covered sketch profile before taperScale can be validated.');
+  }
+  if (profile.kind !== 'circle' && profile.kind !== 'rect' && profile.kind !== 'roundedRect') {
+    throw new Error('Shape.cutout() taperScale currently supports circle, rect, and roundedRect sketch profiles only.');
+  }
+  const scale = Array.isArray(opts.taperScale)
+    ? opts.taperScale
+    : [opts.taperScale, opts.taperScale] as [number, number];
+  if (
+    scale.length !== 2
+    || !isFinitePositive(scale[0])
+    || !isFinitePositive(scale[1])
+  ) {
+    throw new Error('Shape.cutout() taperScale must be a positive finite number or [x, y] pair.');
+  }
+  if (profile.kind === 'circle' && Math.abs(scale[0] - scale[1]) > 1e-6) {
+    throw new Error('Shape.cutout() circular tapered cuts currently require a uniform taperScale.');
+  }
+  return {
+    scale: [scale[0], scale[1]],
+  };
 }
 
 function createOwnedTopologyRewritePlan(
@@ -385,8 +574,11 @@ function resolveHolePlacement(
       targetForOwnership,
       workplane.origin,
       workplane.normal,
-      opts.depth,
-      opts.upToFace,
+      {
+        depth: opts.depth,
+        upToFace: opts.upToFace,
+        extent: opts.extent,
+      },
       'Shape.hole()',
     ),
   };
@@ -438,10 +630,14 @@ function shapeCutout(target: Shape, sketch: Sketch, opts: ShapeCutoutOptions = {
     target,
     placementModel.workplane.origin,
     placementModel.workplane.normal,
-    opts.depth,
-    opts.upToFace,
+    {
+      depth: opts.depth,
+      upToFace: opts.upToFace,
+      extent: opts.extent,
+    },
     'Shape.cutout()',
   );
+  const taper = resolveCutTaperCompilePlan(profile, opts, extent);
 
   const plan = createOwnedTopologyRewritePlan(
     buildCutShapeCompilePlan(
@@ -452,6 +648,7 @@ function shapeCutout(target: Shape, sketch: Sketch, opts: ShapeCutoutOptions = {
       },
       profile,
       extent,
+      taper,
     ),
     'cut',
     (owner) => buildCutTopologyRewritePropagation(
@@ -460,6 +657,7 @@ function shapeCutout(target: Shape, sketch: Sketch, opts: ShapeCutoutOptions = {
       placementModel,
       profile,
       extent,
+      taper,
     ),
   );
   return buildFeatureResult(target, plan);

@@ -1,4 +1,5 @@
 import {
+  type CutTaperCompilePlan,
   findShapePrimaryQueryOwner,
   type FeatureCutExtent,
   type HoleCompilePlan,
@@ -6,6 +7,8 @@ import {
   type ProfileCompileTransformStep,
   type ShapeCompilePlan,
   type ShapeCompileTransformStep,
+  featureCutExtentForwardSide,
+  featureCutExtentReverseSide,
 } from './compilePlan';
 import {
   cloneFaceQueryRef,
@@ -376,6 +379,35 @@ function midpoint2d(a: Vec2, b: Vec2): Vec2 {
   ];
 }
 
+function averageVec3(points: Vec3[]): Vec3 {
+  if (points.length === 0) return [0, 0, 0];
+  const sum = points.reduce<Vec3>(
+    (acc, point) => [acc[0] + point[0], acc[1] + point[1], acc[2] + point[2]],
+    [0, 0, 0],
+  );
+  return [sum[0] / points.length, sum[1] / points.length, sum[2] / points.length];
+}
+
+function scalePoint2d(point: Vec2, scale: [number, number]): Vec2 {
+  return [point[0] * scale[0], point[1] * scale[1]];
+}
+
+function pointOnWorkplane(
+  origin: Vec3,
+  workplaneU: Vec3,
+  workplaneV: Vec3,
+  u: number,
+  v: number,
+  depthDir?: Vec3,
+  depth = 0,
+): Vec3 {
+  return [
+    origin[0] + workplaneU[0] * u + workplaneV[0] * v + (depthDir?.[0] ?? 0) * depth,
+    origin[1] + workplaneU[1] * u + workplaneV[1] * v + (depthDir?.[1] ?? 0) * depth,
+    origin[2] + workplaneU[2] * u + workplaneV[2] * v + (depthDir?.[2] ?? 0) * depth,
+  ];
+}
+
 function normalize2d(vec: Vec2): Vec2 {
   const len = Math.hypot(vec[0], vec[1]);
   if (len < 1e-12) return [1, 0];
@@ -675,11 +707,16 @@ function holeCreatedFaceNames(hole: HoleCompilePlan, extent: FeatureCutExtent): 
   if (hole.countersink) {
     names.push('countersink-wall');
   }
-  if (extent.kind === 'blind') names.push('floor');
+  if (featureCutExtentForwardSide(extent).kind === 'blind') names.push('floor');
+  if (featureCutExtentReverseSide(extent)?.kind === 'blind') names.push('cap');
   return names;
 }
 
-function cutCreatedFaceNames(profile: ProfileCompilePlan, extent: FeatureCutExtent): string[] {
+function cutCreatedFaceNames(
+  profile: ProfileCompilePlan,
+  extent: FeatureCutExtent,
+  _taper?: CutTaperCompilePlan,
+): string[] {
   const names = (() => {
     switch (profile.kind) {
       case 'circle':
@@ -691,7 +728,32 @@ function cutCreatedFaceNames(profile: ProfileCompilePlan, extent: FeatureCutExte
         return [];
     }
   })();
-  if (extent.kind === 'blind') names.push('floor');
+  if (featureCutExtentForwardSide(extent).kind === 'blind') names.push('floor');
+  if (featureCutExtentReverseSide(extent)?.kind === 'blind') names.push('cap');
+  return names;
+}
+
+function holeCreatedEdgeNames(hole: HoleCompilePlan, extent: FeatureCutExtent): string[] {
+  const names = ['entry-rim', 'forward-end-rim'];
+  if (featureCutExtentReverseSide(extent)) {
+    names.push('reverse-end-rim');
+  }
+  if (hole.counterbore || hole.countersink) {
+    names.push('head-transition-rim');
+  }
+  return names;
+}
+
+function cutCreatedEdgeNames(
+  profile: ProfileCompilePlan,
+  extent: FeatureCutExtent,
+  taper?: CutTaperCompilePlan,
+): string[] {
+  if (cutCreatedFaceNames(profile, extent, taper).length === 0) return [];
+  const names = ['entry-rim', 'forward-end-rim'];
+  if (featureCutExtentReverseSide(extent)) {
+    names.push('reverse-end-rim');
+  }
   return names;
 }
 
@@ -776,8 +838,17 @@ function holeHeadDepth(hole: HoleCompilePlan): number {
 }
 
 function holeWallMidDepth(hole: HoleCompilePlan, extent: FeatureCutExtent): number {
+  const reverseDepth = featureCutExtentReverseSide(extent)?.depth ?? 0;
+  if (reverseDepth > 0) {
+    return (featureCutExtentForwardSide(extent).depth - reverseDepth) / 2;
+  }
   const entryDepth = holeHeadDepth(hole);
-  return entryDepth + Math.max(extent.depth - entryDepth, 0) / 2;
+  return entryDepth + Math.max(featureCutExtentForwardSide(extent).depth - entryDepth, 0) / 2;
+}
+
+function cutWallMidDepth(extent: FeatureCutExtent): number {
+  const reverseDepth = featureCutExtentReverseSide(extent)?.depth ?? 0;
+  return (featureCutExtentForwardSide(extent).depth - reverseDepth) / 2;
 }
 
 export function blockedShapeFacesForFeature(
@@ -797,17 +868,25 @@ export function blockedShapeFacesForFeature(
   };
 
   const selectedNames = selectedFaceNamesFromQuery(table, source);
+  const forward = featureCutExtentForwardSide(extent);
   for (const name of selectedNames) {
     register(name, 'host');
-    if (extent.kind === 'through') {
+    if (forward.kind === 'through') {
       for (const opposite of oppositeFaceNames(name, available)) {
         register(opposite, 'through-exit');
       }
     }
   }
 
-  if (extent.kind === 'upToFace') {
-    for (const name of selectedFaceNamesFromQuery(table, extent.face)) {
+  if (forward.kind === 'upToFace') {
+    for (const name of selectedFaceNamesFromQuery(table, forward.face)) {
+      register(name, 'up-to-face-target');
+    }
+  }
+
+  const reverse = featureCutExtentReverseSide(extent);
+  if (reverse?.kind === 'upToFace') {
+    for (const name of selectedFaceNamesFromQuery(table, reverse.face)) {
       register(name, 'up-to-face-target');
     }
   }
@@ -1018,6 +1097,8 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       const workplane = plan.placement.placement.workplane;
       const origin = workplane.origin;
       const inward: Vec3 = [-workplane.normal[0], -workplane.normal[1], -workplane.normal[2]];
+      const forward = featureCutExtentForwardSide(plan.extent);
+      const reverse = featureCutExtentReverseSide(plan.extent);
       const wallQuery = findCreatedFaceQuery(plan.queryPropagation, 'wall');
       if (wallQuery) {
         const wallMidDepth = holeWallMidDepth(plan.hole, plan.extent);
@@ -1085,14 +1166,30 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
           name: 'floor',
           normal: cloneVec3(workplane.normal),
           center: [
-            origin[0] + inward[0] * plan.extent.depth,
-            origin[1] + inward[1] * plan.extent.depth,
-            origin[2] + inward[2] * plan.extent.depth,
+            origin[0] + inward[0] * forward.depth,
+            origin[1] + inward[1] * forward.depth,
+            origin[2] + inward[2] * forward.depth,
           ],
           planar: true,
           uAxis: cloneVec3(workplane.u),
           vAxis: cloneVec3(workplane.v),
           query: floorQuery,
+        });
+      }
+      const capQuery = findCreatedFaceQuery(plan.queryPropagation, 'cap');
+      if (capQuery && reverse?.kind === 'blind') {
+        registerFace(table, {
+          name: 'cap',
+          normal: [-workplane.normal[0], -workplane.normal[1], -workplane.normal[2]],
+          center: [
+            origin[0] - inward[0] * reverse.depth,
+            origin[1] - inward[1] * reverse.depth,
+            origin[2] - inward[2] * reverse.depth,
+          ],
+          planar: true,
+          uAxis: cloneVec3(workplane.u),
+          vAxis: [-workplane.v[0], -workplane.v[1], -workplane.v[2]],
+          query: capQuery,
         });
       }
       return table;
@@ -1126,17 +1223,23 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
         -placement.workplane.normal[1],
         -placement.workplane.normal[2],
       ];
-      const depthMid = plan.extent.depth / 2;
+      const forward = featureCutExtentForwardSide(plan.extent);
+      const reverse = featureCutExtentReverseSide(plan.extent);
+      const reverseDepth = reverse?.depth ?? 0;
+      const depthMid = cutWallMidDepth(plan.extent);
       if (plan.profile.kind === 'circle') {
         const wallQuery = findCreatedFaceQuery(plan.queryPropagation, 'wall');
         if (wallQuery) {
+          const hostRadius = plan.profile.radius;
+          const endRadius = plan.taper ? hostRadius * plan.taper.scale[0] : hostRadius;
+          const wallRadius = (hostRadius + endRadius) / 2;
           registerFace(table, {
             name: 'wall',
             normal: [-placement.workplane.u[0], -placement.workplane.u[1], -placement.workplane.u[2]],
             center: [
-              origin[0] + placement.workplane.u[0] * plan.profile.radius + depthDir[0] * depthMid,
-              origin[1] + placement.workplane.u[1] * plan.profile.radius + depthDir[1] * depthMid,
-              origin[2] + placement.workplane.u[2] * plan.profile.radius + depthDir[2] * depthMid,
+              origin[0] + placement.workplane.u[0] * wallRadius + depthDir[0] * depthMid,
+              origin[1] + placement.workplane.u[1] * wallRadius + depthDir[1] * depthMid,
+              origin[2] + placement.workplane.u[2] * wallRadius + depthDir[2] * depthMid,
             ],
             planar: false,
             query: wallQuery,
@@ -1144,83 +1247,160 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
         }
       }
       if (plan.profile.kind === 'rect' || plan.profile.kind === 'roundedRect') {
+        const matrix = profileTransformMatrix(plan.profile.transforms);
         const minX = plan.profile.center ? -plan.profile.width / 2 : 0;
         const minY = plan.profile.center ? -plan.profile.height / 2 : 0;
         const maxX = minX + plan.profile.width;
         const maxY = minY + plan.profile.height;
+        const hostBl = profilePoint(matrix, minX, minY);
+        const hostBr = profilePoint(matrix, maxX, minY);
+        const hostTr = profilePoint(matrix, maxX, maxY);
+        const hostTl = profilePoint(matrix, minX, maxY);
+        const forwardScale = plan.taper?.scale ?? [1, 1];
+        const endBl = scalePoint2d(hostBl, forwardScale);
+        const endBr = scalePoint2d(hostBr, forwardScale);
+        const endTr = scalePoint2d(hostTr, forwardScale);
+        const endTl = scalePoint2d(hostTl, forwardScale);
         const wallFaces: Array<{
           name: string;
-          u: number;
-          v: number;
-          normal: Vec3;
-          uAxis: Vec3;
-          vAxis: Vec3;
+          reverseStart: Vec2;
+          reverseEnd: Vec2;
+          forwardStart: Vec2;
+          forwardEnd: Vec2;
         }> = [
           {
             name: 'wall-bottom',
-            u: (minX + maxX) / 2,
-            v: minY,
-            normal: cloneVec3(placement.workplane.v),
-            uAxis: cloneVec3(placement.workplane.u),
-            vAxis: [-placement.workplane.normal[0], -placement.workplane.normal[1], -placement.workplane.normal[2]],
+            reverseStart: hostBl,
+            reverseEnd: hostBr,
+            forwardStart: endBl,
+            forwardEnd: endBr,
           },
           {
             name: 'wall-right',
-            u: maxX,
-            v: (minY + maxY) / 2,
-            normal: [-placement.workplane.u[0], -placement.workplane.u[1], -placement.workplane.u[2]],
-            uAxis: cloneVec3(placement.workplane.v),
-            vAxis: [-placement.workplane.normal[0], -placement.workplane.normal[1], -placement.workplane.normal[2]],
+            reverseStart: hostBr,
+            reverseEnd: hostTr,
+            forwardStart: endBr,
+            forwardEnd: endTr,
           },
           {
             name: 'wall-top',
-            u: (minX + maxX) / 2,
-            v: maxY,
-            normal: [-placement.workplane.v[0], -placement.workplane.v[1], -placement.workplane.v[2]],
-            uAxis: cloneVec3(placement.workplane.u),
-            vAxis: cloneVec3(placement.workplane.normal),
+            reverseStart: hostTr,
+            reverseEnd: hostTl,
+            forwardStart: endTr,
+            forwardEnd: endTl,
           },
           {
             name: 'wall-left',
-            u: minX,
-            v: (minY + maxY) / 2,
-            normal: cloneVec3(placement.workplane.u),
-            uAxis: cloneVec3(placement.workplane.v),
-            vAxis: cloneVec3(placement.workplane.normal),
+            reverseStart: hostTl,
+            reverseEnd: hostBl,
+            forwardStart: endTl,
+            forwardEnd: endBl,
           },
         ];
         for (const wall of wallFaces) {
           const wallQuery = findCreatedFaceQuery(plan.queryPropagation, wall.name);
           if (!wallQuery) continue;
+          const reverseStart3 = pointOnWorkplane(
+            origin,
+            placement.workplane.u,
+            placement.workplane.v,
+            wall.reverseStart[0],
+            wall.reverseStart[1],
+            depthDir,
+            -reverseDepth,
+          );
+          const reverseEnd3 = pointOnWorkplane(
+            origin,
+            placement.workplane.u,
+            placement.workplane.v,
+            wall.reverseEnd[0],
+            wall.reverseEnd[1],
+            depthDir,
+            -reverseDepth,
+          );
+          const forwardStart3 = pointOnWorkplane(
+            origin,
+            placement.workplane.u,
+            placement.workplane.v,
+            wall.forwardStart[0],
+            wall.forwardStart[1],
+            depthDir,
+            forward.depth,
+          );
+          const forwardEnd3 = pointOnWorkplane(
+            origin,
+            placement.workplane.u,
+            placement.workplane.v,
+            wall.forwardEnd[0],
+            wall.forwardEnd[1],
+            depthDir,
+            forward.depth,
+          );
+          const edgeVec = normalizeAxis([
+            reverseEnd3[0] - reverseStart3[0],
+            reverseEnd3[1] - reverseStart3[1],
+            reverseEnd3[2] - reverseStart3[2],
+          ]);
+          const depthVec = normalizeAxis([
+            forwardStart3[0] - reverseStart3[0],
+            forwardStart3[1] - reverseStart3[1],
+            forwardStart3[2] - reverseStart3[2],
+          ]);
+          const normal = normalizeAxis(cross3(edgeVec, depthVec));
           registerFace(table, {
             name: wall.name,
-            normal: wall.normal,
-            center: [
-              origin[0] + placement.workplane.u[0] * wall.u + placement.workplane.v[0] * wall.v + depthDir[0] * depthMid,
-              origin[1] + placement.workplane.u[1] * wall.u + placement.workplane.v[1] * wall.v + depthDir[1] * depthMid,
-              origin[2] + placement.workplane.u[2] * wall.u + placement.workplane.v[2] * wall.v + depthDir[2] * depthMid,
-            ],
+            normal,
+            center: averageVec3([reverseStart3, reverseEnd3, forwardStart3, forwardEnd3]),
             planar: true,
-            uAxis: wall.uAxis,
-            vAxis: wall.vAxis,
+            uAxis: edgeVec,
+            vAxis: depthVec,
             query: wallQuery,
           });
         }
       }
       const floorQuery = findCreatedFaceQuery(plan.queryPropagation, 'floor');
       if (floorQuery) {
+        const floorCenter = (() => {
+          if (plan.profile.kind === 'rect' || plan.profile.kind === 'roundedRect') {
+            const matrix = profileTransformMatrix(plan.profile.transforms);
+            const minX = plan.profile.center ? -plan.profile.width / 2 : 0;
+            const minY = plan.profile.center ? -plan.profile.height / 2 : 0;
+            const maxX = minX + plan.profile.width;
+            const maxY = minY + plan.profile.height;
+            const center2d = midpoint2d(profilePoint(matrix, minX, minY), profilePoint(matrix, maxX, maxY));
+            const scaledCenter = plan.taper ? scalePoint2d(center2d, plan.taper.scale) : center2d;
+            return pointOnWorkplane(origin, placement.workplane.u, placement.workplane.v, scaledCenter[0], scaledCenter[1], depthDir, forward.depth);
+          }
+          return [
+            origin[0] + depthDir[0] * forward.depth,
+            origin[1] + depthDir[1] * forward.depth,
+            origin[2] + depthDir[2] * forward.depth,
+          ] as Vec3;
+        })();
         registerFace(table, {
           name: 'floor',
           normal: cloneVec3(placement.workplane.normal),
-          center: [
-            origin[0] + depthDir[0] * plan.extent.depth,
-            origin[1] + depthDir[1] * plan.extent.depth,
-            origin[2] + depthDir[2] * plan.extent.depth,
-          ],
+          center: floorCenter,
           planar: true,
           uAxis: cloneVec3(placement.workplane.u),
           vAxis: cloneVec3(placement.workplane.v),
           query: floorQuery,
+        });
+      }
+      const capQuery = findCreatedFaceQuery(plan.queryPropagation, 'cap');
+      if (capQuery && reverse?.kind === 'blind') {
+        registerFace(table, {
+          name: 'cap',
+          normal: [-placement.workplane.normal[0], -placement.workplane.normal[1], -placement.workplane.normal[2]],
+          center: [
+            origin[0] - depthDir[0] * reverse.depth,
+            origin[1] - depthDir[1] * reverse.depth,
+            origin[2] - depthDir[2] * reverse.depth,
+          ],
+          planar: true,
+          uAxis: cloneVec3(placement.workplane.u),
+          vAxis: [-placement.workplane.v[0], -placement.workplane.v[1], -placement.workplane.v[2]],
+          query: capQuery,
         });
       }
       return table;
@@ -1391,8 +1571,24 @@ export function supportedHoleCreatedFaceNames(
 export function supportedCutCreatedFaceNames(
   profile: ProfileCompilePlan,
   extent: FeatureCutExtent,
+  taper?: CutTaperCompilePlan,
 ): string[] {
-  return cutCreatedFaceNames(profile, extent);
+  return cutCreatedFaceNames(profile, extent, taper);
+}
+
+export function supportedHoleCreatedEdgeNames(
+  hole: HoleCompilePlan,
+  extent: FeatureCutExtent,
+): string[] {
+  return holeCreatedEdgeNames(hole, extent);
+}
+
+export function supportedCutCreatedEdgeNames(
+  profile: ProfileCompilePlan,
+  extent: FeatureCutExtent,
+  taper?: CutTaperCompilePlan,
+): string[] {
+  return cutCreatedEdgeNames(profile, extent, taper);
 }
 
 export function preservedShapeFaceQueries(
