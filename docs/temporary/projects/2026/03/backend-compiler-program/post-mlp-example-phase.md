@@ -97,7 +97,7 @@ When an example mixes helper solids with one primary blocker, the manifest can
 name `primaryShapes` explicitly so the route contract applies to the intended
 shape objects instead of every returned solid.
 
-## Current Starting State
+## Current State After Task 250
 
 The landed starting inventory is:
 
@@ -110,12 +110,19 @@ The landed starting inventory is:
 
 Current part-route counts:
 
-- 9 `exact`
-- 1 `faceted`
-- 63 `holdout`
+- 32 `exact`
+- 5 `faceted`
+- 36 `holdout`
 
-That distribution is intentional for task 240:
+The API/compiler-corpus wave now contributes:
 
-- the gate now defines the scope and fails on drift
-- the compiler corpus and the public exact/faceted demos already declare real route expectations
-- the broader API and product families are explicitly held for their dedicated migration waves instead of staying ambiguous
+- 24 API part examples on `exact`
+- 5 API part examples on `faceted`
+- 2 API part examples left as explicit holdouts because they still mix incompatible route outcomes in one scene
+- all 8 compiler-corpus parts on `exact`
+
+The remaining holdouts are now concentrated in:
+
+- product/demo part examples that belong to task 260
+- mixed-route API galleries such as `extrude-options` and `gears-tier1`
+- any later recovery/fencing decisions owned by task 280

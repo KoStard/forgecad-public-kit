@@ -6,26 +6,17 @@ import {
   type ExampleManifestEntry,
 } from './types';
 
-const API_PART_HOLDOUT = holdoutRoute(
-  'API part examples are inventory-covered now, but their route expectations are deferred to the focused migration wave.',
-  'tasks/250-api-and-corpus-example-migration.md',
-  'Runtime execution is guarded here; exact versus faceted route commitments land in task 250.',
-);
+const API_HOLDOUT_TASK = 'tasks/280-example-gap-recovery-and-legacy-fence.md';
 
-const API_PART_PATHS = [
+const API_EXACT_PART_PATHS = [
   'examples/api/attachTo-basics.forge.js',
   'examples/api/boolean-operations.forge.js',
   'examples/api/center-true-vs-false.forge.js',
   'examples/api/clone-duplicate.forge.js',
   'examples/api/colors-union-vs-array.forge.js',
   'examples/api/coordinate-system.forge.js',
-  'examples/api/curves-surfacing-basics.forge.js',
   'examples/api/dimensioned-bracket.forge.js',
-  'examples/api/elbow-test.forge.js',
-  'examples/api/extrude-options.forge.js',
-  'examples/api/face-gears.forge.js',
   'examples/api/feature-created-faces.forge.js',
-  'examples/api/gears-tier1.forge.js',
   'examples/api/group-vs-union.forge.js',
   'examples/api/import-args-unit.forge.js',
   'examples/api/import-args.forge.js',
@@ -37,11 +28,52 @@ const API_PART_PATHS = [
   'examples/api/js-module-imports.forge.js',
   'examples/api/patterns.forge.js',
   'examples/api/pointAlong-orientation.forge.js',
-  'examples/api/profile-2020-b-slot6.forge.js',
   'examples/api/rotate-around-to.forge.js',
   'examples/api/sketch-basics.forge.js',
   'examples/api/sketch-on-face.forge.js',
   'examples/api/spatial-recipes.forge.js',
+] as const;
+
+const API_FACETED_PARTS = [
+  {
+    path: 'examples/api/benchy-style-hull.forge.js',
+    blocker: 'The lofted/smoothed hull still lacks an exact compile plan, so the primary hull solid intentionally relies on allow-faceted export.',
+    note: 'The cabin and chimney stay exact; the route contract focuses on the hull body.',
+    primaryShapes: ['Hull'],
+  },
+  {
+    path: 'examples/api/curves-surfacing-basics.forge.js',
+    blocker: 'This surfacing demo still depends on loft/sweep geometry outside the exact CadQuery/OCCT subset, so the bottle scene is intentionally faceted.',
+    note: 'The example remains part of the maintained API surface, but only through the faceted route today.',
+  },
+  {
+    path: 'examples/api/elbow-test.forge.js',
+    blocker: 'The shared elbow helper still emits runtime geometry without an exact compile plan, so these elbow variants must use allow-faceted export.',
+    note: 'Keep the helper runtime-covered here while its exact replay story catches up.',
+  },
+  {
+    path: 'examples/api/face-gears.forge.js',
+    blocker: 'Face-gear and perpendicular gear helpers still rely on sampled tooth/profile geometry outside the exact export subset.',
+    note: 'The example should keep succeeding through the faceted route with explicit diagnostics.',
+  },
+  {
+    path: 'examples/api/profile-2020-b-slot6.forge.js',
+    blocker: 'The direct 3D profile helper still lowers through segmented profile geometry, so the extrusion must stay on the faceted route for now.',
+    note: 'The sketch half of the example remains exact-capable; the 3D helper is the intentional blocker.',
+  },
+] as const;
+
+const API_HOLDOUT_PARTS = [
+  {
+    path: 'examples/api/extrude-options.forge.js',
+    blocker: 'Twisted extrude replay remains outside the exact subset, but the same gallery also contains plain exact variants, so one exact/faceted part contract would lie about this mixed-route scene.',
+    note: 'Keep it runtime-covered until the twist gap closes or the gallery is split into route-honest examples.',
+  },
+  {
+    path: 'examples/api/gears-tier1.forge.js',
+    blocker: 'The spur and ring gears still need faceted fallback while the rack gear already stays exact, so this one gallery mixes incompatible route expectations.',
+    note: 'Keep the gear family runtime-covered until the helpers converge on one route or the scene is split by route intent.',
+  },
 ] as const;
 
 const COMPILER_CORPUS_PATHS = [
@@ -56,16 +88,14 @@ const COMPILER_CORPUS_PATHS = [
 ] as const;
 
 export const API_AND_CORPUS_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
-  ...API_PART_PATHS.map((path) => partExample('api-parts', path, API_PART_HOLDOUT)),
-  partExample(
-    'api-parts',
-    'examples/api/benchy-style-hull.forge.js',
-    facetedRoute(
-      'Hull-heavy geometry still falls outside the exact CadQuery/OCCT subset, so this example is expected to require allow-faceted export.',
-      'The runtime path stays valid; the architecture gate only expects the faceted route here.',
-    ),
-    undefined,
-    ['Hull'],
+  ...API_EXACT_PART_PATHS.map((path) =>
+    partExample('api-parts', path, exactRoute('This API example now stays inside the defended exact-route subset.')),
+  ),
+  ...API_FACETED_PARTS.map((entry) =>
+    partExample('api-parts', entry.path, facetedRoute(entry.blocker, entry.note), undefined, entry.primaryShapes),
+  ),
+  ...API_HOLDOUT_PARTS.map((entry) =>
+    partExample('api-parts', entry.path, holdoutRoute(entry.blocker, API_HOLDOUT_TASK, entry.note)),
   ),
   partExample(
     'api-parts',

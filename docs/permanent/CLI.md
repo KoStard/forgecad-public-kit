@@ -465,7 +465,7 @@ Current part route states:
 
 - `exact`: selected primary shapes must stay on the exact compiler route
 - `faceted`: exact must stay blocked and allow-faceted must succeed with diagnostics
-- `holdout`: runtime-checked, but intentionally outside the exact-route claim until a follow-up migration task lands
+- `holdout`: runtime-checked, but intentionally outside the exact-route claim because the example still mixes route outcomes or depends on a documented unsupported capability
 
 Use `--family` when a task owns only one manifest lane, and `--example` when you
 want to debug a single checked artifact.
