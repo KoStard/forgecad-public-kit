@@ -461,6 +461,20 @@ Current example classes:
 - `notebook`: preview-cell validation for `.forge-notebook.json`
 - `experimental`: temporary fenced examples that still have to run
 
+The gate dispatches by declared validation path, not just by class label:
+
+- `part-runtime`: execute and then enforce any declared exact/faceted route contract
+- `assembly-runtime`: execute and validate solved-scene/assembly-owned runtime behavior
+- `runtime-scene`: execute as a viewport/report/runtime scene without treating it as part-route evidence
+- `sketch-svg`: render returned sketch payloads through the sketch SVG path
+- `notebook-preview`: materialize and execute the notebook preview cell
+- `experimental-runtime`: execute only, while the example stays outside the active architecture claim
+
+For non-part entries, the manifest can also pin specific runtime surfaces that
+must remain available to repo checks, such as BOM entries, cut planes,
+`jointsView()` controls, grouped scene structure, or collected
+`robotExport(...)` data.
+
 Current part route states:
 
 - `exact`: selected primary shapes must stay on the exact compiler route
