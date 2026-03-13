@@ -70,11 +70,11 @@ const stackPath = spline3d(
   ],
   { tension: 0.5 },
 );
-const stack = sweep(circle2d(3.8, 26), stackPath, {
+const stack = sweep(circle2d(3.8), stackPath, {
   samples: 28,
   edgeLength: 0.55,
 });
-const stackInner = sweep(circle2d(2.2, 22), stackPath, {
+const stackInner = sweep(circle2d(2.2), stackPath, {
   samples: 28,
   edgeLength: 0.55,
 });
