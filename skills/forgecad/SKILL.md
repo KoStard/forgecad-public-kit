@@ -15,7 +15,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 4. Reuse patterns from `examples/api/` before inventing from scratch.
 5. Default to a concrete first pass — easy iteration beats speculative design review.
 6. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
-7. Validate with `npm run test-run -- <file>` (add `--debug-imports` for import chain issues). This works for notebook preview cells too.
+7. Validate with `forgecad run <file>` (add `--debug-imports` for import chain issues). This works for notebook preview cells too.
 8. For `jointsView()` animations, keep wrapped revolute tracks continuous across branch cuts; do not assume the viewport will auto-fix `-180/180` jumps.
 
 ### Import and Composition
@@ -38,9 +38,9 @@ Useful notebook loop:
 
 - keep stable setup in early cells and the current experiment in the preview cell
 - use `show(...)` for intermediate geometry you want pinned in the viewport
-- use `npm run notebook -- view <file> preview` to inspect the notebook from the terminal
-- use `npm run test-run -- <file>.forge-notebook.json` for preview-cell validation and spatial analysis
-- use `npm run render -- <file>.forge-notebook.json` or `npm run gif -- <file>.forge-notebook.json --list` to inspect the preview cell through the CLI
+- use `forgecad notebook view <file> preview` to inspect the notebook from the terminal
+- use `forgecad run <file>.forge-notebook.json` for preview-cell validation and spatial analysis
+- use `forgecad render <file>.forge-notebook.json` or `forgecad capture gif <file>.forge-notebook.json --list` to inspect the preview cell through the CLI
 - export to `.forge.js` when the exploratory phase is over and the structure is ready to stabilize
 
 ## Source Map
@@ -104,3 +104,7 @@ Modeling patterns, debugging tactics, copyable snippets.
 Test-run, notebook execution, export pipelines, debug flags.
 
 - `docs/permanent/CLI.md`
+
+### 9. Check API examples for more context
+
+- `examples/api/*`
