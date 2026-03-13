@@ -1,12 +1,10 @@
 import {
   exactRoute,
   facetedRoute,
-  holdoutRoute,
   partExample,
   type ExampleManifestEntry,
 } from './types';
 
-const PRODUCT_DEMO_HOLDOUT_TASK = 'tasks/280-example-gap-recovery-and-legacy-fence.md';
 const DEFAULT_EXACT_NOTE = 'This product demo now stays inside the defended exact-route subset.';
 
 const FIVE_FIGEN_FINGER_COMPONENTS = [
@@ -128,11 +126,12 @@ const PRODUCT_DEMO_FACETED_PARTS = [
   },
 ] as const;
 
-const PRODUCT_DEMO_HOLDOUT_PARTS = [
+const PRODUCT_DEMO_RECOVERED_FACETED_PARTS = [
   {
     path: 'examples/chess-set.forge.js',
-    blocker: 'The knight pieces still depend on shape-hull construction while the board and the rest of the set stay exact, so one exact or faceted contract would misrepresent this mixed-route scene.',
-    note: 'Keep the set runtime-covered until the knight body can move inside the exact subset or the scene is split by route intent.',
+    blocker: 'The knight pieces still depend on shape-hull construction outside the exact CadQuery/OCCT subset, so the four knight bodies intentionally stay on the faceted route.',
+    note: 'The board and every non-knight piece still stay exact; this contract scopes the route claim to the four knight bodies that still need faceted fallback.',
+    primaryShapes: ['White Knight 2', 'White Knight 7', 'Black Knight 2', 'Black Knight 7'],
   },
 ] as const;
 
@@ -146,7 +145,7 @@ export const PRODUCT_DEMO_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
   ...PRODUCT_DEMO_FACETED_PARTS.map((entry) =>
     partExample('product-demos', entry.path, facetedRoute(entry.blocker, entry.note)),
   ),
-  ...PRODUCT_DEMO_HOLDOUT_PARTS.map((entry) =>
-    partExample('product-demos', entry.path, holdoutRoute(entry.blocker, PRODUCT_DEMO_HOLDOUT_TASK, entry.note)),
+  ...PRODUCT_DEMO_RECOVERED_FACETED_PARTS.map((entry) =>
+    partExample('product-demos', entry.path, facetedRoute(entry.blocker, entry.note), undefined, entry.primaryShapes),
   ),
 ];

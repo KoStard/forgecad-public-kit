@@ -1,12 +1,9 @@
 import {
   exactRoute,
   facetedRoute,
-  holdoutRoute,
   partExample,
   type ExampleManifestEntry,
 } from './types';
-
-const API_HOLDOUT_TASK = 'tasks/280-example-gap-recovery-and-legacy-fence.md';
 
 const API_EXACT_PART_PATHS = [
   'examples/api/attachTo-basics.forge.js',
@@ -63,16 +60,18 @@ const API_FACETED_PARTS = [
   },
 ] as const;
 
-const API_HOLDOUT_PARTS = [
+const API_RECOVERED_FACETED_PARTS = [
   {
     path: 'examples/api/extrude-options.forge.js',
-    blocker: 'Twisted extrude replay remains outside the exact subset, but the same gallery also contains plain exact variants, so one exact/faceted part contract would lie about this mixed-route scene.',
-    note: 'Keep it runtime-covered until the twist gap closes or the gallery is split into route-honest examples.',
+    blocker: 'Twisted extrude replay still lacks exact compile intent, so the twist-driven variants intentionally stay on the faceted route.',
+    note: 'The plain, tapered, and centered variants still stay exact; this contract scopes the route claim to the two twist-owned solids in the gallery.',
+    primaryShapes: ['Twisted', 'Twist + Taper'],
   },
   {
     path: 'examples/api/gears-tier1.forge.js',
-    blocker: 'The spur and ring gears still need faceted fallback while the rack gear already stays exact, so this one gallery mixes incompatible route expectations.',
-    note: 'Keep the gear family runtime-covered until the helpers converge on one route or the scene is split by route intent.',
+    blocker: 'The spur and ring gear helpers still lower through segmented circle profile geometry outside the exact CadQuery/OCCT subset, so those gears intentionally stay on the faceted route.',
+    note: 'The rack gear already stays exact; this contract scopes the route claim to the three gear solids that still require faceted fallback.',
+    primaryShapes: ['Spur Pinion', 'Spur Gear', 'Ring Gear'],
   },
 ] as const;
 
@@ -94,8 +93,8 @@ export const API_AND_CORPUS_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
   ...API_FACETED_PARTS.map((entry) =>
     partExample('api-parts', entry.path, facetedRoute(entry.blocker, entry.note), undefined, entry.primaryShapes),
   ),
-  ...API_HOLDOUT_PARTS.map((entry) =>
-    partExample('api-parts', entry.path, holdoutRoute(entry.blocker, API_HOLDOUT_TASK, entry.note)),
+  ...API_RECOVERED_FACETED_PARTS.map((entry) =>
+    partExample('api-parts', entry.path, facetedRoute(entry.blocker, entry.note), undefined, entry.primaryShapes),
   ),
   partExample(
     'api-parts',
