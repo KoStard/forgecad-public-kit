@@ -79,6 +79,36 @@ That split lines up with the next migration waves:
   architecture-phase claim until follow-up work decides whether it remains part
   of the maintained example surface.
 
+## Non-Part Boundary
+
+The non-part families are inside the architecture-phase gate, but they do not
+all claim exact part-lowering parity.
+
+The manifest now makes that boundary explicit through four dedicated validation
+paths:
+
+- `assembly-runtime`
+  Executes the example, requires an assembly-style solved scene, and can assert
+  assembly-owned runtime surfaces such as grouped scene emission, `jointsView()`
+  controls, or collected `robotExport(...)` data.
+- `runtime-scene`
+  Executes the example as an active viewport/report/runtime scene without
+  treating it as evidence of exact part export. When the example is about a
+  specific runtime surface, the manifest can assert that surface directly
+  through counts such as BOM entries, cut planes, runtime joints, animations,
+  or grouped scene structure.
+- `sketch-svg`
+  Validates sketch-only examples through the sketch export path by rendering
+  their returned sketch payloads to SVG, rather than by asking the part gate to
+  pretend they are solids.
+- `notebook-preview`
+  Materializes and executes the notebook preview cell, so notebook examples are
+  judged through the same preview contract used by the CLI entrypoints.
+
+This keeps assemblies, runtime demos, sketch-only files, and notebooks visible
+to repo checks without falsely implying that every example is part of the exact
+part-lowering scorecard.
+
 ## Part Route Semantics
 
 Part entries can currently declare three intentional route states:
