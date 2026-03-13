@@ -20,6 +20,11 @@ import {
   cloneEdgeFinishQuadrant,
   type EdgeFeatureResolvedSelector,
 } from './edgeFeatureModel';
+import type {
+  SheetMetalModel,
+  SheetMetalOutput,
+} from './sheetMetalModel';
+import { cloneSheetMetalModel } from './sheetMetalModel';
 
 export type ProfileCompileTransformStep =
   | { kind: 'translate'; x: number; y: number }
@@ -162,6 +167,11 @@ export type ShapeCompilePlan =
       height: number;
       center: boolean;
       scaleTop?: [number, number];
+    }
+  | {
+      kind: 'sheetMetal';
+      model: SheetMetalModel;
+      output: SheetMetalOutput;
     }
   | {
       kind: 'shell';
@@ -578,6 +588,12 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         center: plan.center,
         scaleTop: plan.scaleTop ? [plan.scaleTop[0], plan.scaleTop[1]] : undefined,
       };
+    case 'sheetMetal':
+      return {
+        kind: 'sheetMetal',
+        model: cloneSheetMetalModel(plan.model)!,
+        output: plan.output,
+      };
     case 'shell':
       return {
         kind: 'shell',
@@ -777,6 +793,7 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan | null): Shape
     case 'cylinder':
     case 'sphere':
     case 'extrude':
+    case 'sheetMetal':
     case 'revolve':
     case 'loft':
     case 'sweep':
@@ -819,6 +836,7 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan | null): ShapeQue
       case 'cylinder':
       case 'sphere':
       case 'extrude':
+      case 'sheetMetal':
       case 'revolve':
       case 'loft':
       case 'sweep':
@@ -866,6 +884,7 @@ export function findShapeWorkplanePlacement(
     case 'cylinder':
     case 'sphere':
     case 'extrude':
+    case 'sheetMetal':
     case 'loft':
     case 'sweep':
     case 'boolean':

@@ -492,6 +492,7 @@ export function findShapeTopologyRewritePropagation(
     case 'cylinder':
     case 'sphere':
     case 'extrude':
+    case 'sheetMetal':
     case 'revolve':
     case 'loft':
     case 'sweep':
@@ -540,6 +541,7 @@ export function collectShapeTopologyRewritePropagations(
       case 'cylinder':
       case 'sphere':
       case 'extrude':
+      case 'sheetMetal':
       case 'revolve':
       case 'loft':
       case 'sweep':

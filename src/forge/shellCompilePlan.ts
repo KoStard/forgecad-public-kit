@@ -201,6 +201,7 @@ function lowerBaseShellPlanToConcretePlan(
         reason: 'Shape.shell() v1 does not support edge-finished bodies yet.',
       };
     case 'sphere':
+    case 'sheetMetal':
     case 'hole':
     case 'cut':
     case 'revolve':

@@ -118,6 +118,7 @@ import {
   runWithForgeQuality,
   type ForgeQualityPreset,
 } from './quality';
+import { sheetMetal, SheetMetalPart } from './sheetMetal';
 
 export interface SceneObject {
   id: string;
@@ -1115,6 +1116,8 @@ function executeFile(
       spline3d,
       loft,
       sweep,
+      sheetMetal,
+      SheetMetalPart,
       param,
       Shape,
       Sketch,

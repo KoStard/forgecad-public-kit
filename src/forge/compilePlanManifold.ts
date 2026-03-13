@@ -10,6 +10,7 @@ import {
   lowerHoleShapeCompilePlanToConcretePlan,
 } from './holeCutCompilePlan';
 import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
+import { lowerSheetMetalBasePlan } from './sheetMetalModel';
 import { wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './sketch/loftSweepLowering';
 import { Transform } from './transform';
@@ -278,6 +279,8 @@ export function lowerShapeCompilePlanToManifold(
         plan.scaleTop as [number, number] | undefined,
         plan.center,
       );
+    case 'sheetMetal':
+      return lowerShapeCompilePlanToManifold(lowerSheetMetalBasePlan(plan.model, plan.output), wasm);
     case 'shell': {
       const lowered = lowerShellShapeCompilePlanToConcretePlan(plan);
       if (!lowered.ok) throw new Error(lowered.reason);

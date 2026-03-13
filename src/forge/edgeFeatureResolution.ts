@@ -305,6 +305,7 @@ function searchOwnerMatch(
     case 'cylinder':
     case 'sphere':
     case 'extrude':
+    case 'sheetMetal':
     case 'revolve':
     case 'loft':
     case 'sweep':
@@ -422,6 +423,7 @@ function resolvePropagatedEdgeQueryAtOwnerBase(
     || ownerBase.kind === 'cylinder'
     || ownerBase.kind === 'sphere'
     || ownerBase.kind === 'extrude'
+    || ownerBase.kind === 'sheetMetal'
     || ownerBase.kind === 'revolve'
     || ownerBase.kind === 'loft'
     || ownerBase.kind === 'sweep'
@@ -699,6 +701,7 @@ function resolveSelectionFromOwnerBase(
     case 'boolean':
     case 'cylinder':
     case 'sphere':
+    case 'sheetMetal':
     case 'revolve':
     case 'loft':
     case 'sweep':
@@ -753,6 +756,7 @@ function resolveEdgeChainAtOwnerBase(
     || ownerBase.kind === 'cylinder'
     || ownerBase.kind === 'sphere'
     || ownerBase.kind === 'extrude'
+    || ownerBase.kind === 'sheetMetal'
     || ownerBase.kind === 'revolve'
     || ownerBase.kind === 'loft'
     || ownerBase.kind === 'sweep'

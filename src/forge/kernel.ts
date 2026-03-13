@@ -95,6 +95,7 @@ export type GeometrySource =
   | 'extrude'
   | 'revolve'
   | 'boolean'
+  | 'sheet-metal'
   | 'shell'
   | 'fillet'
   | 'chamfer'

@@ -63,6 +63,13 @@ type PlacementReferenceInput = {
   surfaces?: Record<string, { center: [number, number, number]; normal: [number, number, number] }>;
   objects?: Record<string, Shape | TrackedShape | ShapeGroup | { min: [number, number, number]; max: [number, number, number] }>;
 };
+type FaceDescendantMetadata = {
+  kind: 'single' | 'face-set';
+  semantic: 'face' | 'region' | 'set';
+  memberCount: number;
+  memberNames: string[];
+  coplanar: boolean;
+};
 type FaceRef = {
   name: string;
   normal: [number, number, number];
@@ -70,6 +77,7 @@ type FaceRef = {
   planar?: boolean;
   uAxis?: [number, number, number];
   vAxis?: [number, number, number];
+  descendant?: FaceDescendantMetadata;
 };
 /** Import a 2D sketch from another file. Supports ".sketch.js" and ".svg". */
 declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch;
@@ -134,6 +142,7 @@ type GeometrySource =
   | 'extrude'
   | 'revolve'
   | 'boolean'
+  | 'sheet-metal'
   | 'hull'
   | 'level-set'
   | 'loft'
@@ -149,6 +158,25 @@ type GeometryInfo = {
 };
 type RotateTarget3D = AnchorTarget3D | [number, number, number];
 type RotateAroundToOptions = { mode?: 'plane' | 'line' };
+type SheetMetalEdge = 'top' | 'right' | 'bottom' | 'left';
+type SheetMetalPlanarRegionName = 'panel' | 'flange-top' | 'flange-right' | 'flange-bottom' | 'flange-left';
+type SheetMetalRegionName = SheetMetalPlanarRegionName | 'bend-top' | 'bend-right' | 'bend-bottom' | 'bend-left';
+
+declare class SheetMetalPart {
+  flange(edge: SheetMetalEdge, options: { length: number; angleDeg?: number }): SheetMetalPart;
+  cutout(region: SheetMetalPlanarRegionName, sketch: Sketch, options?: { u?: number; v?: number; selfAnchor?: Anchor }): SheetMetalPart;
+  regionNames(): SheetMetalRegionName[];
+  folded(): Shape;
+  flatPattern(): Shape;
+}
+
+declare function sheetMetal(options: {
+  panel: { width: number; height: number };
+  thickness: number;
+  bendRadius: number;
+  bendAllowance: { kFactor: number };
+  cornerRelief?: { kind?: 'rect'; size: number };
+}): SheetMetalPart;
 
 declare class Shape {
   clone(): Shape;

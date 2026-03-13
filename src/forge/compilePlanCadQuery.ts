@@ -5,6 +5,7 @@ import {
   lowerHoleShapeCompilePlanToConcretePlan,
 } from './holeCutCompilePlan';
 import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
+import { lowerSheetMetalBasePlan } from './sheetMetalModel';
 import {
   compilerDiagnostic,
   compilerFailure,
@@ -64,6 +65,15 @@ function unsupportedHoleCutDiagnostic(kind: 'hole' | 'cut', path: string, reason
     `cadquery-occt-unsupported-${kind}`,
     path,
     `CadQuery/OCCT lowering cannot replay Forge ${kind} intent at ${path}: ${reason}`,
+  );
+}
+
+function unsupportedSheetMetalDiagnostic(path: string, reason: string) {
+  return compilerDiagnostic(
+    'cadquery-occt',
+    'cadquery-occt-unsupported-sheet-metal',
+    path,
+    `CadQuery/OCCT lowering cannot replay Forge sheet-metal intent at ${path}: ${reason}`,
   );
 }
 
@@ -214,6 +224,16 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
         center: plan.center,
         scaleTop: plan.scaleTop ? [plan.scaleTop[0], plan.scaleTop[1]] : undefined,
       }, profile.diagnostics);
+    }
+    case 'sheetMetal': {
+      try {
+        return lowerShapeCompilePlanToCadQueryResultAtPath(lowerSheetMetalBasePlan(plan.model, plan.output), path);
+      } catch (error) {
+        return compilerFailure(unsupportedSheetMetalDiagnostic(
+          path,
+          error instanceof Error ? error.message : String(error),
+        ));
+      }
     }
     case 'shell': {
       const lowered = lowerShellShapeCompilePlanToConcretePlan(plan);

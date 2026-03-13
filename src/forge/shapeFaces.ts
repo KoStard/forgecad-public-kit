@@ -17,6 +17,7 @@ import {
   type TopologyRewriteFaceDescendantContract,
 } from './queryModel';
 import type { FaceDescendantMetadata, FaceDescendantSemantic } from './descendantResolution';
+import { describeSheetMetalFaces } from './sheetMetalModel';
 import { Transform, normalizeAxis, type Mat4, type Vec3 } from './transform';
 import type { SketchPlacementModel } from './sketch/workplaneModel';
 import type { FaceRef } from './sketch/topology';
@@ -941,6 +942,26 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       return buildCylinderFaceTable(plan, owner);
     case 'extrude':
       return buildExtrudeFaceTable(plan, owner);
+    case 'sheetMetal': {
+      const table = emptyFaceTable();
+      for (const descriptor of describeSheetMetalFaces(plan.model, plan.output)) {
+        registerFace(table, {
+          name: descriptor.name,
+          normal: cloneVec3(descriptor.normal),
+          center: cloneVec3(descriptor.center),
+          planar: descriptor.planar,
+          uAxis: descriptor.uAxis ? cloneVec3(descriptor.uAxis) : undefined,
+          vAxis: descriptor.vAxis ? cloneVec3(descriptor.vAxis) : undefined,
+          query: createTrackedFaceQuery(descriptor.name, owner),
+          descendant: createFaceDescendantMetadata(
+            descriptor.semantic,
+            descriptor.memberNames,
+            descriptor.coplanar,
+          ),
+        });
+      }
+      return table;
+    }
     case 'shell': {
       // Rewrite results must inherit the base shape's existing defended query
       // table before layering new propagation on top. Rebasing the base table
