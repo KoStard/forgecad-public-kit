@@ -1,6 +1,6 @@
 # Backend Compiler Program
 
-Date: 2026-03-12
+Date: 2026-03-13
 
 This folder is the active temporary home for the Forge multi-backend compiler program.
 
@@ -11,8 +11,9 @@ Read in this order:
 3. `mlp-readiness-review.md` - current MLP verdict, proof surface, and remaining blockers
 4. `post-mlp-example-phase.md` - the example architecture gate, manifest split, and post-MLP example boundary
 5. `example-gap-recovery.md` - task 280 recovery notes, remaining temporary fences, and route-truthfulness closeout
-6. `mission-tracker.md` - living implementation tracker
-7. `task-graph.md` - multi-agent task breakdown, dependencies, and execution plan
+6. `architecture-phase-entry-review.md` - task 290 verdict, active example-surface summary, and the next architectural bottleneck
+7. `mission-tracker.md` - living implementation tracker
+8. `task-graph.md` - multi-agent task breakdown, dependencies, and execution plan
 
 The landed MLP closeout package is:
 
@@ -22,16 +23,17 @@ The landed MLP closeout package is:
 - a reviewable checkpoint summary in `mlp-readiness-review.md`
 - permanent compiler/export docs that now spell out the defended subset and the remaining gaps directly
 
-Tasks 160, 170, 180, 190, 195, 200, 210, 220, and 230 are now landed on top of that base.
+Tasks 160, 170, 180, 190, 195, 200, 210, 220, 230, 240, 250, 260, 270, 280, and 290 are now landed on top of that base.
 
 The MLP closeout task is:
 
 - [tasks/230-mlp-corpus-and-doc-closeout.md](../../../../../../tasks/230-mlp-corpus-and-doc-closeout.md)
 
-The next program move is the larger checkpoint after MLP, not another truthfulness lane. The current blocker summary lives in:
+The repo has now entered the new architecture phase for the maintained example surface. The current blocker summary and exact meaning of that verdict live in:
 
 - `mlp-readiness-review.md`
 - `example-gap-recovery.md`
+- `architecture-phase-entry-review.md`
 - `mission-tracker.md`
 - `task-graph.md`
 

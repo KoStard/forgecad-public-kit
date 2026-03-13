@@ -170,3 +170,7 @@ temporary experimental fences:
 
 - `examples/sandbox.forge.js`
 - `examples/test-colors.forge.js`
+
+Task 290 closes this gate review in:
+
+- `architecture-phase-entry-review.md`

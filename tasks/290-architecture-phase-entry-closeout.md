@@ -56,3 +56,4 @@ Final closeout lane after the post-MLP example migration wave.
 
 ## Status and log
 - 2026-03-12: Created as the explicit phase-entry review after the post-MLP example migration wave.
+- 2026-03-13: Added `architecture-phase-entry-review.md`, verified `npm run test:examples`, `npm test`, and `npm run build` on the same branch state, declared the repo inside the new architecture phase for the maintained example surface, and pointed the next core wave at task 300.
