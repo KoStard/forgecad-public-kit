@@ -164,20 +164,22 @@ Current progress:
 - placement and exact-export invariants now check that owner lineage survives ordinary shell-plus-cut-plus-boolean style part workflows
 - topology-changing compile nodes now also carry an explicit backend-neutral `queryPropagation` contract for preserved/created query meaning instead of leaving post-rewrite semantics implicit
 - that shared propagation contract now models propagated face/edge queries, feature-created query slots, and explicit ambiguity/unsupported diagnostics on rewrite-producing results
-- trim/split-by-plane now use that contract to expose the first defended created-face slice (`plane-cap`), while hole/cut host-face splits and fillet/chamfer edge merges are recorded explicitly as ambiguous preserved-query outcomes instead of silent fallbacks
-- boolean rewrites now consume that same contract: supported unions preserve operand canonical-face/query lineage when the source owners stay distinct, while duplicate-owner merges plus later difference/intersection descendants are recorded explicitly as ambiguous propagated queries instead of a generic "pending" bucket
-- shell, hole, and cut now layer defended created-face slots on top of that propagation kernel instead of leaving all post-rewrite face meaning as placeholders
-- compile-covered `Shape.face(name)` resolution now reads from the compile graph, so supported shell inner walls, blind-hole floors, and cut-created walls can produce real `FaceRef` values after topology rewrites
+- trim/split-by-plane, shell, hole, cut, boolean, and edge-finish rewrites now also declare descendant contracts on top of that propagation kernel
+- the shared descendant-resolution layer turns those lineage inputs into defended singles, face regions/sets, edge chains, or explicit unsupported results instead of making each caller reverse-engineer rewrite heuristics
+- trim/split-by-plane now expose their plane-cap face plus descendant-region contracts for preserved source surfaces, while hole/cut host-face splits and supported boolean difference/intersection descendants stay reviewable as defended regions instead of disappearing behind one generic ambiguity bucket
+- boolean rewrites now consume that same contract: supported unions still preserve operand canonical-face/query lineage when the source owners stay distinct, and coplanar/multi-member descendants can now surface as defended face sets instead of only masked name conflicts
+- shell, hole, and cut now layer defended created-face slots plus defended descendant regions on top of that propagation kernel instead of leaving all post-rewrite face meaning as placeholders
+- compile-covered `Shape.face(name)` resolution now reads from the compile graph plus the descendant layer, so supported shell inner walls, blind-hole floors, cut-created walls, split host faces, and defended boolean face sets can produce real `FaceRef` values after topology rewrites
 - non-canonical `onFace(shape, 'inner-side-right', ...)` placement now routes through that same compiler-owned face resolver, while direct `FaceRef` placements preserve created-face/propagated-face provenance instead of collapsing everything back to anonymous refs
-- `src/forge/kernel.ts` and the compiler inspection surface now expose collected topology-rewrite propagation contracts directly, and the placement/compiler invariants assert that those contracts stay inspectable and deterministic through later transforms
-- `forgecad check query-propagation` now snapshots that propagation surface directly, so supported plane-cap created faces, defended merged-edge cases, and explicit unsupported rewrite boundaries stay reviewable without wading through the full compiler-scene baseline
+- `src/forge/kernel.ts` and the compiler inspection surface now expose collected topology-rewrite propagation plus descendant contracts directly, and the placement/compiler invariants assert that those contracts stay inspectable and deterministic through later transforms
+- `forgecad check query-propagation` now snapshots both the propagation surface and the descendant contracts directly, so defended plane-cap faces, split-face regions, face sets, merged-edge chains, and explicit unsupported rewrite boundaries stay reviewable without wading through the full compiler-scene baseline
 
 Still missing:
 
-- durable face/edge identity across topology-changing operations
-- booleans/patterns and projection-driven descendants still need their own created-face/query layers on top of the propagation kernel
-- shared edge-query selectors exist for tracked topology, but topology-changing features still do not produce durable compiler-owned edge identity after shell/boolean/fillet-style edits
-- stable downstream face/edge references beyond today's tracked/canonical face foundations still need the follow-on work in tasks 180, 190, and 195
+- universal durable face/edge identity across topology-changing operations
+- mesh/SDF rewrite families still need their own explicit descendant contracts instead of borrowed BREP-style assumptions
+- shared edge-query selectors exist for tracked topology, but topology-changing features still do not produce new single-edge ownership for most rewritten/created edges beyond today's defended preserved-edge and edge-chain subset
+- stable downstream face/edge references beyond today's defended single/region/set/chain subset still need the follow-on work in tasks 180, 190, and 195
 
 ### Phase 3: Mainstream Feature Families
 
@@ -219,10 +221,10 @@ Current limits:
 
 - `shell()` v1 only covers compile-covered `box()`, `cylinder()`, and straight `extrude()` bases with optional `top` / `bottom` openings, while defended named created faces currently cover the exact profile families Forge can model directly (`rect`, `roundedRect`, `circle`)
 - `shape.hole()` still only covers circular holes, and `shape.cutout()` still only covers sketches already placed with `onFace(...)`
-- `filletEdge()` / `chamferEdge()` v1 cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies plus preserved propagated sibling edges through supported edge-finish and boolean-union chains, but the selected rewritten edge itself still becomes an explicit merged-edge ambiguity
+- `filletEdge()` / `chamferEdge()` v1 cover tracked vertical edges on compile-covered `box()` and `rectangle(...).extrude(...)` bodies plus preserved propagated sibling edges through supported edge-finish and boolean-union chains; the selected rewritten edge now resolves as an explicit descendant edge-chain for inspection/debug, but not yet as a new single finishable edge target
 - drafted cuts, two-sided extents, combined counterbore+countersink heads, threaded holes, and broader durable identity beyond today's defended shell/hole/cut created-face subset are still missing
-- `upToFace` currently requires a planar termination face parallel to the feature direction, and reusing that stop plane through later split results should use a saved `FaceRef` instead of re-querying the rewritten face name
-- boolean/pattern propagation currently defends owner-scoped canonical face lineage through supported unions, but post-merge durable face identity and post-difference/intersection face targets are still explicit ambiguity cases rather than one defended face name
+- `upToFace` currently requires a planar termination face parallel to the feature direction, but defended split termination faces can now stay queryable as descendant regions where Forge still owns the source plane
+- boolean/pattern propagation currently defends owner-scoped canonical face lineage through supported unions, and the descendant layer can now expose some post-merge/post-difference results as face sets/regions, but broader durable per-face ownership after arbitrary merged topology changes is still incomplete
 - repeated-feature ownership currently tracks repeated bodies and mirrored descendants, not durable per-face identity after merged pattern topology changes
 - shell, hole/cut, tracked-edge finishing, and repeated-feature workflows now preserve parent-body ownership lineage, but stable downstream face/edge ownership after topology-changing edits is still not solved, which is why richer boolean-difference/intersection targets and broader fillet/chamfer workflows remain harder next layers
 - projection replay still rejects boolean difference/intersection sources, trim/fillet/chamfer silhouette changes, and non-parallel projection bases with explicit compiler diagnostics instead of silently pretending those paths are exact-safe

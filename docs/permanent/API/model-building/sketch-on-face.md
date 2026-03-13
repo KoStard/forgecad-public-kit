@@ -88,8 +88,9 @@ The sketch's local `+Z` becomes the face normal, so `extrude(positive)` goes out
 
 - This is a planar face-placement feature, not arbitrary curved-surface projection.
 - Tracked curved faces like `cylinder(...).face('side')` are rejected because they do not have a planar sketch frame.
-- Supported created-face names on compiler-owned feature results are intentionally narrow. If a named host face is rewritten ambiguously, `shape.face(name)` rejects it explicitly instead of guessing.
-- Supported boolean-preserved names are also intentionally narrow. If multiple propagated descendants still answer to the same canonical name after a union, named placement is rejected and scripts should use an explicit `FaceRef` / face query from the source body instead.
+- Supported created-face names on compiler-owned feature results are intentionally narrow, but defended split descendants now stay visible as semantic regions where Forge can keep one stable source surface.
+- Hole/cut host faces, supported `upToFace` termination faces, and defended boolean-difference / boolean-intersection descendants can now stay queryable as face regions instead of collapsing straight to "missing face".
+- Coplanar boolean face sets now stay placeable through `onFace(shape, name, ...)` when Forge can defend one shared planar frame; non-coplanar sets stay explicit and reject planar placement honestly.
 - The placed sketch still supports normal 2D operations like `translate`, `rotate`, `scale`, and sketch booleans before extrusion.
 - If multiple sketches share the same face placement, their 2D booleans preserve that shared placement.
 - If booleans mix sketches with different 3D placements, the result drops back to an unplaced sketch.

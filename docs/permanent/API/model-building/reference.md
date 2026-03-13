@@ -820,14 +820,14 @@ Supported subset:
   - `floor` on blind holes
   - `counterbore-wall` and `counterbore-floor` on counterbored holes
   - `countersink-wall` on countersunk holes
-- preserved non-host faces stay queryable where Forge can defend them, while rewritten host/exit faces are rejected explicitly
+- preserved non-host faces stay queryable where Forge can defend them
+- rewritten host/exit faces now stay queryable as defended descendant regions when Forge can keep one stable source surface/frame
 - reusing the same `upToFace` stop plane through later rewrites is supported when you keep a `FaceRef` from the earlier face (`const exitFace = block.face('bottom')`)
 
 Not supported yet:
 
 - non-planar or non-parallel `upToFace` termination faces
 - drafted/tapered main holes, threads, or combined counterbore+countersink heads
-- re-querying a split `upToFace` termination face by name on the rewritten result instead of using a saved `FaceRef`
 - segmented polygonal hole cutters
 - runtime-only target bodies without compiler intent
 
@@ -858,14 +858,15 @@ Supported subset:
   - `floor` on blind cuts
   - `wall` on circular cuts
   - `wall-bottom`, `wall-right`, `wall-top`, `wall-left` on rectangular and rounded-rectangle cuts
-- preserved non-host faces stay queryable where Forge can defend them, while rewritten host/exit faces are rejected explicitly
+- preserved non-host faces stay queryable where Forge can defend them
+- rewritten host/exit faces now stay queryable as defended descendant regions when Forge can keep one stable source surface/frame
 - reusing the same `upToFace` stop plane through later rewrites is supported when you keep a `FaceRef` from the earlier face
 
 Not supported yet:
 
 - free-floating sketches without face/workplane provenance
 - non-planar or non-parallel `upToFace` termination faces
-- draft/taper angles, two-sided extents, or re-querying a split `upToFace` termination face by name on the rewritten result
+- draft/taper angles or two-sided extents
 - named created-wall support for arbitrary boolean/offset/projected cut profiles
 
 ### Warping

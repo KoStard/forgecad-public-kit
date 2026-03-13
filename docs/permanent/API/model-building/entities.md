@@ -230,7 +230,7 @@ Supported today:
 - preserved propagated vertical-edge queries after those supported edge-finish rewrites when a later supported boolean union keeps one defended edge lineage
 
 Still out of subset today:
-- the selected edge after an earlier `filletEdge(...)` / `chamferEdge(...)` rewrite, because that edge is recorded as a merged descendant set
+- the selected edge after an earlier `filletEdge(...)` / `chamferEdge(...)` rewrite as a new single finish target, because Forge now records that path as an explicit descendant edge-chain rather than pretending it stayed one edge
 - edge descendants after shell, hole/cut, trim, boolean difference/intersection, or boolean unions that did not already record one supported propagated edge lineage for the selection
 - generic sketch extrudes, tapered extrudes, and arbitrary feature-created edges
 

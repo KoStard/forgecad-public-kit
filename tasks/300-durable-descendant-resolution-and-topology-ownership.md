@@ -196,3 +196,4 @@ Once this task lands, the likely safe follow-on wave is:
 
 ## Status and log
 - 2026-03-13: Created as the post-290 core lane for durable topology/reference ownership and developer-friendly descendant resolution.
+- 2026-03-13: Completed. Added a shared descendant-resolution domain and propagation-backed descendant contracts, taught `shape.face(...)` to keep defended split regions and coplanar face sets visible through hole/cut/boolean/trim flows, taught edge finishing to resolve merged rewritten selections as explicit descendant edge chains, exposed descendant contracts in compiler/query-propagation review surfaces, expanded placement/API/compiler/query-propagation regressions to cover single/region/set/chain outcomes, and synced the permanent docs to the defended landed subset.
