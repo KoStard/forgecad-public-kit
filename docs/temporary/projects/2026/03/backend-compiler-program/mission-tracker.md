@@ -1,6 +1,6 @@
 # Backend Compiler Foundation
 
-Date: 2026-03-12
+Date: 2026-03-13
 
 ## Mission Goal
 
@@ -19,6 +19,8 @@ Program docs:
 
 - `explainer.md`
 - `capabilities.md`
+- `mlp-readiness-review.md`
+- `architecture-phase-entry-review.md`
 - `task-graph.md`
 
 ## Active Checkpoint
@@ -69,6 +71,21 @@ Deepest completed prerequisite:
 - `mlp-readiness-review.md` is now the one-file summary for what MLP proves and what it does not.
 - `examples/compiler-corpus/README.md` plus the compiler/query-propagation/BREP checks make the current MLP state reviewable from the repo.
 - The next checkpoint is still the larger mainstream-part coverage target from this tracker, not "MLP plus optimistic wording".
+
+## Architecture Phase Entry Status
+
+- Task 290 is now landed for the maintained example surface.
+- `architecture-phase-entry-review.md` is the one-file verdict for whether the
+  repo has entered the new architecture phase.
+- The answer is yes for the maintained example surface:
+  - 96 example artifacts are manifest-covered
+  - 94 active artifacts are inside the architecture-phase claim
+  - 2 temporary experimental fences still run through the gate but stay outside
+    the active claim
+  - part routes are now `exact:63`, `faceted:10`, `holdout:0`
+- This does not mean the larger mainstream-part checkpoint is done.
+- The next deepest blocker is still durable descendant resolution and topology
+  ownership, which is why task 300 is the next core lane.
 
 ## Where We Succeed Or Fail
 
@@ -297,7 +314,12 @@ After the first implementation slice for this mission, the minimum acceptable st
 | 11. Push exact export fully behind the CadQuery/OCCT lowerer | In progress | Export now consumes an explicit `cadquery-occt` compiler target, but the target still needs much broader feature coverage. |
 | 12. Add advanced hybrid-only feature families | Deferred | Sheet metal stays deferred until the active checkpoint is done. |
 
-## Post-MLP Next Wave
+## Next Wave After Phase Entry
+
+The repo has now entered the new architecture phase for the maintained example
+surface, but that only means the example surface is fully checked and truthful.
+
+It does not mean the full checkpoint is done.
 
 The next core lane is now explicit:
 
@@ -332,8 +354,12 @@ Still a bigger leap than the current compiler wave:
 ## Current Validation
 
 - `npm test` now runs the current assertion-based invariant suite for compiler/export/runtime/API behavior.
+- `npm run test:examples` now runs the full example architecture gate across the
+  maintained example surface plus the temporary experimental fences.
 - `forgecad check suite` is the CLI entrypoint for the same invariant suite.
 - `forgecad check compiler` snapshots canonical compiler cases and fails if runtime geometry drifts away from compiler-lowered Manifold output.
+- `architecture-phase-entry-review.md` is now the explicit branch-state review
+  artifact for the example-phase closeout.
 - The snapshot baseline now includes compile plans, CadQuery/OCCT lowerings, export routing decisions, and quantized Manifold mesh/polygon digests.
 - The compiler check also asserts that exact/faceted export manifests stay consistent with the per-object compiler reports, not just with the saved JSON baseline.
 - Scene-level route decisions are now part of the compiler inspection surface, so route drift becomes a reviewable regression instead of a hidden internal policy change.
@@ -358,6 +384,9 @@ The current unit-style test strategy is:
 
 ## Current Risks And Issues
 
+- The active example gate is now green, but 10 part examples still depend on
+  intentional `faceted` contracts because hull, smoothing, twist, thread, gear,
+  and sampled-profile helpers remain outside today's defended exact subset.
 - The compile graph still does not fully cover important operation families including deformation ops (`warp`, `smoothOut`, `refine*`), `levelSet`, patterned/drafted/two-sided hole-cut variants, broader projection/feature-pattern workflows, and durable downstream fillet/chamfer ownership beyond today's defended propagated-edge subset. Those unsupported shapes still lose compile intent and fall back to mesh-only behavior.
 - The new sketch workplane metadata plus shared face/edge query lineage are a meaningful foundation step, and the topology-rewrite propagation kernel is now in place, but that is still not the full answer yet. Forge now owns parent-body identity, tracked-topology query selectors, and explicit rewrite-propagation diagnostics for compile-covered feature chains, but it still does not own durable face/edge identity through topology-changing edits.
 - The compiler now preserves `onFace()` workplane placement, parent-body ownership, a broader tracked-edge finishing slice, a topology-rewrite propagation contract, and a broader but still defended projection replay path through `extrude()` / `revolve()`, booleans, shell, hole/cut, split/trim, downstream transforms, and repeated-result owners for mirrored/helper-patterned descendants. The remaining hard part is feature-family-specific query support once features start depending on shell-created faces, broader projection targets, merged patterned children, and durable fillet/chamfer-owned topology.

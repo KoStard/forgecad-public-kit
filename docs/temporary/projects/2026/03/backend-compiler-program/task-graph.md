@@ -1,6 +1,6 @@
 # Task Graph
 
-Date: 2026-03-12
+Date: 2026-03-13
 
 This is the multi-agent execution plan for the backend compiler program.
 
@@ -32,17 +32,27 @@ This is the landed base that task 230 closed out instead of inventing new proven
 
 ## Current Wave
 
-The topology-rewrite backbone and the first post-160 parallel wave are now landed.
+The topology-rewrite wave, the MLP closeout, and the full post-MLP example
+phase are now landed.
 
-That landed second wave was:
+The landed post-160 feature wave was:
 
 - [tasks/200-richer-hole-and-cut-variants.md](../../../../../../tasks/200-richer-hole-and-cut-variants.md)
 - [tasks/210-projection-and-sketch-on-face-expansion.md](../../../../../../tasks/210-projection-and-sketch-on-face-expansion.md)
 - [tasks/220-broader-fillet-and-chamfer.md](../../../../../../tasks/220-broader-fillet-and-chamfer.md)
 
-The closeout lane that finished this wave was:
+The closeout lane for that wave was:
 
 - [tasks/230-mlp-corpus-and-doc-closeout.md](../../../../../../tasks/230-mlp-corpus-and-doc-closeout.md)
+
+The landed example-phase wave after MLP was:
+
+- [tasks/240-example-architecture-gate-and-manifest.md](../../../../../../tasks/240-example-architecture-gate-and-manifest.md)
+- [tasks/250-api-and-corpus-example-migration.md](../../../../../../tasks/250-api-and-corpus-example-migration.md)
+- [tasks/260-product-demo-example-migration.md](../../../../../../tasks/260-product-demo-example-migration.md)
+- [tasks/270-assembly-runtime-notebook-example-boundary.md](../../../../../../tasks/270-assembly-runtime-notebook-example-boundary.md)
+- [tasks/280-example-gap-recovery-and-legacy-fence.md](../../../../../../tasks/280-example-gap-recovery-and-legacy-fence.md)
+- [tasks/290-architecture-phase-entry-closeout.md](../../../../../../tasks/290-architecture-phase-entry-closeout.md)
 
 ## Dependency Graph
 
@@ -65,6 +75,13 @@ graph TD
   T210["210 Projection + Sketch-on-Face Expansion"]
   T220["220 Broader Fillet / Chamfer"]
   T230["230 MLP Corpus + Doc Closeout"]
+  T240["240 Example Architecture Gate"]
+  T250["250 API + Corpus Example Migration"]
+  T260["260 Product Demo Example Migration"]
+  T270["270 Assembly / Runtime / Notebook Boundary"]
+  T280["280 Example Gap Recovery"]
+  T290["290 Architecture Phase Entry Closeout"]
+  T300["300 Durable Descendant Resolution"]
 
   T100 --> T105
   T100 --> T110
@@ -95,24 +112,48 @@ graph TD
   T200 --> T230
   T210 --> T230
   T220 --> T230
+  T230 --> T240
+  T240 --> T250
+  T240 --> T260
+  T240 --> T270
+  T240 --> T280
+  T240 --> T290
+  T250 --> T280
+  T250 --> T290
+  T260 --> T280
+  T260 --> T290
+  T270 --> T280
+  T270 --> T290
+  T280 --> T290
+  T290 --> T300
 ```
 
 ## Program State
 
-- Landed: 100, 105, 110, 120, 125, 130, 140, 150, 160, 170, 180, 190, 195, 200, 210, 220, and 230.
-- Landed second wave: 200, 210, 220.
-- Landed closeout lane: 230.
+- Landed: 100, 105, 110, 120, 125, 130, 140, 150, 160, 170, 180, 190, 195, 200, 210, 220, 230, 240, 250, 260, 270, 280, and 290.
+- Landed post-160 feature wave: 200, 210, 220, with 230 as the MLP closeout lane.
+- Landed post-MLP example phase: 240, 250, 260, 270, 280, and 290.
+- Architecture-phase verdict: yes for the maintained example surface; the deeper checkpoint is still blocked by task 300.
 
 ## Next Up
 
-1. Scope the next checkpoint around the blockers the MLP closeout made explicit:
-   - durable post-topology-change face/edge identity
-   - broader hole/cut, projection, and fillet/chamfer coverage beyond today's defended subset
-   - enough ordinary-part coverage to satisfy the full checkpoint exit criteria without caveats
+1. Start [tasks/300-durable-descendant-resolution-and-topology-ownership.md](../../../../../../tasks/300-durable-descendant-resolution-and-topology-ownership.md).
+   - It is the deepest remaining blocker after the phase-entry review.
+   - It turns lineage and rewrite propagation into defended descendant surfaces, edge chains, and downstream-owned topology.
+2. Keep the next feature-breadth wave behind task 300 instead of parallelizing too early.
+3. Use the follow-on wave only after the shared descendant-resolution contract is real:
+   - task 310
+   - task 320
+   - task 330
+   - task 340
+   - task 350
+   - task 370
+   - task 380
+4. Start task 360 after task 310, and keep task 390 as the cleanup/retirement lane.
 
 ## Planned Next Wave
 
-The next planned wave after the MLP closeout and example-phase work is:
+The next planned wave after the phase-entry closeout is:
 
 ```mermaid
 graph TD
@@ -204,17 +245,28 @@ Task 390:
 
 ## Parallel Starts
 
-These three were intentionally parallel and are now landed:
+These intentionally parallel sets are now landed:
 
 - task 200
 - task 210
 - task 220
+- task 250
+- task 260
+- task 270
 
-They are separated by logic:
+They were separated by logic:
 
 - task 200 stays in richer hole/cut family behavior
 - task 210 stays in projection/sketch-on-face expansion
 - task 220 stays in broader finishing on defended propagated edges
+- task 250 stayed in API parts plus compiler-corpus migration
+- task 260 stayed in product/demo part migration
+- task 270 stayed in the non-part example boundary
+
+The example phase then closed through:
+
+- task 280
+- task 290
 
 ## Merge Strategy
 
@@ -243,11 +295,14 @@ Core integrator lane:
 
 Next planning lane:
 
-- scope the post-MLP checkpoint from the blocker list in `mlp-readiness-review.md`
+- keep task 300 narrow using the blocker list from `mlp-readiness-review.md`
+  and `architecture-phase-entry-review.md`
 
 Quality support:
 
-- Tasks 195 and 230 are both landed, and the active truthfulness surface is now the corpus plus MLP review package rather than a still-open closeout lane
+- Tasks 195, 230, 240, 280, and 290 are landed, and the active truthfulness
+  surface is now the compiler corpus plus the checked example gate plus the
+  phase-entry review package
 
 ## File-Ownership Guidance
 
