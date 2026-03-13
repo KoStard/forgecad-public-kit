@@ -238,10 +238,30 @@ declare class Shape {
       diameter: number;
       depth?: number;
       upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+      extent?: {
+        forward: {
+          depth?: number;
+          upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+          through?: boolean;
+        };
+        reverse?: {
+          depth?: number;
+          upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+          through?: boolean;
+        };
+      };
       u?: number;
       v?: number;
       counterbore?: { diameter: number; depth: number };
       countersink?: { diameter: number; angleDeg?: number };
+      thread?: {
+        designation?: string;
+        pitch?: number;
+        class?: string;
+        handedness?: 'right' | 'left';
+        depth?: number;
+        modeled?: boolean;
+      };
     },
   ): Shape;
   cutout(
@@ -249,6 +269,19 @@ declare class Shape {
     opts?: {
       depth?: number;
       upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+      extent?: {
+        forward: {
+          depth?: number;
+          upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+          through?: boolean;
+        };
+        reverse?: {
+          depth?: number;
+          upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+          through?: boolean;
+        };
+      };
+      taperScale?: number | [number, number];
     },
   ): Shape;
   hull(): Shape;
@@ -450,10 +483,30 @@ declare class TrackedShape {
       diameter: number;
       depth?: number;
       upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+      extent?: {
+        forward: {
+          depth?: number;
+          upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+          through?: boolean;
+        };
+        reverse?: {
+          depth?: number;
+          upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+          through?: boolean;
+        };
+      };
       u?: number;
       v?: number;
       counterbore?: { diameter: number; depth: number };
       countersink?: { diameter: number; angleDeg?: number };
+      thread?: {
+        designation?: string;
+        pitch?: number;
+        class?: string;
+        handedness?: 'right' | 'left';
+        depth?: number;
+        modeled?: boolean;
+      };
     },
   ): Shape;
   cutout(
@@ -461,6 +514,19 @@ declare class TrackedShape {
     opts?: {
       depth?: number;
       upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+      extent?: {
+        forward: {
+          depth?: number;
+          upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+          through?: boolean;
+        };
+        reverse?: {
+          depth?: number;
+          upToFace?: 'front'|'back'|'left'|'right'|'top'|'bottom' | string | FaceRef;
+          through?: boolean;
+        };
+      };
+      taperScale?: number | [number, number];
     },
   ): Shape;
   toShape(): Shape;

@@ -786,10 +786,12 @@ Compiler-owned circular hole workflow anchored to a face/workplane query.
 - `depth` omitted = through-hole
 - `depth` provided = blind hole
 - `upToFace` = stop on a queried planar face parallel to the hole direction
+- `extent: { forward, reverse? }` = two-sided extent with forward/reverse termination options
 - `u` / `v` place the hole in face-local coordinates
 - `counterbore: { diameter, depth }` adds a wider cylindrical recess at the entry
 - `countersink: { diameter, angleDeg? }` adds a conical entry (default `90°`)
-- `depth` and `upToFace` are mutually exclusive
+- `thread: { designation?, pitch?, class?, handedness?, depth?, modeled? }` carries thread intent metadata
+- `depth` and `upToFace` are mutually exclusive with `extent`
 - `counterbore` and `countersink` are mutually exclusive
 
 ```javascript
@@ -813,11 +815,14 @@ Supported subset:
 - compile-covered target bodies
 - canonical faces, tracked planar faces, and `FaceRef` targets
 - through, blind, and planar `upToFace` circular holes
-- counterbore and countersink entry variants on those hole extents
+- two-sided extents with forward/reverse termination (blind or `upToFace` per side)
+- counterbore and countersink entry variants on one-sided hole extents
+- thread metadata for deferred thread intent (modeled threads not yet supported)
 - exact lowering through both Manifold and CadQuery/OCCT
 - created hole faces in the defended subset:
   - `wall` on all supported hole variants
   - `floor` on blind holes
+  - `cap` on reverse blind two-sided holes
   - `counterbore-wall` and `counterbore-floor` on counterbored holes
   - `countersink-wall` on countersunk holes
 - preserved non-host faces stay queryable where Forge can defend them
@@ -827,7 +832,10 @@ Supported subset:
 Not supported yet:
 
 - non-planar or non-parallel `upToFace` termination faces
-- drafted/tapered main holes, threads, or combined counterbore+countersink heads
+- two-sided extents combined with counterbore or countersink heads
+- modeled helical threads (pass thread metadata with `modeled: false` or omitted for deferred intent)
+- combined counterbore+countersink heads
+- drafted/tapered main holes
 - segmented polygonal hole cutters
 - runtime-only target bodies without compiler intent
 
@@ -837,6 +845,8 @@ Compiler-owned cut-extrude workflow using a sketch already placed with `Sketch.o
 - `depth` omitted = through-cut
 - `depth` provided = blind cut
 - `upToFace` = stop on a queried planar face parallel to the cut direction
+- `extent: { forward, reverse? }` = two-sided extent with forward/reverse termination options
+- `taperScale` = draft angle for tapered cuts (uniform or `[x, y]` pair)
 - the sketch must carry semantic workplane placement from `onFace(...)`
 
 ```javascript
@@ -853,11 +863,14 @@ Supported subset:
 - compile-covered sketch profiles that CadQuery/OCCT already supports
 - sketches placed on queried faces via `onFace(...)`
 - through, blind, and planar `upToFace` cut extents
+- two-sided extents with forward/reverse termination
+- tapered cuts via `taperScale` on circle, rect, and roundedRect profiles
 - exact/runtime parity through the shared compiler node family
 - created cut faces in the defended subset:
   - `floor` on blind cuts
   - `wall` on circular cuts
   - `wall-bottom`, `wall-right`, `wall-top`, `wall-left` on rectangular and rounded-rectangle cuts
+  - `cap` on reverse blind two-sided cuts
 - preserved non-host faces stay queryable where Forge can defend them
 - rewritten host/exit faces now stay queryable as defended descendant regions when Forge can keep one stable source surface/frame
 - reusing the same `upToFace` stop plane through later rewrites is supported when you keep a `FaceRef` from the earlier face
@@ -866,7 +879,7 @@ Not supported yet:
 
 - free-floating sketches without face/workplane provenance
 - non-planar or non-parallel `upToFace` termination faces
-- draft/taper angles or two-sided extents
+- two-sided extents combined with `taperScale`
 - named created-wall support for arbitrary boolean/offset/projected cut profiles
 
 #### `sheetMetal(options)`

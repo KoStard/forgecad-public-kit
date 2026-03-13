@@ -111,6 +111,26 @@ const body = base
 return [{ name: 'Workflow', shape: body }];
 `;
 
+const ADVANCED_HOLE_CUT_VARIANTS_CODE = `
+const base = roundedRect(68, 44, 4, true).extrude(20);
+const accessPocket = roundedRect(20, 12, 2, true)
+  .onFace(base, 'top', { u: 0, v: 0, selfAnchor: 'center' });
+const recessed = base.cutout(accessPocket, { depth: 10 });
+const internalFloor = recessed.face('floor');
+const threadedHole = recessed.hole(internalFloor, {
+  diameter: 4.2,
+  extent: {
+    forward: { upToFace: base.face('bottom') },
+    reverse: { depth: 2 },
+  },
+  thread: { designation: 'M5x0.8', class: '6H', depth: 4 },
+});
+const taperedPocket = roundedRect(14, 8, 2, true)
+  .onFace(threadedHole, 'front', { u: 0, v: 2, selfAnchor: 'center' });
+const finished = threadedHole.cutout(taperedPocket, { depth: 5, taperScale: 0.75 });
+return [{ name: 'Advanced Variants', shape: finished }];
+`;
+
 const TRIM_AND_SPLIT_WORKFLOW_CODE = `
 const body = box(40, 30, 20, true).toShape();
 const trimmed = body.trimByPlane([0, 0, 1], 0);
@@ -234,7 +254,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
   ),
   inlineCase(
     'hole-cut-workflows',
-    'Hole and cut workflows record ambiguous preserved-face descendants, defended created-face slots, and explicit unsupported created-edge diagnostics.',
+    'Hole and cut workflows record ambiguous preserved-face descendants plus defended created face and edge-chain slots.',
     HOLE_CUT_WORKFLOW_CODE,
     [
       {
@@ -244,9 +264,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         operations: ['cut', 'cut', 'hole', 'hole'],
         requiredDiagnosticCodes: [
           'cut-source-face-split-ambiguous',
-          'cut-created-edge-propagation-unsupported',
           'hole-source-face-split-ambiguous',
-          'hole-created-edge-propagation-unsupported',
         ],
         requiredPreservedFaceQueries: [
           'propagated-face(split <- tracked-face(side-bottom)',
@@ -259,6 +277,39 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'created-face(hole:floor)',
           'created-face(cut:floor)',
           'created-face(cut:wall-right)',
+        ],
+        requiredCreatedEdgeQueries: [
+          'created-edge(hole:entry-rim)',
+          'created-edge(hole:forward-end-rim)',
+          'created-edge(cut:entry-rim)',
+          'created-edge(cut:forward-end-rim)',
+        ],
+      },
+    ],
+  ),
+  inlineCase(
+    'advanced-hole-cut-variants',
+    'Two-sided threaded holes and tapered cuts keep defended cap/wall ownership and created edge chains reviewable in one feature stack.',
+    ADVANCED_HOLE_CUT_VARIANTS_CODE,
+    [
+      {
+        name: 'Advanced Variants',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['cut', 'hole', 'cut'],
+        requiredDiagnosticCodes: [
+          'cut-source-face-split-ambiguous',
+          'hole-source-face-split-ambiguous',
+          'hole-up-to-face-target-split-ambiguous',
+        ],
+        requiredCreatedFaceQueries: [
+          'created-face(hole:cap)',
+          'created-face(cut:wall-right)',
+        ],
+        requiredCreatedEdgeQueries: [
+          'created-edge(hole:reverse-end-rim)',
+          'created-edge(hole:forward-end-rim)',
+          'created-edge(cut:forward-end-rim)',
         ],
       },
     ],
@@ -304,7 +355,6 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         operations: ['hole', 'chamfer', 'boolean:union', 'chamfer'],
         requiredDiagnosticCodes: [
           'hole-source-face-split-ambiguous',
-          'hole-created-edge-propagation-unsupported',
           'boolean-union-edge-inherited-ambiguity',
           'chamfer-selected-edge-merged-ambiguous',
           'chamfer-created-face-propagation-unsupported',
@@ -410,15 +460,17 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         requiredDiagnosticCodes: [
           'cut-source-face-split-ambiguous',
           'cut-up-to-face-target-split-ambiguous',
-          'cut-created-edge-propagation-unsupported',
           'hole-source-face-split-ambiguous',
           'hole-up-to-face-target-split-ambiguous',
-          'hole-created-edge-propagation-unsupported',
         ],
         requiredCreatedFaceQueries: [
           'created-face(hole:counterbore-floor)',
           'created-face(hole:counterbore-wall)',
           'created-face(hole:countersink-wall)',
+        ],
+        requiredCreatedEdgeQueries: [
+          'created-edge(hole:head-transition-rim)',
+          'created-edge(cut:forward-end-rim)',
         ],
         requiredPreservedFaceQueries: [
           'propagated-face(preserved <- created-face(hole:counterbore-floor)',
@@ -438,10 +490,8 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         requiredDiagnosticCodes: [
           'boolean-union-edge-propagation-unsupported',
           'cut-source-face-split-ambiguous',
-          'cut-created-edge-propagation-unsupported',
           'hole-source-face-split-ambiguous',
           'hole-up-to-face-target-split-ambiguous',
-          'hole-created-edge-propagation-unsupported',
         ],
         requiredCreatedFaceQueries: [
           'created-face(hole:counterbore-floor)',
@@ -449,6 +499,10 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'created-face(hole:countersink-wall)',
           'created-face(cut:wall-right)',
           'created-face(cut:floor)',
+        ],
+        requiredCreatedEdgeQueries: [
+          'created-edge(hole:head-transition-rim)',
+          'created-edge(cut:forward-end-rim)',
         ],
         requiredPreservedFaceQueries: [
           'propagated-face(preserved <- created-face(hole:counterbore-floor)',
@@ -469,12 +523,12 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         operations: ['cut', 'cut', 'cut', 'cut', 'cut', 'cut'],
         requiredDiagnosticCodes: [
           'cut-source-face-split-ambiguous',
-          'cut-created-edge-propagation-unsupported',
         ],
         requiredCreatedFaceQueries: [
           'created-face(cut:wall-right)',
           'created-face(cut:wall)',
         ],
+        requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim)'],
         requiredPreservedFaceQueries: [
           'propagated-face(split <- tracked-face(panel)',
           'propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right)',
@@ -487,12 +541,12 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         operations: ['cut', 'cut', 'cut', 'cut', 'cut', 'cut'],
         requiredDiagnosticCodes: [
           'cut-source-face-split-ambiguous',
-          'cut-created-edge-propagation-unsupported',
         ],
         requiredCreatedFaceQueries: [
           'created-face(cut:wall-right)',
           'created-face(cut:wall)',
         ],
+        requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim)'],
         requiredPreservedFaceQueries: [
           'propagated-face(split <- tracked-face(panel)',
           'propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right)',
@@ -514,9 +568,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'trim-by-plane-preserved-face-propagation-ambiguous',
           'trim-by-plane-edge-propagation-ambiguous',
           'cut-source-face-split-ambiguous',
-          'cut-created-edge-propagation-unsupported',
           'hole-source-face-split-ambiguous',
-          'hole-created-edge-propagation-unsupported',
         ],
         requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
         requiredPreservedFaceQueries: [

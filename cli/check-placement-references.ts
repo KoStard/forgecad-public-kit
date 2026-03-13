@@ -591,6 +591,72 @@ function checkRicherHoleCutVariants(): void {
   const cutBottom = cut.face('bottom');
   expect(cutBottom.query?.kind === 'propagated-face', 'cut upToFace termination descendants should stay queryable as propagated regions');
   expect(cutBottom.descendant?.semantic === 'region', 'cut upToFace termination should expose region semantics');
+
+  const pocketBase = roundedRect(68, 44, 4, true).extrude(20);
+  const accessPocket = roundedRect(20, 12, 2, true)
+    .onFace(pocketBase, 'top', { u: 0, v: 0, selfAnchor: 'center' });
+  const recessed = pocketBase.cutout(accessPocket, { depth: 10 });
+  const internalFloor = recessed.face('floor');
+  const threadedTwoSidedHole = recessed.hole(internalFloor, {
+    diameter: 4.2,
+    extent: {
+      forward: { upToFace: pocketBase.face('bottom') },
+      reverse: { depth: 2 },
+    },
+    thread: {
+      designation: 'M5x0.8',
+      class: '6H',
+      depth: 4,
+    },
+  });
+  expect(threadedTwoSidedHole.faceNames().includes('cap'), 'two-sided holes should expose a defended reverse cap face name');
+  const twoSidedCap = threadedTwoSidedHole.face('cap');
+  expect(twoSidedCap.query?.kind === 'created-face', 'two-sided hole caps should expose created-face queries');
+  if (twoSidedCap.query?.kind === 'created-face') {
+    expect(twoSidedCap.query.slot === 'cap', `expected two-sided hole cap slot "cap", got ${twoSidedCap.query.slot}`);
+  }
+  const threadedHolePropagation = getShapeTopologyRewritePropagation(threadedTwoSidedHole);
+  expect(threadedHolePropagation != null, 'two-sided threaded holes should expose a topology-rewrite propagation contract');
+  expect(
+    threadedHolePropagation!.createdFaces.some((entry) => entry.query.slot === 'cap'),
+    'two-sided threaded holes should record the reverse cap face slot',
+  );
+  expect(
+    threadedHolePropagation!.createdEdges.some((entry) => entry.query.slot === 'reverse-end-rim'),
+    'two-sided threaded holes should record the reverse termination edge chain',
+  );
+  const threadedHolePlan = getShapeCompilePlan(threadedTwoSidedHole);
+  expect(threadedHolePlan?.kind === 'queryOwner', 'two-sided threaded holes should keep a wrapped query-owner compile plan');
+  if (threadedHolePlan?.kind === 'queryOwner' && threadedHolePlan.base.kind === 'hole') {
+    expect(threadedHolePlan.base.extent.kind === 'two-sided', 'threaded two-sided holes should preserve the structured extent in the compile plan');
+    expect(threadedHolePlan.base.hole.thread?.designation === 'M5x0.8', 'threaded holes should preserve thread designation metadata in the compile plan');
+    expect(threadedHolePlan.base.hole.thread?.class === '6H', 'threaded holes should preserve thread class metadata in the compile plan');
+  }
+
+  const taperedPocketBase = roundedRect(60, 38, 4, true).extrude(18);
+  const taperedPocket = roundedRect(16, 10, 2, true)
+    .onFace(taperedPocketBase, 'front', { u: 0, v: 3, selfAnchor: 'center' });
+  const taperedCut = taperedPocketBase.cutout(taperedPocket, { depth: 7, taperScale: 0.72 });
+  expect(taperedCut.faceNames().includes('wall-right'), 'tapered cutouts should keep defended wall faces in the rect subset');
+  const taperedCutPlan = getShapeCompilePlan(taperedCut);
+  expect(taperedCutPlan?.kind === 'queryOwner', 'tapered cutouts should keep a wrapped query-owner compile plan');
+  if (taperedCutPlan?.kind === 'queryOwner' && taperedCutPlan.base.kind === 'cut') {
+    expect(!!taperedCutPlan.base.taper, 'tapered cutouts should record taper metadata in the compile plan');
+    expect(close(taperedCutPlan.base.taper?.scale[0] ?? 0, 0.72), 'tapered cutouts should preserve taperScale x metadata');
+    expect(close(taperedCutPlan.base.taper?.scale[1] ?? 0, 0.72), 'tapered cutouts should preserve taperScale y metadata');
+  }
+  const taperedCutPropagation = getShapeTopologyRewritePropagation(taperedCut);
+  expect(taperedCutPropagation != null, 'tapered cutouts should expose a topology-rewrite propagation contract');
+  expect(
+    taperedCutPropagation!.createdEdges.some((entry) => entry.query.slot === 'forward-end-rim'),
+    'tapered cutouts should record the forward termination edge chain',
+  );
+  const taperedWallBadge = rect(2, 2)
+    .onFace(taperedCut, 'wall-right', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
+    .extrude(0.6)
+    .toShape();
+  const taperedWallPlacement = getShapeWorkplanePlacement(taperedWallBadge);
+  expect(taperedWallPlacement != null, 'tapered cut wall descendants should keep workplane placement semantics');
 }
 
 function checkEdgeFinishOwnerPropagation(): void {
@@ -877,9 +943,14 @@ function checkTopologyRewritePropagationInspection(): void {
     expect(splitFace!.query.source.faceName === 'top', `expected top source face, got ${splitFace!.query.source.faceName}`);
   }
   expect(holePropagation!.createdFaces.length === 2, `expected 2 created faces for a blind hole, got ${holePropagation!.createdFaces.length}`);
+  expect(holePropagation!.createdEdges.length === 2, `expected 2 created edge chains for a blind hole, got ${holePropagation!.createdEdges.length}`);
   expect(
     holePropagation!.createdFaces.some((entry) => entry.query.slot === 'floor'),
     'hole propagation should expose the blind-hole floor created-face slot',
+  );
+  expect(
+    holePropagation!.createdEdges.some((entry) => entry.query.slot === 'forward-end-rim'),
+    'hole propagation should expose the blind-hole floor perimeter edge chain',
   );
   expect(
     holePropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'hole-source-face-split-ambiguous'),

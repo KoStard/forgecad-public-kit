@@ -31,3 +31,4 @@ Primary files:
 ## Status and log
 - 2026-03-13: Blocked on task 300.
 - 2026-03-13: Not started.
+- 2026-03-13: Completed. Added compiler-owned support for two-sided extents, tapered cutouts (taperScale), and thread metadata; extended hole/cut propagation to expose defended reverse cap faces and edge chains; added explicit rejection for unsupported combinations (counterbore+two-sided, countersink+two-sided, taper+two-sided, modeled threads); added proof models in fastener-plate-variants.forge.js and service-panel-cover.forge.js that combine counterbore, countersink, upToFace, and cutout workflows; expanded placement and query-propagation regression coverage for the richer hole/cut subset.
