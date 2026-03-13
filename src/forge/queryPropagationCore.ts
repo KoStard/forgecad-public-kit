@@ -11,6 +11,9 @@ import {
   type ShapeQueryOwner,
   type TopologyRewritePropagation,
   type TopologyRewritePropagationDiagnostic,
+  type TopologyRewriteDescendantContract,
+  type TopologyRewriteEdgeDescendantContract,
+  type TopologyRewriteFaceDescendantContract,
   type TopologyRewriteQueryKind,
   type TopologyRewriteQueryOutcome,
 } from './queryModel';
@@ -28,6 +31,7 @@ export function createTopologyRewritePropagation(
     createdFaces: [],
     createdEdges: [],
     diagnostics: [],
+    descendants: [],
   };
 }
 
@@ -110,4 +114,39 @@ export function createCreatedEdgeQueryRef(
     selector,
     owner: cloneShapeQueryOwner(owner),
   };
+}
+
+export function createFaceDescendantContract(
+  kind: TopologyRewriteFaceDescendantContract['kind'],
+  query: FaceQueryRef,
+  options: { source?: FaceQueryRef; note?: string } = {},
+): TopologyRewriteFaceDescendantContract {
+  return {
+    queryKind: 'face',
+    kind,
+    query: cloneFaceQueryRef(query)!,
+    source: cloneFaceQueryRef(options.source),
+    note: options.note,
+  };
+}
+
+export function createEdgeDescendantContract(
+  kind: TopologyRewriteEdgeDescendantContract['kind'],
+  query: EdgeQueryRef,
+  options: { source?: EdgeQueryRef; note?: string } = {},
+): TopologyRewriteEdgeDescendantContract {
+  return {
+    queryKind: 'edge',
+    kind,
+    query: cloneEdgeQueryRef(query)!,
+    source: cloneEdgeQueryRef(options.source),
+    note: options.note,
+  };
+}
+
+export function pushTopologyRewriteDescendantContract(
+  propagation: TopologyRewritePropagation,
+  contract: TopologyRewriteDescendantContract,
+): void {
+  propagation.descendants.push(contract);
 }

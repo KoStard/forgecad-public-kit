@@ -5,7 +5,7 @@
  * Ensures named points/edges/surfaces/objects survive transforms and importPart().
  */
 import '../src/forge/holeCut';
-import { resolveSupportedEdgeFeatureSelection } from '../src/forge/edgeFeatureResolution';
+import { resolveShapeEdgeDescendant, resolveSupportedEdgeFeatureSelection } from '../src/forge/edgeFeatureResolution';
 import {
   box,
   getShapeCompilePlan,
@@ -424,10 +424,23 @@ function checkHoleCutFeaturePlacement(): void {
     expect(holeFloor.query.slot === 'floor', `expected blind-hole floor slot "floor", got ${holeFloor.query.slot}`);
     expect(holeFloor.query.owner?.id === drilledOwner!.id, 'blind-hole floor queries should target the hole owner');
   }
-  expectThrows(
-    () => drilled.face('top'),
-    /selected host face is rewritten by the hole result/,
-    'hole.hostFace',
+  const drilledTop = drilled.face('top');
+  expect(drilledTop.query?.kind === 'propagated-face', 'hole host-face descendants should stay queryable as propagated regions');
+  if (drilledTop.query?.kind === 'propagated-face') {
+    expect(drilledTop.query.outcome === 'split', `expected split host-face outcome, got ${drilledTop.query.outcome}`);
+    expect(drilledTop.query.owner?.id === drilledOwner!.id, 'hole host-face descendants should target the hole owner');
+  }
+  expect(drilledTop.descendant?.semantic === 'region', 'hole host-face descendants should expose region semantics');
+
+  const topBadge = rect(4, 3)
+    .onFace(drilled, 'top', { u: -12, v: 6, protrude: 0.05, selfAnchor: 'center' })
+    .extrude(0.8)
+    .toShape();
+  const topBadgePlacement = getShapeWorkplanePlacement(topBadge);
+  expect(topBadgePlacement != null, 'downstream features should place on defended hole host-face regions');
+  expect(
+    topBadgePlacement!.placement.workplane.source.kind === 'propagated-face',
+    'hole host-face region placement should preserve a propagated-face query source',
   );
 
   const floorBadge = rect(4, 3)
@@ -512,11 +525,9 @@ function checkRicherHoleCutVariants(): void {
       'counterbore floor queries should target the counterbore owner',
     );
   }
-  expectThrows(
-    () => counterbored.face('bottom'),
-    /selected up-to-face termination face is rewritten by the hole result/,
-    'counterbore.upToFaceTermination',
-  );
+  const counterboreBottom = counterbored.face('bottom');
+  expect(counterboreBottom.query?.kind === 'propagated-face', 'counterbore upToFace termination descendants should stay queryable as propagated regions');
+  expect(counterboreBottom.descendant?.semantic === 'region', 'counterbore upToFace termination should expose region semantics');
 
   const counterboreBadge = rect(3, 2)
     .onFace(counterbored, 'counterbore-floor', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
@@ -577,11 +588,9 @@ function checkRicherHoleCutVariants(): void {
     cutPropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'cut-up-to-face-target-split-ambiguous'),
     'up-to-face cuts should expose an explicit termination-face ambiguity diagnostic',
   );
-  expectThrows(
-    () => cut.face('bottom'),
-    /selected up-to-face termination face is rewritten by the cut result/,
-    'cut.upToFaceTermination',
-  );
+  const cutBottom = cut.face('bottom');
+  expect(cutBottom.query?.kind === 'propagated-face', 'cut upToFace termination descendants should stay queryable as propagated regions');
+  expect(cutBottom.descendant?.semantic === 'region', 'cut upToFace termination should expose region semantics');
 }
 
 function checkEdgeFinishOwnerPropagation(): void {
@@ -741,6 +750,17 @@ function checkBooleanAndRepeatedQueryPropagation(): void {
   const bossPropagation = getShapeTopologyRewritePropagation(bosses);
   expect(bossPropagation != null, 'pattern unions should expose boolean propagation metadata');
   expect(bossPropagation!.operation === 'boolean:union', `expected pattern union propagation operation, got ${bossPropagation!.operation}`);
+  const bossesTop = bosses.face('top');
+  expect(bossesTop.descendant?.semantic === 'set', 'coplanar boolean top descendants should expose face-set semantics');
+  expect(bossesTop.descendant?.memberCount === 3, `expected 3 coplanar top descendants in the set, got ${bossesTop.descendant?.memberCount ?? 0}`);
+  expect(bossesTop.descendant?.coplanar === true, 'coplanar boolean face sets should stay workplane-usable');
+  const bossesCap = rect(4, 3)
+    .onFace(bosses, 'top', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
+    .extrude(0.8)
+    .toShape();
+  const bossesCapPlacement = getShapeWorkplanePlacement(bossesCap);
+  expect(bossesCapPlacement != null, 'coplanar boolean face sets should drive downstream onFace placement');
+  expect(bossesCapPlacement!.placement.workplane.source.kind === 'face-ref', 'coplanar boolean face-set placement should preserve a face-ref source');
   const bossTopFaces = bossPropagation!.preservedFaces.filter((entry) =>
     entry.status === 'supported'
       && entry.query.outcome === 'preserved'
@@ -782,11 +802,11 @@ function checkBooleanTargetAmbiguityDiagnostics(): void {
     box(20, 12, 24, true).translate(0, 0, 6),
   );
 
-  expectThrows(
-    () => carved.hole(topFace, { diameter: 4, depth: 4 }),
-    /ambiguous|defended named-face subset|defended face subset/i,
-    'boolean-difference.face-query',
-  );
+  const carvedTop = carved.face('top');
+  expect(carvedTop.descendant?.semantic === 'region', 'boolean-difference top descendants should expose region semantics');
+  const drilled = carved.hole(topFace, { diameter: 4, depth: 4 });
+  const placement = getShapeWorkplanePlacement(drilled);
+  expect(placement != null, 'boolean-difference face refs should drive later hole placement through defended regions');
 }
 
 function checkTopologyRewritePropagationInspection(): void {
@@ -927,10 +947,12 @@ function checkTopologyRewritePropagationInspection(): void {
   expect(!resolvedMerged.ok, 'merged propagated-edge queries should stay explicitly unsupported');
   if (!resolvedMerged.ok) {
     expect(
-      /blended descendant set|merged rewritten descendants|merged into rewritten descendants|untouched sibling vertical edges/.test(resolvedMerged.issue.reason),
+      /blended descendant set|merged rewritten descendants|merged into rewritten descendants|untouched sibling vertical edges|descendant chain/.test(resolvedMerged.issue.reason),
       `expected merged-edge diagnostic to stay explicit, got "${resolvedMerged.issue.reason}"`,
     );
   }
+  const resolvedMergedChain = resolveShapeEdgeDescendant(getShapeCompilePlan(filleted), mergedEdge!.query);
+  expect(resolvedMergedChain.kind === 'edge-chain', 'merged propagated-edge descendants should resolve as a defended edge chain');
 
   const boss = roundedRect(10, 6, 1.5, true)
     .onFace(prism, 'top', { u: -8, v: 4, protrude: 0.25, selfAnchor: 'center' })

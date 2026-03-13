@@ -8,10 +8,13 @@ import {
 import {
   createCreatedEdgeQueryRef,
   createCreatedFaceQueryRef,
+  createEdgeDescendantContract,
+  createFaceDescendantContract,
   createPropagatedEdgeQueryRef,
   createPropagatedFaceQueryRef,
   createTopologyRewritePropagation,
   createTopologyRewritePropagationDiagnostic,
+  pushTopologyRewriteDescendantContract,
 } from './queryPropagationCore';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import {
@@ -58,17 +61,32 @@ export function buildShellTopologyRewritePropagation(
   const created = supportedShellCreatedFaceNames(base, openFaces);
 
   for (const entry of preserved) {
+    const query = createPropagatedFaceQueryRef(entry.query, owner, 'preserved');
     propagation.preservedFaces.push({
-      query: createPropagatedFaceQueryRef(entry.query, owner, 'preserved'),
+      query,
       status: 'supported',
       note: 'The outer shell face survives as a defended preserved-face query on the shelled result.',
     });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createFaceDescendantContract('single', query, {
+        source: entry.query,
+        note: 'Shell keeps this face as one defended single descendant.',
+      }),
+    );
   }
   for (const name of created) {
+    const query = createCreatedFaceQueryRef(owner, 'shell', name);
     propagation.createdFaces.push({
-      query: createCreatedFaceQueryRef(owner, 'shell', name),
+      query,
       note: 'This shell-created inner face is part of the defended named-face subset.',
     });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createFaceDescendantContract('single', query, {
+        note: 'This shell-created face resolves to one defended descendant.',
+      }),
+    );
   }
 
   if (preserved.length === 0 && created.length === 0) {
@@ -106,22 +124,39 @@ export function buildHoleTopologyRewritePropagation(
   for (const entry of preservedShapeFaceQueries(base)) {
     const blockedReason = blocked.get(entry.name);
     if (blockedReason) {
+      const query = createPropagatedFaceQueryRef(entry.query, owner, 'split');
       propagation.preservedFaces.push({
-        query: createPropagatedFaceQueryRef(entry.query, owner, 'split'),
+        query,
         status: 'ambiguous',
         note: blockedFeatureFaceNote('hole', blockedReason),
       });
+      pushTopologyRewriteDescendantContract(
+        propagation,
+        createFaceDescendantContract('face-region', query, {
+          source: entry.query,
+          note: 'This rewritten hole face remains a defended descendant region on the same source surface.',
+        }),
+      );
       continue;
     }
+    const query = createPropagatedFaceQueryRef(entry.query, owner, 'preserved');
     propagation.preservedFaces.push({
-      query: createPropagatedFaceQueryRef(entry.query, owner, 'preserved'),
+      query,
       status: 'supported',
       note: 'This face stays queryable through the hole rewrite.',
     });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createFaceDescendantContract('single', query, {
+        source: entry.query,
+        note: 'This hole descendant stays one defended face.',
+      }),
+    );
   }
   for (const name of supportedHoleCreatedFaceNames(hole, extent)) {
+    const query = createCreatedFaceQueryRef(owner, 'hole', name);
     propagation.createdFaces.push({
-      query: createCreatedFaceQueryRef(owner, 'hole', name),
+      query,
       note: (() => {
         switch (name) {
           case 'floor':
@@ -137,6 +172,12 @@ export function buildHoleTopologyRewritePropagation(
         }
       })(),
     });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createFaceDescendantContract('single', query, {
+        note: 'This hole-created face resolves to one defended descendant.',
+      }),
+    );
   }
   propagation.diagnostics.push(
     createTopologyRewritePropagationDiagnostic(
@@ -182,27 +223,50 @@ export function buildCutTopologyRewritePropagation(
   for (const entry of preservedShapeFaceQueries(base)) {
     const blockedReason = blocked.get(entry.name);
     if (blockedReason) {
+      const query = createPropagatedFaceQueryRef(entry.query, owner, 'split');
       propagation.preservedFaces.push({
-        query: createPropagatedFaceQueryRef(entry.query, owner, 'split'),
+        query,
         status: 'ambiguous',
         note: blockedFeatureFaceNote('cut', blockedReason),
       });
+      pushTopologyRewriteDescendantContract(
+        propagation,
+        createFaceDescendantContract('face-region', query, {
+          source: entry.query,
+          note: 'This rewritten cut face remains a defended descendant region on the same source surface.',
+        }),
+      );
       continue;
     }
+    const query = createPropagatedFaceQueryRef(entry.query, owner, 'preserved');
     propagation.preservedFaces.push({
-      query: createPropagatedFaceQueryRef(entry.query, owner, 'preserved'),
+      query,
       status: 'supported',
       note: 'This face stays queryable through the cut rewrite.',
     });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createFaceDescendantContract('single', query, {
+        source: entry.query,
+        note: 'This cut descendant stays one defended face.',
+      }),
+    );
   }
   const createdNames = supportedCutCreatedFaceNames(profile, extent);
   for (const name of createdNames) {
+    const query = createCreatedFaceQueryRef(owner, 'cut', name);
     propagation.createdFaces.push({
-      query: createCreatedFaceQueryRef(owner, 'cut', name),
+      query,
       note: name === 'floor'
         ? 'Blind cutouts create a defended planar floor face.'
         : 'This cut-created wall face is part of the defended named-face subset.',
     });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createFaceDescendantContract('single', query, {
+        note: 'This cut-created face resolves to one defended descendant.',
+      }),
+    );
   }
   propagation.diagnostics.push(
     createTopologyRewritePropagationDiagnostic(
@@ -264,12 +328,37 @@ export function buildHullTopologyRewritePropagation(owner: ShapeQueryOwner): Top
   return propagation;
 }
 
-export function buildTrimByPlaneTopologyRewritePropagation(owner: ShapeQueryOwner): TopologyRewritePropagation {
+export function buildTrimByPlaneTopologyRewritePropagation(
+  owner: ShapeQueryOwner,
+  base: ShapeCompilePlan,
+): TopologyRewritePropagation {
   const propagation = createTopologyRewritePropagation('trimByPlane', owner);
+  for (const entry of preservedShapeFaceQueries(base)) {
+    const query = createPropagatedFaceQueryRef(entry.query, owner, 'split');
+    propagation.preservedFaces.push({
+      query,
+      status: 'ambiguous',
+      note: 'Trim keeps a clipped descendant region on the source surface instead of one untouched face.',
+    });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createFaceDescendantContract('face-region', query, {
+        source: entry.query,
+        note: 'Trim keeps a defended descendant region on the source surface.',
+      }),
+    );
+  }
+  const planeCap = createCreatedFaceQueryRef(owner, 'trimByPlane', 'plane-cap');
   propagation.createdFaces.push({
-    query: createCreatedFaceQueryRef(owner, 'trimByPlane', 'plane-cap'),
+    query: planeCap,
     note: 'The kept side of the trim introduces one deterministic cap face on the trim plane.',
   });
+  pushTopologyRewriteDescendantContract(
+    propagation,
+    createFaceDescendantContract('single', planeCap, {
+      note: 'The trim plane cap resolves to one defended descendant face.',
+    }),
+  );
   propagation.diagnostics.push(
     createTopologyRewritePropagationDiagnostic(
       'trim-by-plane-preserved-face-propagation-ambiguous',
@@ -295,11 +384,19 @@ export function buildEdgeFeatureTopologyRewritePropagation(
 ): TopologyRewritePropagation {
   const propagation = createTopologyRewritePropagation(operation, owner);
   for (const source of preservedEdges) {
+    const query = createPropagatedEdgeQueryRef(source, owner, 'preserved');
     propagation.preservedEdges.push({
-      query: createPropagatedEdgeQueryRef(source, owner, 'preserved'),
+      query,
       status: 'supported',
       note: `${operation} leaves this supported propagated vertical edge lineage unchanged in the defended post-rewrite subset.`,
     });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createEdgeDescendantContract('single', query, {
+        source,
+        note: `${operation} keeps this edge as one defended single descendant.`,
+      }),
+    );
   }
   if (edge) {
     const propagated = createPropagatedEdgeQueryRef(edge, owner, 'merged');
@@ -308,6 +405,13 @@ export function buildEdgeFeatureTopologyRewritePropagation(
       status: 'ambiguous',
       note: `${operation} rewrites the selected edge into a blended descendant set rather than one defended edge target.`,
     });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createEdgeDescendantContract('edge-chain', propagated, {
+        source: edge,
+        note: `${operation} rewrites the selected edge into a defended descendant chain instead of one single edge target.`,
+      }),
+    );
     propagation.diagnostics.push(
       createTopologyRewritePropagationDiagnostic(
         `${operation}-selected-edge-merged-ambiguous`,

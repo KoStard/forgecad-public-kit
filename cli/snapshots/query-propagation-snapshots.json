@@ -23,7 +23,38 @@
             "rewriteId": "shape-query-trimbyplane-2",
             "operation": "trimByPlane",
             "owner": "trimByPlane:shape-query-trimbyplane-2",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(bottom) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-bottom) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-left) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-right) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-top) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [
               {
@@ -43,6 +74,15 @@
                 "category": "ambiguous",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- tracked-face(bottom) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2)",
+              "face-region(propagated-face(split <- tracked-face(side-bottom) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2)",
+              "face-region(propagated-face(split <- tracked-face(side-left) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2)",
+              "face-region(propagated-face(split <- tracked-face(side-right) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2)",
+              "face-region(propagated-face(split <- tracked-face(side-top) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2)",
+              "face-region(propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @trimByPlane:shape-query-trimbyplane-2)",
+              "single(created-face(trimByPlane:plane-cap) @trimByPlane:shape-query-trimbyplane-2)"
             ]
           }
         ]
@@ -67,7 +107,38 @@
             "rewriteId": "shape-query-splitbyplane-positive-3",
             "operation": "trimByPlane",
             "owner": "splitByPlane:positive:shape-query-splitbyplane-positive-3",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(bottom) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-bottom) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-left) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-right) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-top) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [
               {
@@ -87,6 +158,15 @@
                 "category": "ambiguous",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- tracked-face(bottom) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3)",
+              "face-region(propagated-face(split <- tracked-face(side-bottom) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3)",
+              "face-region(propagated-face(split <- tracked-face(side-left) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3)",
+              "face-region(propagated-face(split <- tracked-face(side-right) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3)",
+              "face-region(propagated-face(split <- tracked-face(side-top) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3)",
+              "face-region(propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @splitByPlane:positive:shape-query-splitbyplane-positive-3)",
+              "single(created-face(trimByPlane:plane-cap) @splitByPlane:positive:shape-query-splitbyplane-positive-3)"
             ]
           }
         ]
@@ -111,7 +191,38 @@
             "rewriteId": "shape-query-splitbyplane-opposite-4",
             "operation": "trimByPlane",
             "owner": "splitByPlane:opposite:shape-query-splitbyplane-opposite-4",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(bottom) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-bottom) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-left) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-right) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(side-top) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [
               {
@@ -131,6 +242,15 @@
                 "category": "ambiguous",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- tracked-face(bottom) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4)",
+              "face-region(propagated-face(split <- tracked-face(side-bottom) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4)",
+              "face-region(propagated-face(split <- tracked-face(side-left) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4)",
+              "face-region(propagated-face(split <- tracked-face(side-right) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4)",
+              "face-region(propagated-face(split <- tracked-face(side-top) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4)",
+              "face-region(propagated-face(split <- tracked-face(top) @primitive:box:shape-query-primitive-box-1) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4)",
+              "single(created-face(trimByPlane:plane-cap) @splitByPlane:opposite:shape-query-splitbyplane-opposite-4)"
             ]
           }
         ]
@@ -176,6 +296,11 @@
                 "note": "This face stays queryable through the cut rewrite."
               },
               {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
                 "status": "ambiguous",
                 "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
                 "note": "This opposite face is pierced by the through-cut and is not a defended named target."
@@ -184,6 +309,16 @@
                 "status": "ambiguous",
                 "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
                 "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
               },
               {
                 "status": "supported",
@@ -244,6 +379,24 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- created-face(cut:floor) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-5)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-5)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-5)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-5)"
             ]
           },
           {
@@ -263,6 +416,11 @@
               },
               {
                 "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4",
                 "note": "This face stays queryable through the cut rewrite."
               },
@@ -270,6 +428,16 @@
                 "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4",
                 "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
               },
               {
                 "status": "supported",
@@ -314,6 +482,21 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- created-face(hole:floor) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-4)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-4)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-4)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-4)",
+              "single(created-face(cut:floor) @cut:shape-query-cut-4)"
             ]
           },
           {
@@ -328,12 +511,22 @@
               },
               {
                 "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(split <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
                 "note": "This face stays queryable through the hole rewrite."
               },
               {
                 "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(split <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
                 "note": "This face stays queryable through the hole rewrite."
               },
               {
@@ -372,6 +565,17 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- propagated-face(split <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- propagated-face(split <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-3)",
+              "single(created-face(hole:floor) @hole:shape-query-hole-3)"
             ]
           },
           {
@@ -431,6 +635,15 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "face-region(propagated-face(split <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "single(propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "single(propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "face-region(propagated-face(split <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "single(propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-2)"
             ]
           }
         ]
@@ -554,6 +767,15 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(preserved <- created-face(hole:floor) @hole:shape-query-hole-6) @cut:shape-query-cut-7) @boolean:difference:shape-query-boolean-difference-9)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-6) @cut:shape-query-cut-7) @boolean:difference:shape-query-boolean-difference-9)",
+              "face-region(propagated-face(split <- created-face(cut:wall-bottom) @cut:shape-query-cut-7) @boolean:difference:shape-query-boolean-difference-9)",
+              "face-region(propagated-face(split <- created-face(cut:wall-right) @cut:shape-query-cut-7) @boolean:difference:shape-query-boolean-difference-9)",
+              "face-region(propagated-face(split <- created-face(cut:wall-top) @cut:shape-query-cut-7) @boolean:difference:shape-query-boolean-difference-9)",
+              "face-region(propagated-face(split <- created-face(cut:wall-left) @cut:shape-query-cut-7) @boolean:difference:shape-query-boolean-difference-9)",
+              "face-region(propagated-face(split <- created-face(cut:floor) @cut:shape-query-cut-7) @boolean:difference:shape-query-boolean-difference-9)"
             ]
           },
           {
@@ -609,6 +831,15 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- created-face(hole:floor) @hole:shape-query-hole-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-6) @cut:shape-query-cut-7)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-7)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-7)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-7)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-7)",
+              "single(created-face(cut:floor) @cut:shape-query-cut-7)"
             ]
           },
           {
@@ -641,6 +872,10 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(created-face(hole:wall) @hole:shape-query-hole-6)",
+              "single(created-face(hole:floor) @hole:shape-query-hole-6)"
             ]
           },
           {
@@ -680,6 +915,11 @@
                 "category": "unsupported",
                 "queryKind": "face"
               }
+            ],
+            "descendants": [
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4#edge) @fillet:shape-query-fillet-5)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4#edge) @fillet:shape-query-fillet-5)",
+              "edge-chain(propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4#edge) @fillet:shape-query-fillet-5)"
             ]
           },
           {
@@ -740,6 +980,17 @@
                 "source": "propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3",
                 "query": "propagated-edge(preserved <- propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-4)"
             ]
           },
           {
@@ -784,6 +1035,12 @@
                 "category": "unsupported",
                 "queryKind": "face"
               }
+            ],
+            "descendants": [
+              "single(propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3)",
+              "single(propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3)",
+              "single(propagated-edge(preserved <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3)",
+              "edge-chain(propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3)"
             ]
           }
         ]
@@ -843,6 +1100,10 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(created-face(hole:wall) @hole:shape-query-hole-6)",
+              "single(created-face(hole:floor) @hole:shape-query-hole-6)"
             ]
           },
           {
@@ -882,6 +1143,11 @@
                 "category": "unsupported",
                 "queryKind": "face"
               }
+            ],
+            "descendants": [
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3#edge) @boolean:union:shape-query-boolean-union-4#edge) @chamfer:shape-query-chamfer-5)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3#edge) @boolean:union:shape-query-boolean-union-4#edge) @chamfer:shape-query-chamfer-5)",
+              "edge-chain(propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3#edge) @boolean:union:shape-query-boolean-union-4#edge) @chamfer:shape-query-chamfer-5)"
             ]
           },
           {
@@ -942,6 +1208,17 @@
                 "source": "propagated-edge(merged <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3",
                 "query": "propagated-edge(preserved <- propagated-edge(merged <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3#edge) @boolean:union:shape-query-boolean-union-4"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3#edge) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3#edge) @boolean:union:shape-query-boolean-union-4)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3#edge) @boolean:union:shape-query-boolean-union-4)"
             ]
           },
           {
@@ -986,6 +1263,12 @@
                 "category": "unsupported",
                 "queryKind": "face"
               }
+            ],
+            "descendants": [
+              "single(propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3)",
+              "single(propagated-edge(preserved <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3)",
+              "single(propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3)",
+              "edge-chain(propagated-edge(merged <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @chamfer:shape-query-chamfer-3)"
             ]
           }
         ]
@@ -1036,7 +1319,8 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
-            ]
+            ],
+            "descendants": []
           }
         ]
       },
@@ -1080,7 +1364,8 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
-            ]
+            ],
+            "descendants": []
           }
         ]
       }
@@ -1379,6 +1664,31 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bottom) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- created-face(shell:inner-bottom) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- created-face(shell:inner-side-bottom) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- created-face(shell:inner-side-left) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- created-face(shell:inner-side-right) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- created-face(shell:inner-side-top) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11) @boolean:difference:shape-query-boolean-difference-12)"
             ]
           },
           {
@@ -1649,6 +1959,31 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bottom) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- created-face(shell:inner-bottom) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- created-face(shell:inner-side-bottom) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- created-face(shell:inner-side-left) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- created-face(shell:inner-side-right) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- created-face(shell:inner-side-top) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9) @boolean:union:shape-query-boolean-union-10) @boolean:difference:shape-query-boolean-difference-11)"
             ]
           },
           {
@@ -1842,6 +2177,19 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(bottom) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)",
+              "single(propagated-face(preserved <- created-face(shell:inner-bottom) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)",
+              "single(propagated-face(preserved <- created-face(shell:inner-side-bottom) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)",
+              "single(propagated-face(preserved <- created-face(shell:inner-side-left) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)",
+              "single(propagated-face(preserved <- created-face(shell:inner-side-right) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)",
+              "single(propagated-face(preserved <- created-face(shell:inner-side-top) @shell:shape-query-shell-2) @boolean:union:shape-query-boolean-union-10)"
             ]
           },
           {
@@ -1910,6 +2258,19 @@
                 "category": "ambiguous",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- tracked-face(bottom) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2)",
+              "single(propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2)",
+              "single(propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2)",
+              "single(propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2)",
+              "single(propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2)",
+              "single(propagated-face(preserved <- tracked-face(top) @extrude:shape-query-extrude-1) @shell:shape-query-shell-2)",
+              "single(created-face(shell:inner-bottom) @shell:shape-query-shell-2)",
+              "single(created-face(shell:inner-side-bottom) @shell:shape-query-shell-2)",
+              "single(created-face(shell:inner-side-left) @shell:shape-query-shell-2)",
+              "single(created-face(shell:inner-side-right) @shell:shape-query-shell-2)",
+              "single(created-face(shell:inner-side-top) @shell:shape-query-shell-2)"
             ]
           },
           {
@@ -2059,6 +2420,20 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)",
+              "face-set(propagated-face(merged <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7) @boolean:union:shape-query-boolean-union-9)"
             ]
           },
           {
@@ -2124,6 +2499,20 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-5) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-6) @boolean:union:shape-query-boolean-union-7)"
             ]
           }
         ]
@@ -2248,6 +2637,15 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(preserved <- created-face(hole:floor) @hole:shape-query-hole-8) @cut:shape-query-cut-9) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-8) @cut:shape-query-cut-9) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- created-face(cut:wall-bottom) @cut:shape-query-cut-9) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- created-face(cut:wall-right) @cut:shape-query-cut-9) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- created-face(cut:wall-top) @cut:shape-query-cut-9) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- created-face(cut:wall-left) @cut:shape-query-cut-9) @boolean:difference:shape-query-boolean-difference-11)",
+              "face-region(propagated-face(split <- created-face(cut:floor) @cut:shape-query-cut-9) @boolean:difference:shape-query-boolean-difference-11)"
             ]
           },
           {
@@ -2303,6 +2701,15 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- created-face(hole:floor) @hole:shape-query-hole-8) @cut:shape-query-cut-9)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-8) @cut:shape-query-cut-9)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-9)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-9)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-9)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-9)",
+              "single(created-face(cut:floor) @cut:shape-query-cut-9)"
             ]
           },
           {
@@ -2335,6 +2742,10 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(created-face(hole:wall) @hole:shape-query-hole-8)",
+              "single(created-face(hole:floor) @hole:shape-query-hole-8)"
             ]
           },
           {
@@ -2374,6 +2785,11 @@
                 "category": "unsupported",
                 "queryKind": "face"
               }
+            ],
+            "descendants": [
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-6#edge) @chamfer:shape-query-chamfer-7)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-6#edge) @chamfer:shape-query-chamfer-7)",
+              "edge-chain(propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-6#edge) @chamfer:shape-query-chamfer-7)"
             ]
           },
           {
@@ -2458,6 +2874,23 @@
                 "source": "propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3",
                 "query": "propagated-edge(preserved <- propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-6"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3#edge) @boolean:union:shape-query-boolean-union-6)"
             ]
           },
           {
@@ -2502,6 +2935,12 @@
                 "category": "unsupported",
                 "queryKind": "face"
               }
+            ],
+            "descendants": [
+              "single(propagated-edge(preserved <- tracked-edge(vert-bl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3)",
+              "single(propagated-edge(preserved <- tracked-edge(vert-tr#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3)",
+              "single(propagated-edge(preserved <- tracked-edge(vert-tl#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3)",
+              "edge-chain(propagated-edge(merged <- tracked-edge(vert-br#edge) @primitive:box:shape-query-primitive-box-1#edge) @fillet:shape-query-fillet-3)"
             ]
           },
           {
@@ -2567,6 +3006,20 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(front) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(back) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(left) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(right) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(top) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @mirror:shape-query-mirror-4) @boolean:union:shape-query-boolean-union-5)"
             ]
           }
         ]
@@ -2604,6 +3057,11 @@
             "preservedFaces": [
               {
                 "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
                 "note": "This face stays queryable through the cut rewrite."
               },
@@ -2636,6 +3094,11 @@
                 "status": "ambiguous",
                 "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
                 "note": "The selected up-to-face termination face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
               },
               {
                 "status": "supported",
@@ -2683,6 +3146,22 @@
                 "source": "face-ref(side-top) @extrude:shape-query-extrude-1",
                 "query": "propagated-face(split <- face-ref(side-top) @extrude:shape-query-extrude-1) @cut:shape-query-cut-6"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-5) @cut:shape-query-cut-6)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-5) @cut:shape-query-cut-6)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-6)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-6)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-6)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-6)"
             ]
           },
           {
@@ -2690,6 +3169,11 @@
             "operation": "hole",
             "owner": "hole:shape-query-hole-5",
             "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
+                "note": "The selected up-to-face termination face is rewritten by the hole result and is not a defended named target."
+              },
               {
                 "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
@@ -2724,6 +3208,11 @@
                 "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
                 "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5",
+                "note": "The selected host face is rewritten by the hole result and is not a defended named target."
               },
               {
                 "status": "supported",
@@ -2763,6 +3252,20 @@
                 "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
                 "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-5"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5)",
+              "single(propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-4) @hole:shape-query-hole-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4) @hole:shape-query-hole-5)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-4) @hole:shape-query-hole-5)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-5)",
+              "single(created-face(hole:countersink-wall) @hole:shape-query-hole-5)"
             ]
           },
           {
@@ -2770,6 +3273,11 @@
             "operation": "hole",
             "owner": "hole:shape-query-hole-4",
             "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
+                "note": "The selected up-to-face termination face is rewritten by the hole result and is not a defended named target."
+              },
               {
                 "status": "supported",
                 "query": "propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
@@ -2799,6 +3307,11 @@
                 "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
                 "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4",
+                "note": "The selected host face is rewritten by the hole result and is not a defended named target."
               },
               {
                 "status": "supported",
@@ -2838,6 +3351,19 @@
                 "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
                 "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-4"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-3) @hole:shape-query-hole-4)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-4)",
+              "single(created-face(hole:countersink-wall) @hole:shape-query-hole-4)"
             ]
           },
           {
@@ -2845,6 +3371,11 @@
             "operation": "hole",
             "owner": "hole:shape-query-hole-3",
             "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "The selected up-to-face termination face is rewritten by the hole result and is not a defended named target."
+              },
               {
                 "status": "supported",
                 "query": "propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
@@ -2874,6 +3405,11 @@
                 "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
                 "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3",
+                "note": "The selected host face is rewritten by the hole result and is not a defended named target."
               },
               {
                 "status": "supported",
@@ -2917,6 +3453,20 @@
                 "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
                 "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-3"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(split <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "face-region(propagated-face(split <- propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-2) @hole:shape-query-hole-3)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-3)",
+              "single(created-face(hole:counterbore-wall) @hole:shape-query-hole-3)",
+              "single(created-face(hole:counterbore-floor) @hole:shape-query-hole-3)"
             ]
           },
           {
@@ -2991,6 +3541,17 @@
                 "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
                 "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- tracked-face(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "single(propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "single(propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "single(propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "single(propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "face-region(propagated-face(split <- tracked-face(top) @extrude:shape-query-extrude-1) @hole:shape-query-hole-2)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-2)",
+              "single(created-face(hole:counterbore-wall) @hole:shape-query-hole-2)",
+              "single(created-face(hole:counterbore-floor) @hole:shape-query-hole-2)"
             ]
           }
         ]
@@ -3031,6 +3592,10 @@
             "preservedFaces": [
               {
                 "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
               },
               {
@@ -3040,6 +3605,26 @@
               {
                 "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
               },
               {
                 "status": "supported",
@@ -3095,10 +3680,39 @@
             "createdEdges": [],
             "diagnostics": [
               {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14"
+              },
+              {
                 "code": "boolean-union-edge-propagation-unsupported",
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-11) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- created-face(cut:floor) @cut:shape-query-cut-12) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-13) @boolean:union:shape-query-boolean-union-14)"
             ]
           },
           {
@@ -3106,6 +3720,11 @@
             "operation": "cut",
             "owner": "cut:shape-query-cut-12",
             "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
               {
                 "status": "supported",
                 "query": "propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
@@ -3120,6 +3739,31 @@
                 "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
                 "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
               },
               {
                 "status": "supported",
@@ -3164,6 +3808,23 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-11) @cut:shape-query-cut-12)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-12)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-12)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-12)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-12)",
+              "single(created-face(cut:floor) @cut:shape-query-cut-12)"
             ]
           },
           {
@@ -3171,6 +3832,11 @@
             "operation": "hole",
             "owner": "hole:shape-query-hole-11",
             "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
+                "note": "The selected up-to-face termination face is rewritten by the hole result and is not a defended named target."
+              },
               {
                 "status": "supported",
                 "query": "propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
@@ -3185,6 +3851,31 @@
                 "status": "supported",
                 "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
                 "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11",
+                "note": "The selected host face is rewritten by the hole result and is not a defended named target."
               },
               {
                 "status": "supported",
@@ -3228,6 +3919,21 @@
                 "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
                 "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-11"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11)",
+              "single(propagated-face(preserved <- created-face(hole:counterbore-floor) @hole:shape-query-hole-10) @hole:shape-query-hole-11)",
+              "single(propagated-face(preserved <- created-face(hole:counterbore-wall) @hole:shape-query-hole-10) @hole:shape-query-hole-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10) @hole:shape-query-hole-11)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-10) @hole:shape-query-hole-11)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-11)",
+              "single(created-face(hole:counterbore-wall) @hole:shape-query-hole-11)",
+              "single(created-face(hole:counterbore-floor) @hole:shape-query-hole-11)"
             ]
           },
           {
@@ -3236,9 +3942,39 @@
             "owner": "hole:shape-query-hole-10",
             "preservedFaces": [
               {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10",
+                "note": "The selected up-to-face termination face is rewritten by the hole result and is not a defended named target."
+              },
+              {
                 "status": "supported",
                 "query": "propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10",
                 "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10",
+                "note": "The selected host face is rewritten by the hole result and is not a defended named target."
               },
               {
                 "status": "supported",
@@ -3282,6 +4018,19 @@
                 "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
                 "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-10"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10)",
+              "single(propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9) @hole:shape-query-hole-10)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-9) @hole:shape-query-hole-10)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-10)",
+              "single(created-face(hole:counterbore-wall) @hole:shape-query-hole-10)",
+              "single(created-face(hole:counterbore-floor) @hole:shape-query-hole-10)"
             ]
           },
           {
@@ -3290,9 +4039,39 @@
             "owner": "hole:shape-query-hole-9",
             "preservedFaces": [
               {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9",
+                "note": "The selected up-to-face termination face is rewritten by the hole result and is not a defended named target."
+              },
+              {
                 "status": "supported",
                 "query": "propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-8) @hole:shape-query-hole-9",
                 "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9",
+                "note": "The selected host face is rewritten by the hole result and is not a defended named target."
               },
               {
                 "status": "supported",
@@ -3332,13 +4111,56 @@
                 "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
                 "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-9"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9)",
+              "single(propagated-face(preserved <- created-face(hole:countersink-wall) @hole:shape-query-hole-8) @hole:shape-query-hole-9)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8) @hole:shape-query-hole-9)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-8) @hole:shape-query-hole-9)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-9)",
+              "single(created-face(hole:countersink-wall) @hole:shape-query-hole-9)"
             ]
           },
           {
             "rewriteId": "shape-query-hole-8",
             "operation": "hole",
             "owner": "hole:shape-query-hole-8",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8",
+                "note": "The selected up-to-face termination face is rewritten by the hole result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8",
+                "note": "The selected host face is rewritten by the hole result and is not a defended named target."
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [
               {
@@ -3371,6 +4193,16 @@
                 "source": "face-ref(bottom) @extrude:shape-query-extrude-1",
                 "query": "propagated-face(split <- face-ref(bottom) @extrude:shape-query-extrude-1) @hole:shape-query-hole-8"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7) @hole:shape-query-hole-8)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-8)",
+              "single(created-face(hole:countersink-wall) @hole:shape-query-hole-8)"
             ]
           },
           {
@@ -3484,6 +4316,32 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(top) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(bottom) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(top) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(bottom) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(front) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(back) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(left) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(right) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(top) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- canonical-face(bottom) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6) @boolean:union:shape-query-boolean-union-7)"
             ]
           },
           {
@@ -3573,6 +4431,26 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- canonical-face(front) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(back) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(left) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(right) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(top) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @pattern:linear:0:shape-query-pattern-linear-0-3) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(front) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(back) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(left) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(right) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(top) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @pattern:linear:1:shape-query-pattern-linear-1-4) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(front) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(back) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(left) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(right) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(top) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @pattern:linear:2:shape-query-pattern-linear-2-5) @boolean:union:shape-query-boolean-union-6)"
             ]
           }
         ]
@@ -3609,6 +4487,54 @@
             "owner": "boolean:union:shape-query-boolean-union-8",
             "preservedFaces": [
               {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- created-face(cut:floor) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-left) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-right) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- face-ref(top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- created-face(cut:wall-bottom) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- created-face(cut:wall-left) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- created-face(cut:wall-right) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(preserved <- propagated-face(split <- created-face(cut:wall-top) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
                 "status": "supported",
                 "query": "propagated-face(preserved <- created-face(trimByPlane:plane-cap) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
               },
@@ -3642,17 +4568,171 @@
             "createdEdges": [],
             "diagnostics": [
               {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- created-face(cut:floor) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- created-face(cut:floor) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-left) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-left) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-right) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-right) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(split <- propagated-face(split <- face-ref(top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(split <- propagated-face(split <- face-ref(top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- created-face(cut:wall-bottom) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- created-face(cut:wall-bottom) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- created-face(cut:wall-left) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- created-face(cut:wall-left) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- created-face(cut:wall-right) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- created-face(cut:wall-right) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
+                "code": "boolean-union-face-inherited-ambiguity",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- created-face(cut:wall-top) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "query": "propagated-face(preserved <- propagated-face(split <- created-face(cut:wall-top) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8"
+              },
+              {
                 "code": "boolean-union-edge-propagation-unsupported",
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- created-face(trimByPlane:plane-cap) @trimByPlane:shape-query-trimbyplane-6) @boolean:union:shape-query-boolean-union-8)",
+              "single(propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8)",
+              "single(propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8)",
+              "single(propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8)",
+              "single(propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8)",
+              "single(propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-7) @boolean:union:shape-query-boolean-union-8)"
             ]
           },
           {
             "rewriteId": "shape-query-trimbyplane-6",
             "operation": "trimByPlane",
             "owner": "trimByPlane:shape-query-trimbyplane-6",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- created-face(cut:floor) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-left) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-right) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- face-ref(top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- created-face(cut:wall-bottom) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- created-face(cut:wall-left) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- created-face(cut:wall-right) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- created-face(cut:wall-top) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6",
+                "note": "Trim keeps a clipped descendant region on the source surface instead of one untouched face."
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [
               {
@@ -3672,6 +4752,21 @@
                 "category": "ambiguous",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- created-face(cut:floor) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-left) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-right) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- face-ref(side-top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- face-ref(top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-4) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- created-face(cut:wall-bottom) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- created-face(cut:wall-left) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- created-face(cut:wall-right) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "face-region(propagated-face(split <- created-face(cut:wall-top) @cut:shape-query-cut-5) @trimByPlane:shape-query-trimbyplane-6)",
+              "single(created-face(trimByPlane:plane-cap) @trimByPlane:shape-query-trimbyplane-6)"
             ]
           },
           {
@@ -3681,8 +4776,38 @@
             "preservedFaces": [
               {
                 "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- face-ref(bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
                 "query": "propagated-face(preserved <- created-face(hole:floor) @hole:shape-query-hole-4) @cut:shape-query-cut-5",
                 "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- face-ref(side-bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- face-ref(side-left) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- face-ref(side-right) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- face-ref(side-top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- face-ref(top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
               },
               {
                 "status": "supported",
@@ -3727,13 +4852,59 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- face-ref(bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- created-face(hole:floor) @hole:shape-query-hole-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- face-ref(side-bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- face-ref(side-left) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- face-ref(side-right) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- face-ref(side-top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5)",
+              "face-region(propagated-face(split <- propagated-face(split <- face-ref(top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- created-face(hole:wall) @hole:shape-query-hole-4) @cut:shape-query-cut-5)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-5)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-5)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-5)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-5)",
+              "single(created-face(cut:floor) @cut:shape-query-cut-5)"
             ]
           },
           {
             "rewriteId": "shape-query-hole-4",
             "operation": "hole",
             "owner": "hole:shape-query-hole-4",
-            "preservedFaces": [],
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- face-ref(bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- face-ref(side-bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- face-ref(side-left) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- face-ref(side-right) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- face-ref(side-top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4",
+                "note": "This face stays queryable through the hole rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- face-ref(top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4",
+                "note": "The selected host face is rewritten by the hole result and is not a defended named target."
+              }
+            ],
             "preservedEdges": [],
             "createdFaces": [
               {
@@ -3759,6 +4930,16 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- face-ref(bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- face-ref(side-bottom) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- face-ref(side-left) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- face-ref(side-right) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4)",
+              "single(propagated-face(preserved <- face-ref(side-top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4)",
+              "face-region(propagated-face(split <- face-ref(top) @boolean:union:shape-query-boolean-union-3) @hole:shape-query-hole-4)",
+              "single(created-face(hole:wall) @hole:shape-query-hole-4)",
+              "single(created-face(hole:floor) @hole:shape-query-hole-4)"
             ]
           },
           {
@@ -3824,6 +5005,20 @@
                 "category": "unsupported",
                 "queryKind": "edge"
               }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-1) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(front) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(back) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(left) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(right) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(top) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3)",
+              "single(propagated-face(preserved <- canonical-face(bottom) @extrude:shape-query-extrude-2) @boolean:union:shape-query-boolean-union-3)"
             ]
           }
         ]

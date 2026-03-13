@@ -121,6 +121,41 @@ export interface TopologyRewritePropagationDiagnostic {
   query?: FaceQueryRef | EdgeQueryRef;
 }
 
+export type TopologyRewriteDescendantContractKind =
+  | 'single'
+  | 'face-region'
+  | 'face-set'
+  | 'edge-chain'
+  | 'vertex-set'
+  | 'unsupported';
+
+export interface TopologyRewriteFaceDescendantContract {
+  queryKind: 'face';
+  kind: 'single' | 'face-region' | 'face-set' | 'unsupported';
+  query: FaceQueryRef;
+  source?: FaceQueryRef;
+  note?: string;
+}
+
+export interface TopologyRewriteEdgeDescendantContract {
+  queryKind: 'edge';
+  kind: 'single' | 'edge-chain' | 'unsupported';
+  query: EdgeQueryRef;
+  source?: EdgeQueryRef;
+  note?: string;
+}
+
+export interface TopologyRewriteVertexDescendantContract {
+  queryKind: 'vertex';
+  kind: 'vertex-set' | 'unsupported';
+  note?: string;
+}
+
+export type TopologyRewriteDescendantContract =
+  | TopologyRewriteFaceDescendantContract
+  | TopologyRewriteEdgeDescendantContract
+  | TopologyRewriteVertexDescendantContract;
+
 export interface TopologyRewritePropagation {
   rewriteId: string;
   operation: string;
@@ -130,6 +165,7 @@ export interface TopologyRewritePropagation {
   createdFaces: TopologyRewriteCreatedFaceQuery[];
   createdEdges: TopologyRewriteCreatedEdgeQuery[];
   diagnostics: TopologyRewritePropagationDiagnostic[];
+  descendants: TopologyRewriteDescendantContract[];
 }
 
 export function cloneShapeQueryOwner(owner: ShapeQueryOwner | undefined): ShapeQueryOwner | undefined {
@@ -252,6 +288,32 @@ export function cloneTopologyRewritePropagation(
         ? cloneFaceQueryRef(diagnostic.query as FaceQueryRef | undefined)
         : cloneEdgeQueryRef(diagnostic.query as EdgeQueryRef | undefined),
     })),
+    descendants: (propagation.descendants ?? []).map((contract) => {
+      switch (contract.queryKind) {
+        case 'face':
+          return {
+            queryKind: 'face',
+            kind: contract.kind,
+            query: cloneFaceQueryRef(contract.query)!,
+            source: cloneFaceQueryRef(contract.source),
+            note: contract.note,
+          };
+        case 'edge':
+          return {
+            queryKind: 'edge',
+            kind: contract.kind,
+            query: cloneEdgeQueryRef(contract.query)!,
+            source: cloneEdgeQueryRef(contract.source),
+            note: contract.note,
+          };
+        case 'vertex':
+          return {
+            queryKind: 'vertex',
+            kind: contract.kind,
+            note: contract.note,
+          };
+      }
+    }),
   };
 }
 
@@ -353,5 +415,19 @@ export function describeEdgeQueryRef(ref: EdgeQueryRef | undefined | null): stri
       return `propagated-edge(${ref.outcome} <- ${describeEdgeQueryRef(ref.source)}${selector})${owner}`;
     case 'created-edge':
       return `created-edge(${ref.operation}:${ref.slot}${selector})${owner}`;
+  }
+}
+
+export function describeTopologyRewriteDescendantContract(
+  contract: TopologyRewriteDescendantContract | undefined | null,
+): string {
+  if (!contract) return 'none';
+  switch (contract.queryKind) {
+    case 'face':
+      return `${contract.kind}(${describeFaceQueryRef(contract.query)})`;
+    case 'edge':
+      return `${contract.kind}(${describeEdgeQueryRef(contract.query)})`;
+    case 'vertex':
+      return `${contract.kind}(vertex)`;
   }
 }

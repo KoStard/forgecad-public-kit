@@ -26,6 +26,7 @@ import {
   type EdgeQueryRef,
   type FaceQueryRef,
 } from '../queryModel';
+import type { FaceDescendantMetadata } from '../descendantResolution';
 
 export type FaceName = string;
 export type EdgeName = string;
@@ -44,6 +45,8 @@ export interface FaceRef {
   uAxis?: [number, number, number];
   /** Face-local vertical axis for planar faces */
   vAxis?: [number, number, number];
+  /** Shared descendant-resolution metadata when this face is a semantic region/set. */
+  descendant?: FaceDescendantMetadata;
 }
 
 export interface EdgeRef {

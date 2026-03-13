@@ -15,10 +15,13 @@ import {
   type TopologyRewritePropagation,
 } from './queryModel';
 import {
+  createEdgeDescendantContract,
+  createFaceDescendantContract,
   createPropagatedEdgeQueryRef,
   createPropagatedFaceQueryRef,
   createTopologyRewritePropagation,
   createTopologyRewritePropagationDiagnostic,
+  pushTopologyRewriteDescendantContract,
 } from './queryPropagationCore';
 
 interface FacePropagationSeed {
@@ -257,10 +260,18 @@ function buildUnionFacePropagation(
 
   for (const group of groups) {
     if (group.count === 1 && !group.hasAmbiguousSource) {
+      const query = createPropagatedFaceQueryRef(group.source, owner, 'preserved');
       propagation.preservedFaces.push({
-        query: createPropagatedFaceQueryRef(group.source, owner, 'preserved'),
+        query,
         status: 'supported',
       });
+      pushTopologyRewriteDescendantContract(
+        propagation,
+        createFaceDescendantContract('single', query, {
+          source: group.source,
+          note: 'Boolean union keeps one defended single face descendant for this lineage.',
+        }),
+      );
       continue;
     }
 
@@ -273,6 +284,15 @@ function buildUnionFacePropagation(
       query,
       status: 'ambiguous',
     });
+    if (group.count > 1 && !group.hasAmbiguousSource) {
+      pushTopologyRewriteDescendantContract(
+        propagation,
+        createFaceDescendantContract('face-set', query, {
+          source: group.source,
+          note: 'Boolean union keeps a defended descendant face set for this merged lineage.',
+        }),
+      );
+    }
     propagation.diagnostics.push(
       createTopologyRewritePropagationDiagnostic(
         group.count > 1
@@ -303,10 +323,18 @@ function buildUnionEdgePropagation(
 
   for (const group of groups) {
     if (group.count === 1 && !group.hasAmbiguousSource) {
+      const query = createPropagatedEdgeQueryRef(group.source, owner, 'preserved');
       propagation.preservedEdges.push({
-        query: createPropagatedEdgeQueryRef(group.source, owner, 'preserved'),
+        query,
         status: 'supported',
       });
+      pushTopologyRewriteDescendantContract(
+        propagation,
+        createEdgeDescendantContract('single', query, {
+          source: group.source,
+          note: 'Boolean union keeps one defended single edge descendant for this lineage.',
+        }),
+      );
       continue;
     }
 
@@ -353,6 +381,13 @@ function buildDifferenceFacePropagation(
       query,
       status: 'ambiguous',
     });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createFaceDescendantContract('face-region', query, {
+        source: group.source,
+        note: 'Boolean difference keeps a defended descendant region on the source surface.',
+      }),
+    );
     propagation.diagnostics.push(
       createTopologyRewritePropagationDiagnostic(
         'boolean-difference-face-split-ambiguous',
@@ -413,6 +448,13 @@ function buildIntersectionFacePropagation(
       query,
       status: 'ambiguous',
     });
+    pushTopologyRewriteDescendantContract(
+      propagation,
+      createFaceDescendantContract('face-region', query, {
+        source: group.source,
+        note: 'Boolean intersection keeps a defended descendant region on the source surface.',
+      }),
+    );
     propagation.diagnostics.push(
       createTopologyRewritePropagationDiagnostic(
         'boolean-intersection-face-split-ambiguous',

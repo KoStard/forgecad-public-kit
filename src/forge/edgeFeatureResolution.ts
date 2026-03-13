@@ -1,4 +1,5 @@
 import type { ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
+import type { ShapeEdgeDescendantResolution } from './descendantResolution';
 import {
   cloneEdgeQueryRef,
   cloneShapeQueryOwner,
@@ -7,6 +8,7 @@ import {
   type EdgeQueryRef,
   type PropagatedEdgeQueryRef,
   type ShapeQueryOwner,
+  type TopologyRewriteEdgeDescendantContract,
 } from './queryModel';
 import { Transform, type Vec3 } from './transform';
 import type { EdgeFeatureResolvedSelector, ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
@@ -162,6 +164,16 @@ function findEdgePropagationDiagnosticMessage(
 
   const generic = diagnostics.find((entry) => entry.source == null && entry.query == null);
   return generic?.message ?? null;
+}
+
+function findEdgeDescendantContract(
+  plan: TopologyRewritePlan,
+  query: EdgeQueryRef | undefined,
+): TopologyRewriteEdgeDescendantContract | undefined {
+  if (!query) return undefined;
+  return plan.queryPropagation?.descendants.find((entry): entry is TopologyRewriteEdgeDescendantContract =>
+    entry.queryKind === 'edge' && edgeQueryRefsEqual(entry.query, query),
+  );
 }
 
 function rigidTransformForEdgeStep(step: ShapeCompileTransformStep): Transform | null {
@@ -703,44 +715,188 @@ export function resolveSupportedEdgeFeatureSelection(
   plan: ShapeCompilePlan | null,
   ref: EdgeQueryRef | undefined,
 ): EdgeFeatureResolutionResult {
-  if (!ref) {
+  const descendant = resolveShapeEdgeDescendant(plan, ref);
+  if (descendant.kind === 'single') {
+    return edgeSuccess(descendant.selection, descendant.query);
+  }
+  if (descendant.kind === 'edge-chain') {
+    return edgeIssue(
+      'edge-query-ambiguous-after-rewrite',
+      descendant.note
+        ?? 'The selected edge resolves to a defended descendant chain, not one single edge target.',
+    );
+  }
+  if (descendant.query == null && ref == null) {
     return edgeIssue(
       'missing-edge-query',
-      'Edge finishing currently requires a tracked edge query from a compile-covered target body.',
+      descendant.reason,
     );
+  }
+  if (descendant.query == null && ref?.selector && ref.selector !== 'edge') {
+    return edgeIssue('unsupported-edge-selector', descendant.reason);
+  }
+  if (descendant.reason.includes('selector')) {
+    return edgeIssue('unsupported-edge-selector', descendant.reason);
+  }
+  if (descendant.reason.includes('owner')) {
+    return edgeIssue('edge-owner-not-found', descendant.reason);
+  }
+  return edgeIssue('edge-query-unsupported-after-rewrite', descendant.reason);
+}
+
+function resolveEdgeChainAtOwnerBase(
+  ownerBase: ShapeCompilePlan,
+  ref: PropagatedEdgeQueryRef,
+): ShapeEdgeDescendantResolution {
+  if (
+    ownerBase.kind === 'box'
+    || ownerBase.kind === 'cylinder'
+    || ownerBase.kind === 'sphere'
+    || ownerBase.kind === 'extrude'
+    || ownerBase.kind === 'revolve'
+    || ownerBase.kind === 'loft'
+    || ownerBase.kind === 'sweep'
+    || ownerBase.kind === 'transform'
+    || ownerBase.kind === 'queryOwner'
+  ) {
+    return {
+      kind: 'unsupported',
+      query: cloneEdgeQueryRef(ref),
+      reason: 'The selected propagated edge query does not point at a topology-rewrite result on this target shape.',
+    };
+  }
+
+  const contract = findEdgeDescendantContract(ownerBase, ref);
+  if (!contract || contract.kind !== 'edge-chain') {
+    return {
+      kind: 'unsupported',
+      query: cloneEdgeQueryRef(ref),
+      reason: 'This target shape does not record a defended descendant edge chain for the selected query.',
+    };
+  }
+
+  const sourceCandidate = resolveSourceQueryBeforeRewrite(ownerBase, ref.source);
+  if (!sourceCandidate.ok) {
+    return {
+      kind: 'unsupported',
+      query: cloneEdgeQueryRef(ref),
+      reason: sourceCandidate.issue.reason,
+      note: contract.note,
+    };
+  }
+
+  return {
+    kind: 'edge-chain',
+    semantic: 'chain',
+    query: cloneEdgeQueryRef(ref)!,
+    selection: sourceCandidate.selection,
+    note: contract.note,
+  };
+}
+
+export function resolveShapeEdgeDescendant(
+  plan: ShapeCompilePlan | null,
+  ref: EdgeQueryRef | undefined,
+): ShapeEdgeDescendantResolution {
+  if (!ref) {
+    return {
+      kind: 'unsupported',
+      reason: 'Edge finishing currently requires a tracked edge query from a compile-covered target body.',
+    };
   }
   if (ref.selector !== 'edge') {
-    return edgeIssue(
-      'unsupported-edge-selector',
-      'Edge finishing v1 currently supports whole-edge selections only; use shape.edge(name), not .start/.end/.midpoint selectors.',
-    );
+    return {
+      kind: 'unsupported',
+      query: cloneEdgeQueryRef(ref),
+      reason: 'Edge finishing v1 currently supports whole-edge selections only; use shape.edge(name), not .start/.end/.midpoint selectors.',
+    };
   }
   if (ref.kind !== 'tracked-edge' && ref.kind !== 'propagated-edge') {
-    return edgeIssue(
-      'unsupported-edge-query-kind',
-      ref.kind === 'created-edge'
+    return {
+      kind: 'unsupported',
+      query: cloneEdgeQueryRef(ref),
+      reason: ref.kind === 'created-edge'
         ? 'Edge finishing does not yet support created-edge queries from topology rewrites.'
         : 'Edge finishing v1 supports compiler-owned tracked-edge and propagated-edge queries only, not direct edge refs.',
-    );
+    };
   }
   if (!ref.owner) {
-    return edgeIssue(
-      'missing-edge-owner',
-      'Edge finishing currently requires a tracked edge query with a compiler-owned parent body owner.',
-    );
+    return {
+      kind: 'unsupported',
+      query: cloneEdgeQueryRef(ref),
+      reason: 'Edge finishing currently requires a tracked edge query with a compiler-owned parent body owner.',
+    };
   }
 
   const found = searchOwnerMatch(plan, ref.owner);
   if (!found.match) {
-    if (found.issue) return edgeIssue(found.issue.code, found.issue.reason);
-    return edgeIssue(
-      'edge-owner-not-found',
-      'The selected tracked edge is not owned by this target shape or any preserved query ancestor.',
-    );
+    return {
+      kind: 'unsupported',
+      query: cloneEdgeQueryRef(ref),
+      reason: found.issue?.reason
+        ?? 'The selected tracked edge is not owned by this target shape or any preserved query ancestor.',
+    };
   }
+
   const base = resolveEdgeQueryAtOwnerBase(found.match.base, ref);
-  if (!base.ok) return base;
-  return applyOwnerSearchSteps({ selection: base.selection, query: base.query }, found.match.steps);
+  if (base.ok) {
+    const applied = applyOwnerSearchSteps({ selection: base.selection, query: base.query }, found.match.steps);
+    if (!applied.ok) {
+      return {
+        kind: 'unsupported',
+        query: cloneEdgeQueryRef(ref),
+        reason: applied.issue.reason,
+      };
+    }
+    return {
+      kind: 'single',
+      semantic: 'edge',
+      query: applied.query,
+      selection: applied.selection,
+    };
+  }
+
+  if (ref.kind === 'propagated-edge') {
+    const chain = resolveEdgeChainAtOwnerBase(found.match.base, ref);
+    if (chain.kind !== 'unsupported') {
+      let transformed = chain;
+      for (const step of found.match.steps) {
+        if (step.kind === 'transform') {
+          const applied = applyTransformStepsToCandidate(
+            { selection: transformed.selection, query: transformed.query },
+            step.steps,
+          );
+          if (!applied.ok) {
+            return {
+              kind: 'unsupported',
+              query: cloneEdgeQueryRef(ref),
+              reason: applied.issue.reason,
+              note: transformed.note,
+            };
+          }
+          transformed = {
+            ...transformed,
+            selection: applied.selection,
+            query: applied.query,
+          };
+          continue;
+        }
+        return {
+          kind: 'unsupported',
+          query: cloneEdgeQueryRef(ref),
+          reason: 'Later topology rewrites do not yet preserve this defended edge chain as a new downstream chain contract.',
+          note: transformed.note,
+        };
+      }
+      return transformed;
+    }
+  }
+
+  return {
+    kind: 'unsupported',
+    query: cloneEdgeQueryRef(ref),
+    reason: base.issue.reason,
+  };
 }
 
 export function collectSupportedEdgeFinishPreservedSources(

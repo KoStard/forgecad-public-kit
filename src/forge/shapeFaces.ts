@@ -9,11 +9,14 @@ import {
 } from './compilePlan';
 import {
   cloneFaceQueryRef,
+  cloneShapeQueryOwner,
   faceQueryRefsEqual,
   shapeQueryOwnersEqual,
   type FaceQueryRef,
   type ShapeQueryOwner,
+  type TopologyRewriteFaceDescendantContract,
 } from './queryModel';
+import type { FaceDescendantMetadata, FaceDescendantSemantic } from './descendantResolution';
 import { Transform, normalizeAxis, type Mat4, type Vec3 } from './transform';
 import type { SketchPlacementModel } from './sketch/workplaneModel';
 import type { FaceRef } from './sketch/topology';
@@ -28,6 +31,14 @@ interface BlockedFaceQuery {
 interface FaceMatch {
   name: string;
   face: FaceRef;
+}
+
+interface NamedFaceCandidate {
+  name: string;
+  face: FaceRef;
+  query: FaceQueryRef;
+  semantic: FaceDescendantSemantic;
+  aliases: FaceQueryRef[];
 }
 
 interface FaceTable {
@@ -70,7 +81,104 @@ function cloneFaceRefValue(face: FaceRef): FaceRef {
     query: cloneFaceQueryRef(face.query),
     uAxis: face.uAxis ? cloneVec3(face.uAxis) : undefined,
     vAxis: face.vAxis ? cloneVec3(face.vAxis) : undefined,
+    descendant: face.descendant ? cloneFaceDescendantMetadata(face.descendant) : undefined,
   };
+}
+
+function cloneFaceDescendantMetadata(metadata: FaceDescendantMetadata): FaceDescendantMetadata {
+  return {
+    kind: metadata.kind,
+    semantic: metadata.semantic,
+    memberCount: metadata.memberCount,
+    memberNames: [...metadata.memberNames],
+    coplanar: metadata.coplanar,
+  };
+}
+
+function createFaceDescendantMetadata(
+  semantic: FaceDescendantSemantic,
+  memberNames: string[],
+  coplanar: boolean,
+): FaceDescendantMetadata {
+  return {
+    kind: semantic === 'face' && memberNames.length === 1 ? 'single' : 'face-set',
+    semantic,
+    memberCount: memberNames.length,
+    memberNames: [...memberNames],
+    coplanar,
+  };
+}
+
+function facesAreCoplanar(faces: FaceRef[]): boolean {
+  if (faces.length <= 1) return true;
+  const first = faces[0];
+  if (first.planar === false || !first.uAxis || !first.vAxis) return false;
+  const firstNormal = normalizeAxis(first.normal);
+  const planeOffset = (
+    firstNormal[0] * first.center[0]
+    + firstNormal[1] * first.center[1]
+    + firstNormal[2] * first.center[2]
+  );
+  for (const face of faces.slice(1)) {
+    if (face.planar === false || !face.uAxis || !face.vAxis) return false;
+    const normal = normalizeAxis(face.normal);
+    const alignment = Math.abs(
+      firstNormal[0] * normal[0]
+      + firstNormal[1] * normal[1]
+      + firstNormal[2] * normal[2],
+    );
+    if (Math.abs(alignment - 1) > 1e-6) return false;
+    const offset = firstNormal[0] * face.center[0] + firstNormal[1] * face.center[1] + firstNormal[2] * face.center[2];
+    if (Math.abs(offset - planeOffset) > 1e-6) return false;
+  }
+  return true;
+}
+
+function attachFaceDescendantMetadata(
+  face: FaceRef,
+  semantic: FaceDescendantSemantic,
+  memberNames: string[],
+  coplanar: boolean,
+): FaceRef {
+  return {
+    ...face,
+    descendant: createFaceDescendantMetadata(semantic, memberNames, coplanar),
+  };
+}
+
+function representativeFaceForMembers(
+  name: string,
+  faces: FaceRef[],
+  query: FaceQueryRef | undefined,
+  semantic: FaceDescendantSemantic,
+): FaceRef {
+  const cloned = faces.map((face) => cloneFaceRefValue(face));
+  const first = cloned[0];
+  const coplanar = facesAreCoplanar(cloned);
+  const center = cloned.reduce<[number, number, number]>(
+    (acc, face) => [
+      acc[0] + face.center[0],
+      acc[1] + face.center[1],
+      acc[2] + face.center[2],
+    ],
+    [0, 0, 0],
+  );
+  const count = Math.max(cloned.length, 1);
+  const representative: FaceRef = {
+    ...first,
+    name,
+    center: [center[0] / count, center[1] / count, center[2] / count],
+    query: cloneFaceQueryRef(query),
+    planar: coplanar ? first.planar : false,
+    uAxis: coplanar ? first.uAxis : undefined,
+    vAxis: coplanar ? first.vAxis : undefined,
+  };
+  return attachFaceDescendantMetadata(
+    representative,
+    semantic,
+    cloned.map((face) => face.name),
+    coplanar,
+  );
 }
 
 function cloneFaceTable(table: FaceTable): FaceTable {
@@ -114,7 +222,11 @@ function removeSupportedQuery(table: FaceTable, query: FaceQueryRef | undefined)
 }
 
 function registerFace(table: FaceTable, face: FaceRef): void {
-  table.faces.set(face.name, cloneFaceRefValue(face));
+  const next = cloneFaceRefValue(face);
+  if (!next.descendant) {
+    next.descendant = createFaceDescendantMetadata('face', [next.name], next.planar !== false);
+  }
+  table.faces.set(next.name, next);
   registerSupportedQuery(table, face.query);
 }
 
@@ -122,6 +234,22 @@ function setFaceQuery(table: FaceTable, name: string, query: FaceQueryRef, alias
   const face = table.faces.get(name);
   if (!face) return;
   face.query = cloneFaceQueryRef(query);
+  table.faces.set(name, face);
+  registerSupportedQuery(table, query);
+  registerSupportedQuery(table, alias);
+}
+
+function setFaceDescendant(
+  table: FaceTable,
+  name: string,
+  query: FaceQueryRef,
+  semantic: FaceDescendantSemantic,
+  alias?: FaceQueryRef,
+): void {
+  const face = table.faces.get(name);
+  if (!face) return;
+  face.query = cloneFaceQueryRef(query);
+  face.descendant = createFaceDescendantMetadata(semantic, [name], face.planar !== false);
   table.faces.set(name, face);
   registerSupportedQuery(table, query);
   registerSupportedQuery(table, alias);
@@ -251,6 +379,22 @@ function normalize2d(vec: Vec2): Vec2 {
   const len = Math.hypot(vec[0], vec[1]);
   if (len < 1e-12) return [1, 0];
   return [vec[0] / len, vec[1] / len];
+}
+
+function cross3(a: Vec3, b: Vec3): Vec3 {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+
+function orthonormalBasisFromNormal(normal: Vec3): { u: Vec3; v: Vec3 } {
+  const n = normalizeAxis(normal);
+  const seed: Vec3 = Math.abs(n[2]) < 0.9 ? [0, 0, 1] : [0, 1, 0];
+  const u = normalizeAxis(cross3(seed, n));
+  const v = normalizeAxis(cross3(n, u));
+  return { u, v };
 }
 
 function faceFrom2DEdge(
@@ -476,15 +620,30 @@ function buildExtrudeFaceTable(
   }
 }
 
+type AnyTopologyRewritePropagation = Extract<
+  ShapeCompilePlan,
+  { kind: 'shell' | 'hole' | 'cut' | 'boolean' | 'trimByPlane' | 'fillet' | 'chamfer' | 'hull' }
+>['queryPropagation'];
+
 function findCreatedFaceQuery(
-  propagation: Extract<ShapeCompilePlan, { kind: 'shell' | 'hole' | 'cut' }>['queryPropagation'],
+  propagation: AnyTopologyRewritePropagation,
   slot: string,
 ): FaceQueryRef | undefined {
   return propagation?.createdFaces.find((entry) => entry.query.slot === slot)?.query;
 }
 
+function findFaceDescendantContract(
+  propagation: AnyTopologyRewritePropagation,
+  query: FaceQueryRef | undefined,
+): TopologyRewriteFaceDescendantContract | undefined {
+  if (!query) return undefined;
+  return propagation?.descendants.find((entry): entry is TopologyRewriteFaceDescendantContract =>
+    entry.queryKind === 'face' && faceQueryRefsEqual(entry.query, query),
+  );
+}
+
 function findPreservedFaceQuery(
-  propagation: Extract<ShapeCompilePlan, { kind: 'shell' | 'hole' | 'cut' }>['queryPropagation'],
+  propagation: AnyTopologyRewritePropagation,
   source: FaceQueryRef | undefined,
 ): FaceQueryRef | undefined {
   if (!source) return undefined;
@@ -714,6 +873,55 @@ function booleanBlockedFaceReason(note: string | undefined, fallback: string): s
   return note ?? fallback;
 }
 
+function pushNamedFaceCandidate(
+  out: Map<string, NamedFaceCandidate[]>,
+  candidate: NamedFaceCandidate,
+): void {
+  const existing = out.get(candidate.name);
+  if (existing) {
+    existing.push(candidate);
+    return;
+  }
+  out.set(candidate.name, [candidate]);
+}
+
+function registerNamedFaceCandidates(
+  table: FaceTable,
+  candidates: Map<string, NamedFaceCandidate[]>,
+  owner: ShapeQueryOwner | undefined,
+): void {
+  for (const [name, entries] of candidates.entries()) {
+    const representativeQuery = entries.length === 1
+      ? entries[0].query
+      : {
+        kind: 'face-ref',
+        faceName: name,
+        owner: cloneShapeQueryOwner(owner),
+      } satisfies FaceQueryRef;
+    const semantic = entries.some((entry) => entry.semantic === 'region')
+      ? 'region'
+      : entries.length > 1
+        ? 'set'
+        : entries[0].semantic;
+    const representative = representativeFaceForMembers(
+      name,
+      entries.map((entry) => entry.face),
+      representativeQuery,
+      semantic,
+    );
+    registerFace(table, representative);
+    for (const entry of entries) {
+      registerSupportedQuery(table, entry.query);
+      for (const alias of entry.aliases) {
+        registerSupportedQuery(table, alias);
+      }
+    }
+    if (entries.length > 1) {
+      registerSupportedQuery(table, representativeQuery);
+    }
+  }
+}
+
 function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: ShapeQueryOwner | null): FaceTable {
   if (!plan) return emptyFaceTable();
 
@@ -766,12 +974,24 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
     }
     case 'hole': {
       const table = cloneFaceTable(resolveShapeFaceTable(plan.base));
-      for (const blocked of blockedShapeFacesForFeature(plan.base, plan.placement.placement.workplane.source, plan.extent)) {
-        blockNamedFace(table, blocked.name, featureBlockedFaceReason('hole', blocked.reason));
-      }
       for (const [name, face] of table.faces.entries()) {
         const propagated = findPreservedFaceQuery(plan.queryPropagation, face.query);
+        const contract = findFaceDescendantContract(plan.queryPropagation, propagated);
+        if (propagated && contract?.kind === 'face-region') {
+          setFaceDescendant(table, name, propagated, 'region', face.query);
+          continue;
+        }
         if (propagated) setFaceQuery(table, name, propagated, face.query);
+      }
+      for (const blocked of blockedShapeFacesForFeature(plan.base, plan.placement.placement.workplane.source, plan.extent)) {
+        const face = table.faces.get(blocked.name);
+        if (face?.descendant?.semantic === 'region') continue;
+        const regionQuery = face ? findPreservedFaceQuery(plan.queryPropagation, face.query) : undefined;
+        if (face && regionQuery) {
+          setFaceDescendant(table, blocked.name, regionQuery, 'region', face.query);
+          continue;
+        }
+        blockNamedFace(table, blocked.name, featureBlockedFaceReason('hole', blocked.reason));
       }
 
       const workplane = plan.placement.placement.workplane;
@@ -858,12 +1078,24 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
     }
     case 'cut': {
       const table = cloneFaceTable(resolveShapeFaceTable(plan.base));
-      for (const blocked of blockedShapeFacesForFeature(plan.base, plan.placement.placement.workplane.source, plan.extent)) {
-        blockNamedFace(table, blocked.name, featureBlockedFaceReason('cut', blocked.reason));
-      }
       for (const [name, face] of table.faces.entries()) {
         const propagated = findPreservedFaceQuery(plan.queryPropagation, face.query);
+        const contract = findFaceDescendantContract(plan.queryPropagation, propagated);
+        if (propagated && contract?.kind === 'face-region') {
+          setFaceDescendant(table, name, propagated, 'region', face.query);
+          continue;
+        }
         if (propagated) setFaceQuery(table, name, propagated, face.query);
+      }
+      for (const blocked of blockedShapeFacesForFeature(plan.base, plan.placement.placement.workplane.source, plan.extent)) {
+        const face = table.faces.get(blocked.name);
+        if (face?.descendant?.semantic === 'region') continue;
+        const regionQuery = face ? findPreservedFaceQuery(plan.queryPropagation, face.query) : undefined;
+        if (face && regionQuery) {
+          setFaceDescendant(table, blocked.name, regionQuery, 'region', face.query);
+          continue;
+        }
+        blockNamedFace(table, blocked.name, featureBlockedFaceReason('cut', blocked.reason));
       }
 
       const placement = plan.placement.placement;
@@ -977,21 +1209,53 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
     case 'loft':
     case 'sweep':
     case 'hull':
-    case 'trimByPlane':
     case 'fillet':
     case 'chamfer':
       return emptyFaceTable();
+    case 'trimByPlane': {
+      const table = emptyFaceTable();
+      const planeCapQuery = findCreatedFaceQuery(plan.queryPropagation, 'plane-cap');
+      if (!planeCapQuery) return table;
+      const baseTable = resolveShapeFaceTable(plan.base);
+      const centers = Array.from(baseTable.faces.values()).map((face) => face.center);
+      const averageCenter = centers.length > 0
+        ? centers.reduce<Vec3>(
+          (acc, center) => [acc[0] + center[0], acc[1] + center[1], acc[2] + center[2]],
+          [0, 0, 0],
+        ).map((value) => value / centers.length) as Vec3
+        : [0, 0, plan.originOffset] as Vec3;
+      const normal = normalizeAxis([plan.normalX, plan.normalY, plan.normalZ]);
+      const planeDistance = averageCenter[0] * normal[0] + averageCenter[1] * normal[1] + averageCenter[2] * normal[2] - plan.originOffset;
+      const center: Vec3 = [
+        averageCenter[0] - normal[0] * planeDistance,
+        averageCenter[1] - normal[1] * planeDistance,
+        averageCenter[2] - normal[2] * planeDistance,
+      ];
+      const basis = orthonormalBasisFromNormal(normal);
+      registerFace(table, {
+        name: 'plane-cap',
+        normal,
+        center,
+        planar: true,
+        uAxis: basis.u,
+        vAxis: basis.v,
+        query: planeCapQuery,
+      });
+      return table;
+    }
     case 'boolean': {
       const table = emptyFaceTable();
       const operandTables = plan.shapes.map((shape) => resolveShapeFaceTable(shape));
       const propagation = plan.queryPropagation;
       if (!propagation) return table;
+      const candidates = new Map<string, NamedFaceCandidate[]>();
 
       for (const entry of propagation.preservedFaces) {
         const query = cloneFaceQueryRef(entry.query)!;
         const matches = findBooleanPropagationMatches(operandTables, entry.query.source);
-        const name = sharedMatchName(matches);
-        if (entry.status === 'ambiguous') {
+        const contract = findFaceDescendantContract(propagation, query);
+        if (entry.status === 'ambiguous' && !contract) {
+          const name = sharedMatchName(matches);
           const reason = booleanBlockedFaceReason(
             entry.note,
             'This propagated boolean face lineage is ambiguous and is not part of the defended named-face subset.',
@@ -1007,38 +1271,27 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
           continue;
         }
 
-        registerSupportedQuery(table, query);
-        if (entry.query.kind === 'propagated-face') {
-          registerSupportedQuery(table, entry.query.source);
-        }
+        const semantic = contract?.kind === 'face-region'
+          ? 'region'
+          : contract?.kind === 'face-set'
+            ? 'set'
+            : 'face';
         for (const match of matches) {
-          registerSupportedQuery(table, match.face.query);
-        }
-
-        if (matches.length !== 1) {
-          if (name) {
-            maskNamedFace(table, name, booleanNamedFaceConflictReason(name));
-          }
-          continue;
-        }
-
-        const candidate = matches[0];
-        const existing = table.faces.get(candidate.name);
-        if (existing && !faceQueryRefsEqual(existing.query, query)) {
-          maskNamedFace(table, candidate.name, booleanNamedFaceConflictReason(candidate.name));
-          continue;
-        }
-
-        registerFace(table, {
-          ...candidate.face,
-          name: candidate.name,
-          query,
-        });
-        if (entry.query.kind === 'propagated-face') {
-          registerSupportedQuery(table, entry.query.source);
+          pushNamedFaceCandidate(candidates, {
+            name: match.name,
+            face: cloneFaceRefValue(match.face),
+            query,
+            semantic,
+            aliases: [
+              query,
+              ...(entry.query.kind === 'propagated-face' ? [entry.query.source] : []),
+              ...(match.face.query ? [match.face.query] : []),
+            ].filter((candidate): candidate is FaceQueryRef => candidate != null),
+          });
         }
       }
 
+      registerNamedFaceCandidates(table, candidates, propagation.owner);
       return table;
     }
   }

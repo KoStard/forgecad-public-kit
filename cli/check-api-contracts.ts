@@ -191,7 +191,7 @@ function checkEdgeFinishSubsetErrors(): void {
   );
   assert.throws(
     () => filletEdge(once, base.edge('vert-br'), 4, [-1, -1]),
-    /merged rewritten descendants|merged into rewritten descendants|untouched sibling vertical edges/,
+    /merged rewritten descendants|merged into rewritten descendants|untouched sibling vertical edges|descendant chain/,
   );
   assert.throws(
     () => filletEdge(

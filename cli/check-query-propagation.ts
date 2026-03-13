@@ -10,6 +10,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 import { init } from '../src/forge/headless';
 import {
+  describeTopologyRewriteDescendantContract,
   describeEdgeQueryRef,
   describeFaceQueryRef,
   type EdgeQueryRef,
@@ -57,6 +58,7 @@ type QueryPropagationSnapshot = {
   createdFaces: QueryPropagationEntrySnapshot[];
   createdEdges: QueryPropagationEntrySnapshot[];
   diagnostics: QueryPropagationDiagnosticSnapshot[];
+  descendants: string[];
 };
 
 type QueryPropagationObjectSnapshot = {
@@ -578,6 +580,7 @@ function summarizePropagation(propagation: TopologyRewritePropagation): QueryPro
       source: describeQuery(diagnostic.queryKind, diagnostic.source as FaceQueryRef | EdgeQueryRef | undefined),
       query: describeQuery(diagnostic.queryKind, diagnostic.query as FaceQueryRef | EdgeQueryRef | undefined),
     })),
+    descendants: propagation.descendants.map((contract) => describeTopologyRewriteDescendantContract(contract)),
   };
 }
 

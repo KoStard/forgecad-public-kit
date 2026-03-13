@@ -1117,15 +1117,16 @@ export class Shape {
   /** Split by infinite plane. Returns [positive-side, negative-side]. */
   splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
     const info = deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' });
+    const basePlan = getShapeCompilePlanInternal(this);
     const firstPlan = createOwnedTopologyRewritePlan(
-      buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), normal, originOffset),
+      buildTrimByPlaneShapeCompilePlan(basePlan, normal, originOffset),
       'splitByPlane:positive',
-      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner),
+      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan!),
     );
     const secondPlan = createOwnedTopologyRewritePlan(
-      buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), [-normal[0], -normal[1], -normal[2]], -originOffset),
+      buildTrimByPlaneShapeCompilePlan(basePlan, [-normal[0], -normal[1], -normal[2]], -originOffset),
       'splitByPlane:opposite',
-      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner),
+      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan!),
     );
     if (firstPlan && secondPlan) {
       return [
@@ -1148,10 +1149,11 @@ export class Shape {
 
   /** Keep the positive side of the plane and discard the opposite side. */
   trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
+    const basePlan = getShapeCompilePlanInternal(this);
     const nextPlan = createOwnedTopologyRewritePlan(
-      buildTrimByPlaneShapeCompilePlan(getShapeCompilePlanInternal(this), normal, originOffset),
+      buildTrimByPlaneShapeCompilePlan(basePlan, normal, originOffset),
       'trimByPlane',
-      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner),
+      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan!),
     );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
