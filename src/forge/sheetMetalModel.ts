@@ -672,16 +672,16 @@ export function describeSheetMetalFaces(
           [derived.panelWidth / 2 + flange.bendAllowance / 2, flange.centerAlongEdge, derived.thickness / 2],
           [0, 0, 1],
           true,
-          [1, 0, 0],
           [0, 1, 0],
+          [-1, 0, 0],
         ));
         faces.push(descriptor(
           'flange-right',
           [derived.panelWidth / 2 + flange.bendAllowance + flange.length / 2, flange.centerAlongEdge, derived.thickness / 2],
           [0, 0, 1],
           true,
-          [1, 0, 0],
           [0, 1, 0],
+          [-1, 0, 0],
         ));
         break;
       case 'left':
@@ -690,16 +690,16 @@ export function describeSheetMetalFaces(
           [-derived.panelWidth / 2 - flange.bendAllowance / 2, flange.centerAlongEdge, derived.thickness / 2],
           [0, 0, 1],
           true,
+          [0, -1, 0],
           [1, 0, 0],
-          [0, 1, 0],
         ));
         faces.push(descriptor(
           'flange-left',
           [-derived.panelWidth / 2 - flange.bendAllowance - flange.length / 2, flange.centerAlongEdge, derived.thickness / 2],
           [0, 0, 1],
           true,
+          [0, -1, 0],
           [1, 0, 0],
-          [0, 1, 0],
         ));
         break;
     }

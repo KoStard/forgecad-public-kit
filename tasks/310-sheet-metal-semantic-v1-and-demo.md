@@ -175,3 +175,4 @@ After this task lands, the likely safe follow-ons are:
 
 ## Status and log
 - 2026-03-13: Created as the first sheet-metal task after durable descendant resolution, with `folded-service-panel-cover` as the required proof model.
+- 2026-03-13: Landed `sheetMetal()` v1 as a compiler-owned semantic family with folded and flat outputs, defended `panel` / `flange-*` / `bend-*` descendants, the `folded-service-panel-cover` demo, compiler/BREP/query/API checks, and permanent docs for the supported subset and explicit limits.

@@ -869,6 +869,56 @@ Not supported yet:
 - draft/taper angles or two-sided extents
 - named created-wall support for arbitrary boolean/offset/projected cut profiles
 
+#### `sheetMetal(options)`
+Compiler-owned sheet-metal v1 builder.
+
+`sheetMetal(...)` returns a `SheetMetalPart`, not a solid directly.
+
+Core flow:
+
+- define the base panel, thickness, bend radius, and explicit `kFactor`
+- add `90°` edge flanges with `.flange(...)`
+- add planar panel/flange cutouts with `.cutout(...)`
+- materialize either `.folded()` or `.flatPattern()`
+
+```javascript
+const cover = sheetMetal({
+  panel: { width: 180, height: 110 },
+  thickness: 1.5,
+  bendRadius: 2,
+  bendAllowance: { kFactor: 0.42 },
+  cornerRelief: { size: 4 },
+})
+  .flange('top', { length: 18 })
+  .flange('right', { length: 18 })
+  .flange('bottom', { length: 18 })
+  .flange('left', { length: 18 })
+  .cutout('panel', rect(72, 36, true), { selfAnchor: 'center' })
+  .cutout('flange-right', roundedRect(26, 10, 5, true), { selfAnchor: 'center' });
+
+const folded = cover.folded();
+const flat = cover.flatPattern();
+```
+
+Supported v1 subset:
+
+- one base panel
+- up to four `90°` edge flanges
+- constant thickness
+- explicit bend radius plus explicit K-factor bend metadata
+- rectangular corner reliefs
+- planar cutouts on the panel and existing flange regions
+- defended semantic regions such as `panel`, `flange-right`, and `bend-right`
+
+Not supported yet:
+
+- arbitrary solid conversion into sheet metal
+- hems, jogs, lofted bends, or broader miter-corner logic
+- nonuniform thickness
+- cutouts directly on bend regions
+
+Use [sheet-metal.md](sheet-metal.md) for the full sheet-metal contract and the maintained `folded-service-panel-cover` proof model.
+
 ### Warping
 
 ```javascript

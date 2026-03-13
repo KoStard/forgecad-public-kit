@@ -6,7 +6,7 @@ They are intentionally ordinary mechanical parts instead of isolated geometry
 tricks, so lowerer regressions show up in workflows that look like real
 product-design code.
 
-Each file is deterministic: no randomness, no params, one named solid result.
+Each file is deterministic: no randomness, no params, fixed named solid result(s).
 
 ## Coverage Map
 
@@ -17,6 +17,7 @@ Each file is deterministic: no randomness, no params, one named solid result.
 | `sensor-bracket.forge.js` | mirrored ribs, upright `onFace()` cuts, repeated detail holes |
 | `edge-finished-mount.forge.js` | tracked-edge fillet/chamfer, downstream hole/cut edits, boolean chain |
 | `fastener-plate-variants.forge.js` | counterbores, countersinks, planar `upToFace`, created-face propagation |
+| `folded-service-panel-cover.forge.js` | compiler-owned sheet metal, named panel/flange/bend descendants, folded + flat outputs |
 | `projection-relay-cover.forge.js` | `projectToPlane()` replay from repeated union descendants |
 | `service-panel-cover.forge.js` | repeated bosses plus richer hole/cut details plus projection replay |
 | `trimmed-access-cover.forge.js` | `trimByPlane()`, plane-cap ownership, later union edits |
@@ -57,6 +58,13 @@ Guards:
 - compiler-owned counterbore and countersink holes inside a normal fastener-plate workflow
 - `upToFace` hole/cut extents lowering through both Manifold and CadQuery/OCCT from the shared feature family
 - defended created-face/query semantics staying inspectable after multiple richer hole rewrites
+
+### `folded-service-panel-cover.forge.js`
+
+Guards:
+- compiler-owned `sheetMetal()` intent lowering to both the folded cover and the flat pattern from one semantic model
+- named `panel`, `flange-*`, and `bend-*` descendants staying inspectable after panel/flange cutouts split those regions
+- exact export and query-propagation coverage for a manufacturable-looking sheet-metal cover instead of an isolated toy bend
 
 ### `projection-relay-cover.forge.js`
 

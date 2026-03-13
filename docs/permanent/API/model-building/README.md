@@ -8,6 +8,7 @@ This folder is partitioned so each API surface has one primary owner file. Avoid
 - [coordinate-system.md](coordinate-system.md), [geometry-conventions.md](geometry-conventions.md), [positioning.md](positioning.md): orientation rules, winding/transform conventions, and placement strategy.
 - [sketch-core.md](sketch-core.md), [sketch-primitives.md](sketch-primitives.md), [sketch-path.md](sketch-path.md), [sketch-transforms.md](sketch-transforms.md), [sketch-booleans.md](sketch-booleans.md), [sketch-operations.md](sketch-operations.md), [sketch-on-face.md](sketch-on-face.md), [sketch-extrude.md](sketch-extrude.md), [sketch-anchor.md](sketch-anchor.md): detailed 2D sketch APIs.
 - [entities.md](entities.md): named entities, tracked topology, constrained sketches, patterns, and fillet/chamfer utilities.
+- [sheet-metal.md](sheet-metal.md): compiler-owned sheet-metal modeling, folded outputs, flat patterns, and defended region names.
 - [assembly.md](assembly.md): assembly graph, joints, couplings, validation, and robot export behavior.
 
 ## Read Plan
@@ -16,8 +17,9 @@ This folder is partitioned so each API surface has one primary owner file. Avoid
 2. If the task is exploratory, unfamiliar, or likely to need debugging, use a `.forge-notebook.json` during the first iteration instead of jumping straight to a final script layout.
 3. Add sketch docs only when the task is sketch-heavy.
 4. Add [entities.md](entities.md) for topology-aware edits, constraints, or pattern helpers.
-5. Add [assembly.md](assembly.md) only for joint/coupling/mechanism work.
-6. Pull in guides and CLI docs when you need recipes, notebook workflow guidance, troubleshooting, or command usage.
+5. Add [sheet-metal.md](sheet-metal.md) when the task is about folded covers, brackets, flat patterns, or named panel/flange/bend descendants.
+6. Add [assembly.md](assembly.md) only for joint/coupling/mechanism work.
+7. Pull in guides and CLI docs when you need recipes, notebook workflow guidance, troubleshooting, or command usage.
 
 ## Intentionally Excluded
 

@@ -235,7 +235,14 @@ Goal:
 
 - features like sheet metal, advanced library helpers, and richer manufacturing flows build on the same semantic core
 
-These should arrive after the reference/workplane/query layer is credible, not before.
+Current progress:
+
+- `sheetMetal()` now exists as the first dedicated higher-order semantic family on top of the descendant-resolution layer
+- one sheet-metal model now lowers to both a folded solid and a flat pattern instead of splitting folded/export logic across backend-specific codepaths
+- named `panel`, `flange-*`, and `bend-*` descendants now flow through the shared face-descendant machinery, so downstream cutouts can still expose honest region/set semantics after topology rewrites
+- the maintained `folded-service-panel-cover` proof part now lives in the API examples, compiler corpus, query-propagation snapshots, API invariants, and exact BREP checks
+
+These higher-order families should keep arriving only after the shared reference/workplane/query layer is credible enough to defend them honestly.
 
 ## Current Architectural Boundary
 
@@ -258,7 +265,7 @@ Once the descendant-resolution layer is in place, the next credible expansion la
 - broader shell workflows
 - broader fillet/chamfer workflows
 - stronger projection and sketch-on-face flows
-- sheet metal as a dedicated semantic family
+- richer sheet-metal corner and detail workflows on top of the new semantic family
 - manufacturing outputs such as flat patterns and DXF/SVG profile export
 - toolbox and library feature families
 - stronger assembly metadata and exact/faceted route visibility

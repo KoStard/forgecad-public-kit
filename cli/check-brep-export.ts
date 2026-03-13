@@ -110,6 +110,11 @@ function runExactManifestScript(scriptPath: string) {
   return runExactManifestForFiles(script.code, script.fileName, script.allFiles).plans[0];
 }
 
+function runExactManifestScriptObjects(scriptPath: string, expectedObjectCount = 1) {
+  const script = loadProjectScript(scriptPath);
+  return runExactManifestForFiles(script.code, script.fileName, script.allFiles, expectedObjectCount);
+}
+
 function collectProfiles(plan: CadQueryShapePlan): CadQueryProfilePlan[] {
   switch (plan.kind) {
     case 'box':
@@ -213,9 +218,9 @@ function exportExactManifest(code: string, expectedObjectCount = 1): void {
   exportExactManifestForFiles(code, 'main.forge.js', { 'main.forge.js': code }, expectedObjectCount);
 }
 
-function exportExactManifestScript(scriptPath: string): void {
+function exportExactManifestScript(scriptPath: string, expectedObjectCount = 1): void {
   const script = loadProjectScript(scriptPath);
-  exportExactManifestForFiles(script.code, script.fileName, script.allFiles);
+  exportExactManifestForFiles(script.code, script.fileName, script.allFiles, expectedObjectCount);
 }
 
 function checkRoundedRectProfileTransforms(): void {
@@ -878,6 +883,68 @@ function checkCorpusServicePanelCoverPlan(): void {
   );
 }
 
+function checkCorpusFoldedServicePanelCoverPlan(): void {
+  const part = getCompilerRegressionCorpusPart('corpus-folded-service-panel-cover');
+  const { manifest, plans } = runExactManifestScriptObjects(part.scriptPath, part.expectedObjectCount ?? 1);
+  const exactObjects = manifest.objects.filter((object) => object.kind === 'exact');
+  const planByName = new Map(exactObjects.map((object, index) => [object.name, plans[index]]));
+
+  const foldedPlan = planByName.get('Folded Service Panel Cover');
+  const flatPlan = planByName.get('Flat Service Panel Cover');
+  assert(foldedPlan, `Expected ${part.name} corpus scene to include the folded object`);
+  assert(flatPlan, `Expected ${part.name} corpus scene to include the flat object`);
+
+  assert.equal(foldedPlan!.kind, 'boolean', `Expected folded ${part.name} plan to remain a boolean tree, got ${foldedPlan!.kind}`);
+  assert.equal(flatPlan!.kind, 'transform', `Expected flat ${part.name} scene object to preserve its presentation translate, got ${flatPlan!.kind}`);
+  assert(
+    collectShapes(flatPlan!).some((shape) => shape.kind === 'boolean'),
+    `Expected flat ${part.name} exact lowering to retain a boolean tree under the scene-object transform`,
+  );
+
+  const foldedPlacements = collectShapeTransforms(foldedPlan!).filter((step) => step.kind === 'workplanePlacement');
+  const flatPlacements = collectShapeTransforms(flatPlan!).filter((step) => step.kind === 'workplanePlacement');
+  assert.equal(
+    foldedPlacements.length,
+    10,
+    `Expected folded ${part.name} exact lowering to preserve four bend placements plus six cut placements, got ${foldedPlacements.length}`,
+  );
+  assert.equal(
+    flatPlacements.length,
+    6,
+    `Expected flat ${part.name} exact lowering to preserve the six cut placements from the same semantic model, got ${flatPlacements.length}`,
+  );
+  assert(
+    collectShapeTransforms(flatPlan!).some((step) => step.kind === 'translate' && step.x === 280 && step.y === 0 && step.z === 0),
+    `Expected flat ${part.name} scene object to keep the presentation offset without dropping exact lowering`,
+  );
+
+  const foldedProfiles = collectProfiles(foldedPlan!);
+  const flatProfiles = collectProfiles(flatPlan!);
+  assert(
+    foldedProfiles.some((profile) => profile.kind === 'boolean' && profile.op === 'intersection'),
+    `Expected folded ${part.name} exact lowering to retain the bend-sector profile booleans`,
+  );
+  assert(
+    !flatProfiles.some((profile) => profile.kind === 'boolean' && profile.op === 'intersection'),
+    `Expected flat ${part.name} exact lowering to stay a flat strip/band layout instead of retaining folded bend-sector profiles`,
+  );
+
+  for (const profiles of [foldedProfiles, flatProfiles]) {
+    assert(
+      profiles.some((profile) => profile.kind === 'rect' && profile.width === 72 && profile.height === 36),
+      `Expected ${part.name} exact lowering to retain the display-cutout profile`,
+    );
+    assert(
+      profiles.some((profile) => profile.kind === 'roundedRect' && profile.width === 26 && profile.height === 10),
+      `Expected ${part.name} exact lowering to retain the flange cable-slot profile`,
+    );
+    assert(
+      profiles.some((profile) => profile.kind === 'circle' && Math.abs(profile.radius - 2.2) < 1e-9),
+      `Expected ${part.name} exact lowering to retain the mounting-hole profiles`,
+    );
+  }
+}
+
 function checkCorpusTrimmedAccessCoverPlan(): void {
   const part = getCompilerRegressionCorpusPart('corpus-trimmed-access-cover');
   const plan = runExactManifestScript(part.scriptPath);
@@ -901,7 +968,7 @@ function checkCorpusTrimmedAccessCoverPlan(): void {
 
 function checkCompilerRegressionCorpusExportEndToEnd(): void {
   for (const part of COMPILER_REGRESSION_CORPUS) {
-    exportExactManifestScript(part.scriptPath);
+    exportExactManifestScript(part.scriptPath, part.expectedObjectCount ?? 1);
   }
 }
 
@@ -1209,6 +1276,7 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkCorpusMotorMountPlatePlan();
   checkCorpusProjectionRelayCoverPlan();
   checkCorpusServicePanelCoverPlan();
+  checkCorpusFoldedServicePanelCoverPlan();
   checkRepeatedFeatureOwnershipPlan();
   checkRepeatedFeatureOwnershipExportEndToEnd();
   checkSketchOnFacePlacementPlan();

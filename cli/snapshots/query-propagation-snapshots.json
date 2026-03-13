@@ -4458,6 +4458,1426 @@
     ]
   },
   {
+    "id": "corpus-folded-service-panel-cover",
+    "description": "The sheet-metal cover corpus keeps panel/flange cut descendants and bend-region semantics reviewable across both the folded body and flat pattern outputs.",
+    "objects": [
+      {
+        "name": "Folded Service Panel Cover",
+        "exactRoute": {
+          "kind": "exact",
+          "target": "cadquery-occt",
+          "diagnosticCodes": []
+        },
+        "facetedRoute": {
+          "kind": "exact",
+          "target": "cadquery-occt",
+          "diagnosticCodes": []
+        },
+        "propagationOps": [
+          "cut",
+          "cut",
+          "cut",
+          "cut",
+          "cut",
+          "cut"
+        ],
+        "propagations": [
+          {
+            "rewriteId": "shape-query-cut-7",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-7",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall) @cut:shape-query-cut-7",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6) @cut:shape-query-cut-7)",
+              "single(created-face(cut:wall) @cut:shape-query-cut-7)"
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-6",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-6",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall) @cut:shape-query-cut-6",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5) @cut:shape-query-cut-6)",
+              "single(created-face(cut:wall) @cut:shape-query-cut-6)"
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-5",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-5",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall) @cut:shape-query-cut-5",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-3) @cut:shape-query-cut-4) @cut:shape-query-cut-5)",
+              "single(created-face(cut:wall) @cut:shape-query-cut-5)"
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-4",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-4",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall) @cut:shape-query-cut-4",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-3) @cut:shape-query-cut-4)",
+              "single(created-face(cut:wall) @cut:shape-query-cut-4)"
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-3",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-3",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-2) @cut:shape-query-cut-3",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall-bottom) @cut:shape-query-cut-3",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-right) @cut:shape-query-cut-3",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-top) @cut:shape-query-cut-3",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-left) @cut:shape-query-cut-3",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2",
+                "query": "propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-2) @cut:shape-query-cut-3)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-3)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-3)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-3)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-3)"
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-2",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-2",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall-bottom) @cut:shape-query-cut-2",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-right) @cut:shape-query-cut-2",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-top) @cut:shape-query-cut-2",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-left) @cut:shape-query-cut-2",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1",
+                "query": "propagated-face(split <- face-ref(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2)",
+              "single(propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2)",
+              "single(propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2)",
+              "single(propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2)",
+              "single(propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2)",
+              "single(propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2)",
+              "single(propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2)",
+              "single(propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2)",
+              "face-region(propagated-face(split <- tracked-face(panel) @sheet-metal:folded:shape-query-sheet-metal-folded-1) @cut:shape-query-cut-2)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-2)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-2)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-2)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-2)"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Flat Service Panel Cover",
+        "exactRoute": {
+          "kind": "exact",
+          "target": "cadquery-occt",
+          "diagnosticCodes": []
+        },
+        "facetedRoute": {
+          "kind": "exact",
+          "target": "cadquery-occt",
+          "diagnosticCodes": []
+        },
+        "propagationOps": [
+          "cut",
+          "cut",
+          "cut",
+          "cut",
+          "cut",
+          "cut"
+        ],
+        "propagations": [
+          {
+            "rewriteId": "shape-query-cut-14",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-14",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall) @cut:shape-query-cut-14",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13) @cut:shape-query-cut-14)",
+              "single(created-face(cut:wall) @cut:shape-query-cut-14)"
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-13",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-13",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall) @cut:shape-query-cut-13",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12) @cut:shape-query-cut-13)",
+              "single(created-face(cut:wall) @cut:shape-query-cut-13)"
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-12",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-12",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall) @cut:shape-query-cut-12",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "query": "propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "face-region(propagated-face(split <- propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- created-face(cut:wall) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-10) @cut:shape-query-cut-11) @cut:shape-query-cut-12)",
+              "single(created-face(cut:wall) @cut:shape-query-cut-12)"
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-11",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-11",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-10) @cut:shape-query-cut-11",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall) @cut:shape-query-cut-11",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-10) @cut:shape-query-cut-11)",
+              "single(created-face(cut:wall) @cut:shape-query-cut-11)"
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-10",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-10",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-9) @cut:shape-query-cut-10",
+                "note": "This face stays queryable through the cut rewrite."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall-bottom) @cut:shape-query-cut-10",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-right) @cut:shape-query-cut-10",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-top) @cut:shape-query-cut-10",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-left) @cut:shape-query-cut-10",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9",
+                "query": "propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- created-face(cut:wall-bottom) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- created-face(cut:wall-left) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- created-face(cut:wall-right) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(propagated-face(preserved <- created-face(cut:wall-top) @cut:shape-query-cut-9) @cut:shape-query-cut-10)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-10)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-10)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-10)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-10)"
+            ]
+          },
+          {
+            "rewriteId": "shape-query-cut-9",
+            "operation": "cut",
+            "owner": "cut:shape-query-cut-9",
+            "preservedFaces": [
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "supported",
+                "query": "propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9",
+                "note": "This face stays queryable through the cut rewrite."
+              },
+              {
+                "status": "ambiguous",
+                "query": "propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+              }
+            ],
+            "preservedEdges": [],
+            "createdFaces": [
+              {
+                "query": "created-face(cut:wall-bottom) @cut:shape-query-cut-9",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-right) @cut:shape-query-cut-9",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-top) @cut:shape-query-cut-9",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              },
+              {
+                "query": "created-face(cut:wall-left) @cut:shape-query-cut-9",
+                "note": "This cut-created wall face is part of the defended named-face subset."
+              }
+            ],
+            "createdEdges": [],
+            "diagnostics": [
+              {
+                "code": "cut-source-face-split-ambiguous",
+                "category": "ambiguous",
+                "queryKind": "face",
+                "source": "face-ref(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8",
+                "query": "propagated-face(split <- face-ref(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9"
+              },
+              {
+                "code": "cut-created-edge-propagation-unsupported",
+                "category": "unsupported",
+                "queryKind": "edge"
+              }
+            ],
+            "descendants": [
+              "single(propagated-face(preserved <- tracked-face(bend-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9)",
+              "single(propagated-face(preserved <- tracked-face(bend-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9)",
+              "single(propagated-face(preserved <- tracked-face(bend-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9)",
+              "single(propagated-face(preserved <- tracked-face(bend-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9)",
+              "single(propagated-face(preserved <- tracked-face(flange-bottom) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9)",
+              "single(propagated-face(preserved <- tracked-face(flange-left) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9)",
+              "single(propagated-face(preserved <- tracked-face(flange-right) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9)",
+              "single(propagated-face(preserved <- tracked-face(flange-top) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9)",
+              "face-region(propagated-face(split <- tracked-face(panel) @sheet-metal:flat:shape-query-sheet-metal-flat-8) @cut:shape-query-cut-9)",
+              "single(created-face(cut:wall-bottom) @cut:shape-query-cut-9)",
+              "single(created-face(cut:wall-right) @cut:shape-query-cut-9)",
+              "single(created-face(cut:wall-top) @cut:shape-query-cut-9)",
+              "single(created-face(cut:wall-left) @cut:shape-query-cut-9)"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
     "id": "corpus-trimmed-access-cover",
     "description": "The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable while earlier hole/cut created faces and preserved canonical faces flow through later unions.",
     "objects": [

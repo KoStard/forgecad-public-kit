@@ -459,6 +459,48 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
     ],
   ),
   compilerCorpusCase(
+    'corpus-folded-service-panel-cover',
+    'The sheet-metal cover corpus keeps panel/flange cut descendants and bend-region semantics reviewable across both the folded body and flat pattern outputs.',
+    [
+      {
+        name: 'Folded Service Panel Cover',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['cut', 'cut', 'cut', 'cut', 'cut', 'cut'],
+        requiredDiagnosticCodes: [
+          'cut-source-face-split-ambiguous',
+          'cut-created-edge-propagation-unsupported',
+        ],
+        requiredCreatedFaceQueries: [
+          'created-face(cut:wall-right)',
+          'created-face(cut:wall)',
+        ],
+        requiredPreservedFaceQueries: [
+          'propagated-face(split <- tracked-face(panel)',
+          'propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right)',
+        ],
+      },
+      {
+        name: 'Flat Service Panel Cover',
+        exactRouteKind: 'exact',
+        facetedRouteKind: 'exact',
+        operations: ['cut', 'cut', 'cut', 'cut', 'cut', 'cut'],
+        requiredDiagnosticCodes: [
+          'cut-source-face-split-ambiguous',
+          'cut-created-edge-propagation-unsupported',
+        ],
+        requiredCreatedFaceQueries: [
+          'created-face(cut:wall-right)',
+          'created-face(cut:wall)',
+        ],
+        requiredPreservedFaceQueries: [
+          'propagated-face(split <- tracked-face(panel)',
+          'propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right)',
+        ],
+      },
+    ],
+  ),
+  compilerCorpusCase(
     'corpus-trimmed-access-cover',
     'The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable while earlier hole/cut created faces and preserved canonical faces flow through later unions.',
     [

@@ -16,6 +16,7 @@ import {
   rectangle,
   roundedRect,
   circle2d,
+  sheetMetal,
   union2d,
   difference2d,
   filletEdge,
@@ -204,6 +205,69 @@ function checkEdgeFinishSubsetErrors(): void {
   );
 }
 
+function expectFaceDescendant(
+  face: ReturnType<ReturnType<typeof box>['face']>,
+  label: string,
+  semantic: 'face' | 'region' | 'set',
+  minMembers = 1,
+): void {
+  assert(face.descendant, `${label} should expose descendant metadata`);
+  assert.equal(face.descendant!.semantic, semantic, `${label} should expose descendant semantic ${semantic}`);
+  assert(
+    face.descendant!.memberCount >= minMembers,
+    `${label} should expose at least ${minMembers} descendant member(s), got ${face.descendant!.memberCount}`,
+  );
+}
+
+function checkSheetMetalApiContracts(): void {
+  const part = sheetMetal({
+    panel: { width: 180, height: 110 },
+    thickness: 1.5,
+    bendRadius: 2,
+    bendAllowance: { kFactor: 0.42 },
+    cornerRelief: { size: 4 },
+  })
+    .flange('top', { length: 18 })
+    .flange('right', { length: 18 })
+    .flange('bottom', { length: 18 })
+    .flange('left', { length: 18 })
+    .cutout('panel', rect(72, 36, true), { selfAnchor: 'center' })
+    .cutout('flange-right', roundedRect(26, 10, 5, true), { selfAnchor: 'center' })
+    .cutout('panel', circle2d(2.2), { u: -68, v: -37, selfAnchor: 'center' })
+    .cutout('panel', circle2d(2.2), { u: 68, v: -37, selfAnchor: 'center' })
+    .cutout('panel', circle2d(2.2), { u: -68, v: 37, selfAnchor: 'center' })
+    .cutout('panel', circle2d(2.2), { u: 68, v: 37, selfAnchor: 'center' });
+
+  assert.deepEqual(part.regionNames(), [
+    'panel',
+    'bend-top',
+    'flange-top',
+    'bend-right',
+    'flange-right',
+    'bend-bottom',
+    'flange-bottom',
+    'bend-left',
+    'flange-left',
+  ]);
+
+  const folded = part.folded();
+  const flat = part.flatPattern();
+
+  assert(folded.faceNames().includes('panel'), 'Folded sheet-metal output should expose the panel face name');
+  assert(folded.faceNames().includes('flange-right'), 'Folded sheet-metal output should expose flange-right');
+  assert(folded.faceNames().includes('bend-right'), 'Folded sheet-metal output should expose bend-right');
+  assert(flat.faceNames().includes('panel'), 'Flat sheet-metal output should expose the panel face name');
+  assert(flat.faceNames().includes('flange-right'), 'Flat sheet-metal output should expose flange-right');
+  assert(flat.faceNames().includes('bend-right'), 'Flat sheet-metal output should expose bend-right');
+
+  expectFaceDescendant(folded.face('panel'), 'Folded panel', 'region');
+  expectFaceDescendant(folded.face('flange-right'), 'Folded flange-right', 'region');
+  expectFaceDescendant(folded.face('bend-right'), 'Folded bend-right', 'set', 2);
+  expectFaceDescendant(flat.face('panel'), 'Flat panel', 'region');
+  expectFaceDescendant(flat.face('flange-right'), 'Flat flange-right', 'region');
+  expectFaceDescendant(flat.face('bend-right'), 'Flat bend-right', 'face');
+}
+
 function checkSandboxBindings(): void {
   const okScript = `
 const base = box(40, 40, 10);
@@ -237,6 +301,7 @@ export async function runCheckApiContractsCli(): Promise<void> {
   checkSketchBooleanForms();
   checkBooleanErrors();
   checkEdgeFinishSubsetErrors();
+  checkSheetMetalApiContracts();
   checkSandboxBindings();
   console.log('✓ Script API contract invariants passed');
 }

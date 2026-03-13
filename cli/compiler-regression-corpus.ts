@@ -7,6 +7,7 @@ export interface CompilerRegressionCorpusPart {
   guards: string[];
   scriptPath: string;
   objectName: string;
+  expectedObjectCount?: number;
 }
 
 function corpusScriptPath(fileName: string): string {
@@ -105,6 +106,20 @@ export const COMPILER_REGRESSION_CORPUS: CompilerRegressionCorpusPart[] = [
     ],
     scriptPath: corpusScriptPath('service-panel-cover.forge.js'),
     objectName: 'Service Panel Cover',
+  },
+  {
+    id: 'corpus-folded-service-panel-cover',
+    name: 'Folded Service Panel Cover',
+    description:
+      'A compiler-owned sheet-metal cover keeps panel/flange/bend semantics aligned while one model lowers to both folded and flat exact outputs.',
+    guards: [
+      'sheetMetal() stays compiler-owned instead of becoming a backend-local export trick',
+      'panel and flange cutouts preserve named descendant-region semantics after the downstream cut rewrites land',
+      'folded bends stay explicit face sets while the flat pattern keeps the same semantic regions reviewable from the shared model',
+    ],
+    scriptPath: corpusScriptPath('folded-service-panel-cover.forge.js'),
+    objectName: 'Folded Service Panel Cover',
+    expectedObjectCount: 2,
   },
   {
     id: 'corpus-trimmed-access-cover',
