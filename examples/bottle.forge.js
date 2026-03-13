@@ -63,20 +63,20 @@ const bottle = outerBody.subtract(innerBody);
 
 // Thread ridge on neck (simple ring)
 const threadZ = bodyH + neckH * 0.3;
-const threadRing = cylinder(2, neckR + 1.5, neckR + 1.5, 32)
-  .subtract(cylinder(4, neckR - 0.5, neckR - 0.5, 32).translate(0, 0, -1))
+const threadRing = cylinder(2, neckR + 1.5, neckR + 1.5)
+  .subtract(cylinder(4, neckR - 0.5, neckR - 0.5).translate(0, 0, -1))
   .translate(0, 0, threadZ);
 
-const threadRing2 = cylinder(2, neckR + 1.5, neckR + 1.5, 32)
-  .subtract(cylinder(4, neckR - 0.5, neckR - 0.5, 32).translate(0, 0, -1))
+const threadRing2 = cylinder(2, neckR + 1.5, neckR + 1.5)
+  .subtract(cylinder(4, neckR - 0.5, neckR - 0.5).translate(0, 0, -1))
   .translate(0, 0, threadZ + 5);
 
 const bottleWithThreads = union(bottle, threadRing, threadRing2);
 
 // Cap — hollow cylinder that sits on top of neck
 const capOuterR = neckR + 3;
-const capOuter = cylinder(capH, capOuterR, capOuterR, 32);
-const capInner = cylinder(capH - 2, neckR + 0.5, neckR + 0.5, 32).translate(0, 0, 2);
+const capOuter = cylinder(capH, capOuterR, capOuterR);
+const capInner = cylinder(capH - 2, neckR + 0.5, neckR + 0.5).translate(0, 0, 2);
 const cap = capOuter.subtract(capInner)
   .translate(0, 0, bodyH + neckH);
 

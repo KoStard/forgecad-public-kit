@@ -46,7 +46,7 @@ const display = box(80, 3, 30, true)
   .translate(indoorW * 0.3, indoorUnitY - indoorD/2 - 1, indoorUnitZ + indoorH * 0.25);
 
 // LED indicator
-const led = cylinder(2, 3, undefined, 16, true)
+const led = cylinder(2, 3, undefined, undefined, true)
   .color('#00ff00')
   .pointAlong([0, -1, 0])
   .translate(indoorW * 0.3, indoorUnitY - indoorD/2 - 3, indoorUnitZ + indoorH * 0.25);
@@ -76,7 +76,7 @@ const outdoorBody = box(outdoorW, outdoorD, outdoorH, true)
 
 // Fan grill - vertical cylinder facing forward (along -Y)
 const fanRadius = Math.min(outdoorW, outdoorH) * 0.35;
-const fanGrill = cylinder(10, fanRadius, fanRadius, 32, true)
+const fanGrill = cylinder(10, fanRadius, fanRadius, undefined, true)
   .color('#404040')
   .pointAlong([0, -1, 0])
   .translate(0, outdoorUnitY + outdoorD/2 + 5, outdoorUnitZ);
@@ -137,67 +137,67 @@ const pipeZ = mountHeight - indoorH/2 + 50;
 
 // Pipe 1 - the larger insulated line
 // Outdoor segment: from outdoor front (Y=75) extending backward into unit
-const pipe1Outdoor = cylinder(200, pipeR + 6, undefined, 16, true)
+const pipe1Outdoor = cylinder(200, pipeR + 6, undefined, undefined, true)
   .pointAlong([0, -1, 0])  // Points toward -Y (toward wall)
   .color('#8B4513')  // Copper
   .translate(-pipeSpacing/2, outdoorUnitY - outdoorD/2 - 50, pipeZ);
 
 // Wall segment: through the wall thickness
-const pipe1Wall = cylinder(wallThick + 20, pipeR + 8, undefined, 16, true)
+const pipe1Wall = cylinder(wallThick + 20, pipeR + 8, undefined, undefined, true)
   .pointAlong([0, -1, 0])
   .color('#1a5f7a')  // Blue insulation
   .translate(-pipeSpacing/2, 0, pipeZ);
 
 // Indoor segment: from wall (Y=-75) extending into indoor unit (to Y=-175 center)
-const pipe1Indoor = cylinder(120, pipeR + 8, undefined, 16, true)
+const pipe1Indoor = cylinder(120, pipeR + 8, undefined, undefined, true)
   .pointAlong([0, -1, 0])  // Points toward -Y (into indoor unit)
   .color('#1a5f7a')
   .translate(-pipeSpacing/2, indoorUnitY + indoorD/2 - 60, pipeZ);
 
 // Pipe 2 - smaller line
-const pipe2Outdoor = cylinder(200, pipeR, undefined, 16, true)
+const pipe2Outdoor = cylinder(200, pipeR, undefined, undefined, true)
   .pointAlong([0, -1, 0])
   .color('#8B4513')
   .translate(pipeSpacing/2, outdoorUnitY - outdoorD/2 - 50, pipeZ);
 
-const pipe2Wall = cylinder(wallThick + 20, pipeR, undefined, 16, true)
+const pipe2Wall = cylinder(wallThick + 20, pipeR, undefined, undefined, true)
   .pointAlong([0, -1, 0])
   .color('#1a5f7a')
   .translate(pipeSpacing/2, 0, pipeZ);
 
-const pipe2Indoor = cylinder(120, pipeR, undefined, 16, true)
+const pipe2Indoor = cylinder(120, pipeR, undefined, undefined, true)
   .pointAlong([0, -1, 0])
   .color('#1a5f7a')
   .translate(pipeSpacing/2, indoorUnitY + indoorD/2 - 60, pipeZ);
 
 // Wall sleeves
-const sleeve1 = cylinder(wallThick + 10, pipeR + 15, undefined, 16, true)
+const sleeve1 = cylinder(wallThick + 10, pipeR + 15, undefined, undefined, true)
   .pointAlong([0, -1, 0])
   .color('#888888')
   .translate(-pipeSpacing/2, 0, pipeZ);
 
-const sleeve2 = cylinder(wallThick + 10, pipeR + 10, undefined, 16, true)
+const sleeve2 = cylinder(wallThick + 10, pipeR + 10, undefined, undefined, true)
   .pointAlong([0, -1, 0])
   .color('#888888')
   .translate(pipeSpacing/2, 0, pipeZ);
 
 // Connection points (visual only - where pipes enter the units)
-const conn1Indoor = cylinder(20, pipeR + 10, undefined, 16, true)
+const conn1Indoor = cylinder(20, pipeR + 10, undefined, undefined, true)
   .pointAlong([0, -1, 0])
   .color('#606060')
   .translate(-pipeSpacing/2, indoorUnitY + indoorD/2, pipeZ);
 
-const conn1Outdoor = cylinder(20, pipeR + 8, undefined, 16, true)
+const conn1Outdoor = cylinder(20, pipeR + 8, undefined, undefined, true)
   .pointAlong([0, 1, 0])
   .color('#606060')
   .translate(-pipeSpacing/2, outdoorUnitY - outdoorD/2, pipeZ);
 
-const conn2Indoor = cylinder(20, pipeR + 4, undefined, 16, true)
+const conn2Indoor = cylinder(20, pipeR + 4, undefined, undefined, true)
   .pointAlong([0, -1, 0])
   .color('#606060')
   .translate(pipeSpacing/2, indoorUnitY + indoorD/2, pipeZ);
 
-const conn2Outdoor = cylinder(20, pipeR + 2, undefined, 16, true)
+const conn2Outdoor = cylinder(20, pipeR + 2, undefined, undefined, true)
   .pointAlong([0, 1, 0])
   .color('#606060')
   .translate(pipeSpacing/2, outdoorUnitY - outdoorD/2, pipeZ);
