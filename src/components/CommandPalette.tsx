@@ -27,6 +27,7 @@ export function CommandPalette() {
   const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
   const setShowPerformanceInfo = useForgeStore((s) => s.setShowPerformanceInfo);
   const objectSettings = useForgeStore((s) => s.objectSettings);
+  const activeFile = useForgeStore((s) => s.activeFile);
 
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
@@ -77,7 +78,26 @@ export function CommandPalette() {
     },
   ];
 
+  const copyFilePathCommand: Command = {
+    id: 'copy-file-path',
+    label: activeFile ? `Copy Path: ${activeFile}` : 'Copy File Path',
+    action: () => {
+      close();
+      if (!activeFile) return;
+      fetch('/api/project-path')
+        .then((r) => r.json())
+        .then((data: { projectDir: string | null }) => {
+          const absPath = data.projectDir
+            ? `${data.projectDir}/${activeFile}`
+            : activeFile;
+          return navigator.clipboard.writeText(absPath);
+        })
+        .catch((err: unknown) => { console.error('Failed to copy path:', err); });
+    },
+  };
+
   const rootCommands: Command[] = [
+    ...(activeFile ? [copyFilePathCommand] : []),
     ...(hasObjectCommands
       ? [{
         id: 'show-all-objects',

@@ -252,6 +252,13 @@ function forgeProjectPlugin() {
       }
 
       server.middlewares.use((req: any, res: any, next: any) => {
+        // Handle /api/project-path - return the absolute project directory
+        if (req.method === 'GET' && req.url === '/api/project-path') {
+          const absDir = projectDir ? path.resolve(projectDir) : null;
+          sendJson(res, 200, { projectDir: absDir });
+          return;
+        }
+
         // Handle /api/watch - SSE stream for file change notifications
         if (req.method === 'GET' && req.url === '/api/watch') {
           res.setHeader('Content-Type', 'text/event-stream');
