@@ -13,6 +13,7 @@ import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
 import { lowerSheetMetalBasePlan } from './sheetMetalModel';
 import { wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './sketch/loftSweepLowering';
+import { loftStitched } from './sketch/loftStitched';
 import { Transform } from './transform';
 import { planeFrameToWorldToPlaneMatrix } from './planeFrame';
 import { resolveSupportedEdgeFeatureSelection } from './edgeFeatureResolution';
@@ -191,8 +192,17 @@ function lowerShapeLoftCompilePlan(
   plan: Extract<ShapeCompilePlan, { kind: 'loft' }>,
   wasm: ManifoldToplevel,
 ): Manifold {
+  const inputPolygons = plan.profiles.map((profile) => lowerProfileCompilePlanToCrossSection(profile, wasm).toPolygons() as [number, number][][]);
+
+  // Try stitched path first if compatible (one loop per profile, same loop type)
+  const canStitch = inputPolygons.length >= 2 && inputPolygons.every((p) => p.length === 1);
+  if (canStitch) {
+    const stitched = loftStitched(inputPolygons, plan.heights, wasm);
+    if (stitched) return stitched;
+  }
+
   const input = buildLoftLevelSetInput(
-    plan.profiles.map((profile) => lowerProfileCompilePlanToCrossSection(profile, wasm).toPolygons() as [number, number][][]),
+    inputPolygons,
     plan.heights,
     { edgeLength: plan.edgeLength, boundsPadding: plan.boundsPadding },
   );
