@@ -288,7 +288,9 @@ interface ForgeStore {
 
   updateSketchConstraint: (objectId: string, constraintId: string, value: number) => void;
 
-  refreshFiles: () => Promise<void>;
+  applyServerSnapshot: (serverFiles: Record<string, string>) => void;
+  applyServerFileChange: (filename: string, content: string) => void;
+  applyServerFileDelete: (filename: string) => void;
 
   theme: ThemeName;
   setTheme: (name: ThemeName) => void;
@@ -1400,91 +1402,134 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   }),
 
   updateSketchConstraint: (objectId, constraintId, value) => {
-    const current = get().result;
+    const current = get().lastValidResult;
     if (!current) return;
     const objects = current.objects.map((obj) => {
       if (obj.id !== objectId || !obj.sketch || !isConstraintSketch(obj.sketch)) return obj;
       const updated = updateConstraintValue(obj.sketch, constraintId, value);
       return { ...obj, sketch: updated, sketchMeta: updated.constraintMeta };
     });
-    set({ result: { ...current, objects } });
+    set({ lastValidResult: { ...current, objects } });
   },
 
-  refreshFiles: async () => {
-    try {
-      const response = await fetch('/api/files');
-      if (!response.ok) {
-        console.error('Failed to refresh files:', response.statusText);
-        return;
+  applyServerSnapshot: (serverFiles: Record<string, string>) => {
+    const { files, savedFiles, activeFile, objectSettingsByFile } = get();
+
+    const dirtyFiles = new Set<string>();
+    Object.keys(files).forEach((p) => {
+      if (!(p in savedFiles) || savedFiles[p] !== files[p]) dirtyFiles.add(p);
+    });
+
+    const nextFiles: Record<string, string> = {};
+    const nextSaved: Record<string, string> = {};
+    const newFolders = new Set<string>();
+
+    Object.keys(serverFiles).forEach((p) => {
+      if (dirtyFiles.has(p)) {
+        nextFiles[p] = files[p];
+        if (p in savedFiles) nextSaved[p] = savedFiles[p];
+      } else {
+        nextFiles[p] = serverFiles[p];
+        nextSaved[p] = serverFiles[p];
       }
-      const serverFiles: Record<string, string> = await response.json();
-      const { files, savedFiles, activeFile, objectSettingsByFile } = get();
+      collectParentPaths(p).forEach((folder) => newFolders.add(folder));
+    });
 
-      const dirtyFiles = new Set<string>();
-      Object.keys(files).forEach((path) => {
-        if (!(path in savedFiles) || savedFiles[path] !== files[path]) {
-          dirtyFiles.add(path);
-        }
-      });
+    // Keep locally modified files that no longer exist on disk
+    Object.keys(files).forEach((p) => {
+      if (p in nextFiles || !dirtyFiles.has(p)) return;
+      nextFiles[p] = files[p];
+      if (p in savedFiles) nextSaved[p] = savedFiles[p];
+      collectParentPaths(p).forEach((folder) => newFolders.add(folder));
+    });
 
-      const nextFiles: Record<string, string> = {};
-      const nextSaved: Record<string, string> = {};
-      const newFolders = new Set<string>();
+    const hashFile = getActiveFileFromHash();
+    const availableFiles = Object.keys(nextFiles);
+    const newActiveFile = (hashFile && nextFiles[hashFile])
+      ? hashFile
+      : (activeFile && nextFiles[activeFile]
+        ? activeFile
+        : (findPreferredEntryFile(availableFiles)
+          || availableFiles.find((n) => n.endsWith('.js'))
+          || availableFiles[0]));
 
-      Object.keys(serverFiles).forEach((path) => {
-        if (dirtyFiles.has(path)) {
-          nextFiles[path] = files[path];
-          if (path in savedFiles) nextSaved[path] = savedFiles[path];
-        } else {
-          nextFiles[path] = serverFiles[path];
-          nextSaved[path] = serverFiles[path];
-        }
-        collectParentPaths(path).forEach((folder) => newFolders.add(folder));
-      });
+    const nextDirty = Object.keys(nextFiles).some((p) => nextSaved[p] !== nextFiles[p]);
+    const nextObjectSettingsByFile = Object.fromEntries(
+      Object.entries(objectSettingsByFile).filter(([f]) => f in nextFiles),
+    ) as ObjectSettingsByFile;
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
 
-      // Keep locally modified files that no longer exist on disk
-      Object.keys(files).forEach((path) => {
-        if (path in nextFiles) return;
-        if (!dirtyFiles.has(path)) return;
-        nextFiles[path] = files[path];
-        if (path in savedFiles) nextSaved[path] = savedFiles[path];
-        collectParentPaths(path).forEach((folder) => newFolders.add(folder));
-      });
+    set({
+      files: nextFiles,
+      savedFiles: nextSaved,
+      folders: Array.from(newFolders).sort(),
+      activeFile: newActiveFile,
+      dirty: nextDirty,
+      objectSettingsByFile: nextObjectSettingsByFile,
+    });
 
-      const hashFile = getActiveFileFromHash();
-      const availableFiles = Object.keys(nextFiles);
-      const newActiveFile = (hashFile && nextFiles[hashFile])
-        ? hashFile
-        : (activeFile && nextFiles[activeFile]
-          ? activeFile
-          : (findPreferredEntryFile(availableFiles)
-            || availableFiles.find((n) => n.endsWith('.js'))
-            || availableFiles[0]));
-
-      const nextDirty = Object.keys(nextFiles).some((path) => nextSaved[path] !== nextFiles[path]);
-      const nextObjectSettingsByFile = Object.fromEntries(
-        Object.entries(objectSettingsByFile).filter(([file]) => file in nextFiles),
-      ) as ObjectSettingsByFile;
-      writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
-
-      set({
-        files: nextFiles,
-        savedFiles: nextSaved,
-        folders: Array.from(newFolders).sort(),
-        activeFile: newActiveFile,
-        dirty: nextDirty,
-        objectSettingsByFile: nextObjectSettingsByFile,
-      });
-
-      if (newActiveFile && newActiveFile !== activeFile) {
-        // Different document — clear param overrides for the new file
-        set({ paramOverrides: {} });
-        setParamOverrides({});
-        window.history.replaceState(null, '', `#${newActiveFile}`);
+    if (newActiveFile && newActiveFile !== activeFile) {
+      set({ paramOverrides: {}, lastValidResult: null });
+      setParamOverrides({});
+      window.history.replaceState(null, '', `#${newActiveFile}`);
+      setTimeout(() => get().execute(), 0);
+    } else {
+      const previewFile = resolvePreviewFile(newActiveFile, nextFiles);
+      if (previewFile && nextFiles[previewFile] !== files[previewFile]) {
         setTimeout(() => get().execute(), 0);
       }
-    } catch (e) {
-      console.error('Error refreshing files:', e);
+    }
+  },
+
+  applyServerFileChange: (filename: string, content: string) => {
+    const { files, savedFiles, activeFile } = get();
+    const isDirty = filename in files && savedFiles[filename] !== files[filename];
+    if (isDirty) return;
+    if (files[filename] === content) return;
+    const folders = new Set(get().folders);
+    collectParentPaths(filename).forEach((f) => folders.add(f));
+    const nextFiles = { ...files, [filename]: content };
+    set({
+      files: nextFiles,
+      savedFiles: { ...savedFiles, [filename]: content },
+      folders: Array.from(folders).sort(),
+    });
+    const previewFile = resolvePreviewFile(activeFile, nextFiles);
+    if (previewFile === filename) setTimeout(() => get().execute(), 0);
+  },
+
+  applyServerFileDelete: (filename: string) => {
+    const { files, savedFiles, activeFile, objectSettingsByFile } = get();
+    const isDirty = filename in files && savedFiles[filename] !== files[filename];
+    if (isDirty) return;
+    if (!(filename in files)) return;
+    const nextFiles = { ...files };
+    const nextSaved = { ...savedFiles };
+    delete nextFiles[filename];
+    delete nextSaved[filename];
+    const newFolders = new Set<string>();
+    Object.keys(nextFiles).forEach((p) => collectParentPaths(p).forEach((f) => newFolders.add(f)));
+    const availableFiles = Object.keys(nextFiles);
+    const newActiveFile = activeFile === filename
+      ? (findPreferredEntryFile(availableFiles) || availableFiles.find((n) => n.endsWith('.js')) || availableFiles[0])
+      : activeFile;
+    const nextObjectSettingsByFile = Object.fromEntries(
+      Object.entries(objectSettingsByFile).filter(([f]) => f in nextFiles),
+    ) as ObjectSettingsByFile;
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+    set({
+      files: nextFiles,
+      savedFiles: nextSaved,
+      folders: Array.from(newFolders).sort(),
+      activeFile: newActiveFile,
+      dirty: Object.keys(nextFiles).some((p) => nextSaved[p] !== nextFiles[p]),
+      objectSettingsByFile: nextObjectSettingsByFile,
+    });
+    if (newActiveFile && newActiveFile !== activeFile) {
+      set({ paramOverrides: {}, lastValidResult: null });
+      setParamOverrides({});
+      window.history.replaceState(null, '', `#${newActiveFile}`);
+      setTimeout(() => get().execute(), 0);
     }
   },
 
