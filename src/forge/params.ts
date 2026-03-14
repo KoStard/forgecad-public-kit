@@ -10,6 +10,7 @@
 export interface ParamDef {
   name: string;
   value: number;
+  defaultValue: number;
   min: number;
   max: number;
   step: number;
@@ -83,7 +84,8 @@ export function param(
   const step = opts.step ?? (integer ? 1 : (max - min > 100 ? 1 : 0.1));
 
   if (!hasLocalOverride) {
-    _params.push({ name: scopedName, value, min, max, step, unit: opts.unit, integer, reverse: opts.reverse });
+    const def = integer ? Math.round(defaultValue) : defaultValue;
+    _params.push({ name: scopedName, value, defaultValue: def, min, max, step, unit: opts.unit, integer, reverse: opts.reverse });
   }
   return value;
 }
@@ -106,7 +108,7 @@ export function boolParam(name: string, defaultValue: boolean): boolean {
   const value = raw >= 0.5 ? 1 : 0;
 
   if (!hasLocalOverride) {
-    _params.push({ name: scopedName, value, min: 0, max: 1, step: 1, boolean: true });
+    _params.push({ name: scopedName, value, defaultValue: numDefault, min: 0, max: 1, step: 1, boolean: true });
   }
   return value === 1;
 }

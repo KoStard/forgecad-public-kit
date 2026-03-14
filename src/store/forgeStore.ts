@@ -200,6 +200,7 @@ interface ForgeStore {
 
   execute: () => void;
   setParam: (name: string, value: number) => void;
+  resetParamOverrides: () => void;
   setJointValue: (name: string, value: number) => void;
   setJointAnimationClip: (name: string | null) => void;
   setJointAnimationProgress: (value: number) => void;
@@ -884,6 +885,12 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const applied = buildRunState(previewFile, runResult, get());
     set(applied.nextState);
     writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+  },
+
+  resetParamOverrides: () => {
+    set({ paramOverrides: {} });
+    setParamOverrides({});
+    get().execute();
   },
 
   setJointValue: (name, value) => set((state) => {
