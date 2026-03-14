@@ -4049,13 +4049,20 @@ export function Viewport() {
             onPointerDown={(e) => e.stopPropagation()}
             onContextMenu={(e) => e.preventDefault()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <span style={{ fontWeight: 600, fontSize: 13 }}>Surface History</span>
               <button
                 type="button"
                 onClick={() => setFaceInfoPanel(null)}
                 style={{ border: 'none', background: 'transparent', color: 'var(--fc-textMuted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
               >×</button>
+            </div>
+
+            {/* Object name / breadcrumb */}
+            <div style={{ fontSize: 11, color: 'var(--fc-textMuted)', marginBottom: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {obj.treePath && obj.treePath.length > 0
+                ? obj.treePath.join(' / ')
+                : obj.name}
             </div>
 
             {/* Face selector */}
