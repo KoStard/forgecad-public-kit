@@ -81,7 +81,7 @@ import {
   type DimensionDef,
   type SvgImportOptions,
 } from './sketch';
-import { param, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, type ParamDef } from './params';
+import { param, boolParam, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, type ParamDef } from './params';
 import { joint } from './joint';
 import { Assembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
 import { Transform, composeChain } from './transform';
@@ -1119,6 +1119,7 @@ function executeFile(
       sheetMetal,
       SheetMetalPart,
       param,
+      boolParam,
       Shape,
       Sketch,
       lib: partLibrary,

@@ -32,24 +32,38 @@ export function ParamPanel() {
         <div style={{ overflowY: 'auto', padding: '0 12px 8px' }}>
           {params.map((p) => (
             <div key={p.name} style={{ marginBottom: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
-                <span style={{ color: 'var(--fc-text)' }}>{p.name}</span>
-                <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
-                  {p.value}{p.unit ? ` ${p.unit}` : ''}
-                </span>
-              </div>
-              <input
-                type="range"
-                min={p.min}
-                max={p.max}
-                step={p.step}
-                value={p.value}
-                onChange={(e) => {
-                  const v = parseFloat(e.target.value);
-                  setParam(p.name, p.integer ? Math.round(v) : v);
-                }}
-                style={{ width: '100%', accentColor: 'var(--fc-accent)', direction: p.reverse ? 'rtl' : undefined }}
-              />
+              {p.boolean ? (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={p.value === 1}
+                    onChange={(e) => setParam(p.name, e.target.checked ? 1 : 0)}
+                    style={{ accentColor: 'var(--fc-accent)' }}
+                  />
+                  <span style={{ color: 'var(--fc-text)' }}>{p.name}</span>
+                </label>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
+                    <span style={{ color: 'var(--fc-text)' }}>{p.name}</span>
+                    <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
+                      {p.value}{p.unit ? ` ${p.unit}` : ''}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={p.min}
+                    max={p.max}
+                    step={p.step}
+                    value={p.value}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      setParam(p.name, p.integer ? Math.round(v) : v);
+                    }}
+                    style={{ width: '100%', accentColor: 'var(--fc-accent)', direction: p.reverse ? 'rtl' : undefined }}
+                  />
+                </>
+              )}
             </div>
           ))}
         </div>

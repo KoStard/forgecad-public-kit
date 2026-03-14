@@ -16,6 +16,7 @@ export interface ParamDef {
   unit?: string;
   integer?: boolean;
   reverse?: boolean;
+  boolean?: boolean;
 }
 
 interface ParamScope {
@@ -85,4 +86,27 @@ export function param(
     _params.push({ name: scopedName, value, min, max, step, unit: opts.unit, integer, reverse: opts.reverse });
   }
   return value;
+}
+
+/**
+ * Declare a boolean parameter. Returns the current boolean value.
+ * Renders as a checkbox in the UI.
+ */
+export function boolParam(name: string, defaultValue: boolean): boolean {
+  const scope = _scopeStack[_scopeStack.length - 1];
+  const scopedName = scope?.namePrefix ? `${scope.namePrefix} / ${name}` : name;
+  const scopedLocal = scope?.localOverrides;
+  const hasLocalOverride = !!(scopedLocal && hasOwn(scopedLocal, name));
+
+  const numDefault = defaultValue ? 1 : 0;
+  const raw = (hasLocalOverride ? scopedLocal![name] : undefined)
+    ?? _overrides[scopedName]
+    ?? _overrides[name]
+    ?? numDefault;
+  const value = raw >= 0.5 ? 1 : 0;
+
+  if (!hasLocalOverride) {
+    _params.push({ name: scopedName, value, min: 0, max: 1, step: 1, boolean: true });
+  }
+  return value === 1;
 }

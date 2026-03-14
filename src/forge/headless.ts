@@ -54,7 +54,7 @@ export type { PlaneSpec } from './section';
 export * from './holeCut';
 export * from './sheetMetal';
 export * from './sketch';
-export { param, resetParams, getCollectedParams, setParamOverrides } from './params';
+export { param, boolParam, resetParams, getCollectedParams, setParamOverrides } from './params';
 export type { ParamDef } from './params';
 export { joint } from './joint';
 export type { RevoluteJointOpts } from './joint';
