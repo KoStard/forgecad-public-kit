@@ -4049,7 +4049,7 @@ export function Viewport() {
             onContextMenu={(e) => e.preventDefault()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>Face Info</span>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>Surface History</span>
               <button
                 type="button"
                 onClick={() => setFaceInfoPanel(null)}
@@ -4058,7 +4058,7 @@ export function Viewport() {
             </div>
 
             {/* Face selector */}
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 11, color: 'var(--fc-textMuted)', display: 'block', marginBottom: 3 }}>Face</label>
               <select
                 value={faceInfoPanel.faceName}
@@ -4077,27 +4077,60 @@ export function Viewport() {
               </select>
             </div>
 
-            {history ? (
-              <>
-                <InfoRow label="Origin" value={history.origin.operation} />
-                {history.query && <InfoRow label="Query" value={history.query.kind} />}
-                {history.transformations.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    <div style={{ fontSize: 11, color: 'var(--fc-textMuted)', marginBottom: 4 }}>
-                      Transformations ({history.transformations.length})
-                    </div>
-                    {history.transformations.map((step, i) => (
-                      <div key={i} style={{ fontSize: 11, padding: '3px 0', borderTop: i > 0 ? '1px solid var(--fc-border)' : undefined, opacity: 0.85 }}>
-                        <span style={{ color: 'var(--fc-textMuted)', marginRight: 4 }}>{i + 1}.</span>
-                        {step.description}
+            {history && history.timeline.length > 0 ? (
+              <div>
+                {history.timeline.map((entry, i) => {
+                  const isFirst = i === 0;
+                  const isLast = i === history.timeline.length - 1;
+                  const color =
+                    entry.category === 'primitive' ? '#4ade80' :
+                    entry.category === 'sketch' ? '#60a5fa' :
+                    entry.category === 'modifier' ? '#fb923c' :
+                    entry.category === 'boolean' ? '#c084fc' :
+                    'var(--fc-textMuted)';
+                  return (
+                    <div key={i} style={{ display: 'flex', gap: 8, paddingBottom: isLast ? 0 : 6 }}>
+                      {/* Timeline spine */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 14 }}>
+                        <div style={{
+                          width: isFirst ? 10 : 8,
+                          height: isFirst ? 10 : 8,
+                          borderRadius: '50%',
+                          background: color,
+                          flexShrink: 0,
+                          marginTop: isFirst ? 1 : 2,
+                          boxShadow: isFirst ? `0 0 0 2px color-mix(in srgb, ${color} 30%, transparent)` : undefined,
+                        }} />
+                        {!isLast && (
+                          <div style={{ width: 2, flex: 1, background: 'var(--fc-border)', marginTop: 3 }} />
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
-                {history.transformations.length === 0 && (
-                  <div style={{ fontSize: 11, color: 'var(--fc-textMuted)', marginTop: 4 }}>No transforms applied</div>
-                )}
-              </>
+                      {/* Entry content */}
+                      <div style={{ paddingBottom: isLast ? 0 : 4, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fc-text)', lineHeight: 1.3 }}>
+                          {entry.label}
+                          <span style={{
+                            marginLeft: 5,
+                            fontSize: 9,
+                            fontWeight: 500,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                            color,
+                            opacity: 0.85,
+                          }}>
+                            {entry.category}
+                          </span>
+                        </div>
+                        {entry.summary && (
+                          <div style={{ fontSize: 10, color: 'var(--fc-textMuted)', marginTop: 1, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                            {entry.summary}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <div style={{ fontSize: 11, color: 'var(--fc-textMuted)' }}>No history available for this face</div>
             )}

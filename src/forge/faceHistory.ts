@@ -4,7 +4,7 @@
  * Exposes the transformation chain that led to each surface.
  */
 
-import type { ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
+import type { ProfileCompilePlan, ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
 import type { FaceRef } from './sketch/topology';
 import type { FaceQueryRef, ShapeQueryOwner } from './queryModel';
 
@@ -12,6 +12,15 @@ export interface TransformationStep {
   kind: string;
   description: string;
   details?: Record<string, unknown>;
+}
+
+export type TimelineEntryCategory = 'primitive' | 'sketch' | 'modifier' | 'boolean' | 'transform';
+
+export interface TimelineEntry {
+  kind: string;
+  label: string;
+  summary: string;
+  category: TimelineEntryCategory;
 }
 
 export interface FaceTransformationHistory {
@@ -22,6 +31,8 @@ export interface FaceTransformationHistory {
   };
   transformations: TransformationStep[];
   query?: FaceQueryRef;
+  /** Ordered list of operations that built this shape, oldest first. */
+  timeline: TimelineEntry[];
 }
 
 function describeTransformStep(step: ShapeCompileTransformStep): TransformationStep {
@@ -143,17 +154,154 @@ function findOriginOperation(plan: ShapeCompilePlan | null): { operation: string
   }
 }
 
+function summarizeProfile(profile: ProfileCompilePlan): string {
+  switch (profile.kind) {
+    case 'rect': return `${profile.width}×${profile.height} rect`;
+    case 'roundedRect': return `${profile.width}×${profile.height} rounded rect`;
+    case 'circle': return `r=${profile.radius} circle`;
+    case 'polygon': return `polygon (${profile.points.length} pts)`;
+    case 'boolean': return `${profile.op} profile`;
+    case 'offset': return 'offset profile';
+    case 'hull': return 'hull profile';
+    case 'project': return 'projected profile';
+  }
+}
+
+function collectTimelineEntries(plan: ShapeCompilePlan, entries: TimelineEntry[]): void {
+  // Post-order traversal: recurse into base first → results in chronological (oldest-first) order.
+  switch (plan.kind) {
+    case 'queryOwner':
+      // Transparent metadata wrapper — skip, just recurse.
+      collectTimelineEntries(plan.base, entries);
+      return;
+
+    case 'transform':
+      collectTimelineEntries(plan.base, entries);
+      for (const step of plan.steps) {
+        const d = describeTransformStep(step);
+        const label =
+          step.kind === 'translate' ? 'Move' :
+          step.kind === 'rotate' ? 'Rotate' :
+          step.kind === 'rotateAround' ? 'Rotate Around' :
+          step.kind === 'scale' ? 'Scale' :
+          step.kind === 'mirror' ? 'Mirror' :
+          'Place on Workplane';
+        entries.push({ kind: step.kind, label, summary: d.description, category: 'transform' });
+      }
+      return;
+
+    case 'shell':
+      collectTimelineEntries(plan.base, entries);
+      entries.push({ kind: 'shell', label: 'Shell', summary: `t = ${plan.thickness}`, category: 'modifier' });
+      return;
+
+    case 'hole':
+      collectTimelineEntries(plan.base, entries);
+      entries.push({ kind: 'hole', label: 'Hole', summary: `r = ${plan.hole.radius}`, category: 'modifier' });
+      return;
+
+    case 'cut':
+      collectTimelineEntries(plan.base, entries);
+      entries.push({ kind: 'cut', label: 'Cut', summary: summarizeProfile(plan.profile), category: 'modifier' });
+      return;
+
+    case 'fillet':
+      collectTimelineEntries(plan.base, entries);
+      entries.push({ kind: 'fillet', label: 'Fillet', summary: `r = ${plan.radius}`, category: 'modifier' });
+      return;
+
+    case 'chamfer':
+      collectTimelineEntries(plan.base, entries);
+      entries.push({ kind: 'chamfer', label: 'Chamfer', summary: `size = ${plan.size}`, category: 'modifier' });
+      return;
+
+    case 'trimByPlane':
+      collectTimelineEntries(plan.base, entries);
+      entries.push({ kind: 'trimByPlane', label: 'Trim by Plane', summary: `normal [${plan.normalX}, ${plan.normalY}, ${plan.normalZ}]`, category: 'modifier' });
+      return;
+
+    case 'boolean':
+      // Follow the primary operand (base body) as the spine.
+      if (plan.shapes.length > 0) collectTimelineEntries(plan.shapes[0], entries);
+      entries.push({
+        kind: 'boolean',
+        label: plan.op === 'union' ? 'Union' : plan.op === 'difference' ? 'Difference' : 'Intersection',
+        summary: `${plan.shapes.length} operand${plan.shapes.length !== 1 ? 's' : ''}`,
+        category: 'boolean',
+      });
+      return;
+
+    case 'hull':
+      entries.push({ kind: 'hull', label: 'Hull', summary: `${plan.shapes.length} shapes`, category: 'boolean' });
+      return;
+
+    case 'extrude':
+      entries.push({ kind: 'extrude', label: 'Extrude', summary: `${summarizeProfile(plan.profile)}, h = ${plan.height}`, category: 'sketch' });
+      return;
+
+    case 'revolve':
+      entries.push({ kind: 'revolve', label: 'Revolve', summary: `${plan.degrees}°`, category: 'sketch' });
+      return;
+
+    case 'loft':
+      entries.push({ kind: 'loft', label: 'Loft', summary: `${plan.profiles.length} sections`, category: 'sketch' });
+      return;
+
+    case 'sweep':
+      entries.push({ kind: 'sweep', label: 'Sweep', summary: summarizeProfile(plan.profile), category: 'sketch' });
+      return;
+
+    case 'box':
+      entries.push({ kind: 'box', label: 'Box', summary: `${plan.x} × ${plan.y} × ${plan.z}`, category: 'primitive' });
+      return;
+
+    case 'cylinder':
+      entries.push({
+        kind: 'cylinder',
+        label: 'Cylinder',
+        summary: plan.radiusTop !== undefined && plan.radiusTop !== plan.radius
+          ? `r = ${plan.radius}→${plan.radiusTop}, h = ${plan.height}`
+          : `r = ${plan.radius}, h = ${plan.height}`,
+        category: 'primitive',
+      });
+      return;
+
+    case 'sphere':
+      entries.push({ kind: 'sphere', label: 'Sphere', summary: `r = ${plan.radius}`, category: 'primitive' });
+      return;
+
+    case 'sheetMetal':
+      entries.push({ kind: 'sheetMetal', label: 'Sheet Metal', summary: '', category: 'primitive' });
+      return;
+
+    default: {
+      const k = (plan as { kind: string }).kind;
+      entries.push({ kind: k, label: k, summary: '', category: 'primitive' });
+      return;
+    }
+  }
+}
+
+export function buildOperationTimeline(plan: ShapeCompilePlan | null): TimelineEntry[] {
+  if (!plan) return [];
+  const entries: TimelineEntry[] = [];
+  collectTimelineEntries(plan, entries);
+  return entries;
+}
+
 export function traceFaceTransformationHistory(
   plan: ShapeCompilePlan | null,
   face: FaceRef,
 ): FaceTransformationHistory {
   const transformations = tracePlanTransformations(plan);
   const origin = findOriginOperation(plan);
+  const timeline = buildOperationTimeline(plan);
 
   return {
     faceName: face.name,
     origin,
     transformations,
     query: face.query,
+    timeline,
   };
 }
