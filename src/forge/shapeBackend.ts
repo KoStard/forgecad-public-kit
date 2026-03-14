@@ -1,7 +1,7 @@
 import type { Manifold } from 'manifold-3d';
 import type { Mat4 } from './transform';
 
-const SHAPE_BACKEND_MARKER = Symbol.for('forgecad.shapeBackend');
+export const SHAPE_BACKEND_MARKER = Symbol.for('forgecad.shapeBackend');
 
 export type ShapeRuntimeBounds = ReturnType<Manifold['boundingBox']>;
 export type ShapeRuntimeMesh = ReturnType<Manifold['getMesh']>;
