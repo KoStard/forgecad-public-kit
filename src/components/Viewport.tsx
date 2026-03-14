@@ -45,6 +45,7 @@ interface ObjectContextMenuState {
   objectId: string;
   x: number;
   y: number;
+  hitNormal?: [number, number, number];
 }
 
 const VIEWPORT_CAMERA_STORAGE_KEY = 'fc-viewport-camera-v1';
@@ -80,7 +81,7 @@ interface ViewportPerformanceInfo {
   programCount: number;
 }
 const OBJECT_CONTEXT_MENU_WIDTH = 144;
-const OBJECT_CONTEXT_MENU_HEIGHT = 42;
+const OBJECT_CONTEXT_MENU_HEIGHT = 72;
 const OBJECT_CONTEXT_MENU_MARGIN = 8;
 const NON_TEXT_INPUT_TYPES = new Set([
   'button',
@@ -183,10 +184,11 @@ function addExportLights(scene: THREE.Scene): void {
   scene.add(new THREE.HemisphereLight(0xb1e1ff, 0x444444, 0.4));
 }
 
-function hashString(value: string): number {
+function hashString(value: string | undefined | null): number {
+  const s = String(value || '');
   let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
+  for (let i = 0; i < s.length; i += 1) {
+    hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
   }
   return Math.abs(hash);
 }
@@ -1464,8 +1466,8 @@ interface SectionPlaneGuideStyle {
   showAxis: boolean;
 }
 
-const colorFromName = (name: string): string => {
-  const hue = hashString(name) % 360;
+const colorFromName = (name: string | undefined | null): string => {
+  const hue = hashString(name || 'default') % 360;
   return `hsl(${hue}, 72%, 58%)`;
 };
 
@@ -3098,6 +3100,15 @@ function OrbitGifExporterBridge({
   return null;
 }
 
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0' }}>
+      <span style={{ color: 'var(--fc-textMuted)' }}>{label}</span>
+      <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{value}</span>
+    </div>
+  );
+}
+
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const result = useForgeStore((s) => s.result);
@@ -3423,6 +3434,7 @@ export function Viewport() {
   const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
   const [isViewportInteracting, setIsViewportInteracting] = useState(false);
   const [objectContextMenu, setObjectContextMenu] = useState<ObjectContextMenuState | null>(null);
+  const [faceInfoPanel, setFaceInfoPanel] = useState<{ objectId: string; faceName: string; x: number; y: number } | null>(null);
   const themeName = useForgeStore((s) => s.theme);
   const t = themes[themeName];
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
@@ -3628,7 +3640,13 @@ export function Viewport() {
       Math.max(event.clientY - rect.top, OBJECT_CONTEXT_MENU_MARGIN),
       Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.height - OBJECT_CONTEXT_MENU_HEIGHT - OBJECT_CONTEXT_MENU_MARGIN),
     );
-    setObjectContextMenu({ objectId: obj.id, x, y });
+    // Capture the face normal in world space for face identification
+    let hitNormal: [number, number, number] | undefined;
+    if (event.face) {
+      const n = event.face.normal.clone().transformDirection(event.object.matrixWorld);
+      hitNormal = [n.x, n.y, n.z];
+    }
+    setObjectContextMenu({ objectId: obj.id, x, y, hitNormal });
   }, [isViewportInteracting, measureMode, selectObject]);
 
   const handleHideObject = useCallback(() => {
@@ -3636,6 +3654,33 @@ export function Viewport() {
     setObjectVisibility(objectContextMenu.objectId, false);
     closeObjectContextMenu();
   }, [closeObjectContextMenu, objectContextMenu, setObjectVisibility]);
+
+  const handleGetFaceInfo = useCallback(() => {
+    if (!objectContextMenu) return;
+    const obj = objects.find((o) => o.id === objectContextMenu.objectId);
+    if (!obj?.shape) { closeObjectContextMenu(); return; }
+    const hitNormal = objectContextMenu.hitNormal;
+    let faceName: string | undefined;
+    if (hitNormal) {
+      const faceNames = obj.shape.faceNames();
+      let bestDot = -Infinity;
+      for (const name of faceNames) {
+        try {
+          const faceRef = obj.shape.face(name);
+          const n = faceRef.normal;
+          const dot = n[0] * hitNormal[0] + n[1] * hitNormal[1] + n[2] * hitNormal[2];
+          if (dot > bestDot) { bestDot = dot; faceName = name; }
+        } catch { /* skip */ }
+      }
+    }
+    if (!faceName) {
+      const names = obj.shape.faceNames();
+      faceName = names[0];
+    }
+    if (!faceName) { closeObjectContextMenu(); return; }
+    setFaceInfoPanel({ objectId: objectContextMenu.objectId, faceName, x: objectContextMenu.x, y: objectContextMenu.y });
+    closeObjectContextMenu();
+  }, [closeObjectContextMenu, objectContextMenu, objects]);
 
   const handleViewportPointerMissed = useCallback((event: MouseEvent) => {
     if (event.detail !== 2) return;
@@ -3896,6 +3941,23 @@ export function Viewport() {
         >
           <button
             type="button"
+            onClick={handleGetFaceInfo}
+            style={{
+              width: '100%',
+              border: 'none',
+              borderRadius: 6,
+              padding: '8px 10px',
+              background: 'transparent',
+              color: 'var(--fc-text)',
+              textAlign: 'left',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            Get Info
+          </button>
+          <button
+            type="button"
             onClick={handleHideObject}
             style={{
               width: '100%',
@@ -3913,6 +3975,88 @@ export function Viewport() {
           </button>
         </div>
       )}
+
+      {faceInfoPanel && (() => {
+        const obj = objects.find((o) => o.id === faceInfoPanel.objectId);
+        if (!obj?.shape) return null;
+        let history: ReturnType<typeof obj.shape.faceHistory> | null = null;
+        try { history = obj.shape.faceHistory(faceInfoPanel.faceName); } catch { /* no history */ }
+        const faceNames = obj.shape.faceNames();
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left: Math.min(faceInfoPanel.x, (containerRef.current?.clientWidth ?? 600) - 280 - OBJECT_CONTEXT_MENU_MARGIN),
+              top: faceInfoPanel.y,
+              width: 272,
+              background: 'var(--fc-bgPanel)',
+              border: '1px solid var(--fc-border)',
+              borderRadius: 8,
+              boxShadow: '0 12px 28px rgba(0, 0, 0, 0.28)',
+              padding: 12,
+              zIndex: 20,
+              fontSize: 12,
+              color: 'var(--fc-text)',
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>Face Info</span>
+              <button
+                type="button"
+                onClick={() => setFaceInfoPanel(null)}
+                style={{ border: 'none', background: 'transparent', color: 'var(--fc-textMuted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
+              >×</button>
+            </div>
+
+            {/* Face selector */}
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 11, color: 'var(--fc-textMuted)', display: 'block', marginBottom: 3 }}>Face</label>
+              <select
+                value={faceInfoPanel.faceName}
+                onChange={(e) => setFaceInfoPanel({ ...faceInfoPanel, faceName: e.target.value })}
+                style={{
+                  width: '100%',
+                  background: 'var(--fc-bgInput)',
+                  border: '1px solid var(--fc-border)',
+                  borderRadius: 4,
+                  color: 'var(--fc-text)',
+                  fontSize: 12,
+                  padding: '4px 6px',
+                }}
+              >
+                {faceNames.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+
+            {history ? (
+              <>
+                <InfoRow label="Origin" value={history.origin.operation} />
+                {history.query && <InfoRow label="Query" value={history.query.kind} />}
+                {history.transformations.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--fc-textMuted)', marginBottom: 4 }}>
+                      Transformations ({history.transformations.length})
+                    </div>
+                    {history.transformations.map((step, i) => (
+                      <div key={i} style={{ fontSize: 11, padding: '3px 0', borderTop: i > 0 ? '1px solid var(--fc-border)' : undefined, opacity: 0.85 }}>
+                        <span style={{ color: 'var(--fc-textMuted)', marginRight: 4 }}>{i + 1}.</span>
+                        {step.description}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {history.transformations.length === 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--fc-textMuted)', marginTop: 4 }}>No transforms applied</div>
+                )}
+              </>
+            ) : (
+              <div style={{ fontSize: 11, color: 'var(--fc-textMuted)' }}>No history available for this face</div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
