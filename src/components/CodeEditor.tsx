@@ -1150,9 +1150,14 @@ export function CodeEditor() {
   const result = useForgeStore((s) => s.result);
   const loadFromText = useForgeStore((s) => s.loadFromText);
   const theme = useForgeStore((s) => s.theme);
+  const saveFile = useForgeStore((s) => s.saveFile);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const code = files[activeFile] ?? '';
+
+  // Clear pending save timer when switching files so we don't auto-save stale content
+  useEffect(() => () => clearTimeout(saveTimerRef.current), [activeFile]);
 
   const handleMount: OnMount = (editor, monaco) => {
     monaco.languages.typescript.javascriptDefaults.addExtraLib(FORGE_TYPES, 'forge.d.ts');
@@ -1177,8 +1182,10 @@ export function CodeEditor() {
       updateFileCode(activeFile, value);
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => execute(), 400);
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => saveFile(), 1500);
     },
-    [activeFile, updateFileCode, execute],
+    [activeFile, updateFileCode, execute, saveFile],
   );
 
   const handleDrop = useCallback(

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import fs from 'fs';
+import chokidar from 'chokidar';
 import { init, resolveForgeQualityPreset } from './src/forge/headless';
 import { buildNotebookOutputs } from './src/notebook/output';
 import {
@@ -213,20 +214,61 @@ function forgeProjectPlugin() {
       }
     },
     configureServer(server: any) {
+      const sseClients = new Set<any>();
+
+      const broadcast = (event: string, data: object) => {
+        const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+        for (const client of sseClients) {
+          try { client.write(msg); } catch { sseClients.delete(client); }
+        }
+      };
+
+      if (projectDir) {
+        const abs = path.resolve(projectDir);
+        const watcher = chokidar.watch(abs, {
+          ignoreInitial: true,
+          ignored: /(^|[/\\])\../,
+        });
+        watcher.on('add', (filePath) => {
+          if (!isProjectFile(filePath)) return;
+          const rel = path.relative(abs, filePath).replace(/\\/g, '/');
+          try { broadcast('change', { filename: rel, content: fs.readFileSync(filePath, 'utf-8') }); } catch {}
+        });
+        watcher.on('change', (filePath) => {
+          if (!isProjectFile(filePath)) return;
+          const rel = path.relative(abs, filePath).replace(/\\/g, '/');
+          try { broadcast('change', { filename: rel, content: fs.readFileSync(filePath, 'utf-8') }); } catch {}
+        });
+        watcher.on('unlink', (filePath) => {
+          if (!isProjectFile(filePath)) return;
+          const rel = path.relative(abs, filePath).replace(/\\/g, '/');
+          broadcast('delete', { filename: rel });
+        });
+        server.httpServer?.once('close', () => {
+          watcher.close();
+          sseClients.forEach((c) => { try { c.end(); } catch {} });
+          sseClients.clear();
+        });
+      }
+
       server.middlewares.use((req: any, res: any, next: any) => {
-        // Handle /api/files - dynamically fetch all project files
-        if (req.method === 'GET' && req.url === '/api/files') {
-          try {
-            const entries = scanProjectFiles(projectDir);
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify(entries));
-          } catch (e: any) {
-            res.statusCode = 500;
-            res.end(JSON.stringify({ error: e.message }));
+        // Handle /api/watch - SSE stream for file change notifications
+        if (req.method === 'GET' && req.url === '/api/watch') {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.flushHeaders();
+          const entries = scanProjectFiles(projectDir);
+          res.write(`event: init\ndata: ${JSON.stringify(entries)}\n\n`);
+          if (projectDir) {
+            sseClients.add(res);
+            req.on('close', () => sseClients.delete(res));
+          } else {
+            res.end();
           }
           return;
         }
-        
+
         // Handle /api/save - save a file
         if (req.method === 'POST' && req.url === '/api/save') {
           readJsonBody(req)

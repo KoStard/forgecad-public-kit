@@ -23,7 +23,7 @@ export function CommandPalette() {
   const showAllObjects = useForgeStore((s) => s.showAllObjects);
   const setTheme = useForgeStore((s) => s.setTheme);
   const theme = useForgeStore((s) => s.theme);
-  const result = useForgeStore((s) => s.result);
+  const result = useForgeStore((s) => s.lastValidResult);
   const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
   const setShowPerformanceInfo = useForgeStore((s) => s.setShowPerformanceInfo);
   const objectSettings = useForgeStore((s) => s.objectSettings);

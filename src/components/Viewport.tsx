@@ -40,6 +40,7 @@ import { themes } from '../theme';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
+import { MOUSE_BUTTONS_3D, MOUSE_BUTTONS_SKETCH, TOUCH_GESTURES_3D, TOUCH_GESTURES_SKETCH } from '../capture/controlsConfig';
 
 interface ObjectContextMenuState {
   objectId: string;
@@ -3146,7 +3147,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
-  const result = useForgeStore((s) => s.result);
+  const result = useForgeStore((s) => s.lastValidResult);
   const files = useForgeStore((s) => s.files);
   const renderMode = useForgeStore((s) => s.renderMode);
   const projectionMode = useForgeStore((s) => s.projectionMode);
@@ -3886,8 +3887,8 @@ export function Viewport() {
           minPolarAngle={0}
           maxPolarAngle={Math.PI}
           enableRotate={!isSketchOnly}
-          mouseButtons={isSketchOnly ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN } : { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.DOLLY }}
-          touches={isSketchOnly ? { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN } : undefined}
+          mouseButtons={isSketchOnly ? MOUSE_BUTTONS_SKETCH : MOUSE_BUTTONS_3D}
+          touches={isSketchOnly ? TOUCH_GESTURES_SKETCH : TOUCH_GESTURES_3D}
         />
 
         <ControlsInteractionBridge

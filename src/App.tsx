@@ -126,7 +126,9 @@ export function App() {
   const activeFile = useForgeStore((s) => s.activeFile);
   const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
-  const refreshFiles = useForgeStore((s) => s.refreshFiles);
+  const applyServerSnapshot = useForgeStore((s) => s.applyServerSnapshot);
+  const applyServerFileChange = useForgeStore((s) => s.applyServerFileChange);
+  const applyServerFileDelete = useForgeStore((s) => s.applyServerFileDelete);
   const saveFile = useForgeStore((s) => s.saveFile);
   const minFileExplorerWidth = 220;
   const maxFileExplorerWidth = 520;
@@ -143,32 +145,22 @@ export function App() {
     });
   }, []);
 
-  // Refresh files on mount and when tab becomes visible
+  // Sync project files via SSE — reconnects automatically on disconnect
   useEffect(() => {
-    refreshFiles();
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        refreshFiles();
-      }
-    };
-    const handleFocus = () => {
-      refreshFiles();
-    };
-    const refreshInterval = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        refreshFiles();
-      }
-    }, 2000);
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    return () => {
-      window.clearInterval(refreshInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [refreshFiles]);
+    const es = new EventSource('/api/watch');
+    es.addEventListener('init', (e) => {
+      applyServerSnapshot(JSON.parse(e.data));
+    });
+    es.addEventListener('change', (e) => {
+      const { filename, content } = JSON.parse(e.data);
+      applyServerFileChange(filename, content);
+    });
+    es.addEventListener('delete', (e) => {
+      const { filename } = JSON.parse(e.data);
+      applyServerFileDelete(filename);
+    });
+    return () => es.close();
+  }, [applyServerSnapshot, applyServerFileChange, applyServerFileDelete]);
 
   // Warn before closing/refreshing with unsaved changes
   useEffect(() => {

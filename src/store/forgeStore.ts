@@ -187,6 +187,7 @@ interface ForgeStore {
   setFileHandle: (h: FileSystemFileHandle | null) => void;
 
   result: RunResult | null;
+  lastValidResult: RunResult | null;
   consoleLogs: LogEntry[];
   params: ParamDef[];
   runQuality: ForgeQualityPreset;
@@ -287,7 +288,9 @@ interface ForgeStore {
 
   updateSketchConstraint: (objectId: string, constraintId: string, value: number) => void;
 
-  refreshFiles: () => Promise<void>;
+  applyServerSnapshot: (serverFiles: Record<string, string>) => void;
+  applyServerFileChange: (filename: string, content: string) => void;
+  applyServerFileDelete: (filename: string) => void;
 
   theme: ThemeName;
   setTheme: (name: ThemeName) => void;
@@ -648,6 +651,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const restored = (name && nextByFile[name]) ? nextByFile[name] : {};
     set({
       activeFile: name,
+      lastValidResult: null,
       paramOverrides: restored,
       paramOverridesByFile: nextByFile,
       jointValues: {},
@@ -841,6 +845,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   setFileHandle: (fileHandle) => set({ fileHandle }),
 
   result: null,
+  lastValidResult: null,
   consoleLogs: [],
   params: [],
   runQuality: resolveForgeQualityPreset(initialViewPreferences.runQuality ?? 'live'),
@@ -865,7 +870,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     } = get();
     const previewFile = resolvePreviewFile(activeFile, files);
     if (!previewFile) {
-      set({ result: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
+      set({ result: null, lastValidResult: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
       return;
     }
     const code = files[previewFile];
@@ -874,9 +879,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const runResult = isNotebookFile(previewFile)
       ? runNotebookPreview(previewFile, code, files, runQuality)
       : runScript(code, previewFile, files, { quality: runQuality });
-    const applied = buildRunState(previewFile, runResult, get());
-    set(applied.nextState);
-    writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+    if (runResult.error) {
+      set({ result: runResult, consoleLogs: runResult.logs, previewFile });
+    } else {
+      const applied = buildRunState(previewFile, runResult, get());
+      set({ ...applied.nextState, lastValidResult: runResult });
+      writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+    }
   },
 
   setParam: (name, value) => {
@@ -895,7 +904,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     } = get();
     const previewFile = resolvePreviewFile(activeFile, files);
     if (!previewFile) {
-      set({ result: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
+      set({ result: null, lastValidResult: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
       return;
     }
     const code = files[previewFile];
@@ -903,9 +912,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const runResult = isNotebookFile(previewFile)
       ? runNotebookPreview(previewFile, code, files, runQuality)
       : runScript(code, previewFile, files, { quality: runQuality });
-    const applied = buildRunState(previewFile, runResult, get());
-    set(applied.nextState);
-    writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+    if (runResult.error) {
+      set({ result: runResult, consoleLogs: runResult.logs, previewFile });
+    } else {
+      const applied = buildRunState(previewFile, runResult, get());
+      set({ ...applied.nextState, lastValidResult: runResult });
+      writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+    }
   },
 
   resetParamOverrides: () => {
@@ -919,8 +932,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 
   setJointValue: (name, value) => set((state) => {
-    const joints = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.joints ?? []);
-    const couplings = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.couplings ?? []);
+    const joints = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.joints ?? []);
+    const couplings = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.couplings ?? []);
     const coupled = new Set(couplings.map((coupling) => coupling.joint));
     if (coupled.has(name)) return {};
     const joint = joints.find((entry) => entry.name === name);
@@ -933,7 +946,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   }),
 
   setJointAnimationClip: (name) => set((state) => {
-    const clips = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.animations ?? []);
+    const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
     if (!name) {
       return {
         jointAnimationClip: null,
@@ -957,13 +970,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   setJointAnimationPlaying: (playing) => set((state) => {
     if (!playing) return { jointAnimationPlaying: false };
-    const clips = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.animations ?? []);
+    const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
     if (clips.length === 0) return { jointAnimationPlaying: false };
     const clipName = state.jointAnimationClip
       && clips.some((clip) => clip.name === state.jointAnimationClip)
       ? state.jointAnimationClip
-      : (state.result?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.result?.jointsView?.defaultAnimation)
-        ? state.result?.jointsView?.defaultAnimation
+      : (state.lastValidResult?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.lastValidResult?.jointsView?.defaultAnimation)
+        ? state.lastValidResult?.jointsView?.defaultAnimation
         : clips[0].name);
     return {
       jointAnimationClip: clipName,
@@ -979,13 +992,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   toggleJointAnimationPlayback: () => set((state) => {
     if (state.jointAnimationPlaying) return { jointAnimationPlaying: false };
-    const clips = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.animations ?? []);
+    const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
     if (clips.length === 0) return {};
     const clipName = state.jointAnimationClip
       && clips.some((clip) => clip.name === state.jointAnimationClip)
       ? state.jointAnimationClip
-      : (state.result?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.result?.jointsView?.defaultAnimation)
-        ? state.result?.jointsView?.defaultAnimation
+      : (state.lastValidResult?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.lastValidResult?.jointsView?.defaultAnimation)
+        ? state.lastValidResult?.jointsView?.defaultAnimation
         : clips[0].name);
     return {
       jointAnimationClip: clipName,
@@ -1036,7 +1049,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     };
   }),
   showAllObjects: () => set((state) => {
-    const objectMetaById = new Map((state.result?.objects ?? []).map((obj) => [obj.id, obj]));
+    const objectMetaById = new Map((state.lastValidResult?.objects ?? []).map((obj) => [obj.id, obj]));
     const ids = new Set([
       ...Object.keys(state.objectSettings),
       ...objectMetaById.keys(),
@@ -1389,91 +1402,134 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   }),
 
   updateSketchConstraint: (objectId, constraintId, value) => {
-    const current = get().result;
+    const current = get().lastValidResult;
     if (!current) return;
     const objects = current.objects.map((obj) => {
       if (obj.id !== objectId || !obj.sketch || !isConstraintSketch(obj.sketch)) return obj;
       const updated = updateConstraintValue(obj.sketch, constraintId, value);
       return { ...obj, sketch: updated, sketchMeta: updated.constraintMeta };
     });
-    set({ result: { ...current, objects } });
+    set({ lastValidResult: { ...current, objects } });
   },
 
-  refreshFiles: async () => {
-    try {
-      const response = await fetch('/api/files');
-      if (!response.ok) {
-        console.error('Failed to refresh files:', response.statusText);
-        return;
+  applyServerSnapshot: (serverFiles: Record<string, string>) => {
+    const { files, savedFiles, activeFile, objectSettingsByFile } = get();
+
+    const dirtyFiles = new Set<string>();
+    Object.keys(files).forEach((p) => {
+      if (!(p in savedFiles) || savedFiles[p] !== files[p]) dirtyFiles.add(p);
+    });
+
+    const nextFiles: Record<string, string> = {};
+    const nextSaved: Record<string, string> = {};
+    const newFolders = new Set<string>();
+
+    Object.keys(serverFiles).forEach((p) => {
+      if (dirtyFiles.has(p)) {
+        nextFiles[p] = files[p];
+        if (p in savedFiles) nextSaved[p] = savedFiles[p];
+      } else {
+        nextFiles[p] = serverFiles[p];
+        nextSaved[p] = serverFiles[p];
       }
-      const serverFiles: Record<string, string> = await response.json();
-      const { files, savedFiles, activeFile, objectSettingsByFile } = get();
+      collectParentPaths(p).forEach((folder) => newFolders.add(folder));
+    });
 
-      const dirtyFiles = new Set<string>();
-      Object.keys(files).forEach((path) => {
-        if (!(path in savedFiles) || savedFiles[path] !== files[path]) {
-          dirtyFiles.add(path);
-        }
-      });
+    // Keep locally modified files that no longer exist on disk
+    Object.keys(files).forEach((p) => {
+      if (p in nextFiles || !dirtyFiles.has(p)) return;
+      nextFiles[p] = files[p];
+      if (p in savedFiles) nextSaved[p] = savedFiles[p];
+      collectParentPaths(p).forEach((folder) => newFolders.add(folder));
+    });
 
-      const nextFiles: Record<string, string> = {};
-      const nextSaved: Record<string, string> = {};
-      const newFolders = new Set<string>();
+    const hashFile = getActiveFileFromHash();
+    const availableFiles = Object.keys(nextFiles);
+    const newActiveFile = (hashFile && nextFiles[hashFile])
+      ? hashFile
+      : (activeFile && nextFiles[activeFile]
+        ? activeFile
+        : (findPreferredEntryFile(availableFiles)
+          || availableFiles.find((n) => n.endsWith('.js'))
+          || availableFiles[0]));
 
-      Object.keys(serverFiles).forEach((path) => {
-        if (dirtyFiles.has(path)) {
-          nextFiles[path] = files[path];
-          if (path in savedFiles) nextSaved[path] = savedFiles[path];
-        } else {
-          nextFiles[path] = serverFiles[path];
-          nextSaved[path] = serverFiles[path];
-        }
-        collectParentPaths(path).forEach((folder) => newFolders.add(folder));
-      });
+    const nextDirty = Object.keys(nextFiles).some((p) => nextSaved[p] !== nextFiles[p]);
+    const nextObjectSettingsByFile = Object.fromEntries(
+      Object.entries(objectSettingsByFile).filter(([f]) => f in nextFiles),
+    ) as ObjectSettingsByFile;
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
 
-      // Keep locally modified files that no longer exist on disk
-      Object.keys(files).forEach((path) => {
-        if (path in nextFiles) return;
-        if (!dirtyFiles.has(path)) return;
-        nextFiles[path] = files[path];
-        if (path in savedFiles) nextSaved[path] = savedFiles[path];
-        collectParentPaths(path).forEach((folder) => newFolders.add(folder));
-      });
+    set({
+      files: nextFiles,
+      savedFiles: nextSaved,
+      folders: Array.from(newFolders).sort(),
+      activeFile: newActiveFile,
+      dirty: nextDirty,
+      objectSettingsByFile: nextObjectSettingsByFile,
+    });
 
-      const hashFile = getActiveFileFromHash();
-      const availableFiles = Object.keys(nextFiles);
-      const newActiveFile = (hashFile && nextFiles[hashFile])
-        ? hashFile
-        : (activeFile && nextFiles[activeFile]
-          ? activeFile
-          : (findPreferredEntryFile(availableFiles)
-            || availableFiles.find((n) => n.endsWith('.js'))
-            || availableFiles[0]));
-
-      const nextDirty = Object.keys(nextFiles).some((path) => nextSaved[path] !== nextFiles[path]);
-      const nextObjectSettingsByFile = Object.fromEntries(
-        Object.entries(objectSettingsByFile).filter(([file]) => file in nextFiles),
-      ) as ObjectSettingsByFile;
-      writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
-
-      set({
-        files: nextFiles,
-        savedFiles: nextSaved,
-        folders: Array.from(newFolders).sort(),
-        activeFile: newActiveFile,
-        dirty: nextDirty,
-        objectSettingsByFile: nextObjectSettingsByFile,
-      });
-
-      if (newActiveFile && newActiveFile !== activeFile) {
-        // Different document — clear param overrides for the new file
-        set({ paramOverrides: {} });
-        setParamOverrides({});
-        window.history.replaceState(null, '', `#${newActiveFile}`);
+    if (newActiveFile && newActiveFile !== activeFile) {
+      set({ paramOverrides: {}, lastValidResult: null });
+      setParamOverrides({});
+      window.history.replaceState(null, '', `#${newActiveFile}`);
+      setTimeout(() => get().execute(), 0);
+    } else {
+      const previewFile = resolvePreviewFile(newActiveFile, nextFiles);
+      if (previewFile && nextFiles[previewFile] !== files[previewFile]) {
         setTimeout(() => get().execute(), 0);
       }
-    } catch (e) {
-      console.error('Error refreshing files:', e);
+    }
+  },
+
+  applyServerFileChange: (filename: string, content: string) => {
+    const { files, savedFiles, activeFile } = get();
+    const isDirty = filename in files && savedFiles[filename] !== files[filename];
+    if (isDirty) return;
+    if (files[filename] === content) return;
+    const folders = new Set(get().folders);
+    collectParentPaths(filename).forEach((f) => folders.add(f));
+    const nextFiles = { ...files, [filename]: content };
+    set({
+      files: nextFiles,
+      savedFiles: { ...savedFiles, [filename]: content },
+      folders: Array.from(folders).sort(),
+    });
+    const previewFile = resolvePreviewFile(activeFile, nextFiles);
+    if (previewFile === filename) setTimeout(() => get().execute(), 0);
+  },
+
+  applyServerFileDelete: (filename: string) => {
+    const { files, savedFiles, activeFile, objectSettingsByFile } = get();
+    const isDirty = filename in files && savedFiles[filename] !== files[filename];
+    if (isDirty) return;
+    if (!(filename in files)) return;
+    const nextFiles = { ...files };
+    const nextSaved = { ...savedFiles };
+    delete nextFiles[filename];
+    delete nextSaved[filename];
+    const newFolders = new Set<string>();
+    Object.keys(nextFiles).forEach((p) => collectParentPaths(p).forEach((f) => newFolders.add(f)));
+    const availableFiles = Object.keys(nextFiles);
+    const newActiveFile = activeFile === filename
+      ? (findPreferredEntryFile(availableFiles) || availableFiles.find((n) => n.endsWith('.js')) || availableFiles[0])
+      : activeFile;
+    const nextObjectSettingsByFile = Object.fromEntries(
+      Object.entries(objectSettingsByFile).filter(([f]) => f in nextFiles),
+    ) as ObjectSettingsByFile;
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+    set({
+      files: nextFiles,
+      savedFiles: nextSaved,
+      folders: Array.from(newFolders).sort(),
+      activeFile: newActiveFile,
+      dirty: Object.keys(nextFiles).some((p) => nextSaved[p] !== nextFiles[p]),
+      objectSettingsByFile: nextObjectSettingsByFile,
+    });
+    if (newActiveFile && newActiveFile !== activeFile) {
+      set({ paramOverrides: {}, lastValidResult: null });
+      setParamOverrides({});
+      window.history.replaceState(null, '', `#${newActiveFile}`);
+      setTimeout(() => get().execute(), 0);
     }
   },
 

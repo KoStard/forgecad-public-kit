@@ -22,7 +22,7 @@ function pluralize(count: number, singular: string, plural = `${singular}s`): st
 }
 
 export function ExportPanel() {
-  const result = useForgeStore((s) => s.result);
+  const result = useForgeStore((s) => s.lastValidResult);
   const objectSettings = useForgeStore((s) => s.objectSettings);
   const activeFile = useForgeStore((s) => s.activeFile);
   const [dialogOpen, setDialogOpen] = useState(false);
