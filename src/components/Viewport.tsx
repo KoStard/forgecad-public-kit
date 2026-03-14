@@ -3147,7 +3147,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
-  const result = useForgeStore((s) => s.result);
+  const result = useForgeStore((s) => s.lastValidResult);
   const files = useForgeStore((s) => s.files);
   const renderMode = useForgeStore((s) => s.renderMode);
   const projectionMode = useForgeStore((s) => s.projectionMode);

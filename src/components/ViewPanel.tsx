@@ -237,7 +237,7 @@ export function ViewPanel() {
   const setGridSize = useForgeStore((s) => s.setGridSize);
   const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
   const setShowPerformanceInfo = useForgeStore((s) => s.setShowPerformanceInfo);
-  const result = useForgeStore((s) => s.result);
+  const result = useForgeStore((s) => s.lastValidResult);
   const objectSettings = useForgeStore((s) => s.objectSettings);
   const setObjectVisibility = useForgeStore((s) => s.setObjectVisibility);
   const setObjectsVisibility = useForgeStore((s) => s.setObjectsVisibility);

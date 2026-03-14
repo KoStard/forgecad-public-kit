@@ -187,6 +187,7 @@ interface ForgeStore {
   setFileHandle: (h: FileSystemFileHandle | null) => void;
 
   result: RunResult | null;
+  lastValidResult: RunResult | null;
   consoleLogs: LogEntry[];
   params: ParamDef[];
   runQuality: ForgeQualityPreset;
@@ -648,6 +649,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const restored = (name && nextByFile[name]) ? nextByFile[name] : {};
     set({
       activeFile: name,
+      lastValidResult: null,
       paramOverrides: restored,
       paramOverridesByFile: nextByFile,
       jointValues: {},
@@ -841,6 +843,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   setFileHandle: (fileHandle) => set({ fileHandle }),
 
   result: null,
+  lastValidResult: null,
   consoleLogs: [],
   params: [],
   runQuality: resolveForgeQualityPreset(initialViewPreferences.runQuality ?? 'live'),
@@ -865,7 +868,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     } = get();
     const previewFile = resolvePreviewFile(activeFile, files);
     if (!previewFile) {
-      set({ result: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
+      set({ result: null, lastValidResult: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
       return;
     }
     const code = files[previewFile];
@@ -874,9 +877,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const runResult = isNotebookFile(previewFile)
       ? runNotebookPreview(previewFile, code, files, runQuality)
       : runScript(code, previewFile, files, { quality: runQuality });
-    const applied = buildRunState(previewFile, runResult, get());
-    set(applied.nextState);
-    writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+    if (runResult.error) {
+      set({ result: runResult, consoleLogs: runResult.logs, previewFile });
+    } else {
+      const applied = buildRunState(previewFile, runResult, get());
+      set({ ...applied.nextState, lastValidResult: runResult });
+      writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+    }
   },
 
   setParam: (name, value) => {
@@ -895,7 +902,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     } = get();
     const previewFile = resolvePreviewFile(activeFile, files);
     if (!previewFile) {
-      set({ result: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
+      set({ result: null, lastValidResult: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
       return;
     }
     const code = files[previewFile];
@@ -903,9 +910,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const runResult = isNotebookFile(previewFile)
       ? runNotebookPreview(previewFile, code, files, runQuality)
       : runScript(code, previewFile, files, { quality: runQuality });
-    const applied = buildRunState(previewFile, runResult, get());
-    set(applied.nextState);
-    writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+    if (runResult.error) {
+      set({ result: runResult, consoleLogs: runResult.logs, previewFile });
+    } else {
+      const applied = buildRunState(previewFile, runResult, get());
+      set({ ...applied.nextState, lastValidResult: runResult });
+      writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+    }
   },
 
   resetParamOverrides: () => {
@@ -919,8 +930,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 
   setJointValue: (name, value) => set((state) => {
-    const joints = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.joints ?? []);
-    const couplings = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.couplings ?? []);
+    const joints = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.joints ?? []);
+    const couplings = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.couplings ?? []);
     const coupled = new Set(couplings.map((coupling) => coupling.joint));
     if (coupled.has(name)) return {};
     const joint = joints.find((entry) => entry.name === name);
@@ -933,7 +944,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   }),
 
   setJointAnimationClip: (name) => set((state) => {
-    const clips = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.animations ?? []);
+    const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
     if (!name) {
       return {
         jointAnimationClip: null,
@@ -957,13 +968,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   setJointAnimationPlaying: (playing) => set((state) => {
     if (!playing) return { jointAnimationPlaying: false };
-    const clips = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.animations ?? []);
+    const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
     if (clips.length === 0) return { jointAnimationPlaying: false };
     const clipName = state.jointAnimationClip
       && clips.some((clip) => clip.name === state.jointAnimationClip)
       ? state.jointAnimationClip
-      : (state.result?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.result?.jointsView?.defaultAnimation)
-        ? state.result?.jointsView?.defaultAnimation
+      : (state.lastValidResult?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.lastValidResult?.jointsView?.defaultAnimation)
+        ? state.lastValidResult?.jointsView?.defaultAnimation
         : clips[0].name);
     return {
       jointAnimationClip: clipName,
@@ -979,13 +990,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   toggleJointAnimationPlayback: () => set((state) => {
     if (state.jointAnimationPlaying) return { jointAnimationPlaying: false };
-    const clips = state.result?.jointsView?.enabled === false ? [] : (state.result?.jointsView?.animations ?? []);
+    const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
     if (clips.length === 0) return {};
     const clipName = state.jointAnimationClip
       && clips.some((clip) => clip.name === state.jointAnimationClip)
       ? state.jointAnimationClip
-      : (state.result?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.result?.jointsView?.defaultAnimation)
-        ? state.result?.jointsView?.defaultAnimation
+      : (state.lastValidResult?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.lastValidResult?.jointsView?.defaultAnimation)
+        ? state.lastValidResult?.jointsView?.defaultAnimation
         : clips[0].name);
     return {
       jointAnimationClip: clipName,
@@ -1036,7 +1047,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     };
   }),
   showAllObjects: () => set((state) => {
-    const objectMetaById = new Map((state.result?.objects ?? []).map((obj) => [obj.id, obj]));
+    const objectMetaById = new Map((state.lastValidResult?.objects ?? []).map((obj) => [obj.id, obj]));
     const ids = new Set([
       ...Object.keys(state.objectSettings),
       ...objectMetaById.keys(),
