@@ -192,6 +192,7 @@ interface ForgeStore {
   runQuality: ForgeQualityPreset;
   setRunQuality: (quality: ForgeQualityPreset) => void;
   paramOverrides: Record<string, number>;
+  paramOverridesByFile: Record<string, Record<string, number>>;
   jointValues: Record<string, number>;
   jointAnimationClip: string | null;
   jointAnimationProgress: number;
@@ -633,15 +634,29 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (name) {
       window.history.replaceState(null, '', `#${name}`);
     }
+    // Save current file's param overrides before switching
+    const { activeFile: prevFile, paramOverrides, paramOverridesByFile } = get();
+    const nextByFile = { ...paramOverridesByFile };
+    if (prevFile) {
+      if (Object.keys(paramOverrides).length > 0) {
+        nextByFile[prevFile] = paramOverrides;
+      } else {
+        delete nextByFile[prevFile];
+      }
+    }
+    // Restore target file's saved overrides (empty if none)
+    const restored = (name && nextByFile[name]) ? nextByFile[name] : {};
     set({
       activeFile: name,
-      paramOverrides: {},
+      paramOverrides: restored,
+      paramOverridesByFile: nextByFile,
       jointValues: {},
       jointAnimationClip: null,
       jointAnimationProgress: 0,
       jointAnimationPlaying: false,
       hoveredJointName: null,
     });
+    setParamOverrides(restored);
     setTimeout(() => get().execute(), 0);
   },
   updateFileCode: (name, code) => {
@@ -835,6 +850,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set({ runQuality: next });
   },
   paramOverrides: {},
+  paramOverridesByFile: {},
   jointValues: {},
   jointAnimationClip: null,
   jointAnimationProgress: 0,
@@ -865,7 +881,12 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   setParam: (name, value) => {
     const overrides = { ...get().paramOverrides, [name]: value };
-    set({ paramOverrides: overrides });
+    const { activeFile: curFile, paramOverridesByFile } = get();
+    const previewKey = curFile ? resolvePreviewFile(curFile, get().files) : null;
+    const nextByFile = previewKey
+      ? { ...paramOverridesByFile, [previewKey]: overrides }
+      : paramOverridesByFile;
+    set({ paramOverrides: overrides, paramOverridesByFile: nextByFile });
     setParamOverrides(overrides);
     const {
       files,
@@ -888,7 +909,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 
   resetParamOverrides: () => {
-    set({ paramOverrides: {} });
+    const { activeFile, files, paramOverridesByFile } = get();
+    const previewKey = activeFile ? resolvePreviewFile(activeFile, files) : null;
+    const nextByFile = { ...paramOverridesByFile };
+    if (previewKey) delete nextByFile[previewKey];
+    set({ paramOverrides: {}, paramOverridesByFile: nextByFile });
     setParamOverrides({});
     get().execute();
   },
@@ -1441,6 +1466,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       });
 
       if (newActiveFile && newActiveFile !== activeFile) {
+        // Different document — clear param overrides for the new file
+        set({ paramOverrides: {} });
+        setParamOverrides({});
         window.history.replaceState(null, '', `#${newActiveFile}`);
         setTimeout(() => get().execute(), 0);
       }
