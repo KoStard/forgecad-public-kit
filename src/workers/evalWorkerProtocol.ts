@@ -1,0 +1,113 @@
+import type {
+  ForgeQualityPreset,
+  LogEntry,
+  ParamDef,
+} from '@forge/index';
+import type { DimensionDef } from '../forge/sketch/dimensions';
+import type { BomDef } from '../forge/bom';
+import type { CutPlaneDef } from '../forge/cutPlane';
+import type { ExplodeViewOptions } from '../forge/explodeView';
+import type { CollectedJointsView } from '../forge/jointsView';
+import type { ViewConfig } from '../forge/viewConfig';
+import type { CollectedRobotExport } from '../forge/robotExport';
+import type { FaceRef } from '../forge/sketch/topology';
+import type { FaceTransformationHistory } from '../forge/faceHistory';
+import type { GeometryInfo } from '../forge/kernel';
+import type { SketchConstraintMeta, ConstraintDefinition } from '../forge/sketch/constraints';
+
+/** Wire format for a serialized Shape — all WASM data extracted into transferable TypedArrays. */
+export interface SerializedShapeData {
+  meshNumProp: number;
+  meshTriVerts: Uint32Array;
+  meshVertProperties: Float32Array;
+  meshMergeFromVert: Uint32Array;
+  meshMergeToVert: Uint32Array;
+  boundingBox: { min: [number, number, number]; max: [number, number, number] };
+  numTriangles: number;
+  faceNames: string[];
+  faces: Record<string, FaceRef>;
+  faceHistories: Record<string, FaceTransformationHistory>;
+  colorHex: string | null;
+  geometryInfo: GeometryInfo | null;
+}
+
+/** Wire format for a serialized Sketch — polygon data extracted into plain arrays. */
+export interface SerializedSketchData {
+  /** toPolygons() result — Vec2 = [number, number] */
+  polygons: [number, number][][];
+  bounds: { min: [number, number]; max: [number, number] };
+  /** getSketchWorldMatrix() — 16-element Mat4, or null for flat sketches */
+  worldMatrix: number[] | null;
+  colorHex: string | undefined;
+  /** Populated for ConstraintSketch */
+  constraintMeta?: SketchConstraintMeta;
+  /** Populated for ConstraintSketch — allows updateSketchConstraint on main thread */
+  constraintDefinition?: ConstraintDefinition;
+}
+
+/** Serialized SceneObject — shape and sketch replaced with wire-safe equivalents. */
+export interface SerializedSceneObject {
+  id: string;
+  name: string;
+  shapeData: SerializedShapeData | null;
+  sketchData: SerializedSketchData | null;
+  color?: string;
+  geometryInfo?: GeometryInfo | null;
+  sketchMeta?: SketchConstraintMeta;
+  groupName?: string;
+  treePath?: string[];
+}
+
+/** Full serialized RunResult — no WASM objects, safe to postMessage. */
+export interface SerializedRunResult {
+  objects: SerializedSceneObject[];
+  params: ParamDef[];
+  dimensions: DimensionDef[];
+  bom: BomDef[];
+  cutPlanes: CutPlaneDef[];
+  explodeView: ExplodeViewOptions | null;
+  jointsView: CollectedJointsView | null;
+  viewConfig: ViewConfig | null;
+  robotExport: CollectedRobotExport | null;
+  quality: ForgeQualityPreset;
+  error: string | null;
+  timeMs: number;
+  logs: LogEntry[];
+}
+
+// ---- Message types ----
+
+export interface EvalWorkerRunPayload {
+  seq: number;
+  code: string;
+  file: string;
+  files: Record<string, string>;
+  quality: ForgeQualityPreset;
+  paramOverrides: Record<string, number>;
+  isNotebook: boolean;
+}
+
+export interface EvalWorkerRunRequest {
+  type: 'run';
+  payload: EvalWorkerRunPayload;
+}
+
+export interface EvalWorkerRunSuccess {
+  type: 'run-success';
+  payload: {
+    seq: number;
+    result: SerializedRunResult;
+  };
+}
+
+export interface EvalWorkerRunError {
+  type: 'run-error';
+  payload: {
+    seq: number;
+    message: string;
+    logs: LogEntry[];
+  };
+}
+
+export type EvalWorkerRequest = EvalWorkerRunRequest;
+export type EvalWorkerResponse = EvalWorkerRunSuccess | EvalWorkerRunError;

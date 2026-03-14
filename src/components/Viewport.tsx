@@ -3147,6 +3147,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
+  const isEvaluating = useForgeStore((s) => s.isEvaluating);
   const result = useForgeStore((s) => s.lastValidResult);
   const files = useForgeStore((s) => s.files);
   const renderMode = useForgeStore((s) => s.renderMode);
@@ -3942,6 +3943,25 @@ export function Viewport() {
           }}
         >
           📏 Click to place points, drag markers to adjust
+        </div>
+      )}
+
+      {isEvaluating && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 12,
+            right: 12,
+            background: 'var(--fc-bgPanel)',
+            color: 'var(--fc-textDim)',
+            padding: '4px 10px',
+            borderRadius: 4,
+            fontSize: 12,
+            border: '1px solid var(--fc-border)',
+            pointerEvents: 'none',
+          }}
+        >
+          Evaluating…
         </div>
       )}
 

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import {
-  runScript,
   type ParamDef,
   type RunResult,
   type SceneObject,
@@ -12,8 +11,9 @@ import {
 } from '@forge/index';
 import { setParamOverrides } from '@forge/params';
 import projectFiles from 'virtual:forge-project';
-import { isNotebookFile, parseNotebook, resolveNotebookPreviewCellId, serializeNotebook, createNotebook } from '../notebook/model';
-import { runNotebook } from '../notebook/runtime';
+import { isNotebookFile, serializeNotebook, createNotebook } from '../notebook/model';
+import { evalWorkerClient } from '../workers/evalWorkerClient';
+import { deserializeRunResult } from '../forge/deserializeRunResult';
 import { type ThemeName, applyTheme } from '../theme';
 import { clampAnimationSpeed } from '../animationSpeed';
 import type { ViewportCameraState } from '../capture/cameraState';
@@ -200,7 +200,9 @@ interface ForgeStore {
   jointAnimationPlaying: boolean;
   jointAnimationSpeed: number;
 
-  execute: () => void;
+  isEvaluating: boolean;
+
+  execute: () => Promise<void>;
   setParam: (name: string, value: number) => void;
   resetParamOverrides: () => void;
   setJointValue: (name: string, value: number) => void;
@@ -511,24 +513,6 @@ function createErrorRunResult(message: string, quality: ForgeQualityPreset): Run
   };
 }
 
-function runNotebookPreview(
-  fileName: string,
-  source: string,
-  files: Record<string, string>,
-  quality: ForgeQualityPreset,
-): RunResult {
-  try {
-    const notebook = parseNotebook(source);
-    const targetCellId = resolveNotebookPreviewCellId(notebook);
-    return runNotebook(notebook, fileName, files, {
-      quality,
-      targetCellId,
-    }).displayResult;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return createErrorRunResult(message, quality);
-  }
-}
 
 function buildRunState(
   previewFile: string | null,
@@ -862,11 +846,14 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   jointAnimationPlaying: false,
   jointAnimationSpeed: clampAnimationSpeed(initialViewPreferences.jointAnimationSpeed ?? 1),
 
-  execute: () => {
+  isEvaluating: false,
+
+  execute: async () => {
     const {
       files,
       activeFile,
       runQuality,
+      paramOverrides,
     } = get();
     const previewFile = resolvePreviewFile(activeFile, files);
     if (!previewFile) {
@@ -875,16 +862,34 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     }
     const code = files[previewFile];
     if (!code) return;
-    setParamOverrides(get().paramOverrides);
-    const runResult = isNotebookFile(previewFile)
-      ? runNotebookPreview(previewFile, code, files, runQuality)
-      : runScript(code, previewFile, files, { quality: runQuality });
-    if (runResult.error) {
-      set({ result: runResult, consoleLogs: runResult.logs, previewFile });
-    } else {
-      const applied = buildRunState(previewFile, runResult, get());
-      set({ ...applied.nextState, lastValidResult: runResult });
-      writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+
+    set({ isEvaluating: true });
+
+    try {
+      const serialized = await evalWorkerClient.run({
+        code,
+        file: previewFile,
+        files,
+        quality: runQuality,
+        paramOverrides,
+        isNotebook: isNotebookFile(previewFile),
+      });
+
+      const runResult = deserializeRunResult(serialized);
+
+      if (runResult.error) {
+        set({ result: runResult, consoleLogs: runResult.logs, previewFile, isEvaluating: false });
+      } else {
+        const applied = buildRunState(previewFile, runResult, get());
+        set({ ...applied.nextState, lastValidResult: runResult, isEvaluating: false });
+        writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+      }
+    } catch (error: unknown) {
+      // 'cancelled' means a newer run was already started — keep isEvaluating true
+      if (error instanceof Error && error.message === 'cancelled') return;
+      const message = error instanceof Error ? error.message : String(error);
+      const errResult = createErrorRunResult(message, runQuality);
+      set({ result: errResult, consoleLogs: errResult.logs, previewFile, isEvaluating: false });
     }
   },
 
@@ -896,29 +901,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       ? { ...paramOverridesByFile, [previewKey]: overrides }
       : paramOverridesByFile;
     set({ paramOverrides: overrides, paramOverridesByFile: nextByFile });
-    setParamOverrides(overrides);
-    const {
-      files,
-      activeFile,
-      runQuality,
-    } = get();
-    const previewFile = resolvePreviewFile(activeFile, files);
-    if (!previewFile) {
-      set({ result: null, lastValidResult: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
-      return;
-    }
-    const code = files[previewFile];
-    if (!code) return;
-    const runResult = isNotebookFile(previewFile)
-      ? runNotebookPreview(previewFile, code, files, runQuality)
-      : runScript(code, previewFile, files, { quality: runQuality });
-    if (runResult.error) {
-      set({ result: runResult, consoleLogs: runResult.logs, previewFile });
-    } else {
-      const applied = buildRunState(previewFile, runResult, get());
-      set({ ...applied.nextState, lastValidResult: runResult });
-      writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
-    }
+    get().execute();
   },
 
   resetParamOverrides: () => {
