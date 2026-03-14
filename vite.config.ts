@@ -214,6 +214,13 @@ function forgeProjectPlugin() {
     },
     configureServer(server: any) {
       server.middlewares.use((req: any, res: any, next: any) => {
+        // Handle /api/project-path - return the absolute project directory
+        if (req.method === 'GET' && req.url === '/api/project-path') {
+          const absDir = projectDir ? path.resolve(projectDir) : null;
+          sendJson(res, 200, { projectDir: absDir });
+          return;
+        }
+
         // Handle /api/files - dynamically fetch all project files
         if (req.method === 'GET' && req.url === '/api/files') {
           try {
