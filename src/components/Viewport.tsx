@@ -79,6 +79,9 @@ interface ViewportPerformanceInfo {
   memoryGeometries: number;
   memoryTextures: number;
   programCount: number;
+  jsHeapMB: number | null;
+  jsHeapLimitMB: number | null;
+  reactRendersPerSec: number;
 }
 const OBJECT_CONTEXT_MENU_WIDTH = 144;
 const OBJECT_CONTEXT_MENU_HEIGHT = 72;
@@ -104,7 +107,7 @@ interface PlaneTransform {
 interface CutSurfaceDef {
   id: string;
   geometry: THREE.BufferGeometry;
-  outlineGeometries: THREE.BufferGeometry[];
+  outlineGeometry: THREE.BufferGeometry | null;
   sourcePlaneIndex: number;
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
@@ -399,12 +402,20 @@ function buildFilledGeometryFromPolygons(polygons: number[][][]): THREE.BufferGe
   return new THREE.ShapeGeometry(shapes);
 }
 
-function buildOutlineGeometriesFromPolygons(polygons: number[][][]): THREE.BufferGeometry[] {
-  return polygons
-    .filter((polygon) => polygon.length >= 2)
-    .map((polygon) => new THREE.BufferGeometry().setFromPoints(
-      polygon.map((point) => new THREE.Vector3(point[0], point[1], 0)),
-    ));
+function buildOutlineGeometryFromPolygons(polygons: number[][][]): THREE.BufferGeometry | null {
+  const vertices: number[] = [];
+  for (const polygon of polygons) {
+    if (polygon.length < 2) continue;
+    for (let i = 0; i < polygon.length; i++) {
+      const a = polygon[i];
+      const b = polygon[(i + 1) % polygon.length];
+      vertices.push(a[0], a[1], 0, b[0], b[1], 0);
+    }
+  }
+  if (vertices.length === 0) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  return geo;
 }
 
 function resolveSectionSurfaceLift(shape: SceneObject['shape'] | undefined): number {
@@ -1067,11 +1078,13 @@ function PerformanceInfoSampler({
   enabled,
   modelTriangles,
   sceneObjects,
+  reactRenderCountRef,
   onStatsChange,
 }: {
   enabled: boolean;
   modelTriangles: number;
   sceneObjects: number;
+  reactRenderCountRef: React.MutableRefObject<number>;
   onStatsChange: (stats: ViewportPerformanceInfo | null) => void;
 }) {
   const gl = useThree((s) => s.gl);
@@ -1080,6 +1093,7 @@ function PerformanceInfoSampler({
     elapsedSec: 0,
     frameTimeMsTotal: 0,
     sinceEmitSec: 0,
+    reactRenderCountAtLastEmit: 0,
   });
 
   useEffect(() => {
@@ -1088,9 +1102,10 @@ function PerformanceInfoSampler({
       elapsedSec: 0,
       frameTimeMsTotal: 0,
       sinceEmitSec: 0,
+      reactRenderCountAtLastEmit: reactRenderCountRef.current,
     };
     if (!enabled) onStatsChange(null);
-  }, [enabled, modelTriangles, onStatsChange, sceneObjects]);
+  }, [enabled, modelTriangles, onStatsChange, reactRenderCountRef, sceneObjects]);
 
   useFrame((_state, delta) => {
     if (!enabled) return;
@@ -1104,6 +1119,8 @@ function PerformanceInfoSampler({
     if (sample.sinceEmitSec < PERFORMANCE_SAMPLE_INTERVAL_SEC) return;
 
     const frameCount = Math.max(1, sample.frames);
+    const reactRendersDelta = reactRenderCountRef.current - sample.reactRenderCountAtLastEmit;
+    const mem = (performance as Performance & { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
     onStatsChange({
       fps: frameCount / Math.max(sample.elapsedSec, 1e-6),
       frameTimeMs: sample.frameTimeMsTotal / frameCount,
@@ -1116,12 +1133,16 @@ function PerformanceInfoSampler({
       memoryGeometries: gl.info.memory.geometries,
       memoryTextures: gl.info.memory.textures,
       programCount: getProgramCount(gl),
+      jsHeapMB: mem ? mem.usedJSHeapSize / (1024 * 1024) : null,
+      jsHeapLimitMB: mem ? mem.jsHeapSizeLimit / (1024 * 1024) : null,
+      reactRendersPerSec: reactRendersDelta / Math.max(sample.sinceEmitSec, 1e-6),
     });
 
     sample.frames = 0;
     sample.elapsedSec = 0;
     sample.frameTimeMsTotal = 0;
     sample.sinceEmitSec = 0;
+    sample.reactRenderCountAtLastEmit = reactRenderCountRef.current;
   });
 
   return null;
@@ -1140,15 +1161,25 @@ function PerformanceInfoPanel({
     ? [
       ['FPS', stats.fps.toFixed(1)],
       ['Frame ms', stats.frameTimeMs.toFixed(1)],
+      ['React renders/s', stats.reactRendersPerSec.toFixed(1)],
+      null,
       ['Objects', formatPerformanceCount(stats.sceneObjects)],
       ['Model tris', formatPerformanceCount(stats.modelTriangles)],
       ['Drawn tris', formatPerformanceCount(stats.renderTriangles)],
       ['Draw calls', formatPerformanceCount(stats.drawCalls)],
       ['Lines', formatPerformanceCount(stats.renderLines)],
       ['Points', formatPerformanceCount(stats.renderPoints)],
+      null,
       ['Geometries', formatPerformanceCount(stats.memoryGeometries)],
       ['Textures', formatPerformanceCount(stats.memoryTextures)],
       ['Programs', formatPerformanceCount(stats.programCount)],
+      ...(stats.jsHeapMB !== null
+        ? [
+          null,
+          ['JS heap', `${stats.jsHeapMB.toFixed(1)} MB`],
+          ['Heap limit', `${stats.jsHeapLimitMB!.toFixed(0)} MB`],
+        ]
+        : []),
     ]
     : null;
 
@@ -1186,20 +1217,24 @@ function PerformanceInfoPanel({
       {!rows && (
         <div style={{ color: 'var(--fc-textDim)' }}>Measuring...</div>
       )}
-      {rows?.map(([label, value]) => (
-        <div
-          key={label}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-          }}
-        >
-          <span style={{ color: 'var(--fc-textDim)' }}>{label}</span>
-          <span>{value}</span>
-        </div>
-      ))}
+      {rows?.map((row, i) =>
+        row === null
+          ? <div key={`sep-${i}`} style={{ height: 4 }} />
+          : (
+            <div
+              key={row[0]}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <span style={{ color: 'var(--fc-textDim)' }}>{row[0]}</span>
+              <span>{row[1]}</span>
+            </div>
+          )
+      )}
     </div>
   );
 }
@@ -1306,13 +1341,13 @@ function ForgeObject({
               const geometry = buildFilledGeometryFromPolygons(polygons);
               const transform = resolvePlaneTransform(localNormal, localOffset, surfaceLift);
               if (geometry && transform) {
-                const outlineGeometries = buildOutlineGeometriesFromPolygons(polygons);
+                const outlineGeometry = buildOutlineGeometryFromPolygons(polygons);
                 const hatch = resolveSectionHatchMetrics(geometry);
                 const angleSeed = hashString(`${obj.name}:${cutPlaneDef.name}:${planeIndex}`);
                 nextCutSurfaces.push({
                   id: `${cutPlaneDef.name}:${planeIndex}`,
                   geometry,
-                  outlineGeometries,
+                  outlineGeometry,
                   sourcePlaneIndex: planeIndex,
                   position: transform.center,
                   quaternion: transform.quaternion,
@@ -1332,7 +1367,7 @@ function ForgeObject({
         // If boolean trimming fails on pathological geometry, fall back to GPU clipping.
         nextCutSurfaces.forEach((surface) => {
           surface.geometry.dispose();
-          surface.outlineGeometries.forEach((outline) => outline.dispose());
+          surface.outlineGeometry?.dispose();
         });
         shapeForRender = obj.shape;
         fallbackToGpuClip = true;
@@ -1353,7 +1388,7 @@ function ForgeObject({
           const { solid, edges } = shapeToGeometry(obj.shape);
           nextCutSurfaces.forEach((surface) => {
             surface.geometry.dispose();
-            surface.outlineGeometries.forEach((outline) => outline.dispose());
+            surface.outlineGeometry?.dispose();
           });
           return {
             solidGeo: solid,
@@ -1364,7 +1399,7 @@ function ForgeObject({
         } catch {
           nextCutSurfaces.forEach((surface) => {
             surface.geometry.dispose();
-            surface.outlineGeometries.forEach((outline) => outline.dispose());
+            surface.outlineGeometry?.dispose();
           });
           return {
             solidGeo: null,
@@ -1376,7 +1411,7 @@ function ForgeObject({
       }
       nextCutSurfaces.forEach((surface) => {
         surface.geometry.dispose();
-        surface.outlineGeometries.forEach((outline) => outline.dispose());
+        surface.outlineGeometry?.dispose();
       });
       return {
         solidGeo: null,
@@ -1393,7 +1428,7 @@ function ForgeObject({
       edgesGeo?.dispose();
       cutSurfaces.forEach((surface) => {
         surface.geometry.dispose();
-        surface.outlineGeometries.forEach((outline) => outline.dispose());
+        surface.outlineGeometry?.dispose();
       });
     };
   }, [cutSurfaces, edgesGeo, solidGeo]);
@@ -1559,8 +1594,8 @@ vec4 diffuseColor = vec4(sectionColor, opacity);`,
       <mesh geometry={surface.geometry} renderOrder={24}>
         <primitive object={material} attach="material" />
       </mesh>
-      {surface.outlineGeometries.map((geometry, index) => (
-        <lineLoop key={index} geometry={geometry} renderOrder={25}>
+      {surface.outlineGeometry && (
+        <lineSegments geometry={surface.outlineGeometry} renderOrder={25}>
           <lineBasicMaterial
             color={outlineColor}
             transparent={opacity < 1}
@@ -1569,8 +1604,8 @@ vec4 diffuseColor = vec4(sectionColor, opacity);`,
             clippingPlanes={sectionClippingPlanes}
             toneMapped={false}
           />
-        </lineLoop>
-      ))}
+        </lineSegments>
+      )}
     </group>
   );
 }
@@ -3149,13 +3184,24 @@ export function Viewport() {
   const sectionPlaneBorderEnabled = useForgeStore((s) => s.sectionPlaneBorderEnabled);
   const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
   const [performanceInfo, setPerformanceInfo] = useState<ViewportPerformanceInfo | null>(null);
+  const reactRenderCountRef = useRef(0);
+  reactRenderCountRef.current += 1;
   const cutPlaneDefs: CutPlaneDef[] = result?.cutPlanes ?? [];
   const explodeConfig: ExplodeViewOptions | null = result?.explodeView ?? null;
   const jointsConfig = result?.jointsView ?? null;
   const jointOverlayConfig = result?.viewConfig?.jointOverlay ?? DEFAULT_VIEW_CONFIG.jointOverlay;
-  const joints = jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? []);
-  const jointCouplings = jointsConfig?.enabled === false ? [] : (jointsConfig?.couplings ?? []);
-  const jointAnimations = jointsConfig?.enabled === false ? [] : (jointsConfig?.animations ?? []);
+  const joints = useMemo(
+    () => jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? []),
+    [jointsConfig],
+  );
+  const jointCouplings = useMemo(
+    () => jointsConfig?.enabled === false ? [] : (jointsConfig?.couplings ?? []),
+    [jointsConfig],
+  );
+  const jointAnimations = useMemo(
+    () => jointsConfig?.enabled === false ? [] : (jointsConfig?.animations ?? []),
+    [jointsConfig],
+  );
   const activeJointAnimation = useMemo(
     () => findJointAnimationClip(jointAnimations, jointAnimationClip),
     [jointAnimationClip, jointAnimations],
@@ -3797,6 +3843,7 @@ export function Viewport() {
           enabled={showPerformanceInfo}
           sceneObjects={visibleSceneObjectCount}
           modelTriangles={visibleModelTriangles}
+          reactRenderCountRef={reactRenderCountRef}
           onStatsChange={handlePerformanceInfoChange}
         />
 
