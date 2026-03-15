@@ -82,6 +82,8 @@ export type ProfileCompilePlan =
       sourceShape: ShapeCompilePlan;
       plane: PlaneFrame;
       sourcePlacement?: ShapeWorkplanePlacement['placement'];
+      /** Compiler-owned query for the target face when projection is onto a defended descendant region. */
+      targetFaceQuery?: FaceQueryRef;
       replayProfile?: ProfileCompilePlan;
       replayReason?: string;
       transforms: ProfileCompileTransformStep[];
@@ -626,6 +628,7 @@ export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): Profil
           normal: [plan.plane.normal[0], plan.plane.normal[1], plan.plane.normal[2]],
         },
         sourcePlacement: plan.sourcePlacement ? cloneSketchPlacementModel(plan.sourcePlacement)! : undefined,
+        targetFaceQuery: plan.targetFaceQuery ? cloneFaceQueryRef(plan.targetFaceQuery)! : undefined,
         replayProfile: plan.replayProfile ? cloneProfileCompilePlan(plan.replayProfile)! : undefined,
         replayReason: plan.replayReason,
         transforms: plan.transforms.map(cloneProfileTransform),

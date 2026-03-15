@@ -26,3 +26,4 @@ Primary files:
 ## Status and log
 - 2026-03-13: Blocked on task 300.
 - 2026-03-13: Not started.
+- 2026-03-15: Completed. Extended `PlaneSpec` with a `{ face: FaceRef }` variant for face-to-plane projection, wired `targetFaceQuery` provenance into the `project` compile plan so later cuts/offsets/stiffeners can explain their source surfaces, added `projection-face-target` corpus case (shell → inner-bottom face projection → downstream gasket ring + mount pad), registered corpus case in the manifest and snapshot, and updated both projection and sketch-on-face docs to document the face target form and its unsupported edge cases (non-planar faces, non-coplanar sets).
