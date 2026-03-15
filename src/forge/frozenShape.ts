@@ -6,6 +6,10 @@
  * boundingBox(), isEmpty(), and numTri() from cached data with zero WASM calls.
  * A real Manifold is only reconstructed on demand, when geometric operations
  * like splitByPlane() are actually needed (e.g. cut planes).
+ *
+ * Also exposes pre-computed Three.js-ready geometry arrays (positions, normals,
+ * edge positions) built in the worker, so shapeToGeometry() on the main thread
+ * is a zero-cost BufferGeometry assembly with no CPU work.
  */
 
 import { Shape, getWasm } from './kernel';
@@ -13,8 +17,13 @@ import type { ShapeBackend, ShapeRuntimeBounds, ShapeRuntimeMesh, ShapeRuntimeCr
 import { ManifoldShapeBackend, SHAPE_BACKEND_MARKER } from './shapeBackend';
 import type { FaceRef } from './sketch/topology';
 import type { FaceTransformationHistory } from './faceHistory';
-import type { GeometryInfo } from './kernel';
 import type { SerializedShapeData } from '../workers/evalWorkerProtocol';
+
+export interface PrecomputedGeometry {
+  positions: Float32Array;
+  normals: Float32Array;
+  edgePositions: Float32Array;
+}
 
 /**
  * A ShapeBackend that serves rendering data from cached TypedArrays and only
@@ -28,6 +37,14 @@ class FrozenShapeBackend implements ShapeBackend {
 
   constructor(data: SerializedShapeData) {
     this._data = data;
+  }
+
+  getPrecomputedGeometry(): PrecomputedGeometry {
+    return {
+      positions: this._data.geometryPositions,
+      normals: this._data.geometryNormals,
+      edgePositions: this._data.geometryEdgePositions,
+    };
   }
 
   private getManifoldBackend(): ShapeBackend {
@@ -110,22 +127,23 @@ class FrozenShapeBackend implements ShapeBackend {
 }
 
 export class FrozenShape extends Shape {
+  private readonly _backend: FrozenShapeBackend;
   private readonly _faceNames: string[];
   private readonly _faces: Record<string, FaceRef>;
   private readonly _faceHistories: Record<string, FaceTransformationHistory>;
 
   constructor(data: SerializedShapeData) {
-    super(new FrozenShapeBackend(data), data.colorHex ?? undefined, data.geometryInfo ?? undefined);
+    const backend = new FrozenShapeBackend(data);
+    super(backend, data.colorHex ?? undefined, data.geometryInfo ?? undefined);
+    this._backend = backend;
     this._faceNames = data.faceNames;
     this._faces = data.faces;
     this._faceHistories = data.faceHistories;
   }
 
-  override getMesh() {
-    // Delegate to FrozenShapeBackend.getMesh() via the backend WeakMap path,
-    // but Shape.getMesh() already calls getShapeRuntimeBackendInternal(this).getMesh()
-    // so this override is kept only for the type cast.
-    return super.getMesh();
+  /** Returns geometry arrays pre-computed in the worker — zero CPU cost on main thread. */
+  getPrecomputedGeometry(): PrecomputedGeometry {
+    return this._backend.getPrecomputedGeometry();
   }
 
   override faceNames(): string[] {

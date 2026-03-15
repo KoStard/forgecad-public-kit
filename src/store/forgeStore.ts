@@ -18,6 +18,57 @@ import { type ThemeName, applyTheme } from '../theme';
 import { clampAnimationSpeed } from '../animationSpeed';
 import type { ViewportCameraState } from '../capture/cameraState';
 
+// ---------------------------------------------------------------------------
+// Run result LRU cache — avoids re-evaluating a file you just switched away from
+// ---------------------------------------------------------------------------
+const RUN_RESULT_CACHE_MAX = 8;
+
+interface CacheEntry {
+  code: string;
+  files: Record<string, string>;
+  paramOverrides: Record<string, number>;
+  quality: string;
+  result: RunResult;
+}
+
+/** Module-level LRU map: filePath → entry. JS Map preserves insertion order. */
+const runResultCache = new Map<string, CacheEntry>();
+
+function lookupCache(
+  filePath: string,
+  code: string,
+  files: Record<string, string>,
+  paramOverrides: Record<string, number>,
+  quality: string,
+): RunResult | null {
+  const entry = runResultCache.get(filePath);
+  if (!entry) return null;
+  if (
+    entry.code !== code ||
+    entry.quality !== quality ||
+    JSON.stringify(entry.paramOverrides) !== JSON.stringify(paramOverrides) ||
+    JSON.stringify(entry.files) !== JSON.stringify(files)
+  ) return null;
+  return entry.result;
+}
+
+function storeCache(
+  filePath: string,
+  code: string,
+  files: Record<string, string>,
+  paramOverrides: Record<string, number>,
+  quality: string,
+  result: RunResult,
+): void {
+  runResultCache.delete(filePath); // re-insert to mark as recently used
+  runResultCache.set(filePath, { code, files, paramOverrides, quality, result });
+  if (runResultCache.size > RUN_RESULT_CACHE_MAX) {
+    runResultCache.delete(runResultCache.keys().next().value!);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
 const EMPTY_FILE: Record<string, string> = {
   'untitled.forge.js': '// New part\n\nreturn box(50, 30, 10);\n',
 };
@@ -863,6 +914,15 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const code = files[previewFile];
     if (!code) return;
 
+    // Cache hit — show previous result immediately, no worker round-trip
+    const cached = lookupCache(previewFile, code, files, paramOverrides, runQuality);
+    if (cached) {
+      const applied = buildRunState(previewFile, cached, get());
+      set({ ...applied.nextState, lastValidResult: cached, isEvaluating: false });
+      writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
+      return;
+    }
+
     set({ isEvaluating: true });
 
     try {
@@ -880,6 +940,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       if (runResult.error) {
         set({ result: runResult, consoleLogs: runResult.logs, previewFile, isEvaluating: false });
       } else {
+        storeCache(previewFile, code, files, paramOverrides, runQuality, runResult);
         const applied = buildRunState(previewFile, runResult, get());
         set({ ...applied.nextState, lastValidResult: runResult, isEvaluating: false });
         writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
