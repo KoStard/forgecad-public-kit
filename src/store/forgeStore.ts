@@ -926,6 +926,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set({ isEvaluating: true });
 
     try {
+      const tDispatch = performance.now();
       const serialized = await evalWorkerClient.run({
         code,
         file: previewFile,
@@ -934,8 +935,14 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         paramOverrides,
         isNotebook: isNotebookFile(previewFile),
       });
+      const tReceived = performance.now();
 
       const runResult = deserializeRunResult(serialized);
+      const tDeserialize = performance.now();
+
+      console.log(
+        `[main]   workerRoundTrip=${(tReceived - tDispatch).toFixed(0)}ms  deserialize=${(tDeserialize - tReceived).toFixed(0)}ms`,
+      );
 
       if (runResult.error) {
         set({ result: runResult, consoleLogs: runResult.logs, previewFile, isEvaluating: false });
