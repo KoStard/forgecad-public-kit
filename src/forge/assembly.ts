@@ -768,6 +768,23 @@ export function assembly(name?: string): Assembly {
   return new Assembly(name);
 }
 
+export interface MergeIntoOptions {
+  /**
+   * Prefix applied to every part name and joint name from the sub-assembly.
+   * E.g. prefix "Left Arm" turns part "Base" into "Left Arm.Base".
+   * Strongly recommended to avoid name collisions when merging multiple instances.
+   */
+  prefix?: string;
+  /** Part name in the parent assembly to attach the sub-assembly root to. */
+  mountParent: string;
+  /** Name for the new mount joint in the parent graph. */
+  mountJoint: string;
+  /** Joint type for the mount connection (default: 'fixed'). */
+  mountType?: JointType;
+  /** Frame, axis, limits, and other options for the mount joint. */
+  mountOptions?: JointOptions;
+}
+
 /**
  * Wraps an imported Assembly, giving access to named parts and group conversion
  * without losing the kinematic structure.
@@ -882,5 +899,89 @@ export class ImportedAssembly {
       this._offset[2] + dz,
     ];
     return new ImportedAssembly(this._assembly, newRefs, newOffset);
+  }
+
+  /**
+   * Flatten this sub-assembly's parts and joints into `parent`, then wire a
+   * mount joint connecting `mountParent` (a part already in `parent`) to the
+   * sub-assembly root.
+   *
+   * All part names and joint names from the sub-assembly are prefixed with
+   * `"${options.prefix}."` to avoid collisions. After the merge you can drive
+   * sub-assembly joints from the parent: `parent.solve({ "Left Arm.shoulder": 45 })`.
+   *
+   * Throws if the sub-assembly has multiple root parts (connect them with addFixed first).
+   *
+   * Returns `parent` for chaining.
+   */
+  mergeInto(parent: Assembly, options: MergeIntoOptions): Assembly {
+    const def = this._assembly.describe();
+    const pfx = options.prefix ? `${options.prefix}.` : '';
+
+    // Identify the single root part (no incoming joint).
+    const childSet = new Set(def.joints.map(j => j.child));
+    const roots = def.parts.filter(p => !childSet.has(p.name));
+    if (roots.length === 0) {
+      throw new Error(
+        `Cannot mergeInto(): sub-assembly "${def.name}" has no root part (cyclic joint graph)`,
+      );
+    }
+    if (roots.length > 1) {
+      throw new Error(
+        `Cannot mergeInto(): sub-assembly "${def.name}" has multiple root parts ` +
+        `(${roots.map(r => `"${r.name}"`).join(', ')}). ` +
+        'Connect them with addFixed() before merging.',
+      );
+    }
+    const root = roots[0];
+
+    // Add all parts with prefixed names; preserve each part's base transform.
+    for (const p of def.parts) {
+      parent.addPart(`${pfx}${p.name}`, p.part, {
+        transform: p.base,
+        metadata: p.metadata,
+      });
+    }
+
+    // Add all joints with prefixed names and prefixed parent/child references.
+    for (const j of def.joints) {
+      parent.addJoint(
+        `${pfx}${j.name}`,
+        j.type,
+        `${pfx}${j.parent}`,
+        `${pfx}${j.child}`,
+        {
+          frame: j.frame,
+          axis: [...j.axis] as Vec3,
+          min: j.min,
+          max: j.max,
+          default: j.defaultValue,
+          unit: j.unit,
+          effort: j.effort,
+          velocity: j.velocity,
+          damping: j.damping,
+          friction: j.friction,
+        },
+      );
+    }
+
+    // Add all joint couplings with prefixed joint references.
+    for (const c of def.jointCouplings) {
+      parent.addJointCoupling(`${pfx}${c.joint}`, {
+        terms: c.terms.map(t => ({ joint: `${pfx}${t.joint}`, ratio: t.ratio })),
+        offset: c.offset,
+      });
+    }
+
+    // Wire the mount joint: parent part → sub-assembly root.
+    parent.addJoint(
+      options.mountJoint,
+      options.mountType ?? 'fixed',
+      options.mountParent,
+      `${pfx}${root.name}`,
+      options.mountOptions ?? {},
+    );
+
+    return parent;
   }
 }
