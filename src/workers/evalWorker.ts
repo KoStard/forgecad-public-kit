@@ -1,4 +1,5 @@
 import { init, runScript, setParamOverrides } from '@forge/index';
+import type { RunResult } from '@forge/runner';
 import { isNotebookFile, parseNotebook, resolveNotebookPreviewCellId } from '../notebook/model';
 import { runNotebook } from '../notebook/runtime';
 import { serializeRunResult } from '../forge/serializeRunResult';
@@ -17,6 +18,9 @@ function ensureKernelReady(): Promise<void> {
   if (!kernelReadyPromise) kernelReadyPromise = init();
   return kernelReadyPromise;
 }
+
+// Last successful RunResult — kept alive so face-info requests can access live shapes.
+let lastRunResult: RunResult | null = null;
 
 // Serial execution: process one run at a time, keep only the latest queued request.
 let isExecuting = false;
@@ -51,6 +55,7 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
       return;
     }
 
+    lastRunResult = runResult;
     const { serialized, transferables } = serializeRunResult(runResult);
     const tSerialize = performance.now();
 
@@ -73,6 +78,32 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
 
 worker.onmessage = async (event) => {
   const { data } = event;
+
+  if (data.type === 'face-info') {
+    const { reqId, objectId } = data.payload;
+    try {
+      const obj = lastRunResult?.objects.find((o) => o.id === objectId);
+      if (!obj?.shape) throw new Error(`Object '${objectId}' not found or has no shape`);
+
+      const faceNames = obj.shape.faceNames();
+      const faces: Record<string, ReturnType<typeof obj.shape.face>> = {};
+      const faceHistories: Record<string, ReturnType<typeof obj.shape.faceHistory>> = {};
+      for (const name of faceNames) {
+        try {
+          const ref = obj.shape.face(name);
+          if (ref) {
+            faces[name] = ref;
+            faceHistories[name] = obj.shape.faceHistory(name);
+          }
+        } catch { /* skip */ }
+      }
+      worker.postMessage({ type: 'face-info-success', payload: { reqId, result: { faceNames, faces, faceHistories } } });
+    } catch (err) {
+      worker.postMessage({ type: 'face-info-error', payload: { reqId, message: String(err) } });
+    }
+    return;
+  }
+
   if (data.type !== 'run') return;
 
   if (isExecuting) {
