@@ -70,6 +70,11 @@ const RUNTIME_SCENE_ENTRIES: readonly NonPartEntry[] = [
     expect: { minUniqueGroups: 3 },
   },
   {
+    path: 'examples/api/import-group-assembly.forge.js',
+    note: 'Multipart importGroup() demo: validates group import, child access, and param overrides at runtime.',
+    expect: { minUniqueGroups: 1 },
+  },
+  {
     path: 'examples/api/section-plane-visualization.forge.js',
     note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
     expect: { minCutPlanes: 2 },

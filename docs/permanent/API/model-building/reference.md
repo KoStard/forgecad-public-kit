@@ -582,12 +582,14 @@ const housing = group(
 When that group is returned directly, each named child keeps its own viewport object. When the group is used as an assembly part, Forge uses those child names to produce labels such as `Base Assembly.Lid` instead of `Base Assembly.2`.
 
 ### ShapeGroup Methods
-All transforms are chainable and return a new ShapeGroup:
+
+**Transforms** — all chainable, return a new ShapeGroup. Placement references (see below) are transformed along with the children.
 
 ```javascript
 group.translate(x, y, z)
 group.moveTo(x, y, z)
 group.moveToLocal(target, x, y, z)
+group.attachTo(target, targetAnchor, selfAnchor?, offset?)
 group.rotate(x, y, z)
 group.rotateAround(axis, angleDeg, pivot?)
 group.rotateAroundTo(axis, pivot, movingPoint, targetPoint, opts?)
@@ -598,6 +600,24 @@ group.mirror(normal)
 group.color(hex)  // applies to all children
 group.clone()
 group.duplicate() // alias
+```
+
+**Placement references** — same API as `Shape`. References survive all transforms and `importGroup()` round-trips.
+
+```javascript
+group.withReferences({ points?, edges?, surfaces?, objects? })
+group.referenceNames(kind?)
+group.referencePoint(ref)
+group.placeReference(ref, target, offset?)
+```
+
+**Child access** — get a named child as a live `Shape`/`TrackedShape`/`ShapeGroup`.
+
+```javascript
+group.child(name)          // throws if name not found
+group.children             // raw array
+group.childNames           // name array (parallel to children)
+group.childName(index)     // name at index
 ```
 
 `group.rotateAround(...)` is convenience sugar for `group.transform(Transform.rotationAxis(...))`.
@@ -612,6 +632,29 @@ const openedA = lid.rotateAround([1, 0, 0], 35, [0, hingeY, 0]); // sugar
 const openedB = lid.transform(Transform.rotationAxis([1, 0, 0], 35, [0, hingeY, 0])); // equivalent
 
 const laidDown = lid.pointAlong([1, 0, 0]); // same intent as Shape/TrackedShape.pointAlong
+```
+
+### ShapeGroup and placement references
+
+`group()` fully supports `.withReferences()`, `.placeReference()`, and `.referencePoint()` — the same API available on `Shape` and `TrackedShape`. References survive every transform (`translate`, `rotate`, `scale`, `mirror`, `transform`, `rotateAround`, etc.).
+
+```javascript
+const bracketGroup = group(
+  { name: 'Bracket Left',  shape: leftBracket },
+  { name: 'Bracket Right', shape: rightBracket },
+  { name: 'Dowel',         shape: dowel },
+).withReferences({
+  points: {
+    mountCenter: [0, 0, 0],
+    topCenter:   [34, 30, 40],
+  },
+});
+
+// Place the group by a named reference point
+const placed = bracketGroup.placeReference('mountCenter', [100, 0, 0]);
+
+// Reference survives the translation:
+const pt = placed.referencePoint('mountCenter'); // → [100, 0, 0]
 ```
 
 When a ShapeGroup is returned from a script, each child becomes a separate viewport object with its own visibility/color controls. Named children keep those names in the viewport/object tree.
@@ -1077,11 +1120,13 @@ Use [entities.md](entities.md) for:
 
 ## Multi-File Projects
 
-ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.js`, return a `Sketch`), **parts** (`.forge.js`, return a `Shape` or `TrackedShape`), or **SVG assets** (`.svg`, parsed into a `Sketch`).
+ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.js`, return a `Sketch`), **parts** (`.forge.js`, return a `Shape`, `TrackedShape`, or `ShapeGroup`), or **SVG assets** (`.svg`, parsed into a `Sketch`).
 
 ### File Types
 - `*.sketch.js` — 2D sketch file; when used with `importSketch()`, must return a `Sketch`
-- `*.forge.js` — 3D Forge file; when used with `importPart()`, must return a `Shape` or `TrackedShape`
+- `*.forge.js` — 3D Forge file:
+  - when used with `importPart()`, must return a `Shape` or `TrackedShape`
+  - when used with `importGroup()`, must return a `ShapeGroup` (via `group(...)`)
 - `*.svg` — vector artwork file, imported as sketch geometry
 
 ### Import Path Resolution
@@ -1200,17 +1245,66 @@ const cap = box(18, 18, 8, true)
 return [widget, cap];
 ```
 
+### `importGroup(fileName, paramOverrides?)`
+Executes another file and returns its result as a `ShapeGroup`. The target file **must** return a `ShapeGroup` (i.e. use `group(...)` as the final `return`). Use this when you want to import a multipart component and either transform it as a unit or access individual named children separately.
+
+**Parameters:**
+- `fileName` (string) — Import path (e.g. `"./bracket-assembly.forge.js"`)
+- `paramOverrides` (optional object) — Import-time parameter overrides by param name
+
+**Returns:** `ShapeGroup` (chainable)
+
+```javascript
+// bracket-assembly.forge.js  ← the source file
+const thickness = param("Thickness", 4);
+const leftBracket  = box(thickness, 60, 40).color('#5b7c8d');
+const rightBracket = box(thickness, 60, 40).translate(64, 0, 0).color('#5b7c8d');
+const dowel = cylinder(60, 3).rotate(90,0,0).translate(34, 60, 20).color('#d38b4d');
+
+return group(
+  { name: "Bracket Left",  shape: leftBracket },
+  { name: "Bracket Right", shape: rightBracket },
+  { name: "Dowel",         shape: dowel },
+).withReferences({
+  points: { mountCenter: [0, 30, 20] },
+});
+```
+
+```javascript
+// scene.forge.js  ← the consumer
+// Import and use as a whole unit
+const bracketA = importGroup("bracket-assembly.forge.js")
+  .placeReference("mountCenter", [0, 0, 0]);
+
+// Import with param overrides, then work on children individually
+const bracketB = importGroup("bracket-assembly.forge.js", { "Thickness": 6 });
+const leftOnly  = bracketB.child("Bracket Left").color('#ff4444');
+const rightOnly = bracketB.child("Bracket Right").translate(200, 0, 0);
+
+return [bracketA, leftOnly, rightOnly];
+```
+
+**When to use `importGroup` vs `importPart`:**
+
+| | `importPart` | `importGroup` |
+|---|---|---|
+| Source returns | `Shape` or `TrackedShape` | `ShapeGroup` via `group(...)` |
+| Result type | `Shape` — chainable, supports all boolean ops | `ShapeGroup` — children stay separate |
+| Access children | Not possible | `group.child("Name")` |
+| Placement refs | `.withReferences()` on the Shape | `.withReferences()` on the group |
+
 ### Import Rules
 - Circular imports are detected and throw an error
-- Imported files can be instantiated multiple times
+- Imported files can be instantiated multiple times (each call is a fresh execution)
 - `paramOverrides` only affects that import call (other imports are independent)
 - Params supplied through `paramOverrides` are treated as fixed arguments for that import call
 - Relative imports (`./` / `../`) are resolved from the current file path
-- `importPart()` accepts imported `Shape` or `TrackedShape` results and always returns a chainable `Shape`
-- Source files can attach placement references with `.withReferences({ points, edges, surfaces, objects })`
+- `importPart()` accepts `Shape` or `TrackedShape` results and always returns a chainable `Shape`
+- `importGroup()` accepts only `ShapeGroup` results; use `group(...)` as the return value in the source file
+- Source files can attach placement references with `.withReferences({ points, edges, surfaces, objects })` — works on both `Shape` and `ShapeGroup`
 - Imported tracked solids keep their named faces/edges as `surfaces.<faceName>` and `edges.<edgeName>` references
 - SVG import supports deterministic region filtering (`regionSelection`, `maxRegions`, area thresholds)
-- The returned `Shape` or `Sketch` is fully chainable — use `.translate()`, `.rotate()`, `.subtract()`, etc.
+- The returned `Shape`, `Sketch`, or `ShapeGroup` is fully chainable — use `.translate()`, `.rotate()`, etc.
 
 ### Plain JS Module Imports
 Alongside `importPart()` / `importSketch()`, regular JS `import` / `require(...)` is supported for utility modules.
@@ -1242,7 +1336,7 @@ return items.map((entry, index) => ({
 ### Placement References
 
 ### `.withReferences({ points?, edges?, surfaces?, objects? })`
-Attach named placement references to a `Shape` or `TrackedShape`. These references survive normal transforms and `importPart()`.
+Attach named placement references to a `Shape`, `TrackedShape`, or `ShapeGroup`. References survive all normal transforms and import round-trips (`importPart()`, `importGroup()`).
 
 **Reference kinds:**
 - `points`: exact 3D coordinates

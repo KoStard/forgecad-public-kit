@@ -83,6 +83,8 @@ type FaceRef = {
 declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch;
 /** Import a 3D part from another file. The file must return a Shape or TrackedShape. */
 declare function importPart(fileName: string, paramOverrides?: Record<string, number>): Shape;
+/** Import a multipart group from another file. The file must return a ShapeGroup (via group(...)). Use .child(name) to access named parts. */
+declare function importGroup(fileName: string, paramOverrides?: Record<string, number>): ShapeGroup;
 /** Import and parse an SVG file directly as a sketch. */
 declare function importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch;
 
@@ -1102,6 +1104,8 @@ declare class ShapeGroup {
   readonly children: (Shape | Sketch | TrackedShape | ShapeGroup)[];
   readonly childNames: (string | undefined)[];
   childName(index: number): string | undefined;
+  /** Return the named child by name. Throws if not found. */
+  child(name: string): Shape | Sketch | TrackedShape | ShapeGroup;
   clone(): ShapeGroup;
   duplicate(): ShapeGroup;
   translate(x: number, y: number, z: number): ShapeGroup;
@@ -1127,6 +1131,18 @@ declare class ShapeGroup {
   scale(v: number | [number, number, number]): ShapeGroup;
   mirror(normal: [number, number, number]): ShapeGroup;
   color(hex: string): ShapeGroup;
+  /** Attach named placement references. Refs survive transforms and importGroup(). */
+  withReferences(refs: PlacementReferenceInput): ShapeGroup;
+  /** List named placement references carried by this group. */
+  referenceNames(kind?: 'points' | 'edges' | 'surfaces' | 'objects'): string[];
+  /** Resolve a named placement reference or built-in anchor to a 3D point. */
+  referencePoint(ref: AnchorTarget3D): [number, number, number];
+  /** Translate the group so the given reference lands on the target coordinate. */
+  placeReference(ref: AnchorTarget3D, target: [number, number, number], offset?: [number, number, number]): ShapeGroup;
+  /** Attach this group to a named anchor on another shape or group. */
+  attachTo(target: Shape | TrackedShape | ShapeGroup, targetAnchor: AnchorTarget3D, selfAnchor?: Anchor3D, offset?: [number, number, number]): ShapeGroup;
+  /** Bounding box of all 3D children combined. */
+  boundingBox(): { min: [number, number, number]; max: [number, number, number] };
 }
 
 type CutPlaneOptions = { offset?: number; exclude?: string | string[] };

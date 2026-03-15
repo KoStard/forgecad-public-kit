@@ -429,7 +429,7 @@ function makeSandboxConsole(): Record<string, (...args: unknown[]) => void> {
 }
 
 function parseImportParamArgs(
-  importKind: 'importSketch' | 'importPart',
+  importKind: 'importSketch' | 'importPart' | 'importGroup',
   fileName: string,
   args: unknown,
 ): Record<string, number> {
@@ -660,7 +660,7 @@ function logImportTrace(
   fileName: string,
   scope: ImportScope,
   options: RunnerExecutionOptions,
-  kind: 'importSketch' | 'importPart' | 'importSvgSketch' | 'require',
+  kind: 'importSketch' | 'importPart' | 'importSvgSketch' | 'importGroup' | 'require',
   target: string,
   phase: 'start' | 'success' | 'error',
   details: Record<string, unknown> = {},
@@ -1038,6 +1038,28 @@ function executeFile(
       throw new Error(`"${resolvedPath}" did not return a Shape (got ${got})`);
     };
 
+    // importGroup("name", { ...paramOverrides }) — executes another file, expects a ShapeGroup result
+    const importGroup = (name: string, paramOverrides?: Record<string, number>): ShapeGroup => {
+      const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
+      const localOverrides = parseImportParamArgs('importGroup', name, paramOverrides);
+      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      logImportTrace(fileName, scope, options, 'importGroup', resolvedPath, 'start', { requested: name, overrides: localOverrides });
+      let result: ReturnType<typeof executeFile>;
+      try {
+        result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
+      } catch (error) {
+        logImportTrace(fileName, scope, options, 'importGroup', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
+        throw error;
+      }
+      if (result instanceof ShapeGroup) {
+        logImportTrace(fileName, scope, options, 'importGroup', resolvedPath, 'success', { requested: name, got: 'ShapeGroup' });
+        return result;
+      }
+      const got = describeScriptResultType(result);
+      logImportTrace(fileName, scope, options, 'importGroup', resolvedPath, 'error', { requested: name, got });
+      throw new Error(`"${resolvedPath}" did not return a ShapeGroup (got ${got}). Use group(...) as the return value, or use importPart() for single-shape files.`);
+    };
+
     // Wrappers that auto-unwrap TrackedShape for boolean ops
     const unwrap = (s: Shape | TrackedShape): Shape =>
       s instanceof TrackedShape ? s.toShape() : s;
@@ -1134,6 +1156,7 @@ function executeFile(
       projectToPlane,
       importSketch,
       importPart,
+      importGroup,
       importSvgSketch,
       dim,
       dimLine,
