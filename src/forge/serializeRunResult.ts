@@ -10,6 +10,7 @@ import type { RunResult, SceneObject } from './runner';
 import { getSketchPlacement3D } from './sketch/core';
 import { isConstraintSketch, ConstraintSketch } from './sketch/constraints';
 import { computeGeometryArrays } from './geometryArrays';
+import { getShapeCompilePlan } from './kernel';
 import type {
   SerializedRunResult,
   SerializedSceneObject,
@@ -147,6 +148,7 @@ export function serializeRunResult(result: RunResult): {
       name: obj.name,
       shapeData,
       sketchData,
+      compilePlan: obj.shape ? getShapeCompilePlan(obj.shape) : null,
       color: obj.color,
       geometryInfo: obj.geometryInfo,
       sketchMeta: (obj as any).sketchMeta,

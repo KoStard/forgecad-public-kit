@@ -37,6 +37,7 @@ The kernel is not the product. The modeling layer on top is.
 - **View controls** — Render modes (solid/wireframe/overlay), projection (perspective/orthographic), named views (front/back/left/right/top/bottom/iso), fit-to-view, zoom-to-selection
 - **STL export** — Binary STL export from the browser UI
 - **Cut planes** — `cutPlane()` defines named section planes for inspection. Viewport sectioning uses `trimByPlane()` for capped solids, with GPU clipping fallback on trim failures
+- **Compile plan inspector** — selecting a shape opens a Construction panel showing its build tree (Union → Box, Cylinder, Fillet, …). Clicking any node previews that sub-shape as an X-ray ghost in the viewport (visible through the parent solid). Navigate with arrow keys; Escape or clicking elsewhere exits.
 
 ### Gaps to close (Fusion360 parity)
 
@@ -51,7 +52,7 @@ The kernel is not the product. The modeling layer on top is.
 | Thread/helix | Helical sweep for threads, springs | Mechanical fasteners | Medium (threads done via SDF, general helix sweep still missing) |
 
 ### What we deliberately skip
-- **History tree / timeline** — code IS the history. You read it top to bottom. No need for a separate feature tree when the script is the tree.
+- **Editable history tree / timeline** — code IS the history. You read it top to bottom. No need for a separate feature tree when the script is the tree. (Note: the compile plan inspector above is read-only — it shows what the code produced, not a parallel editable feature history.)
 - **Direct modeling** — push/pull faces interactively. Not relevant for code-first CAD.
 - **Full GUI-style assembly mate solving** — Forge now supports code-level assembly graphs (`assembly()`, revolute/prismatic/fixed joints, collision checks, BOM metadata), but not full interactive face-mate workflows like Fusion's assembly workspace.
 - **Photorealistic rendering** — not a rendering tool. Basic viewport materials are sufficient. Export to STL for slicing or external renderers.

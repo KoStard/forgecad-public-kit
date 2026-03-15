@@ -344,6 +344,59 @@ function forgeProjectPlugin(enableInitialScan = true) {
   };
 }
 
+/**
+ * Scans manifold-3d/lib/*.js for bare-specifier imports and returns them as
+ * Vite optimizeDeps.include entries. This ensures that any npm packages
+ * imported by the raw-served manifold-3d lib files are pre-bundled (so CJS
+ * packages get converted to ESM and Node.js globals like Buffer are polyfilled).
+ *
+ * We scan automatically so that future manifold-3d upgrades that add new deps
+ * don't require manual maintenance here. We exclude:
+ *  - Node.js built-ins (path, assert, fs, node:* protocol, etc.)
+ *  - Build/test-only tools (vitest, esbuild-wasm, glob)
+ *  - Self-imports (manifold-3d/*)
+ */
+function getManifoldLibIncludes(): string[] {
+  // Packages that are Node.js-only or build-tool-only and must not be pre-bundled for browser
+  const exclude = new Set([
+    'assert', 'buffer', 'child_process', 'cluster', 'crypto', 'dns', 'domain',
+    'events', 'fs', 'http', 'http2', 'https', 'module', 'net', 'os', 'path',
+    'perf_hooks', 'process', 'punycode', 'querystring', 'readline', 'repl',
+    'stream', 'string_decoder', 'sys', 'timers', 'tls', 'tty', 'url', 'util',
+    'v8', 'vm', 'wasi', 'worker_threads', 'zlib',
+    'glob', 'vitest', 'esbuild', 'esbuild-wasm',
+  ]);
+
+  const libDir = path.resolve(__dirname, 'node_modules/manifold-3d/lib');
+  const deps = new Set<string>();
+
+  let files: string[];
+  try {
+    files = fs.readdirSync(libDir).filter((f) => f.endsWith('.js') && !f.endsWith('.test.js'));
+  } catch {
+    return [];
+  }
+
+  for (const file of files) {
+    try {
+      const content = fs.readFileSync(path.join(libDir, file), 'utf-8');
+      for (const match of content.matchAll(/from '((?:@[^/'\s]+\/[^'\s]+|[^./'\s][^'\s]*)?)'/g)) {
+        const dep = match[1];
+        if (!dep) continue;
+        if (dep.startsWith('node:')) continue;
+        if (dep.startsWith('manifold-3d')) continue;
+        const pkgName = dep.startsWith('@') ? dep.split('/').slice(0, 2).join('/') : dep.split('/')[0];
+        if (exclude.has(pkgName)) continue;
+        deps.add(dep);
+      }
+    } catch {
+      // skip unreadable files
+    }
+  }
+
+  return [...deps];
+}
+
 function stripBrokenManifoldSourceMaps() {
   const manifoldLibPattern = /[\\/]node_modules[\\/]manifold-3d[\\/]lib[\\/].+\.js$/;
   const sourceMapTrailerPattern = /\n\/\/# sourceMappingURL=.*?\.map\s*$/gm;
@@ -373,6 +426,10 @@ export default defineConfig(({ command }) => ({
   },
   optimizeDeps: {
     exclude: ['manifold-3d'],
+    // Auto-discovered: all npm deps imported by manifold-3d/lib/*.js files.
+    // Vite can't discover these itself because manifold-3d is excluded from its
+    // module scan. See getManifoldLibIncludes() for the exclusion logic.
+    include: getManifoldLibIncludes(),
   },
   worker: {
     format: 'es',

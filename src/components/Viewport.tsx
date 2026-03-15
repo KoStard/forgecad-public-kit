@@ -13,6 +13,7 @@ import type {
 import type { DimensionDef } from '@forge/sketch/dimensions';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
+import { buildShapeFromCompilePlan } from '@forge/kernel';
 import { getSketchWorldMatrix } from '@forge/sketch/placement3d';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
 import { resolveJointViewValues } from '@forge/jointsView';
@@ -3151,6 +3152,49 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Ghost overlay for construction tree node preview.
+ *  Two-pass X-ray: visible portions render as a solid+edges; occluded portions
+ *  show as faint edge lines drawn through the parent object (depthTest off). */
+function ConstructionGhostOverlay({ matrix }: { matrix: THREE.Matrix4 }) {
+  const ghost = useForgeStore((s) => s.constructionGhost);
+
+  const { solidGeo, edgesGeo } = useMemo(() => {
+    if (!ghost) return { solidGeo: null, edgesGeo: null };
+    try {
+      const shape = buildShapeFromCompilePlan(ghost.plan);
+      const { solid, edges } = shapeToGeometry(shape);
+      return { solidGeo: solid, edgesGeo: edges };
+    } catch {
+      return { solidGeo: null, edgesGeo: null };
+    }
+  }, [ghost]);
+
+  if (!solidGeo || !edgesGeo) return null;
+
+  return (
+    <group matrixAutoUpdate={false} matrix={matrix}>
+      {/* Pass 1 — depth-tested: solid fill + crisp edges for the visible portion */}
+      <mesh geometry={solidGeo} renderOrder={1}>
+        <meshStandardMaterial
+          color="#4a9eff"
+          transparent
+          opacity={0.25}
+          depthTest={false}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      <lineSegments geometry={edgesGeo} renderOrder={2}>
+        <lineBasicMaterial color="#4a9eff" transparent opacity={1.0} depthWrite={false} />
+      </lineSegments>
+      {/* Pass 2 — no depth test: faint edges visible through the parent solid */}
+      <lineSegments geometry={edgesGeo} renderOrder={3}>
+        <lineBasicMaterial color="#4a9eff" transparent opacity={0.55} depthTest={false} depthWrite={false} />
+      </lineSegments>
+    </group>
+  );
+}
+
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const isEvaluating = useForgeStore((s) => s.isEvaluating);
@@ -3182,6 +3226,7 @@ export function Viewport() {
   const hoveredJointName = useForgeStore((s) => s.hoveredJointName);
   const setJointAnimationProgress = useForgeStore((s) => s.setJointAnimationProgress);
   const setJointAnimationPlaying = useForgeStore((s) => s.setJointAnimationPlaying);
+  const constructionGhost = useForgeStore((s) => s.constructionGhost);
   const objects = result?.objects ?? [];
   const dimensions = result?.dimensions ?? [];
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
@@ -3311,6 +3356,13 @@ export function Viewport() {
     });
     return out;
   }, [explodeOffsets, jointMatrices, objects]);
+
+  const constructionGhostMatrix = useMemo(
+    () => constructionGhost
+      ? (objectMatrices[constructionGhost.objectId] ?? new THREE.Matrix4())
+      : new THREE.Matrix4(),
+    [constructionGhost, objectMatrices],
+  );
 
   useEffect(() => {
     if (!jointAnimationPlaying || !activeJointAnimation) return;
@@ -3569,6 +3621,10 @@ export function Viewport() {
         closeObjectContextMenu();
         return;
       }
+      if (useForgeStore.getState().constructionGhost !== null) {
+        useForgeStore.getState().setConstructionGhost(null);
+        return;
+      }
       if (useForgeStore.getState().focusedObjectIds.length === 0) return;
       clearFocusedObject();
     };
@@ -3755,8 +3811,12 @@ export function Viewport() {
   }, [closeObjectContextMenu, objectContextMenu, objects]);
 
   const handleViewportPointerMissed = useCallback((event: MouseEvent) => {
-    if (event.detail !== 2) return;
     if (measureMode) return;
+    if (useForgeStore.getState().constructionGhost !== null) {
+      useForgeStore.getState().setConstructionGhost(null);
+      return;
+    }
+    if (event.detail !== 2) return;
     clearFocusedObject();
   }, [clearFocusedObject, measureMode]);
 
@@ -3813,7 +3873,8 @@ export function Viewport() {
         {objects.map((obj) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
           const isDimmedByFocus = focusedObjectIdSet.size > 0 && !focusedObjectIdSet.has(obj.id);
-          const effectiveSettings = isDimmedByFocus
+          const isDimmedByGhost = constructionGhost !== null && obj.id !== constructionGhost.objectId;
+          const effectiveSettings = isDimmedByFocus || isDimmedByGhost
             ? { ...settings, opacity: Math.min(settings.opacity, FOCUS_MODE_DIM_OPACITY) }
             : settings;
           const isHovered = hoveredObjectId === obj.id;
@@ -3860,6 +3921,9 @@ export function Viewport() {
           }
           return null;
         })}
+        {constructionGhost && (
+          <ConstructionGhostOverlay matrix={constructionGhostMatrix} />
+        )}
         {hoveredJointOverlay && <HoveredJointOverlay state={hoveredJointOverlay} config={jointOverlayConfig} />}
         {dimensionsVisible && dimensions.map((d) => (
           <DimensionAnnotation key={d.id} def={d} />

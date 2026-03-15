@@ -7,6 +7,7 @@ import { resolveJointViewValues } from '@forge/jointsView';
 import { animationSpeedToSlider, formatAnimationSpeed, sliderToAnimationSpeed } from '../animationSpeed';
 import { getCameraForwardVector, type ViewportCameraState } from '../capture/cameraState';
 import { formatRenderSceneCliSpec, type ViewportRenderSceneState } from '../capture/renderSceneState';
+import { ConstructionTreePanel } from './ConstructionTreePanel';
 
 const btnStyle = (active = false): CSSProperties => ({
   padding: '4px 8px',
@@ -248,6 +249,7 @@ export function ViewPanel() {
   const focusedObjectIds = useForgeStore((s) => s.focusedObjectIds);
   const focusObject = useForgeStore((s) => s.focusObject);
   const clearFocusedObject = useForgeStore((s) => s.clearFocusedObject);
+  const setConstructionGhost = useForgeStore((s) => s.setConstructionGhost);
   const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
   const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
   const setObjectPickSyncEnabled = useForgeStore((s) => s.setObjectPickSyncEnabled);
@@ -766,6 +768,7 @@ export function ViewPanel() {
         style={{ flex: 1, minHeight: 180, overflowY: 'auto', padding: '0 12px 12px' }}
         onDoubleClick={(event) => {
           if (event.target !== event.currentTarget) return;
+          setConstructionGhost(null);
           clearFocusedObject();
         }}
       >
@@ -828,6 +831,10 @@ export function ViewPanel() {
             </div>
           )}
         </div>
+      )}
+
+      {selectedObject?.shape && (
+        <ConstructionTreePanel key={selectedObject.id} objectId={selectedObject.id} shape={selectedObject.shape} />
       )}
 
       <div style={sectionStyle}>

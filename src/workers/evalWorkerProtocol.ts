@@ -13,6 +13,7 @@ import type { CollectedRobotExport } from '../forge/robotExport';
 import type { FaceRef } from '../forge/sketch/topology';
 import type { FaceTransformationHistory } from '../forge/faceHistory';
 import type { GeometryInfo } from '../forge/kernel';
+import type { ShapeCompilePlan } from '../forge/compilePlan';
 import type { SketchConstraintMeta, ConstraintDefinition } from '../forge/sketch/constraints';
 
 /** Wire format for a serialized Shape — all WASM data extracted into transferable TypedArrays. */
@@ -55,6 +56,7 @@ export interface SerializedSceneObject {
   name: string;
   shapeData: SerializedShapeData | null;
   sketchData: SerializedSketchData | null;
+  compilePlan?: ShapeCompilePlan | null;
   color?: string;
   geometryInfo?: GeometryInfo | null;
   sketchMeta?: SketchConstraintMeta;
