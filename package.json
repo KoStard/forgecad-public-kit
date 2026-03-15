@@ -9,11 +9,8 @@
   },
   "files": [
     "dist-cli",
-    "cli",
-    "src",
+    "dist",
     "examples",
-    "index.html",
-    "vite.config.ts",
     "README.md",
     "LICENSE"
   ],
@@ -24,7 +21,7 @@
     "dev": "vite -- ./examples",
     "dev:blank": "vite",
     "build": "tsc && vite build && npm run build:cli",
-    "build:cli": "tsup cli/forgecad.ts --format esm --platform node --target node20 --out-dir dist-cli --clean --sourcemap",
+    "build:cli": "tsup cli/forgecad.ts --format esm --platform node --target node20 --out-dir dist-cli --clean --sourcemap --external typescript",
     "test": "npm run test:prepare && node dist-cli/forgecad.js check suite",
     "test:prepare": "tsc --noEmit && npm run build:cli",
     "test:compiler": "npm run test:prepare && node dist-cli/forgecad.js check compiler",
@@ -36,6 +33,7 @@
     "test:api": "npm run test:prepare && node dist-cli/forgecad.js check api",
     "build:skill:forgecad": "node scripts/build-forgecad-skill.mjs",
     "prepare": "npm run build:cli",
+    "prepublishOnly": "npm run build",
     "preview": "vite preview",
     "prune:branches": "uv run cli/forge-prune-local-branches.py",
     "meta:init": "bash scripts/local-meta.sh init",
@@ -43,25 +41,26 @@
     "meta:path": "bash scripts/local-meta.sh path"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "^4.5.2",
-    "@monaco-editor/react": "^4.7.0",
-    "@react-three/drei": "^10.0.6",
-    "@react-three/fiber": "^9.1.2",
+    "chokidar": "^4.0.0",
     "gifenc": "^1.0.3",
     "manifold-3d": "^3.3.2",
     "pngjs": "^7.0.0",
     "puppeteer-core": "^24.37.2",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "three": "^0.175.0",
-    "typescript": "^5.8.3",
-    "vite": "^6.3.5",
-    "zustand": "^5.0.5"
+    "typescript": "^5.8.3"
   },
   "devDependencies": {
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
     "@types/three": "^0.175.0",
-    "tsup": "^8.5.0"
+    "@vitejs/plugin-react": "^4.5.2",
+    "@monaco-editor/react": "^4.7.0",
+    "@react-three/drei": "^10.0.6",
+    "@react-three/fiber": "^9.1.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "three": "^0.175.0",
+    "tsup": "^8.5.0",
+    "vite": "^6.3.5",
+    "zustand": "^5.0.5"
   }
 }

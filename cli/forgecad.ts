@@ -97,8 +97,8 @@ const ENCODER_VALUES: CompletionItem[] = [
 
 const STUDIO_OPTIONS: CompletionOptionDefinition[] = [
   { name: '--blank', description: 'Start without a project folder' },
-  { name: '--port', description: 'Bind Vite to a specific port', argument: 'required', valueLabel: '<n>' },
-  { name: '--host', description: 'Expose the dev server on the network', argument: 'optional', valueLabel: '[host]', values: HOST_VALUES },
+  { name: '--port', description: 'Bind to a specific port', argument: 'required', valueLabel: '<n>' },
+  { name: '--host', description: 'Expose the server on the network', argument: 'optional', valueLabel: '[host]', values: HOST_VALUES },
   { name: '--open', description: 'Open a browser window automatically' },
   { name: '--strict-port', description: 'Fail instead of selecting another port' },
 ];
