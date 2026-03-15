@@ -7,47 +7,59 @@ import {
   wrapShapeCompilePlanWithQueryOwner,
 } from './compilePlan';
 
-export type ShellOpenFace = 'top' | 'bottom';
+export type ShellOpenFace = string;
 
 export type ShellCompilePlanLoweringResult =
   | { ok: true; plan: ShapeCompilePlan }
   | { ok: false; reason: string };
 
-function normalizeShellOpenFaces(openFaces: readonly ShellOpenFace[] | undefined): ShellOpenFace[] {
-  const ordered: ShellOpenFace[] = [];
-  for (const face of openFaces ?? []) {
-    if (face !== 'top' && face !== 'bottom') {
-      throw new Error(`Shape.shell() only supports "top" and "bottom" openings, got "${face}"`);
+// Canonical face name aliases. Users may write 'front', 'back', 'left', 'right' in openFaces;
+// the compiler normalises these to the internal face-table names before storing in the plan.
+const SHELL_OPEN_FACE_CANONICAL: Record<string, string> = {
+  front: 'side-bottom',
+  back: 'side-top',
+  right: 'side-right',
+  left: 'side-left',
+};
+
+function normalizeShellOpenFaces(openFaces: readonly string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const f of openFaces ?? []) {
+    const resolved = SHELL_OPEN_FACE_CANONICAL[f] ?? f;
+    if (!seen.has(resolved)) {
+      seen.add(resolved);
+      result.push(resolved);
     }
-    if (!ordered.includes(face)) ordered.push(face);
   }
-  return ordered;
+  return result;
 }
 
 function isRigidShellTransformStep(step: ShapeCompileTransformStep): boolean {
   return step.kind !== 'scale';
 }
 
-function buildHeightShellSpan(
-  totalHeight: number,
+// General axis span for one dimension of a shell inner body.
+// openMin removes the wall at the axis minimum (e.g. bottom for Z, side-left for X).
+// openMax removes the wall at the axis maximum (e.g. top for Z, side-right for X).
+// Returns {size, translate} where translate is the offset to apply to the inner body
+// so its extent matches [start, start+size] in the outer body's coordinate frame.
+function buildAxisShellSpan(
+  total: number,
   center: boolean,
   thickness: number,
-  openFaces: readonly ShellOpenFace[],
-): { height: number; translateZ: number } | null {
-  const openTop = openFaces.includes('top');
-  const openBottom = openFaces.includes('bottom');
+  openMin: boolean,
+  openMax: boolean,
+): { size: number; translate: number } | null {
   const start = center
-    ? -totalHeight / 2 + (openBottom ? 0 : thickness)
-    : (openBottom ? 0 : thickness);
+    ? -total / 2 + (openMin ? 0 : thickness)
+    : (openMin ? 0 : thickness);
   const end = center
-    ? totalHeight / 2 - (openTop ? 0 : thickness)
-    : totalHeight - (openTop ? 0 : thickness);
-  const height = end - start;
-  if (!(height > 0)) return null;
-  return {
-    height,
-    translateZ: center ? (start + end) / 2 : start,
-  };
+    ? total / 2 - (openMax ? 0 : thickness)
+    : total - (openMax ? 0 : thickness);
+  const size = end - start;
+  if (!(size > 0)) return null;
+  return { size, translate: center ? (start + end) / 2 : start };
 }
 
 function translateShapePlanZ(plan: ShapeCompilePlan, z: number): ShapeCompilePlan {
@@ -66,30 +78,26 @@ function translateShapePlan(plan: ShapeCompilePlan, x: number, y: number, z: num
 function lowerBoxShellToConcretePlan(
   plan: Extract<ShapeCompilePlan, { kind: 'box' }>,
   thickness: number,
-  openFaces: readonly ShellOpenFace[],
+  openFaces: readonly string[],
 ): ShellCompilePlanLoweringResult {
-  const innerX = plan.x - 2 * thickness;
-  const innerY = plan.y - 2 * thickness;
-  if (!(innerX > 0) || !(innerY > 0)) {
-    return { ok: false, reason: 'Shape.shell() thickness is too large for this box base.' };
-  }
+  // openFaces uses internal face-table names after normalisation.
+  // Box faces: top, bottom, side-left (−X), side-right (+X), side-bottom (−Y/front), side-top (+Y/back).
+  const xSpan = buildAxisShellSpan(plan.x, plan.center, thickness,
+    openFaces.includes('side-left'), openFaces.includes('side-right'));
+  const ySpan = buildAxisShellSpan(plan.y, plan.center, thickness,
+    openFaces.includes('side-bottom'), openFaces.includes('side-top'));
+  const zSpan = buildAxisShellSpan(plan.z, plan.center, thickness,
+    openFaces.includes('bottom'), openFaces.includes('top'));
 
-  const span = buildHeightShellSpan(plan.z, plan.center, thickness, openFaces);
-  if (!span) {
-    return { ok: false, reason: 'Shape.shell() thickness is too large for this box height and opening configuration.' };
+  if (!xSpan || !ySpan || !zSpan) {
+    return { ok: false, reason: 'Shape.shell() thickness is too large for this box base and opening configuration.' };
   }
 
   const inner = translateShapePlan(
-    {
-      kind: 'box',
-      x: innerX,
-      y: innerY,
-      z: span.height,
-      center: plan.center,
-    },
-    plan.center ? 0 : thickness,
-    plan.center ? 0 : thickness,
-    span.translateZ,
+    { kind: 'box', x: xSpan.size, y: ySpan.size, z: zSpan.size, center: plan.center },
+    xSpan.translate,
+    ySpan.translate,
+    zSpan.translate,
   );
   return { ok: true, plan: buildBooleanShapeCompilePlan('difference', [plan, inner])! };
 }
@@ -97,38 +105,55 @@ function lowerBoxShellToConcretePlan(
 function lowerCylinderShellToConcretePlan(
   plan: Extract<ShapeCompilePlan, { kind: 'cylinder' }>,
   thickness: number,
-  openFaces: readonly ShellOpenFace[],
+  openFaces: readonly string[],
 ): ShellCompilePlanLoweringResult {
+  const sideOpenings = openFaces.filter((f) => f !== 'top' && f !== 'bottom');
+  if (sideOpenings.length > 0) {
+    return {
+      ok: false,
+      reason: `Shape.shell() supports only "top" and "bottom" openings for cylinder bases. Unsupported opening${sideOpenings.length > 1 ? 's' : ''}: ${sideOpenings.map((f) => `"${f}"`).join(', ')}.`,
+    };
+  }
+
   const innerRadius = plan.radius - thickness;
   const innerRadiusTop = plan.radiusTop == null ? undefined : plan.radiusTop - thickness;
   if (!(innerRadius > 0) || (innerRadiusTop != null && !(innerRadiusTop > 0))) {
     return { ok: false, reason: 'Shape.shell() thickness is too large for this cylinder or cone base.' };
   }
 
-  const span = buildHeightShellSpan(plan.height, plan.center, thickness, openFaces);
-  if (!span) {
+  const zSpan = buildAxisShellSpan(plan.height, plan.center, thickness,
+    openFaces.includes('bottom'), openFaces.includes('top'));
+  if (!zSpan) {
     return { ok: false, reason: 'Shape.shell() thickness is too large for this cylinder height and opening configuration.' };
   }
 
   const inner = translateShapePlanZ({
     kind: 'cylinder',
-    height: span.height,
+    height: zSpan.size,
     radius: innerRadius,
     radiusTop: innerRadiusTop,
     center: plan.center,
-  }, span.translateZ);
+  }, zSpan.translate);
   return { ok: true, plan: buildBooleanShapeCompilePlan('difference', [plan, inner])! };
 }
 
 function lowerExtrudeShellToConcretePlan(
   plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>,
   thickness: number,
-  openFaces: readonly ShellOpenFace[],
+  openFaces: readonly string[],
 ): ShellCompilePlanLoweringResult {
   if (plan.scaleTop) {
     return {
       ok: false,
-      reason: 'Shape.shell() v1 does not support tapered extrudes (`scaleTop`) yet.',
+      reason: 'Shape.shell() does not support tapered extrudes (`scaleTop`).',
+    };
+  }
+
+  const sideOpenings = openFaces.filter((f) => f !== 'top' && f !== 'bottom');
+  if (sideOpenings.length > 0) {
+    return {
+      ok: false,
+      reason: `Shape.shell() does not support side face openings for extrude bases (requires non-uniform profile offset). Unsupported opening${sideOpenings.length > 1 ? 's' : ''}: ${sideOpenings.map((f) => `"${f}"`).join(', ')}.`,
     };
   }
 
@@ -137,24 +162,25 @@ function lowerExtrudeShellToConcretePlan(
     return { ok: false, reason: 'Shape.shell() could not offset the source profile for this extrude base.' };
   }
 
-  const span = buildHeightShellSpan(plan.height, plan.center, thickness, openFaces);
-  if (!span) {
+  const zSpan = buildAxisShellSpan(plan.height, plan.center, thickness,
+    openFaces.includes('bottom'), openFaces.includes('top'));
+  if (!zSpan) {
     return { ok: false, reason: 'Shape.shell() thickness is too large for this extrude height and opening configuration.' };
   }
 
   const inner = translateShapePlanZ({
     kind: 'extrude',
     profile: innerProfile,
-    height: span.height,
+    height: zSpan.size,
     center: plan.center,
-  }, span.translateZ);
+  }, zSpan.translate);
   return { ok: true, plan: buildBooleanShapeCompilePlan('difference', [plan, inner])! };
 }
 
 function lowerBaseShellPlanToConcretePlan(
   plan: ShapeCompilePlan,
   thickness: number,
-  openFaces: readonly ShellOpenFace[],
+  openFaces: readonly string[],
 ): ShellCompilePlanLoweringResult {
   switch (plan.kind) {
     case 'queryOwner': {
@@ -169,7 +195,7 @@ function lowerBaseShellPlanToConcretePlan(
       if (!plan.steps.every(isRigidShellTransformStep)) {
         return {
           ok: false,
-          reason: 'Shape.shell() v1 supports only rigid transforms before shelling. Scale transforms are not supported yet.',
+          reason: 'Shape.shell() supports only rigid transforms before shelling. Scale transforms are not supported.',
         };
       }
       const lowered = lowerBaseShellPlanToConcretePlan(plan.base, thickness, openFaces);
@@ -192,13 +218,13 @@ function lowerBaseShellPlanToConcretePlan(
     case 'shell':
       return {
         ok: false,
-        reason: 'Shape.shell() v1 does not support shelling an already-shelled result yet.',
+        reason: 'Shape.shell() does not support shelling an already-shelled result.',
       };
     case 'fillet':
     case 'chamfer':
       return {
         ok: false,
-        reason: 'Shape.shell() v1 does not support edge-finished bodies yet.',
+        reason: 'Shape.shell() does not support edge-finished bodies (fillet/chamfer). Apply shell before edge finishing.',
       };
     case 'sphere':
     case 'sheetMetal':
@@ -212,7 +238,7 @@ function lowerBaseShellPlanToConcretePlan(
     case 'trimByPlane':
       return {
         ok: false,
-        reason: 'Shape.shell() v1 currently supports compile-covered box(), cylinder(), and straight extrude() bases with optional top/bottom openings.',
+        reason: `Shape.shell() supports compile-covered box(), cylinder(), and straight extrude() bases. "${plan.kind}" bases are not supported.`,
       };
   }
 }
@@ -220,7 +246,7 @@ function lowerBaseShellPlanToConcretePlan(
 export function buildShellShapeCompilePlan(
   base: ShapeCompilePlan | null,
   thickness: number,
-  openFaces: readonly ShellOpenFace[] = [],
+  openFaces: readonly string[] = [],
 ): ShapeCompilePlan | null {
   if (!base) return null;
   if (!Number.isFinite(thickness) || !(thickness > 0)) return null;

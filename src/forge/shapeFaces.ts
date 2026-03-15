@@ -687,14 +687,13 @@ function shellInnerFaceName(baseName: string): string {
   return `inner-${baseName}`;
 }
 
-function shellCreatedFaceNames(basePlan: ShapeCompilePlan, openFaces: Array<'top' | 'bottom'>): string[] {
+function shellCreatedFaceNames(basePlan: ShapeCompilePlan, openFaces: string[]): string[] {
   const baseTable = resolveShapeFaceTable(basePlan);
   const created: string[] = [];
   for (const name of baseTable.faces.keys()) {
-    if ((name === 'top' && openFaces.includes('top')) || (name === 'bottom' && openFaces.includes('bottom'))) {
-      continue;
+    if (!openFaces.includes(name)) {
+      created.push(shellInnerFaceName(name));
     }
-    created.push(shellInnerFaceName(name));
   }
   return created;
 }
@@ -1555,7 +1554,7 @@ export function validateShapeFaceQuery(plan: ShapeCompilePlan | null, query: Fac
 
 export function supportedShellCreatedFaceNames(
   basePlan: ShapeCompilePlan | null,
-  openFaces: Array<'top' | 'bottom'>,
+  openFaces: string[],
 ): string[] {
   if (!basePlan) return [];
   return shellCreatedFaceNames(basePlan, openFaces).sort();

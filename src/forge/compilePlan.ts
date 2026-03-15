@@ -200,7 +200,7 @@ export type ShapeCompilePlan =
       kind: 'shell';
       base: ShapeCompilePlan;
       thickness: number;
-      openFaces: Array<'top' | 'bottom'>;
+      openFaces: string[];
       queryPropagation?: TopologyRewritePropagation;
     }
   | {

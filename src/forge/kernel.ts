@@ -1179,10 +1179,15 @@ export class Shape {
     ), nextPlan);
   }
 
-  /** Hollow out compile-covered boxes, cylinders, and straight extrudes. */
+  /** Hollow out compile-covered boxes, cylinders, and straight extrudes.
+   * `openFaces` names any subset of the base shape's faces to leave open (no wall).
+   * Box bases accept any of: top, bottom, front (=side-bottom), back (=side-top),
+   * left (=side-left), right (=side-right), or the raw internal names.
+   * Cylinder and extrude bases accept top and bottom only.
+   */
   shell(
     thickness: number,
-    opts: { openFaces?: Array<'top' | 'bottom'> } = {},
+    opts: { openFaces?: string[] } = {},
   ): Shape {
     const basePlan = getShapeCompilePlanInternal(this);
     const nextPlan = createOwnedTopologyRewritePlan(
@@ -1192,7 +1197,7 @@ export class Shape {
     );
     if (!nextPlan) {
       throw new Error(
-        'Shape.shell() currently supports compile-covered box(), cylinder(), and straight extrude() solids with optional top/bottom openings and rigid transforms.',
+        'Shape.shell() supports compile-covered box(), cylinder(), and straight extrude() solids with optional face openings and rigid transforms.',
       );
     }
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
