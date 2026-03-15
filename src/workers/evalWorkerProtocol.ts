@@ -29,6 +29,10 @@ export interface SerializedShapeData {
   faceHistories: Record<string, FaceTransformationHistory>;
   colorHex: string | null;
   geometryInfo: GeometryInfo | null;
+  /** Pre-computed Three.js-ready arrays — built in the worker to keep main thread free. */
+  geometryPositions: Float32Array;
+  geometryNormals: Float32Array;
+  geometryEdgePositions: Float32Array;
 }
 
 /** Wire format for a serialized Sketch — polygon data extracted into plain arrays. */
