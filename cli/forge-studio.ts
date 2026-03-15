@@ -2,7 +2,8 @@
 
 import { existsSync } from 'fs';
 import { resolve } from 'path';
-import { resolvePackagePath } from './package-runtime';
+import { type ChildProcess } from 'child_process';
+import { packageRootFrom, resolvePackagePath, spawnPackageVite } from './package-runtime';
 import { startStudioServer } from './forge-studio-server';
 
 interface StudioOptions {
@@ -80,6 +81,22 @@ function parseStudioArgs(argv: string[]): StudioOptions {
   return options;
 }
 
+function toViteArgs(options: StudioOptions): string[] {
+  const args: string[] = [];
+  if (options.port != null) args.push('--port', String(options.port));
+  if (options.host) args.push('--host', options.host);
+  if (options.open) args.push('--open');
+  if (options.strictPort) args.push('--strictPort');
+  return args;
+}
+
+function waitForExit(child: ChildProcess): Promise<number> {
+  return new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', (code) => resolve(code ?? 0));
+  });
+}
+
 export async function runStudioCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const options = parseStudioArgs(argv);
   const projectDir = options.blank
@@ -87,10 +104,20 @@ export async function runStudioCli(argv: string[] = process.argv.slice(2)): Prom
     : options.projectPath ?? resolvePackagePath(import.meta.url, 'examples');
 
   const distDir = resolvePackagePath(import.meta.url, 'dist');
+
+  // Dev fallback: when dist/ hasn't been built yet, use the Vite dev server.
   if (!existsSync(distDir)) {
-    console.error(`\nError: ForgeCAD studio assets not found at:\n  ${distDir}\n`);
-    console.error('Run "npm run build" in the ForgeCAD package directory, then try again.');
-    process.exit(1);
+    const child = spawnPackageVite(import.meta.url, toViteArgs(options), {
+      cwd: packageRootFrom(import.meta.url),
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        ...(projectDir ? { FORGE_PROJECT: projectDir } : {}),
+      },
+    });
+    const code = await waitForExit(child);
+    if (code !== 0) process.exit(code);
+    return;
   }
 
   const { url, close } = await startStudioServer({
