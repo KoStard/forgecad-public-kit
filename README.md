@@ -87,6 +87,16 @@ forgecad skill install
 
 This copies a pre-built `SKILL.md` to `~/.agents/skills/forgecad/SKILL.md`. Reload your agent to activate. Run again after upgrading ForgeCAD to pick up updated docs.
 
+### Chat UI (Claude.ai, ChatGPT, Gemini, …)
+
+No CLI agent? Generate a single self-contained context file with all ForgeCAD API docs and paste it into any chat session:
+
+```bash
+forgecad skill one-file ~/Desktop/forgecad-context.md
+```
+
+The file includes a preamble explaining the chat-UI setup: the AI has no shell access, so it will ask you to run commands like `forgecad run <file>` and paste back the output for validation and iteration.
+
 ### Instructions for AI model generation
 
 When an AI model is asked to generate ForgeCAD models, require this workflow:
@@ -248,6 +258,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 | Generate report PDF | `forgecad export report examples/cup.forge.js` |
 | Parameter robustness scan | `forgecad check params examples/shoe-rack-doors.forge.js --samples 10` |
 | Install agent skill (Claude Code, Codex, OpenCode…) | `forgecad skill install` |
+| Export all docs as a single file for chat-UI paste | `forgecad skill one-file ~/Desktop/forgecad-context.md` |
 | Prune merged local-only branches | `uv run cli/forge-prune-local-branches.py` |
 | Transform invariants | `forgecad check transforms` |
 | Dimension propagation invariants | `forgecad check dimensions` |
