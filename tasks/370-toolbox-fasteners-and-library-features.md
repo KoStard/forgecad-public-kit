@@ -22,6 +22,7 @@ Primary files:
 - Keep the implementation compiler-owned: library features should compose supported semantic part features instead of reaching into backend APIs directly.
 - Add at least one example assembly or part that shows the library pieces used in a normal mechanical workflow.
 - Keep the initial catalog intentionally small and documented rather than pretending to support every standard.
+- Keep the components efficient and avoid triangles count explosions.
 
 ## Status and log
 - 2026-03-13: Blocked on task 300.
