@@ -5,7 +5,7 @@ import type {
   ProfileCompilePlan,
   ShapeCompilePlan,
 } from './compilePlan';
-import { featureCutExtentForwardSide, featureCutExtentReverseSide } from './compilePlan';
+import { featureCutExtentForwardSide, featureCutExtentReverseSide, findShapePrimaryQueryOwner } from './compilePlan';
 import {
   cloneTopologyRewritePropagation,
   type EdgeQueryRef,
@@ -36,6 +36,142 @@ import {
 } from './shapeFaces';
 
 export { buildBooleanTopologyRewritePropagation } from './booleanQueryPropagation';
+
+// ---------------------------------------------------------------------------
+// Vertical-edge propagation helpers (hole / cut / shell)
+// ---------------------------------------------------------------------------
+
+const VERTICAL_EDGE_NAMES = ['vert-bl', 'vert-br', 'vert-tr', 'vert-tl'] as const;
+
+/** The two side-face names that share a given vertical edge corner. */
+function verticalEdgeAdjacentFaceNames(edgeName: string): readonly string[] {
+  switch (edgeName) {
+    case 'vert-bl': return ['side-bottom', 'side-left'];
+    case 'vert-br': return ['side-bottom', 'side-right'];
+    case 'vert-tr': return ['side-right', 'side-top'];
+    case 'vert-tl': return ['side-top', 'side-left'];
+    default: return [];
+  }
+}
+
+/**
+ * Walk a plan tree to find the propagation record attached to the outermost
+ * topology-rewrite node. Returns `undefined` for primitive / transform-only plans.
+ */
+function rootPlanPropagation(plan: ShapeCompilePlan): TopologyRewritePropagation | undefined {
+  switch (plan.kind) {
+    case 'queryOwner':
+    case 'transform':
+      return rootPlanPropagation(plan.base);
+    case 'shell':
+    case 'hole':
+    case 'cut':
+    case 'boolean':
+    case 'hull':
+    case 'trimByPlane':
+    case 'fillet':
+    case 'chamfer':
+      return plan.queryPropagation;
+    case 'box':
+    case 'cylinder':
+    case 'sphere':
+    case 'extrude':
+    case 'sheetMetal':
+    case 'revolve':
+    case 'loft':
+    case 'sweep':
+      return undefined;
+  }
+}
+
+/** Walk propagated-edge chains to find the original tracked-edge name. */
+function deepestTrackedEdgeName(ref: EdgeQueryRef): string | null {
+  switch (ref.kind) {
+    case 'tracked-edge': return ref.edgeName;
+    case 'propagated-edge': return deepestTrackedEdgeName(ref.source);
+    default: return null;
+  }
+}
+
+/**
+ * Collect the current set of defended vertical-edge queries from a base plan.
+ *
+ * For a raw box / rectangle-extrude (no topology-rewrite propagation yet)
+ * the four `tracked-edge` queries are built directly from the primary query owner.
+ *
+ * For plans that have already been through at least one topology-rewrite
+ * (e.g. a prior fillet or cut), the defended set comes from the outermost
+ * rewrite's `preservedEdges` instead, filtering to the four canonical
+ * vertical-edge lineages only.
+ */
+function collectVerticalEdgeSeeds(
+  base: ShapeCompilePlan,
+): Array<{ edgeName: string; query: EdgeQueryRef }> {
+  const propagation = rootPlanPropagation(base);
+
+  if (!propagation) {
+    // Raw primitive — build tracked-edge refs from the primary owner directly.
+    const owner = findShapePrimaryQueryOwner(base);
+    if (!owner) return [];
+    return VERTICAL_EDGE_NAMES.map((edgeName) => ({
+      edgeName,
+      query: { kind: 'tracked-edge', edgeName, selector: 'edge', owner } as EdgeQueryRef,
+    }));
+  }
+
+  // Post-rewrite — collect surviving supported edges from propagation.
+  const seeds: Array<{ edgeName: string; query: EdgeQueryRef }> = [];
+  for (const entry of propagation.preservedEdges) {
+    if (entry.status !== 'supported') continue;
+    const edgeName = deepestTrackedEdgeName(entry.query);
+    if (!edgeName || !(VERTICAL_EDGE_NAMES as readonly string[]).includes(edgeName)) continue;
+    seeds.push({ edgeName, query: entry.query });
+  }
+  return seeds;
+}
+
+/**
+ * Append vertical-edge propagation entries to a hole / cut propagation record.
+ * Vertical edges whose two adjacent side-faces are both absent from the blocked
+ * map are recorded as `supported` / `preserved` descendants. Edges adjacent to
+ * at least one blocked face are recorded as `ambiguous` / `split` so that the
+ * resolver can surface a precise diagnostic instead of the generic fallback.
+ */
+function buildHoleCutEdgePropagation(
+  propagation: TopologyRewritePropagation,
+  owner: ShapeQueryOwner,
+  base: ShapeCompilePlan,
+  blocked: Map<string, FeatureBlockedFaceReason>,
+  operation: 'hole' | 'cut',
+): void {
+  const seeds = collectVerticalEdgeSeeds(base);
+  for (const { edgeName, query } of seeds) {
+    const adjFaces = verticalEdgeAdjacentFaceNames(edgeName);
+    const isBlocked = blocked.size > 0 && adjFaces.some((face) => blocked.has(face));
+    if (isBlocked) {
+      const propagatedQuery = createPropagatedEdgeQueryRef(query, owner, 'split');
+      propagation.preservedEdges.push({
+        query: propagatedQuery,
+        status: 'ambiguous',
+        note: `${operation} rewrites at least one adjacent face of this vertical edge; its post-rewrite identity is not defended as one single edge target.`,
+      });
+    } else {
+      const propagatedQuery = createPropagatedEdgeQueryRef(query, owner, 'preserved');
+      propagation.preservedEdges.push({
+        query: propagatedQuery,
+        status: 'supported',
+        note: `${operation} leaves this vertical edge unaffected; none of its adjacent faces are in the rewrite set.`,
+      });
+      pushTopologyRewriteDescendantContract(
+        propagation,
+        createEdgeDescendantContract('single', propagatedQuery, {
+          source: query,
+          note: `${operation} keeps this vertical edge as one defended single descendant.`,
+        }),
+      );
+    }
+  }
+}
 
 type TopologyRewriteNodeKind =
   | 'shell'
@@ -141,7 +277,7 @@ function pushExtentUpToFaceDiagnostics(
 export function buildShellTopologyRewritePropagation(
   owner: ShapeQueryOwner,
   base: ShapeCompilePlan,
-  openFaces: Array<'top' | 'bottom'>,
+  openFaces: string[],
 ): TopologyRewritePropagation {
   const propagation = createTopologyRewritePropagation('shell', owner);
   const preserved = preservedShapeFaceQueries(base);
@@ -187,14 +323,49 @@ export function buildShellTopologyRewritePropagation(
       ),
     );
   }
-  propagation.diagnostics.push(
-    createTopologyRewritePropagationDiagnostic(
-      'shell-edge-propagation-ambiguous',
-      'ambiguous',
-      'edge',
-      'Shell rewrites result edges, but durable edge-query propagation is not defended yet.',
-    ),
-  );
+
+  // Propagate vertical edges whose adjacent side-faces are not open.
+  const edgeSeeds = collectVerticalEdgeSeeds(base);
+  let edgePreservedCount = 0;
+  for (const { edgeName, query } of edgeSeeds) {
+    const adjFaces = verticalEdgeAdjacentFaceNames(edgeName);
+    const isOpen = adjFaces.some((face) => openFaces.includes(face));
+    if (isOpen) {
+      const propagatedQuery = createPropagatedEdgeQueryRef(query, owner, 'split');
+      propagation.preservedEdges.push({
+        query: propagatedQuery,
+        status: 'ambiguous',
+        note: 'Shell removes at least one adjacent face of this vertical edge; its post-shell identity is not defended as one single edge target.',
+      });
+    } else {
+      const propagatedQuery = createPropagatedEdgeQueryRef(query, owner, 'preserved');
+      propagation.preservedEdges.push({
+        query: propagatedQuery,
+        status: 'supported',
+        note: 'Shell leaves this vertical edge on the outer surface; none of its adjacent side-faces are in the open set.',
+      });
+      pushTopologyRewriteDescendantContract(
+        propagation,
+        createEdgeDescendantContract('single', propagatedQuery, {
+          source: query,
+          note: 'Shell keeps this outer vertical edge as one defended single descendant.',
+        }),
+      );
+      edgePreservedCount += 1;
+    }
+  }
+  if (edgeSeeds.length === 0 || edgePreservedCount === 0) {
+    propagation.diagnostics.push(
+      createTopologyRewritePropagationDiagnostic(
+        'shell-edge-propagation-ambiguous',
+        'ambiguous',
+        'edge',
+        edgeSeeds.length === 0
+          ? 'Shell edge propagation is not defended for this base shape: no tracked vertical edges were found in the defended subset.'
+          : 'All tracked vertical edges on this base are adjacent to the shell opening and are not defended as single post-shell edge targets.',
+      ),
+    );
+  }
   return propagation;
 }
 
@@ -290,6 +461,7 @@ export function buildHoleTopologyRewritePropagation(
     ),
   );
   pushExtentUpToFaceDiagnostics(propagation, owner, 'hole', extent);
+  buildHoleCutEdgePropagation(propagation, owner, base, blocked, 'hole');
   return propagation;
 }
 
@@ -386,6 +558,7 @@ export function buildCutTopologyRewritePropagation(
       ),
     );
   }
+  buildHoleCutEdgePropagation(propagation, owner, base, blocked, 'cut');
   return propagation;
 }
 

@@ -26,3 +26,10 @@ Primary files:
 ## Status and log
 - 2026-03-13: Blocked on task 300.
 - 2026-03-13: Not started.
+- 2026-03-15: Completed.
+  - Added `buildHoleCutEdgePropagation` in `queryPropagation.ts`: uses vertical-edge/face adjacency to classify each of the four canonical vertical edges as preserved (supported) or ambiguous after `hole()` and `cutout()` rewrites.
+  - Updated `buildShellTopologyRewritePropagation` to emit per-edge preserved/ambiguous entries for vertical edges not adjacent to the open face, replacing the blanket diagnostic.
+  - Fillet/chamfer propagation carries surviving vertical edges through subsequent hole, cut, shell, and boolean-union chains via `buildEdgeFeatureTopologyRewritePropagation` + the existing boolean `collectEdgeSeeds` path.
+  - Updated `defaultUnsupportedReasonForRewrite` fallback messages for `hole`, `cut`, and `shell` to give actionable diagnostics.
+  - Added `examples/compiler-corpus/post-rewrite-edge-finish.forge.js` with four workflow sections: hole→fillet/chamfer, cut→chamfer/fillet, shell→fillet/chamfer, and hole+boolean→fillet.
+  - Updated `examples/compiler-corpus/README.md` with coverage entry and guards description.

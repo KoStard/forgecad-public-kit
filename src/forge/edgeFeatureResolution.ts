@@ -128,11 +128,11 @@ function appendOwnerSearchStep(match: OwnerSearchMatch, step: OwnerSearchStep): 
 function defaultUnsupportedReasonForRewrite(plan: TopologyRewritePlan): string {
   switch (plan.kind) {
     case 'shell':
-      return 'Edge finishing does not yet defend durable edge queries through shell rewrites.';
+      return 'This vertical edge is not in the defended post-shell finishing subset: it is adjacent to the shell opening, or the base shape has no tracked vertical edges in the supported set.';
     case 'hole':
-      return 'Edge finishing does not yet defend durable edge queries through hole rewrites.';
+      return 'This vertical edge is not in the defended post-hole finishing subset: it is adjacent to a face the hole rewrites, or the base shape has no tracked vertical edges in the supported set.';
     case 'cut':
-      return 'Edge finishing does not yet defend durable edge queries through cut rewrites.';
+      return 'This vertical edge is not in the defended post-cut finishing subset: it is adjacent to a face the cut rewrites, or the base shape has no tracked vertical edges in the supported set.';
     case 'boolean':
       return `Edge finishing only accepts propagated edge queries that ${rewriteOperationLabel(plan)} already recorded as supported.`;
     case 'hull':

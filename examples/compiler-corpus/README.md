@@ -16,6 +16,7 @@ Each file is deterministic: no randomness, no params, fixed named solid result(s
 | `motor-mount-plate.forge.js` | circular pattern, mirrored ears, deterministic boolean pockets |
 | `sensor-bracket.forge.js` | mirrored ribs, upright `onFace()` cuts, repeated detail holes |
 | `edge-finished-mount.forge.js` | tracked-edge fillet/chamfer, downstream hole/cut edits, boolean chain |
+| `post-rewrite-edge-finish.forge.js` | fillet/chamfer on corners surviving hole, cut, shell, and boolean-chain rewrites |
 | `fastener-plate-variants.forge.js` | counterbores, countersinks, planar `upToFace`, created-face propagation |
 | `folded-service-panel-cover.forge.js` | compiler-owned sheet metal, named panel/flange/bend descendants, folded + flat outputs |
 | `projection-relay-cover.forge.js` | `projectToPlane()` replay from repeated union descendants |
@@ -86,3 +87,11 @@ Guards:
 - `trimByPlane()` exposing the defended `plane-cap` created-face query inside a normal cover-style workflow
 - earlier `hole()` / `cutout()` rewrites still surfacing explicit split-face ambiguity and unsupported created-edge diagnostics
 - later union edits staying reviewable after the trim-created face lands
+
+### `post-rewrite-edge-finish.forge.js`
+
+Guards:
+- defended vertical-edge propagation through `hole()`, `cutout()`, and `shell()` rewrites so that surviving corner edges remain finishable
+- `filletEdge()` and `chamferEdge()` resolving propagated post-hole and post-cut vertical edges without requiring the caller to reference backend-specific names
+- outer corner edges of a shelled enclosure staying finishable when the open face is top or bottom (not adjacent to any vertical edge)
+- a full hole → boolean-union → fillet chain remaining coherent through each propagation layer
