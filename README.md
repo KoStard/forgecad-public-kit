@@ -10,7 +10,20 @@ TypeScript is the file format. The browser is the CAD system.
 
 [API Reference](docs/permanent/API/README.md) • [CLI Docs](docs/permanent/CLI.md) • [Vision](docs/permanent/VISION.md) • [Examples](examples)
 
-## Start Here
+## Install
+
+```bash
+npm install -g forgecad
+forgecad studio /path/to/your/project
+```
+
+Or without a project folder to start from a blank scratch file:
+
+```bash
+forgecad studio --blank
+```
+
+## Start Here (contributors)
 
 ```bash
 npm install
@@ -151,13 +164,14 @@ Latest benchmark iterations from `ForgeCADBenchmark/results/*` (`version_{n}.for
 
 ```bash
 npm install
-npm link
-forgecad studio
+npm link          # puts forgecad in PATH
+npm run build:cli # build the CLI (~2s, needed after CLI changes)
+forgecad studio   # opens ./examples by default
 ```
 
 Open `http://localhost:5173`.
 
-This starts ForgeCAD with the `./examples` folder loaded.
+`npm run build:cli` is the fast daily-driver build. Run `npm run build` (20s+) only when you need the production SPA in `dist/` — e.g. before publishing or testing the production server path.
 
 ### Open your own project folder
 
@@ -288,6 +302,22 @@ Planned/ongoing areas include:
 - broader mechanical modeling ergonomics
 
 See [Vision](docs/permanent/VISION.md) for the longer-term direction.
+
+## Publishing to npm
+
+```bash
+npm login          # first time only
+npm version patch  # or minor / major
+npm publish        # runs npm run build automatically before publishing
+```
+
+Verify what gets included before publishing:
+
+```bash
+npm pack --dry-run
+```
+
+The build produces `dist/` (browser SPA) and `dist-cli/` (CLI bundle). Both are included in the published package. End users get a fast production server; contributors without a built `dist/` automatically fall back to the Vite dev server.
 
 ## Contributing
 
