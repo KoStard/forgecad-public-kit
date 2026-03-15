@@ -113,5 +113,30 @@ export interface EvalWorkerRunError {
   };
 }
 
-export type EvalWorkerRequest = EvalWorkerRunRequest;
-export type EvalWorkerResponse = EvalWorkerRunSuccess | EvalWorkerRunError;
+/** Request face names + histories for a specific object (on-demand, for face info panel). */
+export interface EvalWorkerFaceInfoRequest {
+  type: 'face-info';
+  payload: {
+    reqId: number;
+    objectId: string;
+  };
+}
+
+export interface EvalWorkerFaceInfoResult {
+  faceNames: string[];
+  faces: Record<string, FaceRef>;
+  faceHistories: Record<string, FaceTransformationHistory>;
+}
+
+export interface EvalWorkerFaceInfoSuccess {
+  type: 'face-info-success';
+  payload: { reqId: number; result: EvalWorkerFaceInfoResult };
+}
+
+export interface EvalWorkerFaceInfoError {
+  type: 'face-info-error';
+  payload: { reqId: number; message: string };
+}
+
+export type EvalWorkerRequest = EvalWorkerRunRequest | EvalWorkerFaceInfoRequest;
+export type EvalWorkerResponse = EvalWorkerRunSuccess | EvalWorkerRunError | EvalWorkerFaceInfoSuccess | EvalWorkerFaceInfoError;

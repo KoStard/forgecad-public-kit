@@ -1148,6 +1148,7 @@ export function CodeEditor() {
   const updateFileCode = useForgeStore((s) => s.updateFileCode);
   const execute = useForgeStore((s) => s.execute);
   const result = useForgeStore((s) => s.result);
+  const isEvaluating = useForgeStore((s) => s.isEvaluating);
   const loadFromText = useForgeStore((s) => s.loadFromText);
   const theme = useForgeStore((s) => s.theme);
   const saveFile = useForgeStore((s) => s.saveFile);
@@ -1229,7 +1230,7 @@ export function CodeEditor() {
           {result.error}
         </div>
       )}
-      {result && !result.error && (
+      {result && !result.error && !isEvaluating && (
         <div style={{ padding: '4px 12px', background: 'var(--fc-successBg)', color: 'var(--fc-success)', fontSize: 12, fontFamily: 'monospace' }}>
           ✓ {result.timeMs.toFixed(1)}ms
         </div>
