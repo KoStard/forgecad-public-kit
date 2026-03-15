@@ -1,6 +1,6 @@
 {
   "name": "forgecad",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Code-first parametric CAD for JavaScript/TypeScript, in the browser and CLI.",
   "license": "BUSL-1.1",
   "type": "module",
