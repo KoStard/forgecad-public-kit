@@ -46,7 +46,7 @@
   "dependencies": {
     "chokidar": "^4.0.0",
     "gifenc": "^1.0.3",
-    "manifold-3d": "^3.3.2",
+    "manifold-3d": "^3.4.0",
     "pngjs": "^7.0.0",
     "puppeteer-core": "^24.37.2",
     "typescript": "^5.8.3"

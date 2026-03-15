@@ -1,4 +1,4 @@
-import { Export3MF } from 'manifold-3d/lib/export-3mf.js';
+import { toArrayBuffer as export3mfToArrayBuffer } from 'manifold-3d/lib/export-3mf.js';
 import {
   GLTFNode,
   GLTFNodesToGLTFDoc,
@@ -182,12 +182,18 @@ export async function build3mfBlob(
       return node;
     });
 
-    const doc = GLTFNodesToGLTFDoc(nodes);
-    const exporter = new Export3MF();
-    exporter.title = escapeXml(options.title ?? exporter.title ?? 'ForgeCAD model');
-    exporter.application = escapeXml(options.application ?? 'ForgeCAD');
-    exporter.description = escapeXml(options.description ?? exporter.description ?? exporter.title);
-    const rawBlob = await exporter.asBlob(doc);
+    const doc = await GLTFNodesToGLTFDoc(nodes);
+    const title = escapeXml(options.title ?? 'ForgeCAD model');
+    const rawBuffer = await export3mfToArrayBuffer(doc, {
+      header: {
+        title,
+        application: escapeXml(options.application ?? 'ForgeCAD'),
+        description: escapeXml(options.description ?? title),
+      },
+    });
+    const rawBlob = new Blob([rawBuffer], {
+      type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
+    });
     return normalize3mfRelationshipTargets(rawBlob);
   } finally {
     cleanupSceneBuilder();
