@@ -1284,14 +1284,67 @@ const rightOnly = bracketB.child("Bracket Right").translate(200, 0, 0);
 return [bracketA, leftOnly, rightOnly];
 ```
 
-**When to use `importGroup` vs `importPart`:**
+### `importAssembly(fileName, paramOverrides?)`
+Executes another file and returns its result as an `ImportedAssembly`. The target file **must** return an `Assembly` instance directly (before calling `.solve()`). Use this when the source file is authored with `assembly()` and you want to access named parts or kinematic structure without rewriting it as a `group()`.
 
-| | `importPart` | `importGroup` |
-|---|---|---|
-| Source returns | `Shape` or `TrackedShape` | `ShapeGroup` via `group(...)` |
-| Result type | `Shape` — chainable, supports all boolean ops | `ShapeGroup` — children stay separate |
-| Access children | Not possible | `group.child("Name")` |
-| Placement refs | `.withReferences()` on the Shape | `.withReferences()` on the group |
+**Parameters:**
+- `fileName` (string) — Import path (e.g. `"./sub-arm.forge.js"`)
+- `paramOverrides` (optional object) — Import-time parameter overrides by param name
+
+**Returns:** `ImportedAssembly` with the following methods:
+- `.assembly` — the raw `Assembly` for `sweepJoint`, `describe`, etc.
+- `.solve(state?)` — delegate to `Assembly.solve()`, returns `SolvedAssembly`
+- `.part(name, state?)` — returns the named part positioned at the given joint state (defaults to each joint's `default` value)
+- `.toGroup(state?)` — converts all parts to a `ShapeGroup` with children named after the assembly part names
+
+```javascript
+// sub-arm.forge.js  ← the source file — returns Assembly, not solved
+const mech = assembly("Sub Arm")
+  .addPart("Base", box(60, 60, 16, true))
+  .addPart("Link", box(120, 20, 20).translate(0, -10, -10))
+  .addRevolute("shoulder", "Base", "Link", {
+    axis: [0, 1, 0],
+    min: -45,
+    max: 120,
+    default: 30,
+    frame: Transform.identity().translate(0, 0, 16),
+  });
+
+return mech;  // return Assembly directly
+```
+
+```javascript
+// scene.forge.js  ← the consumer
+const angle = param("Angle", 45, { unit: "°" });
+
+const subArm = importAssembly("sub-arm.forge.js", { "Link Length": 100 });
+
+// Access a specific part positioned at a given state
+const baseShape = subArm.part("Base");
+const linkShape = subArm.part("Link", { shoulder: angle });
+
+// Convert to a named ShapeGroup — children match assembly part names
+const asGroup = subArm.toGroup({ shoulder: angle });
+const base = asGroup.child("Base");
+
+// Full kinematic access via the underlying assembly
+const swept = subArm.assembly.sweepJoint("shoulder", -45, 120, 20);
+
+// Place two copies at different joint states
+const copy1 = subArm.toGroup({ shoulder: 45 });
+const copy2 = subArm.toGroup({ shoulder: -20 }).translate(200, 0, 0);
+return [copy1, copy2];
+```
+
+**When to use `importGroup` vs `importAssembly`:**
+
+| | `importPart` | `importGroup` | `importAssembly` |
+|---|---|---|---|
+| Source returns | `Shape` or `TrackedShape` | `ShapeGroup` via `group(...)` | `Assembly` (unsolved) |
+| Result type | `Shape` | `ShapeGroup` | `ImportedAssembly` |
+| Access children | Not possible | `.child("Name")` | `.part("Name", state?)` or `.toGroup().child("Name")` |
+| Kinematic access | None | None | `.solve()`, `.assembly.sweepJoint()` |
+| Multiple poses | No | No | Yes — call `.toGroup(state)` with different states |
 
 ### Import Rules
 - Circular imports are detected and throw an error
@@ -1301,6 +1354,7 @@ return [bracketA, leftOnly, rightOnly];
 - Relative imports (`./` / `../`) are resolved from the current file path
 - `importPart()` accepts `Shape` or `TrackedShape` results and always returns a chainable `Shape`
 - `importGroup()` accepts only `ShapeGroup` results; use `group(...)` as the return value in the source file
+- `importAssembly()` accepts only `Assembly` results; return the `assembly(...)` instance before calling `.solve()`
 - Source files can attach placement references with `.withReferences({ points, edges, surfaces, objects })` — works on both `Shape` and `ShapeGroup`
 - Imported tracked solids keep their named faces/edges as `surfaces.<faceName>` and `edges.<edgeName>` references
 - SVG import supports deterministic region filtering (`regionSelection`, `maxRegions`, area thresholds)

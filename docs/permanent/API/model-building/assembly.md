@@ -131,9 +131,50 @@ show(solved.toScene());
 
 That keeps mechanism setup in earlier cells and collision/sweep investigation in the current preview cell.
 
+## Importing assemblies from other files
+
+Use `importAssembly(fileName, paramOverrides?)` to import an assembly defined in another file. The source file must `return` the `Assembly` instance directly (not `.solve()`).
+
+```javascript
+// arm.forge.js — source file
+const mech = assembly("Arm")
+  .addPart("Base", box(80, 80, 20, true))
+  .addPart("Link", box(140, 24, 24).translate(0, -12, -12))
+  .addRevolute("shoulder", "Base", "Link", {
+    axis: [0, 1, 0],
+    min: -30,
+    max: 120,
+    default: 25,
+    frame: Transform.identity().translate(0, 0, 20),
+  });
+
+return mech; // return Assembly, not mech.solve()
+```
+
+```javascript
+// scene.forge.js — consumer
+const arm = importAssembly("arm.forge.js");
+
+// Access named parts by name (positioned at default or given joint state)
+const base = arm.part("Base");
+const link = arm.part("Link", { shoulder: 60 });
+
+// Convert to a ShapeGroup — children named after assembly part names
+const g = arm.toGroup({ shoulder: 45 });
+const baseChild = g.child("Base");
+
+// Full kinematic access
+arm.assembly.sweepJoint("shoulder", -30, 120, 24);
+const solved = arm.solve({ shoulder: 45 });
+console.log(solved.bom());
+
+return arm.toGroup({ shoulder: 45 });
+```
+
 ## Common pitfalls
 - If parts vanish in the viewport, check whether a cut plane is active before debugging kinematics. The viewer-side APIs live in [../runtime/viewport.md](../runtime/viewport.md).
 - If a returned object is empty, Forge logs a warning in script output.
+- `importAssembly()` requires the source file to return the `Assembly` object before calling `.solve()`. If you call `.solve()` in the source file and return a `SolvedAssembly`, use `importGroup()` instead (convert with `.toScene()` → group).
 
 ## Metadata
 - `addPart(..., { metadata })` attaches per-part metadata to an assembly part.
