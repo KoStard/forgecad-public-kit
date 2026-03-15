@@ -9,6 +9,7 @@
 import type { RunResult, SceneObject } from './runner';
 import { getSketchPlacement3D } from './sketch/core';
 import { isConstraintSketch, ConstraintSketch } from './sketch/constraints';
+import { computeGeometryArrays } from './geometryArrays';
 import type {
   SerializedRunResult,
   SerializedSceneObject,
@@ -51,6 +52,17 @@ function serializeShape(obj: SceneObject): SerializedShapeData | null {
       }
     }
 
+    const numTriangles = shape.numTri();
+    const { positions: geometryPositions, normals: geometryNormals, edgePositions: geometryEdgePositions } =
+      computeGeometryArrays({
+        numProp: rawMesh.numProp,
+        numTri: numTriangles,
+        triVerts: meshTriVerts,
+        vertProperties: meshVertProperties,
+        mergeFromVert: meshMergeFromVert.length > 0 ? meshMergeFromVert : undefined,
+        mergeToVert: meshMergeToVert.length > 0 ? meshMergeToVert : undefined,
+      });
+
     return {
       meshNumProp: rawMesh.numProp,
       meshTriVerts,
@@ -58,12 +70,15 @@ function serializeShape(obj: SceneObject): SerializedShapeData | null {
       meshMergeFromVert,
       meshMergeToVert,
       boundingBox,
-      numTriangles: shape.numTri(),
+      numTriangles,
       faceNames,
       faces,
       faceHistories,
       colorHex: shape.colorHex ?? null,
       geometryInfo: obj.geometryInfo ?? null,
+      geometryPositions,
+      geometryNormals,
+      geometryEdgePositions,
     };
   } catch {
     return null;
@@ -135,6 +150,9 @@ export function serializeRunResult(result: RunResult): {
         serialized.shapeData.meshVertProperties.buffer,
         serialized.shapeData.meshMergeFromVert.buffer,
         serialized.shapeData.meshMergeToVert.buffer,
+        serialized.shapeData.geometryPositions.buffer,
+        serialized.shapeData.geometryNormals.buffer,
+        serialized.shapeData.geometryEdgePositions.buffer,
       );
     }
     return serialized;

@@ -3,22 +3,44 @@
  *
  * Converts Manifold mesh data into Three.js BufferGeometry.
  * Shared between the browser Viewport and the CLI renderer.
+ *
+ * Fast path: if the shape is a FrozenShape with pre-computed arrays from the
+ * eval worker, geometry assembly is zero-CPU — just wraps existing TypedArrays
+ * in BufferAttribute. No triangle loop, no EdgesGeometry computation.
+ *
+ * Fallback: computes positions/normals inline and runs EdgesGeometry for live
+ * shapes evaluated directly on the main thread (e.g. notebook cells).
  */
 
 import * as THREE from 'three';
 import type { Shape } from './kernel';
+import { FrozenShape } from './frozenShape';
 
 export interface ForgeGeometry {
   solid: THREE.BufferGeometry;
   edges: THREE.BufferGeometry;
 }
 
-/**
- * Build flat-shaded geometry + edge wireframe from a Shape.
- * Each triangle gets its own vertices with the face normal (non-indexed)
- * so Three.js renders proper CAD-style flat shading.
- */
 export function shapeToGeometry(shape: Shape): ForgeGeometry {
+  // Fast path: pre-computed arrays from the eval worker
+  if (shape instanceof FrozenShape) {
+    const { positions, normals, edgePositions } = shape.getPrecomputedGeometry();
+
+    const solid = new THREE.BufferGeometry();
+    solid.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    solid.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+
+    const edges = new THREE.BufferGeometry();
+    edges.setAttribute('position', new THREE.BufferAttribute(edgePositions, 3));
+
+    return { solid, edges };
+  }
+
+  // Fallback: compute from mesh (live shapes, main-thread eval)
+  return shapeToGeometryFallback(shape);
+}
+
+function shapeToGeometryFallback(shape: Shape): ForgeGeometry {
   const mesh = shape.getMesh();
   const numProp = mesh.numProp;
   const triCount = mesh.numTri;
