@@ -10,12 +10,14 @@
 import type { RunResult, SceneObject } from './runner';
 import { FrozenShape } from './frozenShape';
 import { FrozenSketch, FrozenConstraintSketch } from './frozenSketch';
+import { setShapeCompilePlan } from './kernel';
 import type { SerializedRunResult, SerializedSceneObject } from '../workers/evalWorkerProtocol';
 
 function deserializeSceneObject(s: SerializedSceneObject): SceneObject {
   let shape = null;
   if (s.shapeData) {
     shape = new FrozenShape(s.shapeData);
+    if (s.compilePlan) setShapeCompilePlan(shape, s.compilePlan);
   }
 
   let sketch = null;

@@ -9,6 +9,7 @@ import {
   isConstraintSketch,
   updateConstraintValue,
 } from '@forge/index';
+import type { ShapeCompilePlan } from '../forge/compilePlan';
 import { setParamOverrides } from '@forge/params';
 import projectFiles from 'virtual:forge-project';
 import { isNotebookFile, serializeNotebook, createNotebook } from '../notebook/model';
@@ -283,6 +284,8 @@ interface ForgeStore {
   setObjectColor: (id: string, color: string) => void;
   selectedObjectId: string | null;
   selectObject: (id: string | null) => void;
+  constructionGhost: { plan: ShapeCompilePlan; objectId: string } | null;
+  setConstructionGhost: (ghost: { plan: ShapeCompilePlan; objectId: string } | null) => void;
   focusedObjectIds: string[];
   focusObject: (id: string | null, options?: { additive?: boolean }) => void;
   clearFocusedObject: () => void;
@@ -1183,7 +1186,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     };
   }),
   selectedObjectId: null,
-  selectObject: (id) => set({ selectedObjectId: id }),
+  selectObject: (id) => set({ selectedObjectId: id, constructionGhost: null }),
+  constructionGhost: null,
+  setConstructionGhost: (ghost) => set({ constructionGhost: ghost }),
   focusedObjectIds: [],
   focusObject: (id, options) => set((state) => {
     if (!id) return { focusedObjectIds: [] };
