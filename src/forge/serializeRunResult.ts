@@ -19,7 +19,13 @@ import type {
 
 interface ShapeTimings {
   getMeshMs: number;
+  copyMs: number;
+  bbMs: number;
+  faceNamesMs: number;
+  faceHistoryMs: number;
+  numFaces: number;
   geomArraysMs: number;
+  sketchMs: number;
 }
 
 function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShapeData | null {
@@ -27,26 +33,34 @@ function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShap
   if (!shape) return null;
 
   try {
-    const t0 = performance.now();
+    let t = performance.now();
     const rawMesh = shape.getMesh();
-    timings.getMeshMs += performance.now() - t0;
+    timings.getMeshMs += performance.now() - t;
 
-    // Copy TypedArrays out of WASM memory before they can be freed
+    t = performance.now();
     const meshTriVerts = new Uint32Array(rawMesh.triVerts);
     const meshVertProperties = new Float32Array(rawMesh.vertProperties);
     const meshMergeFromVert = new Uint32Array(rawMesh.mergeFromVert ?? new Uint32Array(0));
     const meshMergeToVert = new Uint32Array(rawMesh.mergeToVert ?? new Uint32Array(0));
+    timings.copyMs += performance.now() - t;
 
+    t = performance.now();
     const bb = shape.boundingBox();
+    timings.bbMs += performance.now() - t;
+
     const boundingBox = {
       min: [bb.min[0], bb.min[1], bb.min[2]] as [number, number, number],
       max: [bb.max[0], bb.max[1], bb.max[2]] as [number, number, number],
     };
 
+    t = performance.now();
     const faceNames = shape.faceNames();
+    timings.faceNamesMs += performance.now() - t;
+
     const faces: SerializedShapeData['faces'] = {};
     const faceHistories: SerializedShapeData['faceHistories'] = {};
 
+    t = performance.now();
     for (const name of faceNames) {
       try {
         const faceRef = shape.face(name);
@@ -58,6 +72,8 @@ function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShap
         // Skip faces that can't be resolved
       }
     }
+    timings.faceHistoryMs += performance.now() - t;
+    timings.numFaces += faceNames.length;
 
     const numTriangles = shape.numTri();
 
@@ -137,15 +153,22 @@ export function serializeRunResult(result: RunResult): {
   transferables: Transferable[];
 } {
   const transferables: Transferable[] = [];
-  const timings: ShapeTimings = { getMeshMs: 0, geomArraysMs: 0 };
+  const timings: ShapeTimings = {
+    getMeshMs: 0, copyMs: 0, bbMs: 0,
+    faceNamesMs: 0, faceHistoryMs: 0, numFaces: 0,
+    geomArraysMs: 0, sketchMs: 0,
+  };
 
   const objects = result.objects.map((obj) => {
     const shapeData = serializeShape(obj, timings);
+    const tSketch = performance.now();
+    const sketchData = serializeSketch(obj);
+    timings.sketchMs += performance.now() - tSketch;
     const serialized: SerializedSceneObject = {
       id: obj.id,
       name: obj.name,
       shapeData,
-      sketchData: serializeSketch(obj),
+      sketchData,
       color: obj.color,
       geometryInfo: obj.geometryInfo,
       sketchMeta: (obj as any).sketchMeta,
@@ -167,7 +190,14 @@ export function serializeRunResult(result: RunResult): {
   });
 
   console.log(
-    `[serialize] ${result.objects.length} objects — getMesh=${timings.getMeshMs.toFixed(0)}ms  geomArrays=${timings.geomArraysMs.toFixed(0)}ms`,
+    `[serialize] ${result.objects.length} obj, ${timings.numFaces} faces` +
+    ` | getMesh=${timings.getMeshMs.toFixed(0)}ms` +
+    ` copy=${timings.copyMs.toFixed(0)}ms` +
+    ` bb=${timings.bbMs.toFixed(0)}ms` +
+    ` faceNames=${timings.faceNamesMs.toFixed(0)}ms` +
+    ` faceHistory=${timings.faceHistoryMs.toFixed(0)}ms` +
+    ` geomArrays=${timings.geomArraysMs.toFixed(0)}ms` +
+    ` sketch=${timings.sketchMs.toFixed(0)}ms`,
   );
 
   const serialized: SerializedRunResult = {
