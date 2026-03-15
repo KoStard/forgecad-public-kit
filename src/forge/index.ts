@@ -70,6 +70,7 @@ export type {
   CollisionOptions,
   CollisionFinding,
   JointSweepFrame,
+  MergeIntoOptions,
   RobotLinkExportOptions,
   RobotJointExportOptions,
   RobotDiffDrivePluginOptions,

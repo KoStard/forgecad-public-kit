@@ -78,6 +78,7 @@ export type {
   CollisionOptions,
   CollisionFinding,
   JointSweepFrame,
+  MergeIntoOptions,
 } from './assembly';
 export { robotExport, resetRobotExport, getCollectedRobotExport } from './robotExport';
 export type {

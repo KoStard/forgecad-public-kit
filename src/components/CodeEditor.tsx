@@ -737,6 +737,18 @@ declare class Assembly {
 declare function assembly(name?: string): Assembly;
 /** Import an assembly from another file. The file must return an Assembly instance (before calling .solve()). */
 declare function importAssembly(fileName: string, paramOverrides?: Record<string, number>): ImportedAssembly;
+type MergeIntoOptions = {
+  /** Prefix for all part/joint names from the sub-assembly. E.g. "Left Arm" turns "Base" into "Left Arm.Base". */
+  prefix?: string;
+  /** Part name in the parent assembly to attach the sub-assembly root to. */
+  mountParent: string;
+  /** Name for the new mount joint in the parent graph. */
+  mountJoint: string;
+  /** Joint type for the mount connection (default: 'fixed'). */
+  mountType?: AssemblyJointType;
+  /** Frame, axis, limits, and other options for the mount joint. */
+  mountOptions?: AssemblyJointOptions;
+};
 declare class ImportedAssembly {
   /** The underlying Assembly — use for sweepJoint, describe, etc. */
   readonly assembly: Assembly;
@@ -752,6 +764,13 @@ declare class ImportedAssembly {
   referenceNames(): string[];
   /** Translate so the named reference point lands on target. Returns a new ImportedAssembly. */
   placeReference(ref: string, target: [number, number, number], offset?: [number, number, number]): ImportedAssembly;
+  /**
+   * Flatten this sub-assembly's parts and joints into parent, then wire a mount joint
+   * from mountParent to the sub-assembly root. All names are prefixed with options.prefix.
+   * After merging you can drive sub-assembly joints from the parent:
+   * parent.solve({ "Left Arm.shoulder": 45 })
+   */
+  mergeInto(parent: Assembly, options: MergeIntoOptions): Assembly;
 }
 
 // --- 3D Advanced ---
