@@ -26,7 +26,9 @@ worker.onmessage = async (event) => {
   const { seq, code, file, files, quality, paramOverrides, isNotebook } = data.payload;
 
   try {
+    const t0 = performance.now();
     await ensureKernelReady();
+    const tKernel = performance.now();
 
     setParamOverrides(paramOverrides);
 
@@ -38,8 +40,14 @@ worker.onmessage = async (event) => {
     } else {
       runResult = runScript(code, file, files, { quality });
     }
+    const tRun = performance.now();
 
     const { serialized, transferables } = serializeRunResult(runResult);
+    const tSerialize = performance.now();
+
+    console.log(
+      `[worker] kernelInit=${(tKernel - t0).toFixed(0)}ms  run=${(tRun - tKernel).toFixed(0)}ms  serialize=${(tSerialize - tRun).toFixed(0)}ms  total=${(tSerialize - t0).toFixed(0)}ms`,
+    );
 
     worker.postMessage(
       { type: 'run-success', payload: { seq, result: serialized } },
