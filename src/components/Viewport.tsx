@@ -1482,12 +1482,14 @@ function ForgeObject({
         />
       ))}
       {showWire && edgesGeo && (
-        <lineSegments geometry={edgesGeo}>
+        // raycast disabled: edge lines are visual only; line raycasting at oblique angles
+        // can report a smaller t-value than the frontmost solid mesh, causing wrong hover picks.
+        <lineSegments geometry={edgesGeo} raycast={() => null}>
           <lineBasicMaterial color={settings.color} transparent={meshOpacity < 1} opacity={meshOpacity} clippingPlanes={fallbackSolidClippingPlanes} />
         </lineSegments>
       )}
       {showEdges && edgesGeo && (
-        <lineSegments geometry={edgesGeo}>
+        <lineSegments geometry={edgesGeo} raycast={() => null}>
           <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={Math.min(1, meshOpacity + 0.1)} clippingPlanes={fallbackSolidClippingPlanes} />
         </lineSegments>
       )}
@@ -2098,19 +2100,21 @@ function SketchObject({
         <primitive
           key={i}
           object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: constraintColor, linewidth: 1, transparent: true, opacity: settings.opacity }))}
+          raycast={() => null}
         />
       ))}
       {pointGeos.map((geo, i) => (
         <primitive
           key={`pt-${i}`}
           object={new THREE.Points(geo, new THREE.PointsMaterial({ color: constraintColor, size: 5 }))}
+          raycast={() => null}
         />
       ))}
       {constructionLines.map((line, i) => (
-        <primitive key={`cl-${i}`} object={line} />
+        <primitive key={`cl-${i}`} object={line} raycast={() => null} />
       ))}
       {constructionCircles.map((circle, i) => (
-        <primitive key={`cc-${i}`} object={circle} />
+        <primitive key={`cc-${i}`} object={circle} raycast={() => null} />
       ))}
       {constraintSprites.map((sprite) => (
         <sprite key={sprite.id} position={sprite.position} scale={sprite.scale}>
@@ -3624,7 +3628,9 @@ export function Viewport() {
     setHoveredObjectId(obj.id);
     const hoverName = resolveHoverObjectName(obj.name, knownFileNames);
     if (!hoverName) {
-      hideHoverTooltip(obj.id);
+      // Pass no ID so the guard in hideHoverTooltip doesn't block clearing a stale tooltip
+      // that belongs to a different (now-occluded) object.
+      hideHoverTooltip();
       return;
     }
     const rect = containerRef.current?.getBoundingClientRect();
