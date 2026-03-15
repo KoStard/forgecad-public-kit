@@ -17,12 +17,19 @@ import type {
   SerializedSketchData,
 } from '../workers/evalWorkerProtocol';
 
-function serializeShape(obj: SceneObject): SerializedShapeData | null {
+interface ShapeTimings {
+  getMeshMs: number;
+  geomArraysMs: number;
+}
+
+function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShapeData | null {
   const { shape } = obj;
   if (!shape) return null;
 
   try {
+    const t0 = performance.now();
     const rawMesh = shape.getMesh();
+    timings.getMeshMs += performance.now() - t0;
 
     // Copy TypedArrays out of WASM memory before they can be freed
     const meshTriVerts = new Uint32Array(rawMesh.triVerts);
@@ -53,6 +60,8 @@ function serializeShape(obj: SceneObject): SerializedShapeData | null {
     }
 
     const numTriangles = shape.numTri();
+
+    const tGeom = performance.now();
     const { positions: geometryPositions, normals: geometryNormals, edgePositions: geometryEdgePositions } =
       computeGeometryArrays({
         numProp: rawMesh.numProp,
@@ -62,6 +71,7 @@ function serializeShape(obj: SceneObject): SerializedShapeData | null {
         mergeFromVert: meshMergeFromVert.length > 0 ? meshMergeFromVert : undefined,
         mergeToVert: meshMergeToVert.length > 0 ? meshMergeToVert : undefined,
       });
+    timings.geomArraysMs += performance.now() - tGeom;
 
     return {
       meshNumProp: rawMesh.numProp,
@@ -117,20 +127,6 @@ function serializeSketch(obj: SceneObject): SerializedSketchData | null {
   }
 }
 
-function serializeSceneObject(obj: SceneObject): SerializedSceneObject {
-  return {
-    id: obj.id,
-    name: obj.name,
-    shapeData: serializeShape(obj),
-    sketchData: serializeSketch(obj),
-    color: obj.color,
-    geometryInfo: obj.geometryInfo,
-    sketchMeta: (obj as any).sketchMeta,
-    groupName: obj.groupName,
-    treePath: obj.treePath,
-  };
-}
-
 /**
  * Extract all transferable data from a RunResult.
  * Returns the serialized result AND a list of all TypedArray buffers
@@ -141,9 +137,21 @@ export function serializeRunResult(result: RunResult): {
   transferables: Transferable[];
 } {
   const transferables: Transferable[] = [];
+  const timings: ShapeTimings = { getMeshMs: 0, geomArraysMs: 0 };
 
   const objects = result.objects.map((obj) => {
-    const serialized = serializeSceneObject(obj);
+    const shapeData = serializeShape(obj, timings);
+    const serialized: SerializedSceneObject = {
+      id: obj.id,
+      name: obj.name,
+      shapeData,
+      sketchData: serializeSketch(obj),
+      color: obj.color,
+      geometryInfo: obj.geometryInfo,
+      sketchMeta: (obj as any).sketchMeta,
+      groupName: obj.groupName,
+      treePath: obj.treePath,
+    };
     if (serialized.shapeData) {
       transferables.push(
         serialized.shapeData.meshTriVerts.buffer,
@@ -157,6 +165,10 @@ export function serializeRunResult(result: RunResult): {
     }
     return serialized;
   });
+
+  console.log(
+    `[serialize] ${result.objects.length} objects — getMesh=${timings.getMeshMs.toFixed(0)}ms  geomArrays=${timings.geomArraysMs.toFixed(0)}ms`,
+  );
 
   const serialized: SerializedRunResult = {
     objects,
