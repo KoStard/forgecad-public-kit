@@ -1,6 +1,6 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { resolvePackagePath } from './package-runtime';
 
 export async function runSkillInstallCli(_argv: string[] = []): Promise<void> {
@@ -28,4 +28,27 @@ export async function runSkillInstallCli(_argv: string[] = []): Promise<void> {
 
   console.log(`ForgeCAD skill installed to ${dest}`);
   console.log(`Reload your agent (Claude Code, Codex, OpenCode, …) to activate.`);
+}
+
+export async function runSkillOneFileCli(argv: string[] = []): Promise<void> {
+  const outputArg = argv.find((a) => !a.startsWith('-'));
+  if (!outputArg) {
+    throw new Error(
+      `Usage: forgecad skill one-file <output-path>\n` +
+        `Example: forgecad skill one-file ~/Desktop/forgecad-context.md`,
+    );
+  }
+
+  const src = resolvePackagePath(import.meta.url, 'dist-skill', 'CONTEXT.md');
+  if (!existsSync(src)) {
+    throw new Error(
+      `Built context file not found at ${src}.\n` +
+        `If you are running from a source checkout, run: npm run build:skill:forgecad`,
+    );
+  }
+
+  const dest = resolve(outputArg);
+  writeFileSync(dest, readFileSync(src));
+  console.log(`ForgeCAD context written to ${dest}`);
+  console.log(`Paste the contents into any AI chat UI (Claude.ai, ChatGPT, Gemini, …) to get full ForgeCAD API knowledge.`);
 }

@@ -234,6 +234,73 @@ ${renderDocGroupsForInstall(docGroups)}
 }
 
 // ---------------------------------------------------------------------------
+// One-file CONTEXT.md — all docs inlined, designed for chat-UI paste
+// ---------------------------------------------------------------------------
+
+const oneFileOutputPath = path.join(repoRoot, "dist-skill/CONTEXT.md");
+
+function buildOneFileContent() {
+  const docSections = allDocs
+    .map((docPath) => {
+      const content = readDoc(docPath);
+      const label = normalizePath(docPath.replace(/^docs\/permanent\//, ""));
+      return `<!-- ${label} -->\n\n${content}`;
+    })
+    .join("\n\n---\n\n");
+
+  return `# ForgeCAD — AI Context (Chat UI)
+
+> **Usage:** Paste this file as context into your AI chat session (Claude.ai, ChatGPT, Gemini, etc.).
+> The AI will have full ForgeCAD API knowledge and will guide you through building models.
+>
+> **No CLI access in this session.** The AI cannot run commands directly. Instead, it will ask
+> you to run commands like \`forgecad run <file>\` or \`forgecad notebook view <file> preview\`
+> in your terminal and paste back the output for verification and iteration.
+
+## Workflow
+
+1. Tell the AI what you want to build and share any existing \`.forge.js\` or \`.forge-notebook.json\` files.
+2. The AI will write or edit model files for you.
+3. To validate, run \`forgecad run <file>\` in your terminal and paste the output.
+4. For notebooks: \`forgecad notebook view <file> preview\` shows the current geometry description.
+5. Iterate until the model looks right, then optionally \`forgecad render <file>\` for a PNG.
+
+---
+
+## ForgeCAD API Reference
+
+Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workflows.
+Prefer documented primitives, import rules, and placement strategies over inventing new APIs.
+
+### Model files
+
+- \`.forge.js\` — parametric part or assembly script; default export is a \`Shape\` or \`Assembly\`.
+- \`.sketch.js\` — 2D sketch script; default export is a \`Sketch\`.
+- \`.forge-notebook.json\` — multi-cell notebook for iterative work; preview cell is the active output.
+
+### Import and composition
+
+- \`importPart()\` for parts, \`importSketch()\` for sketches/SVGs, with explicit \`paramOverrides\`.
+- \`.withReferences()\` + \`.placeReference()\` for reusable placement.
+- Plain \`.js\` modules for shared helpers/constants (not model imports).
+
+### Validation commands (ask the user to run these)
+
+\`\`\`
+forgecad run <file.forge.js>                          # geometry diagnostics
+forgecad run <file.forge-notebook.json>               # preview-cell diagnostics
+forgecad notebook view <file.forge-notebook.json> preview   # inspect notebook output
+forgecad render <file.forge.js>                       # PNG render
+forgecad capture gif <file.forge.js>                  # animated orbit GIF
+\`\`\`
+
+---
+
+${docSections}
+`;
+}
+
+// ---------------------------------------------------------------------------
 // Run
 // ---------------------------------------------------------------------------
 
@@ -248,5 +315,8 @@ console.log(`Wrote ${installOutputPath}`);
 
 cpSync(sourceDocsDir, installDocsOutputDir, { recursive: true });
 console.log(`Copied docs -> ${installDocsOutputDir}`);
+
+writeFileSync(oneFileOutputPath, buildOneFileContent());
+console.log(`Wrote ${oneFileOutputPath}`);
 
 console.log(`Indexed ${allDocs.length} source files.`);

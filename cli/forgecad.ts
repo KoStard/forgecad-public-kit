@@ -32,7 +32,7 @@ import { isDirectCliRun, resolvePackagePath } from './package-runtime';
 import { runParamCheckCli } from './param-check';
 import { runScriptCli } from './test-run';
 import { runDebugDimensionsCli } from './debug-dimensions';
-import { runSkillInstallCli } from './forge-skill';
+import { runSkillInstallCli, runSkillOneFileCli } from './forge-skill';
 
 type CommandDefinition = {
   group: 'Studio' | 'Shell' | 'Modeling' | 'Export' | 'Checks' | 'Debug';
@@ -215,6 +215,22 @@ const commands: CommandDefinition[] = [
     usage: ['forgecad skill install'],
     examples: ['forgecad skill install'],
     run: runSkillInstallCli,
+  },
+  {
+    group: 'Shell',
+    path: ['skill', 'one-file'],
+    summary: 'Write a single self-contained context file with all ForgeCAD docs for pasting into a chat UI (Claude.ai, ChatGPT, …).',
+    usage: ['forgecad skill one-file <output-path>'],
+    examples: [
+      'forgecad skill one-file ~/Desktop/forgecad-context.md',
+      'forgecad skill one-file ./forgecad-context.md',
+    ],
+    completion: {
+      positionals: [
+        { description: 'output path for the context file', valueKind: 'path' },
+      ],
+    },
+    run: runSkillOneFileCli,
   },
   {
     group: 'Shell',
