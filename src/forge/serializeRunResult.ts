@@ -17,42 +17,49 @@ import type {
   SerializedSketchData,
 } from '../workers/evalWorkerProtocol';
 
-function serializeShape(obj: SceneObject): SerializedShapeData | null {
+interface ShapeTimings {
+  getMeshMs: number;
+  copyMs: number;
+  bbMs: number;
+  geomArraysMs: number;
+  sketchMs: number;
+}
+
+function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShapeData | null {
   const { shape } = obj;
   if (!shape) return null;
 
   try {
+    let t = performance.now();
     const rawMesh = shape.getMesh();
+    timings.getMeshMs += performance.now() - t;
 
-    // Copy TypedArrays out of WASM memory before they can be freed
+    t = performance.now();
     const meshTriVerts = new Uint32Array(rawMesh.triVerts);
     const meshVertProperties = new Float32Array(rawMesh.vertProperties);
     const meshMergeFromVert = new Uint32Array(rawMesh.mergeFromVert ?? new Uint32Array(0));
     const meshMergeToVert = new Uint32Array(rawMesh.mergeToVert ?? new Uint32Array(0));
+    timings.copyMs += performance.now() - t;
 
+    t = performance.now();
     const bb = shape.boundingBox();
+    timings.bbMs += performance.now() - t;
+
     const boundingBox = {
       min: [bb.min[0], bb.min[1], bb.min[2]] as [number, number, number],
       max: [bb.max[0], bb.max[1], bb.max[2]] as [number, number, number],
     };
 
-    const faceNames = shape.faceNames();
+    // Face names, refs, and histories are only needed for the face info panel
+    // (right-click → face info). Skip during serialization — computed on demand
+    // via a separate worker request when the panel is opened.
+    const faceNames: string[] = [];
     const faces: SerializedShapeData['faces'] = {};
     const faceHistories: SerializedShapeData['faceHistories'] = {};
 
-    for (const name of faceNames) {
-      try {
-        const faceRef = shape.face(name);
-        if (faceRef) {
-          faces[name] = faceRef;
-          faceHistories[name] = shape.faceHistory(name);
-        }
-      } catch {
-        // Skip faces that can't be resolved
-      }
-    }
-
     const numTriangles = shape.numTri();
+
+    const tGeom = performance.now();
     const { positions: geometryPositions, normals: geometryNormals, edgePositions: geometryEdgePositions } =
       computeGeometryArrays({
         numProp: rawMesh.numProp,
@@ -62,6 +69,7 @@ function serializeShape(obj: SceneObject): SerializedShapeData | null {
         mergeFromVert: meshMergeFromVert.length > 0 ? meshMergeFromVert : undefined,
         mergeToVert: meshMergeToVert.length > 0 ? meshMergeToVert : undefined,
       });
+    timings.geomArraysMs += performance.now() - tGeom;
 
     return {
       meshNumProp: rawMesh.numProp,
@@ -117,20 +125,6 @@ function serializeSketch(obj: SceneObject): SerializedSketchData | null {
   }
 }
 
-function serializeSceneObject(obj: SceneObject): SerializedSceneObject {
-  return {
-    id: obj.id,
-    name: obj.name,
-    shapeData: serializeShape(obj),
-    sketchData: serializeSketch(obj),
-    color: obj.color,
-    geometryInfo: obj.geometryInfo,
-    sketchMeta: (obj as any).sketchMeta,
-    groupName: obj.groupName,
-    treePath: obj.treePath,
-  };
-}
-
 /**
  * Extract all transferable data from a RunResult.
  * Returns the serialized result AND a list of all TypedArray buffers
@@ -141,9 +135,24 @@ export function serializeRunResult(result: RunResult): {
   transferables: Transferable[];
 } {
   const transferables: Transferable[] = [];
+  const timings: ShapeTimings = { getMeshMs: 0, copyMs: 0, bbMs: 0, geomArraysMs: 0, sketchMs: 0 };
 
   const objects = result.objects.map((obj) => {
-    const serialized = serializeSceneObject(obj);
+    const shapeData = serializeShape(obj, timings);
+    const tSketch = performance.now();
+    const sketchData = serializeSketch(obj);
+    timings.sketchMs += performance.now() - tSketch;
+    const serialized: SerializedSceneObject = {
+      id: obj.id,
+      name: obj.name,
+      shapeData,
+      sketchData,
+      color: obj.color,
+      geometryInfo: obj.geometryInfo,
+      sketchMeta: (obj as any).sketchMeta,
+      groupName: obj.groupName,
+      treePath: obj.treePath,
+    };
     if (serialized.shapeData) {
       transferables.push(
         serialized.shapeData.meshTriVerts.buffer,
@@ -157,6 +166,15 @@ export function serializeRunResult(result: RunResult): {
     }
     return serialized;
   });
+
+  console.log(
+    `[serialize] ${result.objects.length} obj` +
+    ` | getMesh=${timings.getMeshMs.toFixed(0)}ms` +
+    ` copy=${timings.copyMs.toFixed(0)}ms` +
+    ` bb=${timings.bbMs.toFixed(0)}ms` +
+    ` geomArrays=${timings.geomArraysMs.toFixed(0)}ms` +
+    ` sketch=${timings.sketchMs.toFixed(0)}ms`,
+  );
 
   const serialized: SerializedRunResult = {
     objects,

@@ -3,6 +3,7 @@ import { useForgeStore } from '../store/forgeStore';
 
 export function ParamPanel() {
   const params = useForgeStore((s) => s.params);
+  const paramOverrides = useForgeStore((s) => s.paramOverrides);
   const setParam = useForgeStore((s) => s.setParam);
   const resetParams = useForgeStore((s) => s.resetParamOverrides);
   const [collapsed, setCollapsed] = useState(false);
@@ -57,14 +58,17 @@ export function ParamPanel() {
       {!collapsed && (
         <div style={{ overflowY: 'auto', padding: '0 12px 8px' }}>
           {params.map((p) => {
-            const isChanged = p.value !== p.defaultValue;
+            // Use the in-flight override if present — makes the slider feel instant
+            // even while the model is still evaluating.
+            const displayValue = paramOverrides[p.name] ?? p.value;
+            const isChanged = displayValue !== p.defaultValue;
             return (
               <div key={p.name} style={{ marginBottom: 6 }}>
                 {p.boolean ? (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={p.value === 1}
+                      checked={displayValue === 1}
                       onChange={(e) => setParam(p.name, e.target.checked ? 1 : 0)}
                       style={{ accentColor: 'var(--fc-accent)' }}
                     />
@@ -79,7 +83,7 @@ export function ParamPanel() {
                         {p.name}
                       </span>
                       <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
-                        {p.value}{p.unit ? ` ${p.unit}` : ''}
+                        {displayValue}{p.unit ? ` ${p.unit}` : ''}
                       </span>
                     </div>
                     <input
@@ -87,7 +91,7 @@ export function ParamPanel() {
                       min={p.min}
                       max={p.max}
                       step={p.step}
-                      value={p.value}
+                      value={displayValue}
                       onChange={(e) => {
                         const v = parseFloat(e.target.value);
                         setParam(p.name, p.integer ? Math.round(v) : v);

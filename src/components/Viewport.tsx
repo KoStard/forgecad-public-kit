@@ -37,6 +37,8 @@ import {
 import { parseViewportCameraState, type ViewportCameraState } from '../capture/cameraState';
 import { getShortcutKey, hasPrimaryModifier } from '../editorShortcuts';
 import { themes } from '../theme';
+import { evalWorkerClient } from '../workers/evalWorkerClient';
+import type { EvalWorkerFaceInfoResult } from '../workers/evalWorkerProtocol';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
@@ -3486,7 +3488,9 @@ export function Viewport() {
   const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
   const [isViewportInteracting, setIsViewportInteracting] = useState(false);
   const [objectContextMenu, setObjectContextMenu] = useState<ObjectContextMenuState | null>(null);
-  const [faceInfoPanel, setFaceInfoPanel] = useState<{ objectId: string; faceName: string; x: number; y: number } | null>(null);
+  const [faceInfoPanel, setFaceInfoPanel] = useState<{ objectId: string; faceName: string | null; hitNormal: [number, number, number] | null; x: number; y: number } | null>(null);
+  const [faceInfoData, setFaceInfoData] = useState<EvalWorkerFaceInfoResult | null>(null);
+  const [faceInfoLoading, setFaceInfoLoading] = useState(false);
   const themeName = useForgeStore((s) => s.theme);
   const t = themes[themeName];
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
@@ -3709,30 +3713,44 @@ export function Viewport() {
     closeObjectContextMenu();
   }, [closeObjectContextMenu, objectContextMenu, setObjectVisibility]);
 
+  // Fetch face info asynchronously when the panel opens or switches object.
+  useEffect(() => {
+    if (!faceInfoPanel) { setFaceInfoData(null); return; }
+    let cancelled = false;
+    setFaceInfoLoading(true);
+    evalWorkerClient.fetchFaceInfo(faceInfoPanel.objectId).then((data) => {
+      if (cancelled) return;
+      setFaceInfoData(data);
+      setFaceInfoLoading(false);
+      // If we don't have a faceName yet, pick the best one now that we have the data.
+      if (!faceInfoPanel.faceName) {
+        let bestName: string | null = data.faceNames[0] ?? null;
+        if (faceInfoPanel.hitNormal && data.faceNames.length > 0) {
+          let bestDot = -Infinity;
+          for (const name of data.faceNames) {
+            try {
+              const n = data.faces[name]?.normal;
+              if (!n) continue;
+              const dot = n[0] * faceInfoPanel.hitNormal[0] + n[1] * faceInfoPanel.hitNormal[1] + n[2] * faceInfoPanel.hitNormal[2];
+              if (dot > bestDot) { bestDot = dot; bestName = name; }
+            } catch { /* skip */ }
+          }
+        }
+        if (bestName) setFaceInfoPanel((prev) => prev ? { ...prev, faceName: bestName } : prev);
+      }
+    }).catch(() => {
+      if (cancelled) return;
+      setFaceInfoLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [faceInfoPanel?.objectId]);
+
   const handleGetFaceInfo = useCallback(() => {
     if (!objectContextMenu) return;
     const obj = objects.find((o) => o.id === objectContextMenu.objectId);
     if (!obj?.shape) { closeObjectContextMenu(); return; }
-    const hitNormal = objectContextMenu.hitNormal;
-    let faceName: string | undefined;
-    if (hitNormal) {
-      const faceNames = obj.shape.faceNames();
-      let bestDot = -Infinity;
-      for (const name of faceNames) {
-        try {
-          const faceRef = obj.shape.face(name);
-          const n = faceRef.normal;
-          const dot = n[0] * hitNormal[0] + n[1] * hitNormal[1] + n[2] * hitNormal[2];
-          if (dot > bestDot) { bestDot = dot; faceName = name; }
-        } catch { /* skip */ }
-      }
-    }
-    if (!faceName) {
-      const names = obj.shape.faceNames();
-      faceName = names[0];
-    }
-    if (!faceName) { closeObjectContextMenu(); return; }
-    setFaceInfoPanel({ objectId: objectContextMenu.objectId, faceName, x: objectContextMenu.x, y: objectContextMenu.y });
+    setFaceInfoData(null);
+    setFaceInfoPanel({ objectId: objectContextMenu.objectId, faceName: null, hitNormal: objectContextMenu.hitNormal ?? null, x: objectContextMenu.x, y: objectContextMenu.y });
     closeObjectContextMenu();
   }, [closeObjectContextMenu, objectContextMenu, objects]);
 
@@ -4052,10 +4070,10 @@ export function Viewport() {
 
       {faceInfoPanel && (() => {
         const obj = objects.find((o) => o.id === faceInfoPanel.objectId);
-        if (!obj?.shape) return null;
-        let history: ReturnType<typeof obj.shape.faceHistory> | null = null;
-        try { history = obj.shape.faceHistory(faceInfoPanel.faceName); } catch { /* no history */ }
-        const faceNames = obj.shape.faceNames();
+        if (!obj) return null;
+        const activeFaceName = faceInfoPanel.faceName;
+        const history = activeFaceName ? (faceInfoData?.faceHistories[activeFaceName] ?? null) : null;
+        const faceNames = faceInfoData?.faceNames ?? [];
         return (
           <div
             style={{
@@ -4091,82 +4109,89 @@ export function Viewport() {
                 : obj.name}
             </div>
 
-            {/* Face selector */}
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ fontSize: 11, color: 'var(--fc-textMuted)', display: 'block', marginBottom: 3 }}>Face</label>
-              <select
-                value={faceInfoPanel.faceName}
-                onChange={(e) => setFaceInfoPanel({ ...faceInfoPanel, faceName: e.target.value })}
-                style={{
-                  width: '100%',
-                  background: 'var(--fc-bgInput)',
-                  border: '1px solid var(--fc-border)',
-                  borderRadius: 4,
-                  color: 'var(--fc-text)',
-                  fontSize: 12,
-                  padding: '4px 6px',
-                }}
-              >
-                {faceNames.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
-
-            {history && history.timeline.length > 0 ? (
-              <div>
-                {history.timeline.map((entry, i) => {
-                  const isFirst = i === 0;
-                  const isLast = i === history.timeline.length - 1;
-                  const color =
-                    entry.category === 'primitive' ? '#4ade80' :
-                    entry.category === 'sketch' ? '#60a5fa' :
-                    entry.category === 'modifier' ? '#fb923c' :
-                    entry.category === 'boolean' ? '#c084fc' :
-                    'var(--fc-textMuted)';
-                  return (
-                    <div key={i} style={{ display: 'flex', gap: 8, paddingBottom: isLast ? 0 : 6 }}>
-                      {/* Timeline spine */}
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 14 }}>
-                        <div style={{
-                          width: isFirst ? 10 : 8,
-                          height: isFirst ? 10 : 8,
-                          borderRadius: '50%',
-                          background: color,
-                          flexShrink: 0,
-                          marginTop: isFirst ? 1 : 2,
-                          boxShadow: isFirst ? `0 0 0 2px color-mix(in srgb, ${color} 30%, transparent)` : undefined,
-                        }} />
-                        {!isLast && (
-                          <div style={{ width: 2, flex: 1, background: 'var(--fc-border)', marginTop: 3 }} />
-                        )}
-                      </div>
-                      {/* Entry content */}
-                      <div style={{ paddingBottom: isLast ? 0 : 4, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fc-text)', lineHeight: 1.3 }}>
-                          {entry.label}
-                          <span style={{
-                            marginLeft: 5,
-                            fontSize: 9,
-                            fontWeight: 500,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.04em',
-                            color,
-                            opacity: 0.85,
-                          }}>
-                            {entry.category}
-                          </span>
-                        </div>
-                        {entry.summary && (
-                          <div style={{ fontSize: 10, color: 'var(--fc-textMuted)', marginTop: 1, fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                            {entry.summary}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            {faceInfoLoading ? (
+              <div style={{ fontSize: 11, color: 'var(--fc-textMuted)' }}>Loading…</div>
             ) : (
-              <div style={{ fontSize: 11, color: 'var(--fc-textMuted)' }}>No history available for this face</div>
+              <>
+                {/* Face selector */}
+                {faceNames.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ fontSize: 11, color: 'var(--fc-textMuted)', display: 'block', marginBottom: 3 }}>Face</label>
+                    <select
+                      value={activeFaceName ?? ''}
+                      onChange={(e) => setFaceInfoPanel({ ...faceInfoPanel, faceName: e.target.value })}
+                      style={{
+                        width: '100%',
+                        background: 'var(--fc-bgInput)',
+                        border: '1px solid var(--fc-border)',
+                        borderRadius: 4,
+                        color: 'var(--fc-text)',
+                        fontSize: 12,
+                        padding: '4px 6px',
+                      }}
+                    >
+                      {faceNames.map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                )}
+                {history && history.timeline.length > 0 ? (
+                  <div>
+                    {history.timeline.map((entry, i) => {
+                      const isFirst = i === 0;
+                      const isLast = i === history.timeline.length - 1;
+                      const color =
+                        entry.category === 'primitive' ? '#4ade80' :
+                        entry.category === 'sketch' ? '#60a5fa' :
+                        entry.category === 'modifier' ? '#fb923c' :
+                        entry.category === 'boolean' ? '#c084fc' :
+                        'var(--fc-textMuted)';
+                      return (
+                        <div key={i} style={{ display: 'flex', gap: 8, paddingBottom: isLast ? 0 : 6 }}>
+                          {/* Timeline spine */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 14 }}>
+                            <div style={{
+                              width: isFirst ? 10 : 8,
+                              height: isFirst ? 10 : 8,
+                              borderRadius: '50%',
+                              background: color,
+                              flexShrink: 0,
+                              marginTop: isFirst ? 1 : 2,
+                              boxShadow: isFirst ? `0 0 0 2px color-mix(in srgb, ${color} 30%, transparent)` : undefined,
+                            }} />
+                            {!isLast && (
+                              <div style={{ width: 2, flex: 1, background: 'var(--fc-border)', marginTop: 3 }} />
+                            )}
+                          </div>
+                          {/* Entry content */}
+                          <div style={{ paddingBottom: isLast ? 0 : 4, minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fc-text)', lineHeight: 1.3 }}>
+                              {entry.label}
+                              <span style={{
+                                marginLeft: 5,
+                                fontSize: 9,
+                                fontWeight: 500,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em',
+                                color,
+                                opacity: 0.85,
+                              }}>
+                                {entry.category}
+                              </span>
+                            </div>
+                            {entry.summary && (
+                              <div style={{ fontSize: 10, color: 'var(--fc-textMuted)', marginTop: 1, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                {entry.summary}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: 'var(--fc-textMuted)' }}>No history available for this face</div>
+                )}
+              </>
             )}
           </div>
         );
