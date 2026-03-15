@@ -2,6 +2,17 @@ import { Shape, union } from './kernel';
 import { ShapeGroup, group } from './group';
 import { TrackedShape } from './sketch/topology';
 import { Transform, composeChain, normalizeAxis, type TransformInput, type Vec3 } from './transform';
+import {
+  type PlacementReferenceInput,
+  applyPlacementReferenceInput,
+  clonePlacementReferences,
+  createPlacementReferences,
+  hasPlacementReferences,
+  placementReferenceNames,
+  resolvePlacementReferencePoint,
+  type PlacementReferenceKind,
+  type PlacementReferences,
+} from './placement';
 
 export type AssemblyPart = Shape | TrackedShape | ShapeGroup;
 export type JointType = 'fixed' | 'revolute' | 'prismatic';
@@ -369,8 +380,26 @@ export class Assembly {
   private readonly parts = new Map<string, PartRecord>();
   private readonly joints = new Map<string, JointRecord>();
   private readonly jointCouplings = new Map<string, JointCouplingRecord>();
+  private _refs: PlacementReferences = createPlacementReferences();
 
   constructor(public readonly name = 'Assembly') {}
+
+  /**
+   * Attach named placement reference points to this assembly.
+   * These are surfaced automatically on the ImportedAssembly when this file is
+   * imported with importAssembly(), so consumers can use placeReference() without
+   * re-declaring them.
+   * Returns `this` for chaining.
+   */
+  withReferences(refs: Pick<PlacementReferenceInput, 'points'>): Assembly {
+    this._refs = applyPlacementReferenceInput(this._refs, refs);
+    return this;
+  }
+
+  /** @internal — used by importAssembly() to seed ImportedAssembly refs. */
+  getReferences(): PlacementReferences {
+    return clonePlacementReferences(this._refs);
+  }
 
   /** Add a virtual reference frame (no geometry) to the assembly graph. */
   addFrame(name: string, options: PartOptions = {}): Assembly {
@@ -737,4 +766,121 @@ export class Assembly {
 
 export function assembly(name?: string): Assembly {
   return new Assembly(name);
+}
+
+/**
+ * Wraps an imported Assembly, giving access to named parts and group conversion
+ * without losing the kinematic structure.
+ *
+ * Supports placement references (`.withReferences()` / `.placeReference()`) so
+ * sub-assemblies can be positioned the same way as imported parts and groups.
+ */
+export class ImportedAssembly {
+  constructor(
+    private readonly _assembly: Assembly,
+    private readonly _refs: PlacementReferences = createPlacementReferences(),
+    private readonly _offset: readonly [number, number, number] = [0, 0, 0],
+  ) {}
+
+  /** The underlying Assembly — use for sweepJoint, addPart into parent, etc. */
+  get assembly(): Assembly {
+    return this._assembly;
+  }
+
+  /** Solve the assembly at the given joint state (defaults to each joint's default value). */
+  solve(state?: JointState): SolvedAssembly {
+    return this._assembly.solve(state);
+  }
+
+  /**
+   * Return a specific named part positioned at the given joint state, with any
+   * stored placement offset applied.
+   */
+  part(name: string, state?: JointState): AssemblyPart {
+    const p = this._assembly.solve(state).getPart(name);
+    const [dx, dy, dz] = this._offset;
+    if (dx !== 0 || dy !== 0 || dz !== 0) {
+      return applyTransformToPart(p, Transform.identity().translate(dx, dy, dz));
+    }
+    return p;
+  }
+
+  /**
+   * Convert all assembly parts to a ShapeGroup with named children.
+   * Child names match the part names used in the assembly.
+   * Any stored placement offset and placement references are forwarded to the group.
+   */
+  toGroup(state?: JointState): ShapeGroup {
+    const solved = this._assembly.solve(state);
+    const def = this._assembly.describe();
+    const children: AssemblyPart[] = [];
+    const childNames: string[] = [];
+    for (const p of def.parts) {
+      children.push(solved.getPart(p.name));
+      childNames.push(p.name);
+    }
+    let result = new ShapeGroup(children, childNames);
+    const [dx, dy, dz] = this._offset;
+    if (dx !== 0 || dy !== 0 || dz !== 0) {
+      result = result.translate(dx, dy, dz);
+    }
+    if (hasPlacementReferences(this._refs)) {
+      // Convert internal refs back to input format for ShapeGroup.withReferences().
+      // Only point refs are stored on ImportedAssembly; they are already translated.
+      const refsInput: PlacementReferenceInput = {
+        points: Object.fromEntries(
+          Object.entries(this._refs.points).map(([k, v]) => [k, [...v] as [number, number, number]]),
+        ),
+      };
+      result = result.withReferences(refsInput);
+    }
+    return result;
+  }
+
+  /**
+   * Attach named placement reference points to this assembly.
+   * Points are simple 3D coordinates (relative to the assembly's own origin).
+   * Returns a new ImportedAssembly — does not mutate.
+   */
+  withReferences(refs: Pick<PlacementReferenceInput, 'points'>): ImportedAssembly {
+    const merged = applyPlacementReferenceInput(clonePlacementReferences(this._refs), refs);
+    return new ImportedAssembly(this._assembly, merged, this._offset);
+  }
+
+  /** List all attached placement reference names. */
+  referenceNames(kind?: PlacementReferenceKind): string[] {
+    return placementReferenceNames(this._refs, kind);
+  }
+
+  /**
+   * Translate the assembly so the named reference point lands on `target`.
+   * Returns a new ImportedAssembly — does not mutate.
+   * All point refs are translated by the same delta.
+   */
+  placeReference(
+    ref: string,
+    target: [number, number, number],
+    offset?: [number, number, number],
+  ): ImportedAssembly {
+    const sourcePoint = resolvePlacementReferencePoint(this._refs, ref);
+    if (!sourcePoint) {
+      const available = this.referenceNames().join(', ') || 'none';
+      throw new Error(`ImportedAssembly has no placement reference "${ref}". Available: ${available}`);
+    }
+    const dx = target[0] - sourcePoint[0] + (offset?.[0] ?? 0);
+    const dy = target[1] - sourcePoint[1] + (offset?.[1] ?? 0);
+    const dz = target[2] - sourcePoint[2] + (offset?.[2] ?? 0);
+    // Translate all stored point refs by the same delta.
+    const newPointRefs: Record<string, [number, number, number]> = {};
+    for (const [name, pt] of Object.entries(this._refs.points)) {
+      newPointRefs[name] = [pt[0] + dx, pt[1] + dy, pt[2] + dz];
+    }
+    const newRefs = applyPlacementReferenceInput(createPlacementReferences(), { points: newPointRefs });
+    const newOffset: [number, number, number] = [
+      this._offset[0] + dx,
+      this._offset[1] + dy,
+      this._offset[2] + dz,
+    ];
+    return new ImportedAssembly(this._assembly, newRefs, newOffset);
+  }
 }

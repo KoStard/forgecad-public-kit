@@ -83,7 +83,7 @@ import {
 } from './sketch';
 import { param, boolParam, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, type ParamDef } from './params';
 import { joint } from './joint';
-import { Assembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
+import { Assembly, ImportedAssembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
 import { Transform, composeChain } from './transform';
 import { partLibrary } from './library';
 import { ShapeGroup, group } from './group';
@@ -429,7 +429,7 @@ function makeSandboxConsole(): Record<string, (...args: unknown[]) => void> {
 }
 
 function parseImportParamArgs(
-  importKind: 'importSketch' | 'importPart' | 'importGroup',
+  importKind: 'importSketch' | 'importPart' | 'importGroup' | 'importAssembly',
   fileName: string,
   args: unknown,
 ): Record<string, number> {
@@ -535,6 +535,8 @@ function describeScriptResultType(value: unknown): string {
   if (value instanceof Sketch) return 'Sketch';
   if (value instanceof TrackedShape) return 'TrackedShape';
   if (value instanceof ShapeGroup) return 'ShapeGroup';
+  if (value instanceof Assembly) return 'Assembly';
+  if (value instanceof ImportedAssembly) return 'ImportedAssembly';
   if (Array.isArray(value)) return 'Array';
   if (typeof value === 'object' && typeof (value as { toShape?: unknown }).toShape === 'function') {
     try {
@@ -660,7 +662,7 @@ function logImportTrace(
   fileName: string,
   scope: ImportScope,
   options: RunnerExecutionOptions,
-  kind: 'importSketch' | 'importPart' | 'importSvgSketch' | 'importGroup' | 'require',
+  kind: 'importSketch' | 'importPart' | 'importSvgSketch' | 'importGroup' | 'importAssembly' | 'require',
   target: string,
   phase: 'start' | 'success' | 'error',
   details: Record<string, unknown> = {},
@@ -1060,6 +1062,28 @@ function executeFile(
       throw new Error(`"${resolvedPath}" did not return a ShapeGroup (got ${got}). Use group(...) as the return value, or use importPart() for single-shape files.`);
     };
 
+    // importAssembly("name", { ...paramOverrides }) — executes another file, expects an Assembly result
+    const importAssembly = (name: string, paramOverrides?: Record<string, number>): ImportedAssembly => {
+      const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
+      const localOverrides = parseImportParamArgs('importAssembly', name, paramOverrides);
+      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      logImportTrace(fileName, scope, options, 'importAssembly', resolvedPath, 'start', { requested: name, overrides: localOverrides });
+      let result: ReturnType<typeof executeFile>;
+      try {
+        result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
+      } catch (error) {
+        logImportTrace(fileName, scope, options, 'importAssembly', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
+        throw error;
+      }
+      if (result instanceof Assembly) {
+        logImportTrace(fileName, scope, options, 'importAssembly', resolvedPath, 'success', { requested: name, got: 'Assembly' });
+        return new ImportedAssembly(result, result.getReferences());
+      }
+      const got = describeScriptResultType(result);
+      logImportTrace(fileName, scope, options, 'importAssembly', resolvedPath, 'error', { requested: name, got });
+      throw new Error(`"${resolvedPath}" did not return an Assembly (got ${got}). Return the assembly() instance directly (before calling .solve()).`);
+    };
+
     // Wrappers that auto-unwrap TrackedShape for boolean ops
     const unwrap = (s: Shape | TrackedShape): Shape =>
       s instanceof TrackedShape ? s.toShape() : s;
@@ -1157,6 +1181,7 @@ function executeFile(
       importSketch,
       importPart,
       importGroup,
+      importAssembly,
       importSvgSketch,
       dim,
       dimLine,
