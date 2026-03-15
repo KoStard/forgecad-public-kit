@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +10,8 @@ const repoRoot = path.resolve(__dirname, "..");
 
 const devOutputPath = path.join(repoRoot, "skills/forgecad/SKILL.md");
 const installOutputPath = path.join(repoRoot, "dist-skill/SKILL.md");
+const installDocsOutputDir = path.join(repoRoot, "dist-skill/docs");
+const sourceDocsDir = path.join(repoRoot, "docs/permanent");
 
 const docs = {
   apiReference: "docs/permanent/API/model-building/reference.md",
@@ -156,21 +158,27 @@ ${renderDocGroupsForDev(docGroups)}
 `;
 
 // ---------------------------------------------------------------------------
-// Install SKILL.md — self-contained, all docs inlined (used after npm install)
+// Install SKILL.md — thin template with {{SKILL_DIR}} placeholder.
+// Docs are shipped as separate files in dist-skill/docs/ and copied to
+// ~/.agents/skills/forgecad/docs/ at install time. forge-skill.ts substitutes
+// the placeholder with the actual install directory path.
 // ---------------------------------------------------------------------------
 
-function renderDocGroupsInlined(groups) {
+// Maps a repo-relative doc path to its path inside the installed skill dir.
+// e.g. "docs/permanent/API/model-building/reference.md"
+//   -> "{{SKILL_DIR}}/docs/API/model-building/reference.md"
+function toInstallDocPath(repoRelPath) {
+  const withoutPrefix = repoRelPath.replace(/^docs\/permanent\//, "docs/");
+  return `{{SKILL_DIR}}/${normalizePath(withoutPrefix)}`;
+}
+
+function renderDocGroupsForInstall(groups) {
   return groups
     .map((group) => {
-      const inlinedDocs = group.paths
-        .map((filePath) => {
-          const content = readDoc(filePath);
-          return `<!-- ${normalizePath(filePath)} -->\n\n${content}`;
-        })
-        .join("\n\n---\n\n");
-      return [`### ${group.title}`, "", group.guidance, "", inlinedDocs, ""].join("\n");
+      const fileBullets = group.paths.map((filePath) => `- \`${toInstallDocPath(filePath)}\``).join("\n");
+      return [`### ${group.title}`, "", group.guidance, "", fileBullets, ""].join("\n");
     })
-    .join("\n\n");
+    .join("\n");
 }
 
 function buildInstallSkillContent() {
@@ -186,7 +194,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 ## Workflow
 
 1. Identify the artifact: \`.forge.js\`, \`.sketch.js\`, \`.forge-notebook.json\`, SVG asset, or CLI/export task.
-2. Use the reference sections below — all API docs are inlined. Start from Core API, add others as needed.
+2. Load only the docs the task needs (see Source Map below). Start from the top group, add others as needed.
 3. Default to a concrete first pass — easy iteration beats speculative design review.
 4. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
 5. Validate with \`forgecad run <file>\` (add \`--debug-imports\` for import chain issues). This works for notebook preview cells too.
@@ -217,11 +225,11 @@ Useful notebook loop:
 - use \`forgecad render <file>.forge-notebook.json\` or \`forgecad capture gif <file>.forge-notebook.json --list\` to inspect the preview cell through the CLI
 - export to \`.forge.js\` when the exploratory phase is over and the structure is ready to stabilize
 
-## API Reference
+## Source Map
 
-All documentation is inlined below. Read the relevant sections based on your task — start from Core API, add others as needed.
+Load groups top-to-bottom, stopping when you have what the task needs.
 
-${renderDocGroupsInlined(docGroups)}
+${renderDocGroupsForInstall(docGroups)}
 `;
 }
 
@@ -237,5 +245,8 @@ console.log(`Wrote ${devOutputPath}`);
 mkdirSync(path.dirname(installOutputPath), { recursive: true });
 writeFileSync(installOutputPath, buildInstallSkillContent());
 console.log(`Wrote ${installOutputPath}`);
+
+cpSync(sourceDocsDir, installDocsOutputDir, { recursive: true });
+console.log(`Copied docs -> ${installDocsOutputDir}`);
 
 console.log(`Indexed ${allDocs.length} source files.`);
