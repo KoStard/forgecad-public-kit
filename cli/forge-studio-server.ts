@@ -260,9 +260,9 @@ export async function startStudioServer(
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.flushHeaders();
-      const entries = scanProjectFiles(projectDir);
-      res.write(`event: init\ndata: ${JSON.stringify(entries)}\n\n`);
       if (projectDir) {
+        const entries = scanProjectFiles(projectDir);
+        res.write(`event: init\ndata: ${JSON.stringify(entries)}\n\n`);
         sseClients.add(res);
         req.on('close', () => sseClients.delete(res));
       } else {
