@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-cli
+dist-skill
 .DS_Store
 .aider*
 
