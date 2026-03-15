@@ -2597,6 +2597,8 @@ export const partLibrary = {
   thread,
   bolt,
   nut,
+  washer,
+  fastenerSet,
   pipeRoute,
   elbow,
   tSlotProfile,
@@ -2759,4 +2761,165 @@ export function nut(
   // TODO: Chamfer top and bottom edges
 
   return hexBody;
+}
+
+// --- Washers ---
+
+type WasherStandard = 'din-125-a';
+
+/** DIN 125-A flat washer dimensions (inner diameter, outer diameter, thickness) in mm */
+const WASHER_TABLE: Record<MetricSize, { id: number; od: number; t: number }> = {
+  M2:    { id: 2.2,  od: 5.0,  t: 0.3 },
+  'M2.5': { id: 2.7, od: 6.0,  t: 0.5 },
+  M3:    { id: 3.2,  od: 7.0,  t: 0.5 },
+  M4:    { id: 4.3,  od: 9.0,  t: 0.8 },
+  M5:    { id: 5.3,  od: 10.0, t: 1.0 },
+  M6:    { id: 6.4,  od: 12.0, t: 1.6 },
+  M8:    { id: 8.4,  od: 17.0, t: 1.6 },
+  M10:   { id: 10.5, od: 21.0, t: 2.0 },
+};
+
+/**
+ * Flat washer (DIN 125-A by default).
+ * Returns a flat ring centered at the origin, thickness along Z.
+ * Use `size` to select a standard metric thread size.
+ */
+export function washer(
+  size: MetricSize,
+  options?: { standard?: WasherStandard; segments?: number },
+): Shape {
+  const dims = WASHER_TABLE[size];
+  if (!dims) throw new Error(`washer: unsupported size "${size}"`);
+  const segs = options?.segments ?? 48;
+  const outer = cylinder(dims.t, dims.od / 2, undefined, segs, true);
+  const bore  = cylinder(dims.t + 1, dims.id / 2, undefined, segs, true);
+  return outer.subtract(bore);
+}
+
+// --- Fastener Sets ---
+
+/** Reference dimensions for a complete fastener joint. */
+export interface FastenerSetDimensions {
+  size: MetricSize;
+  nominalDiameter: number;
+  boltLength: number;
+  clearanceDia: number;
+  tapDia: number;
+  nutAcrossFlats: number;
+  nutHeight: number;
+  washerOuterDia: number;
+  washerInnerDia: number;
+  washerThickness: number;
+}
+
+export interface FastenerSetOptions {
+  /** Include a washer under the bolt head (default: true). */
+  washerUnderHead?: boolean;
+  /** Include a washer under the nut (default: true). */
+  washerUnderNut?: boolean;
+  /** Clearance hole fit (default: 'normal'). */
+  fit?: FastenerFit;
+  /** Thread segment count (default: 36). */
+  segments?: number;
+}
+
+export interface FastenerSetResult {
+  /** Hex bolt: head top at z=0, threaded shaft extends toward −Z by `boltLength`. */
+  bolt: Shape;
+  /** Hex nut centered at z=0. */
+  nut: Shape;
+  /** Flat washer centered at z=0. Null when washerUnderHead is false. */
+  washerUnderHead: Shape | null;
+  /** Flat washer centered at z=0. Null when washerUnderNut is false. */
+  washerUnderNut: Shape | null;
+  /** Clearance-hole cutter (cylinder) centered at z=0, for subtracting from a through-plate. */
+  clearanceHole: Shape;
+  /** Tap-drill cutter (cylinder) centered at z=0, for subtracting from a tapped plate. */
+  tappedHole: Shape;
+  /** Reference dimensions for BOM, placement calculations, and documentation. */
+  dims: FastenerSetDimensions;
+}
+
+/**
+ * Complete ISO metric fastener set — bolt, nut, optional washers, and matching hole cutters.
+ *
+ * All shapes are returned un-positioned (each centered on the Z-axis at z=0 or the
+ * convention described in `FastenerSetResult`). Place them yourself using `.translate()`.
+ *
+ * @param size   - ISO metric thread size, e.g. 'M5'.
+ * @param boltLength - Nominal shaft length in mm (head not included).
+ * @param options - Optional configuration.
+ *
+ * @example
+ * // Bolt two 8mm plates together with M5 hardware
+ * const hw = lib.fastenerSet('M5', 20);
+ * const topPlate = box(60, 40, 8).subtract(
+ *   hw.clearanceHole.translate(15, 10, 0),
+ * );
+ * const botPlate = box(60, 40, 8).translate(0, 0, -8).subtract(
+ *   hw.tappedHole.translate(15, 10, 0),
+ * );
+ * const boltPos = hw.bolt.translate(15, 10, 0);
+ * return [
+ *   { name: 'Top Plate', shape: topPlate, color: '#9ab4cc' },
+ *   { name: 'Bottom Plate', shape: botPlate, color: '#b0b8c8' },
+ *   { name: 'Bolt', shape: boltPos, color: '#aaaaaa' },
+ * ];
+ */
+export function fastenerSet(
+  size: MetricSize,
+  boltLength: number,
+  options?: FastenerSetOptions,
+): FastenerSetResult {
+  const sizeData = METRIC_HOLE_TABLE[size];
+  if (!sizeData) throw new Error(`fastenerSet: unsupported size "${size}"`);
+  if (!Number.isFinite(boltLength) || boltLength <= 0) {
+    throw new Error('fastenerSet: boltLength must be > 0');
+  }
+
+  const fit = options?.fit ?? 'normal';
+  const segs = options?.segments ?? 36;
+  const includeHeadWasher = options?.washerUnderHead ?? true;
+  const includeNutWasher  = options?.washerUnderNut  ?? true;
+
+  const nomDia = parseFloat(size.replace('M', ''));
+  const washerDims = WASHER_TABLE[size];
+  const nutHeight = nomDia * 0.8;
+  const nutAF     = nomDia * 1.6;
+
+  const boltShape = bolt(nomDia, boltLength, { segments: segs });
+  const nutShape  = nut(nomDia, { height: nutHeight, acrossFlats: nutAF, segments: segs });
+
+  const headWasher = includeHeadWasher ? washer(size, { segments: segs }) : null;
+  const nutWasherShape  = includeNutWasher  ? washer(size, { segments: segs }) : null;
+
+  const clearanceDia = sizeData[fit];
+  const tapDia       = sizeData.tap;
+  const depth        = boltLength + 1;  // slightly deeper than bolt for clean cutter
+
+  const clearanceHole = cylinder(depth, clearanceDia / 2, undefined, segs, true);
+  const tappedHole    = cylinder(depth, tapDia / 2,       undefined, segs, true);
+
+  const dims: FastenerSetDimensions = {
+    size,
+    nominalDiameter: nomDia,
+    boltLength,
+    clearanceDia,
+    tapDia,
+    nutAcrossFlats: nutAF,
+    nutHeight,
+    washerOuterDia:   washerDims.od,
+    washerInnerDia:   washerDims.id,
+    washerThickness:  washerDims.t,
+  };
+
+  return {
+    bolt: boltShape,
+    nut: nutShape,
+    washerUnderHead: headWasher,
+    washerUnderNut:  nutWasherShape,
+    clearanceHole,
+    tappedHole,
+    dims,
+  };
 }
