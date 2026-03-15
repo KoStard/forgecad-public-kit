@@ -171,6 +171,59 @@ console.log(solved.bom());
 return arm.toGroup({ shoulder: 45 });
 ```
 
+## Merging sub-assemblies into a parent
+
+`importedAssembly.mergeInto(parent, options)` flattens a sub-assembly's parts and joints into a parent `Assembly`, then wires a mount joint connecting a parent part to the sub-assembly root. After the merge, the parent graph can drive sub-assembly joints directly.
+
+```javascript
+// scene.forge.js
+const chassis = box(200, 80, 20, true);
+
+const robot = assembly("Robot")
+  .addPart("Chassis", chassis);
+
+// Merge left arm — all parts/joints prefixed "Left Arm."
+importAssembly("arm.forge.js")
+  .mergeInto(robot, {
+    prefix: "Left Arm",
+    mountParent: "Chassis",
+    mountJoint: "leftMount",
+    mountOptions: { frame: Transform.identity().translate(-70, 0, 10) },
+  });
+
+// Merge right arm — same source file, different prefix and position
+importAssembly("arm.forge.js")
+  .mergeInto(robot, {
+    prefix: "Right Arm",
+    mountParent: "Chassis",
+    mountJoint: "rightMount",
+    mountOptions: { frame: Transform.identity().translate(70, 0, 10) },
+  });
+
+// Drive sub-assembly joints from the parent using prefixed names
+const solved = robot.solve({
+  "Left Arm.shoulder": 45,
+  "Right Arm.shoulder": -20,
+});
+return solved.toScene();
+```
+
+**`mergeInto(parent, options)` options:**
+
+| Option | Type | Required | Description |
+|---|---|---|---|
+| `prefix` | `string` | recommended | Prefix for all part and joint names. `"Left Arm"` turns `"Base"` into `"Left Arm.Base"`. |
+| `mountParent` | `string` | yes | Part name in `parent` to attach the sub-assembly root to. |
+| `mountJoint` | `string` | yes | Name for the new mount joint in the parent graph. |
+| `mountType` | `JointType` | no | Joint type for the mount (default: `'fixed'`). |
+| `mountOptions` | `JointOptions` | no | Frame, axis, limits, etc. for the mount joint. |
+
+**Notes:**
+- The sub-assembly must have exactly one root part. If it has multiple roots, connect them with `addFixed()` first.
+- Joint couplings inside the sub-assembly are preserved and rewritten with the prefix.
+- After merging, use `parent.sweepJoint("Left Arm.shoulder", ...)` for collision sweeps across the full hierarchy.
+- Returns `parent` for chaining.
+
 ## Common pitfalls
 - If parts vanish in the viewport, check whether a cut plane is active before debugging kinematics. The viewer-side APIs live in [../runtime/viewport.md](../runtime/viewport.md).
 - If a returned object is empty, Forge logs a warning in script output.
