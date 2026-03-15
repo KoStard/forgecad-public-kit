@@ -190,7 +190,7 @@ async function executeNotebookRequest(body: any, createIfMissing = false) {
   };
 }
 
-function forgeProjectPlugin() {
+function forgeProjectPlugin(enableInitialScan = true) {
   const virtualId = 'virtual:forge-project';
   const resolvedId = '\0' + virtualId;
 
@@ -201,7 +201,9 @@ function forgeProjectPlugin() {
     },
     load(id: string) {
       if (id !== resolvedId) return;
-      if (!projectDir) return 'export default null;';
+      // Never bake project files into the production build — the production
+      // server always delivers the real project via the SSE /api/watch init event.
+      if (!enableInitialScan || !projectDir) return 'export default null;';
       const entries = scanProjectFiles(projectDir);
       return `export default ${JSON.stringify(entries)};`;
     },
@@ -361,8 +363,8 @@ function stripBrokenManifoldSourceMaps() {
   };
 }
 
-export default defineConfig({
-  plugins: [forgeProjectPlugin(), stripBrokenManifoldSourceMaps(), react()],
+export default defineConfig(({ command }) => ({
+  plugins: [forgeProjectPlugin(command === 'serve'), stripBrokenManifoldSourceMaps(), react()],
   resolve: {
     alias: {
       '@forge': path.resolve(__dirname, './src/forge'),
@@ -380,4 +382,4 @@ export default defineConfig({
       allow: ['.'],
     },
   },
-});
+}));

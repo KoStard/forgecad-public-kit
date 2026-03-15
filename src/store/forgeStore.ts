@@ -122,7 +122,7 @@ const initialActive = (() => {
 
 const INITIAL_SAVED = projectFiles && Object.keys(projectFiles).length > 0
   ? projectFiles as Record<string, string>
-  : {};
+  : EMPTY_FILE;
 
 export interface ProjectFile {
   name: string;
