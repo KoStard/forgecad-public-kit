@@ -11,7 +11,7 @@ export {
   Transform, composeChain,
   intersectWithPlane, projectToPlane,
   param, resetParams, getCollectedParams, setParamOverrides,
-  Assembly, SolvedAssembly, assembly, bomToCsv,
+  Assembly, ImportedAssembly, SolvedAssembly, assembly, bomToCsv,
   robotExport, resetRobotExport, getCollectedRobotExport,
   bom, resetBom, getCollectedBom,
   explodeView, resetExplodeView, getCollectedExplodeView,

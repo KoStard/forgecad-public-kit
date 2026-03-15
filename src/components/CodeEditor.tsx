@@ -722,6 +722,8 @@ declare class Assembly {
   addFixed(name: string, parent: string, child: string, options?: AssemblyJointOptions): Assembly;
   addJointCoupling(jointName: string, options: AssemblyJointCouplingOptions): Assembly;
   addGearCoupling(drivenJointName: string, driverJointName: string, options?: GearCouplingOptions): Assembly;
+  /** Attach named mounting reference points. Surfaced automatically on ImportedAssembly when this file is imported. */
+  withReferences(refs: { points?: Record<string, [number, number, number]> }): Assembly;
   solve(state?: AssemblyJointState): SolvedAssembly;
   sweepJoint(
     jointName: string,
@@ -733,6 +735,24 @@ declare class Assembly {
   ): JointSweepFrame[];
 }
 declare function assembly(name?: string): Assembly;
+/** Import an assembly from another file. The file must return an Assembly instance (before calling .solve()). */
+declare function importAssembly(fileName: string, paramOverrides?: Record<string, number>): ImportedAssembly;
+declare class ImportedAssembly {
+  /** The underlying Assembly — use for sweepJoint, describe, etc. */
+  readonly assembly: Assembly;
+  /** Solve at the given joint state (defaults to each joint's default value). */
+  solve(state?: AssemblyJointState): SolvedAssembly;
+  /** Get a named part positioned at the given joint state. */
+  part(name: string, state?: AssemblyJointState): AssemblyPart;
+  /** Convert all parts to a ShapeGroup with named children matching assembly part names. */
+  toGroup(state?: AssemblyJointState): ShapeGroup;
+  /** Attach named point placement references. Returns a new ImportedAssembly. */
+  withReferences(refs: { points?: Record<string, [number, number, number]> }): ImportedAssembly;
+  /** List all attached placement reference names. */
+  referenceNames(): string[];
+  /** Translate so the named reference point lands on target. Returns a new ImportedAssembly. */
+  placeReference(ref: string, target: [number, number, number], offset?: [number, number, number]): ImportedAssembly;
+}
 
 // --- 3D Advanced ---
 declare function hull3d(...args: (Shape | TrackedShape | [number, number, number])[]): Shape;
