@@ -16,3 +16,5 @@ export * from './arcBridge';
 export * from './dimensions';
 export * from './curves';
 export * from './svgImport';
+export { text2d, textWidth } from './text';
+export type { TextOptions } from './text';

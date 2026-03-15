@@ -6,6 +6,7 @@
  * entrypoint: a single assertion-based runner over the curated CLI checks.
  */
 import { runCheckApiContractsCli } from './check-api-contracts';
+import { runCheckTextCli } from './check-text';
 import { runCheckBrepExportCli } from './check-brep-export';
 import { runCheckCompilerCli } from './check-compiler';
 import { runCheckDimensionsCli } from './check-dimensions';
@@ -25,5 +26,6 @@ export async function runCheckSuiteCli(): Promise<void> {
   await runCheckQueryPropagationCli([]);
   await runCheckExamplesCli([]);
   await runCheckApiContractsCli();
+  await runCheckTextCli();
   console.log('✓ Invariant suite passed');
 }
