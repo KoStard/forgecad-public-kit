@@ -77,6 +77,16 @@ ForgeCAD is built to work cleanly with coding agents. Your CAD models are plain 
 - browser + CLI run the same engine, so AI-generated scripts behave consistently
 - the generated Codex skill is maintained via [docs/processes/MAINTAINING_FORGECAD_SKILL.md](docs/processes/MAINTAINING_FORGECAD_SKILL.md)
 
+### Agent skill (Claude Code, Codex, OpenCode, …)
+
+Install a self-contained ForgeCAD skill for coding agents that support the `~/.agents/skills/` convention (all API docs inlined — no repo required):
+
+```bash
+forgecad skill install
+```
+
+This copies a pre-built `SKILL.md` to `~/.agents/skills/forgecad/SKILL.md`. Reload your agent to activate. Run again after upgrading ForgeCAD to pick up updated docs.
+
 ### Instructions for AI model generation
 
 When an AI model is asked to generate ForgeCAD models, require this workflow:
@@ -237,6 +247,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 | Export exact BREP (supported subset only) | `forgecad export brep examples/api/brep-exportable.forge.js` |
 | Generate report PDF | `forgecad export report examples/cup.forge.js` |
 | Parameter robustness scan | `forgecad check params examples/shoe-rack-doors.forge.js --samples 10` |
+| Install agent skill (Claude Code, Codex, OpenCode…) | `forgecad skill install` |
 | Prune merged local-only branches | `uv run cli/forge-prune-local-branches.py` |
 | Transform invariants | `forgecad check transforms` |
 | Dimension propagation invariants | `forgecad check dimensions` |
@@ -317,7 +328,7 @@ Verify what gets included before publishing:
 npm pack --dry-run
 ```
 
-The build produces `dist/` (browser SPA) and `dist-cli/` (CLI bundle). Both are included in the published package. End users get a fast production server; contributors without a built `dist/` automatically fall back to the Vite dev server.
+The build produces `dist/` (browser SPA), `dist-cli/` (CLI bundle), and `dist-skill/` (self-contained Claude Code skill). All three are included in the published package. End users get a fast production server; contributors without a built `dist/` automatically fall back to the Vite dev server.
 
 ## Contributing
 

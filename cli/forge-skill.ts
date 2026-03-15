@@ -20,5 +20,5 @@ export async function runSkillInstallCli(_argv: string[] = []): Promise<void> {
   copyFileSync(src, dest);
 
   console.log(`ForgeCAD skill installed to ${dest}`);
-  console.log(`Reload Claude Code to activate.`);
+  console.log(`Reload your agent (Claude Code, Codex, OpenCode, …) to activate.`);
 }
