@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-import { type ChildProcess } from 'child_process';
+import { existsSync } from 'fs';
 import { resolve } from 'path';
-import { packageRootFrom, resolvePackagePath, spawnPackageVite } from './package-runtime';
+import { resolvePackagePath } from './package-runtime';
+import { startStudioServer } from './forge-studio-server';
 
 interface StudioOptions {
   blank: boolean;
@@ -23,8 +24,8 @@ Usage:
 
 Options:
   --blank         Start without a project folder
-  --port <n>      Bind Vite to a specific port
-  --host [host]   Expose the dev server on the network
+  --port <n>      Bind to a specific port (default: 5173)
+  --host [host]   Expose the server on the network
   --open          Open a browser window automatically
   --strict-port   Fail instead of selecting another port
   -h, --help      Show this help`);
@@ -45,49 +46,30 @@ function parseStudioArgs(argv: string[]): StudioOptions {
   }
   if (argv.includes('-h') || argv.includes('--help')) usage();
 
-  const options: StudioOptions = {
-    blank: false,
-    open: false,
-    strictPort: false,
-  };
+  const options: StudioOptions = { blank: false, open: false, strictPort: false };
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--blank') {
-      options.blank = true;
-      continue;
-    }
-    if (arg === '--open') {
-      options.open = true;
-      continue;
-    }
-    if (arg === '--strict-port') {
-      options.strictPort = true;
-      continue;
-    }
+    if (arg === '--blank') { options.blank = true; continue; }
+    if (arg === '--open') { options.open = true; continue; }
+    if (arg === '--strict-port') { options.strictPort = true; continue; }
     if (arg === '--port') {
       const raw = argv[i + 1];
       if (!raw) throw new Error('--port requires a value');
       const port = Number.parseInt(raw, 10);
-      if (!Number.isFinite(port) || port < 1 || port > 65535) {
-        throw new Error(`Invalid port: ${raw}`);
-      }
+      if (!Number.isFinite(port) || port < 1 || port > 65535) throw new Error(`Invalid port: ${raw}`);
       options.port = port;
       i += 1;
       continue;
     }
     if (arg === '--host') {
-      const host = readOptionalHost(argv, i);
-      options.host = host.host;
-      i += host.consumed;
+      const h = readOptionalHost(argv, i);
+      options.host = h.host;
+      i += h.consumed;
       continue;
     }
-    if (arg.startsWith('-')) {
-      throw new Error(`Unknown option: ${arg}`);
-    }
-    if (options.projectPath) {
-      throw new Error('Only one project path can be provided.');
-    }
+    if (arg.startsWith('-')) throw new Error(`Unknown option: ${arg}`);
+    if (options.projectPath) throw new Error('Only one project path can be provided.');
     options.projectPath = resolve(arg);
   }
 
@@ -98,47 +80,33 @@ function parseStudioArgs(argv: string[]): StudioOptions {
   return options;
 }
 
-function toViteArgs(options: StudioOptions): string[] {
-  const args: string[] = [];
-  if (options.port != null) {
-    args.push('--port', String(options.port));
-  }
-  if (options.host) {
-    args.push('--host', options.host);
-  }
-  if (options.open) {
-    args.push('--open');
-  }
-  if (options.strictPort) {
-    args.push('--strictPort');
-  }
-  return args;
-}
-
-function waitForExit(child: ChildProcess): Promise<number> {
-  return new Promise((resolveExit, reject) => {
-    child.once('error', reject);
-    child.once('exit', (code) => resolveExit(code ?? 0));
-  });
-}
-
 export async function runStudioCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const options = parseStudioArgs(argv);
-  const projectPath = options.blank
-    ? undefined
+  const projectDir = options.blank
+    ? null
     : options.projectPath ?? resolvePackagePath(import.meta.url, 'examples');
 
-  const child = spawnPackageVite(import.meta.url, toViteArgs(options), {
-    cwd: packageRootFrom(import.meta.url),
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      ...(projectPath ? { FORGE_PROJECT: projectPath } : {}),
-    },
+  const distDir = resolvePackagePath(import.meta.url, 'dist');
+  if (!existsSync(distDir)) {
+    console.error(`\nError: ForgeCAD studio assets not found at:\n  ${distDir}\n`);
+    console.error('Run "npm run build" in the ForgeCAD package directory, then try again.');
+    process.exit(1);
+  }
+
+  const { url, close } = await startStudioServer({
+    projectDir: projectDir ?? null,
+    distDir,
+    port: options.port ?? 5173,
+    host: options.host ?? '127.0.0.1',
+    open: options.open,
+    strictPort: options.strictPort,
   });
 
-  const code = await waitForExit(child);
-  if (code !== 0) {
-    process.exit(code);
-  }
+  console.log(`\n  ForgeCAD Studio  →  ${url}\n`);
+  if (projectDir) console.log(`  Project  →  ${projectDir}\n`);
+
+  process.on('SIGINT', async () => {
+    await close();
+    process.exit(0);
+  });
 }
