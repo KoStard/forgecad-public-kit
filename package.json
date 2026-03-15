@@ -10,6 +10,7 @@
   "files": [
     "dist-cli/forgecad.js",
     "dist",
+    "dist-skill",
     "examples",
     "!examples/todo.md",
     "!examples/robot_hand_2_api_feedback.md",
@@ -35,7 +36,7 @@
     "test:api": "npm run test:prepare && node dist-cli/forgecad.js check api",
     "build:skill:forgecad": "node scripts/build-forgecad-skill.mjs",
     "prepare": "npm run build:cli",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && npm run build:skill:forgecad",
     "preview": "vite preview",
     "prune:branches": "uv run cli/forge-prune-local-branches.py",
     "meta:init": "bash scripts/local-meta.sh init",

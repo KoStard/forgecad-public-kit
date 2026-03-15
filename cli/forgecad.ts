@@ -32,6 +32,7 @@ import { isDirectCliRun, resolvePackagePath } from './package-runtime';
 import { runParamCheckCli } from './param-check';
 import { runScriptCli } from './test-run';
 import { runDebugDimensionsCli } from './debug-dimensions';
+import { runSkillInstallCli } from './forge-skill';
 
 type CommandDefinition = {
   group: 'Studio' | 'Shell' | 'Modeling' | 'Export' | 'Checks' | 'Debug';
@@ -206,6 +207,14 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: async (args) => runCompletionCli(args),
+  },
+  {
+    group: 'Shell',
+    path: ['skill', 'install'],
+    summary: 'Install the ForgeCAD Claude Code skill to ~/.agents/skills/forgecad/SKILL.md.',
+    usage: ['forgecad skill install'],
+    examples: ['forgecad skill install'],
+    run: runSkillInstallCli,
   },
   {
     group: 'Shell',

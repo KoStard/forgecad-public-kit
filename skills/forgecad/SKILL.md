@@ -11,12 +11,11 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 1. Identify the artifact: `.forge.js`, `.sketch.js`, `.forge-notebook.json`, SVG asset, or CLI/export task.
 2. Load only the docs the task needs (see Source Map below). Start from the top group, add others as needed.
-3. If the task is unfamiliar, geometry-heavy, or likely to need debugging, start in a notebook first instead of committing to a final script shape too early.
-4. Reuse patterns from `examples/api/` before inventing from scratch.
-5. Default to a concrete first pass — easy iteration beats speculative design review.
-6. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
-7. Validate with `forgecad run <file>` (add `--debug-imports` for import chain issues). This works for notebook preview cells too.
-8. For `jointsView()` animations, keep wrapped revolute tracks continuous across branch cuts; do not assume the viewport will auto-fix `-180/180` jumps.
+3. Reuse patterns from `examples/api/` before inventing from scratch.
+4. Default to a concrete first pass — easy iteration beats speculative design review.
+5. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
+6. Validate with `npm run test-run -- <file>` (add `--debug-imports` for import chain issues).
+7. For `jointsView()` animations, keep wrapped revolute tracks continuous across branch cuts; do not assume the viewport will auto-fix `-180/180` jumps.
 
 ### Import and Composition
 
@@ -26,52 +25,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 ### Notebooks
 
-Use `.forge-notebook.json` for stateful iteration and debugging. Cells share state, `show()` pins visible geometry, and the preview cell can be validated or rendered directly from the CLI.
-
-Prefer notebooks when:
-
-- the task is exploratory or the geometry strategy is still unclear
-- you are debugging booleans, placements, or assembly kinematics
-- you want to inspect intermediate shapes or sketches without rewriting the whole file
-
-Useful notebook loop:
-
-- keep stable setup in early cells and the current experiment in the preview cell
-- use `show(...)` for intermediate geometry you want pinned in the viewport
-- use `forgecad notebook view <file> preview` to inspect the notebook from the terminal
-- use `forgecad run <file>.forge-notebook.json` for preview-cell validation and spatial analysis
-- use `forgecad render <file>.forge-notebook.json` or `forgecad capture gif <file>.forge-notebook.json --list` to inspect the preview cell through the CLI
-- export to `.forge.js` when the exploratory phase is over and the structure is ready to stabilize
-
-```
-forgecad notebook --help
-forgecad notebook
-
-Append, execute, inspect, and export `.forge-notebook.json` files.
-
-Usage:
-  forgecad notebook <notebook.forge-notebook.json>
-  forgecad notebook <notebook.forge-notebook.json> --code "show(box(40, 20, 10));"
-  forgecad notebook append <notebook.forge-notebook.json> --file /tmp/cell.js
-  forgecad notebook run <notebook.forge-notebook.json> [cell-id]
-  forgecad notebook view <notebook.forge-notebook.json> [cell-number|cell-id|preview]
-  forgecad notebook export <notebook.forge-notebook.json> [output.forge.js]
-
-Options:
-  --code <code>      Append inline cell source
-  --file <path>      Read cell source from a file
-  --after <cell-id>  Insert after a specific cell id
-  --server <url>     Reuse an existing Forge server
-  --port <n>         Preferred port when auto-starting the server
-
-Examples:
-  forgecad notebook examples/demo.forge-notebook.json --code "show(box(40, 20, 10));"
-  forgecad notebook view examples/api/notebook-iteration.forge-notebook.json preview
-  cat /tmp/cell.js | forgecad notebook examples/demo.forge-notebook.json
-  forgecad notebook export examples/demo.forge-notebook.json out/demo.forge.js
-```
-
-Don't write the `.forge-notebook.json` manually.
+Use `.forge-notebook.json` for stateful iteration and debugging. Cells share state, `show()` pins visible geometry. Export to `.forge.js` when done.
 
 ## Source Map
 
