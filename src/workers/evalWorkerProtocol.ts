@@ -2,6 +2,7 @@ import type {
   ForgeQualityPreset,
   LogEntry,
   ParamDef,
+  VerificationResult,
 } from '@forge/index';
 import type { DimensionDef } from '../forge/sketch/dimensions';
 import type { BomDef } from '../forge/bom';
@@ -79,6 +80,7 @@ export interface SerializedRunResult {
   error: string | null;
   timeMs: number;
   logs: LogEntry[];
+  verifications: VerificationResult[];
 }
 
 // ---- Message types ----

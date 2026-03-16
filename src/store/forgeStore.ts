@@ -358,6 +358,11 @@ interface ForgeStore {
   fileSwitcherOpen: boolean;
   openFileSwitcher: () => void;
   closeFileSwitcher: () => void;
+
+  /** Non-null when the UI wants the code editor to jump to a specific line. */
+  editorNavigate: { line: number; id: number } | null;
+  requestEditorNavigate: (line: number) => void;
+  clearEditorNavigate: () => void;
 }
 
 interface ViewPreferencesState {
@@ -564,6 +569,7 @@ function createErrorRunResult(message: string, quality: ForgeQualityPreset): Run
     error: message,
     timeMs: 0,
     logs: [{ level: 'error', args: [message], timestamp: Date.now() }],
+    verifications: [],
   };
 }
 
@@ -1603,4 +1609,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   fileSwitcherOpen: false,
   openFileSwitcher: () => set({ fileSwitcherOpen: true }),
   closeFileSwitcher: () => set({ fileSwitcherOpen: false }),
+
+  editorNavigate: null,
+  requestEditorNavigate: (line) => set((s) => ({ editorNavigate: { line, id: (s.editorNavigate?.id ?? 0) + 1 } })),
+  clearEditorNavigate: () => set({ editorNavigate: null }),
 }));

@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
+import type * as Monaco from 'monaco-editor';
 import { useForgeStore } from '../store/forgeStore';
 
 const FORGE_TYPES = `
@@ -1195,6 +1196,50 @@ declare function explodeView(options?: ExplodeViewOptions): void;
 declare function jointsView(options?: JointsViewOptions): void;
 /** Configure viewport helper visuals (hovered joint axis/arc, stroke sizes, colors). */
 declare function viewConfig(options?: ViewConfigOptions): void;
+
+// --- Verification API ---
+type VerifyShapeLike = { boundingBox(): { min: number[]; max: number[] }; isEmpty(): boolean; volume(): number; surfaceArea(): number; minGap(other: VerifyShapeLike, searchLength: number): number };
+type VerifyFaceRef = { normal: [number, number, number]; center: [number, number, number] };
+declare const verify: {
+  /** Custom predicate check. Fails if the function returns false or throws. */
+  that(label: string, check: () => boolean, message?: string): void;
+  /** Check that two numbers are approximately equal within tolerance. */
+  equal(label: string, actual: number, expected: number, tolerance?: number, message?: string): void;
+  /** Check that two numbers differ by more than tolerance. */
+  notEqual(label: string, actual: number, unexpected: number, tolerance?: number, message?: string): void;
+  /** Check that actual > min. */
+  greaterThan(label: string, actual: number, min: number, message?: string): void;
+  /** Check that actual < max. */
+  lessThan(label: string, actual: number, max: number, message?: string): void;
+  /** Check that min <= actual <= max. */
+  inRange(label: string, actual: number, min: number, max: number, message?: string): void;
+  /** Check that bounding-box centers of two shapes coincide within tolerance (mm). */
+  centersCoincide(label: string, a: VerifyShapeLike, b: VerifyShapeLike, tolerance?: number): void;
+  /** Check that two shapes do not overlap (minGap > 0). */
+  notColliding(label: string, a: VerifyShapeLike, b: VerifyShapeLike, searchLength?: number): void;
+  /** Check that minimum gap between shapes is at least minGap mm. */
+  minClearance(label: string, a: VerifyShapeLike, b: VerifyShapeLike, minGap: number, searchLength?: number): void;
+  /** Check that two face normals are parallel within toleranceDeg degrees. */
+  parallel(label: string, faceA: VerifyFaceRef, faceB: VerifyFaceRef, toleranceDeg?: number): void;
+  /** Check that two face normals are perpendicular within toleranceDeg degrees. */
+  perpendicular(label: string, faceA: VerifyFaceRef, faceB: VerifyFaceRef, toleranceDeg?: number): void;
+  /** Check that two faces are coplanar (parallel + same offset plane). */
+  coplanar(label: string, faceA: VerifyFaceRef, faceB: VerifyFaceRef, toleranceDeg?: number, toleranceMm?: number): void;
+  /** Check that a face center is at the expected position within toleranceMm. */
+  faceAt(label: string, face: VerifyFaceRef, expectedPos: [number, number, number], toleranceMm?: number): void;
+  /** Check that two face normals point in the same direction (not antiparallel). */
+  sameDirection(label: string, faceA: VerifyFaceRef, faceB: VerifyFaceRef, toleranceDeg?: number): void;
+  /** Check that a shape isEmpty() returns true. */
+  isEmpty(label: string, shape: VerifyShapeLike, message?: string): void;
+  /** Check that a shape is not empty. */
+  notEmpty(label: string, shape: VerifyShapeLike, message?: string): void;
+  /** Check that shape volume ≈ expected mm³ within tolerance. */
+  volumeApprox(label: string, shape: VerifyShapeLike, expected: number, tolerance?: number): void;
+  /** Check that shape surface area ≈ expected mm² within tolerance. */
+  areaApprox(label: string, shape: VerifyShapeLike, expected: number, tolerance?: number): void;
+  /** Check that bounding box dimensions ≈ [sizeX, sizeY, sizeZ] within tolerance mm. */
+  boundingBoxSize(label: string, shape: VerifyShapeLike, expectedSize: [number, number, number], tolerance?: number): void;
+};
 `;
 
 export function CodeEditor() {
@@ -1207,15 +1252,30 @@ export function CodeEditor() {
   const loadFromText = useForgeStore((s) => s.loadFromText);
   const theme = useForgeStore((s) => s.theme);
   const saveFile = useForgeStore((s) => s.saveFile);
+  const editorNavigate = useForgeStore((s) => s.editorNavigate);
+  const clearEditorNavigate = useForgeStore((s) => s.clearEditorNavigate);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
 
   const code = files[activeFile] ?? '';
 
   // Clear pending save timer when switching files so we don't auto-save stale content
   useEffect(() => () => clearTimeout(saveTimerRef.current), [activeFile]);
 
+  // Navigate to a source line when requested (e.g. clicking a failing verify check)
+  useEffect(() => {
+    if (!editorNavigate || !editorRef.current) return;
+    const editor = editorRef.current;
+    const { line } = editorNavigate;
+    editor.revealLineInCenter(line);
+    editor.setPosition({ lineNumber: line, column: 1 });
+    editor.focus();
+    clearEditorNavigate();
+  }, [editorNavigate, clearEditorNavigate]);
+
   const handleMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
     monaco.languages.typescript.javascriptDefaults.addExtraLib(FORGE_TYPES, 'forge.d.ts');
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
       noSemanticValidation: true,
@@ -1285,11 +1345,26 @@ export function CodeEditor() {
           {result.error}
         </div>
       )}
-      {result && !result.error && !isEvaluating && (
-        <div style={{ padding: '4px 12px', background: 'var(--fc-successBg)', color: 'var(--fc-success)', fontSize: 12, fontFamily: 'monospace' }}>
-          ✓ {result.timeMs.toFixed(1)}ms
-        </div>
-      )}
+      {result && !result.error && !isEvaluating && (() => {
+        const failCount = result.verifications?.filter((v) => v.status === 'fail').length ?? 0;
+        return (
+          <div style={{
+            padding: '4px 12px',
+            background: failCount > 0 ? 'var(--fc-warningBg, rgba(230,168,23,0.12))' : 'var(--fc-successBg)',
+            color: failCount > 0 ? 'var(--fc-warning, #e6a817)' : 'var(--fc-success)',
+            fontSize: 12,
+            fontFamily: 'monospace',
+            display: 'flex',
+            gap: 10,
+            alignItems: 'center',
+          }}>
+            <span>✓ {result.timeMs.toFixed(1)}ms</span>
+            {failCount > 0 && (
+              <span>⚠ {failCount} check{failCount !== 1 ? 's' : ''} failed</span>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
