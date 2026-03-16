@@ -15,6 +15,8 @@ export * from './fillets';
 export * from './arcBridge';
 export * from './dimensions';
 export * from './curves';
+export * from './regions';
+export * from './arrangement';
 export * from './svgImport';
 export { text2d, textWidth } from './text';
 export type { TextOptions } from './text';

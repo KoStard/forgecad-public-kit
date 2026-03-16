@@ -24,6 +24,9 @@ import {
   intersection2d,
   hull2d,
   runScript,
+  constrainedSketch,
+  sketchRegions,
+  sketchRegion,
 } from '../src/forge/headless';
 
 const EPS = 1e-6;
@@ -294,6 +297,209 @@ return difference([base, hole1, hole2]);
   );
 }
 
+// ─── Step 1: sketch.regions() / sketch.region() ─────────────────────────────
+
+function checkSketchRegions(): void {
+  // Single continuous sketch → one region
+  const solid = rect(60, 40);
+  const solidRegions = solid.regions();
+  assert.equal(solidRegions.length, 1, 'solid rect should have 1 region');
+  expectClose(solidRegions[0].area(), solid.area(), 'region area matches sketch area');
+
+  // Two disconnected rectangles → two regions
+  const twoRects = union2d(rect(40, 40), rect(40, 40).translate(60, 0));
+  const twoRegions = twoRects.regions();
+  assert.equal(twoRegions.length, 2, 'two disconnected rects should yield 2 regions');
+  expectClose(twoRegions[0].area(), twoRegions[1].area(), 'both rect regions same area');
+
+  // Frame (donut-like) → one region (ring shape)
+  const frame = rect(100, 60).subtract(rect(80, 40, true));
+  const frameRegions = frame.regions();
+  assert.equal(frameRegions.length, 1, 'frame should have 1 ring-shaped region');
+  expectClose(frameRegions[0].area(), frame.area(), 'frame region area matches frame area');
+
+  // Donut (circle minus circle) → one region
+  const donut = circle2d(50).subtract(circle2d(30));
+  const donutRegions = donut.regions();
+  assert.equal(donutRegions.length, 1, 'donut should have 1 region');
+  assert(donutRegions[0].area() > 0, 'donut region should have positive area');
+  assert(donutRegions[0].area() < circle2d(50).area(), 'donut region smaller than full circle');
+
+  // sketch.region(seed) — pick one of two disconnected boxes
+  const pair = union2d(rect(40, 40), rect(40, 40).translate(60, 0));
+  const leftBox = pair.region([20, 20]);
+  const rightBox = pair.region([80, 20]);
+  assert(leftBox.area() > 0, 'left seed should resolve a region');
+  assert(rightBox.area() > 0, 'right seed should resolve a region');
+  expectClose(leftBox.area(), rightBox.area(), 'both boxes should be equal area');
+
+  // Extrude a picked region (smoke test — should not throw)
+  const extruded = leftBox.extrude(10);
+  assert(extruded != null, 'extrude on region should produce a shape');
+
+  // region() with seed in hole → throws
+  assert.throws(
+    () => donut.region([0, 0]),
+    /seed point .* is not inside any/,
+    'seed inside the hole should throw',
+  );
+
+  // region() on empty sketch → throws
+  assert.throws(
+    () => rect(0, 0).region([0, 0]),
+    /no filled area/,
+    'region on empty sketch should throw',
+  );
+
+  // regions() regions are sorted largest-first
+  const big = rect(100, 100);
+  const small = rect(20, 20).translate(200, 0);
+  const mixed = union2d(big, small);
+  const sorted = mixed.regions();
+  assert.equal(sorted.length, 2, 'should have 2 regions');
+  assert(sorted[0].area() >= sorted[1].area(), 'regions should be sorted largest-first');
+}
+
+// ─── Step 2: ConstraintSketch.detectArrangement() ───────────────────────────
+
+function checkArrangementDetection(): void {
+  // Simple case: a rectangle drawn as 4 lines (no explicit loop)
+  const b1 = constrainedSketch();
+  const p00 = b1.point(0, 0); const p10 = b1.point(100, 0);
+  const p11 = b1.point(100, 60); const p01 = b1.point(0, 60);
+  b1.line(p00, p10); b1.line(p10, p11); b1.line(p11, p01); b1.line(p01, p00);
+  const sk1 = b1.solve();
+  const regions1 = sk1.detectArrangement();
+  assert.equal(regions1.length, 1, 'simple closed rectangle should yield 1 region');
+  expectClose(regions1[0].area(), 100 * 60, 'rectangle region area');
+
+  // Divided rectangle: 2 cells separated by a vertical line through the middle
+  const b2 = constrainedSketch();
+  const q00 = b2.point(0, 0);  const q10 = b2.point(100, 0);
+  const q11 = b2.point(100, 60); const q01 = b2.point(0, 60);
+  const qm0 = b2.point(50, 0);  const qm1 = b2.point(50, 60);
+  b2.line(q00, qm0); b2.line(qm0, q10); // bottom in 2 segments
+  b2.line(q10, q11); b2.line(q11, q01); b2.line(q01, q00);
+  b2.line(qm0, qm1); // divider
+  const sk2 = b2.solve();
+  const regions2 = sk2.detectArrangement();
+  assert.equal(regions2.length, 2, 'divided rectangle should yield 2 cells');
+  expectClose(regions2[0].area() + regions2[1].area(), 100 * 60, 'total area preserved');
+
+  // detectArrangementRegion(seed) — pick left cell
+  const leftCell = sk2.detectArrangementRegion([25, 30]);
+  assert(leftCell.area() > 0, 'left seed should pick a region');
+  expectClose(leftCell.area(), 50 * 60, 'left cell should be 50x60');
+
+  // detectArrangementRegion — pick right cell
+  const rightCell = sk2.detectArrangementRegion([75, 30]);
+  expectClose(rightCell.area(), 50 * 60, 'right cell should be 50x60');
+
+  // X-crossing: two lines crossing at 45° — should create 4 triangular faces
+  // (or more complex depending on arrangement, but at least > 1 face)
+  const b3 = constrainedSketch();
+  // Enclosed diamond: 4 segments forming a diamond
+  const dTop = b3.point(50, 80);  const dBot = b3.point(50, 0);
+  const dLeft = b3.point(0, 40);  const dRight = b3.point(100, 40);
+  b3.line(dTop, dRight); b3.line(dRight, dBot);
+  b3.line(dBot, dLeft);  b3.line(dLeft, dTop);
+  const sk3 = b3.solve();
+  const regions3 = sk3.detectArrangement();
+  assert.equal(regions3.length, 1, 'diamond should yield 1 region');
+  assert(regions3[0].area() > 0, 'diamond region has area');
+
+  // Construction lines are excluded from arrangement detection
+  const b4 = constrainedSketch();
+  const r0 = b4.point(0, 0); const r1 = b4.point(50, 0);
+  const r2 = b4.point(50, 50); const r3 = b4.point(0, 50);
+  b4.line(r0, r1); b4.line(r1, r2); b4.line(r2, r3); b4.line(r3, r0);
+  // Add a construction diagonal — should NOT create extra arrangement regions
+  b4.line(r0, r2, true /* construction */);
+  const sk4 = b4.solve();
+  const regions4 = sk4.detectArrangement();
+  assert.equal(regions4.length, 1, 'construction lines should not create extra regions');
+
+  // detectArrangementRegion throws when seed is outside all regions
+  assert.throws(
+    () => sk1.detectArrangementRegion([200, 200]),
+    /seed point .* is not inside any/,
+    'out-of-bounds seed should throw',
+  );
+
+  // Smoke test: extrude a detected arrangement region
+  const extruded = regions1[0].extrude(5);
+  assert(extruded != null, 'extruding an arrangement region should work');
+}
+
+// ─── Step 3: Cross-sketch reference geometry ─────────────────────────────────
+
+function checkCrossSketchReferences(): void {
+  // referencePoint: adds a fixed anchor, verify it is fixed and in definition
+  const b = constrainedSketch();
+  const refPt = b.referencePoint(30, 70);
+  // New point with a free point coincident to it — after solving, free point
+  // should snap to (30, 70)
+  const freePt = b.point(0, 0);
+  b.coincident(freePt, refPt);
+  const freeP2 = b.point(0, 100);
+  b.line(freePt, freeP2);
+  b.addLoop([freePt, freeP2, b.point(50, 100)]);
+  const sk = b.solve();
+  const solved = sk.definition.points.find((p) => p.id === freePt);
+  assert(solved, 'free point should still exist after solve');
+  expectClose(solved!.x, 30, 'free point snapped to reference X');
+  expectClose(solved!.y, 70, 'free point snapped to reference Y');
+
+  // referenceLine: adds a fixed construction line
+  const b2 = constrainedSketch();
+  const refLine = b2.referenceLine(0, 0, 100, 0); // horizontal baseline
+  // Draw a line parallel to the reference baseline
+  const pl1 = b2.point(10, 30); const pl2 = b2.point(90, 30);
+  const mainLine = b2.line(pl1, pl2);
+  b2.parallel(mainLine, refLine);
+  b2.fix(pl1, 10, 30);
+  b2.addLoop([pl1, pl2, b2.point(90, 60), b2.point(10, 60)]);
+  const sk2 = b2.solve();
+  assert.equal(sk2.constraintMeta.status, 'under', 'sketch should be under-constrained (some free points remain)');
+  // The important thing: no constraint was rejected (parallel succeeded)
+  assert.equal(sk2.constraintMeta.rejected.length, 0, 'no constraints should be rejected');
+
+  // referenceFrom: import a solved sketch's entities into a new builder
+  const builderA = constrainedSketch();
+  const a1 = builderA.point(0, 0); const a2 = builderA.point(100, 0);
+  const aLine = builderA.line(a1, a2);
+  builderA.fix(a1, 0, 0); builderA.horizontal(aLine); builderA.length(aLine, 100);
+  const sketchA = builderA.solve();
+
+  const builderB = constrainedSketch();
+  const refImported = builderB.referenceFrom(sketchA, aLine);
+  assert(refImported !== null, 'referenceFrom should return a LineId');
+  // Add a point above the reference line, constrain to be on the vertical axis
+  const bp1 = builderB.point(0, 50);
+  const bp2 = builderB.point(100, 50);
+  const bLine = builderB.line(bp1, bp2);
+  builderB.parallel(bLine, refImported as string);
+  builderB.fix(bp1, 0, 50); builderB.length(bLine, 100);
+  builderB.addLoop([bp1, bp2, builderB.point(100, 80), builderB.point(0, 80)]);
+  const sketchB = builderB.solve();
+  assert.equal(sketchB.constraintMeta.rejected.length, 0, 'cross-sketch parallel should resolve');
+
+  // referenceAllFrom: bulk import all entities
+  const builderC = constrainedSketch();
+  const refs = builderC.referenceAllFrom(sketchA);
+  assert(refs.points.size > 0, 'referenceAllFrom should import points');
+  assert(refs.lines.size > 0, 'referenceAllFrom should import lines');
+  // Every imported point should map to a valid reference
+  for (const [origId, newId] of refs.points) {
+    assert(origId.startsWith('pt-') || origId.startsWith('ref-'), 'original ID should be a point');
+    assert(newId.startsWith('ref-pt-'), 'new ID should be a reference point');
+  }
+
+  // referenceFrom returns null for unknown entity ID
+  const nullResult = builderC.referenceFrom(sketchA, 'nonexistent-id');
+  assert.equal(nullResult, null, 'referenceFrom with unknown ID should return null');
+}
+
 export async function runCheckApiContractsCli(): Promise<void> {
   await init();
   checkShapeBooleanForms();
@@ -303,5 +509,8 @@ export async function runCheckApiContractsCli(): Promise<void> {
   checkEdgeFinishSubsetErrors();
   checkSheetMetalApiContracts();
   checkSandboxBindings();
+  checkSketchRegions();
+  checkArrangementDetection();
+  checkCrossSketchReferences();
   console.log('✓ Script API contract invariants passed');
 }
