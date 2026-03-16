@@ -102,3 +102,40 @@ Creates a star shape.
 ```javascript
 const star5 = star(5, 30, 15);
 ```
+
+### `text2d(content, options?)`
+Renders a string as a filled 2D sketch using the built-in "Forge Mono" geometric font — a clean, angular, monoline typeface designed to extrude and engrave crisply.  Supports A–Z (case-insensitive), 0–9, and common punctuation.
+
+**Parameters:**
+- `content` (string) - Text to render
+- `options.size` (number) - Cap height in model units. Default: `10`
+- `options.letterSpacing` (number) - Extra spacing between characters in model units. Default: `0`
+- `options.align` (`'left' | 'center' | 'right'`) - Horizontal alignment relative to x = 0. Default: `'left'`
+- `options.baseline` (`'baseline' | 'center' | 'top'`) - Vertical alignment relative to y = 0. Default: `'baseline'`
+
+**Returns:** `Sketch`
+
+```javascript
+// Extruded nameplate
+text2d('FORGE CAD', { size: 8 }).extrude(1.5)
+
+// Centered label
+text2d('V 2.0', { size: 6, align: 'center', baseline: 'center' }).extrude(0.8)
+
+// Engraved into a face
+myPart.cut(text2d('A-001', { size: 4 }).onFace(myPart, 'top'), { depth: 0.5 })
+```
+
+### `textWidth(content, options?)`
+Returns the rendered advance width of a string in model units, using the same metrics as `text2d`.
+
+**Parameters:**
+- `content` (string) - Text to measure
+- `options.size` (number) - Cap height in model units. Default: `10`
+- `options.letterSpacing` (number) - Extra spacing between characters. Default: `0`
+
+**Returns:** `number`
+
+```javascript
+const w = textWidth('HELLO', { size: 10 }); // total advance width
+```

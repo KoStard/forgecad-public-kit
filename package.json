@@ -34,6 +34,7 @@
     "test:examples": "npm run test:prepare && node dist-cli/forgecad.js check examples",
     "test:brep": "npm run test:prepare && node dist-cli/forgecad.js check brep",
     "test:api": "npm run test:prepare && node dist-cli/forgecad.js check api",
+    "test:text": "npm run test:prepare && node dist-cli/forgecad.js check text",
     "build:skill:forgecad": "node scripts/build-forgecad-skill.mjs",
     "prepare": "npm run build:cli",
     "prepublishOnly": "npm run build && npm run build:skill:forgecad",
