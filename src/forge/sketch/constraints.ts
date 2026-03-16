@@ -228,6 +228,13 @@ export interface SketchConstraintMeta {
     lines: { a: [number, number]; b: [number, number] }[];
     circles: { center: [number, number]; radius: number }[];
   };
+  /** Non-construction geometry edges — rendered as solid wireframe so all
+   *  sketch edges are visible even when covered by the filled region. */
+  edges: {
+    lines: { a: [number, number]; b: [number, number] }[];
+    circles: { center: [number, number]; radius: number }[];
+    points: [number, number][];
+  };
 }
 
 export interface ConstraintDefinition {
@@ -535,6 +542,32 @@ const buildConstructionGeometry = (def: ConstraintDefinition): SketchConstraintM
     .filter((circle): circle is { center: [number, number]; radius: number } => circle !== null);
 
   return { lines, circles };
+};
+
+const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMeta['edges'] => {
+  const pointMap = new Map(def.points.map((p) => [p.id, p] as const));
+  const lines = def.lines
+    .filter((line) => !line.construction)
+    .map((line) => {
+      const a = pointMap.get(line.a);
+      const b = pointMap.get(line.b);
+      if (!a || !b) return null;
+      return { a: [a.x, a.y] as [number, number], b: [b.x, b.y] as [number, number] };
+    })
+    .filter((line): line is { a: [number, number]; b: [number, number] } => line !== null);
+
+  const circles = def.circles
+    .filter((circle) => !circle.construction)
+    .map((circle) => {
+      const center = pointMap.get(circle.center);
+      if (!center) return null;
+      return { center: [center.x, center.y] as [number, number], radius: circle.radius };
+    })
+    .filter((circle): circle is { center: [number, number]; radius: number } => circle !== null);
+
+  const points = def.points.map((p) => [p.x, p.y] as [number, number]);
+
+  return { lines, circles, points };
 };
 
 const applyFixedConstraint = (pt: SketchPoint, constraint: FixedConstraint): void => {
@@ -1654,7 +1687,8 @@ export const solveConstraintDefinition = (
   );
   const sketch = buildSketchFromDefinition(working);
   const construction = buildConstructionGeometry(working);
-  return new ConstraintSketch(sketch.cross, { status, maxError, constraints, rejected, construction }, working);
+  const edges = buildEdgeGeometry(working);
+  return new ConstraintSketch(sketch.cross, { status, maxError, constraints, rejected, construction, edges }, working);
 };
 
 export const updateConstraintValue = (

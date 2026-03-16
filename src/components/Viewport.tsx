@@ -2042,6 +2042,34 @@ function SketchObject({
     });
   }, [obj.sketchMeta]);
 
+  const edgeLines = useMemo(() => {
+    const meta = obj.sketchMeta?.edges;
+    if (!meta) return { lines: [] as THREE.BufferGeometry[], circles: [] as THREE.BufferGeometry[], points: [] as THREE.BufferGeometry[] };
+    const lines = meta.lines.map((line) =>
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(line.a[0], line.a[1], 0.01),
+        new THREE.Vector3(line.b[0], line.b[1], 0.01),
+      ]),
+    );
+    const segments = 64;
+    const circles = meta.circles.map((circle) => {
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= segments; i += 1) {
+        const angle = (i / segments) * Math.PI * 2;
+        pts.push(new THREE.Vector3(
+          circle.center[0] + Math.cos(angle) * circle.radius,
+          circle.center[1] + Math.sin(angle) * circle.radius,
+          0.01,
+        ));
+      }
+      return new THREE.BufferGeometry().setFromPoints(pts);
+    });
+    const points = meta.points.map((p) =>
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p[0], p[1], 0.01)]),
+    );
+    return { lines, circles, points };
+  }, [obj.sketchMeta]);
+
   const constructionLines = useMemo(() => {
     const meta = obj.sketchMeta?.construction;
     if (!meta) return [] as THREE.Line[];
@@ -2110,6 +2138,27 @@ function SketchObject({
         <primitive
           key={`pt-${i}`}
           object={new THREE.Points(geo, new THREE.PointsMaterial({ color: constraintColor, size: 5 }))}
+          raycast={() => null}
+        />
+      ))}
+      {edgeLines.lines.map((geo, i) => (
+        <primitive
+          key={`el-${i}`}
+          object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: constraintColor, linewidth: 2, transparent: true, opacity: settings.opacity }))}
+          raycast={() => null}
+        />
+      ))}
+      {edgeLines.circles.map((geo, i) => (
+        <primitive
+          key={`ec-${i}`}
+          object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: constraintColor, linewidth: 2, transparent: true, opacity: settings.opacity }))}
+          raycast={() => null}
+        />
+      ))}
+      {edgeLines.points.map((geo, i) => (
+        <primitive
+          key={`ep-${i}`}
+          object={new THREE.Points(geo, new THREE.PointsMaterial({ color: '#ffffff', size: 6 }))}
           raycast={() => null}
         />
       ))}
