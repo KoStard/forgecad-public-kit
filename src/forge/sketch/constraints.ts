@@ -502,7 +502,12 @@ const buildSketchFromDefinition = (def: ConstraintDefinition): Sketch => {
   });
 
   if (loops.length === 0) {
-    throw new Error('Constrained sketch needs at least one closed loop');
+    // Allow loop-less sketches — useful when the sketch is used purely for
+    // detectArrangement() which computes regions from the line geometry directly,
+    // without needing any explicit loops. Return an empty cross-section.
+    // CrossSection([]) crashes in Manifold, so use difference-of-self instead.
+    const unit = getWasm().CrossSection.square([1, 1], false);
+    return new Sketch(getWasm().CrossSection.difference([unit, unit]));
   }
 
   return union2d(...loops);
@@ -1058,6 +1063,24 @@ export class ConstraintSketch extends Sketch {
     super(cross);
   }
 
+  /**
+   * Enumerate all bounded regions formed by the line arrangement of this sketch.
+   * Does not require explicit loops — the algorithm infers enclosed areas from
+   * intersecting line geometry. Construction lines are excluded.
+   * Regions are returned largest-first by area.
+   *
+   * See `arrangement.ts` for full documentation and examples.
+   */
+  detectArrangement(): Sketch[] { throw new Error('Not implemented'); }
+
+  /**
+   * Select the single arrangement region that contains the given seed point.
+   * Throws if no region contains the seed.
+   *
+   * See `arrangement.ts` for full documentation.
+   */
+  detectArrangementRegion(seed: [number, number]): Sketch { throw new Error('Not implemented'); }
+
   withUpdatedConstraint(constraintId: string, value: number): ConstraintSketch {
     const next = cloneDefinition(this.definition);
     const target = next.constraints.find((c) => c.id === constraintId);
@@ -1473,6 +1496,141 @@ export class ConstrainedSketchBuilder {
       left: this.line(tl, bl),
       points: [bl, br, tr, tl],
     };
+  }
+
+  // ─── Cross-sketch reference geometry ───────────────────────────────────────
+
+  /**
+   * Add a fixed reference point at (x, y).
+   *
+   * Reference points are `fixed: true` (the solver never moves them) and do
+   * not belong to any loop (they don't contribute to the sketch profile area).
+   * They are useful as anchors for coincident / distance / collinear constraints
+   * that relate this sketch's geometry to an external coordinate.
+   *
+   * @returns The PointId of the new reference point.
+   */
+  referencePoint(x: number, y: number): PointId {
+    const id = `ref-pt-${this.nextId++}`;
+    this.points.push({ id, x, y, fixed: true });
+    return id;
+  }
+
+  /**
+   * Add a fixed reference line from (x1, y1) to (x2, y2).
+   *
+   * Both endpoints are fixed and the line is marked construction — it guides
+   * constraints but never contributes to the profile area. Useful for importing
+   * a baseline or edge from another sketch so this sketch's geometry can be
+   * constrained relative to it.
+   *
+   * @returns The LineId of the new reference line.
+   */
+  referenceLine(x1: number, y1: number, x2: number, y2: number): LineId {
+    const a = this.referencePoint(x1, y1);
+    const b = this.referencePoint(x2, y2);
+    const id = `ref-ln-${this.nextId++}`;
+    this.lines.push({ id, a, b, construction: true });
+    return id;
+  }
+
+  /**
+   * Import a single named entity (point or line) from a solved `ConstraintSketch`
+   * as fixed reference geometry in this builder.
+   *
+   * The entity is identified by its ID (e.g., `"pt-1"`, `"ln-3"`).
+   * - Points become `fixed: true` points.
+   * - Lines become `construction: true` lines with both endpoints fixed.
+   *
+   * Imported entities fully participate in constraint solving — you can add
+   * `coincident`, `collinear`, `parallel`, `distance`, etc. constraints
+   * between this sketch's geometry and the imported reference.
+   *
+   * @param source - A solved ConstraintSketch (from another builder's `.solve()`).
+   * @param entityId - The point or line ID to import.
+   * @returns The PointId or LineId of the imported entity in this builder,
+   *          or `null` if the entity ID was not found in the source sketch.
+   *
+   * @example
+   * // Sketch A: a horizontal baseline
+   * const builderA = constrainedSketch();
+   * const a1 = builderA.point(0, 0);
+   * const a2 = builderA.point(100, 0);
+   * const baseline = builderA.line(a1, a2);
+   * builderA.fix(a1, 0, 0); builderA.horizontal(baseline); builderA.length(baseline, 100);
+   * const sketchA = builderA.solve();
+   *
+   * // Sketch B: geometry constrained to sit on top of A's baseline
+   * const builderB = constrainedSketch();
+   * const refLine = builderB.referenceFrom(sketchA, baseline); // import A's baseline
+   * const b1 = builderB.point(20, 30);
+   * const b2 = builderB.point(80, 30);
+   * // Constrain b1 to be directly above the baseline's left endpoint
+   * builderB.collinear(b1, builderB.referenceLine(0, 0, 0, 100)); // vertical axis
+   * builderB.distance(b1, refLine !== null ? builderB.referencePoint(0, 0) : b1, 20);
+   */
+  referenceFrom(source: ConstraintSketch, entityId: string): PointId | LineId | null {
+    // Try to find as a point first
+    const srcPoint = source.definition.points.find((p) => p.id === entityId);
+    if (srcPoint) {
+      return this.referencePoint(srcPoint.x, srcPoint.y);
+    }
+    // Try as a line
+    const srcLine = source.definition.lines.find((l) => l.id === entityId);
+    if (srcLine) {
+      const srcA = source.definition.points.find((p) => p.id === srcLine.a);
+      const srcB = source.definition.points.find((p) => p.id === srcLine.b);
+      if (srcA && srcB) {
+        return this.referenceLine(srcA.x, srcA.y, srcB.x, srcB.y);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Import ALL non-construction entities from a solved `ConstraintSketch` as
+   * fixed reference geometry. Points become fixed reference points; lines become
+   * fixed construction lines.
+   *
+   * Returns a map of original-ID → new-ID for both points and lines, so you can
+   * reference specific imported entities by their original names.
+   *
+   * Useful when you want to build a second sketch that is fully anchored to the
+   * complete geometry of an existing sketch.
+   *
+   * @example
+   * // Import sketch A's entire geometry as a reference baseline in sketch B
+   * const builderB = constrainedSketch();
+   * const refs = builderB.referenceAllFrom(sketchA);
+   * // Now constrain new geometry against imported references:
+   * const b1 = builderB.point(50, 20);
+   * builderB.coincident(b1, refs.points.get('pt-1')!); // snap to A's first point
+   */
+  referenceAllFrom(
+    source: ConstraintSketch,
+  ): { points: Map<string, PointId>; lines: Map<string, LineId> } {
+    const pointMap = new Map<string, PointId>();
+    const lineMap = new Map<string, LineId>();
+
+    // Import all non-fixed source points (fixed = already a reference in the source)
+    // We import ALL points so lines can be resolved, but construction-only points
+    // (those not referenced by any non-construction line) are still useful anchors.
+    for (const p of source.definition.points) {
+      pointMap.set(p.id, this.referencePoint(p.x, p.y));
+    }
+
+    // Import all non-construction lines as construction reference lines
+    for (const l of source.definition.lines) {
+      if (l.construction) continue;
+      const aId = pointMap.get(l.a);
+      const bId = pointMap.get(l.b);
+      if (!aId || !bId) continue;
+      const newLineId = `ref-ln-${this.nextId++}`;
+      this.lines.push({ id: newLineId, a: aId, b: bId, construction: true });
+      lineMap.set(l.id, newLineId);
+    }
+
+    return { points: pointMap, lines: lineMap };
   }
 }
 

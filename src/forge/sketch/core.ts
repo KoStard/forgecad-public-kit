@@ -104,6 +104,18 @@ export class Sketch {
   warp(fn: (vert: [number, number]) => void): Sketch {
     return copySketchPlacement3D(this, new Sketch(this.cross.warp(fn as any), this.colorHex));
   }
+  /**
+   * Decompose this sketch into its distinct filled regions. See `sketchRegions()`.
+   * Regions are returned largest-first by area.
+   */
+  regions(): Sketch[] { throw new Error('Not implemented'); }
+
+  /**
+   * Select the single filled region that contains the given 2D seed point.
+   * Throws if the seed is outside all regions. See `sketchRegion()`.
+   */
+  region(seed: [number, number]): Sketch { throw new Error('Not implemented'); }
+
   extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean; }): Shape | any { throw new Error('Not implemented'); }
   revolve(degrees?: number, segments?: number): Shape { throw new Error('Not implemented'); }
   attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: [number, number]): Sketch { throw new Error('Not implemented'); }
