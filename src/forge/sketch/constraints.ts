@@ -19,6 +19,8 @@ export type ConstraintType =
   | 'concentric'
   | 'collinear'
   | 'fixed'
+  | 'midpoint'
+  | 'pointOnCircle'
   | 'distance'
   | 'length'
   | 'angle'
@@ -127,6 +129,18 @@ export interface FixedConstraint extends BaseConstraint {
   y: number;
 }
 
+export interface MidpointConstraint extends BaseConstraint {
+  type: 'midpoint';
+  point: PointId;
+  line: LineId;
+}
+
+export interface PointOnCircleConstraint extends BaseConstraint {
+  type: 'pointOnCircle';
+  point: PointId;
+  circle: CircleId;
+}
+
 export interface DistanceConstraint extends BaseConstraint {
   type: 'distance';
   a: PointId;
@@ -185,6 +199,8 @@ export type SketchConstraint =
   | ConcentricConstraint
   | CollinearConstraint
   | FixedConstraint
+  | MidpointConstraint
+  | PointOnCircleConstraint
   | DistanceConstraint
   | LengthConstraint
   | AngleConstraint
@@ -306,6 +322,10 @@ const buildLabel = (type: ConstraintType): string => {
       return 'COLL';
     case 'fixed':
       return 'FIX';
+    case 'midpoint':
+      return 'MID';
+    case 'pointOnCircle':
+      return 'POC';
     case 'distance':
       return 'DIST';
     case 'length':
@@ -417,6 +437,16 @@ const buildConstraintDisplays = (
       const a = points.get(constraint.a);
       const b = points.get(constraint.b);
       if (a && b) position = midpoint(a, b);
+    } else if (constraint.type === 'midpoint') {
+      const line = lines.get(constraint.line);
+      if (line) {
+        const a = points.get(line.a);
+        const b = points.get(line.b);
+        if (a && b) position = midpoint(a, b);
+      }
+    } else if (constraint.type === 'pointOnCircle') {
+      const pt = points.get(constraint.point);
+      if (pt) position = [pt.x, pt.y];
     } else if (constraint.type === 'tangent') {
       if (constraint.line && constraint.circle) {
         const line = lines.get(constraint.line);
@@ -883,6 +913,50 @@ const solveConstraints = (
         }
       }
 
+      if (constraint.type === 'midpoint') {
+        const pt = points.get(constraint.point);
+        const line = lines.get(constraint.line);
+        if (!pt || !line) return;
+        const a = points.get(line.a);
+        const b = points.get(line.b);
+        if (!a || !b) return;
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        err = Math.sqrt((pt.x - mx) ** 2 + (pt.y - my) ** 2);
+        if (err <= tolerance) return;
+        if (!pt.fixed) {
+          pt.x = mx;
+          pt.y = my;
+        } else {
+          // Shift line endpoints so their midpoint matches the fixed point
+          const dx = pt.x - mx;
+          const dy = pt.y - my;
+          if (!a.fixed) { a.x += dx; a.y += dy; }
+          if (!b.fixed) { b.x += dx; b.y += dy; }
+        }
+      }
+
+      if (constraint.type === 'pointOnCircle') {
+        const pt = points.get(constraint.point);
+        const circle = circles.get(constraint.circle);
+        if (!pt || !circle) return;
+        const center = points.get(circle.center);
+        if (!center) return;
+        const dx = pt.x - center.x;
+        const dy = pt.y - center.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        err = Math.abs(dist - circle.radius);
+        if (err <= tolerance) return;
+        if (!pt.fixed) {
+          pt.x = center.x + (dx / dist) * circle.radius;
+          pt.y = center.y + (dy / dist) * circle.radius;
+        } else if (!center.fixed) {
+          // Move center so the fixed point lands on the perimeter
+          center.x = pt.x - (dx / dist) * circle.radius;
+          center.y = pt.y - (dy / dist) * circle.radius;
+        }
+      }
+
       maxError = Math.max(maxError, err);
     });
 
@@ -908,6 +982,16 @@ const computeStatus = (def: ConstraintDefinition, maxError: number, tolerance: n
       return;
     }
     if (constraint.type === 'collinear') {
+      refCount.set(constraint.point, (refCount.get(constraint.point) ?? 0) + 1);
+      return;
+    }
+    if (constraint.type === 'midpoint') {
+      // Fully determines the constrained point (2 DOF removed)
+      refCount.set(constraint.point, (refCount.get(constraint.point) ?? 0) + 2);
+      return;
+    }
+    if (constraint.type === 'pointOnCircle') {
+      // Constrains point to a 1-D manifold (1 DOF removed)
       refCount.set(constraint.point, (refCount.get(constraint.point) ?? 0) + 1);
       return;
     }
@@ -965,6 +1049,11 @@ export const isConstraintSketch = (sketch: Sketch | null | undefined): sketch is
   return sketch instanceof ConstraintSketch;
 };
 
+export interface ConstrainedSketchOptions {
+  /** When true, adding a constraint that cannot be satisfied throws instead of silently discarding it. */
+  strict?: boolean;
+}
+
 export class ConstrainedSketchBuilder {
   private points: SketchPoint[] = [];
   private lines: SketchLine[] = [];
@@ -975,6 +1064,11 @@ export class ConstrainedSketchBuilder {
   private cursor: PointId | null = null;
   private loopStart: PointId | null = null;
   private nextId = 1;
+  private strict: boolean;
+
+  constructor(options: ConstrainedSketchOptions = {}) {
+    this.strict = options.strict ?? false;
+  }
 
   point(x: number, y: number, fixed = false): PointId {
     const id = `pt-${this.nextId++}`;
@@ -1070,6 +1164,13 @@ export class ConstrainedSketchBuilder {
     const def = this.buildDefinition(next);
     const { maxError } = solveConstraints(def, { iterations: 30, tolerance: DEFAULT_TOLERANCE });
     if (maxError > DEFAULT_TOLERANCE * 5) {
+      if (this.strict) {
+        throw new Error(
+          `Constraint rejected (over-constrained or conflicting): type="${constraint.type}" maxError=${maxError.toFixed(4)}. `
+          + `The sketch already has ${this.constraints.length} constraint(s). `
+          + `Remove a conflicting constraint or relax the geometry.`,
+        );
+      }
       this.rejectedConstraints.push(next);
       return this;
     }
@@ -1082,6 +1183,169 @@ export class ConstrainedSketchBuilder {
       }
     }
     this.constraints.push(next);
+    return this;
+  }
+
+  // ─── Ergonomic constraint helpers ────────────────────────────────────────────
+  // Each method is a typed wrapper around constrain() so callers never need to
+  // construct raw { type: '...' } objects.
+  //
+  // We use explicit typed variables so TypeScript's discriminated-union narrowing
+  // works correctly (inline object literals hit excess-property checks).
+
+  /** Constrain a line to be horizontal. */
+  horizontal(line: LineId): this {
+    const c: Omit<HorizontalConstraint, 'id'> = { type: 'horizontal', line };
+    return this.constrain(c);
+  }
+
+  /** Constrain a line to be vertical. */
+  vertical(line: LineId): this {
+    const c: Omit<VerticalConstraint, 'id'> = { type: 'vertical', line };
+    return this.constrain(c);
+  }
+
+  /** Constrain two lines to be parallel. */
+  parallel(a: LineId, b: LineId): this {
+    const c: Omit<ParallelConstraint, 'id'> = { type: 'parallel', a, b };
+    return this.constrain(c);
+  }
+
+  /** Constrain two lines to be perpendicular. */
+  perpendicular(a: LineId, b: LineId): this {
+    const c: Omit<PerpendicularConstraint, 'id'> = { type: 'perpendicular', a, b };
+    return this.constrain(c);
+  }
+
+  /**
+   * Tangent constraint.
+   * - `tangent(line, circle)` — line is tangent to a circle.
+   * - `tangent(circleA, circleB)` — two circles are externally tangent.
+   *
+   * The method auto-detects which form to use by checking whether the first
+   * argument is a registered line ID.
+   */
+  tangent(a: LineId | CircleId, b: CircleId): this {
+    const aIsLine = this.lines.some((l) => l.id === a);
+    if (aIsLine) {
+      const c: Omit<TangentConstraint, 'id'> = { type: 'tangent', line: a as LineId, circle: b };
+      return this.constrain(c);
+    }
+    const c: Omit<TangentConstraint, 'id'> = { type: 'tangent', a: a as CircleId, b };
+    return this.constrain(c);
+  }
+
+  /** Constrain two lines to have equal length. */
+  equal(a: LineId, b: LineId): this {
+    const c: Omit<EqualConstraint, 'id'> = { type: 'equal', a, b };
+    return this.constrain(c);
+  }
+
+  /** Constrain two points to be at the same location. */
+  coincident(a: PointId, b: PointId): this {
+    const c: Omit<CoincidentConstraint, 'id'> = { type: 'coincident', a, b };
+    return this.constrain(c);
+  }
+
+  /** Constrain two circles to share the same center. */
+  concentric(a: CircleId, b: CircleId): this {
+    const c: Omit<ConcentricConstraint, 'id'> = { type: 'concentric', a, b };
+    return this.constrain(c);
+  }
+
+  /** Constrain a point to lie on an infinite line (collinear). */
+  collinear(point: PointId, line: LineId): this {
+    const c: Omit<CollinearConstraint, 'id'> = { type: 'collinear', point, line };
+    return this.constrain(c);
+  }
+
+  /** Constrain two points to be symmetric about an axis line. */
+  symmetric(a: PointId, b: PointId, axis: LineId): this {
+    const c: Omit<SymmetricConstraint, 'id'> = { type: 'symmetric', a, b, axis };
+    return this.constrain(c);
+  }
+
+  /**
+   * Fix a point at a specific location (or at its current position if x/y are omitted).
+   */
+  fix(point: PointId, x?: number, y?: number): this {
+    const pt = this.points.find((p) => p.id === point);
+    if (!pt) throw new Error(`fix(): point "${point}" not found in sketch`);
+    const c: Omit<FixedConstraint, 'id'> = { type: 'fixed', point, x: x ?? pt.x, y: y ?? pt.y };
+    return this.constrain(c);
+  }
+
+  /**
+   * Constrain a point to lie at the midpoint of a line.
+   */
+  midpoint(point: PointId, line: LineId): this {
+    const c: Omit<MidpointConstraint, 'id'> = { type: 'midpoint', point, line };
+    return this.constrain(c);
+  }
+
+  /**
+   * Constrain a point to lie on the perimeter of a circle.
+   */
+  pointOnCircle(point: PointId, circle: CircleId): this {
+    const c: Omit<PointOnCircleConstraint, 'id'> = { type: 'pointOnCircle', point, circle };
+    return this.constrain(c);
+  }
+
+  /** Constrain the distance between two points. */
+  distance(a: PointId, b: PointId, value: number): this {
+    const c: Omit<DistanceConstraint, 'id'> = { type: 'distance', a, b, value };
+    return this.constrain(c);
+  }
+
+  /** Constrain the length of a line. */
+  length(line: LineId, value: number): this {
+    const c: Omit<LengthConstraint, 'id'> = { type: 'length', line, value };
+    return this.constrain(c);
+  }
+
+  /** Constrain the angle from line `a` to line `b` (degrees). */
+  angle(a: LineId, b: LineId, value: number): this {
+    const c: Omit<AngleConstraint, 'id'> = { type: 'angle', a, b, value };
+    return this.constrain(c);
+  }
+
+  /** Constrain the radius of a circle. */
+  radius(circle: CircleId, value: number): this {
+    const c: Omit<RadiusConstraint, 'id'> = { type: 'radius', circle, value };
+    return this.constrain(c);
+  }
+
+  /** Constrain the diameter of a circle. */
+  diameter(circle: CircleId, value: number): this {
+    const c: Omit<DiameterConstraint, 'id'> = { type: 'diameter', circle, value };
+    return this.constrain(c);
+  }
+
+  /** Constrain the horizontal distance between two points (b.x − a.x = value). */
+  hDistance(a: PointId, b: PointId, value: number): this {
+    const c: Omit<HorizontalDistanceConstraint, 'id'> = { type: 'hDistance', a, b, value };
+    return this.constrain(c);
+  }
+
+  /** Constrain the vertical distance between two points (b.y − a.y = value). */
+  vDistance(a: PointId, b: PointId, value: number): this {
+    const c: Omit<VerticalDistanceConstraint, 'id'> = { type: 'vDistance', a, b, value };
+    return this.constrain(c);
+  }
+
+  // ─── Loop helpers ─────────────────────────────────────────────────────────────
+
+  /**
+   * Register a closed polygon loop from an explicit ordered list of point IDs.
+   * Use this when you build geometry with `point()` + `line()` calls instead of
+   * the `moveTo` / `lineTo` / `close` path-builder flow.
+   *
+   * The points must already exist in the builder and their winding order determines
+   * the fill direction (counter-clockwise = filled region).
+   */
+  addLoop(points: PointId[]): this {
+    if (points.length < 3) throw new Error('addLoop(): needs at least 3 points');
+    this.loops.push({ type: 'poly', points: [...points] });
     return this;
   }
 
@@ -1134,8 +1398,8 @@ export class ConstrainedSketchBuilder {
   }
 }
 
-export function constrainedSketch(): ConstrainedSketchBuilder {
-  return new ConstrainedSketchBuilder();
+export function constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder {
+  return new ConstrainedSketchBuilder(options);
 }
 
 export const solveConstraintDefinition = (
