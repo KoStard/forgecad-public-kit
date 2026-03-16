@@ -39,11 +39,18 @@ for (const [x, y] of boltPositions) {
   );
 }
 
+// Key z-levels:
+//   top plate is centered at z=0 → top face at +topThick/2, bottom face at -topThick/2
+//   bottom plate sits flush below → top face at -topThick/2, center at -(topThick/2 + botThick/2)
+const topFace    =  topThick / 2;
+const botCenter  = -(topThick / 2 + botThick / 2);
+const botFace    =  botCenter - botThick / 2;   // bottom face of bottom plate
+
 // --- Bottom plate: tapped holes ---
-let botPlate = box(plateW, plateD, botThick, true).translate(0, 0, -topThick - botThick);
+let botPlate = box(plateW, plateD, botThick, true).translate(0, 0, botCenter);
 for (const [x, y] of boltPositions) {
   botPlate = botPlate.subtract(
-    hw.tappedHole.translate(x, y, -topThick - botThick),
+    hw.tappedHole.translate(x, y, botCenter),
   );
 }
 
@@ -56,34 +63,29 @@ const washers = [];
 const nuts    = [];
 
 for (const [x, y] of boltPositions) {
-  // Bolt: head top at z = topThick/2 + washer (under head), shaft points -Z
-  const headZ = topThick / 2 + wt;
-  bolts.push(hw.bolt.translate(x, y, headZ));
-
-  // Washer under head (sits on top-plate top face)
+  // Washer under head: sits flush on top-plate top face
   if (hw.washerUnderHead) {
-    washers.push(hw.washerUnderHead.translate(x, y, topThick / 2 + wt / 2));
+    washers.push(hw.washerUnderHead.translate(x, y, topFace + wt / 2));
   }
 
-  // Washer under nut (sits on bottom-plate bottom face)
+  // Bolt: head bottom rests on top of the head washer
+  bolts.push(hw.bolt.translate(x, y, topFace + wt));
+
+  // Washer under nut: sits flush on bottom-plate bottom face
   if (hw.washerUnderNut) {
-    const nutZ = -topThick - botThick - wt / 2;
-    washers.push(hw.washerUnderNut.translate(x, y, nutZ));
+    washers.push(hw.washerUnderNut.translate(x, y, botFace - wt / 2));
   }
 
-  // Nut: centered just below the bottom washer
-  const nutZ = -topThick - botThick - wt - nh / 2;
-  nuts.push(hw.nut.translate(x, y, nutZ));
+  // Nut: centered just below the nut washer
+  nuts.push(hw.nut.translate(x, y, botFace - wt - nh / 2));
 }
 
 // --- BOM ---
-bom([
-  { name: "Top Plate",         qty: 1, material: "Aluminum 6061" },
-  { name: "Bottom Plate",      qty: 1, material: "Aluminum 6061" },
-  { name: `M5 × ${grip + 4} bolt`, qty: boltPositions.length, standard: "ISO 4762" },
-  { name: "M5 washer",         qty: boltPositions.length * 2,  standard: "DIN 125-A" },
-  { name: "M5 nut",            qty: boltPositions.length,      standard: "ISO 4032" },
-]);
+bom(1, "Top Plate — Aluminum 6061");
+bom(1, "Bottom Plate — Aluminum 6061");
+bom(boltPositions.length, `M5 × ${grip + 4} hex bolt (ISO 4762)`);
+bom(boltPositions.length * 2, "M5 flat washer (DIN 125-A)");
+bom(boltPositions.length, "M5 hex nut (ISO 4032)");
 
 // --- Assemble named parts ---
 const parts = [
