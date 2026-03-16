@@ -136,7 +136,7 @@ function VerificationRow({ result, onNavigate }: VerificationRowProps) {
 }
 
 export function VerificationsPanel() {
-  const verifications = useForgeStore((s) => s.result?.verifications ?? []);
+  const verifications = useForgeStore((s) => s.result?.verifications) ?? [];
   const requestEditorNavigate = useForgeStore((s) => s.requestEditorNavigate);
   const [collapsed, setCollapsed] = useState(true);
   const prevHadFailures = useRef(false);
