@@ -1,0 +1,67 @@
+// Load all constraint definitions (side effects: populates the registry)
+import './defs/index';
+
+import type { SketchConstraint } from './types';
+
+// Re-export everything consumers need
+export type {
+  PointId,
+  LineId,
+  CircleId,
+  SketchPoint,
+  SketchLine,
+  SketchCircle,
+  SketchLoop,
+  ConstraintDisplay,
+  SketchConstraintMeta,
+  ConstraintDefinition,
+  SolveOptions,
+  ConstraintType,
+  SketchConstraint,
+  ConstraintTypeMap,
+  ConstraintBuilderMethods,
+  ConstraintDef,
+  SolverContext,
+  DisplayContext,
+  DofContext,
+} from './types';
+
+export type { LineDistanceConstraint } from './defs/index';
+
+export type { ConstrainedSketchOptions } from './builder';
+export { ConstrainedSketchBuilder, constrainedSketch } from './builder';
+
+export {
+  ConstraintSketch,
+  isConstraintSketch,
+  solveConstraintDefinition,
+  updateConstraintValue,
+  cloneDefinition,
+} from './sketch';
+
+export { registerConstraint, installBuilderMethod, getConstraintDef } from './registry';
+
+// ─── Backward-compatible constraint interface aliases ──────────────────────────
+// These match the old exported interface names from constraints.ts so existing
+// code that imports them by name continues to compile.
+
+export type CoincidentConstraint = Extract<SketchConstraint, { type: 'coincident' }>;
+export type HorizontalConstraint = Extract<SketchConstraint, { type: 'horizontal' }>;
+export type VerticalConstraint = Extract<SketchConstraint, { type: 'vertical' }>;
+export type ParallelConstraint = Extract<SketchConstraint, { type: 'parallel' }>;
+export type PerpendicularConstraint = Extract<SketchConstraint, { type: 'perpendicular' }>;
+export type TangentConstraint = Extract<SketchConstraint, { type: 'tangent' }>;
+export type EqualConstraint = Extract<SketchConstraint, { type: 'equal' }>;
+export type SymmetricConstraint = Extract<SketchConstraint, { type: 'symmetric' }>;
+export type ConcentricConstraint = Extract<SketchConstraint, { type: 'concentric' }>;
+export type CollinearConstraint = Extract<SketchConstraint, { type: 'collinear' }>;
+export type FixedConstraint = Extract<SketchConstraint, { type: 'fixed' }>;
+export type MidpointConstraint = Extract<SketchConstraint, { type: 'midpoint' }>;
+export type PointOnCircleConstraint = Extract<SketchConstraint, { type: 'pointOnCircle' }>;
+export type DistanceConstraint = Extract<SketchConstraint, { type: 'distance' }>;
+export type LengthConstraint = Extract<SketchConstraint, { type: 'length' }>;
+export type AngleConstraint = Extract<SketchConstraint, { type: 'angle' }>;
+export type RadiusConstraint = Extract<SketchConstraint, { type: 'radius' }>;
+export type DiameterConstraint = Extract<SketchConstraint, { type: 'diameter' }>;
+export type HorizontalDistanceConstraint = Extract<SketchConstraint, { type: 'hDistance' }>;
+export type VerticalDistanceConstraint = Extract<SketchConstraint, { type: 'vDistance' }>;

@@ -212,10 +212,135 @@ declare class Sketch {
 		selfAnchor?: Anchor;
 	}): Sketch;
 }
+interface ConstraintTypeMap {
+	coincident: {
+		a: PointId;
+		b: PointId;
+	};
+}
+interface ConstraintTypeMap {
+	horizontal: {
+		line: LineId;
+	};
+}
+interface ConstraintTypeMap {
+	vertical: {
+		line: LineId;
+	};
+}
+interface ConstraintTypeMap {
+	parallel: {
+		a: LineId;
+		b: LineId;
+	};
+}
+interface ConstraintTypeMap {
+	perpendicular: {
+		a: LineId;
+		b: LineId;
+	};
+}
+interface ConstraintTypeMap {
+	tangent: {
+		line?: LineId;
+		circle?: CircleId;
+		a?: CircleId;
+		b?: CircleId;
+	};
+}
+interface ConstraintTypeMap {
+	equal: {
+		a: LineId;
+		b: LineId;
+	};
+}
+interface ConstraintTypeMap {
+	symmetric: {
+		a: PointId;
+		b: PointId;
+		axis: LineId;
+	};
+}
+interface ConstraintTypeMap {
+	concentric: {
+		a: CircleId;
+		b: CircleId;
+	};
+}
+interface ConstraintTypeMap {
+	collinear: {
+		point: PointId;
+		line: LineId;
+	};
+}
+interface ConstraintTypeMap {
+	fixed: {
+		point: PointId;
+		x: number;
+		y: number;
+	};
+}
+interface ConstraintTypeMap {
+	midpoint: {
+		point: PointId;
+		line: LineId;
+	};
+}
+interface ConstraintTypeMap {
+	pointOnCircle: {
+		point: PointId;
+		circle: CircleId;
+	};
+}
+interface ConstraintTypeMap {
+	distance: {
+		a: PointId;
+		b: PointId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	length: {
+		line: LineId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	angle: {
+		a: LineId;
+		b: LineId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	radius: {
+		circle: CircleId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	diameter: {
+		circle: CircleId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	hDistance: {
+		a: PointId;
+		b: PointId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	vDistance: {
+		a: PointId;
+		b: PointId;
+		value: number;
+	};
+}
 type PointId = string;
 type LineId = string;
 type CircleId = string;
-type ConstraintType = "coincident" | "horizontal" | "vertical" | "parallel" | "perpendicular" | "tangent" | "equal" | "symmetric" | "concentric" | "collinear" | "fixed" | "midpoint" | "pointOnCircle" | "distance" | "length" | "angle" | "radius" | "diameter" | "hDistance" | "vDistance" | "lineDistance";
 interface SketchPoint {
 	id: PointId;
 	x: number;
@@ -243,133 +368,9 @@ type SketchLoop = {
 	type: "circle";
 	circle: CircleId;
 };
-interface BaseConstraint {
-	id: string;
-	type: ConstraintType;
-}
-interface CoincidentConstraint extends BaseConstraint {
-	type: "coincident";
-	a: PointId;
-	b: PointId;
-}
-interface HorizontalConstraint extends BaseConstraint {
-	type: "horizontal";
-	line: LineId;
-}
-interface VerticalConstraint extends BaseConstraint {
-	type: "vertical";
-	line: LineId;
-}
-interface ParallelConstraint extends BaseConstraint {
-	type: "parallel";
-	a: LineId;
-	b: LineId;
-}
-interface PerpendicularConstraint extends BaseConstraint {
-	type: "perpendicular";
-	a: LineId;
-	b: LineId;
-}
-interface TangentConstraint extends BaseConstraint {
-	type: "tangent";
-	line?: LineId;
-	circle?: CircleId;
-	a?: CircleId;
-	b?: CircleId;
-}
-interface EqualConstraint extends BaseConstraint {
-	type: "equal";
-	a: LineId;
-	b: LineId;
-}
-interface SymmetricConstraint extends BaseConstraint {
-	type: "symmetric";
-	a: PointId;
-	b: PointId;
-	axis: LineId;
-}
-interface ConcentricConstraint extends BaseConstraint {
-	type: "concentric";
-	a: CircleId;
-	b: CircleId;
-}
-interface CollinearConstraint extends BaseConstraint {
-	type: "collinear";
-	point: PointId;
-	line: LineId;
-}
-interface FixedConstraint extends BaseConstraint {
-	type: "fixed";
-	point: PointId;
-	x: number;
-	y: number;
-}
-interface MidpointConstraint extends BaseConstraint {
-	type: "midpoint";
-	point: PointId;
-	line: LineId;
-}
-interface PointOnCircleConstraint extends BaseConstraint {
-	type: "pointOnCircle";
-	point: PointId;
-	circle: CircleId;
-}
-interface DistanceConstraint extends BaseConstraint {
-	type: "distance";
-	a: PointId;
-	b: PointId;
-	value: number;
-}
-interface LengthConstraint extends BaseConstraint {
-	type: "length";
-	line: LineId;
-	value: number;
-}
-interface AngleConstraint extends BaseConstraint {
-	type: "angle";
-	a: LineId;
-	b: LineId;
-	value: number;
-}
-interface RadiusConstraint extends BaseConstraint {
-	type: "radius";
-	circle: CircleId;
-	value: number;
-}
-interface DiameterConstraint extends BaseConstraint {
-	type: "diameter";
-	circle: CircleId;
-	value: number;
-}
-interface HorizontalDistanceConstraint extends BaseConstraint {
-	type: "hDistance";
-	a: PointId;
-	b: PointId;
-	value: number;
-}
-interface VerticalDistanceConstraint extends BaseConstraint {
-	type: "vDistance";
-	a: PointId;
-	b: PointId;
-	value: number;
-}
-/**
- * Perpendicular (offset) distance between two lines.
- * Positive value = line B is on the left side of line A (according to A's direction).
- * Negative value = line B is on the right side.
- * The lines must be parallel for this to make geometric sense; the solver
- * implicitly enforces parallelism while adjusting the gap.
- */
-interface LineDistanceConstraint extends BaseConstraint {
-	type: "lineDistance";
-	a: LineId;
-	b: LineId;
-	value: number;
-}
-type SketchConstraint = CoincidentConstraint | HorizontalConstraint | VerticalConstraint | ParallelConstraint | PerpendicularConstraint | TangentConstraint | EqualConstraint | SymmetricConstraint | ConcentricConstraint | CollinearConstraint | FixedConstraint | MidpointConstraint | PointOnCircleConstraint | DistanceConstraint | LengthConstraint | AngleConstraint | RadiusConstraint | DiameterConstraint | HorizontalDistanceConstraint | VerticalDistanceConstraint | LineDistanceConstraint;
 interface ConstraintDisplay {
 	id: string;
-	type: ConstraintType;
+	type: string;
 	label: string;
 	position: [
 		number,
@@ -403,8 +404,7 @@ interface SketchConstraintMeta {
 			radius: number;
 		}[];
 	};
-	/** Non-construction geometry edges — rendered as solid wireframe so all
-	 *  sketch edges are visible even when covered by the filled region. */
+	/** Non-construction geometry edges rendered as solid wireframe overlay. */
 	edges: {
 		lines: {
 			a: [
@@ -441,24 +441,44 @@ interface SolveOptions {
 	iterations?: number;
 	tolerance?: number;
 }
+interface ConstraintTypeMap {
+}
+interface ConstraintBuilderMethods {
+}
+type SketchConstraint = {
+	[K in keyof ConstraintTypeMap]: {
+		id: string;
+		type: K;
+	} & ConstraintTypeMap[K];
+}[keyof ConstraintTypeMap];
+interface ConstraintTypeMap {
+	lineDistance: {
+		a: LineId;
+		b: LineId;
+		value: number;
+	};
+}
+/** Exported for backward-compatibility with forge-public-api.ts */
+type LineDistanceConstraint = {
+	id: string;
+	type: "lineDistance";
+} & {
+	a: LineId;
+	b: LineId;
+	value: number;
+};
 declare class ConstraintSketch extends Sketch {
 	readonly constraintMeta: SketchConstraintMeta;
 	readonly definition: ConstraintDefinition;
 	constructor(cross: Sketch["cross"], constraintMeta: SketchConstraintMeta, definition: ConstraintDefinition);
 	/**
 	 * Enumerate all bounded regions formed by the line arrangement of this sketch.
-	 * Does not require explicit loops — the algorithm infers enclosed areas from
-	 * intersecting line geometry. Construction lines are excluded.
-	 * Regions are returned largest-first by area.
-	 *
-	 * See `arrangement.ts` for full documentation and examples.
+	 * Construction lines are excluded. Regions are returned largest-first by area.
 	 */
 	detectArrangement(): Sketch[];
 	/**
 	 * Select the single arrangement region that contains the given seed point.
 	 * Throws if no region contains the seed.
-	 *
-	 * See `arrangement.ts` for full documentation.
 	 */
 	detectArrangementRegion(seed: [
 		number,
@@ -467,14 +487,14 @@ declare class ConstraintSketch extends Sketch {
 	withUpdatedConstraint(constraintId: string, value: number): ConstraintSketch;
 	/**
 	 * Return a human-readable diagnostic string of the solved state.
-	 * Useful for debugging constraint issues — shows point positions, line
-	 * angles/lengths, loop areas, rejected constraints, and DOF status.
 	 */
 	inspect(): string;
 }
 interface ConstrainedSketchOptions {
 	/** When true, adding a constraint that cannot be satisfied throws instead of silently discarding it. */
 	strict?: boolean;
+}
+interface ConstrainedSketchBuilder extends ConstraintBuilderMethods {
 }
 declare class ConstrainedSketchBuilder {
 	private points;
@@ -514,9 +534,6 @@ declare class ConstrainedSketchBuilder {
 	 * Tangent constraint.
 	 * - `tangent(line, circle)` — line is tangent to a circle.
 	 * - `tangent(circleA, circleB)` — two circles are externally tangent.
-	 *
-	 * The method auto-detects which form to use by checking whether the first
-	 * argument is a registered line ID.
 	 */
 	tangent(a: LineId | CircleId, b: CircleId): this;
 	/** Constrain two lines to have equal length. */
@@ -529,17 +546,11 @@ declare class ConstrainedSketchBuilder {
 	collinear(point: PointId, line: LineId): this;
 	/** Constrain two points to be symmetric about an axis line. */
 	symmetric(a: PointId, b: PointId, axis: LineId): this;
-	/**
-	 * Fix a point at a specific location (or at its current position if x/y are omitted).
-	 */
+	/** Fix a point at a specific location (or at its current position if x/y are omitted). */
 	fix(point: PointId, x?: number, y?: number): this;
-	/**
-	 * Constrain a point to lie at the midpoint of a line.
-	 */
+	/** Constrain a point to lie at the midpoint of a line. */
 	midpoint(point: PointId, line: LineId): this;
-	/**
-	 * Constrain a point to lie on the perimeter of a circle.
-	 */
+	/** Constrain a point to lie on the perimeter of a circle. */
 	pointOnCircle(point: PointId, circle: CircleId): this;
 	/** Constrain the distance between two points. */
 	distance(a: PointId, b: PointId, value: number): this;
@@ -561,22 +572,14 @@ declare class ConstrainedSketchBuilder {
 	 *
 	 * Positive `value` places line `b` on the **left** side of line `a`
 	 * (according to `a`'s direction vector). Negative places it on the right.
-	 *
-	 * Use this instead of `distance()` when you need edge-to-edge spacing
-	 * (e.g., concentric polygon shells with uniform wall thickness).
 	 */
 	lineDistance(a: LineId, b: LineId, value: number): this;
 	/**
 	 * Register a closed polygon loop from an explicit ordered list of point IDs.
-	 * Use this when you build geometry with `point()` + `line()` calls instead of
-	 * the `moveTo` / `lineTo` / `close` path-builder flow.
-	 *
-	 * The points must already exist in the builder and their winding order determines
-	 * the fill direction (counter-clockwise = filled region).
 	 */
 	addLoop(points: PointId[]): this;
 	solve(options?: SolveOptions): ConstraintSketch;
-	private buildDefinition;
+	buildDefinition(extraConstraint?: SketchConstraint): ConstraintDefinition;
 	private getPoint;
 	/** Import a Point2D, returning its PointId */
 	importPoint(pt: {
@@ -628,80 +631,20 @@ declare class ConstrainedSketchBuilder {
 	};
 	/**
 	 * Add a fixed reference point at (x, y).
-	 *
-	 * Reference points are `fixed: true` (the solver never moves them) and do
-	 * not belong to any loop (they don't contribute to the sketch profile area).
-	 * They are useful as anchors for coincident / distance / collinear constraints
-	 * that relate this sketch's geometry to an external coordinate.
-	 *
-	 * @returns The PointId of the new reference point.
 	 */
 	referencePoint(x: number, y: number): PointId;
 	/**
 	 * Add a fixed reference line from (x1, y1) to (x2, y2).
-	 *
-	 * Both endpoints are fixed and the line is marked construction — it guides
-	 * constraints but never contributes to the profile area. Useful for importing
-	 * a baseline or edge from another sketch so this sketch's geometry can be
-	 * constrained relative to it.
-	 *
-	 * @returns The LineId of the new reference line.
 	 */
 	referenceLine(x1: number, y1: number, x2: number, y2: number): LineId;
 	/**
 	 * Import a single named entity (point or line) from a solved `ConstraintSketch`
 	 * as fixed reference geometry in this builder.
-	 *
-	 * The entity is identified by its ID (e.g., `"pt-1"`, `"ln-3"`).
-	 * - Points become `fixed: true` points.
-	 * - Lines become `construction: true` lines with both endpoints fixed.
-	 *
-	 * Imported entities fully participate in constraint solving — you can add
-	 * `coincident`, `collinear`, `parallel`, `distance`, etc. constraints
-	 * between this sketch's geometry and the imported reference.
-	 *
-	 * @param source - A solved ConstraintSketch (from another builder's `.solve()`).
-	 * @param entityId - The point or line ID to import.
-	 * @returns The PointId or LineId of the imported entity in this builder,
-	 *          or `null` if the entity ID was not found in the source sketch.
-	 *
-	 * @example
-	 * // Sketch A: a horizontal baseline
-	 * const builderA = constrainedSketch();
-	 * const a1 = builderA.point(0, 0);
-	 * const a2 = builderA.point(100, 0);
-	 * const baseline = builderA.line(a1, a2);
-	 * builderA.fix(a1, 0, 0); builderA.horizontal(baseline); builderA.length(baseline, 100);
-	 * const sketchA = builderA.solve();
-	 *
-	 * // Sketch B: geometry constrained to sit on top of A's baseline
-	 * const builderB = constrainedSketch();
-	 * const refLine = builderB.referenceFrom(sketchA, baseline); // import A's baseline
-	 * const b1 = builderB.point(20, 30);
-	 * const b2 = builderB.point(80, 30);
-	 * // Constrain b1 to be directly above the baseline's left endpoint
-	 * builderB.collinear(b1, builderB.referenceLine(0, 0, 0, 100)); // vertical axis
-	 * builderB.distance(b1, refLine !== null ? builderB.referencePoint(0, 0) : b1, 20);
 	 */
 	referenceFrom(source: ConstraintSketch, entityId: string): PointId | LineId | null;
 	/**
 	 * Import ALL non-construction entities from a solved `ConstraintSketch` as
-	 * fixed reference geometry. Points become fixed reference points; lines become
-	 * fixed construction lines.
-	 *
-	 * Returns a map of original-ID → new-ID for both points and lines, so you can
-	 * reference specific imported entities by their original names.
-	 *
-	 * Useful when you want to build a second sketch that is fully anchored to the
-	 * complete geometry of an existing sketch.
-	 *
-	 * @example
-	 * // Import sketch A's entire geometry as a reference baseline in sketch B
-	 * const builderB = constrainedSketch();
-	 * const refs = builderB.referenceAllFrom(sketchA);
-	 * // Now constrain new geometry against imported references:
-	 * const b1 = builderB.point(50, 20);
-	 * builderB.coincident(b1, refs.points.get('pt-1')!); // snap to A's first point
+	 * fixed reference geometry.
 	 */
 	referenceAllFrom(source: ConstraintSketch): {
 		points: Map<string, PointId>;
