@@ -27,3 +27,9 @@ Primary files:
 ## Status and log
 - 2026-03-13: Blocked on task 300.
 - 2026-03-13: Not started.
+- 2026-03-15: Complete.
+  - Added `lib.washer(size, options?)` — DIN 125-A flat washers for M2–M10.
+  - Added `lib.fastenerSet(size, boltLength, options?)` — complete bolt + nut + washers + hole cutters in one call (the "clearance-hole pairing").
+  - Both exported from `partLibrary` in `src/forge/library.ts`.
+  - Example: `examples/toolbox/bolted-joint.forge.js` — two-plate M5 bolted joint with BOM and exploded view.
+  - Catalog doc: `docs/permanent/API/toolbox/fasteners.md`.
