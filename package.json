@@ -42,7 +42,8 @@
     "prune:branches": "uv run cli/forge-prune-local-branches.py",
     "meta:init": "bash scripts/local-meta.sh init",
     "meta:status": "bash scripts/local-meta.sh status",
-    "meta:path": "bash scripts/local-meta.sh path"
+    "meta:path": "bash scripts/local-meta.sh path",
+    "gen:types": "node scripts/gen-forge-types.mjs"
   },
   "dependencies": {
     "chokidar": "^4.0.0",
@@ -60,6 +61,7 @@
     "@types/react-dom": "^19.1.6",
     "@types/three": "^0.175.0",
     "@vitejs/plugin-react": "^4.5.2",
+    "dts-bundle-generator": "^9.5.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "three": "^0.175.0",

@@ -2,8 +2,11 @@ import { useRef, useCallback, useEffect } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { useForgeStore } from '../store/forgeStore';
+import forgeTypes from '../forge/forge-api.d.ts?raw';
 
-const FORGE_TYPES = `
+// Legacy inline types kept only as a fallback while forge-api.d.ts is being regenerated.
+// Run `npm run gen:types` to update the generated file.
+const FORGE_TYPES_LEGACY = `
 declare function box(x: number, y: number, z: number, center?: boolean): TrackedShape;
 declare function cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape;
 declare function sphere(radius: number, segments?: number): Shape;
@@ -1241,6 +1244,9 @@ declare const verify: {
   boundingBoxSize(label: string, shape: VerifyShapeLike, expectedSize: [number, number, number], tolerance?: number): void;
 };
 `;
+
+// Use the generated types file; fall back to legacy inline string if somehow absent.
+const FORGE_TYPES = forgeTypes || FORGE_TYPES_LEGACY;
 
 export function CodeEditor() {
   const files = useForgeStore((s) => s.files);
