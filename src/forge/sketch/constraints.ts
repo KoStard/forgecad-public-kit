@@ -27,7 +27,8 @@ export type ConstraintType =
   | 'radius'
   | 'diameter'
   | 'hDistance'
-  | 'vDistance';
+  | 'vDistance'
+  | 'lineDistance';
 
 export interface SketchPoint {
   id: PointId;
@@ -187,6 +188,20 @@ export interface VerticalDistanceConstraint extends BaseConstraint {
   value: number;
 }
 
+/**
+ * Perpendicular (offset) distance between two lines.
+ * Positive value = line B is on the left side of line A (according to A's direction).
+ * Negative value = line B is on the right side.
+ * The lines must be parallel for this to make geometric sense; the solver
+ * implicitly enforces parallelism while adjusting the gap.
+ */
+export interface LineDistanceConstraint extends BaseConstraint {
+  type: 'lineDistance';
+  a: LineId;
+  b: LineId;
+  value: number;
+}
+
 export type SketchConstraint =
   | CoincidentConstraint
   | HorizontalConstraint
@@ -207,7 +222,8 @@ export type SketchConstraint =
   | RadiusConstraint
   | DiameterConstraint
   | HorizontalDistanceConstraint
-  | VerticalDistanceConstraint;
+  | VerticalDistanceConstraint
+  | LineDistanceConstraint;
 
 export interface ConstraintDisplay {
   id: string;
@@ -347,6 +363,8 @@ const buildLabel = (type: ConstraintType): string => {
       return 'HD';
     case 'vDistance':
       return 'VD';
+    case 'lineDistance':
+      return 'LDIST';
     default:
       return 'C';
   }
@@ -360,6 +378,7 @@ const isDimensionConstraint = (type: ConstraintType): boolean => (
   || type === 'diameter'
   || type === 'hDistance'
   || type === 'vDistance'
+  || type === 'lineDistance'
 );
 
 const getConstraintValue = (constraint: SketchConstraint): number | undefined => {
@@ -370,6 +389,7 @@ const getConstraintValue = (constraint: SketchConstraint): number | undefined =>
   if (constraint.type === 'diameter') return constraint.value;
   if (constraint.type === 'hDistance') return constraint.value;
   if (constraint.type === 'vDistance') return constraint.value;
+  if (constraint.type === 'lineDistance') return constraint.value;
   return undefined;
 };
 
@@ -381,6 +401,7 @@ const setConstraintValue = (constraint: SketchConstraint, value: number): void =
   if (constraint.type === 'diameter') constraint.value = value;
   if (constraint.type === 'hDistance') constraint.value = value;
   if (constraint.type === 'vDistance') constraint.value = value;
+  if (constraint.type === 'lineDistance') constraint.value = value;
 };
 
 const buildConstraintDisplays = (
@@ -406,7 +427,7 @@ const buildConstraintDisplays = (
         const b = points.get(line.b);
         if (a && b) position = midpoint(a, b);
       }
-    } else if (constraint.type === 'parallel' || constraint.type === 'perpendicular' || constraint.type === 'equal' || constraint.type === 'angle') {
+    } else if (constraint.type === 'parallel' || constraint.type === 'perpendicular' || constraint.type === 'equal' || constraint.type === 'angle' || constraint.type === 'lineDistance') {
       const lineA = lines.get(constraint.a);
       const lineB = lines.get(constraint.b);
       if (lineA && lineB) {
@@ -838,6 +859,64 @@ const solveConstraints = (
         }
       }
 
+      if (constraint.type === 'lineDistance') {
+        // Perpendicular (offset) distance between two lines.
+        // Also implicitly enforces parallelism.
+        const lineA = lines.get(constraint.a);
+        const lineB = lines.get(constraint.b);
+        if (!lineA || !lineB) return;
+        const a1 = points.get(lineA.a);
+        const a2 = points.get(lineA.b);
+        const b1 = points.get(lineB.a);
+        const b2 = points.get(lineB.b);
+        if (!a1 || !a2 || !b1 || !b2) return;
+
+        // Step 1: enforce parallelism (rotate B to match A's angle)
+        const angleA = angleOfLine(a1, a2);
+        const angleB = angleOfLine(b1, b2);
+        const diff = angleA - angleB;
+        const diffFlipped = angleA + Math.PI - angleB;
+        const useFlipped = Math.abs(normalizeAngle(diffFlipped)) < Math.abs(normalizeAngle(diff));
+        const targetAngle = useFlipped ? angleA + Math.PI : angleA;
+        const angleDelta = normalizeAngle(targetAngle - angleB);
+        if (Math.abs(angleDelta) > tolerance * 0.01) {
+          const midB: [number, number] = [(b1.x + b2.x) / 2, (b1.y + b2.y) / 2];
+          const lenB = distance(b1, b2) || 1;
+          const cos = Math.cos(targetAngle);
+          const sin = Math.sin(targetAngle);
+          if (!b1.fixed) { b1.x = midB[0] - cos * lenB / 2; b1.y = midB[1] - sin * lenB / 2; }
+          if (!b2.fixed) { b2.x = midB[0] + cos * lenB / 2; b2.y = midB[1] + sin * lenB / 2; }
+        }
+
+        // Step 2: compute signed perpendicular distance from A to midpoint of B
+        const dxA = a2.x - a1.x;
+        const dyA = a2.y - a1.y;
+        const lenA = Math.sqrt(dxA * dxA + dyA * dyA) || 1;
+        // Normal of line A (left-hand side = positive direction)
+        const nx = -dyA / lenA;
+        const ny = dxA / lenA;
+        const midBx = (b1.x + b2.x) / 2;
+        const midBy = (b1.y + b2.y) / 2;
+        const midAx = (a1.x + a2.x) / 2;
+        const midAy = (a1.y + a2.y) / 2;
+        const currentDist = (midBx - midAx) * nx + (midBy - midAy) * ny;
+        err = Math.abs(currentDist - constraint.value);
+        if (err <= tolerance) return;
+
+        // Shift line B along the normal so the distance matches the target
+        const shift = constraint.value - currentDist;
+        const allBFixed = b1.fixed && b2.fixed;
+        const allAFixed = a1.fixed && a2.fixed;
+        if (allBFixed && allAFixed) return;
+        if (allAFixed || !allBFixed) {
+          if (!b1.fixed) { b1.x += nx * shift; b1.y += ny * shift; }
+          if (!b2.fixed) { b2.x += nx * shift; b2.y += ny * shift; }
+        } else {
+          if (!a1.fixed) { a1.x -= nx * shift; a1.y -= ny * shift; }
+          if (!a2.fixed) { a2.x -= nx * shift; a2.y -= ny * shift; }
+        }
+      }
+
       if (constraint.type === 'concentric') {
         const c1 = circles.get(constraint.a);
         const c2 = circles.get(constraint.b);
@@ -1068,7 +1147,7 @@ const computeStatus = (def: ConstraintDefinition, maxError: number, tolerance: n
       }
       return;
     }
-    if (constraint.type === 'parallel' || constraint.type === 'perpendicular' || constraint.type === 'equal' || constraint.type === 'angle') {
+    if (constraint.type === 'parallel' || constraint.type === 'perpendicular' || constraint.type === 'equal' || constraint.type === 'angle' || constraint.type === 'lineDistance') {
       const lineA = def.lines.find((l) => l.id === constraint.a);
       const lineB = def.lines.find((l) => l.id === constraint.b);
       if (lineA) {
@@ -1464,6 +1543,21 @@ export class ConstrainedSketchBuilder {
   /** Constrain the vertical distance between two points (b.y − a.y = value). */
   vDistance(a: PointId, b: PointId, value: number): this {
     const c: Omit<VerticalDistanceConstraint, 'id'> = { type: 'vDistance', a, b, value };
+    return this.constrain(c);
+  }
+
+  /**
+   * Constrain the perpendicular (offset) distance between two lines.
+   * Also implicitly enforces parallelism.
+   *
+   * Positive `value` places line `b` on the **left** side of line `a`
+   * (according to `a`'s direction vector). Negative places it on the right.
+   *
+   * Use this instead of `distance()` when you need edge-to-edge spacing
+   * (e.g., concentric polygon shells with uniform wall thickness).
+   */
+  lineDistance(a: LineId, b: LineId, value: number): this {
+    const c: Omit<LineDistanceConstraint, 'id'> = { type: 'lineDistance', a, b, value };
     return this.constrain(c);
   }
 

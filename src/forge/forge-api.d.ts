@@ -215,7 +215,7 @@ declare class Sketch {
 type PointId = string;
 type LineId = string;
 type CircleId = string;
-type ConstraintType = "coincident" | "horizontal" | "vertical" | "parallel" | "perpendicular" | "tangent" | "equal" | "symmetric" | "concentric" | "collinear" | "fixed" | "midpoint" | "pointOnCircle" | "distance" | "length" | "angle" | "radius" | "diameter" | "hDistance" | "vDistance";
+type ConstraintType = "coincident" | "horizontal" | "vertical" | "parallel" | "perpendicular" | "tangent" | "equal" | "symmetric" | "concentric" | "collinear" | "fixed" | "midpoint" | "pointOnCircle" | "distance" | "length" | "angle" | "radius" | "diameter" | "hDistance" | "vDistance" | "lineDistance";
 interface SketchPoint {
 	id: PointId;
 	x: number;
@@ -353,7 +353,20 @@ interface VerticalDistanceConstraint extends BaseConstraint {
 	b: PointId;
 	value: number;
 }
-type SketchConstraint = CoincidentConstraint | HorizontalConstraint | VerticalConstraint | ParallelConstraint | PerpendicularConstraint | TangentConstraint | EqualConstraint | SymmetricConstraint | ConcentricConstraint | CollinearConstraint | FixedConstraint | MidpointConstraint | PointOnCircleConstraint | DistanceConstraint | LengthConstraint | AngleConstraint | RadiusConstraint | DiameterConstraint | HorizontalDistanceConstraint | VerticalDistanceConstraint;
+/**
+ * Perpendicular (offset) distance between two lines.
+ * Positive value = line B is on the left side of line A (according to A's direction).
+ * Negative value = line B is on the right side.
+ * The lines must be parallel for this to make geometric sense; the solver
+ * implicitly enforces parallelism while adjusting the gap.
+ */
+interface LineDistanceConstraint extends BaseConstraint {
+	type: "lineDistance";
+	a: LineId;
+	b: LineId;
+	value: number;
+}
+type SketchConstraint = CoincidentConstraint | HorizontalConstraint | VerticalConstraint | ParallelConstraint | PerpendicularConstraint | TangentConstraint | EqualConstraint | SymmetricConstraint | ConcentricConstraint | CollinearConstraint | FixedConstraint | MidpointConstraint | PointOnCircleConstraint | DistanceConstraint | LengthConstraint | AngleConstraint | RadiusConstraint | DiameterConstraint | HorizontalDistanceConstraint | VerticalDistanceConstraint | LineDistanceConstraint;
 interface ConstraintDisplay {
 	id: string;
 	type: ConstraintType;
@@ -389,6 +402,31 @@ interface SketchConstraintMeta {
 			];
 			radius: number;
 		}[];
+	};
+	/** Non-construction geometry edges — rendered as solid wireframe so all
+	 *  sketch edges are visible even when covered by the filled region. */
+	edges: {
+		lines: {
+			a: [
+				number,
+				number
+			];
+			b: [
+				number,
+				number
+			];
+		}[];
+		circles: {
+			center: [
+				number,
+				number
+			];
+			radius: number;
+		}[];
+		points: [
+			number,
+			number
+		][];
 	};
 }
 interface ConstraintDefinition {
@@ -517,6 +555,17 @@ declare class ConstrainedSketchBuilder {
 	hDistance(a: PointId, b: PointId, value: number): this;
 	/** Constrain the vertical distance between two points (b.y − a.y = value). */
 	vDistance(a: PointId, b: PointId, value: number): this;
+	/**
+	 * Constrain the perpendicular (offset) distance between two lines.
+	 * Also implicitly enforces parallelism.
+	 *
+	 * Positive `value` places line `b` on the **left** side of line `a`
+	 * (according to `a`'s direction vector). Negative places it on the right.
+	 *
+	 * Use this instead of `distance()` when you need edge-to-edge spacing
+	 * (e.g., concentric polygon shells with uniform wall thickness).
+	 */
+	lineDistance(a: LineId, b: LineId, value: number): this;
 	/**
 	 * Register a closed polygon loop from an explicit ordered list of point IDs.
 	 * Use this when you build geometry with `point()` + `line()` calls instead of

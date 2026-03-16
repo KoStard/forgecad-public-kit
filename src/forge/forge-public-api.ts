@@ -73,7 +73,7 @@ export type { Anchor, SvgImportOptions } from './sketch';
 // ConstrainedSketchBuilder is the main win: all constraint methods are inlined
 // automatically from the source class — addLoop, fix, horizontal, etc.
 export { ConstrainedSketchBuilder } from './sketch/constraints';
-export type { PointId, LineId, CircleId } from './sketch/constraints';
+export type { PointId, LineId, CircleId, LineDistanceConstraint } from './sketch/constraints';
 
 export { param, boolParam } from './params';
 export { Transform, composeChain } from './transform';
