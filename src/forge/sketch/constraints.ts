@@ -634,12 +634,26 @@ const solveConstraints = (
         const b2 = points.get(lineB.b);
         if (!a1 || !a2 || !b1 || !b2) return;
         const baseAngle = angleOfLine(a1, a2);
-        const target = constraint.type === 'parallel'
-          ? baseAngle
-          : constraint.type === 'perpendicular'
-            ? baseAngle + Math.PI / 2
-            : baseAngle + toRad(constraint.value);
         const current = angleOfLine(b1, b2);
+        let target: number;
+        if (constraint.type === 'parallel') {
+          // Accept same OR opposite direction — pick the closer one
+          const d0 = Math.abs(normalizeAngle(current - baseAngle));
+          const dPI = Math.abs(normalizeAngle(current - (baseAngle + Math.PI)));
+          target = d0 <= dPI ? baseAngle : baseAngle + Math.PI;
+        } else if (constraint.type === 'perpendicular') {
+          // Accept both perpendicular orientations — pick the closer one
+          const d90 = Math.abs(normalizeAngle(current - (baseAngle + Math.PI / 2)));
+          const dN90 = Math.abs(normalizeAngle(current - (baseAngle - Math.PI / 2)));
+          target = d90 <= dN90 ? baseAngle + Math.PI / 2 : baseAngle - Math.PI / 2;
+        } else {
+          // angle constraint: pick the closer of +value and -(180-value)
+          const fwd = baseAngle + toRad(constraint.value);
+          const rev = baseAngle + toRad(constraint.value) + Math.PI;
+          const dFwd = Math.abs(normalizeAngle(current - fwd));
+          const dRev = Math.abs(normalizeAngle(current - rev));
+          target = dFwd <= dRev ? fwd : rev;
+        }
         const delta = normalizeAngle(current - target);
         err = Math.abs(delta);
         if (err <= tolerance) return;
@@ -877,12 +891,20 @@ const solveConstraints = (
           err = Math.abs(Math.abs(dist) - circle.radius);
           if (err <= tolerance) return;
           const shift = dist > 0 ? dist - circle.radius : dist + circle.radius;
-          if (!a.fixed || !b.fixed) {
-            if (!a.fixed) { a.x += nx * (-shift); a.y += ny * (-shift); }
-            if (!b.fixed) { b.x += nx * (-shift); b.y += ny * (-shift); }
-          } else if (!c.fixed) {
-            c.x += nx * (-shift);
-            c.y += ny * (-shift);
+          // Move only the endpoint nearest to the circle center so that
+          // two tangent constraints on the same line adjust different ends,
+          // effectively rotating the line into the correct orientation.
+          const distA = Math.hypot(a.x - c.x, a.y - c.y);
+          const distB = Math.hypot(b.x - c.x, b.y - c.y);
+          const moveA = distA <= distB;
+          if (moveA) {
+            if (!a.fixed) { a.x -= nx * shift; a.y -= ny * shift; }
+            else if (!b.fixed) { b.x -= nx * shift; b.y -= ny * shift; }
+            else if (!c.fixed) { c.x -= nx * shift; c.y -= ny * shift; }
+          } else {
+            if (!b.fixed) { b.x -= nx * shift; b.y -= ny * shift; }
+            else if (!a.fixed) { a.x -= nx * shift; a.y -= ny * shift; }
+            else if (!c.fixed) { c.x -= nx * shift; c.y -= ny * shift; }
           }
         } else if (constraint.a && constraint.b) {
           const c1 = circles.get(constraint.a);
@@ -1042,6 +1064,62 @@ export class ConstraintSketch extends Sketch {
     if (!target) return this;
     setConstraintValue(target, value);
     return solveConstraintDefinition(next);
+  }
+
+  /**
+   * Return a human-readable diagnostic string of the solved state.
+   * Useful for debugging constraint issues — shows point positions, line
+   * angles/lengths, loop areas, rejected constraints, and DOF status.
+   */
+  inspect(): string {
+    const meta = this.constraintMeta;
+    const def = this.definition;
+    const lines: string[] = [];
+
+    lines.push(`status: ${meta.status}  maxError: ${meta.maxError.toFixed(6)}`);
+
+    if (meta.rejected.length > 0) {
+      lines.push(`REJECTED (${meta.rejected.length}):`);
+      meta.rejected.forEach((r) => lines.push(`  ${r.type} ${r.label} (${r.id})`));
+    }
+
+    lines.push('points:');
+    def.points.forEach((p) => {
+      lines.push(`  ${p.id}: (${p.x.toFixed(3)}, ${p.y.toFixed(3)})${p.fixed ? ' FIXED' : ''}`);
+    });
+
+    lines.push('lines:');
+    const ptMap = new Map(def.points.map((p) => [p.id, p] as const));
+    def.lines.forEach((l) => {
+      const a = ptMap.get(l.a);
+      const b = ptMap.get(l.b);
+      if (!a || !b) return;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      lines.push(`  ${l.id}: ${l.a}\u2192${l.b}  angle=${ang.toFixed(1)}\u00B0  len=${len.toFixed(3)}${l.construction ? ' (construction)' : ''}`);
+    });
+
+    lines.push('loops:');
+    def.loops.forEach((loop, i) => {
+      if (loop.type === 'poly') {
+        const coords = loop.points.map((id) => ptMap.get(id)).filter(Boolean) as SketchPoint[];
+        let area = 0;
+        for (let j = 0; j < coords.length; j += 1) {
+          const k = (j + 1) % coords.length;
+          area += coords[j].x * coords[k].y - coords[k].x * coords[j].y;
+        }
+        area /= 2;
+        lines.push(`  [${i}]: ${coords.length}-gon  area=${area.toFixed(1)}`);
+      } else {
+        const c = def.circles.find((cc) => cc.id === loop.circle);
+        const cen = c ? ptMap.get(c.center) : null;
+        lines.push(`  [${i}]: circle r=${c ? c.radius.toFixed(2) : '?'} at (${cen ? cen.x.toFixed(1) : '?'},${cen ? cen.y.toFixed(1) : '?'})`);
+      }
+    });
+
+    return lines.join('\n');
   }
 }
 

@@ -6,16 +6,15 @@
  *
  * Parts:
  *   1. Slotted plate     — rectangle with a centred rectangular slot
- *   2. Angle bracket     — two legs at a user-defined angle
+ *   2. Motor mount plate  — T-shaped profile, all dimensions constrained
  *   3. Mounting flange   — square plate with bolt holes
- *   4. Link arm          — two circles connected by tangent lines (capsule)
+ *   4. Connecting rod    — constrained trapezoid with symmetric sides
  */
 
 const W  = param('width',  60, { min: 30, max: 120, unit: 'mm' });
 const H  = param('height', 40, { min: 20, max: 80, unit: 'mm' });
 const T  = param('thick',   8, { min: 3, max: 20, unit: 'mm' });
 const R  = param('radius', 10, { min: 5, max: 25, unit: 'mm' });
-const ANGLE = param('legAngle', 45, { min: 10, max: 150 });
 
 // ─── 1. Slotted plate ─────────────────────────────────────────────────────────
 const slottedPlate = (() => {
@@ -31,15 +30,15 @@ const slottedPlate = (() => {
   const o2 = outer.point(W, H);
   const o3 = outer.point(0, H);
   const ob = outer.line(o0, o1);
-  const or = outer.line(o1, o2);
+  const or_ = outer.line(o1, o2);
   outer.line(o2, o3);
   outer.line(o3, o0);
   outer.addLoop([o0, o1, o2, o3]);
   outer.fix(o0);
   outer.horizontal(ob);
-  outer.vertical(or);
+  outer.vertical(or_);
   outer.length(ob, W);
-  outer.length(or, H);
+  outer.length(or_, H);
   const outerResult = outer.solve();
 
   // Slot cutout
@@ -63,45 +62,62 @@ const slottedPlate = (() => {
   return outerResult.subtract(slotResult).extrude(T);
 })();
 
-// ─── 2. Angle bracket ────────────────────────────────────────────────────────
-// Two equal-length legs joined at the origin, at a specified angle.
-const angleBracket = (() => {
-  const legLen = Math.max(W, H);
-  const rad = (ANGLE * Math.PI) / 180;
+// ─── 2. Motor mount plate (T-shape) ──────────────────────────────────────────
+// A T-shaped profile: wide flange on top, narrow stem below.
+// Stem is centred on the flange via midpoint constraint.
+const motorMount = (() => {
+  const flangeW = W;
+  const flangeH = T;
+  const stemW = W * 0.3;
+  const stemH = H - flangeH;
 
   const sk = constrainedSketch();
 
-  // Pivot at origin
-  const pivot = sk.point(0, 0);
+  // T-shape outline (counter-clockwise):
+  // Start at bottom-left of stem, go around
+  const stemLeft  = (flangeW - stemW) / 2;
+  const stemRight = stemLeft + stemW;
 
-  // Leg A (horizontal)
-  const aEnd  = sk.point(legLen, 0);
-  const aTop  = sk.point(legLen, T);
-  const aBase = sk.point(0, T);
+  const p0 = sk.point(stemLeft, 0);         // bottom-left of stem
+  const p1 = sk.point(stemRight, 0);        // bottom-right of stem
+  const p2 = sk.point(stemRight, stemH);    // where stem meets flange right
+  const p3 = sk.point(flangeW, stemH);      // flange bottom-right corner
+  const p4 = sk.point(flangeW, stemH + flangeH); // flange top-right
+  const p5 = sk.point(0, stemH + flangeH);  // flange top-left
+  const p6 = sk.point(0, stemH);            // flange bottom-left corner
+  const p7 = sk.point(stemLeft, stemH);     // where stem meets flange left
 
-  // Leg B (at ANGLE degrees, approximate start positions)
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const bEnd   = sk.point(cos * legLen, sin * legLen);
-  const bOuter = sk.point(cos * legLen - sin * T, sin * legLen + cos * T);
-  const bBase  = sk.point(-sin * T, cos * T);
+  const stemBot  = sk.line(p0, p1);
+  const stemR    = sk.line(p1, p2);
+  const stepR    = sk.line(p2, p3);
+  const flangeR  = sk.line(p3, p4);
+  const flangeTop= sk.line(p4, p5);
+  const flangeL  = sk.line(p5, p6);
+  const stepL    = sk.line(p6, p7);
+  const stemL    = sk.line(p7, p0);
 
-  const legABot  = sk.line(pivot, aEnd);
-  const legAEnd  = sk.line(aEnd, aTop);
-  const legATop  = sk.line(aTop, aBase);
-  sk.line(aBase, bBase);
-  const legBLeft = sk.line(bBase, bEnd);
-  sk.line(bEnd, bOuter);
-  sk.line(bOuter, pivot);
+  sk.addLoop([p0, p1, p2, p3, p4, p5, p6, p7]);
 
-  sk.addLoop([pivot, aEnd, aTop, aBase, bBase, bEnd, bOuter]);
+  // Fix origin, make all edges horizontal or vertical
+  sk.fix(p0, stemLeft, 0);
+  sk.horizontal(stemBot);
+  sk.vertical(stemR);
+  sk.horizontal(stepR);
+  sk.vertical(flangeR);
+  sk.horizontal(flangeTop);
+  sk.vertical(flangeL);
+  sk.horizontal(stepL);
+  sk.vertical(stemL);
 
-  sk.fix(pivot);
-  sk.horizontal(legABot);
-  sk.length(legABot, legLen);
-  sk.vertical(legAEnd);
-  sk.angle(legABot, legBLeft, ANGLE);
-  sk.equal(legABot, legBLeft);
+  // Dimensions
+  sk.length(stemBot, stemW);
+  sk.length(stemR, stemH);
+  sk.length(flangeTop, flangeW);
+  sk.length(flangeR, flangeH);
+
+  // Symmetry: stem is centred on the flange
+  // Use equal step widths (stepL == stepR)
+  sk.equal(stepR, stepL);
 
   return sk.solve().extrude(T).translate(W + 20, 0, 0);
 })();
@@ -161,46 +177,59 @@ const mountingFlange = (() => {
   return result.extrude(T).translate(0, H + 20, 0);
 })();
 
-// ─── 4. Link arm (capsule) ────────────────────────────────────────────────────
-// Two circles connected by two external tangent lines.
-const linkArm = (() => {
-  const r1 = R;
-  const r2 = R * 0.6;
-  const armLen = W;
+// ─── 4. Connecting rod (symmetric trapezoid) ──────────────────────────────────
+// A trapezoid whose left/right halves are mirror-symmetric, with constrained
+// top width, bottom width, and height. Driven entirely by constraints.
+const connectingRod = (() => {
+  const topW = W * 0.4;
+  const botW = W;
+  const rodH = H;
 
   const sk = constrainedSketch();
 
-  const cL = sk.point(0, 0);
-  const cR = sk.point(armLen, 0);
+  // Trapezoid vertices
+  const bl = sk.point(-botW / 2, 0);
+  const br = sk.point(botW / 2, 0);
+  const tr = sk.point(topW / 2, rodH);
+  const tl = sk.point(-topW / 2, rodH);
 
-  const circL = sk.circle(cL, r1);
-  const circR = sk.circle(cR, r2);
+  const bottom = sk.line(bl, br);
+  const right  = sk.line(br, tr);
+  const top    = sk.line(tr, tl);
+  const left   = sk.line(tl, bl);
 
-  // Tangent lines connecting the two circles
-  const tL = sk.point(0, r1);
-  const tR = sk.point(armLen, r2);
-  const topLine = sk.line(tL, tR);
+  sk.addLoop([bl, br, tr, tl]);
 
-  const bL = sk.point(0, -r1);
-  const bR = sk.point(armLen, -r2);
-  const botLine = sk.line(bL, bR);
+  // Symmetry axis: vertical construction line at x = 0
+  const axBot = sk.point(0, -10, true);
+  const axTop = sk.point(0, rodH + 10, true);
+  const axis = sk.line(axBot, axTop, true); // construction line
 
-  sk.fix(cL, 0, 0);
-  sk.fix(cR, armLen, 0);
-  sk.radius(circL, r1);
-  sk.radius(circR, r2);
+  sk.fix(axBot); sk.fix(axTop);
+  sk.vertical(axis);
 
-  sk.tangent(topLine, circL);
-  sk.tangent(topLine, circR);
-  sk.tangent(botLine, circL);
-  sk.tangent(botLine, circR);
+  // Points are symmetric about the axis
+  sk.symmetric(bl, br, axis);
+  sk.symmetric(tl, tr, axis);
 
-  return sk.solve().extrude(T / 2).translate(0, -(r1 + 20), 0);
+  // Bottom and top are horizontal + parallel
+  sk.horizontal(bottom);
+  sk.horizontal(top);
+
+  // Sides are equal length
+  sk.equal(right, left);
+
+  // Dimensions
+  sk.length(bottom, botW);
+  sk.length(top, topW);
+  sk.vDistance(bl, tl, rodH);
+
+  return sk.solve().extrude(T / 2).translate(0, -(rodH + 20), 0);
 })();
 
 return [
-  { name: '1 - Slotted Plate',    shape: slottedPlate },
-  { name: '2 - Angle Bracket',    shape: angleBracket },
-  { name: '3 - Mounting Flange',  shape: mountingFlange },
-  { name: '4 - Link Arm',         shape: linkArm },
+  { name: '1 - Slotted Plate',      shape: slottedPlate },
+  { name: '2 - Motor Mount (T)',     shape: motorMount },
+  { name: '3 - Mounting Flange',     shape: mountingFlange },
+  { name: '4 - Connecting Rod',      shape: connectingRod },
 ];

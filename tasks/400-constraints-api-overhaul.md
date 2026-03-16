@@ -72,3 +72,10 @@ Overhaul the public API of `ConstrainedSketchBuilder` so that adding constraints
 - [x] `addLoop()` method added
 - [x] Strict mode implemented
 - [x] Examples created
+- [x] Solver bugs fixed 2026-03-16:
+  - `parallel` now accepts anti-parallel lines (picks closer of same/opposite direction)
+  - `perpendicular` now accepts both perpendicular orientations
+  - `angle` now picks the closer of the two valid orientations
+  - tangent line-circle solver moves only the nearest endpoint so two tangent constraints on one line can converge
+- [x] `ConstraintSketch.inspect()` diagnostic method added
+- [x] Examples verified: all volumes match expected analytical values

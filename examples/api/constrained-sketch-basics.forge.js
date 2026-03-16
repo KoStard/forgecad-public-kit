@@ -3,12 +3,10 @@
  *
  * Demonstrates the ForgeCAD 2D constraint API: geometric and dimensional
  * constraints on lines, circles, and points.
- *
- * Each section builds a self-contained sketch that showcases one concept.
  */
 
 // ─── 1. Fully constrained rectangle ─────────────────────────────────────────
-// Origin point fixed → constrain width + height → all other points follow.
+// Four points + four lines, fixed origin, horizontal/vertical + parallel sides.
 const rectangleSketch = (() => {
   const sk = constrainedSketch();
 
@@ -70,20 +68,21 @@ const circleSketch = (() => {
   return sk.solve().extrude(4).translate(0, 60, 0);
 })();
 
-// ─── 4. Parallel lines with equal length ─────────────────────────────────────
+// ─── 4. Parallel + equal: parallelogram ──────────────────────────────────────
+// Two pairs of parallel, equal-length sides. The top line runs right-to-left
+// (anti-parallel to bottom) — the solver handles this correctly.
 const parallelSketch = (() => {
   const sk = constrainedSketch();
 
   const a1 = sk.point(0, 0);
   const a2 = sk.point(30, 0);
+  const b2 = sk.point(25, 22); // solver will correct
   const b1 = sk.point(0, 20);
-  const b2 = sk.point(25, 22); // slightly off — solver will correct
 
   const lineA = sk.line(a1, a2);
-  const lineB = sk.line(b1, b2);
-
-  sk.line(a1, b1);
+  const lineB = sk.line(b2, b1); // anti-parallel to lineA
   sk.line(a2, b2);
+  sk.line(b1, a1);
   sk.addLoop([a1, a2, b2, b1]);
 
   sk.fix(a1);
@@ -96,13 +95,13 @@ const parallelSketch = (() => {
   return sk.solve().extrude(5).translate(120, 0, 0);
 })();
 
-// ─── 5. Perpendicular lines ───────────────────────────────────────────────────
+// ─── 5. Perpendicular lines (right triangle) ─────────────────────────────────
 const perpSketch = (() => {
   const sk = constrainedSketch();
 
   const o  = sk.point(0, 0);
-  const px = sk.point(25, 5);
-  const py = sk.point(-3, 25);
+  const px = sk.point(25, 5);  // approximately right
+  const py = sk.point(-3, 25); // solver will fix
 
   const lineX = sk.line(o, px);
   const lineY = sk.line(o, py);
@@ -118,45 +117,34 @@ const perpSketch = (() => {
 })();
 
 // ─── 6. Midpoint constraint ───────────────────────────────────────────────────
-// A cross-hair marker: a point is constrained to the midpoint of each of two lines.
+// The midpoint of a bar is pinned to a known point. We visualise with a diamond.
 const midpointSketch = (() => {
   const sk = constrainedSketch();
 
-  // Horizontal bar
-  const l0 = sk.point(-20, 0);
-  const l1 = sk.point(20, 0);
-  // Vertical bar
-  const v0 = sk.point(0, -15);
-  const v1 = sk.point(0, 15);
+  const p0 = sk.point(-20, 0);
+  const p1 = sk.point(20, 0);
+  const bar = sk.line(p0, p1);
 
-  const hBar = sk.line(l0, l1);
-  const vBar = sk.line(v0, v1);
+  // The midpoint marker (will be moved to bar's midpoint by solver)
+  const mid = sk.point(5, 3);
 
-  // The intersection point must lie at the midpoint of both bars
-  const ctr = sk.point(0, 0);
-  sk.midpoint(ctr, hBar);
-  sk.midpoint(ctr, vBar);
+  // Small diamond
+  const d0 = sk.point(3, 0);
+  const d1 = sk.point(0, 3);
+  const d2 = sk.point(-3, 0);
+  const d3 = sk.point(0, -3);
+  sk.line(d0, d1); sk.line(d1, d2); sk.line(d2, d3); sk.line(d3, d0);
+  sk.addLoop([d0, d1, d2, d3]);
 
-  // Build a small diamond shape centred at ctr to visualise it
-  const dx = sk.point(3, 0);
-  const dy = sk.point(0, 3);
-  const dxn = sk.point(-3, 0);
-  const dyn = sk.point(0, -3);
-
-  sk.addLoop([dx, dy, dxn, dyn]);
-  sk.line(dx, dy); sk.line(dy, dxn); sk.line(dxn, dyn); sk.line(dyn, dx);
-
-  sk.fix(l0, -20, 0);
-  sk.horizontal(hBar);
-  sk.vertical(vBar);
-  sk.length(hBar, 40);
-  sk.length(vBar, 30);
+  sk.fix(p0, -20, 0);
+  sk.fix(p1, 20, 0);
+  sk.midpoint(mid, bar);
 
   return sk.solve().extrude(2).translate(0, 120, 0);
 })();
 
-// ─── 7. Point on circle ───────────────────────────────────────────────────────
-// An equilateral triangle inscribed in a circle via pointOnCircle constraints.
+// ─── 7. Inscribed triangle via pointOnCircle ──────────────────────────────────
+// Three vertices constrained to a construction circle, with equal side lengths.
 const inscribedSketch = (() => {
   const sk = constrainedSketch();
 
@@ -185,51 +173,59 @@ const inscribedSketch = (() => {
   return sk.solve().extrude(3).translate(120, 60, 0);
 })();
 
-// ─── 8. Symmetric points about an axis ───────────────────────────────────────
+// ─── 8. Symmetric trapezoid ──────────────────────────────────────────────────
+// Points mirrored about a vertical construction axis.
 const symSketch = (() => {
   const sk = constrainedSketch();
 
-  // Symmetry axis: vertical line at x = 0
-  const axA = sk.point(0, -30, true);
-  const axB = sk.point(0, 30, true);
-  const axis = sk.line(axA, axB);
+  // Symmetry axis: vertical construction line at x = 0
+  const axBot = sk.point(0, -5, true);
+  const axTop = sk.point(0, 35, true);
+  const axis = sk.line(axBot, axTop, true);
 
-  // Left and right points — right will mirror left
-  const left  = sk.point(-15, 10);
-  const right = sk.point(12, 8); // slightly off — solver will fix
+  // Trapezoid vertices
+  const bl = sk.point(-20, 0);
+  const br = sk.point(20, 0);
+  const tr = sk.point(10, 25);
+  const tl = sk.point(-10, 25);
 
-  // Diamond shape using the two symmetric points + top/bottom
-  const top = sk.point(0, 18);
-  const bot = sk.point(0, -18);
+  const bottom = sk.line(bl, br);
+  sk.line(br, tr);
+  const top = sk.line(tr, tl);
+  sk.line(tl, bl);
+  sk.addLoop([bl, br, tr, tl]);
 
-  sk.line(left, top); sk.line(top, right); sk.line(right, bot); sk.line(bot, left);
-  sk.addLoop([left, top, right, bot]);
-
-  sk.fix(axA); sk.fix(axB);
-  sk.symmetric(left, right, axis);
-  sk.fix(top, 0, 18);
-  sk.fix(bot, 0, -18);
+  sk.fix(axBot); sk.fix(axTop);
+  sk.vertical(axis);
+  sk.symmetric(bl, br, axis);
+  sk.symmetric(tl, tr, axis);
+  sk.horizontal(bottom);
+  sk.horizontal(top);
+  sk.length(bottom, 40);
+  sk.length(top, 20);
+  sk.vDistance(bl, tl, 25);
 
   return sk.solve().extrude(3).translate(0, -60, 0);
 })();
 
-// ─── 9. Concentric circles (ring) ────────────────────────────────────────────
+// ─── 9. Concentric ring ──────────────────────────────────────────────────────
 const ringSketch = (() => {
   const sk = constrainedSketch();
 
   const cen = sk.point(0, 0);
   const outer = sk.circle(cen, 20);
-  const innerCen = sk.point(1, 0); // slightly off-centre — solver will fix
+
+  // Inner circle — intentionally off-centre; concentric constraint will fix it
+  const innerCen = sk.point(1, 0);
   const inner = sk.circle(innerCen, 12);
 
   sk.fix(cen, 0, 0);
   sk.radius(outer, 20);
   sk.concentric(outer, inner);
   sk.radius(inner, 12);
-
   const outerResult = sk.solve();
 
-  // Build inner cutout separately and subtract
+  // Build inner cutout as a separate sketch and subtract
   const holeSk = constrainedSketch();
   const hc = holeSk.point(0, 0, true);
   const hole = holeSk.circle(hc, 12);
@@ -241,13 +237,13 @@ const ringSketch = (() => {
 })();
 
 return [
-  { name: '1 - Rectangle',         shape: rectangleSketch },
-  { name: '2 - Equilateral Tri',   shape: triangleSketch },
-  { name: '3 - Circle',            shape: circleSketch },
-  { name: '4 - Parallel+Equal',    shape: parallelSketch },
-  { name: '5 - Perpendicular',     shape: perpSketch },
-  { name: '6 - Midpoint',          shape: midpointSketch },
-  { name: '7 - Inscribed Triangle',shape: inscribedSketch },
-  { name: '8 - Symmetric',         shape: symSketch },
-  { name: '9 - Ring',              shape: ringSketch },
+  { name: '1 - Rectangle',          shape: rectangleSketch },
+  { name: '2 - Equilateral Tri',    shape: triangleSketch },
+  { name: '3 - Circle',             shape: circleSketch },
+  { name: '4 - Parallelogram',      shape: parallelSketch },
+  { name: '5 - Perpendicular',      shape: perpSketch },
+  { name: '6 - Midpoint',           shape: midpointSketch },
+  { name: '7 - Inscribed Triangle', shape: inscribedSketch },
+  { name: '8 - Symmetric Trapezoid',shape: symSketch },
+  { name: '9 - Ring',               shape: ringSketch },
 ];
