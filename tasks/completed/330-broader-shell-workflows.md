@@ -47,6 +47,14 @@ Each lowerer now emits a specific rejection message:
 - Scale transforms rejected.
 - The v1 era prefix was removed from all messages.
 
+### Vertical-edge propagation through shell
+Shell now propagates vertical (Z-direction) corner edges, not just faces. The four canonical vertical edges (`vert-bl`, `vert-br`, `vert-tr`, `vert-tl`) are walked against the open-face set:
+
+- Edges whose two adjacent side-faces are **both closed** → `supported` preserved descendant with a single-edge contract.
+- Edges with at least one adjacent open side-face → `ambiguous`/`split` with an explicit note.
+
+If the base has no tracked vertical edges (non-box/extrude primitive), a base-level diagnostic fires. This replaces the old blanket `shell-edge-propagation-ambiguous` and extends the defended subset to outer vertical edges that survive the opening.
+
 ### Regression corpus
 `examples/compiler-corpus/shell-box-side-opening.forge.js` exercises three box configurations:
 1. Top + front open: inner floor and inner back wall targeted with boss and rib.
