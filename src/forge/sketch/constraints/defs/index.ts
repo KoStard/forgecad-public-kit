@@ -20,6 +20,11 @@ import './diameter';
 import './hDistance';
 import './vDistance';
 import './lineDistance';
+import './shapeCentroidX';
+import './shapeCentroidY';
+import './shapeWidth';
+import './shapeHeight';
+import './shapeArea';
 
 // Re-export named types that external code imports directly
 export type { LineDistanceConstraint } from './lineDistance';

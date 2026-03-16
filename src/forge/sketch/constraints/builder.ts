@@ -4,11 +4,13 @@ import type {
   ConstraintDefinition,
   LineId,
   PointId,
+  ShapeId,
   SketchCircle,
   SketchConstraint,
   SketchLine,
   SketchLoop,
   SketchPoint,
+  SketchShape,
   SolveOptions,
 } from './types';
 import { DEFAULT_TOLERANCE, getPendingBuilderMethods, solveConstraints } from './registry';
@@ -28,6 +30,7 @@ export class ConstrainedSketchBuilder {
   private points: SketchPoint[] = [];
   private lines: SketchLine[] = [];
   private circles: SketchCircle[] = [];
+  private shapes: SketchShape[] = [];
   private constraints: SketchConstraint[] = [];
   private loops: SketchLoop[] = [];
   private rejectedConstraints: SketchConstraint[] = [];
@@ -134,6 +137,16 @@ export class ConstrainedSketchBuilder {
   addLoopCircle(center: PointId, radius: number, segments = 48): this {
     this.circle(center, radius, false, segments);
     return this;
+  }
+
+  /**
+   * Register a named shape (closed polygon) from an ordered list of line IDs.
+   * Returns the ShapeId for use in shape constraints (shapeWidth, shapeCentroidX, etc.).
+   */
+  shape(lines: LineId[]): ShapeId {
+    const id: ShapeId = `shp-${this.nextId++}`;
+    this.shapes.push({ id, lines: [...lines] });
+    return id;
   }
 
   constrain(constraint: Omit<SketchConstraint, 'id'>): this {
@@ -308,6 +321,7 @@ export class ConstrainedSketchBuilder {
       points: this.points.map((p) => ({ ...p })),
       lines: this.lines.map((l) => ({ ...l })),
       circles: this.circles.map((c) => ({ ...c })),
+      shapes: this.shapes.map((s) => ({ ...s, lines: [...s.lines] })),
       loops: this.loops.map((loop) =>
         loop.type === 'poly'
           ? { type: 'poly', points: [...loop.points] }

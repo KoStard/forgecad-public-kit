@@ -78,6 +78,7 @@ export const solveConstraints = (
   const points = new Map(def.points.map((p) => [p.id, p] as const));
   const lines = new Map(def.lines.map((l) => [l.id, l] as const));
   const circles = new Map(def.circles.map((c) => [c.id, c] as const));
+  const shapes = new Map((def.shapes ?? []).map((s) => [s.id, s] as const));
 
   const movePoint = (pt: SketchPoint, dx: number, dy: number): boolean => {
     if (pt.fixed) return false;
@@ -86,7 +87,7 @@ export const solveConstraints = (
     return true;
   };
 
-  const ctx: SolverContext = { points, lines, circles, tolerance, movePoint };
+  const ctx: SolverContext = { points, lines, circles, shapes, tolerance, movePoint };
 
   // Pre-solve pass (e.g. fixed constraint pins points before iteration)
   def.constraints.forEach((constraint) => {
@@ -120,6 +121,7 @@ export const buildConstraintDisplays = (
     points: new Map(def.points.map((p) => [p.id, p] as const)),
     lines: new Map(def.lines.map((l) => [l.id, l] as const)),
     circles: new Map(def.circles.map((c) => [c.id, c] as const)),
+    shapes: new Map((def.shapes ?? []).map((s) => [s.id, s] as const)),
   };
 
   return def.constraints.map((constraint) => {
@@ -152,7 +154,7 @@ export const computeStatus = (
   const refCount = new Map<PointId, number>();
   def.points.forEach((p) => refCount.set(p.id, 0));
 
-  const dofCtx: DofContext = { refCount, lines: def.lines };
+  const dofCtx: DofContext = { refCount, lines: def.lines, shapes: new Map((def.shapes ?? []).map((s) => [s.id, s] as const)) };
 
   def.constraints.forEach((constraint) => {
     const constraintDef = registry.get(constraint.type);

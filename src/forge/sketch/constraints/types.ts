@@ -1,6 +1,13 @@
 export type PointId = string;
 export type LineId = string;
 export type CircleId = string;
+export type ShapeId = string;
+
+export interface SketchShape {
+  id: ShapeId;
+  /** Ordered list of line IDs forming a closed polygon. */
+  lines: LineId[];
+}
 
 export interface SketchPoint {
   id: PointId;
@@ -60,6 +67,7 @@ export interface ConstraintDefinition {
   points: SketchPoint[];
   lines: SketchLine[];
   circles: SketchCircle[];
+  shapes: SketchShape[];
   loops: SketchLoop[];
   constraints: SketchConstraint[];
   rejectedConstraints: SketchConstraint[];
@@ -91,6 +99,7 @@ export interface SolverContext {
   points: Map<PointId, SketchPoint>;
   lines: Map<LineId, SketchLine>;
   circles: Map<CircleId, SketchCircle>;
+  shapes: Map<ShapeId, SketchShape>;
   tolerance: number;
   movePoint: (pt: SketchPoint, dx: number, dy: number) => boolean;
 }
@@ -99,11 +108,13 @@ export interface DisplayContext {
   points: Map<PointId, SketchPoint>;
   lines: Map<LineId, SketchLine>;
   circles: Map<CircleId, SketchCircle>;
+  shapes: Map<ShapeId, SketchShape>;
 }
 
 export interface DofContext {
   refCount: Map<PointId, number>;
   lines: SketchLine[];
+  shapes: Map<ShapeId, SketchShape>;
 }
 
 // ─── Constraint definition descriptor ─────────────────────────────────────────
