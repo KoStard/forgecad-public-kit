@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'fs';
 import { runCheckApiContractsCli } from './check-api-contracts';
+import { runCheckTextCli } from './check-text';
 import { runCheckBrepExportCli } from './check-brep-export';
 import { runCheckCompilerCli } from './check-compiler';
 import { runCheckExamplesCli } from './check-examples';
@@ -641,6 +642,14 @@ const commands: CommandDefinition[] = [
     usage: ['forgecad check api'],
     examples: ['forgecad check api'],
     run: () => runCheckApiContractsCli(),
+  },
+  {
+    group: 'Checks',
+    path: ['check', 'text'],
+    summary: 'Run text2d geometry contract tests.',
+    usage: ['forgecad check text'],
+    examples: ['forgecad check text'],
+    run: () => runCheckTextCli(),
   },
   {
     group: 'Debug',

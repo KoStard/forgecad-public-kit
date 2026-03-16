@@ -73,6 +73,8 @@ import {
   loft,
   sweep,
   sketchFromSvg,
+  text2d,
+  textWidth,
   dim,
   dimLine,
   resetDimensions,
@@ -80,6 +82,7 @@ import {
   takeCollectedDimensions,
   type DimensionDef,
   type SvgImportOptions,
+  type TextOptions,
 } from './sketch';
 import { param, boolParam, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, type ParamDef } from './params';
 import { joint } from './joint';
@@ -1183,6 +1186,8 @@ function executeFile(
       importGroup,
       importAssembly,
       importSvgSketch,
+      text2d,
+      textWidth,
       dim,
       dimLine,
       bom,
