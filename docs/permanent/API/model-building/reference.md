@@ -995,9 +995,16 @@ const warped = box(50, 50, 50, true).warp(([x, y, z]) => {
 // Cross-section: intersect shape with a plane → Sketch
 const section = intersectWithPlane(shape, { plane: 'XY', offset: 10 });
 
-// Project: flatten shape onto a plane → Sketch
+// Project: flatten shape onto a coordinate plane → Sketch
 const shadow = projectToPlane(shape, { origin: [0, 0, 0], normal: [0, 0, 1] });
+
+// Project: flatten shape onto a defended descendant face → Sketch
+const shell = roundedRect(90, 56, 6, true).extrude(22).shell(3, { openFaces: ['top'] });
+const innerBottom = shell.face('inner-bottom');
+const projected = projectToPlane(shell, { face: innerBottom });
 ```
+
+The `{ face: faceRef }` target form is called **face-to-plane projection**. The compiler resolves the defended face into a plane frame and stores a `targetFaceQuery` in the projection compile plan so later cuts, offsets, and stiffeners can explain which surface they originated from. The target face must be planar; non-planar faces (curved walls, non-coplanar sets) throw at runtime.
 
 `projectToPlane()` always works as a runtime modeling utility.
 
@@ -1007,9 +1014,11 @@ Compiler-owned replay is narrower today:
   - `Sketch.onFace()`-placed straight extrusions on a matching parallel target plane
   - compatible `shell()` / through-`hole()` / through-`cutout()` descendants aligned to that same basis
   - boolean `union()` combinations of compatible projected operands, including mirrored/patterned descendants
+- both coordinate-plane targets (`{ plane: 'XY' }`, `{ origin, normal }`) and face-descendant targets (`{ face: shape.face(name) }`) follow the same replay rules
 - aligned blind holes/cuts keep the same replayed silhouette, while aligned through holes/cuts subtract their projected profile from it
 - the target plane still has to stay parallel to that defended basis without introducing in-plane shear
 - boolean `difference()` / `intersection()` sources, trim/fillet/chamfer silhouette changes, and non-parallel host workplanes still return a usable runtime sketch but fall back to explicit compiler diagnostics instead of pretending the projection is exact-safe
+- non-planar or non-coplanar face targets (e.g. curved cylinder walls, non-coplanar boolean face sets) are intentionally unsupported and throw at the `projectToPlane` call site rather than silently degrading
 
 ## 2D Sketches
 

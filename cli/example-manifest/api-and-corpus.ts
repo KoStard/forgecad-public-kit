@@ -84,6 +84,7 @@ const COMPILER_CORPUS_PATHS = [
   'examples/compiler-corpus/fastener-plate-variants.forge.js',
   'examples/compiler-corpus/folded-service-panel-cover.forge.js',
   'examples/compiler-corpus/motor-mount-plate.forge.js',
+  'examples/compiler-corpus/projection-face-target.forge.js',
   'examples/compiler-corpus/projection-relay-cover.forge.js',
   'examples/compiler-corpus/sensor-bracket.forge.js',
   'examples/compiler-corpus/service-panel-cover.forge.js',

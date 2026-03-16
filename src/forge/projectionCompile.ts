@@ -10,6 +10,7 @@ import {
 } from './compilePlan';
 import { getShapeCompilePlan, getShapeWorkplanePlacement, type Shape } from './kernel';
 import { resolvePlaneFrame, type PlaneFrame, type PlaneSpec } from './planeFrame';
+import { cloneFaceQueryRef, type FaceQueryRef } from './queryModel';
 import { Transform } from './transform';
 import {
   cloneShapeWorkplanePlacement,
@@ -46,6 +47,7 @@ function projectionReplayFailure(
   plane: PlaneFrame,
   sourcePlacement: ShapeWorkplanePlacement['placement'] | undefined,
   reason: string,
+  targetFaceQuery?: FaceQueryRef,
 ): Extract<ProfileCompilePlan, { kind: 'project' }> {
   return {
     kind: 'project',
@@ -57,6 +59,7 @@ function projectionReplayFailure(
       normal: [plane.normal[0], plane.normal[1], plane.normal[2]],
     },
     sourcePlacement: sourcePlacement ? cloneSketchPlacementModel(sourcePlacement)! : undefined,
+    targetFaceQuery: targetFaceQuery ? cloneFaceQueryRef(targetFaceQuery)! : undefined,
     replayReason: reason,
     transforms: [],
   };
@@ -532,6 +535,10 @@ export function buildProjectionProfileCompilePlan(
   const sourceShape = getShapeCompilePlan(shape);
   if (!sourceShape) return null;
 
+  const targetFaceQuery: FaceQueryRef | undefined = 'face' in plane
+    ? (cloneFaceQueryRef(plane.face.query) ?? undefined)
+    : undefined;
+
   const targetPlane = resolvePlaneFrame(plane);
   const derived = buildProjectionReplayContext(sourceShape);
   if (!derived.ok) {
@@ -540,6 +547,7 @@ export function buildProjectionProfileCompilePlan(
       targetPlane,
       getShapeWorkplanePlacement(shape)?.placement,
       derived.reason,
+      targetFaceQuery,
     );
   }
   const replay = buildReplayProfile(derived.context.profile, derived.context.placement, targetPlane);
@@ -549,6 +557,7 @@ export function buildProjectionProfileCompilePlan(
       targetPlane,
       derived.context.placement.placement,
       replay.reason ?? 'projection replay could not derive a supported 2D profile.',
+      targetFaceQuery,
     );
   }
 
@@ -562,6 +571,7 @@ export function buildProjectionProfileCompilePlan(
       normal: [targetPlane.normal[0], targetPlane.normal[1], targetPlane.normal[2]],
     },
     sourcePlacement: cloneSketchPlacementModel(derived.context.placement.placement)!,
+    targetFaceQuery,
     replayProfile: replay.profile,
     transforms: [],
   };

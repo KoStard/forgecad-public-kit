@@ -1,8 +1,10 @@
 import { Transform, type Mat4, type Vec3 } from './transform';
+import type { FaceRef } from './sketch/topology';
 
 export type PlaneSpec =
   | { origin: Vec3; normal: Vec3 }
-  | { plane: 'XY' | 'XZ' | 'YZ'; offset?: number };
+  | { plane: 'XY' | 'XZ' | 'YZ'; offset?: number }
+  | { face: FaceRef };
 
 export interface PlaneFrame {
   origin: Vec3;
@@ -24,6 +26,13 @@ function normalize(v: Vec3): Vec3 {
 }
 
 export function resolvePlaneOriginNormal(plane: PlaneSpec): { origin: Vec3; normal: Vec3 } {
+  if ('face' in plane) {
+    const face = plane.face;
+    return {
+      origin: [face.center[0], face.center[1], face.center[2]],
+      normal: normalize([face.normal[0], face.normal[1], face.normal[2]]),
+    };
+  }
   if ('origin' in plane) {
     return { origin: [plane.origin[0], plane.origin[1], plane.origin[2]], normal: normalize(plane.normal) };
   }
@@ -82,6 +91,20 @@ export function rotationToPlaneSpace(normal: Vec3): Mat4 {
 }
 
 export function resolvePlaneFrame(plane: PlaneSpec): PlaneFrame {
+  if ('face' in plane) {
+    const face = plane.face;
+    if (face.planar === false || !face.uAxis || !face.vAxis) {
+      throw new Error(
+        `Face "${face.name}" is not planar and cannot be used as a projection plane.`,
+      );
+    }
+    return {
+      origin: [face.center[0], face.center[1], face.center[2]],
+      u: [face.uAxis[0], face.uAxis[1], face.uAxis[2]],
+      v: [face.vAxis[0], face.vAxis[1], face.vAxis[2]],
+      normal: [face.normal[0], face.normal[1], face.normal[2]],
+    };
+  }
   const { origin, normal } = resolvePlaneOriginNormal(plane);
   const worldFromPlane = Transform.from(rotationToPlaneSpace(normal)).inverse();
   return {

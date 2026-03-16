@@ -134,6 +134,19 @@ export const COMPILER_REGRESSION_CORPUS: CompilerRegressionCorpusPart[] = [
     scriptPath: corpusScriptPath('trimmed-access-cover.forge.js'),
     objectName: 'Trimmed Access Cover',
   },
+  {
+    id: 'corpus-projection-face-target',
+    name: 'Projection Face Target',
+    description:
+      'A shelled body keeps face-to-plane projection provenance when the target plane is a defended descendant region instead of a hardcoded coordinate plane.',
+    guards: [
+      'projectToPlane(shape, { face: shape.face(name) }) keeps targetFaceQuery provenance in the compile plan so downstream features can explain which surface they originated from',
+      'projection onto a defended inner-bottom shell descendant stays exact-capable under the same parallel-plane replay rules as coordinate-plane targets',
+      'downstream gasket and mount-pad features placed on the same defended descendant face remain exact-exportable after the face-to-plane projection step',
+    ],
+    scriptPath: corpusScriptPath('projection-face-target.forge.js'),
+    objectName: 'Projection Face Target',
+  },
 ];
 
 export function getCompilerRegressionCorpusPart(id: string): CompilerRegressionCorpusPart {
