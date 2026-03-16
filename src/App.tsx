@@ -11,6 +11,7 @@ import { ViewPanel } from './components/ViewPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { FileSwitcher } from './components/FileSwitcher';
 import { ConsolePanel } from './components/ConsolePanel';
+import { VerificationsPanel } from './components/VerificationsPanel';
 import { ResizablePanel } from './components/ResizablePanel';
 import { isSaveShortcut, shouldBlockBrowserShortcut, type EditorSurface } from './editorShortcuts';
 import { isNotebookFile } from './notebook/model';
@@ -243,6 +244,7 @@ export function App() {
             {notebookMode ? <NotebookEditor /> : <CodeEditor />}
           </div>
           <ParamPanel />
+          <VerificationsPanel />
           <ConsolePanel />
           <ExportPanel />
         </ResizablePanel>

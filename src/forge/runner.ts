@@ -99,6 +99,12 @@ import {
   type CollectedRobotExport,
 } from './robotExport';
 import {
+  verify,
+  resetVerifications,
+  getCollectedVerifications,
+  type VerificationResult,
+} from './verification';
+import {
   explodeView,
   resetExplodeView,
   getCollectedExplodeView,
@@ -159,6 +165,7 @@ export interface RunResult {
   error: string | null;
   timeMs: number;
   logs: LogEntry[];
+  verifications: VerificationResult[];
 }
 
 export interface RunScriptOptions {
@@ -1199,6 +1206,7 @@ function executeFile(
       explodeView,
       jointsView,
       viewConfig,
+      verify,
     };
 
     const requireModule = (requestedName: string): unknown => {
@@ -1348,6 +1356,7 @@ export function runScript(
   resetExplodeView();
   resetJointsView();
   resetViewConfig();
+  resetVerifications();
   _collectedLogs = [];
   const t0 = performance.now();
   const execOptions: RunnerExecutionOptions = {
@@ -1606,6 +1615,7 @@ export function runScript(
         error: objects.length > 0 || options.allowEmptyResult ? null : 'Script must return a Shape or Sketch',
         timeMs: performance.now() - t0,
         logs: _collectedLogs.slice(),
+        verifications: getCollectedVerifications(),
       };
     });
   } catch (e: any) {
@@ -1635,6 +1645,7 @@ export function runScript(
       error: `${msg}${lineInfo}`,
       timeMs: performance.now() - t0,
       logs: _collectedLogs.slice(),
+      verifications: getCollectedVerifications(),
     };
   }
 }

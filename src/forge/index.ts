@@ -106,6 +106,7 @@ export type {
   CollectedJointsView,
 } from './headless';
 export type { RunResult, SceneObject, LogEntry } from './headless';
+export type { VerificationResult, VerificationStatus } from './headless';
 export type { ForgeGeometry } from './headless';
 export type { ForgeQualityPreset, ForgeQualityProfile } from './headless';
 export type { GroupChild, NamedGroupChild, GroupInput } from './headless';

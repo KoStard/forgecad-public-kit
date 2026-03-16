@@ -66,5 +66,6 @@ export function deserializeRunResult(s: SerializedRunResult): RunResult {
     error: s.error,
     timeMs: s.timeMs,
     logs: s.logs,
+    verifications: s.verifications ?? [],
   } as RunResult;
 }

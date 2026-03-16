@@ -192,6 +192,7 @@ export function serializeRunResult(result: RunResult): {
     error: result.error,
     timeMs: result.timeMs,
     logs: result.logs,
+    verifications: result.verifications,
   };
 
   return { serialized, transferables };
