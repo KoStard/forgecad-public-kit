@@ -1,21 +1,12 @@
 import type { ArcId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
+import { arcSweep } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
     arcLength: { arc: ArcId; value: number };
   }
 }
-
-/** Sweep angle (in radians) from start to end, signed by clockwise flag. */
-const arcSweep = (
-  startAngle: number, endAngle: number, clockwise: boolean,
-): number => {
-  const sweep = clockwise
-    ? (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI)
-    : (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI);
-  return sweep < 1e-9 ? 2 * Math.PI : sweep;
-};
 
 registerConstraint<'arcLength', ConstraintTypeMap['arcLength']>({
   type: 'arcLength',
@@ -63,7 +54,6 @@ registerConstraint<'arcLength', ConstraintTypeMap['arcLength']>({
     return err;
   },
 
-
   residual(c, { arcs, points }) {
     const arc = arcs.get(c.arc);
     if (!arc) return [0];
@@ -73,11 +63,7 @@ registerConstraint<'arcLength', ConstraintTypeMap['arcLength']>({
     if (!center || !start || !end) return [0];
     const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
     const endAngle = Math.atan2(end.y - center.y, end.x - center.x);
-    let sweep = arc.clockwise
-      ? (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI)
-      : (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI);
-    if (sweep < 1e-9) sweep = 2 * Math.PI;
-    return [arc.radius * sweep - c.value];
+    return [arc.radius * arcSweep(startAngle, endAngle, arc.clockwise) - c.value];
   },
 
   computeDof(_c, _ctx) {

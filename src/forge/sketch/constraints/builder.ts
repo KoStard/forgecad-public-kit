@@ -407,9 +407,10 @@ export class ConstrainedSketchBuilder {
     const d = Math.sqrt(dx * dx + dy * dy);
     const r = Math.max(radius, d / 2 + 1e-9); // clamp to minimum viable radius
     const h = Math.sqrt(r * r - (d / 2) * (d / 2));
-    // Left-perpendicular of (start→end):
-    const px = -dy / d;
-    const py = dx / d;
+    // Left-perpendicular of (start→end); guard against coincident start/end.
+    const invD = d > 1e-9 ? 1 / d : 0;
+    const px = -dy * invD;
+    const py = dx * invD;
     // CCW → center left of direction; CW → center right.
     const sign = clockwise ? -1 : 1;
     const cx = mx + sign * h * px;

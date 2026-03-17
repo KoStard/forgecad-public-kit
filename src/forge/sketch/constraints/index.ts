@@ -70,3 +70,7 @@ export type RadiusConstraint = Extract<SketchConstraint, { type: 'radius' }>;
 export type DiameterConstraint = Extract<SketchConstraint, { type: 'diameter' }>;
 export type HorizontalDistanceConstraint = Extract<SketchConstraint, { type: 'hDistance' }>;
 export type VerticalDistanceConstraint = Extract<SketchConstraint, { type: 'vDistance' }>;
+export type AbsoluteAngleConstraint = Extract<SketchConstraint, { type: 'absoluteAngle' }>;
+export type EqualRadiusConstraint = Extract<SketchConstraint, { type: 'equalRadius' }>;
+export type ArcLengthConstraint = Extract<SketchConstraint, { type: 'arcLength' }>;
+export type LineTangentArcConstraint = Extract<SketchConstraint, { type: 'lineTangentArc' }>;

@@ -144,7 +144,24 @@ export const buildConstructionGeometry = (
     })
     .filter((circle): circle is { center: [number, number]; radius: number } => circle !== null);
 
-  return { lines, circles };
+  const arcs = (def.arcs ?? [])
+    .filter((arc) => arc.construction)
+    .map((arc) => {
+      const center = pointMap.get(arc.center);
+      const start = pointMap.get(arc.start);
+      const end = pointMap.get(arc.end);
+      if (!center || !start || !end) return null;
+      return {
+        center: [center.x, center.y] as [number, number],
+        start: [start.x, start.y] as [number, number],
+        end: [end.x, end.y] as [number, number],
+        radius: arc.radius,
+        clockwise: arc.clockwise,
+      };
+    })
+    .filter((arc): arc is NonNullable<typeof arc> => arc !== null);
+
+  return { lines, circles, arcs };
 };
 
 export const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMeta['edges'] => {

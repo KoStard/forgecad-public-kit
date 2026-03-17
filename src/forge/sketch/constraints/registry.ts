@@ -121,7 +121,6 @@ const solveNR = (
   maxIter: number,
   tolerance: number,
 ): number => {
-  const { points, circles } = ctx;
   const freePoints = def.points.filter((p) => !p.fixed);
   const freeCircles = def.circles.filter((c) => !c.fixedRadius);
   const n = freePoints.length * 2 + freeCircles.length;
@@ -149,7 +148,7 @@ const solveNR = (
     return r;
   };
 
-  // Ensure point Map refs are current (they already are — we mutate in-place)
+  // Step size for numerical Jacobian finite differences.
   const EPS = 1e-6;
   let maxError = 0;
 
@@ -160,7 +159,7 @@ const solveNR = (
     if (maxError <= tolerance) break;
 
     const vars = getVars();
-    // Numerical Jacobian: J[varIndex] = column of partial derivatives
+    // Numerical Jacobian: build column-by-column via forward finite differences.
     const Jcols: number[][] = [];
     for (let j = 0; j < n; j++) {
       vars[j] += EPS;
@@ -170,16 +169,23 @@ const solveNR = (
       applyVars(vars);
       Jcols.push(r1.map((ri, i) => (ri - r0[i]) / EPS));
     }
-    // J is currently n columns of length m; reshape to m rows of n
+    // J is currently n columns of length m; reshape to m rows of n.
     const m = r0.length;
     const J: number[][] = Array.from({ length: m }, (_, i) => Jcols.map((col) => col[i]));
 
     const dx = gaussNewtonStep(J, r0);
     if (dx.length === 0) break;
 
-    // Damped step to prevent overshooting
-    const step = vars.map((v, j) => v + dx[j]);
-    applyVars(step);
+    // Armijo backtracking line search: halve the step until residual norm decreases.
+    const norm0 = r0.reduce((s, v) => s + v * v, 0);
+    let alpha = 1.0;
+    for (let ls = 0; ls < 8; ls++) {
+      const trial = vars.map((v, j) => v + alpha * dx[j]);
+      applyVars(trial);
+      const rTrial = computeResiduals();
+      if (rTrial.reduce((s, v) => s + v * v, 0) < norm0) break;
+      alpha *= 0.5;
+    }
   }
 
   // All mutations applied in-place — freePoints/freeCircles share objects with def.points/circles.

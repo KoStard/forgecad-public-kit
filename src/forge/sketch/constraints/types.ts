@@ -77,6 +77,7 @@ export interface SketchConstraintMeta {
   construction: {
     lines: { a: [number, number]; b: [number, number] }[];
     circles: { center: [number, number]; radius: number }[];
+    arcs: { center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
   };
   /** Non-construction geometry edges rendered as solid wireframe overlay. */
   edges: {

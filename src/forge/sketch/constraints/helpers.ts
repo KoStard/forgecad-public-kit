@@ -142,6 +142,22 @@ export const polygonSignedArea = (pts: SketchPoint[]): number => {
   return area / 2;
 };
 
+// ─── Arc helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Sweep angle (in radians) from `startAngle` to `endAngle` along the given
+ * direction.  Always returns a value in (0, 2π] — a zero-length arc is treated
+ * as a full circle so constraints don't degenerate.
+ */
+export const arcSweep = (
+  startAngle: number, endAngle: number, clockwise: boolean,
+): number => {
+  const sweep = clockwise
+    ? (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI)
+    : (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI);
+  return sweep < 1e-9 ? 2 * Math.PI : sweep;
+};
+
 export const reflectPointAcrossLine = (
   pt: SketchPoint,
   a: SketchPoint,

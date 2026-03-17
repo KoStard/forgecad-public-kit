@@ -68,7 +68,6 @@ registerConstraint<'lineTangentArc', ConstraintTypeMap['lineTangentArc']>({
     return err;
   },
 
-
   residual(c, { lines, arcs, points }) {
     const line = lines.get(c.line); const arc = arcs.get(c.arc);
     if (!line || !arc) return [0];
@@ -80,9 +79,8 @@ registerConstraint<'lineTangentArc', ConstraintTypeMap['lineTangentArc']>({
     const rdx = tangentPt.x - center.x; const rdy = tangentPt.y - center.y;
     const lenL = Math.hypot(ldx, ldy) || 1;
     const lenR = Math.hypot(rdx, rdy) || 1;
-    // Line ⊥ radius: dot(unit_line, unit_radius) = 0 (tangency when line is tangent to circle)
-    // Actually tangency = line direction ⊥ radius = cross(dir_line, dir_radius) = 0 means parallel
-    // We want line perp to radius, so DOT = 0:
+    // Tangency: line direction must be perpendicular to the radius at the tangent point,
+    // i.e. dot(unit_line, unit_radius) = 0.
     return [(ldx / lenL) * (rdx / lenR) + (ldy / lenL) * (rdy / lenR)];
   },
 
