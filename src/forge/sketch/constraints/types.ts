@@ -110,8 +110,16 @@ export interface ConstraintDefinition {
 }
 
 export interface SolveOptions {
+  /** Maximum number of LM outer iterations per restart. */
   iterations?: number;
+  /** Infinity-norm residual tolerance for declaring convergence. */
   tolerance?: number;
+  /** Number of deterministic restart seeds used by the global solver. */
+  restarts?: number;
+  /** Optional projector iterations used only for initialisation, not as the main solver. */
+  warmStartIterations?: number;
+  /** Maximum LM step length in scaled variable space. Larger = bolder, smaller = safer. */
+  maxScaledStep?: number;
 }
 
 // ─── Extension interfaces (augmented by each constraint def file via declare module) ───

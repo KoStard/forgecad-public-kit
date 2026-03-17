@@ -65,48 +65,34 @@ export const setConstraintValue = (constraint: SketchConstraint, value: number):
   (constraint as unknown as { value: number }).value = value;
 };
 
-// ─── Newton-Raphson / Levenberg-Marquardt solver ────────────────────────────────
+// ─── Global nonlinear least-squares solver ─────────────────────────────────────
 //
-// The constraint solver faces two distinct challenges:
+// The previous implementation mixed a good global idea (LM on residuals) with a
+// weak local one: each constraint also contained its own imperative “move this
+// endpoint” projector and the solver still depended heavily on those local
+// nudges, multi-start spreading, and repeated GS passes.  That architecture is
+// fundamentally fragile because each projector only sees one constraint at a
+// time, while a production sketch solver must optimise the coupled system as a
+// whole.
 //
-// 1. ILL-CONDITIONED JACOBIANS — When many constraints couple the same points,
-//    the normal-equation matrix JᵀJ can become nearly singular.  Pure Gauss-Newton
-//    produces huge, unreliable steps.  Levenberg-Marquardt adds λ·diag(JᵀJ) to JᵀJ
-//    (Marquardt scaling), smoothly interpolating between Gauss-Newton (λ→0, fast
-//    quadratic convergence near the solution) and gradient descent (λ→∞, always
-//    makes progress).  The step is accepted only when the actual reduction in
-//    residual norm matches the predicted reduction (rho > 0); λ adapts via the
-//    standard (1/3, nu) update rule.  Cholesky decomposition is used as the primary
-//    linear solver (exploiting the symmetric positive-definite structure of JᵀJ + λD),
-//    with Gaussian elimination as fallback for degenerate setups.
+// This rewrite makes the global system the primary solver:
+//   1. Build a single state vector over all free geometric variables.
+//   2. Evaluate a single residual vector for the entire sketch.
+//   3. Add internal geometric consistency equations (e.g. arc endpoint/radius
+//      consistency) directly into that residual model.
+//   4. Solve with a trust-region Levenberg–Marquardt loop using:
+//        - central-difference Jacobians with variable-aware step sizes,
+//        - Marquardt diagonal damping,
+//        - row equilibration based on Jacobian row norms,
+//        - bounded steps in scaled variable space,
+//        - deterministic restart seeding.
 //
-// 2. MULTIPLE BASINS OF ATTRACTION — Angle-wrapping (normalizeAngle maps to
-//    [-π, π]) creates a non-convex residual landscape with multiple local minima.
-//    For example, a line can satisfy an absolute-angle constraint at the target
-//    angle OR at target ± π (pointing backwards), and coupled constraints can
-//    trap the solver in a state offset by exactly π/2.  No gradient-based method
-//    can escape a local minimum — the gradient points downhill toward the wrong
-//    solution.  The fix is multi-start: up to 16 attempts, using golden-angle
-//    perturbation for the first 5 and deterministic spread patterns (resetting
-//    points to a grid) from attempt 5 onward for maximal basin coverage.
-//
-// Solver pipeline per attempt:
-//   1. Spread reset (attempts ≥ 5) — place points at grid positions to escape
-//      degenerate initial configurations
-//   2. GS warm-up (15 iterations) — break degeneracy, propagate constraints
-//   3. Perturbation (attempts > 0) — explore a different basin via golden-angle
-//      offsets with per-point scaling
-//   4. LM-NR (40 iterations) — quadratic convergence using central-difference
-//      Jacobian and proper rho-based step acceptance
-//   5. GS fallback (200 iterations) — if NR didn't converge, linear GS as safety net
-//   6. NR retry — GS may have moved points to a better basin; one more NR pass
-// ─────────────────────────────────────────────────────────────────────────────────
+// Constraint-local `solve()` methods remain only as a compatibility fallback and
+// as an optional warm-start projector.  They are no longer the core algorithm.
+// This is the key architectural change that makes the solver meaningfully more
+// powerful instead of merely “a bit less flaky”.
 
-/**
- * Solve a symmetric positive-definite linear system A·x = b using Cholesky
- * decomposition (L·Lᵀ factorisation).  Returns null if A is not positive
- * definite (e.g. after heavy LM damping degenerates the system).
- */
+/** Symmetric positive-definite solve using Cholesky factorisation. */
 function solveCholesky(A: number[][], b: number[]): number[] | null {
   const n = A.length;
   const L: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
@@ -114,243 +100,518 @@ function solveCholesky(A: number[][], b: number[]): number[] | null {
   for (let i = 0; i < n; i++) {
     for (let j = 0; j <= i; j++) {
       let sum = 0;
-      for (let k = 0; k < j; k++) {
-        sum += L[i][k] * L[j][k];
-      }
+      for (let k = 0; k < j; k++) sum += L[i][k] * L[j][k];
       if (i === j) {
-        const val = A[i][i] - sum;
-        if (val <= 0) return null; // Not positive definite
-        L[i][i] = Math.sqrt(val);
+        const value = A[i][i] - sum;
+        if (value <= 0) return null;
+        L[i][i] = Math.sqrt(value);
       } else {
         L[i][j] = (A[i][j] - sum) / L[j][j];
       }
     }
   }
 
-  // Solve L * y = b
   const y = new Array(n).fill(0);
   for (let i = 0; i < n; i++) {
     let sum = 0;
-    for (let k = 0; k < i; k++) {
-      sum += L[i][k] * y[k];
-    }
+    for (let k = 0; k < i; k++) sum += L[i][k] * y[k];
     y[i] = (b[i] - sum) / L[i][i];
   }
 
-  // Solve L^T * x = y
   const x = new Array(n).fill(0);
   for (let i = n - 1; i >= 0; i--) {
     let sum = 0;
-    for (let k = i + 1; k < n; k++) {
-      sum += L[k][i] * x[k];
-    }
+    for (let k = i + 1; k < n; k++) sum += L[k][i] * x[k];
     x[i] = (y[i] - sum) / L[i][i];
   }
 
   return x;
 }
 
-/**
- * Compute a single Levenberg-Marquardt step given the Jacobian J (m×n),
- * residual vector r (m), and damping factor lambda.
- *
- * Uses Marquardt scaling (λ·diag(JᵀJ) instead of λ·I) so damping is
- * proportional to each parameter's sensitivity — better conditioned for
- * problems with variables of different scales.
- *
- * Returns the step vector dx and the predicted reduction in ½‖r‖² for
- * computing the gain ratio rho = actualReduction / predictedReduction.
- * Returns null if the system has zero variables.
- */
-function levenbergMarquardtStep(J: number[][], r: number[], lambda: number): { dx: number[], predictedReduction: number } | null {
-  const m = J.length;
-  const n = m > 0 ? J[0].length : 0;
-  if (n === 0) return { dx: [], predictedReduction: 0 };
+/** Gaussian-elimination fallback for highly degenerate systems. */
+function solveGaussian(A: number[][], b: number[]): number[] {
+  const n = A.length;
+  const aug = A.map((row, i) => [...row, b[i]]);
 
-  const JtJ: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
-  const Jtr: number[] = new Array(n).fill(0);
-
-  for (let i = 0; i < m; i++) {
-    for (let j = 0; j < n; j++) {
-      Jtr[j] += J[i][j] * r[i];
-      for (let k = 0; k <= j; k++) {
-        JtJ[j][k] += J[i][j] * J[i][k];
-      }
-    }
-  }
-
-  // Mirror lower triangle to upper (only lower half was accumulated above).
-  for (let j = 0; j < n; j++) {
-    for (let k = 0; k < j; k++) {
-      JtJ[k][j] = JtJ[j][k];
-    }
-  }
-
-  const A: number[][] = Array.from({ length: n }, (_, i) => [...JtJ[i]]);
-
-  // Marquardt scaling: add λ·(diag(JᵀJ) + ε) to each diagonal.
-  // Using the diagonal of JᵀJ (rather than λ·I) makes damping proportional
-  // to each parameter's sensitivity, which is better conditioned for
-  // problems with variables of different magnitudes.
   for (let i = 0; i < n; i++) {
-    A[i][i] += lambda * (JtJ[i][i] + 1e-6);
-  }
-
-  const negJtr = Jtr.map(v => -v);
-  let dx = solveCholesky(A, negJtr);
-
-  // Fallback to Gaussian elimination with partial pivoting if Cholesky fails (e.g. extremely degenerate setups).
-  if (!dx) {
-    const aug = A.map((row, i) => [...row, negJtr[i]]);
-    for (let i = 0; i < n; i++) {
-      let maxVal = Math.abs(aug[i][i]);
-      let maxRow = i;
-      for (let k = i + 1; k < n; k++) {
-        if (Math.abs(aug[k][i]) > maxVal) { maxVal = Math.abs(aug[k][i]); maxRow = k; }
-      }
-      [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
-      if (Math.abs(aug[i][i]) < 1e-14) continue;
-      for (let k = i + 1; k < n; k++) {
-        const f = aug[k][i] / aug[i][i];
-        for (let j = i; j <= n; j++) aug[k][j] -= f * aug[i][j];
+    let pivotRow = i;
+    let pivotAbs = Math.abs(aug[i][i]);
+    for (let r = i + 1; r < n; r++) {
+      const value = Math.abs(aug[r][i]);
+      if (value > pivotAbs) {
+        pivotAbs = value;
+        pivotRow = r;
       }
     }
-    dx = new Array<number>(n).fill(0);
-    for (let i = n - 1; i >= 0; i--) {
-      if (Math.abs(aug[i][i]) < 1e-14) continue;
-      dx[i] = aug[i][n];
-      for (let j = i + 1; j < n; j++) dx[i] -= aug[i][j] * dx[j];
-      dx[i] /= aug[i][i];
+    [aug[i], aug[pivotRow]] = [aug[pivotRow], aug[i]];
+    if (pivotAbs < 1e-14) continue;
+
+    for (let r = i + 1; r < n; r++) {
+      const factor = aug[r][i] / aug[i][i];
+      for (let c = i; c <= n; c++) aug[r][c] -= factor * aug[i][c];
     }
   }
+
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    if (Math.abs(aug[i][i]) < 1e-14) {
+      x[i] = 0;
+      continue;
+    }
+    let value = aug[i][n];
+    for (let c = i + 1; c < n; c++) value -= aug[i][c] * x[c];
+    x[i] = value / aug[i][i];
+  }
+
+  return x;
+}
+
+interface SolverVariable {
+  get(): number;
+  set(value: number): void;
+  /** Characteristic physical scale for this variable, used for finite differences and step limiting. */
+  scale: number;
+}
+
+interface ResidualEvaluation {
+  values: number[];
+  maxAbs: number;
+}
+
+interface LinearizedSystem {
+  residual: number[];
+  jacobian: number[][];
+  weights: number[];
+  weightedResidual: number[];
+  weightedJacobian: number[][];
+  maxAbsResidual: number;
+  weightedCost: number;
+}
+
+/**
+ * Reference length used for numerical differentiation, step limiting, and
+ * deterministic restart magnitudes.  The goal is unit awareness without
+ * requiring every individual constraint to declare a custom scale.
+ */
+function computeReferenceLength(def: ConstraintDefinition): number {
+  const xs: number[] = [];
+  const ys: number[] = [];
+
+  for (const p of def.points) {
+    xs.push(p.x);
+    ys.push(p.y);
+  }
+
+  for (const circle of def.circles) {
+    xs.push(circle.radius, -circle.radius);
+    ys.push(circle.radius, -circle.radius);
+  }
+
+  for (const arc of def.arcs ?? []) {
+    xs.push(arc.radius, -arc.radius);
+    ys.push(arc.radius, -arc.radius);
+  }
+
+  if (xs.length === 0 || ys.length === 0) return 1;
+  const spanX = Math.max(...xs) - Math.min(...xs);
+  const spanY = Math.max(...ys) - Math.min(...ys);
+  return Math.max(Math.hypot(spanX, spanY), 1);
+}
+
+function buildVariables(def: ConstraintDefinition, referenceLength: number): SolverVariable[] {
+  const scale = Math.max(referenceLength, 1);
+  const variables: SolverVariable[] = [];
+
+  for (const point of def.points) {
+    if (point.fixed) continue;
+    variables.push(
+      {
+        get: () => point.x,
+        set: (value: number) => { point.x = value; },
+        scale,
+      },
+      {
+        get: () => point.y,
+        set: (value: number) => { point.y = value; },
+        scale,
+      },
+    );
+  }
+
+  for (const circle of def.circles) {
+    if (circle.fixedRadius) continue;
+    variables.push({
+      get: () => circle.radius,
+      set: (value: number) => { circle.radius = Math.max(1e-9, value); },
+      scale,
+    });
+  }
+
+  for (const arc of def.arcs ?? []) {
+    variables.push({
+      get: () => arc.radius,
+      set: (value: number) => { arc.radius = Math.max(1e-9, value); },
+      scale,
+    });
+  }
+
+  return variables;
+}
+
+function captureState(variables: SolverVariable[]): number[] {
+  return variables.map((variable) => variable.get());
+}
+
+function applyState(variables: SolverVariable[], state: number[]): void {
+  for (let i = 0; i < variables.length; i++) variables[i].set(state[i]);
+}
+
+function evaluateResiduals(def: ConstraintDefinition, ctx: SolverContext): ResidualEvaluation | null {
+  const values: number[] = [];
+
+  for (const constraint of def.constraints) {
+    const constraintDef = registry.get(constraint.type);
+    if (!constraintDef?.residual) return null;
+    values.push(...constraintDef.residual(constraint as never, ctx));
+  }
+
+  // Internal arc consistency equations.
+  // An arc owns a scalar radius variable, while its start/end points live in the
+  // shared point state vector.  These equations tie the three together so the
+  // global optimiser sees one coherent geometric model instead of a later
+  // projection hack.
+  for (const arc of def.arcs ?? []) {
+    const center = ctx.points.get(arc.center);
+    const start = ctx.points.get(arc.start);
+    const end = ctx.points.get(arc.end);
+    if (!center || !start || !end) continue;
+    values.push(
+      Math.hypot(start.x - center.x, start.y - center.y) - arc.radius,
+      Math.hypot(end.x - center.x, end.y - center.y) - arc.radius,
+    );
+  }
+
+  let maxAbs = 0;
+  for (const value of values) maxAbs = Math.max(maxAbs, Math.abs(value));
+  return { values, maxAbs };
+}
+
+function computeRowWeights(jacobian: number[][], referenceLength: number): number[] {
+  const minNorm = 1e-9 / Math.max(referenceLength, 1);
+  return jacobian.map((row) => {
+    let normSq = 0;
+    for (const value of row) normSq += value * value;
+    const norm = Math.sqrt(normSq);
+    return 1 / Math.max(norm, minNorm);
+  });
+}
+
+function weightResidual(residual: number[], weights: number[]): number[] {
+  return residual.map((value, i) => value * weights[i]);
+}
+
+function weightJacobian(jacobian: number[][], weights: number[]): number[][] {
+  return jacobian.map((row, i) => row.map((value) => value * weights[i]));
+}
+
+function weightedCost(residual: number[]): number {
+  let cost = 0;
+  for (const value of residual) cost += value * value;
+  return 0.5 * cost;
+}
+
+function finiteDifferenceStep(value: number, scale: number): number {
+  return 1e-6 * Math.max(1, Math.abs(value), scale);
+}
+
+function linearizeSystem(
+  def: ConstraintDefinition,
+  ctx: SolverContext,
+  variables: SolverVariable[],
+  referenceLength: number,
+): LinearizedSystem | null {
+  const base = evaluateResiduals(def, ctx);
+  if (!base) return null;
+
+  const parameterCount = variables.length;
+  const equationCount = base.values.length;
+  const jacobian: number[][] = Array.from({ length: equationCount }, () => new Array(parameterCount).fill(0));
+
+  if (parameterCount > 0 && equationCount > 0) {
+    const state = captureState(variables);
+
+    for (let column = 0; column < parameterCount; column++) {
+      const baseValue = state[column];
+      const step = finiteDifferenceStep(baseValue, variables[column].scale);
+
+      const plusState = [...state];
+      plusState[column] = baseValue + step;
+      applyState(variables, plusState);
+      const plusEval = evaluateResiduals(def, ctx);
+      if (!plusEval) {
+        applyState(variables, state);
+        return null;
+      }
+
+      const minusState = [...state];
+      minusState[column] = baseValue - step;
+      applyState(variables, minusState);
+      const minusEval = evaluateResiduals(def, ctx);
+      if (!minusEval) {
+        applyState(variables, state);
+        return null;
+      }
+
+      for (let row = 0; row < equationCount; row++) {
+        jacobian[row][column] = (plusEval.values[row] - minusEval.values[row]) / (2 * step);
+      }
+    }
+
+    applyState(variables, state);
+  }
+
+  const weights = computeRowWeights(jacobian, referenceLength);
+  const weightedResidual = weightResidual(base.values, weights);
+  const weightedJacobian = weightJacobian(jacobian, weights);
+
+  return {
+    residual: base.values,
+    jacobian,
+    weights,
+    weightedResidual,
+    weightedJacobian,
+    maxAbsResidual: base.maxAbs,
+    weightedCost: weightedCost(weightedResidual),
+  };
+}
+
+function solveLevenbergMarquardtStep(
+  weightedJacobian: number[][],
+  weightedResidual: number[],
+  lambda: number,
+): { dx: number[]; predictedReduction: number } | null {
+  const equationCount = weightedJacobian.length;
+  const variableCount = equationCount > 0 ? weightedJacobian[0].length : 0;
+  if (variableCount === 0) return { dx: [], predictedReduction: 0 };
+
+  const jtJ: number[][] = Array.from({ length: variableCount }, () => new Array(variableCount).fill(0));
+  const jtR: number[] = new Array(variableCount).fill(0);
+
+  for (let row = 0; row < equationCount; row++) {
+    for (let i = 0; i < variableCount; i++) {
+      const ji = weightedJacobian[row][i];
+      jtR[i] += ji * weightedResidual[row];
+      for (let j = 0; j <= i; j++) jtJ[i][j] += ji * weightedJacobian[row][j];
+    }
+  }
+
+  for (let i = 0; i < variableCount; i++) {
+    for (let j = 0; j < i; j++) jtJ[j][i] = jtJ[i][j];
+  }
+
+  const A = jtJ.map((row, i) => [...row]);
+  for (let i = 0; i < variableCount; i++) A[i][i] += lambda * (jtJ[i][i] + 1e-9);
+
+  const rhs = jtR.map((value) => -value);
+  const dx = solveCholesky(A, rhs) ?? solveGaussian(A, rhs);
 
   let predictedReduction = 0;
-  for (let j = 0; j < n; j++) {
-    let Jdx = 0;
-    for (let k = 0; k < n; k++) {
-      Jdx += JtJ[j][k] * dx[k];
-    }
-    predictedReduction += dx[j] * (-Jtr[j] - 0.5 * Jdx);
+  for (let i = 0; i < variableCount; i++) {
+    let jtJdx = 0;
+    for (let j = 0; j < variableCount; j++) jtJdx += jtJ[i][j] * dx[j];
+    predictedReduction += dx[i] * (-jtR[i] - 0.5 * jtJdx);
   }
 
   return { dx, predictedReduction };
 }
 
-/** Newton-Raphson solver using residuals and central-difference Jacobian estimation. */
-const solveNR = (
-  def: ConstraintDefinition,
-  ctx: SolverContext,
-  maxIter: number,
-  tolerance: number,
-): number => {
-  const freePoints = def.points.filter((p) => !p.fixed);
-  const freeCircles = def.circles.filter((c) => !c.fixedRadius);
-  const n = freePoints.length * 2 + freeCircles.length;
-  if (n === 0) return 0;
+function scaledStepNorm(dx: number[], variables: SolverVariable[]): number {
+  let sum = 0;
+  for (let i = 0; i < dx.length; i++) {
+    const s = dx[i] / Math.max(variables[i].scale, 1e-9);
+    sum += s * s;
+  }
+  return Math.sqrt(sum);
+}
 
-  const getVars = (): number[] => [
-    ...freePoints.flatMap((p) => [p.x, p.y]),
-    ...freeCircles.map((c) => c.radius),
-  ];
+function limitStep(dx: number[], variables: SolverVariable[], maxScaledNorm: number): number[] {
+  const norm = scaledStepNorm(dx, variables);
+  if (norm <= maxScaledNorm || norm < 1e-12) return dx;
+  const scale = maxScaledNorm / norm;
+  return dx.map((value) => value * scale);
+}
 
-  const applyVars = (vars: number[]): void => {
-    let i = 0;
-    for (const p of freePoints) { p.x = vars[i++]; p.y = vars[i++]; }
-    for (const c of freeCircles) { c.radius = Math.max(1e-9, vars[i++]); }
-    // Keep Maps in sync (they hold references, so x/y mutations propagate automatically)
-  };
-
-  const computeResiduals = (): number[] => {
-    const r: number[] = [];
+function runProjectorWarmStart(def: ConstraintDefinition, ctx: SolverContext, iterations: number): void {
+  if (iterations <= 0) return;
+  for (let iter = 0; iter < iterations; iter++) {
     for (const constraint of def.constraints) {
-      const cdef = registry.get(constraint.type);
-      if (!cdef?.residual) return []; // fallback signal
-      r.push(...cdef.residual(constraint as never, ctx));
+      const constraintDef = registry.get(constraint.type);
+      if (!constraintDef) continue;
+      constraintDef.solve(constraint as never, ctx);
     }
-    return r;
-  };
+  }
+}
 
-  // Step size for central-difference Jacobian.  Central differences give O(h²)
-  // accuracy vs O(h) for forward differences, which matters for near-degenerate
-  // configurations where small errors in the Jacobian stall convergence.
-  const EPS = 1e-6;
-  // Levenberg-Marquardt damping factor.  Starts moderate; adapts each iteration
-  // via the standard (1/3, nu) update rule.
-  let lambda = 1e-3;
-  let nu = 2; // damping increase factor on rejected steps
-  let maxError = 0;
+function seedRestart(
+  def: ConstraintDefinition,
+  variables: SolverVariable[],
+  initialState: number[],
+  attempt: number,
+  referenceLength: number,
+): void {
+  applyState(variables, initialState);
+  if (attempt === 0) return;
 
-  for (let iter = 0; iter < maxIter; iter++) {
-    const r0 = computeResiduals();
-    if (r0.length === 0) return -1; // signal: fall back to GS
-    maxError = Math.max(...r0.map(Math.abs), 0);
-    if (maxError <= tolerance) break;
+  const radius = referenceLength * (0.15 + 0.2 * Math.min(attempt, 4));
+  const goldenAngle = 2.399963229728653;
+  let pointIndex = 0;
 
-    const vars = getVars();
-    const norm0 = r0.reduce((s, v) => s + v * v, 0);
-
-    // Numerical Jacobian via central differences: (r(x+h) − r(x−h)) / 2h.
-    // More accurate than forward differences, reducing false step rejections
-    // caused by Jacobian error near constrained configurations.
-    const Jcols: number[][] = [];
-    for (let j = 0; j < n; j++) {
-      vars[j] += EPS;
-      applyVars(vars);
-      const rPlus = computeResiduals();
-
-      vars[j] -= 2 * EPS;
-      applyVars(vars);
-      const rMinus = computeResiduals();
-
-      vars[j] += EPS; // restore
-      Jcols.push(rPlus.map((rp, i) => (rp - rMinus[i]) / (2 * EPS)));
-    }
-    applyVars(vars);
-
-    // J is currently n columns of length m; reshape to m rows of n.
-    const m = r0.length;
-    const J: number[][] = Array.from({ length: m }, (_, i) => Jcols.map((col) => col[i]));
-
-    // Inner loop: increase λ until the step is accepted (actual reduction > 0)
-    // or we give up.  This guarantees the outer loop always makes progress or
-    // terminates cleanly — the key advantage over a fixed-λ LM scheme.
-    let stepAccepted = false;
-    let innerIters = 0;
-
-    while (!stepAccepted && innerIters < 10) {
-      const lmResult = levenbergMarquardtStep(J, r0, lambda);
-      if (!lmResult || lmResult.dx.length === 0) break;
-      const { dx, predictedReduction } = lmResult;
-
-      const trial = vars.map((v, j) => v + dx[j]);
-      applyVars(trial);
-      const rTrial = computeResiduals();
-      const norm1 = rTrial.reduce((s, v) => s + v * v, 0);
-
-      const actualReduction = norm0 - norm1;
-      // Gain ratio rho: 1.0 = step matches model perfectly; < 0 = step made things worse.
-      const rho = predictedReduction > 0 ? actualReduction / predictedReduction : 0;
-
-      if (rho > 0 && actualReduction > 0) {
-        // Good step — reduce damping toward Gauss-Newton (faster convergence).
-        stepAccepted = true;
-        lambda = lambda * Math.max(1 / 3, 1 - Math.pow(2 * rho - 1, 3));
-        nu = 2;
-      } else {
-        // Bad step — revert and increase damping toward gradient descent (safer).
-        applyVars(vars);
-        lambda *= nu;
-        nu *= 2;
-        innerIters++;
-      }
-    }
-
-    if (!stepAccepted) break; // converged or fully stuck in local minimum
+  for (const point of def.points) {
+    if (point.fixed) continue;
+    const angle = (attempt * 1.37 + pointIndex) * goldenAngle;
+    const localRadius = radius * (1 + (pointIndex % 4) * 0.15);
+    point.x += localRadius * Math.cos(angle);
+    point.y += localRadius * Math.sin(angle);
+    pointIndex++;
   }
 
-  const rFinal = computeResiduals();
-  return rFinal.length > 0 ? Math.max(...rFinal.map(Math.abs), 0) : maxError;
-};
+  let circleIndex = 0;
+  for (const circle of def.circles) {
+    if (circle.fixedRadius) continue;
+    const scale = 1 + 0.1 * ((attempt + circleIndex) % 3 - 1);
+    circle.radius = Math.max(1e-6, circle.radius * scale);
+    circleIndex++;
+  }
+
+  let arcIndex = 0;
+  for (const arc of def.arcs ?? []) {
+    const scale = 1 + 0.1 * ((attempt + arcIndex + 1) % 3 - 1);
+    arc.radius = Math.max(1e-6, arc.radius * scale);
+    arcIndex++;
+  }
+}
+
+function solveGlobalSystem(
+  def: ConstraintDefinition,
+  ctx: SolverContext,
+  iterations: number,
+  tolerance: number,
+  restarts: number,
+  warmStartIterations: number,
+  maxScaledStep: number,
+): number {
+  const referenceLength = computeReferenceLength(def);
+  const variables = buildVariables(def, referenceLength);
+
+  if (variables.length === 0) {
+    const evalResult = evaluateResiduals(def, ctx);
+    return evalResult?.maxAbs ?? 0;
+  }
+
+  const initialState = captureState(variables);
+  let bestState = [...initialState];
+  let bestError = Infinity;
+
+  for (let attempt = 0; attempt < restarts; attempt++) {
+    seedRestart(def, variables, initialState, attempt, referenceLength);
+    runProjectorWarmStart(def, ctx, warmStartIterations);
+
+    let lambda = 1e-3;
+    let nu = 2;
+    let linearized = linearizeSystem(def, ctx, variables, referenceLength);
+    if (!linearized) return Infinity;
+
+    for (let iter = 0; iter < iterations; iter++) {
+      if (linearized.maxAbsResidual <= tolerance) break;
+
+      const stepResult = solveLevenbergMarquardtStep(
+        linearized.weightedJacobian,
+        linearized.weightedResidual,
+        lambda,
+      );
+      if (!stepResult) break;
+
+      const state = captureState(variables);
+      let { dx, predictedReduction } = stepResult;
+      dx = limitStep(dx, variables, maxScaledStep);
+      predictedReduction *= Math.min(1, maxScaledStep / Math.max(scaledStepNorm(stepResult.dx, variables), maxScaledStep));
+
+      let accepted = false;
+      let localNu = nu;
+      let localLambda = lambda;
+
+      for (let inner = 0; inner < 12; inner++) {
+        const trialState = state.map((value, index) => value + dx[index]);
+        applyState(variables, trialState);
+
+        const trial = linearizeSystem(def, ctx, variables, referenceLength);
+        if (!trial) {
+          applyState(variables, state);
+          break;
+        }
+
+        const actualReduction = linearized.weightedCost - trial.weightedCost;
+        const rho = predictedReduction > 0 ? actualReduction / predictedReduction : 0;
+
+        if (actualReduction > 0) {
+          accepted = true;
+          linearized = trial;
+          lambda = rho > 0
+            ? localLambda * Math.max(1 / 3, 1 - Math.pow(2 * rho - 1, 3))
+            : localLambda;
+          nu = 2;
+          break;
+        }
+
+        applyState(variables, state);
+        localLambda *= localNu;
+        localNu *= 2;
+        const retry = solveLevenbergMarquardtStep(
+          linearized.weightedJacobian,
+          linearized.weightedResidual,
+          localLambda,
+        );
+        if (!retry) break;
+        dx = limitStep(retry.dx, variables, maxScaledStep);
+        predictedReduction = retry.predictedReduction;
+      }
+
+      if (!accepted) break;
+    }
+
+    const finalEval = evaluateResiduals(def, ctx);
+    const finalError = finalEval?.maxAbs ?? Infinity;
+    if (finalError < bestError) {
+      bestError = finalError;
+      bestState = captureState(variables);
+    }
+    if (bestError <= tolerance) break;
+  }
+
+  applyState(variables, bestState);
+  return bestError;
+}
+
+function legacyGaussSeidelSolve(
+  def: ConstraintDefinition,
+  ctx: SolverContext,
+  iterations: number,
+): number {
+  let maxError = 0;
+  const gsIterations = Math.max(iterations * 5, 200);
+
+  for (let iter = 0; iter < gsIterations; iter++) {
+    maxError = 0;
+    for (const constraint of def.constraints) {
+      const constraintDef = registry.get(constraint.type);
+      if (!constraintDef) continue;
+      maxError = Math.max(maxError, constraintDef.solve(constraint as never, ctx));
+    }
+    if (maxError <= ctx.tolerance) break;
+  }
+
+  return maxError;
+}
 
 // ─── Solver ────────────────────────────────────────────────────────────────────
 
@@ -360,11 +621,16 @@ export const solveConstraints = (
   def: ConstraintDefinition,
   options: SolveOptions,
 ): { maxError: number } => {
-  const iterations = options.iterations ?? 40;
+  const iterations = options.iterations ?? 80;
   const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
+  const restarts = options.restarts ?? 6;
+  const warmStartIterations = options.warmStartIterations ?? 6;
+  const maxScaledStep = options.maxScaledStep ?? 2.5;
+
   const points = new Map(def.points.map((p) => [p.id, p] as const));
   const lines = new Map(def.lines.map((l) => [l.id, l] as const));
   const circles = new Map(def.circles.map((c) => [c.id, c] as const));
+  const arcs = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
   const shapes = new Map((def.shapes ?? []).map((s) => [s.id, s] as const));
 
   const movePoint = (pt: SketchPoint, dx: number, dy: number): boolean => {
@@ -374,181 +640,31 @@ export const solveConstraints = (
     return true;
   };
 
-  const arcs = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
-  const ctx: SolverContext = { points, lines, circles, arcs, shapes, tolerance, movePoint };
+  const ctx: SolverContext = {
+    points,
+    lines,
+    circles,
+    arcs,
+    shapes,
+    tolerance,
+    movePoint,
+  };
 
-  // Pre-solve pass (e.g. fixed constraint pins points before iteration)
-  def.constraints.forEach((constraint) => {
+  for (const constraint of def.constraints) {
     const constraintDef = registry.get(constraint.type);
     constraintDef?.presolve?.(constraint as never, ctx);
-  });
-
-  // Check whether all active constraints define residuals (prerequisite for NR).
-  const canUseNR = def.constraints.every((c) => {
-    const cdef = registry.get(c.type);
-    return cdef?.residual != null;
-  });
-
-  // ── State snapshot helpers (index-aligned with def arrays for O(1) save/restore) ──
-  const defArcs = def.arcs ?? [];
-  const saveState = () => ({
-    pts: def.points.map(p => [p.x, p.y] as [number, number]),
-    radii: def.circles.map(c => c.radius),
-    arcRadii: defArcs.map(a => a.radius),
-  });
-  type Snapshot = ReturnType<typeof saveState>;
-  const restoreState = (s: Snapshot) => {
-    for (let i = 0; i < def.points.length; i++) {
-      def.points[i].x = s.pts[i][0];
-      def.points[i].y = s.pts[i][1];
-    }
-    for (let i = 0; i < def.circles.length; i++) def.circles[i].radius = s.radii[i];
-    for (let i = 0; i < defArcs.length; i++) defArcs[i].radius = s.arcRadii[i];
-  };
-
-  // ── Shared subroutines for warmup / NR / GS (avoid duplication) ───────────
-  const gsPass = () => {
-    def.constraints.forEach((constraint) => {
-      const constraintDef = registry.get(constraint.type);
-      if (!constraintDef) return;
-      constraintDef.solve(constraint as never, ctx);
-    });
-  };
-
-  const enforceArcImplicit = (snap = false): number => {
-    let arcErr = 0;
-    arcs.forEach((arc) => {
-      const center = points.get(arc.center);
-      const start = points.get(arc.start);
-      const end = points.get(arc.end);
-      if (!center || !start || !end) return;
-      const ds = Math.hypot(start.x - center.x, start.y - center.y);
-      const de = Math.hypot(end.x - center.x, end.y - center.y);
-      arc.radius = (ds + de) / 2;
-      if (arc.radius < 1e-9) return;
-      if (snap) {
-        if (!start.fixed && ds > 1e-9) {
-          const s = arc.radius / ds;
-          start.x = center.x + (start.x - center.x) * s;
-          start.y = center.y + (start.y - center.y) * s;
-        }
-        if (!end.fixed && de > 1e-9) {
-          const s = arc.radius / de;
-          end.x = center.x + (end.x - center.x) * s;
-          end.y = center.y + (end.y - center.y) * s;
-        }
-      }
-      arcErr = Math.max(arcErr, Math.abs(ds - arc.radius), Math.abs(de - arc.radius));
-    });
-    return arcErr;
-  };
-
-  // Save state after presolve (fixed points pinned, others at user-specified positions).
-  const initialState = saveState();
-  let bestError = Infinity;
-  let bestState: Snapshot = initialState;
-
-  // ── Multi-attempt solve ────────────────────────────────────────────────────
-  // Angle-wrapping constraints (normalizeAngle → [-π, π]) create a non-convex
-  // residual landscape with multiple local minima.  The solver can converge to the
-  // wrong basin depending on initial positions.  Attempts 1–4 use golden-angle
-  // perturbation after warm-up; attempts 5+ additionally reset points to a
-  // deterministic spread grid before warm-up, providing maximal initial
-  // position diversity for the hardest degenerate cases.
-  const MAX_ATTEMPTS = 16;
-
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    if (attempt > 0) restoreState(initialState);
-
-    let maxError = 0;
-    const useSpread = attempt >= 5;
-
-    // ── Spread reset (attempts ≥ 5) ───────────────────────────────────────
-    // Place free points at a regular grid to break any degeneracy from the
-    // original initial positions.  Different (sx, sy) patterns cover varied
-    // aspect ratios to avoid aliasing with symmetric constraint systems.
-    if (useSpread) {
-      const spreadPatterns: [number, number][] = [
-        [2, 3], [3, 1], [1, 4], [4, 2], [2, 1], [5, 3], [1, 1],
-        [3, 5], [1, 2], [4, 1], [2, 5],
-      ];
-      const [sx, sy] = spreadPatterns[(attempt - 5) % spreadPatterns.length];
-      for (let i = 0; i < def.points.length; i++) {
-        const p = def.points[i];
-        if (p.fixed) continue;
-        p.x = i * sx;
-        p.y = i * sy;
-      }
-    }
-
-    // ── GS warm-up ────────────────────────────────────────────────────────
-    if (canUseNR && def.constraints.length > 0) {
-      const warmup = Math.min(15, iterations);
-      for (let i = 0; i < warmup; i++) {
-        gsPass();
-        enforceArcImplicit(true);
-      }
-    }
-
-    // ── Perturbation (attempts > 0) ───────────────────────────────────────
-    // After warm-up placed points near roughly correct positions, perturb free
-    // points to bump the solver into a different basin.  Golden-angle spacing
-    // gives uniform directional coverage across attempts and point indices;
-    // per-point scaling (1 + i·0.3) avoids all points receiving identical
-    // offsets (which would leave relative geometry unchanged).
-    if (attempt > 0) {
-      const perturbIdx = useSpread ? (attempt - 4) : attempt;
-      const baseScale = perturbIdx * 3;
-      const PHI = 2.399963; // golden angle (radians)
-      for (let i = 0; i < def.points.length; i++) {
-        const p = def.points[i];
-        if (p.fixed) continue;
-        const angle = (attempt * PHI + i * PHI * 0.5) % (2 * Math.PI);
-        const scale = baseScale * (1 + i * 0.3);
-        p.x += scale * Math.cos(angle);
-        p.y += scale * Math.sin(angle);
-      }
-    }
-
-    if (canUseNR && def.constraints.length > 0) {
-      // ── LM-NR path ───────────────────────────────────────────────────────
-      const nrResult = solveNR(def, ctx, iterations, tolerance);
-      maxError = nrResult >= 0 ? nrResult : tolerance + 1;
-      enforceArcImplicit(false);
-    }
-
-    if (!canUseNR || maxError > tolerance) {
-      // ── GS fallback ───────────────────────────────────────────────────────
-      const gsIter = Math.max(iterations * 5, 200);
-      for (let i = 0; i < gsIter; i += 1) {
-        maxError = 0;
-        def.constraints.forEach((constraint) => {
-          const constraintDef = registry.get(constraint.type);
-          if (!constraintDef) return;
-          maxError = Math.max(maxError, constraintDef.solve(constraint as never, ctx));
-        });
-        maxError = Math.max(maxError, enforceArcImplicit(true));
-        if (maxError <= tolerance) break;
-      }
-
-      // ── NR retry after GS ──────────────────────────────────────────────
-      if (canUseNR && maxError > tolerance) {
-        const nrResult2 = solveNR(def, ctx, iterations, tolerance);
-        if (nrResult2 >= 0) maxError = nrResult2;
-      }
-    }
-
-    // Track best across attempts.
-    if (maxError < bestError) {
-      bestError = maxError;
-      bestState = saveState();
-    }
-    if (bestError <= tolerance) break;
   }
 
-  // Restore the best state found across all attempts.
-  restoreState(bestState);
-  return { maxError: bestError };
+  const hasFullResidualModel = def.constraints.every((constraint) => {
+    const constraintDef = registry.get(constraint.type);
+    return constraintDef?.residual != null;
+  });
+
+  const maxError = hasFullResidualModel
+    ? solveGlobalSystem(def, ctx, iterations, tolerance, restarts, warmStartIterations, maxScaledStep)
+    : legacyGaussSeidelSolve(def, ctx, iterations);
+
+  return { maxError };
 };
 
 // ─── Display ───────────────────────────────────────────────────────────────────
