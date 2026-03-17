@@ -31,6 +31,7 @@ import './shapeHeight';
 import './shapeArea';
 import './shapeEqualCentroid';
 import './pointOnLine';
+import './pointLineDistance';
 
 // Re-export named types that external code imports directly
 export type { LineDistanceConstraint } from './lineDistance';

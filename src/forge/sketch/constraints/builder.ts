@@ -331,6 +331,15 @@ export class ConstrainedSketchBuilder {
   }
 
   /**
+   * Constrain the signed perpendicular distance from a point to a line.
+   * Positive `value` places the point to the **left** of the line (a→b direction).
+   * Zero is equivalent to `collinear`.
+   */
+  pointLineDistance(point: PointId, line: LineId, value: number): this {
+    return this.constrain({ type: 'pointLineDistance', point, line, value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /**
    * Constrain the perpendicular (offset) distance between two lines.
    * Also implicitly enforces parallelism.
    *

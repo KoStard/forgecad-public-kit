@@ -570,9 +570,11 @@ interface ConstraintDisplay {
 	value?: number;
 	isDimension: boolean;
 	isConflicting: boolean;
+	isRedundant: boolean;
 }
 interface SketchConstraintMeta {
 	status: "under" | "fully" | "over";
+	dof: number;
 	maxError: number;
 	constraints: ConstraintDisplay[];
 	rejected: ConstraintDisplay[];
@@ -694,6 +696,21 @@ interface ConstraintTypeMap {
 	lineDistance: {
 		a: LineId;
 		b: LineId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Constrains the signed perpendicular distance from a point to an infinite line.
+	 *
+	 * Positive `value` places the point to the **left** of the line
+	 * (when facing the line's direction from `a` to `b`). Negative places it
+	 * to the right. Zero is equivalent to `collinear`.
+	 * Contributes **1 equation**: `perpDist(point, line) − value = 0`.
+	 */
+	pointLineDistance: {
+		point: PointId;
+		line: LineId;
 		value: number;
 	};
 }
@@ -968,6 +985,12 @@ declare class ConstrainedSketchBuilder {
 	hDistance(a: PointId, b: PointId, value: number): this;
 	/** Constrain the vertical distance between two points (b.y − a.y = value). */
 	vDistance(a: PointId, b: PointId, value: number): this;
+	/**
+	 * Constrain the signed perpendicular distance from a point to a line.
+	 * Positive `value` places the point to the **left** of the line (a→b direction).
+	 * Zero is equivalent to `collinear`.
+	 */
+	pointLineDistance(point: PointId, line: LineId, value: number): this;
 	/**
 	 * Constrain the perpendicular (offset) distance between two lines.
 	 * Also implicitly enforces parallelism.
