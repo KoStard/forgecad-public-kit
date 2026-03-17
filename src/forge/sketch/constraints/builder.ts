@@ -268,6 +268,11 @@ export class ConstrainedSketchBuilder {
     return this.constrain({ type: 'collinear', point, line } as Omit<SketchConstraint, 'id'>);
   }
 
+  /** Constrain a point to lie on a finite line segment (clamped to the segment's extent). */
+  pointOnLine(point: PointId, line: LineId): this {
+    return this.constrain({ type: 'pointOnLine', point, line } as Omit<SketchConstraint, 'id'>);
+  }
+
   /** Constrain two points to be symmetric about an axis line. */
   symmetric(a: PointId, b: PointId, axis: LineId): this {
     return this.constrain({ type: 'symmetric', a, b, axis } as Omit<SketchConstraint, 'id'>);

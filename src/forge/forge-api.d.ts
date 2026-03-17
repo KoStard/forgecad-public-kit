@@ -350,6 +350,19 @@ interface ConstraintTypeMap {
 }
 interface ConstraintTypeMap {
 	/**
+	 * Forces a point to lie on a finite line segment (between its two endpoints).
+	 *
+	 * Unlike `collinear`, the projection is clamped to the segment's extent
+	 * (`t ∈ [0, 1]`), so the point cannot slide off either end.
+	 * Contributes **1 equation**: signed perpendicular distance = 0.
+	 */
+	pointOnLine: {
+		point: PointId;
+		line: LineId;
+	};
+}
+interface ConstraintTypeMap {
+	/**
 	 * Pins a point to an absolute position `(x, y)` in sketch space.
 	 *
 	 * Applied during the **presolve** pass (before iteration), not as a
@@ -931,6 +944,8 @@ declare class ConstrainedSketchBuilder {
 	concentric(a: CircleId, b: CircleId): this;
 	/** Constrain a point to lie on an infinite line (collinear). */
 	collinear(point: PointId, line: LineId): this;
+	/** Constrain a point to lie on a finite line segment (clamped to the segment's extent). */
+	pointOnLine(point: PointId, line: LineId): this;
 	/** Constrain two points to be symmetric about an axis line. */
 	symmetric(a: PointId, b: PointId, axis: LineId): this;
 	/** Fix a point at a specific location (or at its current position if x/y are omitted). */
