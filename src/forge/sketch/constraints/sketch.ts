@@ -14,9 +14,9 @@ import {
   buildConstraintDisplays,
   computeStatus,
   getConstraintDef,
-  solveConstraints,
   setConstraintValue,
 } from './registry';
+import { decomposeAndSolve } from './decompose';
 
 // ─── Arc tessellation ──────────────────────────────────────────────────────────
 
@@ -316,7 +316,7 @@ export const solveConstraintDefinition = (
 ): ConstraintSketch => {
   const working = cloneDefinition(def);
   const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
-  const { maxError } = solveConstraints(working, options);
+  const { maxError } = decomposeAndSolve(working, options);
   const { status, dof } = computeStatus(working, maxError, tolerance);
   // Conflicting = solver couldn't converge (genuinely incompatible constraints).
   const conflicts = new Set<string>(
@@ -332,7 +332,7 @@ export const solveConstraintDefinition = (
       if (!cdef?.residual) continue;
       const testDef = cloneDefinition(def);
       testDef.constraints = testDef.constraints.filter((tc) => tc.id !== c.id);
-      solveConstraints(testDef, { iterations: options.iterations, tolerance });
+      decomposeAndSolve(testDef, { iterations: options.iterations, tolerance });
       const testCtx: SolverContext = {
         points: new Map(testDef.points.map((p) => [p.id, p] as const)),
         lines: new Map(testDef.lines.map((l) => [l.id, l] as const)),

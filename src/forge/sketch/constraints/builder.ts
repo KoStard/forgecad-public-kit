@@ -15,7 +15,8 @@ import type {
   SketchShape,
   SolveOptions,
 } from './types';
-import { DEFAULT_TOLERANCE, getConstraintDef, getPendingBuilderMethods, solveConstraints } from './registry';
+import { DEFAULT_TOLERANCE, getConstraintDef, getPendingBuilderMethods } from './registry';
+import { decomposeAndSolve } from './decompose';
 import { ConstraintSketch, solveConstraintDefinition } from './sketch';
 
 const toRad = (deg: number): number => (deg * Math.PI) / 180;
@@ -190,7 +191,7 @@ export class ConstrainedSketchBuilder {
     const id = `cst-${this.nextId++}`;
     const next = { ...constraint, id } as SketchConstraint;
     const def = this.buildDefinition(next);
-    const { maxError } = solveConstraints(def, { iterations: 30, tolerance: DEFAULT_TOLERANCE });
+    const { maxError } = decomposeAndSolve(def, { iterations: 30, tolerance: DEFAULT_TOLERANCE });
     if (maxError > DEFAULT_TOLERANCE * 5) {
       // Build a human-readable rejection reason: show constraint params,
       // the maxError, and which existing constraint has the highest residual
