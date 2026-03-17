@@ -11,6 +11,7 @@ import type {
   JointOverlayViewConfig,
 } from '@forge/index';
 import type { DimensionDef } from '@forge/sketch/dimensions';
+import type { SketchConstraintMeta } from '@forge/sketch/constraints/types';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
 import { buildShapeFromCompilePlan } from '@forge/kernel';
@@ -106,6 +107,54 @@ const NON_TEXT_INPUT_TYPES = new Set([
 interface PlaneTransform {
   center: THREE.Vector3;
   quaternion: THREE.Quaternion;
+}
+
+type SketchHoveredEntity =
+  | { kind: 'line'; a: [number, number]; b: [number, number] }
+  | { kind: 'circle'; center: [number, number]; radius: number }
+  | { kind: 'arc'; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }
+  | { kind: 'point'; position: [number, number] };
+
+interface SketchEntityInfoPanel {
+  entity: SketchHoveredEntity;
+  x: number;
+  y: number;
+}
+
+function distToSegment2D(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+function findNearestSketchEntity(
+  x: number,
+  y: number,
+  meta: SketchConstraintMeta,
+  threshold: number,
+): SketchHoveredEntity | null {
+  let bestDist = threshold;
+  let best: SketchHoveredEntity | null = null;
+  for (const line of meta.edges.lines) {
+    const d = distToSegment2D(x, y, line.a[0], line.a[1], line.b[0], line.b[1]);
+    if (d < bestDist) { bestDist = d; best = { kind: 'line', a: line.a, b: line.b }; }
+  }
+  for (const circle of meta.edges.circles) {
+    const d = Math.abs(Math.hypot(x - circle.center[0], y - circle.center[1]) - circle.radius);
+    if (d < bestDist) { bestDist = d; best = { kind: 'circle', center: circle.center, radius: circle.radius }; }
+  }
+  for (const arc of meta.edges.arcs) {
+    const d = Math.abs(Math.hypot(x - arc.center[0], y - arc.center[1]) - arc.radius);
+    if (d < bestDist) { bestDist = d; best = { kind: 'arc', center: arc.center, start: arc.start, end: arc.end, radius: arc.radius, clockwise: arc.clockwise }; }
+  }
+  for (const pt of meta.edges.points) {
+    const d = Math.hypot(x - pt[0], y - pt[1]);
+    if (d < bestDist) { bestDist = d; best = { kind: 'point', position: [pt[0], pt[1]] }; }
+  }
+  return best;
 }
 
 interface CutSurfaceDef {
@@ -1945,24 +1994,38 @@ function SketchObject({
   settings,
   renderMode,
   matrix,
+  isSketchMode,
   onPointerEnter,
   onPointerMove,
   onPointerLeave,
   onClick,
   onDoubleClick,
   onContextMenu,
+  onEntityClick,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
   renderMode: RenderMode;
   matrix: THREE.Matrix4;
+  isSketchMode?: boolean;
   onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
   onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
   onClick?: (event: ThreeEvent<MouseEvent>) => void;
   onDoubleClick?: (event: ThreeEvent<MouseEvent>) => void;
   onContextMenu?: (event: ThreeEvent<MouseEvent>) => void;
+  onEntityClick?: (entity: SketchHoveredEntity, clientX: number, clientY: number) => void;
 }) {
+  const [hoveredEntity, setHoveredEntity] = useState<SketchHoveredEntity | null>(null);
+  const worldThresholdRef = useRef(5);
+
+  useFrame(({ camera, size }) => {
+    if (!isSketchMode) return;
+    const ortho = camera as THREE.OrthographicCamera;
+    if (!ortho.isOrthographicCamera) return;
+    const worldH = (ortho.top - ortho.bottom) / Math.max(1e-6, ortho.zoom);
+    worldThresholdRef.current = (worldH / Math.max(1, size.height)) * 10;
+  });
   const { fillGeo, lineGeos, pointGeos } = useMemo(() => {
     if (!obj.sketch) return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
     try {
@@ -2100,14 +2163,39 @@ function SketchObject({
       matrix={matrix}
       onPointerEnter={onPointerEnter}
       onPointerMove={onPointerMove}
-      onPointerLeave={onPointerLeave}
+      onPointerLeave={(event) => { setHoveredEntity(null); onPointerLeave?.(event); }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
     >
       {fillGeo && showFill && (
-        <mesh geometry={fillGeo}>
+        <mesh
+          geometry={fillGeo}
+          onPointerMove={isSketchMode && obj.sketchMeta ? (e) => {
+            setHoveredEntity(findNearestSketchEntity(e.point.x, e.point.y, obj.sketchMeta!, worldThresholdRef.current));
+          } : undefined}
+          onClick={isSketchMode && obj.sketchMeta ? (e) => {
+            const entity = findNearestSketchEntity(e.point.x, e.point.y, obj.sketchMeta!, worldThresholdRef.current);
+            if (entity) onEntityClick?.(entity, e.clientX, e.clientY);
+          } : undefined}
+        >
           <meshBasicMaterial color={constraintColor} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+      {/* Transparent hit plane for detecting hovers near edges when no fill is present */}
+      {isSketchMode && obj.sketchMeta && !fillGeo && (
+        <mesh
+          position={[0, 0, -0.5]}
+          onPointerMove={(e) => {
+            setHoveredEntity(findNearestSketchEntity(e.point.x, e.point.y, obj.sketchMeta!, worldThresholdRef.current));
+          }}
+          onClick={(e) => {
+            const entity = findNearestSketchEntity(e.point.x, e.point.y, obj.sketchMeta!, worldThresholdRef.current);
+            if (entity) onEntityClick?.(entity, e.clientX, e.clientY);
+          }}
+        >
+          <planeGeometry args={[2000, 2000]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
       )}
       {lineGeos.map((geo, i) => (
@@ -2172,6 +2260,42 @@ function SketchObject({
           </span>
         </Html>
       ))}
+      {hoveredEntity && isSketchMode && (() => {
+        const z = 0.05;
+        if (hoveredEntity.kind === 'line') {
+          const geo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(hoveredEntity.a[0], hoveredEntity.a[1], z),
+            new THREE.Vector3(hoveredEntity.b[0], hoveredEntity.b[1], z),
+          ]);
+          return <primitive object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffcc00' }))} raycast={() => null} />;
+        }
+        if (hoveredEntity.kind === 'circle') {
+          const pts: THREE.Vector3[] = [];
+          for (let i = 0; i <= 64; i++) {
+            const a = (i / 64) * Math.PI * 2;
+            pts.push(new THREE.Vector3(hoveredEntity.center[0] + Math.cos(a) * hoveredEntity.radius, hoveredEntity.center[1] + Math.sin(a) * hoveredEntity.radius, z));
+          }
+          return <primitive object={new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#ffcc00' }))} raycast={() => null} />;
+        }
+        if (hoveredEntity.kind === 'arc') {
+          const sa = Math.atan2(hoveredEntity.start[1] - hoveredEntity.center[1], hoveredEntity.start[0] - hoveredEntity.center[0]);
+          const ea = Math.atan2(hoveredEntity.end[1] - hoveredEntity.center[1], hoveredEntity.end[0] - hoveredEntity.center[0]);
+          let span = ea - sa;
+          if (hoveredEntity.clockwise && span > 0) span -= Math.PI * 2;
+          if (!hoveredEntity.clockwise && span < 0) span += Math.PI * 2;
+          const pts: THREE.Vector3[] = [];
+          for (let i = 0; i <= 64; i++) {
+            const a = sa + (span * i) / 64;
+            pts.push(new THREE.Vector3(hoveredEntity.center[0] + Math.cos(a) * hoveredEntity.radius, hoveredEntity.center[1] + Math.sin(a) * hoveredEntity.radius, z));
+          }
+          return <primitive object={new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#ffcc00' }))} raycast={() => null} />;
+        }
+        if (hoveredEntity.kind === 'point') {
+          const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(hoveredEntity.position[0], hoveredEntity.position[1], z)]);
+          return <primitive object={new THREE.Points(geo, new THREE.PointsMaterial({ color: '#ffcc00', size: 12 }))} raycast={() => null} />;
+        }
+        return null;
+      })()}
     </group>
   );
 }
@@ -3591,6 +3715,7 @@ export function Viewport() {
   const [faceInfoPanel, setFaceInfoPanel] = useState<{ objectId: string; faceName: string | null; hitNormal: [number, number, number] | null; x: number; y: number } | null>(null);
   const [faceInfoData, setFaceInfoData] = useState<EvalWorkerFaceInfoResult | null>(null);
   const [faceInfoLoading, setFaceInfoLoading] = useState(false);
+  const [sketchEntityInfo, setSketchEntityInfo] = useState<SketchEntityInfoPanel | null>(null);
   const themeName = useForgeStore((s) => s.theme);
   const t = themes[themeName];
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
@@ -3858,6 +3983,22 @@ export function Viewport() {
     closeObjectContextMenu();
   }, [closeObjectContextMenu, objectContextMenu, objects]);
 
+  const handleSketchEntityClick = useCallback((entity: SketchHoveredEntity, clientX: number, clientY: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const panelWidth = 248;
+    const panelHeight = 160;
+    const x = Math.min(
+      Math.max(clientX - rect.left, OBJECT_CONTEXT_MENU_MARGIN),
+      Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.width - panelWidth - OBJECT_CONTEXT_MENU_MARGIN),
+    );
+    const y = Math.min(
+      Math.max(clientY - rect.top, OBJECT_CONTEXT_MENU_MARGIN),
+      Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.height - panelHeight - OBJECT_CONTEXT_MENU_MARGIN),
+    );
+    setSketchEntityInfo({ entity, x, y });
+  }, []);
+
   const handleViewportPointerMissed = useCallback((event: MouseEvent) => {
     if (measureMode) return;
     if (useForgeStore.getState().constructionGhost !== null) {
@@ -3958,12 +4099,14 @@ export function Viewport() {
                 settings={effectiveSettings}
                 renderMode={renderMode}
                 matrix={matrix}
+                isSketchMode={isSketchOnly}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
                 onPointerMove={(event) => updateHoverLabel(obj, event)}
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
                 onClick={(event) => handleObjectClick(obj, event)}
                 onDoubleClick={(event) => handleObjectDoubleClick(obj, event)}
                 onContextMenu={(event) => handleObjectContextMenu(obj, event)}
+                onEntityClick={handleSketchEntityClick}
               />
             );
           }
@@ -4305,6 +4448,81 @@ export function Viewport() {
                 )}
               </>
             )}
+          </div>
+        );
+      })()}
+
+      {sketchEntityInfo && (() => {
+        const ent = sketchEntityInfo.entity;
+        let title = '';
+        let rows: [string, string][] = [];
+        if (ent.kind === 'line') {
+          const len = Math.hypot(ent.b[0] - ent.a[0], ent.b[1] - ent.a[1]);
+          title = 'Line';
+          rows = [
+            ['Length', `${len.toFixed(3)} mm`],
+            ['Start', `(${ent.a[0].toFixed(2)}, ${ent.a[1].toFixed(2)}) mm`],
+            ['End', `(${ent.b[0].toFixed(2)}, ${ent.b[1].toFixed(2)}) mm`],
+          ];
+        } else if (ent.kind === 'circle') {
+          title = 'Circle';
+          rows = [
+            ['Radius', `${ent.radius.toFixed(3)} mm`],
+            ['Diameter', `${(ent.radius * 2).toFixed(3)} mm`],
+            ['Center', `(${ent.center[0].toFixed(2)}, ${ent.center[1].toFixed(2)}) mm`],
+          ];
+        } else if (ent.kind === 'arc') {
+          const sa = Math.atan2(ent.start[1] - ent.center[1], ent.start[0] - ent.center[0]);
+          const ea = Math.atan2(ent.end[1] - ent.center[1], ent.end[0] - ent.center[0]);
+          let span = ea - sa;
+          if (ent.clockwise && span > 0) span -= Math.PI * 2;
+          if (!ent.clockwise && span < 0) span += Math.PI * 2;
+          title = 'Arc';
+          rows = [
+            ['Radius', `${ent.radius.toFixed(3)} mm`],
+            ['Span', `${(Math.abs(span) * (180 / Math.PI)).toFixed(2)}°`],
+            ['Length', `${(Math.abs(span) * ent.radius).toFixed(3)} mm`],
+          ];
+        } else {
+          title = 'Point';
+          rows = [
+            ['X', `${ent.position[0].toFixed(3)} mm`],
+            ['Y', `${ent.position[1].toFixed(3)} mm`],
+          ];
+        }
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left: sketchEntityInfo.x,
+              top: sketchEntityInfo.y,
+              width: 248,
+              background: 'var(--fc-bgPanel)',
+              border: '1px solid var(--fc-border)',
+              borderRadius: 8,
+              boxShadow: '0 12px 28px rgba(0, 0, 0, 0.28)',
+              padding: 12,
+              zIndex: 20,
+              fontSize: 12,
+              color: 'var(--fc-text)',
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>{title}</span>
+              <button
+                type="button"
+                onClick={() => setSketchEntityInfo(null)}
+                style={{ border: 'none', background: 'transparent', color: 'var(--fc-textMuted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
+              >×</button>
+            </div>
+            {rows.map(([label, value]) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+                <span style={{ color: 'var(--fc-textMuted)', fontSize: 11 }}>{label}</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{value}</span>
+              </div>
+            ))}
           </div>
         );
       })()}
