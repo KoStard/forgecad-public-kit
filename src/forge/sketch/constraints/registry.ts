@@ -65,14 +65,43 @@ export const setConstraintValue = (constraint: SketchConstraint, value: number):
   (constraint as unknown as { value: number }).value = value;
 };
 
-// ─── Newton-Raphson solver helpers ─────────────────────────────────────────────
+// ─── Newton-Raphson / Levenberg-Marquardt solver ────────────────────────────────
+//
+// The constraint solver faces two distinct challenges:
+//
+// 1. ILL-CONDITIONED JACOBIANS — When many constraints couple the same points,
+//    the normal-equation matrix JᵀJ can become nearly singular.  Pure Gauss-Newton
+//    produces huge, unreliable steps.  Levenberg-Marquardt adds λ·I to JᵀJ,
+//    smoothly interpolating between Gauss-Newton (λ→0, fast quadratic convergence
+//    near the solution) and gradient descent (λ→∞, always makes progress).  λ
+//    adapts each iteration: decreases on a successful step, increases on failure.
+//
+// 2. MULTIPLE BASINS OF ATTRACTION — Angle-wrapping (normalizeAngle maps to
+//    [-π, π]) creates a non-convex residual landscape with multiple local minima.
+//    For example, a line can satisfy an absolute-angle constraint at the target
+//    angle OR at target ± π (pointing backwards), and coupled constraints can
+//    trap the solver in a state offset by exactly π/2.  No gradient-based method
+//    can escape a local minimum — the gradient points downhill toward the wrong
+//    solution.  The fix is multi-start: if the first attempt fails, perturb free
+//    points (after GS warm-up, using golden-angle spacing for uniform directional
+//    coverage) and retry.  Typically 2-3 attempts suffice for 2D sketch systems.
+//
+// Solver pipeline per attempt:
+//   1. GS warm-up (15 iterations) — break degeneracy, propagate constraints
+//   2. Perturbation (attempts > 0) — explore a different basin
+//   3. LM-NR (40 iterations) — quadratic convergence from the warm-up basin
+//   4. GS fallback (200 iterations) — if NR didn't converge, linear GS as safety net
+//   5. NR retry — GS may have moved points to a better basin; one more NR pass
+// ─────────────────────────────────────────────────────────────────────────────────
 
 /**
  * Solve a square or over-determined linear system A·x = b using Gauss-Newton
- * (normal equations: Aᵀ·A·x = Aᵀ·b) with partial pivoting.
+ * (normal equations: Aᵀ·A·x = Aᵀ·b) with partial pivoting, plus optional
+ * Levenberg-Marquardt damping.  lambda > 0 adds lambda·I to Jᵀ·J, regularising
+ * ill-conditioned systems and biasing the step toward gradient descent.
  * A is m×n (m equations, n variables). Returns Δx of length n.
  */
-const gaussNewtonStep = (J: number[][], r: number[]): number[] => {
+const gaussNewtonStep = (J: number[][], r: number[], lambda = 0): number[] => {
   const m = J.length;
   const n = m > 0 ? J[0].length : 0;
   if (n === 0) return [];
@@ -86,6 +115,13 @@ const gaussNewtonStep = (J: number[][], r: number[]): number[] => {
   const JtR: number[] = Array.from({ length: n }, (_, i) =>
     -J.reduce((s, row, ri) => s + row[i] * r[ri], 0),
   );
+
+  // Levenberg-Marquardt damping: regularises JᵀJ so the system is always solvable.
+  // Large lambda → gradient-descent direction (safe, slow).
+  // Small lambda → Gauss-Newton direction (fast when near solution).
+  if (lambda > 0) {
+    for (let i = 0; i < n; i++) JtJ[i][i] += lambda;
+  }
 
   // Gaussian elimination with partial pivoting on augmented [JtJ | JtR]
   const aug = JtJ.map((row, i) => [...row, JtR[i]]);
@@ -151,6 +187,11 @@ const solveNR = (
   // Step size for numerical Jacobian finite differences.
   const EPS = 1e-6;
   let maxError = 0;
+  // Levenberg-Marquardt damping factor.  Starts moderate; adapts each iteration:
+  // decreases (→ Gauss-Newton) after a successful step, increases (→ gradient descent)
+  // after a failed one.  This guarantees monotone progress even when the Jacobian is
+  // ill-conditioned — the key property that makes complex constraint systems converge.
+  let lambda = 0.1;
 
   for (let iter = 0; iter < maxIter; iter++) {
     const r0 = computeResiduals();
@@ -159,6 +200,8 @@ const solveNR = (
     if (maxError <= tolerance) break;
 
     const vars = getVars();
+    const norm0 = r0.reduce((s, v) => s + v * v, 0);
+
     // Numerical Jacobian: build column-by-column via forward finite differences.
     const Jcols: number[][] = [];
     for (let j = 0; j < n; j++) {
@@ -173,18 +216,22 @@ const solveNR = (
     const m = r0.length;
     const J: number[][] = Array.from({ length: m }, (_, i) => Jcols.map((col) => col[i]));
 
-    const dx = gaussNewtonStep(J, r0);
+    // LM step: (JᵀJ + lambda·I)·dx = −Jᵀr
+    const dx = gaussNewtonStep(J, r0, lambda);
     if (dx.length === 0) break;
 
-    // Armijo backtracking line search: halve the step until residual norm decreases.
-    const norm0 = r0.reduce((s, v) => s + v * v, 0);
-    let alpha = 1.0;
-    for (let ls = 0; ls < 8; ls++) {
-      const trial = vars.map((v, j) => v + alpha * dx[j]);
-      applyVars(trial);
-      const rTrial = computeResiduals();
-      if (rTrial.reduce((s, v) => s + v * v, 0) < norm0) break;
-      alpha *= 0.5;
+    const trial = vars.map((v, j) => v + dx[j]);
+    applyVars(trial);
+    const rTrial = computeResiduals();
+    const norm1 = rTrial.reduce((s, v) => s + v * v, 0);
+
+    if (norm1 < norm0) {
+      // Good step — reduce damping toward Gauss-Newton (faster convergence).
+      lambda = Math.max(lambda / 3, 1e-10);
+    } else {
+      // Bad step — revert and increase damping toward gradient descent (safer).
+      applyVars(vars);
+      lambda = Math.min(lambda * 10, 1e8);
     }
   }
 
@@ -231,57 +278,34 @@ export const solveConstraints = (
     return cdef?.residual != null;
   });
 
-  let maxError = 0;
-
-  // ── GS warm-up: propagate constraint positions before NR ──────────────────
-  // Fresh points often start at degenerate positions (zero-length lines, overlapping
-  // coordinates).  A few cheap Gauss-Seidel iterations let each constraint's solve()
-  // push points toward the correct basin — especially important for chains of
-  // angle-constrained lines where each line must initialise its endpoint before the
-  // next constraint can compute a meaningful direction.  Without this, NR starts from
-  // a near-singular Jacobian and fails to converge within the iteration budget.
-  if (canUseNR && def.constraints.length > 0) {
-    const warmup = Math.min(5, iterations);
-    for (let i = 0; i < warmup; i++) {
-      def.constraints.forEach((constraint) => {
-        const constraintDef = registry.get(constraint.type);
-        if (!constraintDef) return;
-        constraintDef.solve(constraint as never, ctx);
-      });
-      // Enforce arc implicit constraints during warm-up too.
-      arcs.forEach((arc) => {
-        const center = points.get(arc.center);
-        const start = points.get(arc.start);
-        const end = points.get(arc.end);
-        if (!center || !start || !end) return;
-        const ds = Math.hypot(start.x - center.x, start.y - center.y);
-        const de = Math.hypot(end.x - center.x, end.y - center.y);
-        arc.radius = (ds + de) / 2;
-        if (arc.radius < 1e-9) return;
-        if (!start.fixed && ds > 1e-9) {
-          const s = arc.radius / ds;
-          start.x = center.x + (start.x - center.x) * s;
-          start.y = center.y + (start.y - center.y) * s;
-        }
-        if (!end.fixed && de > 1e-9) {
-          const s = arc.radius / de;
-          end.x = center.x + (end.x - center.x) * s;
-          end.y = center.y + (end.y - center.y) * s;
-        }
-      });
+  // ── State snapshot helpers (index-aligned with def arrays for O(1) save/restore) ──
+  const defArcs = def.arcs ?? [];
+  const saveState = () => ({
+    pts: def.points.map(p => [p.x, p.y] as [number, number]),
+    radii: def.circles.map(c => c.radius),
+    arcRadii: defArcs.map(a => a.radius),
+  });
+  type Snapshot = ReturnType<typeof saveState>;
+  const restoreState = (s: Snapshot) => {
+    for (let i = 0; i < def.points.length; i++) {
+      def.points[i].x = s.pts[i][0];
+      def.points[i].y = s.pts[i][1];
     }
-  }
+    for (let i = 0; i < def.circles.length; i++) def.circles[i].radius = s.radii[i];
+    for (let i = 0; i < defArcs.length; i++) defArcs[i].radius = s.arcRadii[i];
+  };
 
-  if (canUseNR && def.constraints.length > 0) {
-    // ── Newton-Raphson path ──────────────────────────────────────────────────
-    const nrResult = solveNR(def, ctx, iterations, tolerance);
-    if (nrResult >= 0) {
-      maxError = nrResult;
-    } else {
-      // NR signalled fallback (missing residual mid-run) — drop to GS below
-      maxError = tolerance + 1;
-    }
-    // After NR, also enforce arc implicit constraints once.
+  // ── Shared subroutines for warmup / NR / GS (avoid duplication) ───────────
+  const gsPass = () => {
+    def.constraints.forEach((constraint) => {
+      const constraintDef = registry.get(constraint.type);
+      if (!constraintDef) return;
+      constraintDef.solve(constraint as never, ctx);
+    });
+  };
+
+  const enforceArcImplicit = (snap = false): number => {
+    let arcErr = 0;
     arcs.forEach((arc) => {
       const center = points.get(arc.center);
       const start = points.get(arc.start);
@@ -290,29 +314,8 @@ export const solveConstraints = (
       const ds = Math.hypot(start.x - center.x, start.y - center.y);
       const de = Math.hypot(end.x - center.x, end.y - center.y);
       arc.radius = (ds + de) / 2;
-    });
-  }
-
-  if (!canUseNR || maxError > tolerance) {
-    // ── Gauss-Seidel fallback ────────────────────────────────────────────────
-    for (let i = 0; i < iterations; i += 1) {
-      maxError = 0;
-      def.constraints.forEach((constraint) => {
-        const constraintDef = registry.get(constraint.type);
-        if (!constraintDef) return;
-        const err = constraintDef.solve(constraint as never, ctx);
-        maxError = Math.max(maxError, err);
-      });
-      // Enforce implicit arc constraints every GS iteration.
-      arcs.forEach((arc) => {
-        const center = points.get(arc.center);
-        const start = points.get(arc.start);
-        const end = points.get(arc.end);
-        if (!center || !start || !end) return;
-        const ds = Math.hypot(start.x - center.x, start.y - center.y);
-        const de = Math.hypot(end.x - center.x, end.y - center.y);
-        arc.radius = (ds + de) / 2;
-        if (arc.radius < 1e-9) return;
+      if (arc.radius < 1e-9) return;
+      if (snap) {
         if (!start.fixed && ds > 1e-9) {
           const s = arc.radius / ds;
           start.x = center.x + (start.x - center.x) * s;
@@ -323,13 +326,94 @@ export const solveConstraints = (
           end.x = center.x + (end.x - center.x) * s;
           end.y = center.y + (end.y - center.y) * s;
         }
-        maxError = Math.max(maxError, Math.abs(ds - arc.radius), Math.abs(de - arc.radius));
-      });
-      if (maxError <= tolerance) break;
+      }
+      arcErr = Math.max(arcErr, Math.abs(ds - arc.radius), Math.abs(de - arc.radius));
+    });
+    return arcErr;
+  };
+
+  // Save state after presolve (fixed points pinned, others at user-specified positions).
+  const initialState = saveState();
+  let bestError = Infinity;
+  let bestState: Snapshot = initialState;
+
+  // ── Multi-attempt solve ────────────────────────────────────────────────────
+  // Angle-wrapping constraints (normalizeAngle → [-π, π]) create a non-convex
+  // residual landscape with multiple local minima.  The solver can converge to the
+  // wrong basin depending on initial positions.  If the first attempt fails, we
+  // perturb free points after the GS warm-up and retry — this explores different
+  // basins cheaply (extra cost only on failure).
+  const MAX_ATTEMPTS = 5;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) restoreState(initialState);
+
+    let maxError = 0;
+
+    // ── GS warm-up ────────────────────────────────────────────────────────
+    if (canUseNR && def.constraints.length > 0) {
+      const warmup = Math.min(15, iterations);
+      for (let i = 0; i < warmup; i++) {
+        gsPass();
+        enforceArcImplicit(true);
+      }
     }
+
+    // ── Perturbation (attempts > 0) ───────────────────────────────────────
+    // After warmup placed points near roughly correct positions, perturb free
+    // points to bump the solver into a different basin.  Golden-angle spacing
+    // gives uniform directional coverage across attempts and point indices.
+    if (attempt > 0) {
+      const scale = attempt * 3;
+      const PHI = 2.399963; // golden angle (radians)
+      for (let i = 0; i < def.points.length; i++) {
+        const p = def.points[i];
+        if (p.fixed) continue;
+        const angle = (attempt * PHI + i * PHI * 0.5) % (2 * Math.PI);
+        p.x += scale * Math.cos(angle);
+        p.y += scale * Math.sin(angle);
+      }
+    }
+
+    if (canUseNR && def.constraints.length > 0) {
+      // ── LM-NR path ───────────────────────────────────────────────────────
+      const nrResult = solveNR(def, ctx, iterations, tolerance);
+      maxError = nrResult >= 0 ? nrResult : tolerance + 1;
+      enforceArcImplicit(false);
+    }
+
+    if (!canUseNR || maxError > tolerance) {
+      // ── GS fallback ───────────────────────────────────────────────────────
+      const gsIter = Math.max(iterations * 5, 200);
+      for (let i = 0; i < gsIter; i += 1) {
+        maxError = 0;
+        def.constraints.forEach((constraint) => {
+          const constraintDef = registry.get(constraint.type);
+          if (!constraintDef) return;
+          maxError = Math.max(maxError, constraintDef.solve(constraint as never, ctx));
+        });
+        maxError = Math.max(maxError, enforceArcImplicit(true));
+        if (maxError <= tolerance) break;
+      }
+
+      // ── NR retry after GS ──────────────────────────────────────────────
+      if (canUseNR && maxError > tolerance) {
+        const nrResult2 = solveNR(def, ctx, iterations, tolerance);
+        if (nrResult2 >= 0) maxError = nrResult2;
+      }
+    }
+
+    // Track best across attempts.
+    if (maxError < bestError) {
+      bestError = maxError;
+      bestState = saveState();
+    }
+    if (bestError <= tolerance) break;
   }
 
-  return { maxError };
+  // Restore the best state found across all attempts.
+  restoreState(bestState);
+  return { maxError: bestError };
 };
 
 // ─── Display ───────────────────────────────────────────────────────────────────
