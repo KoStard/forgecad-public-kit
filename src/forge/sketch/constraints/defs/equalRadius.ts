@@ -3,6 +3,13 @@ import { registerConstraint } from '../registry';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Forces two circles to have the same radius.
+     *
+     * When both radii are free they are averaged. When one has `fixedRadius`
+     * the other is snapped to it. Contributes **1 equation**:
+     * `radius_b − radius_a = 0`.
+     */
     equalRadius: { a: CircleId; b: CircleId };
   }
 }

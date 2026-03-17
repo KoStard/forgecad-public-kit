@@ -4,6 +4,13 @@ import { shapeVertices, shapeCentroid } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the Y coordinate of a polygon's arithmetic centroid to `value`.
+     *
+     * All non-fixed vertices are translated vertically by the same amount so
+     * that `mean(vertices.y) = value`. The shape's size, proportions, and X
+     * position are unaffected. Contributes **1 equation**.
+     */
     shapeCentroidY: { shape: ShapeId; value: number };
   }
 }

@@ -5,8 +5,14 @@ declare module '../types' {
   interface ConstraintTypeMap {
     /**
      * Constrains a line to be tangent to an arc at the arc's start or end point.
-     * The line's endpoint closest to the arc endpoint is pulled to coincide with it,
-     * and the line is rotated to be perpendicular to the radius at that point.
+     *
+     * Tangency requires the line's direction to be perpendicular to the arc's
+     * radius at the contact point. Set `atStart: true` to use the arc's start
+     * point as the tangency contact; `false` uses the end point.
+     *
+     * The solver rotates the line (around its midpoint, or from the fixed end)
+     * so that `dot(unit_line, unit_radius) = 0`.
+     * Contributes **1 equation**.
      */
     lineTangentArc: { line: LineId; arc: ArcId; atStart: boolean };
   }

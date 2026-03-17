@@ -4,6 +4,20 @@ import { midpoint, angleOfLine, normalizeAngle, distance } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Forces lines `a` and `b` to be parallel **and** separated by a signed
+     * perpendicular distance of `value`.
+     *
+     * The distance is measured from the midpoint of `a` to the midpoint of `b`
+     * along `a`'s left-normal direction. Positive values place `b` to the left
+     * of `a` (when facing `a`'s direction).
+     *
+     * This constraint combines two equations:
+     * 1. `cross(unit_a, unit_b) = 0` — parallelism
+     * 2. `perpDist(mid_b, line_a) − value = 0` — offset distance
+     *
+     * Contributes **2 equations**.
+     */
     lineDistance: { a: LineId; b: LineId; value: number };
   }
 }

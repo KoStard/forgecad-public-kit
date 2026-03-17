@@ -4,6 +4,18 @@ import { midpoint, distance } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Constrains tangency between a line and a circle, or between two circles.
+     *
+     * **Line–circle** (`line` + `circle`): the perpendicular distance from the
+     * circle's center to the infinite line equals the circle's radius.
+     *
+     * **Circle–circle** (`a` + `b`): the two circles are externally tangent —
+     * the distance between centers equals the sum of their radii.
+     *
+     * Exactly one mode must be active (provide either `line`+`circle` or `a`+`b`).
+     * Contributes **1 equation**.
+     */
     tangent: { line?: LineId; circle?: CircleId; a?: CircleId; b?: CircleId };
   }
 }

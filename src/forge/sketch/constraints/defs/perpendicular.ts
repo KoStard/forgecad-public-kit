@@ -4,6 +4,13 @@ import { midpoint, angleOfLine, normalizeAngle, distance } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Forces lines `a` and `b` to be perpendicular (90° apart).
+     *
+     * The direction of `b` is rotated to be ±90° from `a`, choosing the
+     * sign closest to the current orientation. Line `a` is the reference;
+     * only `b` is moved. Contributes **1 equation**: `dot(unit_a, unit_b) = 0`.
+     */
     perpendicular: { a: LineId; b: LineId };
   }
 }

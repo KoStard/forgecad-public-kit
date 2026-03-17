@@ -4,6 +4,14 @@ import { midpoint, angleOfLine, normalizeAngle, distance } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Forces lines `a` and `b` to be parallel.
+     *
+     * The direction of `b` is rotated to match `a`'s direction (either
+     * co-directional or anti-parallel — whichever is closer to the current
+     * orientation). Line `a` is treated as the reference; only `b` is moved.
+     * Contributes **1 equation**: `cross(unit_a, unit_b) = 0`.
+     */
     parallel: { a: LineId; b: LineId };
   }
 }

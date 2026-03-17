@@ -4,6 +4,14 @@ import { shapeVertices, shapeBoundingBox } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the axis-aligned bounding-box width of a polygon shape to `value`.
+     *
+     * All non-fixed vertices are scaled horizontally (`x` only) from the
+     * bounding-box center: `pt.x = cx + (pt.x − cx) × (value / width)`.
+     * The shape's height and Y position are unaffected.
+     * Contributes **1 equation**.
+     */
     shapeWidth: { shape: ShapeId; value: number };
   }
 }

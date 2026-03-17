@@ -4,6 +4,14 @@ import { midpoint, angleOfLine, normalizeAngle, distance, toRad } from '../helpe
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the angle from line `a` to line `b` to `value` degrees.
+     *
+     * `value` is measured counter-clockwise from `a`'s direction to `b`'s
+     * direction. Either orientation of `b` (forward or reversed) is accepted —
+     * whichever is closer to the target. Line `a` is the reference; only `b`
+     * is rotated. Contributes **1 equation**.
+     */
     angle: { a: LineId; b: LineId; value: number };
   }
 }

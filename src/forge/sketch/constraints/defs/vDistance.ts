@@ -4,6 +4,13 @@ import { midpoint } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the signed vertical distance from point `a` to point `b` to `value`.
+     *
+     * The constraint is directional: `b.y − a.y = value`. A positive value places
+     * `b` above `a`; negative places it below.
+     * Contributes **1 equation**.
+     */
     vDistance: { a: PointId; b: PointId; value: number };
   }
 }

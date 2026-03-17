@@ -4,6 +4,13 @@ import { midpoint } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Forces two circles to share the same center point.
+     *
+     * The centers are merged to their average position (or snapped to the fixed
+     * one if either is fixed). Contributes **2 equations**
+     * (one per axis): `center_b − center_a = [0, 0]`.
+     */
     concentric: { a: CircleId; b: CircleId };
   }
 }

@@ -4,6 +4,17 @@ import { arcSweep } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the arc length of an arc to `value`.
+     *
+     * Arc length is defined as `radius × sweep`, where `sweep` is the angle
+     * (in radians) from the start point to the end point in the arc's direction.
+     * A zero-length sweep is treated as a full circle (2π).
+     *
+     * The solver achieves the target by relocating the arc's end point along
+     * the circle; the radius and start point are left unchanged.
+     * Contributes **1 equation**: `radius × sweep − value = 0`.
+     */
     arcLength: { arc: ArcId; value: number };
   }
 }

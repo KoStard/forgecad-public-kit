@@ -4,6 +4,14 @@ import { shapeVertices, shapeCentroid, traverseShapeVertices, polygonSignedArea 
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the enclosed area of a polygon shape to `value`.
+     *
+     * Area is computed via the shoelace formula on the ordered vertex list.
+     * All non-fixed vertices are scaled uniformly from the polygon's arithmetic
+     * centroid: `scale = sqrt(target / current)`, so the shape's proportions
+     * and position are preserved. Contributes **1 equation**.
+     */
     shapeArea: { shape: ShapeId; value: number };
   }
 }

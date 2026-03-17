@@ -4,6 +4,13 @@ import { midpoint } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the signed horizontal distance from point `a` to point `b` to `value`.
+     *
+     * The constraint is directional: `b.x − a.x = value`. A positive value places
+     * `b` to the right of `a`; negative places it to the left.
+     * Contributes **1 equation**.
+     */
     hDistance: { a: PointId; b: PointId; value: number };
   }
 }

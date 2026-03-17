@@ -4,6 +4,13 @@ import { angleOfLine, distance, midpoint, normalizeAngle } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the angle of a line from the positive X axis to `value` degrees.
+     *
+     * Both orientations of the line (forward and reversed) are accepted —
+     * whichever is closer to the target angle. Contributes **1 equation**:
+     * `sin(angle − target) = 0` (normalised by line length).
+     */
     absoluteAngle: { line: LineId; value: number };
   }
 }

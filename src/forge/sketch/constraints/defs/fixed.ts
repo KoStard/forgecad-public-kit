@@ -3,6 +3,14 @@ import { registerConstraint } from '../registry';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Pins a point to an absolute position `(x, y)` in sketch space.
+     *
+     * Applied during the **presolve** pass (before iteration), not as a
+     * per-iteration equation. The point's `fixed` flag is set to `true` so
+     * other constraints treat it as immovable. Contributes **0 equations**
+     * to the DOF count because the DOF is removed by setting `pt.fixed`.
+     */
     fixed: { point: PointId; x: number; y: number };
   }
 }

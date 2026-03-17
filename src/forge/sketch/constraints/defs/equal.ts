@@ -4,6 +4,13 @@ import { midpoint, distance, lineDirection } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Forces lines `a` and `b` to have the same length.
+     *
+     * Line `a`'s length is used as the target; `b`'s endpoints are scaled
+     * symmetrically along `b`'s current direction to match it.
+     * Contributes **1 equation**: `|b| − |a| = 0`.
+     */
     equal: { a: LineId; b: LineId };
   }
 }

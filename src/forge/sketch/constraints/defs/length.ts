@@ -4,6 +4,13 @@ import { midpoint, distance, lineDirection } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the length of a line segment to `value`.
+     *
+     * Endpoints are scaled symmetrically about the line's midpoint while
+     * preserving its direction. Contributes **1 equation**:
+     * `|b − a| − value = 0`.
+     */
     length: { line: LineId; value: number };
   }
 }

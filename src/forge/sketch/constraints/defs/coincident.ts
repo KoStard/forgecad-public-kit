@@ -4,6 +4,13 @@ import { midpoint } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Forces two points to occupy the same position.
+     *
+     * This is the most fundamental connectivity constraint — use it to join
+     * line endpoints, close a polygon, or snap a point to another point.
+     * Contributes **2 equations** (one per axis).
+     */
     coincident: { a: PointId; b: PointId };
   }
 }

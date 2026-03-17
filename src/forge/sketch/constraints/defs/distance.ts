@@ -4,6 +4,13 @@ import { midpoint, distance } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the Euclidean distance between two points to `value`.
+     *
+     * Points are moved symmetrically along the current direction vector so the
+     * center of the pair stays fixed. Contributes **1 equation**:
+     * `|b − a| − value = 0`.
+     */
     distance: { a: PointId; b: PointId; value: number };
   }
 }

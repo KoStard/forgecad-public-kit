@@ -3,6 +3,12 @@ import { registerConstraint } from '../registry';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Sets the diameter of a circle to `value` (i.e. `radius = value / 2`).
+     *
+     * Has no effect if the circle's `fixedRadius` flag is set.
+     * Contributes **1 equation**: `radius − value / 2 = 0`.
+     */
     diameter: { circle: CircleId; value: number };
   }
 }

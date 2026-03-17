@@ -4,6 +4,12 @@ import { midpoint } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Forces a line to be horizontal (parallel to the X axis).
+     *
+     * Both endpoints are moved to their average Y coordinate so the line
+     * remains centered in place. Contributes **1 equation**: `b.y − a.y = 0`.
+     */
     horizontal: { line: LineId };
   }
 }

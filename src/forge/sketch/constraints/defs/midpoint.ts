@@ -4,6 +4,14 @@ import { midpoint } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Forces a point to sit at the exact midpoint of a line segment.
+     *
+     * When the midpoint is free the solver snaps it to `(a + b) / 2`. When the
+     * midpoint is fixed both line endpoints are translated equally to place their
+     * midpoint at the fixed position. Contributes **2 equations**
+     * (one per axis): `point − (a + b) / 2 = [0, 0]`.
+     */
     midpoint: { point: PointId; line: LineId };
   }
 }

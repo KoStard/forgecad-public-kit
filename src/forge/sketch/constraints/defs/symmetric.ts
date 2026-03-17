@@ -4,6 +4,14 @@ import { midpoint, reflectPointAcrossLine } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
+    /**
+     * Forces points `a` and `b` to be mirror images of each other across
+     * the infinite line through `axis`.
+     *
+     * When neither point is fixed, `b` is moved to the reflection of `a`.
+     * When `b` is fixed, `a` is moved instead. Contributes **2 equations**
+     * (one per axis): `b − reflect(a, axis) = [0, 0]`.
+     */
     symmetric: { a: PointId; b: PointId; axis: LineId };
   }
 }
