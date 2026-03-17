@@ -1,20 +1,28 @@
 import type { LineId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
-import { midpoint, angleOfLine, normalizeAngle, distance, toRad } from '../helpers';
+import { midpointPerp, angleOfLine, normalizeAngle, distance, toRad } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
     /**
-     * Sets the angle from line `a` to line `b` to `value` degrees.
-     *
-     * `value` is measured counter-clockwise from `a`'s direction to `b`'s
-     * direction. Either orientation of `b` (forward or reversed) is accepted —
-     * whichever is closer to the target. Line `a` is the reference; only `b`
-     * is rotated. Contributes **1 equation**.
+     * Sets the angle from line `a` to line `b` to `value` degrees (CCW).
+     * Line `a` is the reference; only `b` is rotated. Contributes **1 equation**.
      */
     angle: { a: LineId; b: LineId; value: number };
   }
 }
+
+/** Count how many lines reference a given point ID. */
+const pointLineRefs = (
+  ptId: string,
+  lines: ReadonlyMap<string, { a: string; b: string }>,
+): number => {
+  let n = 0;
+  for (const l of lines.values()) {
+    if (l.a === ptId || l.b === ptId) n++;
+  }
+  return n;
+};
 
 registerConstraint<'angle', ConstraintTypeMap['angle']>({
   type: 'angle',
@@ -24,17 +32,37 @@ registerConstraint<'angle', ConstraintTypeMap['angle']>({
 
   displayPosition(c, { lines, points }) {
     const lineA = lines.get(c.a);
-    const lineB = lines.get(c.b);
-    if (lineA && lineB) {
+    if (lineA) {
       const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
-      const b1 = points.get(lineB.a); const b2 = points.get(lineB.b);
-      if (a1 && a2 && b1 && b2) {
-        const midA = midpoint(a1, a2);
-        const midB = midpoint(b1, b2);
-        return [(midA[0] + midB[0]) / 2, (midA[1] + midB[1]) / 2];
-      }
+      if (a1 && a2) return midpointPerp(a1, a2, 3);
     }
     return [0, 0];
+  },
+
+  presolve(c, { lines, points }) {
+    const la = lines.get(c.a);
+    const lb = lines.get(c.b);
+    if (!la || !lb) return;
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return;
+    if (b1.fixed && b2.fixed) return;
+
+    const targetRad = angleOfLine(a1, a2) + toRad(c.value);
+    const len = distance(b1, b2) || 1;
+    const cos = Math.cos(targetRad);
+    const sin = Math.sin(targetRad);
+
+    const b1Refs = pointLineRefs(lb.a, lines);
+    const b2Refs = pointLineRefs(lb.b, lines);
+
+    if (b2.fixed || (!b1.fixed && b2Refs > b1Refs)) {
+      b1.x = b2.x - cos * len;
+      b1.y = b2.y - sin * len;
+    } else {
+      b2.x = b1.x + cos * len;
+      b2.y = b1.y + sin * len;
+    }
   },
 
   solve(c, { lines, points, tolerance }) {
@@ -44,30 +72,30 @@ registerConstraint<'angle', ConstraintTypeMap['angle']>({
     const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
     const b1 = points.get(lineB.a); const b2 = points.get(lineB.b);
     if (!a1 || !a2 || !b1 || !b2) return 0;
+
     const baseAngle = angleOfLine(a1, a2);
+    const targetRad = baseAngle + toRad(c.value);
     const current = angleOfLine(b1, b2);
-    const fwd = baseAngle + toRad(c.value);
-    const rev = fwd + Math.PI;
-    const dFwd = Math.abs(normalizeAngle(current - fwd));
-    const dRev = Math.abs(normalizeAngle(current - rev));
-    const target = dFwd <= dRev ? fwd : rev;
-    const err = Math.abs(normalizeAngle(current - target));
+    const err = Math.abs(normalizeAngle(current - targetRad));
     if (err <= tolerance) return err;
     if (b1.fixed && b2.fixed) return err;
+
     const len = distance(b1, b2) || 1;
-    const dir: [number, number] = [Math.cos(target), Math.sin(target)];
-    if (b1.fixed) {
-      b2.x = b1.x + dir[0] * len; b2.y = b1.y + dir[1] * len;
-    } else if (b2.fixed) {
-      b1.x = b2.x - dir[0] * len; b1.y = b2.y - dir[1] * len;
+    const cos = Math.cos(targetRad);
+    const sin = Math.sin(targetRad);
+
+    const b1Refs = pointLineRefs(lineB.a, lines);
+    const b2Refs = pointLineRefs(lineB.b, lines);
+
+    if (b2.fixed || (!b1.fixed && b2Refs > b1Refs)) {
+      b1.x = b2.x - cos * len;
+      b1.y = b2.y - sin * len;
     } else {
-      const mid = midpoint(b1, b2);
-      b1.x = mid[0] - dir[0] * len / 2; b1.y = mid[1] - dir[1] * len / 2;
-      b2.x = mid[0] + dir[0] * len / 2; b2.y = mid[1] + dir[1] * len / 2;
+      b2.x = b1.x + cos * len;
+      b2.y = b1.y + sin * len;
     }
     return err;
   },
-
 
   residual(c, { lines, points }) {
     const la = lines.get(c.a); const lb = lines.get(c.b);
@@ -75,15 +103,9 @@ registerConstraint<'angle', ConstraintTypeMap['angle']>({
     const a1 = points.get(la.a); const a2 = points.get(la.b);
     const b1 = points.get(lb.a); const b2 = points.get(lb.b);
     if (!a1 || !a2 || !b1 || !b2) return [0];
-    const dax = a2.x - a1.x; const day = a2.y - a1.y;
-    const dbx = b2.x - b1.x; const dby = b2.y - b1.y;
-    const lenA = Math.hypot(dax, day) || 1;
-    const lenB = Math.hypot(dbx, dby) || 1;
-    const targetRad = c.value * Math.PI / 180;
-    // sin(angle_b - angle_a - target) = 0
-    const crossUnit = (dax / lenA) * (dby / lenB) - (day / lenA) * (dbx / lenB);
-    const dotUnit   = (dax / lenA) * (dbx / lenB) + (day / lenA) * (dby / lenB);
-    return [crossUnit * Math.cos(targetRad) - dotUnit * Math.sin(targetRad)];
+    const angleA = angleOfLine(a1, a2);
+    const angleB = angleOfLine(b1, b2);
+    return [normalizeAngle(angleB - angleA - toRad(c.value))];
   },
 
   computeDof(c, { refCount, lines }) {

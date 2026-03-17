@@ -233,6 +233,45 @@ export const solveConstraints = (
 
   let maxError = 0;
 
+  // ── GS warm-up: propagate constraint positions before NR ──────────────────
+  // Fresh points often start at degenerate positions (zero-length lines, overlapping
+  // coordinates).  A few cheap Gauss-Seidel iterations let each constraint's solve()
+  // push points toward the correct basin — especially important for chains of
+  // angle-constrained lines where each line must initialise its endpoint before the
+  // next constraint can compute a meaningful direction.  Without this, NR starts from
+  // a near-singular Jacobian and fails to converge within the iteration budget.
+  if (canUseNR && def.constraints.length > 0) {
+    const warmup = Math.min(5, iterations);
+    for (let i = 0; i < warmup; i++) {
+      def.constraints.forEach((constraint) => {
+        const constraintDef = registry.get(constraint.type);
+        if (!constraintDef) return;
+        constraintDef.solve(constraint as never, ctx);
+      });
+      // Enforce arc implicit constraints during warm-up too.
+      arcs.forEach((arc) => {
+        const center = points.get(arc.center);
+        const start = points.get(arc.start);
+        const end = points.get(arc.end);
+        if (!center || !start || !end) return;
+        const ds = Math.hypot(start.x - center.x, start.y - center.y);
+        const de = Math.hypot(end.x - center.x, end.y - center.y);
+        arc.radius = (ds + de) / 2;
+        if (arc.radius < 1e-9) return;
+        if (!start.fixed && ds > 1e-9) {
+          const s = arc.radius / ds;
+          start.x = center.x + (start.x - center.x) * s;
+          start.y = center.y + (start.y - center.y) * s;
+        }
+        if (!end.fixed && de > 1e-9) {
+          const s = arc.radius / de;
+          end.x = center.x + (end.x - center.x) * s;
+          end.y = center.y + (end.y - center.y) * s;
+        }
+      });
+    }
+  }
+
   if (canUseNR && def.constraints.length > 0) {
     // ── Newton-Raphson path ──────────────────────────────────────────────────
     const nrResult = solveNR(def, ctx, iterations, tolerance);
@@ -308,7 +347,7 @@ export const buildConstraintDisplays = (
     shapes: new Map((def.shapes ?? []).map((s) => [s.id, s] as const)),
   };
 
-  return def.constraints.map((constraint) => {
+  const displays = def.constraints.map((constraint) => {
     const constraintDef = registry.get(constraint.type);
     const position: [number, number] = constraintDef
       ? constraintDef.displayPosition(constraint as never, ctx)
@@ -325,6 +364,37 @@ export const buildConstraintDisplays = (
       isRedundant: redundantIds.has(constraint.id),
     };
   });
+
+  // Iteratively spread labels that are too close together.
+  const MIN_SEP = 5;
+  const pos = displays.map((d) => [d.position[0], d.position[1]] as [number, number]);
+  for (let iter = 0; iter < 30; iter++) {
+    let moved = false;
+    for (let i = 0; i < pos.length; i++) {
+      for (let j = i + 1; j < pos.length; j++) {
+        const dx = pos[j][0] - pos[i][0];
+        const dy = pos[j][1] - pos[i][1];
+        const d = Math.hypot(dx, dy);
+        if (d < MIN_SEP) {
+          const push = (MIN_SEP - d) / 2 + 0.05;
+          let nx: number; let ny: number;
+          if (d < 0.01) {
+            // Exact overlap — use index-based angle to break symmetry
+            const a = (i * Math.PI * 2) / Math.max(displays.length, 2);
+            nx = Math.cos(a); ny = Math.sin(a);
+          } else {
+            nx = dx / d; ny = dy / d;
+          }
+          pos[i][0] -= nx * push; pos[i][1] -= ny * push;
+          pos[j][0] += nx * push; pos[j][1] += ny * push;
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+
+  return displays.map((d, i) => ({ ...d, position: pos[i] }));
 };
 
 // ─── DOF / status computation ──────────────────────────────────────────────────

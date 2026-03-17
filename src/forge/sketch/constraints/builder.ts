@@ -405,6 +405,11 @@ export class ConstrainedSketchBuilder {
     return this.constrain({ type: 'shapeEqualCentroid', a, b } as Omit<SketchConstraint, 'id'>);
   }
 
+  /** Enforce counter-clockwise winding on a polygon defined by its vertices. */
+  ccw(...points: PointId[]): this {
+    return this.constrain({ type: 'ccw', points } as Omit<SketchConstraint, 'id'>);
+  }
+
   // ─── Loop helpers ──────────────────────────────────────────────────────────
 
   /**
