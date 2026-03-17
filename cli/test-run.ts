@@ -194,6 +194,13 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       if (obj.sketch) {
         console.log(`  ${obj.name}${grpTag}: area=${obj.sketch.area().toFixed(1)}mm²`);
       }
+      const rejected = obj.sketchMeta?.rejected;
+      if (rejected && rejected.length > 0) {
+        console.log(`  ${obj.name}${grpTag}: ✗ ${rejected.length} rejected constraint(s):`);
+        for (const c of rejected) {
+          console.log(`    ${c.label} — ${c.rejectionReason}`);
+        }
+      }
     }
 
     const diagnostics = (result.logs || []).filter((log: any) => log.level === 'warn' || log.level === 'error');
