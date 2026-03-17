@@ -151,8 +151,8 @@ function findNearestSketchEntity(
     if (d < bestDist) { bestDist = d; best = { kind: 'arc', center: arc.center, start: arc.start, end: arc.end, radius: arc.radius, clockwise: arc.clockwise }; }
   }
   for (const pt of meta.edges.points) {
-    const d = Math.hypot(x - pt[0], y - pt[1]);
-    if (d < bestDist) { bestDist = d; best = { kind: 'point', position: [pt[0], pt[1]] }; }
+    const d = Math.hypot(x - pt.pos[0], y - pt.pos[1]);
+    if (d < bestDist) { bestDist = d; best = { kind: 'point', position: [pt.pos[0], pt.pos[1]] }; }
   }
   return best;
 }
@@ -2002,6 +2002,7 @@ function SketchObject({
   onDoubleClick,
   onContextMenu,
   onEntityClick,
+  onVertexHover,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
@@ -2015,6 +2016,7 @@ function SketchObject({
   onDoubleClick?: (event: ThreeEvent<MouseEvent>) => void;
   onContextMenu?: (event: ThreeEvent<MouseEvent>) => void;
   onEntityClick?: (entity: SketchHoveredEntity, clientX: number, clientY: number) => void;
+  onVertexHover?: (pointId: string, event: ThreeEvent<PointerEvent>) => void;
 }) {
   const [hoveredEntity, setHoveredEntity] = useState<SketchHoveredEntity | null>(null);
   const worldThresholdRef = useRef(5);
@@ -2090,7 +2092,11 @@ function SketchObject({
 
   const edgeLines = useMemo(() => {
     const meta = obj.sketchMeta?.edges;
-    if (!meta) return { lines: [] as THREE.BufferGeometry[], circles: [] as THREE.BufferGeometry[], points: [] as THREE.BufferGeometry[] };
+    if (!meta) return {
+      lines: [] as THREE.BufferGeometry[],
+      circles: [] as THREE.BufferGeometry[],
+      points: [] as { id: string; pos: [number, number] }[],
+    };
     const lines = meta.lines.map((line) =>
       new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(line.a[0], line.a[1], 0.01),
@@ -2110,10 +2116,7 @@ function SketchObject({
       }
       return new THREE.BufferGeometry().setFromPoints(pts);
     });
-    const points = meta.points.map((p) =>
-      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p[0], p[1], 0.01)]),
-    );
-    return { lines, circles, points };
+    return { lines, circles, points: meta.points };
   }, [obj.sketchMeta]);
 
   const constructionLines = useMemo(() => {
@@ -2153,6 +2156,49 @@ function SketchObject({
     });
   }, [obj.sketchMeta]);
 
+  // Bounding box covering all sketch geometry — used as a transparent hit plane so
+  // pointer events fire even when the cursor is over edges/vertices outside the fill.
+  const hitPlaneBounds = useMemo(() => {
+    let minX = Infinity; let maxX = -Infinity;
+    let minY = Infinity; let maxY = -Infinity;
+    const expand = (x: number, y: number) => {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    };
+    for (const geo of edgeLines.lines) {
+      const pos = geo.attributes.position;
+      if (pos) {
+        for (let i = 0; i < pos.count; i++) expand(pos.getX(i), pos.getY(i));
+      }
+    }
+    for (const pt of edgeLines.points) { expand(pt.pos[0], pt.pos[1]); }
+    if (!isFinite(minX)) return null;
+    const pad = 5;
+    return {
+      cx: (minX + maxX) / 2,
+      cy: (minY + maxY) / 2,
+      w: Math.max(maxX - minX + pad * 2, pad * 2),
+      h: Math.max(maxY - minY + pad * 2, pad * 2),
+    };
+  }, [edgeLines]);
+
+  // Inverted matrix for transforming world-space hit points to sketch-local 2D coords.
+  const matrixInverse = useMemo(() => new THREE.Matrix4().copy(matrix).invert(), [matrix]);
+
+  // Intercept pointer move to detect vertex proximity and call onVertexHover when close.
+  const handlePointerMove = useCallback((event: ThreeEvent<PointerEvent>) => {
+    onPointerMove?.(event);
+    if (!onVertexHover || edgeLines.points.length === 0) return;
+    const localPt = event.point.clone().applyMatrix4(matrixInverse);
+    const THRESH = 5;
+    let nearest: { id: string; dist: number } | null = null;
+    for (const pt of edgeLines.points) {
+      const d = Math.hypot(localPt.x - pt.pos[0], localPt.y - pt.pos[1]);
+      if (d < THRESH && (!nearest || d < nearest.dist)) nearest = { id: pt.id, dist: d };
+    }
+    if (nearest) onVertexHover(nearest.id, event);
+  }, [edgeLines.points, matrixInverse, onPointerMove, onVertexHover]);
+
   if (!settings.visible) return null;
 
   const showFill = renderMode !== 'wireframe';
@@ -2162,7 +2208,7 @@ function SketchObject({
       matrixAutoUpdate={false}
       matrix={matrix}
       onPointerEnter={onPointerEnter}
-      onPointerMove={onPointerMove}
+      onPointerMove={handlePointerMove}
       onPointerLeave={(event) => { setHoveredEntity(null); onPointerLeave?.(event); }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
@@ -2226,13 +2272,18 @@ function SketchObject({
           raycast={() => null}
         />
       ))}
-      {edgeLines.points.map((geo, i) => (
-        <primitive
-          key={`ep-${i}`}
-          object={new THREE.Points(geo, new THREE.PointsMaterial({ color: '#ffffff', size: 6 }))}
-          raycast={() => null}
-        />
+      {edgeLines.points.map((pt) => (
+        <mesh key={`ep-${pt.id}`} position={[pt.pos[0], pt.pos[1], 0.05]}>
+          <sphereGeometry args={[2, 8, 4]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
       ))}
+      {hitPlaneBounds && (
+        <mesh position={[hitPlaneBounds.cx, hitPlaneBounds.cy, -0.02]}>
+          <planeGeometry args={[hitPlaneBounds.w, hitPlaneBounds.h]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+        </mesh>
+      )}
       {constructionLines.map((line, i) => (
         <primitive key={`cl-${i}`} object={line} raycast={() => null} />
       ))}
@@ -4107,6 +4158,17 @@ export function Viewport() {
                 onDoubleClick={(event) => handleObjectDoubleClick(obj, event)}
                 onContextMenu={(event) => handleObjectContextMenu(obj, event)}
                 onEntityClick={handleSketchEntityClick}
+                onVertexHover={(pointId, event) => {
+                  if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
+                  const rect = containerRef.current?.getBoundingClientRect();
+                  if (!rect) return;
+                  showHoverTooltip({
+                    id: `${obj.id}:${pointId}`,
+                    name: pointId,
+                    x: event.clientX - rect.left + 10,
+                    y: event.clientY - rect.top + 12,
+                  });
+                }}
               />
             );
           }

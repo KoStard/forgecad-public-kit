@@ -12,6 +12,7 @@ import './collinear';
 import './fixed';
 import './midpoint';
 import './pointOnCircle';
+import './pointOnLine';
 import './distance';
 import './length';
 import './angle';

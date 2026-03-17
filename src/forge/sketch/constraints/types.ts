@@ -92,7 +92,7 @@ export interface SketchConstraintMeta {
     lines: { a: [number, number]; b: [number, number] }[];
     circles: { center: [number, number]; radius: number }[];
     arcs: { center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
-    points: [number, number][];
+    points: { id: string; pos: [number, number] }[];
   };
 }
 

@@ -205,7 +205,7 @@ export const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMe
     })
     .filter((arc): arc is NonNullable<typeof arc> => arc !== null);
 
-  const points = def.points.map((p) => [p.x, p.y] as [number, number]);
+  const points = def.points.map((p) => ({ id: p.id, pos: [p.x, p.y] as [number, number] }));
 
   return { lines, circles, arcs, points };
 };

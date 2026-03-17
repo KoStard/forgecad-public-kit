@@ -335,11 +335,6 @@ export class ConstrainedSketchBuilder {
     return this.constrain({ type: 'collinear', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
   }
 
-  /** Constrain a point to lie on a finite line segment (clamped to the segment's extent). */
-  pointOnLine(point: any, line: any): this {
-    return this.constrain({ type: 'pointOnLine', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
-  }
-
   /** Constrain two points to be symmetric about an axis line. */
   symmetric(a: any, b: any, axis: any): this {
     return this.constrain({ type: 'symmetric', a: this.resolvePointId(a), b: this.resolvePointId(b), axis: this.resolveLineId(axis) } as Omit<SketchConstraint, 'id'>);
@@ -361,6 +356,11 @@ export class ConstrainedSketchBuilder {
   /** Constrain a point to lie on the perimeter of a circle. */
   pointOnCircle(point: any, circle: any): this {
     return this.constrain({ type: 'pointOnCircle', point: this.resolvePointId(point), circle: this.resolveCircleId(circle) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain a point to lie on a bounded line segment (not its infinite extension). */
+  pointOnLine(point: PointId, line: LineId): this {
+    return this.constrain({ type: 'pointOnLine', point, line } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the distance between two points. */
