@@ -338,6 +338,7 @@ export const buildConstraintDisplays = (
   def: ConstraintDefinition,
   conflictingIds: Set<string>,
   redundantIds: Set<string> = new Set(),
+  rejectionReasons?: Map<string, string>,
 ): ConstraintDisplay[] => {
   const ctx: DisplayContext = {
     points: new Map(def.points.map((p) => [p.id, p] as const)),
@@ -362,6 +363,7 @@ export const buildConstraintDisplays = (
       isDimension: isDimensionConstraint(constraint.type),
       isConflicting: conflictingIds.has(constraint.id),
       isRedundant: redundantIds.has(constraint.id),
+      rejectionReason: rejectionReasons?.get(constraint.id),
     };
   });
 

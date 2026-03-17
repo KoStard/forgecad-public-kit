@@ -831,8 +831,8 @@ export function ViewPanel() {
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: 11, color: 'var(--fc-error)', marginBottom: 4 }}>Rejected constraints</div>
               {constraintMeta.rejected.map((constraint) => (
-                <div key={constraint.id} style={{ fontSize: 11, color: 'var(--fc-error)' }}>
-                  {constraint.label}
+                <div key={constraint.id} style={{ fontSize: 11, color: 'var(--fc-error)' }} title={constraint.rejectionReason}>
+                  {constraint.label}{constraint.rejectionReason ? ` — ${constraint.rejectionReason}` : ''}
                 </div>
               ))}
             </div>

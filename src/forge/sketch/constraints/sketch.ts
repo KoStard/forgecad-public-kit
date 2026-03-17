@@ -59,6 +59,7 @@ export const cloneDefinition = (def: ConstraintDefinition): ConstraintDefinition
   }),
   constraints: def.constraints.map((c) => ({ ...c } as typeof c)),
   rejectedConstraints: def.rejectedConstraints.map((c) => ({ ...c } as typeof c)),
+  rejectionReasons: def.rejectionReasons ? new Map(def.rejectionReasons) : undefined,
 });
 
 export const buildSketchFromDefinition = (def: ConstraintDefinition): Sketch => {
@@ -252,7 +253,10 @@ export class ConstraintSketch extends Sketch {
 
     if (meta.rejected.length > 0) {
       lines.push(`REJECTED (${meta.rejected.length}):`);
-      meta.rejected.forEach((r) => lines.push(`  ${r.type} ${r.label} (${r.id})`));
+      meta.rejected.forEach((r) => {
+        const reason = r.rejectionReason ? ` — ${r.rejectionReason}` : '';
+        lines.push(`  ${r.type} ${r.label} (${r.id})${reason}`);
+      });
     }
 
     lines.push('points:');
@@ -346,6 +350,8 @@ export const solveConstraintDefinition = (
   const rejected = buildConstraintDisplays(
     { ...working, constraints: working.rejectedConstraints, rejectedConstraints: [] },
     new Set(working.rejectedConstraints.map((c) => c.id)),
+    new Set(),
+    working.rejectionReasons,
   );
   const sketch = buildSketchFromDefinition(working);
   const construction = buildConstructionGeometry(working);

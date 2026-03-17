@@ -71,6 +71,8 @@ export interface ConstraintDisplay {
   /** True when this constraint is mathematically redundant — it duplicates an equation already
    * provided by another constraint, making the DOF count negative even though the solver converges. */
   isRedundant: boolean;
+  /** For rejected constraints: why the builder rejected it (maxError, constraint params, blame). */
+  rejectionReason?: string;
 }
 
 export interface SketchConstraintMeta {
@@ -103,6 +105,8 @@ export interface ConstraintDefinition {
   loops: SketchLoop[];
   constraints: SketchConstraint[];
   rejectedConstraints: SketchConstraint[];
+  /** Maps rejected constraint ID → human-readable reason. Populated by the builder. */
+  rejectionReasons?: Map<string, string>;
 }
 
 export interface SolveOptions {

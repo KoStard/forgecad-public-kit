@@ -15,7 +15,7 @@ import type {
   SketchShape,
   SolveOptions,
 } from './types';
-import { DEFAULT_TOLERANCE, getPendingBuilderMethods, solveConstraints } from './registry';
+import { DEFAULT_TOLERANCE, getConstraintDef, getPendingBuilderMethods, solveConstraints } from './registry';
 import { ConstraintSketch, solveConstraintDefinition } from './sketch';
 
 const toRad = (deg: number): number => (deg * Math.PI) / 180;
@@ -37,6 +37,8 @@ export class ConstrainedSketchBuilder {
   private constraints: SketchConstraint[] = [];
   private loops: SketchLoop[] = [];
   private rejectedConstraints: SketchConstraint[] = [];
+  /** Maps rejected constraint ID → human-readable reason string. */
+  private rejectionReasons = new Map<string, string>();
   private cursor: PointId | null = null;
   private loopStart: PointId | null = null;
   private nextId = 1;
@@ -190,14 +192,15 @@ export class ConstrainedSketchBuilder {
     const def = this.buildDefinition(next);
     const { maxError } = solveConstraints(def, { iterations: 30, tolerance: DEFAULT_TOLERANCE });
     if (maxError > DEFAULT_TOLERANCE * 5) {
+      // Build a human-readable rejection reason: show constraint params,
+      // the maxError, and which existing constraint has the highest residual
+      // (the likely "blame" — often it's not the new constraint at all).
+      const reason = buildRejectionReason(next, def, maxError);
       if (this.strict) {
-        throw new Error(
-          `Constraint rejected (over-constrained or conflicting): type="${constraint.type}" maxError=${maxError.toFixed(4)}. `
-          + `The sketch already has ${this.constraints.length} constraint(s). `
-          + `Remove a conflicting constraint or relax the geometry.`,
-        );
+        throw new Error(reason);
       }
       this.rejectedConstraints.push(next);
+      this.rejectionReasons.set(next.id, reason);
       return this;
     }
     if (next.type === 'fixed') {
@@ -405,6 +408,11 @@ export class ConstrainedSketchBuilder {
     return this.constrain({ type: 'shapeEqualCentroid', a, b } as Omit<SketchConstraint, 'id'>);
   }
 
+  /** Constrain the unsigned angle between two lines (accepts both orientations). */
+  angleBetween(a: LineId, b: LineId, value: number): this {
+    return this.constrain({ type: 'angleBetween', a, b, value } as Omit<SketchConstraint, 'id'>);
+  }
+
   /** Enforce counter-clockwise winding on a polygon defined by its vertices. */
   ccw(...points: PointId[]): this {
     return this.constrain({ type: 'ccw', points } as Omit<SketchConstraint, 'id'>);
@@ -439,6 +447,7 @@ export class ConstrainedSketchBuilder {
       }),
       constraints: extraConstraint ? [...this.constraints, extraConstraint] : [...this.constraints],
       rejectedConstraints: [...this.rejectedConstraints],
+      rejectionReasons: new Map(this.rejectionReasons),
     };
   }
 
@@ -566,6 +575,58 @@ export class ConstrainedSketchBuilder {
 
     return { points: pointMap, lines: lineMap };
   }
+}
+
+/**
+ * Build a human-readable rejection reason string.
+ * Includes the constraint params, the maxError after test-solve, and the
+ * "blame" — the existing constraint with the highest residual (which may
+ * be the real culprit, not the newly added one).
+ */
+function buildRejectionReason(
+  constraint: SketchConstraint,
+  def: ConstraintDefinition,
+  maxError: number,
+): string {
+  // Summarise the constraint's own params (type + any value/entity refs).
+  const params = Object.entries(constraint)
+    .filter(([k]) => k !== 'id' && k !== 'type')
+    .map(([k, v]) => `${k}=${typeof v === 'number' ? (v as number).toFixed(2) : v}`)
+    .join(', ');
+
+  // Find the existing constraint with the highest individual error (the "blame").
+  // We do a quick single-pass solve to read per-constraint errors.
+  const points = new Map(def.points.map((p) => [p.id, p] as const));
+  const lines = new Map(def.lines.map((l) => [l.id, l] as const));
+  const circles = new Map(def.circles.map((c) => [c.id, c] as const));
+  const arcs = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
+  const shapes = new Map((def.shapes ?? []).map((s) => [s.id, s] as const));
+  const ctx: import('./types').SolverContext = {
+    points, lines, circles, arcs, shapes,
+    tolerance: DEFAULT_TOLERANCE,
+    movePoint: () => false,
+  };
+
+  let blameType = '';
+  let blameId = '';
+  let blameError = 0;
+  for (const c of def.constraints) {
+    const cdef = getConstraintDef(c.type);
+    if (!cdef?.residual) continue;
+    const res = cdef.residual(c as never, ctx);
+    const err = Math.max(...res.map(Math.abs), 0);
+    if (err > blameError) {
+      blameError = err;
+      blameType = c.type;
+      blameId = c.id;
+    }
+  }
+
+  let reason = `${constraint.type}(${params}): maxError=${maxError.toFixed(4)}`;
+  if (blameId && blameId !== constraint.id && blameError > DEFAULT_TOLERANCE) {
+    reason += ` — highest residual from ${blameType} (${blameId}, err=${blameError.toFixed(4)})`;
+  }
+  return reason;
 }
 
 export function constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder {
