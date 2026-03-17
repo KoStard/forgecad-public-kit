@@ -5,6 +5,7 @@ import { getWasm } from '../../kernel';
 import type {
   ConstraintDefinition,
   SketchConstraintMeta,
+  SolverContext,
   SketchPoint,
   SolveOptions,
 } from './types';
@@ -12,6 +13,7 @@ import {
   DEFAULT_TOLERANCE,
   buildConstraintDisplays,
   computeStatus,
+  getConstraintDef,
   solveConstraints,
   setConstraintValue,
 } from './registry';
@@ -311,11 +313,36 @@ export const solveConstraintDefinition = (
   const working = cloneDefinition(def);
   const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
   const { maxError } = solveConstraints(working, options);
-  const status = computeStatus(working, maxError, tolerance);
+  const { status, dof } = computeStatus(working, maxError, tolerance);
+  // Conflicting = solver couldn't converge (genuinely incompatible constraints).
   const conflicts = new Set<string>(
-    status === 'over' ? working.constraints.map((c) => c.id) : [],
+    maxError > tolerance * 5 ? working.constraints.map((c) => c.id) : [],
   );
-  const constraints = buildConstraintDisplays(working, conflicts);
+  // Redundant = solver converged but DOF is negative.
+  // For each constraint: solve without it from the original (pre-solve) positions, then check
+  // if that constraint's residual is still ~0. If yes, the other constraints already force it.
+  const redundant = new Set<string>();
+  if (dof < 0 && maxError <= tolerance * 5) {
+    for (const c of def.constraints) {
+      const cdef = getConstraintDef(c.type);
+      if (!cdef?.residual) continue;
+      const testDef = cloneDefinition(def);
+      testDef.constraints = testDef.constraints.filter((tc) => tc.id !== c.id);
+      solveConstraints(testDef, { iterations: options.iterations, tolerance });
+      const testCtx: SolverContext = {
+        points: new Map(testDef.points.map((p) => [p.id, p] as const)),
+        lines: new Map(testDef.lines.map((l) => [l.id, l] as const)),
+        circles: new Map(testDef.circles.map((ci) => [ci.id, ci] as const)),
+        arcs: new Map((testDef.arcs ?? []).map((a) => [a.id, a] as const)),
+        shapes: new Map((testDef.shapes ?? []).map((s) => [s.id, s] as const)),
+        tolerance,
+        movePoint: () => false,
+      };
+      const res = cdef.residual(c as never, testCtx);
+      if (Math.max(...res.map(Math.abs)) < tolerance) redundant.add(c.id);
+    }
+  }
+  const constraints = buildConstraintDisplays(working, conflicts, redundant);
   const rejected = buildConstraintDisplays(
     { ...working, constraints: working.rejectedConstraints, rejectedConstraints: [] },
     new Set(working.rejectedConstraints.map((c) => c.id)),
@@ -325,7 +352,7 @@ export const solveConstraintDefinition = (
   const edges = buildEdgeGeometry(working);
   return new ConstraintSketch(
     sketch.cross,
-    { status, maxError, constraints, rejected, construction, edges },
+    { status, dof, maxError, constraints, rejected, construction, edges },
     working,
   );
 };

@@ -298,6 +298,7 @@ export const solveConstraints = (
 export const buildConstraintDisplays = (
   def: ConstraintDefinition,
   conflictingIds: Set<string>,
+  redundantIds: Set<string> = new Set(),
 ): ConstraintDisplay[] => {
   const ctx: DisplayContext = {
     points: new Map(def.points.map((p) => [p.id, p] as const)),
@@ -321,6 +322,7 @@ export const buildConstraintDisplays = (
       value: getConstraintValue(constraint),
       isDimension: isDimensionConstraint(constraint.type),
       isConflicting: conflictingIds.has(constraint.id),
+      isRedundant: redundantIds.has(constraint.id),
     };
   });
 };
@@ -331,10 +333,7 @@ export const computeStatus = (
   def: ConstraintDefinition,
   maxError: number,
   tolerance: number,
-): 'under' | 'fully' | 'over' => {
-  // Conflict/over-constraint: solver failed to satisfy the constraints.
-  if (maxError > tolerance * 5) return 'over';
-
+): { status: 'under' | 'fully' | 'over'; dof: number } => {
   // Free variables: each non-fixed point contributes 2 (x, y);
   // each non-fixedRadius circle contributes 1 (radius);
   // each arc contributes 1 (radius) but its implicit constraints remove 2,
@@ -352,7 +351,11 @@ export const computeStatus = (
   }, 0);
 
   const dof = freeVars - constraintEqs;
-  if (dof > 0) return 'under';
-  if (dof < 0) return 'over';
-  return 'fully';
+
+  // Conflict/over-constraint: solver failed to satisfy the constraints.
+  if (maxError > tolerance * 5) return { status: 'over', dof };
+  if (dof > 0) return { status: 'under', dof };
+  if (dof < 0) return { status: 'over', dof };
+  return { status: 'fully', dof: 0 };
 };
+

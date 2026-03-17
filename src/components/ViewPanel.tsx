@@ -782,7 +782,14 @@ export function ViewPanel() {
         <div style={sectionStyle}>
           <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>Constraints</span>
-            <span style={{ fontSize: 11, color: constraintStatusColor }}>{constraintMeta.status}</span>
+            <span style={{ fontSize: 11, color: constraintStatusColor }}>
+              {constraintMeta.status}
+              {constraintMeta.dof !== 0 && (
+                <span style={{ marginLeft: 4, opacity: 0.75 }}>
+                  {constraintMeta.dof > 0 ? `+${constraintMeta.dof}` : constraintMeta.dof}
+                </span>
+              )}
+            </span>
           </div>
           {constraintMeta.constraints.length === 0 && (
             <div style={{ fontSize: 12, color: 'var(--fc-textDim)', padding: '6px 0' }}>No constraints in this sketch</div>
@@ -798,10 +805,10 @@ export function ViewPanel() {
                 border: '1px solid var(--fc-borderLight)',
                 borderRadius: 6,
                 marginBottom: 6,
-                background: constraint.isConflicting ? 'var(--fc-errorBg)' : 'var(--fc-bgOverlay)',
+                background: constraint.isConflicting ? 'var(--fc-errorBg)' : constraint.isRedundant ? 'rgba(250,173,20,0.12)' : 'var(--fc-bgOverlay)',
               }}
             >
-              <span style={{ fontSize: 11, color: constraint.isConflicting ? 'var(--fc-error)' : 'var(--fc-text)', width: 48 }}>
+              <span style={{ fontSize: 11, color: constraint.isConflicting ? 'var(--fc-error)' : constraint.isRedundant ? '#faad14' : 'var(--fc-text)', width: 48 }}>
                 {constraint.label}
               </span>
               {constraint.isDimension && constraint.value !== undefined ? (

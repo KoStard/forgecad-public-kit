@@ -66,11 +66,17 @@ export interface ConstraintDisplay {
   position: [number, number];
   value?: number;
   isDimension: boolean;
+  /** True when the solver failed to satisfy this constraint (genuinely conflicting geometry). */
   isConflicting: boolean;
+  /** True when this constraint is mathematically redundant — it duplicates an equation already
+   * provided by another constraint, making the DOF count negative even though the solver converges. */
+  isRedundant: boolean;
 }
 
 export interface SketchConstraintMeta {
   status: 'under' | 'fully' | 'over';
+  /** Net degrees of freedom: positive = under-constrained, 0 = fully, negative = over-constrained. */
+  dof: number;
   maxError: number;
   constraints: ConstraintDisplay[];
   rejected: ConstraintDisplay[];
