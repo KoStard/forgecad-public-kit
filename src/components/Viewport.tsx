@@ -2273,10 +2273,21 @@ function SketchObject({
         />
       ))}
       {edgeLines.points.map((pt) => (
-        <mesh key={`ep-${pt.id}`} position={[pt.pos[0], pt.pos[1], 0.05]}>
-          <sphereGeometry args={[2, 8, 4]} />
-          <meshBasicMaterial color="#ffffff" />
-        </mesh>
+        <Html
+          key={`ep-${pt.id}`}
+          position={[pt.pos[0], pt.pos[1], 0.05]}
+          center
+          zIndexRange={[0, 0]}
+          style={{ pointerEvents: 'none' }}
+        >
+          <div style={{
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: '#ffffff',
+            boxShadow: '0 0 2px #000',
+          }} />
+        </Html>
       ))}
       {hitPlaneBounds && (
         <mesh position={[hitPlaneBounds.cx, hitPlaneBounds.cy, -0.02]}>
