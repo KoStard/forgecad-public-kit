@@ -423,10 +423,10 @@ interface SketchConstraintMeta {
 			];
 			radius: number;
 		}[];
-		points: [
-			number,
-			number
-		][];
+		points: {
+			id: string;
+			pos: [number, number];
+		}[];
 	};
 }
 interface ConstraintDefinition {
