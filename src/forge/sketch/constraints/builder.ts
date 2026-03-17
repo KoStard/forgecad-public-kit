@@ -290,6 +290,11 @@ export class ConstrainedSketchBuilder {
     return this.constrain({ type: 'pointOnCircle', point, circle } as Omit<SketchConstraint, 'id'>);
   }
 
+  /** Constrain a point to lie on a bounded line segment (not its infinite extension). */
+  pointOnLine(point: PointId, line: LineId): this {
+    return this.constrain({ type: 'pointOnLine', point, line } as Omit<SketchConstraint, 'id'>);
+  }
+
   /** Constrain the distance between two points. */
   distance(a: PointId, b: PointId, value: number): this {
     return this.constrain({ type: 'distance', a, b, value } as Omit<SketchConstraint, 'id'>);
