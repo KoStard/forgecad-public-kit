@@ -12,6 +12,7 @@ registerConstraint<'horizontal', ConstraintTypeMap['horizontal']>({
   type: 'horizontal',
   label: 'H',
   isDimension: false,
+  equations: 1,
 
   displayPosition(c, { lines, points }) {
     const line = lines.get(c.line);
@@ -36,6 +37,15 @@ registerConstraint<'horizontal', ConstraintTypeMap['horizontal']>({
     if (!a.fixed) a.y = y;
     if (!b.fixed) b.y = y;
     return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return [0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0];
+    return [b.y - a.y];
   },
 
   computeDof(c, { refCount, lines }) {

@@ -12,6 +12,7 @@ registerConstraint<'vDistance', ConstraintTypeMap['vDistance']>({
   type: 'vDistance',
   label: 'VD',
   isDimension: true,
+  equations: 1,
 
   displayPosition(c, { points }) {
     const a = points.get(c.a);
@@ -37,6 +38,13 @@ registerConstraint<'vDistance', ConstraintTypeMap['vDistance']>({
       b.y = midY + c.value / 2;
     }
     return err;
+  },
+
+
+  residual(c, { points }) {
+    const a = points.get(c.a); const b = points.get(c.b);
+    if (!a || !b) return [0];
+    return [b.y - a.y - c.value];
   },
 
   computeDof(c, { refCount }) {

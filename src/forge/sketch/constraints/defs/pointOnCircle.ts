@@ -11,6 +11,7 @@ registerConstraint<'pointOnCircle', ConstraintTypeMap['pointOnCircle']>({
   type: 'pointOnCircle',
   label: 'POC',
   isDimension: false,
+  equations: 1,
 
   displayPosition(c, { points }) {
     const pt = points.get(c.point);
@@ -37,6 +38,15 @@ registerConstraint<'pointOnCircle', ConstraintTypeMap['pointOnCircle']>({
       center.y = pt.y - (dy / dist) * circle.radius;
     }
     return err;
+  },
+
+
+  residual(c, { points, circles }) {
+    const pt = points.get(c.point); const circle = circles.get(c.circle);
+    if (!pt || !circle) return [0];
+    const center = points.get(circle.center);
+    if (!center) return [0];
+    return [Math.hypot(pt.x - center.x, pt.y - center.y) - circle.radius];
   },
 
   computeDof(c, { refCount }) {

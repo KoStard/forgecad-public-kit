@@ -12,6 +12,7 @@ registerConstraint<'symmetric', ConstraintTypeMap['symmetric']>({
   type: 'symmetric',
   label: 'SYM',
   isDimension: false,
+  equations: 2,
 
   displayPosition(c, { points }) {
     const a = points.get(c.a);
@@ -41,6 +42,22 @@ registerConstraint<'symmetric', ConstraintTypeMap['symmetric']>({
       b.x = ra[0]; b.y = ra[1];
     }
     return err;
+  },
+
+
+  residual(c, { points, lines }) {
+    const a = points.get(c.a); const b = points.get(c.b);
+    const axis = lines.get(c.axis);
+    if (!a || !b || !axis) return [0, 0];
+    const ax1 = points.get(axis.a); const ax2 = points.get(axis.b);
+    if (!ax1 || !ax2) return [0, 0];
+    // Reflect a across axis
+    const dx = ax2.x - ax1.x; const dy = ax2.y - ax1.y;
+    const len2 = dx * dx + dy * dy || 1;
+    const t = ((a.x - ax1.x) * dx + (a.y - ax1.y) * dy) / len2;
+    const px = ax1.x + t * dx; const py = ax1.y + t * dy;
+    const rx = 2 * px - a.x; const ry = 2 * py - a.y;
+    return [b.x - rx, b.y - ry];
   },
 
   computeDof(c, { refCount }) {

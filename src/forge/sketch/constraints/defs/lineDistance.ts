@@ -15,6 +15,7 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
   type: 'lineDistance',
   label: 'LDIST',
   isDimension: true,
+  equations: 2,
 
   displayPosition(c, { lines, points }) {
     const lineA = lines.get(c.a);
@@ -84,6 +85,27 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
       if (!a2.fixed) { a2.x -= nx * shift; a2.y -= ny * shift; }
     }
     return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return [0, 0];
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return [0, 0];
+    const dax = a2.x - a1.x; const day = a2.y - a1.y;
+    const dbx = b2.x - b1.x; const dby = b2.y - b1.y;
+    const lenA = Math.hypot(dax, day) || 1;
+    const lenB = Math.hypot(dbx, dby) || 1;
+    // 1) Parallel: cross of unit directions = 0
+    const parallel = (dax / lenA) * (dby / lenB) - (day / lenA) * (dbx / lenB);
+    // 2) Signed perpendicular distance from midpoint of b to line a = value
+    const nx = -day / lenA; const ny = dax / lenA;
+    const midBx = (b1.x + b2.x) / 2; const midBy = (b1.y + b2.y) / 2;
+    const midAx = (a1.x + a2.x) / 2; const midAy = (a1.y + a2.y) / 2;
+    const dist = (midBx - midAx) * nx + (midBy - midAy) * ny;
+    return [parallel, dist - c.value];
   },
 
   computeDof(c, { refCount, lines }) {

@@ -12,6 +12,7 @@ registerConstraint<'tangent', ConstraintTypeMap['tangent']>({
   type: 'tangent',
   label: 'TAN',
   isDimension: false,
+  equations: 1,
 
   displayPosition(c, { lines, circles, points }) {
     if (c.line && c.circle) {
@@ -92,6 +93,29 @@ registerConstraint<'tangent', ConstraintTypeMap['tangent']>({
     }
 
     return 0;
+  },
+
+
+  residual(c, { lines, circles, points }) {
+    if (c.line && c.circle) {
+      const line = lines.get(c.line); const circle = circles.get(c.circle);
+      if (!line || !circle) return [0];
+      const a = points.get(line.a); const b = points.get(line.b);
+      const center = points.get(circle.center);
+      if (!a || !b || !center) return [0];
+      const dx = b.x - a.x; const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const dist = ((center.x - a.x) * (-dy) + (center.y - a.y) * dx) / len;
+      return [Math.abs(dist) - circle.radius];
+    }
+    if (c.a && c.b) {
+      const c1 = circles.get(c.a); const c2 = circles.get(c.b);
+      if (!c1 || !c2) return [0];
+      const p1 = points.get(c1.center); const p2 = points.get(c2.center);
+      if (!p1 || !p2) return [0];
+      return [Math.hypot(p2.x - p1.x, p2.y - p1.y) - (c1.radius + c2.radius)];
+    }
+    return [0];
   },
 
   computeDof(_c, _ctx) {

@@ -1,10 +1,12 @@
 import type {
+  ArcId,
   CircleId,
   ConstraintBuilderMethods,
   ConstraintDefinition,
   LineId,
   PointId,
   ShapeId,
+  SketchArc,
   SketchCircle,
   SketchConstraint,
   SketchLine,
@@ -30,6 +32,7 @@ export class ConstrainedSketchBuilder {
   private points: SketchPoint[] = [];
   private lines: SketchLine[] = [];
   private circles: SketchCircle[] = [];
+  private arcs: SketchArc[] = [];
   private shapes: SketchShape[] = [];
   private constraints: SketchConstraint[] = [];
   private loops: SketchLoop[] = [];
@@ -94,16 +97,16 @@ export class ConstrainedSketchBuilder {
     const id = this.point(x, y);
     this.cursor = id;
     this.loopStart = id;
-    this.loops.push({ type: 'poly', points: [id] });
+    this.loops.push({ type: 'profile', segments: [] });
     return this;
   }
 
   lineTo(x: number, y: number): this {
     if (!this.cursor) return this.moveTo(x, y);
     const id = this.point(x, y);
-    this.line(this.cursor, id);
+    const lineId = this.line(this.cursor, id);
     const loop = this.loops[this.loops.length - 1];
-    if (loop && loop.type === 'poly') loop.points.push(id);
+    if (loop?.type === 'profile') loop.segments.push({ kind: 'line', line: lineId });
     this.cursor = id;
     return this;
   }
@@ -127,9 +130,41 @@ export class ConstrainedSketchBuilder {
     return this.lineTo(cursorPt.x + Math.cos(rad) * length, cursorPt.y + Math.sin(rad) * length);
   }
 
+  /**
+   * Draw a circular arc from the current cursor position to (x, y) with the given radius.
+   * If `clockwise` is true the arc sweeps clockwise; otherwise counter-clockwise.
+   * The arc center is computed automatically.
+   */
+  arcTo(x: number, y: number, radius: number, clockwise = false): this {
+    if (!this.cursor) return this.moveTo(x, y);
+    const endId = this.point(x, y);
+    const arcId = this.addArc(this.cursor, endId, radius, clockwise);
+    const loop = this.loops[this.loops.length - 1];
+    if (loop?.type === 'profile') loop.segments.push({ kind: 'arc', arc: arcId });
+    this.cursor = endId;
+    return this;
+  }
+
+  /**
+   * Create an arc from an explicit center point.
+   * `start` and `end` are existing PointIds that must lie on the arc's circle.
+   * Returns the ArcId. Does NOT advance the cursor.
+   */
+  arcByCenter(centerId: PointId, startId: PointId, endId: PointId, clockwise = false): ArcId {
+    const center = this.getPoint(centerId);
+    const start = this.getPoint(startId);
+    if (!center || !start) throw new Error('arcByCenter: invalid point IDs');
+    const radius = Math.hypot(start.x - center.x, start.y - center.y);
+    const id: ArcId = `arc-${this.nextId++}`;
+    this.arcs.push({ id, center: centerId, start: startId, end: endId, radius, clockwise, construction: false });
+    return id;
+  }
+
   close(): this {
     if (!this.cursor || !this.loopStart || this.cursor === this.loopStart) return this;
-    this.line(this.cursor, this.loopStart);
+    const lineId = this.line(this.cursor, this.loopStart);
+    const loop = this.loops[this.loops.length - 1];
+    if (loop?.type === 'profile') loop.segments.push({ kind: 'line', line: lineId });
     this.cursor = this.loopStart;
     return this;
   }
@@ -301,6 +336,29 @@ export class ConstrainedSketchBuilder {
     return this.constrain({ type: 'lineDistance', a, b, value } as Omit<SketchConstraint, 'id'>);
   }
 
+  /** Constrain the absolute angle of a line from the positive X-axis (degrees). */
+  absoluteAngle(line: LineId, value: number): this {
+    return this.constrain({ type: 'absoluteAngle', line, value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain two circles to have equal radii. */
+  equalRadius(a: CircleId, b: CircleId): this {
+    return this.constrain({ type: 'equalRadius', a, b } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the arc length of an arc (radius × sweep angle). */
+  arcLength(arc: ArcId, value: number): this {
+    return this.constrain({ type: 'arcLength', arc, value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /**
+   * Constrain a line to be tangent to an arc at the arc's start (`atStart=true`) or end point.
+   * Combine with `coincident` to enforce the shared endpoint.
+   */
+  lineTangentArc(line: LineId, arc: ArcId, atStart: boolean): this {
+    return this.constrain({ type: 'lineTangentArc', line, arc, atStart } as Omit<SketchConstraint, 'id'>);
+  }
+
   // ─── Loop helpers ──────────────────────────────────────────────────────────
 
   /**
@@ -321,12 +379,13 @@ export class ConstrainedSketchBuilder {
       points: this.points.map((p) => ({ ...p })),
       lines: this.lines.map((l) => ({ ...l })),
       circles: this.circles.map((c) => ({ ...c })),
+      arcs: this.arcs.map((a) => ({ ...a })),
       shapes: this.shapes.map((s) => ({ ...s, lines: [...s.lines] })),
-      loops: this.loops.map((loop) =>
-        loop.type === 'poly'
-          ? { type: 'poly', points: [...loop.points] }
-          : { type: 'circle', circle: loop.circle },
-      ),
+      loops: this.loops.map((loop) => {
+        if (loop.type === 'poly') return { type: 'poly', points: [...loop.points] };
+        if (loop.type === 'circle') return { type: 'circle', circle: loop.circle };
+        return { type: 'profile', segments: loop.segments.map((s) => ({ ...s })) };
+      }),
       constraints: extraConstraint ? [...this.constraints, extraConstraint] : [...this.constraints],
       rejectedConstraints: [...this.rejectedConstraints],
     };
@@ -335,6 +394,30 @@ export class ConstrainedSketchBuilder {
   private getPoint(id: PointId | null): SketchPoint | null {
     if (!id) return null;
     return this.points.find((p) => p.id === id) ?? null;
+  }
+
+  /** Compute arc center from start/end points, radius, and clockwise flag; create the arc entity. */
+  private addArc(startId: PointId, endId: PointId, radius: number, clockwise: boolean): ArcId {
+    const start = this.getPoint(startId)!;
+    const end = this.getPoint(endId)!;
+    const mx = (start.x + end.x) / 2;
+    const my = (start.y + end.y) / 2;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    const r = Math.max(radius, d / 2 + 1e-9); // clamp to minimum viable radius
+    const h = Math.sqrt(r * r - (d / 2) * (d / 2));
+    // Left-perpendicular of (start→end):
+    const px = -dy / d;
+    const py = dx / d;
+    // CCW → center left of direction; CW → center right.
+    const sign = clockwise ? -1 : 1;
+    const cx = mx + sign * h * px;
+    const cy = my + sign * h * py;
+    const centerId = this.point(cx, cy);
+    const id: ArcId = `arc-${this.nextId++}`;
+    this.arcs.push({ id, center: centerId, start: startId, end: endId, radius: r, clockwise, construction: false });
+    return id;
   }
 
   /** Import a Point2D, returning its PointId */

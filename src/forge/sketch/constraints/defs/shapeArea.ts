@@ -12,6 +12,7 @@ registerConstraint<'shapeArea', ConstraintTypeMap['shapeArea']>({
   type: 'shapeArea',
   label: 'AREA',
   isDimension: true,
+  equations: 1,
 
   displayPosition(c, { shapes, lines, points }) {
     const shape = shapes.get(c.shape);

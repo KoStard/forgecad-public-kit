@@ -12,6 +12,7 @@ registerConstraint<'shapeHeight', ConstraintTypeMap['shapeHeight']>({
   type: 'shapeHeight',
   label: 'H',
   isDimension: true,
+  equations: 1,
 
   displayPosition(c, { shapes, lines, points }) {
     const shape = shapes.get(c.shape);

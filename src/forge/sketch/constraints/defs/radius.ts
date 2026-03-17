@@ -11,6 +11,7 @@ registerConstraint<'radius', ConstraintTypeMap['radius']>({
   type: 'radius',
   label: 'R',
   isDimension: true,
+  equations: 1,
 
   displayPosition(c, { circles, points }) {
     const circle = circles.get(c.circle);
@@ -28,6 +29,13 @@ registerConstraint<'radius', ConstraintTypeMap['radius']>({
     if (err <= tolerance) return err;
     if (!circle.fixedRadius) circle.radius = c.value;
     return err;
+  },
+
+
+  residual(c, { circles }) {
+    const circle = circles.get(c.circle);
+    if (!circle) return [0];
+    return [circle.radius - c.value];
   },
 
   computeDof(_c, _ctx) {

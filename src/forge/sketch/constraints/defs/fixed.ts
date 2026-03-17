@@ -11,6 +11,7 @@ registerConstraint<'fixed', ConstraintTypeMap['fixed']>({
   type: 'fixed',
   label: 'FIX',
   isDimension: false,
+  equations: 0,
 
   displayPosition(c, { points }) {
     const pt = points.get(c.point);
@@ -29,6 +30,11 @@ registerConstraint<'fixed', ConstraintTypeMap['fixed']>({
   solve(_c, _ctx) {
     // Applied in presolve — nothing to do per-iteration
     return 0;
+  },
+
+
+  residual(_c, _ctx) {
+    return []; // Point is pinned via presolve — no residual equations
   },
 
   computeDof(c, { refCount }) {

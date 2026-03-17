@@ -12,6 +12,7 @@ registerConstraint<'shapeCentroidX', ConstraintTypeMap['shapeCentroidX']>({
   type: 'shapeCentroidX',
   label: 'CX',
   isDimension: true,
+  equations: 1,
 
   displayPosition(c, { shapes, lines, points }) {
     const shape = shapes.get(c.shape);

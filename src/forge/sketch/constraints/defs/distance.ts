@@ -12,6 +12,7 @@ registerConstraint<'distance', ConstraintTypeMap['distance']>({
   type: 'distance',
   label: 'DIST',
   isDimension: true,
+  equations: 1,
 
   displayPosition(c, { points }) {
     const a = points.get(c.a);
@@ -39,6 +40,13 @@ registerConstraint<'distance', ConstraintTypeMap['distance']>({
       b.x = mid[0] + dir[0] * c.value / 2; b.y = mid[1] + dir[1] * c.value / 2;
     }
     return err;
+  },
+
+
+  residual(c, { points }) {
+    const a = points.get(c.a); const b = points.get(c.b);
+    if (!a || !b) return [0];
+    return [Math.hypot(b.x - a.x, b.y - a.y) - c.value];
   },
 
   computeDof(c, { refCount }) {

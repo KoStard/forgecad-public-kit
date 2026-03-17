@@ -12,6 +12,7 @@ registerConstraint<'concentric', ConstraintTypeMap['concentric']>({
   type: 'concentric',
   label: 'CONC',
   isDimension: false,
+  equations: 2,
 
   displayPosition(c, { circles, points }) {
     const c1 = circles.get(c.a);
@@ -46,6 +47,15 @@ registerConstraint<'concentric', ConstraintTypeMap['concentric']>({
       p2.x = mid[0]; p2.y = mid[1];
     }
     return err;
+  },
+
+
+  residual(c, { circles, points }) {
+    const c1 = circles.get(c.a); const c2 = circles.get(c.b);
+    if (!c1 || !c2) return [0, 0];
+    const p1 = points.get(c1.center); const p2 = points.get(c2.center);
+    if (!p1 || !p2) return [0, 0];
+    return [p2.x - p1.x, p2.y - p1.y];
   },
 
   computeDof(_c, _ctx) {

@@ -1,7 +1,23 @@
 export type PointId = string;
 export type LineId = string;
 export type CircleId = string;
+export type ArcId = string;
 export type ShapeId = string;
+
+export interface SketchArc {
+  id: ArcId;
+  /** Center point of the arc's circle. */
+  center: PointId;
+  /** Point on the arc where it begins. Must lie on the circle. */
+  start: PointId;
+  /** Point on the arc where it ends. Must lie on the circle. */
+  end: PointId;
+  /** Current solved radius — kept consistent with |center–start| and |center–end| by the solver. */
+  radius: number;
+  /** True → arc sweeps clockwise from start to end; false → counter-clockwise. */
+  clockwise: boolean;
+  construction: boolean;
+}
 
 export interface SketchShape {
   id: ShapeId;
@@ -32,9 +48,16 @@ export interface SketchCircle {
   segments: number;
 }
 
+/** A segment in a mixed line/arc profile loop. */
+export type ProfileSegment =
+  | { kind: 'line'; line: LineId }
+  | { kind: 'arc'; arc: ArcId };
+
 export type SketchLoop =
   | { type: 'poly'; points: PointId[] }
-  | { type: 'circle'; circle: CircleId };
+  | { type: 'circle'; circle: CircleId }
+  /** Mixed profile of line and arc segments forming a closed loop. */
+  | { type: 'profile'; segments: ProfileSegment[] };
 
 export interface ConstraintDisplay {
   id: string;
@@ -59,6 +82,7 @@ export interface SketchConstraintMeta {
   edges: {
     lines: { a: [number, number]; b: [number, number] }[];
     circles: { center: [number, number]; radius: number }[];
+    arcs: { center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
     points: [number, number][];
   };
 }
@@ -67,6 +91,7 @@ export interface ConstraintDefinition {
   points: SketchPoint[];
   lines: SketchLine[];
   circles: SketchCircle[];
+  arcs: SketchArc[];
   shapes: SketchShape[];
   loops: SketchLoop[];
   constraints: SketchConstraint[];
@@ -99,6 +124,7 @@ export interface SolverContext {
   points: Map<PointId, SketchPoint>;
   lines: Map<LineId, SketchLine>;
   circles: Map<CircleId, SketchCircle>;
+  arcs: Map<ArcId, SketchArc>;
   shapes: Map<ShapeId, SketchShape>;
   tolerance: number;
   movePoint: (pt: SketchPoint, dx: number, dy: number) => boolean;
@@ -108,6 +134,7 @@ export interface DisplayContext {
   points: Map<PointId, SketchPoint>;
   lines: Map<LineId, SketchLine>;
   circles: Map<CircleId, SketchCircle>;
+  arcs: Map<ArcId, SketchArc>;
   shapes: Map<ShapeId, SketchShape>;
 }
 
@@ -123,9 +150,22 @@ export interface ConstraintDef<TType extends string = string, TData extends obje
   type: TType;
   label: string;
   isDimension: boolean;
+  /**
+   * Number of independent constraint equations this constraint provides.
+   * Used for proper DOF arithmetic: DOF = freeVars - sum(equations).
+   * Examples: coincident=2, horizontal=1, fixed=0 (point already pinned via pt.fixed).
+   */
+  equations?: number;
   /** Optional pre-solve hook called once before the iteration loop (used by 'fixed'). */
   presolve?: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => void;
   solve: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => number;
+  /**
+   * Optional residual vector for the Newton-Raphson solver.
+   * Return an array of values that should all be 0 when the constraint is satisfied.
+   * The length must match `equations`. When defined for all active constraints, the
+   * NR solver is used instead of Gauss-Seidel, giving order-independent quadratic convergence.
+   */
+  residual?: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => number[];
   displayPosition: (constraint: { id: string; type: TType } & TData, ctx: DisplayContext) => [number, number];
   computeDof: (constraint: { id: string; type: TType } & TData, ctx: DofContext) => void;
 }

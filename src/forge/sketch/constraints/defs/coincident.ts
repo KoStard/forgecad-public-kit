@@ -12,6 +12,7 @@ registerConstraint<'coincident', ConstraintTypeMap['coincident']>({
   type: 'coincident',
   label: 'COINC',
   isDimension: false,
+  equations: 2,
 
   displayPosition(c, { points }) {
     const a = points.get(c.a);
@@ -36,6 +37,14 @@ registerConstraint<'coincident', ConstraintTypeMap['coincident']>({
     a.x = mx; a.y = my;
     b.x = mx; b.y = my;
     return err;
+  },
+
+
+  residual(c, { points }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (!a || !b) return [0, 0];
+    return [b.x - a.x, b.y - a.y];
   },
 
   computeDof(c, { refCount }) {

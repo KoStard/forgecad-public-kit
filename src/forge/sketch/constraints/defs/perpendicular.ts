@@ -12,6 +12,7 @@ registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
   type: 'perpendicular',
   label: 'PERP',
   isDimension: false,
+  equations: 1,
 
   displayPosition(c, { lines, points }) {
     const lineA = lines.get(c.a);
@@ -55,6 +56,21 @@ registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
       b2.x = mid[0] + dir[0] * len / 2; b2.y = mid[1] + dir[1] * len / 2;
     }
     return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return [0];
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return [0];
+    const dax = a2.x - a1.x; const day = a2.y - a1.y;
+    const dbx = b2.x - b1.x; const dby = b2.y - b1.y;
+    const lenA = Math.hypot(dax, day) || 1;
+    const lenB = Math.hypot(dbx, dby) || 1;
+    // Dot product of unit direction vectors = 0 for perpendicular
+    return [(dax / lenA) * (dbx / lenB) + (day / lenA) * (dby / lenB)];
   },
 
   computeDof(c, { refCount, lines }) {

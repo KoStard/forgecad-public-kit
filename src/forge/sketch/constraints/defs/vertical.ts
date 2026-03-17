@@ -12,6 +12,7 @@ registerConstraint<'vertical', ConstraintTypeMap['vertical']>({
   type: 'vertical',
   label: 'V',
   isDimension: false,
+  equations: 1,
 
   displayPosition(c, { lines, points }) {
     const line = lines.get(c.line);
@@ -36,6 +37,15 @@ registerConstraint<'vertical', ConstraintTypeMap['vertical']>({
     if (!a.fixed) a.x = x;
     if (!b.fixed) b.x = x;
     return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return [0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0];
+    return [b.x - a.x];
   },
 
   computeDof(c, { refCount, lines }) {

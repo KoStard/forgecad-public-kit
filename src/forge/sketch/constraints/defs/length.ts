@@ -12,6 +12,7 @@ registerConstraint<'length', ConstraintTypeMap['length']>({
   type: 'length',
   label: 'LEN',
   isDimension: true,
+  equations: 1,
 
   displayPosition(c, { lines, points }) {
     const line = lines.get(c.line);
@@ -44,6 +45,15 @@ registerConstraint<'length', ConstraintTypeMap['length']>({
       b.x = mid[0] + dir[0] * c.value / 2; b.y = mid[1] + dir[1] * c.value / 2;
     }
     return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return [0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0];
+    return [Math.hypot(b.x - a.x, b.y - a.y) - c.value];
   },
 
   computeDof(c, { refCount, lines }) {

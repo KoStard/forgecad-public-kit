@@ -12,6 +12,7 @@ registerConstraint<'collinear', ConstraintTypeMap['collinear']>({
   type: 'collinear',
   label: 'COLL',
   isDimension: false,
+  equations: 1,
 
   displayPosition(c, { points }) {
     const pt = points.get(c.point);
@@ -39,6 +40,18 @@ registerConstraint<'collinear', ConstraintTypeMap['collinear']>({
       if (!b.fixed) movePoint(b, -dx, -dy);
     }
     return err;
+  },
+
+
+  residual(c, { points, lines }) {
+    const pt = points.get(c.point); const line = lines.get(c.line);
+    if (!pt || !line) return [0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0];
+    const dx = b.x - a.x; const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // Signed distance from pt to the infinite line
+    return [((pt.x - a.x) * dy - (pt.y - a.y) * dx) / len];
   },
 
   computeDof(c, { refCount }) {

@@ -12,6 +12,7 @@ registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
   type: 'midpoint',
   label: 'MID',
   isDimension: false,
+  equations: 2,
 
   displayPosition(c, { lines, points }) {
     const line = lines.get(c.line);
@@ -44,6 +45,15 @@ registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
       if (!b.fixed) { b.x += dx; b.y += dy; }
     }
     return err;
+  },
+
+
+  residual(c, { points, lines }) {
+    const pt = points.get(c.point); const line = lines.get(c.line);
+    if (!pt || !line) return [0, 0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0, 0];
+    return [pt.x - (a.x + b.x) / 2, pt.y - (a.y + b.y) / 2];
   },
 
   computeDof(c, { refCount }) {
