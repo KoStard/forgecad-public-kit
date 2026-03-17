@@ -1,6 +1,6 @@
 import type { LineId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
-import { midpoint, angleOfLine, normalizeAngle, distance } from '../helpers';
+import { midpoint, midpointPerp, angleOfLine, normalizeAngle, distance } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -33,15 +33,9 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
 
   displayPosition(c, { lines, points }) {
     const lineA = lines.get(c.a);
-    const lineB = lines.get(c.b);
-    if (lineA && lineB) {
+    if (lineA) {
       const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
-      const b1 = points.get(lineB.a); const b2 = points.get(lineB.b);
-      if (a1 && a2 && b1 && b2) {
-        const midA = midpoint(a1, a2);
-        const midB = midpoint(b1, b2);
-        return [(midA[0] + midB[0]) / 2, (midA[1] + midB[1]) / 2];
-      }
+      if (a1 && a2) return midpointPerp(a1, a2, 3);
     }
     return [0, 0];
   },

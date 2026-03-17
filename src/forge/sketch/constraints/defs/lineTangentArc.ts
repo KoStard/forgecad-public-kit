@@ -30,7 +30,7 @@ registerConstraint<'lineTangentArc', ConstraintTypeMap['lineTangentArc']>({
     if (!line || !arc) return [0, 0];
     const pt = points.get(c.atStart ? arc.start : arc.end);
     if (!pt) return [0, 0];
-    return [pt.x, pt.y];
+    return [pt.x + 2.5, pt.y + 2.5];
   },
 
   solve(c, { lines, arcs, points, tolerance }) {

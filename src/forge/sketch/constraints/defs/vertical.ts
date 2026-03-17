@@ -1,6 +1,6 @@
 import type { LineId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
-import { midpoint } from '../helpers';
+import { midpoint, midpointPerp } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -25,7 +25,7 @@ registerConstraint<'vertical', ConstraintTypeMap['vertical']>({
     if (line) {
       const a = points.get(line.a);
       const b = points.get(line.b);
-      if (a && b) return midpoint(a, b);
+      if (a && b) return midpointPerp(a, b, 3);
     }
     return [0, 0];
   },

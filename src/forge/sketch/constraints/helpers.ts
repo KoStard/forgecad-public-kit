@@ -13,6 +13,15 @@ export const midpoint = (a: SketchPoint, b: SketchPoint): [number, number] => [
   (a.y + b.y) / 2,
 ];
 
+/** Midpoint of a→b offset by `dist` units in the CCW-perpendicular direction. */
+export const midpointPerp = (a: SketchPoint, b: SketchPoint, dist: number): [number, number] => {
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (len < 1e-9) return [mx + dist, my];
+  return [mx - (b.y - a.y) / len * dist, my + (b.x - a.x) / len * dist];
+};
+
 export const lineDirection = (a: SketchPoint, b: SketchPoint): [number, number] => {
   const len = distance(a, b) || 1;
   return [(b.x - a.x) / len, (b.y - a.y) / len];

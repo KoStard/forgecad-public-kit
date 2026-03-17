@@ -2008,36 +2008,19 @@ function SketchObject({
         ? '#4aa3ff'
         : settings.color;
 
-  const constraintSprites = useMemo(() => {
-    if (!obj.sketchMeta) return [] as { id: string; texture: THREE.Texture; position: [number, number, number]; scale: [number, number, number]; }[];
+  const constraintLabels = useMemo(() => {
+    if (!obj.sketchMeta) return [] as { id: string; text: string; position: [number, number, number]; isConflicting: boolean; isRedundant: boolean; }[];
     return obj.sketchMeta.constraints.map((constraint) => {
       const unit = constraint.type === 'angle' ? 'deg' : 'mm';
-      const label = constraint.isDimension && constraint.value !== undefined
+      const text = constraint.isDimension && constraint.value !== undefined
         ? `${constraint.label} ${formatConstraintValue(constraint.value)}${unit}`
         : constraint.label;
-      const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 64;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = constraint.isConflicting ? '#5b1d1d' : '#111111cc';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = constraint.isConflicting ? '#ff4d4f' : '#4aa3ff';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
-        ctx.fillStyle = '#f1f1f1';
-        ctx.font = 'bold 28px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(label, canvas.width / 2, canvas.height / 2 + 2);
-      }
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.needsUpdate = true;
       return {
         id: constraint.id,
-        texture,
+        text,
         position: [constraint.position[0], constraint.position[1], 0.1] as [number, number, number],
-        scale: [20, 5, 1] as [number, number, number],
+        isConflicting: constraint.isConflicting,
+        isRedundant: constraint.isRedundant,
       };
     });
   }, [obj.sketchMeta]);
@@ -2168,10 +2151,26 @@ function SketchObject({
       {constructionCircles.map((circle, i) => (
         <primitive key={`cc-${i}`} object={circle} raycast={() => null} />
       ))}
-      {constraintSprites.map((sprite) => (
-        <sprite key={sprite.id} position={sprite.position} scale={sprite.scale}>
-          <spriteMaterial map={sprite.texture} transparent />
-        </sprite>
+      {constraintLabels.map((lbl) => (
+        <Html
+          key={lbl.id}
+          position={lbl.position}
+          center
+          zIndexRange={[0, 0]}
+          style={{ pointerEvents: 'none' }}
+        >
+          <span style={{
+            fontSize: 10,
+            fontFamily: 'system-ui, sans-serif',
+            fontWeight: 600,
+            color: lbl.isConflicting ? '#ff6b6b' : lbl.isRedundant ? '#faad14' : '#e8e8e8',
+            textShadow: '0 0 3px #000, 0 0 3px #000',
+            whiteSpace: 'nowrap',
+            userSelect: 'none',
+          }}>
+            {lbl.text}
+          </span>
+        </Html>
       ))}
     </group>
   );

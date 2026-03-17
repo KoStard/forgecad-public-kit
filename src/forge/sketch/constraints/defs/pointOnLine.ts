@@ -22,7 +22,7 @@ registerConstraint<'pointOnLine', ConstraintTypeMap['pointOnLine']>({
 
   displayPosition(c, { points }) {
     const pt = points.get(c.point);
-    if (pt) return [pt.x, pt.y];
+    if (pt) return [pt.x + 2.5, pt.y + 2.5];
     return [0, 0];
   },
 
