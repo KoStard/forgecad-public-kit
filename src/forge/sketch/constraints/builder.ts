@@ -191,7 +191,7 @@ export class ConstrainedSketchBuilder {
     const id = `cst-${this.nextId++}`;
     const next = { ...constraint, id } as SketchConstraint;
     const def = this.buildDefinition(next);
-    const { maxError } = decomposeAndSolve(def, { iterations: 30, tolerance: DEFAULT_TOLERANCE });
+    const { maxError } = decomposeAndSolve(def, { iterations: 40, tolerance: DEFAULT_TOLERANCE });
     if (maxError > DEFAULT_TOLERANCE * 5) {
       // Build a human-readable rejection reason: show constraint params,
       // the maxError, and which existing constraint has the highest residual
@@ -203,6 +203,23 @@ export class ConstrainedSketchBuilder {
       this.rejectedConstraints.push(next);
       this.rejectionReasons.set(next.id, reason);
       return this;
+    }
+    // Sync solved positions back into the builder's live entities so that
+    // subsequent constraints start from an already-satisfied configuration.
+    // This is the core bug fix: without this, each new constraint re-solves
+    // from stale initial positions, which can cause drift and false rejections.
+    if (maxError <= DEFAULT_TOLERANCE) {
+      for (let i = 0; i < this.points.length; i++) {
+        this.points[i].x = def.points[i].x;
+        this.points[i].y = def.points[i].y;
+      }
+      for (let i = 0; i < this.circles.length; i++) {
+        this.circles[i].radius = def.circles[i].radius;
+      }
+      const defArcs = def.arcs ?? [];
+      for (let i = 0; i < this.arcs.length; i++) {
+        if (i < defArcs.length) this.arcs[i].radius = defArcs[i].radius;
+      }
     }
     if (next.type === 'fixed') {
       const c = next as unknown as { point: PointId; x: number; y: number };
@@ -217,26 +234,68 @@ export class ConstrainedSketchBuilder {
     return this;
   }
 
+  // ─── Input Entity Resolution ─────────────────────────────────────────────
+  // Each resolve* helper accepts either a bare ID string, a full entity object
+  // with an `id` field, or (for points) an {x, y} coordinate pair that is
+  // auto-imported.  This lets callers pass rich objects from other APIs without
+  // having to manually extract the ID.
+
+  private resolvePointId(p: any): PointId {
+    if (typeof p === 'string') return p;
+    if (p && typeof p === 'object') {
+      if ('id' in p && typeof p.id === 'string') return p.id;
+      if ('x' in p && 'y' in p) return this.importPoint(p);
+    }
+    throw new Error(`Invalid point reference: ${p}`);
+  }
+
+  private resolveLineId(l: any): LineId {
+    if (typeof l === 'string') return l;
+    if (l && typeof l === 'object') {
+      if ('id' in l && typeof l.id === 'string') return l.id;
+      if ('start' in l && 'end' in l) return this.importLine(l);
+    }
+    throw new Error(`Invalid line reference: ${l}`);
+  }
+
+  private resolveCircleId(c: any): CircleId {
+    if (typeof c === 'string') return c;
+    if (c && typeof c === 'object' && 'id' in c && typeof c.id === 'string') return c.id;
+    throw new Error(`Invalid circle reference: ${c}`);
+  }
+
+  private resolveArcId(a: any): ArcId {
+    if (typeof a === 'string') return a;
+    if (a && typeof a === 'object' && 'id' in a && typeof a.id === 'string') return a.id;
+    throw new Error(`Invalid arc reference: ${a}`);
+  }
+
+  private resolveShapeId(s: any): ShapeId {
+    if (typeof s === 'string') return s;
+    if (s && typeof s === 'object' && 'id' in s && typeof s.id === 'string') return s.id;
+    throw new Error(`Invalid shape reference: ${s}`);
+  }
+
   // ─── Ergonomic constraint helpers ────────────────────────────────────────────
 
   /** Constrain a line to be horizontal. */
-  horizontal(line: LineId): this {
-    return this.constrain({ type: 'horizontal', line } as Omit<SketchConstraint, 'id'>);
+  horizontal(line: any): this {
+    return this.constrain({ type: 'horizontal', line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain a line to be vertical. */
-  vertical(line: LineId): this {
-    return this.constrain({ type: 'vertical', line } as Omit<SketchConstraint, 'id'>);
+  vertical(line: any): this {
+    return this.constrain({ type: 'vertical', line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain two lines to be parallel. */
-  parallel(a: LineId, b: LineId): this {
-    return this.constrain({ type: 'parallel', a, b } as Omit<SketchConstraint, 'id'>);
+  parallel(a: any, b: any): this {
+    return this.constrain({ type: 'parallel', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain two lines to be perpendicular. */
-  perpendicular(a: LineId, b: LineId): this {
-    return this.constrain({ type: 'perpendicular', a, b } as Omit<SketchConstraint, 'id'>);
+  perpendicular(a: any, b: any): this {
+    return this.constrain({ type: 'perpendicular', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);
   }
 
   /**
@@ -244,94 +303,99 @@ export class ConstrainedSketchBuilder {
    * - `tangent(line, circle)` — line is tangent to a circle.
    * - `tangent(circleA, circleB)` — two circles are externally tangent.
    */
-  tangent(a: LineId | CircleId, b: CircleId): this {
-    const aIsLine = this.lines.some((l) => l.id === a);
-    if (aIsLine) {
-      return this.constrain({ type: 'tangent', line: a as LineId, circle: b } as Omit<SketchConstraint, 'id'>);
+  tangent(a: any, b: any): this {
+    let aId: string;
+    try {
+      aId = this.resolveLineId(a);
+      if (!this.lines.some(l => l.id === aId)) throw new Error();
+      return this.constrain({ type: 'tangent', line: aId, circle: this.resolveCircleId(b) } as Omit<SketchConstraint, 'id'>);
+    } catch {
+      aId = this.resolveCircleId(a);
+      return this.constrain({ type: 'tangent', a: aId, b: this.resolveCircleId(b) } as Omit<SketchConstraint, 'id'>);
     }
-    return this.constrain({ type: 'tangent', a: a as CircleId, b } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain two lines to have equal length. */
-  equal(a: LineId, b: LineId): this {
-    return this.constrain({ type: 'equal', a, b } as Omit<SketchConstraint, 'id'>);
+  equal(a: any, b: any): this {
+    return this.constrain({ type: 'equal', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain two points to be at the same location. */
-  coincident(a: PointId, b: PointId): this {
-    return this.constrain({ type: 'coincident', a, b } as Omit<SketchConstraint, 'id'>);
+  coincident(a: any, b: any): this {
+    return this.constrain({ type: 'coincident', a: this.resolvePointId(a), b: this.resolvePointId(b) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain two circles to share the same center. */
-  concentric(a: CircleId, b: CircleId): this {
-    return this.constrain({ type: 'concentric', a, b } as Omit<SketchConstraint, 'id'>);
+  concentric(a: any, b: any): this {
+    return this.constrain({ type: 'concentric', a: this.resolveCircleId(a), b: this.resolveCircleId(b) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain a point to lie on an infinite line (collinear). */
-  collinear(point: PointId, line: LineId): this {
-    return this.constrain({ type: 'collinear', point, line } as Omit<SketchConstraint, 'id'>);
+  collinear(point: any, line: any): this {
+    return this.constrain({ type: 'collinear', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain a point to lie on a finite line segment (clamped to the segment's extent). */
-  pointOnLine(point: PointId, line: LineId): this {
-    return this.constrain({ type: 'pointOnLine', point, line } as Omit<SketchConstraint, 'id'>);
+  pointOnLine(point: any, line: any): this {
+    return this.constrain({ type: 'pointOnLine', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain two points to be symmetric about an axis line. */
-  symmetric(a: PointId, b: PointId, axis: LineId): this {
-    return this.constrain({ type: 'symmetric', a, b, axis } as Omit<SketchConstraint, 'id'>);
+  symmetric(a: any, b: any, axis: any): this {
+    return this.constrain({ type: 'symmetric', a: this.resolvePointId(a), b: this.resolvePointId(b), axis: this.resolveLineId(axis) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Fix a point at a specific location (or at its current position if x/y are omitted). */
-  fix(point: PointId, x?: number, y?: number): this {
-    const pt = this.points.find((p) => p.id === point);
-    if (!pt) throw new Error(`fix(): point "${point}" not found in sketch`);
-    return this.constrain({ type: 'fixed', point, x: x ?? pt.x, y: y ?? pt.y } as Omit<SketchConstraint, 'id'>);
+  fix(point: any, x?: number, y?: number): this {
+    const ptId = this.resolvePointId(point);
+    const pt = this.points.find((p) => p.id === ptId);
+    if (!pt) throw new Error(`fix(): point "${ptId}" not found in sketch`);
+    return this.constrain({ type: 'fixed', point: ptId, x: x ?? pt.x, y: y ?? pt.y } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain a point to lie at the midpoint of a line. */
-  midpoint(point: PointId, line: LineId): this {
-    return this.constrain({ type: 'midpoint', point, line } as Omit<SketchConstraint, 'id'>);
+  midpoint(point: any, line: any): this {
+    return this.constrain({ type: 'midpoint', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain a point to lie on the perimeter of a circle. */
-  pointOnCircle(point: PointId, circle: CircleId): this {
-    return this.constrain({ type: 'pointOnCircle', point, circle } as Omit<SketchConstraint, 'id'>);
+  pointOnCircle(point: any, circle: any): this {
+    return this.constrain({ type: 'pointOnCircle', point: this.resolvePointId(point), circle: this.resolveCircleId(circle) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the distance between two points. */
-  distance(a: PointId, b: PointId, value: number): this {
-    return this.constrain({ type: 'distance', a, b, value } as Omit<SketchConstraint, 'id'>);
+  distance(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'distance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the length of a line. */
-  length(line: LineId, value: number): this {
-    return this.constrain({ type: 'length', line, value } as Omit<SketchConstraint, 'id'>);
+  length(line: any, value: number): this {
+    return this.constrain({ type: 'length', line: this.resolveLineId(line), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the angle from line `a` to line `b` (degrees). */
-  angle(a: LineId, b: LineId, value: number): this {
-    return this.constrain({ type: 'angle', a, b, value } as Omit<SketchConstraint, 'id'>);
+  angle(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'angle', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the radius of a circle. */
-  radius(circle: CircleId, value: number): this {
-    return this.constrain({ type: 'radius', circle, value } as Omit<SketchConstraint, 'id'>);
+  radius(circle: any, value: number): this {
+    return this.constrain({ type: 'radius', circle: this.resolveCircleId(circle), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the diameter of a circle. */
-  diameter(circle: CircleId, value: number): this {
-    return this.constrain({ type: 'diameter', circle, value } as Omit<SketchConstraint, 'id'>);
+  diameter(circle: any, value: number): this {
+    return this.constrain({ type: 'diameter', circle: this.resolveCircleId(circle), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the horizontal distance between two points (b.x − a.x = value). */
-  hDistance(a: PointId, b: PointId, value: number): this {
-    return this.constrain({ type: 'hDistance', a, b, value } as Omit<SketchConstraint, 'id'>);
+  hDistance(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'hDistance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the vertical distance between two points (b.y − a.y = value). */
-  vDistance(a: PointId, b: PointId, value: number): this {
-    return this.constrain({ type: 'vDistance', a, b, value } as Omit<SketchConstraint, 'id'>);
+  vDistance(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'vDistance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /**
@@ -339,8 +403,8 @@ export class ConstrainedSketchBuilder {
    * Positive `value` places the point to the **left** of the line (a→b direction).
    * Zero is equivalent to `collinear`.
    */
-  pointLineDistance(point: PointId, line: LineId, value: number): this {
-    return this.constrain({ type: 'pointLineDistance', point, line, value } as Omit<SketchConstraint, 'id'>);
+  pointLineDistance(point: any, line: any, value: number): this {
+    return this.constrain({ type: 'pointLineDistance', point: this.resolvePointId(point), line: this.resolveLineId(line), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /**
@@ -350,73 +414,73 @@ export class ConstrainedSketchBuilder {
    * Positive `value` places line `b` on the **left** side of line `a`
    * (according to `a`'s direction vector). Negative places it on the right.
    */
-  lineDistance(a: LineId, b: LineId, value: number): this {
-    return this.constrain({ type: 'lineDistance', a, b, value } as Omit<SketchConstraint, 'id'>);
+  lineDistance(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'lineDistance', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the absolute angle of a line from the positive X-axis (degrees). */
-  absoluteAngle(line: LineId, value: number): this {
-    return this.constrain({ type: 'absoluteAngle', line, value } as Omit<SketchConstraint, 'id'>);
+  absoluteAngle(line: any, value: number): this {
+    return this.constrain({ type: 'absoluteAngle', line: this.resolveLineId(line), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain two circles to have equal radii. */
-  equalRadius(a: CircleId, b: CircleId): this {
-    return this.constrain({ type: 'equalRadius', a, b } as Omit<SketchConstraint, 'id'>);
+  equalRadius(a: any, b: any): this {
+    return this.constrain({ type: 'equalRadius', a: this.resolveCircleId(a), b: this.resolveCircleId(b) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the arc length of an arc (radius × sweep angle). */
-  arcLength(arc: ArcId, value: number): this {
-    return this.constrain({ type: 'arcLength', arc, value } as Omit<SketchConstraint, 'id'>);
+  arcLength(arc: any, value: number): this {
+    return this.constrain({ type: 'arcLength', arc: this.resolveArcId(arc), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /**
    * Constrain a line to be tangent to an arc at the arc's start (`atStart=true`) or end point.
    * Combine with `coincident` to enforce the shared endpoint.
    */
-  lineTangentArc(line: LineId, arc: ArcId, atStart: boolean): this {
-    return this.constrain({ type: 'lineTangentArc', line, arc, atStart } as Omit<SketchConstraint, 'id'>);
+  lineTangentArc(line: any, arc: any, atStart: boolean): this {
+    return this.constrain({ type: 'lineTangentArc', line: this.resolveLineId(line), arc: this.resolveArcId(arc), atStart } as Omit<SketchConstraint, 'id'>);
   }
 
   // ─── Shape constraint helpers ─────────────────────────────────────────────
 
   /** Constrain the bounding-box width of a shape. */
-  shapeWidth(shape: ShapeId, value: number): this {
-    return this.constrain({ type: 'shapeWidth', shape, value } as Omit<SketchConstraint, 'id'>);
+  shapeWidth(shape: any, value: number): this {
+    return this.constrain({ type: 'shapeWidth', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the bounding-box height of a shape. */
-  shapeHeight(shape: ShapeId, value: number): this {
-    return this.constrain({ type: 'shapeHeight', shape, value } as Omit<SketchConstraint, 'id'>);
+  shapeHeight(shape: any, value: number): this {
+    return this.constrain({ type: 'shapeHeight', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the X coordinate of a shape's centroid. */
-  shapeCentroidX(shape: ShapeId, value: number): this {
-    return this.constrain({ type: 'shapeCentroidX', shape, value } as Omit<SketchConstraint, 'id'>);
+  shapeCentroidX(shape: any, value: number): this {
+    return this.constrain({ type: 'shapeCentroidX', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the Y coordinate of a shape's centroid. */
-  shapeCentroidY(shape: ShapeId, value: number): this {
-    return this.constrain({ type: 'shapeCentroidY', shape, value } as Omit<SketchConstraint, 'id'>);
+  shapeCentroidY(shape: any, value: number): this {
+    return this.constrain({ type: 'shapeCentroidY', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the area of a shape. */
-  shapeArea(shape: ShapeId, value: number): this {
-    return this.constrain({ type: 'shapeArea', shape, value } as Omit<SketchConstraint, 'id'>);
+  shapeArea(shape: any, value: number): this {
+    return this.constrain({ type: 'shapeArea', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain two shapes to share the same centroid. */
-  shapeEqualCentroid(a: ShapeId, b: ShapeId): this {
-    return this.constrain({ type: 'shapeEqualCentroid', a, b } as Omit<SketchConstraint, 'id'>);
+  shapeEqualCentroid(a: any, b: any): this {
+    return this.constrain({ type: 'shapeEqualCentroid', a: this.resolveShapeId(a), b: this.resolveShapeId(b) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the unsigned angle between two lines (accepts both orientations). */
-  angleBetween(a: LineId, b: LineId, value: number): this {
-    return this.constrain({ type: 'angleBetween', a, b, value } as Omit<SketchConstraint, 'id'>);
+  angleBetween(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'angleBetween', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Enforce counter-clockwise winding on a polygon defined by its vertices. */
-  ccw(...points: PointId[]): this {
-    return this.constrain({ type: 'ccw', points } as Omit<SketchConstraint, 'id'>);
+  ccw(...points: any[]): this {
+    return this.constrain({ type: 'ccw', points: points.map(p => this.resolvePointId(p)) } as Omit<SketchConstraint, 'id'>);
   }
 
   // ─── Loop helpers ──────────────────────────────────────────────────────────
@@ -424,14 +488,30 @@ export class ConstrainedSketchBuilder {
   /**
    * Register a closed polygon loop from an explicit ordered list of point IDs.
    */
-  addLoop(points: PointId[]): this {
+  addLoop(points: any[]): this {
     if (points.length < 3) throw new Error('addLoop(): needs at least 3 points');
-    this.loops.push({ type: 'poly', points: [...points] });
+    this.loops.push({ type: 'poly', points: points.map(p => this.resolvePointId(p)) });
     return this;
   }
 
   solve(options: SolveOptions = {}): ConstraintSketch {
     return solveConstraintDefinition(this.buildDefinition(), options);
+  }
+
+  /**
+   * Run the solver without building a full `ConstraintSketch`.
+   * Useful for lightweight constraint validation or progress monitoring.
+   * Returns the final maxError, the number of rejected constraints, and
+   * the solved `ConstraintDefinition` with updated point positions.
+   */
+  solveConstraintsOnly(options: SolveOptions = {}): {
+    maxError: number;
+    rejectedCount: number;
+    definition: ConstraintDefinition;
+  } {
+    const def = this.buildDefinition();
+    const { maxError } = decomposeAndSolve(def, options);
+    return { maxError, rejectedCount: def.rejectedConstraints.length, definition: def };
   }
 
   private buildDefinition(extraConstraint?: SketchConstraint): ConstraintDefinition {

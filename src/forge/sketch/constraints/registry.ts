@@ -71,10 +71,14 @@ export const setConstraintValue = (constraint: SketchConstraint, value: number):
 //
 // 1. ILL-CONDITIONED JACOBIANS — When many constraints couple the same points,
 //    the normal-equation matrix JᵀJ can become nearly singular.  Pure Gauss-Newton
-//    produces huge, unreliable steps.  Levenberg-Marquardt adds λ·I to JᵀJ,
-//    smoothly interpolating between Gauss-Newton (λ→0, fast quadratic convergence
-//    near the solution) and gradient descent (λ→∞, always makes progress).  λ
-//    adapts each iteration: decreases on a successful step, increases on failure.
+//    produces huge, unreliable steps.  Levenberg-Marquardt adds λ·diag(JᵀJ) to JᵀJ
+//    (Marquardt scaling), smoothly interpolating between Gauss-Newton (λ→0, fast
+//    quadratic convergence near the solution) and gradient descent (λ→∞, always
+//    makes progress).  The step is accepted only when the actual reduction in
+//    residual norm matches the predicted reduction (rho > 0); λ adapts via the
+//    standard (1/3, nu) update rule.  Cholesky decomposition is used as the primary
+//    linear solver (exploiting the symmetric positive-definite structure of JᵀJ + λD),
+//    with Gaussian elimination as fallback for degenerate setups.
 //
 // 2. MULTIPLE BASINS OF ATTRACTION — Angle-wrapping (normalizeAngle maps to
 //    [-π, π]) creates a non-convex residual landscape with multiple local minima.
@@ -82,75 +86,157 @@ export const setConstraintValue = (constraint: SketchConstraint, value: number):
 //    angle OR at target ± π (pointing backwards), and coupled constraints can
 //    trap the solver in a state offset by exactly π/2.  No gradient-based method
 //    can escape a local minimum — the gradient points downhill toward the wrong
-//    solution.  The fix is multi-start: if the first attempt fails, perturb free
-//    points (after GS warm-up, using golden-angle spacing for uniform directional
-//    coverage) and retry.  Typically 2-3 attempts suffice for 2D sketch systems.
+//    solution.  The fix is multi-start: up to 16 attempts, using golden-angle
+//    perturbation for the first 5 and deterministic spread patterns (resetting
+//    points to a grid) from attempt 5 onward for maximal basin coverage.
 //
 // Solver pipeline per attempt:
-//   1. GS warm-up (15 iterations) — break degeneracy, propagate constraints
-//   2. Perturbation (attempts > 0) — explore a different basin
-//   3. LM-NR (40 iterations) — quadratic convergence from the warm-up basin
-//   4. GS fallback (200 iterations) — if NR didn't converge, linear GS as safety net
-//   5. NR retry — GS may have moved points to a better basin; one more NR pass
+//   1. Spread reset (attempts ≥ 5) — place points at grid positions to escape
+//      degenerate initial configurations
+//   2. GS warm-up (15 iterations) — break degeneracy, propagate constraints
+//   3. Perturbation (attempts > 0) — explore a different basin via golden-angle
+//      offsets with per-point scaling
+//   4. LM-NR (40 iterations) — quadratic convergence using central-difference
+//      Jacobian and proper rho-based step acceptance
+//   5. GS fallback (200 iterations) — if NR didn't converge, linear GS as safety net
+//   6. NR retry — GS may have moved points to a better basin; one more NR pass
 // ─────────────────────────────────────────────────────────────────────────────────
 
 /**
- * Solve a square or over-determined linear system A·x = b using Gauss-Newton
- * (normal equations: Aᵀ·A·x = Aᵀ·b) with partial pivoting, plus optional
- * Levenberg-Marquardt damping.  lambda > 0 adds lambda·I to Jᵀ·J, regularising
- * ill-conditioned systems and biasing the step toward gradient descent.
- * A is m×n (m equations, n variables). Returns Δx of length n.
+ * Solve a symmetric positive-definite linear system A·x = b using Cholesky
+ * decomposition (L·Lᵀ factorisation).  Returns null if A is not positive
+ * definite (e.g. after heavy LM damping degenerates the system).
  */
-const gaussNewtonStep = (J: number[][], r: number[], lambda = 0): number[] => {
+function solveCholesky(A: number[][], b: number[]): number[] | null {
+  const n = A.length;
+  const L: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      let sum = 0;
+      for (let k = 0; k < j; k++) {
+        sum += L[i][k] * L[j][k];
+      }
+      if (i === j) {
+        const val = A[i][i] - sum;
+        if (val <= 0) return null; // Not positive definite
+        L[i][i] = Math.sqrt(val);
+      } else {
+        L[i][j] = (A[i][j] - sum) / L[j][j];
+      }
+    }
+  }
+
+  // Solve L * y = b
+  const y = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (let k = 0; k < i; k++) {
+      sum += L[i][k] * y[k];
+    }
+    y[i] = (b[i] - sum) / L[i][i];
+  }
+
+  // Solve L^T * x = y
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    let sum = 0;
+    for (let k = i + 1; k < n; k++) {
+      sum += L[k][i] * x[k];
+    }
+    x[i] = (y[i] - sum) / L[i][i];
+  }
+
+  return x;
+}
+
+/**
+ * Compute a single Levenberg-Marquardt step given the Jacobian J (m×n),
+ * residual vector r (m), and damping factor lambda.
+ *
+ * Uses Marquardt scaling (λ·diag(JᵀJ) instead of λ·I) so damping is
+ * proportional to each parameter's sensitivity — better conditioned for
+ * problems with variables of different scales.
+ *
+ * Returns the step vector dx and the predicted reduction in ½‖r‖² for
+ * computing the gain ratio rho = actualReduction / predictedReduction.
+ * Returns null if the system has zero variables.
+ */
+function levenbergMarquardtStep(J: number[][], r: number[], lambda: number): { dx: number[], predictedReduction: number } | null {
   const m = J.length;
   const n = m > 0 ? J[0].length : 0;
-  if (n === 0) return [];
+  if (n === 0) return { dx: [], predictedReduction: 0 };
 
-  // Form Jᵀ·J (n×n) and Jᵀ·r (n)
-  const JtJ: number[][] = Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, k) =>
-      J.reduce((s, row) => s + row[i] * row[k], 0),
-    ),
-  );
-  const JtR: number[] = Array.from({ length: n }, (_, i) =>
-    -J.reduce((s, row, ri) => s + row[i] * r[ri], 0),
-  );
+  const JtJ: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+  const Jtr: number[] = new Array(n).fill(0);
 
-  // Levenberg-Marquardt damping: regularises JᵀJ so the system is always solvable.
-  // Large lambda → gradient-descent direction (safe, slow).
-  // Small lambda → Gauss-Newton direction (fast when near solution).
-  if (lambda > 0) {
-    for (let i = 0; i < n; i++) JtJ[i][i] += lambda;
+  for (let i = 0; i < m; i++) {
+    for (let j = 0; j < n; j++) {
+      Jtr[j] += J[i][j] * r[i];
+      for (let k = 0; k <= j; k++) {
+        JtJ[j][k] += J[i][j] * J[i][k];
+      }
+    }
   }
 
-  // Gaussian elimination with partial pivoting on augmented [JtJ | JtR]
-  const aug = JtJ.map((row, i) => [...row, JtR[i]]);
+  // Mirror lower triangle to upper (only lower half was accumulated above).
+  for (let j = 0; j < n; j++) {
+    for (let k = 0; k < j; k++) {
+      JtJ[k][j] = JtJ[j][k];
+    }
+  }
+
+  const A: number[][] = Array.from({ length: n }, (_, i) => [...JtJ[i]]);
+
+  // Marquardt scaling: add λ·(diag(JᵀJ) + ε) to each diagonal.
+  // Using the diagonal of JᵀJ (rather than λ·I) makes damping proportional
+  // to each parameter's sensitivity, which is better conditioned for
+  // problems with variables of different magnitudes.
   for (let i = 0; i < n; i++) {
-    // Find pivot
-    let maxVal = Math.abs(aug[i][i]);
-    let maxRow = i;
-    for (let k = i + 1; k < n; k++) {
-      if (Math.abs(aug[k][i]) > maxVal) { maxVal = Math.abs(aug[k][i]); maxRow = k; }
-    }
-    [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
-    if (Math.abs(aug[i][i]) < 1e-14) continue; // singular — skip
-    for (let k = i + 1; k < n; k++) {
-      const f = aug[k][i] / aug[i][i];
-      for (let j = i; j <= n; j++) aug[k][j] -= f * aug[i][j];
-    }
+    A[i][i] += lambda * (JtJ[i][i] + 1e-6);
   }
-  // Back substitution
-  const x = new Array<number>(n).fill(0);
-  for (let i = n - 1; i >= 0; i--) {
-    if (Math.abs(aug[i][i]) < 1e-14) continue;
-    x[i] = aug[i][n];
-    for (let j = i + 1; j < n; j++) x[i] -= aug[i][j] * x[j];
-    x[i] /= aug[i][i];
-  }
-  return x;
-};
 
-/** Newton-Raphson solver using residuals and numerical Jacobian estimation. */
+  const negJtr = Jtr.map(v => -v);
+  let dx = solveCholesky(A, negJtr);
+
+  // Fallback to Gaussian elimination with partial pivoting if Cholesky fails (e.g. extremely degenerate setups).
+  if (!dx) {
+    const aug = A.map((row, i) => [...row, negJtr[i]]);
+    for (let i = 0; i < n; i++) {
+      let maxVal = Math.abs(aug[i][i]);
+      let maxRow = i;
+      for (let k = i + 1; k < n; k++) {
+        if (Math.abs(aug[k][i]) > maxVal) { maxVal = Math.abs(aug[k][i]); maxRow = k; }
+      }
+      [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
+      if (Math.abs(aug[i][i]) < 1e-14) continue;
+      for (let k = i + 1; k < n; k++) {
+        const f = aug[k][i] / aug[i][i];
+        for (let j = i; j <= n; j++) aug[k][j] -= f * aug[i][j];
+      }
+    }
+    dx = new Array<number>(n).fill(0);
+    for (let i = n - 1; i >= 0; i--) {
+      if (Math.abs(aug[i][i]) < 1e-14) continue;
+      dx[i] = aug[i][n];
+      for (let j = i + 1; j < n; j++) dx[i] -= aug[i][j] * dx[j];
+      dx[i] /= aug[i][i];
+    }
+  }
+
+  let predictedReduction = 0;
+  for (let j = 0; j < n; j++) {
+    let Jdx = 0;
+    for (let k = 0; k < n; k++) {
+      Jdx += JtJ[j][k] * dx[k];
+    }
+    predictedReduction += dx[j] * (-Jtr[j] - 0.5 * Jdx);
+  }
+
+  return { dx, predictedReduction };
+}
+
+/** Newton-Raphson solver using residuals and central-difference Jacobian estimation. */
 const solveNR = (
   def: ConstraintDefinition,
   ctx: SolverContext,
@@ -170,7 +256,7 @@ const solveNR = (
   const applyVars = (vars: number[]): void => {
     let i = 0;
     for (const p of freePoints) { p.x = vars[i++]; p.y = vars[i++]; }
-    for (const c of freeCircles) { c.radius = vars[i++]; }
+    for (const c of freeCircles) { c.radius = Math.max(1e-9, vars[i++]); }
     // Keep Maps in sync (they hold references, so x/y mutations propagate automatically)
   };
 
@@ -184,14 +270,15 @@ const solveNR = (
     return r;
   };
 
-  // Step size for numerical Jacobian finite differences.
+  // Step size for central-difference Jacobian.  Central differences give O(h²)
+  // accuracy vs O(h) for forward differences, which matters for near-degenerate
+  // configurations where small errors in the Jacobian stall convergence.
   const EPS = 1e-6;
+  // Levenberg-Marquardt damping factor.  Starts moderate; adapts each iteration
+  // via the standard (1/3, nu) update rule.
+  let lambda = 1e-3;
+  let nu = 2; // damping increase factor on rejected steps
   let maxError = 0;
-  // Levenberg-Marquardt damping factor.  Starts moderate; adapts each iteration:
-  // decreases (→ Gauss-Newton) after a successful step, increases (→ gradient descent)
-  // after a failed one.  This guarantees monotone progress even when the Jacobian is
-  // ill-conditioned — the key property that makes complex constraint systems converge.
-  let lambda = 0.1;
 
   for (let iter = 0; iter < maxIter; iter++) {
     const r0 = computeResiduals();
@@ -202,41 +289,65 @@ const solveNR = (
     const vars = getVars();
     const norm0 = r0.reduce((s, v) => s + v * v, 0);
 
-    // Numerical Jacobian: build column-by-column via forward finite differences.
+    // Numerical Jacobian via central differences: (r(x+h) − r(x−h)) / 2h.
+    // More accurate than forward differences, reducing false step rejections
+    // caused by Jacobian error near constrained configurations.
     const Jcols: number[][] = [];
     for (let j = 0; j < n; j++) {
       vars[j] += EPS;
       applyVars(vars);
-      const r1 = computeResiduals();
-      vars[j] -= EPS;
+      const rPlus = computeResiduals();
+
+      vars[j] -= 2 * EPS;
       applyVars(vars);
-      Jcols.push(r1.map((ri, i) => (ri - r0[i]) / EPS));
+      const rMinus = computeResiduals();
+
+      vars[j] += EPS; // restore
+      Jcols.push(rPlus.map((rp, i) => (rp - rMinus[i]) / (2 * EPS)));
     }
+    applyVars(vars);
+
     // J is currently n columns of length m; reshape to m rows of n.
     const m = r0.length;
     const J: number[][] = Array.from({ length: m }, (_, i) => Jcols.map((col) => col[i]));
 
-    // LM step: (JᵀJ + lambda·I)·dx = −Jᵀr
-    const dx = gaussNewtonStep(J, r0, lambda);
-    if (dx.length === 0) break;
+    // Inner loop: increase λ until the step is accepted (actual reduction > 0)
+    // or we give up.  This guarantees the outer loop always makes progress or
+    // terminates cleanly — the key advantage over a fixed-λ LM scheme.
+    let stepAccepted = false;
+    let innerIters = 0;
 
-    const trial = vars.map((v, j) => v + dx[j]);
-    applyVars(trial);
-    const rTrial = computeResiduals();
-    const norm1 = rTrial.reduce((s, v) => s + v * v, 0);
+    while (!stepAccepted && innerIters < 10) {
+      const lmResult = levenbergMarquardtStep(J, r0, lambda);
+      if (!lmResult || lmResult.dx.length === 0) break;
+      const { dx, predictedReduction } = lmResult;
 
-    if (norm1 < norm0) {
-      // Good step — reduce damping toward Gauss-Newton (faster convergence).
-      lambda = Math.max(lambda / 3, 1e-10);
-    } else {
-      // Bad step — revert and increase damping toward gradient descent (safer).
-      applyVars(vars);
-      lambda = Math.min(lambda * 10, 1e8);
+      const trial = vars.map((v, j) => v + dx[j]);
+      applyVars(trial);
+      const rTrial = computeResiduals();
+      const norm1 = rTrial.reduce((s, v) => s + v * v, 0);
+
+      const actualReduction = norm0 - norm1;
+      // Gain ratio rho: 1.0 = step matches model perfectly; < 0 = step made things worse.
+      const rho = predictedReduction > 0 ? actualReduction / predictedReduction : 0;
+
+      if (rho > 0 && actualReduction > 0) {
+        // Good step — reduce damping toward Gauss-Newton (faster convergence).
+        stepAccepted = true;
+        lambda = lambda * Math.max(1 / 3, 1 - Math.pow(2 * rho - 1, 3));
+        nu = 2;
+      } else {
+        // Bad step — revert and increase damping toward gradient descent (safer).
+        applyVars(vars);
+        lambda *= nu;
+        nu *= 2;
+        innerIters++;
+      }
     }
+
+    if (!stepAccepted) break; // converged or fully stuck in local minimum
   }
 
-  // All mutations applied in-place — freePoints/freeCircles share objects with def.points/circles.
-  // Recompute max error from all residuals
   const rFinal = computeResiduals();
   return rFinal.length > 0 ? Math.max(...rFinal.map(Math.abs), 0) : maxError;
 };
@@ -340,15 +451,35 @@ export const solveConstraints = (
   // ── Multi-attempt solve ────────────────────────────────────────────────────
   // Angle-wrapping constraints (normalizeAngle → [-π, π]) create a non-convex
   // residual landscape with multiple local minima.  The solver can converge to the
-  // wrong basin depending on initial positions.  If the first attempt fails, we
-  // perturb free points after the GS warm-up and retry — this explores different
-  // basins cheaply (extra cost only on failure).
-  const MAX_ATTEMPTS = 5;
+  // wrong basin depending on initial positions.  Attempts 1–4 use golden-angle
+  // perturbation after warm-up; attempts 5+ additionally reset points to a
+  // deterministic spread grid before warm-up, providing maximal initial
+  // position diversity for the hardest degenerate cases.
+  const MAX_ATTEMPTS = 16;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     if (attempt > 0) restoreState(initialState);
 
     let maxError = 0;
+    const useSpread = attempt >= 5;
+
+    // ── Spread reset (attempts ≥ 5) ───────────────────────────────────────
+    // Place free points at a regular grid to break any degeneracy from the
+    // original initial positions.  Different (sx, sy) patterns cover varied
+    // aspect ratios to avoid aliasing with symmetric constraint systems.
+    if (useSpread) {
+      const spreadPatterns: [number, number][] = [
+        [2, 3], [3, 1], [1, 4], [4, 2], [2, 1], [5, 3], [1, 1],
+        [3, 5], [1, 2], [4, 1], [2, 5],
+      ];
+      const [sx, sy] = spreadPatterns[(attempt - 5) % spreadPatterns.length];
+      for (let i = 0; i < def.points.length; i++) {
+        const p = def.points[i];
+        if (p.fixed) continue;
+        p.x = i * sx;
+        p.y = i * sy;
+      }
+    }
 
     // ── GS warm-up ────────────────────────────────────────────────────────
     if (canUseNR && def.constraints.length > 0) {
@@ -360,16 +491,20 @@ export const solveConstraints = (
     }
 
     // ── Perturbation (attempts > 0) ───────────────────────────────────────
-    // After warmup placed points near roughly correct positions, perturb free
+    // After warm-up placed points near roughly correct positions, perturb free
     // points to bump the solver into a different basin.  Golden-angle spacing
-    // gives uniform directional coverage across attempts and point indices.
+    // gives uniform directional coverage across attempts and point indices;
+    // per-point scaling (1 + i·0.3) avoids all points receiving identical
+    // offsets (which would leave relative geometry unchanged).
     if (attempt > 0) {
-      const scale = attempt * 3;
+      const perturbIdx = useSpread ? (attempt - 4) : attempt;
+      const baseScale = perturbIdx * 3;
       const PHI = 2.399963; // golden angle (radians)
       for (let i = 0; i < def.points.length; i++) {
         const p = def.points[i];
         if (p.fixed) continue;
         const angle = (attempt * PHI + i * PHI * 0.5) % (2 * Math.PI);
+        const scale = baseScale * (1 + i * 0.3);
         p.x += scale * Math.cos(angle);
         p.y += scale * Math.sin(angle);
       }
@@ -509,9 +644,9 @@ export const computeStatus = (
   const dof = freeVars - constraintEqs;
 
   // Conflict/over-constraint: solver failed to satisfy the constraints.
+
   if (maxError > tolerance * 5) return { status: 'over', dof };
   if (dof > 0) return { status: 'under', dof };
   if (dof < 0) return { status: 'over', dof };
   return { status: 'fully', dof: 0 };
 };
-
