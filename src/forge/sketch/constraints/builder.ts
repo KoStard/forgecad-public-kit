@@ -359,6 +359,38 @@ export class ConstrainedSketchBuilder {
     return this.constrain({ type: 'lineTangentArc', line, arc, atStart } as Omit<SketchConstraint, 'id'>);
   }
 
+  // ─── Shape constraint helpers ─────────────────────────────────────────────
+
+  /** Constrain the bounding-box width of a shape. */
+  shapeWidth(shape: ShapeId, value: number): this {
+    return this.constrain({ type: 'shapeWidth', shape, value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the bounding-box height of a shape. */
+  shapeHeight(shape: ShapeId, value: number): this {
+    return this.constrain({ type: 'shapeHeight', shape, value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the X coordinate of a shape's centroid. */
+  shapeCentroidX(shape: ShapeId, value: number): this {
+    return this.constrain({ type: 'shapeCentroidX', shape, value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the Y coordinate of a shape's centroid. */
+  shapeCentroidY(shape: ShapeId, value: number): this {
+    return this.constrain({ type: 'shapeCentroidY', shape, value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the area of a shape. */
+  shapeArea(shape: ShapeId, value: number): this {
+    return this.constrain({ type: 'shapeArea', shape, value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain two shapes to share the same centroid. */
+  shapeEqualCentroid(a: ShapeId, b: ShapeId): this {
+    return this.constrain({ type: 'shapeEqualCentroid', a, b } as Omit<SketchConstraint, 'id'>);
+  }
+
   // ─── Loop helpers ──────────────────────────────────────────────────────────
 
   /**

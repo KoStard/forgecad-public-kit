@@ -213,34 +213,80 @@ declare class Sketch {
 	}): Sketch;
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces two points to occupy the same position.
+	 *
+	 * This is the most fundamental connectivity constraint — use it to join
+	 * line endpoints, close a polygon, or snap a point to another point.
+	 * Contributes **2 equations** (one per axis).
+	 */
 	coincident: {
 		a: PointId;
 		b: PointId;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces a line to be horizontal (parallel to the X axis).
+	 *
+	 * Both endpoints are moved to their average Y coordinate so the line
+	 * remains centered in place. Contributes **1 equation**: `b.y − a.y = 0`.
+	 */
 	horizontal: {
 		line: LineId;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces a line to be vertical (parallel to the Y axis).
+	 *
+	 * Both endpoints are moved to their average X coordinate so the line
+	 * remains centered in place. Contributes **1 equation**: `b.x − a.x = 0`.
+	 */
 	vertical: {
 		line: LineId;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces lines `a` and `b` to be parallel.
+	 *
+	 * The direction of `b` is rotated to match `a`'s direction (either
+	 * co-directional or anti-parallel — whichever is closer to the current
+	 * orientation). Line `a` is treated as the reference; only `b` is moved.
+	 * Contributes **1 equation**: `cross(unit_a, unit_b) = 0`.
+	 */
 	parallel: {
 		a: LineId;
 		b: LineId;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces lines `a` and `b` to be perpendicular (90° apart).
+	 *
+	 * The direction of `b` is rotated to be ±90° from `a`, choosing the
+	 * sign closest to the current orientation. Line `a` is the reference;
+	 * only `b` is moved. Contributes **1 equation**: `dot(unit_a, unit_b) = 0`.
+	 */
 	perpendicular: {
 		a: LineId;
 		b: LineId;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Constrains tangency between a line and a circle, or between two circles.
+	 *
+	 * **Line–circle** (`line` + `circle`): the perpendicular distance from the
+	 * circle's center to the infinite line equals the circle's radius.
+	 *
+	 * **Circle–circle** (`a` + `b`): the two circles are externally tangent —
+	 * the distance between centers equals the sum of their radii.
+	 *
+	 * Exactly one mode must be active (provide either `line`+`circle` or `a`+`b`).
+	 * Contributes **1 equation**.
+	 */
 	tangent: {
 		line?: LineId;
 		circle?: CircleId;
@@ -249,12 +295,27 @@ interface ConstraintTypeMap {
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces lines `a` and `b` to have the same length.
+	 *
+	 * Line `a`'s length is used as the target; `b`'s endpoints are scaled
+	 * symmetrically along `b`'s current direction to match it.
+	 * Contributes **1 equation**: `|b| − |a| = 0`.
+	 */
 	equal: {
 		a: LineId;
 		b: LineId;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces points `a` and `b` to be mirror images of each other across
+	 * the infinite line through `axis`.
+	 *
+	 * When neither point is fixed, `b` is moved to the reflection of `a`.
+	 * When `b` is fixed, `a` is moved instead. Contributes **2 equations**
+	 * (one per axis): `b − reflect(a, axis) = [0, 0]`.
+	 */
 	symmetric: {
 		a: PointId;
 		b: PointId;
@@ -262,18 +323,40 @@ interface ConstraintTypeMap {
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces two circles to share the same center point.
+	 *
+	 * The centers are merged to their average position (or snapped to the fixed
+	 * one if either is fixed). Contributes **2 equations**
+	 * (one per axis): `center_b − center_a = [0, 0]`.
+	 */
 	concentric: {
 		a: CircleId;
 		b: CircleId;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces a point to lie on the infinite line passing through a line segment.
+	 *
+	 * The point is projected onto the line's infinite extension (not clamped to
+	 * the segment). Contributes **1 equation**: signed distance from the point
+	 * to the line = 0.
+	 */
 	collinear: {
 		point: PointId;
 		line: LineId;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Pins a point to an absolute position `(x, y)` in sketch space.
+	 *
+	 * Applied during the **presolve** pass (before iteration), not as a
+	 * per-iteration equation. The point's `fixed` flag is set to `true` so
+	 * other constraints treat it as immovable. Contributes **0 equations**
+	 * to the DOF count because the DOF is removed by setting `pt.fixed`.
+	 */
 	fixed: {
 		point: PointId;
 		x: number;
@@ -281,18 +364,39 @@ interface ConstraintTypeMap {
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces a point to sit at the exact midpoint of a line segment.
+	 *
+	 * When the midpoint is free the solver snaps it to `(a + b) / 2`. When the
+	 * midpoint is fixed both line endpoints are translated equally to place their
+	 * midpoint at the fixed position. Contributes **2 equations**
+	 * (one per axis): `point − (a + b) / 2 = [0, 0]`.
+	 */
 	midpoint: {
 		point: PointId;
 		line: LineId;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Forces a point to lie exactly on the circumference of a circle.
+	 *
+	 * The point is moved radially so its distance from the center equals the
+	 * radius. Contributes **1 equation**: `|point − center| − radius = 0`.
+	 */
 	pointOnCircle: {
 		point: PointId;
 		circle: CircleId;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Sets the Euclidean distance between two points to `value`.
+	 *
+	 * Points are moved symmetrically along the current direction vector so the
+	 * center of the pair stays fixed. Contributes **1 equation**:
+	 * `|b − a| − value = 0`.
+	 */
 	distance: {
 		a: PointId;
 		b: PointId;
@@ -300,12 +404,27 @@ interface ConstraintTypeMap {
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Sets the length of a line segment to `value`.
+	 *
+	 * Endpoints are scaled symmetrically about the line's midpoint while
+	 * preserving its direction. Contributes **1 equation**:
+	 * `|b − a| − value = 0`.
+	 */
 	length: {
 		line: LineId;
 		value: number;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Sets the angle from line `a` to line `b` to `value` degrees.
+	 *
+	 * `value` is measured counter-clockwise from `a`'s direction to `b`'s
+	 * direction. Either orientation of `b` (forward or reversed) is accepted —
+	 * whichever is closer to the target. Line `a` is the reference; only `b`
+	 * is rotated. Contributes **1 equation**.
+	 */
 	angle: {
 		a: LineId;
 		b: LineId;
@@ -313,18 +432,37 @@ interface ConstraintTypeMap {
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Sets the radius of a circle to `value`.
+	 *
+	 * Has no effect if the circle's `fixedRadius` flag is set.
+	 * Contributes **1 equation**: `radius − value = 0`.
+	 */
 	radius: {
 		circle: CircleId;
 		value: number;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Sets the diameter of a circle to `value` (i.e. `radius = value / 2`).
+	 *
+	 * Has no effect if the circle's `fixedRadius` flag is set.
+	 * Contributes **1 equation**: `radius − value / 2 = 0`.
+	 */
 	diameter: {
 		circle: CircleId;
 		value: number;
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Sets the signed horizontal distance from point `a` to point `b` to `value`.
+	 *
+	 * The constraint is directional: `b.x − a.x = value`. A positive value places
+	 * `b` to the right of `a`; negative places it to the left.
+	 * Contributes **1 equation**.
+	 */
 	hDistance: {
 		a: PointId;
 		b: PointId;
@@ -332,6 +470,13 @@ interface ConstraintTypeMap {
 	};
 }
 interface ConstraintTypeMap {
+	/**
+	 * Sets the signed vertical distance from point `a` to point `b` to `value`.
+	 *
+	 * The constraint is directional: `b.y − a.y = value`. A positive value places
+	 * `b` above `a`; negative places it below.
+	 * Contributes **1 equation**.
+	 */
 	vDistance: {
 		a: PointId;
 		b: PointId;
@@ -341,6 +486,27 @@ interface ConstraintTypeMap {
 type PointId = string;
 type LineId = string;
 type CircleId = string;
+type ArcId = string;
+type ShapeId = string;
+interface SketchArc {
+	id: ArcId;
+	/** Center point of the arc's circle. */
+	center: PointId;
+	/** Point on the arc where it begins. Must lie on the circle. */
+	start: PointId;
+	/** Point on the arc where it ends. Must lie on the circle. */
+	end: PointId;
+	/** Current solved radius — kept consistent with |center–start| and |center–end| by the solver. */
+	radius: number;
+	/** True → arc sweeps clockwise from start to end; false → counter-clockwise. */
+	clockwise: boolean;
+	construction: boolean;
+}
+interface SketchShape {
+	id: ShapeId;
+	/** Ordered list of line IDs forming a closed polygon. */
+	lines: LineId[];
+}
 interface SketchPoint {
 	id: PointId;
 	x: number;
@@ -361,12 +527,24 @@ interface SketchCircle {
 	fixedRadius: boolean;
 	segments: number;
 }
+type ProfileSegment = {
+	kind: "line";
+	line: LineId;
+} | {
+	kind: "arc";
+	arc: ArcId;
+};
 type SketchLoop = {
 	type: "poly";
 	points: PointId[];
 } | {
 	type: "circle";
 	circle: CircleId;
+}
+/** Mixed profile of line and arc segments forming a closed loop. */
+ | {
+	type: "profile";
+	segments: ProfileSegment[];
 };
 interface ConstraintDisplay {
 	id: string;
@@ -403,6 +581,22 @@ interface SketchConstraintMeta {
 			];
 			radius: number;
 		}[];
+		arcs: {
+			center: [
+				number,
+				number
+			];
+			start: [
+				number,
+				number
+			];
+			end: [
+				number,
+				number
+			];
+			radius: number;
+			clockwise: boolean;
+		}[];
 	};
 	/** Non-construction geometry edges rendered as solid wireframe overlay. */
 	edges: {
@@ -423,6 +617,22 @@ interface SketchConstraintMeta {
 			];
 			radius: number;
 		}[];
+		arcs: {
+			center: [
+				number,
+				number
+			];
+			start: [
+				number,
+				number
+			];
+			end: [
+				number,
+				number
+			];
+			radius: number;
+			clockwise: boolean;
+		}[];
 		points: [
 			number,
 			number
@@ -433,6 +643,8 @@ interface ConstraintDefinition {
 	points: SketchPoint[];
 	lines: SketchLine[];
 	circles: SketchCircle[];
+	arcs: SketchArc[];
+	shapes: SketchShape[];
 	loops: SketchLoop[];
 	constraints: SketchConstraint[];
 	rejectedConstraints: SketchConstraint[];
@@ -452,6 +664,20 @@ type SketchConstraint = {
 	} & ConstraintTypeMap[K];
 }[keyof ConstraintTypeMap];
 interface ConstraintTypeMap {
+	/**
+	 * Forces lines `a` and `b` to be parallel **and** separated by a signed
+	 * perpendicular distance of `value`.
+	 *
+	 * The distance is measured from the midpoint of `a` to the midpoint of `b`
+	 * along `a`'s left-normal direction. Positive values place `b` to the left
+	 * of `a` (when facing `a`'s direction).
+	 *
+	 * This constraint combines two equations:
+	 * 1. `cross(unit_a, unit_b) = 0` — parallelism
+	 * 2. `perpDist(mid_b, line_a) − value = 0` — offset distance
+	 *
+	 * Contributes **2 equations**.
+	 */
 	lineDistance: {
 		a: LineId;
 		b: LineId;
@@ -467,6 +693,148 @@ type LineDistanceConstraint = {
 	b: LineId;
 	value: number;
 };
+interface ConstraintTypeMap {
+	/**
+	 * Sets the angle of a line from the positive X axis to `value` degrees.
+	 *
+	 * Both orientations of the line (forward and reversed) are accepted —
+	 * whichever is closer to the target angle. Contributes **1 equation**:
+	 * `sin(angle − target) = 0` (normalised by line length).
+	 */
+	absoluteAngle: {
+		line: LineId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Forces two circles to have the same radius.
+	 *
+	 * When both radii are free they are averaged. When one has `fixedRadius`
+	 * the other is snapped to it. Contributes **1 equation**:
+	 * `radius_b − radius_a = 0`.
+	 */
+	equalRadius: {
+		a: CircleId;
+		b: CircleId;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Sets the arc length of an arc to `value`.
+	 *
+	 * Arc length is defined as `radius × sweep`, where `sweep` is the angle
+	 * (in radians) from the start point to the end point in the arc's direction.
+	 * A zero-length sweep is treated as a full circle (2π).
+	 *
+	 * The solver achieves the target by relocating the arc's end point along
+	 * the circle; the radius and start point are left unchanged.
+	 * Contributes **1 equation**: `radius × sweep − value = 0`.
+	 */
+	arcLength: {
+		arc: ArcId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Constrains a line to be tangent to an arc at the arc's start or end point.
+	 *
+	 * Tangency requires the line's direction to be perpendicular to the arc's
+	 * radius at the contact point. Set `atStart: true` to use the arc's start
+	 * point as the tangency contact; `false` uses the end point.
+	 *
+	 * The solver rotates the line (around its midpoint, or from the fixed end)
+	 * so that `dot(unit_line, unit_radius) = 0`.
+	 * Contributes **1 equation**.
+	 */
+	lineTangentArc: {
+		line: LineId;
+		arc: ArcId;
+		atStart: boolean;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Sets the X coordinate of a polygon's arithmetic centroid to `value`.
+	 *
+	 * All non-fixed vertices are translated horizontally by the same amount so
+	 * that `mean(vertices.x) = value`. The shape's size, proportions, and Y
+	 * position are unaffected. Contributes **1 equation**.
+	 */
+	shapeCentroidX: {
+		shape: ShapeId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Sets the Y coordinate of a polygon's arithmetic centroid to `value`.
+	 *
+	 * All non-fixed vertices are translated vertically by the same amount so
+	 * that `mean(vertices.y) = value`. The shape's size, proportions, and X
+	 * position are unaffected. Contributes **1 equation**.
+	 */
+	shapeCentroidY: {
+		shape: ShapeId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Sets the axis-aligned bounding-box width of a polygon shape to `value`.
+	 *
+	 * All non-fixed vertices are scaled horizontally (`x` only) from the
+	 * bounding-box center: `pt.x = cx + (pt.x − cx) × (value / width)`.
+	 * The shape's height and Y position are unaffected.
+	 * Contributes **1 equation**.
+	 */
+	shapeWidth: {
+		shape: ShapeId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Sets the axis-aligned bounding-box height of a polygon shape to `value`.
+	 *
+	 * All non-fixed vertices are scaled vertically (`y` only) from the
+	 * bounding-box center: `pt.y = cy + (pt.y − cy) × (value / height)`.
+	 * The shape's width and X position are unaffected.
+	 * Contributes **1 equation**.
+	 */
+	shapeHeight: {
+		shape: ShapeId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Sets the enclosed area of a polygon shape to `value`.
+	 *
+	 * Area is computed via the shoelace formula on the ordered vertex list.
+	 * All non-fixed vertices are scaled uniformly from the polygon's arithmetic
+	 * centroid: `scale = sqrt(target / current)`, so the shape's proportions
+	 * and position are preserved. Contributes **1 equation**.
+	 */
+	shapeArea: {
+		shape: ShapeId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Forces two shapes to share the same centroid.
+	 *
+	 * Translates the non-fixed vertices of each shape so that their arithmetic
+	 * centroids coincide at the mean of the two current centroids.
+	 * Contributes **2 equations**: `cx(a) − cx(b) = 0` and `cy(a) − cy(b) = 0`.
+	 */
+	shapeEqualCentroid: {
+		a: ShapeId;
+		b: ShapeId;
+	};
+}
 declare class ConstraintSketch extends Sketch {
 	readonly constraintMeta: SketchConstraintMeta;
 	readonly definition: ConstraintDefinition;
@@ -500,6 +868,8 @@ declare class ConstrainedSketchBuilder {
 	private points;
 	private lines;
 	private circles;
+	private arcs;
+	private shapes;
 	private constraints;
 	private loops;
 	private rejectedConstraints;
@@ -519,8 +889,25 @@ declare class ConstrainedSketchBuilder {
 	lineH(dx: number): this;
 	lineV(dy: number): this;
 	lineAngled(length: number, degrees: number): this;
+	/**
+	 * Draw a circular arc from the current cursor position to (x, y) with the given radius.
+	 * If `clockwise` is true the arc sweeps clockwise; otherwise counter-clockwise.
+	 * The arc center is computed automatically.
+	 */
+	arcTo(x: number, y: number, radius: number, clockwise?: boolean): this;
+	/**
+	 * Create an arc from an explicit center point.
+	 * `start` and `end` are existing PointIds that must lie on the arc's circle.
+	 * Returns the ArcId. Does NOT advance the cursor.
+	 */
+	arcByCenter(centerId: PointId, startId: PointId, endId: PointId, clockwise?: boolean): ArcId;
 	close(): this;
 	addLoopCircle(center: PointId, radius: number, segments?: number): this;
+	/**
+	 * Register a named shape (closed polygon) from an ordered list of line IDs.
+	 * Returns the ShapeId for use in shape constraints (shapeWidth, shapeCentroidX, etc.).
+	 */
+	shape(lines: LineId[]): ShapeId;
 	constrain(constraint: Omit<SketchConstraint, "id">): this;
 	/** Constrain a line to be horizontal. */
 	horizontal(line: LineId): this;
@@ -574,13 +961,38 @@ declare class ConstrainedSketchBuilder {
 	 * (according to `a`'s direction vector). Negative places it on the right.
 	 */
 	lineDistance(a: LineId, b: LineId, value: number): this;
+	/** Constrain the absolute angle of a line from the positive X-axis (degrees). */
+	absoluteAngle(line: LineId, value: number): this;
+	/** Constrain two circles to have equal radii. */
+	equalRadius(a: CircleId, b: CircleId): this;
+	/** Constrain the arc length of an arc (radius × sweep angle). */
+	arcLength(arc: ArcId, value: number): this;
+	/**
+	 * Constrain a line to be tangent to an arc at the arc's start (`atStart=true`) or end point.
+	 * Combine with `coincident` to enforce the shared endpoint.
+	 */
+	lineTangentArc(line: LineId, arc: ArcId, atStart: boolean): this;
+	/** Constrain the bounding-box width of a shape. */
+	shapeWidth(shape: ShapeId, value: number): this;
+	/** Constrain the bounding-box height of a shape. */
+	shapeHeight(shape: ShapeId, value: number): this;
+	/** Constrain the X coordinate of a shape's centroid. */
+	shapeCentroidX(shape: ShapeId, value: number): this;
+	/** Constrain the Y coordinate of a shape's centroid. */
+	shapeCentroidY(shape: ShapeId, value: number): this;
+	/** Constrain the area of a shape. */
+	shapeArea(shape: ShapeId, value: number): this;
+	/** Constrain two shapes to share the same centroid. */
+	shapeEqualCentroid(a: ShapeId, b: ShapeId): this;
 	/**
 	 * Register a closed polygon loop from an explicit ordered list of point IDs.
 	 */
 	addLoop(points: PointId[]): this;
 	solve(options?: SolveOptions): ConstraintSketch;
-	buildDefinition(extraConstraint?: SketchConstraint): ConstraintDefinition;
+	private buildDefinition;
 	private getPoint;
+	/** Compute arc center from start/end points, radius, and clockwise flag; create the arc entity. */
+	private addArc;
 	/** Import a Point2D, returning its PointId */
 	importPoint(pt: {
 		x: number;
