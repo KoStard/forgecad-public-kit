@@ -8,7 +8,7 @@ ForgeCAD is a multi-backend CAD system with a JavaScript/TypeScript modeling API
 
 TypeScript is the file format. The browser is the CAD system.
 
-[API Reference](docs/permanent/API/README.md) • [CLI Docs](docs/permanent/CLI.md) • [Vision](docs/permanent/VISION.md) • [Examples](examples)
+[**Try it in your browser →**](https://kostard.github.io/ForgeCAD) • [API Reference](docs/permanent/API/README.md) • [CLI Docs](docs/permanent/CLI.md) • [Vision](docs/permanent/VISION.md) • [Examples](examples)
 
 ## Install
 
