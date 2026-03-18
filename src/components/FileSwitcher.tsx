@@ -17,17 +17,64 @@ export function FileSwitcher() {
   // Put active file at the end so it's not the default selection
   const allFiles = [...fileNames, activeFile];
 
-  const filtered = allFiles.filter((f) => {
-    if (!query) return true;
-    const q = query.toLowerCase();
-    // Fuzzy: every character in query appears in order in filename
-    const name = f.toLowerCase();
-    let qi = 0;
-    for (let i = 0; i < name.length && qi < q.length; i++) {
-      if (name[i] === q[qi]) qi++;
+  const filtered = (() => {
+    if (!query) return allFiles;
+    const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+
+    // Fuzzy match a single token against a name, allowing up to maxErrors skipped query chars.
+    // Returns { matched, score } where score is higher for better matches.
+    function matchToken(name: string, token: string, maxErrors: number): { matched: boolean; score: number } {
+      let bestScore = -Infinity;
+      // Try skipping each subset of up to maxErrors chars in the token
+      // Simple approach: try with 0 errors first, then 1 error (drop one char)
+      const candidates = [token];
+      if (maxErrors >= 1) {
+        for (let drop = 0; drop < token.length; drop++) {
+          candidates.push(token.slice(0, drop) + token.slice(drop + 1));
+        }
+      }
+      let matched = false;
+      for (let ci = 0; ci < candidates.length; ci++) {
+        const q = candidates[ci];
+        if (!q) continue;
+        let qi = 0, firstMatchIdx = -1, consecutiveBonus = 0, prevMatchIdx = -1;
+        for (let i = 0; i < name.length && qi < q.length; i++) {
+          if (name[i] === q[qi]) {
+            if (firstMatchIdx === -1) firstMatchIdx = i;
+            if (prevMatchIdx === i - 1) consecutiveBonus++;
+            prevMatchIdx = i;
+            qi++;
+          }
+        }
+        if (qi < q.length) continue;
+        matched = true;
+        let score = 0;
+        if (ci === 0) score += 200; // no errors bonus
+        if (name.includes(q)) score += 1000;
+        if (name.startsWith(q)) score += 500;
+        score += consecutiveBonus * 10;
+        score -= firstMatchIdx;
+        if (score > bestScore) bestScore = score;
+      }
+      return { matched, score: bestScore };
     }
-    return qi === q.length;
-  });
+
+    const scored: { name: string; score: number }[] = [];
+    for (const f of allFiles) {
+      const name = f.toLowerCase();
+      let totalScore = 0;
+      let allMatched = true;
+      for (const token of tokens) {
+        const { matched, score } = matchToken(name, token, 1);
+        if (!matched) { allMatched = false; break; }
+        totalScore += score;
+      }
+      if (!allMatched) continue;
+      scored.push({ name: f, score: totalScore });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((s) => s.name);
+  })();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -70,21 +117,28 @@ export function FileSwitcher() {
 
   if (!open) return null;
 
-  // Highlight matching characters
+  // Highlight matching characters for all tokens
   const highlight = (name: string) => {
     if (!query) return <span>{name}</span>;
-    const q = query.toLowerCase();
-    const parts: React.ReactNode[] = [];
-    let qi = 0;
-    for (let i = 0; i < name.length; i++) {
-      if (qi < q.length && name[i].toLowerCase() === q[qi]) {
-        parts.push(<span key={i} style={{ color: 'var(--fc-accent)' }}>{name[i]}</span>);
-        qi++;
-      } else {
-        parts.push(<span key={i}>{name[i]}</span>);
+    const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+    // Build a set of highlighted char indices by fuzzy-matching each token
+    const highlighted = new Set<number>();
+    for (const token of tokens) {
+      const lower = name.toLowerCase();
+      let qi = 0;
+      for (let i = 0; i < lower.length && qi < token.length; i++) {
+        if (lower[i] === token[qi]) { highlighted.add(i); qi++; }
       }
     }
-    return <>{parts}</>;
+    return (
+      <>
+        {name.split('').map((ch, i) =>
+          highlighted.has(i)
+            ? <span key={i} style={{ color: 'var(--fc-accent)' }}>{ch}</span>
+            : <span key={i}>{ch}</span>
+        )}
+      </>
+    );
   };
 
   return (
