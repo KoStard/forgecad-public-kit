@@ -343,13 +343,13 @@ export function ViewPanel() {
   const objectItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const constraintMeta = selectedObject?.sketchMeta ?? null;
   const constraintStatusColor = constraintMeta?.status === 'over'
-    ? '#ff4d4f'
+    ? 'var(--fc-sketchOverConstrained)'
     : constraintMeta?.status === 'over-redundant'
-      ? '#faad14'
+      ? 'var(--fc-sketchRedundant)'
       : constraintMeta?.status === 'fully'
-        ? '#35c759'
+        ? 'var(--fc-sketchFullyConstrained)'
         : constraintMeta?.status === 'under'
-          ? '#4aa3ff'
+          ? 'var(--fc-sketchUnderConstrained)'
           : 'var(--fc-textDim)';
 
   useEffect(() => {
@@ -812,11 +812,11 @@ export function ViewPanel() {
                 marginBottom: 6,
                 background: selectedConstraintId === constraint.id
                   ? 'rgba(255,204,0,0.15)'
-                  : constraint.isConflicting ? 'var(--fc-errorBg)' : constraint.isRedundant ? 'rgba(250,173,20,0.12)' : 'var(--fc-bgOverlay)',
+                  : constraint.isConflicting ? 'var(--fc-errorBg)' : constraint.isRedundant ? `color-mix(in srgb, var(--fc-sketchRedundant) 12%, transparent)` : 'var(--fc-bgOverlay)',
                 cursor: 'pointer',
               }}
             >
-              <span style={{ fontSize: 11, color: constraint.isConflicting ? 'var(--fc-error)' : constraint.isRedundant ? '#faad14' : 'var(--fc-text)', width: 48 }}>
+              <span style={{ fontSize: 11, color: constraint.isConflicting ? 'var(--fc-sketchConflicting)' : constraint.isRedundant ? 'var(--fc-sketchRedundant)' : 'var(--fc-text)', width: 48 }}>
                 {constraint.label}
               </span>
               {constraint.isDimension && constraint.value !== undefined ? (
