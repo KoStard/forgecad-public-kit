@@ -19,6 +19,7 @@ import { deserializeRunResult } from '../forge/deserializeRunResult';
 import { type ThemeName, applyTheme } from '../theme';
 import { clampAnimationSpeed } from '../animationSpeed';
 import type { ViewportCameraState } from '../capture/cameraState';
+import { decodeSharedHash, getGistId } from '../share';
 
 // ---------------------------------------------------------------------------
 // Run result LRU cache — avoids re-evaluating a file you just switched away from
@@ -107,10 +108,21 @@ const findPreferredEntryFile = (names: string[]): string | null => (
 
 const getActiveFileFromHash = (): string | null => {
   const hash = window.location.hash.slice(1); // Remove the #
+  if (hash.startsWith('code/')) return null; // handled by shared model logic
   return hash || null;
 };
 
+/** If the URL contains a shared model (`#code/...`), decode it once at startup. */
+const sharedModel = decodeSharedHash(window.location.hash);
+if (sharedModel) {
+  INITIAL_FILES[sharedModel.filename] = sharedModel.code;
+}
+
+/** Exported so applyServerSnapshot can inject the shared model into the file set. */
+export { sharedModel };
+
 const initialActive = (() => {
+  if (sharedModel) return sharedModel.filename;
   const hashFile = getActiveFileFromHash();
   if (hashFile && INITIAL_FILES[hashFile]) {
     return hashFile;
@@ -1494,15 +1506,24 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       collectParentPaths(p).forEach((folder) => newFolders.add(folder));
     });
 
+    // Inject shared model from URL (if any) so it survives server snapshots
+    if (sharedModel) {
+      nextFiles[sharedModel.filename] = sharedModel.code;
+      nextSaved[sharedModel.filename] = sharedModel.code;
+      collectParentPaths(sharedModel.filename).forEach((folder) => newFolders.add(folder));
+    }
+
     const hashFile = getActiveFileFromHash();
     const availableFiles = Object.keys(nextFiles);
-    const newActiveFile = (hashFile && nextFiles[hashFile])
-      ? hashFile
-      : (activeFile && nextFiles[activeFile]
-        ? activeFile
-        : (findPreferredEntryFile(availableFiles)
-          || availableFiles.find((n) => n.endsWith('.js'))
-          || availableFiles[0]));
+    const newActiveFile = sharedModel
+      ? sharedModel.filename
+      : (hashFile && nextFiles[hashFile])
+        ? hashFile
+        : (activeFile && nextFiles[activeFile]
+          ? activeFile
+          : (findPreferredEntryFile(availableFiles)
+            || availableFiles.find((n) => n.endsWith('.js'))
+            || availableFiles[0]));
 
     const nextDirty = Object.keys(nextFiles).some((p) => nextSaved[p] !== nextFiles[p]);
     const nextObjectSettingsByFile = Object.fromEntries(

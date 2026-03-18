@@ -17,6 +17,8 @@ import { VerificationsPanel } from './components/VerificationsPanel';
 import { ResizablePanel } from './components/ResizablePanel';
 import { isSaveShortcut, shouldBlockBrowserShortcut, type EditorSurface } from './editorShortcuts';
 import { isNotebookFile } from './notebook/model';
+import { buildShareUrl, buildEmbedUrl, buildEmbedSnippet, isEmbedMode } from './share';
+import { EmbedViewer } from './components/EmbedViewer';
 
 const GITHUB_REPO = 'KoStard/ForgeCAD';
 
@@ -66,6 +68,101 @@ function GitHubStarButton() {
         </>
       )}
     </a>
+  );
+}
+
+function ShareButton() {
+  const activeFile = useForgeStore((s) => s.activeFile);
+  const files = useForgeStore((s) => s.files);
+  const [copied, setCopied] = React.useState<'share' | 'embed' | false>(false);
+
+  const copyToClipboard = (text: string, type: 'share' | 'embed') => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(type);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleShare = () => {
+    if (!activeFile) return;
+    const code = files[activeFile];
+    if (!code) return;
+    const url = buildShareUrl(activeFile, code);
+
+    if (url.length > 8000) {
+      const ok = window.confirm(
+        `The share URL is ${(url.length / 1024).toFixed(0)} KB — some browsers or services may truncate it. Copy anyway?`,
+      );
+      if (!ok) return;
+    }
+
+    copyToClipboard(url, 'share');
+  };
+
+  const handleEmbed = () => {
+    if (!activeFile) return;
+    const code = files[activeFile];
+    if (!code) return;
+    const embedUrl = buildEmbedUrl(activeFile, code);
+
+    if (embedUrl.length > 8000) {
+      const ok = window.confirm(
+        `The embed URL is ${(embedUrl.length / 1024).toFixed(0)} KB — some browsers or services may truncate it.\nFor large models, consider creating a GitHub Gist and using ?gist=<id> instead.\nCopy anyway?`,
+      );
+      if (!ok) return;
+    }
+
+    copyToClipboard(buildEmbedSnippet(embedUrl), 'embed');
+  };
+
+  const shareBtnStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    padding: '3px 8px',
+    background: copied === 'share' ? 'var(--fc-success, #2ea043)' : 'transparent',
+    color: copied === 'share' ? '#fff' : 'var(--fc-textMuted)',
+    border: '1px solid var(--fc-border)',
+    borderRadius: '3px 0 0 3px',
+    fontSize: 12,
+    cursor: 'pointer',
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    transition: 'background 0.15s, color 0.15s',
+  };
+
+  const embedBtnStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '3px 8px',
+    background: copied === 'embed' ? 'var(--fc-success, #2ea043)' : 'transparent',
+    color: copied === 'embed' ? '#fff' : 'var(--fc-textMuted)',
+    border: '1px solid var(--fc-border)',
+    borderLeft: 'none',
+    borderRadius: '0 3px 3px 0',
+    fontSize: 12,
+    cursor: 'pointer',
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    transition: 'background 0.15s, color 0.15s',
+  };
+
+  return (
+    <span style={{ display: 'inline-flex' }}>
+      <button onClick={handleShare} title="Copy shareable link to clipboard" style={shareBtnStyle}>
+        <svg height="12" width="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M3.75 2h3.5a.75.75 0 010 1.5h-3.5a.25.25 0 00-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-3.5a.75.75 0 011.5 0v3.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-8.5C2 2.784 2.784 2 3.75 2zm6.854-.22a.75.75 0 011.062 0l2.554 2.553a.75.75 0 010 1.062l-5.5 5.5a.75.75 0 01-.53.22H5.75a.75.75 0 01-.75-.75V7.914a.75.75 0 01.22-.53l5.384-5.604zm.69 1.28L6.5 7.854v1.396h1.396l4.793-4.794-1.395-1.396z" />
+        </svg>
+        {copied === 'share' ? 'Copied!' : 'Share'}
+      </button>
+      <button onClick={handleEmbed} title="Copy embed iframe snippet to clipboard" style={embedBtnStyle}>
+        <svg height="12" width="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0114.25 16H1.75A1.75 1.75 0 010 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 00.25-.25V1.75a.25.25 0 00-.25-.25H1.75zM4.47 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L7.19 8 4.47 5.28a.75.75 0 010-1.06z" />
+        </svg>
+        {copied === 'embed' ? 'Copied!' : 'Embed'}
+      </button>
+    </span>
   );
 }
 
@@ -157,6 +254,7 @@ function Toolbar() {
         {__FORGE_MODE__ === 'web' && (
           <>
             <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
+            <ShareButton />
             <GitHubStarButton />
           </>
         )}
@@ -201,7 +299,17 @@ function Toolbar() {
   );
 }
 
+// Module-level constant — URL params don't change during session
+const embedMode = isEmbedMode();
+
 export function App() {
+  if (embedMode) {
+    return <EmbedViewer />;
+  }
+  return <FullApp />;
+}
+
+function FullApp() {
   const kernelReady = useForgeStore((s) => s.kernelReady);
   const setKernelReady = useForgeStore((s) => s.setKernelReady);
   const execute = useForgeStore((s) => s.execute);
