@@ -37,6 +37,7 @@ worker.onmessage = async (event) => {
       title,
       objectVisuals,
       includeDisassembled,
+      lengthUnit,
     } = data.payload;
     const code = files[activeFile];
     if (!code) {
@@ -53,6 +54,7 @@ worker.onmessage = async (event) => {
       title,
       includeDisassembled,
       objectVisuals,
+      lengthUnit,
     });
 
     const pdf = toPdfArrayBuffer(report.pdf);

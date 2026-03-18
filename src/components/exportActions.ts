@@ -155,6 +155,7 @@ export async function exportReportFromStore(
   }
 
   const quality = normalizeExportQuality(options.quality);
+  const lengthUnit = useForgeStore.getState().lengthUnit;
   const title = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
   const report = await generateReportInWorker({
     files,
@@ -164,6 +165,7 @@ export async function exportReportFromStore(
     title,
     includeDisassembled: true,
     objectVisuals: objectSettings,
+    lengthUnit,
   });
   const bytes = new Uint8Array(report.pdf);
   const blob = new Blob([bytes], { type: 'application/pdf' });

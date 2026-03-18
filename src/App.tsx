@@ -18,6 +18,7 @@ import { ResizablePanel } from './components/ResizablePanel';
 import { isSaveShortcut, shouldBlockBrowserShortcut, type EditorSurface } from './editorShortcuts';
 import { isNotebookFile } from './notebook/model';
 import { buildShareUrl, buildEmbedUrl, buildEmbedSnippet, isEmbedMode } from './share';
+import { formatLength } from '@forge/units';
 import { EmbedViewer } from './components/EmbedViewer';
 
 const GITHUB_REPO = 'KoStard/ForgeCAD';
@@ -191,6 +192,7 @@ function Toolbar() {
   const clearMeasure = useForgeStore((s) => s.clearMeasure);
   const measurements = useForgeStore((s) => s.measurements);
   const removeMeasurement = useForgeStore((s) => s.removeMeasurement);
+  const lengthUnit = useForgeStore((s) => s.lengthUnit);
   const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
   const toggleFileExplorer = useForgeStore((s) => s.toggleFileExplorer);
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
@@ -271,7 +273,7 @@ function Toolbar() {
                   fontFamily: 'monospace',
                 }}
               >
-                {measurement.label} {measurement.dist.toFixed(2)} mm
+                {measurement.label} {formatLength(measurement.dist, lengthUnit)}
                 <button
                   style={{
                     border: 'none',

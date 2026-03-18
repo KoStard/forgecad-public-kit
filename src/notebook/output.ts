@@ -1,18 +1,19 @@
 import type { RunResult, SceneObject } from '../forge/index';
 import type { ForgeNotebookOutput, NotebookExecutionSummary } from './model';
+import { formatVolume, formatArea, type LengthUnit } from '../forge/units';
 
 function formatVec(values: number[]): string {
   return `[${values.map((value) => value.toFixed(1)).join(', ')}]`;
 }
 
-function summarizeObject(object: SceneObject): string {
+function summarizeObject(object: SceneObject, unit: LengthUnit = 'mm'): string {
   if (object.shape) {
     const bbox = object.shape.boundingBox();
-    return `${object.name}: vol=${object.shape.volume().toFixed(1)}mm^3 bbox=${formatVec(bbox.min)} -> ${formatVec(bbox.max)}`;
+    return `${object.name}: vol=${formatVolume(object.shape.volume(), unit, 1)} bbox=${formatVec(bbox.min)} -> ${formatVec(bbox.max)}`;
   }
   if (object.sketch) {
     const bounds = object.sketch.bounds();
-    return `${object.name}: area=${object.sketch.area().toFixed(1)}mm^2 bounds=${formatVec(bounds.min)} -> ${formatVec(bounds.max)}`;
+    return `${object.name}: area=${formatArea(object.sketch.area(), unit, 1)} bounds=${formatVec(bounds.min)} -> ${formatVec(bounds.max)}`;
   }
   return object.name;
 }

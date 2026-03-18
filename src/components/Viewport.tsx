@@ -2,6 +2,7 @@ import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObjec
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, Lightformer, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
 import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
+import { formatLength, formatCoord, convertFromMm, type LengthUnit } from '@forge/units';
 import { DEFAULT_VIEW_CONFIG, intersectWithPlane } from '@forge/index';
 import type {
   SceneObject,
@@ -2095,12 +2096,17 @@ function SketchObject({
     return map;
   }, [obj.sketchMeta]);
 
+  const lengthUnit = useForgeStore((s) => s.lengthUnit);
   const constraintLabels = useMemo(() => {
     if (!obj.sketchMeta) return [] as { id: string; text: string; position: [number, number, number]; isConflicting: boolean; isRedundant: boolean; entityIds: string[]; }[];
     return obj.sketchMeta.constraints.map((constraint) => {
-      const unit = constraint.type === 'angle' ? 'deg' : 'mm';
-      const text = constraint.isDimension && constraint.value !== undefined
-        ? `${constraint.label} ${formatConstraintValue(constraint.value)}${unit}`
+      const isAngle = constraint.type === 'angle';
+      const unit = isAngle ? 'deg' : lengthUnit;
+      const displayValue = constraint.value !== undefined && !isAngle
+        ? formatConstraintValue(convertFromMm(constraint.value, lengthUnit))
+        : constraint.value !== undefined ? formatConstraintValue(constraint.value) : undefined;
+      const text = constraint.isDimension && displayValue !== undefined
+        ? `${constraint.label} ${displayValue}${unit}`
         : constraint.label;
       return {
         id: constraint.id,
@@ -2111,7 +2117,7 @@ function SketchObject({
         entityIds: constraint.entityIds,
       };
     });
-  }, [obj.sketchMeta]);
+  }, [obj.sketchMeta, lengthUnit]);
 
   // Entity IDs referenced by the selected constraint — used for highlight rendering.
   const highlightedEntityIds = useMemo(() => {
@@ -2467,7 +2473,7 @@ function SketchObject({
 }
 
 /** Renders a single dimension annotation — Fusion360-style with extension lines, arrows, and label */
-function DimensionAnnotation({ def }: { def: DimensionDef }) {
+function DimensionAnnotation({ def, lengthUnit: dimUnit }: { def: DimensionDef; lengthUnit: LengthUnit }) {
   const from = useMemo(() => new THREE.Vector3(...def.from), [def.from]);
   const to = useMemo(() => new THREE.Vector3(...def.to), [def.to]);
   const color = def.color ?? '#e0e0e0';
@@ -2504,7 +2510,7 @@ function DimensionAnnotation({ def }: { def: DimensionDef }) {
     return { dimStart: dS, dimEnd: dE, mid: dS.clone().add(dE).multiplyScalar(0.5), dist: len };
   }, [from, to, def.offset]);
 
-  const label = def.label ? `${def.label}: ${dist.toFixed(1)}` : dist.toFixed(1);
+  const label = def.label ? `${def.label}: ${formatLength(dist, dimUnit, 1)}` : formatLength(dist, dimUnit, 1);
 
   // Extension lines with gap near geometry and overshoot past dimension line
   const extDir = useMemo(() => dimStart.clone().sub(from).normalize(), [dimStart, from]);
@@ -2961,6 +2967,7 @@ function MeasureTool() {
 
 function MeasureLine({ a, b }: { a: number[]; b: number[] }) {
   const { camera } = useThree();
+  const lengthUnit = useForgeStore((s) => s.lengthUnit);
   const points = useMemo(
     () => [new THREE.Vector3(...a), new THREE.Vector3(...b)],
     [a, b],
@@ -3001,9 +3008,9 @@ function MeasureLine({ a, b }: { a: number[]; b: number[] }) {
     ctx.font = 'bold 32px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`${dist.toFixed(2)} mm`, canvas.width / 2, canvas.height / 2);
+    ctx.fillText(formatLength(dist, lengthUnit), canvas.width / 2, canvas.height / 2);
     labelTexture.needsUpdate = true;
-  }, [dist, labelTexture]);
+  }, [dist, labelTexture, lengthUnit]);
 
   return (
     <group>
@@ -3565,6 +3572,7 @@ export function Viewport() {
   const hoveredJointName = useForgeStore((s) => s.hoveredJointName);
   const setJointAnimationProgress = useForgeStore((s) => s.setJointAnimationProgress);
   const setJointAnimationPlaying = useForgeStore((s) => s.setJointAnimationPlaying);
+  const lengthUnit = useForgeStore((s) => s.lengthUnit);
   const constructionGhost = useForgeStore((s) => s.constructionGhost);
   const objects = result?.objects ?? [];
   const dimensions = result?.dimensions ?? [];
@@ -4306,7 +4314,7 @@ export function Viewport() {
         )}
         {hoveredJointOverlay && <HoveredJointOverlay state={hoveredJointOverlay} config={jointOverlayConfig} />}
         {dimensionsVisible && dimensions.map((d) => (
-          <DimensionAnnotation key={d.id} def={d} />
+          <DimensionAnnotation key={d.id} def={d} lengthUnit={lengthUnit} />
         ))}
         <MeasureTool />
         <PerformanceInfoSampler
@@ -4649,16 +4657,16 @@ export function Viewport() {
           const len = Math.hypot(ent.b[0] - ent.a[0], ent.b[1] - ent.a[1]);
           title = 'Line';
           rows = [
-            ['Length', `${len.toFixed(3)} mm`],
-            ['Start', `(${ent.a[0].toFixed(2)}, ${ent.a[1].toFixed(2)}) mm`],
-            ['End', `(${ent.b[0].toFixed(2)}, ${ent.b[1].toFixed(2)}) mm`],
+            ['Length', formatLength(len, lengthUnit, 3)],
+            ['Start', formatCoord(ent.a, lengthUnit)],
+            ['End', formatCoord(ent.b, lengthUnit)],
           ];
         } else if (ent.kind === 'circle') {
           title = 'Circle';
           rows = [
-            ['Radius', `${ent.radius.toFixed(3)} mm`],
-            ['Diameter', `${(ent.radius * 2).toFixed(3)} mm`],
-            ['Center', `(${ent.center[0].toFixed(2)}, ${ent.center[1].toFixed(2)}) mm`],
+            ['Radius', formatLength(ent.radius, lengthUnit, 3)],
+            ['Diameter', formatLength(ent.radius * 2, lengthUnit, 3)],
+            ['Center', formatCoord(ent.center, lengthUnit)],
           ];
         } else if (ent.kind === 'arc') {
           const sa = Math.atan2(ent.start[1] - ent.center[1], ent.start[0] - ent.center[0]);
@@ -4668,15 +4676,15 @@ export function Viewport() {
           if (!ent.clockwise && span < 0) span += Math.PI * 2;
           title = 'Arc';
           rows = [
-            ['Radius', `${ent.radius.toFixed(3)} mm`],
+            ['Radius', formatLength(ent.radius, lengthUnit, 3)],
             ['Span', `${(Math.abs(span) * (180 / Math.PI)).toFixed(2)}°`],
-            ['Length', `${(Math.abs(span) * ent.radius).toFixed(3)} mm`],
+            ['Length', formatLength(Math.abs(span) * ent.radius, lengthUnit, 3)],
           ];
         } else {
           title = 'Point';
           rows = [
-            ['X', `${ent.position[0].toFixed(3)} mm`],
-            ['Y', `${ent.position[1].toFixed(3)} mm`],
+            ['X', formatLength(ent.position[0], lengthUnit, 3)],
+            ['Y', formatLength(ent.position[1], lengthUnit, 3)],
           ];
         }
         return (
