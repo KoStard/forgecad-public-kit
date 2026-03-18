@@ -171,6 +171,8 @@ interface SolverVariable {
   set(value: number): void;
   /** Characteristic physical scale for this variable, used for finite differences and step limiting. */
   scale: number;
+  /** Entity ID that owns this variable (for sparse Jacobian computation). */
+  entityId: string;
 }
 
 interface ResidualEvaluation {
@@ -229,11 +231,13 @@ function buildVariables(def: ConstraintDefinition, referenceLength: number): Sol
         get: () => point.x,
         set: (value: number) => { point.x = value; },
         scale,
+        entityId: point.id,
       },
       {
         get: () => point.y,
         set: (value: number) => { point.y = value; },
         scale,
+        entityId: point.id,
       },
     );
   }
@@ -244,6 +248,7 @@ function buildVariables(def: ConstraintDefinition, referenceLength: number): Sol
       get: () => circle.radius,
       set: (value: number) => { circle.radius = Math.max(1e-9, value); },
       scale,
+      entityId: circle.id,
     });
   }
 
@@ -252,6 +257,7 @@ function buildVariables(def: ConstraintDefinition, referenceLength: number): Sol
       get: () => arc.radius,
       set: (value: number) => { arc.radius = Math.max(1e-9, value); },
       scale,
+      entityId: arc.id,
     });
   }
 
@@ -324,11 +330,113 @@ function finiteDifferenceStep(value: number, scale: number): number {
   return 1e-6 * Math.max(1, Math.abs(value), scale);
 }
 
+/**
+ * Extract all entity IDs referenced by a constraint (string-valued fields
+ * except `id` and `type`, plus array string elements), expanded through
+ * lines → endpoints, circles → center, arcs → center/start/end.
+ */
+function constraintPointIds(constraint: SketchConstraint, def: ConstraintDefinition): Set<string> {
+  const ids = new Set<string>();
+  for (const [key, val] of Object.entries(constraint)) {
+    if (key === 'id' || key === 'type') continue;
+    if (typeof val === 'string') ids.add(val);
+    else if (Array.isArray(val)) {
+      for (const v of val) { if (typeof v === 'string') ids.add(v); }
+    }
+  }
+  // Expand shapes → lines.
+  for (const s of def.shapes ?? []) {
+    if (ids.has(s.id)) {
+      for (const lineId of s.lines) ids.add(lineId);
+    }
+  }
+  // Expand lines → endpoints.
+  for (const l of def.lines) {
+    if (ids.has(l.id)) { ids.add(l.a); ids.add(l.b); }
+  }
+  // Expand circles → center.
+  for (const c of def.circles) {
+    if (ids.has(c.id)) ids.add(c.center);
+  }
+  // Expand arcs → center/start/end.
+  for (const a of def.arcs ?? []) {
+    if (ids.has(a.id)) { ids.add(a.center); ids.add(a.start); ids.add(a.end); }
+  }
+  return ids;
+}
+
+/**
+ * Build a reusable sparsity structure for the Jacobian.
+ * Called once per solve, maps each variable column to the residual rows it
+ * can affect.  This allows the Jacobian loop to skip ~90% of constraint
+ * evaluations per perturbation.
+ */
+function buildSparsityMap(
+  def: ConstraintDefinition,
+  ctx: SolverContext,
+  variables: SolverVariable[],
+): {
+  /** Per-constraint: [startRow, count, constraintDef, constraint] */
+  constraintInfo: Array<{ start: number; count: number; cdef: any; constraint: SketchConstraint }>;
+  /** Per-variable: indices into constraintInfo of constraints affected */
+  varToConstraints: number[][];
+  /** Per-variable: indices of affected arcs (for arc consistency rows) */
+  varToArcs: number[][];
+  /** Starting row of arc consistency equations */
+  arcRowStart: number;
+  /** Total equation count */
+  totalRows: number;
+} {
+  // Compute per-constraint residual counts and row starts.
+  const constraintInfo: Array<{ start: number; count: number; cdef: any; constraint: SketchConstraint }> = [];
+  let row = 0;
+  for (const constraint of def.constraints) {
+    const cdef = registry.get(constraint.type);
+    if (!cdef?.residual) continue;
+    const res = cdef.residual(constraint as never, ctx);
+    constraintInfo.push({ start: row, count: res.length, cdef, constraint });
+    row += res.length;
+  }
+  const arcRowStart = row;
+  const arcs = def.arcs ?? [];
+  const totalRows = row + arcs.length * 2;
+
+  // Build constraint → entityId sets (expanded to points).
+  const constraintEntities = constraintInfo.map(({ constraint }) =>
+    constraintPointIds(constraint, def),
+  );
+
+  // Build arc → entityId sets.
+  const arcEntities = arcs.map((a) =>
+    new Set([a.id, a.center, a.start, a.end]),
+  );
+
+  // Map each variable to affected constraints and arcs.
+  const varToConstraints = variables.map((v) => {
+    const indices: number[] = [];
+    for (let i = 0; i < constraintInfo.length; i++) {
+      if (constraintEntities[i].has(v.entityId)) indices.push(i);
+    }
+    return indices;
+  });
+
+  const varToArcs = variables.map((v) => {
+    const indices: number[] = [];
+    for (let i = 0; i < arcs.length; i++) {
+      if (arcEntities[i].has(v.entityId)) indices.push(i);
+    }
+    return indices;
+  });
+
+  return { constraintInfo, varToConstraints, varToArcs, arcRowStart, totalRows };
+}
+
 function linearizeSystem(
   def: ConstraintDefinition,
   ctx: SolverContext,
   variables: SolverVariable[],
   referenceLength: number,
+  sparsity?: ReturnType<typeof buildSparsityMap>,
 ): LinearizedSystem | null {
   const base = evaluateResiduals(def, ctx);
   if (!base) return null;
@@ -337,30 +445,53 @@ function linearizeSystem(
   const equationCount = base.values.length;
   const jacobian: number[][] = Array.from({ length: equationCount }, () => new Array(parameterCount).fill(0));
 
-  if (parameterCount > 0 && equationCount > 0) {
-    const state = captureState(variables);
-
+  if (parameterCount > 0 && equationCount > 0 && sparsity) {
+    // Sparse Jacobian: only evaluate affected constraints per variable.
+    const arcs = def.arcs ?? [];
     for (let column = 0; column < parameterCount; column++) {
-      const baseValue = state[column];
-      const step = finiteDifferenceStep(baseValue, variables[column].scale);
+      const v = variables[column];
+      const baseValue = v.get();
+      const step = finiteDifferenceStep(baseValue, v.scale);
+      v.set(baseValue + step);
 
-      // Forward difference: J ≈ (f(x+h) - f(x)) / h
-      // Half the cost of central differences, sufficient accuracy for LM.
-      const plusState = [...state];
-      plusState[column] = baseValue + step;
-      applyState(variables, plusState);
-      const plusEval = evaluateResiduals(def, ctx);
-      if (!plusEval) {
-        applyState(variables, state);
-        return null;
+      // Evaluate only affected constraints.
+      for (const ci of sparsity.varToConstraints[column]) {
+        const { start, count, cdef, constraint } = sparsity.constraintInfo[ci];
+        const res = cdef.residual(constraint as never, ctx);
+        for (let r = 0; r < count; r++) {
+          jacobian[start + r][column] = (res[r] - base.values[start + r]) / step;
+        }
       }
 
+      // Evaluate only affected arc consistency equations.
+      for (const ai of sparsity.varToArcs[column]) {
+        const arc = arcs[ai];
+        const center = ctx.points.get(arc.center)!;
+        const start = ctx.points.get(arc.start)!;
+        const end = ctx.points.get(arc.end)!;
+        const r0 = sparsity.arcRowStart + ai * 2;
+        const res0 = Math.hypot(start.x - center.x, start.y - center.y) - arc.radius;
+        const res1 = Math.hypot(end.x - center.x, end.y - center.y) - arc.radius;
+        jacobian[r0][column] = (res0 - base.values[r0]) / step;
+        jacobian[r0 + 1][column] = (res1 - base.values[r0 + 1]) / step;
+      }
+
+      v.set(baseValue); // restore
+    }
+  } else if (parameterCount > 0 && equationCount > 0) {
+    // Dense fallback.
+    for (let column = 0; column < parameterCount; column++) {
+      const v = variables[column];
+      const baseValue = v.get();
+      const step = finiteDifferenceStep(baseValue, v.scale);
+      v.set(baseValue + step);
+      const plusEval = evaluateResiduals(def, ctx);
+      v.set(baseValue);
+      if (!plusEval) return null;
       for (let row = 0; row < equationCount; row++) {
         jacobian[row][column] = (plusEval.values[row] - base.values[row]) / step;
       }
     }
-
-    applyState(variables, state);
   }
 
   const weights = computeRowWeights(jacobian, referenceLength);
@@ -501,6 +632,9 @@ function solveGlobalSystem(
     return evalResult?.maxAbs ?? 0;
   }
 
+  // Build sparsity map once — reused across all LM iterations.
+  const sparsity = buildSparsityMap(def, ctx, variables);
+
   const initialState = captureState(variables);
   let bestState = [...initialState];
   let bestError = Infinity;
@@ -515,7 +649,7 @@ function solveGlobalSystem(
 
     let lambda = 1e-3;
     let nu = 2;
-    let linearized = linearizeSystem(def, ctx, variables, referenceLength);
+    let linearized = linearizeSystem(def, ctx, variables, referenceLength, sparsity);
     if (!linearized) return Infinity;
 
     for (let iter = 0; iter < iterations; iter++) {
@@ -541,7 +675,7 @@ function solveGlobalSystem(
         const trialState = state.map((value, index) => value + dx[index]);
         applyState(variables, trialState);
 
-        const trial = linearizeSystem(def, ctx, variables, referenceLength);
+        const trial = linearizeSystem(def, ctx, variables, referenceLength, sparsity);
         if (!trial) {
           applyState(variables, state);
           break;
@@ -596,7 +730,7 @@ function solveGlobalSystem(
 
       let lambda = 1e-3;
       let nu = 2;
-      let linearized = linearizeSystem(def, ctx, variables, referenceLength);
+      let linearized = linearizeSystem(def, ctx, variables, referenceLength, sparsity);
       if (!linearized) break;
 
       for (let iter = 0; iter < iterations; iter++) {
@@ -617,7 +751,7 @@ function solveGlobalSystem(
         for (let inner = 0; inner < 12; inner++) {
           const trialState = state.map((value, index) => value + dx[index]);
           applyState(variables, trialState);
-          const trial = linearizeSystem(def, ctx, variables, referenceLength);
+          const trial = linearizeSystem(def, ctx, variables, referenceLength, sparsity);
           if (!trial) { applyState(variables, state); break; }
           const actualReduction = linearized.weightedCost - trial.weightedCost;
           const rho = predictedReduction > 0 ? actualReduction / predictedReduction : 0;

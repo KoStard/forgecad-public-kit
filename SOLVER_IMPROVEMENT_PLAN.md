@@ -167,6 +167,8 @@ Each `constrain()` runs `decomposeAndSolve()` on the FULL system from scratch.
 | P1+P2 | Early exit + reduced restarts/iterations | 592 | 34 | 626 | 0.0000 | ✅ 5× faster |
 | P5a | Freeze converged variables (1-hop) | 251 | 1712 | 1962 | 15.7161 | ✗ quality degraded |
 | P6 | Forward-difference Jacobian | 377 | 20 | 398 | 0.0000 | ✅ 7.6× faster |
+| P6b | In-place perturbation (no array copies) | 356 | 19 | 375 | 0.0000 | ✅ 8× faster |
+| P7 | Sparse Jacobian (per-variable constraint filter) | 225 | 11 | 236 | 0.0000 | ✅ 12.8× faster |
 
 ### Performance Experiment Log
 
@@ -215,8 +217,14 @@ Constraints #47-48 (lineDistance in camera holder section) each take ~70-100ms. 
 
 Next optimization targets:
 - **Analytical Jacobian** — compute derivatives analytically instead of finite differences (eliminates all perturbation evaluations)
-- **Sparse Jacobian** — most constraints only reference 2-4 variables; skip zero columns
-- **Subsystem-aware incremental solve** — only re-solve the subsystem affected by the new constraint
+- **Analytical Jacobian** — compute derivatives analytically instead of finite differences
+
+#### P7: Sparse Jacobian — per-variable constraint filter (SUCCESS — 12.8× total speedup)
+**What**: Build a sparsity map that maps each variable to the constraints that reference its entity. When computing a Jacobian column (perturbing one variable), only evaluate those affected constraints instead of all constraints. Requires expanding entity IDs through composites: shapes→lines→points, circles→center, arcs→center/start/end.
+**Result**: Build 375ms → 225ms, solve 19ms → 11ms, total 375ms → 236ms. Quality maintained (maxError=0.0000).
+**Why it worked**: Most constraints reference only 2-4 entities (4-8 variables out of 60). The old code evaluated all 54 constraints per perturbation. With sparse Jacobian, each perturbation evaluates only 3-5 constraints. For 58 variables × 30 iterations, this eliminates ~90% of constraint evaluations.
+**Initial bug**: Forgot to expand shape IDs → line IDs → point IDs, causing the solver to miss dependencies for shape-based constraints (shapeEqualCentroid). This caused quality degradation (maxError=15.7) until fixed.
+**Key insight**: The sparsity map is built once per `solveConstraints` call and reused across all iterations. Building it requires one full residual evaluation (to count rows per constraint) but this cost is amortized across many iterations.
 
 ---
 
