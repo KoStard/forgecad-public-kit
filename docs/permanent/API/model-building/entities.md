@@ -133,50 +133,135 @@ const copy = box.clone();
 copy.face('side-left');
 ```
 
-## Constraint Helpers
+## Constrained Sketches
+
+Parametric 2D sketches driven by geometric constraints and a nonlinear solver. Create geometry, apply constraints, solve, then extrude to 3D.
+
+### Basic workflow
 
 ```javascript
-const sketch = constrainedSketch();
-const p1 = sketch.point(0, 0, true);
-const p2 = sketch.point(50, 0);
-const p3 = sketch.point(50, 30);
-const l1 = sketch.line(p1, p2);
-const l2 = sketch.line(p2, p3);
+const sk = constrainedSketch();
 
-Constraint.horizontal(sketch, l1);
-Constraint.vertical(sketch, l2);
-Constraint.length(sketch, l1, 50);
-Constraint.perpendicular(sketch, l1, l2);
+// Create geometry
+const p1 = sk.point(0, 0);
+const p2 = sk.point(50, 0);
+const p3 = sk.point(50, 30);
+const l1 = sk.line(p1, p2);
+const l2 = sk.line(p2, p3);
 
-const result = sketch.close().solve();
+// Apply constraints (fluent — all return `this`)
+sk.fix(p1, 0, 0);
+sk.horizontal(l1);
+sk.vertical(l2);
+sk.length(l1, 50);
+sk.length(l2, 30);
+
+const result = sk.solve();
+return result.extrude(10);
 ```
 
-### Entity-aware constraints
+### Concepts — high-level shape factories
 
-Constraint functions accept `Point2D`/`Line2D` directly — they auto-import into the builder:
+Instead of creating points and lines individually, use concept factories that create structurally-constrained shapes and return typed handles:
 
 ```javascript
-const sketch = constrainedSketch();
-const myLine = line(0, 0, 50, 0);
-const myRect = rectangle(10, 10, 40, 30);
+const sk = constrainedSketch();
 
-// Pass Line2D directly — auto-imported
-Constraint.makeParallel(sketch, myLine, myRect.side('top'));
-Constraint.horizontal(sketch, myLine);
+// Rectangle: 4 points, 4 sides, horizontal/vertical constraints, CCW winding
+// Returns handle with .top, .bottom, .left, .right (LineIds),
+// .bottomLeft, .topRight, etc. (PointIds), .center, .shape
+const r = sk.rect({ x: 0, y: 0, width: 100, height: 50 });
+sk.fix(r.bottomLeft, 0, 0);
+sk.length(r.bottom, 120);  // override initial width
+
+// Regular polygon: n equal sides, CCW winding, center point
+const hex = sk.regularPolygon({ sides: 6, radius: 25 });
+sk.fix(hex.center, 0, 0);
+sk.length(hex.side(0), 30);  // all sides change (equal constraint)
+
+// General polygon: n vertices from coordinates, CCW winding
+const tri = sk.addPolygon({ points: [[0,0], [100,0], [50,80]] });
+sk.fix(tri.vertex(0), 0, 0);
+sk.length(tri.side(0), 100);
 ```
 
-### Importing entities into a constrained sketch
+### Available constraints
+
+**Geometric** (no value parameter):
+`horizontal`, `vertical`, `parallel`, `perpendicular`, `equal`, `coincident`, `collinear`, `symmetric`, `midpoint`, `pointOnLine`, `pointOnCircle`, `tangent`, `concentric`, `equalRadius`, `ccw`
+
+**Dimensional** (with `value`):
+`length`, `distance`, `angle`, `absoluteAngle`, `angleBetween`, `radius`, `diameter`, `hDistance`, `vDistance`, `lineDistance`, `pointLineDistance`, `arcLength`, `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX`, `shapeCentroidY`
+
+**Pinning:**
+`fix(point, x?, y?)` — pins a point at coordinates (or current position if omitted)
+
+### Construction geometry
+
+Pass `true` as the third argument to `sk.line()` to create construction lines. These participate in constraints but don't appear in the solved sketch output.
 
 ```javascript
-const sketch = constrainedSketch();
+// Axis of symmetry (construction line)
+const axis = sk.line(sk.point(0, -50), sk.point(0, 50), true);
+sk.symmetric(p1, p2, axis);  // p1 mirrors to p2 across axis
+```
+
+### Path drawing (turtle-style)
+
+```javascript
+const sk = constrainedSketch();
+sk.moveTo(0, 0)
+  .lineTo(50, 0)
+  .lineTo(50, 30)
+  .arcTo(25, 40, 15)  // arc with radius 15
+  .lineTo(0, 30)
+  .close();
+// Constraints can reference lines/points by index:
+sk.length(sk.lineAt(0), 50);
+```
+
+### Solver results
+
+```javascript
+const result = sk.solve();
+
+// Check solve quality
+result.constraintMeta.status;   // 'fully' | 'under' | 'over' | 'over-redundant'
+result.constraintMeta.dof;      // 0 = fully constrained
+result.constraintMeta.maxError; // residual — should be < 1e-6
+
+// Diagnostics
+result.inspect();  // human-readable summary
+
+// Update a dimension without rebuilding the sketch
+const updated = result.withUpdatedConstraint('cst-5', 120);
+```
+
+### Importing external geometry
+
+```javascript
+const sk = constrainedSketch();
 const r = rectangle(0, 0, 100, 60);
-const sides = sketch.importRectangle(r);
+const sides = sk.importRectangle(r);
 // sides.bottom, sides.right, sides.top, sides.left are LineIds
-// sides.points is [bl, br, tr, tl] PointIds
-
-Constraint.horizontal(sketch, sides.bottom);
-Constraint.length(sketch, sides.bottom, 100);
+sk.length(sides.bottom, 100);
 ```
+
+Constraint methods also accept `Point2D`/`Line2D` directly — they auto-import:
+
+```javascript
+const sk = constrainedSketch();
+const myLine = line(0, 0, 50, 0);
+sk.horizontal(myLine);  // auto-imported into the sketch
+```
+
+### Troubleshooting
+
+**Constraint silently ignored?** All arguments are validated at call time. Passing a wrong entity type (e.g., a LineId where a PointId is expected) throws immediately with available entity IDs listed. Passing `NaN`/`Infinity` as a dimension value also throws.
+
+**Under-constrained (dof > 0)?** The sketch has free degrees of freedom. Add `fix()`, `length()`, or other dimensional constraints. Check `result.constraintMeta.dof` for how many DOF remain.
+
+**Over-constrained?** Conflicting constraints are auto-rejected. Check `result.constraintMeta.constraints` for conflict flags and `result.inspect()` for details.
 
 
 ## Patterns
