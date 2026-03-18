@@ -44,15 +44,46 @@
 
 | # | Task | Status |
 |---|------|--------|
-| 1 | Terminal parity | TODO |
-| 2 | Status messaging cleanup | TODO |
-| 3 | Constraint identification | TODO |
-| 4 | Per-constraint coloring | TODO |
-| 5 | Redundancy vs conflict | TODO |
-| 6 | Curated test suite | TODO |
+| 1 | Terminal parity | ✅ DONE |
+| 2 | Status messaging cleanup | ✅ DONE |
+| 3 | Constraint identification | 🔶 PARTIAL — entity IDs shown in CLI, click-to-highlight in browser TODO |
+| 4 | Per-constraint coloring | 🔶 PARTIAL — CLI shows per-constraint status; browser still uses global color |
+| 5 | Redundancy vs conflict | ✅ DONE |
+| 6 | Curated test suite | ✅ DONE |
 
 ---
 
-## Experiment Log
+## Completed Work
 
-(Experiments will be logged here as work progresses.)
+### Terminal parity (Issue 1) — ✅
+- `test-run.ts`: Shows status badge (colored), DOF, maxError, constraint count for every sketch
+- `test-run.ts`: Shows problematic constraints (conflicting, redundant, high residual) with entity IDs
+- `check-constraints.ts`: New `printConstraintSummary()` with full constraint table, colored icons, entity refs
+
+### Status messaging (Issue 2) — ✅
+- New `'over-redundant'` status: DOF < 0 but converged (maxError low) → yellow "OVER-REDUNDANT"
+- Original `'over'` status: DOF < 0 and failed to converge → red "OVER" (genuine conflict)
+- Updated across all surfaces: registry.ts, types.ts, ViewPanel.tsx, Viewport.tsx, sketch-svg.ts, forge-api.d.ts
+
+### Redundancy vs conflict (Issue 5) — ✅
+- Fixed property name bugs: `c.conflicting` → `c.isConflicting`, `c.redundant` → `c.isRedundant`
+- Fixed status comparison: `'over-constrained'` → `'over'`
+- Per-constraint `residual` and `entityIds` added to ConstraintDisplay type
+- Redundant constraints show yellow `~` icon, conflicting show red `✗`, satisfied show green `✓`
+
+### Curated test suite (Issue 6) — ✅
+8 files in `examples/constraints/`:
+| File | Scenario | Expected |
+|------|----------|----------|
+| 01 | Fully constrained rectangle | green FULLY DOF=0 |
+| 02 | Underconstrained triangle | blue UNDER DOF>0 |
+| 03 | Redundant constraints (horizontal + absoluteAngle(0)) | yellow OVER-REDUNDANT |
+| 04 | Conflicting constraints (length=10 + length=20) | red OVER |
+| 05 | parallel + lineDistance (implied redundancy) | yellow OVER-REDUNDANT |
+| 06 | Complex spectrogram (54 constraints, 31 points) | yellow OVER-REDUNDANT DOF=-4 |
+| 07 | Perpendicular chain zigzag | green FULLY |
+| 08 | Symmetric L-bracket | green FULLY |
+
+### Remaining browser UI work (Issues 3, 4)
+- Click-to-highlight: clicking a constraint in the panel should highlight its referenced edges/points in the viewport
+- Per-constraint coloring: individual constraint colors based on own residual, not global status
