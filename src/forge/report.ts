@@ -4,6 +4,7 @@ import type { RunResult, SceneObject } from './runner';
 import type { DimensionDef } from './sketch/dimensions';
 import type { BomDef } from './bom';
 import { mapDimensionsToOwnerIds } from './reportDimensionOwnership';
+import { formatLength, type LengthUnit } from './units';
 
 export type ReportViewId = 'front' | 'right' | 'top' | 'iso';
 
@@ -24,6 +25,7 @@ export interface ReportOptions {
    */
   dimensionDirectionToleranceDeg?: number;
   generatedAt?: Date;
+  lengthUnit?: LengthUnit;
 }
 
 export interface ReportGenerationResult {
@@ -169,6 +171,9 @@ const DENSE_DIM_COLOR_PALETTE: ColorRgb[] = [
 const MAX_LABEL_GEOMETRY_SEGMENTS = 2200;
 const MAX_FILL_TRIANGLES_PER_OBJECT = 12000;
 const MAX_EDGE_SEGMENTS_PER_OBJECT = 45000;
+
+/** Module-level length unit for the current report generation. Set by generateReportPdf. */
+let _reportLengthUnit: LengthUnit = 'mm';
 
 const encoder = new TextEncoder();
 
@@ -1952,7 +1957,7 @@ function drawDimension(
   const arrowSize = clamp((len * mapScale) * 0.045, 3, 7.5);
   const extGap = clamp(Math.abs(offset) * projectedModelScale * 0.1, 0.8, 2.5);
   const dmm = distance3(dim.from, dim.to);
-  const baseLabel = dim.label ? `${dim.label}: ${dmm.toFixed(1)} mm` : `${dmm.toFixed(1)} mm`;
+  const baseLabel = dim.label ? `${dim.label}: ${formatLength(dmm, _reportLengthUnit, 1)}` : formatLength(dmm, _reportLengthUnit, 1);
 
   const cmd: string[] = [];
   cmd.push(commandSetStroke(color));
@@ -2537,6 +2542,8 @@ export function generateReportPdf(
   result: RunResult,
   options: ReportOptions = {},
 ): ReportGenerationResult {
+  _reportLengthUnit = options.lengthUnit ?? 'mm';
+
   const views = (options.views && options.views.length > 0 ? options.views : DEFAULT_VIEWS)
     .map(makeViewFrame);
 

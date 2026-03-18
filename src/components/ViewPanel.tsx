@@ -8,6 +8,7 @@ import { animationSpeedToSlider, formatAnimationSpeed, sliderToAnimationSpeed } 
 import { getCameraForwardVector, type ViewportCameraState } from '../capture/cameraState';
 import { formatRenderSceneCliSpec, type ViewportRenderSceneState } from '../capture/renderSceneState';
 import { ConstructionTreePanel } from './ConstructionTreePanel';
+import { formatArea } from '@forge/units';
 
 const btnStyle = (active = false): CSSProperties => ({
   padding: '4px 8px',
@@ -259,6 +260,7 @@ export function ViewPanel() {
   const measureSnapPx = useForgeStore((s) => s.measureSnapPx);
   const setMeasureSnapPx = useForgeStore((s) => s.setMeasureSnapPx);
   const viewportCameraState = useForgeStore((s) => s.viewportCameraState);
+  const lengthUnit = useForgeStore((s) => s.lengthUnit);
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
   const toggleDimensions = useForgeStore((s) => s.toggleDimensions);
   const explodeAmount = useForgeStore((s) => s.explodeAmount);
@@ -548,6 +550,17 @@ export function ViewPanel() {
         <div style={{ display: 'flex', gap: 6 }}>
           <button style={btnStyle(projectionMode === 'perspective')} onClick={() => setProjectionMode('perspective')}>Perspective</button>
           <button style={btnStyle(projectionMode === 'orthographic')} onClick={() => setProjectionMode('orthographic')}>Orthographic</button>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={labelStyle}>Units</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {(['mm', 'cm', 'm', 'in', 'ft'] as const).map((u) => (
+            <button key={u} style={btnStyle(lengthUnit === u)} onClick={() => useForgeStore.getState().setLengthUnit(u)}>
+              {u}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -860,7 +873,7 @@ export function ViewPanel() {
                 return (
                   <div key={s.index} style={{ fontSize: 11, color: 'var(--fc-text)', display: 'flex', gap: 6, alignItems: 'center', padding: '2px 0' }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0, opacity: 0.7 }} />
-                    <span>[{s.index}] {s.area.toFixed(1)}mm²</span>
+                    <span>[{s.index}] {formatArea(s.area, lengthUnit, 1)}</span>
                     <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>
                       seed=[{s.seed[0].toFixed(1)}, {s.seed[1].toFixed(1)}]
                     </span>

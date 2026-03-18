@@ -1,4 +1,5 @@
 import type { ForgeQualityPreset, ReportObjectVisual } from '@forge/index';
+import type { LengthUnit } from '@forge/units';
 
 export interface ReportWorkerGeneratePayload {
   files: Record<string, string>;
@@ -8,6 +9,7 @@ export interface ReportWorkerGeneratePayload {
   title: string;
   objectVisuals: Record<string, ReportObjectVisual>;
   includeDisassembled: boolean;
+  lengthUnit?: LengthUnit;
 }
 
 export interface ReportWorkerGenerateRequest {

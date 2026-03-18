@@ -17,6 +17,7 @@ import { isNotebookFile, serializeNotebook, createNotebook } from '../notebook/m
 import { evalWorkerClient } from '../workers/evalWorkerClient';
 import { deserializeRunResult } from '../forge/deserializeRunResult';
 import { type ThemeName, applyTheme } from '../theme';
+import type { LengthUnit } from '@forge/units';
 import { clampAnimationSpeed } from '../animationSpeed';
 import type { ViewportCameraState } from '../capture/cameraState';
 import { decodeSharedHash, getGistId } from '../share';
@@ -277,6 +278,9 @@ interface ForgeStore {
   setJointAnimationSpeed: (value: number) => void;
   toggleJointAnimationPlayback: () => void;
 
+  lengthUnit: LengthUnit;
+  setLengthUnit: (unit: LengthUnit) => void;
+
   renderMode: RenderMode;
   setRenderMode: (mode: RenderMode) => void;
   projectionMode: ProjectionMode;
@@ -405,6 +409,7 @@ interface ViewPreferencesState {
   sectionPlaneAxisEnabled: boolean;
   fileExplorerOpen: boolean;
   viewPanelOpen: boolean;
+  lengthUnit: LengthUnit;
 }
 
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
@@ -1084,6 +1089,12 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationPlaying: true,
     };
   }),
+
+  lengthUnit: (initialViewPreferences.lengthUnit as LengthUnit) ?? 'mm',
+  setLengthUnit: (unit) => {
+    writeViewPreferences({ lengthUnit: unit });
+    set({ lengthUnit: unit });
+  },
 
   renderMode: initialViewPreferences.renderMode ?? 'overlay',
   setRenderMode: (mode) => {
