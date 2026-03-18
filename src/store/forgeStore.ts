@@ -362,6 +362,10 @@ interface ForgeStore {
   openFileSwitcher: () => void;
   closeFileSwitcher: () => void;
 
+  shortcutsOverlayOpen: boolean;
+  openShortcutsOverlay: () => void;
+  closeShortcutsOverlay: () => void;
+
   /** Non-null when the UI wants the code editor to jump to a specific line. */
   editorNavigate: { line: number; id: number } | null;
   requestEditorNavigate: (line: number) => void;
@@ -1594,6 +1598,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   fileSwitcherOpen: false,
   openFileSwitcher: () => set({ fileSwitcherOpen: true }),
   closeFileSwitcher: () => set({ fileSwitcherOpen: false }),
+
+  shortcutsOverlayOpen: false,
+  openShortcutsOverlay: () => set({ shortcutsOverlayOpen: true }),
+  closeShortcutsOverlay: () => set({ shortcutsOverlayOpen: false }),
 
   editorNavigate: null,
   requestEditorNavigate: (line) => set((s) => ({ editorNavigate: { line, id: (s.editorNavigate?.id ?? 0) + 1 } })),

@@ -1288,6 +1288,100 @@ export function CodeEditor() {
       noSyntaxValidation: false,
     });
 
+    // Register custom themes so editor colors match the app theme
+    monaco.editor.defineTheme('forge-gruvbox', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '928374', fontStyle: 'italic' },
+        { token: 'keyword', foreground: 'fb4934' },
+        { token: 'string', foreground: 'b8bb26' },
+        { token: 'number', foreground: 'd3869b' },
+        { token: 'type', foreground: '83a598' },
+        { token: 'identifier', foreground: 'ebdbb2' },
+      ],
+      colors: {
+        'editor.background': '#282828',
+        'editor.foreground': '#ebdbb2',
+        'editor.lineHighlightBackground': '#32302f',
+        'editorCursor.foreground': '#fe8019',
+        'editor.selectionBackground': '#504945',
+        'editor.inactiveSelectionBackground': '#3c3836',
+        'editorLineNumber.foreground': '#665c54',
+        'editorLineNumber.activeForeground': '#a89984',
+        'editorIndentGuide.background1': '#3c3836',
+        'editorWidget.background': '#1d2021',
+        'editorWidget.border': '#504945',
+        'input.background': '#1d2021',
+        'input.foreground': '#ebdbb2',
+        'input.border': '#504945',
+        'scrollbarSlider.background': '#504945aa',
+        'scrollbarSlider.hoverBackground': '#665c54aa',
+      },
+    });
+
+    monaco.editor.defineTheme('forge-tokyo-night', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '565f89', fontStyle: 'italic' },
+        { token: 'keyword', foreground: 'bb9af7' },
+        { token: 'string', foreground: '9ece6a' },
+        { token: 'number', foreground: 'ff9e64' },
+        { token: 'type', foreground: '7aa2f7' },
+        { token: 'identifier', foreground: 'c0caf5' },
+      ],
+      colors: {
+        'editor.background': '#1a1b26',
+        'editor.foreground': '#c0caf5',
+        'editor.lineHighlightBackground': '#1f2335',
+        'editorCursor.foreground': '#7aa2f7',
+        'editor.selectionBackground': '#33467c',
+        'editor.inactiveSelectionBackground': '#292e42',
+        'editorLineNumber.foreground': '#3b4261',
+        'editorLineNumber.activeForeground': '#737aa2',
+        'editorIndentGuide.background1': '#292e42',
+        'editorWidget.background': '#16161e',
+        'editorWidget.border': '#292e42',
+        'input.background': '#16161e',
+        'input.foreground': '#c0caf5',
+        'input.border': '#292e42',
+        'scrollbarSlider.background': '#292e42aa',
+        'scrollbarSlider.hoverBackground': '#33467caa',
+      },
+    });
+
+    monaco.editor.defineTheme('forge-kanagawa-lotus', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '8a8980', fontStyle: 'italic' },
+        { token: 'keyword', foreground: 'c84053' },
+        { token: 'string', foreground: '6f894e' },
+        { token: 'number', foreground: 'd27e99' },
+        { token: 'type', foreground: '4d699b' },
+        { token: 'identifier', foreground: '545464' },
+      ],
+      colors: {
+        'editor.background': '#f2ecbc',
+        'editor.foreground': '#545464',
+        'editor.lineHighlightBackground': '#e7dba0',
+        'editorCursor.foreground': '#c84053',
+        'editor.selectionBackground': '#c9b97a',
+        'editor.inactiveSelectionBackground': '#d9d08e',
+        'editorLineNumber.foreground': '#a8a070',
+        'editorLineNumber.activeForeground': '#766b6b',
+        'editorIndentGuide.background1': '#e0daa0',
+        'editorWidget.background': '#f7f3d7',
+        'editorWidget.border': '#d7d194',
+        'input.background': '#f7f3d7',
+        'input.foreground': '#545464',
+        'input.border': '#d7d194',
+        'scrollbarSlider.background': '#d7d194aa',
+        'scrollbarSlider.hoverBackground': '#c9b97aaa',
+      },
+    });
+
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       useForgeStore.getState().saveFile();
     });
@@ -1331,7 +1425,13 @@ export function CodeEditor() {
         <Editor
           key={activeFile}
           defaultLanguage="javascript"
-          theme={theme === 'light' || theme === 'kanagawa-lotus' ? 'light' : 'vs-dark'}
+          theme={
+            theme === 'gruvbox' ? 'forge-gruvbox'
+            : theme === 'tokyo-night' ? 'forge-tokyo-night'
+            : theme === 'kanagawa-lotus' ? 'forge-kanagawa-lotus'
+            : theme === 'light' ? 'light'
+            : 'vs-dark'
+          }
           value={code}
           onChange={handleChange}
           onMount={handleMount}

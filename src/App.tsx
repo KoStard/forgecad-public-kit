@@ -11,6 +11,7 @@ import { FileExplorer } from './components/FileExplorer';
 import { ViewPanel } from './components/ViewPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { FileSwitcher } from './components/FileSwitcher';
+import { KeyboardShortcutsOverlay } from './components/KeyboardShortcutsOverlay';
 import { ConsolePanel } from './components/ConsolePanel';
 import { VerificationsPanel } from './components/VerificationsPanel';
 import { ResizablePanel } from './components/ResizablePanel';
@@ -97,6 +98,7 @@ function Toolbar() {
   const toggleFileExplorer = useForgeStore((s) => s.toggleFileExplorer);
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
   const toggleViewPanel = useForgeStore((s) => s.toggleViewPanel);
+  const openCommandPalette = useForgeStore((s) => s.openCommandPalette);
 
   const measureDistances = measurements.map((measurement, index) => {
     if (measurement.points.length !== 2) return null;
@@ -120,16 +122,37 @@ function Toolbar() {
       <span style={{ color: 'var(--fc-textDim)', fontSize: 12, marginLeft: 4 }}>
         {activeFile}{dirty ? ' •' : ''}
       </span>
+      <button
+        onClick={openCommandPalette}
+        title="Open command palette (⌘⇧P)"
+        style={{
+          marginLeft: 8,
+          padding: '2px 8px',
+          background: 'var(--fc-bgSurface)',
+          border: '1px solid var(--fc-border)',
+          borderRadius: 4,
+          color: 'var(--fc-textDim)',
+          fontSize: 11,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontFamily: 'inherit',
+        }}
+      >
+        <span>Commands</span>
+        <kbd style={{ fontSize: 10, opacity: 0.7, fontFamily: 'inherit' }}>⌘⇧P</kbd>
+      </button>
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
-        <button style={btnStyle(fileExplorerOpen)} onClick={toggleFileExplorer}>📁 Files</button>
-        <button style={btnStyle(viewPanelOpen)} onClick={toggleViewPanel}>🧭 View</button>
+        <button style={btnStyle(fileExplorerOpen)} onClick={toggleFileExplorer} title="Toggle file explorer">📁 Files</button>
+        <button style={btnStyle(viewPanelOpen)} onClick={toggleViewPanel} title="Toggle view panel">🧭 View</button>
         <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
-        <button style={btnStyle()} onClick={newProject}>New Project</button>
-        <button style={btnStyle()} onClick={saveFile}>Save</button>
-        <button style={btnStyle()} onClick={saveFileAs}>Save As</button>
+        <button style={btnStyle()} onClick={newProject} title="New project">New Project</button>
+        <button style={btnStyle()} onClick={saveFile} title="Save (⌘S)">Save</button>
+        <button style={btnStyle()} onClick={saveFileAs} title="Save as new file">Save As</button>
         <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
-        <button style={btnStyle(measureMode)} onClick={toggleMeasure}>📏 Measure</button>
+        <button style={btnStyle(measureMode)} onClick={toggleMeasure} title="Toggle measurement tool">📏 Measure</button>
         {measureMode && <button style={btnStyle()} onClick={clearMeasure}>Clear All</button>}
         {__FORGE_MODE__ === 'web' && (
           <>
@@ -227,6 +250,23 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== '?') return;
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      // Don't trigger inside text inputs or editor surfaces
+      if (target.closest('[data-fc-editor-surface]')) return;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      event.preventDefault();
+      const state = useForgeStore.getState();
+      if (state.commandPaletteOpen || state.fileSwitcherOpen) return;
+      state.openShortcutsOverlay();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  useEffect(() => {
     const handleEditorShortcut = (event: KeyboardEvent) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
@@ -319,6 +359,7 @@ export function App() {
       </div>
       <CommandPalette />
       <FileSwitcher />
+      <KeyboardShortcutsOverlay />
     </div>
   );
 }
