@@ -13,3 +13,30 @@ const items = useMemo(() => config?.items ?? [], [config]);
 ```
 
 This is especially dangerous when the unstable reference is several layers removed from the expensive computation — the memoization "looks correct" locally but the dep chain is broken. Use `useMemo` for any derived-with-fallback value that feeds into other hooks.
+
+
+## Constrained Sketch Builder: Validate All Inputs at the Builder Level
+
+**Every public method on `ConstrainedSketchBuilder` must validate its arguments before storing or passing them to the solver.** The solver's constraint `residual()` functions silently return `[0]` (= "constraint satisfied") when entity lookups fail, so invalid inputs produce silent misbehavior instead of errors.
+
+Required validations:
+
+1. **Entity existence** — When accepting an entity ID (`PointId`, `LineId`, `CircleId`, `ArcId`, `ShapeId`), verify it exists in the builder's entity lists via the `resolve*Id()` helpers. These are all `string` at runtime, so passing one type where another is expected compiles fine but fails silently.
+
+2. **Numeric values** — Any `value: number` parameter on a dimension constraint must be validated with `requireFinite()`. `NaN` and `Infinity` cause the solver to spin or produce garbage.
+
+3. **Entity creation** — `point()`, `line()`, `circle()` etc. must validate their inputs (finite coordinates, existing endpoint IDs).
+
+```ts
+// BAD — bypasses validation, solver silently ignores the constraint
+pointOnLine(point: PointId, line: LineId): this {
+  return this.constrain({ type: 'pointOnLine', point, line });
+}
+
+// GOOD — validates both existence and type
+pointOnLine(point: any, line: any): this {
+  return this.constrain({ type: 'pointOnLine',
+    point: this.resolvePointId(point),
+    line: this.resolveLineId(line) });
+}
+```

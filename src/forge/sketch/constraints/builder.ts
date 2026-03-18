@@ -57,7 +57,10 @@ export class ConstrainedSketchBuilder {
     });
   }
 
-  point(x: number, y: number, fixed = false): PointId {
+  point(x = 0, y = 0, fixed = false): PointId {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error(`point(): coordinates must be finite numbers, got (${x}, ${y})`);
+    }
     const id = `pt-${this.nextId++}`;
     this.points.push({ id, x, y, fixed });
     return id;
@@ -70,6 +73,12 @@ export class ConstrainedSketchBuilder {
   }
 
   line(a: PointId, b: PointId, construction = false): LineId {
+    if (!this.points.some((p) => p.id === a)) {
+      throw new Error(`line(): point "${a}" not found in sketch`);
+    }
+    if (!this.points.some((p) => p.id === b)) {
+      throw new Error(`line(): point "${b}" not found in sketch`);
+    }
     const id = `ln-${this.nextId++}`;
     this.lines.push({ id, a, b, construction });
     return id;
@@ -82,6 +91,12 @@ export class ConstrainedSketchBuilder {
   }
 
   circle(center: PointId, radius: number, construction = false, segments = 48): CircleId {
+    if (!Number.isFinite(radius)) {
+      throw new Error(`circle(): radius must be a finite number, got ${radius}`);
+    }
+    if (!this.points.some((p) => p.id === center)) {
+      throw new Error(`circle(): center point "${center}" not found in sketch`);
+    }
     const id = `c-${this.nextId++}`;
     this.circles.push({ id, center, radius, construction, fixedRadius: false, segments });
     if (!construction) {
@@ -231,39 +246,100 @@ export class ConstrainedSketchBuilder {
   // having to manually extract the ID.
 
   private resolvePointId(p: any): PointId {
-    if (typeof p === 'string') return p;
-    if (p && typeof p === 'object') {
-      if ('id' in p && typeof p.id === 'string') return p.id;
-      if ('x' in p && 'y' in p) return this.importPoint(p);
+    let id: string;
+    if (typeof p === 'string') {
+      id = p;
+    } else if (p && typeof p === 'object') {
+      if ('id' in p && typeof p.id === 'string') {
+        id = p.id;
+      } else if ('x' in p && 'y' in p) {
+        return this.importPoint(p);
+      } else {
+        throw new Error(`Invalid point reference: ${p}`);
+      }
+    } else {
+      throw new Error(`Invalid point reference: ${p}`);
     }
-    throw new Error(`Invalid point reference: ${p}`);
+    if (!this.points.some((pt) => pt.id === id)) {
+      throw new Error(`Point "${id}" not found in sketch. Available points: ${this.points.map((pt) => pt.id).join(', ') || '(none)'}`);
+    }
+    return id;
   }
 
   private resolveLineId(l: any): LineId {
-    if (typeof l === 'string') return l;
-    if (l && typeof l === 'object') {
-      if ('id' in l && typeof l.id === 'string') return l.id;
-      if ('start' in l && 'end' in l) return this.importLine(l);
+    let id: string;
+    if (typeof l === 'string') {
+      id = l;
+    } else if (l && typeof l === 'object') {
+      if ('id' in l && typeof l.id === 'string') {
+        id = l.id;
+      } else if ('start' in l && 'end' in l) {
+        return this.importLine(l);
+      } else {
+        throw new Error(`Invalid line reference: ${l}`);
+      }
+    } else {
+      throw new Error(`Invalid line reference: ${l}`);
     }
-    throw new Error(`Invalid line reference: ${l}`);
+    if (!this.lines.some((ln) => ln.id === id)) {
+      throw new Error(`Line "${id}" not found in sketch. Available lines: ${this.lines.map((ln) => ln.id).join(', ') || '(none)'}`);
+    }
+    return id;
   }
 
   private resolveCircleId(c: any): CircleId {
-    if (typeof c === 'string') return c;
-    if (c && typeof c === 'object' && 'id' in c && typeof c.id === 'string') return c.id;
-    throw new Error(`Invalid circle reference: ${c}`);
+    let id: string;
+    if (typeof c === 'string') {
+      id = c;
+    } else if (c && typeof c === 'object' && 'id' in c && typeof c.id === 'string') {
+      id = c.id;
+    } else {
+      throw new Error(`Invalid circle reference: ${c}`);
+    }
+    if (!this.circles.some((ci) => ci.id === id)) {
+      throw new Error(`Circle "${id}" not found in sketch. Available circles: ${this.circles.map((ci) => ci.id).join(', ') || '(none)'}`);
+    }
+    return id;
   }
 
   private resolveArcId(a: any): ArcId {
-    if (typeof a === 'string') return a;
-    if (a && typeof a === 'object' && 'id' in a && typeof a.id === 'string') return a.id;
-    throw new Error(`Invalid arc reference: ${a}`);
+    let id: string;
+    if (typeof a === 'string') {
+      id = a;
+    } else if (a && typeof a === 'object' && 'id' in a && typeof a.id === 'string') {
+      id = a.id;
+    } else {
+      throw new Error(`Invalid arc reference: ${a}`);
+    }
+    if (!this.arcs.some((ar) => ar.id === id)) {
+      throw new Error(`Arc "${id}" not found in sketch. Available arcs: ${this.arcs.map((ar) => ar.id).join(', ') || '(none)'}`);
+    }
+    return id;
   }
 
   private resolveShapeId(s: any): ShapeId {
-    if (typeof s === 'string') return s;
-    if (s && typeof s === 'object' && 'id' in s && typeof s.id === 'string') return s.id;
-    throw new Error(`Invalid shape reference: ${s}`);
+    let id: string;
+    if (typeof s === 'string') {
+      id = s;
+    } else if (s && typeof s === 'object' && 'id' in s && typeof s.id === 'string') {
+      id = s.id;
+    } else {
+      throw new Error(`Invalid shape reference: ${s}`);
+    }
+    if (!this.shapes.some((sh) => sh.id === id)) {
+      throw new Error(`Shape "${id}" not found in sketch. Available shapes: ${this.shapes.map((sh) => sh.id).join(', ') || '(none)'}`);
+    }
+    return id;
+  }
+
+  /**
+   * Validate that a constraint value is a finite number.
+   * Throws with the constraint name for clear debugging.
+   */
+  private requireFinite(value: number, constraintName: string): void {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new Error(`${constraintName}(): value must be a finite number, got ${value} (${typeof value})`);
+    }
   }
 
   // ─── Ergonomic constraint helpers ────────────────────────────────────────────
@@ -335,6 +411,8 @@ export class ConstrainedSketchBuilder {
     const ptId = this.resolvePointId(point);
     const pt = this.points.find((p) => p.id === ptId);
     if (!pt) throw new Error(`fix(): point "${ptId}" not found in sketch`);
+    if (x !== undefined) this.requireFinite(x, 'fix (x)');
+    if (y !== undefined) this.requireFinite(y, 'fix (y)');
     return this.constrain({ type: 'fixed', point: ptId, x: x ?? pt.x, y: y ?? pt.y } as Omit<SketchConstraint, 'id'>);
   }
 
@@ -349,42 +427,49 @@ export class ConstrainedSketchBuilder {
   }
 
   /** Constrain a point to lie on a bounded line segment (not its infinite extension). */
-  pointOnLine(point: PointId, line: LineId): this {
-    return this.constrain({ type: 'pointOnLine', point, line } as Omit<SketchConstraint, 'id'>);
+  pointOnLine(point: any, line: any): this {
+    return this.constrain({ type: 'pointOnLine', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the distance between two points. */
   distance(a: any, b: any, value: number): this {
+    this.requireFinite(value, 'distance');
     return this.constrain({ type: 'distance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the length of a line. */
   length(line: any, value: number): this {
+    this.requireFinite(value, 'length');
     return this.constrain({ type: 'length', line: this.resolveLineId(line), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the angle from line `a` to line `b` (degrees). */
   angle(a: any, b: any, value: number): this {
+    this.requireFinite(value, 'angle');
     return this.constrain({ type: 'angle', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the radius of a circle. */
   radius(circle: any, value: number): this {
+    this.requireFinite(value, 'radius');
     return this.constrain({ type: 'radius', circle: this.resolveCircleId(circle), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the diameter of a circle. */
   diameter(circle: any, value: number): this {
+    this.requireFinite(value, 'diameter');
     return this.constrain({ type: 'diameter', circle: this.resolveCircleId(circle), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the horizontal distance between two points (b.x − a.x = value). */
   hDistance(a: any, b: any, value: number): this {
+    this.requireFinite(value, 'hDistance');
     return this.constrain({ type: 'hDistance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the vertical distance between two points (b.y − a.y = value). */
   vDistance(a: any, b: any, value: number): this {
+    this.requireFinite(value, 'vDistance');
     return this.constrain({ type: 'vDistance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
@@ -394,6 +479,7 @@ export class ConstrainedSketchBuilder {
    * Zero is equivalent to `collinear`.
    */
   pointLineDistance(point: any, line: any, value: number): this {
+    this.requireFinite(value, 'pointLineDistance');
     return this.constrain({ type: 'pointLineDistance', point: this.resolvePointId(point), line: this.resolveLineId(line), value } as Omit<SketchConstraint, 'id'>);
   }
 
@@ -405,11 +491,13 @@ export class ConstrainedSketchBuilder {
    * (according to `a`'s direction vector). Negative places it on the right.
    */
   lineDistance(a: any, b: any, value: number): this {
+    this.requireFinite(value, 'lineDistance');
     return this.constrain({ type: 'lineDistance', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the absolute angle of a line from the positive X-axis (degrees). */
   absoluteAngle(line: any, value: number): this {
+    this.requireFinite(value, 'absoluteAngle');
     return this.constrain({ type: 'absoluteAngle', line: this.resolveLineId(line), value } as Omit<SketchConstraint, 'id'>);
   }
 
@@ -420,6 +508,7 @@ export class ConstrainedSketchBuilder {
 
   /** Constrain the arc length of an arc (radius × sweep angle). */
   arcLength(arc: any, value: number): this {
+    this.requireFinite(value, 'arcLength');
     return this.constrain({ type: 'arcLength', arc: this.resolveArcId(arc), value } as Omit<SketchConstraint, 'id'>);
   }
 
@@ -435,26 +524,31 @@ export class ConstrainedSketchBuilder {
 
   /** Constrain the bounding-box width of a shape. */
   shapeWidth(shape: any, value: number): this {
+    this.requireFinite(value, 'shapeWidth');
     return this.constrain({ type: 'shapeWidth', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the bounding-box height of a shape. */
   shapeHeight(shape: any, value: number): this {
+    this.requireFinite(value, 'shapeHeight');
     return this.constrain({ type: 'shapeHeight', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the X coordinate of a shape's centroid. */
   shapeCentroidX(shape: any, value: number): this {
+    this.requireFinite(value, 'shapeCentroidX');
     return this.constrain({ type: 'shapeCentroidX', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the Y coordinate of a shape's centroid. */
   shapeCentroidY(shape: any, value: number): this {
+    this.requireFinite(value, 'shapeCentroidY');
     return this.constrain({ type: 'shapeCentroidY', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Constrain the area of a shape. */
   shapeArea(shape: any, value: number): this {
+    this.requireFinite(value, 'shapeArea');
     return this.constrain({ type: 'shapeArea', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
   }
 
@@ -465,6 +559,7 @@ export class ConstrainedSketchBuilder {
 
   /** Constrain the unsigned angle between two lines (accepts both orientations). */
   angleBetween(a: any, b: any, value: number): this {
+    this.requireFinite(value, 'angleBetween');
     return this.constrain({ type: 'angleBetween', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
   }
 
