@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForgeStore } from '../store/forgeStore';
-import { exportMeshFromStore, exportOrbitGifFromStore, exportReportFromStore } from './exportActions';
+import { exportMeshFromStore, exportOrbitGifFromStore, exportReportFromStore, exportSketchFromStore } from './exportActions';
 import { fileSystem } from '../fs';
 import { fetchGistModel } from '../share';
 
@@ -46,6 +46,7 @@ export function CommandPalette() {
   const [subCommands, setSubCommands] = useState<Command[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasShapes = (result?.objects?.some((obj) => Boolean(obj.shape)) ?? false);
+  const hasSketches = (result?.objects?.some((obj) => Boolean(obj.sketch)) ?? false);
   const hiddenObjectCount = (result?.objects ?? []).filter((obj) => !(objectSettings[obj.id]?.visible ?? true)).length;
   const hasObjectCommands = (result?.objects?.length ?? 0) > 0 || Object.keys(objectSettings).length > 0;
 
@@ -86,6 +87,22 @@ export function CommandPalette() {
       action: () => {
         close();
         void exportOrbitGifFromStore().catch(handleCommandError);
+      },
+    },
+    {
+      id: 'export-svg',
+      label: `Export Sketch SVG${hasSketches ? '' : ' (no sketches)'}`,
+      action: () => {
+        close();
+        try { exportSketchFromStore('svg'); } catch (err) { handleCommandError(err); }
+      },
+    },
+    {
+      id: 'export-dxf',
+      label: `Export Sketch DXF${hasSketches ? '' : ' (no sketches)'}`,
+      action: () => {
+        close();
+        try { exportSketchFromStore('dxf'); } catch (err) { handleCommandError(err); }
       },
     },
   ];

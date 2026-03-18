@@ -18,5 +18,7 @@ export * from './curves';
 export * from './regions';
 export * from './arrangement';
 export * from './svgImport';
+export * from './exportSvg';
+export * from './exportDxf';
 export { text2d, textWidth } from './text';
 export type { TextOptions } from './text';

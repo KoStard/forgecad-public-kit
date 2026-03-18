@@ -66,9 +66,11 @@ export {
   textWidth,
   dim,
   dimLine,
+  sketchToSvg,
+  sketchToDxf,
 } from './sketch';
 
-export type { Anchor, SvgImportOptions } from './sketch';
+export type { Anchor, SvgImportOptions, SketchSvgOptions, SketchDxfOptions } from './sketch';
 
 // ConstrainedSketchBuilder is the main win: all constraint methods are inlined
 // automatically from the source class — addLoop, fix, horizontal, etc.

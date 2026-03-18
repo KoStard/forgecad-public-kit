@@ -5,8 +5,10 @@ import {
   exportOrbitGifFromStore,
   exportMeshFromStore,
   exportReportFromStore,
+  exportSketchFromStore,
   type ExportQualityChoice,
   type MeshExportFormat,
+  type SketchExportFormat,
 } from './exportActions';
 
 function waitForNextPaint(): Promise<void> {
@@ -34,7 +36,9 @@ export function ExportPanel() {
   const [reportBusy, setReportBusy] = useState(false);
 
   const shapeObjects = result?.objects?.filter((obj) => obj.shape) ?? [];
+  const sketchObjects = result?.objects?.filter((obj) => obj.sketch) ?? [];
   const hasShapes = shapeObjects.length > 0;
+  const hasSketches = sketchObjects.length > 0;
   const defaultMeshStem = useMemo(() => deriveExportStem(activeFile), [activeFile]);
 
   const meshObjects = useMemo(() => (
@@ -449,6 +453,53 @@ export function ExportPanel() {
                 )}
               </button>
             </div>
+
+            {hasSketches && (
+              <div style={{ borderTop: '1px solid var(--fc-borderLight)', marginTop: 12, paddingTop: 12 }}>
+                <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginBottom: 6 }}>2D Sketch Export</div>
+                <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 7 }}>
+                  Export 2D sketches for laser cutting, CNC, or vector graphics.
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => {
+                      try { exportSketchFromStore('svg', meshFileStem || defaultMeshStem); }
+                      catch (err) { alert(`SVG export failed: ${err instanceof Error ? err.message : String(err)}`); }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '7px 8px',
+                      background: 'var(--fc-accent)',
+                      color: 'var(--fc-accentText)',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      fontSize: 12,
+                    }}
+                  >
+                    Export SVG
+                  </button>
+                  <button
+                    onClick={() => {
+                      try { exportSketchFromStore('dxf', meshFileStem || defaultMeshStem); }
+                      catch (err) { alert(`DXF export failed: ${err instanceof Error ? err.message : String(err)}`); }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '7px 8px',
+                      background: 'var(--fc-accent)',
+                      color: 'var(--fc-accentText)',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      fontSize: 12,
+                    }}
+                  >
+                    Export DXF
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

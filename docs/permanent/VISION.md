@@ -41,15 +41,16 @@ The kernel is not the product. The modeling layer on top is.
 
 ### Gaps to close (Fusion360 parity)
 
-| Feature | What it does | Why it matters | Difficulty |
-|---------|-------------|----------------|------------|
-| Arc entity | First-class arc in constraint system | Needed for fillet results to participate in constraints | Medium |
-| Shell operation | Hollow a solid with wall thickness | Enclosures, cases, containers | Medium |
-| Per-edge 3D fillet | Round specific edges by exact radius | The #1 most-used Fusion360 operation | Very Hard (mesh kernel) |
-| Trim/extend | Cut or extend sketch entities at intersections | Complex sketch editing | Medium |
-| Splines | B-spline curves in sketches | Organic shapes | Medium |
-| Loft | Blend between multiple cross-section profiles | Transition shapes, aerodynamic forms | Hard |
-| Thread/helix | Helical sweep for threads, springs | Mechanical fasteners | Medium (threads done via SDF, general helix sweep still missing) |
+| Feature | What it does | Why it matters | Difficulty | Status |
+|---------|-------------|----------------|------------|--------|
+| Arc entity | First-class arc in constraint system | Needed for fillet results to participate in constraints | Medium | **Done** |
+| Shell operation | Hollow a solid with wall thickness | Enclosures, cases, containers | Medium | **Done** |
+| Per-edge 3D fillet | Round specific edges by exact radius | The #1 most-used Fusion360 operation | Very Hard (mesh kernel) | Exists (mesh-based) |
+| Trim/extend | Cut or extend sketch entities at intersections | Complex sketch editing | Medium | |
+| Splines | B-spline curves in sketches | Organic shapes | Medium | **Done** (`spline2d`) |
+| Loft | Blend between multiple cross-section profiles | Transition shapes, aerodynamic forms | Hard | **Done** (sampled) |
+| Thread/helix | Helical sweep for threads, springs | Mechanical fasteners | Medium | Partial (SDF threads) |
+| SVG/DXF sketch export | Export 2D sketches for laser/CNC | Fabrication workflows | Low | **Done** |
 
 ### What we deliberately skip
 - **Editable history tree / timeline** — code IS the history. You read it top to bottom. No need for a separate feature tree when the script is the tree. (Note: the compile plan inspector above is read-only — it shows what the code produced, not a parallel editable feature history.)
