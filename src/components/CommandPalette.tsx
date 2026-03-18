@@ -3,9 +3,13 @@ import { useForgeStore } from '../store/forgeStore';
 import { exportMeshFromStore, exportOrbitGifFromStore, exportReportFromStore } from './exportActions';
 import { fileSystem } from '../fs';
 
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+const mod = isMac ? '⌘' : 'Ctrl';
+
 interface Command {
   id: string;
   label: string;
+  shortcut?: string;
   action: () => void;
   /** If set, selecting this command opens a sub-list instead of executing */
   children?: Command[];
@@ -29,6 +33,12 @@ export function CommandPalette() {
   const setShowPerformanceInfo = useForgeStore((s) => s.setShowPerformanceInfo);
   const objectSettings = useForgeStore((s) => s.objectSettings);
   const activeFile = useForgeStore((s) => s.activeFile);
+  const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
+  const toggleFileExplorer = useForgeStore((s) => s.toggleFileExplorer);
+  const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
+  const toggleViewPanel = useForgeStore((s) => s.toggleViewPanel);
+  const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
+  const openShortcutsOverlay = useForgeStore((s) => s.openShortcutsOverlay);
 
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
@@ -96,6 +106,28 @@ export function CommandPalette() {
 
   const rootCommands: Command[] = [
     ...(activeFile ? [copyFilePathCommand] : []),
+    {
+      id: 'toggle-file-explorer',
+      label: `${fileExplorerOpen ? 'Hide' : 'Show'} File Explorer`,
+      action: () => { toggleFileExplorer(); close(); },
+    },
+    {
+      id: 'toggle-view-panel',
+      label: `${viewPanelOpen ? 'Hide' : 'Show'} View Panel`,
+      action: () => { toggleViewPanel(); close(); },
+    },
+    {
+      id: 'fit-viewport',
+      label: 'Fit Geometry to View',
+      shortcut: `${mod}⇧F`,
+      action: () => { requestViewCommand({ type: 'fit' }); close(); },
+    },
+    {
+      id: 'iso-view',
+      label: 'Snap to Isometric View',
+      shortcut: `${mod}⇧H`,
+      action: () => { requestViewCommand({ type: 'snap', view: 'iso' }); close(); },
+    },
     ...(hasObjectCommands
       ? [{
         id: 'show-all-objects',
@@ -116,6 +148,12 @@ export function CommandPalette() {
     },
     { id: 'export', label: 'Export', children: exportChoices, action: () => {} },
     { id: 'theme', label: 'Change Theme', children: themeChoices, action: () => {} },
+    {
+      id: 'keyboard-shortcuts',
+      label: 'Keyboard Shortcuts',
+      shortcut: '?',
+      action: () => { close(); openShortcutsOverlay(); },
+    },
   ];
 
   const commands = subCommands ?? rootCommands;
@@ -234,10 +272,27 @@ export function CommandPalette() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                gap: 12,
               }}
             >
-              <span>{cmd.label}</span>
-              {cmd.children && <span style={{ color: 'var(--fc-textDim)', fontSize: 11 }}>›</span>}
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cmd.label}</span>
+              {cmd.shortcut && (
+                <kbd style={{
+                  fontSize: 11,
+                  color: 'var(--fc-textDim)',
+                  background: 'var(--fc-bgSurface)',
+                  border: '1px solid var(--fc-border)',
+                  borderRadius: 3,
+                  padding: '1px 5px',
+                  fontFamily: 'inherit',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}>
+                  {cmd.shortcut}
+                </kbd>
+              )}
+              {cmd.children && !cmd.shortcut && <span style={{ color: 'var(--fc-textDim)', fontSize: 11 }}>›</span>}
+              {cmd.children && cmd.shortcut && <span style={{ color: 'var(--fc-textDim)', fontSize: 11, marginLeft: -8 }}>›</span>}
             </div>
           ))}
         </div>
