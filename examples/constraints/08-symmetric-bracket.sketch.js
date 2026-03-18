@@ -24,13 +24,18 @@ const mr = sk.point(25, 20);
 const tr = sk.point(10, 20);
 const ttr = sk.point(10, 40);
 
-// Top connecting bar
-const top = sk.point(-10, 40);
-
+// Lines — full outline
 const lBottom = sk.line(bl, br);
 const lLeft = sk.line(bl, ml);
 const lLeftTop = sk.line(ml, tl);
 const lLeftUp = sk.line(tl, ttl);
+const lTop = sk.line(ttl, ttr);
+const lRightDown = sk.line(ttr, tr);
+const lRightTop = sk.line(tr, mr);
+const lRight = sk.line(mr, br);
+
+// Closed loop
+sk.addLoop([bl, br, mr, tr, ttr, ttl, tl, ml]);
 
 sk.symmetric(bl, br, axis);
 sk.symmetric(ml, mr, axis);

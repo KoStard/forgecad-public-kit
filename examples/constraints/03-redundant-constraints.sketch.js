@@ -1,22 +1,30 @@
 // Redundant constraints — DOF < 0 but converged, status = "over-redundant"
 // Demonstrates: horizontal + absoluteAngle(0) are equivalent — one is redundant
-// Expected: orange status, redundant constraints highlighted
+// Expected: orange "over-redundant" status, redundant constraints highlighted
 
 const sk = constrainedSketch();
 
 const a = sk.point(0, 0, true);
 const b = sk.point(10, 0);
-const l = sk.line(a, b);
+const c = sk.point(10, 5);
+const d = sk.point(0, 5);
 
-sk.addLoop([a, b, sk.point(10, 5), sk.point(0, 5)]);
-sk.line(b, sk.point(10, 5));
-sk.line(sk.point(10, 5), sk.point(0, 5));
-sk.line(sk.point(0, 5), a);
+const lBottom = sk.line(a, b);
+const lRight = sk.line(b, c);
+const lTop = sk.line(c, d);
+const lLeft = sk.line(d, a);
+
+sk.addLoop([a, b, c, d]);
 
 // These two constraints say the same thing:
-sk.horizontal(l);        // line must be horizontal
-sk.absoluteAngle(l, 0);  // line must be at 0 degrees (= horizontal)
+sk.horizontal(lBottom);        // line must be horizontal
+sk.absoluteAngle(lBottom, 0);  // line must be at 0 degrees (= horizontal)
 
-sk.length(l, param("length", 10, { unit: "mm" }));
+// Fully constrain the rest
+sk.vertical(lRight);
+sk.vertical(lLeft);
+sk.horizontal(lTop);
+sk.length(lBottom, param("width", 10, { unit: "mm" }));
+sk.length(lRight, param("height", 5, { unit: "mm" }));
 
 return sk.solve();

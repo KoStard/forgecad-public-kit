@@ -323,16 +323,20 @@ export const solveConstraintDefinition = (
     maxError > tolerance * 5 ? working.constraints.map((c) => c.id) : [],
   );
   // Redundant = solver converged but DOF is negative.
-  // For each constraint: solve without it from the *solved* positions (working),
-  // then check if that constraint's residual is still ~0. Starting from the solved
-  // state is far cheaper — the remaining constraints only need to find a nearby minimum.
+  // Greedy removal: cumulatively remove constraints one at a time (not independently).
+  // After removing a constraint, re-solve the reduced set. If all remaining constraints
+  // (including previously removed ones) are still satisfied, mark it as truly redundant.
+  // Stop once we've removed |DOF| constraints (the exact excess).
   const redundant = new Set<string>();
   if (dof < 0 && maxError <= tolerance * 5) {
+    const targetRemovals = -dof;
+    let reducedConstraints = [...working.constraints];
     for (const c of working.constraints) {
+      if (redundant.size >= targetRemovals) break;
       const cdef = getConstraintDef(c.type);
       if (!cdef?.residual) continue;
       const testDef = cloneDefinition(working);
-      testDef.constraints = testDef.constraints.filter((tc) => tc.id !== c.id);
+      testDef.constraints = reducedConstraints.filter((tc) => tc.id !== c.id);
       decomposeAndSolve(testDef, { iterations: options.iterations, tolerance });
       const testCtx: SolverContext = {
         points: new Map(testDef.points.map((p) => [p.id, p] as const)),
@@ -344,7 +348,10 @@ export const solveConstraintDefinition = (
         movePoint: () => false,
       };
       const res = cdef.residual(c as never, testCtx);
-      if (Math.max(...res.map(Math.abs)) < tolerance) redundant.add(c.id);
+      if (Math.max(...res.map(Math.abs)) < tolerance) {
+        redundant.add(c.id);
+        reducedConstraints = reducedConstraints.filter((tc) => tc.id !== c.id);
+      }
     }
   }
   const constraints = buildConstraintDisplays(working, conflicts, redundant);
