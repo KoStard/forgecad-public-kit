@@ -28,7 +28,7 @@ import { runReportCli } from './forge-report';
 import { runRenderCli } from './forge-render.mjs';
 import { runSdfCli } from './forge-sdf';
 import { runStudioCli } from './forge-studio';
-import { openBrowser } from './forge-studio-server';
+import { runWebCli } from './forge-web';
 import { runSvgCli } from './forge-svg';
 import { runBrepCli } from './forge-brep';
 import { isDirectCliRun, resolvePackagePath } from './package-runtime';
@@ -183,14 +183,16 @@ const commands: CommandDefinition[] = [
   {
     group: 'Studio',
     path: ['web'],
-    summary: 'Open the ForgeCAD web playground in a browser.',
-    usage: ['forgecad web'],
-    examples: ['forgecad web'],
-    run: async () => {
-      const url = 'https://kostard.github.io/ForgeCAD';
-      console.log(`Opening ${url}`);
-      openBrowser(url);
+    summary: 'Start a local dev server in web/playground mode (no filesystem, localStorage only).',
+    usage: ['forgecad web', 'forgecad web --open'],
+    examples: ['forgecad web', 'forgecad web --open --port 4173'],
+    completion: {
+      options: [
+        { name: '--open', description: 'Open a browser window automatically' },
+        { name: '--port', description: 'Dev server port', argument: 'required', valueLabel: '<n>' },
+      ],
     },
+    run: runWebCli,
   },
   {
     group: 'Studio',
