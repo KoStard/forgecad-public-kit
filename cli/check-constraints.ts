@@ -22,6 +22,7 @@ import { resolvePackagePath } from './package-runtime';
 import { constrainedSketch, ConstrainedSketchBuilder } from '../src/forge/sketch/constraints/builder';
 import { isConstraintSketch, ConstraintSketch } from '../src/forge/sketch/constraints/sketch';
 import type { ConstraintDefinition, SketchPoint } from '../src/forge/sketch/constraints/types';
+import { addRect, addPolygon, addRegularPolygon } from '../src/forge/sketch/concepts';
 import { buildConstraintSvgDocument } from './sketch-svg';
 import { getConstraintDef } from '../src/forge/sketch/constraints/registry';
 import '../src/forge/sketch/constraints/defs';
@@ -1319,6 +1320,174 @@ function printDiagnostic(sketch: ConstraintSketch) {
   printConstraintSummary(sketch.constraintMeta);
 }
 
+// ─── L6: High-level concepts ─────────────────────────────────────────────────
+
+function testAddRectStructure() {
+  // Verify that addRect creates a structurally sound axis-aligned rectangle:
+  // 4 DOF left (x, y, width, height), no over-constraint.
+  const sk = constrainedSketch();
+  const rect = addRect(sk, { x: 5, y: 3, width: 20, height: 10 });
+  sk.fix(rect.bottomLeft, 5, 3);
+  const result = sk.solve();
+  assertConverged(result, 'addRect structure');
+  assertNoRejections(result, 'addRect structure');
+
+  const def = result.definition;
+  assertPointAt(def, rect.bottomLeft,  5,  3, 'bl');
+  assertPointAt(def, rect.bottomRight, 25, 3, 'br');
+  assertPointAt(def, rect.topRight,    25, 13, 'tr');
+  assertPointAt(def, rect.topLeft,     5,  13, 'tl');
+
+  // Bottom and top must be horizontal
+  assertApprox(lineAngleDeg(def, rect.bottom), 0, 'bottom horizontal');
+  assertApprox(lineAngleDeg(def, rect.top), 180, 'top horizontal (CCW direction)', 1);
+
+  // Left and right must be vertical
+  const rightAngle = lineAngleDeg(def, rect.right);
+  assertApprox(Math.abs(rightAngle), 90, 'right vertical', 1);
+  const leftAngle = lineAngleDeg(def, rect.left);
+  assertApprox(Math.abs(leftAngle), 90, 'left vertical', 1);
+}
+
+function testAddRectCenter() {
+  // Center point must sit at geometric midpoint
+  const sk = constrainedSketch();
+  const rect = addRect(sk, { x: 0, y: 0, width: 40, height: 20 });
+  sk.fix(rect.bottomLeft, 0, 0);
+  const result = sk.solve();
+  assertConverged(result, 'addRect center');
+  const def = result.definition;
+  assertPointAt(def, rect.center, 20, 10, 'center');
+}
+
+function testAddRectNamedAccess() {
+  // vertex() and side() helpers must return matching IDs
+  const sk = constrainedSketch();
+  const rect = addRect(sk, { x: 0, y: 0, width: 10, height: 5 });
+  assert.equal(rect.vertex('bottomLeft'),  rect.bottomLeft);
+  assert.equal(rect.vertex('bottomRight'), rect.bottomRight);
+  assert.equal(rect.vertex('topRight'),    rect.topRight);
+  assert.equal(rect.vertex('topLeft'),     rect.topLeft);
+  assert.equal(rect.side('bottom'), rect.bottom);
+  assert.equal(rect.side('right'),  rect.right);
+  assert.equal(rect.side('top'),    rect.top);
+  assert.equal(rect.side('left'),   rect.left);
+  assert.equal(rect.vertices[0],    rect.bottomLeft);
+  assert.equal(rect.sides[0],       rect.bottom);
+}
+
+function testAddRectResizable() {
+  // Changing length of bottom via sk.length() must resize correctly
+  const sk = constrainedSketch();
+  const rect = addRect(sk, { x: 0, y: 0, width: 10, height: 5 });
+  sk.fix(rect.bottomLeft, 0, 0);
+  sk.length(rect.bottom, 30);
+  sk.length(rect.left, 15);
+  const result = sk.solve();
+  assertConverged(result, 'addRect resizable');
+  const def = result.definition;
+  assertPointAt(def, rect.bottomLeft,  0,  0,  'bl after resize');
+  assertPointAt(def, rect.bottomRight, 30, 0,  'br after resize');
+  assertPointAt(def, rect.topRight,    30, 15, 'tr after resize');
+  assertPointAt(def, rect.topLeft,     0,  15, 'tl after resize');
+  assertPointAt(def, rect.center,      15, 7.5, 'center after resize');
+}
+
+function testAddRectBuilderMethod() {
+  // sk.rect() convenience method must work identically
+  const sk = constrainedSketch();
+  const rect = sk.rect({ x: 0, y: 0, width: 10, height: 5 });
+  sk.fix(rect.bottomLeft, 0, 0);
+  const result = sk.solve();
+  assertConverged(result, 'sk.rect() method');
+  const def = result.definition;
+  assertPointAt(def, rect.bottomLeft,  0, 0, 'bl');
+  assertPointAt(def, rect.bottomRight, 10, 0, 'br');
+}
+
+function testAddPolygonCCW() {
+  // Triangle given in CW order must be flipped to CCW by the ccw constraint
+  const sk = constrainedSketch();
+  // CW order: going clockwise from origin
+  const tri = addPolygon(sk, { points: [[0, 0], [0, 10], [10, 0]] });
+  sk.fix(tri.vertex(0), 0, 0);
+  const result = sk.solve();
+  assertConverged(result, 'addPolygon CCW');
+  const def = result.definition;
+  // After CCW enforcement, signed area must be positive
+  const pts = [
+    def.points.find(p => p.id === tri.vertex(0))!,
+    def.points.find(p => p.id === tri.vertex(1))!,
+    def.points.find(p => p.id === tri.vertex(2))!,
+  ];
+  let area = 0;
+  for (let i = 0; i < 3; i++) {
+    const j = (i + 1) % 3;
+    area += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+  }
+  assert(area / 2 >= 0, `addPolygon: signed area should be ≥ 0, got ${area / 2}`);
+}
+
+function testAddPolygonSideIndices() {
+  // side(i) must connect vertex(i) to vertex((i+1) % n)
+  const sk = constrainedSketch();
+  const poly = addPolygon(sk, { points: [[0, 0], [10, 0], [5, 8]] });
+  for (let i = 0; i < 3; i++) {
+    const j = (i + 1) % 3;
+    const sideId = poly.side(i);
+    const line = sk['lines' as any].find((l: any) => l.id === sideId);
+    assert(
+      (line.a === poly.vertex(i) && line.b === poly.vertex(j)) ||
+      (line.b === poly.vertex(i) && line.a === poly.vertex(j)),
+      `side(${i}) must connect vertex(${i}) and vertex(${j})`
+    );
+  }
+}
+
+function testAddRegularPolygonEqualSides() {
+  // Regular hexagon: all sides must be equal after solving
+  const sk = constrainedSketch();
+  const hex = addRegularPolygon(sk, { sides: 6, radius: 20, cx: 0, cy: 0 });
+  sk.fix(hex.center, 0, 0);
+  const result = sk.solve();
+  assertConverged(result, 'addRegularPolygon hexagon');
+  assertNoRejections(result, 'addRegularPolygon hexagon');
+
+  const def = result.definition;
+  const sideLen0 = lineLength(def, hex.sides[0]);
+  for (let i = 1; i < 6; i++) {
+    assertApprox(lineLength(def, hex.sides[i]), sideLen0, `hex side ${i} == side 0`);
+  }
+}
+
+function testAddRegularPolygonCenter() {
+  // Center point must be equidistant from all vertices after solving
+  const sk = constrainedSketch();
+  const tri = addRegularPolygon(sk, { sides: 3, radius: 15, cx: 5, cy: 5 });
+  sk.fix(tri.center, 5, 5);
+  const result = sk.solve();
+  assertConverged(result, 'addRegularPolygon triangle center');
+  const def = result.definition;
+  const d0 = dist(def, tri.center, tri.vertices[0]);
+  for (let i = 1; i < 3; i++) {
+    assertApprox(dist(def, tri.center, tri.vertices[i]), d0, `tri center dist to v${i}`);
+  }
+}
+
+function testAddRegularPolygonBuilderMethod() {
+  // sk.regularPolygon() convenience method
+  const sk = constrainedSketch();
+  const square = sk.regularPolygon({ sides: 4, radius: 10 });
+  sk.fix(square.center, 0, 0);
+  const result = sk.solve();
+  assertConverged(result, 'sk.regularPolygon() method');
+  const def = result.definition;
+  const len0 = lineLength(def, square.sides[0]);
+  for (let i = 1; i < 4; i++) {
+    assertApprox(lineLength(def, square.sides[i]), len0, `square side ${i} == side 0`);
+  }
+}
+
 // ─── Runner ──────────────────────────────────────────────────────────────────
 
 export async function runCheckConstraintsCli(args: string[]): Promise<void> {
@@ -1390,6 +1559,19 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
     { name: 'full spectrogram (inline)', fn: testFullSpectrogram },
   ];
 
+  const level6: TestEntry[] = [
+    { name: 'addRect structure', fn: testAddRectStructure },
+    { name: 'addRect center', fn: testAddRectCenter },
+    { name: 'addRect named access', fn: testAddRectNamedAccess },
+    { name: 'addRect resizable', fn: testAddRectResizable },
+    { name: 'addRect builder method', fn: testAddRectBuilderMethod },
+    { name: 'addPolygon CCW enforcement', fn: testAddPolygonCCW },
+    { name: 'addPolygon side indices', fn: testAddPolygonSideIndices },
+    { name: 'addRegularPolygon equal sides', fn: testAddRegularPolygonEqualSides },
+    { name: 'addRegularPolygon center', fn: testAddRegularPolygonCenter },
+    { name: 'addRegularPolygon builder method', fn: testAddRegularPolygonBuilderMethod },
+  ];
+
   const allTests = [
     { level: 'L1: Single constraints', tests: level1 },
     { level: 'L2: Compound constraints', tests: level2 },
@@ -1397,6 +1579,7 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
     { level: 'L4: Regression', tests: level4 },
     { level: 'L4b: Intermediate (spectrogram subsystems)', tests: level4b },
     { level: 'L5: Complex systems', tests: level5 },
+    { level: 'L6: High-level concepts', tests: level6 },
   ];
 
   let passed = 0;

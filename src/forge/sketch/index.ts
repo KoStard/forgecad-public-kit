@@ -20,3 +20,18 @@ export * from './arrangement';
 export * from './svgImport';
 export { text2d, textWidth } from './text';
 export type { TextOptions } from './text';
+export {
+  addRect,
+  addPolygon,
+  addRegularPolygon,
+} from './concepts';
+export type {
+  RectOptions,
+  RectVertexName,
+  RectSideName,
+  ConstrainedRect,
+  PolygonOptions,
+  ConstrainedPolygon,
+  RegularPolygonOptions,
+  ConstrainedRegularPolygon,
+} from './concepts';
