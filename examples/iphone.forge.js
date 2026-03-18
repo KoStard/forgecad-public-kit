@@ -42,8 +42,9 @@ const screenFill = roundedRect(screenW, screenH, screenR, true)
 const camSize = param("Camera Island", 36, { min: 25, max: 45, unit: "mm" });
 const camR = 8;
 const camBump = param("Camera Bump", 1.5, { min: 0.5, max: 3, unit: "mm" });
-const camX = -w / 2 + camSize / 2 + 4;
-const camY = h / 2 - camSize / 2 - 4;
+const camEdgeInset = 4;
+const camX = -w / 2 + camSize / 2 + camEdgeInset;
+const camY = h / 2 - camSize / 2 - camEdgeInset;
 
 let camIsland = roundedRect(camSize, camSize, camR, true)
   .translate(camX, camY)
@@ -54,19 +55,28 @@ if (edgeR > 0) {
   camIsland = camIsland.toShape().smoothOut(80, 0.4).refine(2);
 }
 
-// Camera lenses (3 in L-pattern)
+// Camera lenses — 3 in L-pattern, positioned via entity geometry
 const lensR = param("Lens Radius", 6, { min: 3, max: 10, unit: "mm" });
-const lensSpacing = 12;
+const lensGap = param("Lens Gap", 3, { min: 1, max: 8, unit: "mm" });
+
+// Use Rectangle2D entity to derive lens positions from island bounds
+const camRect = Rectangle2D.fromCenterAndDimensions(point(camX, camY), camSize, camSize);
+const triRadius = camSize / 2 - lensR - lensGap;
+
+// Equilateral triangle: two lenses stacked on outer (left) edge,
+// third lens pointing right toward phone center
+const lens1 = camRect.center.translate(-triRadius / 2, triRadius * Math.sqrt(3) / 2);
+const lens2 = camRect.center.translate(-triRadius / 2, -triRadius * Math.sqrt(3) / 2);
+const lens3 = camRect.center.translate(triRadius, 0);
+
 const lensZ = -d / 2 - camBump;
+const makeLens = (pt) => {
+  const [lx, ly] = pt.toTuple();
+  return circle2d(lensR).translate(lx, ly)
+    .extrude(camBump + 1).translate(0, 0, lensZ - 0.5);
+};
 
-const makeLens = (x, y) =>
-  circle2d(lensR).translate(x, y).extrude(camBump + 1).translate(0, 0, lensZ - 0.5);
-
-camIsland = camIsland.subtract(
-  makeLens(camX - lensSpacing / 2, camY + lensSpacing / 2),
-  makeLens(camX + lensSpacing / 2, camY + lensSpacing / 2),
-  makeLens(camX - lensSpacing / 2, camY - lensSpacing / 2),
-);
+camIsland = camIsland.subtract(makeLens(lens1), makeLens(lens2), makeLens(lens3));
 
 // === Charging port (front -Y face = phone bottom edge) ===
 // pointAlong([0,1,0]) orients the extrusion along +Y so it cuts INTO the body
