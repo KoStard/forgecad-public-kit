@@ -514,7 +514,11 @@ function solveGlobalSystem(
 
   for (let attempt = 0; attempt < restarts; attempt++) {
     seedRestart(def, variables, initialState, attempt, referenceLength);
-    runProjectorWarmStart(def, ctx, warmStartIterations);
+    // Only warm-start on the first attempt. Subsequent restarts rely on their
+    // perturbation seeds — running projectors would overwrite them.
+    if (attempt === 0) {
+      runProjectorWarmStart(def, ctx, warmStartIterations);
+    }
 
     let lambda = 1e-3;
     let nu = 2;
@@ -586,6 +590,76 @@ function solveGlobalSystem(
       bestState = captureState(variables);
     }
     if (bestError <= tolerance) break;
+  }
+
+  // GS escape: if LM converged to a local minimum (not fully solved),
+  // restore the best state, run GS projectors to nudge geometry, then
+  // do one more LM pass.  This hybrid breaks through plateaus that neither
+  // pure LM nor pure GS can handle alone.
+  if (bestError > tolerance) {
+    for (let gsRound = 0; gsRound < 3; gsRound++) {
+      applyState(variables, bestState);
+      runProjectorWarmStart(def, ctx, Math.max(warmStartIterations * 4, 30));
+
+      let lambda = 1e-3;
+      let nu = 2;
+      let linearized = linearizeSystem(def, ctx, variables, referenceLength);
+      if (!linearized) break;
+
+      for (let iter = 0; iter < iterations; iter++) {
+        if (linearized.maxAbsResidual <= tolerance) break;
+        const stepResult = solveLevenbergMarquardtStep(
+          linearized.weightedJacobian,
+          linearized.weightedResidual,
+          lambda,
+        );
+        if (!stepResult) break;
+        const state = captureState(variables);
+        let { dx, predictedReduction } = stepResult;
+        dx = limitStep(dx, variables, maxScaledStep);
+        predictedReduction *= Math.min(1, maxScaledStep / Math.max(scaledStepNorm(stepResult.dx, variables), maxScaledStep));
+        let accepted = false;
+        let localNu = nu;
+        let localLambda = lambda;
+        for (let inner = 0; inner < 12; inner++) {
+          const trialState = state.map((value, index) => value + dx[index]);
+          applyState(variables, trialState);
+          const trial = linearizeSystem(def, ctx, variables, referenceLength);
+          if (!trial) { applyState(variables, state); break; }
+          const actualReduction = linearized.weightedCost - trial.weightedCost;
+          const rho = predictedReduction > 0 ? actualReduction / predictedReduction : 0;
+          if (actualReduction > 0) {
+            accepted = true;
+            linearized = trial;
+            lambda = rho > 0
+              ? localLambda * Math.max(1 / 3, 1 - Math.pow(2 * rho - 1, 3))
+              : localLambda;
+            nu = 2;
+            break;
+          }
+          applyState(variables, state);
+          localLambda *= localNu;
+          localNu *= 2;
+          const retry = solveLevenbergMarquardtStep(
+            linearized.weightedJacobian,
+            linearized.weightedResidual,
+            localLambda,
+          );
+          if (!retry) break;
+          dx = limitStep(retry.dx, variables, maxScaledStep);
+          predictedReduction = retry.predictedReduction;
+        }
+        if (!accepted) break;
+      }
+
+      const gsEval = evaluateResiduals(def, ctx);
+      const gsError = gsEval?.maxAbs ?? Infinity;
+      if (gsError < bestError) {
+        bestError = gsError;
+        bestState = captureState(variables);
+      }
+      if (bestError <= tolerance) break;
+    }
   }
 
   applyState(variables, bestState);

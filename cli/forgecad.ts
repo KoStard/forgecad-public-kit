@@ -12,6 +12,7 @@ import { runCheckDimensionsCli } from './check-dimensions';
 import { runCheckJsModulesCli } from './check-js-modules';
 import { runCheckPlacementReferencesCli } from './check-placement-references';
 import { runCheckTransformsCli } from './check-transforms';
+import { runCheckConstraintsCli } from './check-constraints';
 import {
   runCompletionCli,
   runHiddenCompletionCli,
@@ -586,6 +587,23 @@ const commands: CommandDefinition[] = [
     usage: ['forgecad check brep'],
     examples: ['forgecad check brep'],
     run: () => runCheckBrepExportCli(),
+  },
+  {
+    group: 'Checks',
+    path: ['check', 'constraints'],
+    summary: 'Run constraint solver invariants and snapshot regression tests.',
+    usage: [
+      'forgecad check constraints',
+      'forgecad check constraints --update',
+      'forgecad check constraints --verbose',
+      'forgecad check constraints angle',
+    ],
+    examples: [
+      'forgecad check constraints',
+      'forgecad check constraints --update   # regenerate snapshots',
+      'forgecad check constraints angle      # filter by name',
+    ],
+    run: (args) => runCheckConstraintsCli(args),
   },
   {
     group: 'Checks',

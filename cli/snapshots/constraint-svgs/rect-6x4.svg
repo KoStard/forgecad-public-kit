@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-5.0 -9.0 16.0 14.0" width="600" height="600">
+  <rect x="-5.0" y="-9.0" width="16.0" height="14.0" fill="#1a1a2e"/>
+  <g data-layer="edges">
+    <line x1="0.000" y1="0.000" x2="6.000" y2="0.000" stroke="#e8e8e8" stroke-width="0.4"/>
+    <line x1="6.000" y1="0.000" x2="6.000" y2="-4.000" stroke="#e8e8e8" stroke-width="0.4"/>
+    <line x1="6.000" y1="-4.000" x2="0.000" y2="-4.000" stroke="#e8e8e8" stroke-width="0.4"/>
+    <line x1="0.000" y1="-4.000" x2="0.000" y2="0.000" stroke="#e8e8e8" stroke-width="0.4"/>
+    <circle cx="0.000" cy="0.000" r="0.6" fill="#e8e8e8"/>
+    <circle cx="6.000" cy="0.000" r="0.6" fill="#e8e8e8"/>
+    <circle cx="6.000" cy="-4.000" r="0.6" fill="#e8e8e8"/>
+    <circle cx="0.000" cy="-4.000" r="0.6" fill="#e8e8e8"/>
+  </g>
+  <g data-layer="construction">
+  </g>
+  <g data-layer="labels">
+    <text x="3.000" y="-14.762" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">H</text>
+    <text x="3.000" y="10.429" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">H</text>
+    <text x="3.000" y="-4.717" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">V</text>
+    <text x="3.000" y="0.383" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">V</text>
+    <text x="3.000" y="-9.739" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=6</text>
+    <text x="3.000" y="5.406" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=4</text>
+  </g>
+  <g data-layer="status">
+    <rect x="-4.0" y="-8.0" width="28.6" height="3" rx="0.5" fill="#4ade80" opacity="0.85"/>
+    <text x="-3.2" y="-5.9" fill="#000000" font-size="1.8" font-family="sans-serif" font-weight="bold">FULLY DOF=0 err=0.0000</text>
+  </g>
+</svg>

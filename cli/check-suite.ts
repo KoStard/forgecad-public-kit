@@ -14,9 +14,11 @@ import { runCheckExamplesCli } from './check-examples';
 import { runCheckJsModulesCli } from './check-js-modules';
 import { runCheckPlacementReferencesCli } from './check-placement-references';
 import { runCheckQueryPropagationCli } from './check-query-propagation';
+import { runCheckConstraintsCli } from './check-constraints';
 import { runCheckTransformsCli } from './check-transforms';
 
 export async function runCheckSuiteCli(): Promise<void> {
+  await runCheckConstraintsCli([]);
   await runCheckTransformsCli();
   await runCheckDimensionsCli();
   await runCheckPlacementReferencesCli();

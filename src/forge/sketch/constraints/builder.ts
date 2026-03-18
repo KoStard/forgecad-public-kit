@@ -190,24 +190,27 @@ export class ConstrainedSketchBuilder {
   constrain(constraint: Omit<SketchConstraint, 'id'>): this {
     const id = `cst-${this.nextId++}`;
     const next = { ...constraint, id } as SketchConstraint;
-    const def = this.buildDefinition(next);
-    const { maxError } = decomposeAndSolve(def, { iterations: 40, tolerance: DEFAULT_TOLERANCE });
-    if (maxError > DEFAULT_TOLERANCE * 5) {
-      // Build a human-readable rejection reason: show constraint params,
-      // the maxError, and which existing constraint has the highest residual
-      // (the likely "blame" — often it's not the new constraint at all).
-      const reason = buildRejectionReason(next, def, maxError);
-      if (this.strict) {
-        throw new Error(reason);
+    if (next.type === 'fixed') {
+      const c = next as unknown as { point: PointId; x: number; y: number };
+      const pt = this.points.find((p) => p.id === c.point);
+      if (pt) {
+        pt.fixed = true;
+        pt.x = c.x;
+        pt.y = c.y;
       }
-      this.rejectedConstraints.push(next);
-      this.rejectionReasons.set(next.id, reason);
-      return this;
     }
-    // Sync solved positions back into the builder's live entities so that
-    // subsequent constraints start from an already-satisfied configuration.
-    // This is the core bug fix: without this, each new constraint re-solves
-    // from stale initial positions, which can cause drift and false rejections.
+    // Always accept the constraint — never reject.
+    this.constraints.push(next);
+
+    // Run the new constraint's presolve to initialise its referenced entities
+    // to reasonable positions.  This is critical for constraints like pointOnLine
+    // where new points at (0,0) are far from the line they should be on.
+    this.runSinglePresolve(next);
+
+    // Incremental solve: test-solve the full system so far.  When it converges,
+    // sync positions back so subsequent constraints start from a satisfied state.
+    const def = this.buildDefinition();
+    const { maxError } = decomposeAndSolve(def, { iterations: 40, tolerance: DEFAULT_TOLERANCE });
     if (maxError <= DEFAULT_TOLERANCE) {
       for (let i = 0; i < this.points.length; i++) {
         this.points[i].x = def.points[i].x;
@@ -221,16 +224,6 @@ export class ConstrainedSketchBuilder {
         if (i < defArcs.length) this.arcs[i].radius = defArcs[i].radius;
       }
     }
-    if (next.type === 'fixed') {
-      const c = next as unknown as { point: PointId; x: number; y: number };
-      const pt = this.points.find((p) => p.id === c.point);
-      if (pt) {
-        pt.fixed = true;
-        pt.x = c.x;
-        pt.y = c.y;
-      }
-    }
-    this.constraints.push(next);
     return this;
   }
 
@@ -532,6 +525,32 @@ export class ConstrainedSketchBuilder {
     };
   }
 
+  /**
+   * Run the presolve hook for a single constraint directly on the builder's
+   * own entities.  This initialises newly-added geometry (e.g. a point at
+   * (0,0) that should be on a line) without disturbing already-converged
+   * positions.
+   */
+  private runSinglePresolve(constraint: SketchConstraint): void {
+    const cdef = getConstraintDef(constraint.type);
+    if (!cdef?.presolve) return;
+    const points = new Map(this.points.map((p) => [p.id, p] as const));
+    const lines = new Map(this.lines.map((l) => [l.id, l] as const));
+    const circles = new Map(this.circles.map((c) => [c.id, c] as const));
+    const arcs = new Map(this.arcs.map((a) => [a.id, a] as const));
+    const shapes = new Map((this.shapes ?? []).map((s) => [s.id, s] as const));
+    const ctx = {
+      points, lines, circles, arcs, shapes,
+      tolerance: DEFAULT_TOLERANCE,
+      movePoint: (pt: SketchPoint, dx: number, dy: number) => {
+        if (pt.fixed) return false;
+        pt.x += dx; pt.y += dy;
+        return true;
+      },
+    };
+    cdef.presolve(constraint as never, ctx);
+  }
+
   private getPoint(id: PointId | null): SketchPoint | null {
     if (!id) return null;
     return this.points.find((p) => p.id === id) ?? null;
@@ -656,58 +675,6 @@ export class ConstrainedSketchBuilder {
 
     return { points: pointMap, lines: lineMap };
   }
-}
-
-/**
- * Build a human-readable rejection reason string.
- * Includes the constraint params, the maxError after test-solve, and the
- * "blame" — the existing constraint with the highest residual (which may
- * be the real culprit, not the newly added one).
- */
-function buildRejectionReason(
-  constraint: SketchConstraint,
-  def: ConstraintDefinition,
-  maxError: number,
-): string {
-  // Summarise the constraint's own params (type + any value/entity refs).
-  const params = Object.entries(constraint)
-    .filter(([k]) => k !== 'id' && k !== 'type')
-    .map(([k, v]) => `${k}=${typeof v === 'number' ? (v as number).toFixed(2) : v}`)
-    .join(', ');
-
-  // Find the existing constraint with the highest individual error (the "blame").
-  // We do a quick single-pass solve to read per-constraint errors.
-  const points = new Map(def.points.map((p) => [p.id, p] as const));
-  const lines = new Map(def.lines.map((l) => [l.id, l] as const));
-  const circles = new Map(def.circles.map((c) => [c.id, c] as const));
-  const arcs = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
-  const shapes = new Map((def.shapes ?? []).map((s) => [s.id, s] as const));
-  const ctx: import('./types').SolverContext = {
-    points, lines, circles, arcs, shapes,
-    tolerance: DEFAULT_TOLERANCE,
-    movePoint: () => false,
-  };
-
-  let blameType = '';
-  let blameId = '';
-  let blameError = 0;
-  for (const c of def.constraints) {
-    const cdef = getConstraintDef(c.type);
-    if (!cdef?.residual) continue;
-    const res = cdef.residual(c as never, ctx);
-    const err = Math.max(...res.map(Math.abs), 0);
-    if (err > blameError) {
-      blameError = err;
-      blameType = c.type;
-      blameId = c.id;
-    }
-  }
-
-  let reason = `${constraint.type}(${params}): maxError=${maxError.toFixed(4)}`;
-  if (blameId && blameId !== constraint.id && blameError > DEFAULT_TOLERANCE) {
-    reason += ` — highest residual from ${blameType} (${blameId}, err=${blameError.toFixed(4)})`;
-  }
-  return reason;
 }
 
 export function constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder {

@@ -323,14 +323,15 @@ export const solveConstraintDefinition = (
     maxError > tolerance * 5 ? working.constraints.map((c) => c.id) : [],
   );
   // Redundant = solver converged but DOF is negative.
-  // For each constraint: solve without it from the original (pre-solve) positions, then check
-  // if that constraint's residual is still ~0. If yes, the other constraints already force it.
+  // For each constraint: solve without it from the *solved* positions (working),
+  // then check if that constraint's residual is still ~0. Starting from the solved
+  // state is far cheaper — the remaining constraints only need to find a nearby minimum.
   const redundant = new Set<string>();
   if (dof < 0 && maxError <= tolerance * 5) {
-    for (const c of def.constraints) {
+    for (const c of working.constraints) {
       const cdef = getConstraintDef(c.type);
       if (!cdef?.residual) continue;
-      const testDef = cloneDefinition(def);
+      const testDef = cloneDefinition(working);
       testDef.constraints = testDef.constraints.filter((tc) => tc.id !== c.id);
       decomposeAndSolve(testDef, { iterations: options.iterations, tolerance });
       const testCtx: SolverContext = {
