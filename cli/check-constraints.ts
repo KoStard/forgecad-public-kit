@@ -22,7 +22,7 @@ import { resolvePackagePath } from './package-runtime';
 import { constrainedSketch, ConstrainedSketchBuilder } from '../src/forge/sketch/constraints/builder';
 import { isConstraintSketch, ConstraintSketch } from '../src/forge/sketch/constraints/sketch';
 import type { ConstraintDefinition, SketchPoint } from '../src/forge/sketch/constraints/types';
-import { addRect, addPolygon, addRegularPolygon } from '../src/forge/sketch/concepts';
+import { addRect, addPolygon, addRegularPolygon } from '../src/forge/sketch/constraints/concepts';
 import { buildConstraintSvgDocument } from './sketch-svg';
 import { computeLabelMetrics, formatMetrics } from './label-metrics';
 import { getConstraintDef } from '../src/forge/sketch/constraints/registry';
