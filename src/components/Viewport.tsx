@@ -2020,6 +2020,8 @@ function SketchObject({
 }) {
   const [hoveredEntity, setHoveredEntity] = useState<SketchHoveredEntity | null>(null);
   const worldThresholdRef = useRef(5);
+  const selectedConstraintId = useForgeStore((s) => s.selectedConstraintId);
+  const setSelectedConstraintId = useForgeStore((s) => s.setSelectedConstraintId);
 
   useFrame(({ camera, size }) => {
     if (!isSketchMode) return;
@@ -2076,7 +2078,7 @@ function SketchObject({
           : settings.color;
 
   const constraintLabels = useMemo(() => {
-    if (!obj.sketchMeta) return [] as { id: string; text: string; position: [number, number, number]; isConflicting: boolean; isRedundant: boolean; }[];
+    if (!obj.sketchMeta) return [] as { id: string; text: string; position: [number, number, number]; isConflicting: boolean; isRedundant: boolean; entityIds: string[]; }[];
     return obj.sketchMeta.constraints.map((constraint) => {
       const unit = constraint.type === 'angle' ? 'deg' : 'mm';
       const text = constraint.isDimension && constraint.value !== undefined
@@ -2088,9 +2090,18 @@ function SketchObject({
         position: [constraint.position[0], constraint.position[1], 0.1] as [number, number, number],
         isConflicting: constraint.isConflicting,
         isRedundant: constraint.isRedundant,
+        entityIds: constraint.entityIds,
       };
     });
   }, [obj.sketchMeta]);
+
+  // Entity IDs referenced by the selected constraint — used for highlight rendering.
+  const highlightedEntityIds = useMemo(() => {
+    if (!selectedConstraintId || !obj.sketchMeta) return new Set<string>();
+    const constraint = obj.sketchMeta.constraints.find((c) => c.id === selectedConstraintId);
+    if (!constraint) return new Set<string>();
+    return new Set(constraint.entityIds);
+  }, [selectedConstraintId, obj.sketchMeta]);
 
   const edgeLines = useMemo(() => {
     const meta = obj.sketchMeta?.edges;
@@ -2309,17 +2320,24 @@ function SketchObject({
           position={lbl.position}
           center
           zIndexRange={[0, 0]}
-          style={{ pointerEvents: 'none' }}
+          style={{ pointerEvents: 'auto' }}
         >
-          <span style={{
-            fontSize: 10,
-            fontFamily: 'system-ui, sans-serif',
-            fontWeight: 600,
-            color: lbl.isConflicting ? '#ff6b6b' : lbl.isRedundant ? '#faad14' : '#e8e8e8',
-            textShadow: '0 0 3px #000, 0 0 3px #000',
-            whiteSpace: 'nowrap',
-            userSelect: 'none',
-          }}>
+          <span
+            onClick={(e) => { e.stopPropagation(); setSelectedConstraintId(lbl.id); }}
+            style={{
+              fontSize: 10,
+              fontFamily: 'system-ui, sans-serif',
+              fontWeight: 600,
+              color: selectedConstraintId === lbl.id ? '#ffcc00'
+                : lbl.isConflicting ? '#ff6b6b' : lbl.isRedundant ? '#faad14' : '#e8e8e8',
+              textShadow: '0 0 3px #000, 0 0 3px #000',
+              whiteSpace: 'nowrap',
+              userSelect: 'none',
+              cursor: 'pointer',
+              background: selectedConstraintId === lbl.id ? 'rgba(255,204,0,0.2)' : 'transparent',
+              borderRadius: 3,
+              padding: '1px 3px',
+            }}>
             {lbl.text}
           </span>
         </Html>
@@ -2359,6 +2377,48 @@ function SketchObject({
           return <primitive object={new THREE.Points(geo, new THREE.PointsMaterial({ color: '#ffcc00', size: 12 }))} raycast={() => null} />;
         }
         return null;
+      })()}
+      {highlightedEntityIds.size > 0 && (() => {
+        const z = 0.06;
+        const highlightColor = '#ffcc00';
+        const elements: React.ReactNode[] = [];
+        const meta = obj.sketchMeta;
+        if (!meta) return null;
+        // Highlight matching edge lines
+        for (const line of meta.edges.lines) {
+          if (!highlightedEntityIds.has(line.id)) continue;
+          const geo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(line.a[0], line.a[1], z),
+            new THREE.Vector3(line.b[0], line.b[1], z),
+          ]);
+          elements.push(<primitive key={`hl-ln-${line.id}`} object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: highlightColor, linewidth: 2 }))} raycast={() => null} />);
+        }
+        // Highlight matching construction lines
+        for (const line of meta.construction.lines) {
+          if (!highlightedEntityIds.has(line.id)) continue;
+          const geo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(line.a[0], line.a[1], z),
+            new THREE.Vector3(line.b[0], line.b[1], z),
+          ]);
+          elements.push(<primitive key={`hl-cl-${line.id}`} object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: highlightColor, linewidth: 2 }))} raycast={() => null} />);
+        }
+        // Highlight matching edge circles
+        for (const circle of meta.edges.circles) {
+          if (!highlightedEntityIds.has(circle.id)) continue;
+          const pts: THREE.Vector3[] = [];
+          for (let i = 0; i <= 64; i++) {
+            const a = (i / 64) * Math.PI * 2;
+            pts.push(new THREE.Vector3(circle.center[0] + Math.cos(a) * circle.radius, circle.center[1] + Math.sin(a) * circle.radius, z));
+          }
+          elements.push(<primitive key={`hl-ci-${circle.id}`} object={new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: highlightColor }))} raycast={() => null} />);
+        }
+        // Highlight matching edge points
+        for (const pt of meta.edges.points) {
+          if (!highlightedEntityIds.has(pt.id)) continue;
+          const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(pt.pos[0], pt.pos[1], z)]);
+          elements.push(<primitive key={`hl-pt-${pt.id}`} object={new THREE.Points(geo, new THREE.PointsMaterial({ color: highlightColor, size: 14 }))} raycast={() => null} />);
+        }
+        return <>{elements}</>;
       })()}
     </group>
   );

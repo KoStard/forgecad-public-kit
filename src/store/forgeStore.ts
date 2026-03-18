@@ -292,6 +292,8 @@ interface ForgeStore {
   clearFocusedObject: () => void;
   hoveredObjectId: string | null;
   setHoveredObjectId: (id: string | null) => void;
+  selectedConstraintId: string | null;
+  setSelectedConstraintId: (id: string | null) => void;
   hoveredJointName: string | null;
   setHoveredJointName: (name: string | null) => void;
   objectPickSyncEnabled: boolean;
@@ -1193,7 +1195,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     };
   }),
   selectedObjectId: null,
-  selectObject: (id) => set({ selectedObjectId: id, constructionGhost: null }),
+  selectObject: (id) => set({ selectedObjectId: id, constructionGhost: null, selectedConstraintId: null }),
   constructionGhost: null,
   setConstructionGhost: (ghost) => set({ constructionGhost: ghost }),
   focusedObjectIds: [],
@@ -1217,6 +1219,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   hoveredObjectId: null,
   setHoveredObjectId: (id) => set((state) => (
     state.hoveredObjectId === id ? state : { hoveredObjectId: id }
+  )),
+  selectedConstraintId: null,
+  setSelectedConstraintId: (id) => set((state) => (
+    state.selectedConstraintId === id ? { selectedConstraintId: null } : { selectedConstraintId: id }
   )),
   hoveredJointName: null,
   setHoveredJointName: (name) => set((state) => (

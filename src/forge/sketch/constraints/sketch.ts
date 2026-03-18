@@ -134,18 +134,18 @@ export const buildConstructionGeometry = (
       const a = pointMap.get(line.a);
       const b = pointMap.get(line.b);
       if (!a || !b) return null;
-      return { a: [a.x, a.y] as [number, number], b: [b.x, b.y] as [number, number] };
+      return { id: line.id, a: [a.x, a.y] as [number, number], b: [b.x, b.y] as [number, number] };
     })
-    .filter((line): line is { a: [number, number]; b: [number, number] } => line !== null);
+    .filter((line): line is NonNullable<typeof line> => line !== null);
 
   const circles = def.circles
     .filter((circle) => circle.construction)
     .map((circle) => {
       const center = pointMap.get(circle.center);
       if (!center) return null;
-      return { center: [center.x, center.y] as [number, number], radius: circle.radius };
+      return { id: circle.id, center: [center.x, center.y] as [number, number], radius: circle.radius };
     })
-    .filter((circle): circle is { center: [number, number]; radius: number } => circle !== null);
+    .filter((circle): circle is NonNullable<typeof circle> => circle !== null);
 
   const arcs = (def.arcs ?? [])
     .filter((arc) => arc.construction)
@@ -155,6 +155,7 @@ export const buildConstructionGeometry = (
       const end = pointMap.get(arc.end);
       if (!center || !start || !end) return null;
       return {
+        id: arc.id,
         center: [center.x, center.y] as [number, number],
         start: [start.x, start.y] as [number, number],
         end: [end.x, end.y] as [number, number],
@@ -175,18 +176,18 @@ export const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMe
       const a = pointMap.get(line.a);
       const b = pointMap.get(line.b);
       if (!a || !b) return null;
-      return { a: [a.x, a.y] as [number, number], b: [b.x, b.y] as [number, number] };
+      return { id: line.id, a: [a.x, a.y] as [number, number], b: [b.x, b.y] as [number, number] };
     })
-    .filter((line): line is { a: [number, number]; b: [number, number] } => line !== null);
+    .filter((line): line is NonNullable<typeof line> => line !== null);
 
   const circles = def.circles
     .filter((circle) => !circle.construction)
     .map((circle) => {
       const center = pointMap.get(circle.center);
       if (!center) return null;
-      return { center: [center.x, center.y] as [number, number], radius: circle.radius };
+      return { id: circle.id, center: [center.x, center.y] as [number, number], radius: circle.radius };
     })
-    .filter((circle): circle is { center: [number, number]; radius: number } => circle !== null);
+    .filter((circle): circle is NonNullable<typeof circle> => circle !== null);
 
   const arcs = (def.arcs ?? [])
     .filter((arc) => !arc.construction)
@@ -196,6 +197,7 @@ export const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMe
       const end = pointMap.get(arc.end);
       if (!center || !start || !end) return null;
       return {
+        id: arc.id,
         center: [center.x, center.y] as [number, number],
         start: [start.x, start.y] as [number, number],
         end: [end.x, end.y] as [number, number],

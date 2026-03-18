@@ -253,6 +253,8 @@ export function ViewPanel() {
   const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
   const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
   const setObjectPickSyncEnabled = useForgeStore((s) => s.setObjectPickSyncEnabled);
+  const selectedConstraintId = useForgeStore((s) => s.selectedConstraintId);
+  const setSelectedConstraintId = useForgeStore((s) => s.setSelectedConstraintId);
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
   const measureSnapPx = useForgeStore((s) => s.measureSnapPx);
   const setMeasureSnapPx = useForgeStore((s) => s.setMeasureSnapPx);
@@ -799,15 +801,19 @@ export function ViewPanel() {
           {constraintMeta.constraints.map((constraint) => (
             <div
               key={constraint.id}
+              onClick={() => setSelectedConstraintId(constraint.id)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
                 padding: '6px 8px',
-                border: '1px solid var(--fc-borderLight)',
+                border: selectedConstraintId === constraint.id ? '1px solid #ffcc00' : '1px solid var(--fc-borderLight)',
                 borderRadius: 6,
                 marginBottom: 6,
-                background: constraint.isConflicting ? 'var(--fc-errorBg)' : constraint.isRedundant ? 'rgba(250,173,20,0.12)' : 'var(--fc-bgOverlay)',
+                background: selectedConstraintId === constraint.id
+                  ? 'rgba(255,204,0,0.15)'
+                  : constraint.isConflicting ? 'var(--fc-errorBg)' : constraint.isRedundant ? 'rgba(250,173,20,0.12)' : 'var(--fc-bgOverlay)',
+                cursor: 'pointer',
               }}
             >
               <span style={{ fontSize: 11, color: constraint.isConflicting ? 'var(--fc-error)' : constraint.isRedundant ? '#faad14' : 'var(--fc-text)', width: 48 }}>
@@ -817,6 +823,7 @@ export function ViewPanel() {
                 <input
                   type="number"
                   value={constraint.value}
+                  onClick={(e) => e.stopPropagation()}
                   onChange={(e) => {
                     const nextValue = Number(e.target.value);
                     if (Number.isNaN(nextValue) || !selectedObject) return;
@@ -827,6 +834,9 @@ export function ViewPanel() {
               ) : (
                 <span style={{ fontSize: 12, color: 'var(--fc-textDim)' }}>{constraint.type}</span>
               )}
+              <span style={{ fontSize: 9, color: 'var(--fc-textDim)', marginLeft: 'auto', opacity: 0.6 }}>
+                {constraint.entityIds.join(', ')}
+              </span>
             </div>
           ))}
           {constraintMeta.rejected.length > 0 && (

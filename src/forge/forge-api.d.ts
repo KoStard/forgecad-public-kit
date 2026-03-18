@@ -582,6 +582,7 @@ interface SketchConstraintMeta {
 	rejected: ConstraintDisplay[];
 	construction: {
 		lines: {
+			id: string;
 			a: [
 				number,
 				number
@@ -592,6 +593,7 @@ interface SketchConstraintMeta {
 			];
 		}[];
 		circles: {
+			id: string;
 			center: [
 				number,
 				number
@@ -599,6 +601,7 @@ interface SketchConstraintMeta {
 			radius: number;
 		}[];
 		arcs: {
+			id: string;
 			center: [
 				number,
 				number
@@ -618,6 +621,7 @@ interface SketchConstraintMeta {
 	/** Non-construction geometry edges rendered as solid wireframe overlay. */
 	edges: {
 		lines: {
+			id: string;
 			a: [
 				number,
 				number
@@ -628,6 +632,7 @@ interface SketchConstraintMeta {
 			];
 		}[];
 		circles: {
+			id: string;
 			center: [
 				number,
 				number
@@ -635,6 +640,7 @@ interface SketchConstraintMeta {
 			radius: number;
 		}[];
 		arcs: {
+			id: string;
 			center: [
 				number,
 				number

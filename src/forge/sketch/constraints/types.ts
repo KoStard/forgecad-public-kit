@@ -87,15 +87,15 @@ export interface SketchConstraintMeta {
   constraints: ConstraintDisplay[];
   rejected: ConstraintDisplay[];
   construction: {
-    lines: { a: [number, number]; b: [number, number] }[];
-    circles: { center: [number, number]; radius: number }[];
-    arcs: { center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
+    lines: { id: string; a: [number, number]; b: [number, number] }[];
+    circles: { id: string; center: [number, number]; radius: number }[];
+    arcs: { id: string; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
   };
   /** Non-construction geometry edges rendered as solid wireframe overlay. */
   edges: {
-    lines: { a: [number, number]; b: [number, number] }[];
-    circles: { center: [number, number]; radius: number }[];
-    arcs: { center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
+    lines: { id: string; a: [number, number]; b: [number, number] }[];
+    circles: { id: string; center: [number, number]; radius: number }[];
+    arcs: { id: string; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
     points: { id: string; pos: [number, number] }[];
   };
 }
