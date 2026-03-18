@@ -2019,6 +2019,7 @@ function SketchObject({
   onEntityClick?: (entity: SketchHoveredEntity, clientX: number, clientY: number) => void;
   onVertexHover?: (pointId: string, event: ThreeEvent<PointerEvent>) => void;
 }) {
+  const sketchTheme = useForgeStore((s) => themes[s.theme]);
   const [hoveredEntity, setHoveredEntity] = useState<SketchHoveredEntity | null>(null);
   const worldThresholdRef = useRef(5);
   const selectedConstraintId = useForgeStore((s) => s.selectedConstraintId);
@@ -2070,11 +2071,11 @@ function SketchObject({
 
   // Global status color — used for fill and polygon outlines (sketch geometry without entity IDs).
   const constraintStatusColor = obj.sketchMeta?.status === 'over'
-    ? '#ff4d4f'
+    ? sketchTheme.sketchOverConstrained
     : obj.sketchMeta?.status === 'fully'
-      ? '#35c759'
+      ? sketchTheme.sketchFullyConstrained
       : obj.sketchMeta?.status === 'under'
-        ? '#4aa3ff'
+        ? sketchTheme.sketchUnderConstrained
         : settings.color;
 
   // Per-entity color map: entity ID → worst constraint status color.
@@ -2083,18 +2084,18 @@ function SketchObject({
     const map = new Map<string, string>();
     if (!obj.sketchMeta) return map;
     for (const c of obj.sketchMeta.constraints) {
-      const color = c.isConflicting ? '#ff4d4f' : c.isRedundant ? '#faad14' : null;
+      const color = c.isConflicting ? sketchTheme.sketchConflicting : c.isRedundant ? sketchTheme.sketchRedundant : null;
       if (!color) continue;
       for (const eid of c.entityIds) {
         const existing = map.get(eid);
-        // conflicting (red) takes priority over redundant (orange)
-        if (!existing || (color === '#ff4d4f' && existing !== '#ff4d4f')) {
+        // conflicting takes priority over redundant
+        if (!existing || (color === sketchTheme.sketchConflicting && existing !== sketchTheme.sketchConflicting)) {
           map.set(eid, color);
         }
       }
     }
     return map;
-  }, [obj.sketchMeta]);
+  }, [obj.sketchMeta, sketchTheme]);
 
   const lengthUnit = useForgeStore((s) => s.lengthUnit);
 
@@ -2136,7 +2137,7 @@ function SketchObject({
     if (!obj.sketchMeta) return { labels, lines, triangles, arcs };
 
     for (const c of obj.sketchMeta.constraints) {
-      const color = c.isConflicting ? '#ff6b6b' : c.isRedundant ? '#faad14' : '#4ade80';
+      const color = c.isConflicting ? sketchTheme.sketchConflicting : c.isRedundant ? sketchTheme.sketchRedundant : sketchTheme.sketchConstraint;
       let annIdx = 0;
       for (const ann of c.annotations) {
         const k = `${c.id}-${annIdx++}`;
@@ -2205,7 +2206,7 @@ function SketchObject({
       }
     }
     return { labels, lines, triangles, arcs };
-  }, [obj.sketchMeta, lengthUnit]);
+  }, [obj.sketchMeta, sketchTheme, lengthUnit]);
 
   // Entity IDs referenced by the selected constraint — used for highlight rendering.
   const highlightedEntityIds = useMemo(() => {
@@ -2270,12 +2271,12 @@ function SketchObject({
         new THREE.Vector3(line.a[0], line.a[1], 0),
         new THREE.Vector3(line.b[0], line.b[1], 0),
       ]);
-      const mat = new THREE.LineDashedMaterial({ color: '#888', dashSize: 2, gapSize: 1, transparent: true, opacity: 0.6 });
+      const mat = new THREE.LineDashedMaterial({ color: sketchTheme.sketchConstruction, dashSize: 2, gapSize: 1, transparent: true, opacity: 0.6 });
       const dashed = new THREE.Line(geo, mat);
       dashed.computeLineDistances();
       return dashed;
     });
-  }, [obj.sketchMeta]);
+  }, [obj.sketchMeta, sketchTheme]);
 
   const constructionCircles = useMemo(() => {
     const meta = obj.sketchMeta?.construction;
@@ -2292,12 +2293,12 @@ function SketchObject({
         ));
       }
       const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineDashedMaterial({ color: '#888', dashSize: 2, gapSize: 1, transparent: true, opacity: 0.6 });
+      const mat = new THREE.LineDashedMaterial({ color: sketchTheme.sketchConstruction, dashSize: 2, gapSize: 1, transparent: true, opacity: 0.6 });
       const dashed = new THREE.Line(geo, mat);
       dashed.computeLineDistances();
       return dashed;
     });
-  }, [obj.sketchMeta]);
+  }, [obj.sketchMeta, sketchTheme]);
 
   // Bounding box covering all sketch geometry — used as a transparent hit plane so
   // pointer events fire even when the cursor is over edges/vertices outside the fill.
@@ -2410,14 +2411,14 @@ function SketchObject({
       {edgeLines.lines.map((edge) => (
         <primitive
           key={`el-${edge.id}`}
-          object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({ color: entityColorMap.get(edge.id) ?? '#e8e8e8', linewidth: 2, transparent: true, opacity: settings.opacity }))}
+          object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({ color: entityColorMap.get(edge.id) ?? sketchTheme.sketchEdge, linewidth: 2, transparent: true, opacity: settings.opacity }))}
           raycast={() => null}
         />
       ))}
       {edgeLines.circles.map((edge) => (
         <primitive
           key={`ec-${edge.id}`}
-          object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({ color: entityColorMap.get(edge.id) ?? '#e8e8e8', linewidth: 2, transparent: true, opacity: settings.opacity }))}
+          object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({ color: entityColorMap.get(edge.id) ?? sketchTheme.sketchEdge, linewidth: 2, transparent: true, opacity: settings.opacity }))}
           raycast={() => null}
         />
       ))}
@@ -2433,7 +2434,7 @@ function SketchObject({
             width: 5,
             height: 5,
             borderRadius: '50%',
-            background: entityColorMap.get(pt.id) ?? '#ffffff',
+            background: entityColorMap.get(pt.id) ?? sketchTheme.sketchPoint,
             boxShadow: '0 0 2px #000',
           }} />
         </Html>
@@ -2500,13 +2501,13 @@ function SketchObject({
               fontSize: lbl.fontSize ?? 10,
               fontFamily: 'system-ui, sans-serif',
               fontWeight: 600,
-              color: selectedConstraintId === lbl.constraintId ? '#ffcc00'
-                : lbl.isConflicting ? '#ff6b6b' : lbl.isRedundant ? '#faad14' : '#e8e8e8',
-              textShadow: '0 0 3px #000, 0 0 3px #000',
+              color: selectedConstraintId === lbl.constraintId ? sketchTheme.sketchSelected
+                : lbl.isConflicting ? sketchTheme.sketchConflicting : lbl.isRedundant ? sketchTheme.sketchRedundant : 'var(--fc-text)',
+              textShadow: `0 0 3px var(--fc-viewportBg), 0 0 3px var(--fc-viewportBg)`,
               whiteSpace: 'nowrap',
               userSelect: 'none',
               cursor: 'pointer',
-              background: selectedConstraintId === lbl.constraintId ? 'rgba(255,204,0,0.2)' : 'transparent',
+              background: selectedConstraintId === lbl.constraintId ? `${sketchTheme.sketchSelected}33` : 'transparent',
               borderRadius: 3,
               padding: '1px 3px',
             }}>
@@ -2521,7 +2522,7 @@ function SketchObject({
             new THREE.Vector3(hoveredEntity.a[0], hoveredEntity.a[1], z),
             new THREE.Vector3(hoveredEntity.b[0], hoveredEntity.b[1], z),
           ]);
-          return <primitive object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffcc00' }))} raycast={() => null} />;
+          return <primitive object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: sketchTheme.sketchSelected }))} raycast={() => null} />;
         }
         if (hoveredEntity.kind === 'circle') {
           const pts: THREE.Vector3[] = [];
@@ -2529,7 +2530,7 @@ function SketchObject({
             const a = (i / 64) * Math.PI * 2;
             pts.push(new THREE.Vector3(hoveredEntity.center[0] + Math.cos(a) * hoveredEntity.radius, hoveredEntity.center[1] + Math.sin(a) * hoveredEntity.radius, z));
           }
-          return <primitive object={new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#ffcc00' }))} raycast={() => null} />;
+          return <primitive object={new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: sketchTheme.sketchSelected }))} raycast={() => null} />;
         }
         if (hoveredEntity.kind === 'arc') {
           const sa = Math.atan2(hoveredEntity.start[1] - hoveredEntity.center[1], hoveredEntity.start[0] - hoveredEntity.center[0]);
@@ -2542,17 +2543,17 @@ function SketchObject({
             const a = sa + (span * i) / 64;
             pts.push(new THREE.Vector3(hoveredEntity.center[0] + Math.cos(a) * hoveredEntity.radius, hoveredEntity.center[1] + Math.sin(a) * hoveredEntity.radius, z));
           }
-          return <primitive object={new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#ffcc00' }))} raycast={() => null} />;
+          return <primitive object={new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: sketchTheme.sketchSelected }))} raycast={() => null} />;
         }
         if (hoveredEntity.kind === 'point') {
           const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(hoveredEntity.position[0], hoveredEntity.position[1], z)]);
-          return <primitive object={new THREE.Points(geo, new THREE.PointsMaterial({ color: '#ffcc00', size: 12 }))} raycast={() => null} />;
+          return <primitive object={new THREE.Points(geo, new THREE.PointsMaterial({ color: sketchTheme.sketchSelected, size: 12 }))} raycast={() => null} />;
         }
         return null;
       })()}
       {highlightedEntityIds.size > 0 && (() => {
         const z = 0.06;
-        const highlightColor = '#ffcc00';
+        const highlightColor = sketchTheme.sketchSelected;
         const elements: React.ReactNode[] = [];
         const meta = obj.sketchMeta;
         if (!meta) return null;

@@ -34,6 +34,20 @@ export interface Theme {
   viewportBg: string;
   gridCell: string;
   gridSection: string;
+
+  // Sketch
+  sketchEdge: string;
+  sketchPoint: string;
+  sketchConstruction: string;
+  sketchSurface: string;
+  sketchConstraint: string;
+  sketchConstraintDim: string;
+  sketchConflicting: string;
+  sketchRedundant: string;
+  sketchSelected: string;
+  sketchFullyConstrained: string;
+  sketchUnderConstrained: string;
+  sketchOverConstrained: string;
 }
 
 const dark: Theme = {
@@ -64,6 +78,19 @@ const dark: Theme = {
   viewportBg: '#252526',
   gridCell: '#404040',
   gridSection: '#555',
+
+  sketchEdge: '#e8e8e8',
+  sketchPoint: '#ffffff',
+  sketchConstruction: '#6b7280',
+  sketchSurface: '#4488cc',
+  sketchConstraint: '#4ade80',
+  sketchConstraintDim: '#4ade80',
+  sketchConflicting: '#ff6b6b',
+  sketchRedundant: '#faad14',
+  sketchSelected: '#ffcc00',
+  sketchFullyConstrained: '#35c759',
+  sketchUnderConstrained: '#4aa3ff',
+  sketchOverConstrained: '#ff4d4f',
 };
 
 const light: Theme = {
@@ -94,6 +121,19 @@ const light: Theme = {
   viewportBg: '#e8e8e8',
   gridCell: '#c0c0c0',
   gridSection: '#a0a0a0',
+
+  sketchEdge: '#2d2d2d',
+  sketchPoint: '#1a1a1a',
+  sketchConstruction: '#9ca3af',
+  sketchSurface: '#3370aa',
+  sketchConstraint: '#16a34a',
+  sketchConstraintDim: '#16a34a',
+  sketchConflicting: '#dc2626',
+  sketchRedundant: '#d97706',
+  sketchSelected: '#ca8a04',
+  sketchFullyConstrained: '#16a34a',
+  sketchUnderConstrained: '#2563eb',
+  sketchOverConstrained: '#dc2626',
 };
 
 const gruvbox: Theme = {
@@ -119,6 +159,19 @@ const gruvbox: Theme = {
   viewportBg: '#1d2021',
   gridCell: '#504945',
   gridSection: '#7c6f64',
+
+  sketchEdge: '#ebdbb2',
+  sketchPoint: '#fbf1c7',
+  sketchConstruction: '#7c6f64',
+  sketchSurface: '#458588',
+  sketchConstraint: '#b8bb26',
+  sketchConstraintDim: '#b8bb26',
+  sketchConflicting: '#fb4934',
+  sketchRedundant: '#fabd2f',
+  sketchSelected: '#fe8019',
+  sketchFullyConstrained: '#b8bb26',
+  sketchUnderConstrained: '#83a598',
+  sketchOverConstrained: '#fb4934',
 };
 
 const tokyoNight: Theme = {
@@ -144,6 +197,19 @@ const tokyoNight: Theme = {
   viewportBg: '#16161e',
   gridCell: '#292e42',
   gridSection: '#3b4261',
+
+  sketchEdge: '#c0caf5',
+  sketchPoint: '#dfe5fa',
+  sketchConstruction: '#565f89',
+  sketchSurface: '#7aa2f7',
+  sketchConstraint: '#9ece6a',
+  sketchConstraintDim: '#9ece6a',
+  sketchConflicting: '#f7768e',
+  sketchRedundant: '#e0af68',
+  sketchSelected: '#ff9e64',
+  sketchFullyConstrained: '#9ece6a',
+  sketchUnderConstrained: '#7aa2f7',
+  sketchOverConstrained: '#f7768e',
 };
 
 const kanagawaLotus: Theme = {
@@ -169,6 +235,19 @@ const kanagawaLotus: Theme = {
   viewportBg: '#e7dba0',
   gridCell: '#c9c08a',
   gridSection: '#a8a070',
+
+  sketchEdge: '#545464',
+  sketchPoint: '#3a3a4a',
+  sketchConstruction: '#8a8980',
+  sketchSurface: '#597b8c',
+  sketchConstraint: '#6f894e',
+  sketchConstraintDim: '#6f894e',
+  sketchConflicting: '#c84053',
+  sketchRedundant: '#cc6d00',
+  sketchSelected: '#d27e19',
+  sketchFullyConstrained: '#6f894e',
+  sketchUnderConstrained: '#4d699b',
+  sketchOverConstrained: '#c84053',
 };
 
 export const themes: Record<ThemeName, Theme> = { dark, light, gruvbox, 'tokyo-night': tokyoNight, 'kanagawa-lotus': kanagawaLotus };
