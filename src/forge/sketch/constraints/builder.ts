@@ -207,22 +207,19 @@ export class ConstrainedSketchBuilder {
     // where new points at (0,0) are far from the line they should be on.
     this.runSinglePresolve(next);
 
-    // Incremental solve: test-solve the full system so far.  When it converges,
-    // sync positions back so subsequent constraints start from a satisfied state.
+    // Fast path: check if the system is already satisfied after presolve.
+    if (this.checkResiduals() <= DEFAULT_TOLERANCE) return this;
+
+    // Incremental solve with minimal solver settings — positions are warm.
     const def = this.buildDefinition();
-    const { maxError } = decomposeAndSolve(def, { iterations: 40, tolerance: DEFAULT_TOLERANCE });
+    const { maxError } = decomposeAndSolve(def, {
+      iterations: 30,
+      tolerance: DEFAULT_TOLERANCE,
+      restarts: 1,
+      warmStartIterations: 4,
+    });
     if (maxError <= DEFAULT_TOLERANCE) {
-      for (let i = 0; i < this.points.length; i++) {
-        this.points[i].x = def.points[i].x;
-        this.points[i].y = def.points[i].y;
-      }
-      for (let i = 0; i < this.circles.length; i++) {
-        this.circles[i].radius = def.circles[i].radius;
-      }
-      const defArcs = def.arcs ?? [];
-      for (let i = 0; i < this.arcs.length; i++) {
-        if (i < defArcs.length) this.arcs[i].radius = defArcs[i].radius;
-      }
+      this.syncFromDefinition(def);
     }
     return this;
   }
@@ -523,6 +520,51 @@ export class ConstrainedSketchBuilder {
       rejectedConstraints: [...this.rejectedConstraints],
       rejectionReasons: new Map(this.rejectionReasons),
     };
+  }
+
+  /**
+   * Evaluate all constraint residuals on the builder's live entities.
+   * Returns the max absolute residual (infinity-norm).  Used for fast
+   * "already satisfied?" checks before invoking the full solver.
+   */
+  private checkResiduals(): number {
+    const points = new Map(this.points.map((p) => [p.id, p] as const));
+    const lines = new Map(this.lines.map((l) => [l.id, l] as const));
+    const circles = new Map(this.circles.map((c) => [c.id, c] as const));
+    const arcs = new Map(this.arcs.map((a) => [a.id, a] as const));
+    const shapes = new Map((this.shapes ?? []).map((s) => [s.id, s] as const));
+    const ctx = {
+      points, lines, circles, arcs, shapes,
+      tolerance: DEFAULT_TOLERANCE,
+      movePoint: () => false,
+    };
+    let maxRes = 0;
+    for (const c of this.constraints) {
+      const cdef = getConstraintDef(c.type);
+      if (!cdef?.residual) continue;
+      const res = cdef.residual(c as never, ctx);
+      for (const r of res) {
+        const a = Math.abs(r);
+        if (a > maxRes) maxRes = a;
+        if (maxRes > DEFAULT_TOLERANCE) return maxRes; // early bail
+      }
+    }
+    return maxRes;
+  }
+
+  /** Sync solved positions from a definition back to the builder's live entities. */
+  private syncFromDefinition(def: ConstraintDefinition): void {
+    for (let i = 0; i < this.points.length; i++) {
+      this.points[i].x = def.points[i].x;
+      this.points[i].y = def.points[i].y;
+    }
+    for (let i = 0; i < this.circles.length; i++) {
+      this.circles[i].radius = def.circles[i].radius;
+    }
+    const defArcs = def.arcs ?? [];
+    for (let i = 0; i < this.arcs.length; i++) {
+      if (i < defArcs.length) this.arcs[i].radius = defArcs[i].radius;
+    }
   }
 
   /**

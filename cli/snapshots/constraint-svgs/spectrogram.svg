@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-13.9 -47.2 69.3 58.0" width="600" height="600">
   <rect x="-13.9" y="-47.2" width="69.3" height="58.0" fill="#1a1a2e"/>
   <g data-layer="edges">
-    <line x1="0.000" y1="0.000" x2="15.283" y2="-15.826" stroke="#e8e8e8" stroke-width="0.4"/>
-    <line x1="15.283" y1="-15.826" x2="-6.064" y2="-21.148" stroke="#e8e8e8" stroke-width="0.4"/>
+    <line x1="0.000" y1="0.000" x2="15.282" y2="-15.825" stroke="#e8e8e8" stroke-width="0.4"/>
+    <line x1="15.282" y1="-15.825" x2="-6.064" y2="-21.148" stroke="#e8e8e8" stroke-width="0.4"/>
     <line x1="-6.064" y1="-21.148" x2="0.000" y2="0.000" stroke="#e8e8e8" stroke-width="0.4"/>
     <line x1="-0.968" y1="3.881" x2="19.128" y2="-16.928" stroke="#e8e8e8" stroke-width="0.4"/>
     <line x1="19.128" y1="-16.928" x2="-8.941" y2="-23.926" stroke="#e8e8e8" stroke-width="0.4"/>
@@ -31,7 +31,7 @@
     <line x1="31.349" y1="-1.178" x2="31.349" y2="-35.178" stroke="#e8e8e8" stroke-width="0.4"/>
     <line x1="5.849" y1="-18.178" x2="27.349" y2="-18.178" stroke="#e8e8e8" stroke-width="0.4"/>
     <circle cx="0.000" cy="0.000" r="0.6" fill="#e8e8e8"/>
-    <circle cx="15.283" cy="-15.826" r="0.6" fill="#e8e8e8"/>
+    <circle cx="15.282" cy="-15.825" r="0.6" fill="#e8e8e8"/>
     <circle cx="-6.064" cy="-21.148" r="0.6" fill="#e8e8e8"/>
     <circle cx="-0.968" cy="3.881" r="0.6" fill="#e8e8e8"/>
     <circle cx="19.128" cy="-16.928" r="0.6" fill="#e8e8e8"/>
@@ -65,10 +65,10 @@
   <g data-layer="construction">
   </g>
   <g data-layer="labels">
-    <text x="-0.088" y="-1.885" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">FIX</text>
+    <text x="-0.087" y="-1.885" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">FIX</text>
     <text x="-0.253" y="-7.107" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">EQ</text>
     <text x="11.722" y="-14.458" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">EQ</text>
-    <text x="1.272" y="-16.702" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
+    <text x="1.271" y="-16.701" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
     <text x="9.385" y="-4.120" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">EQ</text>
     <text x="11.488" y="-8.939" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">EQ</text>
     <text x="-2.900" y="-13.137" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
@@ -78,50 +78,50 @@
     <text x="6.454" y="-9.193" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">∠=46</text>
     <text x="5.681" y="-19.161" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">POL</text>
     <text x="9.332" y="-22.666" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PDIST=8.42</text>
-    <text x="16.649" y="-12.408" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
+    <text x="16.649" y="-12.407" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
     <text x="2.245" y="7.834" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">∠=-90</text>
-    <text x="25.020" y="5.485" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">∠=0</text>
+    <text x="25.020" y="5.486" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">∠=0</text>
     <text x="45.623" y="-11.630" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">∠=90</text>
     <text x="23.052" y="-39.516" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">∠=180</text>
     <text x="-4.666" y="-30.844" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">∠=-90</text>
     <text x="5.855" y="0.102" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">POL</text>
     <text x="-3.941" y="-22.680" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">POL</text>
-    <text x="20.367" y="-15.813" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
+    <text x="20.366" y="-15.813" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
     <text x="1.513" y="2.855" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=5</text>
     <text x="23.205" y="0.132" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=5</text>
     <text x="40.304" y="-22.488" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=5</text>
-    <text x="18.853" y="-42.281" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=5</text>
-    <text x="-7.216" y="-35.261" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=5</text>
-    <text x="54.788" y="-16.954" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
-    <text x="51.344" y="-28.029" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PAR</text>
+    <text x="18.852" y="-42.280" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=5</text>
+    <text x="-7.216" y="-35.260" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=5</text>
+    <text x="54.787" y="-16.953" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
+    <text x="51.342" y="-28.030" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PAR</text>
     <text x="50.711" y="-8.509" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PAR</text>
-    <text x="44.988" y="-24.385" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=4</text>
-    <text x="51.156" y="-13.513" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PERP</text>
-    <text x="49.893" y="-23.211" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=0</text>
-    <text x="44.474" y="-16.527" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=0</text>
-    <text x="49.249" y="-18.175" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">MID</text>
-    <text x="39.511" y="-17.535" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">MID</text>
+    <text x="44.990" y="-24.383" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=4</text>
+    <text x="51.155" y="-13.513" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PERP</text>
+    <text x="49.895" y="-23.211" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=0</text>
+    <text x="44.473" y="-16.526" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=0</text>
+    <text x="49.248" y="-18.175" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">MID</text>
+    <text x="39.510" y="-17.535" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">MID</text>
     <text x="35.385" y="-23.566" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
     <text x="33.652" y="-37.481" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">POL</text>
-    <text x="27.746" y="-37.522" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">POL</text>
+    <text x="27.746" y="-37.521" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">POL</text>
     <text x="28.141" y="1.414" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">POL</text>
     <text x="33.547" y="1.090" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">POL</text>
-    <text x="19.200" y="-30.166" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PERP</text>
-    <text x="20.869" y="-34.985" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PERP</text>
-    <text x="26.366" y="-10.599" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
+    <text x="19.200" y="-30.165" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PERP</text>
+    <text x="20.869" y="-34.984" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PERP</text>
+    <text x="26.367" y="-10.596" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
     <text x="30.489" y="-33.295" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=2</text>
-    <text x="30.247" y="-23.273" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=2</text>
+    <text x="30.247" y="-23.274" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=2</text>
     <text x="30.514" y="-3.010" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=2</text>
-    <text x="30.067" y="-14.014" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=2</text>
-    <text x="35.426" y="-14.481" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=2</text>
-    <text x="24.158" y="-21.832" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=-14</text>
-    <text x="33.156" y="-18.994" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=38</text>
-    <text x="28.127" y="-18.730" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">MID</text>
-    <text x="14.275" y="-21.804" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=21.5</text>
-    <text x="19.206" y="-20.758" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PERP</text>
+    <text x="30.065" y="-14.014" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=2</text>
+    <text x="35.426" y="-14.480" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=2</text>
+    <text x="24.157" y="-21.832" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=-14</text>
+    <text x="33.157" y="-18.994" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=38</text>
+    <text x="28.128" y="-18.731" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">MID</text>
+    <text x="14.274" y="-21.804" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=21.5</text>
+    <text x="19.205" y="-20.758" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PERP</text>
   </g>
   <g data-layer="status">
     <rect x="-12.9" y="-46.2" width="28.6" height="3" rx="0.5" fill="#ff6b6b" opacity="0.85"/>
-    <text x="-12.1" y="-44.1" fill="#000000" font-size="1.8" font-family="sans-serif" font-weight="bold">OVER DOF=-4 err=0.0001</text>
+    <text x="-12.1" y="-44.1" fill="#000000" font-size="1.8" font-family="sans-serif" font-weight="bold">OVER DOF=-4 err=0.0000</text>
   </g>
 </svg>

@@ -137,6 +137,71 @@ Clones from solved positions (not original) for faster, more reliable redundancy
 
 ---
 
+## Phase 2: Performance Optimization
+
+### Baseline (2026-03-18)
+```
+Spectrogram (54 constraints, 31 points):
+  Build (constrain() calls): 2989ms = 98.8% of total
+  Final solve():               33ms =  1.2% of total
+  Total:                     3022ms
+```
+Constraints #1-34 take 8ms. Constraints #35-54 take 2981ms.
+Each `constrain()` runs `decomposeAndSolve()` on the FULL system from scratch.
+
+### Optimization Ideas
+
+| # | Idea | Expected Impact | Risk |
+|---|------|----------------|------|
+| P1 | Early exit: after presolve, check residuals — skip solve if already satisfied | HIGH — many constraints converge after presolve alone | May miss cases where presolve helps one constraint but breaks another |
+| P2 | Reduce restarts: use 1 restart for incremental (positions are warm) | MEDIUM — saves 5× solver cost per constrain() call | May miss convergence on harder constraints |
+| P3 | Reduce iterations: use 20 instead of 40 for incremental | MEDIUM | May not converge on complex steps |
+| P4 | Checkpoint reuse: don't rebuild definition from scratch, reuse previous solved state | HIGH — avoids redundant cloning and presolve | Complex implementation |
+| P5 | Freeze converged variables: if a point hasn't moved, mark it as fixed for the incremental solve | HIGH — dramatically reduces Jacobian size | Need to detect which points are affected by new constraint |
+
+### Performance Progress Tracker
+
+| # | Optimization | Build ms | Solve ms | Total ms | maxError | Status |
+|---|-------------|----------|----------|----------|----------|--------|
+| — | Baseline | 2989 | 33 | 3022 | 0.0001 | ✅ |
+| P1+P2 | Early exit + reduced restarts/iterations | 592 | 34 | 626 | 0.0000 | ✅ 5× faster |
+
+### Performance Experiment Log
+
+#### P1+P2: Early exit + reduced restarts/iterations (SUCCESS — 5× speedup)
+**What**: (P1) After running presolve, check all constraint residuals. If maxError ≤ tolerance, skip the decomposeAndSolve call entirely. (P2) Reduce incremental solve from {iterations:40, restarts:6} to {iterations:30, restarts:1, warmStartIterations:4}.
+**Result**: Build 2989ms → 592ms, solve 33ms → 34ms, total 3022ms → 626ms. Quality maintained (maxError=0.0000).
+**Why it worked**: Many constraints (especially early ones) are fully satisfied by presolve alone — the full solver was wasted. Positions are already warm from previous convergences, so 1 restart is sufficient. The early exit alone skips ~20 solver calls.
+
+#### P3a: Skip incremental solve after 2 consecutive failures (FAILED — total time worse)
+**What**: Track consecutive solver failures. After 2 failures in a row, skip decomposeAndSolve entirely.
+**Result**: Build 229ms, BUT solve jumped 33ms → 2062ms. Total 2291ms (3.7× slower).
+**Why it failed**: Incremental solves that "fail" (maxError > tolerance) still partially warm positions. The geometry moves closer to the correct configuration even without full convergence. Skipping them leaves the final solve starting from much worse positions. The ~330ms saved in build costs ~2000ms in solve.
+**Lesson**: Non-converging incremental solves are NOT wasted time — they provide essential partial warming. Never skip them entirely.
+
+#### P3b: Skip after 3 consecutive failures (FAILED — same issue)
+**What**: Same as P3a but with threshold 3 instead of 2.
+**Result**: Build 332ms, solve 2023ms, total 2356ms. Same problem.
+**Lesson**: Even skipping the last 5 incremental solves is too much. The partial warming they provide is critical.
+
+#### P3c: Reduced iterations (10 vs 30) after consecutive failures (NEUTRAL)
+**What**: After 2 consecutive failures, reduce iterations from 30 to 10 and skip warm-start.
+**Result**: Build 450ms, solve 33ms, total 484ms — only 2ms better than P1+P2 alone.
+**Why it didn't help much**: The LM solver's per-iteration cost is dominated by Jacobian computation and matrix setup, not the iterations themselves. Reducing iterations from 30 to 10 saves little because most time is spent in setup.
+**Lesson**: Iteration count is not the bottleneck. The setup cost (Jacobian, decompose) dominates. To make incremental solves faster, need to reduce Jacobian size (freeze variables) or avoid recomputing the full decomposition.
+
+### Remaining Bottlenecks
+Constraints #47-48 (lineDistance in camera holder section) each take ~90-100ms. Analysis from experiment-perf2.ts:
+- #47 converges (useful work, must keep)
+- #48 does NOT converge but provides essential partial warming
+- #49-54 are fast (<1ms each) because they benefit from #47-48's warming
+
+Next optimization targets should focus on making each incremental solve cheaper, not fewer:
+- **P5: Freeze converged variables** — only include points touched by the new constraint in the Jacobian
+- **P4: Subsystem-aware incremental solve** — only re-solve the subsystem affected by the new constraint
+
+---
+
 ## Files Modified
 
 | File | Purpose |
