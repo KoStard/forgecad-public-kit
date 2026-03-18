@@ -1,7 +1,14 @@
 import { Shape, union } from './kernel';
 import { ShapeGroup, group } from './group';
 import { TrackedShape } from './sketch/topology';
-import { Transform, composeChain, normalizeAxis, type TransformInput, type Vec3 } from './transform';
+import { Transform, composeChain, normalizeAxis, type TransformInput, type Vec3, type Mat4 } from './transform';
+import type { RigidBody, Constraint3D, Solve3DResult, Solver3DContext } from './constraints3d/types';
+import { bodyFromTrackedShape, MateBuilder } from './constraints3d/builder';
+import { solve3D, createContext } from './constraints3d/solver';
+import { rodrigues, normalize3, sub3 } from './constraints3d/rodrigues';
+import type { Mat3 } from './constraints3d/rodrigues';
+import { explodeView } from './explodeView';
+import type { ExplodeViewDirective } from './explodeView';
 import {
   type PlacementReferenceInput,
   applyPlacementReferenceInput,
@@ -231,6 +238,152 @@ function clampJointValue(joint: JointRecord, value: number): { value: number; wa
   return { value: clamped, wasClamped: clamped !== value };
 }
 
+// ─── Mate constraint helpers ─────────────────────────────────────────────────
+
+/** Convert solver Rodrigues rotation + translation to a column-major Mat4 Transform. */
+function solverTransformToTransform(position: Vec3, rotation: Vec3): Transform {
+  const R: Mat3 = rodrigues(rotation);
+  // Mat3 is row-major: R[0]=r00, R[1]=r01, R[2]=r02, R[3]=r10, ...
+  // Mat4 is column-major: [col0, col1, col2, col3]
+  const mat: Mat4 = [
+    R[0], R[3], R[6], 0,
+    R[1], R[4], R[7], 0,
+    R[2], R[5], R[8], 0,
+    position[0], position[1], position[2], 1,
+  ];
+  return Transform.from(mat);
+}
+
+/** Extract the TrackedShape from an AssemblyPart, or null if none found. */
+function extractTrackedShape(part: AssemblyPart): TrackedShape | null {
+  if (part instanceof TrackedShape) return part;
+  if (part instanceof ShapeGroup) {
+    for (const child of part.children) {
+      if (child instanceof TrackedShape) return child;
+      if (child instanceof ShapeGroup) {
+        const found = extractTrackedShape(child);
+        if (found) return found;
+      }
+    }
+  }
+  return null;
+}
+
+/** Build solver RigidBodies from parts referenced by constraints. */
+function buildMateRigidBodies(
+  parts: Map<string, PartRecord>,
+  constraints: Constraint3D[],
+  incoming: Map<string, string>,
+): { bodies: Map<string, RigidBody>; groundedId: string | null } {
+  const referencedIds = new Set<string>();
+  for (const c of constraints) {
+    referencedIds.add(c.refA.bodyId);
+    referencedIds.add(c.refB.bodyId);
+  }
+
+  // Ground the first referenced part that has no incoming joint
+  let groundedId: string | null = null;
+  for (const id of referencedIds) {
+    if (!incoming.has(id)) {
+      groundedId = id;
+      break;
+    }
+  }
+  // Fallback: ground the first referenced part
+  if (!groundedId) {
+    groundedId = referencedIds.values().next().value ?? null;
+  }
+
+  const bodies = new Map<string, RigidBody>();
+  for (const id of referencedIds) {
+    const rec = parts.get(id);
+    if (!rec) throw new Error(`Mate constraint references unknown part "${id}"`);
+
+    const tracked = extractTrackedShape(rec.part);
+    if (!tracked) {
+      throw new Error(
+        `Part "${id}" must be a TrackedShape (or ShapeGroup containing one) for mate constraints. ` +
+        'Use TrackedShape (from sketch().extrude() etc.) instead of plain Shape.',
+      );
+    }
+
+    bodies.set(id, bodyFromTrackedShape(id, tracked, { grounded: id === groundedId }));
+  }
+
+  return { bodies, groundedId };
+}
+
+/** Derive explode direction hints from solved mate constraints. */
+function deriveExplodeHintsFromMates(
+  constraints: Constraint3D[],
+  result: Solve3DResult,
+  bodies: Map<string, RigidBody>,
+  ctx: Solver3DContext,
+): Record<string, ExplodeViewDirective> {
+  const hints: Record<string, ExplodeViewDirective> = {};
+
+  for (const c of constraints) {
+    // We want a direction for the non-grounded body
+    const bodyA = bodies.get(c.refA.bodyId);
+    const bodyB = bodies.get(c.refB.bodyId);
+    if (!bodyA || !bodyB) continue;
+
+    const movingId = bodyA.grounded ? c.refB.bodyId : c.refA.bodyId;
+    if (hints[movingId]) continue; // first constraint wins
+
+    let dir: Vec3 | null = null;
+    try {
+      switch (c.type) {
+        case 'flush':
+        case 'faceDistance':
+        case 'parallel':
+        case 'align': {
+          // Use the face normal of the moving body's face as separation direction
+          const ref = bodyA.grounded ? c.refB : c.refA;
+          const face = ctx.worldFace(ref.bodyId, ref.featureName);
+          dir = face.normal;
+          break;
+        }
+        case 'concentric':
+        case 'axisParallel': {
+          // Use the shared axis direction
+          const ref = bodyA.grounded ? c.refB : c.refA;
+          const axis = ctx.worldAxis(ref.bodyId, ref.featureName);
+          dir = axis.direction;
+          break;
+        }
+        case 'pointCoincident': {
+          // Use vector between part centers (from grounded toward moving)
+          const posA = result.transforms.get(c.refA.bodyId);
+          const posB = result.transforms.get(c.refB.bodyId);
+          if (posA && posB) {
+            const raw = sub3(
+              bodyA.grounded ? posB.position : posA.position,
+              bodyA.grounded ? posA.position : posB.position,
+            );
+            dir = normalize3(raw);
+          }
+          break;
+        }
+      }
+    } catch {
+      // If feature lookup fails, skip this constraint's hint
+    }
+
+    if (dir && (dir[0] !== 0 || dir[1] !== 0 || dir[2] !== 0)) {
+      hints[movingId] = { direction: [...dir] as [number, number, number] };
+    }
+  }
+
+  return hints;
+}
+
+export interface MateMetadata {
+  explodeHints: Record<string, { direction: Vec3 }>;
+  dof: number;
+  converged: boolean;
+}
+
 export class SolvedAssembly {
   constructor(
     public readonly name: string,
@@ -238,6 +391,7 @@ export class SolvedAssembly {
     private readonly transforms: Map<string, Transform>,
     private readonly jointValues: JointState,
     private readonly solveWarnings: string[],
+    private readonly _mateMetadata: MateMetadata | null = null,
   ) {}
 
   warnings(): string[] {
@@ -246,6 +400,21 @@ export class SolvedAssembly {
 
   getJointState(): JointState {
     return { ...this.jointValues };
+  }
+
+  /** Explode direction hints derived from mate constraints, or null if no mates. */
+  get mateExplodeHints(): Record<string, { direction: Vec3 }> | null {
+    return this._mateMetadata?.explodeHints ?? null;
+  }
+
+  /** Remaining degrees of freedom after mate constraints, or null if no mates. */
+  get mateDof(): number | null {
+    return this._mateMetadata?.dof ?? null;
+  }
+
+  /** Whether the mate constraint solver converged, or null if no mates. */
+  get mateConverged(): boolean | null {
+    return this._mateMetadata?.converged ?? null;
   }
 
   getTransform(partName: string): Transform {
@@ -380,9 +549,20 @@ export class Assembly {
   private readonly parts = new Map<string, PartRecord>();
   private readonly joints = new Map<string, JointRecord>();
   private readonly jointCouplings = new Map<string, JointCouplingRecord>();
+  private readonly _mateFns: Array<(m: MateBuilder) => void> = [];
   private _refs: PlacementReferences = createPlacementReferences();
 
   constructor(public readonly name = 'Assembly') {}
+
+  /**
+   * Register mate constraints between parts.
+   * Constraints are solved during `solve()` to derive part positions and explode hints.
+   * Part references use "partName:featureName" format.
+   */
+  mate(fn: (m: MateBuilder) => void): Assembly {
+    this._mateFns.push(fn);
+    return this;
+  }
 
   /**
    * Attach named placement reference points to this assembly.
@@ -626,6 +806,55 @@ export class Assembly {
       throw new Error('Assembly has no root part (cyclic joint graph)');
     }
 
+    // ── Mate constraint pre-pass ──────────────────────────────────────────
+    const mateBaseOverrides = new Map<string, Transform>();
+    let mateMetadata: MateMetadata | null = null;
+
+    if (this._mateFns.length > 0) {
+      const builder = new MateBuilder();
+      for (const fn of this._mateFns) {
+        fn(builder);
+      }
+
+      if (builder.constraints.length > 0) {
+        const { bodies, groundedId: _ } = buildMateRigidBodies(this.parts, builder.constraints, incoming);
+        const result = solve3D(bodies, builder.constraints);
+
+        if (!result.converged) {
+          warnings.push(
+            `Mate constraints did not fully converge (maxError=${result.maxError.toFixed(6)}). ` +
+            'Using best-found transforms.',
+          );
+        }
+
+        // Convert solver transforms to Assembly base overrides
+        for (const [id, t] of result.transforms) {
+          mateBaseOverrides.set(id, solverTransformToTransform(t.position, t.rotation));
+        }
+
+        // Derive explode hints
+        const ctx = createContext(bodies);
+        const explodeHints = deriveExplodeHintsFromMates(builder.constraints, result, bodies, ctx);
+
+        // Auto-inject explode hints
+        if (Object.keys(explodeHints).length > 0) {
+          explodeView({ byName: explodeHints });
+        }
+
+        mateMetadata = {
+          explodeHints: Object.fromEntries(
+            Object.entries(explodeHints).map(([k, v]) => {
+              const d = v.direction as [number, number, number];
+              return [k, { direction: [...d] as Vec3 }];
+            }),
+          ),
+          dof: result.dof,
+          converged: result.converged,
+        };
+      }
+    }
+
+    // ── Kinematic DFS ─────────────────────────────────────────────────────
     const world = new Map<string, Transform>();
     const visiting = new Set<string>();
     const visited = new Set<string>();
@@ -677,10 +906,11 @@ export class Assembly {
         const value = resolveJointValue(joint.name);
 
         const child = this.parts.get(joint.child)!;
+        const childBase = mateBaseOverrides.get(joint.child) ?? child.base;
         // Canonical frame composition order for Forge chain semantics:
         // local -> childBase -> jointMotion -> jointFrame -> parentWorld
         const childWorld = composeChain(
-          child.base,
+          childBase,
           motionTransform(joint, value),
           joint.frame,
           worldTransform,
@@ -692,7 +922,8 @@ export class Assembly {
 
     for (const rootName of roots) {
       const root = this.parts.get(rootName)!;
-      dfs(rootName, root.base);
+      const rootBase = mateBaseOverrides.get(rootName) ?? root.base;
+      dfs(rootName, rootBase);
     }
 
     if (visited.size !== this.parts.size) {
@@ -700,7 +931,7 @@ export class Assembly {
       throw new Error(`Assembly graph unresolved for parts: ${missing.join(', ')}`);
     }
 
-    return new SolvedAssembly(this.name, this.parts, world, jointValues, warnings);
+    return new SolvedAssembly(this.name, this.parts, world, jointValues, warnings, mateMetadata);
   }
 
   sweepJoint(
