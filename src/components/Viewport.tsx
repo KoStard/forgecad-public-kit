@@ -3537,6 +3537,7 @@ export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const isEvaluating = useForgeStore((s) => s.isEvaluating);
   const result = useForgeStore((s) => s.lastValidResult);
+  const previewFile = useForgeStore((s) => s.previewFile);
   const files = useForgeStore((s) => s.files);
   const renderMode = useForgeStore((s) => s.renderMode);
   const projectionMode = useForgeStore((s) => s.projectionMode);
@@ -3871,6 +3872,7 @@ export function Viewport() {
   const knownFileNames = useMemo(() => new Set(Object.keys(files)), [files]);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const initialFitRequestedRef = useRef(false);
+  const prevPreviewFileRef = useRef<string | null | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hoverTooltipRef = useRef<HTMLDivElement | null>(null);
   const hoverTooltipIdRef = useRef<string | null>(null);
@@ -3946,6 +3948,16 @@ export function Viewport() {
     initialFitRequestedRef.current = true;
     requestViewCommand({ type: 'fit' });
   }, [objects.length, requestViewCommand, viewCommand, viewPersistenceResolved]);
+
+  // Auto-fit whenever a different model finishes loading
+  useEffect(() => {
+    const prev = prevPreviewFileRef.current;
+    prevPreviewFileRef.current = previewFile;
+    if (prev === undefined) return; // skip initial mount — handled by the effect above
+    if (prev === previewFile) return;
+    if (objects.length === 0) return;
+    requestViewCommand({ type: 'fit' });
+  }, [previewFile, objects.length, requestViewCommand]);
 
   useEffect(() => {
     if (objectPickSyncEnabled) return;
