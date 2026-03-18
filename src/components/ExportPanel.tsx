@@ -55,7 +55,7 @@ export function ExportPanel() {
   );
 
   const openDialog = () => {
-    if (!hasShapes) return;
+    if (!hasShapes && !hasSketches) return;
     setMeshFormat('3mf');
     setExportQuality('default');
     setMeshFileStem(defaultMeshStem);
@@ -119,15 +119,15 @@ export function ExportPanel() {
     <div style={{ padding: '8px 12px', borderTop: '1px solid var(--fc-border)' }}>
       <button
         onClick={openDialog}
-        disabled={!hasShapes}
+        disabled={!hasShapes && !hasSketches}
         style={{
           width: '100%',
           padding: '7px 8px',
-          background: hasShapes ? 'var(--fc-accent)' : 'var(--fc-border)',
-          color: hasShapes ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
+          background: (hasShapes || hasSketches) ? 'var(--fc-accent)' : 'var(--fc-border)',
+          color: (hasShapes || hasSketches) ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
           border: 'none',
           borderRadius: 4,
-          cursor: hasShapes ? 'pointer' : 'default',
+          cursor: (hasShapes || hasSketches) ? 'pointer' : 'default',
           fontSize: 13,
           fontWeight: 600,
         }}
