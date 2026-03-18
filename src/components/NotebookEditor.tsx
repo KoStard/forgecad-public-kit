@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForgeStore } from '../store/forgeStore';
+import { fileSystem } from '../fs';
 import {
   appendNotebookCell,
   cellSourceToString,
@@ -111,6 +112,10 @@ export function NotebookEditor() {
 
   const runCell = async (cellId: string) => {
     if (!parsed.notebook) return;
+    if (!fileSystem.capabilities.notebookServer) {
+      setRequestError('Notebook execution requires the local ForgeCAD Studio (forgecad studio <dir>). Run the app locally to use notebooks.');
+      return;
+    }
     setRequestError(null);
     setRunningCellId(cellId);
     try {

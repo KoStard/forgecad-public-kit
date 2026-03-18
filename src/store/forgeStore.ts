@@ -12,6 +12,7 @@ import {
 import type { ShapeCompilePlan } from '../forge/compilePlan';
 import { setParamOverrides } from '@forge/params';
 import projectFiles from 'virtual:forge-project';
+import { fileSystem } from '../fs';
 import { isNotebookFile, serializeNotebook, createNotebook } from '../notebook/model';
 import { evalWorkerClient } from '../workers/evalWorkerClient';
 import { deserializeRunResult } from '../forge/deserializeRunResult';
@@ -1331,35 +1332,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 
   saveFile: async () => {
-    const { fileHandle, files, activeFile } = get();
-
-    // Try API endpoint first (for project directories)
+    const { files, activeFile } = get();
+    if (!activeFile || !(activeFile in files)) return;
     try {
-      const response = await fetch('/api/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: activeFile, content: files[activeFile] }),
-      });
-      if (response.ok) {
-        set((s) => ({ 
-          dirty: false,
-          savedFiles: { ...s.savedFiles, [activeFile]: files[activeFile] }
-        }));
-        return;
-      }
-    } catch (e) {
-      // Fall through to file handle
-    }
-
-    // Fall back to File System Access API
-    if (!fileHandle) return;
-    try {
-      const writable = await (fileHandle as any).createWritable();
-      await writable.write(files[activeFile]);
-      await writable.close();
-      set((s) => ({ 
+      await fileSystem.save(activeFile, files[activeFile]);
+      set((s) => ({
         dirty: false,
-        savedFiles: { ...s.savedFiles, [activeFile]: files[activeFile] }
+        savedFiles: { ...s.savedFiles, [activeFile]: files[activeFile] },
       }));
     } catch (e) {
       console.error('Save failed:', e);

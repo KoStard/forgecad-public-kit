@@ -416,8 +416,21 @@ function stripBrokenManifoldSourceMaps() {
   };
 }
 
+const forgeMode = process.env.FORGE_MODE === 'web' ? 'web' : 'studio';
+
 export default defineConfig(({ command }) => ({
-  plugins: [forgeProjectPlugin(command === 'serve'), stripBrokenManifoldSourceMaps(), react()],
+  plugins: [
+    // Only serve the project plugin (SSE watch, /api/save etc.) in local studio mode
+    forgeProjectPlugin(command === 'serve' && forgeMode === 'studio'),
+    stripBrokenManifoldSourceMaps(),
+    react(),
+  ],
+  // GitHub Pages serves at /ForgeCAD/; local dev serves at /
+  base: forgeMode === 'web' ? '/ForgeCAD/' : '/',
+  define: {
+    // Injected at build time — picked up by src/fs/index.ts
+    __FORGE_MODE__: JSON.stringify(forgeMode),
+  },
   resolve: {
     alias: {
       '@forge': path.resolve(__dirname, './src/forge'),

@@ -24,6 +24,7 @@
     "dev": "vite -- ./examples",
     "dev:blank": "vite",
     "build": "tsc && vite build && npm run build:cli",
+    "build:web": "tsc && FORGE_MODE=web vite build",
     "dev:cli": "tsup cli/forgecad.ts --format esm --platform node --target node20 --out-dir dist-cli --sourcemap --external typescript",
     "build:cli": "tsup cli/forgecad.ts --format esm --platform node --target node20 --out-dir dist-cli --clean --sourcemap --external typescript",
     "test": "npm run test:prepare && node dist-cli/forgecad.js check suite",

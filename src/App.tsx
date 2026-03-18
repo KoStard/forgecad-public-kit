@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { initKernel } from '@forge/kernel';
 import { useForgeStore } from './store/forgeStore';
+import { fileSystem } from './fs';
 import { CodeEditor } from './components/CodeEditor';
 import { NotebookEditor } from './components/NotebookEditor';
 import { Viewport } from './components/Viewport';
@@ -146,21 +147,13 @@ export function App() {
     });
   }, []);
 
-  // Sync project files via SSE — reconnects automatically on disconnect
+  // Sync project files via the active FileSystemProvider
   useEffect(() => {
-    const es = new EventSource('/api/watch');
-    es.addEventListener('init', (e) => {
-      applyServerSnapshot(JSON.parse(e.data));
+    return fileSystem.subscribe((event) => {
+      if (event.type === 'init') applyServerSnapshot(event.files);
+      else if (event.type === 'change') applyServerFileChange(event.filename, event.content);
+      else if (event.type === 'delete') applyServerFileDelete(event.filename);
     });
-    es.addEventListener('change', (e) => {
-      const { filename, content } = JSON.parse(e.data);
-      applyServerFileChange(filename, content);
-    });
-    es.addEventListener('delete', (e) => {
-      const { filename } = JSON.parse(e.data);
-      applyServerFileDelete(filename);
-    });
-    return () => es.close();
   }, [applyServerSnapshot, applyServerFileChange, applyServerFileDelete]);
 
   // Warn before closing/refreshing with unsaved changes

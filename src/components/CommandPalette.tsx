@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 import { exportMeshFromStore, exportOrbitGifFromStore, exportReportFromStore } from './exportActions';
+import { fileSystem } from '../fs';
 
 interface Command {
   id: string;
@@ -84,12 +85,9 @@ export function CommandPalette() {
     action: () => {
       close();
       if (!activeFile) return;
-      fetch('/api/project-path')
-        .then((r) => r.json())
-        .then((data: { projectDir: string | null }) => {
-          const absPath = data.projectDir
-            ? `${data.projectDir}/${activeFile}`
-            : activeFile;
+      fileSystem.projectPath()
+        .then((projectDir) => {
+          const absPath = projectDir ? `${projectDir}/${activeFile}` : activeFile;
           return navigator.clipboard.writeText(absPath);
         })
         .catch((err: unknown) => { console.error('Failed to copy path:', err); });
