@@ -593,6 +593,79 @@ export class ConstrainedSketchBuilder {
     cdef.presolve(constraint as never, ctx);
   }
 
+  /**
+   * Find all point IDs that should remain free (not frozen) when incrementally
+   * solving for a newly added constraint.  Returns the set of points that are
+   * directly or one-hop-transitively connected to the new constraint's entities.
+   */
+  private findAffectedPoints(constraint: SketchConstraint): Set<string> {
+    // Extract entity IDs from the new constraint.
+    const newEntityIds = new Set<string>();
+    for (const [key, val] of Object.entries(constraint)) {
+      if (key === 'id' || key === 'type') continue;
+      if (typeof val === 'string') newEntityIds.add(val);
+      else if (Array.isArray(val)) {
+        for (const v of val) { if (typeof v === 'string') newEntityIds.add(v); }
+      }
+    }
+    // Expand line/circle/arc/shape IDs to their constituent point IDs.
+    const expandToPoints = (entityIds: Set<string>): void => {
+      for (const l of this.lines) {
+        if (entityIds.has(l.id)) { entityIds.add(l.a); entityIds.add(l.b); }
+      }
+      for (const c of this.circles) {
+        if (entityIds.has(c.id)) entityIds.add(c.center);
+      }
+      for (const a of this.arcs) {
+        if (entityIds.has(a.id)) { entityIds.add(a.center); entityIds.add(a.start); entityIds.add(a.end); }
+      }
+      for (const s of this.shapes ?? []) {
+        if (entityIds.has(s.id)) {
+          for (const lineId of s.lines) {
+            entityIds.add(lineId);
+            const line = this.lines.find(l => l.id === lineId);
+            if (line) { entityIds.add(line.a); entityIds.add(line.b); }
+          }
+        }
+      }
+    };
+    expandToPoints(newEntityIds);
+
+    // Find all constraints that share entities with the new constraint.
+    const affectedEntities = new Set(newEntityIds);
+    for (const c of this.constraints) {
+      if (c.id === constraint.id) continue;
+      let shares = false;
+      for (const [key, val] of Object.entries(c)) {
+        if (key === 'id' || key === 'type') continue;
+        if (typeof val === 'string' && newEntityIds.has(val)) { shares = true; break; }
+        if (Array.isArray(val)) {
+          for (const v of val) { if (typeof v === 'string' && newEntityIds.has(v)) { shares = true; break; } }
+          if (shares) break;
+        }
+      }
+      if (shares) {
+        // Add all entities from this neighbor constraint.
+        for (const [key, val] of Object.entries(c)) {
+          if (key === 'id' || key === 'type') continue;
+          if (typeof val === 'string') affectedEntities.add(val);
+          else if (Array.isArray(val)) {
+            for (const v of val) { if (typeof v === 'string') affectedEntities.add(v); }
+          }
+        }
+      }
+    }
+    expandToPoints(affectedEntities);
+
+    // Return only point IDs.
+    const pointIds = new Set(this.points.map(p => p.id));
+    const result = new Set<string>();
+    for (const id of affectedEntities) {
+      if (pointIds.has(id)) result.add(id);
+    }
+    return result;
+  }
+
   private getPoint(id: PointId | null): SketchPoint | null {
     if (!id) return null;
     return this.points.find((p) => p.id === id) ?? null;

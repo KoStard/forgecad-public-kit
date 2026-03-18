@@ -165,6 +165,8 @@ Each `constrain()` runs `decomposeAndSolve()` on the FULL system from scratch.
 |---|-------------|----------|----------|----------|----------|--------|
 | — | Baseline | 2989 | 33 | 3022 | 0.0001 | ✅ |
 | P1+P2 | Early exit + reduced restarts/iterations | 592 | 34 | 626 | 0.0000 | ✅ 5× faster |
+| P5a | Freeze converged variables (1-hop) | 251 | 1712 | 1962 | 15.7161 | ✗ quality degraded |
+| P6 | Forward-difference Jacobian | 377 | 20 | 398 | 0.0000 | ✅ 7.6× faster |
 
 ### Performance Experiment Log
 
@@ -196,9 +198,25 @@ Constraints #47-48 (lineDistance in camera holder section) each take ~90-100ms. 
 - #48 does NOT converge but provides essential partial warming
 - #49-54 are fast (<1ms each) because they benefit from #47-48's warming
 
-Next optimization targets should focus on making each incremental solve cheaper, not fewer:
-- **P5: Freeze converged variables** — only include points touched by the new constraint in the Jacobian
-- **P4: Subsystem-aware incremental solve** — only re-solve the subsystem affected by the new constraint
+#### P5a: Freeze converged variables — 1-hop (FAILED — quality degraded)
+**What**: Before incremental solve, find all point IDs referenced by the new constraint and its 1-hop neighbor constraints. Temporarily mark all other points as `fixed`. Restore after solving.
+**Result**: Build 592ms → 251ms (fast!), but solve jumped 34ms → 1712ms. Total 1962ms. maxError=15.7161.
+**Why it failed**: Freezing points during incremental solve constrains the solution space too much. The solver finds a locally-optimal solution for the free points that's inconsistent with the global solution. When synced, these corrupted positions make the final solve start from a worse state.
+**Lesson**: The incremental solve needs the full variable space to find globally-consistent solutions. Local solutions with frozen neighbors are not equivalent to global solutions. This is fundamentally different from the skip-solve experiments (P3a-c) — there, we just didn't run the solver. Here, we ran it but with wrong constraints, producing actively harmful solutions.
+
+#### P6: Forward-difference Jacobian (SUCCESS — 1.5× speedup, 7.6× total)
+**What**: Replace central-difference Jacobian (J = (f(x+h) - f(x-h)) / 2h) with forward-difference (J = (f(x+h) - f(x)) / h). Eliminates one residual evaluation per variable per iteration.
+**Result**: Build 592ms → 377ms, solve 34ms → 20ms, total 626ms → 398ms. Quality maintained (maxError=0.0000).
+**Why it worked**: Central differences compute 2 residual evaluations per variable. For 58 variables, that's 116 evaluations per iteration. Forward differences halve this to 58. The accuracy loss is negligible for LM because the step direction is approximate anyway and the trust-region damping compensates.
+**Key insight**: The Jacobian computation is the dominant cost, not the iteration count. With 54 constraints and 58 variables, the Jacobian is a 54×58 matrix built by 58 (was 116) perturbation evaluations per iteration.
+
+### Remaining Bottlenecks
+Constraints #47-48 (lineDistance in camera holder section) each take ~70-100ms. With 30 free points (60 variables), each LM iteration requires 60 residual evaluations for the Jacobian.
+
+Next optimization targets:
+- **Analytical Jacobian** — compute derivatives analytically instead of finite differences (eliminates all perturbation evaluations)
+- **Sparse Jacobian** — most constraints only reference 2-4 variables; skip zero columns
+- **Subsystem-aware incremental solve** — only re-solve the subsystem affected by the new constraint
 
 ---
 

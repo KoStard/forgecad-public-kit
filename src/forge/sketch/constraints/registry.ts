@@ -344,6 +344,8 @@ function linearizeSystem(
       const baseValue = state[column];
       const step = finiteDifferenceStep(baseValue, variables[column].scale);
 
+      // Forward difference: J ≈ (f(x+h) - f(x)) / h
+      // Half the cost of central differences, sufficient accuracy for LM.
       const plusState = [...state];
       plusState[column] = baseValue + step;
       applyState(variables, plusState);
@@ -353,17 +355,8 @@ function linearizeSystem(
         return null;
       }
 
-      const minusState = [...state];
-      minusState[column] = baseValue - step;
-      applyState(variables, minusState);
-      const minusEval = evaluateResiduals(def, ctx);
-      if (!minusEval) {
-        applyState(variables, state);
-        return null;
-      }
-
       for (let row = 0; row < equationCount; row++) {
-        jacobian[row][column] = (plusEval.values[row] - minusEval.values[row]) / (2 * step);
+        jacobian[row][column] = (plusEval.values[row] - base.values[row]) / step;
       }
     }
 
