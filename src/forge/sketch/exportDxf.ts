@@ -19,15 +19,16 @@ export interface SketchDxfOptions {
 export function sketchToDxf(sketch: Sketch, options: SketchDxfOptions = {}): string {
   const { layer = '0', colorIndex = 7 } = options;
 
-  const loops = sketch.toPolygons() as number[][][];
-
-  if (loops.length > 0) {
-    return buildPolygonDxf(loops, layer, colorIndex);
-  }
-
-  // For constraint sketches with no polygon loops, export edge geometry.
+  // Constraint sketches: always use edge geometry to preserve all individual
+  // lines (including internal/shared edges that toPolygons() would merge away).
   if (isConstraintSketch(sketch)) {
     return buildEdgeDxf(sketch.constraintMeta, layer, colorIndex);
+  }
+
+  // Regular sketches: export polygon loops.
+  const loops = sketch.toPolygons() as number[][][];
+  if (loops.length > 0) {
+    return buildPolygonDxf(loops, layer, colorIndex);
   }
 
   // Empty sketch — return minimal valid DXF.

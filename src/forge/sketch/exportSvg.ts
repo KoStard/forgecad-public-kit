@@ -33,16 +33,16 @@ export function sketchToSvg(sketch: Sketch, options: SketchSvgOptions = {}): str
     padding = 2,
   } = options;
 
-  // Try polygon-based export first.
-  const loops = sketch.toPolygons() as number[][][];
-
-  if (loops.length > 0) {
-    return buildPolygonSvg(loops, stroke, strokeWidth, fill, padding, options.pixelsPerUnit);
-  }
-
-  // For constraint sketches with no polygon loops, export edge geometry.
+  // Constraint sketches: always use edge geometry to preserve all individual
+  // lines (including internal/shared edges that toPolygons() would merge away).
   if (isConstraintSketch(sketch)) {
     return buildEdgeSvg(sketch.constraintMeta, stroke, strokeWidth, padding, options.pixelsPerUnit);
+  }
+
+  // Regular sketches: export filled polygon regions.
+  const loops = sketch.toPolygons() as number[][][];
+  if (loops.length > 0) {
+    return buildPolygonSvg(loops, stroke, strokeWidth, fill, padding, options.pixelsPerUnit);
   }
 
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 0"/>';
