@@ -251,13 +251,9 @@ function Toolbar() {
         <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
         <button style={btnStyle(measureMode)} onClick={toggleMeasure} title="Toggle measurement tool">📏 Measure</button>
         {measureMode && <button style={btnStyle()} onClick={clearMeasure}>Clear All</button>}
-        {__FORGE_MODE__ === 'web' && (
-          <>
-            <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
-            <ShareButton />
-            <GitHubStarButton />
-          </>
-        )}
+        <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
+        <ShareButton />
+        {__FORGE_MODE__ === 'web' && <GitHubStarButton />}
         {measureDistances.length > 0 && (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             {measureDistances.map((measurement) => (

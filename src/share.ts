@@ -33,28 +33,27 @@ export function decodeSharedHash(hash: string): SharedModel | null {
   return { filename, code };
 }
 
+/** Production base URL — share links always point here, even from a local dev server. */
+const PROD_BASE = 'https://kostard.github.io/ForgeCAD/';
+
 /** Build the full shareable URL for the current page. */
 export function buildShareUrl(filename: string, code: string): string {
-  const base = `${window.location.origin}${window.location.pathname}`;
-  return `${base}${encodeSharedModel(filename, code)}`;
+  return `${PROD_BASE}${encodeSharedModel(filename, code)}`;
 }
 
 /** Build an embed URL (adds ?embed=1 query param). */
 export function buildEmbedUrl(filename: string, code: string): string {
-  const base = `${window.location.origin}${window.location.pathname}`;
-  return `${base}?embed=1${encodeSharedModel(filename, code)}`;
+  return `${PROD_BASE}?embed=1${encodeSharedModel(filename, code)}`;
 }
 
 /** Build an embed URL that loads from a GitHub Gist. */
 export function buildGistEmbedUrl(gistId: string): string {
-  const base = `${window.location.origin}${window.location.pathname}`;
-  return `${base}?gist=${encodeURIComponent(gistId)}&embed=1`;
+  return `${PROD_BASE}?gist=${encodeURIComponent(gistId)}&embed=1`;
 }
 
 /** Build a share URL that loads from a GitHub Gist. */
 export function buildGistShareUrl(gistId: string): string {
-  const base = `${window.location.origin}${window.location.pathname}`;
-  return `${base}?gist=${encodeURIComponent(gistId)}`;
+  return `${PROD_BASE}?gist=${encodeURIComponent(gistId)}`;
 }
 
 /** Build an iframe snippet for embedding. */
