@@ -21,6 +21,21 @@ registerConstraint<'length', ConstraintTypeMap['length']>({
   isDimension: true,
   equations: 1,
 
+  presolve(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return;
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return;
+    const len = distance(a, b);
+    if (len < 1e-9 || Math.abs(len - c.value) < 1e-9) return;
+    // Resize symmetrically about midpoint to match target length.
+    const dir = lineDirection(a, b);
+    const mid = midpoint(a, b);
+    if (!a.fixed) { a.x = mid[0] - dir[0] * c.value / 2; a.y = mid[1] - dir[1] * c.value / 2; }
+    if (!b.fixed) { b.x = mid[0] + dir[0] * c.value / 2; b.y = mid[1] + dir[1] * c.value / 2; }
+  },
+
   displayPosition(c, { lines, points }) {
     const line = lines.get(c.line);
     if (line) {

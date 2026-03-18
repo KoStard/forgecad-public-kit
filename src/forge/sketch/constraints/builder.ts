@@ -57,8 +57,20 @@ export class ConstrainedSketchBuilder {
     });
   }
 
-  point(x: number, y: number, fixed = false): PointId {
+  point(x?: number, y?: number, fixed = false): PointId {
     const id = `pt-${this.nextId++}`;
+    // Default to bounding box center when coords are omitted, so the point
+    // starts near existing geometry instead of at NaN or an arbitrary origin.
+    if (x == null || y == null) {
+      const bounds = this._pointBounds();
+      if (bounds) {
+        x = x ?? (bounds.minX + bounds.maxX) / 2;
+        y = y ?? (bounds.minY + bounds.maxY) / 2;
+      } else {
+        x = x ?? 0;
+        y = y ?? 0;
+      }
+    }
     this.points.push({ id, x, y, fixed });
     return id;
   }
@@ -789,6 +801,24 @@ export class ConstrainedSketchBuilder {
     }
 
     return { points: pointMap, lines: lineMap };
+  }
+
+  /**
+   * Bounding box of all existing non-construction points.
+   * Returns null when no points exist yet.
+   * Used by concept factories to auto-offset initial geometry.
+   */
+  _pointBounds(): { minX: number; maxX: number; minY: number; maxY: number } | null {
+    const pts = this.points.filter(p => !p.id.startsWith('ref-'));
+    if (pts.length === 0) return null;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return { minX, maxX, minY, maxY };
   }
 }
 
