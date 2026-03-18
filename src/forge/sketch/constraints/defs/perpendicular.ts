@@ -1,4 +1,4 @@
-import type { LineId, ConstraintTypeMap } from '../types';
+import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, midpointPerp, angleOfLine, normalizeAngle, distance } from '../helpers';
 
@@ -17,7 +17,7 @@ declare module '../types' {
 
 registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
   type: 'perpendicular',
-  label: 'PERP',
+  label: '⊥',
   isDimension: false,
   equations: 1,
 
@@ -28,6 +28,26 @@ registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
       if (a1 && a2) return midpointPerp(a1, a2, 3);
     }
     return [0, 0];
+  },
+
+  displayAnnotations(c, { lines, points }) {
+    const lineA = lines.get(c.a);
+    const lineB = lines.get(c.b);
+    if (!lineA || !lineB) return [];
+    // Find shared endpoint
+    const shared = [lineA.a, lineA.b].find(p => p === lineB.a || p === lineB.b);
+    if (shared) {
+      const pt = points.get(shared);
+      if (pt) {
+        const aOther = points.get(lineA.a === shared ? lineA.b : lineA.a);
+        const rotation = aOther ? Math.atan2(aOther.y - pt.y, aOther.x - pt.x) : 0;
+        return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'perpendicular' as const, rotation }];
+      }
+    }
+    // Fallback: midpoint of line A
+    const a1 = points.get(lineA.a), a2 = points.get(lineA.b);
+    if (a1 && a2) return [{ kind: 'symbol', position: [(a1.x+a2.x)/2, (a1.y+a2.y)/2] as [number, number], symbol: 'perpendicular' as const }];
+    return [];
   },
 
   solve(c, { lines, points, tolerance }) {

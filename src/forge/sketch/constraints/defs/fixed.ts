@@ -1,4 +1,4 @@
-import type { PointId, ConstraintTypeMap } from '../types';
+import type { PointId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
 declare module '../types' {
@@ -17,7 +17,7 @@ declare module '../types' {
 
 registerConstraint<'fixed', ConstraintTypeMap['fixed']>({
   type: 'fixed',
-  label: 'FIX',
+  label: '⚓',
   isDimension: false,
   equations: 0,
 
@@ -25,6 +25,12 @@ registerConstraint<'fixed', ConstraintTypeMap['fixed']>({
     const pt = points.get(c.point);
     if (pt) return [pt.x + 2.5, pt.y + 2.5];
     return [0, 0];
+  },
+
+  displayAnnotations(c, { points }) {
+    const pt = points.get(c.point);
+    if (!pt) return [];
+    return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'fixed' as const }];
   },
 
   presolve(c, { points }) {

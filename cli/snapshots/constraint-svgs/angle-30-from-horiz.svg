@@ -10,10 +10,16 @@
   </g>
   <g data-layer="construction">
   </g>
-  <g data-layer="labels">
-    <text x="7.203" y="-0.870" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">H</text>
-    <text x="-0.079" y="-7.911" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">∠=30</text>
-    <text x="3.536" y="-4.415" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=10</text>
+  <g data-layer="annotations">
+    <text x="5.000" y="0.000" fill="#faad14" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">H</text>
+    <path d="M3.000,0.000 A3.000,3.000 0 0,0 2.598,-1.500" fill="none" stroke="#4ade80" stroke-width="0.3"/>
+    <text x="4.057" y="-1.087" fill="#4ade80" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">30°</text>
+    <line x1="-0.150" y1="-0.260" x2="-1.750" y2="-3.031" stroke="#4ade80" stroke-width="0.15" opacity="0.6"/>
+    <line x1="8.510" y1="-5.260" x2="6.910" y2="-8.031" stroke="#4ade80" stroke-width="0.15" opacity="0.6"/>
+    <line x1="-1.500" y1="-2.598" x2="7.160" y2="-7.598" stroke="#4ade80" stroke-width="0.2"/>
+    <polygon points="-1.500,-2.598 -0.809,-3.401 -0.459,-2.795" fill="#4ade80"/>
+    <polygon points="7.160,-7.598 6.119,-7.401 6.469,-6.795" fill="#4ade80"/>
+    <text x="2.830" y="-5.898" fill="#4ade80" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">10</text>
   </g>
   <g data-layer="status">
     <rect x="-4.0" y="-9.0" width="41.6" height="3" rx="0.5" fill="#faad14" opacity="0.85"/>

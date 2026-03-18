@@ -1,4 +1,4 @@
-import type { PointId, SketchPoint, ConstraintTypeMap } from '../types';
+import type { PointId, SketchPoint, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { polygonSignedArea, reflectPointAcrossLine } from '../helpers';
 
@@ -22,7 +22,7 @@ declare module '../types' {
 
 registerConstraint<'ccw', ConstraintTypeMap['ccw']>({
   type: 'ccw',
-  label: 'CCW',
+  label: '↺',
   isDimension: false,
   equations: 0,
 
@@ -32,6 +32,14 @@ registerConstraint<'ccw', ConstraintTypeMap['ccw']>({
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
     return [cx, cy] as [number, number];
+  },
+
+  displayAnnotations(c, { points }) {
+    const pts = c.points.map((id: PointId) => points.get(id)).filter(Boolean) as SketchPoint[];
+    if (pts.length < 3) return [];
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    return [{ kind: 'symbol', position: [cx, cy] as [number, number], symbol: 'ccw' as const }];
   },
 
   presolve(c, { points }) {

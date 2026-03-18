@@ -1,4 +1,4 @@
-import type { PointId, ConstraintTypeMap } from '../types';
+import type { PointId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, distance } from '../helpers';
 
@@ -17,7 +17,7 @@ declare module '../types' {
 
 registerConstraint<'distance', ConstraintTypeMap['distance']>({
   type: 'distance',
-  label: 'DIST',
+  label: '↔',
   isDimension: true,
   equations: 1,
 
@@ -26,6 +26,12 @@ registerConstraint<'distance', ConstraintTypeMap['distance']>({
     const b = points.get(c.b);
     if (a && b) return midpoint(a, b);
     return [0, 0];
+  },
+
+  displayAnnotations(c, { points }): AnnotationElement[] {
+    const a = points.get(c.a), b = points.get(c.b);
+    if (!a || !b) return [];
+    return [{ kind: 'dimension', from: [a.x, a.y], to: [b.x, b.y], offset: 3, value: String(c.value) }];
   },
 
   solve(c, { points, tolerance }) {

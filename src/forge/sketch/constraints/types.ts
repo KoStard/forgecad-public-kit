@@ -59,10 +59,44 @@ export type SketchLoop =
   /** Mixed profile of line and arc segments forming a closed loop. */
   | { type: 'profile'; segments: ProfileSegment[] };
 
+// ─── Annotation elements ──────────────────────────────────────────────────────
+
+/** A single visual element in a constraint's annotation. */
+export type AnnotationElement =
+  /** Symbol placed at a specific position (geometric constraints like parallel, equal, fixed). */
+  | { kind: 'symbol'; position: [number, number]; symbol: ConstraintSymbol; rotation?: number }
+  /** Dimension line with extension lines (length, distance). */
+  | { kind: 'dimension'; from: [number, number]; to: [number, number]; offset: number; value: string }
+  /** Angle arc between two directions (angle, absoluteAngle). */
+  | { kind: 'angle-arc'; center: [number, number]; startAngle: number; endAngle: number;
+      radius: number; value: string }
+  /** Fallback text label for constraints not yet migrated to annotations. */
+  | { kind: 'text'; position: [number, number]; text: string };
+
+/** Named symbols rendered as SVG paths, not Unicode glyphs. */
+export type ConstraintSymbol =
+  | 'parallel'       // >> tick marks
+  | 'equal'          // = double line
+  | 'perpendicular'  // right-angle box
+  | 'horizontal'     // H
+  | 'vertical'       // V
+  | 'fixed'          // ground/anchor hatching
+  | 'midpoint'       // diamond
+  | 'coincident'     // target dot
+  | 'collinear'      // dot on line
+  | 'tangent'        // T
+  | 'concentric'     // concentric circles
+  | 'ccw'            // curved arrow
+  | 'symmetric'      // mirror axis mark
+  ;
+
+// ─── Constraint display ───────────────────────────────────────────────────────
+
 export interface ConstraintDisplay {
   id: string;
   type: string;
   label: string;
+  /** Legacy position — used as fallback when annotations are not defined. */
   position: [number, number];
   value?: number;
   isDimension: boolean;
@@ -77,6 +111,8 @@ export interface ConstraintDisplay {
   entityIds: string[];
   /** Per-equation residual error for this constraint (how far off it is). */
   residual: number;
+  /** Annotation elements for this constraint. Empty array → use legacy text fallback. */
+  annotations: AnnotationElement[];
 }
 
 /** Metadata for a detected surface region (from arrangement detection). */
@@ -208,5 +244,11 @@ export interface ConstraintDef<TType extends string = string, TData extends obje
    */
   residual?: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => number[];
   displayPosition: (constraint: { id: string; type: TType } & TData, ctx: DisplayContext) => [number, number];
+  /**
+   * Optional annotation geometry for Fusion360-style constraint visualization.
+   * Returns an array of visual elements (symbols on entities, dimension lines, arcs).
+   * When defined, these replace the single-position text label.
+   */
+  displayAnnotations?: (constraint: { id: string; type: TType } & TData, ctx: DisplayContext) => AnnotationElement[];
   computeDof: (constraint: { id: string; type: TType } & TData, ctx: DofContext) => void;
 }

@@ -1,4 +1,4 @@
-import type { CircleId, ConstraintTypeMap } from '../types';
+import type { CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
 declare module '../types' {
@@ -16,7 +16,7 @@ declare module '../types' {
 
 registerConstraint<'equalRadius', ConstraintTypeMap['equalRadius']>({
   type: 'equalRadius',
-  label: 'EQR',
+  label: '=R',
   isDimension: false,
   equations: 1,
 
@@ -29,6 +29,18 @@ registerConstraint<'equalRadius', ConstraintTypeMap['equalRadius']>({
       if (pa && pb) return [(pa.x + pb.x) / 2 + ca.radius, (pa.y + pb.y) / 2];
     }
     return [0, 0];
+  },
+
+  displayAnnotations(c, { circles, points }) {
+    const annotations: AnnotationElement[] = [];
+    for (const circleId of [c.a, c.b]) {
+      const circle = circles.get(circleId);
+      if (!circle) continue;
+      const center = points.get(circle.center);
+      if (!center) continue;
+      annotations.push({ kind: 'symbol', position: [center.x + circle.radius, center.y], symbol: 'equal' });
+    }
+    return annotations;
   },
 
   solve(c, { circles, tolerance }) {

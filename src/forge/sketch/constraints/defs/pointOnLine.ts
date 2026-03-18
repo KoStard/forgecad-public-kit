@@ -1,4 +1,4 @@
-import type { PointId, LineId, ConstraintTypeMap } from '../types';
+import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
 declare module '../types' {
@@ -21,7 +21,7 @@ declare module '../types' {
 
 registerConstraint<'pointOnLine', ConstraintTypeMap['pointOnLine']>({
   type: 'pointOnLine',
-  label: 'POL',
+  label: '⋅',
   isDimension: false,
   equations: 1,
 
@@ -29,6 +29,12 @@ registerConstraint<'pointOnLine', ConstraintTypeMap['pointOnLine']>({
     const pt = points.get(c.point);
     if (pt) return [pt.x, pt.y];
     return [0, 0];
+  },
+
+  displayAnnotations(c, { points }) {
+    const pt = points.get(c.point);
+    if (!pt) return [];
+    return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'collinear' as const }];
   },
 
   solve(c, { points, lines, movePoint, tolerance }) {

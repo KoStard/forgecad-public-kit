@@ -1,4 +1,4 @@
-import type { LineId, CircleId, ConstraintTypeMap } from '../types';
+import type { LineId, CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, distance } from '../helpers';
 
@@ -22,7 +22,7 @@ declare module '../types' {
 
 registerConstraint<'tangent', ConstraintTypeMap['tangent']>({
   type: 'tangent',
-  label: 'TAN',
+  label: '⊤',
   isDimension: false,
   equations: 1,
 
@@ -44,6 +44,26 @@ registerConstraint<'tangent', ConstraintTypeMap['tangent']>({
       }
     }
     return [0, 0];
+  },
+
+  displayAnnotations(c, { lines, circles, points }) {
+    if (c.line && c.circle) {
+      const line = lines.get(c.line);
+      if (line) {
+        const a = points.get(line.a);
+        const b = points.get(line.b);
+        if (a && b) return [{ kind: 'symbol', position: [(a.x+b.x)/2, (a.y+b.y)/2] as [number, number], symbol: 'tangent' as const }];
+      }
+    } else if (c.a && c.b) {
+      const c1 = circles.get(c.a);
+      const c2 = circles.get(c.b);
+      if (c1 && c2) {
+        const p1 = points.get(c1.center);
+        const p2 = points.get(c2.center);
+        if (p1 && p2) return [{ kind: 'symbol', position: [(p1.x+p2.x)/2, (p1.y+p2.y)/2] as [number, number], symbol: 'tangent' as const }];
+      }
+    }
+    return [];
   },
 
   solve(c, { lines, circles, points, tolerance }) {

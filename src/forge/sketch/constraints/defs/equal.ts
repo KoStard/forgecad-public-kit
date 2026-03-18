@@ -1,4 +1,4 @@
-import type { LineId, ConstraintTypeMap } from '../types';
+import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, midpointPerp, distance, lineDirection } from '../helpers';
 
@@ -17,7 +17,7 @@ declare module '../types' {
 
 registerConstraint<'equal', ConstraintTypeMap['equal']>({
   type: 'equal',
-  label: 'EQ',
+  label: '=',
   isDimension: false,
   equations: 1,
 
@@ -28,6 +28,20 @@ registerConstraint<'equal', ConstraintTypeMap['equal']>({
       if (a1 && a2) return midpointPerp(a1, a2, 3);
     }
     return [0, 0];
+  },
+
+  displayAnnotations(c, { lines, points }) {
+    const annotations: AnnotationElement[] = [];
+    for (const lineId of [c.a, c.b]) {
+      const line = lines.get(lineId);
+      if (!line) continue;
+      const a = points.get(line.a);
+      const b = points.get(line.b);
+      if (!a || !b) continue;
+      const rotation = Math.atan2(b.y - a.y, b.x - a.x);
+      annotations.push({ kind: 'symbol', position: [(a.x+b.x)/2, (a.y+b.y)/2], symbol: 'equal', rotation });
+    }
+    return annotations;
   },
 
   solve(c, { lines, points, tolerance }) {

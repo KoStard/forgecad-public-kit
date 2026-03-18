@@ -11,7 +11,7 @@ import type {
   JointOverlayViewConfig,
 } from '@forge/index';
 import type { DimensionDef } from '@forge/sketch/dimensions';
-import type { SketchConstraintMeta } from '@forge/sketch/constraints/types';
+import type { SketchConstraintMeta, AnnotationElement } from '@forge/sketch/constraints/types';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
 import { buildShapeFromCompilePlan } from '@forge/kernel';
@@ -2095,22 +2095,101 @@ function SketchObject({
     return map;
   }, [obj.sketchMeta]);
 
-  const constraintLabels = useMemo(() => {
-    if (!obj.sketchMeta) return [] as { id: string; text: string; position: [number, number, number]; isConflicting: boolean; isRedundant: boolean; entityIds: string[]; }[];
-    return obj.sketchMeta.constraints.map((constraint) => {
-      const unit = constraint.type === 'angle' ? 'deg' : 'mm';
-      const text = constraint.isDimension && constraint.value !== undefined
-        ? `${constraint.label} ${formatConstraintValue(constraint.value)}${unit}`
-        : constraint.label;
-      return {
-        id: constraint.id,
-        text,
-        position: [constraint.position[0], constraint.position[1], 0.1] as [number, number, number],
-        isConflicting: constraint.isConflicting,
-        isRedundant: constraint.isRedundant,
-        entityIds: constraint.entityIds,
-      };
-    });
+  // ─── Annotation-based constraint rendering ───
+  // Symbol map: ConstraintSymbol → display character for Html overlays.
+  const symbolChars: Record<string, string> = {
+    parallel: '∥', equal: '=', perpendicular: '⊥', horizontal: 'H', vertical: 'V',
+    fixed: '⚓', midpoint: '◆', coincident: '⊙', collinear: '·', tangent: 'T',
+    concentric: '◎', ccw: '↺', symmetric: '⟷',
+  };
+
+  type AnnotationLabel = {
+    key: string; text: string; position: [number, number, number];
+    constraintId: string; isConflicting: boolean; isRedundant: boolean; entityIds: string[];
+    fontSize?: number;
+  };
+  type AnnotationLine = { key: string; points: [number, number, number][]; color: string; opacity?: number; lineWidth?: number };
+  type AnnotationTriangle = { key: string; points: [number, number][]; color: string };
+  type AnnotationArc = { key: string; points: [number, number, number][]; color: string };
+
+  const constraintAnnotations = useMemo(() => {
+    const labels: AnnotationLabel[] = [];
+    const lines: AnnotationLine[] = [];
+    const triangles: AnnotationTriangle[] = [];
+    const arcs: AnnotationArc[] = [];
+
+    if (!obj.sketchMeta) return { labels, lines, triangles, arcs };
+
+    for (const c of obj.sketchMeta.constraints) {
+      const color = c.isConflicting ? '#ff6b6b' : c.isRedundant ? '#faad14' : '#4ade80';
+      let annIdx = 0;
+      for (const ann of c.annotations) {
+        const k = `${c.id}-${annIdx++}`;
+        if (ann.kind === 'symbol') {
+          labels.push({
+            key: k, text: symbolChars[ann.symbol] ?? ann.symbol,
+            position: [ann.position[0], ann.position[1], 0.1],
+            constraintId: c.id, isConflicting: c.isConflicting, isRedundant: c.isRedundant,
+            entityIds: c.entityIds, fontSize: 9,
+          });
+        } else if (ann.kind === 'dimension') {
+          // Extension lines (from → dimension line, to → dimension line)
+          const dx = ann.to[0] - ann.from[0], dy = ann.to[1] - ann.from[1];
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const nx = -dy / len * ann.offset, ny = dx / len * ann.offset;
+          const f: [number, number] = [ann.from[0] + nx, ann.from[1] + ny];
+          const t: [number, number] = [ann.to[0] + nx, ann.to[1] + ny];
+          // Extension lines
+          lines.push({ key: `${k}-ext1`, points: [[ann.from[0], ann.from[1], 0.08], [f[0], f[1], 0.08]], color, opacity: 0.5 });
+          lines.push({ key: `${k}-ext2`, points: [[ann.to[0], ann.to[1], 0.08], [t[0], t[1], 0.08]], color, opacity: 0.5 });
+          // Dimension line
+          lines.push({ key: `${k}-dim`, points: [[f[0], f[1], 0.08], [t[0], t[1], 0.08]], color });
+          // Arrowheads
+          const adx = t[0] - f[0], ady = t[1] - f[1];
+          const alen = Math.sqrt(adx * adx + ady * ady) || 1;
+          const ux = adx / alen, uy = ady / alen;
+          const arrowLen = Math.min(0.8, alen * 0.15);
+          const arrowW = arrowLen * 0.35;
+          triangles.push({ key: `${k}-arr1`, points: [f, [f[0] + ux * arrowLen + uy * arrowW, f[1] + uy * arrowLen - ux * arrowW], [f[0] + ux * arrowLen - uy * arrowW, f[1] + uy * arrowLen + ux * arrowW]], color });
+          triangles.push({ key: `${k}-arr2`, points: [t, [t[0] - ux * arrowLen + uy * arrowW, t[1] - uy * arrowLen - ux * arrowW], [t[0] - ux * arrowLen - uy * arrowW, t[1] - uy * arrowLen + ux * arrowW]], color });
+          // Value label at midpoint of dimension line
+          const mx = (f[0] + t[0]) / 2, my = (f[1] + t[1]) / 2;
+          labels.push({
+            key: `${k}-val`, text: ann.value,
+            position: [mx, my, 0.12],
+            constraintId: c.id, isConflicting: c.isConflicting, isRedundant: c.isRedundant,
+            entityIds: c.entityIds, fontSize: 10,
+          });
+        } else if (ann.kind === 'angle-arc') {
+          // Arc geometry
+          const segs = 32;
+          const pts: [number, number, number][] = [];
+          for (let i = 0; i <= segs; i++) {
+            const a = ann.startAngle + (ann.endAngle - ann.startAngle) * (i / segs);
+            const rad = a * Math.PI / 180;
+            pts.push([ann.center[0] + Math.cos(rad) * ann.radius, ann.center[1] + Math.sin(rad) * ann.radius, 0.08]);
+          }
+          arcs.push({ key: `${k}-arc`, points: pts, color });
+          // Value label at arc midpoint
+          const midA = ((ann.startAngle + ann.endAngle) / 2) * Math.PI / 180;
+          const labelR = ann.radius * 1.3;
+          labels.push({
+            key: `${k}-val`, text: `${ann.value}°`,
+            position: [ann.center[0] + Math.cos(midA) * labelR, ann.center[1] + Math.sin(midA) * labelR, 0.12],
+            constraintId: c.id, isConflicting: c.isConflicting, isRedundant: c.isRedundant,
+            entityIds: c.entityIds, fontSize: 9,
+          });
+        } else if (ann.kind === 'text') {
+          labels.push({
+            key: k, text: ann.text,
+            position: [ann.position[0], ann.position[1], 0.1],
+            constraintId: c.id, isConflicting: c.isConflicting, isRedundant: c.isRedundant,
+            entityIds: c.entityIds,
+          });
+        }
+      }
+    }
+    return { labels, lines, triangles, arcs };
   }, [obj.sketchMeta]);
 
   // Entity IDs referenced by the selected constraint — used for highlight rendering.
@@ -2356,27 +2435,63 @@ function SketchObject({
       {constructionCircles.map((circle, i) => (
         <primitive key={`cc-${i}`} object={circle} raycast={() => null} />
       ))}
-      {constraintLabels.map((lbl) => (
+      {/* Annotation geometry: dimension lines, arrowheads, angle arcs */}
+      {constraintAnnotations.lines.map((line) => {
+        const geo = new THREE.BufferGeometry().setFromPoints(
+          line.points.map((p) => new THREE.Vector3(p[0], p[1], p[2])),
+        );
+        return (
+          <primitive key={line.key} object={new THREE.Line(geo,
+            new THREE.LineBasicMaterial({ color: line.color, transparent: true, opacity: line.opacity ?? 1, depthWrite: false })
+          )} raycast={() => null} />
+        );
+      })}
+      {constraintAnnotations.arcs.map((arc) => {
+        const geo = new THREE.BufferGeometry().setFromPoints(
+          arc.points.map((p) => new THREE.Vector3(p[0], p[1], p[2])),
+        );
+        return (
+          <primitive key={arc.key} object={new THREE.Line(geo,
+            new THREE.LineBasicMaterial({ color: arc.color, depthWrite: false })
+          )} raycast={() => null} />
+        );
+      })}
+      {constraintAnnotations.triangles.map((tri) => {
+        const shape = new THREE.Shape();
+        shape.moveTo(tri.points[0][0], tri.points[0][1]);
+        shape.lineTo(tri.points[1][0], tri.points[1][1]);
+        shape.lineTo(tri.points[2][0], tri.points[2][1]);
+        shape.closePath();
+        const geo = new THREE.ShapeGeometry(shape);
+        return (
+          <mesh key={tri.key} position={[0, 0, 0.08]}>
+            <primitive object={geo} attach="geometry" />
+            <meshBasicMaterial color={tri.color} depthWrite={false} side={THREE.DoubleSide} />
+          </mesh>
+        );
+      })}
+      {/* Annotation labels: symbols, dimension values, angle values, fallback text */}
+      {constraintAnnotations.labels.map((lbl) => (
         <Html
-          key={lbl.id}
+          key={lbl.key}
           position={lbl.position}
           center
           zIndexRange={[0, 0]}
           style={{ pointerEvents: 'auto' }}
         >
           <span
-            onClick={(e) => { e.stopPropagation(); setSelectedConstraintId(lbl.id); }}
+            onClick={(e) => { e.stopPropagation(); setSelectedConstraintId(lbl.constraintId); }}
             style={{
-              fontSize: 10,
+              fontSize: lbl.fontSize ?? 10,
               fontFamily: 'system-ui, sans-serif',
               fontWeight: 600,
-              color: selectedConstraintId === lbl.id ? '#ffcc00'
+              color: selectedConstraintId === lbl.constraintId ? '#ffcc00'
                 : lbl.isConflicting ? '#ff6b6b' : lbl.isRedundant ? '#faad14' : '#e8e8e8',
               textShadow: '0 0 3px #000, 0 0 3px #000',
               whiteSpace: 'nowrap',
               userSelect: 'none',
               cursor: 'pointer',
-              background: selectedConstraintId === lbl.id ? 'rgba(255,204,0,0.2)' : 'transparent',
+              background: selectedConstraintId === lbl.constraintId ? 'rgba(255,204,0,0.2)' : 'transparent',
               borderRadius: 3,
               padding: '1px 3px',
             }}>

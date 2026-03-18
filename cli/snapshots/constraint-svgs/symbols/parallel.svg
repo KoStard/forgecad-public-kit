@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-5 -4 10 8" width="300" height="240">
+  <rect x="-5" y="-4" width="10" height="8" fill="#1a1a2e"/>
+  <text x="0" y="-2.5" fill="#888" font-size="1.2" font-family="sans-serif" text-anchor="middle">Parallel ∥</text>
+  <line x1="-4" y1="0" x2="4" y2="0" stroke="#555" stroke-width="0.2"/>
+  <line x1="-0.360" y1="-0.600" x2="0.360" y2="0.000" stroke="#4ade80" stroke-width="0.3"/>
+  <line x1="0.360" y1="0.000" x2="-0.360" y2="0.600" stroke="#4ade80" stroke-width="0.3"/>
+  <line x1="0.120" y1="-0.600" x2="0.840" y2="0.000" stroke="#4ade80" stroke-width="0.3"/>
+  <line x1="0.840" y1="0.000" x2="0.120" y2="0.600" stroke="#4ade80" stroke-width="0.3"/>
+</svg>

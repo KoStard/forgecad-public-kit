@@ -17,7 +17,7 @@ declare module '../types' {
 
 registerConstraint<'shapeEqualCentroid', ConstraintTypeMap['shapeEqualCentroid']>({
   type: 'shapeEqualCentroid',
-  label: 'CC',
+  label: '⊕',
   isDimension: false,
   equations: 2,
 

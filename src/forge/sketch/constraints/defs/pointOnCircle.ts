@@ -1,4 +1,4 @@
-import type { PointId, CircleId, ConstraintTypeMap } from '../types';
+import type { PointId, CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
 declare module '../types' {
@@ -15,7 +15,7 @@ declare module '../types' {
 
 registerConstraint<'pointOnCircle', ConstraintTypeMap['pointOnCircle']>({
   type: 'pointOnCircle',
-  label: 'POC',
+  label: '◎',
   isDimension: false,
   equations: 1,
 
@@ -23,6 +23,12 @@ registerConstraint<'pointOnCircle', ConstraintTypeMap['pointOnCircle']>({
     const pt = points.get(c.point);
     if (pt) return [pt.x, pt.y];
     return [0, 0];
+  },
+
+  displayAnnotations(c, { points }) {
+    const pt = points.get(c.point);
+    if (!pt) return [];
+    return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'collinear' as const }];
   },
 
   solve(c, { points, circles, tolerance }) {

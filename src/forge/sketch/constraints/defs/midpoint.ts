@@ -1,4 +1,4 @@
-import type { PointId, LineId, ConstraintTypeMap } from '../types';
+import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, midpointPerp } from '../helpers';
 
@@ -18,7 +18,7 @@ declare module '../types' {
 
 registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
   type: 'midpoint',
-  label: 'MID',
+  label: '◆',
   isDimension: false,
   equations: 2,
 
@@ -30,6 +30,14 @@ registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
       if (a && b) return midpointPerp(a, b, 3);
     }
     return [0, 0];
+  },
+
+  displayAnnotations(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return [];
+    const a = points.get(line.a), b = points.get(line.b);
+    if (!a || !b) return [];
+    return [{ kind: 'symbol', position: [(a.x+b.x)/2, (a.y+b.y)/2] as [number, number], symbol: 'midpoint' as const }];
   },
 
   solve(c, { points, lines, tolerance }) {

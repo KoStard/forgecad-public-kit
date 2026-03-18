@@ -23,6 +23,7 @@ import { constrainedSketch, ConstrainedSketchBuilder } from '../src/forge/sketch
 import { isConstraintSketch, ConstraintSketch } from '../src/forge/sketch/constraints/sketch';
 import type { ConstraintDefinition, SketchPoint } from '../src/forge/sketch/constraints/types';
 import { buildConstraintSvgDocument } from './sketch-svg';
+import { computeLabelMetrics, formatMetrics } from './label-metrics';
 import { getConstraintDef } from '../src/forge/sketch/constraints/registry';
 import '../src/forge/sketch/constraints/defs';
 
@@ -706,7 +707,13 @@ function runSnapshotTests(update: boolean): number {
         writeFileSync(join(svgDir, `${tc.name}.svg`), svg);
       }
 
-      console.log(`  ✓ ${tc.name}`);
+      // Label quality metrics
+      if (_verbose) {
+        const metrics = computeLabelMetrics(result.constraintMeta);
+        console.log(`  ✓ ${tc.name}\n${formatMetrics(metrics).split('\n').map(l => '      ' + l).join('\n')}`);
+      } else {
+        console.log(`  ✓ ${tc.name}`);
+      }
     } catch (e) {
       failures++;
       console.error(`  ✗ ${tc.name}: ${(e as Error).message}`);
@@ -1276,6 +1283,12 @@ function testFullSpectrogram() {
   const svg = buildConstraintSvgDocument(meta);
   writeFileSync(join(svgDir, 'spectrogram.svg'), svg);
   console.log(`      SVG → ${join(svgDir, 'spectrogram.svg')}`);
+
+  // Label quality metrics
+  if (_verbose) {
+    const metrics = computeLabelMetrics(meta);
+    console.log(formatMetrics(metrics).split('\n').map(l => '      ' + l).join('\n'));
+  }
 }
 
 
