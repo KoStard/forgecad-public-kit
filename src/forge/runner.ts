@@ -1488,6 +1488,19 @@ export function runScript(
       const treePath = [...parentTreePath, localSegment];
       const grp = parentGroup;
 
+      // Handle { name, group: ShapeGroup } — pre-built group passed directly
+      if (item.group instanceof ShapeGroup) {
+        item.group.children.forEach((child: any, i: number) => {
+          flattenGroupChild(
+            child,
+            groupChildLabel(item.group, name, i),
+            name,
+            [...treePath, shapeGroupChildSegment(item.group, i)],
+          );
+        });
+        return;
+      }
+
       // Handle { name, group: [...] } — nested assembly group
       if (Array.isArray(item.group)) {
         item.group.forEach((child: any, i: number) => {

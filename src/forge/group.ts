@@ -28,7 +28,7 @@ export interface NamedGroupChild {
   name: string;
   shape?: Shape | TrackedShape | ShapeGroup;
   sketch?: Sketch;
-  group?: GroupInput[];
+  group?: GroupInput[] | ShapeGroup;
 }
 
 export type GroupInput = GroupChild | NamedGroupChild;
@@ -108,7 +108,7 @@ function resolveNamedGroupChild(item: NamedGroupChild): GroupChild {
 
   const hasShape = item.shape !== undefined;
   const hasSketch = item.sketch !== undefined;
-  const hasGroup = Array.isArray(item.group);
+  const hasGroup = Array.isArray(item.group) || item.group instanceof ShapeGroup;
   const payloadCount = Number(hasShape) + Number(hasSketch) + Number(hasGroup);
   if (payloadCount !== 1) {
     throw new Error(`group(...) named item "${childName}" must provide exactly one of shape, sketch, or group`);
@@ -130,6 +130,7 @@ function resolveNamedGroupChild(item: NamedGroupChild): GroupChild {
     }
     return item.sketch as Sketch;
   }
+  if (item.group instanceof ShapeGroup) return item.group;
   return group(...(item.group as GroupInput[]));
 }
 
