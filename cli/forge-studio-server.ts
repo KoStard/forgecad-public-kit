@@ -202,7 +202,7 @@ async function pickPort(preferred: number, host: string, strict: boolean): Promi
 
 // ---- Browser open ----
 
-function openBrowser(url: string): void {
+export function openBrowser(url: string): void {
   const cmd = process.platform === 'darwin' ? `open "${url}"`
     : process.platform === 'win32' ? `start "" "${url}"`
     : `xdg-open "${url}"`;

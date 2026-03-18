@@ -28,6 +28,7 @@ import { runReportCli } from './forge-report';
 import { runRenderCli } from './forge-render.mjs';
 import { runSdfCli } from './forge-sdf';
 import { runStudioCli } from './forge-studio';
+import { openBrowser } from './forge-studio-server';
 import { runSvgCli } from './forge-svg';
 import { runBrepCli } from './forge-brep';
 import { isDirectCliRun, resolvePackagePath } from './package-runtime';
@@ -178,6 +179,18 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: runStudioCli,
+  },
+  {
+    group: 'Studio',
+    path: ['web'],
+    summary: 'Open the ForgeCAD web playground in a browser.',
+    usage: ['forgecad web'],
+    examples: ['forgecad web'],
+    run: async () => {
+      const url = 'https://kostard.github.io/ForgeCAD';
+      console.log(`Opening ${url}`);
+      openBrowser(url);
+    },
   },
   {
     group: 'Studio',
