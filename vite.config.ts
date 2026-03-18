@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 import chokidar from 'chokidar';
 import { init, resolveForgeQualityPreset } from './src/forge/headless';
 import { buildNotebookOutputs } from './src/notebook/output';
@@ -397,6 +398,35 @@ function getManifoldLibIncludes(): string[] {
   return [...deps];
 }
 
+function forgeTypesPlugin() {
+  return {
+    name: 'forge-types',
+    configureServer() {
+      const forgeDir = path.resolve(__dirname, 'src/forge');
+      let debounce: ReturnType<typeof setTimeout> | null = null;
+
+      const regen = () => {
+        try {
+          execSync('node scripts/gen-forge-types.mjs', { cwd: __dirname, stdio: 'pipe' });
+          console.log('✓ forge-api.d.ts regenerated');
+        } catch (e: any) {
+          console.error('✗ gen:types failed:', e.stderr?.toString() ?? e.message);
+        }
+      };
+
+      const watcher = chokidar.watch(`${forgeDir}/**/*.ts`, {
+        ignoreInitial: true,
+        ignored: /forge-api\.d\.ts$/,
+      });
+
+      watcher.on('all', () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(regen, 500);
+      });
+    },
+  };
+}
+
 function stripBrokenManifoldSourceMaps() {
   const manifoldLibPattern = /[\\/]node_modules[\\/]manifold-3d[\\/]lib[\\/].+\.js$/;
   const sourceMapTrailerPattern = /\n\/\/# sourceMappingURL=.*?\.map\s*$/gm;
@@ -422,6 +452,7 @@ export default defineConfig(({ command }) => ({
   plugins: [
     // Only serve the project plugin (SSE watch, /api/save etc.) in local studio mode
     forgeProjectPlugin(command === 'serve' && forgeMode === 'studio'),
+    ...(command === 'serve' ? [forgeTypesPlugin()] : []),
     stripBrokenManifoldSourceMaps(),
     react(),
   ],

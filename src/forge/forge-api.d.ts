@@ -350,19 +350,6 @@ interface ConstraintTypeMap {
 }
 interface ConstraintTypeMap {
 	/**
-	 * Forces a point to lie on a finite line segment (between its two endpoints).
-	 *
-	 * Unlike `collinear`, the projection is clamped to the segment's extent
-	 * (`t ∈ [0, 1]`), so the point cannot slide off either end.
-	 * Contributes **1 equation**: signed perpendicular distance = 0.
-	 */
-	pointOnLine: {
-		point: PointId;
-		line: LineId;
-	};
-}
-interface ConstraintTypeMap {
-	/**
 	 * Pins a point to an absolute position `(x, y)` in sketch space.
 	 *
 	 * Applied during the **presolve** pass (before iteration), not as a
@@ -404,6 +391,24 @@ interface ConstraintTypeMap {
 }
 interface ConstraintTypeMap {
 	/**
+	 * Forces a point to lie on a **bounded** line segment — not merely the
+	 * infinite extension of the line.
+	 *
+	 * The point is projected onto the segment and the parameter `t` is clamped
+	 * to `[0, 1]`.  When `t` is already inside that range the behaviour is
+	 * identical to `collinear`.  When the point would project outside the
+	 * segment it is snapped to the nearest endpoint instead.
+	 *
+	 * Contributes **1 equation** (like `collinear`): the point can still slide
+	 * along the segment, giving it one remaining degree of freedom.
+	 */
+	pointOnLine: {
+		point: PointId;
+		line: LineId;
+	};
+}
+interface ConstraintTypeMap {
+	/**
 	 * Sets the Euclidean distance between two points to `value`.
 	 *
 	 * Points are moved symmetrically along the current direction vector so the
@@ -431,12 +436,8 @@ interface ConstraintTypeMap {
 }
 interface ConstraintTypeMap {
 	/**
-	 * Sets the angle from line `a` to line `b` to `value` degrees.
-	 *
-	 * `value` is measured counter-clockwise from `a`'s direction to `b`'s
-	 * direction. Either orientation of `b` (forward or reversed) is accepted —
-	 * whichever is closer to the target. Line `a` is the reference; only `b`
-	 * is rotated. Contributes **1 equation**.
+	 * Sets the angle from line `a` to line `b` to `value` degrees (CCW).
+	 * Line `a` is the reference; only `b` is rotated. Contributes **1 equation**.
 	 */
 	angle: {
 		a: LineId;
@@ -569,25 +570,58 @@ interface ConstraintDisplay {
 	];
 	value?: number;
 	isDimension: boolean;
+	/** True when the solver failed to satisfy this constraint (genuinely conflicting geometry). */
 	isConflicting: boolean;
+	/** True when this constraint is mathematically redundant — it duplicates an equation already
+	 * provided by another constraint, making the DOF count negative even though the solver converges. */
 	isRedundant: boolean;
+	/** For rejected constraints: why the builder rejected it (maxError, constraint params, blame). */
+	rejectionReason?: string;
+	/** Entity IDs referenced by this constraint (points, lines, circles, etc.). */
 	entityIds: string[];
+	/** Per-equation residual error for this constraint (how far off it is). */
 	residual: number;
 }
 interface SurfaceDisplay {
+	/** Zero-based index, largest-first by area. */
 	index: number;
+	/** Region area in mm². */
 	area: number;
-	centroid: [number, number];
-	bounds: { min: [number, number]; max: [number, number] };
-	seed: [number, number];
-	polygon: [number, number][];
+	/** Centroid of the region polygon. */
+	centroid: [
+		number,
+		number
+	];
+	/** Axis-aligned bounding box. */
+	bounds: {
+		min: [
+			number,
+			number
+		];
+		max: [
+			number,
+			number
+		];
+	};
+	/** A point guaranteed to be inside the region — usable as seed for detectArrangementRegion(). */
+	seed: [
+		number,
+		number
+	];
+	/** Polygon vertices (CCW winding) for rendering the region fill. */
+	polygon: [
+		number,
+		number
+	][];
 }
 interface SketchConstraintMeta {
 	status: "under" | "fully" | "over" | "over-redundant";
+	/** Net degrees of freedom: positive = under-constrained, 0 = fully, negative = over-constrained. */
 	dof: number;
 	maxError: number;
 	constraints: ConstraintDisplay[];
 	rejected: ConstraintDisplay[];
+	/** Detected surfaces from line arrangement (DCEL face detection). Empty if no closed regions. */
 	surfaces: SurfaceDisplay[];
 	construction: {
 		lines: {
@@ -667,7 +701,10 @@ interface SketchConstraintMeta {
 		}[];
 		points: {
 			id: string;
-			pos: [number, number];
+			pos: [
+				number,
+				number
+			];
 		}[];
 	};
 }
@@ -680,10 +717,20 @@ interface ConstraintDefinition {
 	loops: SketchLoop[];
 	constraints: SketchConstraint[];
 	rejectedConstraints: SketchConstraint[];
+	/** Maps rejected constraint ID → human-readable reason. Populated by the builder. */
+	rejectionReasons?: Map<string, string>;
 }
 interface SolveOptions {
+	/** Maximum number of LM outer iterations per restart. */
 	iterations?: number;
+	/** Infinity-norm residual tolerance for declaring convergence. */
 	tolerance?: number;
+	/** Number of deterministic restart seeds used by the global solver. */
+	restarts?: number;
+	/** Optional projector iterations used only for initialisation, not as the main solver. */
+	warmStartIterations?: number;
+	/** Maximum LM step length in scaled variable space. Larger = bolder, smaller = safer. */
+	maxScaledStep?: number;
 }
 interface ConstraintTypeMap {
 }
@@ -716,21 +763,6 @@ interface ConstraintTypeMap {
 		value: number;
 	};
 }
-interface ConstraintTypeMap {
-	/**
-	 * Constrains the signed perpendicular distance from a point to an infinite line.
-	 *
-	 * Positive `value` places the point to the **left** of the line
-	 * (when facing the line's direction from `a` to `b`). Negative places it
-	 * to the right. Zero is equivalent to `collinear`.
-	 * Contributes **1 equation**: `perpDist(point, line) − value = 0`.
-	 */
-	pointLineDistance: {
-		point: PointId;
-		line: LineId;
-		value: number;
-	};
-}
 /** Exported for backward-compatibility with forge-public-api.ts */
 type LineDistanceConstraint = {
 	id: string;
@@ -742,11 +774,9 @@ type LineDistanceConstraint = {
 };
 interface ConstraintTypeMap {
 	/**
-	 * Sets the angle of a line from the positive X axis to `value` degrees.
-	 *
-	 * Both orientations of the line (forward and reversed) are accepted —
-	 * whichever is closer to the target angle. Contributes **1 equation**:
-	 * `sin(angle − target) = 0` (normalised by line length).
+	 * Sets the angle of a line from the positive X axis to exactly `value` degrees.
+	 * The direction is enforced as-is (a→b). Contributes **1 equation**:
+	 * `normalizeAngle(angle − target) = 0`.
 	 */
 	absoluteAngle: {
 		line: LineId;
@@ -882,6 +912,56 @@ interface ConstraintTypeMap {
 		b: ShapeId;
 	};
 }
+interface ConstraintTypeMap {
+	/**
+	 * Constrains the signed perpendicular distance from a point to an infinite line.
+	 *
+	 * Positive `value` places the point to the **left** of the line
+	 * (when facing the line's direction from `a` to `b`). Negative places it
+	 * to the right. Zero is equivalent to `collinear`.
+	 * Contributes **1 equation**: `perpDist(point, line) − value = 0`.
+	 */
+	pointLineDistance: {
+		point: PointId;
+		line: LineId;
+		value: number;
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Enforces counter-clockwise winding order on a polygon defined by `points`.
+	 *
+	 * This resolves the discrete orientation ambiguity that arises when a polygon's
+	 * shape is fully determined but its mirror image also satisfies all constraints
+	 * (e.g. an equilateral triangle with a fixed vertex and side angle).
+	 *
+	 * Applied during **presolve** and **solve**: if the signed area is negative
+	 * (clockwise), the last non-fixed vertex is reflected across the line formed
+	 * by the first two vertices. Contributes **0 equations** — it is a discrete
+	 * constraint, not a continuous one, so it does not change the DOF count.
+	 */
+	ccw: {
+		points: PointId[];
+	};
+}
+interface ConstraintTypeMap {
+	/**
+	 * Sets the unsigned angle between lines `a` and `b` to `value` degrees.
+	 *
+	 * Unlike `angle` (which is directional — 90 ≠ −90), this constraint
+	 * accepts both orientations of `b`: whichever of `+value` or `+value+180°`
+	 * is closer to the current direction is chosen. Use this when you care
+	 * about the magnitude of the angle but not the sign (e.g. "these two lines
+	 * are 60° apart" without specifying which side).
+	 *
+	 * Contributes **1 equation**: `sin(angleB − angleA − target) = 0`.
+	 */
+	angleBetween: {
+		a: LineId;
+		b: LineId;
+		value: number;
+	};
+}
 declare class ConstraintSketch extends Sketch {
 	readonly constraintMeta: SketchConstraintMeta;
 	readonly definition: ConstraintDefinition;
@@ -920,6 +1000,8 @@ declare class ConstrainedSketchBuilder {
 	private constraints;
 	private loops;
 	private rejectedConstraints;
+	/** Maps rejected constraint ID → human-readable reason string. */
+	private rejectionReasons;
 	private cursor;
 	private loopStart;
 	private nextId;
@@ -956,58 +1038,63 @@ declare class ConstrainedSketchBuilder {
 	 */
 	shape(lines: LineId[]): ShapeId;
 	constrain(constraint: Omit<SketchConstraint, "id">): this;
+	private resolvePointId;
+	private resolveLineId;
+	private resolveCircleId;
+	private resolveArcId;
+	private resolveShapeId;
 	/** Constrain a line to be horizontal. */
-	horizontal(line: LineId): this;
+	horizontal(line: any): this;
 	/** Constrain a line to be vertical. */
-	vertical(line: LineId): this;
+	vertical(line: any): this;
 	/** Constrain two lines to be parallel. */
-	parallel(a: LineId, b: LineId): this;
+	parallel(a: any, b: any): this;
 	/** Constrain two lines to be perpendicular. */
-	perpendicular(a: LineId, b: LineId): this;
+	perpendicular(a: any, b: any): this;
 	/**
 	 * Tangent constraint.
 	 * - `tangent(line, circle)` — line is tangent to a circle.
 	 * - `tangent(circleA, circleB)` — two circles are externally tangent.
 	 */
-	tangent(a: LineId | CircleId, b: CircleId): this;
+	tangent(a: any, b: any): this;
 	/** Constrain two lines to have equal length. */
-	equal(a: LineId, b: LineId): this;
+	equal(a: any, b: any): this;
 	/** Constrain two points to be at the same location. */
-	coincident(a: PointId, b: PointId): this;
+	coincident(a: any, b: any): this;
 	/** Constrain two circles to share the same center. */
-	concentric(a: CircleId, b: CircleId): this;
+	concentric(a: any, b: any): this;
 	/** Constrain a point to lie on an infinite line (collinear). */
-	collinear(point: PointId, line: LineId): this;
-	/** Constrain a point to lie on a finite line segment (clamped to the segment's extent). */
-	pointOnLine(point: PointId, line: LineId): this;
+	collinear(point: any, line: any): this;
 	/** Constrain two points to be symmetric about an axis line. */
-	symmetric(a: PointId, b: PointId, axis: LineId): this;
+	symmetric(a: any, b: any, axis: any): this;
 	/** Fix a point at a specific location (or at its current position if x/y are omitted). */
-	fix(point: PointId, x?: number, y?: number): this;
+	fix(point: any, x?: number, y?: number): this;
 	/** Constrain a point to lie at the midpoint of a line. */
-	midpoint(point: PointId, line: LineId): this;
+	midpoint(point: any, line: any): this;
 	/** Constrain a point to lie on the perimeter of a circle. */
-	pointOnCircle(point: PointId, circle: CircleId): this;
+	pointOnCircle(point: any, circle: any): this;
+	/** Constrain a point to lie on a bounded line segment (not its infinite extension). */
+	pointOnLine(point: PointId, line: LineId): this;
 	/** Constrain the distance between two points. */
-	distance(a: PointId, b: PointId, value: number): this;
+	distance(a: any, b: any, value: number): this;
 	/** Constrain the length of a line. */
-	length(line: LineId, value: number): this;
+	length(line: any, value: number): this;
 	/** Constrain the angle from line `a` to line `b` (degrees). */
-	angle(a: LineId, b: LineId, value: number): this;
+	angle(a: any, b: any, value: number): this;
 	/** Constrain the radius of a circle. */
-	radius(circle: CircleId, value: number): this;
+	radius(circle: any, value: number): this;
 	/** Constrain the diameter of a circle. */
-	diameter(circle: CircleId, value: number): this;
+	diameter(circle: any, value: number): this;
 	/** Constrain the horizontal distance between two points (b.x − a.x = value). */
-	hDistance(a: PointId, b: PointId, value: number): this;
+	hDistance(a: any, b: any, value: number): this;
 	/** Constrain the vertical distance between two points (b.y − a.y = value). */
-	vDistance(a: PointId, b: PointId, value: number): this;
+	vDistance(a: any, b: any, value: number): this;
 	/**
 	 * Constrain the signed perpendicular distance from a point to a line.
 	 * Positive `value` places the point to the **left** of the line (a→b direction).
 	 * Zero is equivalent to `collinear`.
 	 */
-	pointLineDistance(point: PointId, line: LineId, value: number): this;
+	pointLineDistance(point: any, line: any, value: number): this;
 	/**
 	 * Constrain the perpendicular (offset) distance between two lines.
 	 * Also implicitly enforces parallelism.
@@ -1015,36 +1102,72 @@ declare class ConstrainedSketchBuilder {
 	 * Positive `value` places line `b` on the **left** side of line `a`
 	 * (according to `a`'s direction vector). Negative places it on the right.
 	 */
-	lineDistance(a: LineId, b: LineId, value: number): this;
+	lineDistance(a: any, b: any, value: number): this;
 	/** Constrain the absolute angle of a line from the positive X-axis (degrees). */
-	absoluteAngle(line: LineId, value: number): this;
+	absoluteAngle(line: any, value: number): this;
 	/** Constrain two circles to have equal radii. */
-	equalRadius(a: CircleId, b: CircleId): this;
+	equalRadius(a: any, b: any): this;
 	/** Constrain the arc length of an arc (radius × sweep angle). */
-	arcLength(arc: ArcId, value: number): this;
+	arcLength(arc: any, value: number): this;
 	/**
 	 * Constrain a line to be tangent to an arc at the arc's start (`atStart=true`) or end point.
 	 * Combine with `coincident` to enforce the shared endpoint.
 	 */
-	lineTangentArc(line: LineId, arc: ArcId, atStart: boolean): this;
+	lineTangentArc(line: any, arc: any, atStart: boolean): this;
 	/** Constrain the bounding-box width of a shape. */
-	shapeWidth(shape: ShapeId, value: number): this;
+	shapeWidth(shape: any, value: number): this;
 	/** Constrain the bounding-box height of a shape. */
-	shapeHeight(shape: ShapeId, value: number): this;
+	shapeHeight(shape: any, value: number): this;
 	/** Constrain the X coordinate of a shape's centroid. */
-	shapeCentroidX(shape: ShapeId, value: number): this;
+	shapeCentroidX(shape: any, value: number): this;
 	/** Constrain the Y coordinate of a shape's centroid. */
-	shapeCentroidY(shape: ShapeId, value: number): this;
+	shapeCentroidY(shape: any, value: number): this;
 	/** Constrain the area of a shape. */
-	shapeArea(shape: ShapeId, value: number): this;
+	shapeArea(shape: any, value: number): this;
 	/** Constrain two shapes to share the same centroid. */
-	shapeEqualCentroid(a: ShapeId, b: ShapeId): this;
+	shapeEqualCentroid(a: any, b: any): this;
+	/** Constrain the unsigned angle between two lines (accepts both orientations). */
+	angleBetween(a: any, b: any, value: number): this;
+	/** Enforce counter-clockwise winding on a polygon defined by its vertices. */
+	ccw(...points: any[]): this;
 	/**
 	 * Register a closed polygon loop from an explicit ordered list of point IDs.
 	 */
-	addLoop(points: PointId[]): this;
+	addLoop(points: any[]): this;
 	solve(options?: SolveOptions): ConstraintSketch;
+	/**
+	 * Run the solver without building a full `ConstraintSketch`.
+	 * Useful for lightweight constraint validation or progress monitoring.
+	 * Returns the final maxError, the number of rejected constraints, and
+	 * the solved `ConstraintDefinition` with updated point positions.
+	 */
+	solveConstraintsOnly(options?: SolveOptions): {
+		maxError: number;
+		rejectedCount: number;
+		definition: ConstraintDefinition;
+	};
 	private buildDefinition;
+	/**
+	 * Evaluate all constraint residuals on the builder's live entities.
+	 * Returns the max absolute residual (infinity-norm).  Used for fast
+	 * "already satisfied?" checks before invoking the full solver.
+	 */
+	private checkResiduals;
+	/** Sync solved positions from a definition back to the builder's live entities. */
+	private syncFromDefinition;
+	/**
+	 * Run the presolve hook for a single constraint directly on the builder's
+	 * own entities.  This initialises newly-added geometry (e.g. a point at
+	 * (0,0) that should be on a line) without disturbing already-converged
+	 * positions.
+	 */
+	private runSinglePresolve;
+	/**
+	 * Find all point IDs that should remain free (not frozen) when incrementally
+	 * solving for a newly added constraint.  Returns the set of points that are
+	 * directly or one-hop-transitively connected to the new constraint's entities.
+	 */
+	private findAffectedPoints;
 	private getPoint;
 	/** Compute arc center from start/end points, radius, and clockwise flag; create the arc entity. */
 	private addArc;
@@ -1954,6 +2077,203 @@ interface TextOptions {
 declare function text2d(content: string, options?: TextOptions): Sketch;
 /** Returns the rendered width of a string in model units (same options as text2d). */
 declare function textWidth(content: string, options?: Pick<TextOptions, "size" | "letterSpacing">): number;
+type RectVertexName = "bottomLeft" | "bottomRight" | "topRight" | "topLeft";
+type RectSideName = "bottom" | "right" | "top" | "left";
+interface RectOptions {
+	/** Bottom-left x coordinate. Default: 0. */
+	x?: number;
+	/** Bottom-left y coordinate. Default: 0. */
+	y?: number;
+	/** Width (along x). Default: 10. */
+	width?: number;
+	/** Height (along y). Default: 10. */
+	height?: number;
+}
+/**
+ * Typed handle for a constrained axis-aligned rectangle in the solver.
+ *
+ * Structural constraints pre-applied:
+ *   `horizontal(bottom)`, `horizontal(top)`, `vertical(left)`, `vertical(right)`.
+ *
+ * This leaves **4 DOF** (position x/y, width, height). Use `sk.fix()`,
+ * `sk.length()`, `sk.shapeWidth()`, etc. to pin them.
+ */
+interface ConstrainedRect {
+	readonly bottomLeft: PointId;
+	readonly bottomRight: PointId;
+	readonly topRight: PointId;
+	readonly topLeft: PointId;
+	/** bottom-left → bottom-right */
+	readonly bottom: LineId;
+	/** bottom-right → top-right */
+	readonly right: LineId;
+	/** top-right → top-left */
+	readonly top: LineId;
+	/** top-left → bottom-left */
+	readonly left: LineId;
+	/**
+	 * Center point constrained to the geometric center via `midpoint` on the diagonal.
+	 * Can be used in further constraints: `sk.fix(rect.center, 0, 0)`,
+	 * `sk.coincident(rect.center, other)`.
+	 */
+	readonly center: PointId;
+	/** ShapeId for `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX/Y`. */
+	readonly shape: ShapeId;
+	/** CCW-ordered vertex array: [bottomLeft, bottomRight, topRight, topLeft]. */
+	readonly vertices: [
+		PointId,
+		PointId,
+		PointId,
+		PointId
+	];
+	/** CCW-ordered side array: [bottom, right, top, left]. */
+	readonly sides: [
+		LineId,
+		LineId,
+		LineId,
+		LineId
+	];
+	/** Named vertex lookup. */
+	vertex(name: RectVertexName): PointId;
+	/** Named side lookup. */
+	side(name: RectSideName): LineId;
+}
+/**
+ * Add an axis-aligned rectangle concept to the builder.
+ *
+ * Creates 4 vertices (CCW: bl→br→tr→tl), 4 sides, applies 4 structural
+ * constraints (`horizontal`/`vertical` on each side), registers a loop and
+ * a shape, and returns a `ConstrainedRect` handle.
+ *
+ * @example
+ * ```ts
+ * const sk = constrainedSketch();
+ * const rect = addRect(sk, { x: 0, y: 0, width: 100, height: 50 });
+ * sk.fix(rect.bottomLeft, 0, 0);
+ * sk.length(rect.bottom, 120);
+ * ```
+ */
+declare function addRect(sk: ConstrainedSketchBuilder, options?: RectOptions): ConstrainedRect;
+interface PolygonOptions {
+	/** Initial vertex coordinates. Minimum 3 points. */
+	points: ReadonlyArray<readonly [
+		number,
+		number
+	]>;
+	/**
+	 * Whether to register a closed loop for sketch generation.
+	 * Default: true.
+	 */
+	addLoop?: boolean;
+}
+/**
+ * Typed handle for a general constrained polygon in the solver.
+ *
+ * Structural constraints pre-applied: `ccw(vertices)` for winding enforcement.
+ *
+ * `sides[i]` goes from `vertices[i]` → `vertices[(i+1) % n]`.
+ */
+interface ConstrainedPolygon {
+	/** CCW-ordered PointIds. */
+	readonly vertices: PointId[];
+	/**
+	 * CCW-ordered LineIds.
+	 * `sides[i]` runs from `vertices[i]` → `vertices[(i+1) % n]`.
+	 */
+	readonly sides: LineId[];
+	/** ShapeId for `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX/Y`. */
+	readonly shape: ShapeId;
+	/** Get vertex by index. */
+	vertex(index: number): PointId;
+	/** Get side by index (side `i` goes vertex `i` → vertex `(i+1) % n`). */
+	side(index: number): LineId;
+}
+/**
+ * Add a general polygon concept to the builder.
+ *
+ * Creates n vertices and n sides (CCW: `sides[i]` from `vertices[i]` →
+ * `vertices[(i+1) % n]`). Applies a `ccw` constraint to enforce winding.
+ * The user is responsible for all dimensional constraints.
+ *
+ * @example
+ * ```ts
+ * const sk = constrainedSketch();
+ * const tri = addPolygon(sk, { points: [[0,0],[100,0],[50,80]] });
+ * sk.fix(tri.vertex(0), 0, 0);
+ * sk.length(tri.side(0), 100);
+ * ```
+ */
+declare function addPolygon(sk: ConstrainedSketchBuilder, options: PolygonOptions): ConstrainedPolygon;
+interface RegularPolygonOptions {
+	/** Number of sides (minimum 3). */
+	sides: number;
+	/** Circumradius — distance from center to vertex. Default: 10. */
+	radius?: number;
+	/** Center x coordinate. Default: 0. */
+	cx?: number;
+	/** Center y coordinate. Default: 0. */
+	cy?: number;
+	/**
+	 * Angle (in degrees) of vertex[0] measured from the +X axis (CCW positive).
+	 * Default: 0 (rightmost vertex).
+	 */
+	startAngle?: number;
+}
+/**
+ * Typed handle for a constrained regular polygon in the solver.
+ *
+ * Structural constraints pre-applied:
+ * - `equal(sides[0], sides[1])`, ..., `equal(sides[n-2], sides[n-1])` — equal sides
+ * - `ccw(vertices)` — CCW winding
+ *
+ * Leaves **4 DOF** (center x/y, radius/scale, rotation). The center point is
+ * tracked by the solver and exposed for further constraints.
+ *
+ * Note: Equal sides + CCW + regular initial placement makes this
+ * "practically regular" for the solver. If you need geometrically exact
+ * regularity (equal angles too), add `angleBetween` constraints on each pair
+ * of adjacent sides.
+ */
+interface ConstrainedRegularPolygon extends ConstrainedPolygon {
+	/**
+	 * Center point. Use `sk.fix(poly.center, x, y)` to pin location,
+	 * or `sk.coincident(poly.center, other)` to align with other geometry.
+	 */
+	readonly center: PointId;
+}
+/**
+ * Add a regular n-gon concept to the builder.
+ *
+ * Vertices are placed at `(cx + r·cos(startAngle + i·2π/n), cy + r·sin(...))`.
+ * Equal-side constraints enforce regularity. The center point is constrained
+ * to the centroid via midpoint constraints on the first diagonal.
+ *
+ * @example
+ * ```ts
+ * const sk = constrainedSketch();
+ * const hex = addRegularPolygon(sk, { sides: 6, radius: 25, cx: 0, cy: 0 });
+ * sk.fix(hex.center, 0, 0);
+ * sk.length(hex.side(0), 30);  // changes all sides (equal constraint)
+ * ```
+ */
+declare function addRegularPolygon(sk: ConstrainedSketchBuilder, options: RegularPolygonOptions): ConstrainedRegularPolygon;
+interface ConstrainedSketchBuilder {
+	/**
+	 * Add an axis-aligned rectangle concept.
+	 * Returns a `ConstrainedRect` handle with named vertices, sides, and center.
+	 */
+	rect(options?: RectOptions): ConstrainedRect;
+	/**
+	 * Add a general polygon concept (CCW winding enforced).
+	 * Returns a `ConstrainedPolygon` handle.
+	 */
+	addPolygon(options: PolygonOptions): ConstrainedPolygon;
+	/**
+	 * Add a regular n-gon concept (equal sides, CCW winding).
+	 * Returns a `ConstrainedRegularPolygon` handle with a center point.
+	 */
+	regularPolygon(options: RegularPolygonOptions): ConstrainedRegularPolygon;
+}
 type GeometryBackend = "manifold" | "occt" | "hybrid" | "unknown";
 type GeometryRepresentation = "mesh-solid" | "brep-solid" | "surface" | "mixed";
 type GeometryFidelity = "kernel-native" | "sampled" | "deformed" | "mixed" | "unknown";
@@ -2195,7 +2515,7 @@ interface NamedGroupChild {
 	name: string;
 	shape?: Shape | TrackedShape | ShapeGroup;
 	sketch?: Sketch;
-	group?: GroupInput[];
+	group?: GroupInput[] | ShapeGroup;
 }
 type GroupInput = GroupChild | NamedGroupChild;
 declare class ShapeGroup {

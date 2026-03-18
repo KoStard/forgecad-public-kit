@@ -66,9 +66,23 @@ export {
   textWidth,
   dim,
   dimLine,
+  addRect,
+  addPolygon,
+  addRegularPolygon,
 } from './sketch';
 
-export type { Anchor, SvgImportOptions } from './sketch';
+export type {
+  Anchor,
+  SvgImportOptions,
+  RectOptions,
+  RectVertexName,
+  RectSideName,
+  ConstrainedRect,
+  PolygonOptions,
+  ConstrainedPolygon,
+  RegularPolygonOptions,
+  ConstrainedRegularPolygon,
+} from './sketch';
 
 // ConstrainedSketchBuilder is the main win: all constraint methods are inlined
 // automatically from the source class — addLoop, fix, horizontal, etc.
