@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 import { exportMeshFromStore, exportOrbitGifFromStore, exportReportFromStore } from './exportActions';
 import { fileSystem } from '../fs';
+import { fetchGistModel } from '../share';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 const mod = isMac ? '⌘' : 'Ctrl';
@@ -144,6 +145,23 @@ export function CommandPalette() {
       action: () => {
         setShowPerformanceInfo(!showPerformanceInfo);
         close();
+      },
+    },
+    {
+      id: 'open-gist',
+      label: 'Open from GitHub Gist',
+      action: () => {
+        close();
+        const input = window.prompt('Paste a GitHub Gist URL or ID:');
+        if (!input) return;
+        // Extract gist ID from URL or use as-is
+        const match = input.match(/gist\.github\.com\/(?:[^/]+\/)?([a-f0-9]+)/i);
+        const gistId = match ? match[1] : input.trim();
+        fetchGistModel(gistId)
+          .then((model) => {
+            useForgeStore.getState().loadFromText(model.code, model.filename);
+          })
+          .catch(handleCommandError);
       },
     },
     { id: 'export', label: 'Export', children: exportChoices, action: () => {} },
