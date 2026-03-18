@@ -52,7 +52,6 @@ registerConstraint<'ccw', ConstraintTypeMap['ccw']>({
   },
 
   residual() {
-    // Discrete constraint — no continuous residual equations.
     return [];
   },
 
