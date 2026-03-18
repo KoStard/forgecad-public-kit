@@ -69,11 +69,15 @@ export {
   addRect,
   addPolygon,
   addRegularPolygon,
+  sketchToSvg,
+  sketchToDxf,
 } from './sketch';
 
 export type {
   Anchor,
   SvgImportOptions,
+  SketchSvgOptions,
+  SketchDxfOptions,
   RectOptions,
   RectVertexName,
   RectSideName,

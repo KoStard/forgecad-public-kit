@@ -1,10 +1,13 @@
 import { build3mfBlob, buildBinaryStl, type MeshExportObject } from '@forge/exportMesh';
 import { runScript, type ForgeQualityPreset, type RunResult } from '@forge/index';
+import { sketchToSvg } from '@forge/sketch/exportSvg';
+import { sketchToDxf } from '@forge/sketch/exportDxf';
 import { setParamOverrides } from '@forge/params';
 import { useForgeStore, type ObjectSettings } from '../store/forgeStore';
 import { generateReportInWorker } from '../workers/reportWorkerClient';
 
 export type MeshExportFormat = '3mf' | 'stl';
+export type SketchExportFormat = 'svg' | 'dxf';
 export type OrbitGifMode = 'solid' | 'wireframe';
 export type ExportQualityChoice = 'default' | 'live' | 'high';
 
@@ -196,4 +199,33 @@ export async function exportOrbitGifFromStore(
     : options;
   const blob = await orbitGifExporter(exporterOptions);
   triggerDownload(blob, `${stem}.orbit.gif`);
+}
+
+export function exportSketchFromStore(
+  format: SketchExportFormat,
+  preferredStem?: string,
+): void {
+  const { result, activeFile } = useForgeStore.getState();
+  const current = requireSuccessfulRunResult(result);
+  const sketchObjects = current.objects.filter((obj) => obj.sketch);
+  if (sketchObjects.length === 0) {
+    throw new Error('No 2D sketch objects available for export.');
+  }
+
+  const stem = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
+
+  for (const obj of sketchObjects) {
+    const sketch = obj.sketch!;
+    const name = sketchObjects.length === 1 ? stem : `${stem}-${obj.name}`;
+
+    if (format === 'svg') {
+      const svg = sketchToSvg(sketch);
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      triggerDownload(blob, `${name}.svg`);
+    } else {
+      const dxf = sketchToDxf(sketch);
+      const blob = new Blob([dxf], { type: 'application/dxf' });
+      triggerDownload(blob, `${name}.dxf`);
+    }
+  }
 }
