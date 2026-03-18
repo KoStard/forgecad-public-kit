@@ -1240,6 +1240,7 @@ function testFullSpectrogram() {
   // Key assertions for the spectrogram
   const meta = result.constraintMeta;
   console.log(`      status=${meta.status} maxErr=${meta.maxError.toFixed(4)} dof=${meta.dof} rejected=${meta.rejected.length}`);
+  if (_verbose) printConstraintSummary(meta);
 
   // Show per-constraint residuals for diagnosis
   if (_verbose) {
@@ -1280,19 +1281,42 @@ function testFullSpectrogram() {
 
 // ─── Diagnostic inspect ──────────────────────────────────────────────────────
 
-function printDiagnostic(sketch: ConstraintSketch) {
-  console.log(sketch.inspect());
-  console.log('constraints:');
-  for (const c of sketch.constraintMeta.constraints) {
-    const status = c.isConflicting ? '✗ CONFLICT' : c.isRedundant ? '~ REDUNDANT' : '✓';
-    console.log(`  ${status} ${c.type} ${c.label} (${c.id})`);
+function printConstraintSummary(meta: import('../src/forge/sketch/constraints/types').SketchConstraintMeta) {
+  // Status line
+  const statusLabel = meta.status === 'over-redundant'
+    ? 'OVER-REDUNDANT' : meta.status.toUpperCase();
+  const statusColor = meta.status === 'fully' ? '\x1b[32m'       // green
+    : meta.status === 'over' ? '\x1b[31m'                         // red
+    : meta.status === 'over-redundant' ? '\x1b[33m'               // yellow
+    : '\x1b[34m';                                                  // blue
+  console.log(`  ${statusColor}${statusLabel}\x1b[0m  DOF=${meta.dof}  maxErr=${meta.maxError.toFixed(6)}`);
+
+  // Constraint table
+  console.log(`  constraints (${meta.constraints.length}):`);
+  for (const c of meta.constraints) {
+    const icon = c.isConflicting ? '\x1b[31m✗\x1b[0m'
+      : c.isRedundant ? '\x1b[33m~\x1b[0m'
+      : '\x1b[32m✓\x1b[0m';
+    const valueStr = c.value !== undefined ? `=${c.value}` : '';
+    const entities = c.entityIds.join(', ');
+    const errStr = c.residual > 1e-6 ? `  err=${c.residual.toFixed(4)}` : '';
+    const tag = c.isConflicting ? ' \x1b[31mCONFLICT\x1b[0m'
+      : c.isRedundant ? ' \x1b[33mREDUNDANT\x1b[0m'
+      : '';
+    console.log(`    ${icon} ${c.label}${valueStr}  (${entities})${errStr}${tag}`);
   }
-  if (sketch.constraintMeta.rejected.length > 0) {
-    console.log(`rejected (${sketch.constraintMeta.rejected.length}):`);
-    for (const r of sketch.constraintMeta.rejected) {
-      console.log(`  ✗ ${r.type} ${r.label} (${r.id}) ${r.rejectionReason ?? ''}`);
+
+  if (meta.rejected.length > 0) {
+    console.log(`  rejected (${meta.rejected.length}):`);
+    for (const r of meta.rejected) {
+      console.log(`    \x1b[31m✗\x1b[0m ${r.label} (${r.entityIds.join(', ')}) ${r.rejectionReason ?? ''}`);
     }
   }
+}
+
+function printDiagnostic(sketch: ConstraintSketch) {
+  console.log(sketch.inspect());
+  printConstraintSummary(sketch.constraintMeta);
 }
 
 // ─── Runner ──────────────────────────────────────────────────────────────────

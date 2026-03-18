@@ -194,11 +194,36 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       if (obj.sketch) {
         console.log(`  ${obj.name}${grpTag}: area=${obj.sketch.area().toFixed(1)}mm²`);
       }
-      const rejected = obj.sketchMeta?.rejected;
-      if (rejected && rejected.length > 0) {
-        console.log(`  ${obj.name}${grpTag}: ✗ ${rejected.length} rejected constraint(s):`);
-        for (const c of rejected) {
-          console.log(`    ${c.label} — ${c.rejectionReason}`);
+      const meta = obj.sketchMeta;
+      if (meta) {
+        const statusLabel = meta.status === 'over-redundant' ? 'OVER-REDUNDANT'
+          : meta.status.toUpperCase();
+        const statusColor = meta.status === 'fully' ? '\x1b[32m'
+          : meta.status === 'over' ? '\x1b[31m'
+          : meta.status === 'over-redundant' ? '\x1b[33m'
+          : '\x1b[34m';
+        console.log(`  ${obj.name}${grpTag}: ${statusColor}${statusLabel}\x1b[0m DOF=${meta.dof} err=${meta.maxError.toFixed(6)} constraints=${meta.constraints.length}`);
+
+        // Show problematic constraints
+        const problems = meta.constraints.filter((c: any) => c.isConflicting || c.isRedundant || c.residual > 1e-4);
+        if (problems.length > 0) {
+          for (const c of problems) {
+            const icon = c.isConflicting ? '\x1b[31m✗\x1b[0m'
+              : c.isRedundant ? '\x1b[33m~\x1b[0m'
+              : '\x1b[31m!\x1b[0m';
+            const valueStr = c.value !== undefined ? `=${c.value}` : '';
+            const tag = c.isConflicting ? ' CONFLICT'
+              : c.isRedundant ? ' REDUNDANT'
+              : ` err=${c.residual.toFixed(4)}`;
+            console.log(`    ${icon} ${c.label}${valueStr} (${c.entityIds.join(', ')})${tag}`);
+          }
+        }
+
+        if (meta.rejected.length > 0) {
+          console.log(`  ${obj.name}${grpTag}: ✗ ${meta.rejected.length} rejected constraint(s):`);
+          for (const c of meta.rejected) {
+            console.log(`    ${c.label} — ${c.rejectionReason}`);
+          }
         }
       }
     }
