@@ -2067,15 +2067,33 @@ function SketchObject({
     }
   }, [obj.sketch]);
 
-  const constraintColor = obj.sketchMeta?.status === 'over'
+  // Global status color — used for fill and polygon outlines (sketch geometry without entity IDs).
+  const constraintStatusColor = obj.sketchMeta?.status === 'over'
     ? '#ff4d4f'
-    : obj.sketchMeta?.status === 'over-redundant'
-      ? '#faad14'
-      : obj.sketchMeta?.status === 'fully'
-        ? '#35c759'
-        : obj.sketchMeta?.status === 'under'
-          ? '#4aa3ff'
-          : settings.color;
+    : obj.sketchMeta?.status === 'fully'
+      ? '#35c759'
+      : obj.sketchMeta?.status === 'under'
+        ? '#4aa3ff'
+        : settings.color;
+
+  // Per-entity color map: entity ID → worst constraint status color.
+  // Only problematic edges get colored; normal edges stay neutral.
+  const entityColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!obj.sketchMeta) return map;
+    for (const c of obj.sketchMeta.constraints) {
+      const color = c.isConflicting ? '#ff4d4f' : c.isRedundant ? '#faad14' : null;
+      if (!color) continue;
+      for (const eid of c.entityIds) {
+        const existing = map.get(eid);
+        // conflicting (red) takes priority over redundant (orange)
+        if (!existing || (color === '#ff4d4f' && existing !== '#ff4d4f')) {
+          map.set(eid, color);
+        }
+      }
+    }
+    return map;
+  }, [obj.sketchMeta]);
 
   const constraintLabels = useMemo(() => {
     if (!obj.sketchMeta) return [] as { id: string; text: string; position: [number, number, number]; isConflicting: boolean; isRedundant: boolean; entityIds: string[]; }[];
@@ -2106,16 +2124,17 @@ function SketchObject({
   const edgeLines = useMemo(() => {
     const meta = obj.sketchMeta?.edges;
     if (!meta) return {
-      lines: [] as THREE.BufferGeometry[],
-      circles: [] as THREE.BufferGeometry[],
+      lines: [] as { id: string; geo: THREE.BufferGeometry }[],
+      circles: [] as { id: string; geo: THREE.BufferGeometry }[],
       points: [] as { id: string; pos: [number, number] }[],
     };
-    const lines = meta.lines.map((line) =>
-      new THREE.BufferGeometry().setFromPoints([
+    const lines = meta.lines.map((line) => ({
+      id: line.id,
+      geo: new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(line.a[0], line.a[1], 0.01),
         new THREE.Vector3(line.b[0], line.b[1], 0.01),
       ]),
-    );
+    }));
     const segments = 64;
     const circles = meta.circles.map((circle) => {
       const pts: THREE.Vector3[] = [];
@@ -2127,7 +2146,7 @@ function SketchObject({
           0.01,
         ));
       }
-      return new THREE.BufferGeometry().setFromPoints(pts);
+      return { id: circle.id, geo: new THREE.BufferGeometry().setFromPoints(pts) };
     });
     return { lines, circles, points: meta.points };
   }, [obj.sketchMeta]);
@@ -2178,8 +2197,8 @@ function SketchObject({
       if (x < minX) minX = x; if (x > maxX) maxX = x;
       if (y < minY) minY = y; if (y > maxY) maxY = y;
     };
-    for (const geo of edgeLines.lines) {
-      const pos = geo.attributes.position;
+    for (const edge of edgeLines.lines) {
+      const pos = edge.geo.attributes.position;
       if (pos) {
         for (let i = 0; i < pos.count; i++) expand(pos.getX(i), pos.getY(i));
       }
@@ -2238,7 +2257,7 @@ function SketchObject({
             if (entity) onEntityClick?.(entity, e.clientX, e.clientY);
           } : undefined}
         >
-          <meshBasicMaterial color={constraintColor} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
+          <meshBasicMaterial color={constraintStatusColor} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
         </mesh>
       )}
       {/* Transparent hit plane for detecting hovers near edges when no fill is present */}
@@ -2260,28 +2279,28 @@ function SketchObject({
       {lineGeos.map((geo, i) => (
         <primitive
           key={i}
-          object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: constraintColor, linewidth: 1, transparent: true, opacity: settings.opacity }))}
+          object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: constraintStatusColor, linewidth: 1, transparent: true, opacity: settings.opacity }))}
           raycast={() => null}
         />
       ))}
       {pointGeos.map((geo, i) => (
         <primitive
           key={`pt-${i}`}
-          object={new THREE.Points(geo, new THREE.PointsMaterial({ color: constraintColor, size: 5 }))}
+          object={new THREE.Points(geo, new THREE.PointsMaterial({ color: constraintStatusColor, size: 5 }))}
           raycast={() => null}
         />
       ))}
-      {edgeLines.lines.map((geo, i) => (
+      {edgeLines.lines.map((edge) => (
         <primitive
-          key={`el-${i}`}
-          object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: constraintColor, linewidth: 2, transparent: true, opacity: settings.opacity }))}
+          key={`el-${edge.id}`}
+          object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({ color: entityColorMap.get(edge.id) ?? '#e8e8e8', linewidth: 2, transparent: true, opacity: settings.opacity }))}
           raycast={() => null}
         />
       ))}
-      {edgeLines.circles.map((geo, i) => (
+      {edgeLines.circles.map((edge) => (
         <primitive
-          key={`ec-${i}`}
-          object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: constraintColor, linewidth: 2, transparent: true, opacity: settings.opacity }))}
+          key={`ec-${edge.id}`}
+          object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({ color: entityColorMap.get(edge.id) ?? '#e8e8e8', linewidth: 2, transparent: true, opacity: settings.opacity }))}
           raycast={() => null}
         />
       ))}
@@ -2297,7 +2316,7 @@ function SketchObject({
             width: 5,
             height: 5,
             borderRadius: '50%',
-            background: '#ffffff',
+            background: entityColorMap.get(pt.id) ?? '#ffffff',
             boxShadow: '0 0 2px #000',
           }} />
         </Html>
