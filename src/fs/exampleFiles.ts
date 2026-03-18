@@ -1,22 +1,18 @@
 /**
- * Default starter files shown in web/playground mode when there are no
- * persisted files in localStorage.
+ * All files from examples/ baked into the bundle at build time via Vite glob.
+ * Used as the default project in web/playground mode.
+ *
+ * Vite resolves the glob at build time — new example files are picked up
+ * automatically without any manual changes here.
  */
-export const EXAMPLE_FILES: Record<string, string> = {
-  'welcome.forge.js': `\
-// Welcome to ForgeCAD — parametric CAD that runs in your browser.
-// Edit any parameter or modify the code. The model updates live!
+const rawExamples = import.meta.glob('/examples/**/*.{forge.js,sketch.js,js,svg,forge-notebook.json}', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+});
 
-const width  = param("Width",   80, { min: 20, max: 200, unit: "mm" });
-const depth  = param("Depth",   50, { min: 20, max: 120, unit: "mm" });
-const height = param("Height",  30, { min:  8, max:  80, unit: "mm" });
-const wall   = param("Wall",     4, { min:  2, max:  15, unit: "mm" });
-
-// Hollow enclosure via boolean subtraction
-const body   = box(width, depth, height).color('#4a8fd4');
-const cavity = box(width - wall * 2, depth - wall * 2, height, true)
-  .translate(0, 0, wall);
-
-return body.subtract(cavity);
-`,
-};
+export const EXAMPLE_FILES: Record<string, string> = Object.fromEntries(
+  Object.entries(rawExamples)
+    // Strip leading '/' → 'examples/foo.forge.js'
+    .map(([vitePath, content]) => [vitePath.slice(1), content as string]),
+);
