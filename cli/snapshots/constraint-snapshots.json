@@ -73,7 +73,7 @@
         "y": 5
       }
     ],
-    "status": "over",
+    "status": "over-redundant",
     "maxError": 0,
     "dof": -1,
     "rejectedCount": 0

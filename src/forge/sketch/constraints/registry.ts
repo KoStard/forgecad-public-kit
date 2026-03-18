@@ -884,11 +884,31 @@ export const buildConstraintDisplays = (
     shapes: new Map((def.shapes ?? []).map((s) => [s.id, s] as const)),
   };
 
+  // Build a solver context for residual evaluation (extends DisplayContext with tolerance and movePoint).
+  const solverCtx = { ...ctx, tolerance: DEFAULT_TOLERANCE, movePoint: () => false as boolean };
+
   const displays = def.constraints.map((constraint) => {
     const constraintDef = registry.get(constraint.type);
     const position: [number, number] = constraintDef
       ? constraintDef.displayPosition(constraint as never, ctx)
       : [0, 0];
+
+    // Extract entity IDs from constraint fields.
+    const entityIds: string[] = [];
+    for (const [key, val] of Object.entries(constraint)) {
+      if (key === 'id' || key === 'type') continue;
+      if (typeof val === 'string') entityIds.push(val);
+      else if (Array.isArray(val)) {
+        for (const v of val) { if (typeof v === 'string') entityIds.push(v); }
+      }
+    }
+
+    // Compute per-constraint residual.
+    let residual = 0;
+    if (constraintDef?.residual) {
+      const res = constraintDef.residual(constraint as never, solverCtx);
+      residual = Math.max(...res.map(Math.abs));
+    }
 
     return {
       id: constraint.id,
@@ -900,6 +920,8 @@ export const buildConstraintDisplays = (
       isConflicting: conflictingIds.has(constraint.id),
       isRedundant: redundantIds.has(constraint.id),
       rejectionReason: rejectionReasons?.get(constraint.id),
+      entityIds,
+      residual,
     };
   });
 
@@ -941,7 +963,7 @@ export const computeStatus = (
   def: ConstraintDefinition,
   maxError: number,
   tolerance: number,
-): { status: 'under' | 'fully' | 'over'; dof: number } => {
+): { status: 'under' | 'fully' | 'over' | 'over-redundant'; dof: number } => {
   // Free variables: each non-fixed point contributes 2 (x, y);
   // each non-fixedRadius circle contributes 1 (radius);
   // each arc contributes 1 (radius) but its implicit constraints remove 2,
@@ -960,10 +982,10 @@ export const computeStatus = (
 
   const dof = freeVars - constraintEqs;
 
-  // Conflict/over-constraint: solver failed to satisfy the constraints.
-
+  // Conflict: solver failed to satisfy the constraints.
   if (maxError > tolerance * 5) return { status: 'over', dof };
   if (dof > 0) return { status: 'under', dof };
-  if (dof < 0) return { status: 'over', dof };
+  // DOF < 0 but converged: constraints are redundant, not conflicting.
+  if (dof < 0) return { status: 'over-redundant', dof };
   return { status: 'fully', dof: 0 };
 };

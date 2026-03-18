@@ -121,7 +121,7 @@
     <text x="19.206" y="-20.758" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">PERP</text>
   </g>
   <g data-layer="status">
-    <rect x="-12.9" y="-46.2" width="28.6" height="3" rx="0.5" fill="#ff6b6b" opacity="0.85"/>
-    <text x="-12.1" y="-44.1" fill="#000000" font-size="1.8" font-family="sans-serif" font-weight="bold">OVER DOF=-4 err=0.0000</text>
+    <rect x="-12.9" y="-46.2" width="41.6" height="3" rx="0.5" fill="#faad14" opacity="0.85"/>
+    <text x="-12.1" y="-44.1" fill="#000000" font-size="1.8" font-family="sans-serif" font-weight="bold">OVER-REDUNDANT DOF=-4 err=0.0000</text>
   </g>
 </svg>

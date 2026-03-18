@@ -73,10 +73,14 @@ export interface ConstraintDisplay {
   isRedundant: boolean;
   /** For rejected constraints: why the builder rejected it (maxError, constraint params, blame). */
   rejectionReason?: string;
+  /** Entity IDs referenced by this constraint (points, lines, circles, etc.). */
+  entityIds: string[];
+  /** Per-equation residual error for this constraint (how far off it is). */
+  residual: number;
 }
 
 export interface SketchConstraintMeta {
-  status: 'under' | 'fully' | 'over';
+  status: 'under' | 'fully' | 'over' | 'over-redundant';
   /** Net degrees of freedom: positive = under-constrained, 0 = fully, negative = over-constrained. */
   dof: number;
   maxError: number;

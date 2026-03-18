@@ -571,9 +571,11 @@ interface ConstraintDisplay {
 	isDimension: boolean;
 	isConflicting: boolean;
 	isRedundant: boolean;
+	entityIds: string[];
+	residual: number;
 }
 interface SketchConstraintMeta {
-	status: "under" | "fully" | "over";
+	status: "under" | "fully" | "over" | "over-redundant";
 	dof: number;
 	maxError: number;
 	constraints: ConstraintDisplay[];

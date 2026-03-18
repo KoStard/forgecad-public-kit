@@ -226,11 +226,12 @@ function constraintColor(c: ConstraintDisplay): string {
   return '#4ade80';
 }
 
-function statusColor(status: 'under' | 'fully' | 'over'): string {
+function statusColor(status: SketchConstraintMeta['status']): string {
   switch (status) {
     case 'fully': return '#4ade80';
     case 'under': return '#60a5fa';
     case 'over': return '#ff6b6b';
+    case 'over-redundant': return '#faad14';
   }
 }
 

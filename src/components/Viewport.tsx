@@ -2067,11 +2067,13 @@ function SketchObject({
 
   const constraintColor = obj.sketchMeta?.status === 'over'
     ? '#ff4d4f'
-    : obj.sketchMeta?.status === 'fully'
-      ? '#35c759'
-      : obj.sketchMeta?.status === 'under'
-        ? '#4aa3ff'
-        : settings.color;
+    : obj.sketchMeta?.status === 'over-redundant'
+      ? '#faad14'
+      : obj.sketchMeta?.status === 'fully'
+        ? '#35c759'
+        : obj.sketchMeta?.status === 'under'
+          ? '#4aa3ff'
+          : settings.color;
 
   const constraintLabels = useMemo(() => {
     if (!obj.sketchMeta) return [] as { id: string; text: string; position: [number, number, number]; isConflicting: boolean; isRedundant: boolean; }[];

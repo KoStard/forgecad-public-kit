@@ -548,8 +548,8 @@ function testRedundantConstraintDetected() {
   assertConverged(result, 'redundant');
   // With a fixed point, these two constraints fully determine b (DOF=0).
   // The system should converge regardless — the redundancy is benign.
-  const hasRedundant = result.constraintMeta.constraints.some((c) => c.redundant);
-  const isOverConstrained = result.constraintMeta.status === 'over-constrained';
+  const hasRedundant = result.constraintMeta.constraints.some((c) => c.isRedundant);
+  const isOverConstrained = result.constraintMeta.status === 'over';
   assert(
     hasRedundant || isOverConstrained || result.constraintMeta.dof <= 0,
     `Expected redundancy detection or over-constrained, got status=${result.constraintMeta.status} dof=${result.constraintMeta.dof} redundant=${hasRedundant}`,
@@ -1284,7 +1284,7 @@ function printDiagnostic(sketch: ConstraintSketch) {
   console.log(sketch.inspect());
   console.log('constraints:');
   for (const c of sketch.constraintMeta.constraints) {
-    const status = c.conflicting ? '✗ CONFLICT' : c.redundant ? '~ REDUNDANT' : '✓';
+    const status = c.isConflicting ? '✗ CONFLICT' : c.isRedundant ? '~ REDUNDANT' : '✓';
     console.log(`  ${status} ${c.type} ${c.label} (${c.id})`);
   }
   if (sketch.constraintMeta.rejected.length > 0) {

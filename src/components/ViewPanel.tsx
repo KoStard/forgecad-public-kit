@@ -342,11 +342,13 @@ export function ViewPanel() {
   const constraintMeta = selectedObject?.sketchMeta ?? null;
   const constraintStatusColor = constraintMeta?.status === 'over'
     ? '#ff4d4f'
-    : constraintMeta?.status === 'fully'
-      ? '#35c759'
-      : constraintMeta?.status === 'under'
-        ? '#4aa3ff'
-        : 'var(--fc-textDim)';
+    : constraintMeta?.status === 'over-redundant'
+      ? '#faad14'
+      : constraintMeta?.status === 'fully'
+        ? '#35c759'
+        : constraintMeta?.status === 'under'
+          ? '#4aa3ff'
+          : 'var(--fc-textDim)';
 
   useEffect(() => {
     if (!objectPickSyncEnabled || !selectedObjectId) return;
