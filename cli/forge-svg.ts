@@ -12,7 +12,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { resolve, basename } from 'path';
 import { init, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
-import { buildSketchSvgDocument } from './sketch-svg';
+import { buildSketchSvgDocument, buildConstraintSvgDocument } from './sketch-svg';
 
 function usage(): never {
   console.error('Usage: forgecad export svg <script.sketch.js> [output.svg]');
@@ -49,6 +49,18 @@ export async function runSvgCli(argv: string[] = process.argv.slice(2)): Promise
   }
 
   const sketch = sketchObj.sketch;
+
+  // Use constraint SVG rendering for constraint sketches (wireframe + surfaces + labels)
+  const meta = sketchObj.sketchMeta;
+  if (meta) {
+    const svg = buildConstraintSvgDocument(meta);
+    await writeFile(resolve(outputPath), svg);
+    const surfaceInfo = meta.surfaces?.length ? `  surfaces=${meta.surfaces.length}` : '';
+    console.log(
+      `✓ ${basename(outputPath)}  ${meta.status.toUpperCase()} DOF=${meta.dof}${surfaceInfo}  constraints=${meta.constraints.length}`,
+    );
+    return;
+  }
 
   const svgDocument = buildSketchSvgDocument([{ name: sketchObj.name, sketch }]);
 

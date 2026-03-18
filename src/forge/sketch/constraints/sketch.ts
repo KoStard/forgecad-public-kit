@@ -17,6 +17,8 @@ import {
   setConstraintValue,
 } from './registry';
 import { decomposeAndSolve } from './decompose';
+import { computeFacesFromSegments, pointInPolygon } from '../arrangement-core';
+import type { SurfaceDisplay } from './types';
 
 // ─── Arc tessellation ──────────────────────────────────────────────────────────
 
@@ -212,6 +214,99 @@ export const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMe
   return { lines, circles, arcs, points };
 };
 
+// ─── Surface detection ──────────────────────────────────────────────────────
+
+const buildSurfaceDisplays = (def: ConstraintDefinition): SurfaceDisplay[] => {
+  const pointMap = new Map(def.points.map((p) => [p.id, p] as const));
+  const segs: { a: [number, number]; b: [number, number] }[] = [];
+  for (const l of def.lines) {
+    if (l.construction) continue;
+    const a = pointMap.get(l.a);
+    const b = pointMap.get(l.b);
+    if (a && b) segs.push({ a: [a.x, a.y], b: [b.x, b.y] });
+  }
+  const faces = computeFacesFromSegments(segs);
+
+  // First pass: compute geometry for each face
+  const rawSurfaces = faces
+    .map((pts) => {
+      let area = 0;
+      let cx = 0;
+      let cy = 0;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (let j = 0; j < pts.length; j++) {
+        const [x1, y1] = pts[j];
+        const [x2, y2] = pts[(j + 1) % pts.length];
+        const cross = x1 * y2 - x2 * y1;
+        area += cross;
+        cx += (x1 + x2) * cross;
+        cy += (y1 + y2) * cross;
+        if (x1 < minX) minX = x1;
+        if (y1 < minY) minY = y1;
+        if (x1 > maxX) maxX = x1;
+        if (y1 > maxY) maxY = y1;
+      }
+      area *= 0.5;
+      if (Math.abs(area) < 1e-9) return null;
+      cx /= (6 * area);
+      cy /= (6 * area);
+      return {
+        area: Math.abs(area),
+        centroid: [cx, cy] as [number, number],
+        bounds: { min: [minX, minY] as [number, number], max: [maxX, maxY] as [number, number] },
+        polygon: pts as [number, number][],
+      };
+    })
+    .filter((s): s is NonNullable<typeof s> => s !== null)
+    .filter((s) => s.area >= 0.1);  // Skip degenerate near-zero-area faces
+
+  // Sort by area descending
+  rawSurfaces.sort((a, b) => b.area - a.area);
+
+  // Second pass: compute unique seed points.
+  // A seed must be inside its own polygon but NOT inside any smaller polygon.
+  // This handles frame/ring regions where the centroid falls inside a nested region.
+  return rawSurfaces.map((s, i) => {
+    const otherPolygons = rawSurfaces.filter((_, j) => j !== i).map((o) => o.polygon);
+    const isUniqueInside = (p: [number, number]) =>
+      pointInPolygon(p, s.polygon) && !otherPolygons.some((op) => pointInPolygon(p, op));
+
+    // Try centroid first
+    let seed: [number, number] = s.centroid;
+    if (!isUniqueInside(seed)) {
+      // Try edge midpoints nudged slightly inward (right-hand perpendicular for CCW polygon)
+      for (let j = 0; j < s.polygon.length; j++) {
+        const [x1, y1] = s.polygon[j];
+        const [x2, y2] = s.polygon[(j + 1) % s.polygon.length];
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        // Left-hand perpendicular (inward for CCW winding)
+        const edx = x2 - x1;
+        const edy = y2 - y1;
+        const eLen = Math.sqrt(edx * edx + edy * edy) || 1;
+        // Inward normal for CCW: rotate edge direction 90° CCW → (-dy, dx) normalized
+        const nudge = Math.min(1.0, eLen * 0.01);
+        const candidate: [number, number] = [mx - (edy / eLen) * nudge, my + (edx / eLen) * nudge];
+        if (isUniqueInside(candidate)) {
+          seed = candidate;
+          break;
+        }
+      }
+    }
+    return {
+      index: i,
+      area: s.area,
+      centroid: s.centroid,
+      bounds: s.bounds,
+      seed,
+      polygon: s.polygon,
+    };
+    })
+    .filter((s): s is SurfaceDisplay => s !== null)
+    .sort((a, b) => b.area - a.area)
+    .map((s, i) => ({ ...s, index: i }));  // re-index after sort
+};
+
 // ─── ConstraintSketch ─────────────────────────────────────────────────────────
 
 export class ConstraintSketch extends Sketch {
@@ -366,9 +461,10 @@ export const solveConstraintDefinition = (
   const sketch = buildSketchFromDefinition(working);
   const construction = buildConstructionGeometry(working);
   const edges = buildEdgeGeometry(working);
+  const surfaces = buildSurfaceDisplays(working);
   return new ConstraintSketch(
     sketch.cross,
-    { status, dof, maxError, constraints, rejected, construction, edges },
+    { status, dof, maxError, constraints, rejected, surfaces, construction, edges },
     working,
   );
 };

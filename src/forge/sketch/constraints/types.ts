@@ -79,6 +79,22 @@ export interface ConstraintDisplay {
   residual: number;
 }
 
+/** Metadata for a detected surface region (from arrangement detection). */
+export interface SurfaceDisplay {
+  /** Zero-based index, largest-first by area. */
+  index: number;
+  /** Region area in mm². */
+  area: number;
+  /** Centroid of the region polygon. */
+  centroid: [number, number];
+  /** Axis-aligned bounding box. */
+  bounds: { min: [number, number]; max: [number, number] };
+  /** A point guaranteed to be inside the region — usable as seed for detectArrangementRegion(). */
+  seed: [number, number];
+  /** Polygon vertices (CCW winding) for rendering the region fill. */
+  polygon: [number, number][];
+}
+
 export interface SketchConstraintMeta {
   status: 'under' | 'fully' | 'over' | 'over-redundant';
   /** Net degrees of freedom: positive = under-constrained, 0 = fully, negative = over-constrained. */
@@ -86,6 +102,8 @@ export interface SketchConstraintMeta {
   maxError: number;
   constraints: ConstraintDisplay[];
   rejected: ConstraintDisplay[];
+  /** Detected surfaces from line arrangement (DCEL face detection). Empty if no closed regions. */
+  surfaces: SurfaceDisplay[];
   construction: {
     lines: { id: string; a: [number, number]; b: [number, number] }[];
     circles: { id: string; center: [number, number]; radius: number }[];

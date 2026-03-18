@@ -574,12 +574,21 @@ interface ConstraintDisplay {
 	entityIds: string[];
 	residual: number;
 }
+interface SurfaceDisplay {
+	index: number;
+	area: number;
+	centroid: [number, number];
+	bounds: { min: [number, number]; max: [number, number] };
+	seed: [number, number];
+	polygon: [number, number][];
+}
 interface SketchConstraintMeta {
 	status: "under" | "fully" | "over" | "over-redundant";
 	dof: number;
 	maxError: number;
 	constraints: ConstraintDisplay[];
 	rejected: ConstraintDisplay[];
+	surfaces: SurfaceDisplay[];
 	construction: {
 		lines: {
 			id: string;

@@ -261,6 +261,29 @@ export function buildConstraintSvgDocument(meta: SketchConstraintMeta, options?:
   // Background
   parts.push(`  <rect x="${minX.toFixed(1)}" y="${(-maxY).toFixed(1)}" width="${width.toFixed(1)}" height="${height.toFixed(1)}" fill="#1a1a2e"/>`);
 
+  // ─── Surface region fills ───
+  if (meta.surfaces && meta.surfaces.length > 0) {
+    const palette = ['#4488cc', '#44cc88', '#cc8844', '#cc44aa', '#88cc44', '#44aacc', '#aa44cc', '#cccc44'];
+    parts.push('  <g data-layer="surfaces" opacity="0.25">');
+    for (const s of meta.surfaces) {
+      const color = palette[s.index % palette.length];
+      const d = s.polygon
+        .map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(3)},${(-p[1]).toFixed(3)}`)
+        .join(' ') + 'Z';
+      parts.push(`    <path d="${d}" fill="${color}" stroke="none"/>`);
+    }
+    parts.push('  </g>');
+    // Surface index labels at centroids
+    parts.push('  <g data-layer="surface-labels">');
+    for (const s of meta.surfaces) {
+      const color = palette[s.index % palette.length];
+      const x = s.centroid[0].toFixed(3);
+      const y = (-s.centroid[1]).toFixed(3);
+      parts.push(`    <text x="${x}" y="${y}" fill="${color}" font-size="3" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold" opacity="0.6">[${s.index}]</text>`);
+    }
+    parts.push('  </g>');
+  }
+
   // ─── Edge geometry ───
   parts.push('  <g data-layer="edges">');
   for (const line of meta.edges.lines) {

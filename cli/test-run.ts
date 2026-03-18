@@ -225,6 +225,19 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
             console.log(`    ${c.label} — ${c.rejectionReason}`);
           }
         }
+
+        // Surface detection summary
+        if (meta.surfaces && meta.surfaces.length > 0) {
+          console.log(`  ${obj.name}${grpTag}: \x1b[36m${meta.surfaces.length} surface(s)\x1b[0m detected`);
+          for (const s of meta.surfaces) {
+            const cx = s.centroid[0].toFixed(1);
+            const cy = s.centroid[1].toFixed(1);
+            const sx = s.seed[0].toFixed(1);
+            const sy = s.seed[1].toFixed(1);
+            const area = s.area.toFixed(1);
+            console.log(`    [${s.index}] area=${area}mm²  centroid=(${cx}, ${cy})  seed=[${sx}, ${sy}]`);
+          }
+        }
       }
     }
 

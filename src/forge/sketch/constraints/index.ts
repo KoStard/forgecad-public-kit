@@ -18,6 +18,7 @@ export type {
   SketchLoop,
   ProfileSegment,
   ConstraintDisplay,
+  SurfaceDisplay,
   SketchConstraintMeta,
   ConstraintDefinition,
   SolveOptions,

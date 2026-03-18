@@ -849,6 +849,26 @@ export function ViewPanel() {
               ))}
             </div>
           )}
+          {constraintMeta.surfaces && constraintMeta.surfaces.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 4 }}>
+                Surfaces ({constraintMeta.surfaces.length})
+              </div>
+              {constraintMeta.surfaces.map((s) => {
+                const palette = ['#4488cc', '#44cc88', '#cc8844', '#cc44aa', '#88cc44', '#44aacc', '#aa44cc', '#cccc44'];
+                const color = palette[s.index % palette.length];
+                return (
+                  <div key={s.index} style={{ fontSize: 11, color: 'var(--fc-text)', display: 'flex', gap: 6, alignItems: 'center', padding: '2px 0' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0, opacity: 0.7 }} />
+                    <span>[{s.index}] {s.area.toFixed(1)}mm²</span>
+                    <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>
+                      seed=[{s.seed[0].toFixed(1)}, {s.seed[1].toFixed(1)}]
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

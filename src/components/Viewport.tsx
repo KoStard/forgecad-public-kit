@@ -2121,6 +2121,23 @@ function SketchObject({
     return new Set(constraint.entityIds);
   }, [selectedConstraintId, obj.sketchMeta]);
 
+  // Surface region fill geometries from arrangement detection.
+  const surfaceFills = useMemo(() => {
+    const surfaces = obj.sketchMeta?.surfaces;
+    if (!surfaces || surfaces.length === 0) return [];
+    const palette = [0x4488cc, 0x44cc88, 0xcc8844, 0xcc44aa, 0x88cc44, 0x44aacc, 0xaa44cc, 0xcccc44];
+    return surfaces.map((s) => {
+      const shape = new THREE.Shape();
+      shape.moveTo(s.polygon[0][0], s.polygon[0][1]);
+      for (let i = 1; i < s.polygon.length; i++) {
+        shape.lineTo(s.polygon[i][0], s.polygon[i][1]);
+      }
+      shape.closePath();
+      const geo = new THREE.ShapeGeometry(shape);
+      return { index: s.index, geo, color: palette[s.index % palette.length], area: s.area };
+    });
+  }, [obj.sketchMeta]);
+
   const edgeLines = useMemo(() => {
     const meta = obj.sketchMeta?.edges;
     if (!meta) return {
@@ -2260,6 +2277,12 @@ function SketchObject({
           <meshBasicMaterial color={constraintStatusColor} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
         </mesh>
       )}
+      {/* Surface region fills from arrangement detection */}
+      {surfaceFills.length > 0 && surfaceFills.map((sf) => (
+        <mesh key={`sf-${sf.index}`} geometry={sf.geo} position={[0, 0, -0.01]} raycast={() => null}>
+          <meshBasicMaterial color={sf.color} transparent opacity={0.15} side={THREE.DoubleSide} depthWrite={false} />
+        </mesh>
+      ))}
       {/* Transparent hit plane for detecting hovers near edges when no fill is present */}
       {isSketchMode && obj.sketchMeta && !fillGeo && (
         <mesh
