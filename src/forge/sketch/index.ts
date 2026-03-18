@@ -26,7 +26,7 @@ export {
   addRect,
   addPolygon,
   addRegularPolygon,
-} from './concepts';
+} from './constraints/concepts';
 export type {
   RectOptions,
   RectVertexName,
@@ -36,4 +36,4 @@ export type {
   ConstrainedPolygon,
   RegularPolygonOptions,
   ConstrainedRegularPolygon,
-} from './concepts';
+} from './constraints/concepts';
