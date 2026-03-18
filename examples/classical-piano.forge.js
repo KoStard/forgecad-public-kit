@@ -35,19 +35,44 @@ const blackKeyWidth = whiteKeyWidth * 0.6;
 const blackKeyDepth = whiteKeyDepth * 0.6;
 const blackKeyHeight = keyHeight * 1.4;
 
-// --- Body outline (grand-style curve) ---
-const rectW = bodyWidth * 0.72;
-const rectL = bodyLength;
-const rectX = -bodyWidth / 2 + rectW / 2;
+// --- Body outline (grand-style curve via constrained sketch with arcs) ---
+// Grand piano outline: straight keyboard edge (front/−Y), straight left side,
+// large sweeping curve around the tail, and a curved right side (bent side).
+const halfW = bodyWidth / 2;
+const halfL = bodyLength / 2;
 
-const mainRect = rect(rectW, rectL, true).translate(rectX, 0);
-const tailRadius = bodyWidth * 0.42;
-const frontRadius = bodyWidth * 0.28;
+// Key control points for the outline (CCW winding)
+const cs = constrainedSketch();
 
-const tailCircle = circle2d(tailRadius).translate(bodyWidth * 0.15, bodyLength * 0.2);
-const frontCircle = circle2d(frontRadius).translate(bodyWidth * 0.18, -bodyLength * 0.35);
+// Front-left corner (keyboard left end)
+const pFL = cs.point(-halfW * 0.85, -halfL, true);
+// Front-right corner (keyboard right end, wider because of the bent side)
+const pFR = cs.point(halfW * 0.55, -halfL, true);
 
-const outerSketch = union2d(mainRect, tailCircle, frontCircle);
+// Right side curves outward — bent side inflection points
+const pR1 = cs.point(halfW * 0.75, -halfL * 0.4);
+const pR2 = cs.point(halfW, halfL * 0.1);
+
+// Tail section — wide sweep at the back
+const pTR = cs.point(halfW * 0.7, halfL * 0.7);
+const pTail = cs.point(0, halfL);
+const pTL = cs.point(-halfW * 0.65, halfL * 0.6);
+
+// Left side — relatively straight
+const pL1 = cs.point(-halfW * 0.85, 0);
+
+// Trace the outline: front edge (straight), then arcs around the body
+cs.moveTo(-halfW * 0.85, -halfL);
+cs.lineTo(halfW * 0.55, -halfL);                  // front edge (keyboard)
+cs.arcTo(halfW * 0.75, -halfL * 0.4, halfW * 0.6);  // front-right curve
+cs.arcTo(halfW, halfL * 0.1, halfW * 0.5);           // right bent side
+cs.arcTo(halfW * 0.7, halfL * 0.7, halfW * 0.6);    // right-to-tail curve
+cs.arcTo(0, halfL, halfW * 0.5);                     // tail sweep right
+cs.arcTo(-halfW * 0.65, halfL * 0.6, halfW * 0.5);  // tail sweep left
+cs.arcTo(-halfW * 0.85, 0, halfW * 0.8);             // left curve back
+cs.close();                                            // straight line to start
+
+const outerSketch = cs.solve();
 const innerSketch = outerSketch.offset(-rimThickness);
 
 // --- Rim body (hollowed) ---
