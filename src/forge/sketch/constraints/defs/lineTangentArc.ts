@@ -1,4 +1,4 @@
-import type { ArcId, LineId, ConstraintTypeMap } from '../types';
+import type { ArcId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
 declare module '../types' {
@@ -20,7 +20,7 @@ declare module '../types' {
 
 registerConstraint<'lineTangentArc', ConstraintTypeMap['lineTangentArc']>({
   type: 'lineTangentArc',
-  label: 'TAN',
+  label: '⊤',
   isDimension: false,
   equations: 1,
 
@@ -31,6 +31,14 @@ registerConstraint<'lineTangentArc', ConstraintTypeMap['lineTangentArc']>({
     const pt = points.get(c.atStart ? arc.start : arc.end);
     if (!pt) return [0, 0];
     return [pt.x + 2.5, pt.y + 2.5];
+  },
+
+  displayAnnotations(c, { arcs, points }) {
+    const arc = arcs.get(c.arc);
+    if (!arc) return [];
+    const pt = points.get(c.atStart ? arc.start : arc.end);
+    if (!pt) return [];
+    return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'tangent' as const }];
   },
 
   solve(c, { lines, arcs, points, tolerance }) {

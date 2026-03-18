@@ -1,4 +1,4 @@
-import type { PointId, LineId, ConstraintTypeMap } from '../types';
+import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, reflectPointAcrossLine } from '../helpers';
 
@@ -18,7 +18,7 @@ declare module '../types' {
 
 registerConstraint<'symmetric', ConstraintTypeMap['symmetric']>({
   type: 'symmetric',
-  label: 'SYM',
+  label: '⟷',
   isDimension: false,
   equations: 2,
 
@@ -27,6 +27,14 @@ registerConstraint<'symmetric', ConstraintTypeMap['symmetric']>({
     const b = points.get(c.b);
     if (a && b) return midpoint(a, b);
     return [0, 0];
+  },
+
+  displayAnnotations(c, { points }) {
+    const a = points.get(c.a), b = points.get(c.b);
+    const annotations: AnnotationElement[] = [];
+    if (a) annotations.push({ kind: 'symbol', position: [a.x, a.y], symbol: 'symmetric' });
+    if (b) annotations.push({ kind: 'symbol', position: [b.x, b.y], symbol: 'symmetric' });
+    return annotations;
   },
 
   solve(c, { points, lines, tolerance }) {

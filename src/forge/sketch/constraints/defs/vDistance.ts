@@ -1,4 +1,4 @@
-import type { PointId, ConstraintTypeMap } from '../types';
+import type { PointId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint } from '../helpers';
 
@@ -26,6 +26,12 @@ registerConstraint<'vDistance', ConstraintTypeMap['vDistance']>({
     const b = points.get(c.b);
     if (a && b) return midpoint(a, b);
     return [0, 0];
+  },
+
+  displayAnnotations(c, { points }): AnnotationElement[] {
+    const a = points.get(c.a), b = points.get(c.b);
+    if (!a || !b) return [];
+    return [{ kind: 'dimension', from: [a.x, a.y], to: [a.x, b.y], offset: 3, value: String(c.value) }];
   },
 
   solve(c, { points, tolerance }) {

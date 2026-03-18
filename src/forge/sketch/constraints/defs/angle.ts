@@ -1,4 +1,4 @@
-import type { LineId, ConstraintTypeMap } from '../types';
+import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpointPerp, angleOfLine, normalizeAngle, distance, toRad } from '../helpers';
 
@@ -26,7 +26,7 @@ const pointLineRefs = (
 
 registerConstraint<'angle', ConstraintTypeMap['angle']>({
   type: 'angle',
-  label: 'ANG',
+  label: '∠',
   isDimension: true,
   equations: 1,
 
@@ -37,6 +37,28 @@ registerConstraint<'angle', ConstraintTypeMap['angle']>({
       if (a1 && a2) return midpointPerp(a1, a2, 3);
     }
     return [0, 0];
+  },
+
+  displayAnnotations(c, { lines, points }): AnnotationElement[] {
+    const lineA = lines.get(c.a), lineB = lines.get(c.b);
+    if (!lineA || !lineB) return [];
+    const a1 = points.get(lineA.a), a2 = points.get(lineA.b);
+    const b1 = points.get(lineB.a), b2 = points.get(lineB.b);
+    if (!a1 || !a2 || !b1 || !b2) return [];
+    const shared = [lineA.a, lineA.b].find(p => p === lineB.a || p === lineB.b);
+    let center: [number, number];
+    if (shared) {
+      const pt = points.get(shared)!;
+      center = [pt.x, pt.y];
+    } else {
+      center = [(a1.x + a2.x + b1.x + b2.x) / 4, (a1.y + a2.y + b1.y + b2.y) / 4];
+    }
+    const angleA = Math.atan2(a2.y - a1.y, a2.x - a1.x);
+    const angleB = Math.atan2(b2.y - b1.y, b2.x - b1.x);
+    const lenA = Math.hypot(a2.x - a1.x, a2.y - a1.y);
+    const lenB = Math.hypot(b2.x - b1.x, b2.y - b1.y);
+    const arcRadius = Math.max(1.5, Math.min(4, Math.min(lenA, lenB) * 0.3));
+    return [{ kind: 'angle-arc', center, startAngle: angleA, endAngle: angleB, radius: arcRadius, value: `${c.value}°` }];
   },
 
   presolve(c, { lines, points }) {

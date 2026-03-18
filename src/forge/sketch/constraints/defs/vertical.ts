@@ -1,4 +1,4 @@
-import type { LineId, ConstraintTypeMap } from '../types';
+import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, midpointPerp } from '../helpers';
 
@@ -28,6 +28,14 @@ registerConstraint<'vertical', ConstraintTypeMap['vertical']>({
       if (a && b) return midpointPerp(a, b, 3);
     }
     return [0, 0];
+  },
+
+  displayAnnotations(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return [];
+    const a = points.get(line.a), b = points.get(line.b);
+    if (!a || !b) return [];
+    return [{ kind: 'symbol', position: [(a.x+b.x)/2, (a.y+b.y)/2] as [number, number], symbol: 'vertical' as const }];
   },
 
   solve(c, { lines, points, tolerance }) {

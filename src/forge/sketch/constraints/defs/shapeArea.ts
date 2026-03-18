@@ -18,7 +18,7 @@ declare module '../types' {
 
 registerConstraint<'shapeArea', ConstraintTypeMap['shapeArea']>({
   type: 'shapeArea',
-  label: 'AREA',
+  label: 'A',
   isDimension: true,
   equations: 1,
 

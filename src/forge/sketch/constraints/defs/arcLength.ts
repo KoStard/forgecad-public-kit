@@ -1,4 +1,4 @@
-import type { ArcId, ConstraintTypeMap } from '../types';
+import type { ArcId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { arcSweep } from '../helpers';
 
@@ -21,7 +21,7 @@ declare module '../types' {
 
 registerConstraint<'arcLength', ConstraintTypeMap['arcLength']>({
   type: 'arcLength',
-  label: 'ARCL',
+  label: '⌒',
   isDimension: true,
   equations: 1,
 
@@ -37,6 +37,21 @@ registerConstraint<'arcLength', ConstraintTypeMap['arcLength']>({
       center.x + (arc.radius + 8) * Math.cos(midAngle),
       center.y + (arc.radius + 8) * Math.sin(midAngle),
     ];
+  },
+
+  displayAnnotations(c, { arcs, points }): AnnotationElement[] {
+    const arc = arcs.get(c.arc);
+    if (!arc) return [];
+    const center = points.get(arc.center);
+    const start = points.get(arc.start);
+    if (!center || !start) return [];
+    const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+    const midAngle = startAngle + (arc.clockwise ? -1 : 1) * Math.PI / 4;
+    const pos: [number, number] = [
+      center.x + (arc.radius + 8) * Math.cos(midAngle),
+      center.y + (arc.radius + 8) * Math.sin(midAngle),
+    ];
+    return [{ kind: 'text', position: pos, text: `⌒${c.value}` }];
   },
 
   solve(c, { arcs, points, tolerance }) {

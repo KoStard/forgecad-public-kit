@@ -1,4 +1,4 @@
-import type { CircleId, ConstraintTypeMap } from '../types';
+import type { CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
 declare module '../types' {
@@ -15,7 +15,7 @@ declare module '../types' {
 
 registerConstraint<'diameter', ConstraintTypeMap['diameter']>({
   type: 'diameter',
-  label: 'DIA',
+  label: '⌀',
   isDimension: true,
   equations: 1,
 
@@ -26,6 +26,14 @@ registerConstraint<'diameter', ConstraintTypeMap['diameter']>({
       if (center) return [center.x + circle.radius, center.y];
     }
     return [0, 0];
+  },
+
+  displayAnnotations(c, { circles, points }): AnnotationElement[] {
+    const circle = circles.get(c.circle);
+    if (!circle) return [];
+    const center = points.get(circle.center);
+    if (!center) return [];
+    return [{ kind: 'dimension', from: [center.x - circle.radius, center.y], to: [center.x + circle.radius, center.y], offset: 0, value: `⌀${c.value}` }];
   },
 
   solve(c, { circles, tolerance }) {

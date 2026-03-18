@@ -1,4 +1,4 @@
-import type { LineId, ConstraintTypeMap } from '../types';
+import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, midpointPerp, angleOfLine, normalizeAngle, distance } from '../helpers';
 
@@ -27,7 +27,7 @@ export type LineDistanceConstraint = { id: string; type: 'lineDistance' } & { a:
 
 registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
   type: 'lineDistance',
-  label: 'LDIST',
+  label: '↕',
   isDimension: true,
   equations: 2,
 
@@ -38,6 +38,17 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
       if (a1 && a2) return midpointPerp(a1, a2, 3);
     }
     return [0, 0];
+  },
+
+  displayAnnotations(c, { lines, points }): AnnotationElement[] {
+    const lineA = lines.get(c.a), lineB = lines.get(c.b);
+    if (!lineA || !lineB) return [];
+    const a1 = points.get(lineA.a), a2 = points.get(lineA.b);
+    const b1 = points.get(lineB.a), b2 = points.get(lineB.b);
+    if (!a1 || !a2 || !b1 || !b2) return [];
+    const midA: [number, number] = [(a1.x + a2.x) / 2, (a1.y + a2.y) / 2];
+    const midB: [number, number] = [(b1.x + b2.x) / 2, (b1.y + b2.y) / 2];
+    return [{ kind: 'dimension', from: midA, to: midB, offset: 0, value: String(c.value) }];
   },
 
   solve(c, { lines, points, tolerance }) {

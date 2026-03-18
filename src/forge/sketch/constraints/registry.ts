@@ -910,48 +910,195 @@ export const buildConstraintDisplays = (
       residual = Math.max(...res.map(Math.abs));
     }
 
+    // Build annotations if the constraint defines them, otherwise fall back to text.
+    const value = getConstraintValue(constraint);
+    const label = buildLabel(constraint.type);
+    const isDimension = isDimensionConstraint(constraint.type);
+    let annotations: import('./types').AnnotationElement[] = [];
+    if (constraintDef?.displayAnnotations) {
+      annotations = constraintDef.displayAnnotations(constraint as never, ctx);
+    }
+    if (annotations.length === 0) {
+      // Fallback: legacy text label at the computed position.
+      const text = isDimension && value !== undefined ? `${label}${value}` : label;
+      annotations = [{ kind: 'text', position, text }];
+    }
+
     return {
       id: constraint.id,
       type: constraint.type,
-      label: buildLabel(constraint.type),
+      label,
       position,
-      value: getConstraintValue(constraint),
-      isDimension: isDimensionConstraint(constraint.type),
+      value,
+      isDimension,
       isConflicting: conflictingIds.has(constraint.id),
       isRedundant: redundantIds.has(constraint.id),
       rejectionReason: rejectionReasons?.get(constraint.id),
       entityIds,
       residual,
+      annotations,
     };
   });
 
-  // Iteratively spread labels that are too close together.
-  const MIN_SEP = 5;
+  // ─── Force-directed label placement ───────────────────────────────────────
+  // Replaces naive point-based pairwise repulsion with a geometry-aware,
+  // text-width-aware force-directed layout.
+
+  const FONT_SIZE = 2;
+  const CHAR_WIDTH = FONT_SIZE * 0.6;
+  const TEXT_HEIGHT = FONT_SIZE * 1.2;
+  const LABEL_PAD = 1.0; // extra padding around text bbox
+
+  // Compute text bounding box dimensions for each label.
+  // Dimension constraints render as "symbol + value" (e.g., "⟨22"), others just the symbol.
+  const labelTexts = displays.map(
+    (d) => d.isDimension && d.value !== undefined ? `${d.label}${d.value}` : d.label,
+  );
+  const halfWidths = labelTexts.map((t) => (t.length * CHAR_WIDTH) / 2 + LABEL_PAD);
+  const halfHeight = TEXT_HEIGHT / 2 + LABEL_PAD;
+
+  // Collect edge segments from the definition's lines (for geometry avoidance).
+  const edgeSegs: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  for (const line of def.lines) {
+    if (line.construction) continue;
+    const a = ctx.points.get(line.a);
+    const b = ctx.points.get(line.b);
+    if (a && b) edgeSegs.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+  }
+
+  // Compute entity centroid for each label (tether anchor).
+  const anchors: ([number, number] | null)[] = displays.map((d) => {
+    const pts: [number, number][] = [];
+    for (const eid of d.entityIds) {
+      const pt = ctx.points.get(eid);
+      if (pt) { pts.push([pt.x, pt.y]); continue; }
+      const ln = ctx.lines.get(eid);
+      if (ln) {
+        const a = ctx.points.get(ln.a);
+        const b = ctx.points.get(ln.b);
+        if (a && b) pts.push([(a.x + b.x) / 2, (a.y + b.y) / 2]);
+        continue;
+      }
+      const ci = ctx.circles.get(eid);
+      if (ci) {
+        const c = ctx.points.get(ci.center);
+        if (c) pts.push([c.x, c.y]);
+      }
+    }
+    if (pts.length === 0) return null;
+    return [
+      pts.reduce((s, p) => s + p[0], 0) / pts.length,
+      pts.reduce((s, p) => s + p[1], 0) / pts.length,
+    ] as [number, number];
+  });
+
   const pos = displays.map((d) => [d.position[0], d.position[1]] as [number, number]);
-  for (let iter = 0; iter < 30; iter++) {
-    let moved = false;
-    for (let i = 0; i < pos.length; i++) {
-      for (let j = i + 1; j < pos.length; j++) {
-        const dx = pos[j][0] - pos[i][0];
-        const dy = pos[j][1] - pos[i][1];
-        const d = Math.hypot(dx, dy);
-        if (d < MIN_SEP) {
-          const push = (MIN_SEP - d) / 2 + 0.05;
-          let nx: number; let ny: number;
+  const n = pos.length;
+
+  // Force simulation parameters.
+  const MAX_ITERS = 80;
+  const DAMPING = 0.4;
+  const LABEL_REPULSION = 2.0;   // strength of label-label repulsion
+  const EDGE_REPULSION = 1.0;    // strength of edge repulsion
+  const EDGE_INFLUENCE = 4.0;    // max distance at which edges repel
+  const TETHER_STRENGTH = 0.12;  // spring pull back toward entity (stronger — symbols are small)
+  const MAX_TETHER_DIST = 12;    // tighter leash — compact symbols stay near entities
+
+  for (let iter = 0; iter < MAX_ITERS; iter++) {
+    let maxForce = 0;
+    const forces: [number, number][] = pos.map(() => [0, 0]);
+
+    // 1. Label-label repulsion (bbox-aware).
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const overlapX = (halfWidths[i] + halfWidths[j]) - Math.abs(pos[j][0] - pos[i][0]);
+        const overlapY = (halfHeight + halfHeight) - Math.abs(pos[j][1] - pos[i][1]);
+        if (overlapX > 0 && overlapY > 0) {
+          // Labels overlap — push apart along the axis of least overlap.
+          let dx = pos[j][0] - pos[i][0];
+          let dy = pos[j][1] - pos[i][1];
+          const d = Math.hypot(dx, dy);
           if (d < 0.01) {
-            // Exact overlap — use index-based angle to break symmetry
-            const a = (i * Math.PI * 2) / Math.max(displays.length, 2);
-            nx = Math.cos(a); ny = Math.sin(a);
+            // Exact overlap — use index-based angle to break symmetry.
+            const a = (i * Math.PI * 2) / Math.max(n, 2);
+            dx = Math.cos(a); dy = Math.sin(a);
           } else {
-            nx = dx / d; ny = dy / d;
+            dx /= d; dy /= d;
           }
-          pos[i][0] -= nx * push; pos[i][1] -= ny * push;
-          pos[j][0] += nx * push; pos[j][1] += ny * push;
-          moved = true;
+          const push = Math.min(overlapX, overlapY) * LABEL_REPULSION;
+          forces[i][0] -= dx * push; forces[i][1] -= dy * push;
+          forces[j][0] += dx * push; forces[j][1] += dy * push;
         }
       }
     }
-    if (!moved) break;
+
+    // 2. Edge repulsion — push labels away from nearby edge segments.
+    //    Uses label bounding box extent to determine effective repulsion radius.
+    for (let i = 0; i < n; i++) {
+      const hw = halfWidths[i];
+      const hh = halfHeight;
+      for (const seg of edgeSegs) {
+        // Find closest point on segment to label center.
+        const ex = seg.x2 - seg.x1;
+        const ey = seg.y2 - seg.y1;
+        const len2 = ex * ex + ey * ey;
+        let t = 0;
+        if (len2 > 1e-9) {
+          t = Math.max(0, Math.min(1, ((pos[i][0] - seg.x1) * ex + (pos[i][1] - seg.y1) * ey) / len2));
+        }
+        const cx = seg.x1 + t * ex;
+        const cy = seg.y1 + t * ey;
+        let dx = pos[i][0] - cx;
+        let dy = pos[i][1] - cy;
+        const d = Math.hypot(dx, dy);
+        // Scale influence by label size — larger labels need more clearance.
+        const effectiveInfluence = EDGE_INFLUENCE + Math.max(hw, hh) * 0.5;
+        if (d < effectiveInfluence && d > 0.01) {
+          const strength = EDGE_REPULSION * (1 - d / effectiveInfluence);
+          dx /= d; dy /= d;
+          forces[i][0] += dx * strength;
+          forces[i][1] += dy * strength;
+        }
+      }
+    }
+
+    // 3. Entity tether — spring force pulling label toward its anchor.
+    for (let i = 0; i < n; i++) {
+      const anchor = anchors[i];
+      if (!anchor) continue;
+      const dx = anchor[0] - pos[i][0];
+      const dy = anchor[1] - pos[i][1];
+      const d = Math.hypot(dx, dy);
+      if (d > 0.1) {
+        forces[i][0] += dx * TETHER_STRENGTH;
+        forces[i][1] += dy * TETHER_STRENGTH;
+      }
+    }
+
+    // Apply forces with damping.
+    for (let i = 0; i < n; i++) {
+      const fx = forces[i][0] * DAMPING;
+      const fy = forces[i][1] * DAMPING;
+      pos[i][0] += fx;
+      pos[i][1] += fy;
+      maxForce = Math.max(maxForce, Math.abs(fx), Math.abs(fy));
+    }
+
+    // Clamp max distance from anchor.
+    for (let i = 0; i < n; i++) {
+      const anchor = anchors[i];
+      if (!anchor) continue;
+      const dx = pos[i][0] - anchor[0];
+      const dy = pos[i][1] - anchor[1];
+      const d = Math.hypot(dx, dy);
+      if (d > MAX_TETHER_DIST) {
+        pos[i][0] = anchor[0] + (dx / d) * MAX_TETHER_DIST;
+        pos[i][1] = anchor[1] + (dy / d) * MAX_TETHER_DIST;
+      }
+    }
+
+    // Early exit when forces are negligible.
+    if (maxForce < 0.01) break;
   }
 
   return displays.map((d, i) => ({ ...d, position: pos[i] }));

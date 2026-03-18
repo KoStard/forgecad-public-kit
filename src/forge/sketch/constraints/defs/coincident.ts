@@ -1,4 +1,4 @@
-import type { PointId, ConstraintTypeMap } from '../types';
+import type { PointId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint } from '../helpers';
 
@@ -17,7 +17,7 @@ declare module '../types' {
 
 registerConstraint<'coincident', ConstraintTypeMap['coincident']>({
   type: 'coincident',
-  label: 'COINC',
+  label: '⊙',
   isDimension: false,
   equations: 2,
 
@@ -26,6 +26,12 @@ registerConstraint<'coincident', ConstraintTypeMap['coincident']>({
     const b = points.get(c.b);
     if (a && b) return midpoint(a, b);
     return [0, 0];
+  },
+
+  displayAnnotations(c, { points }) {
+    const a = points.get(c.a), b = points.get(c.b);
+    if (!a || !b) return [];
+    return [{ kind: 'symbol', position: [(a.x+b.x)/2, (a.y+b.y)/2] as [number, number], symbol: 'coincident' as const }];
   },
 
   solve(c, { points, tolerance }) {

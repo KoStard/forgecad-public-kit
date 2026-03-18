@@ -1,4 +1,4 @@
-import type { PointId, LineId, ConstraintTypeMap } from '../types';
+import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
 declare module '../types' {
@@ -17,7 +17,7 @@ declare module '../types' {
 
 registerConstraint<'pointLineDistance', ConstraintTypeMap['pointLineDistance']>({
   type: 'pointLineDistance',
-  label: 'PDIST',
+  label: '↗',
   isDimension: true,
   equations: 1,
 
@@ -25,6 +25,19 @@ registerConstraint<'pointLineDistance', ConstraintTypeMap['pointLineDistance']>(
     const pt = points.get(c.point);
     if (pt) return [pt.x + 2.5, pt.y + 2.5];
     return [0, 0];
+  },
+
+  displayAnnotations(c, { lines, points }): AnnotationElement[] {
+    const pt = points.get(c.point);
+    const line = lines.get(c.line);
+    if (!pt || !line) return [];
+    const a = points.get(line.a), b = points.get(line.b);
+    if (!a || !b) return [];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 1e-9 ? ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2 : 0;
+    const proj: [number, number] = [a.x + t * dx, a.y + t * dy];
+    return [{ kind: 'dimension', from: [pt.x, pt.y], to: proj, offset: 0, value: String(c.value) }];
   },
 
   solve(c, { points, lines, movePoint, tolerance }) {

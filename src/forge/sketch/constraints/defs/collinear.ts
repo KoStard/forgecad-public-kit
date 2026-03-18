@@ -1,4 +1,4 @@
-import type { PointId, LineId, ConstraintTypeMap } from '../types';
+import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { projectPointToLine } from '../helpers';
 
@@ -17,7 +17,7 @@ declare module '../types' {
 
 registerConstraint<'collinear', ConstraintTypeMap['collinear']>({
   type: 'collinear',
-  label: 'COLL',
+  label: '⋯',
   isDimension: false,
   equations: 1,
 
@@ -25,6 +25,12 @@ registerConstraint<'collinear', ConstraintTypeMap['collinear']>({
     const pt = points.get(c.point);
     if (pt) return [pt.x + 2.5, pt.y + 2.5];
     return [0, 0];
+  },
+
+  displayAnnotations(c, { points }) {
+    const pt = points.get(c.point);
+    if (!pt) return [];
+    return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'collinear' as const }];
   },
 
   solve(c, { points, lines, movePoint, tolerance }) {
