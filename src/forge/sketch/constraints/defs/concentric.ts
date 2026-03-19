@@ -40,9 +40,4 @@ registerConstraint<'concentric', ConstraintTypeMap['concentric']>({
     const p2 = points.get(c2.center);
     if (!p1 || !p2) return [];
     return [{ kind: 'symbol', position: [(p1.x+p2.x)/2, (p1.y+p2.y)/2] as [number, number], symbol: 'concentric' as const }];
-  },
-
-  computeDof(_c, _ctx) {
-    // concentric constrains circle centers — not tracked in point refCount
-  },
-});
+  },});

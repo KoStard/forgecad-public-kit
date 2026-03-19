@@ -29,18 +29,4 @@ registerConstraint<'shapeWidth', ConstraintTypeMap['shapeWidth']>({
     if (pts.length === 0) return [0, 0];
     const { cx, cy } = shapeBoundingBox(pts);
     return [cx, cy];
-  },
-
-  computeDof(c, { refCount, lines, shapes }) {
-    const shape = shapes.get(c.shape);
-    if (!shape) return;
-    const seen = new Set<string>();
-    for (const lineId of shape.lines) {
-      const l = lines.find((ln) => ln.id === lineId);
-      if (!l) continue;
-      for (const ptId of [l.a, l.b]) {
-        if (!seen.has(ptId)) { seen.add(ptId); refCount.set(ptId, (refCount.get(ptId) ?? 0) + 1); }
-      }
-    }
-  },
-});
+  },});

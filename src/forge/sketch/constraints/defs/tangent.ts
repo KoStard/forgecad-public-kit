@@ -64,9 +64,4 @@ registerConstraint<'tangent', ConstraintTypeMap['tangent']>({
       }
     }
     return [];
-  },
-
-  computeDof(_c, _ctx) {
-    // tangent constrains 1 DOF but it's complex — not tracked for simplicity
-  },
-});
+  },});

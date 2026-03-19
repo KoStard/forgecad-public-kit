@@ -34,9 +34,4 @@ registerConstraint<'diameter', ConstraintTypeMap['diameter']>({
     const center = points.get(circle.center);
     if (!center) return [];
     return [{ kind: 'dimension', from: [center.x - circle.radius, center.y], to: [center.x + circle.radius, center.y], offset: 0, value: `⌀${c.value}` }];
-  },
-
-  computeDof(_c, _ctx) {
-    // diameter constrains circle radius (not a point DOF)
-  },
-});
+  },});

@@ -38,9 +38,4 @@ registerConstraint<'pointLineDistance', ConstraintTypeMap['pointLineDistance']>(
     const t = len2 > 1e-9 ? ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2 : 0;
     const proj: [number, number] = [a.x + t * dx, a.y + t * dy];
     return [{ kind: 'dimension', from: [pt.x, pt.y], to: proj, offset: 0, value: String(c.value) }];
-  },
-
-  computeDof(c, { refCount }) {
-    refCount.set(c.point, (refCount.get(c.point) ?? 0) + 1);
-  },
-});
+  },});

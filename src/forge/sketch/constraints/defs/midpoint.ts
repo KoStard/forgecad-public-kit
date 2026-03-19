@@ -38,9 +38,4 @@ registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
     const a = points.get(line.a), b = points.get(line.b);
     if (!a || !b) return [];
     return [{ kind: 'symbol', position: midpointPerp(a, b, 3), symbol: 'midpoint' as const }];
-  },
-
-  computeDof(c, { refCount }) {
-    refCount.set(c.point, (refCount.get(c.point) ?? 0) + 2);
-  },
-});
+  },});

@@ -41,9 +41,4 @@ registerConstraint<'equalRadius', ConstraintTypeMap['equalRadius']>({
       annotations.push({ kind: 'symbol', position: [center.x + circle.radius, center.y], symbol: 'equal' });
     }
     return annotations;
-  },
-
-  computeDof(_c, _ctx) {
-    // Constrains circle radii, not point DOF
-  },
-});
+  },});

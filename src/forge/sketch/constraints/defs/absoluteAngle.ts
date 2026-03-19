@@ -50,13 +50,4 @@ registerConstraint<'absoluteAngle', ConstraintTypeMap['absoluteAngle']>({
     const lineLen = Math.hypot(b.x - a.x, b.y - a.y);
     const arcRadius = Math.max(1.5, Math.min(4, lineLen * 0.3));
     return [{ kind: 'angle-arc', center: [a.x, a.y], startAngle: 0, endAngle: angleRad, radius: arcRadius, value: `${angleDeg}°` }];
-  },
-
-  computeDof(c, { refCount, lines }) {
-    const line = lines.find((l) => l.id === c.line);
-    if (!line) return;
-    for (const ptId of [line.a, line.b]) {
-      refCount.set(ptId, (refCount.get(ptId) ?? 0) + 1);
-    }
-  },
-});
+  },});

@@ -49,18 +49,4 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
     const midA: [number, number] = [(a1.x + a2.x) / 2, (a1.y + a2.y) / 2];
     const midB: [number, number] = [(b1.x + b2.x) / 2, (b1.y + b2.y) / 2];
     return [{ kind: 'dimension', from: midA, to: midB, offset: 0, value: String(c.value) }];
-  },
-
-  computeDof(c, { refCount, lines }) {
-    const lineA = lines.find((l) => l.id === c.a);
-    const lineB = lines.find((l) => l.id === c.b);
-    if (lineA) {
-      refCount.set(lineA.a, (refCount.get(lineA.a) ?? 0) + 1);
-      refCount.set(lineA.b, (refCount.get(lineA.b) ?? 0) + 1);
-    }
-    if (lineB) {
-      refCount.set(lineB.a, (refCount.get(lineB.a) ?? 0) + 1);
-      refCount.set(lineB.b, (refCount.get(lineB.b) ?? 0) + 1);
-    }
-  },
-});
+  },});

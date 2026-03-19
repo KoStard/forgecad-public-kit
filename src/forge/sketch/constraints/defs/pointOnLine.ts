@@ -35,9 +35,4 @@ registerConstraint<'pointOnLine', ConstraintTypeMap['pointOnLine']>({
     const pt = points.get(c.point);
     if (!pt) return [];
     return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'collinear' as const }];
-  },
-
-  computeDof(c, { refCount }) {
-    refCount.set(c.point, (refCount.get(c.point) ?? 0) + 1);
-  },
-});
+  },});

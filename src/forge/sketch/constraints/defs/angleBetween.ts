@@ -66,18 +66,4 @@ registerConstraint<'angleBetween', ConstraintTypeMap['angleBetween']>({
     const lenB = Math.hypot(b2.x - b1.x, b2.y - b1.y);
     const arcRadius = Math.max(1.5, Math.min(4, Math.min(lenA, lenB) * 0.3));
     return [{ kind: 'angle-arc', center, startAngle: angleA, endAngle: angleB, radius: arcRadius, value: `${c.value}°` }];
-  },
-
-  computeDof(c, { refCount, lines }) {
-    const lineA = lines.find((l) => l.id === c.a);
-    const lineB = lines.find((l) => l.id === c.b);
-    if (lineA) {
-      refCount.set(lineA.a, (refCount.get(lineA.a) ?? 0) + 1);
-      refCount.set(lineA.b, (refCount.get(lineA.b) ?? 0) + 1);
-    }
-    if (lineB) {
-      refCount.set(lineB.a, (refCount.get(lineB.a) ?? 0) + 1);
-      refCount.set(lineB.b, (refCount.get(lineB.b) ?? 0) + 1);
-    }
-  },
-});
+  },});

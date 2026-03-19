@@ -39,7 +39,4 @@ registerConstraint<'lineTangentArc', ConstraintTypeMap['lineTangentArc']>({
     const pt = points.get(c.atStart ? arc.start : arc.end);
     if (!pt) return [];
     return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'tangent' as const }];
-  },
-
-  computeDof(_c, _ctx) {},
-});
+  },});

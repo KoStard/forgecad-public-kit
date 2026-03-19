@@ -220,12 +220,6 @@ export interface DisplayContext {
   shapes: Map<ShapeId, SketchShape>;
 }
 
-export interface DofContext {
-  refCount: Map<PointId, number>;
-  lines: SketchLine[];
-  shapes: Map<ShapeId, SketchShape>;
-}
-
 // ─── Constraint definition descriptor ─────────────────────────────────────────
 
 export interface ConstraintDef<TType extends string = string, TData extends object = object> {
@@ -245,5 +239,4 @@ export interface ConstraintDef<TType extends string = string, TData extends obje
    * When defined, these replace the single-position text label.
    */
   displayAnnotations?: (constraint: { id: string; type: TType } & TData, ctx: DisplayContext) => AnnotationElement[];
-  computeDof: (constraint: { id: string; type: TType } & TData, ctx: DofContext) => void;
 }

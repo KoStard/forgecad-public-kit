@@ -107,15 +107,16 @@ Primary hypotheses at start:
 | 6 | Add Rust-native SVG snapshot test harness | Fluent Rust test kit now builds sketches, solves them, renders SVG, and compares snapshots | complete |
 | 7 | Delete dead TS decomposition / analytical solver surface | TS no longer exports or runs decomposition / analytical solver APIs; warm-start now talks directly to the Rust boundary | complete |
 | 8 | Strip TS constraint defs down to metadata only | TS defs no longer carry presolve / solve / residual / jacobian logic; CLI diagnostics now use Rust metadata only | complete |
+| 9 | Remove TS DOF bookkeeping and pebble-game rigidity logic | `analyzeRigidity()` now delegates to Rust solve metadata; TS defs no longer carry `computeDof` hooks | complete |
 
 ## Remaining TS Solver Surface
 
 This is the explicit removal list for Goal 1:
 
 - `src/forge/sketch/constraints/rigidity.ts`
-  - structural redundancy / rigidity analysis is still TypeScript-side
+  - now just a thin Rust-backed wrapper, but still exists as TS API glue
 - `src/forge/sketch/constraints/types.ts`
-  - `ConstraintDef.computeDof` and the TS-side rigidity model are still solver-adjacent metadata
+  - `ConstraintDef.equations` is still duplicated on the TS side as metadata for diagnostics / wrappers
 - `src/forge/sketch/constraints/defs/*`
   - comments and a few dead helper functions still reflect the old TS solver implementation, even though the executable solver methods are gone
 - `cli/check-constraints.ts`
@@ -321,6 +322,26 @@ Additional concrete finding:
 
 - The defs are now clearly non-authoritative for solving. The remaining TS residue is not “hidden LM math in defs” anymore; it is structural analysis (`computeDof` / `rigidity.ts`) and some legacy comments/helpers that can now be cleaned up separately.
 
+### Remove TS DOF Bookkeeping and Pebble-Game Rigidity Logic (SUCCESS)
+**What**: Delete the last executable TS-side DOF bookkeeping from the constraint defs and replace the old pebble-game rigidity analysis with a thin wrapper over Rust solve metadata.
+
+**Changed**:
+
+- removed `computeDof` from `ConstraintDef` and from all `src/forge/sketch/constraints/defs/*.ts`
+- deleted the TS-side `DofContext`
+- rewrote `src/forge/sketch/constraints/rigidity.ts` so `analyzeRigidity()` solves a cloned definition through the Rust boundary and derives `totalDof`, `redundantConstraintIds`, and `isRigid` from Rust metadata
+
+**Verification**:
+
+- `npm exec tsc -- --noEmit` → passes
+- `npm run build:cli` → passes
+- `node dist-cli/forgecad.js check constraints` → `74 passed, 0 failed`
+- Level 9 rigidity tests still pass on the Rust-backed path
+
+**Lesson**:
+
+- At this point the TS constraint defs are declarative metadata only. The remaining migration work is mostly cleanup and API-boundary simplification, not moving hidden solver math.
+
 ## Files Modified
 
 | File | Purpose |
@@ -332,9 +353,10 @@ Additional concrete finding:
 | `src/forge/sketch/constraints/types.ts` | Removed TS decomposition-cache types from the public solver boundary |
 | `src/forge/sketch/constraints/index.ts` | Stopped exporting deleted TS solver modules |
 | `src/forge/sketch/constraints/solver-wasm.ts` | Added Rust presolve bridge APIs for incremental builder seeding |
-| `src/forge/sketch/constraints/defs/*.ts` | Removed legacy TS solver methods so defs now only carry metadata / annotations / DOF bookkeeping |
+| `src/forge/sketch/constraints/defs/*.ts` | Removed legacy TS solver methods and `computeDof`, leaving declarative metadata / annotations only |
 | `src/forge/sketch/constraints/decompose.ts` | Deleted dead TS decomposition wrapper after Rust became authoritative |
 | `src/forge/sketch/constraints/analytical.ts` | Deleted dead TS analytical presolve module |
+| `src/forge/sketch/constraints/rigidity.ts` | Replaced TS pebble-game rigidity analysis with a thin Rust-backed wrapper |
 | `solver/src/solver/mod.rs` | Rust-owned solve orchestration, presolve sequencing, component solve routing |
 | `solver/src/solver/decompose.rs` | Rust component decomposition plan builder |
 | `solver/src/solver/analytical.rs` | Rust analytical presolve module |

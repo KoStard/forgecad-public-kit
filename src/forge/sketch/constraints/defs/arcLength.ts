@@ -52,9 +52,4 @@ registerConstraint<'arcLength', ConstraintTypeMap['arcLength']>({
       center.y + (arc.radius + 8) * Math.sin(midAngle),
     ];
     return [{ kind: 'text', position: pos, text: `⌒${c.value}` }];
-  },
-
-  computeDof(_c, _ctx) {
-    // Constrains arc end-point angle — DOF accounted for by equations count.
-  },
-});
+  },});

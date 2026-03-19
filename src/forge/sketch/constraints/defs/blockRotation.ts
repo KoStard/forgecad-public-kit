@@ -38,12 +38,7 @@ registerConstraint<'blockRotation', ConstraintTypeMap['blockRotation']>({
 
   displayAnnotations() {
     return []; // No visual annotation — structural constraint
-  },
-
-  computeDof() {
-    // No continuous DOF consumed — discrete orientation choice.
-  },
-});
+  },});
 
 /**
  * If the first edge (p0 → p1) points in the wrong direction along the

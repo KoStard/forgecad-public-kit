@@ -37,13 +37,4 @@ registerConstraint<'length', ConstraintTypeMap['length']>({
     const a = points.get(line.a), b = points.get(line.b);
     if (!a || !b) return [];
     return [{ kind: 'dimension', from: [a.x, a.y], to: [b.x, b.y], offset: 3, value: String(c.value) }];
-  },
-
-  computeDof(c, { refCount, lines }) {
-    const line = lines.find((l) => l.id === c.line);
-    if (line) {
-      refCount.set(line.a, (refCount.get(line.a) ?? 0) + 1);
-      refCount.set(line.b, (refCount.get(line.b) ?? 0) + 1);
-    }
-  },
-});
+  },});

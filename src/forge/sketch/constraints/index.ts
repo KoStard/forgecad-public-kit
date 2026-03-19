@@ -28,7 +28,6 @@ export type {
   ConstraintBuilderMethods,
   ConstraintDef,
   DisplayContext,
-  DofContext,
 } from './types';
 
 export type { LineDistanceConstraint } from './defs/index';

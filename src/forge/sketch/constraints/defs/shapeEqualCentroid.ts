@@ -28,20 +28,4 @@ registerConstraint<'shapeEqualCentroid', ConstraintTypeMap['shapeEqualCentroid']
     const [ax, ay] = shapeCentroid(shapeVertices(shapeA, lines, points));
     const [bx, by] = shapeCentroid(shapeVertices(shapeB, lines, points));
     return [(ax + bx) / 2, (ay + by) / 2];
-  },
-
-  computeDof(c, { refCount, lines, shapes }) {
-    for (const shapeId of [c.a, c.b]) {
-      const shape = shapes.get(shapeId);
-      if (!shape) continue;
-      const seen = new Set<string>();
-      for (const lineId of shape.lines) {
-        const l = lines.find((ln) => ln.id === lineId);
-        if (!l) continue;
-        for (const ptId of [l.a, l.b]) {
-          if (!seen.has(ptId)) { seen.add(ptId); refCount.set(ptId, (refCount.get(ptId) ?? 0) + 1); }
-        }
-      }
-    }
-  },
-});
+  },});

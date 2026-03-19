@@ -31,9 +31,4 @@ registerConstraint<'fixed', ConstraintTypeMap['fixed']>({
     const pt = points.get(c.point);
     if (!pt) return [];
     return [{ kind: 'symbol', position: [pt.x + 2.5, pt.y + 2.5] as [number, number], symbol: 'fixed' as const }];
-  },
-
-  computeDof(c, { refCount }) {
-    refCount.set(c.point, (refCount.get(c.point) ?? 0) + 2);
-  },
-});
+  },});

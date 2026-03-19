@@ -35,10 +35,4 @@ registerConstraint<'symmetric', ConstraintTypeMap['symmetric']>({
     if (a) annotations.push({ kind: 'symbol', position: [a.x, a.y], symbol: 'symmetric' });
     if (b) annotations.push({ kind: 'symbol', position: [b.x, b.y], symbol: 'symmetric' });
     return annotations;
-  },
-
-  computeDof(c, { refCount }) {
-    refCount.set(c.a, (refCount.get(c.a) ?? 0) + 1);
-    refCount.set(c.b, (refCount.get(c.b) ?? 0) + 1);
-  },
-});
+  },});

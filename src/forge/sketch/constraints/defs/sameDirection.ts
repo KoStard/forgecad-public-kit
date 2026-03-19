@@ -54,21 +54,7 @@ registerConstraint<'sameDirection', ConstraintTypeMap['sameDirection']>({
       });
     }
     return annotations;
-  },
-
-  computeDof(c, { refCount, lines }) {
-    const lineA = lines.find((l) => l.id === c.a);
-    const lineB = lines.find((l) => l.id === c.b);
-    if (lineA) {
-      refCount.set(lineA.a, (refCount.get(lineA.a) ?? 0) + 1);
-      refCount.set(lineA.b, (refCount.get(lineA.b) ?? 0) + 1);
-    }
-    if (lineB) {
-      refCount.set(lineB.a, (refCount.get(lineB.a) ?? 0) + 1);
-      refCount.set(lineB.b, (refCount.get(lineB.b) ?? 0) + 1);
-    }
-  },
-});
+  },});
 
 /**
  * If `b` points opposite to `a`, flip `b`'s endpoints so it points the same way.

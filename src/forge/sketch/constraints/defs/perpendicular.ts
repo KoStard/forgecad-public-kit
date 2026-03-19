@@ -48,18 +48,4 @@ registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
     const a1 = points.get(lineA.a), a2 = points.get(lineA.b);
     if (a1 && a2) return [{ kind: 'symbol', position: midpointPerp(a1, a2, 3), symbol: 'perpendicular' as const }];
     return [];
-  },
-
-  computeDof(c, { refCount, lines }) {
-    const lineA = lines.find((l) => l.id === c.a);
-    const lineB = lines.find((l) => l.id === c.b);
-    if (lineA) {
-      refCount.set(lineA.a, (refCount.get(lineA.a) ?? 0) + 1);
-      refCount.set(lineA.b, (refCount.get(lineA.b) ?? 0) + 1);
-    }
-    if (lineB) {
-      refCount.set(lineB.a, (refCount.get(lineB.a) ?? 0) + 1);
-      refCount.set(lineB.b, (refCount.get(lineB.b) ?? 0) + 1);
-    }
-  },
-});
+  },});

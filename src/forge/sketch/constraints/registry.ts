@@ -3,7 +3,6 @@ import type {
   ConstraintDefinition,
   ConstraintDisplay,
   ConstraintType,
-  DofContext,
   DisplayContext,
   PointId,
   SketchConstraint,

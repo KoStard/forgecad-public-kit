@@ -42,12 +42,7 @@ registerConstraint<'ccw', ConstraintTypeMap['ccw']>({
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
     return [{ kind: 'symbol', position: [cx, cy] as [number, number], symbol: 'ccw' as const }];
-  },
-
-  computeDof() {
-    // No continuous DOF consumed — CCW is a discrete orientation choice.
-  },
-});
+  },});
 
 /**
  * If the polygon wound by `ptIds` has negative signed area (clockwise),

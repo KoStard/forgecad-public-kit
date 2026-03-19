@@ -32,10 +32,4 @@ registerConstraint<'distance', ConstraintTypeMap['distance']>({
     const a = points.get(c.a), b = points.get(c.b);
     if (!a || !b) return [];
     return [{ kind: 'dimension', from: [a.x, a.y], to: [b.x, b.y], offset: 3, value: String(c.value) }];
-  },
-
-  computeDof(c, { refCount }) {
-    refCount.set(c.a, (refCount.get(c.a) ?? 0) + 1);
-    refCount.set(c.b, (refCount.get(c.b) ?? 0) + 1);
-  },
-});
+  },});

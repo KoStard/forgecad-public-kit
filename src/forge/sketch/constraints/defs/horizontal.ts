@@ -36,13 +36,4 @@ registerConstraint<'horizontal', ConstraintTypeMap['horizontal']>({
     const a = points.get(line.a), b = points.get(line.b);
     if (!a || !b) return [];
     return [{ kind: 'symbol', position: midpointPerp(a, b, 3), symbol: 'horizontal' as const }];
-  },
-
-  computeDof(c, { refCount, lines }) {
-    const line = lines.find((l) => l.id === c.line);
-    if (line) {
-      refCount.set(line.a, (refCount.get(line.a) ?? 0) + 1);
-      refCount.set(line.b, (refCount.get(line.b) ?? 0) + 1);
-    }
-  },
-});
+  },});
