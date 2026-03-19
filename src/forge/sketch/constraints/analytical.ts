@@ -233,14 +233,9 @@ function tryDirectPlacement(
       const knownOther = known.get(other);
       if (!knownOther) continue;
       if (data.a === pointId) {
-        // pointId is 'a': b.x - a.x = value → a.x = b.x - value ... wait
-        // Actually: a is this point. b.x - a.x = value → a.x = knownOther.x - value if other=b
-        // If other is 'b' (known): a is our point. b.x - a.x = value → a.x = b.x - value
-        // But wait, other = data.b when data.a === pointId. So other=b, known.
-        // Actually let me re-check: data.a === pointId, other = data.b
-        // No: other = data.a === pointId ? data.b : data.a. So if data.a === pointId, other = data.b.
-        // Hmm no, that's wrong. Let me fix:
-        resolvedX = knownOther.x - data.value; // a.x = b.x - value
+        // hDistance: b.x - a.x = value. Since data.a === pointId, other is data.b (known).
+        // Solving for a.x: a.x = b.x - value
+        resolvedX = knownOther.x - data.value;
       } else {
         // pointId is 'b': b.x - a.x = value → b.x = a.x + value
         resolvedX = knownOther.x + data.value;

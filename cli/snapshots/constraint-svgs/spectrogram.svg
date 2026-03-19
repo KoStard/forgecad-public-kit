@@ -85,17 +85,17 @@
   <g data-layer="construction">
   </g>
   <g data-layer="labels">
-    <text x="-0.088" y="-1.885" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">FIX</text>
-    <text x="-0.253" y="-7.107" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">EQ</text>
-    <text x="11.722" y="-14.458" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">EQ</text>
-    <text x="1.272" y="-16.702" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
+    <text x="-0.088" y="-1.885" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">FIX</text>
+    <text x="-0.253" y="-7.107" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">EQ</text>
+    <text x="11.722" y="-14.458" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">EQ</text>
+    <text x="1.272" y="-16.702" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
     <text x="9.385" y="-4.120" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">EQ</text>
     <text x="11.488" y="-8.939" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">EQ</text>
     <text x="-2.900" y="-13.137" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
-    <text x="4.174" y="-4.687" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=22</text>
-    <text x="6.689" y="-14.237" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=-2</text>
-    <text x="1.992" y="-11.696" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">CC</text>
-    <text x="6.454" y="-9.193" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">∠=46</text>
+    <text x="4.174" y="-4.687" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LEN=22</text>
+    <text x="6.689" y="-14.237" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">LDIST=-2</text>
+    <text x="1.992" y="-11.696" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">CC</text>
+    <text x="6.454" y="-9.193" fill="#faad14" font-size="2" font-family="sans-serif" text-anchor="middle">∠=46</text>
     <text x="5.681" y="-19.161" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">POL</text>
     <text x="9.332" y="-22.666" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">PDIST=8.42</text>
     <text x="16.649" y="-12.407" fill="#4ade80" font-size="2" font-family="sans-serif" text-anchor="middle">CCW</text>
