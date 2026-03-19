@@ -74,6 +74,24 @@ registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
     return [pt.x - (a.x + b.x) / 2, pt.y - (a.y + b.y) / 2];
   },
 
+  jacobian(c, { points, lines }) {
+    const pt = points.get(c.point); const line = lines.get(c.line);
+    if (!pt || !line) return { residuals: [0, 0], partials: {} };
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return { residuals: [0, 0], partials: {} };
+    return {
+      residuals: [pt.x - (a.x + b.x) / 2, pt.y - (a.y + b.y) / 2],
+      partials: {
+        [`${c.point}.x`]: [1, 0],
+        [`${c.point}.y`]: [0, 1],
+        [`${line.a}.x`]: [-0.5, 0],
+        [`${line.a}.y`]: [0, -0.5],
+        [`${line.b}.x`]: [-0.5, 0],
+        [`${line.b}.y`]: [0, -0.5],
+      },
+    };
+  },
+
   computeDof(c, { refCount }) {
     refCount.set(c.point, (refCount.get(c.point) ?? 0) + 2);
   },

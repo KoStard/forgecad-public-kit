@@ -62,6 +62,20 @@ registerConstraint<'vertical', ConstraintTypeMap['vertical']>({
     return [b.x - a.x];
   },
 
+  jacobian(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return { residuals: [0], partials: {} };
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return { residuals: [0], partials: {} };
+    return {
+      residuals: [b.x - a.x],
+      partials: {
+        [`${line.a}.x`]: [-1],
+        [`${line.b}.x`]: [1],
+      },
+    };
+  },
+
   computeDof(c, { refCount, lines }) {
     const line = lines.find((l) => l.id === c.line);
     if (line) {

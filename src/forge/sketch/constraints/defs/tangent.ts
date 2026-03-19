@@ -150,6 +150,60 @@ registerConstraint<'tangent', ConstraintTypeMap['tangent']>({
     return [0];
   },
 
+  jacobian(c, { lines, circles, points }) {
+    if (c.line && c.circle) {
+      const line = lines.get(c.line); const circle = circles.get(c.circle);
+      if (!line || !circle) return { residuals: [0], partials: {} };
+      const a = points.get(line.a); const b = points.get(line.b);
+      const center = points.get(circle.center);
+      if (!a || !b || !center) return { residuals: [0], partials: {} };
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy || 1e-24;
+      const len = Math.sqrt(len2);
+      const px = center.x - a.x, py = center.y - a.y;
+      // Signed perp distance: dist = (py*dx - px*dy) / len
+      const S = py * dx - px * dy;
+      const dist = S / len;
+      const sgn = dist >= 0 ? 1 : -1;
+      const r = Math.abs(dist) - circle.radius;
+      // ∂|dist|/∂var = sgn * ∂dist/∂var
+      // dist = S/len, same structure as pointLineDistance
+      return {
+        residuals: [r],
+        partials: {
+          [`${circle.center}.x`]: [sgn * (-dy / len)],
+          [`${circle.center}.y`]: [sgn * (dx / len)],
+          [`${line.a}.x`]: [sgn * ((dy - py) / len - S * dx / (len * len2))],
+          [`${line.a}.y`]: [sgn * ((px - dx) / len - S * dy / (len * len2))],
+          [`${line.b}.x`]: [sgn * (py / len + S * dx / (len * len2))],
+          [`${line.b}.y`]: [sgn * (-px / len + S * dy / (len * len2))],
+          [`${c.circle}.r`]: [-1],
+        },
+      };
+    }
+    if (c.a && c.b) {
+      const c1 = circles.get(c.a); const c2 = circles.get(c.b);
+      if (!c1 || !c2) return { residuals: [0], partials: {} };
+      const p1 = points.get(c1.center); const p2 = points.get(c2.center);
+      if (!p1 || !p2) return { residuals: [0], partials: {} };
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const d = Math.hypot(dx, dy) || 1e-12;
+      const ux = dx / d, uy = dy / d;
+      return {
+        residuals: [d - (c1.radius + c2.radius)],
+        partials: {
+          [`${c1.center}.x`]: [-ux],
+          [`${c1.center}.y`]: [-uy],
+          [`${c2.center}.x`]: [ux],
+          [`${c2.center}.y`]: [uy],
+          [`${c.a}.r`]: [-1],
+          [`${c.b}.r`]: [-1],
+        },
+      };
+    }
+    return { residuals: [0], partials: {} };
+  },
+
   computeDof(_c, _ctx) {
     // tangent constrains 1 DOF but it's complex — not tracked for simplicity
   },

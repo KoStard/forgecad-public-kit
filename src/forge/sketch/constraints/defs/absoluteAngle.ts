@@ -127,6 +127,25 @@ registerConstraint<'absoluteAngle', ConstraintTypeMap['absoluteAngle']>({
     return [normalizeAngle(angleOfLine(a, b) - targetRad)];
   },
 
+  jacobian(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return { residuals: [0], partials: {} };
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return { residuals: [0], partials: {} };
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy || 1e-24;
+    const targetRad = c.value * Math.PI / 180;
+    return {
+      residuals: [normalizeAngle(Math.atan2(dy, dx) - targetRad)],
+      partials: {
+        [`${line.a}.x`]: [dy / len2],
+        [`${line.a}.y`]: [-dx / len2],
+        [`${line.b}.x`]: [-dy / len2],
+        [`${line.b}.y`]: [dx / len2],
+      },
+    };
+  },
+
   computeDof(c, { refCount, lines }) {
     const line = lines.find((l) => l.id === c.line);
     if (!line) return;

@@ -130,6 +130,34 @@ registerConstraint<'angle', ConstraintTypeMap['angle']>({
     return [normalizeAngle(angleB - angleA - toRad(c.value))];
   },
 
+  jacobian(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return { residuals: [0], partials: {} };
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return { residuals: [0], partials: {} };
+    const dax = a2.x - a1.x, day = a2.y - a1.y;
+    const dbx = b2.x - b1.x, dby = b2.y - b1.y;
+    const la2 = dax * dax + day * day || 1e-24;
+    const lb2 = dbx * dbx + dby * dby || 1e-24;
+    const angleA = Math.atan2(day, dax);
+    const angleB = Math.atan2(dby, dbx);
+    return {
+      residuals: [normalizeAngle(angleB - angleA - toRad(c.value))],
+      partials: {
+        // ∂r/∂ = -∂angleA/∂ + ∂angleB/∂
+        [`${la.a}.x`]: [-day / la2],
+        [`${la.a}.y`]: [dax / la2],
+        [`${la.b}.x`]: [day / la2],
+        [`${la.b}.y`]: [-dax / la2],
+        [`${lb.a}.x`]: [dby / lb2],
+        [`${lb.a}.y`]: [-dbx / lb2],
+        [`${lb.b}.x`]: [-dby / lb2],
+        [`${lb.b}.y`]: [dbx / lb2],
+      },
+    };
+  },
+
   computeDof(c, { refCount, lines }) {
     const lineA = lines.find((l) => l.id === c.a);
     const lineB = lines.find((l) => l.id === c.b);

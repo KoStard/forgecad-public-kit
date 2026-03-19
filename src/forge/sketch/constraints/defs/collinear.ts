@@ -67,6 +67,30 @@ registerConstraint<'collinear', ConstraintTypeMap['collinear']>({
     return [((pt.x - a.x) * dy - (pt.y - a.y) * dx) / len];
   },
 
+  jacobian(c, { points, lines }) {
+    const pt = points.get(c.point); const line = lines.get(c.line);
+    if (!pt || !line) return { residuals: [0], partials: {} };
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return { residuals: [0], partials: {} };
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy || 1e-24;
+    const len = Math.sqrt(len2);
+    const px = pt.x - a.x, py = pt.y - a.y;
+    const N = px * dy - py * dx;
+    const r = N / len;
+    return {
+      residuals: [r],
+      partials: {
+        [`${c.point}.x`]: [dy / len],
+        [`${c.point}.y`]: [-dx / len],
+        [`${line.a}.x`]: [(py - dy) / len + r * dx / len2],
+        [`${line.a}.y`]: [(dx - px) / len + r * dy / len2],
+        [`${line.b}.x`]: [-py / len - r * dx / len2],
+        [`${line.b}.y`]: [px / len - r * dy / len2],
+      },
+    };
+  },
+
   computeDof(c, { refCount }) {
     refCount.set(c.point, (refCount.get(c.point) ?? 0) + 1);
   },

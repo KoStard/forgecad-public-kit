@@ -173,6 +173,8 @@ interface SolverVariable {
   scale: number;
   /** Entity ID that owns this variable (for sparse Jacobian computation). */
   entityId: string;
+  /** Unique variable key for analytical Jacobian mapping: `${entityId}.${'x'|'y'|'r'}` */
+  key: string;
 }
 
 interface ResidualEvaluation {
@@ -232,12 +234,14 @@ function buildVariables(def: ConstraintDefinition, referenceLength: number): Sol
         set: (value: number) => { point.x = value; },
         scale,
         entityId: point.id,
+        key: `${point.id}.x`,
       },
       {
         get: () => point.y,
         set: (value: number) => { point.y = value; },
         scale,
         entityId: point.id,
+        key: `${point.id}.y`,
       },
     );
   }
@@ -249,6 +253,7 @@ function buildVariables(def: ConstraintDefinition, referenceLength: number): Sol
       set: (value: number) => { circle.radius = Math.max(1e-9, value); },
       scale,
       entityId: circle.id,
+      key: `${circle.id}.r`,
     });
   }
 
@@ -258,6 +263,7 @@ function buildVariables(def: ConstraintDefinition, referenceLength: number): Sol
       set: (value: number) => { arc.radius = Math.max(1e-9, value); },
       scale,
       entityId: arc.id,
+      key: `${arc.id}.r`,
     });
   }
 
@@ -431,82 +437,134 @@ function buildSparsityMap(
   return { constraintInfo, varToConstraints, varToArcs, arcRowStart, totalRows };
 }
 
+/**
+ * Hybrid Jacobian path: uses analytical derivatives where available,
+ * falls back to per-constraint finite differences for the rest.
+ * This eliminates FD artifacts for the vast majority of constraints
+ * while gracefully handling any that lack a `jacobian()` method.
+ */
+function linearizeSystemAnalytical(
+  def: ConstraintDefinition,
+  ctx: SolverContext,
+  variables: SolverVariable[],
+  referenceLength: number,
+): LinearizedSystem | null {
+  // Build variable key → column index map.
+  const keyToCol = new Map<string, number>();
+  for (let i = 0; i < variables.length; i++) keyToCol.set(variables[i].key, i);
+
+  const nVars = variables.length;
+  const residualValues: number[] = [];
+  const jacobianRows: number[][] = [];
+
+  // Evaluate each constraint — analytical if available, FD otherwise.
+  for (const constraint of def.constraints) {
+    const cdef = registry.get(constraint.type);
+    if (!cdef?.residual) continue;
+
+    if (cdef.jacobian) {
+      // Analytical path: exact derivatives in one call.
+      const { residuals, partials } = cdef.jacobian(constraint as never, ctx);
+      for (let i = 0; i < residuals.length; i++) {
+        residualValues.push(residuals[i]);
+        const row = new Array(nVars).fill(0);
+        for (const key in partials) {
+          const col = keyToCol.get(key);
+          if (col !== undefined) row[col] = partials[key][i];
+        }
+        jacobianRows.push(row);
+      }
+    } else {
+      // FD fallback for this constraint only.
+      const baseRes = cdef.residual(constraint as never, ctx);
+      const rowStart = residualValues.length;
+      for (const r of baseRes) residualValues.push(r);
+      const rows = baseRes.map(() => new Array(nVars).fill(0));
+
+      // Determine which variables this constraint touches.
+      const touchedIds = constraintPointIds(constraint, def);
+      for (let col = 0; col < nVars; col++) {
+        if (!touchedIds.has(variables[col].entityId)) continue;
+        const v = variables[col];
+        const base = v.get();
+        const step = finiteDifferenceStep(base, v.scale);
+        v.set(base + step);
+        const pertRes = cdef.residual(constraint as never, ctx);
+        v.set(base);
+        for (let r = 0; r < baseRes.length; r++) {
+          rows[r][col] = (pertRes[r] - baseRes[r]) / step;
+        }
+      }
+      jacobianRows.push(...rows);
+    }
+  }
+
+  // Arc consistency equations with analytical derivatives.
+  for (const arc of def.arcs ?? []) {
+    const center = ctx.points.get(arc.center);
+    const start = ctx.points.get(arc.start);
+    const end = ctx.points.get(arc.end);
+    if (!center || !start || !end) continue;
+
+    // Start: sqrt((sx-cx)² + (sy-cy)²) - radius = 0
+    const dsx = start.x - center.x, dsy = start.y - center.y;
+    const ds = Math.hypot(dsx, dsy) || 1e-12;
+    residualValues.push(ds - arc.radius);
+    const rowS = new Array(nVars).fill(0);
+    const sxCol = keyToCol.get(`${arc.start}.x`);
+    const syCol = keyToCol.get(`${arc.start}.y`);
+    const cxCol = keyToCol.get(`${arc.center}.x`);
+    const cyCol = keyToCol.get(`${arc.center}.y`);
+    const rCol = keyToCol.get(`${arc.id}.r`);
+    if (sxCol !== undefined) rowS[sxCol] = dsx / ds;
+    if (syCol !== undefined) rowS[syCol] = dsy / ds;
+    if (cxCol !== undefined) rowS[cxCol] = -dsx / ds;
+    if (cyCol !== undefined) rowS[cyCol] = -dsy / ds;
+    if (rCol !== undefined) rowS[rCol] = -1;
+    jacobianRows.push(rowS);
+
+    // End: sqrt((ex-cx)² + (ey-cy)²) - radius = 0
+    const dex = end.x - center.x, dey = end.y - center.y;
+    const de = Math.hypot(dex, dey) || 1e-12;
+    residualValues.push(de - arc.radius);
+    const rowE = new Array(nVars).fill(0);
+    const exCol = keyToCol.get(`${arc.end}.x`);
+    const eyCol = keyToCol.get(`${arc.end}.y`);
+    if (exCol !== undefined) rowE[exCol] = dex / de;
+    if (eyCol !== undefined) rowE[eyCol] = dey / de;
+    if (cxCol !== undefined) rowE[cxCol] = -dex / de;
+    if (cyCol !== undefined) rowE[cyCol] = -dey / de;
+    if (rCol !== undefined) rowE[rCol] = -1;
+    jacobianRows.push(rowE);
+  }
+
+  let maxAbs = 0;
+  for (const v of residualValues) maxAbs = Math.max(maxAbs, Math.abs(v));
+
+  const weights = computeRowWeights(jacobianRows, referenceLength);
+  const wRes = weightResidual(residualValues, weights);
+  const wJac = weightJacobian(jacobianRows, weights);
+
+  return {
+    residual: residualValues,
+    jacobian: jacobianRows,
+    weights,
+    weightedResidual: wRes,
+    weightedJacobian: wJac,
+    maxAbsResidual: maxAbs,
+    weightedCost: weightedCost(wRes),
+  };
+}
+
 function linearizeSystem(
   def: ConstraintDefinition,
   ctx: SolverContext,
   variables: SolverVariable[],
   referenceLength: number,
-  sparsity?: ReturnType<typeof buildSparsityMap>,
+  _sparsity?: ReturnType<typeof buildSparsityMap>,
 ): LinearizedSystem | null {
-  const base = evaluateResiduals(def, ctx);
-  if (!base) return null;
-
-  const parameterCount = variables.length;
-  const equationCount = base.values.length;
-  const jacobian: number[][] = Array.from({ length: equationCount }, () => new Array(parameterCount).fill(0));
-
-  if (parameterCount > 0 && equationCount > 0 && sparsity) {
-    // Sparse Jacobian: only evaluate affected constraints per variable.
-    const arcs = def.arcs ?? [];
-    for (let column = 0; column < parameterCount; column++) {
-      const v = variables[column];
-      const baseValue = v.get();
-      const step = finiteDifferenceStep(baseValue, v.scale);
-      v.set(baseValue + step);
-
-      // Evaluate only affected constraints.
-      for (const ci of sparsity.varToConstraints[column]) {
-        const { start, count, cdef, constraint } = sparsity.constraintInfo[ci];
-        const res = cdef.residual(constraint as never, ctx);
-        for (let r = 0; r < count; r++) {
-          jacobian[start + r][column] = (res[r] - base.values[start + r]) / step;
-        }
-      }
-
-      // Evaluate only affected arc consistency equations.
-      for (const ai of sparsity.varToArcs[column]) {
-        const arc = arcs[ai];
-        const center = ctx.points.get(arc.center)!;
-        const start = ctx.points.get(arc.start)!;
-        const end = ctx.points.get(arc.end)!;
-        const r0 = sparsity.arcRowStart + ai * 2;
-        const res0 = Math.hypot(start.x - center.x, start.y - center.y) - arc.radius;
-        const res1 = Math.hypot(end.x - center.x, end.y - center.y) - arc.radius;
-        jacobian[r0][column] = (res0 - base.values[r0]) / step;
-        jacobian[r0 + 1][column] = (res1 - base.values[r0 + 1]) / step;
-      }
-
-      v.set(baseValue); // restore
-    }
-  } else if (parameterCount > 0 && equationCount > 0) {
-    // Dense fallback.
-    for (let column = 0; column < parameterCount; column++) {
-      const v = variables[column];
-      const baseValue = v.get();
-      const step = finiteDifferenceStep(baseValue, v.scale);
-      v.set(baseValue + step);
-      const plusEval = evaluateResiduals(def, ctx);
-      v.set(baseValue);
-      if (!plusEval) return null;
-      for (let row = 0; row < equationCount; row++) {
-        jacobian[row][column] = (plusEval.values[row] - base.values[row]) / step;
-      }
-    }
-  }
-
-  const weights = computeRowWeights(jacobian, referenceLength);
-  const weightedResidual = weightResidual(base.values, weights);
-  const weightedJacobian = weightJacobian(jacobian, weights);
-
-  return {
-    residual: base.values,
-    jacobian,
-    weights,
-    weightedResidual,
-    weightedJacobian,
-    maxAbsResidual: base.maxAbs,
-    weightedCost: weightedCost(weightedResidual),
-  };
+  // Hybrid path: analytical derivatives where available, per-constraint FD fallback.
+  return linearizeSystemAnalytical(def, ctx, variables, referenceLength);
 }
 
 function solveLevenbergMarquardtStep(

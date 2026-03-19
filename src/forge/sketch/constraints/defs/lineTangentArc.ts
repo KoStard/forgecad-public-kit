@@ -98,5 +98,38 @@ registerConstraint<'lineTangentArc', ConstraintTypeMap['lineTangentArc']>({
     return [(ldx / lenL) * (rdx / lenR) + (ldy / lenL) * (rdy / lenR)];
   },
 
+  jacobian(c, { lines, arcs, points }) {
+    const line = lines.get(c.line); const arc = arcs.get(c.arc);
+    if (!line || !arc) return { residuals: [0], partials: {} };
+    const la = points.get(line.a); const lb = points.get(line.b);
+    const center = points.get(arc.center);
+    const tpId = c.atStart ? arc.start : arc.end;
+    const tangentPt = points.get(tpId);
+    if (!la || !lb || !center || !tangentPt) return { residuals: [0], partials: {} };
+    const ldx = lb.x - la.x, ldy = lb.y - la.y;
+    const rdx = tangentPt.x - center.x, rdy = tangentPt.y - center.y;
+    const ll2 = ldx * ldx + ldy * ldy || 1e-24;
+    const rl2 = rdx * rdx + rdy * rdy || 1e-24;
+    const lenL = Math.sqrt(ll2), lenR = Math.sqrt(rl2);
+    const ulx = ldx / lenL, uly = ldy / lenL;
+    const urx = rdx / lenR, ury = rdy / lenR;
+    const dot = ulx * urx + uly * ury;
+    const cross = ulx * ury - uly * urx;
+    // Same structure as perpendicular: r = dot(unitL, unitR)
+    return {
+      residuals: [dot],
+      partials: {
+        [`${line.a}.x`]: [ldy * cross / ll2],
+        [`${line.a}.y`]: [-ldx * cross / ll2],
+        [`${line.b}.x`]: [-ldy * cross / ll2],
+        [`${line.b}.y`]: [ldx * cross / ll2],
+        [`${tpId}.x`]: [-rdy * cross / rl2],
+        [`${tpId}.y`]: [rdx * cross / rl2],
+        [`${arc.center}.x`]: [rdy * cross / rl2],
+        [`${arc.center}.y`]: [-rdx * cross / rl2],
+      },
+    };
+  },
+
   computeDof(_c, _ctx) {},
 });

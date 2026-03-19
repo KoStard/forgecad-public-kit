@@ -75,6 +75,22 @@ registerConstraint<'concentric', ConstraintTypeMap['concentric']>({
     return [p2.x - p1.x, p2.y - p1.y];
   },
 
+  jacobian(c, { circles, points }) {
+    const c1 = circles.get(c.a); const c2 = circles.get(c.b);
+    if (!c1 || !c2) return { residuals: [0, 0], partials: {} };
+    const p1 = points.get(c1.center); const p2 = points.get(c2.center);
+    if (!p1 || !p2) return { residuals: [0, 0], partials: {} };
+    return {
+      residuals: [p2.x - p1.x, p2.y - p1.y],
+      partials: {
+        [`${c1.center}.x`]: [-1, 0],
+        [`${c1.center}.y`]: [0, -1],
+        [`${c2.center}.x`]: [1, 0],
+        [`${c2.center}.y`]: [0, 1],
+      },
+    };
+  },
+
   computeDof(_c, _ctx) {
     // concentric constrains circle centers — not tracked in point refCount
   },

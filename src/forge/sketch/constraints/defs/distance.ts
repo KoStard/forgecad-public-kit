@@ -62,6 +62,25 @@ registerConstraint<'distance', ConstraintTypeMap['distance']>({
     return [Math.hypot(b.x - a.x, b.y - a.y) - c.value];
   },
 
+  jacobian(c, { points }) {
+    const a = points.get(c.a); const b = points.get(c.b);
+    if (!a || !b) return { residuals: [0], partials: {} };
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const d = Math.hypot(dx, dy) || 1e-12;
+    const ux = dx / d;
+    const uy = dy / d;
+    return {
+      residuals: [d - c.value],
+      partials: {
+        [`${c.a}.x`]: [-ux],
+        [`${c.a}.y`]: [-uy],
+        [`${c.b}.x`]: [ux],
+        [`${c.b}.y`]: [uy],
+      },
+    };
+  },
+
   computeDof(c, { refCount }) {
     refCount.set(c.a, (refCount.get(c.a) ?? 0) + 1);
     refCount.set(c.b, (refCount.get(c.b) ?? 0) + 1);

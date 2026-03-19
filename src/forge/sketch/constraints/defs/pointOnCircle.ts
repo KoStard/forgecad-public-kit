@@ -61,6 +61,26 @@ registerConstraint<'pointOnCircle', ConstraintTypeMap['pointOnCircle']>({
     return [Math.hypot(pt.x - center.x, pt.y - center.y) - circle.radius];
   },
 
+  jacobian(c, { points, circles }) {
+    const pt = points.get(c.point); const circle = circles.get(c.circle);
+    if (!pt || !circle) return { residuals: [0], partials: {} };
+    const center = points.get(circle.center);
+    if (!center) return { residuals: [0], partials: {} };
+    const dx = pt.x - center.x, dy = pt.y - center.y;
+    const d = Math.hypot(dx, dy) || 1e-12;
+    const ux = dx / d, uy = dy / d;
+    return {
+      residuals: [d - circle.radius],
+      partials: {
+        [`${c.point}.x`]: [ux],
+        [`${c.point}.y`]: [uy],
+        [`${circle.center}.x`]: [-ux],
+        [`${circle.center}.y`]: [-uy],
+        [`${c.circle}.r`]: [-1],
+      },
+    };
+  },
+
   computeDof(c, { refCount }) {
     refCount.set(c.point, (refCount.get(c.point) ?? 0) + 1);
   },

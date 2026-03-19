@@ -79,6 +79,33 @@ registerConstraint<'equal', ConstraintTypeMap['equal']>({
     return [Math.hypot(a2.x - a1.x, a2.y - a1.y) - Math.hypot(b2.x - b1.x, b2.y - b1.y)];
   },
 
+  jacobian(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return { residuals: [0], partials: {} };
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return { residuals: [0], partials: {} };
+    const dax = a2.x - a1.x, day = a2.y - a1.y;
+    const dbx = b2.x - b1.x, dby = b2.y - b1.y;
+    const lenA = Math.hypot(dax, day) || 1e-12;
+    const lenB = Math.hypot(dbx, dby) || 1e-12;
+    const uax = dax / lenA, uay = day / lenA;
+    const ubx = dbx / lenB, uby = dby / lenB;
+    return {
+      residuals: [lenA - lenB],
+      partials: {
+        [`${la.a}.x`]: [-uax],
+        [`${la.a}.y`]: [-uay],
+        [`${la.b}.x`]: [uax],
+        [`${la.b}.y`]: [uay],
+        [`${lb.a}.x`]: [ubx],
+        [`${lb.a}.y`]: [uby],
+        [`${lb.b}.x`]: [-ubx],
+        [`${lb.b}.y`]: [-uby],
+      },
+    };
+  },
+
   computeDof(c, { refCount, lines }) {
     const lineA = lines.find((l) => l.id === c.a);
     const lineB = lines.find((l) => l.id === c.b);

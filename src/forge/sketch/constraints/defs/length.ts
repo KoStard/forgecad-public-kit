@@ -86,6 +86,27 @@ registerConstraint<'length', ConstraintTypeMap['length']>({
     return [Math.hypot(b.x - a.x, b.y - a.y) - c.value];
   },
 
+  jacobian(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return { residuals: [0], partials: {} };
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return { residuals: [0], partials: {} };
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const d = Math.hypot(dx, dy) || 1e-12;
+    const ux = dx / d;
+    const uy = dy / d;
+    return {
+      residuals: [d - c.value],
+      partials: {
+        [`${line.a}.x`]: [-ux],
+        [`${line.a}.y`]: [-uy],
+        [`${line.b}.x`]: [ux],
+        [`${line.b}.y`]: [uy],
+      },
+    };
+  },
+
   computeDof(c, { refCount, lines }) {
     const line = lines.find((l) => l.id === c.line);
     if (line) {

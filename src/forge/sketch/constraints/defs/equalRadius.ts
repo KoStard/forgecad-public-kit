@@ -69,6 +69,18 @@ registerConstraint<'equalRadius', ConstraintTypeMap['equalRadius']>({
     return [cb.radius - ca.radius];
   },
 
+  jacobian(c, { circles }) {
+    const ca = circles.get(c.a); const cb = circles.get(c.b);
+    if (!ca || !cb) return { residuals: [0], partials: {} };
+    return {
+      residuals: [cb.radius - ca.radius],
+      partials: {
+        [`${c.a}.r`]: [-1],
+        [`${c.b}.r`]: [1],
+      },
+    };
+  },
+
   computeDof(_c, _ctx) {
     // Constrains circle radii, not point DOF
   },

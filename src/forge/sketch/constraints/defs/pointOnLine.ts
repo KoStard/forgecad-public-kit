@@ -100,6 +100,66 @@ registerConstraint<'pointOnLine', ConstraintTypeMap['pointOnLine']>({
     return [((pt.x - a.x) * dy - (pt.y - a.y) * dx) / len];
   },
 
+  jacobian(c, { points, lines }) {
+    const pt = points.get(c.point);
+    const line = lines.get(c.line);
+    if (!pt || !line) return { residuals: [0], partials: {} };
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return { residuals: [0], partials: {} };
+
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 1e-9) return { residuals: [0], partials: {} };
+    const len = Math.sqrt(len2);
+    const px = pt.x - a.x, py = pt.y - a.y;
+    const t = (px * dx + py * dy) / len2;
+
+    if (t < 0) {
+      // Distance to endpoint a
+      const d = Math.hypot(px, py) || 1e-12;
+      const ux = px / d, uy = py / d;
+      return {
+        residuals: [-d],
+        partials: {
+          [`${c.point}.x`]: [-ux],
+          [`${c.point}.y`]: [-uy],
+          [`${line.a}.x`]: [ux],
+          [`${line.a}.y`]: [uy],
+        },
+      };
+    }
+    if (t > 1) {
+      // Distance to endpoint b
+      const qx = pt.x - b.x, qy = pt.y - b.y;
+      const d = Math.hypot(qx, qy) || 1e-12;
+      const ux = qx / d, uy = qy / d;
+      return {
+        residuals: [d],
+        partials: {
+          [`${c.point}.x`]: [ux],
+          [`${c.point}.y`]: [uy],
+          [`${line.b}.x`]: [-ux],
+          [`${line.b}.y`]: [-uy],
+        },
+      };
+    }
+    // Interior: signed perpendicular distance (same as collinear)
+    const N = px * dy - py * dx;
+    const r = N / len;
+    return {
+      residuals: [r],
+      partials: {
+        [`${c.point}.x`]: [dy / len],
+        [`${c.point}.y`]: [-dx / len],
+        [`${line.a}.x`]: [(py - dy) / len + r * dx / len2],
+        [`${line.a}.y`]: [(dx - px) / len + r * dy / len2],
+        [`${line.b}.x`]: [-py / len - r * dx / len2],
+        [`${line.b}.y`]: [px / len - r * dy / len2],
+      },
+    };
+  },
+
   computeDof(c, { refCount }) {
     refCount.set(c.point, (refCount.get(c.point) ?? 0) + 1);
   },

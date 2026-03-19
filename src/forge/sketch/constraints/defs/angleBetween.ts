@@ -150,6 +150,41 @@ registerConstraint<'angleBetween', ConstraintTypeMap['angleBetween']>({
     return [crossUnit * Math.cos(targetRad) - dotUnit * Math.sin(targetRad)];
   },
 
+  jacobian(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return { residuals: [0], partials: {} };
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return { residuals: [0], partials: {} };
+    const dax = a2.x - a1.x, day = a2.y - a1.y;
+    const dbx = b2.x - b1.x, dby = b2.y - b1.y;
+    const la2 = dax * dax + day * day || 1e-24;
+    const lb2 = dbx * dbx + dby * dby || 1e-24;
+    const lenA = Math.sqrt(la2), lenB = Math.sqrt(lb2);
+    const uax = dax / lenA, uay = day / lenA;
+    const ubx = dbx / lenB, uby = dby / lenB;
+    const cross = uax * uby - uay * ubx;
+    const dot = uax * ubx + uay * uby;
+    const targetRad = toRad(c.value);
+    const ct = Math.cos(targetRad), st = Math.sin(targetRad);
+    const r = cross * ct - dot * st;
+    // K = dot*ct + cross*st — common factor for ∂r/∂(angle-affecting vars)
+    const K = dot * ct + cross * st;
+    return {
+      residuals: [r],
+      partials: {
+        [`${la.a}.x`]: [-day * K / la2],
+        [`${la.a}.y`]: [dax * K / la2],
+        [`${la.b}.x`]: [day * K / la2],
+        [`${la.b}.y`]: [-dax * K / la2],
+        [`${lb.a}.x`]: [dby * K / lb2],
+        [`${lb.a}.y`]: [-dbx * K / lb2],
+        [`${lb.b}.x`]: [-dby * K / lb2],
+        [`${lb.b}.y`]: [dbx * K / lb2],
+      },
+    };
+  },
+
   computeDof(c, { refCount, lines }) {
     const lineA = lines.find((l) => l.id === c.a);
     const lineB = lines.find((l) => l.id === c.b);

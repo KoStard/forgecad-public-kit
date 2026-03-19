@@ -92,6 +92,37 @@ registerConstraint<'arcLength', ConstraintTypeMap['arcLength']>({
     return [arc.radius * arcSweep(startAngle, endAngle, arc.clockwise) - c.value];
   },
 
+  jacobian(c, { arcs, points }) {
+    const arc = arcs.get(c.arc);
+    if (!arc) return { residuals: [0], partials: {} };
+    const center = points.get(arc.center);
+    const start = points.get(arc.start);
+    const end = points.get(arc.end);
+    if (!center || !start || !end) return { residuals: [0], partials: {} };
+    const sx = start.x - center.x, sy = start.y - center.y;
+    const ex = end.x - center.x, ey = end.y - center.y;
+    const rs2 = sx * sx + sy * sy || 1e-24;
+    const re2 = ex * ex + ey * ey || 1e-24;
+    const startAngle = Math.atan2(sy, sx);
+    const endAngle = Math.atan2(ey, ex);
+    const sweep = arcSweep(startAngle, endAngle, arc.clockwise);
+    const r = arc.radius * sweep - c.value;
+    const dir = arc.clockwise ? -1 : 1;
+    const R = arc.radius;
+    return {
+      residuals: [r],
+      partials: {
+        [`${arc.end}.x`]: [R * dir * (-ey / re2)],
+        [`${arc.end}.y`]: [R * dir * (ex / re2)],
+        [`${arc.start}.x`]: [R * dir * (sy / rs2)],
+        [`${arc.start}.y`]: [R * dir * (-sx / rs2)],
+        [`${arc.center}.x`]: [R * dir * ((ey / re2) - (sy / rs2))],
+        [`${arc.center}.y`]: [R * dir * ((-ex / re2) + (sx / rs2))],
+        [`${c.arc}.r`]: [sweep],
+      },
+    };
+  },
+
   computeDof(_c, _ctx) {
     // Constrains arc end-point angle — DOF accounted for by equations count.
   },

@@ -60,6 +60,18 @@ registerConstraint<'vDistance', ConstraintTypeMap['vDistance']>({
     return [b.y - a.y - c.value];
   },
 
+  jacobian(c, { points }) {
+    const a = points.get(c.a); const b = points.get(c.b);
+    if (!a || !b) return { residuals: [0], partials: {} };
+    return {
+      residuals: [b.y - a.y - c.value],
+      partials: {
+        [`${c.a}.y`]: [-1],
+        [`${c.b}.y`]: [1],
+      },
+    };
+  },
+
   computeDof(c, { refCount }) {
     refCount.set(c.a, (refCount.get(c.a) ?? 0) + 1);
     refCount.set(c.b, (refCount.get(c.b) ?? 0) + 1);

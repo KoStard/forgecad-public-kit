@@ -245,6 +245,20 @@ export interface ConstraintDef<TType extends string = string, TData extends obje
    * NR solver is used instead of Gauss-Seidel, giving order-independent quadratic convergence.
    */
   residual?: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => number[];
+  /**
+   * Analytical Jacobian: returns both residuals and exact partial derivatives
+   * in a single call. When provided for ALL constraints, the solver uses these
+   * instead of finite-difference Jacobians — eliminating step-size sensitivity,
+   * discontinuity artifacts near atan2/sqrt boundaries, and ~50% of evaluations.
+   *
+   * `partials` maps variable keys (`${entityId}.x`, `${entityId}.y`, `${circleId}.r`,
+   * `${arcId}.r`) to arrays of partial derivatives, one per residual equation.
+   * Only include non-zero entries.
+   */
+  jacobian?: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => {
+    residuals: number[];
+    partials: Record<string, number[]>;
+  };
   displayPosition: (constraint: { id: string; type: TType } & TData, ctx: DisplayContext) => [number, number];
   /**
    * Optional annotation geometry for Fusion360-style constraint visualization.

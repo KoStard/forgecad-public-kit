@@ -53,6 +53,17 @@ registerConstraint<'diameter', ConstraintTypeMap['diameter']>({
     return [circle.radius - c.value / 2];
   },
 
+  jacobian(c, { circles }) {
+    const circle = circles.get(c.circle);
+    if (!circle) return { residuals: [0], partials: {} };
+    return {
+      residuals: [circle.radius - c.value / 2],
+      partials: {
+        [`${c.circle}.r`]: [1],
+      },
+    };
+  },
+
   computeDof(_c, _ctx) {
     // diameter constrains circle radius (not a point DOF)
   },

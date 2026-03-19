@@ -60,6 +60,21 @@ registerConstraint<'coincident', ConstraintTypeMap['coincident']>({
     return [b.x - a.x, b.y - a.y];
   },
 
+  jacobian(c, { points }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (!a || !b) return { residuals: [0, 0], partials: {} };
+    return {
+      residuals: [b.x - a.x, b.y - a.y],
+      partials: {
+        [`${c.a}.x`]: [-1, 0],
+        [`${c.a}.y`]: [0, -1],
+        [`${c.b}.x`]: [1, 0],
+        [`${c.b}.y`]: [0, 1],
+      },
+    };
+  },
+
   computeDof(c, { refCount }) {
     refCount.set(c.a, (refCount.get(c.a) ?? 0) + 1);
     refCount.set(c.b, (refCount.get(c.b) ?? 0) + 1);
