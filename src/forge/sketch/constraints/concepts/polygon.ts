@@ -20,6 +20,8 @@ export interface PolygonOptions {
    * Default: true.
    */
   addLoop?: boolean;
+  /** Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false. */
+  blockRotation?: boolean;
 }
 
 /**
@@ -65,7 +67,7 @@ export function addPolygon(
   sk: ConstrainedSketchBuilder,
   options: PolygonOptions,
 ): ConstrainedPolygon {
-  const { points, addLoop: registerLoop = true } = options;
+  const { points, addLoop: registerLoop = true, blockRotation = false } = options;
   if (points.length < 3) throw new Error('addPolygon: requires at least 3 points');
 
   // Create all vertex points
@@ -77,6 +79,9 @@ export function addPolygon(
 
   // Enforce CCW winding
   sk.ccw(...vertices);
+  if (blockRotation) {
+    sk.blockRotation(vertices);
+  }
 
   // Shape for dimensional constraints
   const shapeId = sk.shape(sides);

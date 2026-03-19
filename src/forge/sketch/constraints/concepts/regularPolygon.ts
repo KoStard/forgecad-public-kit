@@ -27,6 +27,8 @@ export interface RegularPolygonOptions {
    * Default: 0 (rightmost vertex).
    */
   startAngle?: number;
+  /** Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false. */
+  blockRotation?: boolean;
 }
 
 /**
@@ -71,7 +73,7 @@ export function addRegularPolygon(
   sk: ConstrainedSketchBuilder,
   options: RegularPolygonOptions,
 ): ConstrainedRegularPolygon {
-  const { sides: n, radius = 10, cx = 0, cy = 0, startAngle = 0 } = options;
+  const { sides: n, radius = 10, cx = 0, cy = 0, startAngle = 0, blockRotation = false } = options;
   if (n < 3) throw new Error('addRegularPolygon: minimum 3 sides');
 
   const startRad = (startAngle * Math.PI) / 180;
@@ -88,7 +90,7 @@ export function addRegularPolygon(
   const center = sk.point(cx, cy);
 
   // Use addPolygon for the base structure (vertices, sides, ccw, shape, loop)
-  const poly = addPolygon(sk, { points: coords });
+  const poly = addPolygon(sk, { points: coords, blockRotation });
 
   // Construction lines from center to each vertex — used for equal-radius constraints
   const radialLines: LineId[] = poly.vertices.map((v) =>
