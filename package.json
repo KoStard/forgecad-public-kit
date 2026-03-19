@@ -23,10 +23,9 @@
   "scripts": {
     "dev": "vite -- ./examples",
     "dev:blank": "vite",
-    "dev:solver": "source $HOME/.cargo/env && wasm-pack build solver --target web --out-dir pkg --dev",
-    "build:solver": "source $HOME/.cargo/env && wasm-pack build solver --target web --out-dir pkg --release",
-    "build:solver:dev": "source $HOME/.cargo/env && wasm-pack build solver --target web --out-dir pkg --dev",
-    "test:solver": "source $HOME/.cargo/env && cargo test --manifest-path solver/Cargo.toml 2>&1",
+    "build:solver": "node scripts/solver-build.mjs --release",
+    "build:solver:dev": "node scripts/solver-build.mjs",
+    "test:solver": "node scripts/solver-test.mjs",
     "build": "npm run build:solver && tsc && vite build && npm run build:cli",
     "build:web": "npm run build:solver && tsc && FORGE_MODE=web vite build",
     "dev:cli": "tsup cli/forgecad.ts --format esm --platform node --target node20 --out-dir dist-cli --sourcemap --external typescript",

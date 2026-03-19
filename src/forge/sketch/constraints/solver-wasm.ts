@@ -102,13 +102,22 @@ export async function initSolverWasm(): Promise<void> {
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
-    // Dynamic import so Vite can handle the WASM file as an asset.
-    const solverModule = await import(
-      /* webpackChunkName: "solver-wasm" */
-      '../../../../solver/pkg/solver.js'
-    );
-    await solverModule.default();
-    _wasm_solve = solverModule.solve as WasmSolveFn;
+    try {
+      // Dynamic import so Vite can handle the WASM file as an asset.
+      const solverModule = await import(
+        /* webpackChunkName: "solver-wasm" */
+        '../../../../solver/pkg/solver.js'
+      );
+      await solverModule.default();
+      _wasm_solve = solverModule.solve as WasmSolveFn;
+    } catch (err) {
+      throw new Error(
+        `[solver-wasm] Failed to load WASM solver.\n` +
+        `  Build it with: npm run build:solver\n` +
+        `  (or run "npm run dev" which auto-builds)\n` +
+        `  Original error: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   })();
 
   return _initPromise;
