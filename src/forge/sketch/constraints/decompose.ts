@@ -1,11 +1,17 @@
 /**
- * Graph-based constraint decomposition.
+ * Graph-based constraint decomposition with constructive solve planning.
  *
  * Builds a connectivity graph (Union-Find) over all geometric entities and
  * partitions the constraint system into independent connected components.
  * Each component is solved separately, reducing the Jacobian size from O(n²)
  * to O((n/k)²) per component and eliminating cross-component basin-of-attraction
  * conflicts.
+ *
+ * Constructive solve plan (new):
+ *   - Components are topologically sorted: those with more fixed points
+ *     (anchors) are solved first.
+ *   - Within each component, the analytical solver runs first to place points
+ *     via closed-form geometry, reducing the numerical problem size.
  *
  * Connectivity rules:
  *   - Lines implicitly couple their two endpoints.
@@ -79,14 +85,33 @@ const extractEntityIds = (constraint: SketchConstraint): string[] => {
   return ids;
 };
 
-// ─── Decompose & Solve ──────────────────────────────────────────────────────────
+// ─── Solve Plan ─────────────────────────────────────────────────────────────────
 
-export const decomposeAndSolve = (
+/** A component in the constructive solve plan. */
+export interface SolvePlanComponent {
+  root: string;
+  points: ConstraintDefinition['points'];
+  lines: ConstraintDefinition['lines'];
+  circles: ConstraintDefinition['circles'];
+  arcs: ConstraintDefinition['arcs'];
+  shapes: ConstraintDefinition['shapes'];
+  constraints: SketchConstraint[];
+  /** Number of fixed (anchor) points in this component. Higher = solve first. */
+  anchorCount: number;
+  /** Total free DOF in this component. */
+  freeDof: number;
+}
+
+/**
+ * Build a constructive solve plan: topologically ordered list of components.
+ * Components with more anchor points are solved first because they are more
+ * constrained and likely to converge quickly, producing determined positions
+ * that downstream components can use.
+ */
+function buildSolvePlan(
   def: ConstraintDefinition,
-  options: SolveOptions,
-): { maxError: number } => {
-  // Fast path: trivial systems don't benefit from decomposition.
-  if (def.constraints.length <= 1) return solveConstraints(def, options);
+): SolvePlanComponent[] | null {
+  if (def.constraints.length <= 1) return null; // use fast path
 
   const uf = new UnionFind();
 
@@ -97,7 +122,7 @@ export const decomposeAndSolve = (
   for (const a of def.arcs ?? []) uf.add(a.id);
   for (const s of def.shapes ?? []) uf.add(s.id);
 
-  // Structural edges: composite entities → constituent points.
+  // Structural edges.
   for (const l of def.lines) { uf.union(l.id, l.a); uf.union(l.id, l.b); }
   for (const c of def.circles) { uf.union(c.id, c.center); }
   for (const a of def.arcs ?? []) {
@@ -109,14 +134,14 @@ export const decomposeAndSolve = (
     for (const lineId of s.lines) uf.union(s.id, lineId);
   }
 
-  // Constraint edges: union all entity IDs each constraint references.
+  // Constraint edges.
   for (const constraint of def.constraints) {
     const ids = extractEntityIds(constraint);
     for (let i = 1; i < ids.length; i++) uf.union(ids[0], ids[i]);
   }
 
   // Group entity IDs by component root.
-  const componentOf = new Map<string, string>(); // entity ID → component root
+  const componentOf = new Map<string, string>();
   const roots = new Set<string>();
   const allIds = [
     ...def.points.map(p => p.id),
@@ -131,13 +156,10 @@ export const decomposeAndSolve = (
     roots.add(root);
   }
 
-  // Single component → solve directly, no decomposition overhead.
-  if (roots.size <= 1) return solveConstraints(def, options);
+  if (roots.size <= 1) return null; // single component
 
-  // Solve each component independently.  Sub-definitions share the same entity
-  // object references as the original, so solver mutations (point.x, etc.)
-  // propagate back automatically.
-  let maxError = 0;
+  const components: SolvePlanComponent[] = [];
+
   for (const root of roots) {
     const inComponent = (id: string) => componentOf.get(id) === root;
 
@@ -153,14 +175,61 @@ export const decomposeAndSolve = (
 
     if (subConstraints.length === 0) continue;
 
-    const result = solveConstraints({
+    const anchorCount = subPoints.filter(p => p.fixed).length;
+    const freeDof = subPoints.filter(p => !p.fixed).length * 2 +
+      subCircles.filter(c => !c.fixedRadius).length +
+      subArcs.length; // arc radius DOF
+
+    components.push({
+      root,
       points: subPoints,
       lines: subLines,
       circles: subCircles,
       arcs: subArcs,
       shapes: subShapes,
-      loops: [],
       constraints: subConstraints,
+      anchorCount,
+      freeDof,
+    });
+  }
+
+  // Sort: components with more anchor points first (more constrained → solve first).
+  // Secondary sort: fewer free DOF first (simpler → faster convergence).
+  components.sort((a, b) => {
+    if (b.anchorCount !== a.anchorCount) return b.anchorCount - a.anchorCount;
+    return a.freeDof - b.freeDof;
+  });
+
+  return components;
+}
+
+// ─── Decompose & Solve ──────────────────────────────────────────────────────────
+
+export const decomposeAndSolve = (
+  def: ConstraintDefinition,
+  options: SolveOptions,
+): { maxError: number } => {
+  // Fast path: trivial systems don't benefit from decomposition.
+  if (def.constraints.length <= 1) return solveConstraints(def, options);
+
+  const plan = buildSolvePlan(def);
+
+  // Single component → solve directly, no decomposition overhead.
+  if (!plan) return solveConstraints(def, options);
+
+  // Solve each component independently in topological order.
+  // Sub-definitions share the same entity object references as the original,
+  // so solver mutations (point.x, etc.) propagate back automatically.
+  let maxError = 0;
+  for (const comp of plan) {
+    const result = solveConstraints({
+      points: comp.points,
+      lines: comp.lines,
+      circles: comp.circles,
+      arcs: comp.arcs,
+      shapes: comp.shapes,
+      loops: [],
+      constraints: comp.constraints,
       rejectedConstraints: [],
     }, options);
     maxError = Math.max(maxError, result.maxError);
