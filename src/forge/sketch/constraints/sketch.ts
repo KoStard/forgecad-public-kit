@@ -17,6 +17,7 @@ import {
   setConstraintValue,
 } from './registry';
 import { decomposeAndSolve } from './decompose';
+import { analyzeRigidity } from './rigidity';
 import { computeFacesFromSegments, pointInPolygon } from '../arrangement-core';
 import type { SurfaceDisplay } from './types';
 
@@ -420,34 +421,47 @@ export const solveConstraintDefinition = (
     maxError > tolerance * 5 ? working.constraints.map((c) => c.id) : [],
   );
   // Redundant = solver converged but DOF is negative.
-  // Greedy removal: cumulatively remove constraints one at a time (not independently).
-  // After removing a constraint, re-solve the reduced set. If all remaining constraints
-  // (including previously removed ones) are still satisfied, mark it as truly redundant.
-  // Stop once we've removed |DOF| constraints (the exact excess).
+  // Two-pass approach:
+  //   1. Fast structural check via pebble game (Laman rigidity analysis)
+  //   2. Fall back to greedy re-solve for constraints not caught by the pebble game
   const redundant = new Set<string>();
   if (dof < 0 && maxError <= tolerance * 5) {
     const targetRemovals = -dof;
-    let reducedConstraints = [...working.constraints];
-    for (const c of working.constraints) {
+
+    // Pass 1: structural redundancy via pebble game (O(n) — no re-solves).
+    const rigidity = analyzeRigidity(working);
+    for (const cid of rigidity.redundantConstraintIds) {
       if (redundant.size >= targetRemovals) break;
-      const cdef = getConstraintDef(c.type);
-      if (!cdef?.residual) continue;
-      const testDef = cloneDefinition(working);
-      testDef.constraints = reducedConstraints.filter((tc) => tc.id !== c.id);
-      decomposeAndSolve(testDef, { iterations: options.iterations, tolerance });
-      const testCtx: SolverContext = {
-        points: new Map(testDef.points.map((p) => [p.id, p] as const)),
-        lines: new Map(testDef.lines.map((l) => [l.id, l] as const)),
-        circles: new Map(testDef.circles.map((ci) => [ci.id, ci] as const)),
-        arcs: new Map((testDef.arcs ?? []).map((a) => [a.id, a] as const)),
-        shapes: new Map((testDef.shapes ?? []).map((s) => [s.id, s] as const)),
-        tolerance,
-        movePoint: () => false,
-      };
-      const res = cdef.residual(c as never, testCtx);
-      if (Math.max(...res.map(Math.abs)) < tolerance) {
-        redundant.add(c.id);
-        reducedConstraints = reducedConstraints.filter((tc) => tc.id !== c.id);
+      redundant.add(cid);
+    }
+
+    // Pass 2: greedy re-solve for remaining excess if pebble game didn't
+    // catch everything (e.g., constraints that are redundant in value but
+    // not structurally redundant in the graph sense).
+    if (redundant.size < targetRemovals) {
+      let reducedConstraints = working.constraints.filter(c => !redundant.has(c.id));
+      for (const c of working.constraints) {
+        if (redundant.size >= targetRemovals) break;
+        if (redundant.has(c.id)) continue;
+        const cdef = getConstraintDef(c.type);
+        if (!cdef?.residual) continue;
+        const testDef = cloneDefinition(working);
+        testDef.constraints = reducedConstraints.filter((tc) => tc.id !== c.id);
+        decomposeAndSolve(testDef, { iterations: options.iterations, tolerance });
+        const testCtx: SolverContext = {
+          points: new Map(testDef.points.map((p) => [p.id, p] as const)),
+          lines: new Map(testDef.lines.map((l) => [l.id, l] as const)),
+          circles: new Map(testDef.circles.map((ci) => [ci.id, ci] as const)),
+          arcs: new Map((testDef.arcs ?? []).map((a) => [a.id, a] as const)),
+          shapes: new Map((testDef.shapes ?? []).map((s) => [s.id, s] as const)),
+          tolerance,
+          movePoint: () => false,
+        };
+        const res = cdef.residual(c as never, testCtx);
+        if (Math.max(...res.map(Math.abs)) < tolerance) {
+          redundant.add(c.id);
+          reducedConstraints = reducedConstraints.filter((tc) => tc.id !== c.id);
+        }
       }
     }
   }
