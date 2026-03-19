@@ -426,18 +426,28 @@ export const isConstraintSketch = (sketch: Sketch | null | undefined): sketch is
 
 // ─── solveConstraintDefinition ────────────────────────────────────────────────
 
+/** Solve timing breakdown — populated by solveConstraintDefinition when profiling is enabled. */
+export let lastSolveProfile: Record<string, number> | null = null;
+
 export const solveConstraintDefinition = (
   def: ConstraintDefinition,
   options: SolveOptions = {},
 ): ConstraintSketch => {
+  const t0 = performance.now();
   const working = cloneDefinition(def);
   const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
+
+  const t1 = performance.now();
   const { maxError } = decomposeAndSolve(working, options);
+  const t2 = performance.now();
+
   const { status, dof } = computeStatus(working, maxError, tolerance);
   // Conflicting = solver couldn't converge (genuinely incompatible constraints).
   const conflicts = new Set<string>(
     maxError > tolerance * 5 ? working.constraints.map((c) => c.id) : [],
   );
+
+  const t3 = performance.now();
   // Redundant = solver converged but DOF is negative.
   // Use Jacobian rank analysis to identify which constraint equations are linearly
   // dependent at the solved state. This is O(m·n·min(m,n)) — sub-millisecond —
@@ -445,7 +455,11 @@ export const solveConstraintDefinition = (
   const redundant = dof < 0 && maxError <= tolerance * 5 && !options.skipRedundancyCheck
     ? findRedundantConstraints(working, -dof)
     : new Set<string>();
+  const t4 = performance.now();
+
   const constraints = buildConstraintDisplays(working, conflicts, redundant);
+  const t5 = performance.now();
+
   const rejected = buildConstraintDisplays(
     { ...working, constraints: working.rejectedConstraints, rejectedConstraints: [] },
     new Set(working.rejectedConstraints.map((c) => c.id)),
@@ -455,7 +469,21 @@ export const solveConstraintDefinition = (
   const sketch = buildSketchFromDefinition(working);
   const construction = buildConstructionGeometry(working);
   const edges = buildEdgeGeometry(working);
+  const t6 = performance.now();
+
   const surfaces = buildSurfaceDisplays(working);
+  const t7 = performance.now();
+
+  lastSolveProfile = {
+    clone: t1 - t0,
+    solve: t2 - t1,
+    redundancy: t4 - t3,
+    displays: t5 - t4,
+    buildSketch: t6 - t5,
+    surfaces: t7 - t6,
+    total: t7 - t0,
+  };
+
   return new ConstraintSketch(
     sketch.cross,
     { status, dof, maxError, constraints, rejected, surfaces, construction, edges },

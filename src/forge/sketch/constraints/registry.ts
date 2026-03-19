@@ -564,6 +564,7 @@ function linearizeSystem(
   referenceLength: number,
   _sparsity?: ReturnType<typeof buildSparsityMap>,
 ): LinearizedSystem | null {
+  _totalLinearizations++;
   // Hybrid path: analytical derivatives where available, per-constraint FD fallback.
   return linearizeSystemAnalytical(def, ctx, variables, referenceLength);
 }
@@ -580,11 +581,26 @@ function solveLevenbergMarquardtStep(
   const jtJ: number[][] = Array.from({ length: variableCount }, () => new Array(variableCount).fill(0));
   const jtR: number[] = new Array(variableCount).fill(0);
 
+  // Sparse J^T·J: only iterate over non-zero Jacobian entries per row.
+  // Each constraint row typically has 2-6 non-zero entries out of n variables,
+  // making this O(m × k²) instead of O(m × n²) where k << n.
   for (let row = 0; row < equationCount; row++) {
+    const jRow = weightedJacobian[row];
+    const wr = weightedResidual[row];
+    // Collect non-zero column indices for this row.
+    const nzCols: number[] = [];
     for (let i = 0; i < variableCount; i++) {
-      const ji = weightedJacobian[row][i];
-      jtR[i] += ji * weightedResidual[row];
-      for (let j = 0; j <= i; j++) jtJ[i][j] += ji * weightedJacobian[row][j];
+      if (jRow[i] !== 0) nzCols.push(i);
+    }
+    // Accumulate J^T·r and J^T·J using only non-zero entries.
+    for (let ki = 0; ki < nzCols.length; ki++) {
+      const i = nzCols[ki];
+      const ji = jRow[i];
+      jtR[i] += ji * wr;
+      for (let kj = 0; kj <= ki; kj++) {
+        const j = nzCols[kj];
+        jtJ[i][j] += ji * jRow[j];
+      }
     }
   }
 
@@ -592,7 +608,7 @@ function solveLevenbergMarquardtStep(
     for (let j = 0; j < i; j++) jtJ[j][i] = jtJ[i][j];
   }
 
-  const A = jtJ.map((row, i) => [...row]);
+  const A = jtJ.map((row) => [...row]);
   for (let i = 0; i < variableCount; i++) A[i][i] += lambda * (jtJ[i][i] + 1e-9);
 
   const rhs = jtR.map((value) => -value);
@@ -712,6 +728,7 @@ function solveGlobalSystem(
     if (!linearized) return Infinity;
 
     for (let iter = 0; iter < iterations; iter++) {
+      _totalLmIterations++;
       if (linearized.maxAbsResidual <= tolerance) break;
 
       const stepResult = solveLevenbergMarquardtStep(
@@ -877,6 +894,15 @@ function legacyGaussSeidelSolve(
 
 export const DEFAULT_TOLERANCE = 1e-3;
 
+/** Detailed solver timing breakdown — populated per solveConstraints call. */
+export let lastSolverProfile: Record<string, number> | null = null;
+let _totalLmTime = 0;
+let _totalLmCalls = 0;
+let _totalLinearizations = 0;
+let _totalLmIterations = 0;
+export const getSolverStats = () => ({ totalLmTime: _totalLmTime, totalLmCalls: _totalLmCalls, totalLinearizations: _totalLinearizations, totalLmIterations: _totalLmIterations });
+export const resetSolverStats = () => { _totalLmTime = 0; _totalLmCalls = 0; _totalLinearizations = 0; _totalLmIterations = 0; };
+
 export const solveConstraints = (
   def: ConstraintDefinition,
   options: SolveOptions,
@@ -924,6 +950,7 @@ export const solveConstraints = (
     entityRefCount,
   };
 
+  const _st0 = performance.now();
   for (const constraint of def.constraints) {
     const constraintDef = registry.get(constraint.type);
     constraintDef?.presolve?.(constraint as never, ctx);
@@ -934,21 +961,38 @@ export const solveConstraints = (
   // The analytical solver marks solved points as fixed to reduce the numerical
   // problem size, but we must restore them for correct DOF computation.
   const originalFixed = new Map(def.points.map(p => [p.id, p.fixed] as const));
+  const _st1 = performance.now();
   analyticalPreSolve(def);
+  const _st2 = performance.now();
 
   const hasFullResidualModel = def.constraints.every((constraint) => {
     const constraintDef = registry.get(constraint.type);
     return constraintDef?.residual != null;
   });
 
+  const _st3 = performance.now();
   const maxError = hasFullResidualModel
     ? solveGlobalSystem(def, ctx, iterations, tolerance, restarts, warmStartIterations, maxScaledStep)
     : legacyGaussSeidelSolve(def, ctx, iterations);
+  const _st4 = performance.now();
+  _totalLmTime += _st4 - _st3;
+  _totalLmCalls++;
 
   // Restore original fixed flags so DOF computation in sketch.ts is correct.
   for (const p of def.points) {
     p.fixed = originalFixed.get(p.id) ?? p.fixed;
   }
+
+  lastSolverProfile = {
+    presolve: _st1 - _st0,
+    analytical: _st2 - _st1,
+    lm: _st4 - _st3,
+    total: _st4 - _st0,
+    restarts,
+    warmStartIterations,
+    constraints: def.constraints.length,
+    freePoints: def.points.filter(p => !p.fixed).length,
+  };
 
   return { maxError };
 };
@@ -1077,7 +1121,8 @@ export const buildConstraintDisplays = (
     ] as [number, number];
   });
 
-  const pos = displays.map((d) => [d.position[0], d.position[1]] as [number, number]);
+  const origPos = displays.map((d) => [d.position[0], d.position[1]] as [number, number]);
+  const pos = origPos.map((p) => [p[0], p[1]] as [number, number]);
   const n = pos.length;
 
   // Force simulation parameters.
@@ -1186,7 +1231,28 @@ export const buildConstraintDisplays = (
     if (maxForce < 0.01) break;
   }
 
-  return displays.map((d, i) => ({ ...d, position: pos[i] }));
+  return displays.map((d, i) => {
+    const dx = pos[i][0] - origPos[i][0];
+    const dy = pos[i][1] - origPos[i][1];
+    // Shift annotation positions by the same delta the force layout applied.
+    const annotations = (dx === 0 && dy === 0) ? d.annotations : d.annotations.map((ann) => {
+      if (ann.kind === 'symbol' || ann.kind === 'text') {
+        return { ...ann, position: [ann.position[0] + dx, ann.position[1] + dy] as [number, number] };
+      }
+      if (ann.kind === 'dimension') {
+        return {
+          ...ann,
+          from: [ann.from[0] + dx, ann.from[1] + dy] as [number, number],
+          to: [ann.to[0] + dx, ann.to[1] + dy] as [number, number],
+        };
+      }
+      if (ann.kind === 'angle-arc') {
+        return { ...ann, center: [ann.center[0] + dx, ann.center[1] + dy] as [number, number] };
+      }
+      return ann;
+    });
+    return { ...d, position: pos[i], annotations };
+  });
 };
 
 // ─── DOF / status computation ──────────────────────────────────────────────────

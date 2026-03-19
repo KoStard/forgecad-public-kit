@@ -9,6 +9,8 @@ import { init, runScript } from "../src/forge/headless";
 import { collectProjectFiles } from "./collect-files";
 import { materializeNotebookPreviewScript } from "./notebook-entry";
 import type { Shape } from "../src/forge/kernel";
+import { lastSolveProfile } from "../src/forge/sketch/constraints/sketch";
+import { lastSolverProfile, getSolverStats, resetSolverStats } from "../src/forge/sketch/constraints/registry";
 
 type ShapeEntry = { name: string; shape: Shape; min: number[]; max: number[]; groupName?: string };
 
@@ -167,6 +169,7 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
     const { allFiles, fileName } = collectProjectFiles(materialized.runnablePath);
 
     await init();
+    resetSolverStats();
     const result = runScript(code, fileName, allFiles, { debugImports });
 
     if (result.error) {
@@ -276,6 +279,35 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
 
     console.log(`✓ Params: ${result.params.map((p) => p.name).join(", ")}`);
     console.log(`✓ Time: ${result.timeMs.toFixed(0)}ms`);
+
+    // Constraint solver profiling
+    if (lastSolveProfile) {
+      const p = lastSolveProfile;
+      console.log(`\n✓ Solver profile (last solve):`);
+      console.log(`    total:      ${p.total.toFixed(0)}ms`);
+      console.log(`    clone:      ${p.clone.toFixed(1)}ms`);
+      console.log(`    solve:      ${p.solve.toFixed(0)}ms`);
+      console.log(`    redundancy: ${p.redundancy.toFixed(0)}ms`);
+      console.log(`    displays:   ${p.displays.toFixed(0)}ms`);
+      console.log(`    buildSketch:${p.buildSketch.toFixed(0)}ms`);
+      console.log(`    surfaces:   ${p.surfaces.toFixed(0)}ms`);
+    }
+    if (lastSolverProfile) {
+      const s = lastSolverProfile;
+      console.log(`  Solver internals (last solve):`);
+      console.log(`    constraints: ${s.constraints}  freePoints: ${s.freePoints}  restarts: ${s.restarts}`);
+      console.log(`    presolve:   ${s.presolve.toFixed(1)}ms`);
+      console.log(`    analytical: ${s.analytical.toFixed(1)}ms`);
+      console.log(`    LM:         ${s.lm.toFixed(0)}ms`);
+    }
+    const stats = getSolverStats();
+    if (stats.totalLmCalls > 0) {
+      console.log(`  All solves (build + final):`);
+      console.log(`    LM calls:        ${stats.totalLmCalls}`);
+      console.log(`    linearizations:  ${stats.totalLinearizations}`);
+      console.log(`    LM iterations:   ${stats.totalLmIterations}`);
+      console.log(`    total LM time:   ${stats.totalLmTime.toFixed(0)}ms`);
+    }
   } finally {
     materialized.cleanup();
   }
