@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { initKernel } from '@forge/kernel';
+import { initSolverWasm } from '@forge/sketch/constraints/solver-wasm';
 import { useForgeStore } from './store/forgeStore';
 import { fileSystem } from './fs';
 import { CodeEditor } from './components/CodeEditor';
@@ -327,7 +328,7 @@ function FullApp() {
   const notebookMode = isNotebookFile(activeFile);
 
   useEffect(() => {
-    initKernel().then(() => {
+    Promise.all([initKernel(), initSolverWasm()]).then(() => {
       setKernelReady(true);
       execute();
     });

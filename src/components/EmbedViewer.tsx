@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { initKernel } from '@forge/kernel';
+import { initSolverWasm } from '@forge/sketch/constraints/solver-wasm';
 import { useForgeStore } from '../store/forgeStore';
 import { Viewport } from './Viewport';
 import { getGistId, fetchGistModel, buildShareUrl } from '../share';
@@ -39,7 +40,7 @@ export function EmbedViewer() {
 
   // Init kernel
   useEffect(() => {
-    initKernel().then(() => {
+    Promise.all([initKernel(), initSolverWasm()]).then(() => {
       setKernelReady(true);
       execute();
     });
