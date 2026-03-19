@@ -5,7 +5,7 @@
  *
  * Usage:
  * - call `initSolverWasm()` once at startup
- * - use `solveConstraintsWasm()` / presolve helpers after init
+ * - use `solveConstraintsWasm()` after init
  * - use `globalThis.__forgecadSolver` in the browser console for timing and capture helpers
  * - build the WASM artifact with `npm run build:solver`
  */
@@ -55,6 +55,8 @@ interface WasmOptions {
   warm_start_iterations?: number;
   max_scaled_step?: number;
   skip_redundancy_check?: boolean;
+  presolve_constraint_id?: string;
+  fallback_restarts?: number;
 }
 
 interface WasmProblem {
@@ -172,8 +174,6 @@ export interface SolverWasmRunDebugSnapshot {
 type WasmSolveFn = (problem_json: string) => string;
 
 let _wasm_solve: WasmSolveFn | null = null;
-let _wasm_presolve: WasmSolveFn | null = null;
-let _wasm_presolve_single: ((problem_json: string, constraint_id: string) => string) | null = null;
 let _initPromise: Promise<void> | null = null;
 const MAX_EXCHANGE_HISTORY = 64;
 const DEBUG_STORAGE_KEY = 'fc:solver-debug';
@@ -575,8 +575,6 @@ export async function initSolverWasm(): Promise<void> {
       }
 
       _wasm_solve = solverModule.solve as WasmSolveFn;
-      _wasm_presolve = solverModule.presolve as WasmSolveFn;
-      _wasm_presolve_single = solverModule.presolve_single as (problem_json: string, constraint_id: string) => string;
     } catch (err) {
       throw new Error(
         `[solver-wasm] Failed to load WASM solver.\n` +
@@ -637,6 +635,8 @@ function serializeProblem(def: ConstraintDefinition, options: SolveOptions): Was
       warm_start_iterations: options.warmStartIterations,
       max_scaled_step: options.maxScaledStep,
       skip_redundancy_check: options.skipRedundancyCheck,
+      presolve_constraint_id: options.presolveConstraintId,
+      fallback_restarts: options.fallbackRestarts,
     },
   };
 }
@@ -870,54 +870,3 @@ export function solveConstraintsWasm(
   });
 }
 
-/**
- * Run only the Rust presolve stages.
- * Updates `def` in place and returns `{ maxError }`.
- */
-export function presolveConstraintsWasm(
-  def: ConstraintDefinition,
-  options: SolveOptions,
-  source = 'presolveConstraintsWasm',
-): { maxError: number } {
-  if (!_wasm_presolve) {
-    throw new Error('[solver-wasm] WASM solver not initialised — build it with: npm run build:solver');
-  }
-  return runWasmCall(def, options, {
-    kind: 'presolve',
-    source,
-    invoke: (requestJson) => _wasm_presolve!(requestJson),
-    sentinelError: '[solver-wasm] WASM presolve failed to parse problem JSON',
-    parseError: '[solver-wasm] WASM presolve returned invalid JSON',
-    finalize: (result) => {
-      applyResult(def, result);
-      return { maxError: result.max_error };
-    },
-  });
-}
-
-/**
- * Run the Rust presolve hook for a single newly-added constraint.
- * Updates `def` in place and returns `{ maxError }`.
- */
-export function presolveSingleConstraintWasm(
-  def: ConstraintDefinition,
-  constraintId: string,
-  options: SolveOptions,
-  source = 'presolveSingleConstraintWasm',
-): { maxError: number } {
-  if (!_wasm_presolve_single) {
-    throw new Error('[solver-wasm] WASM solver not initialised — build it with: npm run build:solver');
-  }
-  return runWasmCall(def, options, {
-    kind: 'presolve-single',
-    source,
-    constraintId,
-    invoke: (requestJson) => _wasm_presolve_single!(requestJson, constraintId),
-    sentinelError: '[solver-wasm] WASM single-constraint presolve failed to parse problem JSON',
-    parseError: '[solver-wasm] WASM single-constraint presolve returned invalid JSON',
-    finalize: (result) => {
-      applyResult(def, result);
-      return { maxError: result.max_error };
-    },
-  });
-}

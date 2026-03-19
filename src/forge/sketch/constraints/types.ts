@@ -185,6 +185,10 @@ export interface SolveOptions {
   maxScaledStep?: number;
   /** Skip redundancy detection (safe when topology is unchanged and previous DOF >= 0). */
   skipRedundancyCheck?: boolean;
+  /** Run the targeted presolve hook for this constraint before the main solve. */
+  presolveConstraintId?: string;
+  /** When set and the first solve exceeds tolerance*5, retry with this many restarts. */
+  fallbackRestarts?: number;
 }
 
 export interface SolverConstraintResidual {

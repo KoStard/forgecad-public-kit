@@ -895,8 +895,7 @@ fn analytical_direct_placement_with_zero_iterations() {
             tolerance: Some(1e-6),
             restarts: Some(1),
             warm_start_iterations: Some(0),
-            max_scaled_step: Some(2.5),
-            skip_redundancy_check: Some(false),
+            ..Default::default()
         }),
     );
     assert_solved(&result, 1e-6, "analytical direct placement");

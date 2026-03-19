@@ -40,8 +40,7 @@ fn rect_svg_snapshot_stays_stable() {
         tolerance: Some(1e-6),
         restarts: Some(4),
         warm_start_iterations: Some(8),
-        max_scaled_step: Some(2.5),
-        skip_redundancy_check: Some(false),
+        ..Default::default()
     }));
     solved.assert_solved(1e-6);
 

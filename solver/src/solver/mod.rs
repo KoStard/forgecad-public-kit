@@ -74,12 +74,71 @@ pub fn solve(
     constraints: &Vec<Constraint>,
     options: &SolveOptions,
 ) -> f64 {
+    // Run targeted single-constraint presolve before the main solve when
+    // the caller requests it (builder incremental path).
+    if let Some(ref cid) = options.presolve_constraint_id {
+        let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
+        let entity_ref_count = build_entity_ref_count(constraints);
+        if let Some(constraint) = constraints.iter().find(|c| c.id() == cid.as_str()) {
+            apply_presolve_constraint(points, lines, &pts, &entity_ref_count, constraint);
+        }
+    }
+
     let iterations = options.iterations.unwrap_or(80);
     let tolerance = options.tolerance.unwrap_or(1e-3);
     let restarts = options.restarts.unwrap_or(6);
     let warm_start_iters = options.warm_start_iterations.unwrap_or(6);
     let max_scaled_step = options.max_scaled_step.unwrap_or(2.5);
 
+    // Snapshot initial geometry when fallback retry is requested, so we can
+    // restore to original positions before the retry (matching the TS-side
+    // updateConstraintValue behavior that clones from the original definition).
+    let snapshot = if options.fallback_restarts.is_some() {
+        Some((points.clone(), circles.clone(), arcs.clone()))
+    } else {
+        None
+    };
+
+    let max_error = solve_system(
+        points, lines, circles, arcs, shapes, constraints,
+        iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
+    );
+
+    // Fallback: if the first solve exceeded tolerance * 5 and a fallback is
+    // configured, restore the original geometry and retry with more restarts.
+    if let (Some(fallback), Some((snap_pts, snap_circles, snap_arcs))) =
+        (options.fallback_restarts, snapshot)
+    {
+        if max_error > tolerance * 5.0 {
+            *points = snap_pts;
+            *circles = snap_circles;
+            *arcs = snap_arcs;
+            let fb_restarts = fallback;
+            let fb_warm = options.warm_start_iterations.unwrap_or(6);
+            return solve_system(
+                points, lines, circles, arcs, shapes, constraints,
+                iterations, tolerance, fb_restarts, fb_warm, max_scaled_step,
+            );
+        }
+    }
+
+    max_error
+}
+
+/// Inner solve dispatch — decompose into independent components when possible.
+fn solve_system(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+    iterations: u32,
+    tolerance: f64,
+    restarts: u32,
+    warm_start_iters: u32,
+    max_scaled_step: f64,
+) -> f64 {
     if let Some(plan) = build_solve_plan(points, lines, circles, arcs, shapes, constraints) {
         let mut max_error: f64 = 0.0;
         for component in plan {

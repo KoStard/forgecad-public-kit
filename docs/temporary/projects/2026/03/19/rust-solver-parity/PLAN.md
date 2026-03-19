@@ -110,6 +110,7 @@ Primary hypotheses at start:
 | 9 | Remove TS DOF bookkeeping and pebble-game rigidity logic | `analyzeRigidity()` now delegates to Rust solve metadata; TS defs no longer carry `computeDof` hooks | complete |
 | 10 | Explain and shrink the surviving TS boundary | every remaining constraints TS file now states its thin role explicitly; dead compatibility helpers were removed; a README now points solver debugging back to Rust first | complete |
 | 11 | Add Rust-boundary timing and capture tooling | spectrogram now reports Rust/WASM time directly; the last request/response can be copied as a clean JSON bundle and replayed in Rust tests | complete |
+| 12 | Consolidate TS solve orchestration into single Rust calls | Builder: 2 WASM calls → 1 (presolve+solve via `presolveConstraintId`). Update: 2 WASM calls → 1 (warm+fallback via `fallbackRestarts`). Dead TS presolve bridge functions removed | complete |
 
 ## Remaining TS Solver Surface
 
@@ -421,6 +422,34 @@ Additional concrete finding:
 **Lesson**:
 
 - On spectrogram, the dominant cost is not JSON marshalling anymore; it is the number of Rust/WASM solve calls during incremental construction. That means the next performance work should target solve frequency / branch stability first, not serialization micro-optimizations.
+
+### Consolidate TS Solve Orchestration (SUCCESS)
+**What**: Reduce every TS→Rust solve flow to a single WASM call by moving the remaining orchestration decisions into Rust `SolveOptions`.
+
+**Changed**:
+
+- added `presolve_constraint_id` to Rust `SolveOptions` — when set, `solve()` runs the targeted single-constraint presolve hook before the main solver loop, replacing the separate `presolve_single` WASM call
+- added `fallback_restarts` to Rust `SolveOptions` — when set and the first solve exceeds `tolerance * 5`, `solve()` restores the original geometry snapshot and retries with more restarts, replacing the TS warm-start-then-fallback pattern in `updateConstraintValue`
+- extracted `solve_system()` from `solve()` in `solver/src/solver/mod.rs` so the fallback retry can re-enter the decompose-and-solve path cleanly
+- updated `builder.ts::constrain()` from 2 WASM calls (`presolveSingleConstraintWasm` + `solveConstraints`) to 1 call with `presolveConstraintId`
+- updated `sketch.ts::updateConstraintValue()` from 2 calls (warm attempt + full fallback) to 1 call with `fallbackRestarts: 6`
+- removed dead `presolveSingleConstraintWasm` and `presolveConstraintsWasm` from `solver-wasm.ts`
+- removed `_wasm_presolve` and `_wasm_presolve_single` module state from `solver-wasm.ts`
+
+**Verification**:
+
+- `cargo test -q` → `54 passed`
+- `npm exec tsc -- --noEmit` → passes
+- `npm run build:solver` → passes
+- `npm run build:cli` → passes
+- `node dist-cli/forgecad.js check constraints` → `74 passed, 0 failed`
+- `spectrogram.forge.js` → `OVER-REDUNDANT DOF=-4 err=0.000608`
+- `case_wood_cut.forge.js` → `area=616850.0`
+- `case_wood_cut_from_wood.forge.js` → `area=762500.0`
+
+**Lesson**:
+
+- Every TS solve flow now makes exactly 1 WASM call. The remaining TS orchestration is purely UI assembly (building display objects from Rust-returned geometry and metadata). Rust now owns: when to presolve, how to retry on failure, and solver parameter selection for the fallback path.
 
 ## Files Modified
 

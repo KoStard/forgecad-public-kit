@@ -159,6 +159,14 @@ pub struct SolveOptions {
     pub warm_start_iterations: Option<u32>,
     pub max_scaled_step: Option<f64>,
     pub skip_redundancy_check: Option<bool>,
+    /// When set, run the targeted presolve hook for this constraint before the
+    /// main solve.  Used by the builder's incremental construction path so that
+    /// presolve + solve is a single WASM call.
+    pub presolve_constraint_id: Option<String>,
+    /// When set and the first solve attempt exceeds `tolerance * 5`, the solver
+    /// retries with this many restarts.  Used by `updateConstraintValue` so the
+    /// warm-start-then-fallback policy is a single WASM call.
+    pub fallback_restarts: Option<u32>,
 }
 
 impl Default for SolveOptions {
@@ -170,6 +178,8 @@ impl Default for SolveOptions {
             warm_start_iterations: Some(6),
             max_scaled_step: Some(2.5),
             skip_redundancy_check: Some(false),
+            presolve_constraint_id: None,
+            fallback_restarts: None,
         }
     }
 }

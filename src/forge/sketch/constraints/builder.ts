@@ -22,7 +22,6 @@ import type {
   SolveOptions,
 } from './types';
 import { DEFAULT_TOLERANCE, getPendingBuilderMethods, solveConstraints } from './registry';
-import { presolveSingleConstraintWasm } from './solver-wasm';
 import { ConstraintSketch, solveConstraintDefinition } from './sketch';
 
 const toRad = (deg: number): number => (deg * Math.PI) / 180;
@@ -235,21 +234,14 @@ export class ConstrainedSketchBuilder {
     // Always accept the constraint — never reject.
     this.constraints.push(next);
 
-    // Run only the new constraint's Rust-owned presolve hook first. Replaying
-    // presolve across the full system here is too aggressive for incremental
-    // construction and can reopen old branch-selection failures.
+    // Single Rust call: presolve the new constraint then solve incrementally.
     const def = this.buildDefinition();
-    presolveSingleConstraintWasm(def, next.id, {
-      tolerance: DEFAULT_TOLERANCE,
-    }, 'builder.constrain.presolveSingle');
-    this.syncFromDefinition(def);
-
-    // Incremental solve with minimal solver settings — positions are warm.
     const { maxError } = solveConstraints(def, {
       iterations: 30,
       tolerance: DEFAULT_TOLERANCE,
       restarts: 1,
       warmStartIterations: 4,
+      presolveConstraintId: next.id,
     }, 'builder.constrain');
     if (maxError <= DEFAULT_TOLERANCE) {
       this.syncFromDefinition(def);

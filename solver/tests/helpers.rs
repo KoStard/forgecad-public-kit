@@ -82,8 +82,7 @@ pub fn tight_options() -> SolveOptions {
         tolerance: Some(1e-6),
         restarts: Some(8),
         warm_start_iterations: Some(10),
-        max_scaled_step: Some(2.5),
-        skip_redundancy_check: Some(false),
+        ..Default::default()
     }
 }
 

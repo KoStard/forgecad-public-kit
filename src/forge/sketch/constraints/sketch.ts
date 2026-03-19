@@ -496,21 +496,14 @@ export const updateConstraintValue = (
   if (!target) return sketch;
   setConstraintValue(target, value);
 
-  // Warm-start: cloned definition carries previous solved positions.
+  // Single Rust call: try warm-start first (1 restart), automatically fall
+  // back to a full solve (6 restarts) from the original positions if the
+  // warm attempt exceeds tolerance * 5.
   const skipRedundancyCheck = sketch.constraintMeta.dof >= 0;
-  const warmResult = solveConstraintDefinition(next, {
+  return solveConstraintDefinition(next, {
     restarts: 1,
     warmStartIterations: 0,
     skipRedundancyCheck,
+    fallbackRestarts: 6,
   });
-  if (warmResult.constraintMeta.maxError <= DEFAULT_TOLERANCE * 5) {
-    return warmResult;
-  }
-
-  // Fallback: full solve with all restarts.
-  const freshNext = cloneDefinition(sketch.definition);
-  const freshTarget = freshNext.constraints.find((c) => c.id === constraintId);
-  if (!freshTarget) return sketch;
-  setConstraintValue(freshTarget, value);
-  return solveConstraintDefinition(freshNext);
 };
