@@ -120,6 +120,12 @@ The current three-layer approach (presolve + solve + residual) is the correct de
 - One-sided residual — LM sees CW violations but CCW is "free" (no false constraints)
 - presolve/solve — imperative correction for GS phases
 
+### Experiment 13: Spectrogram width parameter fragility — CLI vs UI
+**What**: User reported spectrogram fails at `width=93` but works at `width=94`. Investigated whether the solver is fundamentally fragile or this is an environment issue.
+**Result**: CLI sweep of width=10 through 200 — ALL converge at err=0.000303. No fragility whatsoever. The solver is robust across the entire range.
+**Root cause**: The failure is UI-only. Analysis of `forgeStore.ts` and `evalWorker.ts` showed the UI re-executes the script from scratch (same path as CLI) — no partial caching or warm-starting from old positions. The `runResultCache` is keyed on `(code, files, paramOverrides, quality)` and correctly invalidates on any change. Most likely cause: stale Vite dev server bundle that hadn't picked up the solver fixes (entityRefCount, CCW residual). CLI runs against source directly via `npx tsx`.
+**Lesson**: When diagnosing solver fragility, always verify with CLI first to isolate solver bugs from build/caching issues. Added `disableRunCache` advanced config flag to allow disabling the UI's `runResultCache` for debugging.
+
 ---
 
 ## Summary of Changes

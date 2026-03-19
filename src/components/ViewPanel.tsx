@@ -239,6 +239,8 @@ export function ViewPanel() {
   const setGridSize = useForgeStore((s) => s.setGridSize);
   const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
   const setShowPerformanceInfo = useForgeStore((s) => s.setShowPerformanceInfo);
+  const disableRunCache = useForgeStore((s) => s.disableRunCache);
+  const setDisableRunCache = useForgeStore((s) => s.setDisableRunCache);
   const result = useForgeStore((s) => s.lastValidResult);
   const objectSettings = useForgeStore((s) => s.objectSettings);
   const setObjectVisibility = useForgeStore((s) => s.setObjectVisibility);
@@ -919,6 +921,16 @@ export function ViewPanel() {
               onChange={(e) => setShowPerformanceInfo(e.target.checked)}
             />
             Show performance info
+          </label>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
+            <input
+              type="checkbox"
+              checked={disableRunCache}
+              onChange={(e) => setDisableRunCache(e.target.checked)}
+            />
+            Disable run cache
           </label>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>

@@ -386,6 +386,10 @@ interface ForgeStore {
   editorNavigate: { line: number; id: number } | null;
   requestEditorNavigate: (line: number) => void;
   clearEditorNavigate: () => void;
+
+  /** When true, skip the run-result cache — every param/code change round-trips to the worker. */
+  disableRunCache: boolean;
+  setDisableRunCache: (disabled: boolean) => void;
 }
 
 interface ViewPreferencesState {
@@ -410,6 +414,8 @@ interface ViewPreferencesState {
   fileExplorerOpen: boolean;
   viewPanelOpen: boolean;
   lengthUnit: LengthUnit;
+  /** Disable the run-result cache so every execution round-trips to the worker. */
+  disableRunCache: boolean;
 }
 
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
@@ -948,7 +954,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (!code) return;
 
     // Cache hit — show previous result immediately, no worker round-trip
-    const cached = lookupCache(previewFile, code, files, paramOverrides, runQuality);
+    const cached = get().disableRunCache ? null : lookupCache(previewFile, code, files, paramOverrides, runQuality);
     if (cached) {
       const applied = buildRunState(previewFile, cached, get());
       set({ ...applied.nextState, lastValidResult: cached, isEvaluating: false });
@@ -1638,4 +1644,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   editorNavigate: null,
   requestEditorNavigate: (line) => set((s) => ({ editorNavigate: { line, id: (s.editorNavigate?.id ?? 0) + 1 } })),
   clearEditorNavigate: () => set({ editorNavigate: null }),
+
+  disableRunCache: initialViewPreferences.disableRunCache ?? false,
+  setDisableRunCache: (disabled) => {
+    writeViewPreferences({ disableRunCache: disabled });
+    set({ disableRunCache: disabled });
+  },
 }));
