@@ -47,6 +47,12 @@ export {
 
 export { registerConstraint, installBuilderMethod, getConstraintDef } from './registry';
 
+export { analyticalPreSolve } from './analytical';
+export type { AnalyticalResult, ConstructionStep } from './analytical';
+
+export { analyzeRigidity } from './rigidity';
+export type { RigidityResult } from './rigidity';
+
 // ─── Backward-compatible constraint interface aliases ──────────────────────────
 // These match the old exported interface names from constraints.ts so existing
 // code that imports them by name continues to compile.

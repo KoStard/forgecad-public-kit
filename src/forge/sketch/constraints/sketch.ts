@@ -5,7 +5,6 @@ import { getWasm } from '../../kernel';
 import type {
   ConstraintDefinition,
   SketchConstraintMeta,
-  SolverContext,
   SketchPoint,
   SolveOptions,
 } from './types';
@@ -14,7 +13,6 @@ import {
   buildConstraintDisplays,
   computeStatus,
   findRedundantConstraints,
-  getConstraintDef,
   setConstraintValue,
 } from './registry';
 import { decomposeAndSolve } from './decompose';

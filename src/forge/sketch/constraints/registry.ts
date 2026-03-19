@@ -11,6 +11,7 @@ import type {
   SolverContext,
   SolveOptions,
 } from './types';
+import { analyticalPreSolve } from './analytical';
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
@@ -928,6 +929,13 @@ export const solveConstraints = (
     constraintDef?.presolve?.(constraint as never, ctx);
   }
 
+  // ── Analytical pre-solve ──────────────────────────────────────────────────
+  // Save original fixed flags so we can restore them after solving.
+  // The analytical solver marks solved points as fixed to reduce the numerical
+  // problem size, but we must restore them for correct DOF computation.
+  const originalFixed = new Map(def.points.map(p => [p.id, p.fixed] as const));
+  analyticalPreSolve(def);
+
   const hasFullResidualModel = def.constraints.every((constraint) => {
     const constraintDef = registry.get(constraint.type);
     return constraintDef?.residual != null;
@@ -936,6 +944,11 @@ export const solveConstraints = (
   const maxError = hasFullResidualModel
     ? solveGlobalSystem(def, ctx, iterations, tolerance, restarts, warmStartIterations, maxScaledStep)
     : legacyGaussSeidelSolve(def, ctx, iterations);
+
+  // Restore original fixed flags so DOF computation in sketch.ts is correct.
+  for (const p of def.points) {
+    p.fixed = originalFixed.get(p.id) ?? p.fixed;
+  }
 
   return { maxError };
 };
