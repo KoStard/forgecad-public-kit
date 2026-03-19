@@ -276,6 +276,12 @@ export function ViewPanel() {
   const hoveredJointName = useForgeStore((s) => s.hoveredJointName);
   const setHoveredJointName = useForgeStore((s) => s.setHoveredJointName);
   const updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
+  const selectedSurfaceIndex = useForgeStore((s) => s.selectedSurfaceIndex);
+  const setSelectedSurfaceIndex = useForgeStore((s) => s.setSelectedSurfaceIndex);
+  const hoveredSurfaceIndex = useForgeStore((s) => s.hoveredSurfaceIndex);
+  const setHoveredSurfaceIndex = useForgeStore((s) => s.setHoveredSurfaceIndex);
+  const selectedSketchEntityId = useForgeStore((s) => s.selectedSketchEntityId);
+  const setSelectedSketchEntityId = useForgeStore((s) => s.setSelectedSketchEntityId);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
   const setCutPlaneEnabled = useForgeStore((s) => s.setCutPlaneEnabled);
   const sectionPlaneGuidesEnabled = useForgeStore((s) => s.sectionPlaneGuidesEnabled);
@@ -782,6 +788,140 @@ export function ViewPanel() {
         {objectTree.map(renderObjectTreeNode)}
       </div>
 
+      {/* Sketch Geometry Tree */}
+      {constraintMeta && (
+        <div style={sectionStyle}>
+          <div style={labelStyle}>Sketch Geometry</div>
+          {/* Edges */}
+          {(constraintMeta.edges.lines.length > 0 || constraintMeta.edges.circles.length > 0 || constraintMeta.edges.arcs.length > 0) && (
+            <div style={{ marginBottom: 4 }}>
+              <div style={{ fontSize: 10, color: 'var(--fc-textDim)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Edges ({constraintMeta.edges.lines.length + constraintMeta.edges.circles.length + constraintMeta.edges.arcs.length})
+              </div>
+              {constraintMeta.edges.lines.map((line) => {
+                const isSelected = selectedSketchEntityId === line.id;
+                const len = Math.hypot(line.b[0] - line.a[0], line.b[1] - line.a[1]);
+                return (
+                  <div
+                    key={line.id}
+                    onClick={() => setSelectedSketchEntityId(line.id)}
+                    style={{
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      background: isSelected ? 'rgba(74,163,255,0.15)' : 'transparent',
+                      border: isSelected ? '1px solid rgba(74,163,255,0.4)' : '1px solid transparent',
+                      color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
+                    }}
+                  >
+                    <span>{line.id}</span>
+                    <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>{len.toFixed(1)}mm</span>
+                  </div>
+                );
+              })}
+              {constraintMeta.edges.circles.map((c) => {
+                const isSelected = selectedSketchEntityId === c.id;
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => setSelectedSketchEntityId(c.id)}
+                    style={{
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      background: isSelected ? 'rgba(74,163,255,0.15)' : 'transparent',
+                      border: isSelected ? '1px solid rgba(74,163,255,0.4)' : '1px solid transparent',
+                      color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
+                    }}
+                  >
+                    <span>{c.id}</span>
+                    <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>r={c.radius.toFixed(1)}mm</span>
+                  </div>
+                );
+              })}
+              {constraintMeta.edges.arcs.map((a) => {
+                const isSelected = selectedSketchEntityId === a.id;
+                return (
+                  <div
+                    key={a.id}
+                    onClick={() => setSelectedSketchEntityId(a.id)}
+                    style={{
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      background: isSelected ? 'rgba(74,163,255,0.15)' : 'transparent',
+                      border: isSelected ? '1px solid rgba(74,163,255,0.4)' : '1px solid transparent',
+                      color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
+                    }}
+                  >
+                    <span>{a.id}</span>
+                    <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>r={a.radius.toFixed(1)}mm</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {/* Points */}
+          {constraintMeta.edges.points.length > 0 && (
+            <div style={{ marginBottom: 4 }}>
+              <div style={{ fontSize: 10, color: 'var(--fc-textDim)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Points ({constraintMeta.edges.points.length})
+              </div>
+              {constraintMeta.edges.points.map((pt) => {
+                const isSelected = selectedSketchEntityId === pt.id;
+                return (
+                  <div
+                    key={pt.id}
+                    onClick={() => setSelectedSketchEntityId(pt.id)}
+                    style={{
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      background: isSelected ? 'rgba(74,163,255,0.15)' : 'transparent',
+                      border: isSelected ? '1px solid rgba(74,163,255,0.4)' : '1px solid transparent',
+                      color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
+                    }}
+                  >
+                    <span>{pt.id}</span>
+                    <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>({pt.pos[0].toFixed(1)}, {pt.pos[1].toFixed(1)})</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {/* Construction */}
+          {(constraintMeta.construction.lines.length > 0 || constraintMeta.construction.circles.length > 0) && (
+            <div style={{ marginBottom: 4 }}>
+              <div style={{ fontSize: 10, color: 'var(--fc-textDim)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Construction ({constraintMeta.construction.lines.length + constraintMeta.construction.circles.length + constraintMeta.construction.arcs.length})
+              </div>
+              {constraintMeta.construction.lines.map((line) => (
+                <div key={line.id} style={{ fontSize: 11, padding: '2px 6px', color: '#888', fontStyle: 'italic' }}>
+                  {line.id}
+                </div>
+              ))}
+              {constraintMeta.construction.circles.map((c) => (
+                <div key={c.id} style={{ fontSize: 11, padding: '2px 6px', color: '#888', fontStyle: 'italic' }}>
+                  {c.id} — r={c.radius.toFixed(1)}mm
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {constraintMeta && (
         <div style={sectionStyle}>
           <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -857,18 +997,77 @@ export function ViewPanel() {
               {constraintMeta.surfaces.map((s) => {
                 const palette = ['#4488cc', '#44cc88', '#cc8844', '#cc44aa', '#88cc44', '#44aacc', '#aa44cc', '#cccc44'];
                 const color = palette[s.index % palette.length];
+                const isSelected = selectedSurfaceIndex === s.index;
+                const isHovered = hoveredSurfaceIndex === s.index;
                 return (
-                  <div key={s.index} style={{ fontSize: 11, color: 'var(--fc-text)', display: 'flex', gap: 6, alignItems: 'center', padding: '2px 0' }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0, opacity: 0.7 }} />
-                    <span>[{s.index}] {s.area.toFixed(1)}mm²</span>
-                    <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>
-                      seed=[{s.seed[0].toFixed(1)}, {s.seed[1].toFixed(1)}]
-                    </span>
+                  <div
+                    key={s.index}
+                    onClick={() => setSelectedSurfaceIndex(s.index)}
+                    onMouseEnter={() => setHoveredSurfaceIndex(s.index)}
+                    onMouseLeave={() => setHoveredSurfaceIndex(null)}
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--fc-text)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      padding: '4px 6px',
+                      marginBottom: 3,
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      border: isSelected ? `1px solid ${color}` : '1px solid transparent',
+                      background: isSelected ? `${color}22` : isHovered ? 'var(--fc-bgOverlay)' : 'transparent',
+                      transition: 'all 0.1s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0, opacity: isSelected ? 1 : 0.7 }} />
+                      <span style={{ fontWeight: isSelected ? 600 : 400 }}>S{s.index} — {s.area.toFixed(1)}mm²</span>
+                    </div>
+                    {isSelected && (
+                      <div style={{ fontSize: 10, color: 'var(--fc-textDim)', paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <span>Centroid: ({s.centroid[0].toFixed(2)}, {s.centroid[1].toFixed(2)})</span>
+                        <span>Bounds: [{s.bounds.min[0].toFixed(1)}, {s.bounds.min[1].toFixed(1)}] → [{s.bounds.max[0].toFixed(1)}, {s.bounds.max[1].toFixed(1)}]</span>
+                        <span>Seed: ({s.seed[0].toFixed(2)}, {s.seed[1].toFixed(2)})</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
+          {/* Selected entity info — show constraints referencing this entity */}
+          {selectedSketchEntityId && constraintMeta && (() => {
+            const relatedConstraints = constraintMeta.constraints.filter(
+              (c) => c.entityIds.includes(selectedSketchEntityId)
+            );
+            if (relatedConstraints.length === 0) return null;
+            return (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 4 }}>
+                  Constraints on {selectedSketchEntityId} ({relatedConstraints.length})
+                </div>
+                {relatedConstraints.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => { setSelectedConstraintId(c.id); }}
+                    style={{
+                      fontSize: 11,
+                      padding: '3px 6px',
+                      marginBottom: 2,
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      color: c.isConflicting ? 'var(--fc-error)' : c.isRedundant ? '#faad14' : 'var(--fc-text)',
+                      background: selectedConstraintId === c.id ? 'rgba(255,204,0,0.15)' : 'transparent',
+                      border: selectedConstraintId === c.id ? '1px solid #ffcc00' : '1px solid transparent',
+                    }}
+                  >
+                    {c.label} {c.isDimension && c.value !== undefined ? `= ${c.value}` : c.type}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
 

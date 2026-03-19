@@ -110,10 +110,10 @@ interface PlaneTransform {
 }
 
 type SketchHoveredEntity =
-  | { kind: 'line'; a: [number, number]; b: [number, number] }
-  | { kind: 'circle'; center: [number, number]; radius: number }
-  | { kind: 'arc'; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }
-  | { kind: 'point'; position: [number, number] };
+  | { kind: 'line'; id: string; a: [number, number]; b: [number, number] }
+  | { kind: 'circle'; id: string; center: [number, number]; radius: number }
+  | { kind: 'arc'; id: string; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }
+  | { kind: 'point'; id: string; position: [number, number] };
 
 interface SketchEntityInfoPanel {
   entity: SketchHoveredEntity;
@@ -130,6 +130,33 @@ function distToSegment2D(px: number, py: number, ax: number, ay: number, bx: num
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
+function pointInPolygon(px: number, py: number, polygon: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function findHoveredSurface(
+  x: number,
+  y: number,
+  meta: SketchConstraintMeta,
+): number | null {
+  // Check surfaces from smallest to largest so inner regions take priority
+  for (let i = meta.surfaces.length - 1; i >= 0; i--) {
+    const s = meta.surfaces[i];
+    // Quick bounding box check
+    if (x < s.bounds.min[0] || x > s.bounds.max[0] || y < s.bounds.min[1] || y > s.bounds.max[1]) continue;
+    if (pointInPolygon(x, y, s.polygon)) return s.index;
+  }
+  return null;
+}
+
 function findNearestSketchEntity(
   x: number,
   y: number,
@@ -140,19 +167,19 @@ function findNearestSketchEntity(
   let best: SketchHoveredEntity | null = null;
   for (const line of meta.edges.lines) {
     const d = distToSegment2D(x, y, line.a[0], line.a[1], line.b[0], line.b[1]);
-    if (d < bestDist) { bestDist = d; best = { kind: 'line', a: line.a, b: line.b }; }
+    if (d < bestDist) { bestDist = d; best = { kind: 'line', id: line.id, a: line.a, b: line.b }; }
   }
   for (const circle of meta.edges.circles) {
     const d = Math.abs(Math.hypot(x - circle.center[0], y - circle.center[1]) - circle.radius);
-    if (d < bestDist) { bestDist = d; best = { kind: 'circle', center: circle.center, radius: circle.radius }; }
+    if (d < bestDist) { bestDist = d; best = { kind: 'circle', id: circle.id, center: circle.center, radius: circle.radius }; }
   }
   for (const arc of meta.edges.arcs) {
     const d = Math.abs(Math.hypot(x - arc.center[0], y - arc.center[1]) - arc.radius);
-    if (d < bestDist) { bestDist = d; best = { kind: 'arc', center: arc.center, start: arc.start, end: arc.end, radius: arc.radius, clockwise: arc.clockwise }; }
+    if (d < bestDist) { bestDist = d; best = { kind: 'arc', id: arc.id, center: arc.center, start: arc.start, end: arc.end, radius: arc.radius, clockwise: arc.clockwise }; }
   }
   for (const pt of meta.edges.points) {
     const d = Math.hypot(x - pt.pos[0], y - pt.pos[1]);
-    if (d < bestDist) { bestDist = d; best = { kind: 'point', position: [pt.pos[0], pt.pos[1]] }; }
+    if (d < bestDist) { bestDist = d; best = { kind: 'point', id: pt.id, position: [pt.pos[0], pt.pos[1]] }; }
   }
   return best;
 }
@@ -2019,9 +2046,15 @@ function SketchObject({
   onVertexHover?: (pointId: string, event: ThreeEvent<PointerEvent>) => void;
 }) {
   const [hoveredEntity, setHoveredEntity] = useState<SketchHoveredEntity | null>(null);
+  const [hoveredSurfIdx, setHoveredSurfIdx] = useState<number | null>(null);
   const worldThresholdRef = useRef(5);
   const selectedConstraintId = useForgeStore((s) => s.selectedConstraintId);
   const setSelectedConstraintId = useForgeStore((s) => s.setSelectedConstraintId);
+  const selectedSurfaceIndex = useForgeStore((s) => s.selectedSurfaceIndex);
+  const setSelectedSurfaceIndex = useForgeStore((s) => s.setSelectedSurfaceIndex);
+  const setHoveredSurfaceIndex = useForgeStore((s) => s.setHoveredSurfaceIndex);
+  const selectedSketchEntityId = useForgeStore((s) => s.selectedSketchEntityId);
+  const setSelectedSketchEntityId = useForgeStore((s) => s.setSelectedSketchEntityId);
 
   useFrame(({ camera, size }) => {
     if (!isSketchMode) return;
@@ -2258,7 +2291,7 @@ function SketchObject({
       matrix={matrix}
       onPointerEnter={onPointerEnter}
       onPointerMove={handlePointerMove}
-      onPointerLeave={(event) => { setHoveredEntity(null); onPointerLeave?.(event); }}
+      onPointerLeave={(event) => { setHoveredEntity(null); setHoveredSurfIdx(null); setHoveredSurfaceIndex(null); onPointerLeave?.(event); }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
@@ -2267,32 +2300,65 @@ function SketchObject({
         <mesh
           geometry={fillGeo}
           onPointerMove={isSketchMode && obj.sketchMeta ? (e) => {
-            setHoveredEntity(findNearestSketchEntity(e.point.x, e.point.y, obj.sketchMeta!, worldThresholdRef.current));
+            const entity = findNearestSketchEntity(e.point.x, e.point.y, obj.sketchMeta!, worldThresholdRef.current);
+            setHoveredEntity(entity);
+            // Surface detection — only when no entity is near
+            const surfIdx = !entity ? findHoveredSurface(e.point.x, e.point.y, obj.sketchMeta!) : null;
+            setHoveredSurfIdx(surfIdx);
+            setHoveredSurfaceIndex(surfIdx);
           } : undefined}
           onClick={isSketchMode && obj.sketchMeta ? (e) => {
             const entity = findNearestSketchEntity(e.point.x, e.point.y, obj.sketchMeta!, worldThresholdRef.current);
-            if (entity) onEntityClick?.(entity, e.clientX, e.clientY);
+            if (entity) {
+              setSelectedSketchEntityId(entity.id);
+              onEntityClick?.(entity, e.clientX, e.clientY);
+            } else {
+              // Check for surface click
+              const surfIdx = findHoveredSurface(e.point.x, e.point.y, obj.sketchMeta!);
+              if (surfIdx !== null) {
+                setSelectedSurfaceIndex(surfIdx);
+                setSelectedSketchEntityId(null);
+              }
+            }
           } : undefined}
         >
           <meshBasicMaterial color={constraintStatusColor} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
         </mesh>
       )}
       {/* Surface region fills from arrangement detection */}
-      {surfaceFills.length > 0 && surfaceFills.map((sf) => (
-        <mesh key={`sf-${sf.index}`} geometry={sf.geo} position={[0, 0, -0.01]} raycast={() => null}>
-          <meshBasicMaterial color={sf.color} transparent opacity={0.15} side={THREE.DoubleSide} depthWrite={false} />
-        </mesh>
-      ))}
+      {surfaceFills.length > 0 && surfaceFills.map((sf) => {
+        const isHovered = hoveredSurfIdx === sf.index;
+        const isSelected = selectedSurfaceIndex === sf.index;
+        const opacity = isSelected ? 0.45 : isHovered ? 0.35 : 0.15;
+        return (
+          <mesh key={`sf-${sf.index}`} geometry={sf.geo} position={[0, 0, -0.01]} raycast={() => null}>
+            <meshBasicMaterial color={sf.color} transparent opacity={opacity} side={THREE.DoubleSide} depthWrite={false} />
+          </mesh>
+        );
+      })}
       {/* Transparent hit plane for detecting hovers near edges when no fill is present */}
       {isSketchMode && obj.sketchMeta && !fillGeo && (
         <mesh
           position={[0, 0, -0.5]}
           onPointerMove={(e) => {
-            setHoveredEntity(findNearestSketchEntity(e.point.x, e.point.y, obj.sketchMeta!, worldThresholdRef.current));
+            const entity = findNearestSketchEntity(e.point.x, e.point.y, obj.sketchMeta!, worldThresholdRef.current);
+            setHoveredEntity(entity);
+            const surfIdx = !entity ? findHoveredSurface(e.point.x, e.point.y, obj.sketchMeta!) : null;
+            setHoveredSurfIdx(surfIdx);
+            setHoveredSurfaceIndex(surfIdx);
           }}
           onClick={(e) => {
             const entity = findNearestSketchEntity(e.point.x, e.point.y, obj.sketchMeta!, worldThresholdRef.current);
-            if (entity) onEntityClick?.(entity, e.clientX, e.clientY);
+            if (entity) {
+              setSelectedSketchEntityId(entity.id);
+              onEntityClick?.(entity, e.clientX, e.clientY);
+            } else {
+              const surfIdx = findHoveredSurface(e.point.x, e.point.y, obj.sketchMeta!);
+              if (surfIdx !== null) {
+                setSelectedSurfaceIndex(surfIdx);
+                setSelectedSketchEntityId(null);
+              }
+            }
           }}
         >
           <planeGeometry args={[2000, 2000]} />
@@ -2313,37 +2379,54 @@ function SketchObject({
           raycast={() => null}
         />
       ))}
-      {edgeLines.lines.map((edge) => (
-        <primitive
-          key={`el-${edge.id}`}
-          object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({ color: entityColorMap.get(edge.id) ?? '#e8e8e8', linewidth: 2, transparent: true, opacity: settings.opacity }))}
-          raycast={() => null}
-        />
-      ))}
-      {edgeLines.circles.map((edge) => (
-        <primitive
-          key={`ec-${edge.id}`}
-          object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({ color: entityColorMap.get(edge.id) ?? '#e8e8e8', linewidth: 2, transparent: true, opacity: settings.opacity }))}
-          raycast={() => null}
-        />
-      ))}
-      {edgeLines.points.map((pt) => (
-        <Html
-          key={`ep-${pt.id}`}
-          position={[pt.pos[0], pt.pos[1], 0.05]}
-          center
-          zIndexRange={[0, 0]}
-          style={{ pointerEvents: 'none' }}
-        >
-          <div style={{
-            width: 5,
-            height: 5,
-            borderRadius: '50%',
-            background: entityColorMap.get(pt.id) ?? '#ffffff',
-            boxShadow: '0 0 2px #000',
-          }} />
-        </Html>
-      ))}
+      {edgeLines.lines.map((edge) => {
+        const isEntitySelected = selectedSketchEntityId === edge.id;
+        const isEntityHovered = hoveredEntity?.id === edge.id;
+        const color = isEntitySelected ? '#4aa3ff' : isEntityHovered ? '#7ec8ff' : entityColorMap.get(edge.id) ?? '#e8e8e8';
+        return (
+          <primitive
+            key={`el-${edge.id}`}
+            object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({ color, linewidth: 2, transparent: true, opacity: settings.opacity }))}
+            raycast={() => null}
+          />
+        );
+      })}
+      {edgeLines.circles.map((edge) => {
+        const isEntitySelected = selectedSketchEntityId === edge.id;
+        const isEntityHovered = hoveredEntity?.id === edge.id;
+        const color = isEntitySelected ? '#4aa3ff' : isEntityHovered ? '#7ec8ff' : entityColorMap.get(edge.id) ?? '#e8e8e8';
+        return (
+          <primitive
+            key={`ec-${edge.id}`}
+            object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({ color, linewidth: 2, transparent: true, opacity: settings.opacity }))}
+            raycast={() => null}
+          />
+        );
+      })}
+      {edgeLines.points.map((pt) => {
+        const isEntitySelected = selectedSketchEntityId === pt.id;
+        const isEntityHovered = hoveredEntity?.id === pt.id;
+        const bg = isEntitySelected ? '#4aa3ff' : isEntityHovered ? '#7ec8ff' : entityColorMap.get(pt.id) ?? '#ffffff';
+        const size = isEntitySelected || isEntityHovered ? 8 : 5;
+        return (
+          <Html
+            key={`ep-${pt.id}`}
+            position={[pt.pos[0], pt.pos[1], 0.05]}
+            center
+            zIndexRange={[0, 0]}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div style={{
+              width: size,
+              height: size,
+              borderRadius: '50%',
+              background: bg,
+              boxShadow: isEntitySelected ? '0 0 6px #4aa3ff' : '0 0 2px #000',
+              transition: 'all 0.1s',
+            }} />
+          </Html>
+        );
+      })}
       {hitPlaneBounds && (
         <mesh position={[hitPlaneBounds.cx, hitPlaneBounds.cy, -0.02]}>
           <planeGeometry args={[hitPlaneBounds.w, hitPlaneBounds.h]} />
@@ -2356,6 +2439,84 @@ function SketchObject({
       {constructionCircles.map((circle, i) => (
         <primitive key={`cc-${i}`} object={circle} raycast={() => null} />
       ))}
+      {/* Surface centroid labels */}
+      {isSketchMode && obj.sketchMeta?.surfaces.map((s) => {
+        const palette = ['#4488cc', '#44cc88', '#cc8844', '#cc44aa', '#88cc44', '#44aacc', '#aa44cc', '#cccc44'];
+        const color = palette[s.index % palette.length];
+        const isHovered = hoveredSurfIdx === s.index;
+        const isSelected = selectedSurfaceIndex === s.index;
+        return (
+          <Html
+            key={`sl-${s.index}`}
+            position={[s.centroid[0], s.centroid[1], 0.08]}
+            center
+            zIndexRange={[0, 0]}
+            style={{ pointerEvents: 'auto' }}
+          >
+            <span
+              onClick={(e) => { e.stopPropagation(); setSelectedSurfaceIndex(s.index); }}
+              style={{
+                fontSize: 10,
+                fontFamily: 'system-ui, sans-serif',
+                fontWeight: 600,
+                color: isSelected ? '#fff' : isHovered ? '#fff' : color,
+                background: isSelected ? color : isHovered ? `${color}88` : 'rgba(0,0,0,0.5)',
+                borderRadius: 3,
+                padding: '1px 4px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                textShadow: '0 0 2px #000',
+                border: isSelected ? `1px solid ${color}` : '1px solid transparent',
+                transition: 'all 0.15s',
+              }}
+            >
+              S{s.index} {s.area.toFixed(0)}mm²
+            </span>
+          </Html>
+        );
+      })}
+      {/* Entity hover tooltip */}
+      {hoveredEntity && isSketchMode && (() => {
+        let label = '';
+        if (hoveredEntity.kind === 'line') {
+          const len = Math.hypot(hoveredEntity.b[0] - hoveredEntity.a[0], hoveredEntity.b[1] - hoveredEntity.a[1]);
+          label = `${hoveredEntity.id} — ${len.toFixed(1)}mm`;
+        } else if (hoveredEntity.kind === 'circle') {
+          label = `${hoveredEntity.id} — r=${hoveredEntity.radius.toFixed(1)}mm`;
+        } else if (hoveredEntity.kind === 'arc') {
+          label = `${hoveredEntity.id} — r=${hoveredEntity.radius.toFixed(1)}mm`;
+        } else {
+          label = hoveredEntity.id;
+        }
+        const pos: [number, number] = hoveredEntity.kind === 'point'
+          ? hoveredEntity.position
+          : hoveredEntity.kind === 'line'
+            ? [(hoveredEntity.a[0] + hoveredEntity.b[0]) / 2, (hoveredEntity.a[1] + hoveredEntity.b[1]) / 2]
+            : [hoveredEntity.center[0], hoveredEntity.center[1]];
+        return (
+          <Html
+            position={[pos[0], pos[1], 0.12]}
+            center
+            zIndexRange={[0, 0]}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div style={{
+              fontSize: 10,
+              fontFamily: 'system-ui, sans-serif',
+              fontWeight: 500,
+              color: '#fff',
+              background: 'rgba(30,30,30,0.9)',
+              borderRadius: 4,
+              padding: '2px 6px',
+              whiteSpace: 'nowrap',
+              border: '1px solid rgba(74,163,255,0.5)',
+              transform: 'translateY(-14px)',
+            }}>
+              {label}
+            </div>
+          </Html>
+        );
+      })()}
       {constraintLabels.map((lbl) => (
         <Html
           key={lbl.id}
@@ -4647,14 +4808,14 @@ export function Viewport() {
         let rows: [string, string][] = [];
         if (ent.kind === 'line') {
           const len = Math.hypot(ent.b[0] - ent.a[0], ent.b[1] - ent.a[1]);
-          title = 'Line';
+          title = `Line — ${ent.id}`;
           rows = [
             ['Length', `${len.toFixed(3)} mm`],
             ['Start', `(${ent.a[0].toFixed(2)}, ${ent.a[1].toFixed(2)}) mm`],
             ['End', `(${ent.b[0].toFixed(2)}, ${ent.b[1].toFixed(2)}) mm`],
           ];
         } else if (ent.kind === 'circle') {
-          title = 'Circle';
+          title = `Circle — ${ent.id}`;
           rows = [
             ['Radius', `${ent.radius.toFixed(3)} mm`],
             ['Diameter', `${(ent.radius * 2).toFixed(3)} mm`],
@@ -4666,19 +4827,24 @@ export function Viewport() {
           let span = ea - sa;
           if (ent.clockwise && span > 0) span -= Math.PI * 2;
           if (!ent.clockwise && span < 0) span += Math.PI * 2;
-          title = 'Arc';
+          title = `Arc — ${ent.id}`;
           rows = [
             ['Radius', `${ent.radius.toFixed(3)} mm`],
             ['Span', `${(Math.abs(span) * (180 / Math.PI)).toFixed(2)}°`],
             ['Length', `${(Math.abs(span) * ent.radius).toFixed(3)} mm`],
           ];
         } else {
-          title = 'Point';
+          title = `Point — ${ent.id}`;
           rows = [
             ['X', `${ent.position[0].toFixed(3)} mm`],
             ['Y', `${ent.position[1].toFixed(3)} mm`],
           ];
         }
+        // Find constraints referencing this entity
+        const sketchObj = objects.find((o) => o.sketchMeta);
+        const relatedConstraints = sketchObj?.sketchMeta?.constraints.filter(
+          (c) => c.entityIds.includes(ent.id)
+        ) ?? [];
         return (
           <div
             style={{
@@ -4712,6 +4878,28 @@ export function Viewport() {
                 <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{value}</span>
               </div>
             ))}
+            {relatedConstraints.length > 0 && (
+              <div style={{ marginTop: 6, borderTop: '1px solid var(--fc-border)', paddingTop: 6 }}>
+                <div style={{ fontSize: 10, color: 'var(--fc-textMuted)', marginBottom: 4 }}>
+                  Constraints ({relatedConstraints.length})
+                </div>
+                {relatedConstraints.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => useForgeStore.getState().setSelectedConstraintId(c.id)}
+                    style={{
+                      fontSize: 10,
+                      padding: '2px 4px',
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                      color: c.isConflicting ? '#ff6b6b' : c.isRedundant ? '#faad14' : 'var(--fc-text)',
+                    }}
+                  >
+                    {c.label} {c.isDimension && c.value !== undefined ? `= ${c.value}` : c.type}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       })()}

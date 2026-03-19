@@ -306,6 +306,12 @@ interface ForgeStore {
   setHoveredObjectId: (id: string | null) => void;
   selectedConstraintId: string | null;
   setSelectedConstraintId: (id: string | null) => void;
+  hoveredSurfaceIndex: number | null;
+  setHoveredSurfaceIndex: (index: number | null) => void;
+  selectedSurfaceIndex: number | null;
+  setSelectedSurfaceIndex: (index: number | null) => void;
+  selectedSketchEntityId: string | null;
+  setSelectedSketchEntityId: (id: string | null) => void;
   hoveredJointName: string | null;
   setHoveredJointName: (name: string | null) => void;
   objectPickSyncEnabled: boolean;
@@ -1239,6 +1245,18 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   selectedConstraintId: null,
   setSelectedConstraintId: (id) => set((state) => (
     state.selectedConstraintId === id ? { selectedConstraintId: null } : { selectedConstraintId: id }
+  )),
+  hoveredSurfaceIndex: null,
+  setHoveredSurfaceIndex: (index) => set((state) => (
+    state.hoveredSurfaceIndex === index ? state : { hoveredSurfaceIndex: index }
+  )),
+  selectedSurfaceIndex: null,
+  setSelectedSurfaceIndex: (index) => set((state) => (
+    state.selectedSurfaceIndex === index ? { selectedSurfaceIndex: null } : { selectedSurfaceIndex: index }
+  )),
+  selectedSketchEntityId: null,
+  setSelectedSketchEntityId: (id) => set((state) => (
+    state.selectedSketchEntityId === id ? { selectedSketchEntityId: null } : { selectedSketchEntityId: id }
   )),
   hoveredJointName: null,
   setHoveredJointName: (name) => set((state) => (
