@@ -1,6 +1,12 @@
+/**
+ * Thin TS constraint descriptor for `absoluteAngle`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
-import { angleOfLine, distance, midpointPerp, normalizeAngle } from '../helpers';
+import { midpointPerp } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -12,18 +18,6 @@ declare module '../types' {
     absoluteAngle: { line: LineId; value: number };
   }
 }
-
-/** Count how many lines reference a given point ID. */
-const pointLineRefs = (
-  ptId: string,
-  lines: ReadonlyMap<string, { a: string; b: string }>,
-): number => {
-  let n = 0;
-  for (const l of lines.values()) {
-    if (l.a === ptId || l.b === ptId) n++;
-  }
-  return n;
-};
 
 registerConstraint<'absoluteAngle', ConstraintTypeMap['absoluteAngle']>({
   type: 'absoluteAngle',
@@ -50,4 +44,5 @@ registerConstraint<'absoluteAngle', ConstraintTypeMap['absoluteAngle']>({
     const lineLen = Math.hypot(b.x - a.x, b.y - a.y);
     const arcRadius = Math.max(1.5, Math.min(4, lineLen * 0.3));
     return [{ kind: 'angle-arc', center: [a.x, a.y], startAngle: 0, endAngle: angleRad, radius: arcRadius, value: `${angleDeg}°` }];
-  },});
+  },
+});

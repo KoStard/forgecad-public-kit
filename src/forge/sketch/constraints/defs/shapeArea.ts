@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `shapeArea`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { ShapeId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
 import { shapeVertices, shapeCentroid, traverseShapeVertices, polygonSignedArea } from '../helpers';
@@ -27,4 +33,5 @@ registerConstraint<'shapeArea', ConstraintTypeMap['shapeArea']>({
     if (!shape) return [0, 0];
     const pts = shapeVertices(shape, lines, points);
     return shapeCentroid(pts);
-  },});
+  },
+});

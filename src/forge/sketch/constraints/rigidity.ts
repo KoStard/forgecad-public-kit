@@ -1,5 +1,11 @@
+/**
+ * Compatibility wrapper for rigidity-style diagnostics.
+ *
+ * The actual analysis now comes from Rust solve metadata; this file keeps the old TS API shape.
+ */
 import type { ConstraintDefinition } from './types';
 import { getConstraintDef, solveConstraints } from './registry';
+import { cloneDefinition } from './sketch';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -38,23 +44,5 @@ export function analyzeRigidity(def: ConstraintDefinition): RigidityResult {
     isRigid: totalDof <= 0
       && redundantConstraintIds.size === 0
       && conflictingConstraintIds.size === 0,
-  };
-}
-
-function cloneDefinition(def: ConstraintDefinition): ConstraintDefinition {
-  return {
-    points: def.points.map((point) => ({ ...point })),
-    lines: def.lines.map((line) => ({ ...line })),
-    circles: def.circles.map((circle) => ({ ...circle })),
-    arcs: (def.arcs ?? []).map((arc) => ({ ...arc })),
-    shapes: (def.shapes ?? []).map((shape) => ({ ...shape, lines: [...shape.lines] })),
-    loops: def.loops.map((loop) => {
-      if (loop.type === 'poly') return { type: 'poly', points: [...loop.points] };
-      if (loop.type === 'circle') return { type: 'circle', circle: loop.circle };
-      return { type: 'profile', segments: loop.segments.map((segment) => ({ ...segment })) };
-    }),
-    constraints: def.constraints.map((constraint) => ({ ...constraint } as typeof constraint)),
-    rejectedConstraints: def.rejectedConstraints.map((constraint) => ({ ...constraint } as typeof constraint)),
-    rejectionReasons: def.rejectionReasons ? new Map(def.rejectionReasons) : undefined,
   };
 }

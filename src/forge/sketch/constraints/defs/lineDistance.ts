@@ -1,6 +1,12 @@
+/**
+ * Thin TS constraint descriptor for `lineDistance`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
-import { midpoint, midpointPerp, angleOfLine, normalizeAngle, distance } from '../helpers';
+import { midpointPerp } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -49,4 +55,5 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
     const midA: [number, number] = [(a1.x + a2.x) / 2, (a1.y + a2.y) / 2];
     const midB: [number, number] = [(b1.x + b2.x) / 2, (b1.y + b2.y) / 2];
     return [{ kind: 'dimension', from: midA, to: midB, offset: 0, value: String(c.value) }];
-  },});
+  },
+});

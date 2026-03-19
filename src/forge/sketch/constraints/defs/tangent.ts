@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `tangent`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { LineId, CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, midpointPerp, distance } from '../helpers';
@@ -64,4 +70,5 @@ registerConstraint<'tangent', ConstraintTypeMap['tangent']>({
       }
     }
     return [];
-  },});
+  },
+});

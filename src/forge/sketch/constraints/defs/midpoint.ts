@@ -1,16 +1,20 @@
+/**
+ * Thin TS constraint descriptor for `midpoint`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
-import { midpoint, midpointPerp } from '../helpers';
+import { midpointPerp } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
     /**
      * Forces a point to sit at the exact midpoint of a line segment.
      *
-     * When the midpoint is free the solver snaps it to `(a + b) / 2`. When the
-     * midpoint is fixed both line endpoints are translated equally to place their
-     * midpoint at the fixed position. Contributes **2 equations**
-     * (one per axis): `point − (a + b) / 2 = [0, 0]`.
+     * Rust enforces this as two scalar equations, one per axis:
+     * `point - (a + b) / 2 = [0, 0]`.
      */
     midpoint: { point: PointId; line: LineId };
   }
@@ -38,4 +42,5 @@ registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
     const a = points.get(line.a), b = points.get(line.b);
     if (!a || !b) return [];
     return [{ kind: 'symbol', position: midpointPerp(a, b, 3), symbol: 'midpoint' as const }];
-  },});
+  },
+});

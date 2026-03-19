@@ -1,3 +1,8 @@
+/**
+ * Public TS facade for the Rust-backed constraints package.
+ *
+ * This file only re-exports builder/types/UI helpers and loads thin descriptor modules.
+ */
 // Load all constraint definitions (side effects: populates the registry)
 import './defs/index';
 

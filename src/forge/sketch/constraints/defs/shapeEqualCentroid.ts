@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `shapeEqualCentroid`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { ShapeId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
 import { shapeVertices, shapeCentroid } from '../helpers';
@@ -28,4 +34,5 @@ registerConstraint<'shapeEqualCentroid', ConstraintTypeMap['shapeEqualCentroid']
     const [ax, ay] = shapeCentroid(shapeVertices(shapeA, lines, points));
     const [bx, by] = shapeCentroid(shapeVertices(shapeB, lines, points));
     return [(ax + bx) / 2, (ay + by) / 2];
-  },});
+  },
+});

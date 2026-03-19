@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `length`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, midpointPerp, distance, lineDirection } from '../helpers';
@@ -37,4 +43,5 @@ registerConstraint<'length', ConstraintTypeMap['length']>({
     const a = points.get(line.a), b = points.get(line.b);
     if (!a || !b) return [];
     return [{ kind: 'dimension', from: [a.x, a.y], to: [b.x, b.y], offset: 3, value: String(c.value) }];
-  },});
+  },
+});

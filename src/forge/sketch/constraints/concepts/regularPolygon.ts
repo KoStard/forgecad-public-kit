@@ -1,14 +1,8 @@
 /**
- * Regular Polygon Concept
+ * Builder convenience concept for regular polygons.
  *
- * Factory that adds a constrained regular n-gon to a
- * `ConstrainedSketchBuilder` and returns a typed handle with center point,
- * indexed vertices and sides.
- *
- * Winding: CCW (inherited from `addPolygon`).
- * `vertices[0]` is at `startAngle` (default 0 = +X axis).
+ * This file does not solve constraints; it emits regular-polygon geometry and constraints into the builder.
  */
-
 import type { LineId, PointId } from '../types';
 import { ConstrainedSketchBuilder } from '../builder';
 import { addPolygon, type ConstrainedPolygon } from './polygon';

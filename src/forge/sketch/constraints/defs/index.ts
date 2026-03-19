@@ -1,3 +1,8 @@
+/**
+ * Side-effect registration for thin TS constraint descriptors.
+ *
+ * Rust owns solving. This file only loads per-constraint payload/display metadata modules.
+ */
 // Side-effect imports: each file calls registerConstraint() at module load time.
 import './coincident';
 import './horizontal';
@@ -31,7 +36,6 @@ import './shapeWidth';
 import './shapeHeight';
 import './shapeArea';
 import './shapeEqualCentroid';
-import './pointOnLine';
 import './pointLineDistance';
 import './ccw';
 import './angleBetween';

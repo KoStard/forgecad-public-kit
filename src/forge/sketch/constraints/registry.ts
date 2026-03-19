@@ -1,3 +1,9 @@
+/**
+ * Constraint metadata registry and thin Rust solve/display glue.
+ *
+ * Rust/WASM owns numerical solving; this file stores declarative descriptors,
+ * forwards solve calls, and builds UI-facing display data.
+ */
 import type {
   ConstraintDef,
   ConstraintDefinition,

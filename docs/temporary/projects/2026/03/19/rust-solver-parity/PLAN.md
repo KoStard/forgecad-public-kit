@@ -108,19 +108,32 @@ Primary hypotheses at start:
 | 7 | Delete dead TS decomposition / analytical solver surface | TS no longer exports or runs decomposition / analytical solver APIs; warm-start now talks directly to the Rust boundary | complete |
 | 8 | Strip TS constraint defs down to metadata only | TS defs no longer carry presolve / solve / residual / jacobian logic; CLI diagnostics now use Rust metadata only | complete |
 | 9 | Remove TS DOF bookkeeping and pebble-game rigidity logic | `analyzeRigidity()` now delegates to Rust solve metadata; TS defs no longer carry `computeDof` hooks | complete |
+| 10 | Explain and shrink the surviving TS boundary | every remaining constraints TS file now states its thin role explicitly; dead compatibility helpers were removed; a README now points solver debugging back to Rust first | complete |
 
 ## Remaining TS Solver Surface
 
 This is the explicit removal list for Goal 1:
 
-- `src/forge/sketch/constraints/rigidity.ts`
-  - now just a thin Rust-backed wrapper, but still exists as TS API glue
-- `src/forge/sketch/constraints/types.ts`
-  - `ConstraintDef.equations` is still duplicated on the TS side as metadata for diagnostics / wrappers
+- `src/forge/sketch/constraints/builder.ts`
+  - still needed for fluent sketch authoring in TS, but solving and branch seeding now delegate to Rust
+- `src/forge/sketch/constraints/concepts/*`
+  - still needed as TS ergonomics macros (`rect`, `polygon`, `regularPolygon`)
 - `src/forge/sketch/constraints/defs/*`
-  - comments and a few dead helper functions still reflect the old TS solver implementation, even though the executable solver methods are gone
+  - now purely declarative metadata, labels, and annotation builders; no executable solver behavior remains
+- `src/forge/sketch/constraints/helpers.ts`
+  - still needed for TS-side annotation/display geometry only
+- `src/forge/sketch/constraints/registry.ts`
+  - still needed for descriptor registration and UI-facing display assembly around Rust metadata
+- `src/forge/sketch/constraints/rigidity.ts`
+  - still exists as a compatibility wrapper around Rust metadata for old TS callers
+- `src/forge/sketch/constraints/sketch.ts`
+  - still owns downstream arrangement/surface generation after Rust returns solved geometry
+- `src/forge/sketch/constraints/solver-wasm.ts`
+  - still needed as the JSON/WASM bridge until a different client boundary replaces it
+- `src/forge/sketch/constraints/types.ts`
+  - still duplicates a small amount of TS-facing metadata (`ConstraintDef.equations`, display types) for wrappers and UI
 - `cli/check-constraints.ts`
-  - still carries TS-side ergonomics and rigidity tests rather than driving the Rust crate directly for those concerns
+  - still exercises the public TS boundary instead of the Rust crate directly for some end-to-end coverage
 
 ## Experiment Log
 
@@ -342,6 +355,27 @@ Additional concrete finding:
 
 - At this point the TS constraint defs are declarative metadata only. The remaining migration work is mostly cleanup and API-boundary simplification, not moving hidden solver math.
 
+### Explain the Remaining TS Boundary (SUCCESS)
+**What**: Make the surviving TS layer self-explanatory and remove the last dead compatibility leftovers so future solver work can focus on Rust without wondering whether TS still hides executable solver behavior.
+
+**Changed**:
+
+- added top-of-file ownership comments across the remaining `src/forge/sketch/constraints/**/*.ts` surface
+- added `src/forge/sketch/constraints/README.md` as an explicit inventory of why each TS file still exists
+- removed dead helper leftovers from constraint defs (`pointLineRefs`, old direction-flip helpers, old winding helper)
+- tightened stale per-constraint docs so they describe Rust as the authoritative solver instead of implying TS-side presolve / solve behavior
+- removed a small TS duplication by reusing `cloneDefinition()` from `sketch.ts` inside `rigidity.ts`
+
+**Verification**:
+
+- `npm exec tsc -- --noEmit` → passes
+- `npm run build:cli` → passes
+- `node dist-cli/forgecad.js check constraints` → `74 passed, 0 failed`
+
+**Lesson**:
+
+- The remaining TS code is now easier to audit: it is either builder ergonomics, registry/display metadata, the WASM bridge, or post-solve UI geometry. If a future constraint regression appears, the default assumption should now be “debug Rust first”.
+
 ## Files Modified
 
 | File | Purpose |
@@ -353,6 +387,7 @@ Additional concrete finding:
 | `src/forge/sketch/constraints/types.ts` | Removed TS decomposition-cache types from the public solver boundary |
 | `src/forge/sketch/constraints/index.ts` | Stopped exporting deleted TS solver modules |
 | `src/forge/sketch/constraints/solver-wasm.ts` | Added Rust presolve bridge APIs for incremental builder seeding |
+| `src/forge/sketch/constraints/README.md` | Explicit inventory of why the surviving TS boundary still exists |
 | `src/forge/sketch/constraints/defs/*.ts` | Removed legacy TS solver methods and `computeDof`, leaving declarative metadata / annotations only |
 | `src/forge/sketch/constraints/decompose.ts` | Deleted dead TS decomposition wrapper after Rust became authoritative |
 | `src/forge/sketch/constraints/analytical.ts` | Deleted dead TS analytical presolve module |

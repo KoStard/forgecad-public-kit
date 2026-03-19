@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `pointLineDistance`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
@@ -38,4 +44,5 @@ registerConstraint<'pointLineDistance', ConstraintTypeMap['pointLineDistance']>(
     const t = len2 > 1e-9 ? ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2 : 0;
     const proj: [number, number] = [a.x + t * dx, a.y + t * dy];
     return [{ kind: 'dimension', from: [pt.x, pt.y], to: proj, offset: 0, value: String(c.value) }];
-  },});
+  },
+});

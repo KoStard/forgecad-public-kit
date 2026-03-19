@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `pointOnCircle`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { PointId, CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
@@ -29,4 +35,5 @@ registerConstraint<'pointOnCircle', ConstraintTypeMap['pointOnCircle']>({
     const pt = points.get(c.point);
     if (!pt) return [];
     return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'collinear' as const }];
-  },});
+  },
+});

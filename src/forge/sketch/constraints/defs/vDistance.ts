@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `vDistance`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { PointId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint } from '../helpers';
@@ -32,4 +38,5 @@ registerConstraint<'vDistance', ConstraintTypeMap['vDistance']>({
     const a = points.get(c.a), b = points.get(c.b);
     if (!a || !b) return [];
     return [{ kind: 'dimension', from: [a.x, a.y], to: [a.x, b.y], offset: 3, value: String(c.value) }];
-  },});
+  },
+});

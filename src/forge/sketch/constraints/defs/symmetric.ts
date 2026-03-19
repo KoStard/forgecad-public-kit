@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `symmetric`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, reflectPointAcrossLine } from '../helpers';
@@ -35,4 +41,5 @@ registerConstraint<'symmetric', ConstraintTypeMap['symmetric']>({
     if (a) annotations.push({ kind: 'symbol', position: [a.x, a.y], symbol: 'symmetric' });
     if (b) annotations.push({ kind: 'symbol', position: [b.x, b.y], symbol: 'symmetric' });
     return annotations;
-  },});
+  },
+});

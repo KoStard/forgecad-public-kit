@@ -1,6 +1,11 @@
+/**
+ * Thin TS constraint descriptor for `oppositeDirection`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
-import { angleOfLine, normalizeAngle, distance, midpoint } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -14,9 +19,8 @@ declare module '../types' {
      * Use this with `lineDistance` when you need two lines facing each other —
      * e.g. the top of one rect facing the bottom of another.
      *
-     * Contributes **1 equation**: `cross(unit_a, unit_b) = 0` (parallelism).
-     * The anti-parallel requirement is enforced via presolve/solve and a
-     * one-sided residual penalty when co-directional.
+     * Rust uses one continuous parallelism equation plus orientation-aware
+     * branch handling to keep `b` facing opposite to `a`.
      */
     oppositeDirection: { a: LineId; b: LineId };
   }
@@ -52,29 +56,5 @@ registerConstraint<'oppositeDirection', ConstraintTypeMap['oppositeDirection']>(
       });
     }
     return annotations;
-  },});
-
-/**
- * If `b` points the same way as `a`, flip `b`'s endpoints so it points opposite.
- */
-function flipIfCoDirectional(
-  c: ConstraintTypeMap['oppositeDirection'],
-  lines: ReadonlyMap<string, { a: string; b: string }>,
-  points: ReadonlyMap<string, { x: number; y: number; fixed: boolean }>,
-): void {
-  const la = lines.get(c.a), lb = lines.get(c.b);
-  if (!la || !lb) return;
-  const a1 = points.get(la.a), a2 = points.get(la.b);
-  const b1 = points.get(lb.a), b2 = points.get(lb.b);
-  if (!a1 || !a2 || !b1 || !b2) return;
-
-  const dax = a2.x - a1.x, day = a2.y - a1.y;
-  const dbx = b2.x - b1.x, dby = b2.y - b1.y;
-  const dot = dax * dbx + day * dby;
-
-  if (dot > 0 && !b1.fixed && !b2.fixed) {
-    const tx = b1.x, ty = b1.y;
-    b1.x = b2.x; b1.y = b2.y;
-    b2.x = tx; b2.y = ty;
-  }
-}
+  },
+});

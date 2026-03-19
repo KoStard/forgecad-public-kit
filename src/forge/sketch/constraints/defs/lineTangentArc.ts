@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `lineTangentArc`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { ArcId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
@@ -10,9 +16,8 @@ declare module '../types' {
      * radius at the contact point. Set `atStart: true` to use the arc's start
      * point as the tangency contact; `false` uses the end point.
      *
-     * The solver rotates the line (around its midpoint, or from the fixed end)
-     * so that `dot(unit_line, unit_radius) = 0`.
-     * Contributes **1 equation**.
+     * Rust enforces tangency as one scalar orthogonality equation between the
+     * line direction and the chosen radius direction.
      */
     lineTangentArc: { line: LineId; arc: ArcId; atStart: boolean };
   }
@@ -39,4 +44,5 @@ registerConstraint<'lineTangentArc', ConstraintTypeMap['lineTangentArc']>({
     const pt = points.get(c.atStart ? arc.start : arc.end);
     if (!pt) return [];
     return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'tangent' as const }];
-  },});
+  },
+});

@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `equalRadius`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
@@ -6,9 +12,7 @@ declare module '../types' {
     /**
      * Forces two circles to have the same radius.
      *
-     * When both radii are free they are averaged. When one has `fixedRadius`
-     * the other is snapped to it. Contributes **1 equation**:
-     * `radius_b − radius_a = 0`.
+     * Rust enforces one scalar equality: `radius_b - radius_a = 0`.
      */
     equalRadius: { a: CircleId; b: CircleId };
   }
@@ -41,4 +45,5 @@ registerConstraint<'equalRadius', ConstraintTypeMap['equalRadius']>({
       annotations.push({ kind: 'symbol', position: [center.x + circle.radius, center.y], symbol: 'equal' });
     }
     return annotations;
-  },});
+  },
+});

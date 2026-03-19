@@ -1,3 +1,8 @@
+/**
+ * TS-only geometry helpers for constraint metadata and UI.
+ *
+ * No solving lives here; Rust owns constraint math.
+ */
 import type { LineId, PointId, SketchLine, SketchPoint, SketchShape } from './types';
 
 export const toRad = (deg: number): number => (deg * Math.PI) / 180;

@@ -1,3 +1,9 @@
+/**
+ * Solved-sketch wrapper and downstream UI geometry helpers.
+ *
+ * Rust/WASM produces the solved constraint state; this file turns it into arrangement,
+ * display, and warm-start-friendly TS objects.
+ */
 import { Sketch } from '../core';
 import { polygon } from '../primitives';
 import { union2d } from '../booleans';

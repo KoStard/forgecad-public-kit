@@ -1,3 +1,8 @@
+/**
+ * Side-effect registration and exports for builder concepts.
+ *
+ * Concept modules are TS ergonomics only; they compose user-friendly shapes on top of the Rust-backed solver.
+ */
 // Side-effect imports: each file patches ConstrainedSketchBuilder.prototype
 import './rect';
 import './polygon';

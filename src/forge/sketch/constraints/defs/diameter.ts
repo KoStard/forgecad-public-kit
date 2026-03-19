@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `diameter`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 
@@ -34,4 +40,5 @@ registerConstraint<'diameter', ConstraintTypeMap['diameter']>({
     const center = points.get(circle.center);
     if (!center) return [];
     return [{ kind: 'dimension', from: [center.x - circle.radius, center.y], to: [center.x + circle.radius, center.y], offset: 0, value: `⌀${c.value}` }];
-  },});
+  },
+});

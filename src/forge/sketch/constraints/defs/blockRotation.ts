@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `blockRotation`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { PointId, SketchPoint, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
 
@@ -12,10 +18,8 @@ declare module '../types' {
      * Without this, a rect can satisfy CCW winding while being inside-out
      * (negative width AND negative height → positive area → CCW blind spot).
      *
-     * Uses the same one-sided barrier pattern as `ccw`:
-     * - `equations: 0` — no continuous DOF consumed
-     * - Presolve/solve: swap endpoints when violated
-     * - Residual: one-sided penalty giving LM gradient info
+     * Rust treats this as an orientation guard with `equations: 0`, so it
+     * preserves the intended branch without claiming an extra continuous DOF.
      *
      * The constraint stores `axis: 'x' | 'y'` — which coordinate of the
      * first edge must increase. For rects, this is `'x'` (bottom goes right).
@@ -38,40 +42,5 @@ registerConstraint<'blockRotation', ConstraintTypeMap['blockRotation']>({
 
   displayAnnotations() {
     return []; // No visual annotation — structural constraint
-  },});
-
-/**
- * If the first edge (p0 → p1) points in the wrong direction along the
- * specified axis, swap ALL diagonal pairs to correct the 180° rotation.
- */
-function enforceEdgeDirection(
-  c: ConstraintTypeMap['blockRotation'],
-  points: ReadonlyMap<PointId, SketchPoint>,
-): void {
-  const pts = c.points.map((id) => points.get(id)).filter(Boolean) as SketchPoint[];
-  if (pts.length < 2) return;
-
-  const delta = c.axis === 'x' ? (pts[1].x - pts[0].x) : (pts[1].y - pts[0].y);
-  if (delta >= 0) return; // Correct direction
-
-  // Reverse ALL point positions along the offending axis to undo the rotation.
-  // For a rect [bl, br, tr, tl], when bl.x > br.x, we need to mirror all
-  // x-coordinates around the centroid to flip the direction.
-  let cx = 0, cy = 0;
-  let freeCount = 0;
-  for (const p of pts) {
-    if (!p.fixed) { cx += p.x; cy += p.y; freeCount++; }
-  }
-  if (freeCount === 0) return;
-  cx /= freeCount;
-  cy /= freeCount;
-
-  for (const p of pts) {
-    if (p.fixed) continue;
-    if (c.axis === 'x') {
-      p.x = 2 * cx - p.x;
-    } else {
-      p.y = 2 * cy - p.y;
-    }
-  }
-}
+  },
+});

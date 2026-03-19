@@ -1,6 +1,12 @@
+/**
+ * Thin TS constraint descriptor for `angleBetween`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
-import { midpointPerp, angleOfLine, normalizeAngle, distance, toRad } from '../helpers';
+import { midpointPerp } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -18,18 +24,6 @@ declare module '../types' {
     angleBetween: { a: LineId; b: LineId; value: number };
   }
 }
-
-/** Count how many lines reference a given point ID. */
-const pointLineRefs = (
-  ptId: string,
-  lines: ReadonlyMap<string, { a: string; b: string }>,
-): number => {
-  let n = 0;
-  for (const l of lines.values()) {
-    if (l.a === ptId || l.b === ptId) n++;
-  }
-  return n;
-};
 
 registerConstraint<'angleBetween', ConstraintTypeMap['angleBetween']>({
   type: 'angleBetween',
@@ -66,4 +60,5 @@ registerConstraint<'angleBetween', ConstraintTypeMap['angleBetween']>({
     const lenB = Math.hypot(b2.x - b1.x, b2.y - b1.y);
     const arcRadius = Math.max(1.5, Math.min(4, Math.min(lenA, lenB) * 0.3));
     return [{ kind: 'angle-arc', center, startAngle: angleA, endAngle: angleB, radius: arcRadius, value: `${c.value}°` }];
-  },});
+  },
+});

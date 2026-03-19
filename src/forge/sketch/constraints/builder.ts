@@ -1,3 +1,9 @@
+/**
+ * Thin TS builder facade for constraints.
+ *
+ * This file owns fluent sketch-construction ergonomics only. All solving and
+ * branch-seeding decisions delegate to Rust/WASM.
+ */
 import type {
   ArcId,
   CircleId,

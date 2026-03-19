@@ -1,3 +1,8 @@
+/**
+ * Shared TS-side builder, display, and wire-format types for constraints.
+ *
+ * These types describe the Rust-backed boundary and the remaining UI/builder surface.
+ */
 export type PointId = string;
 export type LineId = string;
 export type CircleId = string;

@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `perpendicular`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint, midpointPerp, angleOfLine, normalizeAngle, distance } from '../helpers';
@@ -48,4 +54,5 @@ registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
     const a1 = points.get(lineA.a), a2 = points.get(lineA.b);
     if (a1 && a2) return [{ kind: 'symbol', position: midpointPerp(a1, a2, 3), symbol: 'perpendicular' as const }];
     return [];
-  },});
+  },
+});

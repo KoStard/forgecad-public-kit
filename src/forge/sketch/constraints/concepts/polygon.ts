@@ -1,14 +1,8 @@
 /**
- * Polygon Concept
+ * Builder convenience concept for general polygons.
  *
- * Factory that adds a general constrained polygon to a
- * `ConstrainedSketchBuilder` and returns a typed handle with indexed
- * vertex and side access.
- *
- * Winding: CCW enforced via `ccw` constraint.
- * `sides[i]` runs from `vertices[i]` → `vertices[(i+1) % n]`.
+ * This file does not solve constraints; it emits polygon geometry and constraints into the builder.
  */
-
 import type { LineId, PointId, ShapeId } from '../types';
 import { ConstrainedSketchBuilder } from '../builder';
 

@@ -1,13 +1,8 @@
 /**
- * Rectangle Concept
+ * Builder convenience concept for constrained rectangles.
  *
- * Factory that adds a structurally-constrained axis-aligned rectangle to a
- * `ConstrainedSketchBuilder` and returns a typed handle with named vertices,
- * sides, and center point.
- *
- * Winding: CCW (bottomLeft → bottomRight → topRight → topLeft)
+ * This file does not solve constraints; it emits rectangle geometry and constraints into the builder.
  */
-
 import type { LineId, PointId, ShapeId } from '../types';
 import { ConstrainedSketchBuilder } from '../builder';
 
@@ -31,8 +26,8 @@ export interface RectOptions {
  * Typed handle for a constrained axis-aligned rectangle in the solver.
  *
  * Structural constraints pre-applied:
- *   `horizontal(bottom)`, `horizontal(top)`, `vertical(left)`, `vertical(right)`,
- *   `ccw(bl, br, tr, tl)`.
+ * `horizontal(bottom)`, `horizontal(top)`, `vertical(left)`, `vertical(right)`,
+ * `ccw(bl, br, tr, tl)`.
  *
  * This leaves **4 DOF** (position x/y, width, height). Use `sk.fix()`,
  * `sk.length()`, `sk.shapeWidth()`, etc. to pin them.

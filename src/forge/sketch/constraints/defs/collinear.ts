@@ -1,3 +1,9 @@
+/**
+ * Thin TS constraint descriptor for `collinear`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
 import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
 import { projectPointToLine } from '../helpers';
@@ -31,4 +37,5 @@ registerConstraint<'collinear', ConstraintTypeMap['collinear']>({
     const pt = points.get(c.point);
     if (!pt) return [];
     return [{ kind: 'symbol', position: [pt.x + 2.5, pt.y + 2.5] as [number, number], symbol: 'collinear' as const }];
-  },});
+  },
+});

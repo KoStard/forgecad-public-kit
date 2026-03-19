@@ -1,10 +1,12 @@
 /**
- * TypeScript bridge to the Rust/WASM constraint solver.
+ * Thin JSON/WASM boundary for the Rust constraint solver.
+ *
+ * This file exists only to initialize wasm, serialize problems, and apply Rust results.
  *
  * Usage:
- *   - Call `initSolverWasm()` once at startup (awaited — it must succeed).
- *   - `solveConstraintsWasm()` is the constraint solver; throws if not initialised.
- *   - Build the WASM artifact with: npm run build:solver
+ * - call `initSolverWasm()` once at startup
+ * - use `solveConstraintsWasm()` / presolve helpers after init
+ * - build the WASM artifact with `npm run build:solver`
  */
 
 import type { ConstraintDefinition, SolveOptions, SolverMetadata } from './types';
