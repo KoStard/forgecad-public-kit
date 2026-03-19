@@ -5,11 +5,12 @@
  */
 import { initKernel } from '../src/forge/kernel';
 import { constrainedSketch, ConstrainedSketchBuilder } from '../src/forge/sketch/constraints/builder';
-import { decomposeAndSolve } from '../src/forge/sketch/constraints/decompose';
-import { DEFAULT_TOLERANCE } from '../src/forge/sketch/constraints/registry';
+import { initSolverWasm } from '../src/forge/sketch/constraints/solver-wasm';
+import { DEFAULT_TOLERANCE, solveConstraints } from '../src/forge/sketch/constraints/registry';
 import '../src/forge/sketch/constraints/defs';
 
 async function main() {
+  await initSolverWasm();
   await initKernel();
 
   const origConstrain = ConstrainedSketchBuilder.prototype.constrain;
@@ -25,7 +26,7 @@ async function main() {
       // Check if the solve actually converged
       const self = this as any;
       const def = self.buildDefinition();
-      const { maxError } = decomposeAndSolve(
+      const { maxError } = solveConstraints(
         { ...def, points: def.points.map((p: any) => ({...p})), lines: def.lines.map((l: any) => ({...l})), circles: def.circles.map((c: any) => ({...c})), arcs: (def.arcs ?? []).map((a: any) => ({...a})) },
         { iterations: 1, tolerance: DEFAULT_TOLERANCE, restarts: 1, warmStartIterations: 0 },
       );

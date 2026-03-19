@@ -30,12 +30,9 @@ export type {
   SolverContext,
   DisplayContext,
   DofContext,
-  DecompositionCache,
 } from './types';
 
 export type { LineDistanceConstraint } from './defs/index';
-
-export { buildDecomposition, computeTopologyFingerprint } from './decompose';
 
 export type { ConstrainedSketchOptions } from './builder';
 export { ConstrainedSketchBuilder, constrainedSketch } from './builder';
@@ -49,9 +46,6 @@ export {
 } from './sketch';
 
 export { registerConstraint, installBuilderMethod, getConstraintDef } from './registry';
-
-export { analyticalPreSolve } from './analytical';
-export type { AnalyticalResult, ConstructionStep } from './analytical';
 
 export { analyzeRigidity } from './rigidity';
 export type { RigidityResult } from './rigidity';

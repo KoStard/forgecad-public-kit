@@ -296,9 +296,18 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       const s = lastSolverProfile;
       console.log(`  Solver internals (last solve):`);
       console.log(`    constraints: ${s.constraints}  freePoints: ${s.freePoints}  restarts: ${s.restarts}`);
-      console.log(`    presolve:   ${s.presolve.toFixed(1)}ms`);
-      console.log(`    analytical: ${s.analytical.toFixed(1)}ms`);
-      console.log(`    LM:         ${s.lm.toFixed(0)}ms`);
+      if (typeof s.presolve === 'number') {
+        console.log(`    presolve:   ${s.presolve.toFixed(1)}ms`);
+      }
+      if (typeof s.analytical === 'number') {
+        console.log(`    analytical: ${s.analytical.toFixed(1)}ms`);
+      }
+      if (typeof s.lm === 'number') {
+        console.log(`    LM:         ${s.lm.toFixed(0)}ms`);
+      }
+      if (typeof s.solve === 'number' && typeof s.lm !== 'number') {
+        console.log(`    solve:      ${s.solve.toFixed(0)}ms`);
+      }
     }
     const stats = getSolverStats();
     if (stats.totalLmCalls > 0) {

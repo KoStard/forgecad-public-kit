@@ -15,8 +15,8 @@ import type {
   SketchShape,
   SolveOptions,
 } from './types';
-import { DEFAULT_TOLERANCE, getConstraintDef, getPendingBuilderMethods } from './registry';
-import { decomposeAndSolve } from './decompose';
+import { DEFAULT_TOLERANCE, getPendingBuilderMethods, solveConstraints } from './registry';
+import { presolveSingleConstraintWasm } from './solver-wasm';
 import { ConstraintSketch, solveConstraintDefinition } from './sketch';
 
 const toRad = (deg: number): number => (deg * Math.PI) / 180;
@@ -229,17 +229,17 @@ export class ConstrainedSketchBuilder {
     // Always accept the constraint — never reject.
     this.constraints.push(next);
 
-    // Run the new constraint's presolve to initialise its referenced entities
-    // to reasonable positions.  This is critical for constraints like pointOnLine
-    // where new points at (0,0) are far from the line they should be on.
-    this.runSinglePresolve(next);
-
-    // Fast path: check if the system is already satisfied after presolve.
-    if (this.checkResiduals() <= DEFAULT_TOLERANCE) return this;
+    // Run only the new constraint's Rust-owned presolve hook first. Replaying
+    // presolve across the full system here is too aggressive for incremental
+    // construction and can reopen old branch-selection failures.
+    const def = this.buildDefinition();
+    presolveSingleConstraintWasm(def, next.id, {
+      tolerance: DEFAULT_TOLERANCE,
+    });
+    this.syncFromDefinition(def);
 
     // Incremental solve with minimal solver settings — positions are warm.
-    const def = this.buildDefinition();
-    const { maxError } = decomposeAndSolve(def, {
+    const { maxError } = solveConstraints(def, {
       iterations: 30,
       tolerance: DEFAULT_TOLERANCE,
       restarts: 1,
@@ -628,7 +628,7 @@ export class ConstrainedSketchBuilder {
     definition: ConstraintDefinition;
   } {
     const def = this.buildDefinition();
-    const { maxError } = decomposeAndSolve(def, options);
+    const { maxError } = solveConstraints(def, options);
     return { maxError, rejectedCount: def.rejectedConstraints.length, definition: def };
   }
 
@@ -650,36 +650,6 @@ export class ConstrainedSketchBuilder {
     };
   }
 
-  /**
-   * Evaluate all constraint residuals on the builder's live entities.
-   * Returns the max absolute residual (infinity-norm).  Used for fast
-   * "already satisfied?" checks before invoking the full solver.
-   */
-  private checkResiduals(): number {
-    const points = new Map(this.points.map((p) => [p.id, p] as const));
-    const lines = new Map(this.lines.map((l) => [l.id, l] as const));
-    const circles = new Map(this.circles.map((c) => [c.id, c] as const));
-    const arcs = new Map(this.arcs.map((a) => [a.id, a] as const));
-    const shapes = new Map((this.shapes ?? []).map((s) => [s.id, s] as const));
-    const ctx = {
-      points, lines, circles, arcs, shapes,
-      tolerance: DEFAULT_TOLERANCE,
-      movePoint: () => false,
-    };
-    let maxRes = 0;
-    for (const c of this.constraints) {
-      const cdef = getConstraintDef(c.type);
-      if (!cdef?.residual) continue;
-      const res = cdef.residual(c as never, ctx);
-      for (const r of res) {
-        const a = Math.abs(r);
-        if (a > maxRes) maxRes = a;
-        if (maxRes > DEFAULT_TOLERANCE) return maxRes; // early bail
-      }
-    }
-    return maxRes;
-  }
-
   /** Sync solved positions from a definition back to the builder's live entities. */
   private syncFromDefinition(def: ConstraintDefinition): void {
     for (let i = 0; i < this.points.length; i++) {
@@ -693,45 +663,6 @@ export class ConstrainedSketchBuilder {
     for (let i = 0; i < this.arcs.length; i++) {
       if (i < defArcs.length) this.arcs[i].radius = defArcs[i].radius;
     }
-  }
-
-  /**
-   * Run the presolve hook for a single constraint directly on the builder's
-   * own entities.  This initialises newly-added geometry (e.g. a point at
-   * (0,0) that should be on a line) without disturbing already-converged
-   * positions.
-   */
-  private runSinglePresolve(constraint: SketchConstraint): void {
-    const cdef = getConstraintDef(constraint.type);
-    if (!cdef?.presolve) return;
-    const points = new Map(this.points.map((p) => [p.id, p] as const));
-    const lines = new Map(this.lines.map((l) => [l.id, l] as const));
-    const circles = new Map(this.circles.map((c) => [c.id, c] as const));
-    const arcs = new Map(this.arcs.map((a) => [a.id, a] as const));
-    const shapes = new Map((this.shapes ?? []).map((s) => [s.id, s] as const));
-    // Count how many constraints reference each entity — lines/points with more
-    // references are more "established" and should not be moved by presolve.
-    const entityRefCount = new Map<string, number>();
-    for (const c of this.constraints) {
-      for (const [key, val] of Object.entries(c)) {
-        if (key === 'id' || key === 'type') continue;
-        if (typeof val === 'string') entityRefCount.set(val, (entityRefCount.get(val) ?? 0) + 1);
-        else if (Array.isArray(val)) {
-          for (const v of val) { if (typeof v === 'string') entityRefCount.set(v, (entityRefCount.get(v) ?? 0) + 1); }
-        }
-      }
-    }
-    const ctx = {
-      points, lines, circles, arcs, shapes,
-      tolerance: DEFAULT_TOLERANCE,
-      entityRefCount,
-      movePoint: (pt: SketchPoint, dx: number, dy: number) => {
-        if (pt.fixed) return false;
-        pt.x += dx; pt.y += dy;
-        return true;
-      },
-    };
-    cdef.presolve(constraint as never, ctx);
   }
 
   /**

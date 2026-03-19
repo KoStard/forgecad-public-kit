@@ -167,14 +167,6 @@ export interface ConstraintDefinition {
   rejectionReasons?: Map<string, string>;
 }
 
-/** Cached decomposition structure for reuse across solves with the same topology. */
-export interface DecompositionCache {
-  /** Topology fingerprint — if it matches the current definition, the cache is valid. */
-  fingerprint: string;
-  /** Component entity-ID sets from Union-Find. */
-  components: Set<string>[];
-}
-
 export interface SolveOptions {
   /** Maximum number of LM outer iterations per restart. */
   iterations?: number;
@@ -186,10 +178,21 @@ export interface SolveOptions {
   warmStartIterations?: number;
   /** Maximum LM step length in scaled variable space. Larger = bolder, smaller = safer. */
   maxScaledStep?: number;
-  /** Cached decomposition from a previous solve. Reused if topology fingerprint matches. */
-  cachedDecomposition?: DecompositionCache;
   /** Skip redundancy detection (safe when topology is unchanged and previous DOF >= 0). */
   skipRedundancyCheck?: boolean;
+}
+
+export interface SolverConstraintResidual {
+  id: string;
+  residual: number;
+}
+
+export interface SolverMetadata {
+  status: 'under' | 'fully' | 'over' | 'over-redundant';
+  dof: number;
+  constraintResiduals: SolverConstraintResidual[];
+  redundantConstraintIds: string[];
+  conflictingConstraintIds: string[];
 }
 
 // ─── Extension interfaces (augmented by each constraint def file via declare module) ───

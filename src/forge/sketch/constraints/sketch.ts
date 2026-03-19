@@ -11,11 +11,9 @@ import type {
 import {
   DEFAULT_TOLERANCE,
   buildConstraintDisplays,
-  computeStatus,
-  findRedundantConstraints,
+  solveConstraints,
   setConstraintValue,
 } from './registry';
-import { buildDecomposition, decomposeAndSolve } from './decompose';
 import { computeFacesFromSegments, pointInPolygon } from '../arrangement-core';
 import type { SurfaceDisplay } from './types';
 
@@ -336,13 +334,11 @@ export class ConstraintSketch extends Sketch {
     setConstraintValue(target, value);
 
     // Warm-start: cloned definition carries previous solved positions.
-    // Use reduced restarts, cache decomposition, skip redundancy if safe.
-    const cachedDecomposition = buildDecomposition(this.definition);
+    // Use reduced restarts and skip redundancy if safe.
     const skipRedundancyCheck = this.constraintMeta.dof >= 0;
     const warmResult = solveConstraintDefinition(next, {
       restarts: 1,
       warmStartIterations: 0,
-      cachedDecomposition,
       skipRedundancyCheck,
     });
     if (warmResult.constraintMeta.maxError <= DEFAULT_TOLERANCE * 5) {
@@ -435,29 +431,22 @@ export const solveConstraintDefinition = (
 ): ConstraintSketch => {
   const t0 = performance.now();
   const working = cloneDefinition(def);
-  const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
 
   const t1 = performance.now();
-  const { maxError } = decomposeAndSolve(working, options);
+  const { maxError, metadata } = solveConstraints(working, options);
   const t2 = performance.now();
 
-  const { status, dof } = computeStatus(working, maxError, tolerance);
-  // Conflicting = solver couldn't converge (genuinely incompatible constraints).
-  const conflicts = new Set<string>(
-    maxError > tolerance * 5 ? working.constraints.map((c) => c.id) : [],
-  );
-
   const t3 = performance.now();
-  // Redundant = solver converged but DOF is negative.
-  // Use Jacobian rank analysis to identify which constraint equations are linearly
-  // dependent at the solved state. This is O(m·n·min(m,n)) — sub-millisecond —
-  // versus the old approach of re-solving n times.
-  const redundant = dof < 0 && maxError <= tolerance * 5 && !options.skipRedundancyCheck
-    ? findRedundantConstraints(working, -dof)
-    : new Set<string>();
+  const status = metadata?.status ?? 'over';
+  const dof = metadata?.dof ?? 0;
+  const conflicts = new Set<string>(metadata?.conflictingConstraintIds ?? []);
+  const redundant = new Set<string>(metadata?.redundantConstraintIds ?? []);
+  const residualById = new Map(
+    (metadata?.constraintResiduals ?? []).map((entry) => [entry.id, entry.residual] as const),
+  );
   const t4 = performance.now();
 
-  const constraints = buildConstraintDisplays(working, conflicts, redundant);
+  const constraints = buildConstraintDisplays(working, conflicts, redundant, undefined, residualById);
   const t5 = performance.now();
 
   const rejected = buildConstraintDisplays(
@@ -502,12 +491,10 @@ export const updateConstraintValue = (
   setConstraintValue(target, value);
 
   // Warm-start: cloned definition carries previous solved positions.
-  const cachedDecomposition = buildDecomposition(sketch.definition);
   const skipRedundancyCheck = sketch.constraintMeta.dof >= 0;
   const warmResult = solveConstraintDefinition(next, {
     restarts: 1,
     warmStartIterations: 0,
-    cachedDecomposition,
     skipRedundancyCheck,
   });
   if (warmResult.constraintMeta.maxError <= DEFAULT_TOLERANCE * 5) {

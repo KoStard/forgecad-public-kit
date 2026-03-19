@@ -7,7 +7,7 @@
  *   - Build the WASM artifact with: npm run build:solver
  */
 
-import type { ConstraintDefinition, SolveOptions } from './types';
+import type { ConstraintDefinition, SolveOptions, SolverMetadata } from './types';
 
 // ─── Serialisation types (mirror Rust types.rs) ───────────────────────────────
 
@@ -51,6 +51,7 @@ interface WasmOptions {
   restarts?: number;
   warm_start_iterations?: number;
   max_scaled_step?: number;
+  skip_redundancy_check?: boolean;
 }
 
 interface WasmProblem {
@@ -84,6 +85,20 @@ interface WasmSolveResult {
   points: WasmPointResult[];
   circles: WasmCircleResult[];
   arcs: WasmArcResult[];
+  metadata?: WasmSolveMetadata;
+}
+
+interface WasmConstraintResidual {
+  id: string;
+  residual: number;
+}
+
+interface WasmSolveMetadata {
+  status: 'under' | 'fully' | 'over' | 'over-redundant';
+  dof: number;
+  constraint_residuals: WasmConstraintResidual[];
+  redundant_constraint_ids: string[];
+  conflicting_constraint_ids: string[];
 }
 
 // ─── WASM module state ────────────────────────────────────────────────────────
@@ -91,6 +106,8 @@ interface WasmSolveResult {
 type WasmSolveFn = (problem_json: string) => string;
 
 let _wasm_solve: WasmSolveFn | null = null;
+let _wasm_presolve: WasmSolveFn | null = null;
+let _wasm_presolve_single: ((problem_json: string, constraint_id: string) => string) | null = null;
 let _initPromise: Promise<void> | null = null;
 
 /**
@@ -108,8 +125,34 @@ export async function initSolverWasm(): Promise<void> {
         /* webpackChunkName: "solver-wasm" */
         '../../../../solver/pkg/solver.js'
       );
-      await solverModule.default();
+
+      // In Node.js, the wasm-pack --target web init() uses fetch() which
+      // doesn't work for local files. Load the WASM bytes manually instead.
+      const isNode = typeof process !== 'undefined' && process.versions?.node;
+      if (isNode) {
+        const { readFileSync, existsSync } = await import('fs');
+        const { resolve, dirname } = await import('path');
+        const { fileURLToPath } = await import('url');
+        // Walk up from the current file to find the project root (contains solver/pkg/).
+        let dir = dirname(fileURLToPath(import.meta.url));
+        let wasmPath = '';
+        for (let i = 0; i < 10; i++) {
+          const candidate = resolve(dir, 'solver', 'pkg', 'solver_bg.wasm');
+          if (existsSync(candidate)) { wasmPath = candidate; break; }
+          const parent = dirname(dir);
+          if (parent === dir) break;
+          dir = parent;
+        }
+        if (!wasmPath) throw new Error('solver_bg.wasm not found — run: npm run build:solver');
+        const wasmBytes = readFileSync(wasmPath);
+        await solverModule.default(wasmBytes);
+      } else {
+        await solverModule.default();
+      }
+
       _wasm_solve = solverModule.solve as WasmSolveFn;
+      _wasm_presolve = solverModule.presolve as WasmSolveFn;
+      _wasm_presolve_single = solverModule.presolve_single as (problem_json: string, constraint_id: string) => string;
     } catch (err) {
       throw new Error(
         `[solver-wasm] Failed to load WASM solver.\n` +
@@ -169,6 +212,7 @@ function serializeProblem(def: ConstraintDefinition, options: SolveOptions): Was
       restarts: options.restarts,
       warm_start_iterations: options.warmStartIterations,
       max_scaled_step: options.maxScaledStep,
+      skip_redundancy_check: options.skipRedundancyCheck,
     },
   };
 }
@@ -218,7 +262,7 @@ function applyResult(def: ConstraintDefinition, result: WasmSolveResult): void {
 export function solveConstraintsWasm(
   def: ConstraintDefinition,
   options: SolveOptions,
-): { maxError: number } {
+): { maxError: number; metadata: SolverMetadata | null } {
   if (!_wasm_solve) {
     throw new Error('[solver-wasm] WASM solver not initialised — build it with: npm run build:solver');
   }
@@ -229,6 +273,67 @@ export function solveConstraintsWasm(
 
   if (result.max_error === 1e308) {
     throw new Error('[solver-wasm] WASM solver failed to parse problem JSON');
+  }
+
+  applyResult(def, result);
+  return {
+    maxError: result.max_error,
+    metadata: result.metadata ? {
+      status: result.metadata.status,
+      dof: result.metadata.dof,
+      constraintResiduals: result.metadata.constraint_residuals.map((entry) => ({
+        id: entry.id,
+        residual: entry.residual,
+      })),
+      redundantConstraintIds: result.metadata.redundant_constraint_ids,
+      conflictingConstraintIds: result.metadata.conflicting_constraint_ids,
+    } : null,
+  };
+}
+
+/**
+ * Run only the Rust presolve stages.
+ * Updates `def` in place and returns `{ maxError }`.
+ */
+export function presolveConstraintsWasm(
+  def: ConstraintDefinition,
+  options: SolveOptions,
+): { maxError: number } {
+  if (!_wasm_presolve) {
+    throw new Error('[solver-wasm] WASM solver not initialised — build it with: npm run build:solver');
+  }
+
+  const problem = serializeProblem(def, options);
+  const resultJson = _wasm_presolve(JSON.stringify(problem));
+  const result: WasmSolveResult = JSON.parse(resultJson);
+
+  if (result.max_error === 1e308) {
+    throw new Error('[solver-wasm] WASM presolve failed to parse problem JSON');
+  }
+
+  applyResult(def, result);
+  return { maxError: result.max_error };
+}
+
+/**
+ * Run the Rust presolve hook for a single newly-added constraint.
+ * Updates `def` in place and returns `{ maxError }`.
+ */
+export function presolveSingleConstraintWasm(
+  def: ConstraintDefinition,
+  constraintId: string,
+  options: SolveOptions,
+): { maxError: number } {
+  if (!_wasm_presolve_single) {
+    throw new Error('[solver-wasm] WASM solver not initialised — build it with: npm run build:solver');
+  }
+
+  const problem = serializeProblem(def, options);
+  const resultJson = _wasm_presolve_single(JSON.stringify(problem), constraintId);
+  const result: WasmSolveResult = JSON.parse(resultJson);
+
+  if (result.max_error === 1e308) {
+    throw new Error('[solver-wasm] WASM single-constraint presolve failed to parse problem JSON');
   }
 
   applyResult(def, result);

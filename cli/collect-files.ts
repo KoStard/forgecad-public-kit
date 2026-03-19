@@ -19,7 +19,12 @@ function collectFilesRecursive(dir: string, root: string): Record<string, string
   const result: Record<string, string> = {};
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
-    const stat = statSync(full);
+    let stat;
+    try {
+      stat = statSync(full);
+    } catch {
+      continue;
+    }
     if (stat.isDirectory() && !entry.startsWith('.') && entry !== 'node_modules') {
       Object.assign(result, collectFilesRecursive(full, root));
     } else if (stat.isFile() && isForgeFile(entry)) {

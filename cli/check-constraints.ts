@@ -18,17 +18,16 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { initKernel } from '../src/forge/kernel';
+import { initSolverWasm } from '../src/forge/sketch/constraints/solver-wasm';
 import { resolvePackagePath } from './package-runtime';
 import { constrainedSketch, ConstrainedSketchBuilder } from '../src/forge/sketch/constraints/builder';
-import { isConstraintSketch, ConstraintSketch, solveConstraintDefinition, updateConstraintValue, cloneDefinition } from '../src/forge/sketch/constraints/sketch';
+import { isConstraintSketch, ConstraintSketch, solveConstraintDefinition, updateConstraintValue } from '../src/forge/sketch/constraints/sketch';
 import type { ConstraintDefinition, SketchPoint } from '../src/forge/sketch/constraints/types';
 import { addRect, addPolygon, addRegularPolygon } from '../src/forge/sketch/constraints/concepts';
 import { buildConstraintSvgDocument } from './sketch-svg';
 import { computeLabelMetrics, formatMetrics } from './label-metrics';
 import { getConstraintDef } from '../src/forge/sketch/constraints/registry';
-import { analyticalPreSolve } from '../src/forge/sketch/constraints/analytical';
 import { analyzeRigidity } from '../src/forge/sketch/constraints/rigidity';
-import { buildDecomposition, computeTopologyFingerprint } from '../src/forge/sketch/constraints/decompose';
 import '../src/forge/sketch/constraints/defs';
 
 const EPS = 1e-2; // solver tolerance for position checks (1/100th of a unit)
@@ -82,7 +81,27 @@ function dist(def: ConstraintDefinition, idA: string, idB: string): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
+function printTopResiduals(sketch: ConstraintSketch, limit = 12) {
+  const rows = [...sketch.constraintMeta.constraints]
+    .filter((c) => c.residual > 1e-6)
+    .sort((a, b) => b.residual - a.residual)
+    .slice(0, limit);
+  if (rows.length === 0) {
+    console.log('      top residuals: none above 1e-6');
+    return;
+  }
+  console.log('      top residuals:');
+  for (const row of rows) {
+    const entities = row.entityIds.join(', ');
+    console.log(`        ${row.residual.toFixed(4)} ${row.type} (${row.id}) [${entities}]`);
+  }
+}
+
 function assertConverged(sketch: ConstraintSketch, label: string) {
+  if (_verbose && sketch.constraintMeta.maxError >= 1e-2) {
+    console.log(`      ${label}: status=${sketch.constraintMeta.status} maxErr=${sketch.constraintMeta.maxError.toFixed(4)} dof=${sketch.constraintMeta.dof}`);
+    printTopResiduals(sketch);
+  }
   assert(
     sketch.constraintMeta.maxError < 1e-2,
     `${label}: solver did not converge, maxError=${sketch.constraintMeta.maxError.toFixed(6)}`,
@@ -1852,27 +1871,6 @@ function testAnalyticalChainPropagation() {
   assertApprox(dist(result.definition, c, d), 5, 'chain: |CD|');
 }
 
-/** The analytical pre-solver directly: verify it marks solved points correctly. */
-function testAnalyticalPreSolverAPI() {
-  const s = constrainedSketch();
-  const a = s.point(0, 0, true);
-  const b = s.point(50, 50);
-  s.hDistance(a, b, 10);
-  s.vDistance(a, b, 20);
-
-  // Build the definition manually and run analytical pre-solve
-  const def = (s as any).buildDefinition() as ConstraintDefinition;
-  const result = analyticalPreSolve(def);
-
-  assert(result.solvedPoints.size > 0, 'pre-solver should solve at least one point');
-  assert(result.steps.length > 0, 'pre-solver should produce construction steps');
-  // Check the point was actually placed
-  const bPoint = def.points.find(p => p.id === b);
-  assert(bPoint, 'point b should exist');
-  assertApprox(bPoint!.x, 10, 'pre-solve: b.x');
-  assertApprox(bPoint!.y, 20, 'pre-solve: b.y');
-}
-
 // ─── Level 9: Rigidity analysis tests ──────────────────────────────────────────
 
 /** Well-constrained triangle: 3 points, 3 fixed + structural → rigid. */
@@ -1964,66 +1962,7 @@ function testRigidityDuplicateConstraint() {
   assert(result.redundantConstraintIds.size > 0, 'should detect redundant duplicate constraint');
 }
 
-// ─── Level 10: Cached solve plan tests ──────────────────────────────────────
-
-/** Topology fingerprint is stable across clones with same structure. */
-function testTopologyFingerprintStable() {
-  const s = constrainedSketch();
-  const a = s.point(0, 0, true);
-  const b = s.point(10, 0);
-  const c = s.point(5, 8);
-  const ab = s.line(a, b);
-  const ac = s.line(a, c);
-  s.length(ab, 10);
-  s.length(ac, Math.hypot(5, 8));
-  const def = (s as any).buildDefinition() as ConstraintDefinition;
-  const fp1 = computeTopologyFingerprint(def);
-  const clone = cloneDefinition(def);
-  const fp2 = computeTopologyFingerprint(clone);
-  assert.equal(fp1, fp2, 'fingerprints should match for identical topology');
-}
-
-/** Topology fingerprint changes when a constraint is added. */
-function testTopologyFingerprintChangesOnConstraintAdd() {
-  const s = constrainedSketch();
-  const a = s.point(0, 0, true);
-  const b = s.point(10, 0);
-  const ab = s.line(a, b);
-  s.length(ab, 10);
-  const def1 = (s as any).buildDefinition() as ConstraintDefinition;
-  const fp1 = computeTopologyFingerprint(def1);
-
-  s.horizontal(ab);
-  const def2 = (s as any).buildDefinition() as ConstraintDefinition;
-  const fp2 = computeTopologyFingerprint(def2);
-  assert.notEqual(fp1, fp2, 'fingerprint should differ after adding constraint');
-}
-
-/** buildDecomposition produces valid cache for multi-component system. */
-function testBuildDecompositionMultiComponent() {
-  const s = constrainedSketch();
-  // Component 1
-  const a = s.point(0, 0, true);
-  const b = s.point(10, 0);
-  s.distance(a, b, 10);
-  // Component 2 (disconnected)
-  const c = s.point(50, 50, true);
-  const d = s.point(60, 50);
-  s.distance(c, d, 10);
-
-  const def = (s as any).buildDefinition() as ConstraintDefinition;
-  const cache = buildDecomposition(def);
-  assert(cache.fingerprint.length > 0, 'fingerprint should be non-empty');
-  assert(cache.components.length >= 2, 'should have at least 2 components');
-  // Components should partition entities
-  const allIds = new Set<string>();
-  for (const comp of cache.components) {
-    for (const id of comp) {
-      assert(!allIds.has(id), `entity ${id} should not appear in multiple components`);
-      allIds.add(id);
-    }
-  }
-}
+// ─── Level 10: Warm-start / solver options ───────────────────────────────────
 
 /** Warm-start solve converges for small value changes (the interactive editing case). */
 function testWarmStartConvergence() {
@@ -2049,33 +1988,6 @@ function testWarmStartConvergence() {
   assertApprox(Math.abs(bottomPts.bx - bottomPts.ax), 12, 'bottom length after warm-start');
 }
 
-/** Cached decomposition is reused when topology hasn't changed. */
-function testCachedDecompositionReuse() {
-  const s = constrainedSketch();
-  // Two independent components
-  const a = s.point(0, 0, true);
-  const b = s.point(10, 0);
-  s.distance(a, b, 10);
-  s.hDistance(a, b, 10);
-
-  const c = s.point(50, 50, true);
-  const d = s.point(60, 50);
-  s.distance(c, d, 10);
-  s.hDistance(c, d, 10);
-
-  const def = (s as any).buildDefinition() as ConstraintDefinition;
-  const cache = buildDecomposition(def);
-
-  // Solve with cache
-  const result1 = solveConstraintDefinition(def, { cachedDecomposition: cache });
-  assertConverged(result1, 'cached-decomposition-first');
-
-  // Solve again — cache fingerprint should still match
-  const clone = cloneDefinition(def);
-  const result2 = solveConstraintDefinition(clone, { cachedDecomposition: cache });
-  assertConverged(result2, 'cached-decomposition-reuse');
-}
-
 /** skipRedundancyCheck produces correct DOF=0 for fully constrained system. */
 function testSkipRedundancyCheckCorrectness() {
   const s = constrainedSketch();
@@ -2092,34 +2004,6 @@ function testSkipRedundancyCheckCorrectness() {
   assert.equal(result.constraintMeta.dof, 0, 'DOF should still be 0');
 }
 
-/** Cache invalidated when topology changes (constraint added). */
-function testCacheInvalidationOnTopologyChange() {
-  const s = constrainedSketch();
-  const a = s.point(0, 0, true);
-  const b = s.point(10, 0);
-  const ab = s.line(a, b);
-  s.length(ab, 10);
-
-  const def1 = (s as any).buildDefinition() as ConstraintDefinition;
-  const cache = buildDecomposition(def1);
-
-  // Add a constraint → topology changes
-  s.horizontal(ab);
-  const def2 = (s as any).buildDefinition() as ConstraintDefinition;
-
-  // Cache fingerprint should not match — solver should still converge via fresh decomposition
-  const fp2 = computeTopologyFingerprint(def2);
-  assert.notEqual(cache.fingerprint, fp2, 'fingerprint mismatch after topology change');
-
-  // Passing stale cache should NOT cause incorrect results — decomposeAndSolve falls back
-  const result = solveConstraintDefinition(def2, { cachedDecomposition: cache });
-  assertConverged(result, 'stale-cache-fallback');
-  // Verify horizontal constraint was satisfied
-  const aPoint = result.definition.points.find(p => p.id === a)!;
-  const bPoint = result.definition.points.find(p => p.id === b)!;
-  assertApprox(aPoint.y, bPoint.y, 'horizontal satisfied despite stale cache');
-}
-
 /** Helper: extract line endpoint coordinates from a definition. */
 function getLineEndpoints(def: ConstraintDefinition, lineId: string) {
   const line = def.lines.find(l => l.id === lineId)!;
@@ -2131,6 +2015,7 @@ function getLineEndpoints(def: ConstraintDefinition, lineId: string) {
 // ─── Runner ──────────────────────────────────────────────────────────────────
 
 export async function runCheckConstraintsCli(args: string[]): Promise<void> {
+  await initSolverWasm();
   await initKernel();
 
   const update = args.includes('--update');
@@ -2229,7 +2114,6 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
     { name: 'analytical: hDistance + distance', fn: testAnalyticalHDistPlusDistance },
     { name: 'analytical: vDistance + distance', fn: testAnalyticalVDistPlusDistance },
     { name: 'analytical: chain propagation', fn: testAnalyticalChainPropagation },
-    { name: 'analytical: pre-solver API', fn: testAnalyticalPreSolverAPI },
   ];
 
   const level9: TestEntry[] = [
@@ -2242,13 +2126,8 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
   ];
 
   const level10: TestEntry[] = [
-    { name: 'cache: topology fingerprint stable', fn: testTopologyFingerprintStable },
-    { name: 'cache: fingerprint changes on add', fn: testTopologyFingerprintChangesOnConstraintAdd },
-    { name: 'cache: decomposition multi-component', fn: testBuildDecompositionMultiComponent },
-    { name: 'cache: warm-start convergence', fn: testWarmStartConvergence },
-    { name: 'cache: decomposition reuse', fn: testCachedDecompositionReuse },
-    { name: 'cache: skipRedundancyCheck correctness', fn: testSkipRedundancyCheckCorrectness },
-    { name: 'cache: invalidation on topology change', fn: testCacheInvalidationOnTopologyChange },
+    { name: 'warm-start: convergence', fn: testWarmStartConvergence },
+    { name: 'solver options: skipRedundancyCheck correctness', fn: testSkipRedundancyCheckCorrectness },
   ];
 
   const allTests = [
@@ -2262,7 +2141,7 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
     { level: 'L7: Wrapper rect stability', tests: level7 },
     { level: 'L8: Analytical sub-solvers', tests: level8 },
     { level: 'L9: Rigidity analysis', tests: level9 },
-    { level: 'L10: Cached solve plans', tests: level10 },
+    { level: 'L10: Warm-start & options', tests: level10 },
   ];
 
   let passed = 0;
