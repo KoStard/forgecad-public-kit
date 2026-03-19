@@ -35,6 +35,9 @@ import './pointOnLine';
 import './pointLineDistance';
 import './ccw';
 import './angleBetween';
+import './sameDirection';
+import './oppositeDirection';
+import './blockRotation';
 
 // Re-export named types that external code imports directly
 export type { LineDistanceConstraint } from './lineDistance';

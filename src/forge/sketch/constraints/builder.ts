@@ -371,6 +371,27 @@ export class ConstrainedSketchBuilder {
     return this.constrain({ type: 'parallel', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);
   }
 
+  /** Constrain two lines to point in the same direction (co-directional, not just parallel). */
+  sameDirection(a: any, b: any): this {
+    return this.constrain({ type: 'sameDirection', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain two lines to point in opposite directions (anti-parallel). */
+  oppositeDirection(a: any, b: any): this {
+    return this.constrain({ type: 'oppositeDirection', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /**
+   * Prevent 180° rotation of a polygon.
+   * For rects: ensures the bottom edge points rightward (`axis: 'x'`).
+   * @param points — vertex IDs in order (e.g. rect.vertices)
+   * @param axis — `'x'` or `'y'`: which axis the first edge must increase along. Default `'x'`.
+   */
+  blockRotation(points: any[], axis: 'x' | 'y' = 'x'): this {
+    const resolved = points.map((p: any) => this.resolvePointId(p));
+    return this.constrain({ type: 'blockRotation', points: resolved, axis } as Omit<SketchConstraint, 'id'>);
+  }
+
   /** Constrain two lines to be perpendicular. */
   perpendicular(a: any, b: any): this {
     return this.constrain({ type: 'perpendicular', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);

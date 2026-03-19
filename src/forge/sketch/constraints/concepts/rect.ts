@@ -23,6 +23,8 @@ export interface RectOptions {
   width?: number;
   /** Height (along y). Default: 10. */
   height?: number;
+  /** Prevent 180° rotation (ensures bottom edge points rightward). Default: false. */
+  blockRotation?: boolean;
 }
 
 /**
@@ -92,7 +94,7 @@ export function addRect(
   sk: ConstrainedSketchBuilder,
   options: RectOptions = {},
 ): ConstrainedRect {
-  const { x = 0, y = 0, width = 10, height = 10 } = options;
+  const { x = 0, y = 0, width = 10, height = 10, blockRotation = false } = options;
 
   // Vertices in CCW order: bl → br → tr → tl
   const bl = sk.point(x,         y);
@@ -115,6 +117,9 @@ export function addRect(
 
   // Enforce CCW winding
   sk.ccw(bl, br, tr, tl);
+  if (blockRotation) {
+    sk.blockRotation([bl, br, tr, tl]);
+  }
 
   // Center point: midpoint of the bl→tr diagonal (construction line)
   const diag = sk.line(bl, tr, /* construction */ true);
