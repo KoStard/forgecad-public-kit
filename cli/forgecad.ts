@@ -27,6 +27,7 @@ import { runNotebookCli } from './forge-notebook';
 import { runReportCli } from './forge-report';
 import { runRenderCli } from './forge-render.mjs';
 import { runSdfCli } from './forge-sdf';
+import { runDevCli } from './forge-dev';
 import { runStudioCli } from './forge-studio';
 import { runWebCli } from './forge-web';
 import { runSvgCli } from './forge-svg';
@@ -160,8 +161,30 @@ const CAPTURE_COMMON_OPTIONS: CompletionOptionDefinition[] = [
 const commands: CommandDefinition[] = [
   {
     group: 'Studio',
+    path: ['dev'],
+    summary: 'Start the Vite dev server with live reload. No build step required — the preferred way to run ForgeCAD during active development.',
+    usage: [
+      'forgecad dev',
+      'forgecad dev <project-path>',
+      'forgecad dev --blank',
+    ],
+    examples: [
+      'forgecad dev',
+      'forgecad dev ~/cad/gearbox',
+      'forgecad dev --blank --port 4173',
+    ],
+    completion: {
+      options: STUDIO_OPTIONS,
+      positionals: [
+        { description: 'project path', valueKind: 'directory' },
+      ],
+    },
+    run: runDevCli,
+  },
+  {
+    group: 'Studio',
     path: ['studio'],
-    summary: 'Launch the browser studio against examples, a project folder, or a blank workspace.',
+    summary: 'Serve the production build of the studio (requires dist/ — run `npm run build` first).',
     usage: [
       'forgecad studio',
       'forgecad studio <project-path>',

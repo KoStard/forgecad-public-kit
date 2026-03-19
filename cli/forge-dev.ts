@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
-import { existsSync } from 'fs';
 import { resolve } from 'path';
-import { resolvePackagePath } from './package-runtime';
-import { startStudioServer } from './forge-studio-server';
+import { type ChildProcess } from 'child_process';
+import { packageRootFrom, resolvePackagePath, spawnPackageVite } from './package-runtime';
 
-interface StudioOptions {
+interface DevOptions {
   blank: boolean;
   open: boolean;
   strictPort: boolean;
@@ -15,12 +14,15 @@ interface StudioOptions {
 }
 
 function usage(): never {
-  console.error(`ForgeCAD Studio
+  console.error(`ForgeCAD Dev Server
 
 Usage:
-  forgecad studio
-  forgecad studio <project-path>
-  forgecad studio --blank
+  forgecad dev
+  forgecad dev <project-path>
+  forgecad dev --blank
+
+Starts the Vite development server with live reload. No build step required.
+For the production server (requires \`npm run build\`), use \`forgecad studio\`.
 
 Options:
   --blank         Start without a project folder
@@ -40,13 +42,13 @@ function readOptionalHost(argv: string[], index: number): { host?: string; consu
   return { host: value, consumed: 1 };
 }
 
-function parseStudioArgs(argv: string[]): StudioOptions {
+function parseDevArgs(argv: string[]): DevOptions {
   if (argv.length === 0) {
     return { blank: false, open: false, strictPort: false };
   }
   if (argv.includes('-h') || argv.includes('--help')) usage();
 
-  const options: StudioOptions = { blank: false, open: false, strictPort: false };
+  const options: DevOptions = { blank: false, open: false, strictPort: false };
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -80,39 +82,37 @@ function parseStudioArgs(argv: string[]): StudioOptions {
   return options;
 }
 
-export async function runStudioCli(argv: string[] = process.argv.slice(2)): Promise<void> {
-  const options = parseStudioArgs(argv);
+function toViteArgs(options: DevOptions): string[] {
+  const args: string[] = [];
+  if (options.port != null) args.push('--port', String(options.port));
+  if (options.host) args.push('--host', options.host);
+  if (options.open) args.push('--open');
+  if (options.strictPort) args.push('--strictPort');
+  return args;
+}
+
+function waitForExit(child: ChildProcess): Promise<number> {
+  return new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', (code) => resolve(code ?? 0));
+  });
+}
+
+export async function runDevCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const options = parseDevArgs(argv);
   const projectDir = options.blank
     ? null
     : options.projectPath ?? resolvePackagePath(import.meta.url, 'examples');
 
-  const distDir = resolvePackagePath(import.meta.url, 'dist');
-
-  if (!existsSync(distDir)) {
-    console.error(`
-  Error: Studio UI not built (dist/ is missing).
-
-  For live-reload development:    forgecad dev
-  To build the production bundle: npm run build
-  Then serve it:                  forgecad studio
-`);
-    process.exit(1);
-  }
-
-  const { url, close } = await startStudioServer({
-    projectDir: projectDir ?? null,
-    distDir,
-    port: options.port ?? 5173,
-    host: options.host ?? '127.0.0.1',
-    open: options.open,
-    strictPort: options.strictPort,
+  const child = spawnPackageVite(import.meta.url, toViteArgs(options), {
+    cwd: packageRootFrom(import.meta.url),
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      ...(projectDir ? { FORGE_PROJECT: projectDir } : {}),
+    },
   });
 
-  console.log(`\n  ForgeCAD Studio  →  ${url}\n`);
-  if (projectDir) console.log(`  Project  →  ${projectDir}\n`);
-
-  process.on('SIGINT', async () => {
-    await close();
-    process.exit(0);
-  });
+  const code = await waitForExit(child);
+  if (code !== 0) process.exit(code);
 }

@@ -22,6 +22,29 @@ src/forge/headless.ts    ← Single entry point for all contexts
 
 The key function is `runScript(code, fileName, allFiles)` — it wraps user code in a `Function()` sandbox with the entire forge API injected, and transpiles project files so standard JS `import` / `export` / `require(...)` work for shared utility modules. CLI scripts just call `init()` + `runScript()` and work with the results.
 
+## When to use what
+
+ForgeCAD has two overlapping interfaces. Use the right one for each context.
+
+| Context | Use | Avoid |
+|---------|-----|-------|
+| **Using ForgeCAD as a tool** | `forgecad *` commands | `npm run *` |
+| **Developing ForgeCAD itself** | `npm run dev` (live reload), `npm run build` (prod) | — |
+| **CI / publishing** | `npm run build && npm run test` | forgecad CLI (not installed in CI) |
+| **AI agents in this repo** | `forgecad *` commands only | `npm run build`, `npm run build:cli` |
+
+The CLI is always available after `npm install` — no explicit build step needed.
+
+### Dev server vs production server
+
+| Command | What it does | Requires |
+|---------|-------------|---------|
+| `forgecad dev [path]` | Vite dev server, live reload | nothing beyond `npm install` |
+| `forgecad studio [path]` | Fast static server for the production build | `dist/` built via `npm run build` |
+| `npm run dev` | Same as `forgecad dev` — standard JS project entry point | nothing |
+
+Use `forgecad dev` during active development of forge scripts. Use `forgecad studio` to verify the production build or serve it to others.
+
 ## Install
 
 Install the package and link the local binary once:
@@ -67,6 +90,33 @@ The completions are contextual:
 - ForgeCAD file suggestions where a command expects `.forge.js`, `.sketch.js`, or `.forge-notebook.json`
 
 ## Available Commands
+
+### Studio & Dev Server
+
+```bash
+# Development — Vite dev server, live reload, no build needed
+forgecad dev
+forgecad dev ~/cad/gearbox
+forgecad dev --blank --port 4173
+
+# Production — static server, requires dist/ (npm run build)
+forgecad studio
+forgecad studio ~/cad/gearbox
+forgecad studio --blank --port 4173
+
+# Web / embeddable mode — always dev server, no filesystem
+forgecad web
+forgecad web --open
+```
+
+Both `forgecad dev` and `forgecad studio` accept the same options:
+- `--blank` — open without any project folder
+- `--port <n>` — bind to a specific port (default: 5173)
+- `--host [host]` — expose on the network
+- `--open` — open a browser tab automatically
+- `--strict-port` — fail if the port is already in use
+
+`forgecad open` is an alias for `forgecad studio`.
 
 ### Notebook Cells (server-backed)
 
