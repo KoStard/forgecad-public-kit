@@ -30,7 +30,7 @@ registerConstraint<'collinear', ConstraintTypeMap['collinear']>({
   displayAnnotations(c, { points }) {
     const pt = points.get(c.point);
     if (!pt) return [];
-    return [{ kind: 'symbol', position: [pt.x, pt.y] as [number, number], symbol: 'collinear' as const }];
+    return [{ kind: 'symbol', position: [pt.x + 2.5, pt.y + 2.5] as [number, number], symbol: 'collinear' as const }];
   },
 
   solve(c, { points, lines, movePoint, tolerance }) {

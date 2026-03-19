@@ -46,7 +46,7 @@ registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
     }
     // Fallback: midpoint of line A
     const a1 = points.get(lineA.a), a2 = points.get(lineA.b);
-    if (a1 && a2) return [{ kind: 'symbol', position: [(a1.x+a2.x)/2, (a1.y+a2.y)/2] as [number, number], symbol: 'perpendicular' as const }];
+    if (a1 && a2) return [{ kind: 'symbol', position: midpointPerp(a1, a2, 3), symbol: 'perpendicular' as const }];
     return [];
   },
 

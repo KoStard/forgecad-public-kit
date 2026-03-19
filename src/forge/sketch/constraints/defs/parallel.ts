@@ -40,7 +40,7 @@ registerConstraint<'parallel', ConstraintTypeMap['parallel']>({
       const b = points.get(line.b);
       if (!a || !b) continue;
       const rotation = Math.atan2(b.y - a.y, b.x - a.x);
-      annotations.push({ kind: 'symbol', position: [(a.x+b.x)/2, (a.y+b.y)/2], symbol: 'parallel', rotation });
+      annotations.push({ kind: 'symbol', position: midpointPerp(a, b, 3), symbol: 'parallel', rotation });
     }
     return annotations;
   },

@@ -1,6 +1,6 @@
 import type { LineId, CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
-import { midpoint, distance } from '../helpers';
+import { midpoint, midpointPerp, distance } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -52,7 +52,7 @@ registerConstraint<'tangent', ConstraintTypeMap['tangent']>({
       if (line) {
         const a = points.get(line.a);
         const b = points.get(line.b);
-        if (a && b) return [{ kind: 'symbol', position: [(a.x+b.x)/2, (a.y+b.y)/2] as [number, number], symbol: 'tangent' as const }];
+        if (a && b) return [{ kind: 'symbol', position: midpointPerp(a, b, 3), symbol: 'tangent' as const }];
       }
     } else if (c.a && c.b) {
       const c1 = circles.get(c.a);

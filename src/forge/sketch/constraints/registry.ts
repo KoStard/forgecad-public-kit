@@ -1121,7 +1121,25 @@ export const buildConstraintDisplays = (
     ] as [number, number];
   });
 
-  const origPos = displays.map((d) => [d.position[0], d.position[1]] as [number, number]);
+  // Seed force layout from the annotation's own natural position, not displayPosition().
+  // displayAnnotations() and displayPosition() often compute different positions (e.g. midpoint
+  // vs midpointPerp), causing the delta to be applied on the wrong baseline.
+  const origPos = displays.map((d): [number, number] => {
+    for (const ann of d.annotations) {
+      if (ann.kind === 'symbol' || ann.kind === 'text') {
+        return [ann.position[0], ann.position[1]];
+      }
+      if (ann.kind === 'dimension') {
+        // Midpoint of the offset dimension line = where the label naturally appears.
+        const [ax, ay] = ann.from, [bx, by] = ann.to;
+        const dx = bx - ax, dy = by - ay;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len * ann.offset, ny = dx / len * ann.offset;
+        return [(ax + bx) / 2 + nx, (ay + by) / 2 + ny];
+      }
+    }
+    return [d.position[0], d.position[1]];
+  });
   const pos = origPos.map((p) => [p[0], p[1]] as [number, number]);
   const n = pos.length;
 
@@ -1240,14 +1258,12 @@ export const buildConstraintDisplays = (
         return { ...ann, position: [ann.position[0] + dx, ann.position[1] + dy] as [number, number] };
       }
       if (ann.kind === 'dimension') {
-        return {
-          ...ann,
-          from: [ann.from[0] + dx, ann.from[1] + dy] as [number, number],
-          to: [ann.to[0] + dx, ann.to[1] + dy] as [number, number],
-        };
+        // Don't shift from/to — they are entity endpoints that must stay anchored to geometry.
+        return ann;
       }
       if (ann.kind === 'angle-arc') {
-        return { ...ann, center: [ann.center[0] + dx, ann.center[1] + dy] as [number, number] };
+        // Don't shift center — it is the vertex of the angle and must stay on the entity.
+        return ann;
       }
       return ann;
     });

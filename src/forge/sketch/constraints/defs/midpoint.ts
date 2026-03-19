@@ -37,7 +37,7 @@ registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
     if (!line) return [];
     const a = points.get(line.a), b = points.get(line.b);
     if (!a || !b) return [];
-    return [{ kind: 'symbol', position: [(a.x+b.x)/2, (a.y+b.y)/2] as [number, number], symbol: 'midpoint' as const }];
+    return [{ kind: 'symbol', position: midpointPerp(a, b, 3), symbol: 'midpoint' as const }];
   },
 
   solve(c, { points, lines, tolerance }) {
