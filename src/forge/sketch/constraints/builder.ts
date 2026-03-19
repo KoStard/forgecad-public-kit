@@ -241,7 +241,7 @@ export class ConstrainedSketchBuilder {
     const def = this.buildDefinition();
     presolveSingleConstraintWasm(def, next.id, {
       tolerance: DEFAULT_TOLERANCE,
-    });
+    }, 'builder.constrain.presolveSingle');
     this.syncFromDefinition(def);
 
     // Incremental solve with minimal solver settings — positions are warm.
@@ -250,7 +250,7 @@ export class ConstrainedSketchBuilder {
       tolerance: DEFAULT_TOLERANCE,
       restarts: 1,
       warmStartIterations: 4,
-    });
+    }, 'builder.constrain');
     if (maxError <= DEFAULT_TOLERANCE) {
       this.syncFromDefinition(def);
     }
@@ -634,7 +634,7 @@ export class ConstrainedSketchBuilder {
     definition: ConstraintDefinition;
   } {
     const def = this.buildDefinition();
-    const { maxError } = solveConstraints(def, options);
+    const { maxError } = solveConstraints(def, options, 'builder.solveConstraintsOnly');
     return { maxError, rejectedCount: def.rejectedConstraints.length, definition: def };
   }
 

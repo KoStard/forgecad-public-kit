@@ -3,7 +3,10 @@ mod solver;
 pub mod types;
 
 use wasm_bindgen::prelude::*;
-use types::{ArcResult, CircleResult, PointResult, Problem, SolveOptions, SolveResult};
+use types::{
+    ArcResult, CircleResult, PointResult, Problem, SolveExchange, SolveExchangeKind, SolveOptions,
+    SolveResult,
+};
 
 /// Set up the panic hook once on WASM init so panics surface in the browser console.
 #[wasm_bindgen(start)]
@@ -124,6 +127,58 @@ fn build_result(
     }
 }
 
+fn solve_problem_with_embedded_options(mut problem: Problem) -> SolveResult {
+    let options = problem.options.clone().unwrap_or_default();
+    let max_error = solver::solve(
+        &mut problem.points,
+        &problem.lines,
+        &mut problem.circles,
+        &mut problem.arcs,
+        &problem.shapes,
+        &problem.constraints,
+        &options,
+    );
+    let metadata = solver::analyze_solution(
+        &problem.points,
+        &problem.lines,
+        &problem.circles,
+        &problem.arcs,
+        &problem.shapes,
+        &problem.constraints,
+        max_error,
+        &options,
+    );
+    build_result(max_error, &problem, Some(metadata))
+}
+
+fn presolve_problem_with_embedded_options(mut problem: Problem) -> SolveResult {
+    let options = problem.options.clone().unwrap_or_default();
+    let max_error = solver::presolve(
+        &mut problem.points,
+        &problem.lines,
+        &mut problem.circles,
+        &mut problem.arcs,
+        &problem.shapes,
+        &problem.constraints,
+        &options,
+    );
+    build_result(max_error, &problem, None)
+}
+
+fn presolve_single_problem(problem: Problem, constraint_id: &str) -> SolveResult {
+    let mut problem = problem;
+    let max_error = solver::presolve_constraint(
+        &mut problem.points,
+        &problem.lines,
+        &mut problem.circles,
+        &mut problem.arcs,
+        &problem.shapes,
+        &problem.constraints,
+        constraint_id,
+    );
+    build_result(max_error, &problem, None)
+}
+
 /// Native Rust entry point (used in tests — no WASM overhead).
 pub fn solve_problem(mut problem: Problem, options: Option<SolveOptions>) -> SolveResult {
     let opts = options.unwrap_or_default();
@@ -147,4 +202,20 @@ pub fn solve_problem(mut problem: Problem, options: Option<SolveOptions>) -> Sol
         &opts,
     );
     build_result(max_error, &problem, Some(metadata))
+}
+
+pub fn replay_solve_exchange(exchange: SolveExchange) -> SolveResult {
+    match exchange.kind {
+        SolveExchangeKind::Solve => solve_problem_with_embedded_options(exchange.request),
+        SolveExchangeKind::Presolve => presolve_problem_with_embedded_options(exchange.request),
+        SolveExchangeKind::PresolveSingle => presolve_single_problem(
+            exchange.request,
+            exchange.constraint_id.as_deref().unwrap_or(""),
+        ),
+    }
+}
+
+pub fn replay_solve_exchange_json(exchange_json: &str) -> Result<SolveResult, serde_json::Error> {
+    let exchange: SolveExchange = serde_json::from_str(exchange_json)?;
+    Ok(replay_solve_exchange(exchange))
 }

@@ -439,7 +439,7 @@ export const solveConstraintDefinition = (
   const working = cloneDefinition(def);
 
   const t1 = performance.now();
-  const { maxError, metadata } = solveConstraints(working, options);
+  const { maxError, metadata } = solveConstraints(working, options, 'sketch.solveConstraintDefinition');
   const t2 = performance.now();
 
   const t3 = performance.now();

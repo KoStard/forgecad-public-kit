@@ -22,7 +22,7 @@ export interface RigidityResult {
 
 export function analyzeRigidity(def: ConstraintDefinition): RigidityResult {
   const working = cloneDefinition(def);
-  const { metadata } = solveConstraints(working, {});
+  const { metadata } = solveConstraints(working, {}, 'rigidity.analyze');
   const totalDof = metadata?.dof ?? 0;
   const redundantConstraintIds = new Set(metadata?.redundantConstraintIds ?? []);
   const conflictingConstraintIds = new Set(metadata?.conflictingConstraintIds ?? []);

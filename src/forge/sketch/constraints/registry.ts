@@ -15,7 +15,12 @@ import type {
   SolveOptions,
   SolverMetadata,
 } from './types';
-import { solveConstraintsWasm } from './solver-wasm';
+import {
+  getLastSolverWasmExchange,
+  getSolverWasmStats,
+  resetSolverWasmStats,
+  solveConstraintsWasm,
+} from './solver-wasm';
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
@@ -80,29 +85,51 @@ export const setConstraintValue = (constraint: SketchConstraint, value: number):
 export const DEFAULT_TOLERANCE = 1e-3;
 
 /** Detailed solver timing breakdown — populated per solveConstraints call. */
-export let lastSolverProfile: Record<string, number> | null = null;
+export let lastSolverProfile: Record<string, number | string> | null = null;
 let _totalLmTime = 0;
 let _totalLmCalls = 0;
 let _totalLinearizations = 0;
 let _totalLmIterations = 0;
-export const getSolverStats = () => ({ totalLmTime: _totalLmTime, totalLmCalls: _totalLmCalls, totalLinearizations: _totalLinearizations, totalLmIterations: _totalLmIterations });
-export const resetSolverStats = () => { _totalLmTime = 0; _totalLmCalls = 0; _totalLinearizations = 0; _totalLmIterations = 0; };
+export const getSolverStats = () => ({
+  totalLmTime: _totalLmTime,
+  totalLmCalls: _totalLmCalls,
+  totalLinearizations: _totalLinearizations,
+  totalLmIterations: _totalLmIterations,
+  wasm: getSolverWasmStats(),
+});
+export const resetSolverStats = () => {
+  _totalLmTime = 0;
+  _totalLmCalls = 0;
+  _totalLinearizations = 0;
+  _totalLmIterations = 0;
+  resetSolverWasmStats();
+};
 
 export const solveConstraints = (
   def: ConstraintDefinition,
   options: SolveOptions,
+  source = 'registry.solveConstraints',
 ): { maxError: number; metadata: SolverMetadata | null } => {
   const _st0 = performance.now();
-  const { maxError, metadata } = solveConstraintsWasm(def, options);
+  const { maxError, metadata } = solveConstraintsWasm(def, options, source);
   const _st1 = performance.now();
   _totalLmTime += _st1 - _st0;
   _totalLmCalls++;
+  const exchange = getLastSolverWasmExchange('solve');
 
   lastSolverProfile = {
+    source,
     solve: _st1 - _st0,
     total: _st1 - _st0,
     constraints: def.constraints.length,
     freePoints: def.points.filter(p => !p.fixed).length,
+    serialize: exchange?.timings.serialize ?? 0,
+    stringify: exchange?.timings.stringify ?? 0,
+    wasm: exchange?.timings.wasm ?? 0,
+    parse: exchange?.timings.parse ?? 0,
+    apply: exchange?.timings.apply ?? 0,
+    requestBytes: exchange?.requestBytes ?? 0,
+    responseBytes: exchange?.responseBytes ?? 0,
   };
 
   return { maxError, metadata };

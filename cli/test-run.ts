@@ -295,7 +295,26 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
     if (lastSolverProfile) {
       const s = lastSolverProfile;
       console.log(`  Solver internals (last solve):`);
+      console.log(`    source:      ${String(s.source ?? 'unknown')}`);
       console.log(`    constraints: ${s.constraints}  freePoints: ${s.freePoints}  restarts: ${s.restarts}`);
+      if (typeof s.serialize === 'number') {
+        console.log(`    serialize:  ${s.serialize.toFixed(1)}ms`);
+      }
+      if (typeof s.stringify === 'number') {
+        console.log(`    stringify:  ${s.stringify.toFixed(1)}ms`);
+      }
+      if (typeof s.wasm === 'number') {
+        console.log(`    rust/wasm:  ${s.wasm.toFixed(0)}ms`);
+      }
+      if (typeof s.parse === 'number') {
+        console.log(`    parse:      ${s.parse.toFixed(1)}ms`);
+      }
+      if (typeof s.apply === 'number') {
+        console.log(`    apply:      ${s.apply.toFixed(1)}ms`);
+      }
+      if (typeof s.requestBytes === 'number' && typeof s.responseBytes === 'number') {
+        console.log(`    json:       req=${s.requestBytes}B  res=${s.responseBytes}B`);
+      }
       if (typeof s.presolve === 'number') {
         console.log(`    presolve:   ${s.presolve.toFixed(1)}ms`);
       }
@@ -310,6 +329,18 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       }
     }
     const stats = getSolverStats();
+    const wasmTotals = stats.wasm?.totals;
+    if (wasmTotals && wasmTotals.calls > 0) {
+      console.log(`  Rust/WASM boundary (build + final):`);
+      console.log(`    calls:       ${wasmTotals.calls}`);
+      console.log(`    total:       ${wasmTotals.total.toFixed(0)}ms`);
+      console.log(`    rust/wasm:   ${wasmTotals.wasm.toFixed(0)}ms`);
+      console.log(`    serialize:   ${wasmTotals.serialize.toFixed(0)}ms`);
+      console.log(`    stringify:   ${wasmTotals.stringify.toFixed(0)}ms`);
+      console.log(`    parse:       ${wasmTotals.parse.toFixed(0)}ms`);
+      console.log(`    apply:       ${wasmTotals.apply.toFixed(0)}ms`);
+      console.log(`    json bytes:  req=${wasmTotals.requestBytes}B  res=${wasmTotals.responseBytes}B`);
+    }
     if (stats.totalLmCalls > 0) {
       console.log(`  All solves (build + final):`);
       console.log(`    LM calls:        ${stats.totalLmCalls}`);

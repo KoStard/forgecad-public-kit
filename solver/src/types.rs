@@ -239,6 +239,23 @@ pub struct SolveResult {
     pub metadata: Option<SolveMetadata>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SolveExchangeKind {
+    Solve,
+    Presolve,
+    PresolveSingle,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SolveExchange {
+    pub kind: SolveExchangeKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub constraint_id: Option<String>,
+    pub request: Problem,
+    pub response: SolveResult,
+}
+
 impl Constraint {
     pub fn equation_count(&self) -> i32 {
         match self {

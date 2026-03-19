@@ -3,9 +3,9 @@ use std::fmt::Write;
 use std::fs;
 use std::path::PathBuf;
 
-use solver::solve_problem;
+use solver::{replay_solve_exchange, solve_problem};
 use solver::types::{
-    Circle, Constraint, Line, Point, Problem, Shape, SolveOptions, SolveResult,
+    Circle, Constraint, Line, Point, Problem, Shape, SolveExchange, SolveOptions, SolveResult,
 };
 
 pub struct RectIds {
@@ -303,6 +303,16 @@ impl SolvedSketch {
 
         writeln!(svg, "</svg>").unwrap();
         svg
+    }
+}
+
+pub fn solve_captured_exchange_json(json: &str) -> SolvedSketch {
+    let exchange: SolveExchange =
+        serde_json::from_str(json).unwrap_or_else(|err| panic!("invalid captured exchange JSON: {err}"));
+    let result = replay_solve_exchange(exchange.clone());
+    SolvedSketch {
+        problem: exchange.request,
+        result,
     }
 }
 

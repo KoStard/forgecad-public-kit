@@ -109,6 +109,7 @@ Primary hypotheses at start:
 | 8 | Strip TS constraint defs down to metadata only | TS defs no longer carry presolve / solve / residual / jacobian logic; CLI diagnostics now use Rust metadata only | complete |
 | 9 | Remove TS DOF bookkeeping and pebble-game rigidity logic | `analyzeRigidity()` now delegates to Rust solve metadata; TS defs no longer carry `computeDof` hooks | complete |
 | 10 | Explain and shrink the surviving TS boundary | every remaining constraints TS file now states its thin role explicitly; dead compatibility helpers were removed; a README now points solver debugging back to Rust first | complete |
+| 11 | Add Rust-boundary timing and capture tooling | spectrogram now reports Rust/WASM time directly; the last request/response can be copied as a clean JSON bundle and replayed in Rust tests | complete |
 
 ## Remaining TS Solver Surface
 
@@ -376,6 +377,46 @@ Additional concrete finding:
 
 - The remaining TS code is now easier to audit: it is either builder ergonomics, registry/display metadata, the WASM bridge, or post-solve UI geometry. If a future constraint regression appears, the default assumption should now be “debug Rust first”.
 
+### Add Rust-Boundary Timing and Capture Tooling (SUCCESS)
+**What**: Make the Rust boundary observable enough that a slow or broken UI solve can be moved into a Rust repro with minimal friction.
+
+**Changed**:
+
+- instrumented `src/forge/sketch/constraints/solver-wasm.ts` with per-call timing breakdowns:
+  - `serialize`
+  - `stringify`
+  - `rust/wasm`
+  - `parse`
+  - `apply`
+- added cumulative Rust-boundary stats and source labels (`builder.constrain`, `sketch.solveConstraintDefinition`, `rigidity.analyze`, etc.)
+- exposed browser-console helpers on `globalThis.__forgecadSolver`:
+  - `enableConsoleDebug()`
+  - `resetStats()`
+  - `getStats()`
+  - `printRecent()`
+  - `copyLastExchange()`
+  - `copyLastRequest()`
+  - `copyLastResponse()`
+- added a clean capture bundle format:
+  - `{ kind, constraint_id?, request, response }`
+  - `request` is the exact JSON sent to Rust
+  - `response` is the exact JSON returned by Rust
+- added Rust-side replay support in `solver/src/lib.rs` and `solver/src/types.rs`
+- added Rust test helpers and a replay regression in `solver/tests/testkit.rs` and `solver/tests/capture_replay_tests.rs`
+
+**Measured result**:
+
+- `node dist-cli/forgecad.js run /Users/kostard/Projects/CAD/PersonalForgeCADProjects/2026/03/16/spectrogram.forge.js`
+  - reported wall-clock in the command: `Time: 2658ms`
+  - Rust/WASM boundary totals: `109` calls, `2598ms` total
+  - time spent inside Rust/WASM itself: `2592ms`
+  - JS boundary overhead on those calls (`serialize + stringify + parse + apply`): about `6ms`
+  - final solve call alone: `31ms` total in `solveConstraintDefinition`, `4ms` inside Rust/WASM
+
+**Lesson**:
+
+- On spectrogram, the dominant cost is not JSON marshalling anymore; it is the number of Rust/WASM solve calls during incremental construction. That means the next performance work should target solve frequency / branch stability first, not serialization micro-optimizations.
+
 ## Files Modified
 
 | File | Purpose |
@@ -387,6 +428,10 @@ Additional concrete finding:
 | `src/forge/sketch/constraints/types.ts` | Removed TS decomposition-cache types from the public solver boundary |
 | `src/forge/sketch/constraints/index.ts` | Stopped exporting deleted TS solver modules |
 | `src/forge/sketch/constraints/solver-wasm.ts` | Added Rust presolve bridge APIs for incremental builder seeding |
+| `solver/src/lib.rs` | Added Rust-side replay helpers for captured boundary exchanges |
+| `solver/src/types.rs` | Added a serializable solve-exchange format shared by UI captures and Rust tests |
+| `solver/tests/capture_replay_tests.rs` | Verifies that a captured UI exchange can be replayed directly inside Rust tests |
+| `solver/tests/testkit.rs` | Added helper to solve and inspect captured exchange JSON inside Rust tests |
 | `src/forge/sketch/constraints/README.md` | Explicit inventory of why the surviving TS boundary still exists |
 | `src/forge/sketch/constraints/defs/*.ts` | Removed legacy TS solver methods and `computeDof`, leaving declarative metadata / annotations only |
 | `src/forge/sketch/constraints/decompose.ts` | Deleted dead TS decomposition wrapper after Rust became authoritative |
