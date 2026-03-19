@@ -2569,12 +2569,13 @@ function SketchObject({
           </mesh>
         );
       })}
-      {/* Surface centroid labels */}
+      {/* Surface centroid labels — only shown for hovered/selected to avoid clutter */}
       {isSketchMode && obj.sketchMeta?.surfaces.map((s) => {
-        const palette = ['#4488cc', '#44cc88', '#cc8844', '#cc44aa', '#88cc44', '#44aacc', '#aa44cc', '#cccc44'];
-        const color = palette[s.index % palette.length];
         const isHovered = hoveredSurfIdx === s.index;
         const isSelected = selectedSurfaceIndex === s.index;
+        if (!isHovered && !isSelected) return null;
+        const palette = ['#4488cc', '#44cc88', '#cc8844', '#cc44aa', '#88cc44', '#44aacc', '#aa44cc', '#cccc44'];
+        const color = palette[s.index % palette.length];
         return (
           <Html
             key={`sl-${s.index}`}
@@ -2589,8 +2590,8 @@ function SketchObject({
                 fontSize: 10,
                 fontFamily: 'system-ui, sans-serif',
                 fontWeight: 600,
-                color: isSelected ? '#fff' : isHovered ? '#fff' : color,
-                background: isSelected ? color : isHovered ? `${color}88` : 'rgba(0,0,0,0.5)',
+                color: '#fff',
+                background: isSelected ? color : `${color}88`,
                 borderRadius: 3,
                 padding: '1px 4px',
                 cursor: 'pointer',
