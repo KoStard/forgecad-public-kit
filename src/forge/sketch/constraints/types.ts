@@ -205,6 +205,8 @@ export interface SolverContext {
   shapes: Map<ShapeId, SketchShape>;
   tolerance: number;
   movePoint: (pt: SketchPoint, dx: number, dy: number) => boolean;
+  /** Number of constraints referencing each entity ID (available during presolve). */
+  entityRefCount?: Map<string, number>;
 }
 
 export interface DisplayContext {

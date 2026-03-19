@@ -688,9 +688,22 @@ export class ConstrainedSketchBuilder {
     const circles = new Map(this.circles.map((c) => [c.id, c] as const));
     const arcs = new Map(this.arcs.map((a) => [a.id, a] as const));
     const shapes = new Map((this.shapes ?? []).map((s) => [s.id, s] as const));
+    // Count how many constraints reference each entity — lines/points with more
+    // references are more "established" and should not be moved by presolve.
+    const entityRefCount = new Map<string, number>();
+    for (const c of this.constraints) {
+      for (const [key, val] of Object.entries(c)) {
+        if (key === 'id' || key === 'type') continue;
+        if (typeof val === 'string') entityRefCount.set(val, (entityRefCount.get(val) ?? 0) + 1);
+        else if (Array.isArray(val)) {
+          for (const v of val) { if (typeof v === 'string') entityRefCount.set(v, (entityRefCount.get(v) ?? 0) + 1); }
+        }
+      }
+    }
     const ctx = {
       points, lines, circles, arcs, shapes,
       tolerance: DEFAULT_TOLERANCE,
+      entityRefCount,
       movePoint: (pt: SketchPoint, dx: number, dy: number) => {
         if (pt.fixed) return false;
         pt.x += dx; pt.y += dy;

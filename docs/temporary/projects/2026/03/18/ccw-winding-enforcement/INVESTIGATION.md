@@ -1,98 +1,104 @@
-# CCW Winding Enforcement During lineDistance Constraints
+# CCW Winding Enforcement & Wrapper Rect Stability
 
-**Goal**: Fix the constraint solver so that adding `lineDistance(wrapper.side, inner.side, 0)` constraints (to create a bounding wrapper rectangle) does not cause inner rectangles to "flip inside" — collapsing their winding order.
+**Goal**: Fix the constraint solver so that adding `lineDistance(wrapper.side, inner.side, 0)` constraints (to create a bounding wrapper rectangle) does not disturb existing geometry. Adding a wrapper must be a pure addition — existing point positions must not drift.
 
-**Current state**: SOLVED — 53/53 tests pass, model produces 26 surfaces correctly with err=0.000635 (below tolerance 0.001).
+**Current state**: SOLVED ✓ (54/54 tests pass, spectrogram converges at err=0.000006)
+
+**Formal test**: `testWrapperRectDoesNotDisturbLayout` in `cli/check-constraints.ts` (L7)
+- Builds a multi-rect case layout (2 sections × 5 rects = 10 rects, connected via midpoint+lineDistance)
+- Solves without wrapper, captures all point positions
+- Adds wrapper rect with 4 lineDistance=0 constraints to outermost edges
+- Re-solves and asserts every original point stays within 0.1mm relative drift
+
+**Baseline failure**: pt-133 drifted 375.65mm when wrapper was added.
 
 ---
 
 ## Root Cause Analysis
 
-### The problem
-When a wrapper rectangle is added with `lineDistance(wrapper.side, innerRect.side, 0)` to align edges, inner rectangles "flip inside" — their vertices rearrange and winding breaks, producing collapsed/inverted geometry.
-
-### Architecture context
-From the solver improvement plan, the key architecture is:
+### Architecture
 ```
 constrain() → runSinglePresolve() → checkResiduals() → incremental decomposeAndSolve()
                                                             ↓
                                                     runProjectorWarmStart() → LM iterations
 ```
 
-### Why it happens (2 interacting issues)
+### The actual root cause
 
-1. **`lineDistance` has no `presolve` hook** — so `runSinglePresolve()` does nothing when `lineDistance(wrapper.left, inner.left, 0)` is added. The wrapper stays at its default 10×10 position at origin.
+**lineDistance.presolve() moved inner geometry instead of wrapper geometry.**
 
-2. **`lineDistance.solve()` always moves line `b` when both lines are free** — During `runProjectorWarmStart()`, the `solve()` projector drags `b` (inner.left, the established geometry) toward `a` (wrapper.left, near origin), corrupting inner geometry positions.
+When `lineDistance(wrapper.right, rightSide.right, 0)` was presolve'd, the presolve needed to decide which line to move. The original heuristic was purely length-based: move the shorter line. But after previous wrapper constraints (top/bottom) moved the wrapper corners, `wrapper.right` spanned the full layout height (934mm), making it appear "established" — longer than `rightSide.right` (339mm).
 
-### Key constraint: `lineDistance` solve priority
-```typescript
-// lineDistance.solve(), line 99:
-if (allAFixed || !allBFixed) {
-  // move b toward a — THIS IS THE PROBLEM
-}
-```
-When both lines are free (`allAFixed=false`, `allBFixed=false`): `false || true = true` → always moves `b`. For `lineDistance(wrapper, inner, 0)`, this moves inner toward wrapper at origin.
+So the presolve moved the inner `rightSide.right` line (305mm shift) instead of the wrapper line. This corruption propagated through `syncFromDefinition` and the final solve converged to the corrupted state.
 
----
+### Why entityRefCount was needed
 
-## Solution
+The length heuristic fails when wrapper lines get **inflated** by prior presolves — a rect's vertical sides grow taller when its corners are moved by horizontal lineDistance constraints. The inflated length gives a false signal of "established" geometry.
 
-Two changes to `lineDistance.ts`, both addressing initialization:
+Entity reference counting (how many constraints reference each entity) is a better signal: wrapper lines are new and have few constraint references, while inner geometry lines are part of an established network with many references.
 
-### 1. Added `presolve` hook — move shorter line toward longer
-When `constrain()` calls `runSinglePresolve()`, the new `presolve` compares line lengths and moves the shorter line toward the longer one. New geometry (e.g. wrapper rect at default 10×10) has short sides; established geometry has been sized by previous constraints. This places the wrapper near the inner geometry during initialization.
+### The tie-breaker problem
 
-### 2. Smart `solve` heuristic — move shorter line when size difference is large
-In `solve()`, when both lines are free and line `a` is less than half the length of `b`, move `a` instead of `b`. This prevents the warm-start projector from dragging large established geometry toward small new geometry. Falls back to the original behavior (move `b`) when lines are similar size.
+When ref counts are equal (common case — both lines are part of rects with identical constraint structures), the fallback matters:
 
-These two changes together fix the initialization problem without affecting existing tests. The CCW continuous residual was tested but ultimately not needed.
+- `lenA < lenB` (original): Fails for inflated wrapper lines (wrapper is longer → moves inner)
+- `lenA < lenB || lenA > lenB * 2` (solution): Detects inflation — if A is much longer than B (>2×), it's inflated by prior presolves, so move A. Otherwise, move the shorter line.
 
 ---
 
 ## Experiment Log
 
-### Experiment A: CCW continuous residual — `min(area, 0)` (FAILED)
-**What**: Added one-sided penalty to CCW residual: `return [Math.min(area, 0)]`
-**Result**: Model still broken — 8 surfaces, centroids at x≈11228. Solver converged to wrong local minimum.
-**Why it failed**: The raw area value (~166,250 mm²) is orders of magnitude larger than other constraint residuals (~0-500 mm). Even with `computeRowWeights` normalization, the kink at `area=0` and the massive scale difference cause LM to struggle.
-**Lesson**: Unnormalized area as a residual doesn't work — scale matters even with row weighting.
+### Experiment 1: lineDistance presolve (move shorter line) + smart solve (< 0.5× threshold)
+**What**: Added `presolve` that moves shorter line toward longer. Changed `solve` to move `a` when `lenA < lenB * 0.5`.
+**Result**: 53/53 old tests pass. Wrapper test not yet written.
+**Why insufficient**: The `0.5×` threshold in solve is too conservative.
 
-### Experiment B: lineDistance split-movement when both free (PARTIAL — broke test)
-**What**: When both lines are free in `lineDistance.solve()`, split the shift equally between both lines.
-**Result**: Wrapper model improved (26 surfaces, near-origin centroids), but `rectWithOffset` test regressed to maxError=28.13.
-**Why it partially worked**: Splitting movement prevents the projector from fully dragging inner geometry to origin. But the split also breaks the common case where `b` (the newer geometry) SHOULD move toward `a` (the reference).
-**Lesson**: The `both-free` case needs a smarter heuristic than 50/50 split. Most callers expect `b` to move.
+### Experiment 2: CCW residual as min(area,0) / sqrt(-area)
+**What**: Made CCW contribute a continuous residual to the Jacobian.
+**Result**: Unnormalized area (~166k mm²) dominated solver.
+**Lesson**: Scale matters.
 
-### Experiment B+: CCW normalized residual — `-sqrt(-area)` (alongside split-movement)
-**What**: Changed CCW residual to `area >= 0 ? 0 : -Math.sqrt(-area)` for length-scale normalization.
-**Result**: Combined with split-movement, produced 26 surfaces correctly. But the split-movement broke the rectWithOffset test.
-**Lesson**: sqrt normalization brings CCW residual to the right scale, but not needed if initialization is fixed.
+### Experiment 3: 50/50 split movement in solve()
+**What**: Split the distance shift evenly between both lines.
+**Result**: Broke `rectWithOffset` test (maxError=28.13).
 
-### Experiment C: lineDistance presolve — move shorter line (SUCCESS — tests pass, model works)
-**What**: Added `presolve` hook to `lineDistance` that moves the shorter line toward the longer one. This places new geometry near established geometry during initialization.
-**Result**: 53/53 tests pass. Model: 26 surfaces, err=0.000635, correct geometry.
-**Why it worked**: Consistent with the solver plan's key insight: "the problem is initialization, not solver power." The presolve places the wrapper near the inner geometry, giving the solver a good starting point.
+### Experiment 4: Presolve + smart solve (< 0.25× threshold)
+**What**: Combined presolve with a stricter smart heuristic in solve.
+**Result**: Formal wrapper test: pt-133 drifts 378.79mm.
+**Root cause**: Drift happens during `constrain()` phase.
 
-### Experiment D: Smart solve heuristic — move shorter when < half length (SUCCESS)
-**What**: In `lineDistance.solve()`, when both lines are free and `lenA < lenB * 0.5`, move `a` instead of `b`. Falls back to move-b otherwise.
-**Result**: Same quality — 53/53 tests pass, 26 surfaces, err=0.000635.
-**Why it works**: During warm-start iterations, the wrapper sides (10mm) are much shorter than inner sides (339-475mm), so the projector moves the wrapper instead of dragging inner geometry. For the rectWithOffset test, outer (20mm) and inner (14mm) lines are similar size → falls back to move-b → no regression.
+### Experiment 5: Position regularization (Tikhonov damping)
+**Result**: Base case fails to converge — regularization fights initial convergence.
 
-### Experiment E: CCW residual without lineDistance fixes (FAILED — not sufficient alone)
-**What**: Added CCW continuous residual without presolve/solve changes.
-**Result**: Without presolve fix: 37 constraint residuals above 0 (all below tolerance, but worse convergence). Without any lineDistance changes: same broken behavior as baseline.
-**Lesson**: CCW residual is defense-in-depth but doesn't fix the root cause (bad initialization). The lineDistance presolve + smart-solve are the essential fixes.
+### Experiment 6: Adaptive regularization + post-warmstart anchoring
+**Result**: Wrapper drift unchanged. Anchoring locks in corruption.
 
-### Experiment F: lineDistance fixes without CCW residual (SUCCESS — CCW not needed)
-**What**: Kept presolve + smart-solve, reverted CCW to discrete-only.
-**Result**: 53/53 tests pass, 26 surfaces, err=0.000635. Identical to with CCW residual.
-**Lesson**: The CCW continuous residual is not needed when initialization is correct. Keeping CCW as discrete-only (simpler, no DOF impact).
+### Experiment 7: Monotonic warm-start (iteration-level)
+**Result**: Didn't help wrapper (GS pass reduces total error by satisfying new constraint, masking inner drift).
+
+### Experiment 8: entityRefCount in solve()
+**What**: Used constraint reference counts in `lineDistance.solve()` for the "which line to move" decision.
+**Result**: Spectrogram convergence broke (err=2.77–17.89). Wrapper drift unchanged.
+**Why**: The drift was in PRESOLVE, not solve(). Changing solve() heuristic was targeting the wrong layer.
+
+### Experiment 9: warmStartIterations=0 in constrain()
+**What**: Disabled GS warm-start during incremental solves.
+**Result**: All check-constraints pass but spectrogram MODEL fails (err=6.86). The spectrogram needs cross-constraint GS iterations during incremental builds.
+**Lesson**: User feedback — "If the algorithm is good, why should it get hurt from running it more times?"
+
+### Experiment 10: entityRefCount in presolve with inflation-aware tie-breaker ← THE FIX
+**What**: Added `entityRefCount` to presolve context (both `runSinglePresolve` in builder.ts and `solveConstraints` in registry.ts). When ref counts are equal, use `lenA < lenB || lenA > lenB * 2` — the second condition detects lines inflated by prior presolves.
+**Result**: ALL 54 tests pass. Spectrogram: err=0.000006. Wrapper: 0.0mm drift.
+**Why it works**: The inflation detection (`lenA > lenB * 2`) catches the specific failure mode — wrapper lines that were stretched by top/bottom presolves appear artificially long. The presolve correctly moves the inflated wrapper line instead of the inner geometry, giving LM a good starting point.
 
 ---
 
-## Files Modified
+## Summary of Changes
 
-| File | Purpose |
-|------|---------|
-| `src/forge/sketch/constraints/defs/lineDistance.ts` | Added `presolve` hook + smart `solve` heuristic |
+| File | Change | Purpose |
+|------|--------|---------|
+| `types.ts` | `entityRefCount?: Map<string, number>` on `SolverContext` | Passes ref count info to presolve hooks |
+| `registry.ts` | Build `entityRefCount` in `solveConstraints()` | Counts constraint refs for final solve context |
+| `builder.ts` | Build `entityRefCount` in `runSinglePresolve()` | Counts constraint refs for incremental presolve context |
+| `lineDistance.ts` | `presolve()` uses entityRefCount + inflation detection | Moves less-constrained line; detects inflated wrapper lines |
+| `check-constraints.ts` | L7 wrapper stability test | Regression test for wrapper rect stability |

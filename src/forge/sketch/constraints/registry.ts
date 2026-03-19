@@ -841,6 +841,19 @@ export const solveConstraints = (
     return true;
   };
 
+  // Count how many constraints reference each entity — used by solve() heuristics
+  // to determine which entities are "established" and should not be moved.
+  const entityRefCount = new Map<string, number>();
+  for (const c of def.constraints) {
+    for (const [key, val] of Object.entries(c)) {
+      if (key === 'id' || key === 'type') continue;
+      if (typeof val === 'string') entityRefCount.set(val, (entityRefCount.get(val) ?? 0) + 1);
+      else if (Array.isArray(val)) {
+        for (const v of val) { if (typeof v === 'string') entityRefCount.set(v, (entityRefCount.get(v) ?? 0) + 1); }
+      }
+    }
+  }
+
   const ctx: SolverContext = {
     points,
     lines,
@@ -849,6 +862,7 @@ export const solveConstraints = (
     shapes,
     tolerance,
     movePoint,
+    entityRefCount,
   };
 
   for (const constraint of def.constraints) {

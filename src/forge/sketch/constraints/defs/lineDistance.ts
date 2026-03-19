@@ -51,16 +51,13 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
     return [{ kind: 'dimension', from: midA, to: midB, offset: 0, value: String(c.value) }];
   },
 
-  presolve(c, { lines, points }) {
+  presolve(c, { lines, points, entityRefCount }) {
     const lineA = lines.get(c.a);
     const lineB = lines.get(c.b);
     if (!lineA || !lineB) return;
     const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
     const b1 = points.get(lineB.a); const b2 = points.get(lineB.b);
     if (!a1 || !a2 || !b1 || !b2) return;
-    const allAFixed = a1.fixed && a2.fixed;
-    const allBFixed = b1.fixed && b2.fixed;
-    if (allAFixed && allBFixed) return;
 
     const lenA = distance(a1, a2) || 1;
     const lenB = distance(b1, b2) || 1;
@@ -74,14 +71,38 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
     const shift = c.value - currentDist;
     if (Math.abs(shift) < 0.01) return;
 
-    // Move the SHORTER line toward the longer one. New geometry (e.g. a wrapper
-    // rect at default 10×10) has short sides; established geometry has been sized
-    // by previous constraints. This places new geometry near existing geometry
-    // rather than dragging existing geometry to the new rect's default position.
+    // Move the LESS CONSTRAINED line toward the more constrained one.
+    // Primary: constraint reference count (lines with more constraints are established).
+    // Fallback: line length (shorter = newer, e.g. default 10×10 rect).
+    const allAFixed = a1.fixed && a2.fixed;
+    const allBFixed = b1.fixed && b2.fixed;
+    if (allAFixed && allBFixed) return;
+
+    let moveA: boolean;
     if (allAFixed) {
-      if (!b1.fixed) { b1.x += nx * shift; b1.y += ny * shift; }
-      if (!b2.fixed) { b2.x += nx * shift; b2.y += ny * shift; }
-    } else if (allBFixed || lenA < lenB) {
+      moveA = false;
+    } else if (allBFixed) {
+      moveA = true;
+    } else if (entityRefCount) {
+      const refsA = (entityRefCount.get(c.a) ?? 0)
+        + (entityRefCount.get(lineA.a) ?? 0) + (entityRefCount.get(lineA.b) ?? 0);
+      const refsB = (entityRefCount.get(c.b) ?? 0)
+        + (entityRefCount.get(lineB.a) ?? 0) + (entityRefCount.get(lineB.b) ?? 0);
+      if (refsA < refsB) {
+        moveA = true;
+      } else if (refsA > refsB) {
+        moveA = false;
+      } else {
+        // Refs are equal — move the shorter line (likely newer geometry),
+        // but also move A if it is much longer than B (indicating inflation
+        // from prior presolves, e.g. wrapper lines stretched by top/bottom).
+        moveA = lenA < lenB || lenA > lenB * 2;
+      }
+    } else {
+      moveA = lenA < lenB;
+    }
+
+    if (moveA) {
       if (!a1.fixed) { a1.x -= nx * shift; a1.y -= ny * shift; }
       if (!a2.fixed) { a2.x -= nx * shift; a2.y -= ny * shift; }
     } else {
@@ -131,9 +152,8 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
     if (err <= tolerance) return err;
 
     // Shift lines along the normal so the distance matches the target.
-    // When both lines are free and one is much shorter than the other, move
-    // the shorter one — it is likely newer geometry (e.g. a wrapper rect at
-    // default size) that should adapt to established geometry, not vice versa.
+    // When both lines are free and one is much shorter, move the shorter one —
+    // it is likely newer geometry that should adapt to established geometry.
     const shift = c.value - currentDist;
     const allBFixed = b1.fixed && b2.fixed;
     const allAFixed = a1.fixed && a2.fixed;
@@ -144,10 +164,9 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
     } else if (allBFixed) {
       moveA = true;
     } else {
-      // Both free — move the shorter line when there's a clear size difference.
       const lenASq = (a2.x - a1.x) ** 2 + (a2.y - a1.y) ** 2;
       const lenBSq = (b2.x - b1.x) ** 2 + (b2.y - b1.y) ** 2;
-      moveA = lenASq < lenBSq * 0.25; // a is less than half the length of b
+      moveA = lenASq < lenBSq * 0.25;
     }
     if (moveA) {
       if (!a1.fixed) { a1.x -= nx * shift; a1.y -= ny * shift; }

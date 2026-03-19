@@ -1501,6 +1501,148 @@ function testAddRegularPolygonBuilderMethod() {
   }
 }
 
+// ─── Level 7: Wrapper rect stability ─────────────────────────────────────────
+
+/**
+ * Build the multi-rect case layout (2 sections × 5 rects each, connected via
+ * midpoint+lineDistance). Returns the builder and all rect handles.
+ */
+function buildCaseLayout(sk: ConstrainedSketchBuilder) {
+  const boxWidth = 475;
+  const thickness = 5.5;
+  const boxLength = 350;
+  const topHeight = 38;
+  const bottomHeight = 90;
+
+  function attachAtMidpoint(side1: string, side2: string) {
+    const midPt = sk.point();
+    sk.midpoint(midPt, side1);
+    sk.midpoint(midPt, side2);
+    sk.lineDistance(side1, side2, 0);
+  }
+
+  function makeSection(height: number, anchorSide: string | null) {
+    const surface = sk.rect();
+    sk.length(surface.top, boxWidth);
+    sk.length(surface.left, boxLength);
+    const sideHeight = height - thickness;
+    const sideLength = boxLength - 2 * thickness;
+
+    const rightSide = sk.rect();
+    sk.length(rightSide.top, sideHeight);
+    sk.length(rightSide.left, sideLength);
+    attachAtMidpoint(surface.right, rightSide.left);
+
+    const leftSide = sk.rect();
+    sk.length(leftSide.top, sideHeight);
+    sk.length(leftSide.left, sideLength);
+    attachAtMidpoint(surface.left, leftSide.right);
+
+    const frontPiece = sk.rect();
+    sk.length(frontPiece.top, boxWidth);
+    sk.length(frontPiece.left, sideHeight);
+    attachAtMidpoint(surface.top, frontPiece.bottom);
+
+    const backPiece = sk.rect();
+    sk.length(backPiece.top, boxWidth);
+    sk.length(backPiece.left, sideHeight);
+    attachAtMidpoint(surface.bottom, backPiece.top);
+
+    if (anchorSide) {
+      attachAtMidpoint(anchorSide, frontPiece.top);
+    }
+
+    return { surface, rightSide, leftSide, frontPiece, backPiece };
+  }
+
+  const topSection = makeSection(topHeight, null);
+  const bottomSection = makeSection(bottomHeight, topSection.backPiece.bottom);
+  return { topSection, bottomSection };
+}
+
+/**
+ * Adding a wrapper rectangle with lineDistance=0 to outermost edges must not
+ * disturb the positions of existing geometry. The wrapper should adapt to the
+ * established layout, not the other way around.
+ *
+ * Captures all point positions from the base layout, then adds the wrapper and
+ * re-solves. Asserts every original point stays within tolerance.
+ */
+function testWrapperRectDoesNotDisturbLayout() {
+  // 1. Solve without wrapper
+  const skBase = constrainedSketch();
+  buildCaseLayout(skBase);
+  const baseResult = skBase.solve();
+  assertConverged(baseResult, 'wrapperStability-base');
+  assertNoRejections(baseResult, 'wrapperStability-base');
+
+  // Capture all point positions
+  const basePositions = new Map<string, { x: number; y: number }>();
+  for (const pt of baseResult.definition.points) {
+    basePositions.set(pt.id, { x: pt.x, y: pt.y });
+  }
+
+  // 2. Solve with wrapper
+  const skWrapped = constrainedSketch();
+  const { topSection, bottomSection } = buildCaseLayout(skWrapped);
+
+  const wrapper = skWrapped.rect();
+  skWrapped.lineDistance(wrapper.top, topSection.frontPiece.top, 0);
+  skWrapped.lineDistance(wrapper.bottom, bottomSection.backPiece.bottom, 0);
+  skWrapped.lineDistance(wrapper.left, bottomSection.leftSide.left, 0);
+  skWrapped.lineDistance(wrapper.right, bottomSection.rightSide.right, 0);
+
+  const wrappedResult = skWrapped.solve();
+  assertConverged(wrappedResult, 'wrapperStability-wrapped');
+  assertNoRejections(wrappedResult, 'wrapperStability-wrapped');
+
+  // 3. Assert all base points preserved (wrapper adds new points, skip those).
+  //    The layout has no fixed point, so absolute position is unconstrained.
+  //    Subtract the global translation (centroid shift) and measure RELATIVE drift.
+  const matchedPairs: { id: string; bx: number; by: number; wx: number; wy: number }[] = [];
+  for (const pt of wrappedResult.definition.points) {
+    const basePt = basePositions.get(pt.id);
+    if (!basePt) continue;
+    matchedPairs.push({ id: pt.id, bx: basePt.x, by: basePt.y, wx: pt.x, wy: pt.y });
+  }
+  // Compute global translation = mean displacement
+  let sumDx = 0, sumDy = 0;
+  for (const p of matchedPairs) { sumDx += p.wx - p.bx; sumDy += p.wy - p.by; }
+  const meanDx = sumDx / matchedPairs.length;
+  const meanDy = sumDy / matchedPairs.length;
+
+  let maxDrift = 0;
+  let worstPoint = '';
+  const driftDetails: string[] = [];
+  for (const p of matchedPairs) {
+    // Relative drift = displacement minus global translation
+    const relDx = (p.wx - p.bx) - meanDx;
+    const relDy = (p.wy - p.by) - meanDy;
+    const drift = Math.hypot(relDx, relDy);
+    if (drift > 0.5) {
+      driftDetails.push(`  ${p.id}: relDrift=${drift.toFixed(1)}mm`);
+    }
+    if (drift > maxDrift) {
+      maxDrift = drift;
+      worstPoint = p.id;
+    }
+  }
+  if (_verbose) {
+    console.log(`    Global translation: (${meanDx.toFixed(1)}, ${meanDy.toFixed(1)})mm`);
+    if (driftDetails.length > 0) {
+      console.log(`    Points with relative drift >0.5mm (${driftDetails.length} of ${matchedPairs.length}):`);
+      for (const d of driftDetails.slice(0, 20)) console.log(d);
+      if (driftDetails.length > 20) console.log(`    ... and ${driftDetails.length - 20} more`);
+    } else {
+      console.log(`    All ${matchedPairs.length} points within 0.5mm relative drift ✓`);
+    }
+  }
+  assert(
+    maxDrift < 0.1,
+    `wrapperStability: adding wrapper moved existing point ${worstPoint} by ${maxDrift.toFixed(4)}mm relative drift (max allowed: 0.1mm)`,
+  );
+}
+
 // ─── Runner ──────────────────────────────────────────────────────────────────
 
 export async function runCheckConstraintsCli(args: string[]): Promise<void> {
@@ -1585,6 +1727,10 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
     { name: 'addRegularPolygon builder method', fn: testAddRegularPolygonBuilderMethod },
   ];
 
+  const level7: TestEntry[] = [
+    { name: 'wrapper rect does not disturb layout', fn: testWrapperRectDoesNotDisturbLayout },
+  ];
+
   const allTests = [
     { level: 'L1: Single constraints', tests: level1 },
     { level: 'L2: Compound constraints', tests: level2 },
@@ -1593,6 +1739,7 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
     { level: 'L4b: Intermediate (spectrogram subsystems)', tests: level4b },
     { level: 'L5: Complex systems', tests: level5 },
     { level: 'L6: High-level concepts', tests: level6 },
+    { level: 'L7: Wrapper rect stability', tests: level7 },
   ];
 
   let passed = 0;
