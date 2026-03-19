@@ -157,8 +157,6 @@ export type {
  * Safe to call multiple times (idempotent).
  */
 export async function init() {
-  // Initialise the Rust/WASM solver in the background — non-blocking.
-  // If WASM is unavailable the TypeScript solver is used as fallback.
-  initSolverWasm().catch(() => {});
+  await initSolverWasm();
   await initKernel();
 }

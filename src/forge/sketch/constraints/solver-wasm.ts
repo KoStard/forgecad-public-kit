@@ -2,10 +2,9 @@
  * TypeScript bridge to the Rust/WASM constraint solver.
  *
  * Usage:
- *   - Call `initSolverWasm()` once at startup (e.g., in a worker or at app boot).
- *   - The exported `solveConstraintsWasm()` is a drop-in replacement for
- *     `solveConstraints()` from registry.ts when WASM is ready.
- *   - Falls back to null if WASM is not initialised yet (caller must handle).
+ *   - Call `initSolverWasm()` once at startup (awaited — it must succeed).
+ *   - `solveConstraintsWasm()` is the constraint solver; throws if not initialised.
+ *   - Build the WASM artifact with: npm run build:solver
  */
 
 import type { ConstraintDefinition, SolveOptions } from './types';
@@ -103,26 +102,16 @@ export async function initSolverWasm(): Promise<void> {
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
-    try {
-      // Dynamic import so Vite can handle the WASM file as an asset.
-      const solverModule = await import(
-        /* webpackChunkName: "solver-wasm" */
-        '../../../../solver/pkg/solver.js'
-      );
-      await solverModule.default();
-      _wasm_solve = solverModule.solve as WasmSolveFn;
-    } catch (err) {
-      console.warn('[solver-wasm] failed to load WASM solver, falling back to TypeScript solver:', err);
-      _wasm_solve = null;
-    }
+    // Dynamic import so Vite can handle the WASM file as an asset.
+    const solverModule = await import(
+      /* webpackChunkName: "solver-wasm" */
+      '../../../../solver/pkg/solver.js'
+    );
+    await solverModule.default();
+    _wasm_solve = solverModule.solve as WasmSolveFn;
   })();
 
   return _initPromise;
-}
-
-/** True once WASM has been initialised successfully. */
-export function isSolverWasmReady(): boolean {
-  return _wasm_solve !== null;
 }
 
 // ─── Serialisation helpers ────────────────────────────────────────────────────
@@ -214,25 +203,23 @@ function applyResult(def: ConstraintDefinition, result: WasmSolveResult): void {
 
 /**
  * Solve a constraint system using the Rust/WASM solver.
- *
- * Returns `null` if the WASM module is not yet initialised (caller should fall
- * back to the TypeScript solver).
- *
- * On success, updates `def` in place and returns `{ maxError }`.
+ * Updates `def` in place and returns `{ maxError }`.
+ * Throws if WASM is not initialised (call `initSolverWasm()` first).
  */
 export function solveConstraintsWasm(
   def: ConstraintDefinition,
   options: SolveOptions,
-): { maxError: number } | null {
-  if (!_wasm_solve) return null;
+): { maxError: number } {
+  if (!_wasm_solve) {
+    throw new Error('[solver-wasm] WASM solver not initialised — build it with: npm run build:solver');
+  }
 
   const problem = serializeProblem(def, options);
   const resultJson = _wasm_solve(JSON.stringify(problem));
   const result: WasmSolveResult = JSON.parse(resultJson);
 
   if (result.max_error === 1e308) {
-    // Sentinel: WASM parse error — fall back to TS solver.
-    return null;
+    throw new Error('[solver-wasm] WASM solver failed to parse problem JSON');
   }
 
   applyResult(def, result);
