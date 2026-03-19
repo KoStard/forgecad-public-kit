@@ -101,7 +101,7 @@ This standard is package-wide for any new user-facing concept or API family.
 This standard is package-wide for any geometry feature that affects runtime lowering, exact export, or backend capability routing.
 
 Read [API/internals/compiler.md](API/internals/compiler.md) before changing this area.
-For large multi-agent migrations or architecture programs, also read [PROGRAM-LEAD.md](PROGRAM-LEAD.md).
+For large multi-agent migrations or architecture programs, also read [PROGRAM-LEAD.md](../processes/PROGRAM-LEAD.md).
 
 ### Contract
 - Forge semantic intent comes first. Backends are lowerers, not the authoring model.
@@ -116,7 +116,7 @@ For large multi-agent migrations or architecture programs, also read [PROGRAM-LE
 
 ## Multi-Agent Program Standard (Required For Large Migrations)
 
-For work that spans multiple agent branches or staged dependency waves, the Program Lead role in [PROGRAM-LEAD.md](PROGRAM-LEAD.md) is the default operating model.
+For work that spans multiple agent branches or staged dependency waves, the Program Lead role in [PROGRAM-LEAD.md](../processes/PROGRAM-LEAD.md) is the default operating model.
 
 Use it when:
 

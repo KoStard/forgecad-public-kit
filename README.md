@@ -75,7 +75,7 @@ ForgeCAD is built to work cleanly with coding agents. Your CAD models are plain 
 - `docs/permanent/` explains the modeling API and workflows
 - `examples/api/` provides concrete model patterns to copy and adapt
 - browser + CLI run the same engine, so AI-generated scripts behave consistently
-- the generated Codex skill is maintained via [docs/processes/MAINTAINING_FORGECAD_SKILL.md](docs/processes/MAINTAINING_FORGECAD_SKILL.md)
+- the generated Codex skill is rebuilt with `npm run build:skill:forgecad`
 
 ### Agent skill (Claude Code, Codex, OpenCode, …)
 
