@@ -157,168 +157,168 @@
   <g data-layer="construction">
   </g>
   <g data-layer="annotations">
-    <line x1="-1.200" y1="0.360" x2="1.200" y2="0.360" stroke="#ff6b6b" stroke-width="0.3"/>
-    <line x1="-0.840" y1="0.360" x2="-1.200" y2="0.960" stroke="#ff6b6b" stroke-width="0.2"/>
-    <line x1="-0.240" y1="0.360" x2="-0.600" y2="0.960" stroke="#ff6b6b" stroke-width="0.2"/>
-    <line x1="0.360" y1="0.360" x2="0.000" y2="0.960" stroke="#ff6b6b" stroke-width="0.2"/>
-    <line x1="0.960" y1="0.360" x2="0.600" y2="0.960" stroke="#ff6b6b" stroke-width="0.2"/>
-    <line x1="7.693" y1="-8.334" x2="8.893" y2="-8.334" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.3 8.293 -8.094)"/>
-    <line x1="7.693" y1="-7.854" x2="8.893" y2="-7.854" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.3 8.293 -8.094)"/>
-    <line x1="4.795" y1="-19.788" x2="5.995" y2="-19.788" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-163.3 5.395 -19.548)"/>
-    <line x1="4.795" y1="-19.308" x2="5.995" y2="-19.308" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-163.3 5.395 -19.548)"/>
-    <line x1="7.693" y1="-8.334" x2="8.893" y2="-8.334" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.3 8.293 -8.094)"/>
-    <line x1="7.693" y1="-7.854" x2="8.893" y2="-7.854" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.3 8.293 -8.094)"/>
-    <line x1="-3.498" y1="-11.694" x2="-2.298" y2="-11.694" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(75.8 -2.898 -11.454)"/>
-    <line x1="-3.498" y1="-11.214" x2="-2.298" y2="-11.214" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(75.8 -2.898 -11.454)"/>
-    <path d="M4.317,-13.032 A0.720,0.720 0 1,0 3.597,-13.752" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <polygon points="3.597,-14.112 3.897,-13.632 3.297,-13.632" fill="#ff6b6b"/>
-    <line x1="9.347" y1="-6.786" x2="10.547" y2="-6.786" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.6 9.947 -6.546)"/>
-    <line x1="9.347" y1="-6.306" x2="10.547" y2="-6.306" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.6 9.947 -6.546)"/>
-    <line x1="5.094" y1="-22.366" x2="6.294" y2="-22.366" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-165.3 5.694 -22.126)"/>
-    <line x1="5.094" y1="-21.886" x2="6.294" y2="-21.886" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-165.3 5.694 -22.126)"/>
-    <line x1="9.347" y1="-6.786" x2="10.547" y2="-6.786" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.6 9.947 -6.546)"/>
-    <line x1="9.347" y1="-6.306" x2="10.547" y2="-6.306" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.6 9.947 -6.546)"/>
-    <line x1="-6.484" y1="-10.941" x2="-5.284" y2="-10.941" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(74.7 -5.884 -10.701)"/>
-    <line x1="-6.484" y1="-10.461" x2="-5.284" y2="-10.461" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(74.7 -5.884 -10.701)"/>
-    <path d="M3.972,-13.124 A0.720,0.720 0 1,0 3.252,-13.844" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <polygon points="3.252,-14.204 3.552,-13.724 2.952,-13.724" fill="#ff6b6b"/>
-    <line x1="-0.210" y1="-0.215" x2="-2.445" y2="-2.505" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
-    <line x1="16.376" y1="-16.402" x2="14.141" y2="-18.692" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
-    <line x1="-2.095" y1="-2.147" x2="14.490" y2="-18.334" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="-2.095,-2.147 -1.624,-3.096 -1.135,-2.595" fill="#ff6b6b"/>
-    <polygon points="14.490,-18.334 13.530,-17.886 14.019,-17.385" fill="#ff6b6b"/>
-    <text x="6.197" y="-11.041" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">22</text>
-    <line x1="8.293" y1="-8.094" x2="9.947" y2="-6.546" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="8.293,-8.094 8.622,-7.948 8.460,-7.775" fill="#ff6b6b"/>
-    <polygon points="9.947,-6.546 9.780,-6.865 9.617,-6.692" fill="#ff6b6b"/>
-    <text x="9.120" y="-8.120" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">-2</text>
-    <text x="3.425" y="-13.078" fill="#ff6b6b" font-size="2" font-family="sans-serif" text-anchor="middle">⊕</text>
-    <path d="M4.000,0.000 A4.000,4.000 0 0,0 2.779,-2.877" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <text x="4.787" y="-2.032" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">46°</text>
-    <circle cx="11.093" cy="-19.090" r="0.36" fill="#ff6b6b" opacity="0.8"/>
-    <line x1="11.093" y1="-19.090" x2="15.224" y2="-14.858" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="11.093,-19.090 11.935,-18.672 11.490,-18.239" fill="#ff6b6b"/>
-    <polygon points="15.224,-14.858 14.826,-15.710 14.382,-15.276" fill="#ff6b6b"/>
-    <text x="13.158" y="-17.774" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">8.42</text>
-    <path d="M5.045,-13.845 A0.720,0.720 0 1,0 4.325,-14.565" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <polygon points="4.325,-14.925 4.625,-14.445 4.025,-14.445" fill="#ff6b6b"/>
-    <path d="M-0.131,4.879 A1.500,1.500 0 0,1 -1.631,6.379" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <text x="0.278" y="6.788" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">-90°</text>
-    <path d="M2.014,5.666 A4.000,4.000 0 0,1 2.014,5.666" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <text x="3.214" y="5.666" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">0°</text>
-    <path d="M21.864,5.757 A4.000,4.000 0 0,0 17.864,1.757" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <text x="21.541" y="2.080" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">90°</text>
-    <path d="M21.897,-42.738 A4.000,4.000 0 0,0 13.897,-42.738" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <text x="17.897" y="-47.938" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">180°</text>
-    <path d="M-6.521,-42.787 A4.000,4.000 0 0,1 -10.521,-38.787" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <text x="-6.844" y="-39.110" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">-90°</text>
-    <circle cx="12.998" cy="-9.569" r="0.36" fill="#ff6b6b" opacity="0.8"/>
-    <circle cx="-5.169" cy="-24.972" r="0.36" fill="#ff6b6b" opacity="0.8"/>
-    <path d="M5.760,-16.760 A0.720,0.720 0 1,0 5.040,-17.480" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <polygon points="5.040,-17.840 5.340,-17.360 4.740,-17.360" fill="#ff6b6b"/>
-    <line x1="-1.809" y1="5.273" x2="2.852" y2="-4.526" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="-1.809,5.273 -1.695,4.219 -1.063,4.520" fill="#ff6b6b"/>
-    <polygon points="2.852,-4.526 2.107,-3.773 2.739,-3.473" fill="#ff6b6b"/>
-    <text x="0.522" y="-0.427" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">5</text>
-    <line x1="7.939" y1="5.712" x2="2.691" y2="0.647" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="7.939,5.712 6.977,5.269 7.463,4.765" fill="#ff6b6b"/>
-    <polygon points="2.691,0.647 3.167,1.593 3.654,1.089" fill="#ff6b6b"/>
-    <text x="5.315" y="2.379" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">5</text>
-    <line x1="17.881" y1="-18.491" x2="12.724" y2="-18.457" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="17.881,-18.491 17.109,-18.215 17.105,-18.756" fill="#ff6b6b"/>
-    <polygon points="12.724,-18.457 13.499,-18.191 13.495,-18.733" fill="#ff6b6b"/>
-    <text x="15.302" y="-19.274" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">5</text>
-    <line x1="3.688" y1="-42.762" x2="3.410" y2="-37.763" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="3.688,-42.762 3.909,-41.998 3.384,-42.027" fill="#ff6b6b"/>
-    <polygon points="3.410,-37.763 3.715,-38.499 3.190,-38.528" fill="#ff6b6b"/>
-    <text x="3.549" y="-41.063" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">5</text>
-    <line x1="-10.329" y1="-34.534" x2="-5.560" y2="-31.404" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="-10.329,-34.534 -9.449,-34.315 -9.778,-33.814" fill="#ff6b6b"/>
-    <polygon points="-5.560,-31.404 -6.111,-32.124 -6.440,-31.623" fill="#ff6b6b"/>
-    <text x="-7.944" y="-33.769" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">5</text>
-    <path d="M16.104,-18.415 A0.720,0.720 0 1,0 15.384,-19.135" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <polygon points="15.384,-19.495 15.684,-19.015 15.084,-19.015" fill="#ff6b6b"/>
-    <line x1="12.455" y1="-19.020" x2="13.175" y2="-18.420" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(90.3 12.815 -18.420)"/>
-    <line x1="13.175" y1="-18.420" x2="12.455" y2="-17.820" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(90.3 12.815 -18.420)"/>
-    <line x1="12.935" y1="-19.020" x2="13.655" y2="-18.420" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(90.3 12.815 -18.420)"/>
-    <line x1="13.655" y1="-18.420" x2="12.935" y2="-17.820" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(90.3 12.815 -18.420)"/>
-    <line x1="17.592" y1="-19.010" x2="18.312" y2="-18.410" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-89.9 17.952 -18.410)"/>
-    <line x1="18.312" y1="-18.410" x2="17.592" y2="-17.810" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-89.9 17.952 -18.410)"/>
-    <line x1="18.072" y1="-19.010" x2="18.792" y2="-18.410" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-89.9 17.952 -18.410)"/>
-    <line x1="18.792" y1="-18.410" x2="18.072" y2="-17.810" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-89.9 17.952 -18.410)"/>
-    <line x1="15.017" y1="-17.014" x2="15.737" y2="-16.414" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(0.1 15.377 -16.414)"/>
-    <line x1="15.737" y1="-16.414" x2="15.017" y2="-15.814" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(0.1 15.377 -16.414)"/>
-    <line x1="15.497" y1="-17.014" x2="16.217" y2="-16.414" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(0.1 15.377 -16.414)"/>
-    <line x1="16.217" y1="-16.414" x2="15.497" y2="-15.814" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(0.1 15.377 -16.414)"/>
-    <line x1="15.031" y1="-21.015" x2="15.751" y2="-20.415" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-179.9 15.391 -20.415)"/>
-    <line x1="15.751" y1="-20.415" x2="15.031" y2="-19.815" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-179.9 15.391 -20.415)"/>
-    <line x1="15.511" y1="-21.015" x2="16.231" y2="-20.415" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-179.9 15.391 -20.415)"/>
-    <line x1="16.231" y1="-20.415" x2="15.511" y2="-19.815" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-179.9 15.391 -20.415)"/>
-    <line x1="13.126" y1="-20.419" x2="16.326" y2="-20.403" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
-    <line x1="13.105" y1="-16.417" x2="16.305" y2="-16.401" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
-    <line x1="15.826" y1="-20.405" x2="15.805" y2="-16.403" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="15.826,-20.405 16.033,-19.804 15.612,-19.806" fill="#ff6b6b"/>
-    <polygon points="15.805,-16.403 16.018,-17.002 15.598,-17.005" fill="#ff6b6b"/>
-    <text x="15.815" y="-19.204" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">4</text>
-    <polyline points="13.525,-16.418 12.805,-16.418 12.805,-15.698" fill="none" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-89.7 12.805 -16.418)"/>
-    <line x1="12.815" y1="-18.420" x2="12.724" y2="-18.457" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="12.815,-18.420 12.800,-18.420 12.804,-18.430" fill="#ff6b6b"/>
-    <polygon points="12.724,-18.457 12.735,-18.446 12.739,-18.456" fill="#ff6b6b"/>
-    <text x="12.770" y="-19.238" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">0</text>
-    <line x1="17.952" y1="-18.410" x2="17.881" y2="-18.491" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="17.952,-18.410 17.937,-18.418 17.946,-18.426" fill="#ff6b6b"/>
-    <polygon points="17.881,-18.491 17.887,-18.475 17.896,-18.482" fill="#ff6b6b"/>
-    <text x="17.916" y="-19.250" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">0</text>
-    <polygon points="12.815,-19.020 13.295,-18.420 12.815,-17.820 12.335,-18.420" fill="#ff6b6b" opacity="0.7"/>
-    <polygon points="12.724,-19.057 13.204,-18.457 12.724,-17.857 12.244,-18.457" fill="#ff6b6b" opacity="0.7"/>
-    <path d="M-2.522,-18.673 A0.720,0.720 0 1,0 -3.242,-19.393" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <polygon points="-3.242,-19.753 -2.942,-19.273 -3.542,-19.273" fill="#ff6b6b"/>
-    <circle cx="0.473" cy="-37.783" r="0.36" fill="#ff6b6b" opacity="0.8"/>
-    <circle cx="-6.571" cy="-37.835" r="0.36" fill="#ff6b6b" opacity="0.8"/>
-    <circle cx="-7.115" cy="0.283" r="0.36" fill="#ff6b6b" opacity="0.8"/>
-    <circle cx="0.244" cy="0.645" r="0.36" fill="#ff6b6b" opacity="0.8"/>
-    <polyline points="4.130,-37.763 3.410,-37.763 3.410,-37.043" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <polyline points="4.130,-37.763 3.410,-37.763 3.410,-37.043" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <path d="M-2.234,-18.657 A0.720,0.720 0 1,0 -2.954,-19.377" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
-    <polygon points="-2.954,-19.737 -2.654,-19.257 -3.254,-19.257" fill="#ff6b6b"/>
-    <line x1="-3.049" y1="-37.809" x2="-2.824" y2="-35.806" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="-3.049,-37.809 -2.910,-37.520 -3.120,-37.497" fill="#ff6b6b"/>
-    <polygon points="-2.824,-35.806 -2.752,-36.118 -2.963,-36.094" fill="#ff6b6b"/>
-    <text x="-2.936" y="-37.607" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">2</text>
-    <line x1="-6.843" y1="-18.776" x2="-4.229" y2="-18.693" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="-6.843,-18.776 -6.447,-18.901 -6.455,-18.626" fill="#ff6b6b"/>
-    <polygon points="-4.229,-18.693 -4.617,-18.843 -4.625,-18.569" fill="#ff6b6b"/>
-    <text x="-5.536" y="-19.535" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">2</text>
-    <line x1="-3.436" y1="0.464" x2="-3.085" y2="-1.508" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="-3.436,0.464 -3.487,0.150 -3.280,0.187" fill="#ff6b6b"/>
-    <polygon points="-3.085,-1.508 -3.242,-1.230 -3.035,-1.193" fill="#ff6b6b"/>
-    <text x="-3.261" y="-1.322" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">2</text>
-    <line x1="0.358" y1="-18.569" x2="-1.680" y2="-18.620" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="0.358,-18.569 0.050,-18.470 0.055,-18.684" fill="#ff6b6b"/>
-    <polygon points="-1.680,-18.620 -1.377,-18.505 -1.372,-18.719" fill="#ff6b6b"/>
-    <text x="-0.661" y="-19.394" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">2</text>
-    <line x1="-4.229" y1="-18.693" x2="-1.680" y2="-18.620" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="-4.229,-18.693 -3.843,-18.816 -3.850,-18.549" fill="#ff6b6b"/>
-    <polygon points="-1.680,-18.620 -2.059,-18.765 -2.066,-18.497" fill="#ff6b6b"/>
-    <text x="-2.954" y="-19.457" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">2</text>
-    <line x1="-1.680" y1="-18.620" x2="12.724" y2="-18.457" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="-1.680,-18.620 -0.676,-18.958 -0.684,-18.259" fill="#ff6b6b"/>
-    <polygon points="12.724,-18.457 11.728,-18.818 11.720,-18.118" fill="#ff6b6b"/>
-    <text x="5.522" y="-19.338" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">-14</text>
-    <line x1="-6.271" y1="-37.831" x2="-3.072" y2="-37.785" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
-    <line x1="-6.815" y1="0.287" x2="-3.616" y2="0.333" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
-    <line x1="-3.571" y1="-37.792" x2="-4.116" y2="0.326" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="-3.571,-37.792 -3.236,-36.787 -3.936,-36.797" fill="#ff6b6b"/>
-    <polygon points="-4.116,0.326 -3.751,-0.669 -4.451,-0.679" fill="#ff6b6b"/>
-    <text x="-3.844" y="-19.533" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">38</text>
-    <polygon points="-6.843,-19.376 -6.363,-18.776 -6.843,-18.176 -7.323,-18.776" fill="#ff6b6b" opacity="0.7"/>
-    <line x1="11.095" y1="-18.790" x2="11.112" y2="-15.590" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
-    <line x1="-8.344" y1="-18.683" x2="-8.326" y2="-15.483" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
-    <line x1="11.110" y1="-16.090" x2="-8.329" y2="-15.983" stroke="#ff6b6b" stroke-width="0.2"/>
-    <polygon points="11.110,-16.090 10.112,-15.735 10.108,-16.435" fill="#ff6b6b"/>
-    <polygon points="-8.329,-15.983 -7.327,-15.639 -7.331,-16.339" fill="#ff6b6b"/>
-    <text x="1.390" y="-16.837" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">21.5</text>
-    <polyline points="2.094,-19.037 1.374,-19.037 1.374,-18.317" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <line x1="0.364" y1="0.944" x2="2.764" y2="0.944" stroke="#ff6b6b" stroke-width="0.3"/>
+    <line x1="0.724" y1="0.944" x2="0.364" y2="1.544" stroke="#ff6b6b" stroke-width="0.2"/>
+    <line x1="1.324" y1="0.944" x2="0.964" y2="1.544" stroke="#ff6b6b" stroke-width="0.2"/>
+    <line x1="1.924" y1="0.944" x2="1.564" y2="1.544" stroke="#ff6b6b" stroke-width="0.2"/>
+    <line x1="2.524" y1="0.944" x2="2.164" y2="1.544" stroke="#ff6b6b" stroke-width="0.2"/>
+    <line x1="7.005" y1="-14.070" x2="8.205" y2="-14.070" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.3 7.605 -13.830)"/>
+    <line x1="7.005" y1="-13.590" x2="8.205" y2="-13.590" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.3 7.605 -13.830)"/>
+    <line x1="4.107" y1="-25.524" x2="5.307" y2="-25.524" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-163.3 4.707 -25.284)"/>
+    <line x1="4.107" y1="-25.044" x2="5.307" y2="-25.044" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-163.3 4.707 -25.284)"/>
+    <line x1="3.051" y1="-4.948" x2="4.251" y2="-4.948" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.3 3.651 -4.708)"/>
+    <line x1="3.051" y1="-4.468" x2="4.251" y2="-4.468" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.3 3.651 -4.708)"/>
+    <line x1="-8.140" y1="-8.309" x2="-6.940" y2="-8.309" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(75.8 -7.540 -8.069)"/>
+    <line x1="-8.140" y1="-7.829" x2="-6.940" y2="-7.829" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(75.8 -7.540 -8.069)"/>
+    <path d="M5.911,-7.445 A0.720,0.720 0 1,0 5.191,-8.165" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <polygon points="5.191,-8.525 5.491,-8.045 4.891,-8.045" fill="#ff6b6b"/>
+    <line x1="9.098" y1="-1.156" x2="10.298" y2="-1.156" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.6 9.698 -0.916)"/>
+    <line x1="9.098" y1="-0.676" x2="10.298" y2="-0.676" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.6 9.698 -0.916)"/>
+    <line x1="4.845" y1="-16.736" x2="6.045" y2="-16.736" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-165.3 5.445 -16.496)"/>
+    <line x1="4.845" y1="-16.256" x2="6.045" y2="-16.256" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-165.3 5.445 -16.496)"/>
+    <line x1="11.626" y1="-1.281" x2="12.826" y2="-1.281" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.6 12.226 -1.041)"/>
+    <line x1="11.626" y1="-0.801" x2="12.826" y2="-0.801" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-44.6 12.226 -1.041)"/>
+    <line x1="-4.205" y1="-5.435" x2="-3.005" y2="-5.435" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(74.7 -3.605 -5.195)"/>
+    <line x1="-4.205" y1="-4.955" x2="-3.005" y2="-4.955" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(74.7 -3.605 -5.195)"/>
+    <path d="M-7.611,-10.698 A0.720,0.720 0 1,0 -8.331,-11.418" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <polygon points="-8.331,-11.778 -8.031,-11.298 -8.631,-11.298" fill="#ff6b6b"/>
+    <line x1="3.096" y1="2.784" x2="0.861" y2="0.494" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
+    <line x1="19.681" y1="-13.403" x2="17.446" y2="-15.693" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
+    <line x1="1.210" y1="0.852" x2="17.795" y2="-15.335" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="1.210,0.852 1.681,-0.097 2.170,0.404" fill="#ff6b6b"/>
+    <polygon points="17.795,-15.335 16.835,-14.887 17.324,-14.386" fill="#ff6b6b"/>
+    <text x="9.503" y="-8.042" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">22</text>
+    <line x1="17.486" y1="-5.376" x2="19.140" y2="-3.828" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="17.486,-5.376 17.816,-5.230 17.653,-5.057" fill="#ff6b6b"/>
+    <polygon points="19.140,-3.828 18.974,-4.147 18.811,-3.973" fill="#ff6b6b"/>
+    <text x="18.313" y="-5.402" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">-2</text>
+    <text x="-0.979" y="-11.287" fill="#ff6b6b" font-size="2" font-family="sans-serif" text-anchor="middle">⊕</text>
+    <path d="M12.762,-7.408 A4.000,4.000 0 0,0 11.540,-10.285" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <text x="13.548" y="-9.439" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">46°</text>
+    <circle cx="16.714" cy="-21.950" r="0.36" fill="#ff6b6b" opacity="0.8"/>
+    <line x1="7.450" y1="-22.892" x2="11.581" y2="-18.659" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="7.450,-22.892 8.292,-22.474 7.848,-22.040" fill="#ff6b6b"/>
+    <polygon points="11.581,-18.659 11.183,-19.511 10.739,-19.077" fill="#ff6b6b"/>
+    <text x="9.516" y="-21.576" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">8.42</text>
+    <path d="M9.996,-20.937 A0.720,0.720 0 1,0 9.276,-21.657" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <polygon points="9.276,-22.017 9.576,-21.537 8.976,-21.537" fill="#ff6b6b"/>
+    <path d="M-4.503,8.245 A1.500,1.500 0 0,1 -6.003,9.745" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <text x="-4.094" y="10.154" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">-90°</text>
+    <path d="M2.007,11.830 A4.000,4.000 0 0,1 2.007,11.830" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <text x="3.207" y="11.830" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">0°</text>
+    <path d="M17.741,8.162 A4.000,4.000 0 0,0 13.741,4.162" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <text x="17.418" y="4.485" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">90°</text>
+    <path d="M23.760,-43.859 A4.000,4.000 0 0,0 15.760,-43.859" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <text x="19.760" y="-49.059" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">180°</text>
+    <path d="M-8.798,-39.639 A4.000,4.000 0 0,1 -12.798,-35.639" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <text x="-9.121" y="-35.962" fill="#ff6b6b" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">-90°</text>
+    <circle cx="14.211" cy="-3.480" r="0.36" fill="#ff6b6b" opacity="0.8"/>
+    <circle cx="-2.099" cy="-27.044" r="0.36" fill="#ff6b6b" opacity="0.8"/>
+    <path d="M3.286,-22.961 A0.720,0.720 0 1,0 2.566,-23.681" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <polygon points="2.566,-24.041 2.866,-23.561 2.266,-23.561" fill="#ff6b6b"/>
+    <line x1="-0.586" y1="6.413" x2="4.075" y2="-3.386" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="-0.586,6.413 -0.473,5.360 0.159,5.660" fill="#ff6b6b"/>
+    <polygon points="4.075,-3.386 3.329,-2.633 3.961,-2.332" fill="#ff6b6b"/>
+    <text x="1.744" y="0.714" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">5</text>
+    <line x1="7.533" y1="6.188" x2="2.285" y2="1.123" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="7.533,6.188 6.571,5.745 7.057,5.242" fill="#ff6b6b"/>
+    <polygon points="2.285,1.123 2.762,2.070 3.248,1.566" fill="#ff6b6b"/>
+    <text x="4.909" y="2.856" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">5</text>
+    <line x1="10.445" y1="-25.744" x2="5.288" y2="-25.711" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="10.445,-25.744 9.673,-25.469 9.670,-26.010" fill="#ff6b6b"/>
+    <polygon points="5.288,-25.711 6.064,-25.445 6.060,-25.986" fill="#ff6b6b"/>
+    <text x="7.867" y="-26.528" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">5</text>
+    <line x1="4.238" y1="-48.301" x2="3.961" y2="-43.303" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="4.238,-48.301 4.459,-47.537 3.934,-47.566" fill="#ff6b6b"/>
+    <polygon points="3.961,-43.303 4.265,-44.038 3.740,-44.067" fill="#ff6b6b"/>
+    <text x="4.100" y="-46.602" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">5</text>
+    <line x1="-12.553" y1="-35.509" x2="-7.784" y2="-32.379" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="-12.553,-35.509 -11.673,-35.290 -12.002,-34.789" fill="#ff6b6b"/>
+    <polygon points="-7.784,-32.379 -8.335,-33.099 -8.664,-32.598" fill="#ff6b6b"/>
+    <text x="-10.168" y="-34.744" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">5</text>
+    <path d="M11.133,-13.026 A0.720,0.720 0 1,0 10.413,-13.746" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <polygon points="10.413,-14.106 10.713,-13.626 10.113,-13.626" fill="#ff6b6b"/>
+    <line x1="20.309" y1="-20.911" x2="21.029" y2="-20.311" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(90.3 20.669 -20.311)"/>
+    <line x1="21.029" y1="-20.311" x2="20.309" y2="-19.711" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(90.3 20.669 -20.311)"/>
+    <line x1="20.789" y1="-20.911" x2="21.509" y2="-20.311" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(90.3 20.669 -20.311)"/>
+    <line x1="21.509" y1="-20.311" x2="20.789" y2="-19.711" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(90.3 20.669 -20.311)"/>
+    <line x1="25.446" y1="-20.901" x2="26.166" y2="-20.301" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-89.9 25.806 -20.301)"/>
+    <line x1="26.166" y1="-20.301" x2="25.446" y2="-19.701" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-89.9 25.806 -20.301)"/>
+    <line x1="25.926" y1="-20.901" x2="26.646" y2="-20.301" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-89.9 25.806 -20.301)"/>
+    <line x1="26.646" y1="-20.301" x2="25.926" y2="-19.701" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-89.9 25.806 -20.301)"/>
+    <line x1="16.870" y1="-24.922" x2="17.590" y2="-24.322" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(0.1 17.230 -24.322)"/>
+    <line x1="17.590" y1="-24.322" x2="16.870" y2="-23.722" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(0.1 17.230 -24.322)"/>
+    <line x1="17.350" y1="-24.922" x2="18.070" y2="-24.322" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(0.1 17.230 -24.322)"/>
+    <line x1="18.070" y1="-24.322" x2="17.350" y2="-23.722" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(0.1 17.230 -24.322)"/>
+    <line x1="16.884" y1="-28.922" x2="17.604" y2="-28.322" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-179.9 17.244 -28.322)"/>
+    <line x1="17.604" y1="-28.322" x2="16.884" y2="-27.722" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-179.9 17.244 -28.322)"/>
+    <line x1="17.364" y1="-28.922" x2="18.084" y2="-28.322" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-179.9 17.244 -28.322)"/>
+    <line x1="18.084" y1="-28.322" x2="17.364" y2="-27.722" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-179.9 17.244 -28.322)"/>
+    <line x1="17.699" y1="-24.803" x2="20.899" y2="-24.786" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
+    <line x1="17.679" y1="-20.800" x2="20.879" y2="-20.784" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
+    <line x1="20.399" y1="-24.789" x2="20.379" y2="-20.787" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="20.399,-24.789 20.606,-24.187 20.186,-24.190" fill="#ff6b6b"/>
+    <polygon points="20.379,-20.787 20.592,-21.386 20.172,-21.388" fill="#ff6b6b"/>
+    <text x="20.389" y="-23.588" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">4</text>
+    <polyline points="19.199,-9.718 18.479,-9.718 18.479,-8.998" fill="none" stroke="#ff6b6b" stroke-width="0.3" transform="rotate(-89.7 18.479 -9.718)"/>
+    <line x1="19.351" y1="-15.692" x2="19.259" y2="-15.729" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="19.351,-15.692 19.335,-15.692 19.339,-15.702" fill="#ff6b6b"/>
+    <polygon points="19.259,-15.729 19.271,-15.719 19.274,-15.728" fill="#ff6b6b"/>
+    <text x="19.305" y="-16.510" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">0</text>
+    <line x1="9.636" y1="-21.022" x2="9.565" y2="-21.103" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="9.636,-21.022 9.621,-21.031 9.630,-21.038" fill="#ff6b6b"/>
+    <polygon points="9.565,-21.103 9.571,-21.087 9.580,-21.095" fill="#ff6b6b"/>
+    <text x="9.601" y="-21.863" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">0</text>
+    <polygon points="15.670,-12.573 16.150,-11.973 15.670,-11.373 15.190,-11.973" fill="#ff6b6b" opacity="0.7"/>
+    <polygon points="10.851,-13.343 11.331,-12.743 10.851,-12.143 10.371,-12.743" fill="#ff6b6b" opacity="0.7"/>
+    <path d="M-0.025,-20.310 A0.720,0.720 0 1,0 -0.745,-21.030" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <polygon points="-0.745,-21.390 -0.445,-20.910 -1.045,-20.910" fill="#ff6b6b"/>
+    <circle cx="0.545" cy="-40.966" r="0.36" fill="#ff6b6b" opacity="0.8"/>
+    <circle cx="-2.544" cy="-40.868" r="0.36" fill="#ff6b6b" opacity="0.8"/>
+    <circle cx="-9.281" cy="-3.276" r="0.36" fill="#ff6b6b" opacity="0.8"/>
+    <circle cx="3.881" cy="3.302" r="0.36" fill="#ff6b6b" opacity="0.8"/>
+    <polyline points="3.140,-35.367 2.420,-35.367 2.420,-34.647" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <polyline points="6.328,-32.741 5.608,-32.741 5.608,-32.021" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <path d="M3.581,-20.045 A0.720,0.720 0 1,0 2.861,-20.765" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
+    <polygon points="2.861,-21.125 3.161,-20.645 2.561,-20.645" fill="#ff6b6b"/>
+    <line x1="-2.519" y1="-35.887" x2="-2.294" y2="-33.883" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="-2.519,-35.887 -2.380,-35.598 -2.591,-35.575" fill="#ff6b6b"/>
+    <polygon points="-2.294,-33.883 -2.222,-34.196 -2.433,-34.172" fill="#ff6b6b"/>
+    <text x="-2.407" y="-35.685" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">2</text>
+    <line x1="-14.125" y1="-21.869" x2="-11.510" y2="-21.786" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="-14.125,-21.869 -13.728,-21.994 -13.737,-21.719" fill="#ff6b6b"/>
+    <polygon points="-11.510,-21.786 -11.898,-21.936 -11.907,-21.661" fill="#ff6b6b"/>
+    <text x="-12.817" y="-22.628" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">2</text>
+    <line x1="-3.379" y1="-2.355" x2="-3.029" y2="-4.327" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="-3.379,-2.355 -3.430,-2.669 -3.223,-2.632" fill="#ff6b6b"/>
+    <polygon points="-3.029,-4.327 -3.185,-4.049 -2.978,-4.012" fill="#ff6b6b"/>
+    <text x="-3.204" y="-4.141" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">2</text>
+    <line x1="6.369" y1="-12.970" x2="4.331" y2="-13.020" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="6.369,-12.970 6.061,-12.870 6.066,-13.084" fill="#ff6b6b"/>
+    <polygon points="4.331,-13.020 4.634,-12.906 4.639,-13.120" fill="#ff6b6b"/>
+    <text x="5.350" y="-13.795" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">2</text>
+    <line x1="-1.868" y1="-27.826" x2="0.681" y2="-27.752" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="-1.868,-27.826 -1.482,-27.949 -1.489,-27.681" fill="#ff6b6b"/>
+    <polygon points="0.681,-27.752 0.302,-27.897 0.295,-27.630" fill="#ff6b6b"/>
+    <text x="-0.594" y="-28.589" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">2</text>
+    <line x1="-2.534" y1="-19.944" x2="11.869" y2="-19.781" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="-2.534,-19.944 -1.531,-20.283 -1.539,-19.583" fill="#ff6b6b"/>
+    <polygon points="11.869,-19.781 10.873,-20.142 10.865,-19.442" fill="#ff6b6b"/>
+    <text x="4.667" y="-20.662" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">-14</text>
+    <line x1="-16.726" y1="-36.836" x2="-13.526" y2="-36.791" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
+    <line x1="-17.270" y1="1.282" x2="-14.071" y2="1.327" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
+    <line x1="-14.026" y1="-36.798" x2="-14.570" y2="1.320" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="-14.026,-36.798 -13.691,-35.793 -14.391,-35.803" fill="#ff6b6b"/>
+    <polygon points="-14.570,1.320 -14.206,0.325 -14.906,0.315" fill="#ff6b6b"/>
+    <text x="-14.298" y="-18.539" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">38</text>
+    <polygon points="-13.224,-15.694 -12.744,-15.094 -13.224,-14.494 -13.704,-15.094" fill="#ff6b6b" opacity="0.7"/>
+    <line x1="5.960" y1="-18.341" x2="5.977" y2="-15.141" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
+    <line x1="-13.479" y1="-18.234" x2="-13.462" y2="-15.034" stroke="#ff6b6b" stroke-width="0.15" opacity="0.6"/>
+    <line x1="5.974" y1="-15.641" x2="-13.464" y2="-15.534" stroke="#ff6b6b" stroke-width="0.2"/>
+    <polygon points="5.974,-15.641 4.976,-15.285 4.972,-15.985" fill="#ff6b6b"/>
+    <polygon points="-13.464,-15.534 -12.462,-15.189 -12.466,-15.889" fill="#ff6b6b"/>
+    <text x="-3.745" y="-16.387" fill="#ff6b6b" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">21.5</text>
+    <polyline points="2.383,-17.946 1.663,-17.946 1.663,-17.226" fill="none" stroke="#ff6b6b" stroke-width="0.3"/>
   </g>
   <g data-layer="status">
     <rect x="-14.5" y="-46.8" width="28.6" height="3" rx="0.5" fill="#ff6b6b" opacity="0.85"/>
