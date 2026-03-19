@@ -11,6 +11,7 @@ import { getSketchPlacement3D } from './sketch/core';
 import { isConstraintSketch, ConstraintSketch } from './sketch/constraints';
 import { computeGeometryArrays } from './geometryArrays';
 import { getShapeCompilePlan } from './kernel';
+import type { SolverWasmRunDebugSnapshot } from './sketch/constraints/solver-wasm';
 import type {
   SerializedRunResult,
   SerializedSceneObject,
@@ -131,7 +132,10 @@ function serializeSketch(obj: SceneObject): SerializedSketchData | null {
  * Returns the serialized result AND a list of all TypedArray buffers
  * that should be transferred (zero-copy) via postMessage.
  */
-export function serializeRunResult(result: RunResult): {
+export function serializeRunResult(
+  result: RunResult,
+  solverDebug: SolverWasmRunDebugSnapshot | null = null,
+): {
   serialized: SerializedRunResult;
   transferables: Transferable[];
 } {
@@ -193,6 +197,7 @@ export function serializeRunResult(result: RunResult): {
     timeMs: result.timeMs,
     logs: result.logs,
     verifications: result.verifications,
+    solverDebug,
   };
 
   return { serialized, transferables };

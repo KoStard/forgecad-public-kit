@@ -16,6 +16,7 @@ import { fileSystem } from '../fs';
 import { isNotebookFile, serializeNotebook, createNotebook } from '../notebook/model';
 import { evalWorkerClient } from '../workers/evalWorkerClient';
 import { deserializeRunResult } from '../forge/deserializeRunResult';
+import { publishSolverWasmRunDebug } from '../forge/sketch/constraints/solver-wasm';
 import { type ThemeName, applyTheme } from '../theme';
 import type { LengthUnit } from '@forge/units';
 import { clampAnimationSpeed } from '../animationSpeed';
@@ -984,6 +985,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
       const runResult = deserializeRunResult(serialized);
       const tDeserialize = performance.now();
+      publishSolverWasmRunDebug(runResult.solverDebug ?? null);
 
       console.log(
         `[main]   workerRoundTrip=${(tReceived - tDispatch).toFixed(0)}ms  deserialize=${(tDeserialize - tReceived).toFixed(0)}ms`,

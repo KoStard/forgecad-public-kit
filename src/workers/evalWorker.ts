@@ -1,5 +1,9 @@
 import { init, runScript, setParamOverrides } from '@forge/index';
 import type { RunResult } from '@forge/runner';
+import {
+  getSolverWasmRunDebugSnapshot,
+  resetSolverWasmStats,
+} from '../forge/sketch/constraints/solver-wasm';
 import { isNotebookFile, parseNotebook, resolveNotebookPreviewCellId } from '../notebook/model';
 import { runNotebook } from '../notebook/runtime';
 import { serializeRunResult } from '../forge/serializeRunResult';
@@ -34,6 +38,7 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
     await ensureKernelReady();
     const tKernel = performance.now();
 
+    resetSolverWasmStats();
     setParamOverrides(paramOverrides);
 
     let runResult;
@@ -56,7 +61,7 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
     }
 
     lastRunResult = runResult;
-    const { serialized, transferables } = serializeRunResult(runResult);
+    const { serialized, transferables } = serializeRunResult(runResult, getSolverWasmRunDebugSnapshot());
     const tSerialize = performance.now();
 
     console.log(

@@ -16,6 +16,7 @@ import type { FaceTransformationHistory } from '../forge/faceHistory';
 import type { GeometryInfo } from '../forge/kernel';
 import type { ShapeCompilePlan } from '../forge/compilePlan';
 import type { SketchConstraintMeta, ConstraintDefinition } from '../forge/sketch/constraints';
+import type { SolverWasmRunDebugSnapshot } from '../forge/sketch/constraints/solver-wasm';
 
 /** Wire format for a serialized Shape — all WASM data extracted into transferable TypedArrays. */
 export interface SerializedShapeData {
@@ -81,6 +82,7 @@ export interface SerializedRunResult {
   timeMs: number;
   logs: LogEntry[];
   verifications: VerificationResult[];
+  solverDebug?: SolverWasmRunDebugSnapshot | null;
 }
 
 // ---- Message types ----

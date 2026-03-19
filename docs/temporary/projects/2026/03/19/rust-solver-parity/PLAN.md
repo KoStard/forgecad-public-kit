@@ -397,6 +397,11 @@ Additional concrete finding:
   - `copyLastExchange()`
   - `copyLastRequest()`
   - `copyLastResponse()`
+- pushed the worker-side solver snapshot back to the main thread, so normal UI devtools now see:
+  - `window.__forgecadSolver.lastRun`
+  - `window.__forgecadSolver.lastSolveExchange`
+  - `window.__forgecadSolver.lastRun.lastSolveExchangeBundleJson`
+  - an automatic console summary after each completed run
 - added a clean capture bundle format:
   - `{ kind, constraint_id?, request, response }`
   - `request` is the exact JSON sent to Rust

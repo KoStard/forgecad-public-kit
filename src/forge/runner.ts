@@ -124,6 +124,7 @@ import {
   getCollectedViewConfig,
   type ViewConfig,
 } from './viewConfig';
+import type { SolverWasmRunDebugSnapshot } from './sketch/constraints/solver-wasm';
 import {
   resolveForgeQualityPreset,
   runWithForgeQuality,
@@ -168,6 +169,7 @@ export interface RunResult {
   timeMs: number;
   logs: LogEntry[];
   verifications: VerificationResult[];
+  solverDebug?: SolverWasmRunDebugSnapshot | null;
 }
 
 export interface RunScriptOptions {

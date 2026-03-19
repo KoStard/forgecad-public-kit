@@ -159,6 +159,14 @@ export interface SolverWasmStats {
   history: SolverWasmExchangeSummary[];
 }
 
+export interface SolverWasmRunDebugSnapshot {
+  stats: SolverWasmStats;
+  lastExchange: SolverWasmExchangeRecord | null;
+  lastSolveExchange: SolverWasmExchangeRecord | null;
+  lastExchangeBundleJson: string | null;
+  lastSolveExchangeBundleJson: string | null;
+}
+
 // ─── WASM module state ────────────────────────────────────────────────────────
 
 type WasmSolveFn = (problem_json: string) => string;
@@ -172,6 +180,7 @@ const DEBUG_STORAGE_KEY = 'fc:solver-debug';
 let _consoleDebug = readInitialConsoleDebug();
 let _exchangeCounter = 0;
 let _lastExchange: SolverWasmExchangeRecord | null = null;
+let _lastPublishedRunDebug: SolverWasmRunDebugSnapshot | null = null;
 const _exchangeHistory: SolverWasmExchangeRecord[] = [];
 const _totals = createAccumulator();
 const _byKind = new Map<SolverWasmExchangeKind, SolverWasmTimingAccumulator>();
@@ -187,6 +196,9 @@ type SolverWasmDebugHandle = {
   getHistory: (limit?: number) => SolverWasmExchangeSummary[];
   printRecent: (limit?: number) => SolverWasmExchangeSummary[];
   getLastExchange: (kind?: SolverWasmExchangeKind) => SolverWasmExchangeRecord | null;
+  lastExchange: SolverWasmExchangeRecord | null;
+  lastSolveExchange: SolverWasmExchangeRecord | null;
+  lastRun: SolverWasmRunDebugSnapshot | null;
   printLastExchange: (kind?: SolverWasmExchangeKind) => string | null;
   copyLastExchange: (kind?: SolverWasmExchangeKind) => Promise<string | null>;
   copyLastRequest: (kind?: SolverWasmExchangeKind) => Promise<string | null>;
@@ -399,6 +411,44 @@ export function getLastSolverWasmExchange(kind?: SolverWasmExchangeKind): Solver
   return findLastExchange(kind);
 }
 
+export function getSolverWasmRunDebugSnapshot(): SolverWasmRunDebugSnapshot {
+  const lastExchange = getLastSolverWasmExchange();
+  const lastSolveExchange = getLastSolverWasmExchange('solve');
+  return {
+    stats: getSolverWasmStats(),
+    lastExchange,
+    lastSolveExchange,
+    lastExchangeBundleJson: lastExchange ? formatSolverWasmExchange(lastExchange) : null,
+    lastSolveExchangeBundleJson: lastSolveExchange ? formatSolverWasmExchange(lastSolveExchange) : null,
+  };
+}
+
+export function publishSolverWasmRunDebug(snapshot: SolverWasmRunDebugSnapshot | null): void {
+  _lastPublishedRunDebug = snapshot;
+  if (!snapshot || typeof window === 'undefined') return;
+
+  const totals = snapshot.stats.totals;
+  const lastSolve = snapshot.lastSolveExchange;
+  const header =
+    `[forgecad solver] ${totals.calls} Rust calls`
+    + ` | boundary=${formatMs(totals.total)}`
+    + ` | rust/wasm=${formatMs(totals.wasm)}`
+    + (lastSolve ? ` | last solve rust/wasm=${formatMs(lastSolve.timings.wasm)}` : '');
+
+  if (typeof console.groupCollapsed === 'function') {
+    console.groupCollapsed(header);
+    console.log('window.__forgecadSolver.lastRun', snapshot);
+    if (snapshot.lastSolveExchangeBundleJson) {
+      console.log('window.__forgecadSolver.lastRun.lastSolveExchangeBundleJson');
+      console.log(snapshot.lastSolveExchangeBundleJson);
+    }
+    console.groupEnd();
+  } else {
+    console.log(header);
+    console.log(snapshot);
+  }
+}
+
 export function printLastSolverWasmExchange(kind: SolverWasmExchangeKind = 'solve'): string | null {
   const record = findLastExchange(kind);
   if (!record) return null;
@@ -430,7 +480,22 @@ export async function copyLastSolverWasmResponse(kind: SolverWasmExchangeKind = 
 }
 
 function installDebugHandle(): void {
-  const handle: SolverWasmDebugHandle = {
+  const handle = {} as SolverWasmDebugHandle;
+  Object.defineProperties(handle, {
+    lastExchange: {
+      get: () => getLastSolverWasmExchange(),
+      enumerable: true,
+    },
+    lastSolveExchange: {
+      get: () => getLastSolverWasmExchange('solve'),
+      enumerable: true,
+    },
+    lastRun: {
+      get: () => _lastPublishedRunDebug,
+      enumerable: true,
+    },
+  });
+  Object.assign(handle, {
     enableConsoleDebug: () => setSolverWasmConsoleDebug(true),
     disableConsoleDebug: () => setSolverWasmConsoleDebug(false),
     isConsoleDebugEnabled: () => isSolverWasmConsoleDebugEnabled(),
@@ -458,12 +523,12 @@ function installDebugHandle(): void {
       }
       return history;
     },
-    getLastExchange: (kind = 'solve') => getLastSolverWasmExchange(kind),
-    printLastExchange: (kind = 'solve') => printLastSolverWasmExchange(kind),
-    copyLastExchange: (kind = 'solve') => copyLastSolverWasmExchange(kind),
-    copyLastRequest: (kind = 'solve') => copyLastSolverWasmRequest(kind),
-    copyLastResponse: (kind = 'solve') => copyLastSolverWasmResponse(kind),
-  };
+    getLastExchange: (kind: SolverWasmExchangeKind = 'solve') => getLastSolverWasmExchange(kind),
+    printLastExchange: (kind: SolverWasmExchangeKind = 'solve') => printLastSolverWasmExchange(kind),
+    copyLastExchange: (kind: SolverWasmExchangeKind = 'solve') => copyLastSolverWasmExchange(kind),
+    copyLastRequest: (kind: SolverWasmExchangeKind = 'solve') => copyLastSolverWasmRequest(kind),
+    copyLastResponse: (kind: SolverWasmExchangeKind = 'solve') => copyLastSolverWasmResponse(kind),
+  });
   (globalThis as Record<string, unknown>).__forgecadSolver = handle;
 }
 

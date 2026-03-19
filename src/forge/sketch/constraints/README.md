@@ -24,7 +24,7 @@ Rust is the only solver implementation now. Everything under this folder exists 
 - `sketch.ts`
   Converts solved geometry into sketch objects, arrangement surfaces, and other UI-facing structures.
 - `solver-wasm.ts`
-  JSON/WASM boundary that initializes the Rust module, serializes problems, applies solved values, and exposes debug/capture helpers on `globalThis.__forgecadSolver`.
+  JSON/WASM boundary that initializes the Rust module, serializes problems, applies solved values, and exposes debug/capture helpers plus the latest run snapshot on `globalThis.__forgecadSolver`.
 - `types.ts`
   Shared TS builder, display, and wire-format types for the Rust-backed constraints surface.
 - `index.ts`
