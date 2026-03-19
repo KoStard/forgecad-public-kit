@@ -38,6 +38,10 @@ Three.js BoxGeometry material indices (cube face order):
 Default drei labels are `['Right', 'Left', 'Top', 'Bottom', 'Front', 'Back']` (Y-up).
 For Z-up we pass `faces={['Right', 'Left', 'Front', 'Back', 'Top', 'Bottom']}`.
 
+## Kernel Axis Convention
+
+Manifold (the geometry kernel) is Y-up internally. ForgeCAD is Z-up externally. If a kernel-facing operation behaves as if axes are swapped, check whether a Manifold call is still assuming Y-up semantics.
+
 ## Grid
 
 The ground plane is XY (Z = 0). The grid lies on this plane.

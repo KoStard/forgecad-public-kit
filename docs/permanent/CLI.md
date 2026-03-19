@@ -2,20 +2,7 @@
 
 ## Architecture
 
-All CLI tools share the **same forge engine** as the browser UI. There is one source of truth for geometry logic — no code duplication.
-
-```
-src/forge/headless.ts    ← Single entry point for all contexts
-  ├── kernel.ts          ← Manifold WASM wrapper (Shape, box, cylinder, sphere, etc.)
-  ├── runner.ts          ← Script sandbox (Function() with full forge API injected)
-  ├── section.ts         ← Plane intersection / projection
-  ├── sketch/            ← Complete 2D sketch system (primitives, transforms, booleans,
-  │                         constraints, entities, topology, patterns, fillets, arc bridge)
-  ├── params.ts          ← Parameter system
-  ├── library.ts         ← Part library
-  ├── meshToGeometry.ts  ← Manifold mesh → Three.js BufferGeometry
-  └── sceneBuilder.ts    ← Three.js scene setup (lighting, camera, materials)
-```
+All CLI tools share the **same forge engine** as the browser UI. There is one source of truth for geometry logic — no code duplication. See [CODING.md → Project Structure](CODING.md#project-structure) for the full source tree.
 
 **Browser** imports via `src/forge/index.ts` → re-exports from `headless.ts`.
 **CLI tools** import directly from `src/forge/headless.ts`.

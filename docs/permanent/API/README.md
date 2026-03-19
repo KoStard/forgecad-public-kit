@@ -19,6 +19,5 @@ That `model-building/` set is the complete script-authoring surface for geometry
 - [output/dimensions.md](output/dimensions.md): dimension annotations for viewport/report output
 - [output/brep-export.md](output/brep-export.md): exact STEP/BREP export parity matrix
 - [guides/modeling-recipes.md](guides/modeling-recipes.md): patterns, best practices, debugging, and example snippets
-- [internals/manifold.md](internals/manifold.md): implementation notes about the current geometry backend
 
 Read those only when the task explicitly involves that area.

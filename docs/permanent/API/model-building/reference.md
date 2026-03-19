@@ -5,7 +5,6 @@ This file covers the script authoring surface for geometry, sketches, topology, 
 It intentionally excludes:
 - viewport-only APIs in [../runtime/viewport.md](../runtime/viewport.md)
 - report/export APIs in [../output/bom.md](../output/bom.md), [../output/dimensions.md](../output/dimensions.md), and [../output/brep-export.md](../output/brep-export.md)
-- implementation notes in [../internals/manifold.md](../internals/manifold.md)
 
 ## Core Concepts
 
