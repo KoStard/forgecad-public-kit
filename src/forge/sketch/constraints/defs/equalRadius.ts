@@ -43,44 +43,6 @@ registerConstraint<'equalRadius', ConstraintTypeMap['equalRadius']>({
     return annotations;
   },
 
-  solve(c, { circles, tolerance }) {
-    const ca = circles.get(c.a);
-    const cb = circles.get(c.b);
-    if (!ca || !cb) return 0;
-    const err = Math.abs(ca.radius - cb.radius);
-    if (err <= tolerance) return err;
-
-    if (!ca.fixedRadius && !cb.fixedRadius) {
-      const avg = (ca.radius + cb.radius) / 2;
-      ca.radius = avg;
-      cb.radius = avg;
-    } else if (ca.fixedRadius) {
-      if (!cb.fixedRadius) cb.radius = ca.radius;
-    } else {
-      ca.radius = cb.radius;
-    }
-    return err;
-  },
-
-
-  residual(c, { circles }) {
-    const ca = circles.get(c.a); const cb = circles.get(c.b);
-    if (!ca || !cb) return [0];
-    return [cb.radius - ca.radius];
-  },
-
-  jacobian(c, { circles }) {
-    const ca = circles.get(c.a); const cb = circles.get(c.b);
-    if (!ca || !cb) return { residuals: [0], partials: {} };
-    return {
-      residuals: [cb.radius - ca.radius],
-      partials: {
-        [`${c.a}.r`]: [-1],
-        [`${c.b}.r`]: [1],
-      },
-    };
-  },
-
   computeDof(_c, _ctx) {
     // Constrains circle radii, not point DOF
   },

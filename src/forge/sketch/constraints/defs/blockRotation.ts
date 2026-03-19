@@ -40,35 +40,6 @@ registerConstraint<'blockRotation', ConstraintTypeMap['blockRotation']>({
     return []; // No visual annotation — structural constraint
   },
 
-  presolve(c, { points }) {
-    enforceEdgeDirection(c, points);
-  },
-
-  solve(c, { points }) {
-    enforceEdgeDirection(c, points);
-    return 0;
-  },
-
-  residual(c, { points }) {
-    const p0 = points.get(c.points[0]);
-    const p1 = points.get(c.points[1]);
-    if (!p0 || !p1) return [0];
-
-    // First edge must increase along the specified axis.
-    const delta = c.axis === 'x' ? (p1.x - p0.x) : (p1.y - p0.y);
-    if (delta > 0) return [0]; // Correct direction — satisfied
-
-    // Wrong direction: return one-sided penalty normalized by polygon size.
-    const pts = c.points.map((id: PointId) => points.get(id)).filter(Boolean) as SketchPoint[];
-    let perimeter = 0;
-    for (let i = 0; i < pts.length; i++) {
-      const j = (i + 1) % pts.length;
-      perimeter += Math.hypot(pts[j].x - pts[i].x, pts[j].y - pts[i].y);
-    }
-    const scale = perimeter || 1;
-    return [delta / scale]; // Negative when wrong → drives LM to fix it
-  },
-
   computeDof() {
     // No continuous DOF consumed — discrete orientation choice.
   },

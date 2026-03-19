@@ -30,44 +30,6 @@ registerConstraint<'shapeEqualCentroid', ConstraintTypeMap['shapeEqualCentroid']
     return [(ax + bx) / 2, (ay + by) / 2];
   },
 
-  solve(c, { shapes, lines, points, tolerance }) {
-    const shapeA = shapes.get(c.a);
-    const shapeB = shapes.get(c.b);
-    if (!shapeA || !shapeB) return 0;
-    const ptsA = shapeVertices(shapeA, lines, points);
-    const ptsB = shapeVertices(shapeB, lines, points);
-    if (ptsA.length === 0 || ptsB.length === 0) return 0;
-
-    const [ax, ay] = shapeCentroid(ptsA);
-    const [bx, by] = shapeCentroid(ptsB);
-
-    const errX = Math.abs(ax - bx);
-    const errY = Math.abs(ay - by);
-    const err = Math.max(errX, errY);
-    if (err <= tolerance) return err;
-
-    // Translate each shape toward the midpoint between their centroids.
-    const tx = (ax + bx) / 2;
-    const ty = (ay + by) / 2;
-
-    for (const pt of ptsA) {
-      if (!pt.fixed) { pt.x += tx - ax; pt.y += ty - ay; }
-    }
-    for (const pt of ptsB) {
-      if (!pt.fixed) { pt.x += tx - bx; pt.y += ty - by; }
-    }
-    return err;
-  },
-
-  residual(c, { shapes, lines, points }) {
-    const shapeA = shapes.get(c.a);
-    const shapeB = shapes.get(c.b);
-    if (!shapeA || !shapeB) return [0, 0];
-    const [ax, ay] = shapeCentroid(shapeVertices(shapeA, lines, points));
-    const [bx, by] = shapeCentroid(shapeVertices(shapeB, lines, points));
-    return [ax - bx, ay - by];
-  },
-
   computeDof(c, { refCount, lines, shapes }) {
     for (const shapeId of [c.a, c.b]) {
       const shape = shapes.get(shapeId);

@@ -44,32 +44,6 @@ registerConstraint<'ccw', ConstraintTypeMap['ccw']>({
     return [{ kind: 'symbol', position: [cx, cy] as [number, number], symbol: 'ccw' as const }];
   },
 
-  presolve(c, { points }) {
-    enforceWinding(c.points, points);
-  },
-
-  solve(c, { points }) {
-    enforceWinding(c.points, points);
-    return 0;
-  },
-
-  residual(c, { points }) {
-    const pts = c.points.map((id: PointId) => points.get(id)).filter(Boolean) as SketchPoint[];
-    if (pts.length < 3) return [0];
-    const area = polygonSignedArea(pts);
-    if (area >= 0) return [0]; // CCW — satisfied
-
-    // CW: return a normalized one-sided penalty so LM sees the violation.
-    // Normalize by perimeter² to keep the residual scale-independent (~O(1)).
-    let perimeter = 0;
-    for (let i = 0; i < pts.length; i++) {
-      const j = (i + 1) % pts.length;
-      perimeter += Math.hypot(pts[j].x - pts[i].x, pts[j].y - pts[i].y);
-    }
-    const scale = (perimeter * perimeter) / (4 * Math.PI) || 1; // isoperimetric reference
-    return [area / scale]; // negative value drives LM toward CCW
-  },
-
   computeDof() {
     // No continuous DOF consumed — CCW is a discrete orientation choice.
   },

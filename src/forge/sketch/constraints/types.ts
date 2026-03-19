@@ -212,18 +212,6 @@ export type ConstraintType = keyof ConstraintTypeMap;
 
 // ─── Solver / registry context types ───────────────────────────────────────────
 
-export interface SolverContext {
-  points: Map<PointId, SketchPoint>;
-  lines: Map<LineId, SketchLine>;
-  circles: Map<CircleId, SketchCircle>;
-  arcs: Map<ArcId, SketchArc>;
-  shapes: Map<ShapeId, SketchShape>;
-  tolerance: number;
-  movePoint: (pt: SketchPoint, dx: number, dy: number) => boolean;
-  /** Number of constraints referencing each entity ID (available during presolve). */
-  entityRefCount?: Map<string, number>;
-}
-
 export interface DisplayContext {
   points: Map<PointId, SketchPoint>;
   lines: Map<LineId, SketchLine>;
@@ -250,30 +238,6 @@ export interface ConstraintDef<TType extends string = string, TData extends obje
    * Examples: coincident=2, horizontal=1, fixed=0 (point already pinned via pt.fixed).
    */
   equations?: number;
-  /** Optional pre-solve hook called once before the iteration loop (used by 'fixed'). */
-  presolve?: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => void;
-  solve: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => number;
-  /**
-   * Optional residual vector for the Newton-Raphson solver.
-   * Return an array of values that should all be 0 when the constraint is satisfied.
-   * The length must match `equations`. When defined for all active constraints, the
-   * NR solver is used instead of Gauss-Seidel, giving order-independent quadratic convergence.
-   */
-  residual?: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => number[];
-  /**
-   * Analytical Jacobian: returns both residuals and exact partial derivatives
-   * in a single call. When provided for ALL constraints, the solver uses these
-   * instead of finite-difference Jacobians — eliminating step-size sensitivity,
-   * discontinuity artifacts near atan2/sqrt boundaries, and ~50% of evaluations.
-   *
-   * `partials` maps variable keys (`${entityId}.x`, `${entityId}.y`, `${circleId}.r`,
-   * `${arcId}.r`) to arrays of partial derivatives, one per residual equation.
-   * Only include non-zero entries.
-   */
-  jacobian?: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => {
-    residuals: number[];
-    partials: Record<string, number[]>;
-  };
   displayPosition: (constraint: { id: string; type: TType } & TData, ctx: DisplayContext) => [number, number];
   /**
    * Optional annotation geometry for Fusion360-style constraint visualization.

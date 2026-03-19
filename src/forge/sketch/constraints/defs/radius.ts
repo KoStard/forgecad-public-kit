@@ -36,33 +36,6 @@ registerConstraint<'radius', ConstraintTypeMap['radius']>({
     return [{ kind: 'dimension', from: [center.x, center.y], to: [center.x + circle.radius, center.y], offset: 0, value: `R${c.value}` }];
   },
 
-  solve(c, { circles, tolerance }) {
-    const circle = circles.get(c.circle);
-    if (!circle) return 0;
-    const err = Math.abs(circle.radius - c.value);
-    if (err <= tolerance) return err;
-    if (!circle.fixedRadius) circle.radius = c.value;
-    return err;
-  },
-
-
-  residual(c, { circles }) {
-    const circle = circles.get(c.circle);
-    if (!circle) return [0];
-    return [circle.radius - c.value];
-  },
-
-  jacobian(c, { circles }) {
-    const circle = circles.get(c.circle);
-    if (!circle) return { residuals: [0], partials: {} };
-    return {
-      residuals: [circle.radius - c.value],
-      partials: {
-        [`${c.circle}.r`]: [1],
-      },
-    };
-  },
-
   computeDof(_c, _ctx) {
     // radius constrains circle radius (not a point DOF)
   },

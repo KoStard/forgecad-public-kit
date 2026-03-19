@@ -33,24 +33,6 @@ registerConstraint<'fixed', ConstraintTypeMap['fixed']>({
     return [{ kind: 'symbol', position: [pt.x + 2.5, pt.y + 2.5] as [number, number], symbol: 'fixed' as const }];
   },
 
-  presolve(c, { points }) {
-    const pt = points.get(c.point);
-    if (!pt) return;
-    pt.fixed = true;
-    pt.x = c.x;
-    pt.y = c.y;
-  },
-
-  solve(_c, _ctx) {
-    // Applied in presolve — nothing to do per-iteration
-    return 0;
-  },
-
-
-  residual(_c, _ctx) {
-    return []; // Point is pinned via presolve — no residual equations
-  },
-
   computeDof(c, { refCount }) {
     refCount.set(c.point, (refCount.get(c.point) ?? 0) + 2);
   },

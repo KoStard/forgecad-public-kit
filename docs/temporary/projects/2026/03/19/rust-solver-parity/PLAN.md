@@ -106,17 +106,20 @@ Primary hypotheses at start:
 | 5 | Move incremental builder presolve to Rust | Whole-system builder presolve regressed spectrogram; single-constraint Rust presolve restored good branches | complete |
 | 6 | Add Rust-native SVG snapshot test harness | Fluent Rust test kit now builds sketches, solves them, renders SVG, and compares snapshots | complete |
 | 7 | Delete dead TS decomposition / analytical solver surface | TS no longer exports or runs decomposition / analytical solver APIs; warm-start now talks directly to the Rust boundary | complete |
+| 8 | Strip TS constraint defs down to metadata only | TS defs no longer carry presolve / solve / residual / jacobian logic; CLI diagnostics now use Rust metadata only | complete |
 
 ## Remaining TS Solver Surface
 
 This is the explicit removal list for Goal 1:
 
-- `src/forge/sketch/constraints/defs/*`
-  - solver-specific `presolve`, `solve`, `residual`, `jacobian` behavior is still present in TS definitions even though Rust is now authoritative
+- `src/forge/sketch/constraints/rigidity.ts`
+  - structural redundancy / rigidity analysis is still TypeScript-side
 - `src/forge/sketch/constraints/types.ts`
-  - `ConstraintDef` still carries solver-method fields that are only there for legacy defs
+  - `ConstraintDef.computeDof` and the TS-side rigidity model are still solver-adjacent metadata
+- `src/forge/sketch/constraints/defs/*`
+  - comments and a few dead helper functions still reflect the old TS solver implementation, even though the executable solver methods are gone
 - `cli/check-constraints.ts`
-  - still carries a few TS-only tests that probe higher-level sketch ergonomics rather than the Rust crate directly
+  - still carries TS-side ergonomics and rigidity tests rather than driving the Rust crate directly for those concerns
 
 ## Experiment Log
 
@@ -296,6 +299,28 @@ Additional concrete finding:
 
 - When Rust owns decomposition and presolve internally, keeping TS decomposition / analytical APIs around only obscures what is still unfinished. Deleting them is cleaner than pretending they are still part of the supported solver boundary.
 
+### Strip TS Constraint Defs to Metadata Only (SUCCESS)
+**What**: Remove the legacy solver implementation methods from every TypeScript constraint definition so the defs only describe builder-facing metadata, UI annotation geometry, and TS-side rigidity bookkeeping.
+
+**Changed**:
+
+- stripped `presolve`, `solve`, `residual`, and `jacobian` from `src/forge/sketch/constraints/defs/*.ts`
+- removed `SolverContext` and the solver-method fields from `ConstraintDef` in `src/forge/sketch/constraints/types.ts`
+- removed the last TS-side residual recomputation path from `cli/check-constraints.ts`; verbose diagnostics now read the Rust-returned residual metadata
+
+**Verification**:
+
+- `npm exec tsc -- --noEmit` → passes
+- `npm run build:cli` → passes
+- `cargo test -q` → passes
+- `node dist-cli/forgecad.js check constraints` → `74 passed, 0 failed`
+- `node dist-cli/forgecad.js run /Users/kostard/Projects/CAD/PersonalForgeCADProjects/2026/03/16/spectrogram.forge.js`
+  - `OVER-REDUNDANT DOF=-4 err=0.000986`
+
+**Lesson**:
+
+- The defs are now clearly non-authoritative for solving. The remaining TS residue is not “hidden LM math in defs” anymore; it is structural analysis (`computeDof` / `rigidity.ts`) and some legacy comments/helpers that can now be cleaned up separately.
+
 ## Files Modified
 
 | File | Purpose |
@@ -307,6 +332,7 @@ Additional concrete finding:
 | `src/forge/sketch/constraints/types.ts` | Removed TS decomposition-cache types from the public solver boundary |
 | `src/forge/sketch/constraints/index.ts` | Stopped exporting deleted TS solver modules |
 | `src/forge/sketch/constraints/solver-wasm.ts` | Added Rust presolve bridge APIs for incremental builder seeding |
+| `src/forge/sketch/constraints/defs/*.ts` | Removed legacy TS solver methods so defs now only carry metadata / annotations / DOF bookkeeping |
 | `src/forge/sketch/constraints/decompose.ts` | Deleted dead TS decomposition wrapper after Rust became authoritative |
 | `src/forge/sketch/constraints/analytical.ts` | Deleted dead TS analytical presolve module |
 | `solver/src/solver/mod.rs` | Rust-owned solve orchestration, presolve sequencing, component solve routing |
@@ -323,3 +349,4 @@ Additional concrete finding:
 | `solver/tests/solver_tests.rs` | Coverage for Rust orchestration / orientation cases |
 | `cli/collect-files.ts` | Robust file collection for CLI validation commands |
 | `cli/test-run.ts` | Robust CLI profiling output when internal timing fields are absent |
+| `cli/check-constraints.ts` | Uses Rust-returned residual metadata instead of TS residual recomputation |

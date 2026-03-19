@@ -27,7 +27,6 @@ export type {
   ConstraintTypeMap,
   ConstraintBuilderMethods,
   ConstraintDef,
-  SolverContext,
   DisplayContext,
   DofContext,
 } from './types';

@@ -26,7 +26,6 @@ import type { ConstraintDefinition, SketchPoint } from '../src/forge/sketch/cons
 import { addRect, addPolygon, addRegularPolygon } from '../src/forge/sketch/constraints/concepts';
 import { buildConstraintSvgDocument } from './sketch-svg';
 import { computeLabelMetrics, formatMetrics } from './label-metrics';
-import { getConstraintDef } from '../src/forge/sketch/constraints/registry';
 import { analyzeRigidity } from '../src/forge/sketch/constraints/rigidity';
 import '../src/forge/sketch/constraints/defs';
 
@@ -1272,30 +1271,7 @@ function testFullSpectrogram() {
   console.log(`      status=${meta.status} maxErr=${meta.maxError.toFixed(4)} dof=${meta.dof} rejected=${meta.rejected.length}`);
   if (_verbose) printConstraintSummary(meta);
 
-  // Show per-constraint residuals for diagnosis
-  if (_verbose) {
-    // getConstraintDef imported at top of file
-    const def = result.definition;
-    const pts = new Map(def.points.map((p) => [p.id, p] as const));
-    const lns = new Map(def.lines.map((l) => [l.id, l] as const));
-    const cirs = new Map(def.circles.map((c) => [c.id, c] as const));
-    const arcs = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
-    const shapes = new Map((def.shapes ?? []).map((s) => [s.id, s] as const));
-    const ctx = { points: pts, lines: lns, circles: cirs, arcs, shapes, tolerance: 1e-6, movePoint: () => false };
-    const residuals: { id: string; type: string; err: number; res: number[] }[] = [];
-    for (const c of def.constraints) {
-      const cdef = getConstraintDef(c.type);
-      if (!cdef?.residual) continue;
-      const res = cdef.residual(c as never, ctx);
-      const err = Math.max(...res.map(Math.abs));
-      residuals.push({ id: c.id, type: c.type, err, res });
-    }
-    residuals.sort((a, b) => b.err - a.err);
-    console.log(`      top residuals:`);
-    for (const r of residuals.slice(0, 15)) {
-      console.log(`        ${r.err.toFixed(4)} ${r.type} (${r.id}) [${r.res.map((v) => v.toFixed(4)).join(', ')}]`);
-    }
-  }
+  if (_verbose) printTopResiduals(result, 15);
 
   // Track rejections — 0 is the target after deferred solving.
   assert.equal(meta.rejected.length, 0, `spectrogram: unexpected rejections (${meta.rejected.length})`);

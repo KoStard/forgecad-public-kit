@@ -40,58 +40,6 @@ registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
     return [{ kind: 'symbol', position: midpointPerp(a, b, 3), symbol: 'midpoint' as const }];
   },
 
-  solve(c, { points, lines, tolerance }) {
-    const pt = points.get(c.point);
-    const line = lines.get(c.line);
-    if (!pt || !line) return 0;
-    const a = points.get(line.a);
-    const b = points.get(line.b);
-    if (!a || !b) return 0;
-    const mx = (a.x + b.x) / 2;
-    const my = (a.y + b.y) / 2;
-    const dx = pt.x - mx;
-    const dy = pt.y - my;
-    const err = Math.sqrt(dx * dx + dy * dy);
-    if (err <= tolerance) return err;
-    if (pt.fixed) {
-      // Point is anchored — move line endpoints to center on it.
-      if (!a.fixed) { a.x += dx; a.y += dy; }
-      if (!b.fixed) { b.x += dx; b.y += dy; }
-    } else {
-      // Snap point to the midpoint of the line.
-      pt.x = mx;
-      pt.y = my;
-    }
-    return err;
-  },
-
-
-  residual(c, { points, lines }) {
-    const pt = points.get(c.point); const line = lines.get(c.line);
-    if (!pt || !line) return [0, 0];
-    const a = points.get(line.a); const b = points.get(line.b);
-    if (!a || !b) return [0, 0];
-    return [pt.x - (a.x + b.x) / 2, pt.y - (a.y + b.y) / 2];
-  },
-
-  jacobian(c, { points, lines }) {
-    const pt = points.get(c.point); const line = lines.get(c.line);
-    if (!pt || !line) return { residuals: [0, 0], partials: {} };
-    const a = points.get(line.a); const b = points.get(line.b);
-    if (!a || !b) return { residuals: [0, 0], partials: {} };
-    return {
-      residuals: [pt.x - (a.x + b.x) / 2, pt.y - (a.y + b.y) / 2],
-      partials: {
-        [`${c.point}.x`]: [1, 0],
-        [`${c.point}.y`]: [0, 1],
-        [`${line.a}.x`]: [-0.5, 0],
-        [`${line.a}.y`]: [0, -0.5],
-        [`${line.b}.x`]: [-0.5, 0],
-        [`${line.b}.y`]: [0, -0.5],
-      },
-    };
-  },
-
   computeDof(c, { refCount }) {
     refCount.set(c.point, (refCount.get(c.point) ?? 0) + 2);
   },
