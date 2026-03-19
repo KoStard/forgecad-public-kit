@@ -91,6 +91,35 @@ When ref counts are equal (common case — both lines are part of rects with ide
 **Result**: ALL 54 tests pass. Spectrogram: err=0.000006. Wrapper: 0.0mm drift.
 **Why it works**: The inflation detection (`lenA > lenB * 2`) catches the specific failure mode — wrapper lines that were stretched by top/bottom presolves appear artificially long. The presolve correctly moves the inflated wrapper line instead of the inner geometry, giving LM a good starting point.
 
+### Experiment 11: CCW constraint investigation — can it be removed?
+**What**: Temporarily made CCW a complete no-op (presolve, solve, residual all return immediately).
+**Result**: 53/54 tests pass. `addPolygon CCW enforcement` fails — CW-ordered input stays CW (area=-50).
+**Lesson**: CCW enforcement is load-bearing. Downstream code (`polygon()` in primitives.ts) normalizes winding for geometry output, BUT:
+1. The `testAddPolygonCCW` test expects the solver to flip CW→CCW
+2. CCW winding affects lineDistance sign semantics during solving
+3. Removing CCW would break the contract that solver output vertices are in CCW order
+
+### Experiment 12: Keep CCW with one-sided residual ← VALIDATED
+**What**: CCW constraint uses three layers: (1) presolve reflects a vertex to flip CW→CCW, (2) solve does the same during GS warm-start, (3) residual returns `area/scale` when CW (negative), `0` when CCW.
+**Result**: ALL 55 tests pass (including new multi-rect winding test). Spectrogram: err=0.000303. All 11 rects in wrapper test are CCW.
+**Why it works**: presolve seeds the correct basin, solve maintains it during GS, and the one-sided residual gives LM gradient information without consuming DOF. The `equations: 0` keeps DOF arithmetic unchanged since CCW is a discrete orientation choice, not a continuous constraint.
+
+---
+
+## CCW Analysis
+
+CCW enforcement **cannot be removed** — it is load-bearing:
+- Manifold `CrossSection` expects CCW outer loops (CW = hole)
+- Region detection uses signed area to distinguish outers from holes
+- Boolean ops produce inverted geometry with CW input
+- Extrude produces inside-out shapes with CW winding
+- `polygon()` normalizes winding downstream, but solver tests and lineDistance semantics depend on CCW output
+
+The current three-layer approach (presolve + solve + residual) is the correct design:
+- `equations: 0` — no DOF consumed (discrete choice)
+- One-sided residual — LM sees CW violations but CCW is "free" (no false constraints)
+- presolve/solve — imperative correction for GS phases
+
 ---
 
 ## Summary of Changes
@@ -101,4 +130,5 @@ When ref counts are equal (common case — both lines are part of rects with ide
 | `registry.ts` | Build `entityRefCount` in `solveConstraints()` | Counts constraint refs for final solve context |
 | `builder.ts` | Build `entityRefCount` in `runSinglePresolve()` | Counts constraint refs for incremental presolve context |
 | `lineDistance.ts` | `presolve()` uses entityRefCount + inflation detection | Moves less-constrained line; detects inflated wrapper lines |
-| `check-constraints.ts` | L7 wrapper stability test | Regression test for wrapper rect stability |
+| `ccw.ts` | One-sided residual + updated docstring | Gives LM gradient info for CW violations |
+| `check-constraints.ts` | L7 wrapper stability + multi-rect winding tests | Regression tests for wrapper rect stability and CCW winding |

@@ -1643,6 +1643,56 @@ function testWrapperRectDoesNotDisturbLayout() {
   );
 }
 
+/**
+ * After solving a multi-rect layout with a wrapper, every rectangle must
+ * maintain CCW winding order. This validates that the solver's CCW constraint
+ * (presolve + residual) correctly prevents mirror solutions in complex systems.
+ */
+function testMultiRectWindingOrder() {
+  const sk = constrainedSketch();
+  const { topSection, bottomSection } = buildCaseLayout(sk);
+
+  const wrapper = sk.rect();
+  sk.lineDistance(wrapper.top, topSection.frontPiece.top, 0);
+  sk.lineDistance(wrapper.bottom, bottomSection.backPiece.bottom, 0);
+  sk.lineDistance(wrapper.left, bottomSection.leftSide.left, 0);
+  sk.lineDistance(wrapper.right, bottomSection.rightSide.right, 0);
+
+  const result = sk.solve();
+  assertConverged(result, 'multiRectWinding');
+  const def = result.definition;
+  const ptMap = new Map(def.points.map((p: SketchPoint) => [p.id, p]));
+
+  function signedArea(vertices: string[]): number {
+    const pts = vertices.map((id) => ptMap.get(id)).filter(Boolean) as SketchPoint[];
+    let area = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const j = (i + 1) % pts.length;
+      area += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+    }
+    return area / 2;
+  }
+
+  const rects = [
+    { name: 'topSection.surface', v: topSection.surface.vertices },
+    { name: 'topSection.rightSide', v: topSection.rightSide.vertices },
+    { name: 'topSection.leftSide', v: topSection.leftSide.vertices },
+    { name: 'topSection.frontPiece', v: topSection.frontPiece.vertices },
+    { name: 'topSection.backPiece', v: topSection.backPiece.vertices },
+    { name: 'bottomSection.surface', v: bottomSection.surface.vertices },
+    { name: 'bottomSection.rightSide', v: bottomSection.rightSide.vertices },
+    { name: 'bottomSection.leftSide', v: bottomSection.leftSide.vertices },
+    { name: 'bottomSection.frontPiece', v: bottomSection.frontPiece.vertices },
+    { name: 'bottomSection.backPiece', v: bottomSection.backPiece.vertices },
+    { name: 'wrapper', v: wrapper.vertices },
+  ];
+
+  for (const { name, v } of rects) {
+    const area = signedArea(v as string[]);
+    assert(area > 0, `multiRectWinding: ${name} has CW winding (signed area=${area.toFixed(2)})`);
+  }
+}
+
 // ─── Runner ──────────────────────────────────────────────────────────────────
 
 export async function runCheckConstraintsCli(args: string[]): Promise<void> {
@@ -1729,6 +1779,7 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
 
   const level7: TestEntry[] = [
     { name: 'wrapper rect does not disturb layout', fn: testWrapperRectDoesNotDisturbLayout },
+    { name: 'multi-rect CCW winding order', fn: testMultiRectWindingOrder },
   ];
 
   const allTests = [

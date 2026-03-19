@@ -11,10 +11,12 @@ declare module '../types' {
      * shape is fully determined but its mirror image also satisfies all constraints
      * (e.g. an equilateral triangle with a fixed vertex and side angle).
      *
-     * Applied during **presolve** and **solve**: if the signed area is negative
-     * (clockwise), the last non-fixed vertex is reflected across the line formed
-     * by the first two vertices. Contributes **0 equations** — it is a discrete
-     * constraint, not a continuous one, so it does not change the DOF count.
+     * **Presolve**: reflects a free vertex if the polygon is clockwise, seeding LM
+     * in the CCW basin.
+     *
+     * **Residual**: one-sided barrier — `0` when CCW (area ≥ 0), negative when CW.
+     * This gives LM gradient information to avoid mirror solutions without
+     * consuming a DOF (`equations: 0` keeps DOF arithmetic unchanged).
      */
     ccw: { points: PointId[] };
   }
@@ -51,12 +53,25 @@ registerConstraint<'ccw', ConstraintTypeMap['ccw']>({
     return 0;
   },
 
-  residual() {
-    return [];
+  residual(c, { points }) {
+    const pts = c.points.map((id: PointId) => points.get(id)).filter(Boolean) as SketchPoint[];
+    if (pts.length < 3) return [0];
+    const area = polygonSignedArea(pts);
+    if (area >= 0) return [0]; // CCW — satisfied
+
+    // CW: return a normalized one-sided penalty so LM sees the violation.
+    // Normalize by perimeter² to keep the residual scale-independent (~O(1)).
+    let perimeter = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const j = (i + 1) % pts.length;
+      perimeter += Math.hypot(pts[j].x - pts[i].x, pts[j].y - pts[i].y);
+    }
+    const scale = (perimeter * perimeter) / (4 * Math.PI) || 1; // isoperimetric reference
+    return [area / scale]; // negative value drives LM toward CCW
   },
 
   computeDof() {
-    // No continuous DOF consumed.
+    // No continuous DOF consumed — CCW is a discrete orientation choice.
   },
 });
 
@@ -75,8 +90,6 @@ function enforceWinding(
   if (area >= 0) return; // already CCW (or degenerate)
 
   // Find the last non-fixed point and reflect it across the line p0→p1.
-  // For the typical triangle case: p0 is fixed, p1's direction is constrained,
-  // so p2 (the free vertex) gets reflected.
   const p0 = pts[0];
   const p1 = pts[1];
   for (let i = pts.length - 1; i >= 0; i--) {
