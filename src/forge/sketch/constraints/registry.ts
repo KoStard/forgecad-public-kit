@@ -12,6 +12,7 @@ import type {
   SolveOptions,
 } from './types';
 import { analyticalPreSolve } from './analytical';
+import { solveConstraintsWasm } from './solver-wasm';
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
@@ -907,11 +908,7 @@ export const solveConstraints = (
   def: ConstraintDefinition,
   options: SolveOptions,
 ): { maxError: number } => {
-  const iterations = options.iterations ?? 80;
   const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
-  const restarts = options.restarts ?? 6;
-  const warmStartIterations = options.warmStartIterations ?? 6;
-  const maxScaledStep = options.maxScaledStep ?? 2.5;
 
   const points = new Map(def.points.map((p) => [p.id, p] as const));
   const lines = new Map(def.lines.map((l) => [l.id, l] as const));
@@ -919,35 +916,14 @@ export const solveConstraints = (
   const arcs = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
   const shapes = new Map((def.shapes ?? []).map((s) => [s.id, s] as const));
 
-  const movePoint = (pt: SketchPoint, dx: number, dy: number): boolean => {
-    if (pt.fixed) return false;
-    pt.x += dx;
-    pt.y += dy;
-    return true;
-  };
-
-  // Count how many constraints reference each entity — used by solve() heuristics
-  // to determine which entities are "established" and should not be moved.
-  const entityRefCount = new Map<string, number>();
-  for (const c of def.constraints) {
-    for (const [key, val] of Object.entries(c)) {
-      if (key === 'id' || key === 'type') continue;
-      if (typeof val === 'string') entityRefCount.set(val, (entityRefCount.get(val) ?? 0) + 1);
-      else if (Array.isArray(val)) {
-        for (const v of val) { if (typeof v === 'string') entityRefCount.set(v, (entityRefCount.get(v) ?? 0) + 1); }
-      }
-    }
-  }
-
   const ctx: SolverContext = {
-    points,
-    lines,
-    circles,
-    arcs,
-    shapes,
-    tolerance,
-    movePoint,
-    entityRefCount,
+    points, lines, circles, arcs, shapes, tolerance,
+    movePoint: (pt: SketchPoint, dx: number, dy: number): boolean => {
+      if (pt.fixed) return false;
+      pt.x += dx; pt.y += dy;
+      return true;
+    },
+    entityRefCount: new Map(),
   };
 
   const _st0 = performance.now();
@@ -965,15 +941,9 @@ export const solveConstraints = (
   analyticalPreSolve(def);
   const _st2 = performance.now();
 
-  const hasFullResidualModel = def.constraints.every((constraint) => {
-    const constraintDef = registry.get(constraint.type);
-    return constraintDef?.residual != null;
-  });
-
+  // ── Numerical solve via Rust/WASM ─────────────────────────────────────────
   const _st3 = performance.now();
-  const maxError = hasFullResidualModel
-    ? solveGlobalSystem(def, ctx, iterations, tolerance, restarts, warmStartIterations, maxScaledStep)
-    : legacyGaussSeidelSolve(def, ctx, iterations);
+  const { maxError } = solveConstraintsWasm(def, options);
   const _st4 = performance.now();
   _totalLmTime += _st4 - _st3;
   _totalLmCalls++;
@@ -988,8 +958,6 @@ export const solveConstraints = (
     analytical: _st2 - _st1,
     lm: _st4 - _st3,
     total: _st4 - _st0,
-    restarts,
-    warmStartIterations,
     constraints: def.constraints.length,
     freePoints: def.points.filter(p => !p.fixed).length,
   };

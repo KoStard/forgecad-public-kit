@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import chokidar from 'chokidar';
 import { init, resolveForgeQualityPreset } from './src/forge/headless';
 import { buildNotebookOutputs } from './src/notebook/output';
@@ -187,6 +187,60 @@ async function executeNotebookRequest(body: any, createIfMissing = false) {
       objectCount: run.cellResult.objects.length,
       paramNames: run.cellResult.params.map((param) => param.name),
       timeMs: run.cellResult.timeMs,
+    },
+  };
+}
+
+// ─── Solver auto-build & watch plugin ─────────────────────────────────────────
+
+function forgeSolverPlugin() {
+  const solverPkg = path.resolve(__dirname, 'solver/pkg/solver.js');
+  const solverBuildScript = path.resolve(__dirname, 'scripts/solver-build.mjs');
+  const solverSrc = path.resolve(__dirname, 'solver/src');
+
+  function buildSolver() {
+    try {
+      execFileSync(process.execPath, [solverBuildScript], {
+        cwd: __dirname,
+        stdio: 'inherit',
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return {
+    name: 'forge-solver',
+    // Auto-build solver on dev server start if pkg is missing.
+    configureServer(server: any) {
+      if (!fs.existsSync(solverPkg)) {
+        console.log('\n  Solver WASM not found — building…\n');
+        if (!buildSolver()) {
+          console.error('\n  ✖ Solver build failed. Sketches will not work.\n');
+        }
+      }
+
+      // Watch Rust source files and rebuild on change.
+      const watcher = chokidar.watch([`${solverSrc}/**/*.rs`, path.resolve(__dirname, 'solver/Cargo.toml')], {
+        ignoreInitial: true,
+      });
+
+      let building = false;
+      const rebuild = () => {
+        if (building) return;
+        building = true;
+        console.log('\n  Rust source changed — rebuilding solver…\n');
+        buildSolver();
+        building = false;
+        // Trigger a full page reload so the new WASM is picked up.
+        server.ws.send({ type: 'full-reload' });
+      };
+
+      watcher.on('change', rebuild);
+      watcher.on('add', rebuild);
+
+      server.httpServer?.once('close', () => watcher.close());
     },
   };
 }
@@ -450,6 +504,8 @@ const forgeMode = process.env.FORGE_MODE === 'web' ? 'web' : 'studio';
 
 export default defineConfig(({ command }) => ({
   plugins: [
+    // Auto-build & watch the Rust solver (dev server only)
+    ...(command === 'serve' ? [forgeSolverPlugin()] : []),
     // Only serve the project plugin (SSE watch, /api/save etc.) in local studio mode
     forgeProjectPlugin(command === 'serve' && forgeMode === 'studio'),
     ...(command === 'serve' ? [forgeTypesPlugin()] : []),
@@ -469,7 +525,12 @@ export default defineConfig(({ command }) => ({
     },
   },
   optimizeDeps: {
-    exclude: ['manifold-3d'],
+    exclude: [
+      'manifold-3d',
+      // The WASM solver is a raw wasm-pack package — exclude from dep optimisation
+      // so Vite serves the .wasm file directly.
+      'solver',
+    ],
     // Auto-discovered: all npm deps imported by manifold-3d/lib/*.js files.
     // Vite can't discover these itself because manifold-3d is excluded from its
     // module scan. See getManifoldLibIncludes() for the exclusion logic.
@@ -480,7 +541,9 @@ export default defineConfig(({ command }) => ({
   },
   server: {
     fs: {
+      // Allow serving solver/pkg/ WASM files from the project root.
       allow: ['.'],
     },
   },
+  assetsInclude: ['**/*.wasm'],
 }));

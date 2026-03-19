@@ -15,6 +15,7 @@
  */
 
 import { initKernel } from './kernel';
+import { initSolverWasm } from './sketch/constraints/solver-wasm';
 
 // Re-export everything from the public API
 export {
@@ -156,5 +157,6 @@ export type {
  * Safe to call multiple times (idempotent).
  */
 export async function init() {
+  await initSolverWasm();
   await initKernel();
 }
