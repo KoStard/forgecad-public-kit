@@ -13,6 +13,7 @@ import {
   DEFAULT_TOLERANCE,
   buildConstraintDisplays,
   computeStatus,
+  findRedundantConstraints,
   getConstraintDef,
   setConstraintValue,
 } from './registry';
@@ -420,37 +421,12 @@ export const solveConstraintDefinition = (
     maxError > tolerance * 5 ? working.constraints.map((c) => c.id) : [],
   );
   // Redundant = solver converged but DOF is negative.
-  // Greedy removal: cumulatively remove constraints one at a time (not independently).
-  // After removing a constraint, re-solve the reduced set. If all remaining constraints
-  // (including previously removed ones) are still satisfied, mark it as truly redundant.
-  // Stop once we've removed |DOF| constraints (the exact excess).
-  const redundant = new Set<string>();
-  if (dof < 0 && maxError <= tolerance * 5) {
-    const targetRemovals = -dof;
-    let reducedConstraints = [...working.constraints];
-    for (const c of working.constraints) {
-      if (redundant.size >= targetRemovals) break;
-      const cdef = getConstraintDef(c.type);
-      if (!cdef?.residual) continue;
-      const testDef = cloneDefinition(working);
-      testDef.constraints = reducedConstraints.filter((tc) => tc.id !== c.id);
-      decomposeAndSolve(testDef, { iterations: options.iterations, tolerance });
-      const testCtx: SolverContext = {
-        points: new Map(testDef.points.map((p) => [p.id, p] as const)),
-        lines: new Map(testDef.lines.map((l) => [l.id, l] as const)),
-        circles: new Map(testDef.circles.map((ci) => [ci.id, ci] as const)),
-        arcs: new Map((testDef.arcs ?? []).map((a) => [a.id, a] as const)),
-        shapes: new Map((testDef.shapes ?? []).map((s) => [s.id, s] as const)),
-        tolerance,
-        movePoint: () => false,
-      };
-      const res = cdef.residual(c as never, testCtx);
-      if (Math.max(...res.map(Math.abs)) < tolerance) {
-        redundant.add(c.id);
-        reducedConstraints = reducedConstraints.filter((tc) => tc.id !== c.id);
-      }
-    }
-  }
+  // Use Jacobian rank analysis to identify which constraint equations are linearly
+  // dependent at the solved state. This is O(m·n·min(m,n)) — sub-millisecond —
+  // versus the old approach of re-solving n times.
+  const redundant = dof < 0 && maxError <= tolerance * 5
+    ? findRedundantConstraints(working, -dof)
+    : new Set<string>();
   const constraints = buildConstraintDisplays(working, conflicts, redundant);
   const rejected = buildConstraintDisplays(
     { ...working, constraints: working.rejectedConstraints, rejectedConstraints: [] },

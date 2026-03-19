@@ -1208,3 +1208,179 @@ export const computeStatus = (
   if (dof < 0) return { status: 'over-redundant', dof };
   return { status: 'fully', dof: 0 };
 };
+
+// ─── Jacobian-based redundancy detection ────────────────────────────────────────
+
+/**
+ * Identify redundant constraints via Jacobian rank analysis at the solved state.
+ *
+ * Instead of re-solving n times (O(n × solve_cost)), this builds the Jacobian
+ * once and uses column-pivoted QR on J^T to find which equation rows are
+ * linearly dependent. Cost: O(m × n × min(m,n)) ≈ sub-millisecond for typical
+ * constraint systems.
+ *
+ * @returns Set of constraint IDs that are redundant, up to `targetRemovals`.
+ */
+export function findRedundantConstraints(
+  def: ConstraintDefinition,
+  targetRemovals: number,
+): Set<string> {
+  const tolerance = DEFAULT_TOLERANCE;
+  const points = new Map(def.points.map((p) => [p.id, p] as const));
+  const lines = new Map(def.lines.map((l) => [l.id, l] as const));
+  const circles = new Map(def.circles.map((c) => [c.id, c] as const));
+  const arcs = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
+  const shapes = new Map((def.shapes ?? []).map((s) => [s.id, s] as const));
+  const ctx: SolverContext = {
+    points, lines, circles, arcs, shapes, tolerance,
+    movePoint: () => false,
+    entityRefCount: new Map(),
+  };
+
+  // Build variables (same as solver)
+  const referenceLength = computeReferenceLength(def);
+  const variables = buildVariables(def, referenceLength);
+  if (variables.length === 0) return new Set();
+
+  // Build variable key → column index map
+  const keyToCol = new Map<string, number>();
+  for (let i = 0; i < variables.length; i++) keyToCol.set(variables[i].key, i);
+  const nVars = variables.length;
+
+  // Build Jacobian and track which rows belong to which constraint
+  const jacobianRows: number[][] = [];
+  const rowToConstraintId: string[] = [];
+
+  for (const constraint of def.constraints) {
+    const cdef = registry.get(constraint.type);
+    if (!cdef?.residual) continue;
+
+    if (cdef.jacobian) {
+      const { residuals, partials } = cdef.jacobian(constraint as never, ctx);
+      for (let i = 0; i < residuals.length; i++) {
+        const row = new Array(nVars).fill(0);
+        for (const key in partials) {
+          const col = keyToCol.get(key);
+          if (col !== undefined) row[col] = partials[key][i];
+        }
+        jacobianRows.push(row);
+        rowToConstraintId.push(constraint.id);
+      }
+    } else {
+      // Finite-difference fallback for constraints without analytical jacobian
+      const baseRes = cdef.residual(constraint as never, ctx);
+      for (let ri = 0; ri < baseRes.length; ri++) {
+        const row = new Array(nVars).fill(0);
+        for (let vi = 0; vi < nVars; vi++) {
+          const v = variables[vi];
+          const orig = v.get();
+          const step = 1e-6 * Math.max(1, Math.abs(orig), v.scale);
+          v.set(orig + step);
+          const pertRes = cdef.residual(constraint as never, ctx);
+          row[vi] = (pertRes[ri] - baseRes[ri]) / step;
+          v.set(orig);
+        }
+        jacobianRows.push(row);
+        rowToConstraintId.push(constraint.id);
+      }
+    }
+  }
+
+  const m = jacobianRows.length;  // equations
+  const n = nVars;                // variables
+  if (m === 0) return new Set();
+
+  // Column-pivoted QR on J^T (n×m) to identify dependent equations (columns of J^T).
+  // We work with J^T stored as columns = rows of J for clarity.
+  // After pivoting, the last m-rank columns correspond to dependent equations.
+
+  // Copy J^T as column-major: col[j] = jacobianRows[j] (the j-th equation)
+  const cols: number[][] = [];
+  for (let j = 0; j < m; j++) cols.push([...jacobianRows[j]]);
+
+  const pivotOrder: number[] = Array.from({ length: m }, (_, i) => i);
+  const rank = Math.min(m, n);
+  let detectedRank = rank;
+
+  // Compute initial column norms squared
+  const colNormsSq: number[] = cols.map(col => col.reduce((s, v) => s + v * v, 0));
+
+  for (let k = 0; k < rank; k++) {
+    // Pick column with largest remaining norm
+    let maxNorm = colNormsSq[k];
+    let maxIdx = k;
+    for (let j = k + 1; j < m; j++) {
+      if (colNormsSq[j] > maxNorm) { maxNorm = colNormsSq[j]; maxIdx = j; }
+    }
+
+    // Check if remaining columns are numerically zero
+    if (maxNorm < 1e-12) {
+      detectedRank = k;
+      break;
+    }
+
+    // Swap columns k and maxIdx
+    if (maxIdx !== k) {
+      [cols[k], cols[maxIdx]] = [cols[maxIdx], cols[k]];
+      [pivotOrder[k], pivotOrder[maxIdx]] = [pivotOrder[maxIdx], pivotOrder[k]];
+      [colNormsSq[k], colNormsSq[maxIdx]] = [colNormsSq[maxIdx], colNormsSq[k]];
+    }
+
+    // Householder reflection to zero out below-diagonal in column k
+    // Compute the Householder vector for cols[k][k..n-1]
+    const col = cols[k];
+    let sigma = 0;
+    for (let i = k; i < n; i++) sigma += col[i] * col[i];
+    const norm = Math.sqrt(sigma);
+    if (norm < 1e-14) { detectedRank = k; break; }
+
+    const sign = col[k] >= 0 ? 1 : -1;
+    const u0 = col[k] + sign * norm;
+    const v: number[] = new Array(n).fill(0);
+    v[k] = 1;
+    for (let i = k + 1; i < n; i++) v[i] = col[i] / u0;
+    const tau = sign * u0 / norm;
+
+    // Apply Householder to all columns j >= k
+    for (let j = k; j < m; j++) {
+      const c = cols[j];
+      let dot = 0;
+      for (let i = k; i < n; i++) dot += v[i] * c[i];
+      dot *= tau;
+      for (let i = k; i < n; i++) c[i] -= dot * v[i];
+    }
+
+    // Update column norms for remaining columns (downdate)
+    for (let j = k + 1; j < m; j++) {
+      colNormsSq[j] = 0;
+      for (let i = k + 1; i < n; i++) colNormsSq[j] += cols[j][i] * cols[j][i];
+    }
+  }
+
+  // Equations at positions detectedRank..m-1 in pivotOrder are dependent (redundant)
+  const redundantEqIndices = new Set<number>();
+  for (let i = detectedRank; i < m; i++) {
+    redundantEqIndices.add(pivotOrder[i]);
+  }
+
+  // Map equation indices to constraint IDs.
+  // A constraint is redundant if ALL of its equation rows are redundant.
+  const constraintRowCount = new Map<string, number>();
+  const constraintRedundantCount = new Map<string, number>();
+  for (let i = 0; i < m; i++) {
+    const cid = rowToConstraintId[i];
+    constraintRowCount.set(cid, (constraintRowCount.get(cid) ?? 0) + 1);
+    if (redundantEqIndices.has(i)) {
+      constraintRedundantCount.set(cid, (constraintRedundantCount.get(cid) ?? 0) + 1);
+    }
+  }
+
+  const redundant = new Set<string>();
+  for (const [cid, total] of constraintRowCount) {
+    if (redundant.size >= targetRemovals) break;
+    const redCount = constraintRedundantCount.get(cid) ?? 0;
+    if (redCount === total) redundant.add(cid);
+  }
+
+  return redundant;
+}
