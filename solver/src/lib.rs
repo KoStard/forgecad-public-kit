@@ -26,6 +26,24 @@ pub fn solve(problem_json: &str) -> String {
     }
 }
 
+/// Run only the deterministic presolve stages and return the updated geometry.
+#[wasm_bindgen]
+pub fn presolve(problem_json: &str) -> String {
+    match presolve_inner(problem_json) {
+        Ok(result) => serde_json::to_string(&result).unwrap_or_default(),
+        Err(_) => r#"{"max_error":1e308,"points":[],"circles":[],"arcs":[]}"#.to_string(),
+    }
+}
+
+/// Run the targeted presolve hook for one constraint and return the updated geometry.
+#[wasm_bindgen]
+pub fn presolve_single(problem_json: &str, constraint_id: &str) -> String {
+    match presolve_single_inner(problem_json, constraint_id) {
+        Ok(result) => serde_json::to_string(&result).unwrap_or_default(),
+        Err(_) => r#"{"max_error":1e308,"points":[],"circles":[],"arcs":[]}"#.to_string(),
+    }
+}
+
 fn solve_inner(problem_json: &str) -> Result<SolveResult, serde_json::Error> {
     let mut problem: Problem = serde_json::from_str(problem_json)?;
     let options = problem.options.clone().unwrap_or_default();
@@ -38,12 +56,55 @@ fn solve_inner(problem_json: &str) -> Result<SolveResult, serde_json::Error> {
         &problem.constraints,
         &options,
     );
-    Ok(build_result(max_error, &problem))
+    let metadata = solver::analyze_solution(
+        &problem.points,
+        &problem.lines,
+        &problem.circles,
+        &problem.arcs,
+        &problem.shapes,
+        &problem.constraints,
+        max_error,
+        &options,
+    );
+    Ok(build_result(max_error, &problem, Some(metadata)))
 }
 
-fn build_result(max_error: f64, problem: &Problem) -> SolveResult {
+fn presolve_inner(problem_json: &str) -> Result<SolveResult, serde_json::Error> {
+    let mut problem: Problem = serde_json::from_str(problem_json)?;
+    let options = problem.options.clone().unwrap_or_default();
+    let max_error = solver::presolve(
+        &mut problem.points,
+        &problem.lines,
+        &mut problem.circles,
+        &mut problem.arcs,
+        &problem.shapes,
+        &problem.constraints,
+        &options,
+    );
+    Ok(build_result(max_error, &problem, None))
+}
+
+fn presolve_single_inner(problem_json: &str, constraint_id: &str) -> Result<SolveResult, serde_json::Error> {
+    let mut problem: Problem = serde_json::from_str(problem_json)?;
+    let max_error = solver::presolve_constraint(
+        &mut problem.points,
+        &problem.lines,
+        &problem.circles,
+        &problem.arcs,
+        &problem.shapes,
+        &problem.constraints,
+        constraint_id,
+    );
+    Ok(build_result(max_error, &problem, None))
+}
+
+fn build_result(
+    max_error: f64,
+    problem: &Problem,
+    metadata: Option<types::SolveMetadata>,
+) -> SolveResult {
     SolveResult {
-        max_error,
+        max_error: if max_error.is_finite() { max_error.abs() } else { 1e308 },
         points: problem
             .points
             .iter()
@@ -59,6 +120,7 @@ fn build_result(max_error: f64, problem: &Problem) -> SolveResult {
             .iter()
             .map(|a| ArcResult { id: a.id.clone(), radius: a.radius })
             .collect(),
+        metadata,
     }
 }
 
@@ -74,5 +136,15 @@ pub fn solve_problem(mut problem: Problem, options: Option<SolveOptions>) -> Sol
         &problem.constraints,
         &opts,
     );
-    build_result(max_error, &problem)
+    let metadata = solver::analyze_solution(
+        &problem.points,
+        &problem.lines,
+        &problem.circles,
+        &problem.arcs,
+        &problem.shapes,
+        &problem.constraints,
+        max_error,
+        &opts,
+    );
+    build_result(max_error, &problem, Some(metadata))
 }

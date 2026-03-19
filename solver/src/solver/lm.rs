@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::constraints::{evaluate_residuals, has_residual};
+use crate::constraints::{constraint_jacobian_impl, evaluate_residuals};
 use crate::types::{Arc, Circle, Constraint, Line, Point, Shape};
 use super::linear::solve_linear;
 
@@ -148,11 +148,6 @@ fn eval_residuals_full(
     shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
 ) -> Option<(Vec<f64>, f64)> {
-    // Check all constraints have residuals.
-    if !constraints.iter().all(|c| has_residual(c)) {
-        return None;
-    }
-
     let mut vals = evaluate_residuals(points, lines, circles, arcs, shapes, constraints);
 
     // Arc consistency equations.
@@ -170,8 +165,29 @@ fn eval_residuals_full(
         }
     }
 
+    if vals.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+
     let max_abs = vals.iter().copied().fold(0.0f64, |a, v| a.max(v.abs()));
+    if !max_abs.is_finite() {
+        return None;
+    }
     Some((vals, max_abs))
+}
+
+pub fn current_max_error(
+    points: &Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &Vec<Circle>,
+    arcs: &Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+) -> f64 {
+    match eval_residuals_full(points, lines, circles, arcs, shapes, constraints) {
+        Some((_, max_abs)) => max_abs,
+        None => f64::INFINITY,
+    }
 }
 
 // ─── Sparsity map ─────────────────────────────────────────────────────────────
@@ -313,6 +329,47 @@ fn linearize(
     let pts_map: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
     let circs_map: HashMap<String, usize> = circles.iter().enumerate().map(|(i, c)| (c.id.clone(), i)).collect();
     let arcs_map_idx: HashMap<String, usize> = arcs.iter().enumerate().map(|(i, a)| (a.id.clone(), i)).collect();
+    let mut key_to_col: HashMap<String, usize> = HashMap::new();
+    for (i, point) in points.iter().enumerate() {
+        let vi = pt_var_idx[i];
+        if vi != usize::MAX {
+            key_to_col.insert(format!("{}.x", point.id), vi);
+            key_to_col.insert(format!("{}.y", point.id), vi + 1);
+        }
+    }
+    for (i, circle) in circles.iter().enumerate() {
+        let vi = circ_var_idx[i];
+        if vi != usize::MAX {
+            key_to_col.insert(format!("{}.r", circle.id), vi);
+        }
+    }
+    for (i, arc) in arcs.iter().enumerate() {
+        key_to_col.insert(format!("{}.r", arc.id), arc_var_idx[i]);
+    }
+
+    let mut analytic_rows: HashMap<usize, usize> = HashMap::new();
+    let mut row_cursor = 0usize;
+    for constraint in constraints {
+        let row_count = crate::constraints::constraint_residual_impl(
+            constraint, points, lines, circles, arcs, shapes,
+        ).len();
+        if row_count == 0 {
+            continue;
+        }
+        if let Some((_residuals, partials)) = constraint_jacobian_impl(
+            constraint, points, lines, circles, arcs, shapes,
+        ) {
+            for (key, derivs) in partials {
+                if let Some(&col) = key_to_col.get(&key) {
+                    for (r, value) in derivs.iter().enumerate().take(row_count) {
+                        jacobian[row_cursor + r][col] = *value;
+                    }
+                }
+            }
+            analytic_rows.insert(row_cursor, row_count);
+        }
+        row_cursor += row_count;
+    }
 
     for col in 0..n_vars {
         let v = &vars[col];
@@ -323,6 +380,9 @@ fn linearize(
 
         // Sparse: only evaluate affected constraints.
         for &(row_start, row_count) in &sparsity.var_to_constraint_rows[col] {
+            if analytic_rows.contains_key(&row_start) {
+                continue;
+            }
             let ci = constraint_index_at_row(row_start, constraints, points, lines, circles, arcs, shapes);
             if let Some(ci) = ci {
                 let res = crate::constraints::constraint_residual_impl(
@@ -360,7 +420,18 @@ fn linearize(
         let _ = (&pts_map, &circs_map, &arcs_map_idx);
     }
 
+    if jacobian
+        .iter()
+        .flat_map(|row| row.iter())
+        .any(|value| !value.is_finite())
+    {
+        return None;
+    }
+
     let weights = compute_row_weights(&jacobian, vars[0].scale.max(1.0));
+    if weights.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
     let weighted_residual: Vec<f64> = base.iter().zip(&weights).map(|(r, w)| r * w).collect();
     let weighted_jacobian: Vec<Vec<f64>> = jacobian
         .iter()
@@ -368,6 +439,15 @@ fn linearize(
         .map(|(row, w)| row.iter().map(|v| v * w).collect())
         .collect();
     let weighted_cost: f64 = 0.5 * weighted_residual.iter().map(|v| v * v).sum::<f64>();
+    if weighted_residual.iter().any(|value| !value.is_finite())
+        || weighted_jacobian
+            .iter()
+            .flat_map(|row| row.iter())
+            .any(|value| !value.is_finite())
+        || !weighted_cost.is_finite()
+    {
+        return None;
+    }
 
     Some(LinearizedSystem {
         residual: base,
@@ -478,7 +558,13 @@ struct LmStep {
     predicted_reduction: f64,
 }
 
-fn lm_step(wj: &Vec<Vec<f64>>, wr: &Vec<f64>, lambda: f64) -> Option<LmStep> {
+fn lm_step(
+    wj: &Vec<Vec<f64>>,
+    wr: &Vec<f64>,
+    lambda: f64,
+    prior_offset: Option<&[f64]>,
+    prior_diag: f64,
+) -> Option<LmStep> {
     let n_eq = wj.len();
     let n_var = if n_eq > 0 { wj[0].len() } else { 0 };
     if n_var == 0 {
@@ -496,6 +582,12 @@ fn lm_step(wj: &Vec<Vec<f64>>, wr: &Vec<f64>, lambda: f64) -> Option<LmStep> {
             }
         }
     }
+    if let Some(offset) = prior_offset {
+        for i in 0..n_var {
+            jtj[i][i] += prior_diag;
+            jtr[i] += prior_diag * offset[i];
+        }
+    }
     // Symmetrize.
     for i in 0..n_var {
         for j in 0..i {
@@ -511,6 +603,9 @@ fn lm_step(wj: &Vec<Vec<f64>>, wr: &Vec<f64>, lambda: f64) -> Option<LmStep> {
 
     let rhs: Vec<f64> = jtr.iter().map(|v| -v).collect();
     let dx = solve_linear(&a, &rhs);
+    if dx.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
 
     let mut predicted = 0.0f64;
     for i in 0..n_var {
@@ -519,6 +614,9 @@ fn lm_step(wj: &Vec<Vec<f64>>, wr: &Vec<f64>, lambda: f64) -> Option<LmStep> {
             jtjdx += jtj[i][j] * dx[j];
         }
         predicted += dx[i] * (-jtr[i] - 0.5 * jtjdx);
+    }
+    if !predicted.is_finite() {
+        return None;
     }
 
     Some(LmStep { dx, predicted_reduction: predicted })
@@ -536,6 +634,15 @@ fn limit_step(dx: Vec<f64>, scale: f64, max_norm: f64) -> Vec<f64> {
         let factor = max_norm / norm;
         dx.into_iter().map(|v| v * factor).collect()
     }
+}
+
+fn scaled_state_displacement(state: &[f64], anchor_state: &[f64], scale: f64) -> f64 {
+    state
+        .iter()
+        .zip(anchor_state.iter())
+        .map(|(s, a)| ((s - a) / scale.max(1e-9)).powi(2))
+        .sum::<f64>()
+        .sqrt()
 }
 
 // ─── Projector warm-start (GS iterations) ────────────────────────────────────
@@ -647,11 +754,15 @@ pub fn solve_global(
         if attempt == 0 {
             projector_warm_start(points, lines, circles, arcs, shapes, constraints, warm_start_iters, tolerance);
         }
+        let pass_anchor_state = capture_state(
+            points, circles, arcs,
+            &pt_var_idx, &circ_var_idx, &arc_var_idx, vars.len(),
+        );
 
         let error = run_lm_pass(
             points, lines, circles, arcs, shapes, constraints,
             &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx,
-            &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale,
+            &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
         );
 
         if error < best_error {
@@ -667,11 +778,15 @@ pub fn solve_global(
             apply_state(&best_state, points, circles, arcs, &pt_var_idx, &circ_var_idx, &arc_var_idx);
             let gs_iters = (warm_start_iters * 4).max(30);
             projector_warm_start(points, lines, circles, arcs, shapes, constraints, gs_iters, tolerance);
+            let pass_anchor_state = capture_state(
+                points, circles, arcs,
+                &pt_var_idx, &circ_var_idx, &arc_var_idx, vars.len(),
+            );
 
             let error = run_lm_pass(
                 points, lines, circles, arcs, shapes, constraints,
                 &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx,
-                &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale,
+                &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
             );
 
             if error < best_error {
@@ -703,9 +818,11 @@ fn run_lm_pass(
     tolerance: f64,
     max_scaled_step: f64,
     scale: f64,
+    anchor_state: &Vec<f64>,
 ) -> f64 {
     let mut lambda = 1e-3f64;
     let mut nu = 2.0f64;
+    let prior_diag = 1e-6 / scale.max(1.0).powi(2);
 
     let mut lin = match linearize(
         points, lines, circles, arcs, shapes, constraints,
@@ -714,18 +831,28 @@ fn run_lm_pass(
         Some(l) => l,
         None => return f64::INFINITY,
     };
+    let mut best_pass_state = capture_state(points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx, vars.len());
+    let mut best_pass_error = lin.max_abs;
+    let mut best_pass_disp = scaled_state_displacement(&best_pass_state, anchor_state, scale);
 
     for _ in 0..iterations {
         if lin.max_abs <= tolerance { break; }
 
-        let step = match lm_step(&lin.weighted_jacobian, &lin.weighted_residual, lambda) {
+        let state = capture_state(points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx, vars.len());
+        let prior_offset: Vec<f64> = state.iter().zip(anchor_state.iter()).map(|(s, a)| s - a).collect();
+
+        let step = match lm_step(
+            &lin.weighted_jacobian,
+            &lin.weighted_residual,
+            lambda,
+            Some(&prior_offset),
+            prior_diag,
+        ) {
             Some(s) => s,
             None => break,
         };
-
-        let state = capture_state(points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx, vars.len());
-        let dx = limit_step(step.dx.clone(), scale, max_scaled_step);
-        let pred = step.predicted_reduction
+        let mut dx = limit_step(step.dx.clone(), scale, max_scaled_step);
+        let mut pred = step.predicted_reduction
             * (1.0_f64).min(max_scaled_step / scaled_step_norm(&step.dx, scale).max(max_scaled_step));
 
         let mut accepted = false;
@@ -759,6 +886,14 @@ fn run_lm_pass(
                     local_lambda
                 };
                 nu = 2.0;
+                let trial_disp = scaled_state_displacement(&trial_state, anchor_state, scale);
+                if trial.max_abs + 1e-9 < best_pass_error
+                    || (trial.max_abs <= best_pass_error + tolerance * 0.25 && trial_disp < best_pass_disp)
+                {
+                    best_pass_error = trial.max_abs;
+                    best_pass_disp = trial_disp;
+                    best_pass_state = trial_state.clone();
+                }
                 lin = trial;
                 break;
             }
@@ -767,17 +902,25 @@ fn run_lm_pass(
             local_lambda *= local_nu;
             local_nu *= 2.0;
 
-            let retry = match lm_step(&lin.weighted_jacobian, &lin.weighted_residual, local_lambda) {
+            let retry = match lm_step(
+                &lin.weighted_jacobian,
+                &lin.weighted_residual,
+                local_lambda,
+                Some(&prior_offset),
+                prior_diag,
+            ) {
                 Some(s) => s,
                 None => break,
             };
-            let new_dx = limit_step(retry.dx, scale, max_scaled_step);
-            let _ = new_dx; // use dx for next inner iteration
-            break; // just increase lambda, don't retry in inner loop
+            dx = limit_step(retry.dx.clone(), scale, max_scaled_step);
+            pred = retry.predicted_reduction
+                * (1.0_f64).min(max_scaled_step / scaled_step_norm(&retry.dx, scale).max(max_scaled_step));
         }
 
         if !accepted { break; }
     }
+
+    apply_state(&best_pass_state, points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx);
 
     match eval_residuals_full(points, lines, circles, arcs, shapes, constraints) {
         Some((_, max_abs)) => max_abs,

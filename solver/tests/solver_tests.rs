@@ -879,6 +879,93 @@ fn point_line_distance() {
     assert!(approx_eq(py, 8.0, TOL), "py={py}");
 }
 
+#[test]
+fn analytical_direct_placement_with_zero_iterations() {
+    let result = solve_problem(
+        problem(
+            vec![fixed_point("a", 10.0, 20.0), point("b", 0.0, 0.0)],
+            vec![],
+            vec![
+                Constraint::HDistance { id: "hx".into(), a: "a".into(), b: "b".into(), value: 5.0 },
+                Constraint::VDistance { id: "vy".into(), a: "a".into(), b: "b".into(), value: 7.0 },
+            ],
+        ),
+        Some(SolveOptions {
+            iterations: Some(0),
+            tolerance: Some(1e-6),
+            restarts: Some(1),
+            warm_start_iterations: Some(0),
+            max_scaled_step: Some(2.5),
+            skip_redundancy_check: Some(false),
+        }),
+    );
+    assert_solved(&result, 1e-6, "analytical direct placement");
+    let (bx, by) = get_pt(&result, "b");
+    assert!(approx_eq(bx, 15.0, 1e-9), "bx={bx}");
+    assert!(approx_eq(by, 27.0, 1e-9), "by={by}");
+}
+
+#[test]
+fn ccw_and_block_rotation_keep_rectangle_upright() {
+    let result = solve_problem(
+        problem(
+            vec![
+                fixed_point("bl", 0.0, 0.0),
+                point("br", -10.0, 0.0),
+                point("tr", -10.0, -5.0),
+                point("tl", 0.0, -5.0),
+            ],
+            vec![
+                line("bottom", "bl", "br"),
+                line("right", "br", "tr"),
+                line("top", "tr", "tl"),
+                line("left", "tl", "bl"),
+            ],
+            vec![
+                Constraint::Horizontal { id: "h1".into(), line: "bottom".into() },
+                Constraint::Vertical { id: "v1".into(), line: "right".into() },
+                Constraint::Horizontal { id: "h2".into(), line: "top".into() },
+                Constraint::Vertical { id: "v2".into(), line: "left".into() },
+                Constraint::Length { id: "len-bottom".into(), line: "bottom".into(), value: 10.0 },
+                Constraint::Length { id: "len-left".into(), line: "left".into(), value: 5.0 },
+                Constraint::Ccw { id: "ccw".into(), points: vec!["bl".into(), "br".into(), "tr".into(), "tl".into()] },
+                Constraint::BlockRotation { id: "block".into(), points: vec!["bl".into(), "br".into(), "tr".into(), "tl".into()], axis: "x".into() },
+            ],
+        ),
+        Some(tight_options()),
+    );
+    assert_solved(&result, 1e-4, "ccw + blockRotation");
+    let (blx, bly) = get_pt(&result, "bl");
+    let (brx, bry) = get_pt(&result, "br");
+    let (_trx, try_) = get_pt(&result, "tr");
+    let (_tlx, tly) = get_pt(&result, "tl");
+    assert!(brx > blx + 1.0, "expected bottom edge to point right: blx={blx} brx={brx}");
+    assert!(try_ > bry + 1.0, "expected rectangle top above bottom: bry={bry} try={try_}");
+    assert!(tly > bly + 1.0, "expected left edge to point upward: bly={bly} tly={tly}");
+}
+
+#[test]
+fn solve_result_reports_metadata() {
+    let result = solve_problem(
+        problem(
+            vec![fixed_point("a", 0.0, 0.0), point("b", 12.0, 3.0)],
+            vec![],
+            vec![
+                Constraint::Distance { id: "d1".into(), a: "a".into(), b: "b".into(), value: 10.0 },
+                Constraint::HDistance { id: "hx".into(), a: "a".into(), b: "b".into(), value: 10.0 },
+                Constraint::VDistance { id: "vy".into(), a: "a".into(), b: "b".into(), value: 0.0 },
+            ],
+        ),
+        Some(tight_options()),
+    );
+    let metadata = result.metadata.expect("metadata should be present");
+    assert_eq!(metadata.status, SolveStatus::OverRedundant);
+    assert!(metadata.dof < 0, "expected negative dof, got {}", metadata.dof);
+    assert_eq!(metadata.conflicting_constraint_ids.len(), 0);
+    assert_eq!(metadata.constraint_residuals.len(), 3);
+    assert!(metadata.redundant_constraint_ids.len() <= metadata.constraint_residuals.len());
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Linear algebra tests (unit level)
 // ═══════════════════════════════════════════════════════════════════════════════
