@@ -63,24 +63,21 @@ function toRGB555(colorHex: string): number {
   return 0x8000 | ((rgb.r >> 3) << 10) | ((rgb.g >> 3) << 5) | (rgb.b >> 3);
 }
 
-async function normalize3mfRelationshipTargets(blob: Blob): Promise<Blob> {
-  const archiveBytes = new Uint8Array(await blob.arrayBuffer());
+function normalize3mfRelationshipTargetsBuffer(archiveBytes: Uint8Array): Uint8Array {
   const files = unzipSync(archiveBytes);
   const relPath = '_rels/.rels';
   const relXml = files[relPath];
-  if (!relXml) return blob;
+  if (!relXml) return archiveBytes;
 
   const relText = strFromU8(relXml);
   const normalizedRelText = relText.replace(
     /Target="3D\/3dmodel\.model"/g,
     'Target="/3D/3dmodel.model"',
   );
-  if (normalizedRelText === relText) return blob;
+  if (normalizedRelText === relText) return archiveBytes;
 
   files[relPath] = strToU8(normalizedRelText);
-  const normalizedArchive = zipSync(files);
-  const normalizedBytes = Uint8Array.from(normalizedArchive);
-  return new Blob([normalizedBytes], { type: blob.type });
+  return Uint8Array.from(zipSync(files));
 }
 
 export function buildBinaryStl(objects: MeshExportObject[]): ArrayBuffer {
@@ -159,10 +156,13 @@ export function buildBinaryStl(objects: MeshExportObject[]): ArrayBuffer {
   return buffer;
 }
 
-export async function build3mfBlob(
+/**
+ * Build a 3MF archive as a Uint8Array (works in Node and browser).
+ */
+export async function build3mfBuffer(
   objects: MeshExportObject[],
   options: ThreeMfExportOptions = {},
-): Promise<Blob> {
+): Promise<Uint8Array> {
   if (objects.length === 0) {
     throw new Error('No shapes available for 3MF export.');
   }
@@ -191,11 +191,18 @@ export async function build3mfBlob(
         description: escapeXml(options.description ?? title),
       },
     });
-    const rawBlob = new Blob([rawBuffer], {
-      type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
-    });
-    return normalize3mfRelationshipTargets(rawBlob);
+    return normalize3mfRelationshipTargetsBuffer(new Uint8Array(rawBuffer));
   } finally {
     cleanupSceneBuilder();
   }
+}
+
+export async function build3mfBlob(
+  objects: MeshExportObject[],
+  options: ThreeMfExportOptions = {},
+): Promise<Blob> {
+  const buffer = await build3mfBuffer(objects, options);
+  return new Blob([buffer.buffer as ArrayBuffer], {
+    type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
+  });
 }

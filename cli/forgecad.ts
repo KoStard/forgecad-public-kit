@@ -33,6 +33,7 @@ import { runWebCli } from './forge-web';
 import { runSvgCli } from './forge-svg';
 import { runSketchPdfCli } from './forge-sketch-pdf';
 import { runBrepCli } from './forge-brep';
+import { runMeshExportCli } from './forge-mesh';
 import { isDirectCliRun, resolvePackagePath } from './package-runtime';
 import { runParamCheckCli } from './param-check';
 import { runScriptCli } from './test-run';
@@ -537,6 +538,52 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: (args) => runBrepCli(['--format', 'brep', ...args]),
+  },
+  {
+    group: 'Export',
+    path: ['export', '3mf'],
+    summary: 'Export a Forge script to 3MF (3D Manufacturing Format) for 3D printing.',
+    usage: [
+      'forgecad export 3mf <script.forge.js> [--output path] [--quality default|live|high]',
+    ],
+    examples: [
+      'forgecad export 3mf examples/cup.forge.js',
+      'forgecad export 3mf examples/cup.forge.js --output out/cup.3mf',
+      'forgecad export 3mf examples/cup.forge.js --quality high',
+    ],
+    completion: {
+      options: [
+        { name: '--output', description: 'Output 3MF path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
+        { name: '--quality', description: 'Forge quality preset', argument: 'required', valueLabel: '<default|live|high>', values: QUALITY_VALUES },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+      ],
+    },
+    run: (args) => runMeshExportCli('3mf', args),
+  },
+  {
+    group: 'Export',
+    path: ['export', 'stl'],
+    summary: 'Export a Forge script to binary STL.',
+    usage: [
+      'forgecad export stl <script.forge.js> [--output path] [--quality default|live|high]',
+    ],
+    examples: [
+      'forgecad export stl examples/cup.forge.js',
+      'forgecad export stl examples/cup.forge.js --output out/cup.stl',
+      'forgecad export stl examples/cup.forge.js --quality high',
+    ],
+    completion: {
+      options: [
+        { name: '--output', description: 'Output STL path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
+        { name: '--quality', description: 'Forge quality preset', argument: 'required', valueLabel: '<default|live|high>', values: QUALITY_VALUES },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+      ],
+    },
+    run: (args) => runMeshExportCli('stl', args),
   },
   {
     group: 'Export',
