@@ -438,7 +438,12 @@ export default defineConfig(({ command }) => ({
     },
   },
   optimizeDeps: {
-    exclude: ['manifold-3d'],
+    exclude: [
+      'manifold-3d',
+      // The WASM solver is a raw wasm-pack package — exclude from dep optimisation
+      // so Vite serves the .wasm file directly.
+      'solver',
+    ],
     // Auto-discovered: all npm deps imported by manifold-3d/lib/*.js files.
     // Vite can't discover these itself because manifold-3d is excluded from its
     // module scan. See getManifoldLibIncludes() for the exclusion logic.
@@ -449,7 +454,9 @@ export default defineConfig(({ command }) => ({
   },
   server: {
     fs: {
+      // Allow serving solver/pkg/ WASM files from the project root.
       allow: ['.'],
     },
   },
+  assetsInclude: ['**/*.wasm'],
 }));

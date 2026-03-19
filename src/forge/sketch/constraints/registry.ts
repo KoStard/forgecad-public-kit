@@ -822,6 +822,21 @@ export const solveConstraints = (
   def: ConstraintDefinition,
   options: SolveOptions,
 ): { maxError: number } => {
+  // ── Fast path: Rust/WASM solver ──────────────────────────────────────────
+  // Import lazily so this module never hard-errors if the WASM file is absent.
+  // The dynamic require is tree-shaken in prod if WASM init was never called.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const wasmBridge = require('./solver-wasm') as typeof import('./solver-wasm');
+    if (wasmBridge.isSolverWasmReady()) {
+      const wasmResult = wasmBridge.solveConstraintsWasm(def, options);
+      if (wasmResult !== null) return wasmResult;
+    }
+  } catch {
+    // WASM module not available — fall through to TypeScript solver.
+  }
+
+  // ── TypeScript fallback solver ────────────────────────────────────────────
   const iterations = options.iterations ?? 80;
   const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
   const restarts = options.restarts ?? 6;

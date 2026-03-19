@@ -15,6 +15,7 @@
  */
 
 import { initKernel } from './kernel';
+import { initSolverWasm } from './sketch/constraints/solver-wasm';
 
 // Re-export everything from the public API
 export {
@@ -156,5 +157,8 @@ export type {
  * Safe to call multiple times (idempotent).
  */
 export async function init() {
+  // Initialise the Rust/WASM solver in the background — non-blocking.
+  // If WASM is unavailable the TypeScript solver is used as fallback.
+  initSolverWasm().catch(() => {});
   await initKernel();
 }
