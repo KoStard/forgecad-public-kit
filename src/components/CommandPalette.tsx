@@ -105,6 +105,14 @@ export function CommandPalette() {
         try { exportSketchFromStore('dxf'); } catch (err) { handleCommandError(err); }
       },
     },
+    {
+      id: 'export-sketch-pdf',
+      label: `Export Sketch PDF${hasSketches ? '' : ' (no sketches)'}`,
+      action: () => {
+        close();
+        try { exportSketchFromStore('pdf'); } catch (err) { handleCommandError(err); }
+      },
+    },
   ];
 
   const copyFilePathCommand: Command = {

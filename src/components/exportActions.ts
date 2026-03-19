@@ -2,12 +2,13 @@ import { build3mfBlob, buildBinaryStl, type MeshExportObject } from '@forge/expo
 import { runScript, type ForgeQualityPreset, type RunResult } from '@forge/index';
 import { sketchToSvg } from '@forge/sketch/exportSvg';
 import { sketchToDxf } from '@forge/sketch/exportDxf';
+import { generateSketchPdf } from '@forge/sketch/exportSketchPdf';
 import { setParamOverrides } from '@forge/params';
 import { useForgeStore, type ObjectSettings } from '../store/forgeStore';
 import { generateReportInWorker } from '../workers/reportWorkerClient';
 
 export type MeshExportFormat = '3mf' | 'stl';
-export type SketchExportFormat = 'svg' | 'dxf';
+export type SketchExportFormat = 'svg' | 'dxf' | 'pdf';
 export type OrbitGifMode = 'solid' | 'wireframe';
 export type ExportQualityChoice = 'default' | 'live' | 'high';
 
@@ -224,6 +225,14 @@ export function exportSketchFromStore(
       const svg = sketchToSvg(sketch);
       const blob = new Blob([svg], { type: 'image/svg+xml' });
       triggerDownload(blob, `${name}.svg`);
+    } else if (format === 'pdf') {
+      const meta = obj.sketchMeta;
+      if (!meta) {
+        throw new Error('Sketch PDF export requires a constrained sketch (with sketchMeta). Use constrainedSketch() API.');
+      }
+      const { pdf } = generateSketchPdf(meta);
+      const blob = new Blob([new Uint8Array(pdf)], { type: 'application/pdf' });
+      triggerDownload(blob, `${name}.sketch.pdf`);
     } else {
       const dxf = sketchToDxf(sketch);
       const blob = new Blob([dxf], { type: 'application/dxf' });

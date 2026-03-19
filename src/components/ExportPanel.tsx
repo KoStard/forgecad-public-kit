@@ -497,6 +497,24 @@ export function ExportPanel() {
                   >
                     Export DXF
                   </button>
+                  <button
+                    onClick={() => {
+                      try { exportSketchFromStore('pdf', meshFileStem || defaultMeshStem); }
+                      catch (err) { alert(`Sketch PDF export failed: ${err instanceof Error ? err.message : String(err)}`); }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '7px 8px',
+                      background: 'var(--fc-accent)',
+                      color: 'var(--fc-accentText)',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      fontSize: 12,
+                    }}
+                  >
+                    Export Sketch PDF
+                  </button>
                 </div>
               </div>
             )}

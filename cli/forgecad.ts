@@ -31,6 +31,7 @@ import { runDevCli } from './forge-dev';
 import { runStudioCli } from './forge-studio';
 import { runWebCli } from './forge-web';
 import { runSvgCli } from './forge-svg';
+import { runSketchPdfCli } from './forge-sketch-pdf';
 import { runBrepCli } from './forge-brep';
 import { isDirectCliRun, resolvePackagePath } from './package-runtime';
 import { runParamCheckCli } from './param-check';
@@ -471,6 +472,23 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: runSvgCli,
+  },
+  {
+    group: 'Export',
+    path: ['export', 'sketch-pdf'],
+    summary: 'Export a constrained `.sketch.js` to a single-page PDF with dimensions, constraints, and surfaces.',
+    usage: ['forgecad export sketch-pdf <script.sketch.js> [output.pdf]'],
+    examples: [
+      'forgecad export sketch-pdf examples/frame.sketch.js',
+      'forgecad export sketch-pdf examples/frame.sketch.js out/frame.pdf',
+    ],
+    completion: {
+      positionals: [
+        { description: 'Sketch script', valueKind: 'sketch-script' },
+        { description: 'output PDF path', valueKind: 'pdf' },
+      ],
+    },
+    run: runSketchPdfCli,
   },
   {
     group: 'Export',
