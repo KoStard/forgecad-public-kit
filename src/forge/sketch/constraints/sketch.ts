@@ -15,7 +15,7 @@ import {
   findRedundantConstraints,
   setConstraintValue,
 } from './registry';
-import { decomposeAndSolve } from './decompose';
+import { buildDecomposition, decomposeAndSolve } from './decompose';
 import { computeFacesFromSegments, pointInPolygon } from '../arrangement-core';
 import type { SurfaceDisplay } from './types';
 
@@ -334,7 +334,27 @@ export class ConstraintSketch extends Sketch {
     const target = next.constraints.find((c) => c.id === constraintId);
     if (!target) return this;
     setConstraintValue(target, value);
-    return solveConstraintDefinition(next);
+
+    // Warm-start: cloned definition carries previous solved positions.
+    // Use reduced restarts, cache decomposition, skip redundancy if safe.
+    const cachedDecomposition = buildDecomposition(this.definition);
+    const skipRedundancyCheck = this.constraintMeta.dof >= 0;
+    const warmResult = solveConstraintDefinition(next, {
+      restarts: 1,
+      warmStartIterations: 0,
+      cachedDecomposition,
+      skipRedundancyCheck,
+    });
+    if (warmResult.constraintMeta.maxError <= DEFAULT_TOLERANCE * 5) {
+      return warmResult;
+    }
+
+    // Fallback: full solve with all restarts.
+    const freshNext = cloneDefinition(this.definition);
+    const freshTarget = freshNext.constraints.find((c) => c.id === constraintId);
+    if (!freshTarget) return this;
+    setConstraintValue(freshTarget, value);
+    return solveConstraintDefinition(freshNext);
   }
 
   /**
@@ -422,7 +442,7 @@ export const solveConstraintDefinition = (
   // Use Jacobian rank analysis to identify which constraint equations are linearly
   // dependent at the solved state. This is O(m·n·min(m,n)) — sub-millisecond —
   // versus the old approach of re-solving n times.
-  const redundant = dof < 0 && maxError <= tolerance * 5
+  const redundant = dof < 0 && maxError <= tolerance * 5 && !options.skipRedundancyCheck
     ? findRedundantConstraints(working, -dof)
     : new Set<string>();
   const constraints = buildConstraintDisplays(working, conflicts, redundant);
@@ -452,5 +472,24 @@ export const updateConstraintValue = (
   const target = next.constraints.find((c) => c.id === constraintId);
   if (!target) return sketch;
   setConstraintValue(target, value);
-  return solveConstraintDefinition(next);
+
+  // Warm-start: cloned definition carries previous solved positions.
+  const cachedDecomposition = buildDecomposition(sketch.definition);
+  const skipRedundancyCheck = sketch.constraintMeta.dof >= 0;
+  const warmResult = solveConstraintDefinition(next, {
+    restarts: 1,
+    warmStartIterations: 0,
+    cachedDecomposition,
+    skipRedundancyCheck,
+  });
+  if (warmResult.constraintMeta.maxError <= DEFAULT_TOLERANCE * 5) {
+    return warmResult;
+  }
+
+  // Fallback: full solve with all restarts.
+  const freshNext = cloneDefinition(sketch.definition);
+  const freshTarget = freshNext.constraints.find((c) => c.id === constraintId);
+  if (!freshTarget) return sketch;
+  setConstraintValue(freshTarget, value);
+  return solveConstraintDefinition(freshNext);
 };

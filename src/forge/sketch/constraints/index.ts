@@ -30,9 +30,12 @@ export type {
   SolverContext,
   DisplayContext,
   DofContext,
+  DecompositionCache,
 } from './types';
 
 export type { LineDistanceConstraint } from './defs/index';
+
+export { buildDecomposition, computeTopologyFingerprint } from './decompose';
 
 export type { ConstrainedSketchOptions } from './builder';
 export { ConstrainedSketchBuilder, constrainedSketch } from './builder';

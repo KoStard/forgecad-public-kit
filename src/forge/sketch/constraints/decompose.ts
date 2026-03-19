@@ -23,7 +23,7 @@
  * When there is only one component the solver is called directly (zero overhead).
  */
 
-import type { ConstraintDefinition, SketchConstraint, SolveOptions } from './types';
+import type { ConstraintDefinition, DecompositionCache, SketchConstraint, SolveOptions } from './types';
 import { solveConstraints } from './registry';
 
 // ─── Union-Find ─────────────────────────────────────────────────────────────────
@@ -83,6 +83,51 @@ const extractEntityIds = (constraint: SketchConstraint): string[] => {
     }
   }
   return ids;
+};
+
+// ─── Topology fingerprint ────────────────────────────────────────────────────────
+
+/**
+ * Compute a topology fingerprint for a constraint definition.
+ * Captures entity IDs, fixed status, connectivity, and constraint types,
+ * but NOT numeric values. Two definitions with the same fingerprint have
+ * identical decomposition structure.
+ */
+export const computeTopologyFingerprint = (def: ConstraintDefinition): string => {
+  const parts: string[] = [];
+  parts.push('P:' + def.points.map(p => p.id + (p.fixed ? 'F' : '')).sort().join(','));
+  parts.push('L:' + def.lines.map(l => `${l.id}:${l.a}-${l.b}`).sort().join(','));
+  parts.push('C:' + def.circles.map(c => `${c.id}:${c.center}${c.fixedRadius ? 'F' : ''}`).sort().join(','));
+  parts.push('A:' + (def.arcs ?? []).map(a => `${a.id}:${a.center}-${a.start}-${a.end}`).sort().join(','));
+  parts.push('S:' + (def.shapes ?? []).map(s => `${s.id}:${s.lines.join('+')}`).sort().join(','));
+  const constraintParts = def.constraints.map(c => {
+    const ids = extractEntityIds(c);
+    return `${c.type}:${ids.sort().join('+')}`;
+  }).sort();
+  parts.push('K:' + constraintParts.join(','));
+  return parts.join('|');
+};
+
+/**
+ * Build a decomposition cache for a definition.
+ * Can be stored and passed back via `SolveOptions.cachedDecomposition`.
+ */
+export const buildDecomposition = (def: ConstraintDefinition): DecompositionCache => {
+  const fingerprint = computeTopologyFingerprint(def);
+  const plan = buildSolvePlan(def);
+  // Convert SolvePlanComponent[] to Set<string>[] for the cache
+  const components: Set<string>[] = plan
+    ? plan.map(comp => {
+      const ids = new Set<string>();
+      for (const p of comp.points) ids.add(p.id);
+      for (const l of comp.lines) ids.add(l.id);
+      for (const c of comp.circles) ids.add(c.id);
+      for (const a of comp.arcs ?? []) ids.add(a.id);
+      for (const s of comp.shapes ?? []) ids.add(s.id);
+      return ids;
+    })
+    : [];
+  return { fingerprint, components };
 };
 
 // ─── Solve Plan ─────────────────────────────────────────────────────────────────
@@ -205,6 +250,49 @@ function buildSolvePlan(
 
 // ─── Decompose & Solve ──────────────────────────────────────────────────────────
 
+/**
+ * Solve components from a cached decomposition. Filters def entities by component
+ * ID sets, sorts by anchor count, and solves each independently.
+ */
+function solveWithCachedComponents(
+  def: ConstraintDefinition,
+  options: SolveOptions,
+  components: Set<string>[],
+): { maxError: number } {
+  if (components.length <= 1) return solveConstraints(def, options);
+
+  const subs: Array<{ points: typeof def.points; lines: typeof def.lines; circles: typeof def.circles; arcs: typeof def.arcs; shapes: typeof def.shapes; constraints: SketchConstraint[]; anchorCount: number; freeDof: number }> = [];
+
+  for (const componentIds of components) {
+    const inComponent = (id: string) => componentIds.has(id);
+    const subPoints = def.points.filter(p => inComponent(p.id));
+    const subLines = def.lines.filter(l => inComponent(l.id));
+    const subCircles = def.circles.filter(c => inComponent(c.id));
+    const subArcs = (def.arcs ?? []).filter(a => inComponent(a.id));
+    const subShapes = (def.shapes ?? []).filter(s => inComponent(s.id));
+    const subConstraints = def.constraints.filter(c => {
+      const ids = extractEntityIds(c);
+      return ids.length > 0 && inComponent(ids[0]);
+    });
+    if (subConstraints.length === 0) continue;
+    subs.push({
+      points: subPoints, lines: subLines, circles: subCircles, arcs: subArcs, shapes: subShapes,
+      constraints: subConstraints,
+      anchorCount: subPoints.filter(p => p.fixed).length,
+      freeDof: subPoints.filter(p => !p.fixed).length * 2 + subCircles.filter(c => !c.fixedRadius).length + subArcs.length,
+    });
+  }
+
+  subs.sort((a, b) => b.anchorCount !== a.anchorCount ? b.anchorCount - a.anchorCount : a.freeDof - b.freeDof);
+
+  let maxError = 0;
+  for (const comp of subs) {
+    const result = solveConstraints({ points: comp.points, lines: comp.lines, circles: comp.circles, arcs: comp.arcs, shapes: comp.shapes, loops: [], constraints: comp.constraints, rejectedConstraints: [] }, options);
+    maxError = Math.max(maxError, result.maxError);
+  }
+  return { maxError };
+}
+
 export const decomposeAndSolve = (
   def: ConstraintDefinition,
   options: SolveOptions,
@@ -212,14 +300,22 @@ export const decomposeAndSolve = (
   // Fast path: trivial systems don't benefit from decomposition.
   if (def.constraints.length <= 1) return solveConstraints(def, options);
 
+  // Check if a cached decomposition can be reused.
+  const cached = options.cachedDecomposition;
+  if (cached && cached.components.length > 0) {
+    const currentFingerprint = computeTopologyFingerprint(def);
+    if (currentFingerprint === cached.fingerprint) {
+      return solveWithCachedComponents(def, options, cached.components);
+    }
+  }
+
+  // Fresh decomposition.
   const plan = buildSolvePlan(def);
 
   // Single component → solve directly, no decomposition overhead.
   if (!plan) return solveConstraints(def, options);
 
   // Solve each component independently in topological order.
-  // Sub-definitions share the same entity object references as the original,
-  // so solver mutations (point.x, etc.) propagate back automatically.
   let maxError = 0;
   for (const comp of plan) {
     const result = solveConstraints({
