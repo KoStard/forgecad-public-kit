@@ -19,10 +19,18 @@ function usage(): never {
   process.exit(1);
 }
 
+function defaultSvgOutput(scriptPath: string): string {
+  return scriptPath.replace(/\.(forge|sketch)\.js$/, '.svg').replace(/\.js$/, '.svg');
+}
+
 export async function runSvgCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const scriptPath = argv[0];
   if (!scriptPath) usage();
-  const outputPath = argv[1] || scriptPath.replace(/\.sketch\.js$/, '.svg');
+  const outputPath = argv[1] || defaultSvgOutput(scriptPath);
+  if (resolve(outputPath) === resolve(scriptPath)) {
+    console.error(`ERROR: output path would overwrite the input script. Specify an explicit output path.`);
+    process.exit(1);
+  }
 
   // Read script
   const code = await readFile(resolve(scriptPath), 'utf-8');

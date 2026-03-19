@@ -15,10 +15,18 @@ function usage(): never {
   process.exit(1);
 }
 
+function defaultPdfOutput(scriptPath: string): string {
+  return scriptPath.replace(/\.(forge|sketch)\.js$/, '.sketch.pdf').replace(/\.js$/, '.sketch.pdf');
+}
+
 export async function runSketchPdfCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const scriptPath = argv[0];
   if (!scriptPath) usage();
-  const outputPath = argv[1] || scriptPath.replace(/\.sketch\.js$/, '.sketch.pdf');
+  const outputPath = argv[1] || defaultPdfOutput(scriptPath);
+  if (resolve(outputPath) === resolve(scriptPath)) {
+    console.error(`ERROR: output path would overwrite the input script. Specify an explicit output path.`);
+    process.exit(1);
+  }
 
   const code = await readFile(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
