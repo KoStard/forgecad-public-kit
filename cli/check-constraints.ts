@@ -26,6 +26,8 @@ import { addRect, addPolygon, addRegularPolygon } from '../src/forge/sketch/cons
 import { buildConstraintSvgDocument } from './sketch-svg';
 import { computeLabelMetrics, formatMetrics } from './label-metrics';
 import { getConstraintDef } from '../src/forge/sketch/constraints/registry';
+import { analyticalPreSolve } from '../src/forge/sketch/constraints/analytical';
+import { analyzeRigidity } from '../src/forge/sketch/constraints/rigidity';
 import '../src/forge/sketch/constraints/defs';
 
 const EPS = 1e-2; // solver tolerance for position checks (1/100th of a unit)
@@ -1693,6 +1695,274 @@ function testMultiRectWindingOrder() {
   }
 }
 
+// ─── Level 8: Analytical sub-solver tests ─────────────────────────────────────
+
+/** Direct placement: hDistance + vDistance from a fixed point. */
+function testAnalyticalDirectPlacement() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(50, 50); // intentionally far from target
+  s.hDistance(a, b, 10);
+  s.vDistance(a, b, 20);
+  const result = s.solve();
+  assertConverged(result, 'analytical-direct');
+  assertPointAt(result.definition, b, 10, 20, 'direct placement');
+}
+
+/** Coincident propagation: place a point exactly on a known point. */
+function testAnalyticalCoincidentPropagation() {
+  const s = constrainedSketch();
+  const a = s.point(5, 7, true);
+  const b = s.point(100, 100);
+  s.coincident(a, b);
+  const result = s.solve();
+  assertConverged(result, 'analytical-coincident');
+  assertPointAt(result.definition, b, 5, 7, 'coincident propagation');
+}
+
+/** Circle-circle intersection: two distances from two known points. */
+function testAnalyticalCircleCircle() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(10, 0, true);
+  const c = s.point(5, 5); // initial guess near the positive-y solution
+  s.distance(a, c, 5 * Math.sqrt(2)); // |ac| = 5√2 → circle of radius 5√2 around origin
+  s.distance(b, c, 5 * Math.sqrt(2)); // |bc| = 5√2 → circle of radius 5√2 around (10,0)
+  // Intersection: (5, 5) and (5, -5). Should pick (5,5) since initial guess is closer.
+  const result = s.solve();
+  assertConverged(result, 'analytical-circle-circle');
+  assertPointAt(result.definition, c, 5, 5, 'circle-circle intersection');
+}
+
+/** Circle-circle picks the other solution when initial guess is closer to it. */
+function testAnalyticalCircleCircleOtherSolution() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(10, 0, true);
+  const c = s.point(5, -5); // initial guess near the negative-y solution
+  s.distance(a, c, 5 * Math.sqrt(2));
+  s.distance(b, c, 5 * Math.sqrt(2));
+  const result = s.solve();
+  assertConverged(result, 'analytical-circle-circle-alt');
+  assertPointAt(result.definition, c, 5, -5, 'circle-circle alt solution');
+}
+
+/** Degenerate: circles too far apart (no intersection). Solver should still converge via LM. */
+function testAnalyticalCircleCircleNoIntersection() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(100, 0, true);
+  const c = s.point(50, 0);
+  s.distance(a, c, 3); // radius 3 from origin
+  s.distance(b, c, 3); // radius 3 from (100,0) — too far to intersect
+  const result = s.solve();
+  // This is over-constrained; solver may not converge
+  // but it shouldn't crash
+  assert(typeof result.constraintMeta.maxError === 'number', 'no-intersect: returned a number');
+}
+
+/** Tangent circles: exactly one intersection point. */
+function testAnalyticalCircleCircleTangent() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(10, 0, true);
+  const c = s.point(5, 0);
+  s.distance(a, c, 5); // tangent at (5, 0)
+  s.distance(b, c, 5);
+  const result = s.solve();
+  assertConverged(result, 'analytical-tangent');
+  assertPointAt(result.definition, c, 5, 0, 'tangent intersection');
+}
+
+/** Line-circle: horizontal constraint + distance from known point. */
+function testAnalyticalLineCircleHorizontal() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(5, 3); // initial guess
+  const l = s.line(a, b);
+  s.horizontal(l); // b.y = 0
+  s.distance(a, b, 7); // |ab| = 7
+  const result = s.solve();
+  assertConverged(result, 'analytical-line-circle-horiz');
+  const pb = getPoint(result.definition, b);
+  assertApprox(pb.y, 0, 'horizontal: y=0');
+  assertApprox(dist(result.definition, a, b), 7, 'distance = 7');
+}
+
+/** Line-circle: vertical constraint + distance from known point. */
+function testAnalyticalLineCircleVertical() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(3, 5);
+  const l = s.line(a, b);
+  s.vertical(l); // b.x = 0
+  s.distance(a, b, 7);
+  const result = s.solve();
+  assertConverged(result, 'analytical-line-circle-vert');
+  const pb = getPoint(result.definition, b);
+  assertApprox(pb.x, 0, 'vertical: x=0');
+  assertApprox(dist(result.definition, a, b), 7, 'distance = 7');
+}
+
+/** hDistance + distance: x known from hDistance, y from circle intersection. */
+function testAnalyticalHDistPlusDistance() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(3, 4); // initial near solution
+  s.hDistance(a, b, 3);
+  s.distance(a, b, 5); // 3-4-5 triangle
+  const result = s.solve();
+  assertConverged(result, 'analytical-hdist-distance');
+  assertPointAt(result.definition, b, 3, 4, 'hDist+distance');
+}
+
+/** vDistance + distance: y known from vDistance, x from circle intersection. */
+function testAnalyticalVDistPlusDistance() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(4, 3); // initial near solution
+  s.vDistance(a, b, 3);
+  s.distance(a, b, 5); // 3-4-5 triangle
+  const result = s.solve();
+  assertConverged(result, 'analytical-vdist-distance');
+  assertPointAt(result.definition, b, 4, 3, 'vDist+distance');
+}
+
+/** Chain propagation: A(fixed) → B(hDist+vDist) → C(coincident to B) → D(distances from A and C). */
+function testAnalyticalChainPropagation() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(50, 50);
+  const c = s.point(100, 100);
+  const d = s.point(5, 4); // initial guess near expected solution
+  s.hDistance(a, b, 3);
+  s.vDistance(a, b, 4);
+  s.coincident(b, c);
+  // A=(0,0), C=(3,4). D at distances 5 from A and 5 from C.
+  // Circles: center (0,0) r=5, center (3,4) r=5.
+  // d between centers = 5, r1+r2 = 10, |r1-r2| = 0 → two intersections exist.
+  s.distance(a, d, 5);
+  s.distance(c, d, 5);
+  const result = s.solve();
+  assertConverged(result, 'analytical-chain');
+  assertPointAt(result.definition, b, 3, 4, 'chain: B');
+  assertPointAt(result.definition, c, 3, 4, 'chain: C');
+  assertApprox(dist(result.definition, a, d), 5, 'chain: |AD|');
+  assertApprox(dist(result.definition, c, d), 5, 'chain: |CD|');
+}
+
+/** The analytical pre-solver directly: verify it marks solved points correctly. */
+function testAnalyticalPreSolverAPI() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(50, 50);
+  s.hDistance(a, b, 10);
+  s.vDistance(a, b, 20);
+
+  // Build the definition manually and run analytical pre-solve
+  const def = (s as any).buildDefinition() as ConstraintDefinition;
+  const result = analyticalPreSolve(def);
+
+  assert(result.solvedPoints.size > 0, 'pre-solver should solve at least one point');
+  assert(result.steps.length > 0, 'pre-solver should produce construction steps');
+  // Check the point was actually placed
+  const bPoint = def.points.find(p => p.id === b);
+  assert(bPoint, 'point b should exist');
+  assertApprox(bPoint!.x, 10, 'pre-solve: b.x');
+  assertApprox(bPoint!.y, 20, 'pre-solve: b.y');
+}
+
+// ─── Level 9: Rigidity analysis tests ──────────────────────────────────────────
+
+/** Well-constrained triangle: 3 points, 3 fixed + structural → rigid. */
+function testRigidityWellConstrained() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(10, 0, true);
+  const c = s.point(5, 8);
+  s.distance(a, c, Math.hypot(5, 8));
+  s.distance(b, c, Math.hypot(5, 8));
+  // c has 2 DOF, 2 distance constraints → 0 DOF
+  const def = (s as any).buildDefinition() as ConstraintDefinition;
+  const result = analyzeRigidity(def);
+  assert.equal(result.redundantConstraintIds.size, 0, 'no redundant constraints');
+}
+
+/** Over-constrained: add a third distance to a fully constrained point. */
+function testRigidityOverConstrained() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(10, 0, true);
+  const c = s.point(5, 8);
+  s.distance(a, c, Math.hypot(5, 8));
+  s.distance(b, c, Math.hypot(5, 8));
+  // Now add a horizontal constraint — over-constrains c
+  const l = s.line(a, c);
+  s.horizontal(l); // 3rd eq on a point with 2 DOF → 1 redundant
+  const def = (s as any).buildDefinition() as ConstraintDefinition;
+  const result = analyzeRigidity(def);
+  assert(result.totalDof < 0, 'totalDof should be negative (over-constrained)');
+}
+
+/** Under-constrained: single free point, one distance constraint (1 DOF remaining). */
+function testRigidityUnderConstrained() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(5, 5);
+  s.distance(a, b, 7);
+  const def = (s as any).buildDefinition() as ConstraintDefinition;
+  const result = analyzeRigidity(def);
+  assert(result.totalDof > 0, 'totalDof should be positive (under-constrained)');
+  assert.equal(result.redundantConstraintIds.size, 0, 'no redundant constraints');
+}
+
+/** Fully constrained rectangle: 4 points, H/V on 4 sides + fixed corner + 2 lengths. */
+function testRigidityFullRectangle() {
+  const s = constrainedSketch();
+  const rect = addRect(s, { x: 0, y: 0, width: 10, height: 5 });
+  s.fix(rect.bottomLeft, 0, 0);
+  s.length(rect.bottom, 10);
+  s.length(rect.right, 5);
+  const result = s.solve();
+  assertConverged(result, 'rigidity-rect');
+  // Should be fully constrained with no redundancy
+  assert.equal(result.constraintMeta.dof, 0, 'rect DOF should be 0');
+}
+
+/** Independent components: rigidity analysis works when graph has multiple components. */
+function testRigidityIndependentComponents() {
+  const s = constrainedSketch();
+  // Component 1: fixed triangle
+  const a = s.point(0, 0, true);
+  const b = s.point(10, 0, true);
+  const c = s.point(5, 5);
+  s.distance(a, c, Math.hypot(5, 5));
+  s.distance(b, c, Math.hypot(5, 5));
+  // Component 2: independent fixed segment
+  const d = s.point(20, 20, true);
+  const e = s.point(30, 30);
+  s.distance(d, e, Math.hypot(10, 10));
+  // Both components should be analyzable
+  const def = (s as any).buildDefinition() as ConstraintDefinition;
+  const result = analyzeRigidity(def);
+  // No redundant constraints
+  assert.equal(result.redundantConstraintIds.size, 0, 'no redundant in independent components');
+}
+
+/** Redundant: two identical distance constraints on the same pair. */
+function testRigidityDuplicateConstraint() {
+  const s = constrainedSketch();
+  const a = s.point(0, 0, true);
+  const b = s.point(10, 0, true);
+  const c = s.point(5, 5);
+  s.distance(a, c, Math.hypot(5, 5));
+  s.distance(b, c, Math.hypot(5, 5));
+  s.distance(a, c, Math.hypot(5, 5)); // duplicate!
+  const def = (s as any).buildDefinition() as ConstraintDefinition;
+  const result = analyzeRigidity(def);
+  assert(result.redundantConstraintIds.size > 0, 'should detect redundant duplicate constraint');
+}
+
 // ─── Runner ──────────────────────────────────────────────────────────────────
 
 export async function runCheckConstraintsCli(args: string[]): Promise<void> {
@@ -1782,6 +2052,30 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
     { name: 'multi-rect CCW winding order', fn: testMultiRectWindingOrder },
   ];
 
+  const level8: TestEntry[] = [
+    { name: 'analytical: direct placement (hDist+vDist)', fn: testAnalyticalDirectPlacement },
+    { name: 'analytical: coincident propagation', fn: testAnalyticalCoincidentPropagation },
+    { name: 'analytical: circle-circle intersection', fn: testAnalyticalCircleCircle },
+    { name: 'analytical: circle-circle other solution', fn: testAnalyticalCircleCircleOtherSolution },
+    { name: 'analytical: circle-circle no intersection', fn: testAnalyticalCircleCircleNoIntersection },
+    { name: 'analytical: circle-circle tangent', fn: testAnalyticalCircleCircleTangent },
+    { name: 'analytical: line-circle (horizontal)', fn: testAnalyticalLineCircleHorizontal },
+    { name: 'analytical: line-circle (vertical)', fn: testAnalyticalLineCircleVertical },
+    { name: 'analytical: hDistance + distance', fn: testAnalyticalHDistPlusDistance },
+    { name: 'analytical: vDistance + distance', fn: testAnalyticalVDistPlusDistance },
+    { name: 'analytical: chain propagation', fn: testAnalyticalChainPropagation },
+    { name: 'analytical: pre-solver API', fn: testAnalyticalPreSolverAPI },
+  ];
+
+  const level9: TestEntry[] = [
+    { name: 'rigidity: well-constrained triangle', fn: testRigidityWellConstrained },
+    { name: 'rigidity: over-constrained', fn: testRigidityOverConstrained },
+    { name: 'rigidity: under-constrained', fn: testRigidityUnderConstrained },
+    { name: 'rigidity: full rectangle', fn: testRigidityFullRectangle },
+    { name: 'rigidity: independent components', fn: testRigidityIndependentComponents },
+    { name: 'rigidity: duplicate constraint', fn: testRigidityDuplicateConstraint },
+  ];
+
   const allTests = [
     { level: 'L1: Single constraints', tests: level1 },
     { level: 'L2: Compound constraints', tests: level2 },
@@ -1791,6 +2085,8 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
     { level: 'L5: Complex systems', tests: level5 },
     { level: 'L6: High-level concepts', tests: level6 },
     { level: 'L7: Wrapper rect stability', tests: level7 },
+    { level: 'L8: Analytical sub-solvers', tests: level8 },
+    { level: 'L9: Rigidity analysis', tests: level9 },
   ];
 
   let passed = 0;
