@@ -113,6 +113,13 @@ pub fn solve(
 ) -> f64 {
     lm::trail_reset();
 
+    // Progressive mode: add constraints one at a time with short LM solves,
+    // replicating the TS solver's incremental constrain() behavior in a single
+    // WASM call. This keeps geometry warm throughout the build.
+    if options.progressive.unwrap_or(false) && constraints.len() > 1 {
+        return progressive_solve(points, lines, circles, arcs, shapes, constraints, options, groups);
+    }
+
     // Run targeted single-constraint presolve before the main solve when
     // the caller requests it (builder incremental path).
     if let Some(ref cid) = options.presolve_constraint_id {
@@ -139,10 +146,12 @@ pub fn solve(
         None
     };
 
+    let incremental = options.presolve_constraint_id.is_some();
+
     let max_error = solve_system(
         points, lines, circles, arcs, shapes, constraints,
         iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
-        groups,
+        groups, incremental,
     );
 
     // Fallback: if the first solve exceeded tolerance * 5 and a fallback is
@@ -160,12 +169,74 @@ pub fn solve(
             return solve_system(
                 points, lines, circles, arcs, shapes, constraints,
                 iterations, tolerance, fb_restarts, fb_warm, max_scaled_step,
-                groups,
+                groups, false,
             );
         }
     }
 
     max_error
+}
+
+/// Progressive solve: add constraints one at a time with short LM solves.
+/// This replicates the TS solver's incremental constrain() behavior but in a
+/// single Rust call, avoiding N WASM round-trips.
+///
+/// Works best when the TS builder's seedIncrementalGeometry has already placed
+/// entities near their targets via separate WASM calls.  The progressive phase
+/// then refines progressively.
+fn progressive_solve(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+    options: &SolveOptions,
+    groups: &mut Vec<SketchGroup>,
+) -> f64 {
+    let tolerance = options.tolerance.unwrap_or(1e-3);
+    let entity_ref_count = build_entity_ref_count(constraints);
+    let ref_scale = compute_presolve_ref_scale(constraints);
+
+    // Phase 1: Progressive warm-up — add constraints one by one with short solves.
+    // Uses solve_global with ALL entities.  This relies on seedIncrementalGeometry
+    // having already placed entities near their targets.  Without warm geometry,
+    // unconstrained variables drift and convergence fails (err>100).
+    let recon_graph = reconstruction::ReconstructionGraph::empty();
+    for i in 0..constraints.len() {
+        let sub = constraints[..=i].to_vec();
+
+        // Run presolve for the newly added constraint.
+        let pts_idx: HashMap<String, usize> = points.iter().enumerate().map(|(j, p)| (p.id.clone(), j)).collect();
+        apply_presolve_constraint(points, lines, &pts_idx, &entity_ref_count, &constraints[i], ref_scale);
+        run_analytical_presolve(points, lines, &sub);
+        resolve_group_points(points, groups);
+
+        let has_residual = sub.iter().any(|c| crate::constraints::has_residual(c));
+        if !has_residual { continue; }
+
+        // Short LM solve — geometry is warm from seedIncrementalGeometry.
+        lm::solve_global(
+            points, lines, circles, arcs, shapes, &sub,
+            30, tolerance, 1, 4, 2.5,
+            groups, &recon_graph,
+        );
+    }
+
+    let progressive_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
+    lm::trail_push("progressive-warmup", progressive_error);
+
+    // Phase 2: Full solve from the warmed geometry
+    let iterations = options.iterations.unwrap_or(80);
+    let restarts = options.restarts.unwrap_or(6);
+    let warm_start_iters = options.warm_start_iterations.unwrap_or(6);
+    let max_scaled_step = options.max_scaled_step.unwrap_or(2.5);
+
+    solve_single_system(
+        points, lines, circles, arcs, shapes, constraints,
+        iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
+        groups, false,
+    )
 }
 
 /// Inner solve dispatch — decompose into independent components when possible.
@@ -182,6 +253,7 @@ fn solve_system(
     warm_start_iters: u32,
     max_scaled_step: f64,
     groups: &mut Vec<SketchGroup>,
+    incremental: bool,
 ) -> f64 {
     if let Some(plan) = build_solve_plan(points, lines, circles, arcs, shapes, constraints) {
         // Build a set of group-owned point IDs for quick lookup.
@@ -242,6 +314,7 @@ fn solve_system(
                 warm_start_iters,
                 max_scaled_step,
                 &mut sub_groups,
+                incremental,
             );
             max_error = max_error.max(component_error);
 
@@ -292,6 +365,7 @@ fn solve_system(
             warm_start_iters,
             max_scaled_step,
             groups,
+            incremental,
         )
     }
 }
@@ -418,22 +492,29 @@ fn solve_single_system(
     warm_start_iters: u32,
     max_scaled_step: f64,
     groups: &mut Vec<SketchGroup>,
+    incremental: bool,
 ) -> f64 {
     run_presolve(points, lines, circles, arcs, shapes, constraints, tolerance);
     let presolve_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
     lm::trail_push("presolve", presolve_error);
     run_analytical_presolve(points, lines, constraints);
 
-    let group_owned_ids: std::collections::HashSet<String> = groups.iter()
-        .flat_map(|g| g.points.iter().map(|p| p.id.clone()))
-        .collect();
-    let recon_graph = reconstruction::build_reconstruction_graph(
-        points, lines, constraints, &group_owned_ids,
-    );
-
-    if !recon_graph.is_empty() {
-        reconstruction::reconstruct(&recon_graph, points, lines, constraints);
-    }
+    // For incremental calls (progressive warm-up or builder warm-seeding),
+    // skip the heavy reconstruction graph and DAG analysis but still run LM.
+    let recon_graph = if incremental {
+        reconstruction::ReconstructionGraph::empty()
+    } else {
+        let group_owned_ids: std::collections::HashSet<String> = groups.iter()
+            .flat_map(|g| g.points.iter().map(|p| p.id.clone()))
+            .collect();
+        let graph = reconstruction::build_reconstruction_graph(
+            points, lines, constraints, &group_owned_ids,
+        );
+        if !graph.is_empty() {
+            reconstruction::reconstruct(&graph, points, lines, constraints);
+        }
+        graph
+    };
 
     resolve_group_points(points, groups);
 
@@ -447,31 +528,33 @@ fn solve_single_system(
         ));
     }
 
-    // ── Graph decomposition: extract structural info and build solve DAG ──
-    let info = lm::extract_structural_info(
-        points, lines, circles, arcs, shapes, constraints, groups, &recon_graph,
-    );
+    if !incremental {
+        // ── Graph decomposition: extract structural info and build solve DAG ──
+        let info = lm::extract_structural_info(
+            points, lines, circles, arcs, shapes, constraints, groups, &recon_graph,
+        );
 
-    // If no variables, just evaluate residuals.
-    if info.n_vars == 0 {
-        return sanitize_max_error(lm::current_max_error(
-            points, lines, circles, arcs, shapes, constraints,
-        ));
+        // If no variables, just evaluate residuals.
+        if info.n_vars == 0 {
+            return sanitize_max_error(lm::current_max_error(
+                points, lines, circles, arcs, shapes, constraints,
+            ));
+        }
+
+        let dag = graph::decompose_to_solve_dag(
+            info.n_vars,
+            &info.constraint_var_sets,
+            &info.constraint_row_ranges,
+            &info.arc_var_sets,
+            info.arc_row_start,
+        );
+
+        let nontrivial_blocks = dag.blocks.iter().filter(|b| !b.vars.is_empty()).count();
+        lm::trail_push(
+            &format!("dag: {} blocks ({} with vars)", dag.blocks.len(), nontrivial_blocks),
+            presolve_error,
+        );
     }
-
-    let dag = graph::decompose_to_solve_dag(
-        info.n_vars,
-        &info.constraint_var_sets,
-        &info.constraint_row_ranges,
-        &info.arc_var_sets,
-        info.arc_row_start,
-    );
-
-    let nontrivial_blocks = dag.blocks.iter().filter(|b| !b.vars.is_empty()).count();
-    lm::trail_push(
-        &format!("dag: {} blocks ({} with vars)", dag.blocks.len(), nontrivial_blocks),
-        presolve_error,
-    );
 
     // Keep decomposition analysis live, but do not execute blockwise solves yet.
     // The current SCC extraction is structurally informative, but the runtime path

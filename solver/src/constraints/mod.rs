@@ -1763,3 +1763,21 @@ pub fn apply_projector(
         }
     }
 }
+
+/// Run multiple Gauss-Seidel projector passes over all constraints.
+pub fn apply_projector_pass(
+    constraints: &Vec<Constraint>,
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    shapes: &Vec<Shape>,
+    tolerance: f64,
+    iters: u32,
+) {
+    for _ in 0..iters {
+        for c in constraints {
+            apply_projector(c, points, lines, circles, arcs, shapes, tolerance);
+        }
+    }
+}

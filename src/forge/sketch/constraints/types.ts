@@ -220,6 +220,8 @@ export interface SolveOptions {
   presolveConstraintId?: string;
   /** When set and the first solve exceeds tolerance*5, retry with this many restarts. */
   fallbackRestarts?: number;
+  /** Add constraints progressively with short LM solves, all in one WASM call. */
+  progressive?: boolean;
 }
 
 export interface SolverConstraintResidual {

@@ -226,6 +226,11 @@ pub struct SolveOptions {
     /// retries with this many restarts.  Used by `updateConstraintValue` so the
     /// warm-start-then-fallback policy is a single WASM call.
     pub fallback_restarts: Option<u32>,
+    /// When true, the solver adds constraints progressively (one at a time) and
+    /// runs a short LM solve after each addition, inside a single WASM call.
+    /// This replicates the TS solver's incremental constrain() behavior without
+    /// 54 separate WASM round-trips.
+    pub progressive: Option<bool>,
 }
 
 impl Default for SolveOptions {
@@ -239,6 +244,7 @@ impl Default for SolveOptions {
             skip_redundancy_check: Some(false),
             presolve_constraint_id: None,
             fallback_restarts: None,
+            progressive: None,
         }
     }
 }

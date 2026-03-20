@@ -685,6 +685,7 @@ function serializeProblem(def: ConstraintDefinition, options: SolveOptions): Was
       skip_redundancy_check: options.skipRedundancyCheck,
       presolve_constraint_id: options.presolveConstraintId,
       fallback_restarts: options.fallbackRestarts,
+      progressive: options.progressive,
     },
   };
 }

@@ -677,14 +677,15 @@ export class ConstrainedSketchBuilder {
 
   solve(options: SolveOptions = {}): ConstraintSketch {
     return solveConstraintDefinition(this.buildDefinition(), {
-      iterations: options.iterations ?? 200,
-      restarts: options.restarts ?? 1,
-      warmStartIterations: options.warmStartIterations ?? 8,
-      maxScaledStep: options.maxScaledStep ?? 0.75,
-      fallbackRestarts: options.fallbackRestarts ?? 6,
+      iterations: options.iterations ?? 80,
+      restarts: options.restarts ?? 6,
+      warmStartIterations: options.warmStartIterations ?? 6,
+      maxScaledStep: options.maxScaledStep ?? 2.5,
+      fallbackRestarts: options.fallbackRestarts,
       tolerance: options.tolerance,
       skipRedundancyCheck: options.skipRedundancyCheck,
       presolveConstraintId: options.presolveConstraintId,
+      progressive: options.progressive ?? true,
     });
   }
 

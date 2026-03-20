@@ -1502,7 +1502,10 @@ fn run_lm_pass(
 ) -> f64 {
     let mut lambda = 1e-3f64;
     let mut nu = 2.0f64;
-    let prior_diag = 1e-6 / scale.max(1.0).powi(2);
+    // Prior regularization disabled — it pulls toward initial geometry which
+    // hurts cold-start convergence where the solver needs to move far.
+    // The TS solver never had this term and converged fine.
+    let prior_diag = 0.0;
 
     let mut lin = match linearize(
         points, lines, circles, arcs, shapes, constraints, groups,
@@ -1568,12 +1571,8 @@ fn run_lm_pass(
                     local_lambda
                 };
                 nu = 2.0;
-                let trial_disp = scaled_state_displacement(&trial_state, anchor_state, scale);
-                if trial.max_abs + 1e-9 < best_pass_error
-                    || (trial.max_abs <= best_pass_error + tolerance * 0.25 && trial_disp < best_pass_disp)
-                {
+                if trial.max_abs + 1e-9 < best_pass_error {
                     best_pass_error = trial.max_abs;
-                    best_pass_disp = trial_disp;
                     best_pass_state = trial_state.clone();
                 }
                 lin = trial;
