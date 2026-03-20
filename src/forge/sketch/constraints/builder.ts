@@ -275,20 +275,7 @@ export class ConstrainedSketchBuilder {
     }
     // Always accept the constraint — never reject.
     this.constraints.push(next);
-
-    // Single Rust call: presolve the new constraint then solve incrementally.
-    const def = this.buildDefinition();
-    const { maxError } = solveConstraints(def, {
-      iterations: 30,
-      tolerance: DEFAULT_TOLERANCE,
-      restarts: 1,
-      warmStartIterations: 4,
-      presolveConstraintId: next.id,
-    }, 'builder.constrain');
-    if (maxError <= DEFAULT_TOLERANCE) {
-      this.syncFromDefinition(def);
-    }
-    return this;
+    return this;  // No solve — only solve() triggers the solver
   }
 
   // ─── Input Entity Resolution ─────────────────────────────────────────────

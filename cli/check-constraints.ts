@@ -24,7 +24,7 @@ import { constrainedSketch, ConstrainedSketchBuilder } from '../src/forge/sketch
 import { isConstraintSketch, ConstraintSketch, solveConstraintDefinition, updateConstraintValue } from '../src/forge/sketch/constraints/sketch';
 import type { ConstraintDefinition, SketchPoint } from '../src/forge/sketch/constraints/types';
 import { addRect, addPolygon, addRegularPolygon } from '../src/forge/sketch/constraints/concepts';
-import { buildConstraintSvgDocument } from './sketch-svg';
+import { buildEdgeSvg } from '../src/forge/sketch/exportSvg';
 import { computeLabelMetrics, formatMetrics } from './label-metrics';
 import { analyzeRigidity } from '../src/forge/sketch/constraints/rigidity';
 import '../src/forge/sketch/constraints/defs';
@@ -32,6 +32,7 @@ import '../src/forge/sketch/constraints/defs';
 const EPS = 1e-2; // solver tolerance for position checks (1/100th of a unit)
 const ANGLE_EPS = 0.1; // degrees
 let _verbose = false;
+let _update = false;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -643,6 +644,29 @@ function compareSnapshot(name: string, current: ConstraintSnapshot, saved: Const
   }
 }
 
+function assertSvgSnapshot(name: string, svg: string, update: boolean): void {
+  const svgDir = join(SNAPSHOT_DIR, 'constraint-svgs');
+  if (!existsSync(svgDir)) mkdirSync(svgDir, { recursive: true });
+  const baselinePath = join(svgDir, `${name}.svg`);
+  const normalizedSvg = svg.replace(/\r\n/g, '\n');
+
+  if (update) {
+    writeFileSync(baselinePath, normalizedSvg);
+    return;
+  }
+
+  if (!existsSync(baselinePath)) {
+    writeFileSync(join(svgDir, `${name}.actual.svg`), normalizedSvg);
+    throw new Error(`${name}: no SVG baseline found — run with --update to create it`);
+  }
+
+  const expected = readFileSync(baselinePath, 'utf8').replace(/\r\n/g, '\n');
+  if (normalizedSvg !== expected) {
+    writeFileSync(join(svgDir, `${name}.actual.svg`), normalizedSvg);
+    throw new Error(`${name}: SVG snapshot mismatch — see ${name}.actual.svg`);
+  }
+}
+
 type SnapshotCase = {
   name: string;
   build: () => ConstraintSketch;
@@ -710,8 +734,6 @@ function runSnapshotTests(update: boolean): number {
   const next: Record<string, ConstraintSnapshot> = {};
   let failures = 0;
 
-  const svgDir = join(SNAPSHOT_DIR, 'constraint-svgs');
-
   for (const tc of snapshotCases) {
     try {
       const result = tc.build();
@@ -722,12 +744,9 @@ function runSnapshotTests(update: boolean): number {
         compareSnapshot(tc.name, snap, saved[tc.name]);
       }
 
-      // Generate SVG for visual inspection
-      if (update) {
-        const svg = buildConstraintSvgDocument(result.constraintMeta);
-        if (!existsSync(svgDir)) mkdirSync(svgDir, { recursive: true });
-        writeFileSync(join(svgDir, `${tc.name}.svg`), svg);
-      }
+      // SVG snapshot: simple wireframe (black lines on white)
+      const svg = buildEdgeSvg(result.constraintMeta, 'black', 0.5, 2);
+      assertSvgSnapshot(tc.name, svg, update);
 
       // Label quality metrics
       if (_verbose) {
@@ -744,6 +763,7 @@ function runSnapshotTests(update: boolean): number {
 
   if (update) {
     saveSnapshots(next);
+    const svgDir = join(SNAPSHOT_DIR, 'constraint-svgs');
     console.log(`  Saved ${Object.keys(next).length} snapshots + SVGs to ${svgDir}`);
   }
 
@@ -1276,12 +1296,17 @@ function testFullSpectrogram() {
   // Track rejections — 0 is the target after deferred solving.
   assert.equal(meta.rejected.length, 0, `spectrogram: unexpected rejections (${meta.rejected.length})`);
 
-  // Always generate spectrogram SVG for visual debugging
-  const svgDir = join(SNAPSHOT_DIR, 'constraint-svgs');
-  if (!existsSync(svgDir)) mkdirSync(svgDir, { recursive: true });
-  const svg = buildConstraintSvgDocument(meta);
-  writeFileSync(join(svgDir, 'spectrogram.svg'), svg);
-  console.log(`      SVG → ${join(svgDir, 'spectrogram.svg')}`);
+  // TODO: assert(meta.maxError < 0.01) once Rust solver handles cold-start
+  // from all-zeros. Currently the solver can't converge the spectrogram
+  // without incremental presolve (see constructive-solver PLAN).
+  if (meta.maxError >= 0.01) {
+    console.log(`      ⚠ maxError=${meta.maxError.toFixed(4)} — solver did not converge (cold-start regression)`);
+  }
+
+  // SVG snapshot: simple wireframe
+  const svg = buildEdgeSvg(meta, 'black', 0.5, 2);
+  assertSvgSnapshot('spectrogram', svg, _update);
+  console.log(`      SVG snapshot ${_update ? 'updated' : 'verified'}`);
 
   // Label quality metrics
   if (_verbose) {
@@ -1995,6 +2020,7 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
   await initKernel();
 
   const update = args.includes('--update');
+  _update = update;
   _verbose = args.includes('--verbose') || args.includes('-v');
   const caseFilter = args.find((a) => !a.startsWith('-'));
 

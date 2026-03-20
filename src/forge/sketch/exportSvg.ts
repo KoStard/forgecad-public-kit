@@ -88,7 +88,7 @@ function buildPolygonSvg(
 
 // ─── Edge-based SVG (constraint sketches — lines, arcs, circles) ──────────
 
-function buildEdgeSvg(
+export function buildEdgeSvg(
   meta: SketchConstraintMeta,
   stroke: string,
   strokeWidth: number,

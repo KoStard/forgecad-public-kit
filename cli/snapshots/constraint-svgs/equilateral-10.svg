@@ -1,40 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-5.0 -13.7 20.0 18.7" width="600" height="600">
-  <rect x="-5.0" y="-13.7" width="20.0" height="18.7" fill="#1a1a2e"/>
-  <g data-layer="surfaces" opacity="0.25">
-    <path d="M0.000,0.000 L10.000,0.000 L5.000,-8.660Z" fill="#4488cc" stroke="none"/>
-  </g>
-  <g data-layer="surface-labels">
-    <text x="5.000" y="-2.887" fill="#4488cc" font-size="3" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold" opacity="0.6">[0]</text>
-  </g>
-  <g data-layer="edges">
-    <line x1="0.000" y1="0.000" x2="10.000" y2="0.000" stroke="#e8e8e8" stroke-width="0.4"/>
-    <line x1="10.000" y1="0.000" x2="5.000" y2="-8.660" stroke="#e8e8e8" stroke-width="0.4"/>
-    <line x1="5.000" y1="-8.660" x2="0.000" y2="0.000" stroke="#e8e8e8" stroke-width="0.4"/>
-    <circle cx="0.000" cy="0.000" r="0.6" fill="#e8e8e8"/>
-    <circle cx="10.000" cy="0.000" r="0.6" fill="#e8e8e8"/>
-    <circle cx="5.000" cy="-8.660" r="0.6" fill="#e8e8e8"/>
-  </g>
-  <g data-layer="construction">
-  </g>
-  <g data-layer="annotations">
-    <text x="5.000" y="0.000" fill="#4ade80" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">H</text>
-    <line x1="4.400" y1="-0.240" x2="5.600" y2="-0.240" stroke="#4ade80" stroke-width="0.3" transform="rotate(0.0 5.000 0.000)"/>
-    <line x1="4.400" y1="0.240" x2="5.600" y2="0.240" stroke="#4ade80" stroke-width="0.3" transform="rotate(0.0 5.000 0.000)"/>
-    <line x1="6.900" y1="-4.570" x2="8.100" y2="-4.570" stroke="#4ade80" stroke-width="0.3" transform="rotate(-120.0 7.500 -4.330)"/>
-    <line x1="6.900" y1="-4.090" x2="8.100" y2="-4.090" stroke="#4ade80" stroke-width="0.3" transform="rotate(-120.0 7.500 -4.330)"/>
-    <line x1="4.400" y1="-0.240" x2="5.600" y2="-0.240" stroke="#4ade80" stroke-width="0.3" transform="rotate(0.0 5.000 0.000)"/>
-    <line x1="4.400" y1="0.240" x2="5.600" y2="0.240" stroke="#4ade80" stroke-width="0.3" transform="rotate(0.0 5.000 0.000)"/>
-    <line x1="1.900" y1="-4.570" x2="3.100" y2="-4.570" stroke="#4ade80" stroke-width="0.3" transform="rotate(120.0 2.500 -4.330)"/>
-    <line x1="1.900" y1="-4.090" x2="3.100" y2="-4.090" stroke="#4ade80" stroke-width="0.3" transform="rotate(120.0 2.500 -4.330)"/>
-    <line x1="0.000" y1="-0.300" x2="0.000" y2="-3.500" stroke="#4ade80" stroke-width="0.15" opacity="0.6"/>
-    <line x1="10.000" y1="-0.300" x2="10.000" y2="-3.500" stroke="#4ade80" stroke-width="0.15" opacity="0.6"/>
-    <line x1="0.000" y1="-3.000" x2="10.000" y2="-3.000" stroke="#4ade80" stroke-width="0.2"/>
-    <polygon points="0.000,-3.000 1.000,-3.350 1.000,-2.650" fill="#4ade80"/>
-    <polygon points="10.000,-3.000 9.000,-3.350 9.000,-2.650" fill="#4ade80"/>
-    <text x="5.000" y="-3.800" fill="#4ade80" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">10</text>
-  </g>
-  <g data-layer="status">
-    <rect x="-4.0" y="-12.7" width="28.6" height="3" rx="0.5" fill="#4ade80" opacity="0.85"/>
-    <text x="-3.2" y="-10.6" fill="#000000" font-size="1.8" font-family="sans-serif" font-weight="bold">FULLY DOF=0 err=0.0002</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 14 12.66">
+  <g transform="translate(0, 8.66) scale(1, -1)">
+    <line x1="0" y1="0" x2="10" y2="0" stroke="black" stroke-width="0.5"/>
+    <line x1="10" y1="0" x2="5" y2="8.66" stroke="black" stroke-width="0.5"/>
+    <line x1="5" y1="8.66" x2="0" y2="0" stroke="black" stroke-width="0.5"/>
   </g>
 </svg>
