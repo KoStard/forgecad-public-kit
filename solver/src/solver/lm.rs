@@ -5,6 +5,7 @@ use crate::types::{Arc, Circle, Constraint, Line, Point, Shape, SketchGroup, Sol
 use super::linear::solve_linear;
 use super::resolve_group_points;
 use super::reconstruction::ReconstructionGraph;
+use super::profiler;
 
 // ─── Solve trail (thread-local accumulator) ──────────────────────────────────
 
@@ -300,6 +301,10 @@ struct SparsityMap {
     /// Set of variable column indices that affect reconstructed points
     /// (require calling reconstruct() during FD).
     reconstruction_var_cols: HashSet<usize>,
+    /// Per constraint: (row_start, row_count). Avoids re-evaluating residuals just for row layout.
+    constraint_row_layout: Vec<(usize, usize)>,
+    /// row_start → constraint_index for O(1) lookup in FD loop.
+    row_to_constraint: HashMap<usize, usize>,
 }
 
 fn build_sparsity(
@@ -454,7 +459,18 @@ fn build_sparsity(
         rows.dedup();
     }
 
-    (SparsityMap { var_to_constraint_rows, var_to_arc_rows, arc_row_start, group_var_cols, reconstruction_var_cols }, arc_row_start + arcs.len() * 2)
+    // Build row_to_constraint map for O(1) lookup in FD loop.
+    let row_to_constraint: HashMap<usize, usize> = constraint_rows.iter().enumerate()
+        .filter(|(_, &(_, count))| count > 0)
+        .map(|(ci, &(row_start, _))| (row_start, ci))
+        .collect();
+
+    (SparsityMap {
+        var_to_constraint_rows, var_to_arc_rows, arc_row_start,
+        group_var_cols, reconstruction_var_cols,
+        constraint_row_layout: constraint_rows,
+        row_to_constraint,
+    }, arc_row_start + arcs.len() * 2)
 }
 
 // ─── Structural info for graph decomposition ─────────────────────────────────
@@ -659,7 +675,10 @@ fn linearize(
     n_rows: usize,
     graph: &ReconstructionGraph,
 ) -> Option<LinearizedSystem> {
+    let t_resid = profiler::platform::now_us();
     let (base, max_abs) = eval_residuals_full(points, lines, circles, arcs, shapes, constraints)?;
+    profiler::add(|p| p.linearize_residual_us += profiler::platform::now_us() - t_resid);
+
     let n_vars = vars.len();
     let n_eq = base.len();
 
@@ -669,6 +688,7 @@ fn linearize(
 
     let mut jacobian = vec![vec![0.0f64; n_vars]; n_eq];
 
+    let t_analytic = profiler::platform::now_us();
     let pts_map: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
     let circs_map: HashMap<String, usize> = circles.iter().enumerate().map(|(i, c)| (c.id.clone(), i)).collect();
     let arcs_map_idx: HashMap<String, usize> = arcs.iter().enumerate().map(|(i, a)| (a.id.clone(), i)).collect();
@@ -691,40 +711,107 @@ fn linearize(
     }
 
     let mut analytic_rows: HashMap<usize, usize> = HashMap::new();
-    let mut row_cursor = 0usize;
-    for constraint in constraints {
-        let row_count = crate::constraints::constraint_residual_impl(
-            constraint, points, lines, circles, arcs, shapes,
-        ).len();
+    static LOGGED_MISSING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    for (ci, constraint) in constraints.iter().enumerate() {
+        let (row_start, row_count) = sparsity.constraint_row_layout[ci];
         if row_count == 0 {
             continue;
         }
-        // Only use analytic Jacobian for non-group variables; group variables use FD.
         if let Some((_residuals, partials)) = constraint_jacobian_impl(
             constraint, points, lines, circles, arcs, shapes,
         ) {
             for (key, derivs) in partials {
                 if let Some(&col) = key_to_col.get(&key) {
                     for (r, value) in derivs.iter().enumerate().take(row_count) {
-                        jacobian[row_cursor + r][col] = *value;
+                        jacobian[row_start + r][col] = *value;
                     }
                 }
             }
-            analytic_rows.insert(row_cursor, row_count);
+            analytic_rows.insert(row_start, row_count);
+        } else if !LOGGED_MISSING.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            let mut missing_types: Vec<String> = Vec::new();
+            for (ci2, c) in constraints.iter().enumerate() {
+                let (_, rc) = sparsity.constraint_row_layout[ci2];
+                if rc > 0 && constraint_jacobian_impl(c, points, lines, circles, arcs, shapes).is_none() {
+                    let type_name = format!("{:?}", c).split('{').next().unwrap_or("?").trim().to_string();
+                    if !missing_types.contains(&type_name) {
+                        missing_types.push(type_name);
+                    }
+                }
+            }
+            #[cfg(target_arch = "wasm32")]
+            {
+                use wasm_bindgen::prelude::*;
+                #[wasm_bindgen]
+                extern "C" {
+                    #[wasm_bindgen(js_namespace = console)]
+                    fn warn(s: &str);
+                }
+                warn(&format!("[solver] Constraints without analytic Jacobian: {:?}", missing_types));
+            }
         }
-        row_cursor += row_count;
     }
+    profiler::add(|p| p.linearize_analytic_us += profiler::platform::now_us() - t_analytic);
 
+    // ── Build col → (entity_kind, entity_index, field) for O(1) get/set ──
+    // 0=point.x, 1=point.y, 2=circle.r, 3=arc.r, 4=group.x, 5=group.y, 6=group.theta
+    let col_to_entity: Vec<(u8, usize)> = {
+        let mut map = vec![(255u8, 0usize); n_vars];
+        for (i, &vi) in pt_var_idx.iter().enumerate() {
+            if vi != usize::MAX {
+                map[vi] = (0, i);       // point.x
+                map[vi + 1] = (1, i);   // point.y
+            }
+        }
+        for (i, &vi) in circ_var_idx.iter().enumerate() {
+            if vi != usize::MAX {
+                map[vi] = (2, i);       // circle.r
+            }
+        }
+        for (i, &vi) in arc_var_idx.iter().enumerate() {
+            if vi != usize::MAX {
+                map[vi] = (3, i);       // arc.r
+            }
+        }
+        for (i, &vi) in group_var_idx.iter().enumerate() {
+            if vi != usize::MAX {
+                map[vi] = (4, i);       // group.x
+                map[vi + 1] = (5, i);   // group.y
+                if !groups[i].fixed_rotation {
+                    map[vi + 2] = (6, i); // group.theta
+                }
+            }
+        }
+        map
+    };
+
+    let t_fd = profiler::platform::now_us();
+    let mut fd_cols_run = 0u32;
+    let mut fd_cols_skipped = 0u32;
     for col in 0..n_vars {
-        let v = &vars[col];
-        let base_val = get_var(col, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
-        let step = fd_step(base_val, v.scale);
         let is_group = sparsity.group_var_cols.contains(&col);
+
+        // Skip FD entirely if all constraint rows for this column have analytics
+        // and there are no arc rows to evaluate — the analytic pass already filled them.
+        if !is_group {
+            let all_analytic = sparsity.var_to_constraint_rows[col]
+                .iter()
+                .all(|&(row_start, _)| analytic_rows.contains_key(&row_start));
+            if all_analytic && sparsity.var_to_arc_rows[col].is_empty() {
+                fd_cols_skipped += 1;
+                continue;
+            }
+        }
+        fd_cols_run += 1;
+
+        let v = &vars[col];
+        let base_val = get_var_fast(col, points, circles, arcs, groups, &col_to_entity);
+        let step = fd_step(base_val, v.scale);
         let needs_reconstruct = sparsity.reconstruction_var_cols.contains(&col);
 
         // Central differences: evaluate at x+h and x-h, derivative = (f(x+h) - f(x-h)) / (2h)
         // Collect forward residuals (x+h).
-        set_var(col, base_val + step, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+        set_var_fast(col, base_val + step, points, circles, arcs, groups, &col_to_entity);
         if is_group { resolve_group_points(points, groups); }
         if needs_reconstruct { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
@@ -733,8 +820,7 @@ fn linearize(
             if analytic_rows.contains_key(&row_start) && !is_group {
                 continue;
             }
-            let ci = constraint_index_at_row(row_start, constraints, points, lines, circles, arcs, shapes);
-            if let Some(ci) = ci {
+            if let Some(&ci) = sparsity.row_to_constraint.get(&row_start) {
                 let res = crate::constraints::constraint_residual_impl(
                     &constraints[ci], points, lines, circles, arcs, shapes,
                 );
@@ -757,7 +843,7 @@ fn linearize(
         }
 
         // Collect backward residuals (x-h).
-        set_var(col, base_val - step, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+        set_var_fast(col, base_val - step, points, circles, arcs, groups, &col_to_entity);
         if is_group { resolve_group_points(points, groups); }
         if needs_reconstruct { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
@@ -767,8 +853,7 @@ fn linearize(
             if analytic_rows.contains_key(&row_start) && !is_group {
                 continue;
             }
-            let ci = constraint_index_at_row(row_start, constraints, points, lines, circles, arcs, shapes);
-            if let Some(ci) = ci {
+            if let Some(&ci) = sparsity.row_to_constraint.get(&row_start) {
                 let res = crate::constraints::constraint_residual_impl(
                     &constraints[ci], points, lines, circles, arcs, shapes,
                 );
@@ -808,12 +893,18 @@ fn linearize(
         }
 
         // Restore original value.
-        set_var(col, base_val, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+        set_var_fast(col, base_val, points, circles, arcs, groups, &col_to_entity);
         if is_group { resolve_group_points(points, groups); }
         if needs_reconstruct { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
         let _ = (&pts_map, &circs_map, &arcs_map_idx);
     }
+    profiler::add(|p| {
+        p.linearize_fd_us += profiler::platform::now_us() - t_fd;
+        // Encode fd_cols stats in unused fields for debugging
+        p.state_capture_count += fd_cols_skipped;
+        p.state_apply_count += fd_cols_run;
+    });
 
     if jacobian
         .iter()
@@ -941,6 +1032,53 @@ fn set_var(
         if vi == col { g.x = value; return; }
         if vi + 1 == col { g.y = value; return; }
         if !g.fixed_rotation && vi + 2 == col { g.theta = value; return; }
+    }
+}
+
+/// O(1) variable access using precomputed col → (kind, entity_index) mapping.
+/// Kinds: 0=point.x, 1=point.y, 2=circle.r, 3=arc.r, 4=group.x, 5=group.y, 6=group.theta
+#[inline]
+fn get_var_fast(
+    col: usize,
+    points: &[Point],
+    circles: &[Circle],
+    arcs: &[Arc],
+    groups: &[SketchGroup],
+    col_to_entity: &[(u8, usize)],
+) -> f64 {
+    let (kind, idx) = col_to_entity[col];
+    match kind {
+        0 => points[idx].x,
+        1 => points[idx].y,
+        2 => circles[idx].radius,
+        3 => arcs[idx].radius,
+        4 => groups[idx].x,
+        5 => groups[idx].y,
+        6 => groups[idx].theta,
+        _ => 0.0,
+    }
+}
+
+#[inline]
+fn set_var_fast(
+    col: usize,
+    value: f64,
+    points: &mut [Point],
+    circles: &mut [Circle],
+    arcs: &mut [Arc],
+    groups: &mut [SketchGroup],
+    col_to_entity: &[(u8, usize)],
+) {
+    let (kind, idx) = col_to_entity[col];
+    match kind {
+        0 => points[idx].x = value,
+        1 => points[idx].y = value,
+        2 => circles[idx].radius = value.max(1e-9),
+        3 => arcs[idx].radius = value.max(1e-9),
+        4 => groups[idx].x = value,
+        5 => groups[idx].y = value,
+        6 => groups[idx].theta = value,
+        _ => {}
     }
 }
 
@@ -1337,8 +1475,10 @@ pub fn solve_global(
     let ref_len = compute_reference_length(points, circles, arcs, constraints);
     let scale = ref_len.max(1.0);
 
-    let (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx) =
-        build_variables(points, circles, arcs, groups, scale, graph);
+    let (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx) = profiler::timed(
+        |p, us| p.build_variables_us += us,
+        || build_variables(points, circles, arcs, groups, scale, graph),
+    );
 
     if vars.is_empty() {
         return match eval_residuals_full(points, lines, circles, arcs, shapes, constraints) {
@@ -1347,12 +1487,16 @@ pub fn solve_global(
         };
     }
 
-    let (sparsity, n_rows) = build_sparsity(
-        points, lines, circles, arcs, shapes, constraints, groups,
-        &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
-        graph,
+    let (sparsity, n_rows) = profiler::timed(
+        |p, us| p.build_sparsity_us += us,
+        || build_sparsity(
+            points, lines, circles, arcs, shapes, constraints, groups,
+            &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
+            graph,
+        ),
     );
 
+    profiler::add(|p| { p.n_vars = vars.len() as u32; p.n_rows = n_rows as u32; });
     trail_push(&format!("init: vars={} rows={} ref_len={:.2}", vars.len(), n_rows, ref_len), 0.0);
 
     let initial_state = capture_state(points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len());
@@ -1361,6 +1505,8 @@ pub fn solve_global(
     let mut nullspace_basis: Vec<Vec<f64>> = Vec::new();
 
     for attempt in 0..restarts {
+        profiler::add(|p| p.lm_restarts += 1);
+
         if attempt > 0 && !nullspace_basis.is_empty() {
             seed_nullspace_restart(
                 points, circles, arcs, groups, &best_state,
@@ -1381,7 +1527,9 @@ pub fn solve_global(
                 &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len(),
             );
             let pre_gs_error = current_max_error(points, lines, circles, arcs, shapes, constraints);
-            projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, warm_start_iters, tolerance);
+            profiler::timed(|p, us| p.gs_warmstart_us += us, || {
+                projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, warm_start_iters, tolerance);
+            });
             let mut gs_error = current_max_error(points, lines, circles, arcs, shapes, constraints);
             if gs_error > pre_gs_error {
                 apply_state(
@@ -1429,6 +1577,7 @@ pub fn solve_global(
     // GS escape: 3 rounds of GS warm-start + another LM pass.
     if best_error > tolerance {
         for gs_round in 0..3u32 {
+            profiler::add(|p| p.gs_escape_rounds += 1);
             apply_state(&best_state, points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx);
             if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
             let gs_iters = (warm_start_iters * 4).max(30);
@@ -1437,7 +1586,9 @@ pub fn solve_global(
                 &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len(),
             );
             let pre_gs_error = current_max_error(points, lines, circles, arcs, shapes, constraints);
-            projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, gs_iters, tolerance);
+            profiler::timed(|p, us| p.gs_warmstart_us += us, || {
+                projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, gs_iters, tolerance);
+            });
             let mut gs_error = current_max_error(points, lines, circles, arcs, shapes, constraints);
             if gs_error > pre_gs_error {
                 apply_state(
@@ -1507,10 +1658,12 @@ fn run_lm_pass(
     // The TS solver never had this term and converged fine.
     let prior_diag = 0.0;
 
-    let mut lin = match linearize(
-        points, lines, circles, arcs, shapes, constraints, groups,
-        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
-    ) {
+    let mut lin = match profiler::timed(|p, us| { p.linearize_us += us; p.linearize_count += 1; }, || {
+        linearize(
+            points, lines, circles, arcs, shapes, constraints, groups,
+            vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
+        )
+    }) {
         Some(l) => l,
         None => return f64::INFINITY,
     };
@@ -1520,17 +1673,20 @@ fn run_lm_pass(
 
     for _ in 0..iterations {
         if lin.max_abs <= tolerance { break; }
+        profiler::add(|p| p.lm_outer_iterations += 1);
 
         let state = capture_state(points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, vars.len());
         let prior_offset: Vec<f64> = state.iter().zip(anchor_state.iter()).map(|(s, a)| s - a).collect();
 
-        let step = match lm_step(
-            &lin.weighted_jacobian,
-            &lin.weighted_residual,
-            lambda,
-            Some(&prior_offset),
-            prior_diag,
-        ) {
+        let step = match profiler::timed(|p, us| { p.lm_step_us += us; p.lm_step_count += 1; }, || {
+            lm_step(
+                &lin.weighted_jacobian,
+                &lin.weighted_residual,
+                lambda,
+                Some(&prior_offset),
+                prior_diag,
+            )
+        }) {
             Some(s) => s,
             None => break,
         };
@@ -1543,14 +1699,18 @@ fn run_lm_pass(
         let mut local_nu = nu;
 
         for _ in 0..12 {
+            profiler::add(|p| p.lm_inner_retries += 1);
+
             let trial_state: Vec<f64> = state.iter().zip(&dx).map(|(s, d)| s + d).collect();
             apply_state(&trial_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
             if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
-            let trial = match linearize(
-                points, lines, circles, arcs, shapes, constraints, groups,
-                vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
-            ) {
+            let trial = match profiler::timed(|p, us| { p.linearize_us += us; p.linearize_count += 1; }, || {
+                linearize(
+                    points, lines, circles, arcs, shapes, constraints, groups,
+                    vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
+                )
+            }) {
                 Some(l) => l,
                 None => {
                     apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
@@ -1564,6 +1724,7 @@ fn run_lm_pass(
 
             if actual > 0.0 {
                 accepted = true;
+                profiler::add(|p| p.lm_accepted_steps += 1);
                 lambda = if rho > 0.0 {
                     let factor = 1.0 - (2.0 * rho - 1.0).powi(3);
                     local_lambda * (1.0_f64 / 3.0).max(factor)
@@ -1584,13 +1745,15 @@ fn run_lm_pass(
             local_lambda *= local_nu;
             local_nu *= 2.0;
 
-            let retry = match lm_step(
-                &lin.weighted_jacobian,
-                &lin.weighted_residual,
-                local_lambda,
-                Some(&prior_offset),
-                prior_diag,
-            ) {
+            let retry = match profiler::timed(|p, us| { p.lm_step_us += us; p.lm_step_count += 1; }, || {
+                lm_step(
+                    &lin.weighted_jacobian,
+                    &lin.weighted_residual,
+                    local_lambda,
+                    Some(&prior_offset),
+                    prior_diag,
+                )
+            }) {
                 Some(s) => s,
                 None => break,
             };

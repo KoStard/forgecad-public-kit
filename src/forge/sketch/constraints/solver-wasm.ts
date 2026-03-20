@@ -74,6 +74,7 @@ interface WasmOptions {
   skip_redundancy_check?: boolean;
   presolve_constraint_id?: string;
   fallback_restarts?: number;
+  progressive?: boolean;
 }
 
 interface WasmProblem {
@@ -130,6 +131,7 @@ interface WasmSolveMetadata {
   constraint_residuals: WasmConstraintResidual[];
   redundant_constraint_ids: string[];
   conflicting_constraint_ids: string[];
+  solve_trail?: { phase: string; error: number }[];
 }
 
 export type SolverWasmExchangeKind = 'solve' | 'presolve' | 'presolve-single';
@@ -198,8 +200,10 @@ export interface SolverWasmRunDebugSnapshot {
 // ─── WASM module state ────────────────────────────────────────────────────────
 
 type WasmSolveFn = (problem_json: string) => string;
+type WasmProfileFn = () => string;
 
 let _wasm_solve: WasmSolveFn | null = null;
+let _wasm_get_profile: WasmProfileFn | null = null;
 let _initPromise: Promise<void> | null = null;
 const MAX_EXCHANGE_HISTORY = 64;
 const DEBUG_STORAGE_KEY = 'fc:solver-debug';
@@ -601,6 +605,7 @@ export async function initSolverWasm(): Promise<void> {
       }
 
       _wasm_solve = solverModule.solve as WasmSolveFn;
+      _wasm_get_profile = (solverModule as any).get_last_profile as WasmProfileFn | undefined ?? null;
     } catch (err) {
       throw new Error(
         `[solver-wasm] Failed to load WASM solver.\n` +
@@ -943,5 +948,13 @@ export function solveConstraintsWasm(
       };
     },
   });
+}
+
+/** Return the Rust-side profiling data from the last solve call, or null if unavailable. */
+export function getLastRustProfile(): Record<string, number> | null {
+  if (!_wasm_get_profile) return null;
+  try {
+    return JSON.parse(_wasm_get_profile());
+  } catch { return null; }
 }
 

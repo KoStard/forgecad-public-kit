@@ -15,6 +15,13 @@ pub fn start() {
     console_error_panic_hook::set_once();
 }
 
+/// Return the profiling data from the last solve call as JSON.
+#[wasm_bindgen]
+pub fn get_last_profile() -> String {
+    let p = solver::profiler::snapshot();
+    solver::profiler::to_json(&p)
+}
+
 /// Solve a constraint system from JSON.
 #[wasm_bindgen]
 pub fn solve(problem_json: &str) -> String {
@@ -43,17 +50,37 @@ pub fn presolve_single(problem_json: &str, constraint_id: &str) -> String {
 }
 
 fn solve_inner(problem_json: &str) -> Result<SolveResult, serde_json::Error> {
-    let mut problem: Problem = serde_json::from_str(problem_json)?;
-    solver::expand_groups(&mut problem);
+    solver::profiler::reset();
+
+    let mut problem: Problem = solver::profiler::timed(
+        |p, us| p.deserialize_us = us,
+        || serde_json::from_str(problem_json),
+    )?;
+
+    solver::profiler::timed(
+        |p, us| p.expand_groups_us = us,
+        || solver::expand_groups(&mut problem),
+    );
+
+    solver::profiler::add(|p| {
+        p.n_constraints = problem.constraints.len() as u32;
+        p.n_points = problem.points.len() as u32;
+    });
+
     let options = problem.options.clone().unwrap_or_default();
     let max_error = solver::solve(
         &mut problem.points, &problem.lines, &mut problem.circles, &mut problem.arcs,
         &problem.shapes, &problem.constraints, &options, &mut problem.groups,
     );
-    let metadata = solver::analyze_solution(
-        &problem.points, &problem.lines, &problem.circles, &problem.arcs,
-        &problem.shapes, &problem.constraints, max_error, &options, &problem.groups,
+
+    let metadata = solver::profiler::timed(
+        |p, us| p.analyze_solution_us = us,
+        || solver::analyze_solution(
+            &problem.points, &problem.lines, &problem.circles, &problem.arcs,
+            &problem.shapes, &problem.constraints, max_error, &options, &problem.groups,
+        ),
     );
+
     Ok(build_result(max_error, &problem, Some(metadata)))
 }
 

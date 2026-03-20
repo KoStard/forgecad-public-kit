@@ -11,6 +11,7 @@ import { materializeNotebookPreviewScript } from "./notebook-entry";
 import type { Shape } from "../src/forge/kernel";
 import { lastSolveProfile } from "../src/forge/sketch/constraints/sketch";
 import { lastSolverProfile, getSolverStats, resetSolverStats } from "../src/forge/sketch/constraints/registry";
+import { getLastRustProfile } from "../src/forge/sketch/constraints/solver-wasm";
 
 type ShapeEntry = { name: string; shape: Shape; min: number[]; max: number[]; groupName?: string };
 
@@ -347,6 +348,36 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       console.log(`    linearizations:  ${stats.totalLinearizations}`);
       console.log(`    LM iterations:   ${stats.totalLmIterations}`);
       console.log(`    total LM time:   ${stats.totalLmTime.toFixed(0)}ms`);
+    }
+    const rustProfile = getLastRustProfile();
+    if (rustProfile) {
+      const us = (key: string) => ((rustProfile[key] ?? 0) / 1000).toFixed(1);
+      console.log(`  Rust profile (last solve — final solve only):`);
+      console.log(`    deserialize:     ${us('deserialize_us')}ms`);
+      console.log(`    expand_groups:   ${us('expand_groups_us')}ms`);
+      console.log(`    presolve:        ${us('presolve_us')}ms`);
+      console.log(`    analytical:      ${us('analytical_presolve_us')}ms`);
+      console.log(`    recon_graph:     ${us('reconstruction_graph_us')}ms`);
+      console.log(`    dag_decompose:   ${us('dag_decompose_us')}ms`);
+      console.log(`    build_variables: ${us('build_variables_us')}ms`);
+      console.log(`    build_sparsity:  ${us('build_sparsity_us')}ms`);
+      console.log(`    gs_warmstart:    ${us('gs_warmstart_us')}ms`);
+      console.log(`    lm_total:        ${us('lm_total_us')}ms`);
+      console.log(`    analyze:         ${us('analyze_solution_us')}ms`);
+      console.log(`    progressive:     ${us('progressive_total_us')}ms  (${rustProfile.progressive_steps ?? 0} steps)`);
+      console.log(`    --- LM internals ---`);
+      console.log(`    linearize:       ${us('linearize_us')}ms  (${rustProfile.linearize_count ?? 0} calls)`);
+      console.log(`      residuals:     ${us('linearize_residual_us')}ms`);
+      console.log(`      analytic J:    ${us('linearize_analytic_us')}ms`);
+      console.log(`      FD loop:       ${us('linearize_fd_us')}ms`);
+      console.log(`    lm_step:         ${us('lm_step_us')}ms  (${rustProfile.lm_step_count ?? 0} calls)`);
+      console.log(`    outer iters:     ${rustProfile.lm_outer_iterations ?? 0}`);
+      console.log(`    inner retries:   ${rustProfile.lm_inner_retries ?? 0}`);
+      console.log(`    accepted steps:  ${rustProfile.lm_accepted_steps ?? 0}`);
+      console.log(`    restarts:        ${rustProfile.lm_restarts ?? 0}`);
+      console.log(`    gs_escape:       ${rustProfile.gs_escape_rounds ?? 0} rounds`);
+      console.log(`    problem size:    ${rustProfile.n_vars ?? 0} vars × ${rustProfile.n_rows ?? 0} rows, ${rustProfile.n_constraints ?? 0} constraints, ${rustProfile.n_points ?? 0} points`);
+      console.log(`    FD debug:        skipped=${rustProfile.state_capture_count ?? 0} cols, ran=${rustProfile.state_apply_count ?? 0} cols`);
     }
   } finally {
     materialized.cleanup();

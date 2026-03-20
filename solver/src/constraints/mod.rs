@@ -204,6 +204,17 @@ pub fn constraint_jacobian_impl(
     };
 
     match c {
+        Constraint::Coincident { a, b, .. } => {
+            let pa = pts.get(a.as_str())?;
+            let pb = pts.get(b.as_str())?;
+            let residuals = vec![pb.x - pa.x, pb.y - pa.y];
+            add(format!("{}.x", a), vec![-1.0, 0.0]);
+            add(format!("{}.y", a), vec![0.0, -1.0]);
+            add(format!("{}.x", b), vec![1.0, 0.0]);
+            add(format!("{}.y", b), vec![0.0, 1.0]);
+            Some((residuals, partials))
+        }
+
         Constraint::Horizontal { line, .. } => {
             let l = lns.get(line.as_str())?;
             let pa = pts.get(l.a.as_str())?;
