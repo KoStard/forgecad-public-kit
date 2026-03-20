@@ -2,6 +2,7 @@ pub mod analytical;
 pub mod decompose;
 pub mod linear;
 pub mod lm;
+pub mod reconstruction;
 
 use std::collections::HashMap;
 use crate::constraints::{constraint_jacobian_impl, constraint_residual_impl, evaluate_residuals, has_residual};
@@ -417,6 +418,22 @@ fn solve_single_system(
     run_presolve(points, lines, circles, arcs, shapes, constraints, tolerance);
     run_analytical_presolve(points, lines, constraints);
 
+    // Build the reconstruction graph: identifies points that can be computed
+    // from closed-form geometry (circle-circle intersection, line-circle, etc.)
+    // and the constraints they consume. These points are removed from LM's
+    // variable list; their positions are recomputed during each FD perturbation.
+    let group_owned_ids: std::collections::HashSet<String> = groups.iter()
+        .flat_map(|g| g.points.iter().map(|p| p.id.clone()))
+        .collect();
+    let graph = reconstruction::build_reconstruction_graph(
+        points, lines, constraints, &group_owned_ids,
+    );
+
+    // Initial reconstruction: place determined points at their computed positions.
+    if !graph.is_empty() {
+        reconstruction::reconstruct(&graph, points, lines, constraints);
+    }
+
     // Resolve group-owned points from their group frames after presolve.
     resolve_group_points(points, groups);
 
@@ -428,6 +445,7 @@ fn solve_single_system(
             points, lines, circles, arcs, shapes, constraints,
             iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
             groups,
+            &graph,
         )
     } else {
         gauss_seidel_solve(

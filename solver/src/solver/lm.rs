@@ -3,6 +3,7 @@ use crate::constraints::{constraint_jacobian_impl, evaluate_residuals};
 use crate::types::{Arc, Circle, Constraint, Line, Point, Shape, SketchGroup};
 use super::linear::solve_linear;
 use super::resolve_group_points;
+use super::reconstruction::ReconstructionGraph;
 
 // ─── Variable abstraction ─────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ fn build_variables(
     arcs: &Vec<Arc>,
     groups: &Vec<SketchGroup>,
     scale: f64,
+    graph: &ReconstructionGraph,
 ) -> (Vec<Variable>, Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>) {
     // Returns: (vars, point_indices, circle_indices, arc_indices, group_indices)
     // point_indices[i] → variable index for points[i].x (y = +1)
@@ -40,7 +42,8 @@ fn build_variables(
     }
 
     for (i, p) in points.iter().enumerate() {
-        if p.fixed || group_owned_points.contains(&p.id) {
+        // Skip: fixed, group-owned, or reconstructed (determined by constructive geometry).
+        if p.fixed || group_owned_points.contains(&p.id) || graph.determined_point_indices.contains(&i) {
             pt_var_idx.push(usize::MAX);
         } else {
             pt_var_idx.push(vars.len());
@@ -252,6 +255,9 @@ struct SparsityMap {
     arc_row_start: usize,
     /// Set of variable column indices that are group frame variables.
     group_var_cols: HashSet<usize>,
+    /// Set of variable column indices that affect reconstructed points
+    /// (require calling reconstruct() during FD).
+    reconstruction_var_cols: HashSet<usize>,
 }
 
 fn build_sparsity(
@@ -267,6 +273,7 @@ fn build_sparsity(
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
+    graph: &ReconstructionGraph,
 ) -> (SparsityMap, usize) {
     let n_vars = vars.len();
 
@@ -296,7 +303,7 @@ fn build_sparsity(
     for (i, p) in points.iter().enumerate() {
         let vi = pt_var_idx[i];
         if vi != usize::MAX {
-            // Non-group-owned, non-fixed point — maps to its own x/y variables.
+            // Non-group-owned, non-fixed, non-reconstructed point — maps to its own x/y variables.
             entity_to_vars.entry(p.id.clone()).or_default().extend([vi, vi + 1]);
         } else if let Some(&gi) = group_point_to_group_idx.get(&p.id) {
             // Group-owned point — maps to the group's frame variables.
@@ -310,6 +317,29 @@ fn build_sparsity(
                 }
             }
         }
+        // Reconstructed point routing is done below after entity_to_vars is populated.
+    }
+
+    // Route reconstructed points to the variables of the points they depend on.
+    // This must happen after the initial entity_to_vars population so that
+    // transitive dependencies through other free points are already registered.
+    let dep_map = graph.dependency_point_indices();
+    let mut reconstruction_var_cols: HashSet<usize> = HashSet::new();
+    for (&recon_idx, dep_indices) in &dep_map {
+        let recon_id = points[recon_idx].id.clone();
+        let mut dep_vars: Vec<usize> = Vec::new();
+        for &dep_idx in dep_indices {
+            let dep_id = &points[dep_idx].id;
+            if let Some(vars) = entity_to_vars.get(dep_id.as_str()) {
+                dep_vars.extend(vars);
+            }
+        }
+        dep_vars.sort();
+        dep_vars.dedup();
+        for &vi in &dep_vars {
+            reconstruction_var_cols.insert(vi);
+        }
+        entity_to_vars.insert(recon_id, dep_vars);
     }
     for (i, c) in circles.iter().enumerate() {
         let vi = circ_var_idx[i];
@@ -382,7 +412,7 @@ fn build_sparsity(
         rows.dedup();
     }
 
-    (SparsityMap { var_to_constraint_rows, var_to_arc_rows, arc_row_start, group_var_cols }, arc_row_start + arcs.len() * 2)
+    (SparsityMap { var_to_constraint_rows, var_to_arc_rows, arc_row_start, group_var_cols, reconstruction_var_cols }, arc_row_start + arcs.len() * 2)
 }
 
 // ─── Jacobian + linearization ─────────────────────────────────────────────────
@@ -406,6 +436,7 @@ fn linearize(
     group_var_idx: &Vec<usize>,
     sparsity: &SparsityMap,
     n_rows: usize,
+    graph: &ReconstructionGraph,
 ) -> Option<LinearizedSystem> {
     let (base, max_abs) = eval_residuals_full(points, lines, circles, arcs, shapes, constraints)?;
     let n_vars = vars.len();
@@ -468,11 +499,13 @@ fn linearize(
         let base_val = get_var(col, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
         let step = fd_step(base_val, v.scale);
         let is_group = sparsity.group_var_cols.contains(&col);
+        let needs_reconstruct = sparsity.reconstruction_var_cols.contains(&col);
 
         // Central differences: evaluate at x+h and x-h, derivative = (f(x+h) - f(x-h)) / (2h)
         // Collect forward residuals (x+h).
         set_var(col, base_val + step, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
         if is_group { resolve_group_points(points, groups); }
+        if needs_reconstruct { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
         let mut fwd_constraint_res: Vec<(usize, usize, Vec<f64>)> = Vec::new();
         for &(row_start, row_count) in &sparsity.var_to_constraint_rows[col] {
@@ -505,6 +538,7 @@ fn linearize(
         // Collect backward residuals (x-h).
         set_var(col, base_val - step, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
         if is_group { resolve_group_points(points, groups); }
+        if needs_reconstruct { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
         let two_h = 2.0 * step;
         let mut bwd_idx = 0usize;
@@ -555,6 +589,7 @@ fn linearize(
         // Restore original value.
         set_var(col, base_val, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
         if is_group { resolve_group_points(points, groups); }
+        if needs_reconstruct { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
         let _ = (&pts_map, &circs_map, &arcs_map_idx);
     }
@@ -947,6 +982,7 @@ fn compute_nullspace_basis(
     group_var_idx: &Vec<usize>,
     sparsity: &SparsityMap,
     n_rows: usize,
+    graph: &ReconstructionGraph,
 ) -> Vec<Vec<f64>> {
     let n = vars.len();
     if n == 0 || n > 200 {
@@ -955,7 +991,7 @@ fn compute_nullspace_basis(
 
     let lin = match linearize(
         points, lines, circles, arcs, shapes, constraints, groups,
-        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows,
+        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
     ) {
         Some(l) => l,
         None => return Vec::new(),
@@ -1075,12 +1111,13 @@ pub fn solve_global(
     warm_start_iters: u32,
     max_scaled_step: f64,
     groups: &mut Vec<SketchGroup>,
+    graph: &ReconstructionGraph,
 ) -> f64 {
     let ref_len = compute_reference_length(points, circles, arcs);
     let scale = ref_len.max(1.0);
 
     let (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx) =
-        build_variables(points, circles, arcs, groups, scale);
+        build_variables(points, circles, arcs, groups, scale, graph);
 
     if vars.is_empty() {
         return match eval_residuals_full(points, lines, circles, arcs, shapes, constraints) {
@@ -1092,6 +1129,7 @@ pub fn solve_global(
     let (sparsity, n_rows) = build_sparsity(
         points, lines, circles, arcs, shapes, constraints, groups,
         &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
+        graph,
     );
 
     let initial_state = capture_state(points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len());
@@ -1127,6 +1165,7 @@ pub fn solve_global(
             points, lines, circles, arcs, shapes, constraints, groups,
             &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
             &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
+            graph,
         );
 
         if error < best_error {
@@ -1141,7 +1180,7 @@ pub fn solve_global(
             nullspace_basis = compute_nullspace_basis(
                 points, lines, circles, arcs, shapes, constraints, groups,
                 &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
-                &sparsity, n_rows,
+                &sparsity, n_rows, graph,
             );
         }
     }
@@ -1150,6 +1189,7 @@ pub fn solve_global(
     if best_error > tolerance {
         for _ in 0..3 {
             apply_state(&best_state, points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx);
+            if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
             let gs_iters = (warm_start_iters * 4).max(30);
             projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, gs_iters, tolerance);
             let pass_anchor_state = capture_state(
@@ -1161,6 +1201,7 @@ pub fn solve_global(
                 points, lines, circles, arcs, shapes, constraints, groups,
                 &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
                 &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
+                graph,
             );
 
             if error < best_error {
@@ -1172,6 +1213,7 @@ pub fn solve_global(
     }
 
     apply_state(&best_state, points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx);
+    if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
     best_error
 }
 
@@ -1195,6 +1237,7 @@ fn run_lm_pass(
     max_scaled_step: f64,
     scale: f64,
     anchor_state: &Vec<f64>,
+    graph: &ReconstructionGraph,
 ) -> f64 {
     let mut lambda = 1e-3f64;
     let mut nu = 2.0f64;
@@ -1202,7 +1245,7 @@ fn run_lm_pass(
 
     let mut lin = match linearize(
         points, lines, circles, arcs, shapes, constraints, groups,
-        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows,
+        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
     ) {
         Some(l) => l,
         None => return f64::INFINITY,
@@ -1236,14 +1279,16 @@ fn run_lm_pass(
         // Nielsen update: one trial step per outer iteration.
         let trial_state: Vec<f64> = state.iter().zip(&dx).map(|(s, d)| s + d).collect();
         apply_state(&trial_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+        if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
         let trial = match linearize(
             points, lines, circles, arcs, shapes, constraints, groups,
-            vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows,
+            vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
         ) {
             Some(l) => l,
             None => {
                 apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+                if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
                 // Reject: increase damping.
                 lambda *= nu;
                 nu *= 2.0;
@@ -1275,6 +1320,7 @@ fn run_lm_pass(
         } else {
             // Reject: restore state, increase damping.
             apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+            if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
             lambda *= nu;
             nu *= 2.0;
             consecutive_rejects += 1;
@@ -1283,6 +1329,7 @@ fn run_lm_pass(
     }
 
     apply_state(&best_pass_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+    if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
     match eval_residuals_full(points, lines, circles, arcs, shapes, constraints) {
         Some((_, max_abs)) => max_abs,
