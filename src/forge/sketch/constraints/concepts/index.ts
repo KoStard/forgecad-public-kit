@@ -7,6 +7,7 @@
 import './rect';
 import './polygon';
 import './regularPolygon';
+import './groupRect';
 
 // Re-export public API
 export { addRect } from './rect';
@@ -17,3 +18,6 @@ export type { PolygonOptions, ConstrainedPolygon } from './polygon';
 
 export { addRegularPolygon } from './regularPolygon';
 export type { RegularPolygonOptions, ConstrainedRegularPolygon } from './regularPolygon';
+
+export { addGroupRect } from './groupRect';
+export type { GroupRectOptions, ConstrainedGroupRect } from './groupRect';

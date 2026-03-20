@@ -502,6 +502,7 @@ type LineId = string;
 type CircleId = string;
 type ArcId = string;
 type ShapeId = string;
+type GroupId = string;
 interface SketchArc {
 	id: ArcId;
 	/** Center point of the arc's circle. */
@@ -520,6 +521,21 @@ interface SketchShape {
 	id: ShapeId;
 	/** Ordered list of line IDs forming a closed polygon. */
 	lines: LineId[];
+}
+interface SketchGroupLocalPoint {
+	id: PointId;
+	lx: number;
+	ly: number;
+}
+interface SketchGroup {
+	id: GroupId;
+	x: number;
+	y: number;
+	theta: number;
+	fixed: boolean;
+	fixedRotation: boolean;
+	points: SketchGroupLocalPoint[];
+	lines: { id: LineId; a: PointId; b: PointId }[];
 }
 interface SketchPoint {
 	id: PointId;
@@ -714,6 +730,7 @@ interface ConstraintDefinition {
 	circles: SketchCircle[];
 	arcs: SketchArc[];
 	shapes: SketchShape[];
+	groups: SketchGroup[];
 	loops: SketchLoop[];
 	constraints: SketchConstraint[];
 	rejectedConstraints: SketchConstraint[];

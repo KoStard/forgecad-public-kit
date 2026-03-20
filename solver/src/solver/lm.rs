@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::constraints::{constraint_jacobian_impl, evaluate_residuals};
-use crate::types::{Arc, Circle, Constraint, Line, Point, Shape};
+use crate::types::{Arc, Circle, Constraint, Line, Point, Shape, SketchGroup};
 use super::linear::solve_linear;
+use super::resolve_group_points;
 
 // ─── Variable abstraction ─────────────────────────────────────────────────────
 
@@ -16,19 +17,30 @@ fn build_variables(
     points: &Vec<Point>,
     circles: &Vec<Circle>,
     arcs: &Vec<Arc>,
+    groups: &Vec<SketchGroup>,
     scale: f64,
-) -> (Vec<Variable>, Vec<usize>, Vec<usize>, Vec<usize>) {
-    // Returns: (vars, point_indices, circle_indices, arc_indices)
+) -> (Vec<Variable>, Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>) {
+    // Returns: (vars, point_indices, circle_indices, arc_indices, group_indices)
     // point_indices[i] → variable index for points[i].x (y = +1)
     // circle_indices[i] → variable index for circles[i].radius
     // arc_indices[i] → variable index for arcs[i].radius
+    // group_indices[i] → variable index for groups[i].x (y = +1, theta = +2 if not fixed_rotation)
     let mut vars: Vec<Variable> = Vec::new();
     let mut pt_var_idx = Vec::new();
     let mut circ_var_idx = Vec::new();
     let mut arc_var_idx = Vec::new();
+    let mut group_var_idx = Vec::new();
+
+    // Build set of group-owned point IDs — these are NOT independent solver variables.
+    let mut group_owned_points: HashSet<String> = HashSet::new();
+    for group in groups {
+        for lp in &group.points {
+            group_owned_points.insert(lp.id.clone());
+        }
+    }
 
     for (i, p) in points.iter().enumerate() {
-        if p.fixed {
+        if p.fixed || group_owned_points.contains(&p.id) {
             pt_var_idx.push(usize::MAX);
         } else {
             pt_var_idx.push(vars.len());
@@ -52,16 +64,32 @@ fn build_variables(
         vars.push(Variable { entity_id: a.id.clone(), scale });
     }
 
-    (vars, pt_var_idx, circ_var_idx, arc_var_idx)
+    // Group frame variables.
+    for g in groups.iter() {
+        if g.fixed {
+            group_var_idx.push(usize::MAX);
+        } else {
+            group_var_idx.push(vars.len());
+            vars.push(Variable { entity_id: g.id.clone(), scale }); // gx
+            vars.push(Variable { entity_id: g.id.clone(), scale }); // gy
+            if !g.fixed_rotation {
+                vars.push(Variable { entity_id: g.id.clone(), scale: 1.0 }); // gθ (radians)
+            }
+        }
+    }
+
+    (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx)
 }
 
 fn capture_state(
     points: &Vec<Point>,
     circles: &Vec<Circle>,
     arcs: &Vec<Arc>,
+    groups: &Vec<SketchGroup>,
     pt_var_idx: &Vec<usize>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
     n_vars: usize,
 ) -> Vec<f64> {
     let mut state = vec![0.0f64; n_vars];
@@ -81,6 +109,16 @@ fn capture_state(
     for (i, a) in arcs.iter().enumerate() {
         state[arc_var_idx[i]] = a.radius;
     }
+    for (i, g) in groups.iter().enumerate() {
+        let vi = group_var_idx[i];
+        if vi != usize::MAX {
+            state[vi] = g.x;
+            state[vi + 1] = g.y;
+            if !g.fixed_rotation {
+                state[vi + 2] = g.theta;
+            }
+        }
+    }
     state
 }
 
@@ -89,9 +127,11 @@ fn apply_state(
     points: &mut Vec<Point>,
     circles: &mut Vec<Circle>,
     arcs: &mut Vec<Arc>,
+    groups: &mut Vec<SketchGroup>,
     pt_var_idx: &Vec<usize>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
 ) {
     for (i, p) in points.iter_mut().enumerate() {
         let vi = pt_var_idx[i];
@@ -109,6 +149,18 @@ fn apply_state(
     for (i, a) in arcs.iter_mut().enumerate() {
         a.radius = state[arc_var_idx[i]].max(1e-9);
     }
+    for (i, g) in groups.iter_mut().enumerate() {
+        let vi = group_var_idx[i];
+        if vi != usize::MAX {
+            g.x = state[vi];
+            g.y = state[vi + 1];
+            if !g.fixed_rotation {
+                g.theta = state[vi + 2];
+            }
+        }
+    }
+    // Resolve group-owned points to world coordinates.
+    resolve_group_points(points, groups);
 }
 
 // ─── Reference length ─────────────────────────────────────────────────────────
@@ -198,6 +250,8 @@ struct SparsityMap {
     /// Per variable: which arc consistency rows it affects.
     var_to_arc_rows: Vec<Vec<usize>>,
     arc_row_start: usize,
+    /// Set of variable column indices that are group frame variables.
+    group_var_cols: HashSet<usize>,
 }
 
 fn build_sparsity(
@@ -207,19 +261,54 @@ fn build_sparsity(
     arcs: &Vec<Arc>,
     shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
+    groups: &Vec<SketchGroup>,
     vars: &Vec<Variable>,
     pt_var_idx: &Vec<usize>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
 ) -> (SparsityMap, usize) {
     let n_vars = vars.len();
+
+    // Build set of group-owned point IDs and map them to their group's variable indices.
+    let mut group_point_to_group_idx: HashMap<String, usize> = HashMap::new();
+    for (gi, group) in groups.iter().enumerate() {
+        for lp in &group.points {
+            group_point_to_group_idx.insert(lp.id.clone(), gi);
+        }
+    }
+
+    // Build the set of all group variable columns.
+    let mut group_var_cols: HashSet<usize> = HashSet::new();
+    for (gi, g) in groups.iter().enumerate() {
+        let vi = group_var_idx[gi];
+        if vi != usize::MAX {
+            group_var_cols.insert(vi);     // gx
+            group_var_cols.insert(vi + 1); // gy
+            if !g.fixed_rotation {
+                group_var_cols.insert(vi + 2); // gθ
+            }
+        }
+    }
 
     // Map entity_id → variable indices it contributes.
     let mut entity_to_vars: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, p) in points.iter().enumerate() {
         let vi = pt_var_idx[i];
         if vi != usize::MAX {
+            // Non-group-owned, non-fixed point — maps to its own x/y variables.
             entity_to_vars.entry(p.id.clone()).or_default().extend([vi, vi + 1]);
+        } else if let Some(&gi) = group_point_to_group_idx.get(&p.id) {
+            // Group-owned point — maps to the group's frame variables.
+            let gvi = group_var_idx[gi];
+            if gvi != usize::MAX {
+                let entry = entity_to_vars.entry(p.id.clone()).or_default();
+                entry.push(gvi);     // gx
+                entry.push(gvi + 1); // gy
+                if !groups[gi].fixed_rotation {
+                    entry.push(gvi + 2); // gθ
+                }
+            }
         }
     }
     for (i, c) in circles.iter().enumerate() {
@@ -293,7 +382,7 @@ fn build_sparsity(
         rows.dedup();
     }
 
-    (SparsityMap { var_to_constraint_rows, var_to_arc_rows, arc_row_start }, arc_row_start + arcs.len() * 2)
+    (SparsityMap { var_to_constraint_rows, var_to_arc_rows, arc_row_start, group_var_cols }, arc_row_start + arcs.len() * 2)
 }
 
 // ─── Jacobian + linearization ─────────────────────────────────────────────────
@@ -309,10 +398,12 @@ fn linearize(
     arcs: &mut Vec<Arc>,
     shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
+    groups: &mut Vec<SketchGroup>,
     vars: &Vec<Variable>,
     pt_var_idx: &Vec<usize>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
     sparsity: &SparsityMap,
     n_rows: usize,
 ) -> Option<LinearizedSystem> {
@@ -356,6 +447,7 @@ fn linearize(
         if row_count == 0 {
             continue;
         }
+        // Only use analytic Jacobian for non-group variables; group variables use FD.
         if let Some((_residuals, partials)) = constraint_jacobian_impl(
             constraint, points, lines, circles, arcs, shapes,
         ) {
@@ -373,14 +465,19 @@ fn linearize(
 
     for col in 0..n_vars {
         let v = &vars[col];
-        let base_val = get_var(col, points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx);
+        let base_val = get_var(col, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
         let step = fd_step(base_val, v.scale);
 
-        set_var(col, base_val + step, points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx);
+        set_var(col, base_val + step, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+
+        // If this is a group variable, resolve group points after perturbation.
+        if sparsity.group_var_cols.contains(&col) {
+            resolve_group_points(points, groups);
+        }
 
         // Sparse: only evaluate affected constraints.
         for &(row_start, row_count) in &sparsity.var_to_constraint_rows[col] {
-            if analytic_rows.contains_key(&row_start) {
+            if analytic_rows.contains_key(&row_start) && !sparsity.group_var_cols.contains(&col) {
                 continue;
             }
             let ci = constraint_index_at_row(row_start, constraints, points, lines, circles, arcs, shapes);
@@ -415,7 +512,12 @@ fn linearize(
             }
         }
 
-        set_var(col, base_val, points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx);
+        set_var(col, base_val, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+
+        // If this is a group variable, resolve group points after restoration.
+        if sparsity.group_var_cols.contains(&col) {
+            resolve_group_points(points, groups);
+        }
 
         let _ = (&pts_map, &circs_map, &arcs_map_idx);
     }
@@ -488,9 +590,11 @@ fn get_var(
     points: &Vec<Point>,
     circles: &Vec<Circle>,
     arcs: &Vec<Arc>,
+    groups: &Vec<SketchGroup>,
     pt_var_idx: &Vec<usize>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
 ) -> f64 {
     for (i, p) in points.iter().enumerate() {
         let vi = pt_var_idx[i];
@@ -504,6 +608,13 @@ fn get_var(
     for (i, a) in arcs.iter().enumerate() {
         if arc_var_idx[i] == col { return a.radius; }
     }
+    for (i, g) in groups.iter().enumerate() {
+        let vi = group_var_idx[i];
+        if vi == usize::MAX { continue; }
+        if vi == col { return g.x; }
+        if vi + 1 == col { return g.y; }
+        if !g.fixed_rotation && vi + 2 == col { return g.theta; }
+    }
     0.0
 }
 
@@ -513,9 +624,11 @@ fn set_var(
     points: &mut Vec<Point>,
     circles: &mut Vec<Circle>,
     arcs: &mut Vec<Arc>,
+    groups: &mut Vec<SketchGroup>,
     pt_var_idx: &Vec<usize>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
 ) {
     for (i, p) in points.iter_mut().enumerate() {
         let vi = pt_var_idx[i];
@@ -528,6 +641,13 @@ fn set_var(
     }
     for (i, a) in arcs.iter_mut().enumerate() {
         if arc_var_idx[i] == col { a.radius = value.max(1e-9); return; }
+    }
+    for (i, g) in groups.iter_mut().enumerate() {
+        let vi = group_var_idx[i];
+        if vi == usize::MAX { continue; }
+        if vi == col { g.x = value; return; }
+        if vi + 1 == col { g.y = value; return; }
+        if !g.fixed_rotation && vi + 2 == col { g.theta = value; return; }
     }
 }
 
@@ -654,6 +774,7 @@ fn projector_warm_start(
     arcs: &mut Vec<Arc>,
     shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
+    groups: &mut Vec<SketchGroup>,
     iters: u32,
     tolerance: f64,
 ) {
@@ -662,6 +783,8 @@ fn projector_warm_start(
             crate::constraints::apply_projector(c, points, lines, circles, arcs, shapes, tolerance);
         }
     }
+    // After GS iterations, resolve group points to keep them consistent.
+    resolve_group_points(points, groups);
 }
 
 // ─── Deterministic restart seeding ───────────────────────────────────────────
@@ -670,14 +793,16 @@ fn seed_restart(
     points: &mut Vec<Point>,
     circles: &mut Vec<Circle>,
     arcs: &mut Vec<Arc>,
+    groups: &mut Vec<SketchGroup>,
     initial_state: &Vec<f64>,
     pt_var_idx: &Vec<usize>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
     attempt: u32,
     reference_length: f64,
 ) {
-    apply_state(initial_state, points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx);
+    apply_state(initial_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
     if attempt == 0 {
         return;
     }
@@ -705,6 +830,19 @@ fn seed_restart(
         let scale = 1.0 + 0.1 * (((attempt as usize + i + 1) % 3) as f64 - 1.0);
         a.radius = (a.radius * scale).max(1e-6);
     }
+
+    // Perturb non-fixed group frames.
+    let mut group_index = 0usize;
+    for g in groups.iter_mut() {
+        if g.fixed { continue; }
+        let angle = (attempt as f64 * 1.37 + group_index as f64) * golden_angle;
+        let local_radius = radius * (1.0 + (group_index % 4) as f64 * 0.15);
+        g.x += local_radius * angle.cos();
+        g.y += local_radius * angle.sin();
+        group_index += 1;
+    }
+    // Resolve group-owned points after perturbation.
+    resolve_group_points(points, groups);
 }
 
 // ─── Main LM outer loop ───────────────────────────────────────────────────────
@@ -721,12 +859,13 @@ pub fn solve_global(
     restarts: u32,
     warm_start_iters: u32,
     max_scaled_step: f64,
+    groups: &mut Vec<SketchGroup>,
 ) -> f64 {
     let ref_len = compute_reference_length(points, circles, arcs);
     let scale = ref_len.max(1.0);
 
-    let (vars, pt_var_idx, circ_var_idx, arc_var_idx) =
-        build_variables(points, circles, arcs, scale);
+    let (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx) =
+        build_variables(points, circles, arcs, groups, scale);
 
     if vars.is_empty() {
         return match eval_residuals_full(points, lines, circles, arcs, shapes, constraints) {
@@ -736,38 +875,38 @@ pub fn solve_global(
     }
 
     let (sparsity, n_rows) = build_sparsity(
-        points, lines, circles, arcs, shapes, constraints,
-        &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx,
+        points, lines, circles, arcs, shapes, constraints, groups,
+        &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
     );
 
-    let initial_state = capture_state(points, circles, arcs, &pt_var_idx, &circ_var_idx, &arc_var_idx, vars.len());
+    let initial_state = capture_state(points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len());
     let mut best_state = initial_state.clone();
     let mut best_error = f64::INFINITY;
 
     for attempt in 0..restarts {
         seed_restart(
-            points, circles, arcs, &initial_state,
-            &pt_var_idx, &circ_var_idx, &arc_var_idx,
+            points, circles, arcs, groups, &initial_state,
+            &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
             attempt, ref_len,
         );
 
         if attempt == 0 {
-            projector_warm_start(points, lines, circles, arcs, shapes, constraints, warm_start_iters, tolerance);
+            projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, warm_start_iters, tolerance);
         }
         let pass_anchor_state = capture_state(
-            points, circles, arcs,
-            &pt_var_idx, &circ_var_idx, &arc_var_idx, vars.len(),
+            points, circles, arcs, groups,
+            &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len(),
         );
 
         let error = run_lm_pass(
-            points, lines, circles, arcs, shapes, constraints,
-            &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx,
+            points, lines, circles, arcs, shapes, constraints, groups,
+            &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
             &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
         );
 
         if error < best_error {
             best_error = error;
-            best_state = capture_state(points, circles, arcs, &pt_var_idx, &circ_var_idx, &arc_var_idx, vars.len());
+            best_state = capture_state(points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len());
         }
         if best_error <= tolerance { break; }
     }
@@ -775,29 +914,29 @@ pub fn solve_global(
     // GS escape: 3 rounds of GS warm-start + another LM pass.
     if best_error > tolerance {
         for _ in 0..3 {
-            apply_state(&best_state, points, circles, arcs, &pt_var_idx, &circ_var_idx, &arc_var_idx);
+            apply_state(&best_state, points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx);
             let gs_iters = (warm_start_iters * 4).max(30);
-            projector_warm_start(points, lines, circles, arcs, shapes, constraints, gs_iters, tolerance);
+            projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, gs_iters, tolerance);
             let pass_anchor_state = capture_state(
-                points, circles, arcs,
-                &pt_var_idx, &circ_var_idx, &arc_var_idx, vars.len(),
+                points, circles, arcs, groups,
+                &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len(),
             );
 
             let error = run_lm_pass(
-                points, lines, circles, arcs, shapes, constraints,
-                &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx,
+                points, lines, circles, arcs, shapes, constraints, groups,
+                &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
                 &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
             );
 
             if error < best_error {
                 best_error = error;
-                best_state = capture_state(points, circles, arcs, &pt_var_idx, &circ_var_idx, &arc_var_idx, vars.len());
+                best_state = capture_state(points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len());
             }
             if best_error <= tolerance { break; }
         }
     }
 
-    apply_state(&best_state, points, circles, arcs, &pt_var_idx, &circ_var_idx, &arc_var_idx);
+    apply_state(&best_state, points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx);
     best_error
 }
 
@@ -808,10 +947,12 @@ fn run_lm_pass(
     arcs: &mut Vec<Arc>,
     shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
+    groups: &mut Vec<SketchGroup>,
     vars: &Vec<Variable>,
     pt_var_idx: &Vec<usize>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
     sparsity: &SparsityMap,
     n_rows: usize,
     iterations: u32,
@@ -825,20 +966,20 @@ fn run_lm_pass(
     let prior_diag = 1e-6 / scale.max(1.0).powi(2);
 
     let mut lin = match linearize(
-        points, lines, circles, arcs, shapes, constraints,
-        vars, pt_var_idx, circ_var_idx, arc_var_idx, sparsity, n_rows,
+        points, lines, circles, arcs, shapes, constraints, groups,
+        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows,
     ) {
         Some(l) => l,
         None => return f64::INFINITY,
     };
-    let mut best_pass_state = capture_state(points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx, vars.len());
+    let mut best_pass_state = capture_state(points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, vars.len());
     let mut best_pass_error = lin.max_abs;
     let mut best_pass_disp = scaled_state_displacement(&best_pass_state, anchor_state, scale);
 
     for _ in 0..iterations {
         if lin.max_abs <= tolerance { break; }
 
-        let state = capture_state(points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx, vars.len());
+        let state = capture_state(points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, vars.len());
         let prior_offset: Vec<f64> = state.iter().zip(anchor_state.iter()).map(|(s, a)| s - a).collect();
 
         let step = match lm_step(
@@ -861,15 +1002,15 @@ fn run_lm_pass(
 
         for _ in 0..12 {
             let trial_state: Vec<f64> = state.iter().zip(&dx).map(|(s, d)| s + d).collect();
-            apply_state(&trial_state, points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx);
+            apply_state(&trial_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
 
             let trial = match linearize(
-                points, lines, circles, arcs, shapes, constraints,
-                vars, pt_var_idx, circ_var_idx, arc_var_idx, sparsity, n_rows,
+                points, lines, circles, arcs, shapes, constraints, groups,
+                vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows,
             ) {
                 Some(l) => l,
                 None => {
-                    apply_state(&state, points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx);
+                    apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
                     break;
                 }
             };
@@ -898,7 +1039,7 @@ fn run_lm_pass(
                 break;
             }
 
-            apply_state(&state, points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx);
+            apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
             local_lambda *= local_nu;
             local_nu *= 2.0;
 
@@ -920,7 +1061,7 @@ fn run_lm_pass(
         if !accepted { break; }
     }
 
-    apply_state(&best_pass_state, points, circles, arcs, pt_var_idx, circ_var_idx, arc_var_idx);
+    apply_state(&best_pass_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
 
     match eval_residuals_full(points, lines, circles, arcs, shapes, constraints) {
         Some((_, max_abs)) => max_abs,

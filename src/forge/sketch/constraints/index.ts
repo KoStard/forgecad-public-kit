@@ -15,11 +15,14 @@ export type {
   CircleId,
   ArcId,
   ShapeId,
+  GroupId,
   SketchPoint,
   SketchLine,
   SketchCircle,
   SketchArc,
   SketchShape,
+  SketchGroup,
+  SketchGroupLocalPoint,
   SketchLoop,
   ProfileSegment,
   ConstraintDisplay,
@@ -37,8 +40,8 @@ export type {
 
 export type { LineDistanceConstraint } from './defs/index';
 
-export type { ConstrainedSketchOptions } from './builder';
-export { ConstrainedSketchBuilder, constrainedSketch } from './builder';
+export type { ConstrainedSketchOptions, SketchGroupHandle } from './builder';
+export { ConstrainedSketchBuilder, SketchGroupBuilder, constrainedSketch } from './builder';
 
 export {
   ConstraintSketch,

@@ -6,11 +6,45 @@ pub mod lm;
 use std::collections::HashMap;
 use crate::constraints::{constraint_jacobian_impl, constraint_residual_impl, evaluate_residuals, has_residual};
 use crate::types::{
-    Arc, Circle, Constraint, ConstraintResidual, Line, Point, Shape, SolveMetadata, SolveOptions,
-    SolveStatus,
+    Arc, Circle, Constraint, ConstraintResidual, Line, Point, Shape, SketchGroup, SolveMetadata,
+    SolveOptions, SolveStatus, Problem,
 };
 use analytical::run_analytical_presolve;
 use decompose::build_solve_plan;
+
+/// Expand group local points/lines into the main problem arrays.
+/// Must be called before solving. Group points become regular points
+/// with world coordinates computed from the group frame.
+pub fn expand_groups(problem: &mut Problem) {
+    for group in &problem.groups {
+        for lp in &group.points {
+            let (wx, wy) = group.resolve_point(lp);
+            problem.points.push(Point {
+                id: lp.id.clone(),
+                x: wx,
+                y: wy,
+                fixed: group.fixed,
+            });
+        }
+        for line in &group.lines {
+            problem.lines.push(line.clone());
+        }
+    }
+}
+
+/// Update group-owned points from their group's current frame.
+pub fn resolve_group_points(points: &mut Vec<Point>, groups: &Vec<SketchGroup>) {
+    let pt_map: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
+    for group in groups {
+        for lp in &group.points {
+            if let Some(&idx) = pt_map.get(&lp.id) {
+                let (wx, wy) = group.resolve_point(lp);
+                points[idx].x = wx;
+                points[idx].y = wy;
+            }
+        }
+    }
+}
 
 /// Mutable state for the solver — everything borrowed from the Problem.
 pub struct SolverState<'a> {
@@ -73,6 +107,7 @@ pub fn solve(
     shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
     options: &SolveOptions,
+    groups: &mut Vec<SketchGroup>,
 ) -> f64 {
     // Run targeted single-constraint presolve before the main solve when
     // the caller requests it (builder incremental path).
@@ -94,7 +129,7 @@ pub fn solve(
     // restore to original positions before the retry (matching the TS-side
     // updateConstraintValue behavior that clones from the original definition).
     let snapshot = if options.fallback_restarts.is_some() {
-        Some((points.clone(), circles.clone(), arcs.clone()))
+        Some((points.clone(), circles.clone(), arcs.clone(), groups.clone()))
     } else {
         None
     };
@@ -102,22 +137,25 @@ pub fn solve(
     let max_error = solve_system(
         points, lines, circles, arcs, shapes, constraints,
         iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
+        groups,
     );
 
     // Fallback: if the first solve exceeded tolerance * 5 and a fallback is
     // configured, restore the original geometry and retry with more restarts.
-    if let (Some(fallback), Some((snap_pts, snap_circles, snap_arcs))) =
+    if let (Some(fallback), Some((snap_pts, snap_circles, snap_arcs, snap_groups))) =
         (options.fallback_restarts, snapshot)
     {
         if max_error > tolerance * 5.0 {
             *points = snap_pts;
             *circles = snap_circles;
             *arcs = snap_arcs;
+            *groups = snap_groups;
             let fb_restarts = fallback;
             let fb_warm = options.warm_start_iterations.unwrap_or(6);
             return solve_system(
                 points, lines, circles, arcs, shapes, constraints,
                 iterations, tolerance, fb_restarts, fb_warm, max_scaled_step,
+                groups,
             );
         }
     }
@@ -138,8 +176,14 @@ fn solve_system(
     restarts: u32,
     warm_start_iters: u32,
     max_scaled_step: f64,
+    groups: &mut Vec<SketchGroup>,
 ) -> f64 {
     if let Some(plan) = build_solve_plan(points, lines, circles, arcs, shapes, constraints) {
+        // Build a set of group-owned point IDs for quick lookup.
+        let group_point_ids: std::collections::HashSet<String> = groups.iter()
+            .flat_map(|g| g.points.iter().map(|p| p.id.clone()))
+            .collect();
+
         let mut max_error: f64 = 0.0;
         for component in plan {
             let mut sub_points: Vec<Point> = points
@@ -173,6 +217,13 @@ fn solve_system(
                 .map(|&index| constraints[index].clone())
                 .collect();
 
+            // Filter groups whose points are in this component.
+            let mut sub_groups: Vec<SketchGroup> = groups
+                .iter()
+                .filter(|g| g.points.iter().any(|p| component.entity_ids.contains(&p.id)))
+                .cloned()
+                .collect();
+
             let component_error = solve_single_system(
                 &mut sub_points,
                 &sub_lines,
@@ -185,6 +236,7 @@ fn solve_system(
                 restarts,
                 warm_start_iters,
                 max_scaled_step,
+                &mut sub_groups,
             );
             max_error = max_error.max(component_error);
 
@@ -209,6 +261,16 @@ fn solve_system(
                     arc.radius = solved.radius;
                 }
             }
+
+            // Read back group frame updates from sub_groups into the main groups.
+            let sub_group_map: HashMap<&str, &SketchGroup> = sub_groups.iter().map(|g| (g.id.as_str(), g)).collect();
+            for group in groups.iter_mut() {
+                if let Some(solved) = sub_group_map.get(group.id.as_str()) {
+                    group.x = solved.x;
+                    group.y = solved.y;
+                    group.theta = solved.theta;
+                }
+            }
         }
         sanitize_max_error(max_error)
     } else {
@@ -224,6 +286,7 @@ fn solve_system(
             restarts,
             warm_start_iters,
             max_scaled_step,
+            groups,
         )
     }
 }
@@ -239,6 +302,7 @@ pub fn presolve(
     shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
     options: &SolveOptions,
+    groups: &mut Vec<SketchGroup>,
 ) -> f64 {
     let tolerance = options.tolerance.unwrap_or(1e-3);
 
@@ -276,6 +340,13 @@ pub fn presolve(
                 .map(|&index| constraints[index].clone())
                 .collect();
 
+            // Filter groups whose points are in this component.
+            let mut sub_groups: Vec<SketchGroup> = groups
+                .iter()
+                .filter(|g| g.points.iter().any(|p| component.entity_ids.contains(&p.id)))
+                .cloned()
+                .collect();
+
             let component_error = presolve_single_system(
                 &mut sub_points,
                 &sub_lines,
@@ -284,6 +355,7 @@ pub fn presolve(
                 &sub_shapes,
                 &sub_constraints,
                 tolerance,
+                &mut sub_groups,
             );
             max_error = max_error.max(component_error);
 
@@ -311,10 +383,20 @@ pub fn presolve(
                     arc.radius = solved.radius;
                 }
             }
+
+            // Read back group frame updates.
+            let sub_group_map: HashMap<&str, &SketchGroup> = sub_groups.iter().map(|g| (g.id.as_str(), g)).collect();
+            for group in groups.iter_mut() {
+                if let Some(solved) = sub_group_map.get(group.id.as_str()) {
+                    group.x = solved.x;
+                    group.y = solved.y;
+                    group.theta = solved.theta;
+                }
+            }
         }
         sanitize_max_error(max_error)
     } else {
-        presolve_single_system(points, lines, circles, arcs, shapes, constraints, tolerance)
+        presolve_single_system(points, lines, circles, arcs, shapes, constraints, tolerance, groups)
     }
 }
 
@@ -330,9 +412,13 @@ fn solve_single_system(
     restarts: u32,
     warm_start_iters: u32,
     max_scaled_step: f64,
+    groups: &mut Vec<SketchGroup>,
 ) -> f64 {
     run_presolve(points, lines, circles, arcs, shapes, constraints, tolerance);
     run_analytical_presolve(points, lines, constraints);
+
+    // Resolve group-owned points from their group frames after presolve.
+    resolve_group_points(points, groups);
 
     let has_any_residual = constraints.iter().any(|c| crate::constraints::has_residual(c))
         || !arcs.is_empty();
@@ -341,6 +427,7 @@ fn solve_single_system(
         lm::solve_global(
             points, lines, circles, arcs, shapes, constraints,
             iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
+            groups,
         )
     } else {
         gauss_seidel_solve(
@@ -360,9 +447,14 @@ fn presolve_single_system(
     shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
     tolerance: f64,
+    groups: &mut Vec<SketchGroup>,
 ) -> f64 {
     run_presolve(points, lines, circles, arcs, shapes, constraints, tolerance);
     run_analytical_presolve(points, lines, constraints);
+
+    // Resolve group-owned points from their group frames after presolve.
+    resolve_group_points(points, groups);
+
     sanitize_max_error(lm::current_max_error(
         points, lines, circles, arcs, shapes, constraints,
     ))
@@ -398,6 +490,7 @@ pub fn presolve_constraint(
     shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
     constraint_id: &str,
+    groups: &mut Vec<SketchGroup>,
 ) -> f64 {
     let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
     let entity_ref_count = build_entity_ref_count(constraints);
@@ -405,6 +498,9 @@ pub fn presolve_constraint(
     if let Some(constraint) = constraints.iter().find(|constraint| constraint.id() == constraint_id) {
         apply_presolve_constraint(points, lines, &pts, &entity_ref_count, constraint);
     }
+
+    // Resolve group-owned points after presolve.
+    resolve_group_points(points, groups);
 
     sanitize_max_error(lm::current_max_error(
         points, lines, circles, arcs, shapes, constraints,
@@ -812,9 +908,10 @@ pub fn analyze_solution(
     constraints: &Vec<Constraint>,
     max_error: f64,
     options: &SolveOptions,
+    groups: &Vec<SketchGroup>,
 ) -> SolveMetadata {
     let tolerance = options.tolerance.unwrap_or(1e-3);
-    let dof = compute_dof(points, circles, arcs, constraints);
+    let dof = compute_dof(points, circles, arcs, groups, constraints);
     let status = compute_status(dof, max_error, tolerance);
     let constraint_residuals = constraints
         .iter()
@@ -835,7 +932,7 @@ pub fn analyze_solution(
         && max_error <= tolerance * 5.0
         && !options.skip_redundancy_check.unwrap_or(false)
     {
-        find_redundant_constraints(points, lines, circles, arcs, shapes, constraints, (-dof) as usize)
+        find_redundant_constraints(points, lines, circles, arcs, shapes, constraints, (-dof) as usize, groups)
     } else {
         Vec::new()
     };
@@ -853,13 +950,27 @@ fn compute_dof(
     points: &Vec<Point>,
     circles: &Vec<Circle>,
     arcs: &Vec<Arc>,
+    groups: &Vec<SketchGroup>,
     constraints: &Vec<Constraint>,
 ) -> i32 {
-    let free_vars =
-        points.iter().filter(|point| !point.fixed).count() as i32 * 2
-        + circles.iter().filter(|circle| !circle.fixed_radius).count() as i32
+    // Build set of group-owned point IDs
+    let group_point_ids: std::collections::HashSet<&str> = groups.iter()
+        .flat_map(|g| g.points.iter().map(|p| p.id.as_str()))
+        .collect();
+
+    // Free point vars: exclude group-owned points and fixed points
+    let free_point_vars = points.iter()
+        .filter(|p| !p.fixed && !group_point_ids.contains(p.id.as_str()))
+        .count() as i32 * 2;
+
+    // Group vars
+    let group_vars: i32 = groups.iter().map(|g| g.dof_count()).sum();
+
+    let free_vars = free_point_vars + group_vars
+        + circles.iter().filter(|c| !c.fixed_radius).count() as i32
         + arcs.len() as i32 * (1 - 2);
-    let constraint_eqs: i32 = constraints.iter().map(|constraint| constraint.equation_count()).sum();
+
+    let constraint_eqs: i32 = constraints.iter().map(|c| c.equation_count()).sum();
     free_vars - constraint_eqs
 }
 
@@ -881,6 +992,9 @@ enum VariableRef {
     PointY(usize),
     CircleRadius(usize),
     ArcRadius(usize),
+    GroupX(usize),
+    GroupY(usize),
+    GroupTheta(usize),
 }
 
 #[derive(Clone)]
@@ -892,21 +1006,27 @@ struct VariableInfo {
 }
 
 impl VariableInfo {
-    fn get(&self, points: &Vec<Point>, circles: &Vec<Circle>, arcs: &Vec<Arc>) -> f64 {
+    fn get(&self, points: &Vec<Point>, circles: &Vec<Circle>, arcs: &Vec<Arc>, groups: &Vec<SketchGroup>) -> f64 {
         match self.reference {
             VariableRef::PointX(index) => points[index].x,
             VariableRef::PointY(index) => points[index].y,
             VariableRef::CircleRadius(index) => circles[index].radius,
             VariableRef::ArcRadius(index) => arcs[index].radius,
+            VariableRef::GroupX(index) => groups[index].x,
+            VariableRef::GroupY(index) => groups[index].y,
+            VariableRef::GroupTheta(index) => groups[index].theta,
         }
     }
 
-    fn set(&self, points: &mut Vec<Point>, circles: &mut Vec<Circle>, arcs: &mut Vec<Arc>, value: f64) {
+    fn set(&self, points: &mut Vec<Point>, circles: &mut Vec<Circle>, arcs: &mut Vec<Arc>, groups: &mut Vec<SketchGroup>, value: f64) {
         match self.reference {
             VariableRef::PointX(index) => points[index].x = value,
             VariableRef::PointY(index) => points[index].y = value,
             VariableRef::CircleRadius(index) => circles[index].radius = value.max(1e-9),
             VariableRef::ArcRadius(index) => arcs[index].radius = value.max(1e-9),
+            VariableRef::GroupX(index) => groups[index].x = value,
+            VariableRef::GroupY(index) => groups[index].y = value,
+            VariableRef::GroupTheta(index) => groups[index].theta = value,
         }
     }
 }
@@ -915,12 +1035,22 @@ fn build_analysis_variables(
     points: &Vec<Point>,
     circles: &Vec<Circle>,
     arcs: &Vec<Arc>,
+    groups: &Vec<SketchGroup>,
 ) -> Vec<VariableInfo> {
     let scale = compute_reference_length(points, circles, arcs).max(1.0);
     let mut variables = Vec::new();
 
+    // Build set of group-owned point IDs to skip them as individual variables.
+    let group_point_ids: std::collections::HashSet<&str> = groups.iter()
+        .flat_map(|g| g.points.iter().map(|p| p.id.as_str()))
+        .collect();
+
     for (index, point) in points.iter().enumerate() {
         if point.fixed {
+            continue;
+        }
+        // Skip group-owned points — their positions are derived from the group frame.
+        if group_point_ids.contains(point.id.as_str()) {
             continue;
         }
         variables.push(VariableInfo {
@@ -956,6 +1086,33 @@ fn build_analysis_variables(
             scale,
             reference: VariableRef::ArcRadius(index),
         });
+    }
+
+    // Add group frame variables.
+    for (index, group) in groups.iter().enumerate() {
+        if group.fixed {
+            continue;
+        }
+        variables.push(VariableInfo {
+            entity_id: group.id.clone(),
+            key: format!("{}.gx", group.id),
+            scale,
+            reference: VariableRef::GroupX(index),
+        });
+        variables.push(VariableInfo {
+            entity_id: group.id.clone(),
+            key: format!("{}.gy", group.id),
+            scale,
+            reference: VariableRef::GroupY(index),
+        });
+        if !group.fixed_rotation {
+            variables.push(VariableInfo {
+                entity_id: group.id.clone(),
+                key: format!("{}.gtheta", group.id),
+                scale: 1.0, // angular variable, unit scale
+                reference: VariableRef::GroupTheta(index),
+            });
+        }
     }
 
     variables
@@ -1003,11 +1160,13 @@ fn find_redundant_constraints(
     shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
     target_removals: usize,
+    groups: &Vec<SketchGroup>,
 ) -> Vec<String> {
     let mut work_points = points.clone();
     let mut work_circles = circles.clone();
     let mut work_arcs = arcs.clone();
-    let variables = build_analysis_variables(points, circles, arcs);
+    let mut work_groups = groups.clone();
+    let variables = build_analysis_variables(points, circles, arcs, groups);
     if variables.is_empty() {
         return Vec::new();
     }
@@ -1047,13 +1206,27 @@ fn find_redundant_constraints(
         for residual_index in 0..base_residuals.len() {
             let mut row = vec![0.0; n_vars];
             for (var_index, variable) in variables.iter().enumerate() {
-                let original = variable.get(&work_points, &work_circles, &work_arcs);
+                let original = variable.get(&work_points, &work_circles, &work_arcs, &work_groups);
                 let step = 1e-6 * original.abs().max(1.0).max(variable.scale);
-                variable.set(&mut work_points, &mut work_circles, &mut work_arcs, original + step);
+                variable.set(&mut work_points, &mut work_circles, &mut work_arcs, &mut work_groups, original + step);
+                // If this is a group variable, resolve group-owned points so residuals see updated positions.
+                match variable.reference {
+                    VariableRef::GroupX(_) | VariableRef::GroupY(_) | VariableRef::GroupTheta(_) => {
+                        resolve_group_points(&mut work_points, &work_groups);
+                    }
+                    _ => {}
+                }
                 let perturbed =
                     constraint_residual_impl(constraint, &work_points, lines, &work_circles, &work_arcs, shapes);
                 row[var_index] = (perturbed[residual_index] - base_residuals[residual_index]) / step;
-                variable.set(&mut work_points, &mut work_circles, &mut work_arcs, original);
+                variable.set(&mut work_points, &mut work_circles, &mut work_arcs, &mut work_groups, original);
+                // Restore group-owned points after resetting group variable.
+                match variable.reference {
+                    VariableRef::GroupX(_) | VariableRef::GroupY(_) | VariableRef::GroupTheta(_) => {
+                        resolve_group_points(&mut work_points, &work_groups);
+                    }
+                    _ => {}
+                }
             }
             jacobian_rows.push(row);
             row_to_constraint_id.push(constraint.id().to_string());

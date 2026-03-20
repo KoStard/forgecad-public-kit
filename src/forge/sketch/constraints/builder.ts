@@ -9,12 +9,15 @@ import type {
   CircleId,
   ConstraintBuilderMethods,
   ConstraintDefinition,
+  GroupId,
   LineId,
   PointId,
   ShapeId,
   SketchArc,
   SketchCircle,
   SketchConstraint,
+  SketchGroup,
+  SketchGroupLocalPoint,
   SketchLine,
   SketchLoop,
   SketchPoint,
@@ -40,6 +43,11 @@ export class ConstrainedSketchBuilder {
   private circles: SketchCircle[] = [];
   private arcs: SketchArc[] = [];
   private shapes: SketchShape[] = [];
+  private _groups: SketchGroup[] = [];
+  /** Point IDs owned by groups — excluded from the serialized points array. */
+  private groupOwnedPointIds = new Set<string>();
+  /** Line IDs owned by groups — excluded from the serialized lines array. */
+  private groupOwnedLineIds = new Set<string>();
   private constraints: SketchConstraint[] = [];
   private loops: SketchLoop[] = [];
   private rejectedConstraints: SketchConstraint[] = [];
@@ -217,6 +225,40 @@ export class ConstrainedSketchBuilder {
     const id: ShapeId = `shp-${this.nextId++}`;
     this.shapes.push({ id, lines: [...lines] });
     return id;
+  }
+
+  /**
+   * Create a rigid-body group with a local coordinate frame.
+   * Points/lines added to the group move together as a unit — the solver
+   * sees 3 DOF (x, y, θ) instead of 2N per point.
+   *
+   * @example
+   * ```ts
+   * const g = sk.group({ x: 50, y: 30 });
+   * const p0 = g.point(0, 0);    // local origin → world (50, 30)
+   * const p1 = g.point(100, 0);  // local (100,0) → world (150, 30)
+   * const l = g.line(p0, p1);
+   * g.fixRotation();
+   * // p0, p1 work in constraints like any other PointId:
+   * sk.coincident(p0, someExternalPoint);
+   * ```
+   */
+  group(opts: { x?: number; y?: number; theta?: number; id?: string } = {}): SketchGroupBuilder {
+    return new SketchGroupBuilder(this, opts);
+  }
+
+  /**
+   * Register a group directly (called by SketchGroupBuilder).
+   * @internal
+   */
+  _registerGroup(group: SketchGroup): void {
+    this._groups.push(group);
+    for (const lp of group.points) {
+      this.groupOwnedPointIds.add(lp.id);
+    }
+    for (const l of group.lines) {
+      this.groupOwnedLineIds.add(l.id);
+    }
   }
 
   constrain(constraint: Omit<SketchConstraint, 'id'>): this {
@@ -442,6 +484,12 @@ export class ConstrainedSketchBuilder {
     const ptId = this.resolvePointId(point);
     const pt = this.points.find((p) => p.id === ptId);
     if (!pt) throw new Error(`fix(): point "${ptId}" not found in sketch`);
+    if (this.groupOwnedPointIds.has(ptId)) {
+      throw new Error(
+        `fix(): point "${ptId}" belongs to a group — use group.fix() to freeze the entire group frame, ` +
+        `or constrain the group via coincident/distance constraints on its points.`
+      );
+    }
     if (x !== undefined) this.requireFinite(x, 'fix (x)');
     if (y !== undefined) this.requireFinite(y, 'fix (y)');
     return this.constrain({ type: 'fixed', point: ptId, x: x ?? pt.x, y: y ?? pt.y } as Omit<SketchConstraint, 'id'>);
@@ -632,11 +680,17 @@ export class ConstrainedSketchBuilder {
 
   private buildDefinition(extraConstraint?: SketchConstraint): ConstraintDefinition {
     return {
+      // Include all points/lines (group-owned ones are filtered at serialization to Rust).
       points: this.points.map((p) => ({ ...p })),
       lines: this.lines.map((l) => ({ ...l })),
       circles: this.circles.map((c) => ({ ...c })),
       arcs: this.arcs.map((a) => ({ ...a })),
       shapes: this.shapes.map((s) => ({ ...s, lines: [...s.lines] })),
+      groups: this._groups.map((g) => ({
+        ...g,
+        points: g.points.map((p) => ({ ...p })),
+        lines: g.lines.map((l) => ({ ...l })),
+      })),
       loops: this.loops.map((loop) => {
         if (loop.type === 'poly') return { type: 'poly', points: [...loop.points] };
         if (loop.type === 'circle') return { type: 'circle', circle: loop.circle };
@@ -650,9 +704,12 @@ export class ConstrainedSketchBuilder {
 
   /** Sync solved positions from a definition back to the builder's live entities. */
   private syncFromDefinition(def: ConstraintDefinition): void {
-    for (let i = 0; i < this.points.length; i++) {
-      this.points[i].x = def.points[i].x;
-      this.points[i].y = def.points[i].y;
+    // Sync non-group points from the definition.
+    const defPointMap = new Map(def.points.map((p) => [p.id, p]));
+    for (const p of this.points) {
+      if (this.groupOwnedPointIds.has(p.id)) continue;
+      const dp = defPointMap.get(p.id);
+      if (dp) { p.x = dp.x; p.y = dp.y; }
     }
     for (let i = 0; i < this.circles.length; i++) {
       this.circles[i].radius = def.circles[i].radius;
@@ -660,6 +717,24 @@ export class ConstrainedSketchBuilder {
     const defArcs = def.arcs ?? [];
     for (let i = 0; i < this.arcs.length; i++) {
       if (i < defArcs.length) this.arcs[i].radius = defArcs[i].radius;
+    }
+    // Sync group frame positions and recompute world coordinates of group-owned points.
+    const defGroupMap = new Map((def.groups ?? []).map((g) => [g.id, g]));
+    const builderPointMap = new Map(this.points.map((p) => [p.id, p]));
+    for (const g of this._groups) {
+      const dg = defGroupMap.get(g.id);
+      if (dg) {
+        g.x = dg.x; g.y = dg.y; g.theta = dg.theta;
+        const cosT = Math.cos(g.theta);
+        const sinT = Math.sin(g.theta);
+        for (const lp of g.points) {
+          const bp = builderPointMap.get(lp.id);
+          if (bp) {
+            bp.x = g.x + lp.lx * cosT - lp.ly * sinT;
+            bp.y = g.y + lp.lx * sinT + lp.ly * cosT;
+          }
+        }
+      }
     }
   }
 
@@ -882,4 +957,122 @@ export class ConstrainedSketchBuilder {
 
 export function constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder {
   return new ConstrainedSketchBuilder(options);
+}
+
+// ─── Sketch group builder ─────────────────────────────────────────────────────
+
+export interface SketchGroupHandle {
+  readonly id: GroupId;
+  /** Get a group vertex PointId by its index (order of `.point()` calls). */
+  point(index: number): PointId;
+  /** Get a group line LineId by its index (order of `.line()` calls). */
+  line(index: number): LineId;
+  /** All group vertex PointIds in creation order. */
+  readonly vertices: PointId[];
+  /** All group line LineIds in creation order. */
+  readonly sides: LineId[];
+}
+
+/**
+ * Fluent builder for a rigid-body group within a constrained sketch.
+ *
+ * Points are specified in local coordinates relative to the group's origin.
+ * The solver optimises 3 frame DOF (x, y, θ) instead of 2N point DOF.
+ */
+export class SketchGroupBuilder {
+  private sk: ConstrainedSketchBuilder;
+  private groupId: GroupId;
+  private gx: number;
+  private gy: number;
+  private gtheta: number;
+  private localPoints: SketchGroupLocalPoint[] = [];
+  private localLines: { id: LineId; a: PointId; b: PointId }[] = [];
+  private isFixed = false;
+  private isFixedRotation = false;
+  private registered = false;
+
+  constructor(sk: ConstrainedSketchBuilder, opts: { x?: number; y?: number; theta?: number; id?: string }) {
+    this.sk = sk;
+    this.gx = opts.x ?? 0;
+    this.gy = opts.y ?? 0;
+    this.gtheta = opts.theta ?? 0;
+    this.groupId = opts.id ?? `grp-${(sk as any).nextId++}`;
+  }
+
+  /** Add a point in local coordinates. Returns its globally-addressable PointId. */
+  point(lx: number, ly: number): PointId {
+    if (!Number.isFinite(lx) || !Number.isFinite(ly)) {
+      throw new Error(`group.point(): coordinates must be finite, got (${lx}, ${ly})`);
+    }
+    const id: PointId = `pt-${(this.sk as any).nextId++}`;
+    this.localPoints.push({ id, lx, ly });
+
+    // Compute world position and register the point in the builder so
+    // it's addressable by resolvePointId and visible to constraints.
+    const cosT = Math.cos(this.gtheta);
+    const sinT = Math.sin(this.gtheta);
+    const wx = this.gx + lx * cosT - ly * sinT;
+    const wy = this.gy + lx * sinT + ly * cosT;
+    (this.sk as any).points.push({ id, x: wx, y: wy, fixed: this.isFixed });
+    return id;
+  }
+
+  /** Connect two group points with a line. Both must be PointIds from this group. */
+  line(a: PointId, b: PointId): LineId {
+    const id: LineId = `ln-${(this.sk as any).nextId++}`;
+    this.localLines.push({ id, a, b });
+    // Register in the builder's lines array for constraint resolution.
+    (this.sk as any).lines.push({ id, a, b, construction: false });
+    return id;
+  }
+
+  /** Freeze rotation (θ). Group can still translate — 2 DOF remain. */
+  fixRotation(): this {
+    this.isFixedRotation = true;
+    return this;
+  }
+
+  /** Freeze all 3 DOF — group is completely fixed. */
+  fix(): this {
+    this.isFixed = true;
+    return this;
+  }
+
+  /**
+   * Finalize and register the group with the builder.
+   * Returns a handle for referencing group points/lines in constraints.
+   */
+  done(): SketchGroupHandle {
+    if (this.registered) throw new Error('group.done(): already finalized');
+    this.registered = true;
+
+    const group: SketchGroup = {
+      id: this.groupId,
+      x: this.gx,
+      y: this.gy,
+      theta: this.gtheta,
+      fixed: this.isFixed,
+      fixedRotation: this.isFixedRotation,
+      points: this.localPoints,
+      lines: this.localLines,
+    };
+    this.sk._registerGroup(group);
+
+    const vertices = this.localPoints.map((p) => p.id);
+    const sides = this.localLines.map((l) => l.id);
+    const groupId = this.groupId;
+    return {
+      id: groupId,
+      vertices,
+      sides,
+      point(index: number): PointId {
+        if (index < 0 || index >= vertices.length) throw new Error(`group.point(${index}): index out of range (${vertices.length} points)`);
+        return vertices[index];
+      },
+      line(index: number): LineId {
+        if (index < 0 || index >= sides.length) throw new Error(`group.line(${index}): index out of range (${sides.length} lines)`);
+        return sides[index];
+      },
+    };
+  }
 }

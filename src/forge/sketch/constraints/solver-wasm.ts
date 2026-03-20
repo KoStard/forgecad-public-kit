@@ -48,6 +48,23 @@ interface WasmShape {
   lines: string[];
 }
 
+interface WasmLocalPoint {
+  id: string;
+  lx: number;
+  ly: number;
+}
+
+interface WasmGroup {
+  id: string;
+  x: number;
+  y: number;
+  theta: number;
+  fixed: boolean;
+  fixed_rotation: boolean;
+  points: WasmLocalPoint[];
+  lines: WasmLine[];
+}
+
 interface WasmOptions {
   iterations?: number;
   tolerance?: number;
@@ -65,6 +82,7 @@ interface WasmProblem {
   circles: WasmCircle[];
   arcs: WasmArc[];
   shapes: WasmShape[];
+  groups: WasmGroup[];
   constraints: object[];
   options?: WasmOptions;
 }
@@ -85,11 +103,19 @@ interface WasmArcResult {
   radius: number;
 }
 
+interface WasmGroupResult {
+  id: string;
+  x: number;
+  y: number;
+  theta: number;
+}
+
 interface WasmSolveResult {
   max_error: number;
   points: WasmPointResult[];
   circles: WasmCircleResult[];
   arcs: WasmArcResult[];
+  groups?: WasmGroupResult[];
   metadata?: WasmSolveMetadata;
 }
 
@@ -595,18 +621,30 @@ export async function initSolverWasm(): Promise<void> {
  * The Rust solver uses snake_case for struct fields (via serde rename).
  */
 function serializeProblem(def: ConstraintDefinition, options: SolveOptions): WasmProblem {
+  // Build set of group-owned point/line IDs — these are expanded by Rust's expand_groups.
+  const groupOwnedPointIds = new Set<string>();
+  const groupOwnedLineIds = new Set<string>();
+  for (const g of def.groups ?? []) {
+    for (const p of g.points) groupOwnedPointIds.add(p.id);
+    for (const l of g.lines) groupOwnedLineIds.add(l.id);
+  }
+
   return {
-    points: def.points.map((p) => ({
-      id: p.id,
-      x: p.x,
-      y: p.y,
-      fixed: p.fixed,
-    })),
-    lines: def.lines.map((l) => ({
-      id: l.id,
-      a: l.a,
-      b: l.b,
-    })),
+    points: def.points
+      .filter((p) => !groupOwnedPointIds.has(p.id))
+      .map((p) => ({
+        id: p.id,
+        x: p.x,
+        y: p.y,
+        fixed: p.fixed,
+      })),
+    lines: def.lines
+      .filter((l) => !groupOwnedLineIds.has(l.id))
+      .map((l) => ({
+        id: l.id,
+        a: l.a,
+        b: l.b,
+      })),
     circles: def.circles.map((c) => ({
       id: c.id,
       center: c.center,
@@ -624,6 +662,16 @@ function serializeProblem(def: ConstraintDefinition, options: SolveOptions): Was
     shapes: (def.shapes ?? []).map((s) => ({
       id: s.id,
       lines: s.lines,
+    })),
+    groups: (def.groups ?? []).map((g) => ({
+      id: g.id,
+      x: g.x,
+      y: g.y,
+      theta: g.theta,
+      fixed: g.fixed,
+      fixed_rotation: g.fixedRotation,
+      points: g.points.map((p) => ({ id: p.id, lx: p.lx, ly: p.ly })),
+      lines: g.lines.map((l) => ({ id: l.id, a: l.a, b: l.b })),
     })),
     // Pass constraints as raw JSON — the Rust side uses serde's discriminated union
     // with `type` as the tag.  TypeScript constraint objects already have a `type` field.
@@ -673,6 +721,28 @@ function applyResult(def: ConstraintDefinition, result: WasmSolveResult): void {
   for (const { id, radius } of result.arcs) {
     const a = arcMap.get(id);
     if (a) { a.radius = radius; }
+  }
+  // Apply group frame updates and recompute world positions of group-owned points.
+  if (result.groups && def.groups) {
+    const groupMap = new Map(def.groups.map((g) => [g.id, g]));
+    for (const { id, x, y, theta } of result.groups) {
+      const g = groupMap.get(id);
+      if (g) {
+        g.x = x;
+        g.y = y;
+        g.theta = theta;
+        // Recompute world positions of group-owned points.
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+        for (const lp of g.points) {
+          const p = pointMap.get(lp.id);
+          if (p) {
+            p.x = x + lp.lx * cosT - lp.ly * sinT;
+            p.y = y + lp.lx * sinT + lp.ly * cosT;
+          }
+        }
+      }
+    }
   }
 }
 

@@ -57,6 +57,11 @@ export const cloneDefinition = (def: ConstraintDefinition): ConstraintDefinition
   circles: def.circles.map((c) => ({ ...c })),
   arcs: (def.arcs ?? []).map((a) => ({ ...a })),
   shapes: (def.shapes ?? []).map((s) => ({ ...s, lines: [...s.lines] })),
+  groups: (def.groups ?? []).map((g) => ({
+    ...g,
+    points: g.points.map((p) => ({ ...p })),
+    lines: g.lines.map((l) => ({ ...l })),
+  })),
   loops: def.loops.map((loop) => {
     if (loop.type === 'poly') return { type: 'poly', points: [...loop.points] };
     if (loop.type === 'circle') return { type: 'circle', circle: loop.circle };

@@ -41,6 +41,65 @@ pub struct Shape {
     pub lines: Vec<String>,
 }
 
+// ─── Sketch groups (rigid-body DOF) ──────────────────────────────────────────
+
+/// A point stored in a group's local coordinate frame.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalPoint {
+    pub id: String,
+    pub lx: f64,
+    pub ly: f64,
+}
+
+/// A rigid-body group: N local points with a shared coordinate frame (x, y, θ).
+/// The solver optimises over the 3 frame DOF instead of 2N point DOF.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SketchGroup {
+    pub id: String,
+    /// World position of the group's local origin.
+    pub x: f64,
+    pub y: f64,
+    /// Rotation angle (radians) of the group frame.
+    pub theta: f64,
+    /// When true, all 3 DOF are frozen (equivalent to fixing every point).
+    #[serde(default)]
+    pub fixed: bool,
+    /// When true, θ is frozen — only translation DOF remain.
+    #[serde(default)]
+    pub fixed_rotation: bool,
+    /// Points in local coordinates.
+    pub points: Vec<LocalPoint>,
+    /// Lines connecting local points (using their global IDs).
+    #[serde(default)]
+    pub lines: Vec<Line>,
+}
+
+impl SketchGroup {
+    /// Resolve a local point to world coordinates using the current frame.
+    pub fn resolve_point(&self, lp: &LocalPoint) -> (f64, f64) {
+        let (cos_t, sin_t) = (self.theta.cos(), self.theta.sin());
+        (
+            self.x + lp.lx * cos_t - lp.ly * sin_t,
+            self.y + lp.lx * sin_t + lp.ly * cos_t,
+        )
+    }
+
+    /// Number of solver DOF this group contributes.
+    pub fn dof_count(&self) -> i32 {
+        if self.fixed { 0 }
+        else if self.fixed_rotation { 2 }
+        else { 3 }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupResult {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub theta: f64,
+}
+
 // ─── Constraint payload ───────────────────────────────────────────────────────
 
 /// All constraint types with their data, discriminated by `kind`.
@@ -191,6 +250,8 @@ pub struct Problem {
     pub circles: Vec<Circle>,
     pub arcs: Vec<Arc>,
     pub shapes: Vec<Shape>,
+    #[serde(default)]
+    pub groups: Vec<SketchGroup>,
     pub constraints: Vec<Constraint>,
     #[serde(default)]
     pub options: Option<SolveOptions>,
@@ -245,6 +306,8 @@ pub struct SolveResult {
     pub points: Vec<PointResult>,
     pub circles: Vec<CircleResult>,
     pub arcs: Vec<ArcResult>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<GroupResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<SolveMetadata>,
 }

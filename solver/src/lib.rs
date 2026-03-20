@@ -4,8 +4,8 @@ pub mod types;
 
 use wasm_bindgen::prelude::*;
 use types::{
-    ArcResult, CircleResult, PointResult, Problem, SolveExchange, SolveExchangeKind, SolveOptions,
-    SolveResult,
+    ArcResult, CircleResult, GroupResult, PointResult, Problem, SolveExchange, SolveExchangeKind,
+    SolveOptions, SolveResult,
 };
 
 /// Set up the panic hook once on WASM init so panics surface in the browser console.
@@ -16,11 +16,6 @@ pub fn start() {
 }
 
 /// Solve a constraint system from JSON.
-///
-/// `problem_json` must be a JSON-serialized [`Problem`].
-/// Returns a JSON-serialized [`SolveResult`] with updated coordinates and max error.
-///
-/// On parse errors returns `{"max_error":1e308,"points":[],"circles":[],"arcs":[]}`.
 #[wasm_bindgen]
 pub fn solve(problem_json: &str) -> String {
     match solve_inner(problem_json) {
@@ -49,54 +44,36 @@ pub fn presolve_single(problem_json: &str, constraint_id: &str) -> String {
 
 fn solve_inner(problem_json: &str) -> Result<SolveResult, serde_json::Error> {
     let mut problem: Problem = serde_json::from_str(problem_json)?;
+    solver::expand_groups(&mut problem);
     let options = problem.options.clone().unwrap_or_default();
     let max_error = solver::solve(
-        &mut problem.points,
-        &problem.lines,
-        &mut problem.circles,
-        &mut problem.arcs,
-        &problem.shapes,
-        &problem.constraints,
-        &options,
+        &mut problem.points, &problem.lines, &mut problem.circles, &mut problem.arcs,
+        &problem.shapes, &problem.constraints, &options, &mut problem.groups,
     );
     let metadata = solver::analyze_solution(
-        &problem.points,
-        &problem.lines,
-        &problem.circles,
-        &problem.arcs,
-        &problem.shapes,
-        &problem.constraints,
-        max_error,
-        &options,
+        &problem.points, &problem.lines, &problem.circles, &problem.arcs,
+        &problem.shapes, &problem.constraints, max_error, &options, &problem.groups,
     );
     Ok(build_result(max_error, &problem, Some(metadata)))
 }
 
 fn presolve_inner(problem_json: &str) -> Result<SolveResult, serde_json::Error> {
     let mut problem: Problem = serde_json::from_str(problem_json)?;
+    solver::expand_groups(&mut problem);
     let options = problem.options.clone().unwrap_or_default();
     let max_error = solver::presolve(
-        &mut problem.points,
-        &problem.lines,
-        &mut problem.circles,
-        &mut problem.arcs,
-        &problem.shapes,
-        &problem.constraints,
-        &options,
+        &mut problem.points, &problem.lines, &mut problem.circles, &mut problem.arcs,
+        &problem.shapes, &problem.constraints, &options, &mut problem.groups,
     );
     Ok(build_result(max_error, &problem, None))
 }
 
 fn presolve_single_inner(problem_json: &str, constraint_id: &str) -> Result<SolveResult, serde_json::Error> {
     let mut problem: Problem = serde_json::from_str(problem_json)?;
+    solver::expand_groups(&mut problem);
     let max_error = solver::presolve_constraint(
-        &mut problem.points,
-        &problem.lines,
-        &problem.circles,
-        &problem.arcs,
-        &problem.shapes,
-        &problem.constraints,
-        constraint_id,
+        &mut problem.points, &problem.lines, &problem.circles, &problem.arcs,
+        &problem.shapes, &problem.constraints, constraint_id, &mut problem.groups,
     );
     Ok(build_result(max_error, &problem, None))
 }
@@ -108,98 +85,67 @@ fn build_result(
 ) -> SolveResult {
     SolveResult {
         max_error: if max_error.is_finite() { max_error.abs() } else { 1e308 },
-        points: problem
-            .points
-            .iter()
+        points: problem.points.iter()
             .map(|p| PointResult { id: p.id.clone(), x: p.x, y: p.y })
             .collect(),
-        circles: problem
-            .circles
-            .iter()
+        circles: problem.circles.iter()
             .map(|c| CircleResult { id: c.id.clone(), radius: c.radius })
             .collect(),
-        arcs: problem
-            .arcs
-            .iter()
+        arcs: problem.arcs.iter()
             .map(|a| ArcResult { id: a.id.clone(), radius: a.radius })
+            .collect(),
+        groups: problem.groups.iter()
+            .map(|g| GroupResult { id: g.id.clone(), x: g.x, y: g.y, theta: g.theta })
             .collect(),
         metadata,
     }
 }
 
 fn solve_problem_with_embedded_options(mut problem: Problem) -> SolveResult {
+    solver::expand_groups(&mut problem);
     let options = problem.options.clone().unwrap_or_default();
     let max_error = solver::solve(
-        &mut problem.points,
-        &problem.lines,
-        &mut problem.circles,
-        &mut problem.arcs,
-        &problem.shapes,
-        &problem.constraints,
-        &options,
+        &mut problem.points, &problem.lines, &mut problem.circles, &mut problem.arcs,
+        &problem.shapes, &problem.constraints, &options, &mut problem.groups,
     );
     let metadata = solver::analyze_solution(
-        &problem.points,
-        &problem.lines,
-        &problem.circles,
-        &problem.arcs,
-        &problem.shapes,
-        &problem.constraints,
-        max_error,
-        &options,
+        &problem.points, &problem.lines, &problem.circles, &problem.arcs,
+        &problem.shapes, &problem.constraints, max_error, &options, &problem.groups,
     );
     build_result(max_error, &problem, Some(metadata))
 }
 
 fn presolve_problem_with_embedded_options(mut problem: Problem) -> SolveResult {
+    solver::expand_groups(&mut problem);
     let options = problem.options.clone().unwrap_or_default();
     let max_error = solver::presolve(
-        &mut problem.points,
-        &problem.lines,
-        &mut problem.circles,
-        &mut problem.arcs,
-        &problem.shapes,
-        &problem.constraints,
-        &options,
+        &mut problem.points, &problem.lines, &mut problem.circles, &mut problem.arcs,
+        &problem.shapes, &problem.constraints, &options, &mut problem.groups,
     );
     build_result(max_error, &problem, None)
 }
 
 fn presolve_single_problem(problem: Problem, constraint_id: &str) -> SolveResult {
     let mut problem = problem;
+    solver::expand_groups(&mut problem);
     let max_error = solver::presolve_constraint(
-        &mut problem.points,
-        &problem.lines,
-        &mut problem.circles,
-        &mut problem.arcs,
-        &problem.shapes,
-        &problem.constraints,
-        constraint_id,
+        &mut problem.points, &problem.lines, &problem.circles, &problem.arcs,
+        &problem.shapes, &problem.constraints, constraint_id, &mut problem.groups,
     );
     build_result(max_error, &problem, None)
 }
 
 /// Native Rust entry point (used in tests — no WASM overhead).
 pub fn solve_problem(mut problem: Problem, options: Option<SolveOptions>) -> SolveResult {
+    solver::expand_groups(&mut problem);
     let opts = options.unwrap_or_default();
     let max_error = solver::solve(
-        &mut problem.points,
-        &problem.lines,
-        &mut problem.circles,
-        &mut problem.arcs,
-        &problem.shapes,
-        &problem.constraints,
-        &opts,
+        &mut problem.points, &problem.lines, &mut problem.circles, &mut problem.arcs,
+        &problem.shapes, &problem.constraints, &opts, &mut problem.groups,
     );
     let metadata = solver::analyze_solution(
-        &problem.points,
-        &problem.lines,
-        &problem.circles,
-        &problem.arcs,
-        &problem.shapes,
-        &problem.constraints,
-        max_error,
-        &opts,
+        &problem.points, &problem.lines, &problem.circles, &problem.arcs,
+        &problem.shapes, &problem.constraints, max_error, &opts, &problem.groups,
     );
     build_result(max_error, &problem, Some(metadata))
 }

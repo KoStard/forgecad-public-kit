@@ -8,6 +8,7 @@ export type LineId = string;
 export type CircleId = string;
 export type ArcId = string;
 export type ShapeId = string;
+export type GroupId = string;
 
 export interface SketchArc {
   id: ArcId;
@@ -28,6 +29,34 @@ export interface SketchShape {
   id: ShapeId;
   /** Ordered list of line IDs forming a closed polygon. */
   lines: LineId[];
+}
+
+/** A point in a group's local coordinate frame. */
+export interface SketchGroupLocalPoint {
+  id: PointId;
+  lx: number;
+  ly: number;
+}
+
+/**
+ * A rigid-body group: N local points with a shared coordinate frame (x, y, θ).
+ * The solver optimises over the 3 frame DOF instead of 2N point DOF.
+ */
+export interface SketchGroup {
+  id: GroupId;
+  /** World position of the group's local origin. */
+  x: number;
+  y: number;
+  /** Rotation angle (radians) of the group frame. */
+  theta: number;
+  /** When true, all 3 DOF are frozen. */
+  fixed: boolean;
+  /** When true, θ is frozen — only translation DOF remain. */
+  fixedRotation: boolean;
+  /** Points in local coordinates. */
+  points: SketchGroupLocalPoint[];
+  /** Lines connecting local points (using their global IDs). */
+  lines: { id: LineId; a: PointId; b: PointId }[];
 }
 
 export interface SketchPoint {
@@ -165,6 +194,8 @@ export interface ConstraintDefinition {
   circles: SketchCircle[];
   arcs: SketchArc[];
   shapes: SketchShape[];
+  /** Rigid-body groups — the solver sees 3 DOF per group instead of 2N per point. */
+  groups: SketchGroup[];
   loops: SketchLoop[];
   constraints: SketchConstraint[];
   rejectedConstraints: SketchConstraint[];
