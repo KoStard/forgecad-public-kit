@@ -165,16 +165,50 @@ The reconstruction graph's dependency DAG enables:
 
 | # | Change | Suite (74) | Time | Spectrogram | Status |
 |---|--------|-----------|------|-------------|--------|
-| — | Baseline | 74/74 | 12.6s | correct (7 surfaces) | ✅ |
-| P1 | Reconstruction graph analysis | | | | |
-| P2 | Variable elimination + reconstruct | | | | |
+| — | Baseline (pre-hardening, 707dcc2) | 74/74 | 12.6s | correct (7 surfaces), err=0.000608 | ✅ |
+| E1 | Wire dead-code analytical patterns (fixed=true) | 74/74 | — | BROKEN (37 surfaces), err=325 | ❌ reverted |
+| E2 | LM hardening (8c16b75): central-diff FD + Nielsen + nullspace | 74/74 | — | BROKEN, err=325, 0 convergence | ❌ regression |
+| E3 | Revert Nielsen → inner retry loop (keep central-diff + nullspace) | 74/74 | 11.6s | correct (7 surfaces), err=0.000434 | ✅ |
+| P1+P2 | Reconstruction graph + variable elimination (aee8ccf) | 74/74 | 11.6s | correct (7 surfaces), err=0.000434 | ✅ |
 | P3 | Subsume SketchGroup | | | | |
+
+## Experiment Log
+
+### E1: Wire dead-code analytical patterns (FAILED)
+
+**What**: Enabled the 4 disabled patterns in `analytical.rs` — `try_circle_circle_intersection`, `try_line_circle_intersection`, `try_hdistance_plus_distance`, `try_vdistance_plus_distance`. These mark constructively-solved points as `fixed = true`.
+
+**Result**: Spectrometer broke — 37 surfaces instead of 7, err=325. Equilateral triangle vertices placed at wrong circle-circle intersections because `pick_closest` uses garbage initial positions `(1,1)`, `(0,5)`.
+
+**Why it failed**: `fixed = true` prevents LM from correcting wrong branch choices. Initial positions are unreliable placeholders, so proximity-based branch selection is meaningless.
+
+**Lesson**: Never mark constructively-solved points as fixed. Use variable elimination (remove from LM) with reconstruction during FD, so LM can still influence results through remaining constraints.
+
+### E2: LM hardening regression (FAILED — spectrometer)
+
+**What**: Commit `8c16b75` introduced three changes: (1) central-difference FD for more accurate Jacobians, (2) Nielsen lambda update — single trial per outer iteration instead of inner retry loop with up to 12 lambda trials, (3) null-space restarts for smarter exploration.
+
+**Result**: 74/74 tests pass, but spectrometer fails with err=325. Solver appears to make 0 progress.
+
+**Root cause**: The **Nielsen single-trial update** is the culprit. By removing the inner retry loop (which tried up to 12 different lambda values per outer iteration), the solver can't find an acceptable step quickly enough. After 12 consecutive rejections, `run_lm_pass` bails out entirely. The spectrometer's high-dimensional, poorly-conditioned constraint system needs the inner retry loop to explore the damping landscape before giving up.
+
+**Fix**: Restored the inner retry loop (up to 12 lambda trials per outer iteration) while keeping central-difference FD and null-space restarts.
+
+**Lesson**: Nielsen's single-trial-per-iteration strategy works well for well-conditioned problems (all 74 unit tests pass) but fails on large, ill-conditioned systems where the initial lambda guess is far from optimal. The inner retry loop is essential for robustness.
+
+### P1+P2: Reconstruction graph + variable elimination (SUCCESS)
+
+**What**: Added `reconstruction.rs` with dependency DAG. Points determined by closed-form geometry (coincident, offset, circle-circle, line-circle, hDist+circle, vDist+circle) are removed from LM's variable list. Positions recomputed during each FD perturbation. Branch selection uses remaining-constraint evaluation instead of proximity.
+
+**Result**: 74/74 tests pass, spectrometer correct (7 surfaces, err=0.000434). Same convergence quality as baseline.
+
+**Note**: Performance impact not yet measured — the reconstruction graph currently has no effect on the spectrometer because no patterns match yet (no fixed anchor points in the spectrometer's constraint graph). The real test will come when Phase 3 (SketchGroup subsumption) is implemented, or when more patterns are added.
 
 ## Files Modified
 
 | File | Purpose |
 |------|---------|
 | `solver/src/solver/reconstruction.rs` | New — graph data structure, analysis, execution |
-| `solver/src/solver/lm.rs` | Variable construction, FD integration, consumed constraints |
+| `solver/src/solver/lm.rs` | Variable construction, FD integration, consumed constraints, fixed Nielsen regression |
 | `solver/src/solver/mod.rs` | Wire reconstruction into solve pipeline |
 | `solver/src/solver/analytical.rs` | Subsumed by reconstruction (eventually removed) |

@@ -103,6 +103,14 @@ impl ReconstructionGraph {
         self.steps.is_empty()
     }
 
+    pub fn empty() -> Self {
+        ReconstructionGraph {
+            steps: Vec::new(),
+            determined_point_indices: HashSet::new(),
+            consumed_constraint_indices: HashSet::new(),
+        }
+    }
+
     /// For each reconstructed point, compute the set of point indices it
     /// transitively depends on (for sparsity mapping).
     pub fn dependency_point_indices(&self) -> HashMap<usize, Vec<usize>> {

@@ -1254,8 +1254,6 @@ fn run_lm_pass(
     let mut best_pass_error = lin.max_abs;
     let mut best_pass_disp = scaled_state_displacement(&best_pass_state, anchor_state, scale);
 
-    let mut consecutive_rejects = 0u32;
-
     for _ in 0..iterations {
         if lin.max_abs <= tolerance { break; }
 
@@ -1272,59 +1270,78 @@ fn run_lm_pass(
             Some(s) => s,
             None => break,
         };
-        let dx = limit_step(step.dx.clone(), scale, max_scaled_step);
-        let pred = step.predicted_reduction
+        let mut dx = limit_step(step.dx.clone(), scale, max_scaled_step);
+        let mut pred = step.predicted_reduction
             * (1.0_f64).min(max_scaled_step / scaled_step_norm(&step.dx, scale).max(max_scaled_step));
 
-        // Nielsen update: one trial step per outer iteration.
-        let trial_state: Vec<f64> = state.iter().zip(&dx).map(|(s, d)| s + d).collect();
-        apply_state(&trial_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
-        if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
+        let mut accepted = false;
+        let mut local_lambda = lambda;
+        let mut local_nu = nu;
 
-        let trial = match linearize(
-            points, lines, circles, arcs, shapes, constraints, groups,
-            vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
-        ) {
-            Some(l) => l,
-            None => {
-                apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
-                if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
-                // Reject: increase damping.
-                lambda *= nu;
-                nu *= 2.0;
-                consecutive_rejects += 1;
-                if consecutive_rejects >= 12 { break; }
-                continue;
+        for _ in 0..12 {
+            let trial_state: Vec<f64> = state.iter().zip(&dx).map(|(s, d)| s + d).collect();
+            apply_state(&trial_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+            if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
+
+            let trial = match linearize(
+                points, lines, circles, arcs, shapes, constraints, groups,
+                vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
+            ) {
+                Some(l) => l,
+                None => {
+                    apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+                    if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
+                    break;
+                }
+            };
+
+            let actual = lin.weighted_cost - trial.weighted_cost;
+            let rho = if pred > 0.0 { actual / pred } else { 0.0 };
+
+            if actual > 0.0 {
+                accepted = true;
+                lambda = if rho > 0.0 {
+                    let factor = 1.0 - (2.0 * rho - 1.0).powi(3);
+                    local_lambda * (1.0_f64 / 3.0).max(factor)
+                } else {
+                    local_lambda
+                };
+                nu = 2.0;
+                let trial_disp = scaled_state_displacement(&trial_state, anchor_state, scale);
+                if trial.max_abs + 1e-9 < best_pass_error
+                    || (trial.max_abs <= best_pass_error + tolerance * 0.25 && trial_disp < best_pass_disp)
+                {
+                    best_pass_error = trial.max_abs;
+                    best_pass_disp = trial_disp;
+                    best_pass_state = trial_state.clone();
+                }
+                lin = trial;
+                break;
             }
-        };
 
-        let actual = lin.weighted_cost - trial.weighted_cost;
-        let rho = if pred > 0.0 { actual / pred } else { 0.0 };
-
-        if actual > 0.0 {
-            // Accept: Nielsen lambda update.
-            let factor = 1.0 - (2.0 * rho - 1.0).powi(3);
-            lambda *= (1.0_f64 / 3.0).max(factor);
-            nu = 2.0;
-            consecutive_rejects = 0;
-
-            let trial_disp = scaled_state_displacement(&trial_state, anchor_state, scale);
-            if trial.max_abs + 1e-9 < best_pass_error
-                || (trial.max_abs <= best_pass_error + tolerance * 0.25 && trial_disp < best_pass_disp)
-            {
-                best_pass_error = trial.max_abs;
-                best_pass_disp = trial_disp;
-                best_pass_state = trial_state.clone();
-            }
-            lin = trial;
-        } else {
-            // Reject: restore state, increase damping.
             apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
             if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
+            local_lambda *= local_nu;
+            local_nu *= 2.0;
+
+            let retry = match lm_step(
+                &lin.weighted_jacobian,
+                &lin.weighted_residual,
+                local_lambda,
+                Some(&prior_offset),
+                prior_diag,
+            ) {
+                Some(s) => s,
+                None => break,
+            };
+            dx = limit_step(retry.dx.clone(), scale, max_scaled_step);
+            pred = retry.predicted_reduction
+                * (1.0_f64).min(max_scaled_step / scaled_step_norm(&retry.dx, scale).max(max_scaled_step));
+        }
+
+        if !accepted {
             lambda *= nu;
             nu *= 2.0;
-            consecutive_rejects += 1;
-            if consecutive_rejects >= 12 { break; }
         }
     }
 
