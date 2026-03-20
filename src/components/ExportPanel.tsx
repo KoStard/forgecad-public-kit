@@ -134,17 +134,6 @@ export function ExportPanel() {
       >
         Export...
       </button>
-      <div
-        style={{
-          marginTop: 6,
-          fontSize: 11,
-          color: 'var(--fc-textDim)',
-          lineHeight: 1.35,
-        }}
-      >
-        3MF is recommended for manifold CAD solids. STL is kept as a legacy option.
-      </div>
-
       {dialogOpen && (
         <div
           role="presentation"
