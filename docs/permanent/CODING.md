@@ -74,8 +74,7 @@ examples/                 # Example scripts
 
 ## Coding Standards
 
-### Minimal Implementation
-Write only the code needed to solve the problem. No verbose implementations, no speculative features.
+See [CODING_BEST_PRACTICES.md](CODING_BEST_PRACTICES.md) for TypeScript, React, state management, and performance best practices.
 
 ## Domain Localization Standard (Required)
 
@@ -128,21 +127,6 @@ The key rule is simple:
 
 - solve the deepest shared prerequisite first
 - only then open the parallel wave that builds on top of it
-
-### TypeScript
-- Use explicit types for function parameters and return values
-- Avoid `any` - use `unknown` or proper types
-- Prefer interfaces for object shapes
-
-### React Components
-- Functional components only
-- Inline styles for simplicity (no CSS files unless necessary)
-- Extract reusable logic to custom hooks or store actions
-
-### State Management
-- All global state lives in `forgeStore.ts`
-- Use Zustand selectors to prevent unnecessary re-renders
-- Keep actions pure and synchronous where possible
 
 ## Frame Composition Standard (Required)
 
@@ -302,33 +286,6 @@ Before committing UI changes:
 - Test parameter sliders update geometry
 - Verify STL export produces valid files
 - Check measure mode calculates correctly
-
-## Code Review
-
-### Self-Review Before Commit
-1. Remove console.logs and debug code
-2. Check for unused imports
-3. Verify TypeScript has no errors
-4. Test the change works as intended
-5. Read the diff - does it make sense?
-
-### What to Look For
-- Does this solve the problem with minimal code?
-- Are there edge cases not handled?
-- Is the code readable without comments?
-- Does it follow existing patterns?
-
-## Performance
-
-### Geometry Operations
-- Manifold operations are expensive - minimize boolean ops
-- Cache geometry results when parameters don't change
-- Use debouncing for real-time updates (already implemented)
-
-### React Rendering
-- Use Zustand selectors to prevent unnecessary re-renders
-- Memoize expensive computations with `useMemo`
-- Keep component tree shallow
 
 ## Common Patterns
 

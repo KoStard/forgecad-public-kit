@@ -227,12 +227,18 @@ export interface SolverConstraintResidual {
   residual: number;
 }
 
+export interface SolveTrailStep {
+  phase: string;
+  error: number;
+}
+
 export interface SolverMetadata {
   status: 'under' | 'fully' | 'over' | 'over-redundant';
   dof: number;
   constraintResiduals: SolverConstraintResidual[];
   redundantConstraintIds: string[];
   conflictingConstraintIds: string[];
+  solveTrail?: SolveTrailStep[];
 }
 
 // ─── Extension interfaces (augmented by each constraint def file via declare module) ───

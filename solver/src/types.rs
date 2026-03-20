@@ -292,12 +292,20 @@ pub struct ConstraintResidual {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SolveTrailStep {
+    pub phase: String,
+    pub error: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SolveMetadata {
     pub status: SolveStatus,
     pub dof: i32,
     pub constraint_residuals: Vec<ConstraintResidual>,
     pub redundant_constraint_ids: Vec<String>,
     pub conflicting_constraint_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub solve_trail: Vec<SolveTrailStep>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

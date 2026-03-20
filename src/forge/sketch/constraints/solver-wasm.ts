@@ -756,6 +756,10 @@ function toSolverMetadata(result: WasmSolveResult): SolverMetadata | null {
     })),
     redundantConstraintIds: result.metadata.redundant_constraint_ids,
     conflictingConstraintIds: result.metadata.conflicting_constraint_ids,
+    solveTrail: result.metadata.solve_trail?.map((s: { phase: string; error: number }) => ({
+      phase: s.phase,
+      error: s.error,
+    })),
   } : null;
 }
 

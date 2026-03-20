@@ -1,9 +1,31 @@
 use std::collections::{HashMap, HashSet};
+use std::cell::RefCell;
 use crate::constraints::{constraint_jacobian_impl, evaluate_residuals};
-use crate::types::{Arc, Circle, Constraint, Line, Point, Shape, SketchGroup};
+use crate::types::{Arc, Circle, Constraint, Line, Point, Shape, SketchGroup, SolveTrailStep};
 use super::linear::solve_linear;
 use super::resolve_group_points;
 use super::reconstruction::ReconstructionGraph;
+
+// ─── Solve trail (thread-local accumulator) ──────────────────────────────────
+
+thread_local! {
+    static SOLVE_TRAIL: RefCell<Vec<SolveTrailStep>> = RefCell::new(Vec::new());
+}
+
+pub fn trail_push(phase: &str, error: f64) {
+    SOLVE_TRAIL.with(|t| t.borrow_mut().push(SolveTrailStep {
+        phase: phase.to_string(),
+        error,
+    }));
+}
+
+pub fn trail_reset() {
+    SOLVE_TRAIL.with(|t| t.borrow_mut().clear());
+}
+
+pub fn trail_take() -> Vec<SolveTrailStep> {
+    SOLVE_TRAIL.with(|t| std::mem::take(&mut *t.borrow_mut()))
+}
 
 // ─── Variable abstraction ─────────────────────────────────────────────────────
 
@@ -168,7 +190,7 @@ fn apply_state(
 
 // ─── Reference length ─────────────────────────────────────────────────────────
 
-fn compute_reference_length(points: &Vec<Point>, circles: &Vec<Circle>, arcs: &Vec<Arc>) -> f64 {
+fn compute_reference_length(points: &Vec<Point>, circles: &Vec<Circle>, arcs: &Vec<Arc>, constraints: &Vec<Constraint>) -> f64 {
     let mut xs: Vec<f64> = points.iter().map(|p| p.x).collect();
     let mut ys: Vec<f64> = points.iter().map(|p| p.y).collect();
     for c in circles {
@@ -183,14 +205,34 @@ fn compute_reference_length(points: &Vec<Point>, circles: &Vec<Circle>, arcs: &V
         ys.push(a.radius);
         ys.push(-a.radius);
     }
-    if xs.is_empty() {
+
+    // Include constraint-specified values so the solver knows the scale
+    // even when all points start at the origin.
+    let mut max_constraint_value: f64 = 0.0;
+    for c in constraints {
+        let v = match c {
+            Constraint::Length { value, .. }
+            | Constraint::Distance { value, .. }
+            | Constraint::LineDistance { value, .. }
+            | Constraint::PointLineDistance { value, .. }
+            | Constraint::Radius { value, .. }
+            | Constraint::Diameter { value, .. } => value.abs(),
+            Constraint::HDistance { value, .. }
+            | Constraint::VDistance { value, .. } => value.abs(),
+            Constraint::Fixed { x, y, .. } => x.abs().max(y.abs()),
+            _ => 0.0,
+        };
+        if v > max_constraint_value { max_constraint_value = v; }
+    }
+
+    if xs.is_empty() && max_constraint_value < 1e-9 {
         return 1.0;
     }
     let span_x = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
         - xs.iter().cloned().fold(f64::INFINITY, f64::min);
     let span_y = ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
         - ys.iter().cloned().fold(f64::INFINITY, f64::min);
-    span_x.hypot(span_y).max(1.0)
+    span_x.hypot(span_y).max(max_constraint_value).max(1.0)
 }
 
 // ─── Residual evaluation (including arc consistency) ─────────────────────────
@@ -413,6 +455,185 @@ fn build_sparsity(
     }
 
     (SparsityMap { var_to_constraint_rows, var_to_arc_rows, arc_row_start, group_var_cols, reconstruction_var_cols }, arc_row_start + arcs.len() * 2)
+}
+
+// ─── Structural info for graph decomposition ─────────────────────────────────
+
+/// Identifies what entity/DOF a variable column represents.
+#[derive(Debug, Clone)]
+pub enum VarOrigin {
+    PointX(usize),   // point index
+    PointY(usize),
+    CircleR(usize),  // circle index
+    ArcR(usize),     // arc index
+    GroupX(usize),   // group index
+    GroupY(usize),
+    GroupTheta(usize),
+}
+
+/// Structural information for building the scalar bipartite graph.
+pub struct StructuralInfo {
+    pub n_vars: usize,
+    pub constraint_var_sets: Vec<Vec<usize>>,
+    pub constraint_row_ranges: Vec<(usize, usize)>,
+    pub arc_var_sets: Vec<Vec<usize>>,
+    pub arc_row_start: usize,
+    pub var_origins: Vec<VarOrigin>,
+}
+
+/// Extract the structural info needed by graph decomposition.
+/// This builds the variable list and sparsity map, then extracts the
+/// bipartite graph structure without running any LM iterations.
+pub fn extract_structural_info(
+    points: &Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &Vec<Circle>,
+    arcs: &Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+    groups: &Vec<SketchGroup>,
+    graph: &ReconstructionGraph,
+) -> StructuralInfo {
+    let ref_len = compute_reference_length(points, circles, arcs, constraints);
+    let scale = ref_len.max(1.0);
+
+    let (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx) =
+        build_variables(points, circles, arcs, groups, scale, graph);
+
+    let n_vars = vars.len();
+
+    // Build var_origins: what entity/DOF each variable column represents.
+    let mut var_origins: Vec<VarOrigin> = vec![VarOrigin::PointX(0); n_vars];
+    for (i, _p) in points.iter().enumerate() {
+        let vi = pt_var_idx[i];
+        if vi != usize::MAX {
+            var_origins[vi] = VarOrigin::PointX(i);
+            var_origins[vi + 1] = VarOrigin::PointY(i);
+        }
+    }
+    for (i, _c) in circles.iter().enumerate() {
+        let vi = circ_var_idx[i];
+        if vi != usize::MAX {
+            var_origins[vi] = VarOrigin::CircleR(i);
+        }
+    }
+    for (i, _a) in arcs.iter().enumerate() {
+        var_origins[arc_var_idx[i]] = VarOrigin::ArcR(i);
+    }
+    for (i, g) in groups.iter().enumerate() {
+        let vi = group_var_idx[i];
+        if vi != usize::MAX {
+            var_origins[vi] = VarOrigin::GroupX(i);
+            var_origins[vi + 1] = VarOrigin::GroupY(i);
+            if !g.fixed_rotation {
+                var_origins[vi + 2] = VarOrigin::GroupTheta(i);
+            }
+        }
+    }
+
+    // Now build the constraint_var_sets and constraint_row_ranges using the
+    // same logic as build_sparsity, but only extracting the structural part.
+    let mut group_point_to_group_idx: HashMap<String, usize> = HashMap::new();
+    for (gi, group) in groups.iter().enumerate() {
+        for lp in &group.points {
+            group_point_to_group_idx.insert(lp.id.clone(), gi);
+        }
+    }
+
+    let mut entity_to_vars: HashMap<String, Vec<usize>> = HashMap::new();
+    for (i, p) in points.iter().enumerate() {
+        let vi = pt_var_idx[i];
+        if vi != usize::MAX {
+            entity_to_vars.entry(p.id.clone()).or_default().extend([vi, vi + 1]);
+        } else if let Some(&gi) = group_point_to_group_idx.get(&p.id) {
+            let gvi = group_var_idx[gi];
+            if gvi != usize::MAX {
+                let entry = entity_to_vars.entry(p.id.clone()).or_default();
+                entry.push(gvi);
+                entry.push(gvi + 1);
+                if !groups[gi].fixed_rotation {
+                    entry.push(gvi + 2);
+                }
+            }
+        }
+    }
+    // Route reconstructed points.
+    let dep_map = graph.dependency_point_indices();
+    for (&recon_idx, dep_indices) in &dep_map {
+        let recon_id = points[recon_idx].id.clone();
+        let mut dep_vars: Vec<usize> = Vec::new();
+        for &dep_idx in dep_indices {
+            let dep_id = &points[dep_idx].id;
+            if let Some(vars) = entity_to_vars.get(dep_id.as_str()) {
+                dep_vars.extend(vars);
+            }
+        }
+        dep_vars.sort();
+        dep_vars.dedup();
+        entity_to_vars.insert(recon_id, dep_vars);
+    }
+    for (i, c) in circles.iter().enumerate() {
+        let vi = circ_var_idx[i];
+        if vi != usize::MAX {
+            entity_to_vars.entry(c.id.clone()).or_default().push(vi);
+        }
+    }
+    for (i, a) in arcs.iter().enumerate() {
+        entity_to_vars.entry(a.id.clone()).or_default().push(arc_var_idx[i]);
+    }
+
+    let lines_map: HashMap<&str, &Line> = lines.iter().map(|l| (l.id.as_str(), l)).collect();
+    let circles_map: HashMap<&str, &Circle> = circles.iter().map(|c| (c.id.as_str(), c)).collect();
+    let arcs_map: HashMap<&str, &Arc> = arcs.iter().map(|a| (a.id.as_str(), a)).collect();
+    let shapes_map: HashMap<&str, &Shape> = shapes.iter().map(|s| (s.id.as_str(), s)).collect();
+
+    let mut constraint_var_sets: Vec<Vec<usize>> = Vec::with_capacity(constraints.len());
+    let mut constraint_row_ranges: Vec<(usize, usize)> = Vec::with_capacity(constraints.len());
+    let mut row = 0usize;
+
+    for c in constraints {
+        let res = crate::constraints::constraint_residual_impl(c, points, lines, circles, arcs, shapes);
+        let count = res.len();
+        constraint_row_ranges.push((row, count));
+        row += count;
+
+        let entity_ids = crate::constraints::constraint_entity_ids(c, &lines_map, &circles_map, &arcs_map, &shapes_map);
+        let mut var_indices: Vec<usize> = Vec::new();
+        for eid in &entity_ids {
+            if let Some(vis) = entity_to_vars.get(eid.as_str()) {
+                var_indices.extend_from_slice(vis);
+            }
+        }
+        var_indices.sort();
+        var_indices.dedup();
+        constraint_var_sets.push(var_indices);
+    }
+
+    let arc_row_start = row;
+
+    // Arc var sets.
+    let mut arc_var_sets: Vec<Vec<usize>> = Vec::with_capacity(arcs.len());
+    for arc in arcs {
+        let arc_entity_ids = [arc.id.as_str(), arc.center.as_str(), arc.start.as_str(), arc.end.as_str()];
+        let mut vs: Vec<usize> = Vec::new();
+        for eid in arc_entity_ids {
+            if let Some(vis) = entity_to_vars.get(eid) {
+                vs.extend(vis);
+            }
+        }
+        vs.sort();
+        vs.dedup();
+        arc_var_sets.push(vs);
+    }
+
+    StructuralInfo {
+        n_vars,
+        constraint_var_sets,
+        constraint_row_ranges,
+        arc_var_sets,
+        arc_row_start,
+        var_origins,
+    }
 }
 
 // ─── Jacobian + linearization ─────────────────────────────────────────────────
@@ -1113,7 +1334,7 @@ pub fn solve_global(
     groups: &mut Vec<SketchGroup>,
     graph: &ReconstructionGraph,
 ) -> f64 {
-    let ref_len = compute_reference_length(points, circles, arcs);
+    let ref_len = compute_reference_length(points, circles, arcs, constraints);
     let scale = ref_len.max(1.0);
 
     let (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx) =
@@ -1132,6 +1353,8 @@ pub fn solve_global(
         graph,
     );
 
+    trail_push(&format!("init: vars={} rows={} ref_len={:.2}", vars.len(), n_rows, ref_len), 0.0);
+
     let initial_state = capture_state(points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len());
     let mut best_state = initial_state.clone();
     let mut best_error = f64::INFINITY;
@@ -1139,7 +1362,6 @@ pub fn solve_global(
 
     for attempt in 0..restarts {
         if attempt > 0 && !nullspace_basis.is_empty() {
-            // Null-space restart: perturb along constraint-satisfying directions.
             seed_nullspace_restart(
                 points, circles, arcs, groups, &best_state,
                 &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
@@ -1154,7 +1376,24 @@ pub fn solve_global(
         }
 
         if attempt == 0 {
+            let pre_gs_state = capture_state(
+                points, circles, arcs, groups,
+                &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len(),
+            );
+            let pre_gs_error = current_max_error(points, lines, circles, arcs, shapes, constraints);
             projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, warm_start_iters, tolerance);
+            let mut gs_error = current_max_error(points, lines, circles, arcs, shapes, constraints);
+            if gs_error > pre_gs_error {
+                apply_state(
+                    &pre_gs_state, points, circles, arcs, groups,
+                    &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
+                );
+                if !graph.is_empty() {
+                    super::reconstruction::reconstruct(graph, points, lines, constraints);
+                }
+                gs_error = pre_gs_error;
+            }
+            trail_push("gs-warm", gs_error);
         }
         let pass_anchor_state = capture_state(
             points, circles, arcs, groups,
@@ -1167,6 +1406,7 @@ pub fn solve_global(
             &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
             graph,
         );
+        trail_push(&format!("lm-pass[{}]", attempt), error);
 
         if error < best_error {
             best_error = error;
@@ -1182,16 +1422,35 @@ pub fn solve_global(
                 &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
                 &sparsity, n_rows, graph,
             );
+            trail_push(&format!("nullspace: {} vectors", nullspace_basis.len()), best_error);
         }
     }
 
     // GS escape: 3 rounds of GS warm-start + another LM pass.
     if best_error > tolerance {
-        for _ in 0..3 {
+        for gs_round in 0..3u32 {
             apply_state(&best_state, points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx);
             if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
             let gs_iters = (warm_start_iters * 4).max(30);
+            let pre_gs_state = capture_state(
+                points, circles, arcs, groups,
+                &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len(),
+            );
+            let pre_gs_error = current_max_error(points, lines, circles, arcs, shapes, constraints);
             projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, gs_iters, tolerance);
+            let mut gs_error = current_max_error(points, lines, circles, arcs, shapes, constraints);
+            if gs_error > pre_gs_error {
+                apply_state(
+                    &pre_gs_state, points, circles, arcs, groups,
+                    &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
+                );
+                if !graph.is_empty() {
+                    super::reconstruction::reconstruct(graph, points, lines, constraints);
+                }
+                gs_error = pre_gs_error;
+            }
+            trail_push(&format!("gs-escape[{}] ({}iters)", gs_round, gs_iters), gs_error);
+
             let pass_anchor_state = capture_state(
                 points, circles, arcs, groups,
                 &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len(),
@@ -1203,6 +1462,7 @@ pub fn solve_global(
                 &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
                 graph,
             );
+            trail_push(&format!("lm-escape[{}]", gs_round), error);
 
             if error < best_error {
                 best_error = error;
@@ -1214,6 +1474,7 @@ pub fn solve_global(
 
     apply_state(&best_state, points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx);
     if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
+    trail_push("done", best_error);
     best_error
 }
 

@@ -1,105 +1,149 @@
-// Complex spectrogram optical bench — 54 constraints, 31 points
-// Demonstrates: nested triangles, case geometry, camera holder, light path
-// Expected: orange "over-redundant" (DOF=-4) — some constraints are redundant
-// This is the primary stress test for the constraint solver.
+const width = param('width', 39);
 
-const sk = constrainedSketch();
-
-function eqTriangle(p1, p2, p3) {
-  const l1 = sk.line(p1, p2);
-  const l2 = sk.line(p2, p3);
-  const l3 = sk.line(p3, p1);
-  sk.equal(l1, l2);
-  sk.equal(l1, l3);
-  sk.ccw(p1, p2, p3);
-  return { points: [p1, p2, p3], lines: [l1, l2, l3], shape: sk.shape([l1, l2, l3]) };
-}
-
-function getLine(p1, p2) {
-  if (!p1) p1 = sk.point(0, 0);
-  if (!p2) p2 = sk.point(0, 1);
-  return { points: [p1, p2], line: sk.line(p1, p2) };
-}
-
-function getLines(p1, p2, count) {
-  const results = [];
-  let nextStart = p1;
+/** Create an open polyline of `count` segments from startPoint to endPoint. */
+function polyline(sk, startPoint, endPoint, count) {
+  const points = [startPoint];
+  const lines = [];
   for (let i = 0; i < count; i++) {
-    const line = i === count - 1 ? getLine(nextStart, p2) : getLine(nextStart);
-    nextStart = line.points[1];
-    results.push(line);
+    const end = i === count - 1 ? endPoint : sk.point(0, 1);
+    lines.push(sk.line(points[i], end));
+    points.push(end);
   }
-  sk.ccw(...results.map((obj) => obj.points[0]));
-  return results;
+  sk.ccw(...points.slice(0, -1));
+  return { points, lines };
 }
 
-// Inner prism triangle
-const origin = sk.point(0, 0);
-sk.fix(origin);
-const innerTri = eqTriangle(origin, sk.point(1, 1), sk.point(0, 5));
-const outerTri = eqTriangle(sk.point(0, 0), sk.point(1, 1), sk.point(0, 5));
-sk.length(innerTri.lines[0], param("prism_side", 22, { unit: "mm" }));
-sk.lineDistance(innerTri.lines[0], outerTri.lines[0], -2);
-sk.shapeEqualCentroid(innerTri.shape, outerTri.shape);
-sk.absoluteAngle(innerTri.lines[0], param("prism_angle", 46, { unit: "deg" }));
+function openRect(sk, points = [[0, 0], [1, 0], [1, 1], [0, 1]]) {
+  const vertices = points.map(([x, y]) => sk.point(x, y));
+  const sides = [
+    sk.line(vertices[0], vertices[1]),
+    sk.line(vertices[1], vertices[2]),
+    sk.line(vertices[2], vertices[3]),
+    sk.line(vertices[3], vertices[0]),
+  ];
+  const shape = sk.shape(sides);
+  sk.addLoop(vertices);
+  return {
+    vertices,
+    sides,
+    shape,
+    vertex(index) {
+      return vertices[((index % 4) + 4) % 4];
+    },
+    side(index) {
+      return sides[((index % 4) + 4) % 4];
+    },
+  };
+}
 
-// Light leaving point
-const llp = sk.point(0, 0);
-sk.pointOnLine(llp, innerTri.lines[1]);
-sk.pointLineDistance(llp, innerTri.lines[0], param("light_offset", 8.42, { unit: "mm" }));
+function mustRef(map, id, label) {
+  const ref = map.get(id);
+  if (!ref) {
+    throw new Error(`Missing ${label}: ${id}`);
+  }
+  return ref;
+}
 
-// Case exterior
-const caseExt = getLines(outerTri.points[0], outerTri.points[2], 5);
-sk.absoluteAngle(caseExt[0].line, -90);
-sk.absoluteAngle(caseExt[1].line, 0);
-sk.absoluteAngle(caseExt[2].line, 90);
-sk.absoluteAngle(caseExt[3].line, 180);
-sk.absoluteAngle(caseExt[4].line, -90);
+function buildPrismHolder() {
+  const sk = constrainedSketch();
 
-// Case interior
-const intSP = sk.point(0, 0);
-sk.pointOnLine(intSP, outerTri.lines[0]);
-const intEP = sk.point(0, 0);
-sk.pointOnLine(intEP, outerTri.lines[1]);
-const caseInt = getLines(intSP, intEP, 5);
-for (let i = 0; i < 5; i++) sk.lineDistance(caseExt[i].line, caseInt[i].line, param("wall", 5, { unit: "mm" }));
+  const inner = sk.addPolygon({ points: [[0, 0], [1, 1], [0, 5]], addLoop: false });
+  sk.equal(inner.sides[0], inner.sides[1]);
+  sk.equal(inner.sides[0], inner.sides[2]);
+  sk.fix(inner.vertex(0));
 
-// Opening
-const openP1 = sk.point(0, 0);
-const attachMid = sk.point(0, 0);
-const openLines = getLines(openP1, openP1, 4);
-sk.parallel(openLines[0].line, openLines[2].line);
-sk.parallel(openLines[1].line, openLines[3].line);
-sk.length(openLines[0].line, param("opening_width", 4, { unit: "mm" }));
-sk.perpendicular(openLines[0].line, openLines[1].line);
-sk.lineDistance(openLines[0].line, caseInt[2].line, 0);
-sk.lineDistance(openLines[2].line, caseExt[2].line, 0);
-sk.midpoint(attachMid, openLines[0].line);
-sk.midpoint(attachMid, caseInt[2].line);
+  const outer = sk.addPolygon({ points: [[0, 0], [1, 1], [0, 5]], addLoop: false });
+  sk.equal(outer.sides[0], outer.sides[1]);
+  sk.equal(outer.sides[0], outer.sides[2]);
 
-// Camera holder exterior
-const camP1 = sk.point(0, 0);
-const camExt = getLines(camP1, camP1, 4);
-sk.pointOnLine(camExt[0].points[0], caseInt[3].line);
-sk.pointOnLine(camExt[0].points[1], caseInt[3].line);
-sk.pointOnLine(camExt[2].points[0], caseInt[1].line);
-sk.pointOnLine(camExt[2].points[1], caseInt[1].line);
-sk.perpendicular(caseInt[3].line, camExt[1].line);
-sk.perpendicular(caseInt[3].line, camExt[3].line);
+  sk.length(inner.sides[0], 22);
+  sk.lineDistance(inner.sides[0], outer.sides[0], -2);
+  sk.shapeEqualCentroid(inner.shape, outer.shape);
+  sk.absoluteAngle(inner.sides[0], 46);
 
-// Camera holder interior
-const camP2 = sk.point(0, 0);
-const camInt = getLines(camP2, camP2, 4);
-for (let i = 0; i < 4; i++) sk.lineDistance(camExt[i].line, camInt[i].line, param("cam_wall", 2, { unit: "mm" }));
-sk.lineDistance(camInt[1].line, camInt[3].line, param("cam_sensor", 2, { unit: "mm" }));
-sk.lineDistance(camInt[3].line, caseInt[2].line, param("cam_offset", -14, { unit: "mm" }));
-sk.length(camExt[1].line, param("cam_height", 38, { unit: "mm" }));
+  const lightLeavingPoint = sk.point(0, 0);
+  sk.pointOnLine(lightLeavingPoint, inner.sides[1]);
+  sk.pointLineDistance(lightLeavingPoint, inner.sides[0], 8.42);
 
-// Light path
-const mp = sk.point(0, 0);
-sk.midpoint(mp, camExt[1].line);
-const lightLine = getLine(llp, mp);
-sk.length(lightLine.line, param("light_path", 21.5, { unit: "mm" }));
-sk.perpendicular(lightLine.line, camExt[1].line);
+  return {
+    sketch: sk.solve(),
+    inner,
+    outer,
+    lightLeavingPoint,
+  };
+}
 
-return sk.solve({ iterations: 200, restarts: 12 });
+function buildCaseAndCamera(prismHolder) {
+  const sk = constrainedSketch();
+  const refs = sk.referenceAllFrom(prismHolder.sketch);
+
+  const outerStart = mustRef(refs.points, prismHolder.outer.vertex(0), 'outer start');
+  const outerEnd = mustRef(refs.points, prismHolder.outer.vertex(2), 'outer end');
+  const outerSide0 = mustRef(refs.lines, prismHolder.outer.sides[0], 'outer side 0');
+  const outerSide1 = mustRef(refs.lines, prismHolder.outer.sides[1], 'outer side 1');
+  const lightLeavingPoint = mustRef(refs.points, prismHolder.lightLeavingPoint, 'light point');
+
+  const outerChain = polyline(sk, outerStart, outerEnd, 5);
+  sk.absoluteAngle(outerChain.lines[0], -90);
+  sk.absoluteAngle(outerChain.lines[1], 0);
+  sk.absoluteAngle(outerChain.lines[2], 90);
+  sk.absoluteAngle(outerChain.lines[3], 180);
+  sk.absoluteAngle(outerChain.lines[4], -90);
+
+  const innerStart = sk.point(0, 0);
+  sk.pointOnLine(innerStart, outerSide0);
+  const innerEnd = sk.point(0, 0);
+  sk.pointOnLine(innerEnd, outerSide1);
+  const innerChain = polyline(sk, innerStart, innerEnd, 5);
+
+  for (let i = 0; i < 5; i++) {
+    sk.lineDistance(outerChain.lines[i], innerChain.lines[i], 5);
+  }
+
+  const attachMidpoint = sk.point(0, 0);
+  const opening = openRect(sk);
+  sk.parallel(opening.sides[0], opening.sides[2]);
+  sk.parallel(opening.sides[1], opening.sides[3]);
+  sk.length(opening.sides[0], 4);
+  sk.perpendicular(opening.sides[0], opening.sides[1]);
+  sk.lineDistance(opening.sides[0], innerChain.lines[2], 0);
+  sk.lineDistance(opening.sides[2], outerChain.lines[2], 0);
+  sk.midpoint(attachMidpoint, opening.sides[0]);
+  sk.midpoint(attachMidpoint, innerChain.lines[2]);
+
+  const outerCam = openRect(sk);
+  sk.pointOnLine(outerCam.vertex(0), innerChain.lines[3]);
+  sk.pointOnLine(outerCam.vertex(1), innerChain.lines[3]);
+  sk.pointOnLine(outerCam.vertex(2), innerChain.lines[1]);
+  sk.pointOnLine(outerCam.vertex(3), innerChain.lines[1]);
+  sk.perpendicular(innerChain.lines[3], outerCam.sides[1]);
+  sk.perpendicular(innerChain.lines[3], outerCam.sides[3]);
+
+  const innerCam = openRect(sk);
+  sk.lineDistance(outerCam.sides[0], innerCam.sides[0], 2);
+  sk.lineDistance(outerCam.sides[1], innerCam.sides[1], 2);
+  sk.lineDistance(outerCam.sides[2], innerCam.sides[2], 2);
+  sk.lineDistance(outerCam.sides[3], innerCam.sides[3], 2);
+  sk.lineDistance(innerCam.sides[1], innerCam.sides[3], 2);
+  sk.lineDistance(innerCam.sides[3], innerChain.lines[2], -14);
+
+  sk.length(outerCam.sides[1], width);
+
+  const midpoint = sk.point(0, 0);
+  sk.midpoint(midpoint, outerCam.sides[1]);
+  const lightLine = sk.line(lightLeavingPoint, midpoint);
+  sk.length(lightLine, 21.5);
+  sk.perpendicular(lightLine, outerCam.sides[1]);
+
+  return {
+    sketch: sk.solve(),
+  };
+}
+
+const prismHolder = buildPrismHolder();
+const spectrometerBody = buildCaseAndCamera(prismHolder);
+
+return [
+  { name: '1 - Prism Holder', sketch: prismHolder.sketch },
+  { name: '2 - Spectrometer Body', sketch: spectrometerBody.sketch },
+];

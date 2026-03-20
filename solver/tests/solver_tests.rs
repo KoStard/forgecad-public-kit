@@ -621,23 +621,21 @@ fn arc_consistency_maintained() {
     let end = point("e", 0.0, 10.0);
     let a = arc("arc1", "c", "s", "e", 10.0, false);
 
-    let result = solve_problem(
-        Problem {
-            points: vec![center, start, end],
-            lines: vec![],
-            circles: vec![],
-            arcs: vec![a],
-            shapes: vec![],
-            groups: vec![],
-            constraints: vec![
-                Constraint::Fixed { id: "fc".into(), point: "c".into(), x: 0.0, y: 0.0 },
-                Constraint::Fixed { id: "fs".into(), point: "s".into(), x: 10.0, y: 0.0 },
-                Constraint::Fixed { id: "fe".into(), point: "e".into(), x: 0.0, y: 10.0 },
-            ],
-            options: None,
-        },
-        None,
-    );
+    let problem = Problem {
+        points: vec![center, start, end],
+        lines: vec![],
+        circles: vec![],
+        arcs: vec![a],
+        shapes: vec![],
+        groups: vec![],
+        constraints: vec![
+            Constraint::Fixed { id: "fc".into(), point: "c".into(), x: 0.0, y: 0.0 },
+            Constraint::Fixed { id: "fs".into(), point: "s".into(), x: 10.0, y: 0.0 },
+            Constraint::Fixed { id: "fe".into(), point: "e".into(), x: 0.0, y: 10.0 },
+        ],
+        options: None,
+    };
+    let result = solve_problem(problem, None);
     // With all points fixed, arc radius should be auto-adjusted or error should be small.
     let arc_result = result.arcs.iter().find(|a| a.id == "arc1").unwrap();
     let (cx, cy) = get_pt(&result, "c");
@@ -993,5 +991,1367 @@ mod linear_tests {
         }
         let result = solve_problem(problem(points, vec![], constraints), Some(tight_options()));
         assert_solved(&result, 1e-4, "many coincident");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Cold-start convergence tests — minimal reproducers for spectrometer regression
+// These test whether the solver can converge from "garbage" initial positions
+// where points are clustered near the origin at small scale (~0-5 units)
+// but the solution is at a much larger scale (~20-60 units).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Equilateral triangle: 3 points at placeholder positions, fully constrained
+/// by equal sides + fixed vertex + length + absolute angle.
+/// This is the inner prism holder from the spectrometer.
+#[test]
+fn cold_start_equilateral_triangle() {
+    // Placeholder positions (small scale, clustered) — NOT the solution.
+    let problem = Problem {
+        points: vec![
+            point("p0", 0.0, 0.0),
+            point("p1", 1.0, 1.0),
+            point("p2", 0.0, 5.0),
+        ],
+        lines: vec![
+            line("s0", "p0", "p1"),
+            line("s1", "p1", "p2"),
+            line("s2", "p2", "p0"),
+        ],
+        circles: vec![],
+        arcs: vec![],
+        shapes: vec![],
+        groups: vec![],
+        constraints: vec![
+            Constraint::Ccw { id: "c-ccw".into(), points: vec!["p0".into(), "p1".into(), "p2".into()] },
+            Constraint::Equal { id: "c-eq1".into(), a: "s0".into(), b: "s1".into() },
+            Constraint::Equal { id: "c-eq2".into(), a: "s0".into(), b: "s2".into() },
+            Constraint::Fixed { id: "c-fix".into(), point: "p0".into(), x: 0.0, y: 0.0 },
+            Constraint::Length { id: "c-len".into(), line: "s0".into(), value: 22.0 },
+            Constraint::AbsoluteAngle { id: "c-angle".into(), line: "s0".into(), value: 46.0 },
+        ],
+        options: None,
+    };
+    let result = solve_problem(problem, None);
+    eprintln!("  equilateral triangle: max_error={:.6}, trail={:?}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| &m.solve_trail));
+    assert_solved(&result, TOL, "cold-start equilateral triangle");
+}
+
+/// Two concentric equilateral triangles with lineDistance offset.
+/// This is the prism holder from the spectrometer (inner + outer triangles).
+#[test]
+fn cold_start_concentric_triangles() {
+    let problem = Problem {
+        points: vec![
+            point("i0", 0.0, 0.0),
+            point("i1", 1.0, 1.0),
+            point("i2", 0.0, 5.0),
+            point("o0", 0.0, 0.0),
+            point("o1", 1.0, 1.0),
+            point("o2", 0.0, 5.0),
+        ],
+        lines: vec![
+            line("is0", "i0", "i1"),
+            line("is1", "i1", "i2"),
+            line("is2", "i2", "i0"),
+            line("os0", "o0", "o1"),
+            line("os1", "o1", "o2"),
+            line("os2", "o2", "o0"),
+        ],
+        circles: vec![],
+        arcs: vec![],
+        shapes: vec![
+            Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
+            Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
+        ],
+        groups: vec![],
+        constraints: vec![
+            Constraint::Ccw { id: "c1".into(), points: vec!["i0".into(), "i1".into(), "i2".into()] },
+            Constraint::Equal { id: "c2".into(), a: "is0".into(), b: "is1".into() },
+            Constraint::Equal { id: "c3".into(), a: "is0".into(), b: "is2".into() },
+            Constraint::Fixed { id: "c4".into(), point: "i0".into(), x: 0.0, y: 0.0 },
+            Constraint::Ccw { id: "c5".into(), points: vec!["o0".into(), "o1".into(), "o2".into()] },
+            Constraint::Equal { id: "c6".into(), a: "os0".into(), b: "os1".into() },
+            Constraint::Equal { id: "c7".into(), a: "os0".into(), b: "os2".into() },
+            Constraint::Length { id: "c8".into(), line: "is0".into(), value: 22.0 },
+            Constraint::LineDistance { id: "c9".into(), a: "is0".into(), b: "os0".into(), value: -2.0 },
+            Constraint::ShapeEqualCentroid { id: "c10".into(), a: "ishape".into(), b: "oshape".into() },
+            Constraint::AbsoluteAngle { id: "c11".into(), line: "is0".into(), value: 46.0 },
+        ],
+        options: None,
+    };
+    let result = solve_problem(problem, None);
+    eprintln!("  concentric triangles: max_error={:.6}, trail={:?}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| &m.solve_trail));
+    assert_solved(&result, TOL, "cold-start concentric triangles");
+}
+
+/// Case frame: 5 absolute-angle polyline segments with parallel inner offset.
+/// Tests the outer case of the spectrometer.
+#[test]
+fn cold_start_case_frame() {
+    // Start with just a simple case: 5 connected lines with absolute angles and lengths.
+    // All starting at near-origin positions.
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                fixed_point("p0", 0.0, 0.0),
+                point("p1", 0.0, 1.0),
+                point("p2", 0.0, 1.0),
+                point("p3", 0.0, 1.0),
+                point("p4", 0.0, 1.0),
+                point("p5", 0.0, 1.0),
+            ],
+            lines: vec![
+                line("l0", "p0", "p1"),
+                line("l1", "p1", "p2"),
+                line("l2", "p2", "p3"),
+                line("l3", "p3", "p4"),
+                line("l4", "p4", "p5"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![],
+            groups: vec![],
+            constraints: vec![
+                Constraint::AbsoluteAngle { id: "a0".into(), line: "l0".into(), value: -90.0 },
+                Constraint::AbsoluteAngle { id: "a1".into(), line: "l1".into(), value: 0.0 },
+                Constraint::AbsoluteAngle { id: "a2".into(), line: "l2".into(), value: 90.0 },
+                Constraint::AbsoluteAngle { id: "a3".into(), line: "l3".into(), value: 180.0 },
+                Constraint::AbsoluteAngle { id: "a4".into(), line: "l4".into(), value: -90.0 },
+                Constraint::Length { id: "len0".into(), line: "l0".into(), value: 5.0 },
+                Constraint::Length { id: "len1".into(), line: "l1".into(), value: 50.0 },
+                Constraint::Length { id: "len2".into(), line: "l2".into(), value: 49.0 },
+                Constraint::Length { id: "len3".into(), line: "l3".into(), value: 50.0 },
+                Constraint::Length { id: "len4".into(), line: "l4".into(), value: 25.0 },
+            ],
+            options: None,
+        },
+        None,
+    );
+    eprintln!("  case frame: max_error={:.6}, trail={:?}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| &m.solve_trail));
+    assert_solved(&result, TOL, "cold-start case frame");
+}
+
+/// Combined: equilateral triangle + case frame attached to it.
+/// This tests whether coupled subsystems can be solved cold-start.
+#[test]
+fn cold_start_triangle_plus_case() {
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                // Inner triangle
+                point("i0", 0.0, 0.0),
+                point("i1", 1.0, 1.0),
+                point("i2", 0.0, 5.0),
+                // Outer triangle
+                point("o0", 0.0, 0.0),
+                point("o1", 1.0, 1.0),
+                point("o2", 0.0, 5.0),
+                // Case: 5-segment polyline from outer.vertex(0) to outer.vertex(2)
+                // (using shared points o0 and o2 as endpoints, with 4 intermediate points)
+                point("c1", 0.0, 1.0),
+                point("c2", 0.0, 1.0),
+                point("c3", 0.0, 1.0),
+                point("c4", 0.0, 1.0),
+            ],
+            lines: vec![
+                line("is0", "i0", "i1"),
+                line("is1", "i1", "i2"),
+                line("is2", "i2", "i0"),
+                line("os0", "o0", "o1"),
+                line("os1", "o1", "o2"),
+                line("os2", "o2", "o0"),
+                // Case lines: o0 → c1 → c2 → c3 → c4 → o2
+                line("cl0", "o0", "c1"),
+                line("cl1", "c1", "c2"),
+                line("cl2", "c2", "c3"),
+                line("cl3", "c3", "c4"),
+                line("cl4", "c4", "o2"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![
+                Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
+                Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
+            ],
+            groups: vec![],
+            constraints: vec![
+                // Inner triangle
+                Constraint::Ccw { id: "t1".into(), points: vec!["i0".into(), "i1".into(), "i2".into()] },
+                Constraint::Equal { id: "t2".into(), a: "is0".into(), b: "is1".into() },
+                Constraint::Equal { id: "t3".into(), a: "is0".into(), b: "is2".into() },
+                Constraint::Fixed { id: "t4".into(), point: "i0".into(), x: 0.0, y: 0.0 },
+                // Outer triangle
+                Constraint::Ccw { id: "t5".into(), points: vec!["o0".into(), "o1".into(), "o2".into()] },
+                Constraint::Equal { id: "t6".into(), a: "os0".into(), b: "os1".into() },
+                Constraint::Equal { id: "t7".into(), a: "os0".into(), b: "os2".into() },
+                Constraint::Length { id: "t8".into(), line: "is0".into(), value: 22.0 },
+                Constraint::LineDistance { id: "t9".into(), a: "is0".into(), b: "os0".into(), value: -2.0 },
+                Constraint::ShapeEqualCentroid { id: "t10".into(), a: "ishape".into(), b: "oshape".into() },
+                Constraint::AbsoluteAngle { id: "t11".into(), line: "is0".into(), value: 46.0 },
+                // Case angles
+                Constraint::AbsoluteAngle { id: "ca0".into(), line: "cl0".into(), value: -90.0 },
+                Constraint::AbsoluteAngle { id: "ca1".into(), line: "cl1".into(), value: 0.0 },
+                Constraint::AbsoluteAngle { id: "ca2".into(), line: "cl2".into(), value: 90.0 },
+                Constraint::AbsoluteAngle { id: "ca3".into(), line: "cl3".into(), value: 180.0 },
+                Constraint::AbsoluteAngle { id: "ca4".into(), line: "cl4".into(), value: -90.0 },
+            ],
+            options: None,
+        },
+        None,
+    );
+    eprintln!("  triangle+case: max_error={:.6}, dof={}, trail_len={}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| m.dof).unwrap_or(0),
+        result.metadata.as_ref().map(|m| m.solve_trail.len()).unwrap_or(0));
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "cold-start triangle+case");
+}
+
+/// Triangle + case + inner case with lineDistance.
+/// The inner case has no explicit angles/lengths — geometry determined by lineDistance from outer.
+#[test]
+fn cold_start_triangle_case_inner() {
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                // Inner triangle
+                point("i0", 0.0, 0.0),
+                point("i1", 1.0, 1.0),
+                point("i2", 0.0, 5.0),
+                // Outer triangle
+                point("o0", 0.0, 0.0),
+                point("o1", 1.0, 1.0),
+                point("o2", 0.0, 5.0),
+                // Outer case: o0 → c1 → c2 → c3 → c4 → o2
+                point("c1", 0.0, 1.0),
+                point("c2", 0.0, 1.0),
+                point("c3", 0.0, 1.0),
+                point("c4", 0.0, 1.0),
+                // Inner case: ic0 → ic1 → ic2 → ic3 → ic4 → ic5
+                // ic0 is on outer.sides[0], ic5 is on outer.sides[1]
+                point("ic0", 0.5, 0.5),
+                point("ic1", 0.5, 1.0),
+                point("ic2", 0.5, 1.0),
+                point("ic3", 0.5, 1.0),
+                point("ic4", 0.5, 1.0),
+                point("ic5", 0.5, 2.0),
+            ],
+            lines: vec![
+                line("is0", "i0", "i1"),
+                line("is1", "i1", "i2"),
+                line("is2", "i2", "i0"),
+                line("os0", "o0", "o1"),
+                line("os1", "o1", "o2"),
+                line("os2", "o2", "o0"),
+                // Outer case
+                line("cl0", "o0", "c1"),
+                line("cl1", "c1", "c2"),
+                line("cl2", "c2", "c3"),
+                line("cl3", "c3", "c4"),
+                line("cl4", "c4", "o2"),
+                // Inner case
+                line("il0", "ic0", "ic1"),
+                line("il1", "ic1", "ic2"),
+                line("il2", "ic2", "ic3"),
+                line("il3", "ic3", "ic4"),
+                line("il4", "ic4", "ic5"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![
+                Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
+                Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
+            ],
+            groups: vec![],
+            constraints: vec![
+                // Inner triangle
+                Constraint::Ccw { id: "t1".into(), points: vec!["i0".into(), "i1".into(), "i2".into()] },
+                Constraint::Equal { id: "t2".into(), a: "is0".into(), b: "is1".into() },
+                Constraint::Equal { id: "t3".into(), a: "is0".into(), b: "is2".into() },
+                Constraint::Fixed { id: "t4".into(), point: "i0".into(), x: 0.0, y: 0.0 },
+                // Outer triangle
+                Constraint::Ccw { id: "t5".into(), points: vec!["o0".into(), "o1".into(), "o2".into()] },
+                Constraint::Equal { id: "t6".into(), a: "os0".into(), b: "os1".into() },
+                Constraint::Equal { id: "t7".into(), a: "os0".into(), b: "os2".into() },
+                Constraint::Length { id: "t8".into(), line: "is0".into(), value: 22.0 },
+                Constraint::LineDistance { id: "t9".into(), a: "is0".into(), b: "os0".into(), value: -2.0 },
+                Constraint::ShapeEqualCentroid { id: "t10".into(), a: "ishape".into(), b: "oshape".into() },
+                Constraint::AbsoluteAngle { id: "t11".into(), line: "is0".into(), value: 46.0 },
+                // Outer case angles
+                Constraint::AbsoluteAngle { id: "ca0".into(), line: "cl0".into(), value: -90.0 },
+                Constraint::AbsoluteAngle { id: "ca1".into(), line: "cl1".into(), value: 0.0 },
+                Constraint::AbsoluteAngle { id: "ca2".into(), line: "cl2".into(), value: 90.0 },
+                Constraint::AbsoluteAngle { id: "ca3".into(), line: "cl3".into(), value: 180.0 },
+                Constraint::AbsoluteAngle { id: "ca4".into(), line: "cl4".into(), value: -90.0 },
+                // Inner case ↔ outer case lineDistance
+                Constraint::LineDistance { id: "ld0".into(), a: "cl0".into(), b: "il0".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld1".into(), a: "cl1".into(), b: "il1".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld2".into(), a: "cl2".into(), b: "il2".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld3".into(), a: "cl3".into(), b: "il3".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld4".into(), a: "cl4".into(), b: "il4".into(), value: 5.0 },
+                // Inner case endpoints on outer triangle sides
+                Constraint::PointOnLine { id: "pol0".into(), point: "ic0".into(), line: "os0".into() },
+                Constraint::PointOnLine { id: "pol1".into(), point: "ic5".into(), line: "os1".into() },
+                // CCW for inner case points
+                Constraint::Ccw { id: "ccw_ic".into(), points: vec!["ic0".into(), "ic1".into(), "ic2".into()] },
+            ],
+            options: None,
+        },
+        None,
+    );
+    eprintln!("  triangle+case+inner: max_error={:.6}, dof={}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| m.dof).unwrap_or(0));
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "cold-start triangle+case+inner");
+}
+
+/// Triangle + case + inner case + back opening + outer camera.
+/// This isolates whether the camera rectangle causes the convergence failure.
+#[test]
+fn cold_start_with_camera() {
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                // Inner triangle
+                point("i0", 0.0, 0.0),
+                point("i1", 1.0, 1.0),
+                point("i2", 0.0, 5.0),
+                // Outer triangle
+                point("o0", 0.0, 0.0),
+                point("o1", 1.0, 1.0),
+                point("o2", 0.0, 5.0),
+                // Outer case: o0 → c1 → c2 → c3 → c4 → o2
+                point("c1", 0.0, 1.0),
+                point("c2", 0.0, 1.0),
+                point("c3", 0.0, 1.0),
+                point("c4", 0.0, 1.0),
+                // Inner case: ic0 → ic1 → ic2 → ic3 → ic4 → ic5
+                point("ic0", 0.5, 0.5),
+                point("ic1", 0.5, 1.0),
+                point("ic2", 0.5, 1.0),
+                point("ic3", 0.5, 1.0),
+                point("ic4", 0.5, 1.0),
+                point("ic5", 0.5, 2.0),
+                // Back opening (rectangle)
+                point("bp0", 1.0, 1.0),
+                point("bp1", 2.0, 1.0),
+                point("bp2", 2.0, 2.0),
+                point("bp3", 1.0, 2.0),
+                point("attach", 1.5, 1.0), // opening midpoint
+                // Outer camera
+                point("oc0", 1.0, 1.0),
+                point("oc1", 2.0, 1.0),
+                point("oc2", 2.0, 2.0),
+                point("oc3", 1.0, 2.0),
+            ],
+            lines: vec![
+                line("is0", "i0", "i1"),
+                line("is1", "i1", "i2"),
+                line("is2", "i2", "i0"),
+                line("os0", "o0", "o1"),
+                line("os1", "o1", "o2"),
+                line("os2", "o2", "o0"),
+                // Outer case
+                line("cl0", "o0", "c1"),
+                line("cl1", "c1", "c2"),
+                line("cl2", "c2", "c3"),
+                line("cl3", "c3", "c4"),
+                line("cl4", "c4", "o2"),
+                // Inner case
+                line("il0", "ic0", "ic1"),
+                line("il1", "ic1", "ic2"),
+                line("il2", "ic2", "ic3"),
+                line("il3", "ic3", "ic4"),
+                line("il4", "ic4", "ic5"),
+                // Back opening
+                line("bs0", "bp0", "bp1"),
+                line("bs1", "bp1", "bp2"),
+                line("bs2", "bp2", "bp3"),
+                line("bs3", "bp3", "bp0"),
+                // Outer camera
+                line("ocs0", "oc0", "oc1"),
+                line("ocs1", "oc1", "oc2"),
+                line("ocs2", "oc2", "oc3"),
+                line("ocs3", "oc3", "oc0"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![
+                Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
+                Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
+            ],
+            groups: vec![],
+            constraints: vec![
+                // Inner triangle
+                Constraint::Ccw { id: "t1".into(), points: vec!["i0".into(), "i1".into(), "i2".into()] },
+                Constraint::Equal { id: "t2".into(), a: "is0".into(), b: "is1".into() },
+                Constraint::Equal { id: "t3".into(), a: "is0".into(), b: "is2".into() },
+                Constraint::Fixed { id: "t4".into(), point: "i0".into(), x: 0.0, y: 0.0 },
+                // Outer triangle
+                Constraint::Ccw { id: "t5".into(), points: vec!["o0".into(), "o1".into(), "o2".into()] },
+                Constraint::Equal { id: "t6".into(), a: "os0".into(), b: "os1".into() },
+                Constraint::Equal { id: "t7".into(), a: "os0".into(), b: "os2".into() },
+                Constraint::Length { id: "t8".into(), line: "is0".into(), value: 22.0 },
+                Constraint::LineDistance { id: "t9".into(), a: "is0".into(), b: "os0".into(), value: -2.0 },
+                Constraint::ShapeEqualCentroid { id: "t10".into(), a: "ishape".into(), b: "oshape".into() },
+                Constraint::AbsoluteAngle { id: "t11".into(), line: "is0".into(), value: 46.0 },
+                // Outer case angles
+                Constraint::AbsoluteAngle { id: "ca0".into(), line: "cl0".into(), value: -90.0 },
+                Constraint::AbsoluteAngle { id: "ca1".into(), line: "cl1".into(), value: 0.0 },
+                Constraint::AbsoluteAngle { id: "ca2".into(), line: "cl2".into(), value: 90.0 },
+                Constraint::AbsoluteAngle { id: "ca3".into(), line: "cl3".into(), value: 180.0 },
+                Constraint::AbsoluteAngle { id: "ca4".into(), line: "cl4".into(), value: -90.0 },
+                // Inner case ↔ outer case lineDistance
+                Constraint::LineDistance { id: "ld0".into(), a: "cl0".into(), b: "il0".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld1".into(), a: "cl1".into(), b: "il1".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld2".into(), a: "cl2".into(), b: "il2".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld3".into(), a: "cl3".into(), b: "il3".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld4".into(), a: "cl4".into(), b: "il4".into(), value: 5.0 },
+                // Inner case endpoints on outer triangle sides
+                Constraint::PointOnLine { id: "pol0".into(), point: "ic0".into(), line: "os0".into() },
+                Constraint::PointOnLine { id: "pol1".into(), point: "ic5".into(), line: "os1".into() },
+                // Back opening
+                Constraint::Parallel { id: "bp0".into(), a: "bs0".into(), b: "bs2".into() },
+                Constraint::Parallel { id: "bp1".into(), a: "bs1".into(), b: "bs3".into() },
+                Constraint::Length { id: "blen".into(), line: "bs0".into(), value: 4.0 },
+                Constraint::Perpendicular { id: "bperp".into(), a: "bs0".into(), b: "bs1".into() },
+                Constraint::LineDistance { id: "bld0".into(), a: "bs0".into(), b: "il2".into(), value: 0.0 },
+                Constraint::LineDistance { id: "bld1".into(), a: "bs2".into(), b: "cl2".into(), value: 0.0 },
+                Constraint::Midpoint { id: "bmid0".into(), point: "attach".into(), line: "bs0".into() },
+                Constraint::Midpoint { id: "bmid1".into(), point: "attach".into(), line: "il2".into() },
+                // Outer camera: vertices on inner case lines
+                Constraint::PointOnLine { id: "cpol0".into(), point: "oc0".into(), line: "il3".into() },
+                Constraint::PointOnLine { id: "cpol1".into(), point: "oc1".into(), line: "il3".into() },
+                Constraint::PointOnLine { id: "cpol2".into(), point: "oc2".into(), line: "il1".into() },
+                Constraint::PointOnLine { id: "cpol3".into(), point: "oc3".into(), line: "il1".into() },
+                Constraint::Perpendicular { id: "cperp0".into(), a: "il3".into(), b: "ocs1".into() },
+                Constraint::Perpendicular { id: "cperp1".into(), a: "il3".into(), b: "ocs3".into() },
+                Constraint::Length { id: "clen".into(), line: "ocs1".into(), value: 39.0 },
+            ],
+            options: None,
+        },
+        None,
+    );
+    eprintln!("  with-camera: max_error={:.6}, dof={}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| m.dof).unwrap_or(0));
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "cold-start with camera");
+}
+
+/// Minimal reproduction: rectangle with vertices on two parallel lines.
+/// This is the camera-on-case-lines pattern from the spectrometer.
+#[test]
+fn cold_start_rect_on_parallel_lines() {
+    // Two horizontal parallel lines (simulating inner case lines il1 and il3).
+    // A rectangle with vertices constrained to lie on these lines.
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                // Two horizontal lines (fixed endpoints to simulate known case geometry)
+                fixed_point("la0", 0.0, 0.0),
+                fixed_point("la1", 50.0, 0.0),
+                fixed_point("lb0", 50.0, 39.0),
+                fixed_point("lb1", 0.0, 39.0),
+                // Rectangle vertices (start at bad positions)
+                point("r0", 1.0, 1.0),
+                point("r1", 2.0, 1.0),
+                point("r2", 2.0, 2.0),
+                point("r3", 1.0, 2.0),
+            ],
+            lines: vec![
+                line("lineA", "la0", "la1"), // horizontal at y=0
+                line("lineB", "lb0", "lb1"), // horizontal at y=40
+                line("rs0", "r0", "r1"),
+                line("rs1", "r1", "r2"),
+                line("rs2", "r2", "r3"),
+                line("rs3", "r3", "r0"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![],
+            groups: vec![],
+            constraints: vec![
+                // Rectangle vertices on the two lines
+                Constraint::PointOnLine { id: "pol0".into(), point: "r0".into(), line: "lineB".into() },
+                Constraint::PointOnLine { id: "pol1".into(), point: "r1".into(), line: "lineB".into() },
+                Constraint::PointOnLine { id: "pol2".into(), point: "r2".into(), line: "lineA".into() },
+                Constraint::PointOnLine { id: "pol3".into(), point: "r3".into(), line: "lineA".into() },
+                // Perpendicular to lineB
+                Constraint::Perpendicular { id: "perp0".into(), a: "lineB".into(), b: "rs1".into() },
+                Constraint::Perpendicular { id: "perp1".into(), a: "lineB".into(), b: "rs3".into() },
+                // Rectangle width
+                Constraint::Length { id: "len".into(), line: "rs1".into(), value: 39.0 },
+            ],
+            options: None,
+        },
+        None,
+    );
+    eprintln!("  rect-on-lines: max_error={:.6}, dof={}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| m.dof).unwrap_or(0));
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "rect on parallel lines");
+}
+
+/// Same as above but with FREE (non-fixed) parallel lines, simulating the real spectrometer.
+/// Lines determined by angle constraints + lineDistance, not fixed endpoints.
+#[test]
+fn cold_start_rect_on_free_lines() {
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                // Two lines with free endpoints (simulating inner case)
+                fixed_point("a0", 0.0, 0.0),
+                point("a1", 1.0, 0.0),
+                point("b0", 1.0, 1.0),
+                point("b1", 0.0, 1.0),
+                // Rectangle
+                point("r0", 0.5, 0.5),
+                point("r1", 1.5, 0.5),
+                point("r2", 1.5, 1.5),
+                point("r3", 0.5, 1.5),
+            ],
+            lines: vec![
+                line("lineA", "a0", "a1"),
+                line("lineB", "b0", "b1"),
+                line("rs0", "r0", "r1"),
+                line("rs1", "r1", "r2"),
+                line("rs2", "r2", "r3"),
+                line("rs3", "r3", "r0"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![],
+            groups: vec![],
+            constraints: vec![
+                // Lines are horizontal
+                Constraint::AbsoluteAngle { id: "aa0".into(), line: "lineA".into(), value: 0.0 },
+                Constraint::AbsoluteAngle { id: "aa1".into(), line: "lineB".into(), value: 180.0 },
+                // Lines are 39 apart (matches rect height)
+                Constraint::LineDistance { id: "ld".into(), a: "lineA".into(), b: "lineB".into(), value: 39.0 },
+                // Line lengths
+                Constraint::Length { id: "lenA".into(), line: "lineA".into(), value: 50.0 },
+                Constraint::Length { id: "lenB".into(), line: "lineB".into(), value: 50.0 },
+                // Rectangle on lines
+                Constraint::PointOnLine { id: "pol0".into(), point: "r0".into(), line: "lineB".into() },
+                Constraint::PointOnLine { id: "pol1".into(), point: "r1".into(), line: "lineB".into() },
+                Constraint::PointOnLine { id: "pol2".into(), point: "r2".into(), line: "lineA".into() },
+                Constraint::PointOnLine { id: "pol3".into(), point: "r3".into(), line: "lineA".into() },
+                Constraint::Perpendicular { id: "perp0".into(), a: "lineB".into(), b: "rs1".into() },
+                Constraint::Perpendicular { id: "perp1".into(), a: "lineB".into(), b: "rs3".into() },
+                Constraint::Length { id: "rlen".into(), line: "rs1".into(), value: 39.0 },
+            ],
+            options: None,
+        },
+        None,
+    );
+    eprintln!("  rect-on-free-lines: max_error={:.6}, dof={}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| m.dof).unwrap_or(0));
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "rect on free lines");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LM convergence basin tests — probe the solver's ability to converge from
+// various distances. No presolve changes here; we're testing LM's limits.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Helper: build the camera-on-free-lines problem with points at a given offset
+/// from the known solution. offset=0 means perfect solution, offset=10 means
+/// each free point displaced by ~10 units.
+fn camera_on_lines_problem(offset: f64) -> Problem {
+    // Solution geometry:
+    // lineA: (0,0) → (50,0)  horizontal right
+    // lineB: (50,39) → (0,39)  horizontal left (angle=180)
+    // Rectangle: r0=(33,39) r1=(27,39) on lineB; r2=(27,0) r3=(33,0) on lineA
+    // (6 wide × 39 tall rectangle)
+    let a0 = (0.0, 0.0);  // fixed
+    let a1_sol = (50.0, 0.0);
+    let b0_sol = (50.0, 39.0);
+    let b1_sol = (0.0, 39.0);
+    let r0_sol = (33.0, 39.0);
+    let r1_sol = (27.0, 39.0);
+    let r2_sol = (27.0, 0.0);
+    let r3_sol = (33.0, 0.0);
+
+    // Displace free points by `offset` in a deterministic pattern.
+    let displace = |sol: (f64, f64), seed: f64| -> (f64, f64) {
+        let angle = seed * 2.3; // deterministic but varied directions
+        (sol.0 + offset * angle.cos(), sol.1 + offset * angle.sin())
+    };
+    let a1 = displace(a1_sol, 1.0);
+    let b0 = displace(b0_sol, 2.0);
+    let b1 = displace(b1_sol, 3.0);
+    let r0 = displace(r0_sol, 4.0);
+    let r1 = displace(r1_sol, 5.0);
+    let r2 = displace(r2_sol, 6.0);
+    let r3 = displace(r3_sol, 7.0);
+
+    Problem {
+        points: vec![
+            fixed_point("a0", a0.0, a0.1),
+            point("a1", a1.0, a1.1),
+            point("b0", b0.0, b0.1),
+            point("b1", b1.0, b1.1),
+            point("r0", r0.0, r0.1),
+            point("r1", r1.0, r1.1),
+            point("r2", r2.0, r2.1),
+            point("r3", r3.0, r3.1),
+        ],
+        lines: vec![
+            line("lineA", "a0", "a1"),
+            line("lineB", "b0", "b1"),
+            line("rs0", "r0", "r1"),
+            line("rs1", "r1", "r2"),
+            line("rs2", "r2", "r3"),
+            line("rs3", "r3", "r0"),
+        ],
+        circles: vec![],
+        arcs: vec![],
+        shapes: vec![],
+        groups: vec![],
+        constraints: vec![
+            Constraint::AbsoluteAngle { id: "aa0".into(), line: "lineA".into(), value: 0.0 },
+            Constraint::AbsoluteAngle { id: "aa1".into(), line: "lineB".into(), value: 180.0 },
+            Constraint::LineDistance { id: "ld".into(), a: "lineA".into(), b: "lineB".into(), value: 39.0 },
+            Constraint::Length { id: "lenA".into(), line: "lineA".into(), value: 50.0 },
+            Constraint::Length { id: "lenB".into(), line: "lineB".into(), value: 50.0 },
+            Constraint::PointOnLine { id: "pol0".into(), point: "r0".into(), line: "lineB".into() },
+            Constraint::PointOnLine { id: "pol1".into(), point: "r1".into(), line: "lineB".into() },
+            Constraint::PointOnLine { id: "pol2".into(), point: "r2".into(), line: "lineA".into() },
+            Constraint::PointOnLine { id: "pol3".into(), point: "r3".into(), line: "lineA".into() },
+            Constraint::Perpendicular { id: "perp0".into(), a: "lineB".into(), b: "rs1".into() },
+            Constraint::Perpendicular { id: "perp1".into(), a: "lineB".into(), b: "rs3".into() },
+            Constraint::Length { id: "rlen".into(), line: "rs1".into(), value: 39.0 },
+        ],
+        options: None,
+    }
+}
+
+#[test]
+fn lm_basin_offset_0() {
+    // At the solution — should trivially converge.
+    let result = solve_problem(camera_on_lines_problem(0.0), None);
+    eprintln!("  offset=0: max_error={:.6}", result.max_error);
+    assert_solved(&result, TOL, "LM basin offset=0");
+}
+
+#[test]
+fn lm_basin_offset_1() {
+    let result = solve_problem(camera_on_lines_problem(1.0), None);
+    eprintln!("  offset=1: max_error={:.6}", result.max_error);
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "LM basin offset=1");
+}
+
+#[test]
+fn lm_basin_offset_5() {
+    let result = solve_problem(camera_on_lines_problem(5.0), None);
+    eprintln!("  offset=5: max_error={:.6}", result.max_error);
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "LM basin offset=5");
+}
+
+#[test]
+fn lm_basin_offset_10() {
+    let result = solve_problem(camera_on_lines_problem(10.0), None);
+    eprintln!("  offset=10: max_error={:.6}", result.max_error);
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "LM basin offset=10");
+}
+
+#[test]
+fn lm_basin_offset_20() {
+    let result = solve_problem(camera_on_lines_problem(20.0), None);
+    eprintln!("  offset=20: max_error={:.6}", result.max_error);
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "LM basin offset=20");
+}
+
+#[test]
+fn lm_basin_offset_40() {
+    let result = solve_problem(camera_on_lines_problem(40.0), None);
+    eprintln!("  offset=40: max_error={:.6}", result.max_error);
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "LM basin offset=40");
+}
+
+/// Test with lines starting at wrong scale — simulating the case chain problem.
+/// Lines start short (5 units) instead of 50, and close together (5 units apart
+/// instead of 39). The camera must stretch to 39 while the lines must grow to 50.
+#[test]
+fn lm_basin_wrong_scale() {
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                // Lines start short and close together
+                fixed_point("a0", 0.0, 0.0),
+                point("a1", 5.0, 0.0),       // should be (50, 0) — 10x too short
+                point("b0", 5.0, 5.0),        // should be (50, 39) — wrong position
+                point("b1", 0.0, 5.0),        // should be (0, 39) — 8x too short
+                // Rectangle starts small
+                point("r0", 3.0, 5.0),
+                point("r1", 2.0, 5.0),
+                point("r2", 2.0, 0.0),
+                point("r3", 3.0, 0.0),
+            ],
+            lines: vec![
+                line("lineA", "a0", "a1"),
+                line("lineB", "b0", "b1"),
+                line("rs0", "r0", "r1"),
+                line("rs1", "r1", "r2"),
+                line("rs2", "r2", "r3"),
+                line("rs3", "r3", "r0"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![],
+            groups: vec![],
+            constraints: vec![
+                Constraint::AbsoluteAngle { id: "aa0".into(), line: "lineA".into(), value: 0.0 },
+                Constraint::AbsoluteAngle { id: "aa1".into(), line: "lineB".into(), value: 180.0 },
+                Constraint::LineDistance { id: "ld".into(), a: "lineA".into(), b: "lineB".into(), value: 39.0 },
+                Constraint::Length { id: "lenA".into(), line: "lineA".into(), value: 50.0 },
+                Constraint::Length { id: "lenB".into(), line: "lineB".into(), value: 50.0 },
+                Constraint::PointOnLine { id: "pol0".into(), point: "r0".into(), line: "lineB".into() },
+                Constraint::PointOnLine { id: "pol1".into(), point: "r1".into(), line: "lineB".into() },
+                Constraint::PointOnLine { id: "pol2".into(), point: "r2".into(), line: "lineA".into() },
+                Constraint::PointOnLine { id: "pol3".into(), point: "r3".into(), line: "lineA".into() },
+                Constraint::Perpendicular { id: "perp0".into(), a: "lineB".into(), b: "rs1".into() },
+                Constraint::Perpendicular { id: "perp1".into(), a: "lineB".into(), b: "rs3".into() },
+                Constraint::Length { id: "rlen".into(), line: "rs1".into(), value: 39.0 },
+            ],
+            options: None,
+        },
+        None,
+    );
+    eprintln!("  wrong-scale: max_error={:.6}, dof={}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| m.dof).unwrap_or(0));
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "LM wrong scale");
+}
+
+/// Same as wrong_scale but WITHOUT Length constraints on the lines.
+/// This simulates the spectrometer case chain where line lengths are
+/// implicitly determined by the camera width.
+#[test]
+fn lm_basin_no_line_lengths() {
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                fixed_point("a0", 0.0, 0.0),
+                point("a1", 5.0, 0.0),
+                point("b0", 5.0, 5.0),
+                point("b1", 0.0, 5.0),
+                point("r0", 3.0, 5.0),
+                point("r1", 2.0, 5.0),
+                point("r2", 2.0, 0.0),
+                point("r3", 3.0, 0.0),
+            ],
+            lines: vec![
+                line("lineA", "a0", "a1"),
+                line("lineB", "b0", "b1"),
+                line("rs0", "r0", "r1"),
+                line("rs1", "r1", "r2"),
+                line("rs2", "r2", "r3"),
+                line("rs3", "r3", "r0"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![],
+            groups: vec![],
+            constraints: vec![
+                Constraint::AbsoluteAngle { id: "aa0".into(), line: "lineA".into(), value: 0.0 },
+                Constraint::AbsoluteAngle { id: "aa1".into(), line: "lineB".into(), value: 180.0 },
+                Constraint::LineDistance { id: "ld".into(), a: "lineA".into(), b: "lineB".into(), value: 39.0 },
+                // NO Length constraints on lineA and lineB!
+                Constraint::PointOnLine { id: "pol0".into(), point: "r0".into(), line: "lineB".into() },
+                Constraint::PointOnLine { id: "pol1".into(), point: "r1".into(), line: "lineB".into() },
+                Constraint::PointOnLine { id: "pol2".into(), point: "r2".into(), line: "lineA".into() },
+                Constraint::PointOnLine { id: "pol3".into(), point: "r3".into(), line: "lineA".into() },
+                Constraint::Perpendicular { id: "perp0".into(), a: "lineB".into(), b: "rs1".into() },
+                Constraint::Perpendicular { id: "perp1".into(), a: "lineB".into(), b: "rs3".into() },
+                Constraint::Length { id: "rlen".into(), line: "rs1".into(), value: 39.0 },
+            ],
+            options: None,
+        },
+        None,
+    );
+    eprintln!("  no-line-lengths: max_error={:.6}, dof={}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| m.dof).unwrap_or(0));
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    assert_solved(&result, TOL, "LM no line lengths");
+}
+
+/// The cold_start_with_camera problem but with points NEAR the correct solution.
+/// This verifies the solution exists and LM can find it from nearby.
+/// Solution derived from the reference spectrogram SVG.
+#[test]
+fn lm_camera_from_solution() {
+    // Known solution (approximate, from reference SVG geometry):
+    // Inner tri: i0=(0,0), i1=(15.3,15.8), i2=(-6.0,21.1)
+    // Outer tri: o0=(-1.0,-3.9), o1=(19.1,16.9), o2=(-8.9,23.9)
+    // Case outer: o0→c1→c2→c3→c4→o2
+    //   c1=(-1.0,-5.8), c2=(32.5,-5.8), c3=(32.5,42.2), c4=(-8.9,42.2)
+    // Case inner: ic0→ic1→ic2→ic3→ic4→ic5
+    //   ic0=(4.0,1.3), ic1=(4.0,-0.8), ic2=(27.5,-0.8), ic3=(27.5,37.2), ic4=(-3.9,37.2), ic5=(-3.9,22.7)
+    // Opening: bp0=(27.5,20.2), bp1=(27.5,16.2), bp2=(32.5,16.2), bp3=(32.5,20.2)
+    // Camera outer: oc0=(27.3,37.2), oc1=(27.4,-0.8), oc2=(33.4,-0.8), oc3=(33.3,37.2)
+    // (Wait, the camera in the reference is 6×39 at x≈27-33)
+    // Actually from reference SVG: outer cam is lines 23-26 which is 6×39
+
+    // Test at various offsets. Change this to probe convergence basin.
+    let off = 10.0;
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                point("i0", 0.0, 0.0),
+                point("i1", 15.3 + off*0.3, 15.8 - off*0.2),
+                point("i2", -6.0 - off*0.1, 21.1 + off*0.3),
+                point("o0", -1.0 + off*0.2, -3.9 - off*0.1),
+                point("o1", 19.1 - off*0.3, 16.9 + off*0.2),
+                point("o2", -8.9 + off*0.1, 23.9 - off*0.3),
+                // Outer case
+                point("c1", -1.0 + off*0.1, -5.8 + off*0.2),
+                point("c2", 32.5 - off*0.3, -5.8 - off*0.1),
+                point("c3", 32.5 + off*0.2, 42.2 + off*0.1),
+                point("c4", -8.9 - off*0.1, 42.2 - off*0.2),
+                // Inner case
+                point("ic0", 4.0 + off*0.2, 1.3 + off*0.1),
+                point("ic1", 4.0 - off*0.1, -0.8 - off*0.2),
+                point("ic2", 27.5 + off*0.3, -0.8 + off*0.1),
+                point("ic3", 27.5 - off*0.2, 37.2 - off*0.1),
+                point("ic4", -3.9 + off*0.1, 37.2 + off*0.3),
+                point("ic5", -3.9 - off*0.2, 22.7 - off*0.1),
+                // Opening
+                point("bp0", 27.5 + off*0.1, 20.2 + off*0.2),
+                point("bp1", 27.5 - off*0.2, 16.2 - off*0.1),
+                point("bp2", 32.5 + off*0.1, 16.2 + off*0.3),
+                point("bp3", 32.5 - off*0.1, 20.2 - off*0.2),
+                point("attach", 27.5 + off*0.05, 18.2 + off*0.1),
+                // Camera outer
+                point("oc0", 27.3 + off*0.2, 37.2 - off*0.1),
+                point("oc1", 27.4 - off*0.1, -0.8 + off*0.2),
+                point("oc2", 33.4 + off*0.1, -0.8 - off*0.1),
+                point("oc3", 33.3 - off*0.2, 37.2 + off*0.1),
+            ],
+            lines: vec![
+                line("is0", "i0", "i1"),
+                line("is1", "i1", "i2"),
+                line("is2", "i2", "i0"),
+                line("os0", "o0", "o1"),
+                line("os1", "o1", "o2"),
+                line("os2", "o2", "o0"),
+                line("cl0", "o0", "c1"),
+                line("cl1", "c1", "c2"),
+                line("cl2", "c2", "c3"),
+                line("cl3", "c3", "c4"),
+                line("cl4", "c4", "o2"),
+                line("il0", "ic0", "ic1"),
+                line("il1", "ic1", "ic2"),
+                line("il2", "ic2", "ic3"),
+                line("il3", "ic3", "ic4"),
+                line("il4", "ic4", "ic5"),
+                line("bs0", "bp0", "bp1"),
+                line("bs1", "bp1", "bp2"),
+                line("bs2", "bp2", "bp3"),
+                line("bs3", "bp3", "bp0"),
+                line("ocs0", "oc0", "oc1"),
+                line("ocs1", "oc1", "oc2"),
+                line("ocs2", "oc2", "oc3"),
+                line("ocs3", "oc3", "oc0"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![
+                Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
+                Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
+            ],
+            groups: vec![],
+            constraints: vec![
+                // Inner triangle
+                Constraint::Ccw { id: "t1".into(), points: vec!["i0".into(), "i1".into(), "i2".into()] },
+                Constraint::Equal { id: "t2".into(), a: "is0".into(), b: "is1".into() },
+                Constraint::Equal { id: "t3".into(), a: "is0".into(), b: "is2".into() },
+                Constraint::Fixed { id: "t4".into(), point: "i0".into(), x: 0.0, y: 0.0 },
+                // Outer triangle
+                Constraint::Ccw { id: "t5".into(), points: vec!["o0".into(), "o1".into(), "o2".into()] },
+                Constraint::Equal { id: "t6".into(), a: "os0".into(), b: "os1".into() },
+                Constraint::Equal { id: "t7".into(), a: "os0".into(), b: "os2".into() },
+                Constraint::Length { id: "t8".into(), line: "is0".into(), value: 22.0 },
+                Constraint::LineDistance { id: "t9".into(), a: "is0".into(), b: "os0".into(), value: -2.0 },
+                Constraint::ShapeEqualCentroid { id: "t10".into(), a: "ishape".into(), b: "oshape".into() },
+                Constraint::AbsoluteAngle { id: "t11".into(), line: "is0".into(), value: 46.0 },
+                // Case angles
+                Constraint::AbsoluteAngle { id: "ca0".into(), line: "cl0".into(), value: -90.0 },
+                Constraint::AbsoluteAngle { id: "ca1".into(), line: "cl1".into(), value: 0.0 },
+                Constraint::AbsoluteAngle { id: "ca2".into(), line: "cl2".into(), value: 90.0 },
+                Constraint::AbsoluteAngle { id: "ca3".into(), line: "cl3".into(), value: 180.0 },
+                Constraint::AbsoluteAngle { id: "ca4".into(), line: "cl4".into(), value: -90.0 },
+                // Inner case ↔ outer case lineDistance
+                Constraint::LineDistance { id: "ld0".into(), a: "cl0".into(), b: "il0".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld1".into(), a: "cl1".into(), b: "il1".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld2".into(), a: "cl2".into(), b: "il2".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld3".into(), a: "cl3".into(), b: "il3".into(), value: 5.0 },
+                Constraint::LineDistance { id: "ld4".into(), a: "cl4".into(), b: "il4".into(), value: 5.0 },
+                // Inner case endpoints on outer triangle sides
+                Constraint::PointOnLine { id: "pol0".into(), point: "ic0".into(), line: "os0".into() },
+                Constraint::PointOnLine { id: "pol1".into(), point: "ic5".into(), line: "os1".into() },
+                // Back opening
+                Constraint::Parallel { id: "bp0".into(), a: "bs0".into(), b: "bs2".into() },
+                Constraint::Parallel { id: "bp1".into(), a: "bs1".into(), b: "bs3".into() },
+                Constraint::Length { id: "blen".into(), line: "bs0".into(), value: 4.0 },
+                Constraint::Perpendicular { id: "bperp".into(), a: "bs0".into(), b: "bs1".into() },
+                Constraint::LineDistance { id: "bld0".into(), a: "bs0".into(), b: "il2".into(), value: 0.0 },
+                Constraint::LineDistance { id: "bld1".into(), a: "bs2".into(), b: "cl2".into(), value: 0.0 },
+                Constraint::Midpoint { id: "bmid0".into(), point: "attach".into(), line: "bs0".into() },
+                Constraint::Midpoint { id: "bmid1".into(), point: "attach".into(), line: "il2".into() },
+                // Camera outer
+                Constraint::PointOnLine { id: "cpol0".into(), point: "oc0".into(), line: "il3".into() },
+                Constraint::PointOnLine { id: "cpol1".into(), point: "oc1".into(), line: "il3".into() },
+                Constraint::PointOnLine { id: "cpol2".into(), point: "oc2".into(), line: "il1".into() },
+                Constraint::PointOnLine { id: "cpol3".into(), point: "oc3".into(), line: "il1".into() },
+                Constraint::Perpendicular { id: "cperp0".into(), a: "il3".into(), b: "ocs1".into() },
+                Constraint::Perpendicular { id: "cperp1".into(), a: "il3".into(), b: "ocs3".into() },
+                Constraint::Length { id: "clen".into(), line: "ocs1".into(), value: 39.0 },
+            ],
+            options: None,
+        },
+        None,
+    );
+    eprintln!("  camera-from-solution(off={}): max_error={:.6}, dof={}",
+        off, result.max_error,
+        result.metadata.as_ref().map(|m| m.dof).unwrap_or(0));
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    // Show per-constraint residuals at the stuck point.
+    let mut diag_points: Vec<Point> = result.points.iter()
+        .map(|p| Point { id: p.id.clone(), x: p.x, y: p.y, fixed: false })
+        .collect();
+    // Restore fixed flag for i0
+    if let Some(p) = diag_points.iter_mut().find(|p| p.id == "i0") { p.fixed = true; }
+
+    let diag_lines = vec![
+        line("is0", "i0", "i1"), line("is1", "i1", "i2"), line("is2", "i2", "i0"),
+        line("os0", "o0", "o1"), line("os1", "o1", "o2"), line("os2", "o2", "o0"),
+        line("cl0", "o0", "c1"), line("cl1", "c1", "c2"), line("cl2", "c2", "c3"),
+        line("cl3", "c3", "c4"), line("cl4", "c4", "o2"),
+        line("il0", "ic0", "ic1"), line("il1", "ic1", "ic2"), line("il2", "ic2", "ic3"),
+        line("il3", "ic3", "ic4"), line("il4", "ic4", "ic5"),
+        line("bs0", "bp0", "bp1"), line("bs1", "bp1", "bp2"),
+        line("bs2", "bp2", "bp3"), line("bs3", "bp3", "bp0"),
+        line("ocs0", "oc0", "oc1"), line("ocs1", "oc1", "oc2"),
+        line("ocs2", "oc2", "oc3"), line("ocs3", "oc3", "oc0"),
+    ];
+    let diag_shapes = vec![
+        Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
+        Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
+    ];
+    let diag_constraints: Vec<Constraint> = vec![
+        Constraint::Ccw { id: "t1".into(), points: vec!["i0".into(), "i1".into(), "i2".into()] },
+        Constraint::Equal { id: "t2".into(), a: "is0".into(), b: "is1".into() },
+        Constraint::Equal { id: "t3".into(), a: "is0".into(), b: "is2".into() },
+        Constraint::Fixed { id: "t4".into(), point: "i0".into(), x: 0.0, y: 0.0 },
+        Constraint::Ccw { id: "t5".into(), points: vec!["o0".into(), "o1".into(), "o2".into()] },
+        Constraint::Equal { id: "t6".into(), a: "os0".into(), b: "os1".into() },
+        Constraint::Equal { id: "t7".into(), a: "os0".into(), b: "os2".into() },
+        Constraint::Length { id: "t8".into(), line: "is0".into(), value: 22.0 },
+        Constraint::LineDistance { id: "t9".into(), a: "is0".into(), b: "os0".into(), value: -2.0 },
+        Constraint::ShapeEqualCentroid { id: "t10".into(), a: "ishape".into(), b: "oshape".into() },
+        Constraint::AbsoluteAngle { id: "t11".into(), line: "is0".into(), value: 46.0 },
+        Constraint::AbsoluteAngle { id: "ca0".into(), line: "cl0".into(), value: -90.0 },
+        Constraint::AbsoluteAngle { id: "ca1".into(), line: "cl1".into(), value: 0.0 },
+        Constraint::AbsoluteAngle { id: "ca2".into(), line: "cl2".into(), value: 90.0 },
+        Constraint::AbsoluteAngle { id: "ca3".into(), line: "cl3".into(), value: 180.0 },
+        Constraint::AbsoluteAngle { id: "ca4".into(), line: "cl4".into(), value: -90.0 },
+        Constraint::LineDistance { id: "ld0".into(), a: "cl0".into(), b: "il0".into(), value: 5.0 },
+        Constraint::LineDistance { id: "ld1".into(), a: "cl1".into(), b: "il1".into(), value: 5.0 },
+        Constraint::LineDistance { id: "ld2".into(), a: "cl2".into(), b: "il2".into(), value: 5.0 },
+        Constraint::LineDistance { id: "ld3".into(), a: "cl3".into(), b: "il3".into(), value: 5.0 },
+        Constraint::LineDistance { id: "ld4".into(), a: "cl4".into(), b: "il4".into(), value: 5.0 },
+        Constraint::PointOnLine { id: "pol0".into(), point: "ic0".into(), line: "os0".into() },
+        Constraint::PointOnLine { id: "pol1".into(), point: "ic5".into(), line: "os1".into() },
+        Constraint::Parallel { id: "bp0".into(), a: "bs0".into(), b: "bs2".into() },
+        Constraint::Parallel { id: "bp1".into(), a: "bs1".into(), b: "bs3".into() },
+        Constraint::Length { id: "blen".into(), line: "bs0".into(), value: 4.0 },
+        Constraint::Perpendicular { id: "bperp".into(), a: "bs0".into(), b: "bs1".into() },
+        Constraint::LineDistance { id: "bld0".into(), a: "bs0".into(), b: "il2".into(), value: 0.0 },
+        Constraint::LineDistance { id: "bld1".into(), a: "bs2".into(), b: "cl2".into(), value: 0.0 },
+        Constraint::Midpoint { id: "bmid0".into(), point: "attach".into(), line: "bs0".into() },
+        Constraint::Midpoint { id: "bmid1".into(), point: "attach".into(), line: "il2".into() },
+        Constraint::PointOnLine { id: "cpol0".into(), point: "oc0".into(), line: "il3".into() },
+        Constraint::PointOnLine { id: "cpol1".into(), point: "oc1".into(), line: "il3".into() },
+        Constraint::PointOnLine { id: "cpol2".into(), point: "oc2".into(), line: "il1".into() },
+        Constraint::PointOnLine { id: "cpol3".into(), point: "oc3".into(), line: "il1".into() },
+        Constraint::Perpendicular { id: "cperp0".into(), a: "il3".into(), b: "ocs1".into() },
+        Constraint::Perpendicular { id: "cperp1".into(), a: "il3".into(), b: "ocs3".into() },
+        Constraint::Length { id: "clen".into(), line: "ocs1".into(), value: 39.0 },
+    ];
+    let per_c = solver::constraints::per_constraint_residuals(
+        &diag_points, &diag_lines, &vec![], &vec![], &diag_shapes, &diag_constraints,
+    );
+    eprintln!("  Per-constraint residuals (top 10):");
+    let mut sorted = per_c;
+    sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    for (id, err) in sorted.iter().take(10) {
+        eprintln!("    {}: {:.6}", id, err);
+    }
+    assert_solved(&result, TOL, "LM camera from solution");
+}
+
+/// Full spectrometer from cold start — mirrors the real 06-complex-spectrogram.sketch.js
+/// with all constraints including inner camera, light line, etc.
+#[test]
+fn cold_start_full_spectrometer() {
+    // Points: all start at approximate positions (like the JS builder would place them)
+    // Inner triangle: ip0=(0,0) fixed, ip1=(1,1), ip2=(0,5)
+    // Outer triangle: op0=(0,0), op1=(1,1), op2=(0,5)
+    // Light leaving point: llp=(0,0)
+    // Outer case chain: o0=op0, oc1..oc4, o5=op2 (oc1-oc4 are new)
+    // Inner case: ic_start, ic_end on outer tri sides; ic1..ic4 chain intermediates
+    // Opening: att, bp0-bp3
+    // Outer cam: cam0-cam3
+    // Inner cam: icam0-icam3
+    // Light midpoint + light line
+    let problem = Problem {
+            points: vec![
+                // Inner triangle
+                Point { id: "ip0".into(), x: 0.0, y: 0.0, fixed: true },
+                point("ip1", 1.0, 1.0),
+                point("ip2", 0.0, 5.0),
+                // Outer triangle
+                point("op0", 0.0, 0.0),
+                point("op1", 1.0, 1.0),
+                point("op2", 0.0, 5.0),
+                // Light leaving point
+                point("llp", 0.0, 0.0),
+                // Outer case chain intermediates (between op0 and op2)
+                point("oc1", 0.0, 1.0),
+                point("oc2", 0.0, 1.0),
+                point("oc3", 0.0, 1.0),
+                point("oc4", 0.0, 1.0),
+                // Inner case start/end
+                point("ics", 0.0, 0.0),
+                point("ice", 0.0, 0.0),
+                // Inner case chain intermediates
+                point("ic1", 0.0, 1.0),
+                point("ic2", 0.0, 1.0),
+                point("ic3", 0.0, 1.0),
+                point("ic4", 0.0, 1.0),
+                // Back opening
+                point("att", 0.0, 0.0),
+                point("bp0", 0.0, 0.0),
+                point("bp1", 1.0, 0.0),
+                point("bp2", 1.0, 1.0),
+                point("bp3", 0.0, 1.0),
+                // Outer camera
+                point("cam0", 0.0, 0.0),
+                point("cam1", 1.0, 0.0),
+                point("cam2", 1.0, 1.0),
+                point("cam3", 0.0, 1.0),
+                // Inner camera
+                point("icam0", 0.0, 0.0),
+                point("icam1", 1.0, 0.0),
+                point("icam2", 1.0, 1.0),
+                point("icam3", 0.0, 1.0),
+                // Light line midpoint
+                point("lmid", 0.0, 0.0),
+            ],
+            lines: vec![
+                // Inner triangle sides
+                line("is0", "ip0", "ip1"), line("is1", "ip1", "ip2"), line("is2", "ip2", "ip0"),
+                // Outer triangle sides
+                line("os0", "op0", "op1"), line("os1", "op1", "op2"), line("os2", "op2", "op0"),
+                // Outer case chain: op0 → oc1 → oc2 → oc3 → oc4 → op2
+                line("ocl0", "op0", "oc1"), line("ocl1", "oc1", "oc2"), line("ocl2", "oc2", "oc3"),
+                line("ocl3", "oc3", "oc4"), line("ocl4", "oc4", "op2"),
+                // Inner case chain: ics → ic1 → ic2 → ic3 → ic4 → ice
+                line("icl0", "ics", "ic1"), line("icl1", "ic1", "ic2"), line("icl2", "ic2", "ic3"),
+                line("icl3", "ic3", "ic4"), line("icl4", "ic4", "ice"),
+                // Back opening sides
+                line("bs0", "bp0", "bp1"), line("bs1", "bp1", "bp2"),
+                line("bs2", "bp2", "bp3"), line("bs3", "bp3", "bp0"),
+                // Outer camera sides
+                line("cs0", "cam0", "cam1"), line("cs1", "cam1", "cam2"),
+                line("cs2", "cam2", "cam3"), line("cs3", "cam3", "cam0"),
+                // Inner camera sides
+                line("ics0", "icam0", "icam1"), line("ics1", "icam1", "icam2"),
+                line("ics2", "icam2", "icam3"), line("ics3", "icam3", "icam0"),
+                // Light line
+                line("ll", "llp", "lmid"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![
+                Shape { id: "ishp".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
+                Shape { id: "oshp".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
+            ],
+            groups: vec![],
+            constraints: vec![
+                // ── Inner triangle ──
+                Constraint::Ccw { id: "c_ccw_inner".into(), points: vec!["ip0".into(), "ip1".into(), "ip2".into()] },
+                Constraint::Equal { id: "c_eq_i01".into(), a: "is0".into(), b: "is1".into() },
+                Constraint::Equal { id: "c_eq_i02".into(), a: "is0".into(), b: "is2".into() },
+                Constraint::Fixed { id: "c_fix".into(), point: "ip0".into(), x: 0.0, y: 0.0 },
+                // ── Outer triangle ──
+                Constraint::Ccw { id: "c_ccw_outer".into(), points: vec!["op0".into(), "op1".into(), "op2".into()] },
+                Constraint::Equal { id: "c_eq_o01".into(), a: "os0".into(), b: "os1".into() },
+                Constraint::Equal { id: "c_eq_o02".into(), a: "os0".into(), b: "os2".into() },
+                // ── Prism holder geometry ──
+                Constraint::Length { id: "c_len_i0".into(), line: "is0".into(), value: 22.0 },
+                Constraint::LineDistance { id: "c_ld_tri".into(), a: "is0".into(), b: "os0".into(), value: -2.0 },
+                Constraint::ShapeEqualCentroid { id: "c_centroid".into(), a: "ishp".into(), b: "oshp".into() },
+                Constraint::AbsoluteAngle { id: "c_ang_i0".into(), line: "is0".into(), value: 46.0 },
+                // ── Light leaving point ──
+                Constraint::PointOnLine { id: "c_llp_on".into(), point: "llp".into(), line: "is1".into() },
+                Constraint::PointLineDistance { id: "c_llp_dist".into(), point: "llp".into(), line: "is0".into(), value: 8.42 },
+                // ── Outer case chain CCW + angles ──
+                Constraint::Ccw { id: "c_ccw_oc".into(), points: vec!["op0".into(), "oc1".into(), "oc2".into(), "oc3".into(), "oc4".into()] },
+                Constraint::AbsoluteAngle { id: "c_ang_oc0".into(), line: "ocl0".into(), value: -90.0 },
+                Constraint::AbsoluteAngle { id: "c_ang_oc1".into(), line: "ocl1".into(), value: 0.0 },
+                Constraint::AbsoluteAngle { id: "c_ang_oc2".into(), line: "ocl2".into(), value: 90.0 },
+                Constraint::AbsoluteAngle { id: "c_ang_oc3".into(), line: "ocl3".into(), value: 180.0 },
+                Constraint::AbsoluteAngle { id: "c_ang_oc4".into(), line: "ocl4".into(), value: -90.0 },
+                // ── Inner case start/end on outer triangle ──
+                Constraint::PointOnLine { id: "c_ics_on".into(), point: "ics".into(), line: "os0".into() },
+                Constraint::PointOnLine { id: "c_ice_on".into(), point: "ice".into(), line: "os1".into() },
+                // ── Inner case chain CCW ──
+                Constraint::Ccw { id: "c_ccw_ic".into(), points: vec!["ics".into(), "ic1".into(), "ic2".into(), "ic3".into(), "ic4".into()] },
+                // ── LineDistance outer↔inner case ──
+                Constraint::LineDistance { id: "c_ld0".into(), a: "ocl0".into(), b: "icl0".into(), value: 5.0 },
+                Constraint::LineDistance { id: "c_ld1".into(), a: "ocl1".into(), b: "icl1".into(), value: 5.0 },
+                Constraint::LineDistance { id: "c_ld2".into(), a: "ocl2".into(), b: "icl2".into(), value: 5.0 },
+                Constraint::LineDistance { id: "c_ld3".into(), a: "ocl3".into(), b: "icl3".into(), value: 5.0 },
+                Constraint::LineDistance { id: "c_ld4".into(), a: "ocl4".into(), b: "icl4".into(), value: 5.0 },
+                // ── Back opening ──
+                Constraint::Parallel { id: "c_bp0".into(), a: "bs0".into(), b: "bs2".into() },
+                Constraint::Parallel { id: "c_bp1".into(), a: "bs1".into(), b: "bs3".into() },
+                Constraint::Length { id: "c_blen".into(), line: "bs0".into(), value: 4.0 },
+                Constraint::Perpendicular { id: "c_bperp".into(), a: "bs0".into(), b: "bs1".into() },
+                Constraint::LineDistance { id: "c_bld0".into(), a: "bs0".into(), b: "icl2".into(), value: 0.0 },
+                Constraint::LineDistance { id: "c_bld1".into(), a: "bs2".into(), b: "ocl2".into(), value: 0.0 },
+                Constraint::Midpoint { id: "c_bmid0".into(), point: "att".into(), line: "bs0".into() },
+                Constraint::Midpoint { id: "c_bmid1".into(), point: "att".into(), line: "icl2".into() },
+                // ── Outer camera ──
+                Constraint::PointOnLine { id: "c_cam0_on".into(), point: "cam0".into(), line: "icl3".into() },
+                Constraint::PointOnLine { id: "c_cam1_on".into(), point: "cam1".into(), line: "icl3".into() },
+                Constraint::PointOnLine { id: "c_cam2_on".into(), point: "cam2".into(), line: "icl1".into() },
+                Constraint::PointOnLine { id: "c_cam3_on".into(), point: "cam3".into(), line: "icl1".into() },
+                Constraint::Perpendicular { id: "c_cperp0".into(), a: "icl3".into(), b: "cs1".into() },
+                Constraint::Perpendicular { id: "c_cperp1".into(), a: "icl3".into(), b: "cs3".into() },
+                // ── Inner camera ──
+                Constraint::LineDistance { id: "c_icld0".into(), a: "cs0".into(), b: "ics0".into(), value: 2.0 },
+                Constraint::LineDistance { id: "c_icld1".into(), a: "cs1".into(), b: "ics1".into(), value: 2.0 },
+                Constraint::LineDistance { id: "c_icld2".into(), a: "cs2".into(), b: "ics2".into(), value: 2.0 },
+                Constraint::LineDistance { id: "c_icld3".into(), a: "cs3".into(), b: "ics3".into(), value: 2.0 },
+                Constraint::LineDistance { id: "c_icw".into(), a: "ics1".into(), b: "ics3".into(), value: 2.0 },
+                Constraint::LineDistance { id: "c_ic_case".into(), a: "ics3".into(), b: "icl2".into(), value: -14.0 },
+                // ── Camera dimensions ──
+                Constraint::Length { id: "c_clen".into(), line: "cs1".into(), value: 39.0 },
+                // ── Light line ──
+                Constraint::Midpoint { id: "c_lmid".into(), point: "lmid".into(), line: "cs1".into() },
+                Constraint::Length { id: "c_llen".into(), line: "ll".into(), value: 21.5 },
+                Constraint::Perpendicular { id: "c_lperp".into(), a: "ll".into(), b: "cs1".into() },
+            ],
+            options: None,
+        };
+    let result = solve_problem(problem.clone(), None);
+    eprintln!("  full spectrometer cold start: max_error={:.6}, dof={}",
+        result.max_error,
+        result.metadata.as_ref().map(|m| m.dof).unwrap_or(0));
+    for step in result.metadata.as_ref().map(|m| &m.solve_trail).unwrap_or(&vec![]) {
+        eprintln!("    {} err={:.4}", step.phase, step.error);
+    }
+    let fixed_points: std::collections::HashSet<String> = problem.points.iter()
+        .filter(|p| p.fixed)
+        .map(|p| p.id.clone())
+        .collect();
+    let mut diag_points: Vec<Point> = result.points.iter()
+        .map(|p| Point {
+            id: p.id.clone(),
+            x: p.x,
+            y: p.y,
+            fixed: fixed_points.contains(&p.id),
+        })
+        .collect();
+    diag_points.sort_by(|a, b| a.id.cmp(&b.id));
+    let mut per_c = solver::constraints::per_constraint_residuals(
+        &diag_points,
+        &problem.lines,
+        &problem.circles,
+        &problem.arcs,
+        &problem.shapes,
+        &problem.constraints,
+    );
+    per_c.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    eprintln!("  Per-constraint residuals (top 15):");
+    for (id, err) in per_c.iter().take(15) {
+        eprintln!("    {}: {:.6}", id, err);
+    }
+    // Note: this test may fail from cold start — it's a diagnostic to understand
+    // the fully-constrained system's behavior.
+    assert!(result.max_error < 1.0,
+        "Full spectrometer cold start: max_error={:.6} (expected < 1.0)", result.max_error);
+}
+
+/// Sweep many starting offsets to map ALL local minima in the error landscape.
+/// This is the key experiment: we need to understand the structure of the problem
+/// before we can solve it.
+#[test]
+fn lm_local_minima_landscape() {
+    let offsets = [0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
+
+    eprintln!("\n=== Local Minima Landscape ===");
+    eprintln!("{:>6} {:>10} {:>4}  trail", "offset", "max_error", "dof");
+
+    for &off in &offsets {
+        let result = solve_problem(
+            Problem {
+                points: vec![
+                    point("i0", 0.0, 0.0),
+                    point("i1", 15.3 + off*0.3, 15.8 - off*0.2),
+                    point("i2", -6.0 - off*0.1, 21.1 + off*0.3),
+                    point("o0", -1.0 + off*0.2, -3.9 - off*0.1),
+                    point("o1", 19.1 - off*0.3, 16.9 + off*0.2),
+                    point("o2", -8.9 + off*0.1, 23.9 - off*0.3),
+                    point("c1", -1.0 + off*0.1, -5.8 + off*0.2),
+                    point("c2", 32.5 - off*0.3, -5.8 - off*0.1),
+                    point("c3", 32.5 + off*0.2, 42.2 + off*0.1),
+                    point("c4", -8.9 - off*0.1, 42.2 - off*0.2),
+                    point("ic0", 4.0 + off*0.2, 1.3 + off*0.1),
+                    point("ic1", 4.0 - off*0.1, -0.8 - off*0.2),
+                    point("ic2", 27.5 + off*0.3, -0.8 + off*0.1),
+                    point("ic3", 27.5 - off*0.2, 37.2 - off*0.1),
+                    point("ic4", -3.9 + off*0.1, 37.2 + off*0.3),
+                    point("ic5", -3.9 - off*0.2, 22.7 - off*0.1),
+                    point("bp0", 27.5 + off*0.1, 20.2 + off*0.2),
+                    point("bp1", 27.5 - off*0.2, 16.2 - off*0.1),
+                    point("bp2", 32.5 + off*0.1, 16.2 + off*0.3),
+                    point("bp3", 32.5 - off*0.1, 20.2 - off*0.2),
+                    point("attach", 27.5 + off*0.05, 18.2 + off*0.1),
+                    point("oc0", 27.3 + off*0.2, 37.2 - off*0.1),
+                    point("oc1", 27.4 - off*0.1, -0.8 + off*0.2),
+                    point("oc2", 33.4 + off*0.1, -0.8 - off*0.1),
+                    point("oc3", 33.3 - off*0.2, 37.2 + off*0.1),
+                ],
+                lines: vec![
+                    line("is0", "i0", "i1"), line("is1", "i1", "i2"), line("is2", "i2", "i0"),
+                    line("os0", "o0", "o1"), line("os1", "o1", "o2"), line("os2", "o2", "o0"),
+                    line("cl0", "o0", "c1"), line("cl1", "c1", "c2"), line("cl2", "c2", "c3"),
+                    line("cl3", "c3", "c4"), line("cl4", "c4", "o2"),
+                    line("il0", "ic0", "ic1"), line("il1", "ic1", "ic2"), line("il2", "ic2", "ic3"),
+                    line("il3", "ic3", "ic4"), line("il4", "ic4", "ic5"),
+                    line("bs0", "bp0", "bp1"), line("bs1", "bp1", "bp2"),
+                    line("bs2", "bp2", "bp3"), line("bs3", "bp3", "bp0"),
+                    line("ocs0", "oc0", "oc1"), line("ocs1", "oc1", "oc2"),
+                    line("ocs2", "oc2", "oc3"), line("ocs3", "oc3", "oc0"),
+                ],
+                circles: vec![],
+                arcs: vec![],
+                shapes: vec![
+                    Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
+                    Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
+                ],
+                groups: vec![],
+                constraints: vec![
+                    Constraint::Ccw { id: "t1".into(), points: vec!["i0".into(), "i1".into(), "i2".into()] },
+                    Constraint::Equal { id: "t2".into(), a: "is0".into(), b: "is1".into() },
+                    Constraint::Equal { id: "t3".into(), a: "is0".into(), b: "is2".into() },
+                    Constraint::Fixed { id: "t4".into(), point: "i0".into(), x: 0.0, y: 0.0 },
+                    Constraint::Ccw { id: "t5".into(), points: vec!["o0".into(), "o1".into(), "o2".into()] },
+                    Constraint::Equal { id: "t6".into(), a: "os0".into(), b: "os1".into() },
+                    Constraint::Equal { id: "t7".into(), a: "os0".into(), b: "os2".into() },
+                    Constraint::Length { id: "t8".into(), line: "is0".into(), value: 22.0 },
+                    Constraint::LineDistance { id: "t9".into(), a: "is0".into(), b: "os0".into(), value: -2.0 },
+                    Constraint::ShapeEqualCentroid { id: "t10".into(), a: "ishape".into(), b: "oshape".into() },
+                    Constraint::AbsoluteAngle { id: "t11".into(), line: "is0".into(), value: 46.0 },
+                    Constraint::AbsoluteAngle { id: "ca0".into(), line: "cl0".into(), value: -90.0 },
+                    Constraint::AbsoluteAngle { id: "ca1".into(), line: "cl1".into(), value: 0.0 },
+                    Constraint::AbsoluteAngle { id: "ca2".into(), line: "cl2".into(), value: 90.0 },
+                    Constraint::AbsoluteAngle { id: "ca3".into(), line: "cl3".into(), value: 180.0 },
+                    Constraint::AbsoluteAngle { id: "ca4".into(), line: "cl4".into(), value: -90.0 },
+                    Constraint::LineDistance { id: "ld0".into(), a: "cl0".into(), b: "il0".into(), value: 5.0 },
+                    Constraint::LineDistance { id: "ld1".into(), a: "cl1".into(), b: "il1".into(), value: 5.0 },
+                    Constraint::LineDistance { id: "ld2".into(), a: "cl2".into(), b: "il2".into(), value: 5.0 },
+                    Constraint::LineDistance { id: "ld3".into(), a: "cl3".into(), b: "il3".into(), value: 5.0 },
+                    Constraint::LineDistance { id: "ld4".into(), a: "cl4".into(), b: "il4".into(), value: 5.0 },
+                    Constraint::PointOnLine { id: "pol0".into(), point: "ic0".into(), line: "os0".into() },
+                    Constraint::PointOnLine { id: "pol1".into(), point: "ic5".into(), line: "os1".into() },
+                    Constraint::Parallel { id: "bp0".into(), a: "bs0".into(), b: "bs2".into() },
+                    Constraint::Parallel { id: "bp1".into(), a: "bs1".into(), b: "bs3".into() },
+                    Constraint::Length { id: "blen".into(), line: "bs0".into(), value: 4.0 },
+                    Constraint::Perpendicular { id: "bperp".into(), a: "bs0".into(), b: "bs1".into() },
+                    Constraint::LineDistance { id: "bld0".into(), a: "bs0".into(), b: "il2".into(), value: 0.0 },
+                    Constraint::LineDistance { id: "bld1".into(), a: "bs2".into(), b: "cl2".into(), value: 0.0 },
+                    Constraint::Midpoint { id: "bmid0".into(), point: "attach".into(), line: "bs0".into() },
+                    Constraint::Midpoint { id: "bmid1".into(), point: "attach".into(), line: "il2".into() },
+                    Constraint::PointOnLine { id: "cpol0".into(), point: "oc0".into(), line: "il3".into() },
+                    Constraint::PointOnLine { id: "cpol1".into(), point: "oc1".into(), line: "il3".into() },
+                    Constraint::PointOnLine { id: "cpol2".into(), point: "oc2".into(), line: "il1".into() },
+                    Constraint::PointOnLine { id: "cpol3".into(), point: "oc3".into(), line: "il1".into() },
+                    Constraint::Perpendicular { id: "cperp0".into(), a: "il3".into(), b: "ocs1".into() },
+                    Constraint::Perpendicular { id: "cperp1".into(), a: "il3".into(), b: "ocs3".into() },
+                    Constraint::Length { id: "clen".into(), line: "ocs1".into(), value: 39.0 },
+                ],
+                options: None,
+            },
+            None,
+        );
+        let trail: Vec<String> = result.metadata.as_ref()
+            .map(|m| m.solve_trail.iter().map(|s| format!("{}={:.2}", s.phase, s.error)).collect())
+            .unwrap_or_default();
+        let trail_summary: String = trail.iter()
+            .filter(|s| s.starts_with("lm-pass") || s.starts_with("done"))
+            .cloned().collect::<Vec<_>>().join(" ");
+        eprintln!("{:>6.1} {:>10.6} {:>4}  {}",
+            off, result.max_error,
+            result.metadata.as_ref().map(|m| m.dof).unwrap_or(0),
+            trail_summary);
+
+        // At offset=10 (stuck), dump point positions so we can see what the
+        // local minimum looks like geometrically.
+        if off == 10.0 || off == 0.0 || off == 0.5 || off == 5.0 || off == 30.0 {
+            eprintln!("  Point positions at off={}:", off);
+            for p in &result.points {
+                eprintln!("    {} ({:.4}, {:.4})", p.id, p.x, p.y);
+            }
+        }
     }
 }

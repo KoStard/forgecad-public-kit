@@ -13,6 +13,7 @@ import type {
   PointId,
   SketchConstraint,
   SolveOptions,
+  SolveTrailStep,
   SolverMetadata,
 } from './types';
 import {
@@ -86,6 +87,8 @@ export const DEFAULT_TOLERANCE = 1e-3;
 
 /** Detailed solver timing breakdown — populated per solveConstraints call. */
 export let lastSolverProfile: Record<string, number | string> | null = null;
+let _lastSolveTrail: SolveTrailStep[] = [];
+export const getLastSolveTrail = (): SolveTrailStep[] => _lastSolveTrail;
 let _totalLmTime = 0;
 let _totalLmCalls = 0;
 let _totalLinearizations = 0;
@@ -132,6 +135,7 @@ export const solveConstraints = (
     responseBytes: exchange?.responseBytes ?? 0,
   };
 
+  _lastSolveTrail = metadata?.solveTrail ?? [];
   return { maxError, metadata };
 };
 

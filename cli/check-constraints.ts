@@ -25,6 +25,7 @@ import { isConstraintSketch, ConstraintSketch, solveConstraintDefinition, update
 import type { ConstraintDefinition, SketchPoint } from '../src/forge/sketch/constraints/types';
 import { addRect, addPolygon, addRegularPolygon } from '../src/forge/sketch/constraints/concepts';
 import { buildEdgeSvg } from '../src/forge/sketch/exportSvg';
+import { getLastSolveTrail } from '../src/forge/sketch/constraints/registry';
 import { computeLabelMetrics, formatMetrics } from './label-metrics';
 import { analyzeRigidity } from '../src/forge/sketch/constraints/rigidity';
 import '../src/forge/sketch/constraints/defs';
@@ -1289,6 +1290,16 @@ function testFullSpectrogram() {
   // Key assertions for the spectrogram
   const meta = result.constraintMeta;
   console.log(`      status=${meta.status} maxErr=${meta.maxError.toFixed(4)} dof=${meta.dof} rejected=${meta.rejected.length}`);
+
+  // Print solve trail — shows the sequence of solver phases and errors
+  const trail = getLastSolveTrail();
+  if (trail.length > 0) {
+    console.log(`      solve trail:`);
+    for (const step of trail) {
+      console.log(`        ${step.phase}: err=${step.error.toFixed(6)}`);
+    }
+  }
+
   if (_verbose) printConstraintSummary(meta);
 
   if (_verbose) printTopResiduals(result, 15);

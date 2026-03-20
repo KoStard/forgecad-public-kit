@@ -609,6 +609,32 @@ pub fn evaluate_residuals(
     out
 }
 
+/// Returns per-constraint residuals as (constraint_id, max_abs_residual) pairs.
+pub fn per_constraint_residuals(
+    points: &Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &Vec<Circle>,
+    arcs: &Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+) -> Vec<(String, f64)> {
+    let pts = make_pts(points);
+    let lns = make_lines(lines);
+    let circs = make_circles(circles);
+    let arcs_map = make_arcs(arcs);
+    let shapes_map = make_shapes(shapes);
+
+    let mut out = Vec::new();
+    for c in constraints {
+        if has_residual(c) {
+            let res = residual(c, &pts, &lns, &circs, &arcs_map, &shapes_map);
+            let max_abs = res.iter().copied().fold(0.0f64, |a, v| a.max(v.abs()));
+            out.push((c.id().to_string(), max_abs));
+        }
+    }
+    out
+}
+
 /// Returns all entity IDs (expanded to point ids) that a constraint depends on.
 pub fn constraint_entity_ids(
     c: &Constraint,

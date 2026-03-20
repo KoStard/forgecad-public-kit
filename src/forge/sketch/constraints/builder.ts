@@ -275,7 +275,37 @@ export class ConstrainedSketchBuilder {
     }
     // Always accept the constraint — never reject.
     this.constraints.push(next);
-    return this;  // No solve — only solve() triggers the solver
+    this.seedIncrementalGeometry(next);
+    return this;
+  }
+
+  /**
+   * Keep the live builder geometry near a solved state as constraints are added.
+   * This restores the progressive seeding path used by large sketches in the browser
+   * without rejecting constraints or changing the final solve API.
+   */
+  private seedIncrementalGeometry(constraint: SketchConstraint): void {
+    try {
+      const working = this.buildDefinition();
+      const { maxError } = solveConstraints(
+        working,
+        {
+          iterations: 30,
+          restarts: 1,
+          warmStartIterations: 4,
+          maxScaledStep: 2.0,
+          skipRedundancyCheck: true,
+          presolveConstraintId: constraint.id,
+        },
+        'builder.seedIncrementalGeometry',
+      );
+
+      if (Number.isFinite(maxError) && maxError <= DEFAULT_TOLERANCE * 100) {
+        this.syncFromDefinition(working);
+      }
+    } catch (error) {
+      if (this.strict) throw error;
+    }
   }
 
   // ─── Input Entity Resolution ─────────────────────────────────────────────
@@ -646,7 +676,16 @@ export class ConstrainedSketchBuilder {
   }
 
   solve(options: SolveOptions = {}): ConstraintSketch {
-    return solveConstraintDefinition(this.buildDefinition(), options);
+    return solveConstraintDefinition(this.buildDefinition(), {
+      iterations: options.iterations ?? 200,
+      restarts: options.restarts ?? 1,
+      warmStartIterations: options.warmStartIterations ?? 8,
+      maxScaledStep: options.maxScaledStep ?? 0.75,
+      fallbackRestarts: options.fallbackRestarts ?? 6,
+      tolerance: options.tolerance,
+      skipRedundancyCheck: options.skipRedundancyCheck,
+      presolveConstraintId: options.presolveConstraintId,
+    });
   }
 
   /**

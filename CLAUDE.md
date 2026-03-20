@@ -1,5 +1,7 @@
 # ForgeCAD — Development Guidelines
 
+Read [docs/permanent/CODING_BEST_PRACTICES.md](docs/permanent/CODING_BEST_PRACTICES.md) for coding best practices (TypeScript, React, performance, self-review).
+
 ## CLI vs npm scripts — which layer to use
 
 ForgeCAD has two overlapping interfaces for build and dev tasks. Use the right one for your context.
@@ -62,3 +64,8 @@ pointOnLine(point: any, line: any): this {
     line: this.resolveLineId(line) });
 }
 ```
+
+## Approach
+If you hit a moment you don't know how to proceed, take the scientist hat of experiments, only reality can give us the data, so we should run experiments, analyse, capture, iterate. If unsure about the science, take the first principles book approach.
+
+Our design goal should be to prevent parameter hacking. It should work automatically and smoothly without microoptimizing magic numbers.

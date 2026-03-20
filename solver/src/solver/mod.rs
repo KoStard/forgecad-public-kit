@@ -1,10 +1,11 @@
 pub mod analytical;
 pub mod decompose;
+pub mod graph;
 pub mod linear;
 pub mod lm;
 pub mod reconstruction;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::constraints::{constraint_jacobian_impl, constraint_residual_impl, evaluate_residuals, has_residual};
 use crate::types::{
     Arc, Circle, Constraint, ConstraintResidual, Line, Point, Shape, SketchGroup, SolveMetadata,
@@ -110,13 +111,16 @@ pub fn solve(
     options: &SolveOptions,
     groups: &mut Vec<SketchGroup>,
 ) -> f64 {
+    lm::trail_reset();
+
     // Run targeted single-constraint presolve before the main solve when
     // the caller requests it (builder incremental path).
     if let Some(ref cid) = options.presolve_constraint_id {
         let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
         let entity_ref_count = build_entity_ref_count(constraints);
+        let ref_scale = compute_presolve_ref_scale(constraints);
         if let Some(constraint) = constraints.iter().find(|c| c.id() == cid.as_str()) {
-            apply_presolve_constraint(points, lines, &pts, &entity_ref_count, constraint);
+            apply_presolve_constraint(points, lines, &pts, &entity_ref_count, constraint, ref_scale);
         }
     }
 
@@ -416,45 +420,260 @@ fn solve_single_system(
     groups: &mut Vec<SketchGroup>,
 ) -> f64 {
     run_presolve(points, lines, circles, arcs, shapes, constraints, tolerance);
+    let presolve_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
+    lm::trail_push("presolve", presolve_error);
     run_analytical_presolve(points, lines, constraints);
 
-    // Build the reconstruction graph: identifies points that can be computed
-    // from closed-form geometry (circle-circle intersection, line-circle, etc.)
-    // and the constraints they consume. These points are removed from LM's
-    // variable list; their positions are recomputed during each FD perturbation.
     let group_owned_ids: std::collections::HashSet<String> = groups.iter()
         .flat_map(|g| g.points.iter().map(|p| p.id.clone()))
         .collect();
-    let graph = reconstruction::build_reconstruction_graph(
+    let recon_graph = reconstruction::build_reconstruction_graph(
         points, lines, constraints, &group_owned_ids,
     );
 
-    // Initial reconstruction: place determined points at their computed positions.
-    if !graph.is_empty() {
-        reconstruction::reconstruct(&graph, points, lines, constraints);
+    if !recon_graph.is_empty() {
+        reconstruction::reconstruct(&recon_graph, points, lines, constraints);
     }
 
-    // Resolve group-owned points from their group frames after presolve.
     resolve_group_points(points, groups);
 
     let has_any_residual = constraints.iter().any(|c| crate::constraints::has_residual(c))
         || !arcs.is_empty();
 
-    let error = if has_any_residual {
-        lm::solve_global(
-            points, lines, circles, arcs, shapes, constraints,
-            iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
-            groups,
-            &graph,
-        )
-    } else {
-        gauss_seidel_solve(
+    if !has_any_residual {
+        return sanitize_max_error(gauss_seidel_solve(
             points, lines, circles, arcs, shapes, constraints,
             iterations, tolerance,
-        )
-    };
+        ));
+    }
 
-    sanitize_max_error(error)
+    // ── Graph decomposition: extract structural info and build solve DAG ──
+    let info = lm::extract_structural_info(
+        points, lines, circles, arcs, shapes, constraints, groups, &recon_graph,
+    );
+
+    // If no variables, just evaluate residuals.
+    if info.n_vars == 0 {
+        return sanitize_max_error(lm::current_max_error(
+            points, lines, circles, arcs, shapes, constraints,
+        ));
+    }
+
+    let dag = graph::decompose_to_solve_dag(
+        info.n_vars,
+        &info.constraint_var_sets,
+        &info.constraint_row_ranges,
+        &info.arc_var_sets,
+        info.arc_row_start,
+    );
+
+    let nontrivial_blocks = dag.blocks.iter().filter(|b| !b.vars.is_empty()).count();
+    lm::trail_push(
+        &format!("dag: {} blocks ({} with vars)", dag.blocks.len(), nontrivial_blocks),
+        presolve_error,
+    );
+
+    // Keep decomposition analysis live, but do not execute blockwise solves yet.
+    // The current SCC extraction is structurally informative, but the runtime path
+    // is not safe until block solves carry cross-block coupling correctly.
+    let final_error = lm::solve_global(
+        points, lines, circles, arcs, shapes, constraints,
+        iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
+        groups,
+        &recon_graph,
+    );
+    sanitize_max_error(final_error)
+}
+
+/// Progressive sub-solve (experimental, currently unused).
+/// Builds the constraint graph, computes dependency layers,
+/// and runs small LM passes on growing subsets.
+#[allow(dead_code)]
+fn progressive_sub_solve(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+    groups: &mut Vec<SketchGroup>,
+    tolerance: f64,
+    graph: &reconstruction::ReconstructionGraph,
+) {
+    if constraints.len() < 4 { return; } // too small to benefit
+
+    // Build point-DOF map: which point IDs does each constraint touch?
+    let lines_map: HashMap<&str, &Line> = lines.iter().map(|l| (l.id.as_str(), l)).collect();
+    let circles_map: HashMap<&str, &Circle> = circles.iter().map(|c| (c.id.as_str(), c)).collect();
+    let arcs_map: HashMap<&str, &Arc> = arcs.iter().map(|a| (a.id.as_str(), a)).collect();
+    let shapes_map: HashMap<&str, &Shape> = shapes.iter().map(|s| (s.id.as_str(), s)).collect();
+
+    let point_ids: HashSet<String> = points.iter().map(|p| p.id.clone()).collect();
+
+    // For each constraint, collect the point IDs it involves.
+    let constraint_points: Vec<HashSet<String>> = constraints.iter().map(|c| {
+        let entity_ids = crate::constraints::constraint_entity_ids(c, &lines_map, &circles_map, &arcs_map, &shapes_map);
+        entity_ids.into_iter().filter(|id| point_ids.contains(id)).collect()
+    }).collect();
+
+    // Start with fixed points as "solved".
+    let mut solved_points: HashSet<String> = points.iter()
+        .filter(|p| p.fixed)
+        .map(|p| p.id.clone())
+        .collect();
+
+    let mut used_constraints: Vec<bool> = vec![false; constraints.len()];
+
+    // Greedily add constraint layers. Each layer adds the constraints that
+    // introduce the fewest new points, preferring constraints whose points are
+    // mostly already solved. Limit to at most 4 new DOFs (2 new points) per layer
+    // to keep LM subsystems small.
+    for layer in 0..20 {
+        // Score each unused constraint: (new_point_count, total_points)
+        // Lower new_point_count = higher priority (more anchored).
+        let mut candidates: Vec<(usize, usize, usize)> = Vec::new(); // (index, new_count, total)
+        for (i, c_points) in constraint_points.iter().enumerate() {
+            if used_constraints[i] || c_points.is_empty() { continue; }
+            let new_count = c_points.iter().filter(|p| !solved_points.contains(*p)).count();
+            let total = c_points.len();
+            let solved_count = total - new_count;
+            // Must have at least 1 solved point to be a candidate (anchored).
+            if solved_count > 0 {
+                candidates.push((i, new_count, total));
+            }
+        }
+
+        if candidates.is_empty() {
+            // Try unanchored constraints (all-new points).
+            for (i, c_points) in constraint_points.iter().enumerate() {
+                if used_constraints[i] || c_points.is_empty() { continue; }
+                candidates.push((i, c_points.len(), c_points.len()));
+            }
+        }
+
+        if candidates.is_empty() { break; }
+
+        // Sort by new_count (ascending) then total (ascending).
+        candidates.sort_by(|a, b| a.1.cmp(&b.1).then(a.2.cmp(&b.2)));
+
+        // Add constraints greedily, tracking new points introduced.
+        // First pass: add constraints that introduce ≤4 new points.
+        let mut layer_indices: Vec<usize> = Vec::new();
+        let mut layer_new_points: HashSet<String> = HashSet::new();
+        let max_new_points = 4;
+
+        for (i, _new_count, _total) in &candidates {
+            let new_pts: Vec<&String> = constraint_points[*i].iter()
+                .filter(|p| !solved_points.contains(*p) && !layer_new_points.contains(*p))
+                .collect();
+            if layer_new_points.len() + new_pts.len() <= max_new_points || layer_indices.is_empty() {
+                layer_indices.push(*i);
+                for p in new_pts {
+                    layer_new_points.insert(p.clone());
+                }
+            }
+        }
+
+        // Second pass: add any remaining unused constraints that ONLY involve
+        // points already in this layer (no additional new points). This ensures
+        // that shape constraints (parallel, perpendicular, length) on newly-introduced
+        // points are solved together with position constraints, not deferred.
+        let layer_all_points: HashSet<String> = used_constraints.iter()
+            .enumerate()
+            .filter(|(_, &used)| used)
+            .flat_map(|(i, _)| constraint_points[i].iter().cloned())
+            .chain(layer_new_points.iter().cloned())
+            .chain(solved_points.iter().cloned())
+            .collect();
+
+        for (i, c_points) in constraint_points.iter().enumerate() {
+            if used_constraints[i] || layer_indices.contains(&i) || c_points.is_empty() { continue; }
+            if c_points.iter().all(|p| layer_all_points.contains(p)) {
+                layer_indices.push(i);
+            }
+        }
+
+        // Collect all constraints for this sub-solve (all previously used + new layer).
+        // Log which constraints are new in this layer.
+        let new_ids: Vec<String> = layer_indices.iter()
+            .map(|&i| constraints[i].id().to_string())
+            .collect();
+        lm::trail_push(&format!("layer[{}] adding: {}", layer, new_ids.join(",")), 0.0);
+
+        for &i in &layer_indices {
+            used_constraints[i] = true;
+        }
+        let sub_constraints: Vec<Constraint> = used_constraints.iter()
+            .enumerate()
+            .filter(|(_, &used)| used)
+            .map(|(i, _)| constraints[i].clone())
+            .collect();
+
+        // Collect all points involved in the sub-constraints.
+        let sub_point_ids: HashSet<String> = used_constraints.iter()
+            .enumerate()
+            .filter(|(_, &used)| used)
+            .flat_map(|(i, _)| constraint_points[i].iter().cloned())
+            .collect();
+
+        // Check current error on just the sub-constraints.
+        let sub_error = lm::current_max_error(points, lines, circles, arcs, shapes, &sub_constraints);
+        if sub_error <= tolerance {
+            // Already solved — mark all points as solved and continue.
+            solved_points.extend(sub_point_ids);
+            continue;
+        }
+
+        // Compute "active" points: new points + their direct constraint neighbors.
+        // Points not in this active set are temporarily fixed.
+        let mut active_points: HashSet<String> = layer_new_points.clone();
+        // Add all points that share a NEW constraint with a new point.
+        for &ci in &layer_indices {
+            // If this constraint involves any new point, all its points are active.
+            if constraint_points[ci].iter().any(|p| layer_new_points.contains(p)) {
+                for p in &constraint_points[ci] {
+                    active_points.insert(p.clone());
+                }
+            }
+        }
+
+        let mut saved_fixed: Vec<(usize, bool)> = Vec::new();
+        for (i, p) in points.iter_mut().enumerate() {
+            if !p.fixed && !active_points.contains(&p.id) {
+                saved_fixed.push((i, p.fixed));
+                p.fixed = true;
+            }
+        }
+
+        // Run LM on the sub-constraints. Use more restarts for larger layers
+        // since they're more likely to have local minima.
+        let new_pt_count = layer_new_points.len();
+        let sub_iters = if new_pt_count > 3 { 60 } else { 40 };
+        let sub_restarts = if new_pt_count > 3 { 6 } else { 3 };
+        let warm_iters = 4;
+        let max_step = 2.5;
+
+        let err = lm::solve_global(
+            points, lines, circles, arcs, shapes, &sub_constraints,
+            sub_iters, tolerance, sub_restarts, warm_iters, max_step,
+            groups, graph,
+        );
+        lm::trail_push(&format!("sub-layer[{}] ({} constraints, {} pts)", layer, sub_constraints.len(), sub_point_ids.len()), err);
+
+        // Restore fixed flags.
+        for (i, was_fixed) in saved_fixed {
+            points[i].fixed = was_fixed;
+        }
+
+        // Mark all points in this sub-solve as solved.
+        solved_points.extend(sub_point_ids);
+
+        if err <= tolerance {
+            // Sub-solve converged — keep going to add more layers.
+        }
+        // Even if sub-solve didn't converge perfectly, the positions are
+        // better than cold-start for the next layer.
+    }
 }
 
 fn presolve_single_system(
@@ -482,21 +701,748 @@ fn sanitize_max_error(value: f64) -> f64 {
     if value.is_finite() { value.abs() } else { 1e308 }
 }
 
+/// Compute the characteristic scale of the problem from constraint dimension values.
+/// Traverse a shape's lines to collect unique vertex IDs in order.
+fn shape_vertex_ids(shape: &Shape, lines_map: &HashMap<&str, &Line>) -> Vec<String> {
+    if shape.lines.is_empty() { return vec![]; }
+    let mut adj: HashMap<&str, Vec<&str>> = HashMap::new();
+    for lid in &shape.lines {
+        if let Some(l) = lines_map.get(lid.as_str()) {
+            adj.entry(l.a.as_str()).or_default().push(l.b.as_str());
+            adj.entry(l.b.as_str()).or_default().push(l.a.as_str());
+        }
+    }
+    if adj.is_empty() { return vec![]; }
+    let start = *adj.keys().next().unwrap();
+    let mut result = vec![start.to_string()];
+    let mut prev: Option<&str> = None;
+    let mut current = start;
+    loop {
+        let neighbors = match adj.get(current) { Some(n) => n, None => break };
+        let next = neighbors.iter().find(|&&n| Some(n) != prev).copied();
+        prev = Some(current);
+        match next {
+            Some(n) => {
+                if n == start { break; }
+                result.push(n.to_string());
+                current = n;
+            }
+            None => break,
+        }
+    }
+    result
+}
+
+fn compute_presolve_ref_scale(constraints: &Vec<Constraint>) -> f64 {
+    let mut max_val: f64 = 1.0;
+    for c in constraints {
+        let v = match c {
+            Constraint::Length { value, .. }
+            | Constraint::Distance { value, .. }
+            | Constraint::LineDistance { value, .. }
+            | Constraint::PointLineDistance { value, .. }
+            | Constraint::Radius { value, .. }
+            | Constraint::Diameter { value, .. } => value.abs(),
+            Constraint::HDistance { value, .. }
+            | Constraint::VDistance { value, .. } => value.abs(),
+            _ => 0.0,
+        };
+        if v > max_val { max_val = v; }
+    }
+    max_val
+}
+
+/// Polyline chain closure: find connected chains of lines with known directions
+/// (AbsoluteAngle), where both terminal points are "anchored" (fixed or shared with
+/// other subsystems). Compute segment lengths via pseudo-inverse to satisfy the
+/// closure condition: Σ Lᵢ·dᵢ = endpoint_B - endpoint_A.
+fn propagate_chain_closure(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    constraints: &Vec<Constraint>,
+) {
+    let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
+
+    // Collect lines that have AbsoluteAngle constraints.
+    let mut angle_lines: HashMap<String, f64> = HashMap::new();
+    for c in constraints {
+        if let Constraint::AbsoluteAngle { line, value, .. } = c {
+            angle_lines.insert(line.clone(), *value);
+        }
+    }
+    // Collect lines that have explicit Length constraints (don't override their lengths).
+    let mut length_lines: HashSet<String> = HashSet::new();
+    for c in constraints {
+        if let Constraint::Length { line, .. } = c {
+            length_lines.insert(line.clone());
+        }
+    }
+
+    if angle_lines.is_empty() { return; }
+
+    // Build point-to-line adjacency for angle-constrained lines only.
+    let mut point_to_lines: HashMap<&str, Vec<&Line>> = HashMap::new();
+    for l in lines {
+        if angle_lines.contains_key(&l.id) {
+            point_to_lines.entry(l.a.as_str()).or_default().push(l);
+            point_to_lines.entry(l.b.as_str()).or_default().push(l);
+        }
+    }
+
+    // Count how many angle-constrained lines touch each point.
+    // Terminal points of a chain are those with exactly 1 angle-constrained line.
+    let mut terminals: Vec<&str> = Vec::new();
+    for (&pt, ll) in &point_to_lines {
+        if ll.len() == 1 {
+            terminals.push(pt);
+        }
+    }
+
+    // For each terminal, trace the chain.
+    let mut visited_lines: HashSet<String> = HashSet::new();
+    for &start_pt in &terminals {
+        // Find the single angle-constrained line at this terminal.
+        let start_lines = match point_to_lines.get(start_pt) {
+            Some(ll) => ll,
+            None => continue,
+        };
+        let first_line = match start_lines.iter().find(|l| !visited_lines.contains(&l.id)) {
+            Some(l) => *l,
+            None => continue,
+        };
+
+        // Trace the chain: follow connected angle-constrained lines.
+        let mut chain: Vec<(&Line, &str, &str)> = Vec::new(); // (line, from_pt, to_pt)
+        let mut current_pt = start_pt;
+        let mut current_line = first_line;
+        loop {
+            if visited_lines.contains(&current_line.id) { break; }
+            visited_lines.insert(current_line.id.clone());
+
+            let (from, to) = if current_line.a.as_str() == current_pt {
+                (current_line.a.as_str(), current_line.b.as_str())
+            } else {
+                (current_line.b.as_str(), current_line.a.as_str())
+            };
+            chain.push((current_line, from, to));
+            current_pt = to;
+
+            // Find the next line at current_pt (the other angle-constrained line).
+            let next_lines = match point_to_lines.get(current_pt) {
+                Some(ll) => ll,
+                None => break,
+            };
+            let next = next_lines.iter().find(|l| !visited_lines.contains(&l.id));
+            match next {
+                Some(l) => current_line = *l,
+                None => break, // reached terminal or dead end
+            }
+        }
+
+        if chain.len() < 2 { continue; } // need at least 2 segments for closure to matter
+
+        // Check that both terminals have known positions.
+        let start_idx = match pts.get(chain[0].1) { Some(&i) => i, None => continue };
+        let end_idx = match pts.get(chain.last().unwrap().2) { Some(&i) => i, None => continue };
+
+        // Compute target displacement.
+        let dx = points[end_idx].x - points[start_idx].x;
+        let dy = points[end_idx].y - points[start_idx].y;
+
+        // Build direction matrix D (2×N) and current lengths.
+        let n = chain.len();
+        let mut dirs: Vec<(f64, f64)> = Vec::with_capacity(n);
+        let mut current_lens: Vec<f64> = Vec::with_capacity(n);
+        let mut has_length: Vec<bool> = Vec::with_capacity(n);
+
+        for (line, from, to) in &chain {
+            let angle_deg = angle_lines[&line.id];
+            let angle_rad = angle_deg * std::f64::consts::PI / 180.0;
+            // Direction from `from` to `to`. If the line is defined A→B but we traverse B→A,
+            // the angle constraint is for A→B. We need to check if we're going the "right" way.
+            let (d_x, d_y) = if line.a.as_str() == *from {
+                (angle_rad.cos(), angle_rad.sin())
+            } else {
+                (-angle_rad.cos(), -angle_rad.sin())
+            };
+            dirs.push((d_x, d_y));
+
+            let fi = pts[*from];
+            let ti = pts[*to];
+            let len = (points[ti].x - points[fi].x).hypot(points[ti].y - points[fi].y);
+            current_lens.push(len);
+            has_length.push(length_lines.contains(&line.id));
+        }
+
+        // Compute D·D^T (2×2 matrix).
+        let mut ddt = [[0.0f64; 2]; 2];
+        for i in 0..n {
+            if has_length[i] { continue; } // Fixed-length segments don't participate
+            let (dx_i, dy_i) = dirs[i];
+            ddt[0][0] += dx_i * dx_i;
+            ddt[0][1] += dx_i * dy_i;
+            ddt[1][0] += dy_i * dx_i;
+            ddt[1][1] += dy_i * dy_i;
+        }
+
+        // Invert the 2×2 matrix.
+        let det = ddt[0][0] * ddt[1][1] - ddt[0][1] * ddt[1][0];
+        if det.abs() < 1e-12 { continue; } // degenerate (all segments in same direction)
+
+        // Current displacement with current lengths.
+        let mut cur_dx = 0.0f64;
+        let mut cur_dy = 0.0f64;
+        for i in 0..n {
+            cur_dx += current_lens[i] * dirs[i].0;
+            cur_dy += current_lens[i] * dirs[i].1;
+        }
+
+        // Residual: how much we need to adjust.
+        let res_x = dx - cur_dx;
+        let res_y = dy - cur_dy;
+
+        // Solve: inv(D·D^T) · residual
+        let inv_det = 1.0 / det;
+        let sol_x = inv_det * (ddt[1][1] * res_x - ddt[0][1] * res_y);
+        let sol_y = inv_det * (-ddt[1][0] * res_x + ddt[0][0] * res_y);
+
+        // Update lengths: Lᵢ += dᵢ^T · sol (pseudo-inverse step)
+        let mut new_lens: Vec<f64> = current_lens.clone();
+        for i in 0..n {
+            if has_length[i] { continue; }
+            let delta = dirs[i].0 * sol_x + dirs[i].1 * sol_y;
+            new_lens[i] += delta;
+            if new_lens[i] < 0.5 { new_lens[i] = 0.5; } // minimum positive length
+        }
+
+        // Apply: position intermediate points along the chain.
+        let mut cx = points[start_idx].x;
+        let mut cy = points[start_idx].y;
+        for i in 0..n {
+            cx += new_lens[i] * dirs[i].0;
+            cy += new_lens[i] * dirs[i].1;
+            // Set the "to" point (intermediate or final).
+            let to_idx = pts[chain[i].2];
+            if !points[to_idx].fixed && i < n - 1 {
+                // Only set intermediate points, not the final terminal.
+                points[to_idx].x = cx;
+                points[to_idx].y = cy;
+            }
+        }
+    }
+}
+
+/// Midpoint-bridged opening placement:
+/// detect the spectrometer slit pattern where a short line is centered on the
+/// midpoint of one support line and bridged perpendicularly to a second support
+/// line. This removes the persistent back-opening ambiguity before LM.
+fn propagate_midpoint_bridged_opening(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    constraints: &Vec<Constraint>,
+) {
+    let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
+    let line_map: HashMap<String, &Line> = lines.iter().map(|line| (line.id.clone(), line)).collect();
+
+    let mut line_lengths: HashMap<String, f64> = HashMap::new();
+    let mut midpoint_lines_by_point: HashMap<String, Vec<String>> = HashMap::new();
+    let mut zero_line_distances: Vec<(String, String)> = Vec::new();
+    let mut parallel_pairs: Vec<(String, String)> = Vec::new();
+
+    for c in constraints {
+        match c {
+            Constraint::Length { line, value, .. } => {
+                line_lengths.insert(line.clone(), *value);
+            }
+            Constraint::Midpoint { point, line, .. } => {
+                midpoint_lines_by_point.entry(point.clone()).or_default().push(line.clone());
+            }
+            Constraint::LineDistance { a, b, value, .. } if value.abs() < 1e-9 => {
+                zero_line_distances.push((a.clone(), b.clone()));
+            }
+            Constraint::Parallel { a, b, .. } => {
+                parallel_pairs.push((a.clone(), b.clone()));
+            }
+            _ => {}
+        }
+    }
+
+    let is_zero_distance_pair = |a: &str, b: &str| -> bool {
+        zero_line_distances.iter().any(|(x, y)| (x == a && y == b) || (x == b && y == a))
+    };
+
+    let zero_distance_partners = |line_id: &str| -> Vec<String> {
+        zero_line_distances.iter()
+            .filter_map(|(a, b)| {
+                if a == line_id {
+                    Some(b.clone())
+                } else if b == line_id {
+                    Some(a.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    };
+
+    let normalize = |v: (f64, f64)| -> Option<(f64, f64)> {
+        let len = v.0.hypot(v.1);
+        if len < 1e-9 {
+            None
+        } else {
+            Some((v.0 / len, v.1 / len))
+        }
+    };
+
+    let line_intersection = |p0: (f64, f64), d0: (f64, f64), a0: (f64, f64), a1: (f64, f64)| -> Option<(f64, f64)> {
+        let d1 = (a1.0 - a0.0, a1.1 - a0.1);
+        let den = d0.0 * d1.1 - d0.1 * d1.0;
+        if den.abs() < 1e-9 {
+            return None;
+        }
+        let t = ((a0.0 - p0.0) * d1.1 - (a0.1 - p0.1) * d1.0) / den;
+        Some((p0.0 + d0.0 * t, p0.1 + d0.1 * t))
+    };
+
+    let choose_assignment = |ia: usize, ib: usize, p0: (f64, f64), p1: (f64, f64), points: &Vec<Point>| -> ((f64, f64), (f64, f64)) {
+        let same = (points[ia].x - p0.0).powi(2)
+            + (points[ia].y - p0.1).powi(2)
+            + (points[ib].x - p1.0).powi(2)
+            + (points[ib].y - p1.1).powi(2);
+        let swapped = (points[ia].x - p1.0).powi(2)
+            + (points[ia].y - p1.1).powi(2)
+            + (points[ib].x - p0.0).powi(2)
+            + (points[ib].y - p0.1).powi(2);
+        if swapped < same {
+            (p1, p0)
+        } else {
+            (p0, p1)
+        }
+    };
+
+    for (attach_point, midpoint_lines) in midpoint_lines_by_point {
+        for opening_line_id in midpoint_lines.iter() {
+            let Some(opening_len) = line_lengths.get(opening_line_id.as_str()).copied() else { continue };
+            let Some(support0_id) = midpoint_lines.iter()
+                .find(|candidate| candidate.as_str() != opening_line_id.as_str() && is_zero_distance_pair(opening_line_id, candidate))
+                .cloned()
+            else {
+                continue;
+            };
+
+            let Some(opposite_line_id) = parallel_pairs.iter().find_map(|(a, b)| {
+                if a == opening_line_id {
+                    Some(b.clone())
+                } else if b == opening_line_id {
+                    Some(a.clone())
+                } else {
+                    None
+                }
+            }) else {
+                continue;
+            };
+
+            let Some(support1_id) = zero_distance_partners(opposite_line_id.as_str()).into_iter()
+                .find(|candidate| candidate != &support0_id)
+            else {
+                continue;
+            };
+
+            let (Some(opening_line), Some(opposite_line), Some(support0), Some(support1)) = (
+                line_map.get(opening_line_id.as_str()),
+                line_map.get(opposite_line_id.as_str()),
+                line_map.get(support0_id.as_str()),
+                line_map.get(support1_id.as_str()),
+            ) else {
+                continue;
+            };
+
+            let (Some(&open_ai), Some(&open_bi), Some(&opp_ai), Some(&opp_bi), Some(&support0_ai), Some(&support0_bi), Some(&support1_ai), Some(&support1_bi)) = (
+                pts.get(opening_line.a.as_str()),
+                pts.get(opening_line.b.as_str()),
+                pts.get(opposite_line.a.as_str()),
+                pts.get(opposite_line.b.as_str()),
+                pts.get(support0.a.as_str()),
+                pts.get(support0.b.as_str()),
+                pts.get(support1.a.as_str()),
+                pts.get(support1.b.as_str()),
+            ) else {
+                continue;
+            };
+
+            let support0_vec = (
+                points[support0_bi].x - points[support0_ai].x,
+                points[support0_bi].y - points[support0_ai].y,
+            );
+            let support1_vec = (
+                points[support1_bi].x - points[support1_ai].x,
+                points[support1_bi].y - points[support1_ai].y,
+            );
+            let Some(dir0) = normalize(support0_vec) else { continue };
+            let Some(mut dir1) = normalize(support1_vec) else { continue };
+            if dir0.0 * dir1.0 + dir0.1 * dir1.1 < 0.0 {
+                dir1 = (-dir1.0, -dir1.1);
+            }
+
+            let mut dir = normalize((dir0.0 + dir1.0, dir0.1 + dir1.1)).unwrap_or(dir0);
+            let current_open = (
+                points[open_bi].x - points[open_ai].x,
+                points[open_bi].y - points[open_ai].y,
+            );
+            if current_open.0 * dir.0 + current_open.1 * dir.1 < 0.0 {
+                dir = (-dir.0, -dir.1);
+            }
+
+            let attach_target = (
+                (points[support0_ai].x + points[support0_bi].x) * 0.5,
+                (points[support0_ai].y + points[support0_bi].y) * 0.5,
+            );
+            let open_p0 = (
+                attach_target.0 - dir.0 * opening_len * 0.5,
+                attach_target.1 - dir.1 * opening_len * 0.5,
+            );
+            let open_p1 = (
+                attach_target.0 + dir.0 * opening_len * 0.5,
+                attach_target.1 + dir.1 * opening_len * 0.5,
+            );
+
+            let mut normal = (-dir.1, dir.0);
+            let support_mid_delta = (
+                (points[support1_ai].x + points[support1_bi].x) * 0.5 - attach_target.0,
+                (points[support1_ai].y + points[support1_bi].y) * 0.5 - attach_target.1,
+            );
+            if support_mid_delta.0 * normal.0 + support_mid_delta.1 * normal.1 < 0.0 {
+                normal = (-normal.0, -normal.1);
+            }
+
+            let Some(opp_p0) = line_intersection(
+                open_p0,
+                normal,
+                (points[support1_ai].x, points[support1_ai].y),
+                (points[support1_bi].x, points[support1_bi].y),
+            ) else {
+                continue;
+            };
+            let Some(opp_p1) = line_intersection(
+                open_p1,
+                normal,
+                (points[support1_ai].x, points[support1_ai].y),
+                (points[support1_bi].x, points[support1_bi].y),
+            ) else {
+                continue;
+            };
+
+            let opposite_len = (opp_p1.0 - opp_p0.0).hypot(opp_p1.1 - opp_p0.1);
+            if opposite_len < 1e-9 || (opposite_len - opening_len).abs() > opening_len.max(1.0) * 0.35 {
+                continue;
+            }
+
+            let (open_a_target, open_b_target) = choose_assignment(open_ai, open_bi, open_p0, open_p1, points);
+            let (opp_a_target, opp_b_target) = choose_assignment(opp_ai, opp_bi, opp_p0, opp_p1, points);
+
+            if let Some(&attach_i) = pts.get(attach_point.as_str()) {
+                if !points[attach_i].fixed {
+                    points[attach_i].x = attach_target.0;
+                    points[attach_i].y = attach_target.1;
+                }
+            }
+
+            if !points[open_ai].fixed {
+                points[open_ai].x = open_a_target.0;
+                points[open_ai].y = open_a_target.1;
+            }
+            if !points[open_bi].fixed {
+                points[open_bi].x = open_b_target.0;
+                points[open_bi].y = open_b_target.1;
+            }
+            if !points[opp_ai].fixed {
+                points[opp_ai].x = opp_a_target.0;
+                points[opp_ai].y = opp_a_target.1;
+            }
+            if !points[opp_bi].fixed {
+                points[opp_bi].x = opp_b_target.0;
+                points[opp_bi].y = opp_b_target.1;
+            }
+
+            if cfg!(test) {
+                eprintln!(
+                    "presolve opening: attach={} base={} support0={} opposite={} support1={}",
+                    attach_point, opening_line_id, support0_id, opposite_line_id, support1_id
+                );
+            }
+        }
+    }
+}
+
+/// Light-locked camera placement:
+/// detect a line whose midpoint is tied to a light ray of known length and
+/// perpendicularity, and whose endpoints are constrained onto two support lines.
+/// This is the remaining hard pattern in the spectrometer: it fixes the camera
+/// slide DOF before LM sees the coupled inner-camera offsets.
+fn propagate_light_locked_camera(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    constraints: &Vec<Constraint>,
+) {
+    let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
+    let line_map: HashMap<String, &Line> = lines.iter().map(|line| (line.id.clone(), line)).collect();
+
+    let mut line_lengths: HashMap<String, f64> = HashMap::new();
+    let mut midpoints: Vec<(String, String)> = Vec::new(); // (midpoint point id, side line id)
+    let mut perpendicular_pairs: Vec<(String, String)> = Vec::new();
+    let mut point_on_line: HashMap<String, String> = HashMap::new();
+
+    for c in constraints {
+        match c {
+            Constraint::Length { line, value, .. } => {
+                line_lengths.insert(line.clone(), *value);
+            }
+            Constraint::Midpoint { point, line, .. } => {
+                midpoints.push((point.clone(), line.clone()));
+            }
+            Constraint::Perpendicular { a, b, .. } => {
+                perpendicular_pairs.push((a.clone(), b.clone()));
+            }
+            Constraint::PointOnLine { point, line, .. } => {
+                point_on_line.insert(point.clone(), line.clone());
+            }
+            _ => {}
+        }
+    }
+
+    let are_perpendicular = |a: &str, b: &str| -> bool {
+        perpendicular_pairs.iter().any(|(x, y)| (x == a && y == b) || (x == b && y == a))
+    };
+
+    let line_intersection = |p0: (f64, f64), d0: (f64, f64), a0: (f64, f64), a1: (f64, f64)| -> Option<(f64, f64)> {
+        let d1 = (a1.0 - a0.0, a1.1 - a0.1);
+        let den = d0.0 * d1.1 - d0.1 * d1.0;
+        if den.abs() < 1e-9 {
+            return None;
+        }
+        let t = ((a0.0 - p0.0) * d1.1 - (a0.1 - p0.1) * d1.0) / den;
+        Some((p0.0 + d0.0 * t, p0.1 + d0.1 * t))
+    };
+
+    for (mid_point, side_line_id) in midpoints {
+        let Some(side_line) = line_map.get(side_line_id.as_str()) else { continue };
+        let Some(side_len) = line_lengths.get(side_line_id.as_str()).copied() else { continue };
+
+        let Some(light_line) = lines.iter().find(|line| {
+            (line.a == mid_point || line.b == mid_point)
+                && line_lengths.contains_key(line.id.as_str())
+                && are_perpendicular(line.id.as_str(), side_line_id.as_str())
+        }) else {
+            continue;
+        };
+        let Some(light_len) = line_lengths.get(light_line.id.as_str()).copied() else { continue };
+
+        let side_a_support = point_on_line.get(side_line.a.as_str()).cloned();
+        let side_b_support = point_on_line.get(side_line.b.as_str()).cloned();
+        let (Some(support_a_id), Some(support_b_id)) = (side_a_support, side_b_support) else { continue };
+        let (Some(support_a), Some(support_b)) = (
+            line_map.get(support_a_id.as_str()),
+            line_map.get(support_b_id.as_str()),
+        ) else {
+            continue;
+        };
+
+        let (Some(&mid_i), Some(&side_a_i), Some(&side_b_i)) = (
+            pts.get(mid_point.as_str()),
+            pts.get(side_line.a.as_str()),
+            pts.get(side_line.b.as_str()),
+        ) else {
+            continue;
+        };
+
+        let anchor_id = if light_line.a == mid_point {
+            light_line.b.as_str()
+        } else {
+            light_line.a.as_str()
+        };
+        let Some(&anchor_i) = pts.get(anchor_id) else { continue };
+
+        let (Some(&sa0), Some(&sa1), Some(&sb0), Some(&sb1)) = (
+            pts.get(support_a.a.as_str()),
+            pts.get(support_a.b.as_str()),
+            pts.get(support_b.a.as_str()),
+            pts.get(support_b.b.as_str()),
+        ) else {
+            continue;
+        };
+
+        let ta = (
+            points[sa1].x - points[sa0].x,
+            points[sa1].y - points[sa0].y,
+        );
+        let tb = (
+            points[sb1].x - points[sb0].x,
+            points[sb1].y - points[sb0].y,
+        );
+        let ta_len = ta.0.hypot(ta.1);
+        let tb_len = tb.0.hypot(tb.1);
+        if ta_len < 1e-9 || tb_len < 1e-9 {
+            continue;
+        }
+
+        let mut tangent = (
+            ta.0 / ta_len + tb.0 / tb_len,
+            ta.1 / ta_len + tb.1 / tb_len,
+        );
+        let tangent_len = tangent.0.hypot(tangent.1);
+        if tangent_len < 1e-9 {
+            tangent = (ta.0 / ta_len, ta.1 / ta_len);
+        } else {
+            tangent = (tangent.0 / tangent_len, tangent.1 / tangent_len);
+        }
+
+        let mut normal = (-tangent.1, tangent.0);
+        let current_side = (
+            points[side_b_i].x - points[side_a_i].x,
+            points[side_b_i].y - points[side_a_i].y,
+        );
+        if current_side.0 * normal.0 + current_side.1 * normal.1 < 0.0 {
+            normal = (-normal.0, -normal.1);
+        }
+
+        let current_mid_vec = (
+            points[mid_i].x - points[anchor_i].x,
+            points[mid_i].y - points[anchor_i].y,
+        );
+        let sign = if current_mid_vec.0 * tangent.0 + current_mid_vec.1 * tangent.1 >= 0.0 {
+            1.0
+        } else {
+            -1.0
+        };
+        let target_mid = (
+            points[anchor_i].x + tangent.0 * light_len * sign,
+            points[anchor_i].y + tangent.1 * light_len * sign,
+        );
+
+        let Some(new_a) = line_intersection(
+            target_mid,
+            normal,
+            (points[sa0].x, points[sa0].y),
+            (points[sa1].x, points[sa1].y),
+        ) else {
+            continue;
+        };
+        let Some(new_b) = line_intersection(
+            target_mid,
+            normal,
+            (points[sb0].x, points[sb0].y),
+            (points[sb1].x, points[sb1].y),
+        ) else {
+            continue;
+        };
+
+        let actual_side_len = (new_b.0 - new_a.0).hypot(new_b.1 - new_a.1);
+        if actual_side_len < 1e-9 {
+            continue;
+        }
+
+        // Only apply if the supporting lines are already roughly compatible with
+        // the camera side length. Otherwise this presolve would fight the case
+        // geometry instead of helping it.
+        if (actual_side_len - side_len).abs() > side_len.max(1.0) * 0.15 {
+            continue;
+        }
+
+        if !points[side_a_i].fixed {
+            points[side_a_i].x = new_a.0;
+            points[side_a_i].y = new_a.1;
+        }
+        if !points[side_b_i].fixed {
+            points[side_b_i].x = new_b.0;
+            points[side_b_i].y = new_b.1;
+        }
+
+        if !points[mid_i].fixed {
+            points[mid_i].x = (new_a.0 + new_b.0) * 0.5;
+            points[mid_i].y = (new_a.1 + new_b.1) * 0.5;
+        }
+
+        if cfg!(test) {
+            eprintln!(
+                "presolve light-camera: mid={} side={} light={} supports=({}, {})",
+                mid_point, side_line_id, light_line.id, support_a_id, support_b_id
+            );
+        }
+    }
+}
+
 fn run_presolve(
     points: &mut Vec<Point>,
     lines: &Vec<Line>,
     _circles: &mut Vec<Circle>,
     _arcs: &mut Vec<Arc>,
-    _shapes: &Vec<Shape>,
+    shapes: &Vec<Shape>,
     constraints: &Vec<Constraint>,
     _tolerance: f64,
 ) {
-    // Build shared lookup tables (owned String keys so there's no lifetime conflict with mutations).
-    let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
-    let entity_ref_count = build_entity_ref_count(constraints);
+    let ref_scale = compute_presolve_ref_scale(constraints);
 
-    for c in constraints {
-        apply_presolve_constraint(points, lines, &pts, &entity_ref_count, c);
+    // Stage 1: Establish base geometry (Fixed, CCW, AbsoluteAngle, Length, BlockRotation).
+    // These set positions, orientations, and scales that derived constraints depend on.
+    // Stage 2: Scale/position-related (Equal, LineDistance, PointLineDistance, Distance).
+    // Stage 3: Derived geometric constraints (PointOnLine, Perpendicular, Parallel, Midpoint).
+    // Run 2 full cycles so later stages benefit from earlier stage updates.
+    for _cycle in 0..2 {
+        let entity_ref_count = build_entity_ref_count(constraints);
+        // Stage 1: base geometry
+        for _pass in 0..2 {
+            let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
+            for c in constraints {
+                match c {
+                    Constraint::Fixed { .. }
+                    | Constraint::Ccw { .. }
+                    | Constraint::AbsoluteAngle { .. }
+                    | Constraint::Length { .. }
+                    | Constraint::BlockRotation { .. }
+                    | Constraint::Horizontal { .. }
+                    | Constraint::Vertical { .. } => {
+                        apply_presolve_constraint(points, lines, &pts, &entity_ref_count, c, ref_scale);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        // Close open angle-driven chains once their endpoint geometry is roughly in place.
+        propagate_chain_closure(points, lines, constraints);
+        // Stage 2: scale and distance
+        {
+            let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
+            for c in constraints {
+                match c {
+                    Constraint::Equal { .. }
+                    | Constraint::LineDistance { .. }
+                    | Constraint::PointLineDistance { .. }
+                    | Constraint::Distance { .. }
+                    | Constraint::HDistance { .. }
+                    | Constraint::VDistance { .. } => {
+                        apply_presolve_constraint(points, lines, &pts, &entity_ref_count, c, ref_scale);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        // Stage 3: derived geometry
+        {
+            let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
+            for c in constraints {
+                match c {
+                    Constraint::PointOnLine { .. }
+                    | Constraint::Perpendicular { .. }
+                    | Constraint::Parallel { .. }
+                    | Constraint::Midpoint { .. } => {
+                        apply_presolve_constraint(points, lines, &pts, &entity_ref_count, c, ref_scale);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        propagate_midpoint_bridged_opening(points, lines, constraints);
+        propagate_light_locked_camera(points, lines, constraints);
     }
 }
 
@@ -513,8 +1459,9 @@ pub fn presolve_constraint(
     let pts: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
     let entity_ref_count = build_entity_ref_count(constraints);
 
+    let ref_scale = compute_presolve_ref_scale(constraints);
     if let Some(constraint) = constraints.iter().find(|constraint| constraint.id() == constraint_id) {
-        apply_presolve_constraint(points, lines, &pts, &entity_ref_count, constraint);
+        apply_presolve_constraint(points, lines, &pts, &entity_ref_count, constraint, ref_scale);
     }
 
     // Resolve group-owned points after presolve.
@@ -531,6 +1478,7 @@ fn apply_presolve_constraint(
     pts: &HashMap<String, usize>,
     entity_ref_count: &HashMap<String, usize>,
     c: &Constraint,
+    ref_scale: f64,
 ) {
     let point_line_refs = |point_id: &str| -> usize {
         lines.iter().filter(|line| line.a == point_id || line.b == point_id).count()
@@ -606,7 +1554,7 @@ fn apply_presolve_constraint(
                         let len = ((points[bi].x - points[ai].x).powi(2)
                             + (points[bi].y - points[ai].y).powi(2))
                         .sqrt()
-                        .max(1.0);
+                        .max(ref_scale * 0.5);
                         let cos = target.cos();
                         let sin = target.sin();
                         let a_refs = point_line_refs(l.a.as_str());
@@ -629,11 +1577,11 @@ fn apply_presolve_constraint(
                         let dx = points[bi].x - points[ai].x;
                         let dy = points[bi].y - points[ai].y;
                         let len = dx.hypot(dy);
-                        if len < 1e-9 || (len - value).abs() < 1e-9 {
+                        if (len - value).abs() < 1e-9 {
                             return;
                         }
-                        let ux = dx / len;
-                        let uy = dy / len;
+                        // When points are coincident, use x-axis as default direction.
+                        let (ux, uy) = if len < 1e-9 { (1.0, 0.0) } else { (dx / len, dy / len) };
                         let mx = (points[ai].x + points[bi].x) / 2.0;
                         let my = (points[ai].y + points[bi].y) / 2.0;
                         if !points[ai].fixed {
@@ -659,13 +1607,12 @@ fn apply_presolve_constraint(
                     return;
                 };
 
-                let len_a = (points[a2i].x - points[a1i].x).hypot(points[a2i].y - points[a1i].y).max(1e-9);
-                let len_b = (points[b2i].x - points[b1i].x).hypot(points[b2i].y - points[b1i].y).max(1e-9);
-
+                let len_a = (points[a2i].x - points[a1i].x).hypot(points[a2i].y - points[a1i].y);
+                let len_b = (points[b2i].x - points[b1i].x).hypot(points[b2i].y - points[b1i].y);
                 let dx_a = points[a2i].x - points[a1i].x;
                 let dy_a = points[a2i].y - points[a1i].y;
-                let nx = -dy_a / len_a;
-                let ny = dx_a / len_a;
+                // When reference line has zero length, use y-axis as default normal.
+                let (nx, ny) = if len_a < 1e-9 { (0.0, 1.0) } else { (-dy_a / len_a, dx_a / len_a) };
                 let mid_bx = (points[b1i].x + points[b2i].x) / 2.0;
                 let mid_by = (points[b1i].y + points[b2i].y) / 2.0;
                 let mid_ax = (points[a1i].x + points[a2i].x) / 2.0;
@@ -721,6 +1668,29 @@ fn apply_presolve_constraint(
                         points[b2i].y += ny * shift;
                     }
                 }
+                // After shifting, scale the moved line toward the reference line's
+                // length when grossly undersized. This helps lines at default scale
+                // (e.g., outer triangle sides at ~5 units, should be ~25).
+                let (ref_len_val, moved_i1, moved_i2) = if move_a {
+                    (len_b, a1i, a2i)
+                } else {
+                    (len_a, b1i, b2i)
+                };
+                let moved_len = (points[moved_i2].x - points[moved_i1].x)
+                    .hypot(points[moved_i2].y - points[moved_i1].y);
+                if ref_len_val > 1e-9 && moved_len > 1e-9 && moved_len < ref_len_val * 0.5 {
+                    let ratio = ref_len_val / moved_len;
+                    let mx = (points[moved_i1].x + points[moved_i2].x) * 0.5;
+                    let my = (points[moved_i1].y + points[moved_i2].y) * 0.5;
+                    if !points[moved_i1].fixed {
+                        points[moved_i1].x = mx + (points[moved_i1].x - mx) * ratio;
+                        points[moved_i1].y = my + (points[moved_i1].y - my) * ratio;
+                    }
+                    if !points[moved_i2].fixed {
+                        points[moved_i2].x = mx + (points[moved_i2].x - mx) * ratio;
+                        points[moved_i2].y = my + (points[moved_i2].y - my) * ratio;
+                    }
+                }
             }
             // Horizontal/vertical: snap degenerate zero-length segments.
             Constraint::Horizontal { line, .. } | Constraint::Vertical { line, .. } => {
@@ -741,6 +1711,158 @@ fn apply_presolve_constraint(
                                 _ => {}
                             }
                         }
+                    }
+                }
+            }
+            // Equal: scale the shorter line to match the longer one, preserving direction.
+            Constraint::Equal { a, b, .. } => {
+                let la = lines.iter().find(|l| &l.id == a);
+                let lb = lines.iter().find(|l| &l.id == b);
+                if let (Some(la), Some(lb)) = (la, lb) {
+                    if let (Some(&a1i), Some(&a2i), Some(&b1i), Some(&b2i)) = (
+                        pts.get(la.a.as_str()), pts.get(la.b.as_str()),
+                        pts.get(lb.a.as_str()), pts.get(lb.b.as_str()),
+                    ) {
+                        let len_a = (points[a2i].x - points[a1i].x).hypot(points[a2i].y - points[a1i].y);
+                        let len_b = (points[b2i].x - points[b1i].x).hypot(points[b2i].y - points[b1i].y);
+                        if len_a < 1e-12 || len_b < 1e-12 { return; }
+                        // Scale the shorter line to match the longer one.
+                        if len_a > len_b {
+                            let ratio = len_a / len_b;
+                            let mx = (points[b1i].x + points[b2i].x) * 0.5;
+                            let my = (points[b1i].y + points[b2i].y) * 0.5;
+                            if !points[b1i].fixed {
+                                points[b1i].x = mx + (points[b1i].x - mx) * ratio;
+                                points[b1i].y = my + (points[b1i].y - my) * ratio;
+                            }
+                            if !points[b2i].fixed {
+                                points[b2i].x = mx + (points[b2i].x - mx) * ratio;
+                                points[b2i].y = my + (points[b2i].y - my) * ratio;
+                            }
+                        } else if len_b > len_a {
+                            let ratio = len_b / len_a;
+                            let mx = (points[a1i].x + points[a2i].x) * 0.5;
+                            let my = (points[a1i].y + points[a2i].y) * 0.5;
+                            if !points[a1i].fixed {
+                                points[a1i].x = mx + (points[a1i].x - mx) * ratio;
+                                points[a1i].y = my + (points[a1i].y - my) * ratio;
+                            }
+                            if !points[a2i].fixed {
+                                points[a2i].x = mx + (points[a2i].x - mx) * ratio;
+                                points[a2i].y = my + (points[a2i].y - my) * ratio;
+                            }
+                        }
+                    }
+                }
+            }
+            // PointOnLine: project the point onto the line.
+            Constraint::PointOnLine { point, line, .. } => {
+                if let Some(l) = lines.iter().find(|l| &l.id == line) {
+                    if let (Some(&pi), Some(&ai), Some(&bi)) = (
+                        pts.get(point.as_str()), pts.get(l.a.as_str()), pts.get(l.b.as_str()),
+                    ) {
+                        if points[pi].fixed { return; }
+                        let dx = points[bi].x - points[ai].x;
+                        let dy = points[bi].y - points[ai].y;
+                        let len2 = dx * dx + dy * dy;
+                        if len2 < 1e-24 { return; }
+                        let t = ((points[pi].x - points[ai].x) * dx
+                            + (points[pi].y - points[ai].y) * dy) / len2;
+                        points[pi].x = points[ai].x + t * dx;
+                        points[pi].y = points[ai].y + t * dy;
+                    }
+                }
+            }
+            // Perpendicular: rotate the shorter line to be perpendicular to the longer one.
+            Constraint::Perpendicular { a, b, .. } => {
+                let la = lines.iter().find(|l| &l.id == a);
+                let lb = lines.iter().find(|l| &l.id == b);
+                if let (Some(la), Some(lb)) = (la, lb) {
+                    if let (Some(&a1i), Some(&a2i), Some(&b1i), Some(&b2i)) = (
+                        pts.get(la.a.as_str()), pts.get(la.b.as_str()),
+                        pts.get(lb.a.as_str()), pts.get(lb.b.as_str()),
+                    ) {
+                        let dax = points[a2i].x - points[a1i].x;
+                        let day = points[a2i].y - points[a1i].y;
+                        let len_a = dax.hypot(day);
+                        let dbx = points[b2i].x - points[b1i].x;
+                        let dby = points[b2i].y - points[b1i].y;
+                        let len_b = dbx.hypot(dby);
+                        if len_a < 1e-12 || len_b < 1e-12 { return; }
+                        // Rotate the shorter line to be perpendicular to the longer.
+                        // Perpendicular direction of a: (-day, dax)/len_a
+                        if len_b <= len_a {
+                            // Rotate b to be perp to a, preserving b's length and start point.
+                            let perp_x = -day / len_a;
+                            let perp_y = dax / len_a;
+                            // Choose sign that's closest to current b direction.
+                            let dot = dbx * perp_x + dby * perp_y;
+                            let sign = if dot >= 0.0 { 1.0 } else { -1.0 };
+                            if !points[b2i].fixed {
+                                points[b2i].x = points[b1i].x + sign * perp_x * len_b;
+                                points[b2i].y = points[b1i].y + sign * perp_y * len_b;
+                            }
+                        } else {
+                            let perp_x = -dby / len_b;
+                            let perp_y = dbx / len_b;
+                            let dot = dax * perp_x + day * perp_y;
+                            let sign = if dot >= 0.0 { 1.0 } else { -1.0 };
+                            if !points[a2i].fixed {
+                                points[a2i].x = points[a1i].x + sign * perp_x * len_a;
+                                points[a2i].y = points[a1i].y + sign * perp_y * len_a;
+                            }
+                        }
+                    }
+                }
+            }
+            // Parallel: rotate the shorter line to be parallel to the longer one.
+            Constraint::Parallel { a, b, .. } => {
+                let la = lines.iter().find(|l| &l.id == a);
+                let lb = lines.iter().find(|l| &l.id == b);
+                if let (Some(la), Some(lb)) = (la, lb) {
+                    if let (Some(&a1i), Some(&a2i), Some(&b1i), Some(&b2i)) = (
+                        pts.get(la.a.as_str()), pts.get(la.b.as_str()),
+                        pts.get(lb.a.as_str()), pts.get(lb.b.as_str()),
+                    ) {
+                        let dax = points[a2i].x - points[a1i].x;
+                        let day = points[a2i].y - points[a1i].y;
+                        let len_a = dax.hypot(day);
+                        let dbx = points[b2i].x - points[b1i].x;
+                        let dby = points[b2i].y - points[b1i].y;
+                        let len_b = dbx.hypot(dby);
+                        if len_a < 1e-12 || len_b < 1e-12 { return; }
+                        // Rotate the shorter line to be parallel to the longer.
+                        if len_b <= len_a {
+                            let dir_x = dax / len_a;
+                            let dir_y = day / len_a;
+                            let dot = dbx * dir_x + dby * dir_y;
+                            let sign = if dot >= 0.0 { 1.0 } else { -1.0 };
+                            if !points[b2i].fixed {
+                                points[b2i].x = points[b1i].x + sign * dir_x * len_b;
+                                points[b2i].y = points[b1i].y + sign * dir_y * len_b;
+                            }
+                        } else {
+                            let dir_x = dbx / len_b;
+                            let dir_y = dby / len_b;
+                            let dot = dax * dir_x + day * dir_y;
+                            let sign = if dot >= 0.0 { 1.0 } else { -1.0 };
+                            if !points[a2i].fixed {
+                                points[a2i].x = points[a1i].x + sign * dir_x * len_a;
+                                points[a2i].y = points[a1i].y + sign * dir_y * len_a;
+                            }
+                        }
+                    }
+                }
+            }
+            // Midpoint: move the point to the midpoint of the line.
+            Constraint::Midpoint { point, line, .. } => {
+                if let Some(l) = lines.iter().find(|l| &l.id == line) {
+                    if let (Some(&pi), Some(&ai), Some(&bi)) = (
+                        pts.get(point.as_str()), pts.get(l.a.as_str()), pts.get(l.b.as_str()),
+                    ) {
+                        if points[pi].fixed { return; }
+                        points[pi].x = (points[ai].x + points[bi].x) * 0.5;
+                        points[pi].y = (points[ai].y + points[bi].y) * 0.5;
                     }
                 }
             }
@@ -961,6 +2083,7 @@ pub fn analyze_solution(
         constraint_residuals,
         redundant_constraint_ids,
         conflicting_constraint_ids,
+        solve_trail: lm::trail_take(),
     }
 }
 

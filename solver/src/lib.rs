@@ -1,4 +1,4 @@
-mod constraints;
+pub mod constraints;
 mod solver;
 pub mod types;
 
