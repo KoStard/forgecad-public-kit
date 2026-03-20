@@ -467,17 +467,16 @@ fn linearize(
         let v = &vars[col];
         let base_val = get_var(col, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
         let step = fd_step(base_val, v.scale);
+        let is_group = sparsity.group_var_cols.contains(&col);
 
+        // Central differences: evaluate at x+h and x-h, derivative = (f(x+h) - f(x-h)) / (2h)
+        // Collect forward residuals (x+h).
         set_var(col, base_val + step, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+        if is_group { resolve_group_points(points, groups); }
 
-        // If this is a group variable, resolve group points after perturbation.
-        if sparsity.group_var_cols.contains(&col) {
-            resolve_group_points(points, groups);
-        }
-
-        // Sparse: only evaluate affected constraints.
+        let mut fwd_constraint_res: Vec<(usize, usize, Vec<f64>)> = Vec::new();
         for &(row_start, row_count) in &sparsity.var_to_constraint_rows[col] {
-            if analytic_rows.contains_key(&row_start) && !sparsity.group_var_cols.contains(&col) {
+            if analytic_rows.contains_key(&row_start) && !is_group {
                 continue;
             }
             let ci = constraint_index_at_row(row_start, constraints, points, lines, circles, arcs, shapes);
@@ -485,15 +484,11 @@ fn linearize(
                 let res = crate::constraints::constraint_residual_impl(
                     &constraints[ci], points, lines, circles, arcs, shapes,
                 );
-                for r in 0..row_count {
-                    if let (Some(pv), Some(bv)) = (res.get(r), base.get(row_start + r)) {
-                        jacobian[row_start + r][col] = (pv - bv) / step;
-                    }
-                }
+                fwd_constraint_res.push((row_start, row_count, res));
             }
         }
 
-        // Arc consistency rows.
+        let mut fwd_arc_res: Vec<(usize, f64, f64)> = Vec::new();
         for &arc_row_0 in &sparsity.var_to_arc_rows[col] {
             let ai = (arc_row_0 - sparsity.arc_row_start) / 2;
             let arc = &arcs[ai];
@@ -503,21 +498,63 @@ fn linearize(
             if let (Some(center), Some(start), Some(end)) = (center, start, end) {
                 let r0 = (start.x - center.x).hypot(start.y - center.y) - arc.radius;
                 let r1 = (end.x - center.x).hypot(end.y - center.y) - arc.radius;
-                if let Some(bv) = base.get(arc_row_0) {
-                    jacobian[arc_row_0][col] = (r0 - bv) / step;
-                }
-                if let Some(bv) = base.get(arc_row_0 + 1) {
-                    jacobian[arc_row_0 + 1][col] = (r1 - bv) / step;
+                fwd_arc_res.push((arc_row_0, r0, r1));
+            }
+        }
+
+        // Collect backward residuals (x-h).
+        set_var(col, base_val - step, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+        if is_group { resolve_group_points(points, groups); }
+
+        let two_h = 2.0 * step;
+        let mut bwd_idx = 0usize;
+        for &(row_start, row_count) in &sparsity.var_to_constraint_rows[col] {
+            if analytic_rows.contains_key(&row_start) && !is_group {
+                continue;
+            }
+            let ci = constraint_index_at_row(row_start, constraints, points, lines, circles, arcs, shapes);
+            if let Some(ci) = ci {
+                let res = crate::constraints::constraint_residual_impl(
+                    &constraints[ci], points, lines, circles, arcs, shapes,
+                );
+                if bwd_idx < fwd_constraint_res.len() {
+                    let (fwd_row_start, fwd_row_count, ref fwd_res) = fwd_constraint_res[bwd_idx];
+                    if fwd_row_start == row_start && fwd_row_count == row_count {
+                        for r in 0..row_count {
+                            if let (Some(fv), Some(bv)) = (fwd_res.get(r), res.get(r)) {
+                                jacobian[row_start + r][col] = (fv - bv) / two_h;
+                            }
+                        }
+                    }
+                    bwd_idx += 1;
                 }
             }
         }
 
-        set_var(col, base_val, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
-
-        // If this is a group variable, resolve group points after restoration.
-        if sparsity.group_var_cols.contains(&col) {
-            resolve_group_points(points, groups);
+        let mut bwd_arc_idx = 0usize;
+        for &arc_row_0 in &sparsity.var_to_arc_rows[col] {
+            let ai = (arc_row_0 - sparsity.arc_row_start) / 2;
+            let arc = &arcs[ai];
+            let center = pts_map.get(&arc.center).map(|&i| &points[i]);
+            let start = pts_map.get(&arc.start).map(|&i| &points[i]);
+            let end = pts_map.get(&arc.end).map(|&i| &points[i]);
+            if let (Some(center), Some(start), Some(end)) = (center, start, end) {
+                let r0 = (start.x - center.x).hypot(start.y - center.y) - arc.radius;
+                let r1 = (end.x - center.x).hypot(end.y - center.y) - arc.radius;
+                if bwd_arc_idx < fwd_arc_res.len() {
+                    let (fwd_row, fwd_r0, fwd_r1) = fwd_arc_res[bwd_arc_idx];
+                    if fwd_row == arc_row_0 {
+                        jacobian[arc_row_0][col] = (fwd_r0 - r0) / two_h;
+                        jacobian[arc_row_0 + 1][col] = (fwd_r1 - r1) / two_h;
+                    }
+                    bwd_arc_idx += 1;
+                }
+            }
         }
+
+        // Restore original value.
+        set_var(col, base_val, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+        if is_group { resolve_group_points(points, groups); }
 
         let _ = (&pts_map, &circs_map, &arcs_map_idx);
     }
@@ -845,6 +882,184 @@ fn seed_restart(
     resolve_group_points(points, groups);
 }
 
+// ─── Null-space restart ───────────────────────────────────────────────────────
+
+fn seed_nullspace_restart(
+    points: &mut Vec<Point>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    groups: &mut Vec<SketchGroup>,
+    best_state: &Vec<f64>,
+    pt_var_idx: &Vec<usize>,
+    circ_var_idx: &Vec<usize>,
+    arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
+    nullspace_basis: &Vec<Vec<f64>>,
+    attempt: u32,
+    reference_length: f64,
+) {
+    apply_state(best_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+
+    let n = best_state.len();
+    let scale = reference_length * 0.2;
+    let golden_angle = 2.399963229728653f64;
+
+    // Build a random unit vector in the null space using golden-angle seeded coefficients.
+    let k = nullspace_basis.len();
+    let mut perturbation = vec![0.0f64; n];
+    let mut norm2 = 0.0f64;
+    for (i, basis_vec) in nullspace_basis.iter().enumerate() {
+        let coeff = ((attempt as f64 * 1.37 + i as f64) * golden_angle).sin();
+        for j in 0..n {
+            perturbation[j] += coeff * basis_vec[j];
+        }
+        norm2 += coeff * coeff;
+    }
+
+    let norm = norm2.sqrt().max(1e-12);
+    let amplitude = scale * (1.0 + 0.3 * (attempt.min(4) as f64));
+
+    // Apply perturbation to state.
+    let mut new_state = best_state.clone();
+    for j in 0..n {
+        new_state[j] += (perturbation[j] / norm) * amplitude;
+    }
+
+    apply_state(&new_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+}
+
+// ─── Null-space computation ───────────────────────────────────────────────────
+
+/// Compute approximate null-space basis of J^T·J via symmetric eigendecomposition.
+/// Returns eigenvectors whose eigenvalues are below `threshold × max_eigenvalue`.
+fn compute_nullspace_basis(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+    groups: &mut Vec<SketchGroup>,
+    vars: &Vec<Variable>,
+    pt_var_idx: &Vec<usize>,
+    circ_var_idx: &Vec<usize>,
+    arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
+    sparsity: &SparsityMap,
+    n_rows: usize,
+) -> Vec<Vec<f64>> {
+    let n = vars.len();
+    if n == 0 || n > 200 {
+        return Vec::new(); // Skip for very large systems.
+    }
+
+    let lin = match linearize(
+        points, lines, circles, arcs, shapes, constraints, groups,
+        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows,
+    ) {
+        Some(l) => l,
+        None => return Vec::new(),
+    };
+
+    // Build J^T·J from weighted Jacobian.
+    let wj = &lin.weighted_jacobian;
+    let n_eq = wj.len();
+    let mut jtj = vec![vec![0.0f64; n]; n];
+    for row in 0..n_eq {
+        for i in 0..n {
+            if wj[row][i] == 0.0 { continue; }
+            for j in 0..=i {
+                jtj[i][j] += wj[row][i] * wj[row][j];
+            }
+        }
+    }
+    // Symmetrize.
+    for i in 0..n {
+        for j in 0..i {
+            jtj[j][i] = jtj[i][j];
+        }
+    }
+
+    // Jacobi eigenvalue algorithm for symmetric matrix.
+    let mut a = jtj;
+    let mut v = vec![vec![0.0f64; n]; n]; // Eigenvectors as columns.
+    for i in 0..n { v[i][i] = 1.0; }
+
+    for _ in 0..100 {
+        // Find largest off-diagonal element.
+        let mut max_off = 0.0f64;
+        let mut p = 0;
+        let mut q = 1;
+        for i in 0..n {
+            for j in (i+1)..n {
+                let val = a[i][j].abs();
+                if val > max_off {
+                    max_off = val;
+                    p = i;
+                    q = j;
+                }
+            }
+        }
+        if max_off < 1e-14 { break; }
+
+        // Compute rotation angle.
+        let diff = a[q][q] - a[p][p];
+        let t = if diff.abs() < 1e-30 {
+            1.0f64
+        } else {
+            let tau = diff / (2.0 * a[p][q]);
+            let sign = if tau >= 0.0 { 1.0 } else { -1.0 };
+            sign / (tau.abs() + (1.0 + tau * tau).sqrt())
+        };
+        let c = 1.0 / (1.0 + t * t).sqrt();
+        let s = t * c;
+
+        // Apply rotation to A.
+        let app = a[p][p] - t * a[p][q];
+        let aqq = a[q][q] + t * a[p][q];
+        a[p][p] = app;
+        a[q][q] = aqq;
+        a[p][q] = 0.0;
+        a[q][p] = 0.0;
+        for r in 0..n {
+            if r == p || r == q { continue; }
+            let arp = a[r][p];
+            let arq = a[r][q];
+            a[r][p] = c * arp - s * arq;
+            a[p][r] = a[r][p];
+            a[r][q] = s * arp + c * arq;
+            a[q][r] = a[r][q];
+        }
+
+        // Update eigenvectors.
+        for r in 0..n {
+            let vrp = v[r][p];
+            let vrq = v[r][q];
+            v[r][p] = c * vrp - s * vrq;
+            v[r][q] = s * vrp + c * vrq;
+        }
+    }
+
+    // Collect eigenvalues (diagonal of a).
+    let eigenvalues: Vec<f64> = (0..n).map(|i| a[i][i].max(0.0)).collect();
+    let max_eig = eigenvalues.iter().copied().fold(0.0f64, f64::max);
+    if max_eig < 1e-15 { return Vec::new(); }
+
+    let threshold = 1e-6 * max_eig;
+    let mut basis = Vec::new();
+    for j in 0..n {
+        if eigenvalues[j] < threshold {
+            let eigvec: Vec<f64> = (0..n).map(|i| v[i][j]).collect();
+            let norm = eigvec.iter().map(|x| x * x).sum::<f64>().sqrt();
+            if norm > 1e-12 {
+                basis.push(eigvec.iter().map(|x| x / norm).collect());
+            }
+        }
+    }
+
+    basis
+}
+
 // ─── Main LM outer loop ───────────────────────────────────────────────────────
 
 pub fn solve_global(
@@ -882,13 +1097,23 @@ pub fn solve_global(
     let initial_state = capture_state(points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len());
     let mut best_state = initial_state.clone();
     let mut best_error = f64::INFINITY;
+    let mut nullspace_basis: Vec<Vec<f64>> = Vec::new();
 
     for attempt in 0..restarts {
-        seed_restart(
-            points, circles, arcs, groups, &initial_state,
-            &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
-            attempt, ref_len,
-        );
+        if attempt > 0 && !nullspace_basis.is_empty() {
+            // Null-space restart: perturb along constraint-satisfying directions.
+            seed_nullspace_restart(
+                points, circles, arcs, groups, &best_state,
+                &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
+                &nullspace_basis, attempt, ref_len,
+            );
+        } else {
+            seed_restart(
+                points, circles, arcs, groups, &initial_state,
+                &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
+                attempt, ref_len,
+            );
+        }
 
         if attempt == 0 {
             projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, warm_start_iters, tolerance);
@@ -909,6 +1134,16 @@ pub fn solve_global(
             best_state = capture_state(points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len());
         }
         if best_error <= tolerance { break; }
+
+        // After the first failed attempt, compute null space at the best state for smarter restarts.
+        if attempt == 0 && best_error > tolerance {
+            apply_state(&best_state, points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx);
+            nullspace_basis = compute_nullspace_basis(
+                points, lines, circles, arcs, shapes, constraints, groups,
+                &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
+                &sparsity, n_rows,
+            );
+        }
     }
 
     // GS escape: 3 rounds of GS warm-start + another LM pass.
@@ -976,6 +1211,8 @@ fn run_lm_pass(
     let mut best_pass_error = lin.max_abs;
     let mut best_pass_disp = scaled_state_displacement(&best_pass_state, anchor_state, scale);
 
+    let mut consecutive_rejects = 0u32;
+
     for _ in 0..iterations {
         if lin.max_abs <= tolerance { break; }
 
@@ -992,73 +1229,57 @@ fn run_lm_pass(
             Some(s) => s,
             None => break,
         };
-        let mut dx = limit_step(step.dx.clone(), scale, max_scaled_step);
-        let mut pred = step.predicted_reduction
+        let dx = limit_step(step.dx.clone(), scale, max_scaled_step);
+        let pred = step.predicted_reduction
             * (1.0_f64).min(max_scaled_step / scaled_step_norm(&step.dx, scale).max(max_scaled_step));
 
-        let mut accepted = false;
-        let mut local_lambda = lambda;
-        let mut local_nu = nu;
+        // Nielsen update: one trial step per outer iteration.
+        let trial_state: Vec<f64> = state.iter().zip(&dx).map(|(s, d)| s + d).collect();
+        apply_state(&trial_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
 
-        for _ in 0..12 {
-            let trial_state: Vec<f64> = state.iter().zip(&dx).map(|(s, d)| s + d).collect();
-            apply_state(&trial_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
-
-            let trial = match linearize(
-                points, lines, circles, arcs, shapes, constraints, groups,
-                vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows,
-            ) {
-                Some(l) => l,
-                None => {
-                    apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
-                    break;
-                }
-            };
-
-            let actual = lin.weighted_cost - trial.weighted_cost;
-            let rho = if pred > 0.0 { actual / pred } else { 0.0 };
-
-            if actual > 0.0 {
-                accepted = true;
-                lambda = if rho > 0.0 {
-                    let factor = 1.0 - (2.0 * rho - 1.0).powi(3);
-                    local_lambda * (1.0_f64 / 3.0).max(factor)
-                } else {
-                    local_lambda
-                };
-                nu = 2.0;
-                let trial_disp = scaled_state_displacement(&trial_state, anchor_state, scale);
-                if trial.max_abs + 1e-9 < best_pass_error
-                    || (trial.max_abs <= best_pass_error + tolerance * 0.25 && trial_disp < best_pass_disp)
-                {
-                    best_pass_error = trial.max_abs;
-                    best_pass_disp = trial_disp;
-                    best_pass_state = trial_state.clone();
-                }
-                lin = trial;
-                break;
+        let trial = match linearize(
+            points, lines, circles, arcs, shapes, constraints, groups,
+            vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows,
+        ) {
+            Some(l) => l,
+            None => {
+                apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+                // Reject: increase damping.
+                lambda *= nu;
+                nu *= 2.0;
+                consecutive_rejects += 1;
+                if consecutive_rejects >= 12 { break; }
+                continue;
             }
+        };
 
+        let actual = lin.weighted_cost - trial.weighted_cost;
+        let rho = if pred > 0.0 { actual / pred } else { 0.0 };
+
+        if actual > 0.0 {
+            // Accept: Nielsen lambda update.
+            let factor = 1.0 - (2.0 * rho - 1.0).powi(3);
+            lambda *= (1.0_f64 / 3.0).max(factor);
+            nu = 2.0;
+            consecutive_rejects = 0;
+
+            let trial_disp = scaled_state_displacement(&trial_state, anchor_state, scale);
+            if trial.max_abs + 1e-9 < best_pass_error
+                || (trial.max_abs <= best_pass_error + tolerance * 0.25 && trial_disp < best_pass_disp)
+            {
+                best_pass_error = trial.max_abs;
+                best_pass_disp = trial_disp;
+                best_pass_state = trial_state.clone();
+            }
+            lin = trial;
+        } else {
+            // Reject: restore state, increase damping.
             apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
-            local_lambda *= local_nu;
-            local_nu *= 2.0;
-
-            let retry = match lm_step(
-                &lin.weighted_jacobian,
-                &lin.weighted_residual,
-                local_lambda,
-                Some(&prior_offset),
-                prior_diag,
-            ) {
-                Some(s) => s,
-                None => break,
-            };
-            dx = limit_step(retry.dx.clone(), scale, max_scaled_step);
-            pred = retry.predicted_reduction
-                * (1.0_f64).min(max_scaled_step / scaled_step_norm(&retry.dx, scale).max(max_scaled_step));
+            lambda *= nu;
+            nu *= 2.0;
+            consecutive_rejects += 1;
+            if consecutive_rejects >= 12 { break; }
         }
-
-        if !accepted { break; }
     }
 
     apply_state(&best_pass_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);

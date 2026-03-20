@@ -628,6 +628,7 @@ fn arc_consistency_maintained() {
             circles: vec![],
             arcs: vec![a],
             shapes: vec![],
+            groups: vec![],
             constraints: vec![
                 Constraint::Fixed { id: "fc".into(), point: "c".into(), x: 0.0, y: 0.0 },
                 Constraint::Fixed { id: "fs".into(), point: "s".into(), x: 10.0, y: 0.0 },

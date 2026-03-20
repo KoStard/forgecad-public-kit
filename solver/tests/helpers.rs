@@ -36,6 +36,7 @@ pub fn problem(
         circles: vec![],
         arcs: vec![],
         shapes: vec![],
+        groups: vec![],
         constraints,
         options: None,
     }
@@ -53,6 +54,7 @@ pub fn problem_with_circles(
         circles,
         arcs: vec![],
         shapes: vec![],
+        groups: vec![],
         constraints,
         options: None,
     }
@@ -71,6 +73,7 @@ pub fn problem_with_arcs(
         circles,
         arcs,
         shapes: vec![],
+        groups: vec![],
         constraints,
         options: None,
     }

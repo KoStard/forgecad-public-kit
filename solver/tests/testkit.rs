@@ -32,6 +32,7 @@ impl TestSketch {
                 circles: Vec::new(),
                 arcs: Vec::new(),
                 shapes: Vec::new(),
+                groups: Vec::new(),
                 constraints: Vec::new(),
                 options: None,
             },
