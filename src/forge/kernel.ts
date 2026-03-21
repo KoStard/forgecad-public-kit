@@ -58,6 +58,7 @@ import {
 } from './shapeBackend';
 import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
 import { lowerShapeCompilePlanToOCCTBackend, OCCTUnsupportedError } from './compilePlanOCCT';
+import { isOCCTShapeBackend } from './occtShapeBackend';
 import { initOCCT } from './occtInit';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
@@ -1484,9 +1485,25 @@ function normalizePoint3(value: unknown, apiName: string, index: number): [numbe
   throw new Error(`${apiName} argument ${index}: expected a [x, y, z] point, got ${describeApiArg(value)}`);
 }
 
+function requireManifoldOrConvert(backend: ShapeBackend, apiName: string): Manifold {
+  if (isOCCTShapeBackend(backend)) {
+    const wasm = getWasm();
+    const mesh = backend.getMesh();
+    const wasmMesh = new wasm.Mesh({
+      numProp: mesh.numProp,
+      triVerts: mesh.triVerts,
+      vertProperties: mesh.vertProperties,
+      mergeFromVert: mesh.mergeFromVert,
+      mergeToVert: mesh.mergeToVert,
+    });
+    return new wasm.Manifold(wasmMesh);
+  }
+  return requireManifoldShapeBackend(backend, apiName);
+}
+
 function requireManifoldOperands(apiName: string, shapes: Shape[]): Manifold[] {
   return shapes.map((shape, index) =>
-    requireManifoldShapeBackend(getShapeRuntimeBackendInternal(shape), `${apiName} operand ${index + 1}`));
+    requireManifoldOrConvert(getShapeRuntimeBackendInternal(shape), `${apiName} operand ${index + 1}`));
 }
 
 // --- Boolean helpers ---
@@ -1575,7 +1592,7 @@ export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]
     if (arg instanceof Shape || (arg && typeof arg === 'object' && typeof (arg as { toShape?: unknown }).toShape === 'function')) {
       const shape = unwrapShapeLike(arg);
       shapeArgs.push(shape);
-      return requireManifoldShapeBackend(getShapeRuntimeBackendInternal(shape), `hull3d() shape ${shapeArgs.length}`);
+      return requireManifoldOrConvert(getShapeRuntimeBackendInternal(shape), `hull3d() shape ${shapeArgs.length}`);
     }
     const point = normalizePoint3(arg, 'hull3d()', index + 1);
     pointArgs.push(point);

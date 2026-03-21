@@ -89,9 +89,31 @@ function extractMeshFromShape(
     expl.Next();
   }
 
-  // Build Manifold-compatible mesh format
+  // OCCT tessellates each face independently — shared edges produce
+  // duplicate vertices. Manifold requires a watertight mesh, so we must
+  // weld coincident vertices via mergeFromVert / mergeToVert.
+  const EPS = 1e-8;
   const vertProperties = new Float32Array(allPositions);
   const triVerts = new Uint32Array(allIndices);
+
+  // Build a spatial hash to find coincident vertices
+  const mergeFrom: number[] = [];
+  const mergeTo: number[] = [];
+  const vertMap = new Map<string, number>();
+  for (let i = 0; i < totalVerts; i++) {
+    const x = allPositions[i * 3];
+    const y = allPositions[i * 3 + 1];
+    const z = allPositions[i * 3 + 2];
+    // Quantize to EPS grid for hash-based welding
+    const key = `${Math.round(x / EPS)}:${Math.round(y / EPS)}:${Math.round(z / EPS)}`;
+    const existing = vertMap.get(key);
+    if (existing !== undefined && existing !== i) {
+      mergeFrom.push(i);
+      mergeTo.push(existing);
+    } else {
+      vertMap.set(key, i);
+    }
+  }
 
   return {
     numProp: 3,
@@ -99,9 +121,8 @@ function extractMeshFromShape(
     triVerts,
     vertProperties,
     numVert: totalVerts,
-    // Manifold mesh includes merge data — OCCT doesn't need it, provide empty
-    mergeFromVert: new Uint32Array(0),
-    mergeToVert: new Uint32Array(0),
+    mergeFromVert: new Uint32Array(mergeFrom),
+    mergeToVert: new Uint32Array(mergeTo),
     runIndex: new Uint32Array([0, totalTris]),
     runOriginalID: new Uint32Array([0]),
     runTransform: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]),
@@ -146,7 +167,6 @@ function applyTransform(oc: OCCTModule, shape: any, m: Mat4): any {
     m[0], m[4], m[8], m[12],
     m[1], m[5], m[9], m[13],
     m[2], m[6], m[10], m[14],
-    1e-10, // tolerance
   );
   const transformed = new oc.BRepBuilderAPI_Transform_2(shape, trsf, true);
   return transformed.Shape();

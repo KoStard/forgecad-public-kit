@@ -22,6 +22,8 @@ export function buildSceneBuilderPayloadForShape(
       numProp: mesh.numProp,
       triVerts: mesh.triVerts,
       vertProperties: mesh.vertProperties,
+      mergeFromVert: mesh.mergeFromVert,
+      mergeToVert: mesh.mergeToVert,
     });
     manifold = new wasm.Manifold(wasmMesh);
   } else {

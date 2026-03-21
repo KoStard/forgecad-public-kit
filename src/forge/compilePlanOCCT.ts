@@ -231,7 +231,6 @@ function applyShapeTransform(oc: OCCTModule, shape: any, step: ShapeCompileTrans
         mat[0], mat[4], mat[8], mat[12],
         mat[1], mat[5], mat[9], mat[13],
         mat[2], mat[6], mat[10], mat[14],
-        1e-10,
       );
       break;
     }
@@ -258,7 +257,6 @@ function applyShapeTransform(oc: OCCTModule, shape: any, step: ShapeCompileTrans
         mat[0], mat[4], mat[8], mat[12],
         mat[1], mat[5], mat[9], mat[13],
         mat[2], mat[6], mat[10], mat[14],
-        1e-10,
       );
       break;
     }
@@ -274,7 +272,6 @@ function applyShapeTransform(oc: OCCTModule, shape: any, step: ShapeCompileTrans
         m[0], m[4], m[8], m[12],
         m[1], m[5], m[9], m[13],
         m[2], m[6], m[10], m[14],
-        1e-10,
       );
       break;
     }
