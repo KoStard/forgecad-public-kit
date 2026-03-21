@@ -113,7 +113,7 @@ fn build_variables(
         vars.push(Variable { entity_id: a.id.clone(), scale });
     }
 
-    // Group frame variables.
+    // Group frame + param variables.
     for g in groups.iter() {
         if g.fixed {
             group_var_idx.push(usize::MAX);
@@ -123,6 +123,10 @@ fn build_variables(
             vars.push(Variable { entity_id: g.id.clone(), scale }); // gy
             if !g.fixed_rotation {
                 vars.push(Variable { entity_id: g.id.clone(), scale: 1.0 }); // gθ (radians)
+            }
+            // Shape parameter variables (parameterized groups).
+            for _pi in 0..g.params.len() {
+                vars.push(Variable { entity_id: g.id.clone(), scale });
             }
         }
     }
@@ -161,8 +165,13 @@ fn capture_state(
         if vi != usize::MAX {
             state[vi] = g.x;
             state[vi + 1] = g.y;
+            let mut offset = 2;
             if !g.fixed_rotation {
-                state[vi + 2] = g.theta;
+                state[vi + offset] = g.theta;
+                offset += 1;
+            }
+            for (pi, &pv) in g.params.iter().enumerate() {
+                state[vi + offset + pi] = pv;
             }
         }
     }
@@ -199,9 +208,15 @@ fn apply_state(
         if vi != usize::MAX {
             g.x = state[vi];
             g.y = state[vi + 1];
+            let mut offset = 2;
             if !g.fixed_rotation {
-                g.theta = state[vi + 2];
+                g.theta = state[vi + offset];
+                offset += 1;
             }
+            for pi in 0..g.params.len() {
+                g.params[pi] = state[vi + offset + pi];
+            }
+            g.update_local_coords_from_params();
         }
     }
     // Resolve group-owned points to world coordinates.
@@ -380,15 +395,20 @@ fn build_sparsity(
         }
     }
 
-    // Build the set of all group variable columns.
+    // Build the set of all group variable columns (frame + params).
     let mut group_var_cols: HashSet<usize> = HashSet::new();
     for (gi, g) in groups.iter().enumerate() {
         let vi = group_var_idx[gi];
         if vi != usize::MAX {
             group_var_cols.insert(vi);     // gx
             group_var_cols.insert(vi + 1); // gy
+            let mut offset = 2;
             if !g.fixed_rotation {
-                group_var_cols.insert(vi + 2); // gθ
+                group_var_cols.insert(vi + offset); // gθ
+                offset += 1;
+            }
+            for pi in 0..g.params.len() {
+                group_var_cols.insert(vi + offset + pi); // param
             }
         }
     }
@@ -418,14 +438,19 @@ fn build_sparsity(
                 }
             }
         } else if let Some(&gi) = group_point_to_group_idx.get(&p.id) {
-            // Group-owned point — maps to the group's frame variables.
+            // Group-owned point — maps to the group's frame + param variables.
             let gvi = group_var_idx[gi];
             if gvi != usize::MAX {
                 let entry = entity_to_vars.entry(p.id.clone()).or_default();
                 entry.push(gvi);     // gx
                 entry.push(gvi + 1); // gy
+                let mut offset = 2;
                 if !groups[gi].fixed_rotation {
-                    entry.push(gvi + 2); // gθ
+                    entry.push(gvi + offset); // gθ
+                    offset += 1;
+                }
+                for pi in 0..groups[gi].params.len() {
+                    entry.push(gvi + offset + pi); // param
                 }
             }
         }
@@ -839,8 +864,14 @@ fn linearize(
             if vi != usize::MAX {
                 map[vi] = (4, i);       // group.x
                 map[vi + 1] = (5, i);   // group.y
+                let mut offset = 2;
                 if !groups[i].fixed_rotation {
-                    map[vi + 2] = (6, i); // group.theta
+                    map[vi + offset] = (6, i); // group.theta
+                    offset += 1;
+                }
+                // Param vars: kind=7, idx = group_idx * 256 + param_idx
+                for pi in 0..groups[i].params.len() {
+                    map[vi + offset + pi] = (7, i * 256 + pi);
                 }
             }
         }
@@ -1117,6 +1148,11 @@ fn get_var_fast(
         4 => groups[idx].x,
         5 => groups[idx].y,
         6 => groups[idx].theta,
+        7 => {
+            let gi = idx / 256;
+            let pi = idx % 256;
+            groups[gi].params[pi]
+        }
         _ => 0.0,
     }
 }
@@ -1153,6 +1189,12 @@ fn set_var_fast(
         4 => groups[idx].x = value,
         5 => groups[idx].y = value,
         6 => groups[idx].theta = value,
+        7 => {
+            let gi = idx / 256;
+            let pi = idx % 256;
+            groups[gi].params[pi] = value;
+            groups[gi].update_local_coords_from_params();
+        }
         _ => {}
     }
 }
