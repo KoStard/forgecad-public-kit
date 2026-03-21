@@ -10,7 +10,7 @@ import { collectProjectFiles } from "./collect-files";
 import { materializeNotebookPreviewScript } from "./notebook-entry";
 import type { Shape } from "../src/forge/kernel";
 import { lastSolveProfile } from "../src/forge/sketch/constraints/sketch";
-import { lastSolverProfile, getSolverStats, resetSolverStats } from "../src/forge/sketch/constraints/registry";
+import { lastSolverProfile, getSolverStats, resetSolverStats, getLastSolveTrail } from "../src/forge/sketch/constraints/registry";
 import { getLastRustProfile } from "../src/forge/sketch/constraints/solver-wasm";
 
 type ShapeEntry = { name: string; shape: Shape; min: number[]; max: number[]; groupName?: string };
@@ -365,6 +365,9 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       console.log(`    lm_total:        ${us('lm_total_us')}ms`);
       console.log(`    analyze:         ${us('analyze_solution_us')}ms`);
       console.log(`    progressive:     ${us('progressive_total_us')}ms  (${rustProfile.progressive_steps ?? 0} steps)`);
+      if (rustProfile.bottom_up_clusters > 0) {
+        console.log(`    bottom-up:       ${rustProfile.bottom_up_clusters} clusters, internal=${us('bottom_up_internal_us')}ms, bridge=${us('bottom_up_bridge_us')}ms`);
+      }
       console.log(`    --- LM internals ---`);
       console.log(`    linearize:       ${us('linearize_us')}ms  (${rustProfile.linearize_count ?? 0} calls)`);
       console.log(`      residuals:     ${us('linearize_residual_us')}ms`);
@@ -378,6 +381,14 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       console.log(`    gs_escape:       ${rustProfile.gs_escape_rounds ?? 0} rounds`);
       console.log(`    problem size:    ${rustProfile.n_vars ?? 0} vars × ${rustProfile.n_rows ?? 0} rows, ${rustProfile.n_constraints ?? 0} constraints, ${rustProfile.n_points ?? 0} points`);
       console.log(`    FD debug:        skipped=${rustProfile.state_capture_count ?? 0} cols, ran=${rustProfile.state_apply_count ?? 0} cols`);
+    }
+    // Print solve trail if available.
+    const trail = getLastSolveTrail();
+    if (trail && trail.length > 0) {
+      console.log(`  Solve trail:`);
+      for (const step of trail) {
+        console.log(`    ${step.phase}: err=${step.error.toFixed(6)}`);
+      }
     }
   } finally {
     materialized.cleanup();
