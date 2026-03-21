@@ -132,14 +132,14 @@ describe('filletEdgeSegment', () => {
       parallel: [0, 0, 1],
       near: [0, 0, 10],
     });
+    const boxVol = box.volume();
     const result = filletEdgeSegment(box, edge, 2);
     expect(result).toBeInstanceOf(Shape);
-    // The boolean fillet approach (cut corner box + union full cylinder) adds
-    // material where the cylinder extends beyond adjacent faces on convex edges.
-    // Net area change per cross-section = (π-1)×r² (cylinder area minus corner area).
-    // This is a known limitation shared with the existing filletEdge() runtime.
-    const expectedChange = (Math.PI - 1) * 4 * 20; // ≈ 171
-    expect(Math.abs(result.volume() - (box.volume() + expectedChange))).toBeLessThan(20);
+    // Crescent approach removes sharp corner, keeps arc surface.
+    // Net loss per cross-section = r² - πr²/4 = (1 - π/4)×r² ≈ 0.215×r²
+    const expectedLoss = (1 - Math.PI / 4) * 4 * 20; // ≈ 17.2
+    expect(result.volume()).toBeLessThan(boxVol);
+    expect(result.volume()).toBeGreaterThan(boxVol - expectedLoss - 5);
   });
 
   test('chamfers a box edge without error', () => {
