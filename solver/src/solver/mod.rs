@@ -230,7 +230,7 @@ fn progressive_solve(
     let plan = classify_constraints(points, lines, constraints, groups);
 
     if plan.clusters.len() >= 2 {
-        // ── Cluster path: solve each shape independently, then full solve ──
+        // ── Cluster path: solve each shape independently, then bridge warm-up ──
         solve_clusters(
             points, lines, circles, arcs, shapes, constraints,
             &plan, groups, tolerance, progressive_deadline_us,
@@ -242,6 +242,80 @@ fn progressive_solve(
                 plan.clusters.len(), plan.bridge_indices.len()),
             cluster_error,
         );
+
+        // Bridge warm-up: progressively apply bridge constraints to position
+        // clusters relative to each other. Internal geometry is already solved
+        // by cluster warm-up, so we only need bridge constraints here.
+        if !plan.bridge_indices.is_empty() {
+            let entity_ref_count = build_entity_ref_count(constraints);
+            let recon_graph = reconstruction::ReconstructionGraph::empty();
+
+            // All cluster-internal constraints (already solved, included to
+            // maintain internal geometry while LM positions clusters).
+            let mut all_internal_indices: Vec<usize> = plan.clusters.iter()
+                .flat_map(|(_, ci)| ci.iter().copied())
+                .collect();
+            all_internal_indices.sort();
+            let internal_constraints: Vec<Constraint> = all_internal_indices.iter()
+                .map(|&ci| constraints[ci].clone())
+                .collect();
+
+            for (bi, &bridge_ci) in plan.bridge_indices.iter().enumerate() {
+                if progressive_deadline_us > 0 && profiler::platform::now_us() >= progressive_deadline_us {
+                    break;
+                }
+
+                // Internal constraints + cumulative bridges.
+                let mut sub = internal_constraints.clone();
+                for &prev_bi in &plan.bridge_indices[..=bi] {
+                    sub.push(constraints[prev_bi].clone());
+                }
+
+                let pts_idx: HashMap<String, usize> = points.iter().enumerate()
+                    .map(|(j, p)| (p.id.clone(), j))
+                    .collect();
+                apply_presolve_constraint(points, lines, &pts_idx, &entity_ref_count, &constraints[bridge_ci], ref_scale);
+                run_analytical_presolve(points, lines, &sub);
+
+                let cr = coord_reduction::build_coord_reduction(points, lines, &sub);
+                for j in 0..points.len() {
+                    if j < cr.repr_x.len() {
+                        let rx = cr.repr_x[j];
+                        if rx != j { points[j].x = points[rx].x; }
+                    }
+                    if j < cr.repr_y.len() {
+                        let ry = cr.repr_y[j];
+                        if ry != j { points[j].y = points[ry].y; }
+                    }
+                }
+
+                resolve_group_points(points, groups);
+
+                let has_residual_c = sub.iter().any(|c| has_residual(c));
+                if !has_residual_c { continue; }
+
+                let step_deadline = if progressive_deadline_us > 0 {
+                    let now = profiler::platform::now_us();
+                    let remaining = progressive_deadline_us.saturating_sub(now);
+                    now + remaining.min(500_000)
+                } else {
+                    0
+                };
+
+                lm::solve_global(
+                    points, lines, circles, arcs, shapes, &sub,
+                    30, tolerance, 1, 4, 2.5,
+                    groups, &recon_graph, step_deadline, None,
+                );
+                profiler::add(|p| p.progressive_steps += 1);
+            }
+
+            let bridge_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
+            lm::trail_push(
+                &format!("bridge-warmup: {} bridges", plan.bridge_indices.len()),
+                bridge_error,
+            );
+        }
     } else {
         // ── Legacy progressive path: single-component or trivial cases ──
         let entity_ref_count = build_entity_ref_count(constraints);
@@ -359,9 +433,37 @@ fn classify_constraints(
     }
 
     // Keep only clusters with ≥4 points (smaller ones aren't worth solving independently).
-    let clusters_by_root: HashMap<usize, Vec<usize>> = components.into_iter()
+    let mut clusters_by_root: HashMap<usize, Vec<usize>> = components.into_iter()
         .filter(|(_, members)| members.len() >= 4)
         .collect();
+
+    // Expand clusters: include points connected via Midpoint constraints where
+    // the line is internal to a cluster. This captures rect center points (connected
+    // to diagonal midpoints) without merging separate shapes.
+    let lines_map: HashMap<&str, &Line> = lines.iter().map(|l| (l.id.as_str(), l)).collect();
+    let mut point_to_root: HashMap<usize, usize> = HashMap::new();
+    for (&root, members) in &clusters_by_root {
+        for &i in members {
+            point_to_root.insert(i, root);
+        }
+    }
+    for c in constraints {
+        if let Constraint::Midpoint { point, line, .. } = c {
+            if let (Some(&pi), Some(l)) = (pt_idx.get(point.as_str()), lines_map.get(line.as_str())) {
+                if let (Some(&ai), Some(&bi)) = (pt_idx.get(l.a.as_str()), pt_idx.get(l.b.as_str())) {
+                    // If both line endpoints are in the same cluster, add the midpoint.
+                    if let (Some(&ra), Some(&rb)) = (point_to_root.get(&ai), point_to_root.get(&bi)) {
+                        if ra == rb && !point_to_root.contains_key(&pi)
+                            && !points[pi].fixed && !group_owned.contains(points[pi].id.as_str())
+                        {
+                            clusters_by_root.get_mut(&ra).unwrap().push(pi);
+                            point_to_root.insert(pi, ra);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Map point index → cluster root (for fast lookup).
     let mut point_to_cluster: HashMap<usize, usize> = HashMap::new();
