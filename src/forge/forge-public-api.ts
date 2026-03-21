@@ -120,6 +120,9 @@ export { jointsView } from './jointsView';
 export { viewConfig } from './viewConfig';
 export { sheetMetal, SheetMetalPart } from './sheetMetal';
 export { intersectWithPlane, projectToPlane } from './section';
+export { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';
+export type { EdgeSegment, EdgeQuery, BoundingRegion } from './edgeQuery';
+export { filletEdgeSegment, chamferEdgeSegment } from './edgeSegmentFeatures';
 
 // `lib` — re-export the partLibrary object as `lib` so its full inferred type
 // (all the gear/pipe/extrusion helpers) is always in sync with library.ts.
