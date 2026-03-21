@@ -12,9 +12,10 @@
  * is a zero-cost BufferGeometry assembly with no CPU work.
  */
 
+import type { Manifold } from 'manifold-3d';
 import { Shape, getWasm } from './kernel';
 import { SHAPE_BACKEND_MARKER, type ShapeBackend, type ShapeRuntimeBounds, type ShapeRuntimeMesh, type ShapeRuntimeCrossSection } from './shapeBackend';
-import { ManifoldShapeBackend } from './backends/manifold/shapeBackend';
+import { ManifoldShapeBackend, type ManifoldCapableBackend } from './backends/manifold/shapeBackend';
 import type { FaceRef } from './sketch/topology';
 import type { FaceTransformationHistory } from './faceHistory';
 import type { SerializedShapeData } from '../workers/evalWorkerProtocol';
@@ -29,7 +30,7 @@ export interface PrecomputedGeometry {
  * A ShapeBackend that serves rendering data from cached TypedArrays and only
  * builds a real Manifold when an actual geometric operation is requested.
  */
-class FrozenShapeBackend implements ShapeBackend {
+class FrozenShapeBackend implements ManifoldCapableBackend {
   readonly [SHAPE_BACKEND_MARKER] = true as const;
 
   private readonly _data: SerializedShapeData;
@@ -123,7 +124,7 @@ class FrozenShapeBackend implements ShapeBackend {
   minGap(other: ShapeBackend, searchLength: number): number { return this.getManifoldBackend().minGap(other, searchLength); }
   slice(offset: number): ShapeRuntimeCrossSection { return this.getManifoldBackend().slice(offset); }
   project(): ShapeRuntimeCrossSection { return this.getManifoldBackend().project(); }
-  requireManifold(apiName?: string): ReturnType<ShapeBackend['requireManifold']> { return this.getManifoldBackend().requireManifold(apiName); }
+  requireManifold(apiName?: string): Manifold { return (this.getManifoldBackend() as ManifoldCapableBackend).requireManifold(apiName); }
 }
 
 export class FrozenShape extends Shape {

@@ -1,4 +1,4 @@
-export { ManifoldShapeBackend, wrapManifoldShapeBackend, requireManifoldShapeBackend } from './shapeBackend';
+export { ManifoldShapeBackend, wrapManifoldShapeBackend, requireManifoldShapeBackend, isManifoldCapableBackend, type ManifoldCapableBackend } from './shapeBackend';
 export { lowerProfileCompilePlanToCrossSection, lowerShapeCompilePlanToManifold, lowerShapeCompilePlanToShapeBackend } from './lower';
 export {
   applyFilletSelectionToManifold,

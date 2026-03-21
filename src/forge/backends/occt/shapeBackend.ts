@@ -6,7 +6,6 @@
  * producing data compatible with Manifold's getMesh() format.
  */
 
-import type { Manifold } from 'manifold-3d';
 import type { Mat4 } from '../../transform';
 import { Transform } from '../../transform';
 import {
@@ -443,12 +442,6 @@ export class OCCTShapeBackend implements ShapeBackend {
     return new OCCTShapeBackend(mkChamfer.Shape());
   }
 
-  requireManifold(apiName = 'requireManifold()'): Manifold {
-    throw new Error(
-      `${apiName}: this shape uses the OCCT backend. ` +
-      `Direct Manifold access is not available. Use ShapeBackend methods instead.`,
-    );
-  }
 }
 
 export function wrapOCCTShapeBackend(shape: any): ShapeBackend {

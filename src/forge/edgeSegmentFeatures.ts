@@ -20,7 +20,7 @@ import {
   getShapeRuntimeBackend,
 } from './kernel';
 import type { ShapeBackend } from './shapeBackend';
-import { requireManifoldShapeBackend, wrapManifoldShapeBackend } from './backends/manifold/shapeBackend';
+import { requireManifoldShapeBackend, wrapManifoldShapeBackend } from './backends/manifold';
 import {
   applyFilletSelectionToManifold,
   applyChamferSelectionToManifold,

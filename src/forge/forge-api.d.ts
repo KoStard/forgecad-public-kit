@@ -1776,7 +1776,6 @@ interface ShapeBackend {
 	getMesh(): ShapeRuntimeMesh;
 	slice(offset: number): ShapeRuntimeCrossSection;
 	project(): ShapeRuntimeCrossSection;
-	requireManifold(apiName?: string): Manifold;
 }
 interface TransformationStep {
 	kind: string;

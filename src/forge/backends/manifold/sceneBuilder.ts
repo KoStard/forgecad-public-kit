@@ -1,7 +1,7 @@
 import { setMaterial } from 'manifold-3d/lib/scene-builder.js';
 import type { Shape } from '../../kernel';
 import { getShapeRuntimeBackend, getWasm } from '../../kernel';
-import { ManifoldShapeBackend } from './shapeBackend';
+import { isManifoldCapableBackend } from './shapeBackend';
 import { isOCCTShapeBackend } from '../occt/shapeBackend';
 
 export function buildSceneBuilderPayloadForShape(
@@ -11,7 +11,7 @@ export function buildSceneBuilderPayloadForShape(
   const backend = getShapeRuntimeBackend(shape);
 
   let manifold: any;
-  if (backend instanceof ManifoldShapeBackend) {
+  if (isManifoldCapableBackend(backend)) {
     manifold = backend.requireManifold();
   } else if (isOCCTShapeBackend(backend)) {
     // For OCCT shapes, reconstruct a Manifold from the mesh data

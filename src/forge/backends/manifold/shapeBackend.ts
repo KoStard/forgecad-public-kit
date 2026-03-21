@@ -8,7 +8,21 @@ import {
   type ShapeRuntimeCrossSection,
 } from '../../shapeBackend';
 
-export class ManifoldShapeBackend implements ShapeBackend {
+/**
+ * A ShapeBackend that can provide a raw Manifold object.
+ * Only backends that wrap a real Manifold (ManifoldShapeBackend, FrozenShapeBackend)
+ * should implement this.
+ */
+export interface ManifoldCapableBackend extends ShapeBackend {
+  requireManifold(apiName?: string): Manifold;
+}
+
+/** Type guard: does this backend support direct Manifold access? */
+export function isManifoldCapableBackend(b: ShapeBackend): b is ManifoldCapableBackend {
+  return typeof (b as ManifoldCapableBackend).requireManifold === 'function';
+}
+
+export class ManifoldShapeBackend implements ManifoldCapableBackend {
   readonly [SHAPE_BACKEND_MARKER] = true as const;
 
   constructor(private readonly manifold: Manifold) {}
@@ -80,7 +94,7 @@ export class ManifoldShapeBackend implements ShapeBackend {
   }
 
   boundingBox(): ShapeRuntimeBounds {
-    return this.manifold.boundingBox();
+    return this.manifold.boundingBox() as unknown as ShapeRuntimeBounds;
   }
 
   volume(): number {
@@ -104,15 +118,15 @@ export class ManifoldShapeBackend implements ShapeBackend {
   }
 
   getMesh(): ShapeRuntimeMesh {
-    return this.manifold.getMesh();
+    return this.manifold.getMesh() as unknown as ShapeRuntimeMesh;
   }
 
   slice(offset: number): ShapeRuntimeCrossSection {
-    return this.manifold.slice(offset);
+    return this.manifold.slice(offset) as unknown as ShapeRuntimeCrossSection;
   }
 
   project(): ShapeRuntimeCrossSection {
-    return this.manifold.project();
+    return this.manifold.project() as unknown as ShapeRuntimeCrossSection;
   }
 
   requireManifold(): Manifold {
@@ -125,10 +139,8 @@ export function wrapManifoldShapeBackend(manifold: Manifold): ShapeBackend {
 }
 
 export function requireManifoldShapeBackend(backend: ShapeBackend, apiName = 'requireManifoldShapeBackend()'): Manifold {
-  try {
+  if (isManifoldCapableBackend(backend)) {
     return backend.requireManifold(apiName);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`${apiName} currently requires a Manifold-backed runtime shape. ${message}`);
   }
+  throw new Error(`${apiName} currently requires a Manifold-backed runtime shape.`);
 }
