@@ -12,6 +12,52 @@ use std::collections::{HashMap, HashSet};
 use crate::types::{Constraint, Line, LocalPoint, ParamCoord, Point, SketchGroup};
 use super::coord_reduction::CoordReduction;
 
+// ── Union-find helpers (used by both build_line_components and detect_subgraphs) ──
+
+pub fn uf_find(parent: &mut [usize], x: usize) -> usize {
+    if parent[x] != x {
+        parent[x] = uf_find(parent, parent[x]);
+    }
+    parent[x]
+}
+
+fn uf_union(parent: &mut [usize], rank: &mut [usize], a: usize, b: usize) {
+    let ra = uf_find(parent, a);
+    let rb = uf_find(parent, b);
+    if ra == rb { return; }
+    match rank[ra].cmp(&rank[rb]) {
+        std::cmp::Ordering::Less => parent[ra] = rb,
+        std::cmp::Ordering::Greater => parent[rb] = ra,
+        std::cmp::Ordering::Equal => { parent[rb] = ra; rank[ra] += 1; }
+    }
+}
+
+/// Build connected components using only line connectivity.
+///
+/// Returns `(parent, rank)` arrays for the union-find over point indices.
+/// Each shape connected by lines forms one component; bridge constraints
+/// (Midpoint, Coincident, etc.) do NOT merge components.
+pub fn build_line_components(
+    points: &[Point],
+    lines: &[Line],
+) -> (Vec<usize>, Vec<usize>) {
+    let n = points.len();
+    let pt_idx: HashMap<&str, usize> = points.iter().enumerate()
+        .map(|(i, p)| (p.id.as_str(), i))
+        .collect();
+
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut rank: Vec<usize> = vec![0; n];
+
+    for line in lines {
+        if let (Some(&ai), Some(&bi)) = (pt_idx.get(line.a.as_str()), pt_idx.get(line.b.as_str())) {
+            uf_union(&mut parent, &mut rank, ai, bi);
+        }
+    }
+
+    (parent, rank)
+}
+
 /// Result of subgraph detection: new groups to add and constraints to absorb.
 pub struct DetectionResult {
     /// New parameterized groups created from detected subgraphs.
@@ -51,63 +97,8 @@ pub fn detect_subgraphs(
         .flat_map(|g| g.points.iter().map(|lp| lp.id.as_str()))
         .collect();
 
-    // ── Union-find over points ──────────────────────────────────────────────
-    let mut parent: Vec<usize> = (0..n).collect();
-    let mut rank: Vec<usize> = vec![0; n];
-
-    fn uf_find(parent: &mut [usize], x: usize) -> usize {
-        if parent[x] != x {
-            parent[x] = uf_find(parent, parent[x]);
-        }
-        parent[x]
-    }
-    fn uf_union(parent: &mut [usize], rank: &mut [usize], a: usize, b: usize) {
-        let ra = uf_find(parent, a);
-        let rb = uf_find(parent, b);
-        if ra == rb { return; }
-        match rank[ra].cmp(&rank[rb]) {
-            std::cmp::Ordering::Less => parent[ra] = rb,
-            std::cmp::Ordering::Greater => parent[rb] = ra,
-            std::cmp::Ordering::Equal => { parent[rb] = ra; rank[ra] += 1; }
-        }
-    }
-
-    // Connect via lines.
-    for line in lines {
-        if let (Some(&ai), Some(&bi)) = (pt_idx.get(line.a.as_str()), pt_idx.get(line.b.as_str())) {
-            uf_union(&mut parent, &mut rank, ai, bi);
-        }
-    }
-
-    // Connect via structural constraints.
-    for c in constraints {
-        match c {
-            Constraint::Coincident { a, b, .. } => {
-                if let (Some(&ai), Some(&bi)) = (pt_idx.get(a.as_str()), pt_idx.get(b.as_str())) {
-                    uf_union(&mut parent, &mut rank, ai, bi);
-                }
-            }
-            Constraint::PointOnLine { point, line, .. } => {
-                if let Some(&pi) = pt_idx.get(point.as_str()) {
-                    if let Some(l) = line_map.get(line.as_str()) {
-                        if let Some(&ai) = pt_idx.get(l.a.as_str()) {
-                            uf_union(&mut parent, &mut rank, pi, ai);
-                        }
-                    }
-                }
-            }
-            Constraint::Midpoint { point, line, .. } => {
-                if let Some(&pi) = pt_idx.get(point.as_str()) {
-                    if let Some(l) = line_map.get(line.as_str()) {
-                        if let Some(&ai) = pt_idx.get(l.a.as_str()) {
-                            uf_union(&mut parent, &mut rank, pi, ai);
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
+    // ── Build line components ───────────────────────────────────────────────
+    let (mut parent, _rank) = build_line_components(points, lines);
 
     // ── Group non-fixed, non-group-owned points by component ────────────────
     let mut components: HashMap<usize, Vec<usize>> = HashMap::new();
@@ -187,7 +178,11 @@ pub fn detect_subgraphs(
             (!component_line_ids.is_empty() && component_line_ids.iter().all(|l| hv_constrained_lines.contains(l)));
 
         let frame_dof = if rotation_locked { 2 } else { 3 };
-        let internal_dof = if unique_coords > frame_dof { unique_coords - frame_dof } else { 0 };
+        // Frame anchor absorption: the frame centroid absorbs one x-repr and
+        // one y-repr (they become Constants). Only remaining reprs become params.
+        let x_params = if unique_repr_x.len() > 1 { unique_repr_x.len() - 1 } else { 0 };
+        let y_params = if unique_repr_y.len() > 1 { unique_repr_y.len() - 1 } else { 0 };
+        let internal_dof = x_params + y_params;
         let vars_after = frame_dof + internal_dof;
         let vars_saved = if total_point_dof > vars_after { total_point_dof - vars_after } else { 0 };
 
@@ -242,28 +237,45 @@ pub fn detect_subgraphs(
         let mut repr_y_sorted: Vec<usize> = unique_repr_y.iter().copied().collect();
         repr_y_sorted.sort();
 
-        // Map representative → param index.
-        // For frame DOF, we subtract the centroid from each param value.
-        // If rotation is locked, params are just the unique local coordinates.
-        // If rotation is free, the first edge direction is the frame angle, and params are local coords.
+        // ── Frame anchor absorption ───────────────────────────────────────
+        // The frame centroid (gx, gy) already provides translation DOF.
+        // To avoid redundancy, the first representative in each axis becomes
+        // a Constant (its local coord is fixed; the frame absorbs its world
+        // position). Only remaining representatives become solver params.
+        //
+        // For a rect: 2 unique x-reprs → 1 becomes constant, 1 becomes param
+        //             2 unique y-reprs → 1 becomes constant, 1 becomes param
+        //             Total: 2 frame + 2 params = 4 vars (instead of 8)
 
-        // For the axis-aligned (rotation_locked) case:
-        // - unique x-representatives form x-params (local x = param - centroid_x_component)
-        // - unique y-representatives form y-params (local y = param - centroid_y_component)
-        // For general rotation:
-        // - params are the local coordinates of each unique representative
+        // Anchor = first repr in each axis (constant local coord).
+        let x_anchor = repr_x_sorted[0];
+        let y_anchor = repr_y_sorted[0];
 
-        let n_x_params = repr_x_sorted.len();
-        // Param layout: [x_param_0, x_param_1, ..., y_param_0, y_param_1, ...]
-        let repr_x_to_param: HashMap<usize, usize> = repr_x_sorted.iter().enumerate()
+        // Remaining reprs become params.
+        let x_param_reprs: Vec<usize> = repr_x_sorted[1..].to_vec();
+        let y_param_reprs: Vec<usize> = repr_y_sorted[1..].to_vec();
+        let n_x_params = x_param_reprs.len();
+
+        // Map representative → param index (only non-anchor reprs).
+        let repr_x_to_param: HashMap<usize, usize> = x_param_reprs.iter().enumerate()
             .map(|(pi, &repr)| (repr, pi))
             .collect();
-        let repr_y_to_param: HashMap<usize, usize> = repr_y_sorted.iter().enumerate()
+        let repr_y_to_param: HashMap<usize, usize> = y_param_reprs.iter().enumerate()
             .map(|(pi, &repr)| (repr, pi + n_x_params))
             .collect();
 
-        // Build param values from local coordinates.
-        let mut params = vec![0.0f64; n_x_params + repr_y_sorted.len()];
+        // Collect anchor local coord values (for Constant expressions).
+        let mut anchor_lx = 0.0f64;
+        let mut anchor_ly = 0.0f64;
+        for (mi, &pt_i) in members.iter().enumerate() {
+            let repr_x = if coord_red.repr_x.len() > pt_i { coord_red.repr_x[pt_i] } else { pt_i };
+            let repr_y = if coord_red.repr_y.len() > pt_i { coord_red.repr_y[pt_i] } else { pt_i };
+            if repr_x == x_anchor { anchor_lx = local_coords[mi].0; }
+            if repr_y == y_anchor { anchor_ly = local_coords[mi].1; }
+        }
+
+        // Build param values from local coordinates of non-anchor reprs.
+        let mut params = vec![0.0f64; n_x_params + y_param_reprs.len()];
         for (mi, &pt_i) in members.iter().enumerate() {
             let (lx, ly) = local_coords[mi];
             let repr_x = if coord_red.repr_x.len() > pt_i { coord_red.repr_x[pt_i] } else { pt_i };
@@ -285,8 +297,10 @@ pub fn detect_subgraphs(
             let repr_x = if coord_red.repr_x.len() > pt_i { coord_red.repr_x[pt_i] } else { pt_i };
             let repr_y = if coord_red.repr_y.len() > pt_i { coord_red.repr_y[pt_i] } else { pt_i };
 
-            let lx_expr = if let Some(&pi) = repr_x_to_param.get(&repr_x) {
-                // Check if the point's local x equals the param value or has an offset.
+            let lx_expr = if repr_x == x_anchor {
+                // Anchor: local coord is constant (absorbed by frame gx).
+                ParamCoord::Constant(anchor_lx)
+            } else if let Some(&pi) = repr_x_to_param.get(&repr_x) {
                 let param_val = params[pi];
                 let diff = lx - param_val;
                 if diff.abs() < 1e-12 {
@@ -298,7 +312,9 @@ pub fn detect_subgraphs(
                 ParamCoord::Constant(lx)
             };
 
-            let ly_expr = if let Some(&pi) = repr_y_to_param.get(&repr_y) {
+            let ly_expr = if repr_y == y_anchor {
+                ParamCoord::Constant(anchor_ly)
+            } else if let Some(&pi) = repr_y_to_param.get(&repr_y) {
                 let param_val = params[pi];
                 let diff = ly - param_val;
                 if diff.abs() < 1e-12 {
@@ -459,7 +475,8 @@ mod tests {
         assert!(g.fixed_rotation, "rotation should be locked (all H/V)");
         // 4 points → 8 DOF total. 4 unique coords (left_x, right_x, bottom_y, top_y).
         // Frame = 2 (rotation locked). Internal = 4 - 2 = 2 params.
-        assert_eq!(g.params.len(), 4, "should have 4 params (2 unique x + 2 unique y)");
+        // With anchor absorption: 2 unique x - 1 anchor + 2 unique y - 1 anchor = 2 params.
+        assert_eq!(g.params.len(), 2, "should have 2 params (1 x-param + 1 y-param after anchor absorption)");
         // Vars saved: 8 - 2 - 4 = 2
         assert!(result.absorbed_constraint_indices.len() >= 4, "all H/V constraints absorbed");
     }
@@ -483,6 +500,75 @@ mod tests {
         let coord_red = super::super::coord_reduction::build_coord_reduction(&points, &lines, &constraints);
         let result = detect_subgraphs(&points, &lines, &constraints, &[], &coord_red);
         assert_eq!(result.new_groups.len(), 0, "3 points should not be grouped");
+    }
+
+    #[test]
+    fn two_rects_connected_by_bridge_detected_separately() {
+        // Simulate two rects connected by attachCentered:
+        // Rect A: 4 corners + 4 edges + diagonal
+        // Rect B: 4 corners + 4 edges + diagonal
+        // Bridge: mid1 + mid2 + bridge line
+        // Midpoint constraints connect mid1→rectA edge, mid2→rectB edge
+        let points = vec![
+            // Rect A corners
+            pt("a_bl", 0.0, 0.0),   // 0
+            pt("a_br", 10.0, 0.0),  // 1
+            pt("a_tr", 10.0, 5.0),  // 2
+            pt("a_tl", 0.0, 5.0),   // 3
+            // Rect B corners
+            pt("b_bl", 20.0, 0.0),  // 4
+            pt("b_br", 30.0, 0.0),  // 5
+            pt("b_tr", 30.0, 5.0),  // 6
+            pt("b_tl", 20.0, 5.0),  // 7
+            // Bridge midpoints
+            pt("mid1", 10.0, 2.5),  // 8
+            pt("mid2", 20.0, 2.5),  // 9
+        ];
+        let lines = vec![
+            // Rect A
+            ln("a_bottom", "a_bl", "a_br"),
+            ln("a_right", "a_br", "a_tr"),
+            ln("a_top", "a_tr", "a_tl"),
+            ln("a_left", "a_tl", "a_bl"),
+            // Rect B
+            ln("b_bottom", "b_bl", "b_br"),
+            ln("b_right", "b_br", "b_tr"),
+            ln("b_top", "b_tr", "b_tl"),
+            ln("b_left", "b_tl", "b_bl"),
+            // Bridge line connecting the two midpoints
+            ln("bridge", "mid1", "mid2"),
+        ];
+        let constraints = vec![
+            // Rect A structural
+            Constraint::Horizontal { id: "ah1".into(), line: "a_bottom".into() },
+            Constraint::Horizontal { id: "ah2".into(), line: "a_top".into() },
+            Constraint::Vertical { id: "av1".into(), line: "a_right".into() },
+            Constraint::Vertical { id: "av2".into(), line: "a_left".into() },
+            // Rect B structural
+            Constraint::Horizontal { id: "bh1".into(), line: "b_bottom".into() },
+            Constraint::Horizontal { id: "bh2".into(), line: "b_top".into() },
+            Constraint::Vertical { id: "bv1".into(), line: "b_right".into() },
+            Constraint::Vertical { id: "bv2".into(), line: "b_left".into() },
+            // Bridge constraints (cross-shape)
+            Constraint::Midpoint { id: "mp1".into(), point: "mid1".into(), line: "a_right".into() },
+            Constraint::Midpoint { id: "mp2".into(), point: "mid2".into(), line: "b_left".into() },
+            Constraint::Horizontal { id: "bh".into(), line: "bridge".into() },
+        ];
+
+        let coord_red = super::super::coord_reduction::build_coord_reduction(&points, &lines, &constraints);
+        let result = detect_subgraphs(&points, &lines, &constraints, &[], &coord_red);
+
+        assert_eq!(result.new_groups.len(), 2, "should detect two separate groups (one per rect)");
+        for g in &result.new_groups {
+            assert_eq!(g.points.len(), 4, "each group should have 4 corner points");
+            assert!(g.fixed_rotation, "rotation should be locked");
+        }
+        // Bridge midpoints and bridge line should NOT be in any group.
+        let all_group_point_ids: HashSet<&str> = result.new_groups.iter()
+            .flat_map(|g| g.points.iter().map(|p| p.id.as_str()))
+            .collect();
+        assert!(!all_group_point_ids.contains("mid1"), "bridge point mid1 should not be grouped");
+        assert!(!all_group_point_ids.contains("mid2"), "bridge point mid2 should not be grouped");
     }
 
     #[test]
