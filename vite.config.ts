@@ -527,6 +527,8 @@ export default defineConfig(({ command }) => ({
   optimizeDeps: {
     exclude: [
       'manifold-3d',
+      // OpenCascade.js WASM — raw-served like manifold-3d.
+      'opencascade.js',
       // The WASM solver is a raw wasm-pack package — exclude from dep optimisation
       // so Vite serves the .wasm file directly.
       'solver',

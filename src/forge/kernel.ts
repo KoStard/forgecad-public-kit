@@ -57,6 +57,8 @@ import {
   wrapManifoldShapeBackend,
 } from './shapeBackend';
 import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
+import { lowerShapeCompilePlanToOCCTBackend, OCCTUnsupportedError } from './compilePlanOCCT';
+import { initOCCT } from './occtInit';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './shapeFaces';
@@ -75,17 +77,42 @@ let _wasm: ManifoldToplevel | null = null;
 
 export async function initKernel(): Promise<ManifoldToplevel> {
   if (_wasm) return _wasm;
-  const Module = (await import('manifold-3d')).default;
-  _wasm = await Module();
-  _wasm.setup();
-  _wasm.setMinCircularAngle(2);
-  _wasm.setMinCircularEdgeLength(0.5);
+  // Initialize Manifold and OCCT WASM modules in parallel.
+  // Both are cached as singletons — subsequent calls are instant.
+  const [manifoldModule] = await Promise.all([
+    (async () => {
+      const Module = (await import('manifold-3d')).default;
+      const wasm = await Module();
+      wasm.setup();
+      wasm.setMinCircularAngle(2);
+      wasm.setMinCircularEdgeLength(0.5);
+      return wasm;
+    })(),
+    initOCCT(),
+  ]);
+  _wasm = manifoldModule;
   return _wasm;
 }
 
 export function getWasm(): ManifoldToplevel {
   if (!_wasm) throw new Error('Kernel not initialized — call initKernel() first');
   return _wasm;
+}
+
+/**
+ * Active geometry backend selector.
+ * - 'occt'     — OCCT primary, Manifold fallback for unsupported ops
+ * - 'manifold' — Manifold only (original behaviour)
+ */
+export type ActiveBackend = 'occt' | 'manifold';
+let _activeBackend: ActiveBackend = 'occt';
+
+export function setActiveBackend(backend: ActiveBackend): void {
+  _activeBackend = backend;
+}
+
+export function getActiveBackend(): ActiveBackend {
+  return _activeBackend;
 }
 
 export type GeometryBackend = 'manifold' | 'occt' | 'hybrid' | 'unknown';
@@ -664,8 +691,24 @@ export function buildShapeFromCompilePlan(
   color?: string,
   geometryInfo?: Partial<GeometryInfo>,
 ): Shape {
+  let backend: ShapeBackend;
+  if (_activeBackend === 'manifold') {
+    backend = lowerShapeCompilePlanToShapeBackend(plan, getWasm());
+  } else {
+    // OCCT primary — falls back to Manifold for unsupported ops
+    try {
+      backend = lowerShapeCompilePlanToOCCTBackend(plan);
+    } catch (e) {
+      if (e instanceof OCCTUnsupportedError) {
+        backend = lowerShapeCompilePlanToShapeBackend(plan, getWasm());
+      } else {
+        console.warn(`[ForgeCAD] OCCT lowering failed, falling back to Manifold:`, e);
+        backend = lowerShapeCompilePlanToShapeBackend(plan, getWasm());
+      }
+    }
+  }
   return setShapeCompilePlan(
-    new Shape(lowerShapeCompilePlanToShapeBackend(plan, getWasm()), color, geometryInfo),
+    new Shape(backend, color, geometryInfo),
     plan,
   );
 }
