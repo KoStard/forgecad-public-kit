@@ -76,18 +76,42 @@ function edgeSegmentToSelection(segment: EdgeSegment): ResolvedEdgeFeatureSelect
     axis[0] * by - axis[1] * bx,
   ];
 
-  // Project the average outward normal onto the basis to determine quadrant.
-  const avgNx = normalA[0] + normalB[0];
-  const avgNy = normalA[1] + normalB[1];
-  const avgNz = normalA[2] + normalB[2];
+  // --- Compute surface directions in the (basisX, basisY) cross-section plane ---
 
-  const projX = avgNx * basisX[0] + avgNy * basisX[1] + avgNz * basisX[2];
-  const projY = avgNx * basisY[0] + avgNy * basisY[1] + avgNz * basisY[2];
+  // Project both normals into the 2D cross-section plane
+  const nAx = normalA[0] * basisX[0] + normalA[1] * basisX[1] + normalA[2] * basisX[2];
+  const nAy = normalA[0] * basisY[0] + normalA[1] * basisY[1] + normalA[2] * basisY[2];
+  const nBx = normalB[0] * basisX[0] + normalB[1] * basisX[1] + normalB[2] * basisX[2];
+  const nBy = normalB[0] * basisY[0] + normalB[1] * basisY[1] + normalB[2] * basisY[2];
 
-  // For convex edges: the corner is on the MATERIAL side (opposite outward normal).
-  //   The runtime removes the corner and adds a cylinder.
-  // For concave edges: the corner is on the AIR side (same as outward normal).
-  //   The runtime adds the corner and carves with a cylinder.
+  // Average outward normal in 2D — points away from material
+  const avgX = nAx + nBx;
+  const avgY = nAy + nBy;
+
+  // For each normal, compute the perpendicular that points toward the sharp feature:
+  //   - Convex: into material (negative dot with avg outward normal)
+  //   - Concave: into groove/air (positive dot with avg outward normal)
+  // In both cases, the resulting directions define the wedge that the fillet replaces.
+  function pickSurfaceDir(nx: number, ny: number): [number, number] {
+    // Two perpendiculars of (nx, ny): (-ny, nx) and (ny, -nx)
+    const perpAx = -ny, perpAy = nx;
+    const perpBx = ny, perpBy = -nx;
+    const dotA2 = perpAx * avgX + perpAy * avgY;
+    const dotB2 = perpBx * avgX + perpBy * avgY;
+    // For convex: pick negative dot. For concave: pick positive dot.
+    if (convex) {
+      return dotA2 < dotB2 ? [perpAx, perpAy] : [perpBx, perpBy];
+    } else {
+      return dotA2 > dotB2 ? [perpAx, perpAy] : [perpBx, perpBy];
+    }
+  }
+
+  const surfaceDirA = pickSurfaceDir(nAx, nAy);
+  const surfaceDirB = pickSurfaceDir(nBx, nBy);
+
+  // Legacy quadrant (for backward compat with tracked-edge path)
+  const projX = avgX;
+  const projY = avgY;
   const sign = convex ? -1 : 1;
   const quadrant: [number, number] = [
     projX >= 0 ? sign : -sign,
@@ -108,6 +132,10 @@ function edgeSegmentToSelection(segment: EdgeSegment): ResolvedEdgeFeatureSelect
     basisX,
     basisY,
     quadrant,
+    dihedralAngleDeg: segment.dihedralAngle,
+    surfaceDirA,
+    surfaceDirB,
+    isConvex: convex,
   };
 }
 

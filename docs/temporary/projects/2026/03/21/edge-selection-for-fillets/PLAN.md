@@ -256,6 +256,26 @@ It fails for:
 
 **Correct approach**: Edge selection (Phase 1-2) should produce an `EdgeQueryRef` that feeds into the existing compile plan system. The compile plan would record `{ kind: 'fillet', edge: EdgeQueryRef, radius, ... }` and get lowered to both Manifold and CadQuery correctly. This means extending the resolution system rather than bypassing it.
 
+#### Angle-aware kite polygon fillet (SUCCESS — flat+flat at any angle)
+
+**What**: Replaced the hard-coded square cross-section with an analytical kite polygon that adapts to the actual dihedral angle between adjacent faces.
+
+**Math** (same as `buildCornerGeometry` in `sketch/fillets.ts`):
+- `α = dihedralAngle` (opening angle of the material wedge)
+- `tangentDist = r / tan(α/2)` — distance from edge vertex to tangent point on each face
+- `centerDist = r / sin(α/2)` — distance from edge vertex to arc center along bisector
+- Crescent area per unit length = `r²/tan(α/2) - r²(π-α)/2`
+
+**Construction**: Kite quadrilateral (origin → tangentA → cylinder center → tangentB) replaces the square. For 90° edges, the kite degenerates to the same square as before. The cylinder center sits at one vertex of the kite, ensuring the arc exactly covers the correct region.
+
+**Key fix**: The earlier triangle approach (origin → tangentA → tangentB) failed because the triangle didn't extend to the cylinder center, leaving most of the wedge outside the cylinder's coverage. The kite includes the center vertex.
+
+**Result**: Tested on 60° (triangular prism), 90° (box), and 120° (hexagonal prism) edges. Volume loss matches analytical formula within mesh discretization tolerance. All 17 tests pass.
+
+**Files modified**: `edgeFeatureModel.ts` (added `dihedralAngleDeg`, `surfaceDirA/B`, `isConvex`), `edgeSegmentFeatures.ts` (surface direction computation), `edgeFeatureRuntime.ts` (kite polygon + correct cylinder offset).
+
+**Lesson**: The fillet cross-section is a KITE (4 vertices: edge vertex + 2 tangent points + arc center), not a triangle or square. The square was a special case that happened to work for 90°. Getting the shape right requires including the cylinder center as a vertex.
+
 ## Fundamental Problem: Fillet on Curved Surfaces
 
 The "square corner + cylinder" boolean approach is a geometric shortcut that only works when both faces adjacent to the edge are flat planes. For real-world models (cylinders, spheres, lofts, boolean results), at least one face is typically curved.
