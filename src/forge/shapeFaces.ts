@@ -1494,6 +1494,8 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       registerNamedFaceCandidates(table, candidates, propagation.owner);
       return table;
     }
+    case 'opaque':
+      return emptyFaceTable();
   }
 }
 

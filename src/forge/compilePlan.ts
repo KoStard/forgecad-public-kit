@@ -1,5 +1,6 @@
 import { Transform, type Mat4, type Vec3 } from './transform';
 import type { PlaneFrame } from './planeFrame';
+import type { ShapeBackend } from './shapeBackend';
 import {
   cloneEdgeQueryRef,
   cloneFaceQueryRef,
@@ -292,6 +293,11 @@ export type ShapeCompilePlan =
       quadrant: [number, number];
       resolvedEdge?: EdgeFeatureResolvedSelector;
       queryPropagation?: TopologyRewritePropagation;
+    }
+  | {
+      /** Wraps a pre-built ShapeBackend that can't be expressed as IR (levelSet, warp, smoothOut, etc.). */
+      kind: 'opaque';
+      backend: ShapeBackend;
     };
 
 function cloneProfileTransform(step: ProfileCompileTransformStep): ProfileCompileTransformStep {
@@ -793,6 +799,10 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
       break;
+    case 'opaque':
+      // Opaque plans hold a pre-built backend — clone shares the same backend reference.
+      result = { kind: 'opaque', backend: plan.backend };
+      break;
   }
   // Preserve OCCT shape cache across clones (set by compilePlanOCCT.ts)
   if ((plan as any)._occtCache) (result as any)._occtCache = (plan as any)._occtCache;
@@ -894,6 +904,7 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan | null): Shape
     case 'sweep':
     case 'boolean':
     case 'hull':
+    case 'opaque':
       return null;
   }
 }
@@ -935,6 +946,7 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan | null): ShapeQue
       case 'revolve':
       case 'loft':
       case 'sweep':
+      case 'opaque':
         return;
     }
   }
@@ -985,6 +997,7 @@ export function findShapeWorkplanePlacement(
     case 'boolean':
     case 'hull':
     case 'revolve':
+    case 'opaque':
       return null;
   }
 }

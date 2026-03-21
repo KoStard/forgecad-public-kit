@@ -327,6 +327,8 @@ export function lowerShapeCompilePlanToManifold(
       return lowerShapeHullCompilePlan(plan, wasm);
     case 'trimByPlane':
       return lowerShapeTrimByPlaneCompilePlan(plan, wasm);
+    case 'opaque':
+      throw new Error('Cannot lower opaque compile plan to Manifold — opaque plans must be intercepted before lowering');
   }
 }
 

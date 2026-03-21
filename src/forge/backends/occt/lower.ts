@@ -1025,6 +1025,8 @@ function _lowerShapeCompilePlanToOCCTInner(
       throw new OCCTUnsupportedError('sweep');
     case 'hull':
       throw new OCCTUnsupportedError('hull');
+    case 'opaque':
+      throw new Error('Cannot lower opaque compile plan to OCCT — opaque plans must be intercepted before lowering');
   }
 }
 

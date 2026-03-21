@@ -72,6 +72,7 @@ function rootTopologyRewritePropagation(plan: ShapeCompilePlan | null): Topology
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'opaque':
       return null;
   }
 }
