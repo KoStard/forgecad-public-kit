@@ -6,6 +6,7 @@ pub mod linear;
 pub mod lm;
 pub mod profiler;
 pub mod reconstruction;
+pub mod session;
 pub mod subgraph_detection;
 
 use std::collections::{HashMap, HashSet};
@@ -199,7 +200,7 @@ pub fn solve(
 ///
 /// Falls back to legacy progressive warm-up for single-cluster problems (e.g.,
 /// spectrometer) where decomposition isn't profitable.
-fn progressive_solve(
+pub(crate) fn progressive_solve(
     points: &mut Vec<Point>,
     lines: &Vec<Line>,
     circles: &mut Vec<Circle>,
@@ -315,12 +316,31 @@ fn legacy_progressive_warmup(
             0
         };
 
+        // Snapshot positions before LM so we can roll back on divergence.
+        let snap_pts: Vec<(f64, f64)> = points.iter().map(|p| (p.x, p.y)).collect();
+        let snap_circles: Vec<f64> = circles.iter().map(|c| c.radius).collect();
+        let err_before = lm::current_max_error(points, lines, circles, arcs, shapes, &sub);
+
         lm::solve_global(
             points, lines, circles, arcs, shapes, &sub,
             30, tolerance, 1, 4, 2.5,
             groups, &recon_graph, step_deadline, None,
         );
         profiler::add(|p| p.progressive_steps += 1);
+
+        // Reject: if LM made error significantly worse, restore pre-step positions.
+        // This mirrors the TS seedIncrementalGeometry rejection: only accept if the
+        // solve improved things or didn't make them much worse.
+        let err_after = lm::current_max_error(points, lines, circles, arcs, shapes, &sub);
+        if err_after > err_before * 2.0 + 1.0 && err_after > tolerance * 100.0 {
+            for (j, &(sx, sy)) in snap_pts.iter().enumerate() {
+                points[j].x = sx;
+                points[j].y = sy;
+            }
+            for (j, &sr) in snap_circles.iter().enumerate() {
+                circles[j].radius = sr;
+            }
+        }
     }
 
     let progressive_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
@@ -487,12 +507,29 @@ fn bottom_up_progressive(
             0
         };
 
+        // Snapshot positions before LM so we can roll back on divergence.
+        let snap_pts: Vec<(f64, f64)> = points.iter().map(|p| (p.x, p.y)).collect();
+        let snap_circles: Vec<f64> = circles.iter().map(|c| c.radius).collect();
+        let err_before = lm::current_max_error(points, lines, circles, arcs, shapes, &sub);
+
         lm::solve_global(
             points, lines, circles, arcs, shapes, &sub,
             30, tolerance, 1, 4, 2.5,
             groups, &recon_graph, step_deadline, None,
         );
         profiler::add(|p| p.progressive_steps += 1);
+
+        // Reject: if LM made error significantly worse, restore pre-step positions.
+        let err_after = lm::current_max_error(points, lines, circles, arcs, shapes, &sub);
+        if err_after > err_before * 2.0 + 1.0 && err_after > tolerance * 100.0 {
+            for (j, &(sx, sy)) in snap_pts.iter().enumerate() {
+                points[j].x = sx;
+                points[j].y = sy;
+            }
+            for (j, &sr) in snap_circles.iter().enumerate() {
+                circles[j].radius = sr;
+            }
+        }
     }
 
     let bridge_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
@@ -517,7 +554,7 @@ fn bottom_up_progressive(
 }
 
 /// Inner solve dispatch — decompose into independent components when possible.
-fn solve_system(
+pub(crate) fn solve_system(
     points: &mut Vec<Point>,
     lines: &Vec<Line>,
     circles: &mut Vec<Circle>,
@@ -1180,7 +1217,7 @@ fn shape_vertex_ids(shape: &Shape, lines_map: &HashMap<&str, &Line>) -> Vec<Stri
     result
 }
 
-fn compute_presolve_ref_scale(constraints: &Vec<Constraint>) -> f64 {
+pub(crate) fn compute_presolve_ref_scale(constraints: &Vec<Constraint>) -> f64 {
     let mut max_val: f64 = 1.0;
     for c in constraints {
         let v = match c {
@@ -2101,7 +2138,7 @@ pub fn presolve_constraint(
     ))
 }
 
-fn apply_presolve_constraint(
+pub(crate) fn apply_presolve_constraint(
     points: &mut Vec<Point>,
     lines: &Vec<Line>,
     pts: &HashMap<String, usize>,
@@ -2499,7 +2536,7 @@ fn apply_presolve_constraint(
         }
 }
 
-fn build_entity_ref_count(constraints: &Vec<Constraint>) -> HashMap<String, usize> {
+pub(crate) fn build_entity_ref_count(constraints: &Vec<Constraint>) -> HashMap<String, usize> {
     let mut counts = HashMap::new();
     let add = |id: &str, counts: &mut HashMap<String, usize>| {
         *counts.entry(id.to_string()).or_insert(0) += 1;

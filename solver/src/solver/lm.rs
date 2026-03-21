@@ -336,6 +336,18 @@ fn eval_residuals_full(
     Some((vals, max_abs))
 }
 
+/// Public wrapper for eval_residuals_full (used by session module).
+pub fn eval_residuals_pub(
+    points: &Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &Vec<Circle>,
+    arcs: &Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+) -> Option<(Vec<f64>, f64)> {
+    eval_residuals_full(points, lines, circles, arcs, shapes, constraints)
+}
+
 pub fn current_max_error(
     points: &Vec<Point>,
     lines: &Vec<Line>,

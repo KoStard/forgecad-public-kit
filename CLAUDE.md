@@ -8,11 +8,11 @@ ForgeCAD has two overlapping interfaces for build and dev tasks. Use the right o
 
 | Context | Use | Avoid |
 |---------|-----|-------|
-| **AI agents working in this repo** | `forgecad check suite`, `forgecad dev`, `forgecad studio` | `npm run build`, `npm run dev`, `npm run build:cli` |
+| **AI agents working in this repo** | `node dist-cli/forgecad.js check suite`, `node dist-cli/forgecad.js run ...` | Global `forgecad` (may be stale), `npm run build`, `npm run dev` |
 | **Humans developing ForgeCAD** | `npm run dev` (live reload), `npm run build` (prod), `forgecad check suite` | — |
 | **CI / pre-publish** | `npm run build && npm run test` | forgecad CLI (not installed in CI) |
 
-**The CLI is always available after `npm install`** — the `prepare` hook builds `dist-cli/forgecad.js` automatically. No extra build step is needed before using CLI commands.
+**Important**: Always use `node dist-cli/forgecad.js` (local build) instead of the global `forgecad` command. The global binary may be an older installed version that doesn't reflect local source changes. After editing TS source, run `npm run build:cli` to rebuild, then use `node dist-cli/forgecad.js` to run.
 
 ### Dev server commands
 
@@ -22,7 +22,7 @@ ForgeCAD has two overlapping interfaces for build and dev tasks. Use the right o
 | `forgecad studio [path]` | Production server — requires `dist/` to be built (`npm run build`) |
 | `npm run dev` | Same as `forgecad dev` for humans; conventional JS-project entry point |
 
-**Never** call `npm run build:cli` in agent context — the CLI binary is already built. Call `forgecad check suite` (or other `forgecad` commands) directly.
+After editing TS source files, rebuild the CLI with `npm run build:cli`, then use `node dist-cli/forgecad.js` to run commands. Do not use the global `forgecad` binary — it won't reflect local changes.
 
 ## React Performance: Stable References in Render Bodies
 
