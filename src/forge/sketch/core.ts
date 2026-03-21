@@ -4,7 +4,7 @@ import type { ProfileCompilePlan } from '../compilePlan';
 import { cloneProfileCompilePlan } from '../compilePlan';
 import type { Mat4 } from '../transform';
 import type { FaceRef } from './topology';
-import { lowerProfileCompilePlanToCrossSection } from '../compilePlanManifold';
+import { lowerProfileCompilePlanToCrossSection } from '../backends/manifold/lower';
 import { faceQueryRefsEqual } from '../queryModel';
 import {
   cloneSketchPlacementModel,

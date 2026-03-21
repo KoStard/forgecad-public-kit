@@ -53,13 +53,9 @@ import { wrapRepeatedShapeCompilePlan } from './repetitionOwnership';
 import {
   type ShapeBackend,
   isShapeBackend,
-  requireManifoldShapeBackend,
-  wrapManifoldShapeBackend,
 } from './shapeBackend';
-import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
-import { lowerShapeCompilePlanToOCCTBackend, OCCTUnsupportedError } from './compilePlanOCCT';
-import { isOCCTShapeBackend } from './occtShapeBackend';
-import { initOCCT } from './occtInit';
+import { requireManifoldShapeBackend, wrapManifoldShapeBackend, lowerShapeCompilePlanToShapeBackend } from './backends/manifold';
+import { lowerShapeCompilePlanToOCCTBackend, OCCTUnsupportedError, isOCCTShapeBackend, initOCCT } from './backends/occt';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './shapeFaces';

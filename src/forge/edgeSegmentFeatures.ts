@@ -19,21 +19,21 @@ import {
   setShapePlacementReferences,
   getShapeRuntimeBackend,
 } from './kernel';
-import { requireManifoldShapeBackend, wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
-import { isOCCTShapeBackend } from './occtShapeBackend';
-import { TrackedShape } from './sketch/topology';
-import type { EdgeSegment } from './meshEdgeExtraction';
-import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
-import type { Vec3 } from './transform';
+import type { ShapeBackend } from './shapeBackend';
+import { requireManifoldShapeBackend, wrapManifoldShapeBackend } from './backends/manifold/shapeBackend';
 import {
   applyFilletSelectionToManifold,
   applyChamferSelectionToManifold,
   applyConcaveFilletSelectionToManifold,
   applyConcaveChamferSelectionToManifold,
-} from './edgeFeatureRuntime';
+} from './backends/manifold/edgeFeatureRuntime';
+import { isOCCTShapeBackend, type OCCTShapeBackend } from './backends/occt/shapeBackend';
+import { TrackedShape } from './sketch/topology';
+import type { EdgeSegment } from './meshEdgeExtraction';
+import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
+import type { Vec3 } from './transform';
 
 import type { Manifold } from 'manifold-3d';
-import type { OCCTShapeBackend } from './occtShapeBackend';
 
 /** Convert an OCCT backend to a Manifold object via mesh reconstruction. */
 function occtToManifold(backend: OCCTShapeBackend): Manifold {

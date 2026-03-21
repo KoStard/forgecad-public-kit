@@ -13,8 +13,8 @@
  */
 
 import { Shape, getWasm } from './kernel';
-import type { ShapeBackend, ShapeRuntimeBounds, ShapeRuntimeMesh, ShapeRuntimeCrossSection } from './shapeBackend';
-import { ManifoldShapeBackend, SHAPE_BACKEND_MARKER } from './shapeBackend';
+import { SHAPE_BACKEND_MARKER, type ShapeBackend, type ShapeRuntimeBounds, type ShapeRuntimeMesh, type ShapeRuntimeCrossSection } from './shapeBackend';
+import { ManifoldShapeBackend } from './backends/manifold/shapeBackend';
 import type { FaceRef } from './sketch/topology';
 import type { FaceTransformationHistory } from './faceHistory';
 import type { SerializedShapeData } from '../workers/evalWorkerProtocol';

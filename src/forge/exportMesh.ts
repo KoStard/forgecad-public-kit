@@ -6,7 +6,7 @@ import {
 } from 'manifold-3d/lib/scene-builder.js';
 import { strToU8, strFromU8, unzipSync, zipSync } from 'fflate';
 import type { Shape } from './kernel';
-import { buildSceneBuilderPayloadForShape } from './shapeBackendSceneBuilder';
+import { buildSceneBuilderPayloadForShape } from './backends/manifold/sceneBuilder';
 
 export interface MeshExportObject {
   name: string;
