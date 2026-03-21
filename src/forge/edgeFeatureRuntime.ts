@@ -2,7 +2,13 @@ import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import type { Mat4 } from './transform';
 import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
 
-const EDGE_PAD = 0.01;
+/**
+ * Minimum extrusion overshoot past each end of the edge.
+ * The actual pad is max(MIN_EDGE_PAD, featureSize) — extending by at least
+ * the fillet radius or chamfer size handles non-perpendicular adjacent faces.
+ * Since the crescent is boolean'd with the body, overshooting is safe.
+ */
+const MIN_EDGE_PAD = 0.01;
 /** Small absolute extension past tangent points to ensure clean boolean cuts */
 const WEDGE_PAD = 0.02;
 
@@ -156,8 +162,11 @@ export function applyFilletSelectionToManifold(
   const height = edgeLength(selection);
   if (!(height > 1e-6)) return base;
 
-  const span = height + EDGE_PAD * 2;
-  const frame = edgeFrameMatrix(selection, -EDGE_PAD);
+  // Extend past both ends by at least the fillet radius so that non-perpendicular
+  // adjacent faces are fully covered. The boolean clips the overshoot safely.
+  const pad = Math.max(MIN_EDGE_PAD, radius);
+  const span = height + pad * 2;
+  const frame = edgeFrameMatrix(selection, -pad);
 
   // Use angle-aware construction when surface direction data is available,
   // fall back to legacy 90°-only square for tracked-edge path.
@@ -190,8 +199,9 @@ export function applyConcaveFilletSelectionToManifold(
   const height = edgeLength(selection);
   if (!(height > 1e-6)) return base;
 
-  const span = height + EDGE_PAD * 2;
-  const frame = edgeFrameMatrix(selection, -EDGE_PAD);
+  const pad = Math.max(MIN_EDGE_PAD, radius);
+  const span = height + pad * 2;
+  const frame = edgeFrameMatrix(selection, -pad);
 
   const cs = buildFilletCrossSection(selection, radius, segments, wasm)
     ?? legacyFilletCrossSection(selection, radius, segments, wasm);
@@ -217,8 +227,9 @@ export function applyChamferSelectionToManifold(
   const height = edgeLength(selection);
   if (!(height > 1e-6)) return base;
 
-  const span = height + EDGE_PAD * 2;
-  const frame = edgeFrameMatrix(selection, -EDGE_PAD);
+  const pad = Math.max(MIN_EDGE_PAD, size);
+  const span = height + pad * 2;
+  const frame = edgeFrameMatrix(selection, -pad);
 
   const triangle = buildChamferCrossSection(selection, size, wasm)
     ?? legacyChamferCrossSection(selection, size, wasm);
@@ -239,8 +250,9 @@ export function applyConcaveChamferSelectionToManifold(
   const height = edgeLength(selection);
   if (!(height > 1e-6)) return base;
 
-  const span = height + EDGE_PAD * 2;
-  const frame = edgeFrameMatrix(selection, -EDGE_PAD);
+  const pad = Math.max(MIN_EDGE_PAD, size);
+  const span = height + pad * 2;
+  const frame = edgeFrameMatrix(selection, -pad);
 
   const triangle = buildChamferCrossSection(selection, size, wasm)
     ?? legacyChamferCrossSection(selection, size, wasm);
