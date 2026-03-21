@@ -568,8 +568,25 @@ export function lowerShapeCompilePlanToOCCT(
   plan: ShapeCompilePlan,
   oc?: OCCTModule,
 ): any {
+  // Return cached OCCT shape if this plan node was already lowered.
+  // The cache is set on plan objects by this function and preserved
+  // across clones by cloneShapeCompilePlan(). This avoids re-lowering
+  // the entire plan tree on every chained Shape operation.
+  const cached = (plan as any)._occtCache;
+  if (cached) return cached;
+
+  const shape = _lowerShapeCompilePlanToOCCTInner(plan, oc);
+  (plan as any)._occtCache = shape;
+  return shape;
+}
+
+function _lowerShapeCompilePlanToOCCTInner(
+  plan: ShapeCompilePlan,
+  oc?: OCCTModule,
+): any {
   if (!oc) oc = getOCCT();
 
+  let result: any;
   switch (plan.kind) {
     case 'box':
       if (plan.center) {
