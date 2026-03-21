@@ -128,6 +128,7 @@ The speedup is super-linear because the FD Jacobian is O(n²) in variable count 
 | E3 | + Absorbed constraint filtering | 138 vars × 186 rows, maxError=420 | — | — | ❌ Worse convergence |
 | E4 | Variable elimination only (revert E3) | 138 vars × 264 rows, 16s | 78 vars, 4.15s | 60 vars, 12s | ✅ Final implementation |
 | E5 | Spread overlapping shapes (grid + jitter) | 138 vars, 3.2s final, ✅ converges | 533ms ✅ | 3.0s ✅ | ✅ Case_wood 03/18 now solves! |
+| E6 | General parameterized groups | TBD | TBD | TBD | 🔄 Implementation complete, needs browser testing |
 
 ## Experiment Log
 
@@ -191,6 +192,36 @@ The speedup is super-linear because the FD Jacobian is O(n²) in variable count 
 **Why it worked**: The root cause was 16 rects at identical positions → degenerate line normals → LineDistance presolve couldn't compute shift directions → seeds timed out → progressive solve got bad initial geometry. Spreading shapes apart by just 2× their size gives each shape a unique position, making normals well-defined and presolve effective.
 **Lesson**: Initial geometry quality matters more than solver sophistication. A simple grid spread (~20 lines of logic) solved a convergence problem that variable reduction (200+ lines of complex refactoring) could not.
 
+#### E6: General parameterized groups (IN PROGRESS)
+**What**: Full implementation of general subgraph detection and parameterized group creation:
+- `ParamCoord` enum in types.rs: `Constant(f64)`, `Param(usize)`, `ParamOffset(usize, f64)`
+- Extended `SketchGroup` with `params`, `param_point_map`, `auto_detected` fields
+- `update_local_coords_from_params()` method recomputes local coords from params
+- `subgraph_detection.rs`: general connected-component analysis + DOF computation via coord_reduction equivalence classes
+- `lm.rs`: kind=7 for param variables, capture/apply state includes params, FD Jacobian perturbs params + resolves group points
+- `mod.rs`: integrated into solve pipeline after coord_reduction, before LM solve
+
+**Algorithm**:
+1. Build connected components via lines + structural constraints (same union-find as spread_overlapping_shapes)
+2. For each component with ≥4 non-fixed, non-group-owned points:
+   - Count unique representative coordinates (from coord_reduction equivalence classes)
+   - Determine rotation lock (all lines H/V constrained, or BlockRotation present)
+   - frame_DOF = 2 (rotation locked) or 3
+   - internal_DOF = unique_repr_coords - frame_DOF
+   - variables_saved = 2*N_points - frame_DOF - internal_DOF
+   - Skip if variables_saved < 2
+3. Compute frame (centroid + first edge angle), transform to local coords
+4. Map local coords to params via representative analysis (ParamCoord expressions)
+5. Create auto-detected SketchGroup with params + param_point_map
+6. Absorb structural constraints internal to the component (H/V/Coincident/Ccw/BlockRotation/Midpoint)
+7. Auto-detected groups are stripped before DOF analysis and result serialization
+
+**Result**: 61/63 Rust tests pass (same pre-existing failures). WASM builds. Browser testing pending.
+**Key design decisions**:
+- Shape-agnostic: works for any constraint pattern, not rect-specific
+- coord_reduction disabled when subgraph detection absorbs constraints (groups subsume the equivalences)
+- Auto-detected groups are internal to solver, invisible to TS side
+
 ## Root Cause: Bad Initial Geometry (FIXED by E5)
 
 The case_wood 03/18 convergence failure was caused by:
@@ -208,6 +239,9 @@ Remaining future work:
 
 | File | Change |
 |------|--------|
+| `solver/src/types.rs` | Added `ParamCoord` enum, extended `SketchGroup` with `params`, `param_point_map`, `auto_detected`. Added `update_local_coords_from_params()`. Updated `dof_count()`. |
+| `solver/src/solver/subgraph_detection.rs` | **NEW**: General rigid/semi-rigid subgraph detection. Connected components via union-find, DOF analysis via coord_reduction, parameterized group creation. |
 | `solver/src/solver/coord_reduction.rs` | **NEW**: Coordinate equivalence via union-find. Scans H/V/Coincident constraints, builds equivalence classes. Includes `CoordLinkMap` for fast FD propagation. |
-| `solver/src/solver/mod.rs` | Added `pub mod coord_reduction`. Integrated into `solve_single_system` (non-incremental path). Coord propagation in progressive solve loop. Added `spread_overlapping_shapes` for initial geometry improvement. |
-| `solver/src/solver/lm.rs` | Refactored `build_variables` to use `PtVarIdx` (per-coord indices). Added `propagate_coord_links_fast`. Updated `set_var_fast` for FD propagation. Updated sparsity to include representative vars for linked points. Threading of `coord_red`/`link_map` through solve_global → run_lm_pass → linearize. |
+| `solver/src/solver/mod.rs` | Added `pub mod coord_reduction`, `pub mod subgraph_detection`. Integrated both into `solve_single_system`. Constraint filtering for absorbed constraints. |
+| `solver/src/solver/lm.rs` | Extended for param variables: kind=7 in col_to_entity, capture/apply state includes params, FD Jacobian for params, sparsity maps group-owned points to frame+param vars. |
+| `solver/src/lib.rs` | Filter auto-detected groups from results. Strip auto-detected groups before DOF analysis. |

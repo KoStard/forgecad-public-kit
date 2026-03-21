@@ -73,6 +73,10 @@ fn solve_inner(problem_json: &str) -> Result<SolveResult, serde_json::Error> {
         &problem.shapes, &problem.constraints, &options, &mut problem.groups,
     );
 
+    // Strip auto-detected groups before analysis — DOF calculation should
+    // use the original constraint/point structure, not the internal optimization.
+    problem.groups.retain(|g| !g.auto_detected);
+
     let metadata = solver::profiler::timed(
         |p, us| p.analyze_solution_us = us,
         || solver::analyze_solution(
@@ -122,6 +126,7 @@ fn build_result(
             .map(|a| ArcResult { id: a.id.clone(), radius: a.radius })
             .collect(),
         groups: problem.groups.iter()
+            .filter(|g| !g.auto_detected)
             .map(|g| GroupResult { id: g.id.clone(), x: g.x, y: g.y, theta: g.theta })
             .collect(),
         metadata,

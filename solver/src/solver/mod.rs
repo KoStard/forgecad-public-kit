@@ -6,6 +6,7 @@ pub mod linear;
 pub mod lm;
 pub mod profiler;
 pub mod reconstruction;
+pub mod subgraph_detection;
 
 use std::collections::{HashMap, HashSet};
 use crate::constraints::{constraint_jacobian_impl, constraint_residual_impl, evaluate_residuals, has_residual};
@@ -592,6 +593,43 @@ fn solve_single_system(
         }
     };
 
+    // Subgraph detection: collapse rigid/semi-rigid components into parameterized groups.
+    // Only for non-incremental (final) solves.
+    let absorbed_constraints: std::collections::HashSet<usize>;
+    if !incremental && coord_red.vars_saved > 0 {
+        let detection = subgraph_detection::detect_subgraphs(
+            points, lines, constraints, groups, &coord_red,
+        );
+        if !detection.new_groups.is_empty() {
+            let n_new = detection.new_groups.len();
+            let n_absorbed = detection.absorbed_constraint_indices.len();
+            absorbed_constraints = detection.absorbed_constraint_indices;
+            groups.extend(detection.new_groups);
+            // Resolve new group-owned points to world coordinates.
+            resolve_group_points(points, groups);
+            lm::trail_push(
+                &format!("subgraph-detection: {} groups, {} constraints absorbed", n_new, n_absorbed),
+                lm::current_max_error(points, lines, circles, arcs, shapes, constraints),
+            );
+        } else {
+            absorbed_constraints = std::collections::HashSet::new();
+        }
+    } else {
+        absorbed_constraints = std::collections::HashSet::new();
+    }
+
+    // Build filtered constraint list excluding absorbed constraints.
+    let filtered_constraints: Vec<Constraint>;
+    let effective_constraints: &Vec<Constraint> = if absorbed_constraints.is_empty() {
+        constraints
+    } else {
+        filtered_constraints = constraints.iter().enumerate()
+            .filter(|(i, _)| !absorbed_constraints.contains(i))
+            .map(|(_, c)| c.clone())
+            .collect();
+        &filtered_constraints
+    };
+
     // For incremental calls (progressive warm-up or builder warm-seeding),
     // skip the heavy reconstruction graph and DAG analysis but still run LM.
     let recon_graph = if incremental {
@@ -602,10 +640,10 @@ fn solve_single_system(
                 .flat_map(|g| g.points.iter().map(|p| p.id.clone()))
                 .collect();
             let graph = reconstruction::build_reconstruction_graph(
-                points, lines, constraints, &group_owned_ids,
+                points, lines, effective_constraints, &group_owned_ids,
             );
             if !graph.is_empty() {
-                reconstruction::reconstruct(&graph, points, lines, constraints);
+                reconstruction::reconstruct(&graph, points, lines, effective_constraints);
             }
             graph
         })
@@ -613,12 +651,12 @@ fn solve_single_system(
 
     resolve_group_points(points, groups);
 
-    let has_any_residual = constraints.iter().any(|c| crate::constraints::has_residual(c))
+    let has_any_residual = effective_constraints.iter().any(|c| crate::constraints::has_residual(c))
         || !arcs.is_empty();
 
     if !has_any_residual {
         return sanitize_max_error(gauss_seidel_solve(
-            points, lines, circles, arcs, shapes, constraints,
+            points, lines, circles, arcs, shapes, effective_constraints,
             iterations, tolerance,
         ));
     }
@@ -627,7 +665,7 @@ fn solve_single_system(
         // ── Graph decomposition: extract structural info and build solve DAG ──
         profiler::timed(|p, us| p.dag_decompose_us += us, || {
             let info = lm::extract_structural_info(
-                points, lines, circles, arcs, shapes, constraints, groups, &recon_graph,
+                points, lines, circles, arcs, shapes, effective_constraints, groups, &recon_graph,
             );
 
             if info.n_vars > 0 {
@@ -648,11 +686,17 @@ fn solve_single_system(
         });
     }
 
-    let cr_ref = if coord_red.vars_saved > 0 { Some(&coord_red) } else { None };
+    // When subgraph detection absorbed constraints, don't also use coord_reduction
+    // (the detected groups already subsume the coordinate equivalences).
+    let cr_ref = if coord_red.vars_saved > 0 && absorbed_constraints.is_empty() {
+        Some(&coord_red)
+    } else {
+        None
+    };
     let final_error = profiler::timed(
         |p, us| p.lm_total_us += us,
         || lm::solve_global(
-            points, lines, circles, arcs, shapes, constraints,
+            points, lines, circles, arcs, shapes, effective_constraints,
             iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
             groups,
             &recon_graph,
