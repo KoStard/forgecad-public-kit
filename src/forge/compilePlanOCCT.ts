@@ -293,24 +293,56 @@ function lowerBooleanPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind
   if (shapes.length === 0) throw new Error('Cannot lower empty boolean');
   if (shapes.length === 1) return shapes[0];
 
-  let result = shapes[0];
-  for (let i = 1; i < shapes.length; i++) {
-    let op: any;
-    switch (plan.op) {
-      case 'union':
-        op = new oc.BRepAlgoAPI_Fuse_3(result, shapes[i], new oc.Message_ProgressRange_1());
-        break;
-      case 'difference':
-        op = new oc.BRepAlgoAPI_Cut_3(result, shapes[i], new oc.Message_ProgressRange_1());
-        break;
-      case 'intersection':
-        op = new oc.BRepAlgoAPI_Common_3(result, shapes[i], new oc.Message_ProgressRange_1());
-        break;
-    }
-    op.Build(new oc.Message_ProgressRange_1());
-    result = op.Shape();
+  // For 2-operand booleans, use the simple API path.
+  if (shapes.length === 2) {
+    return lowerBooleanPair(oc, plan.op, shapes[0], shapes[1]);
   }
-  return result;
+
+  // Batched booleans: use SetArguments/SetTools to let OCCT optimize the
+  // intersection graph across all operands at once, instead of sequential
+  // pairwise operations. This is dramatically faster for many-operand
+  // booleans (e.g. 90 vent cuts: 32s → <5s).
+  const args = new oc.TopTools_ListOfShape_1();
+  args.Append_1(shapes[0]);
+
+  const tools = new oc.TopTools_ListOfShape_1();
+  for (let i = 1; i < shapes.length; i++) {
+    tools.Append_1(shapes[i]);
+  }
+
+  let op: any;
+  switch (plan.op) {
+    case 'union':
+      op = new oc.BRepAlgoAPI_Fuse_1();
+      break;
+    case 'difference':
+      op = new oc.BRepAlgoAPI_Cut_1();
+      break;
+    case 'intersection':
+      op = new oc.BRepAlgoAPI_Common_1();
+      break;
+  }
+  op.SetArguments(args);
+  op.SetTools(tools);
+  op.Build(new oc.Message_ProgressRange_1());
+  return op.Shape();
+}
+
+function lowerBooleanPair(oc: OCCTModule, boolOp: string, a: any, b: any): any {
+  let op: any;
+  switch (boolOp) {
+    case 'union':
+      op = new oc.BRepAlgoAPI_Fuse_3(a, b, new oc.Message_ProgressRange_1());
+      break;
+    case 'difference':
+      op = new oc.BRepAlgoAPI_Cut_3(a, b, new oc.Message_ProgressRange_1());
+      break;
+    case 'intersection':
+      op = new oc.BRepAlgoAPI_Common_3(a, b, new oc.Message_ProgressRange_1());
+      break;
+  }
+  op.Build(new oc.Message_ProgressRange_1());
+  return op.Shape();
 }
 
 function lowerFilletPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'fillet' }>): any {
