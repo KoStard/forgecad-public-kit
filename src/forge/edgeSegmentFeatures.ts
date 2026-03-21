@@ -9,6 +9,8 @@
 import {
   Shape,
   getWasm,
+  getShapeCompilePlan,
+  setShapeCompilePlan,
   getShapeGeometryInfo,
   setShapeGeometryInfo,
   getShapeDimensions,
@@ -151,6 +153,7 @@ function buildResult(target: Shape, manifold: import('manifold-3d').Manifold, so
     topology: 'none',
     sources: [source as any, ...targetInfo.sources],
   });
+  setShapeCompilePlan(result, getShapeCompilePlan(target));
   return result;
 }
 
