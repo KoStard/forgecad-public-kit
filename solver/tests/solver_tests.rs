@@ -3,6 +3,134 @@ use helpers::*;
 use solver::solve_problem;
 use solver::types::*;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Parameterized groups: subgraph detection with bridged rects
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Two rects connected by a bridge (simulating attachCentered).
+/// Each rect has 4 corners + 4 edges + 1 diagonal.
+/// Bridge: 2 midpoints + 1 bridge line + Midpoint constraints.
+/// Detection should find 2 separate 4-point groups, solve correctly,
+/// and produce valid geometry with Length constraints satisfied.
+#[test]
+fn two_rects_bridged_subgraph_detection() {
+    // Rect A: corners at approximately (0,0)-(10,5)
+    // Rect B: corners at approximately (20,0)-(30,5)
+    // Bridge: mid1=midpoint(a_right), mid2=midpoint(b_left), bridge line mid1→mid2
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                point("a_bl", 0.0, 0.0),
+                point("a_br", 10.0, 0.0),
+                point("a_tr", 10.0, 5.0),
+                point("a_tl", 0.0, 5.0),
+                point("a_center", 5.0, 2.5),
+                point("b_bl", 20.0, 0.0),
+                point("b_br", 30.0, 0.0),
+                point("b_tr", 30.0, 5.0),
+                point("b_tl", 20.0, 5.0),
+                point("b_center", 25.0, 2.5),
+                point("mid1", 10.0, 2.5),
+                point("mid2", 20.0, 2.5),
+            ],
+            lines: vec![
+                // Rect A edges
+                line("a_bottom", "a_bl", "a_br"),
+                line("a_right", "a_br", "a_tr"),
+                line("a_top", "a_tr", "a_tl"),
+                line("a_left", "a_tl", "a_bl"),
+                line("a_diag", "a_bl", "a_tr"),
+                // Rect B edges
+                line("b_bottom", "b_bl", "b_br"),
+                line("b_right", "b_br", "b_tr"),
+                line("b_top", "b_tr", "b_tl"),
+                line("b_left", "b_tl", "b_bl"),
+                line("b_diag", "b_bl", "b_tr"),
+                // Bridge
+                line("bridge", "mid1", "mid2"),
+            ],
+            circles: vec![],
+            arcs: vec![],
+            shapes: vec![],
+            groups: vec![],
+            constraints: vec![
+                // Rect A structural
+                Constraint::Horizontal { id: "ah1".into(), line: "a_bottom".into() },
+                Constraint::Horizontal { id: "ah2".into(), line: "a_top".into() },
+                Constraint::Vertical { id: "av1".into(), line: "a_right".into() },
+                Constraint::Vertical { id: "av2".into(), line: "a_left".into() },
+                Constraint::Ccw { id: "accw".into(), points: vec!["a_bl".into(), "a_br".into(), "a_tr".into(), "a_tl".into()] },
+                Constraint::BlockRotation { id: "abr".into(), points: vec!["a_bl".into(), "a_br".into(), "a_tr".into(), "a_tl".into()], axis: "a_bl".into() },
+                Constraint::Midpoint { id: "amp".into(), point: "a_center".into(), line: "a_diag".into() },
+                // Rect B structural
+                Constraint::Horizontal { id: "bh1".into(), line: "b_bottom".into() },
+                Constraint::Horizontal { id: "bh2".into(), line: "b_top".into() },
+                Constraint::Vertical { id: "bv1".into(), line: "b_right".into() },
+                Constraint::Vertical { id: "bv2".into(), line: "b_left".into() },
+                Constraint::Ccw { id: "bccw".into(), points: vec!["b_bl".into(), "b_br".into(), "b_tr".into(), "b_tl".into()] },
+                Constraint::BlockRotation { id: "bbr".into(), points: vec!["b_bl".into(), "b_br".into(), "b_tr".into(), "b_tl".into()], axis: "b_bl".into() },
+                Constraint::Midpoint { id: "bmp".into(), point: "b_center".into(), line: "b_diag".into() },
+                // Dimensional constraints
+                Constraint::Length { id: "la_top".into(), line: "a_top".into(), value: 15.0 },
+                Constraint::Length { id: "la_left".into(), line: "a_left".into(), value: 8.0 },
+                Constraint::Length { id: "lb_top".into(), line: "b_top".into(), value: 12.0 },
+                Constraint::Length { id: "lb_left".into(), line: "b_left".into(), value: 6.0 },
+                // Bridge constraints
+                Constraint::Midpoint { id: "bmp1".into(), point: "mid1".into(), line: "a_right".into() },
+                Constraint::Midpoint { id: "bmp2".into(), point: "mid2".into(), line: "b_left".into() },
+                Constraint::Horizontal { id: "bh".into(), line: "bridge".into() },
+            ],
+            options: Some(SolveOptions {
+                progressive: Some(true),
+                iterations: Some(200),
+                tolerance: Some(1e-4),
+                time_budget_ms: Some(30000),
+                ..Default::default()
+            }),
+        },
+        None,
+    );
+
+    // Check that the solver converged.
+    assert!(result.max_error < 0.01, "two bridged rects should converge: max_error={}", result.max_error);
+
+    // Verify rect A dimensions.
+    let (a_bl_x, a_bl_y) = get_pt(&result, "a_bl");
+    let (a_br_x, a_br_y) = get_pt(&result, "a_br");
+    let (a_tr_x, _) = get_pt(&result, "a_tr");
+    let (a_tl_x, a_tl_y) = get_pt(&result, "a_tl");
+    let a_width = (a_br_x - a_bl_x).abs();
+    let a_height = (a_tl_y - a_bl_y).abs();
+    assert!(approx_eq(a_width, 15.0, 0.1), "rect A width should be 15, got {}", a_width);
+    assert!(approx_eq(a_height, 8.0, 0.1), "rect A height should be 8, got {}", a_height);
+    // H/V satisfied
+    assert!(approx_eq(a_bl_y, a_br_y, 0.01), "rect A bottom should be horizontal");
+    assert!(approx_eq(a_br_x, a_tr_x, 0.01), "rect A right should be vertical");
+    assert!(approx_eq(a_tl_x, a_bl_x, 0.01), "rect A left should be vertical");
+
+    // Verify rect B dimensions.
+    let (b_bl_x, b_bl_y) = get_pt(&result, "b_bl");
+    let (b_br_x, _) = get_pt(&result, "b_br");
+    let (_, b_tl_y) = get_pt(&result, "b_tl");
+    let b_width = (b_br_x - b_bl_x).abs();
+    let b_height = (b_tl_y - b_bl_y).abs();
+    assert!(approx_eq(b_width, 12.0, 0.1), "rect B width should be 12, got {}", b_width);
+    assert!(approx_eq(b_height, 6.0, 0.1), "rect B height should be 6, got {}", b_height);
+
+    // Verify bridge: mid1 and mid2 should be horizontally aligned.
+    let (_, mid1_y) = get_pt(&result, "mid1");
+    let (_, mid2_y) = get_pt(&result, "mid2");
+    assert!(approx_eq(mid1_y, mid2_y, 0.1), "bridge should be horizontal: mid1.y={} mid2.y={}", mid1_y, mid2_y);
+
+    // Verify subgraph detection fired.
+    if let Some(ref m) = result.metadata {
+        let trail_str: String = m.solve_trail.iter().map(|s| format!("  {}={:.4}\n", s.phase, s.error)).collect();
+        eprintln!("Trail:\n{}", trail_str);
+        let detection_fired = m.solve_trail.iter().any(|s| s.phase.contains("subgraph-detection"));
+        assert!(detection_fired, "subgraph detection should fire for bridged rects. Trail:\n{}", trail_str);
+    }
+}
+
 const TOL: f64 = 1e-3;
 const TIGHT: f64 = 1e-6;
 

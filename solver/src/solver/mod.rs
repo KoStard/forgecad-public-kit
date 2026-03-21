@@ -316,7 +316,7 @@ fn solve_system(
 ) -> f64 {
     if let Some(plan) = build_solve_plan(points, lines, circles, arcs, shapes, constraints) {
         // Build a set of group-owned point IDs for quick lookup.
-        let group_point_ids: std::collections::HashSet<String> = groups.iter()
+        let _group_point_ids: std::collections::HashSet<String> = groups.iter()
             .flat_map(|g| g.points.iter().map(|p| p.id.clone()))
             .collect();
 
@@ -595,7 +595,7 @@ fn solve_single_system(
 
     // Subgraph detection: collapse rigid/semi-rigid components into parameterized groups.
     // Only for non-incremental (final) solves.
-    let absorbed_constraints: std::collections::HashSet<usize>;
+    let mut absorbed_constraints: std::collections::HashSet<usize> = std::collections::HashSet::new();
     if !incremental && coord_red.vars_saved > 0 {
         let detection = subgraph_detection::detect_subgraphs(
             points, lines, constraints, groups, &coord_red,
@@ -605,20 +605,23 @@ fn solve_single_system(
             let n_absorbed = detection.absorbed_constraint_indices.len();
             absorbed_constraints = detection.absorbed_constraint_indices;
             groups.extend(detection.new_groups);
-            // Resolve new group-owned points to world coordinates.
             resolve_group_points(points, groups);
+            let n_group_points: usize = groups.iter().filter(|g| g.auto_detected).map(|g| g.points.len()).sum();
+            let n_group_params: usize = groups.iter().filter(|g| g.auto_detected).map(|g| g.params.len()).sum();
+            let frame_vars: usize = groups.iter().filter(|g| g.auto_detected).map(|g| if g.fixed_rotation { 2 } else { 3 }).sum();
+            let vars_before = n_group_points * 2;
+            let vars_after = frame_vars + n_group_params;
             lm::trail_push(
-                &format!("subgraph-detection: {} groups, {} constraints absorbed", n_new, n_absorbed),
+                &format!("subgraph-detection: {} groups, {} absorbed, {} pts → {} vars (was {})",
+                    n_new, n_absorbed, n_group_points, vars_after, vars_before),
                 lm::current_max_error(points, lines, circles, arcs, shapes, constraints),
             );
-        } else {
-            absorbed_constraints = std::collections::HashSet::new();
         }
-    } else {
-        absorbed_constraints = std::collections::HashSet::new();
     }
 
     // Build filtered constraint list excluding absorbed constraints.
+    // Absorbed constraints are internal to parameterized groups — they're
+    // structurally satisfied by the group parameterization.
     let filtered_constraints: Vec<Constraint>;
     let effective_constraints: &Vec<Constraint> = if absorbed_constraints.is_empty() {
         constraints
@@ -686,9 +689,12 @@ fn solve_single_system(
         });
     }
 
-    // When subgraph detection absorbed constraints, don't also use coord_reduction
-    // (the detected groups already subsume the coordinate equivalences).
-    let cr_ref = if coord_red.vars_saved > 0 && absorbed_constraints.is_empty() {
+    // When subgraph detection created groups, disable coord_reduction for LM.
+    // Coord_reduction might link a non-group point's coordinate to a group-owned
+    // point's coordinate. Since group-owned points have no variables, this would
+    // silently eliminate the non-group point's coordinate from the solver.
+    let has_auto_groups = groups.iter().any(|g| g.auto_detected);
+    let cr_ref = if coord_red.vars_saved > 0 && !has_auto_groups {
         Some(&coord_red)
     } else {
         None
