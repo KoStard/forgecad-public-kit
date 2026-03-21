@@ -54,6 +54,63 @@ export function applyFilletSelectionToManifold(
   ]);
 }
 
+/**
+ * Concave fillet: fill the sharp groove with a corner block, then carve
+ * a smooth curved channel with the cylinder. Opposite of convex fillet.
+ */
+export function applyConcaveFilletSelectionToManifold(
+  base: Manifold,
+  selection: ResolvedEdgeFeatureSelection,
+  radius: number,
+  segments: number,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const height = edgeLength(selection);
+  if (!(height > 1e-6)) return base;
+
+  const [qx, qy] = selection.quadrant;
+  const span = height + EDGE_PAD * 2;
+  const frame = edgeFrameMatrix(selection, -EDGE_PAD);
+
+  const corner = wasm.CrossSection.square([radius, radius], false)
+    .translate(qx > 0 ? 0 : -radius, qy > 0 ? 0 : -radius)
+    .extrude(span, 0, 0, undefined, false)
+    .transform(frame);
+  const cylinder = wasm.CrossSection.circle(radius, Math.max(3, segments))
+    .extrude(span, 0, 0, undefined, false)
+    .transform(frame);
+
+  return wasm.Manifold.difference([
+    wasm.Manifold.union([base, corner]),
+    cylinder,
+  ]);
+}
+
+export function applyConcaveChamferSelectionToManifold(
+  base: Manifold,
+  selection: ResolvedEdgeFeatureSelection,
+  size: number,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const height = edgeLength(selection);
+  if (!(height > 1e-6)) return base;
+
+  const [qx, qy] = selection.quadrant;
+  const span = height + EDGE_PAD * 2;
+  const frame = edgeFrameMatrix(selection, -EDGE_PAD);
+  const triangle = new wasm.CrossSection([[
+    [0, 0],
+    [qx * size, 0],
+    [0, qy * size],
+  ]]);
+  const chamfer = triangle
+    .extrude(span, 0, 0, undefined, false)
+    .transform(frame);
+
+  // For concave chamfer: add the triangle (fill groove)
+  return wasm.Manifold.union([base, chamfer]);
+}
+
 export function applyChamferSelectionToManifold(
   base: Manifold,
   selection: ResolvedEdgeFeatureSelection,
