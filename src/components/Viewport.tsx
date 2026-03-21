@@ -3830,6 +3830,7 @@ function ConstructionGhostOverlay({ matrix }: { matrix: THREE.Matrix4 }) {
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const isEvaluating = useForgeStore((s) => s.isEvaluating);
+  const evaluationPhase = useForgeStore((s) => s.evaluationPhase);
   const result = useForgeStore((s) => s.lastValidResult);
   const previewFile = useForgeStore((s) => s.previewFile);
   const files = useForgeStore((s) => s.files);
@@ -4724,7 +4725,9 @@ export function Viewport() {
             pointerEvents: 'none',
           }}
         >
-          Evaluating…
+          {evaluationPhase === 'kernel-init' ? 'Loading geometry kernel…'
+            : evaluationPhase === 'serializing' ? 'Preparing display…'
+            : 'Evaluating model…'}
         </div>
       )}
 

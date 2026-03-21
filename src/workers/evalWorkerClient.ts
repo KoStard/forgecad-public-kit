@@ -4,6 +4,8 @@ import type {
   EvalWorkerResponse,
   EvalWorkerFaceInfoResult,
   SerializedRunResult,
+  ActiveBackend,
+  EvalPhase,
 } from './evalWorkerProtocol';
 
 interface PendingRun {
@@ -16,7 +18,9 @@ interface PendingFaceInfo {
   reject: (error: Error) => void;
 }
 
-/** Maximum wall-clock time (ms) a run may take before the worker is killed. */
+/** Maximum wall-clock time (ms) for kernel init (WASM loading). */
+const INIT_TIMEOUT_MS = 120_000;
+/** Maximum wall-clock time (ms) a script evaluation may take. */
 const RUN_TIMEOUT_MS = 30_000;
 
 class EvalWorkerClient {
@@ -27,6 +31,9 @@ class EvalWorkerClient {
   private readonly pendingFaceInfo = new Map<number, PendingFaceInfo>();
   private runTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
+  /** Called when the worker reports a progress phase change. */
+  public onProgress: ((phase: EvalPhase) => void) | null = null;
+
   private getWorker(): Worker {
     if (this.worker) return this.worker;
 
@@ -34,6 +41,19 @@ class EvalWorkerClient {
 
     this.worker.onmessage = (event: MessageEvent<EvalWorkerResponse>) => {
       const { data } = event;
+
+      if (data.type === 'progress') {
+        this.onProgress?.(data.payload.phase);
+        // When evaluation starts, switch from the generous init timeout
+        // to the shorter run timeout.
+        if (data.payload.phase === 'evaluating') {
+          this.clearRunTimeout();
+          this.runTimeoutId = setTimeout(() => {
+            this.killWorker(`Script execution timed out after ${RUN_TIMEOUT_MS / 1000}s`);
+          }, RUN_TIMEOUT_MS);
+        }
+        return;
+      }
 
       if (data.type === 'run-success' || data.type === 'run-error') {
         this.clearRunTimeout();
@@ -102,8 +122,8 @@ class EvalWorkerClient {
    * Run an eval in the worker. Any in-flight run is cancelled (its promise rejects
    * with 'cancelled'). Only the latest run's result is resolved.
    *
-   * If the worker doesn't respond within RUN_TIMEOUT_MS, it is terminated and
-   * recreated on the next call — preventing hung scripts from blocking the UI.
+   * A generous init timeout (120s) covers WASM loading. Once the worker signals
+   * 'evaluating', a shorter run timeout (30s) takes over.
    */
   run(options: {
     code: string;
@@ -112,6 +132,7 @@ class EvalWorkerClient {
     quality: ForgeQualityPreset;
     paramOverrides: Record<string, number>;
     isNotebook: boolean;
+    activeBackend: ActiveBackend;
   }): Promise<SerializedRunResult> {
     for (const req of this.pendingRuns.values()) req.reject(new Error('cancelled'));
     this.pendingRuns.clear();
@@ -122,10 +143,11 @@ class EvalWorkerClient {
     return new Promise<SerializedRunResult>((resolve, reject) => {
       this.pendingRuns.set(seq, { resolve, reject });
 
-      // Start timeout watchdog — kills the worker if the run takes too long.
+      // Start with generous init timeout — replaced by run timeout
+      // once worker signals 'evaluating' phase.
       this.runTimeoutId = setTimeout(() => {
-        this.killWorker(`Script execution timed out after ${RUN_TIMEOUT_MS / 1000}s`);
-      }, RUN_TIMEOUT_MS);
+        this.killWorker(`Kernel initialization timed out after ${INIT_TIMEOUT_MS / 1000}s`);
+      }, INIT_TIMEOUT_MS);
 
       const request: EvalWorkerRequest = { type: 'run', payload: { seq, ...options } };
       this.getWorker().postMessage(request);

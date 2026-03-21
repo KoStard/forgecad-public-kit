@@ -1,4 +1,4 @@
-import { init, runScript, setParamOverrides } from '@forge/index';
+import { init, runScript, setParamOverrides, setActiveBackend } from '@forge/index';
 import type { RunResult } from '@forge/runner';
 import {
   getSolverWasmRunDebugSnapshot,
@@ -31,15 +31,18 @@ let isExecuting = false;
 let queuedPayload: EvalWorkerRunPayload | null = null;
 
 async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
-  const { seq, code, file, files, quality, paramOverrides, isNotebook } = payload;
+  const { seq, code, file, files, quality, paramOverrides, isNotebook, activeBackend } = payload;
 
   try {
     const t0 = performance.now();
+    worker.postMessage({ type: 'progress', payload: { seq, phase: 'kernel-init' } });
     await ensureKernelReady();
     const tKernel = performance.now();
 
+    worker.postMessage({ type: 'progress', payload: { seq, phase: 'evaluating' } });
     resetSolverWasmStats();
     setParamOverrides(paramOverrides);
+    setActiveBackend(activeBackend);
 
     let runResult;
     if (isNotebook) {
@@ -61,6 +64,7 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
     }
 
     lastRunResult = runResult;
+    worker.postMessage({ type: 'progress', payload: { seq, phase: 'serializing' } });
     const { serialized, transferables } = serializeRunResult(runResult, getSolverWasmRunDebugSnapshot());
     const tSerialize = performance.now();
 

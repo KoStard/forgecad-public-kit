@@ -87,6 +87,10 @@ export interface SerializedRunResult {
 
 // ---- Message types ----
 
+export type ActiveBackend = 'occt' | 'manifold';
+
+export type EvalPhase = 'kernel-init' | 'evaluating' | 'serializing';
+
 export interface EvalWorkerRunPayload {
   seq: number;
   code: string;
@@ -95,6 +99,7 @@ export interface EvalWorkerRunPayload {
   quality: ForgeQualityPreset;
   paramOverrides: Record<string, number>;
   isNotebook: boolean;
+  activeBackend: ActiveBackend;
 }
 
 export interface EvalWorkerRunRequest {
@@ -144,5 +149,13 @@ export interface EvalWorkerFaceInfoError {
   payload: { reqId: number; message: string };
 }
 
+export interface EvalWorkerProgressMessage {
+  type: 'progress';
+  payload: {
+    seq: number;
+    phase: EvalPhase;
+  };
+}
+
 export type EvalWorkerRequest = EvalWorkerRunRequest | EvalWorkerFaceInfoRequest;
-export type EvalWorkerResponse = EvalWorkerRunSuccess | EvalWorkerRunError | EvalWorkerFaceInfoSuccess | EvalWorkerFaceInfoError;
+export type EvalWorkerResponse = EvalWorkerRunSuccess | EvalWorkerRunError | EvalWorkerProgressMessage | EvalWorkerFaceInfoSuccess | EvalWorkerFaceInfoError;

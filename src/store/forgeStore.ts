@@ -33,6 +33,7 @@ interface CacheEntry {
   files: Record<string, string>;
   paramOverrides: Record<string, number>;
   quality: string;
+  backend: string;
   result: RunResult;
 }
 
@@ -45,12 +46,14 @@ function lookupCache(
   files: Record<string, string>,
   paramOverrides: Record<string, number>,
   quality: string,
+  backend: string,
 ): RunResult | null {
   const entry = runResultCache.get(filePath);
   if (!entry) return null;
   if (
     entry.code !== code ||
     entry.quality !== quality ||
+    entry.backend !== backend ||
     JSON.stringify(entry.paramOverrides) !== JSON.stringify(paramOverrides) ||
     JSON.stringify(entry.files) !== JSON.stringify(files)
   ) return null;
@@ -63,10 +66,11 @@ function storeCache(
   files: Record<string, string>,
   paramOverrides: Record<string, number>,
   quality: string,
+  backend: string,
   result: RunResult,
 ): void {
   runResultCache.delete(filePath); // re-insert to mark as recently used
-  runResultCache.set(filePath, { code, files, paramOverrides, quality, result });
+  runResultCache.set(filePath, { code, files, paramOverrides, quality, backend, result });
   if (runResultCache.size > RUN_RESULT_CACHE_MAX) {
     runResultCache.delete(runResultCache.keys().next().value!);
   }
@@ -268,6 +272,9 @@ interface ForgeStore {
   jointAnimationSpeed: number;
 
   isEvaluating: boolean;
+  evaluationPhase: 'idle' | 'kernel-init' | 'evaluating' | 'serializing';
+  activeBackend: 'occt' | 'manifold';
+  setActiveBackend: (backend: 'occt' | 'manifold') => void;
 
   execute: () => Promise<void>;
   setParam: (name: string, value: number) => void;
@@ -423,6 +430,8 @@ interface ViewPreferencesState {
   lengthUnit: LengthUnit;
   /** Disable the run-result cache so every execution round-trips to the worker. */
   disableRunCache: boolean;
+  /** Active geometry backend for evaluation. */
+  activeBackend: 'occt' | 'manifold';
 }
 
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
@@ -944,6 +953,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   jointAnimationSpeed: clampAnimationSpeed(initialViewPreferences.jointAnimationSpeed ?? 1),
 
   isEvaluating: false,
+  evaluationPhase: 'idle' as const,
+  activeBackend: (initialViewPreferences.activeBackend as 'occt' | 'manifold') || 'manifold',
+  setActiveBackend: (backend) => {
+    writeViewPreferences({ activeBackend: backend });
+    set({ activeBackend: backend });
+    get().execute();
+  },
 
   execute: async () => {
     const {
@@ -961,15 +977,15 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (!code) return;
 
     // Cache hit — show previous result immediately, no worker round-trip
-    const cached = get().disableRunCache ? null : lookupCache(previewFile, code, files, paramOverrides, runQuality);
+    const cached = get().disableRunCache ? null : lookupCache(previewFile, code, files, paramOverrides, runQuality, get().activeBackend);
     if (cached) {
       const applied = buildRunState(previewFile, cached, get());
-      set({ ...applied.nextState, lastValidResult: cached, isEvaluating: false });
+      set({ ...applied.nextState, lastValidResult: cached, isEvaluating: false, evaluationPhase: 'idle' as const });
       writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
       return;
     }
 
-    set({ isEvaluating: true });
+    set({ isEvaluating: true, evaluationPhase: 'kernel-init' });
 
     try {
       const tDispatch = performance.now();
@@ -980,6 +996,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         quality: runQuality,
         paramOverrides,
         isNotebook: isNotebookFile(previewFile),
+        activeBackend: get().activeBackend,
       });
       const tReceived = performance.now();
 
@@ -992,11 +1009,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       );
 
       if (runResult.error) {
-        set({ result: runResult, consoleLogs: runResult.logs, previewFile, isEvaluating: false });
+        set({ result: runResult, consoleLogs: runResult.logs, previewFile, isEvaluating: false, evaluationPhase: 'idle' as const });
       } else {
-        storeCache(previewFile, code, files, paramOverrides, runQuality, runResult);
+        storeCache(previewFile, code, files, paramOverrides, runQuality, get().activeBackend, runResult);
         const applied = buildRunState(previewFile, runResult, get());
-        set({ ...applied.nextState, lastValidResult: runResult, isEvaluating: false });
+        set({ ...applied.nextState, lastValidResult: runResult, isEvaluating: false, evaluationPhase: 'idle' as const });
         writeViewPreferences({ objectSettingsByFile: applied.nextObjectSettingsByFile, cutPlaneEnabled: applied.nextCutPlaneEnabled });
       }
     } catch (error: unknown) {
@@ -1004,7 +1021,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       if (error instanceof Error && error.message === 'cancelled') return;
       const message = error instanceof Error ? error.message : String(error);
       const errResult = createErrorRunResult(message, runQuality);
-      set({ result: errResult, consoleLogs: errResult.logs, previewFile, isEvaluating: false });
+      set({ result: errResult, consoleLogs: errResult.logs, previewFile, isEvaluating: false, evaluationPhase: 'idle' as const });
     }
   },
 
@@ -1671,3 +1688,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set({ disableRunCache: disabled });
   },
 }));
+
+// Wire up worker progress reporting → store evaluationPhase
+evalWorkerClient.onProgress = (phase) => {
+  useForgeStore.setState({ evaluationPhase: phase });
+};

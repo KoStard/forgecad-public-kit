@@ -106,7 +106,7 @@ export function getWasm(): ManifoldToplevel {
  * - 'manifold' — Manifold only (original behaviour)
  */
 export type ActiveBackend = 'occt' | 'manifold';
-let _activeBackend: ActiveBackend = 'occt';
+let _activeBackend: ActiveBackend = 'manifold';
 
 export function setActiveBackend(backend: ActiveBackend): void {
   _activeBackend = backend;
@@ -703,8 +703,7 @@ export function buildShapeFromCompilePlan(
       if (e instanceof OCCTUnsupportedError) {
         backend = lowerShapeCompilePlanToShapeBackend(plan, getWasm());
       } else {
-        console.warn(`[ForgeCAD] OCCT lowering failed, falling back to Manifold:`, e);
-        backend = lowerShapeCompilePlanToShapeBackend(plan, getWasm());
+        throw e;
       }
     }
   }

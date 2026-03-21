@@ -484,9 +484,7 @@ export function lowerShapeCompilePlanToOCCT(
       const vec = new oc.gp_Vec_4(0, 0, height);
 
       if (plan.scaleTop && (plan.scaleTop[0] !== 1 || plan.scaleTop[1] !== 1)) {
-        // Scaled extrusion — OCCT doesn't have direct support.
-        // Use MakePrism for now (no scale), or fall back to Manifold.
-        // TODO: implement via loft between base and scaled top profile
+        throw new OCCTUnsupportedError('extrude with scaleTop');
       }
 
       const prism = new oc.BRepPrimAPI_MakePrism_1(face, vec, false, true);
@@ -513,6 +511,9 @@ export function lowerShapeCompilePlanToOCCT(
       const radians = degrees * Math.PI / 180;
       const revol = new oc.BRepPrimAPI_MakeRevol_1(face, axis, radians, true);
       revol.Build(new oc.Message_ProgressRange_1());
+      if (!revol.IsDone()) {
+        throw new Error('OCCT revolve failed — profile may be too complex or self-intersecting');
+      }
       return revol.Shape();
     }
 
