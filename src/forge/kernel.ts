@@ -54,7 +54,7 @@ import {
   type ShapeBackend,
   isShapeBackend,
 } from './shapeBackend';
-import { requireManifoldShapeBackend, wrapManifoldShapeBackend, lowerShapeCompilePlanToShapeBackend } from './backends/manifold';
+import { wrapManifoldShapeBackend, lowerShapeCompilePlanToShapeBackend, isManifoldCapableBackend } from './backends/manifold';
 import { lowerShapeCompilePlanToOCCTBackend, OCCTUnsupportedError, isOCCTShapeBackend, initOCCT } from './backends/occt';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
@@ -1062,7 +1062,7 @@ export class Shape {
         shapes,
         nextPlan
           ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-          : new Shape(getWasm().Manifold.union(requireManifoldOperands('Shape.add()', shapes)), this.colorHex),
+          : new Shape(booleanViaBackend('union', shapes, 'Shape.add()'), this.colorHex),
       ),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
     ), nextPlan);
@@ -1086,7 +1086,7 @@ export class Shape {
         this,
         nextPlan
           ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-          : new Shape(getWasm().Manifold.difference(requireManifoldOperands('Shape.subtract()', shapes)), this.colorHex),
+          : new Shape(booleanViaBackend('difference', shapes, 'Shape.subtract()'), this.colorHex),
       ),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
     ), nextPlan);
@@ -1110,7 +1110,7 @@ export class Shape {
         shapes,
         nextPlan
           ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-          : new Shape(getWasm().Manifold.intersection(requireManifoldOperands('Shape.intersect()', shapes)), this.colorHex),
+          : new Shape(booleanViaBackend('intersection', shapes, 'Shape.intersect()'), this.colorHex),
       ),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
     ), nextPlan);
@@ -1480,9 +1480,27 @@ function normalizePoint3(value: unknown, apiName: string, index: number): [numbe
   throw new Error(`${apiName} argument ${index}: expected a [x, y, z] point, got ${describeApiArg(value)}`);
 }
 
-function requireManifoldOrConvert(backend: ShapeBackend, apiName: string): Manifold {
-  if (isOCCTShapeBackend(backend)) {
-    const wasm = getWasm();
+/**
+ * Perform a boolean operation through the active backend abstraction layer.
+ * When compile plans exist for all operands, callers should use
+ * buildShapeFromCompilePlan() instead. This is the fallback for shapes
+ * that lack compile plans (e.g. from warp(), smoothOut(), or external sources).
+ */
+function booleanViaBackend(
+  op: 'union' | 'difference' | 'intersection',
+  shapes: Shape[],
+  apiName: string,
+): ShapeBackend {
+  const backends = shapes.map((shape) => getShapeRuntimeBackendInternal(shape));
+  const wasm = getWasm();
+
+  // Convert all backends to Manifold objects for the boolean.
+  // This works for both Manifold-native and OCCT backends (via mesh reconstruction).
+  const manifolds = backends.map((backend, index) => {
+    if (isManifoldCapableBackend(backend)) {
+      return backend.requireManifold(`${apiName} operand ${index + 1}`);
+    }
+    // OCCT or other backend — reconstruct Manifold from mesh
     const mesh = backend.getMesh();
     const wasmMesh = new wasm.Mesh({
       numProp: mesh.numProp,
@@ -1492,13 +1510,55 @@ function requireManifoldOrConvert(backend: ShapeBackend, apiName: string): Manif
       mergeToVert: mesh.mergeToVert,
     });
     return new wasm.Manifold(wasmMesh);
+  });
+
+  let result: Manifold;
+  switch (op) {
+    case 'union':
+      result = wasm.Manifold.union(manifolds);
+      break;
+    case 'difference':
+      result = wasm.Manifold.difference(manifolds);
+      break;
+    case 'intersection':
+      result = wasm.Manifold.intersection(manifolds);
+      break;
   }
-  return requireManifoldShapeBackend(backend, apiName);
+  return wrapManifoldShapeBackend(result);
 }
 
-function requireManifoldOperands(apiName: string, shapes: Shape[]): Manifold[] {
-  return shapes.map((shape, index) =>
-    requireManifoldOrConvert(getShapeRuntimeBackendInternal(shape), `${apiName} operand ${index + 1}`));
+/**
+ * Perform a convex hull through the active backend.
+ * Fallback for shapes/points that lack compile plans.
+ */
+function hullViaBackend(
+  shapes: Shape[],
+  points: [number, number, number][],
+): ShapeBackend {
+  const wasm = getWasm();
+  const items: (Manifold | [number, number, number])[] = [];
+
+  for (const shape of shapes) {
+    const backend = getShapeRuntimeBackendInternal(shape);
+    if (isManifoldCapableBackend(backend)) {
+      items.push(backend.requireManifold('hull3d()'));
+    } else {
+      const mesh = backend.getMesh();
+      const wasmMesh = new wasm.Mesh({
+        numProp: mesh.numProp,
+        triVerts: mesh.triVerts,
+        vertProperties: mesh.vertProperties,
+        mergeFromVert: mesh.mergeFromVert,
+        mergeToVert: mesh.mergeToVert,
+      });
+      items.push(new wasm.Manifold(wasmMesh));
+    }
+  }
+  for (const point of points) {
+    items.push(point);
+  }
+
+  return wrapManifoldShapeBackend(wasm.Manifold.hull(items));
 }
 
 // --- Boolean helpers ---
@@ -1523,7 +1583,7 @@ export function union(...inputs: ShapeOperandInput[]): Shape {
       shapes,
       nextPlan
         ? buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex)
-        : new Shape(getWasm().Manifold.union(requireManifoldOperands('union()', shapes)), shapes[0].colorHex),
+        : new Shape(booleanViaBackend('union', shapes, 'union()'), shapes[0].colorHex),
     ),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), nextPlan);
@@ -1548,7 +1608,7 @@ export function difference(...inputs: ShapeOperandInput[]): Shape {
       shapes[0],
       nextPlan
         ? buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex)
-        : new Shape(getWasm().Manifold.difference(requireManifoldOperands('difference()', shapes)), shapes[0].colorHex),
+        : new Shape(booleanViaBackend('difference', shapes, 'difference()'), shapes[0].colorHex),
     ),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), nextPlan);
@@ -1573,7 +1633,7 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
       shapes,
       nextPlan
         ? buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex)
-        : new Shape(getWasm().Manifold.intersection(requireManifoldOperands('intersection()', shapes)), shapes[0].colorHex),
+        : new Shape(booleanViaBackend('intersection', shapes, 'intersection()'), shapes[0].colorHex),
     ),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), nextPlan);
@@ -1583,16 +1643,14 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
 export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]): Shape {
   const shapeArgs: Shape[] = [];
   const pointArgs: [number, number, number][] = [];
-  const items = args.map((arg, index) => {
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
     if (arg instanceof Shape || (arg && typeof arg === 'object' && typeof (arg as { toShape?: unknown }).toShape === 'function')) {
-      const shape = unwrapShapeLike(arg);
-      shapeArgs.push(shape);
-      return requireManifoldOrConvert(getShapeRuntimeBackendInternal(shape), `hull3d() shape ${shapeArgs.length}`);
+      shapeArgs.push(unwrapShapeLike(arg));
+    } else {
+      pointArgs.push(normalizePoint3(arg, 'hull3d()', index + 1));
     }
-    const point = normalizePoint3(arg, 'hull3d()', index + 1);
-    pointArgs.push(point);
-    return point;
-  });
+  }
   const nextPlan = createOwnedTopologyRewritePlan(
     buildHullShapeCompilePlan(shapeArgs.map((shape) => getShapeCompilePlanInternal(shape)), pointArgs),
     'hull',
@@ -1600,7 +1658,7 @@ export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]
   );
   const out = nextPlan
     ? buildShapeFromCompilePlan(nextPlan, shapeArgs[0]?.colorHex)
-    : new Shape(getWasm().Manifold.hull(items), shapeArgs[0]?.colorHex);
+    : new Shape(hullViaBackend(shapeArgs, pointArgs), shapeArgs[0]?.colorHex);
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(shapeArgs, out),
     shapeArgs.length > 0
@@ -1609,19 +1667,27 @@ export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]
   ), nextPlan);
 }
 
-/** Create shape from a signed distance function. Positive = inside. */
+/**
+ * Create shape from a signed distance function. Positive = inside.
+ *
+ * This operation is inherently Manifold-only — it evaluates the SDF on a grid
+ * and constructs a mesh via marching cubes. It works regardless of the active
+ * backend setting because the result is always a Manifold mesh.
+ */
 export function levelSet(
   sdf: (point: [number, number, number]) => number,
   bounds: { min: [number, number, number]; max: [number, number, number] },
   edgeLength: number,
   level = 0,
 ): Shape {
-  return new Shape(getWasm().Manifold.levelSet(
+  const wasm = getWasm();
+  const manifold = wasm.Manifold.levelSet(
     sdf as any,
     { min: bounds.min, max: bounds.max },
     edgeLength,
     level,
-  ), undefined, {
+  );
+  return new Shape(wrapManifoldShapeBackend(manifold), undefined, {
     fidelity: 'sampled',
     sources: ['level-set'],
   });
