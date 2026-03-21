@@ -40,23 +40,30 @@ export function applyFilletSelectionToManifold(
   const span = height + EDGE_PAD * 2;
   const frame = edgeFrameMatrix(selection, -EDGE_PAD);
 
+  // Corner block covering the sharp edge region
   const corner = wasm.CrossSection.square([radius, radius], false)
     .translate(qx > 0 ? 0 : -radius, qy > 0 ? 0 : -radius)
     .extrude(span, 0, 0, undefined, false)
     .transform(frame);
+
+  // Cylinder offset to the inner corner of the block (INSIDE the body).
+  // For a 90° edge the center is at (qx*r, qy*r) in local frame — exactly
+  // where the two faces' offset-by-r planes intersect.
   const cylinder = wasm.CrossSection.circle(radius, Math.max(3, segments))
+    .translate(qx * radius, qy * radius)
     .extrude(span, 0, 0, undefined, false)
     .transform(frame);
 
-  return wasm.Manifold.union([
-    wasm.Manifold.difference([base, corner]),
-    cylinder,
-  ]);
+  // The "crescent" is the sharp material between the corner block and the
+  // cylinder arc — exactly the region to carve away for a smooth fillet.
+  const crescent = wasm.Manifold.difference([corner, cylinder]);
+  return wasm.Manifold.difference([base, crescent]);
 }
 
 /**
- * Concave fillet: fill the sharp groove with a corner block, then carve
- * a smooth curved channel with the cylinder. Opposite of convex fillet.
+ * Concave fillet: fill the sharp groove with material up to a smooth arc.
+ * Opposite of convex: we ADD the crescent (corner minus cylinder) to fill
+ * the sharp interior corner with a smooth curve.
  */
 export function applyConcaveFilletSelectionToManifold(
   base: Manifold,
@@ -76,14 +83,16 @@ export function applyConcaveFilletSelectionToManifold(
     .translate(qx > 0 ? 0 : -radius, qy > 0 ? 0 : -radius)
     .extrude(span, 0, 0, undefined, false)
     .transform(frame);
+
   const cylinder = wasm.CrossSection.circle(radius, Math.max(3, segments))
+    .translate(qx * radius, qy * radius)
     .extrude(span, 0, 0, undefined, false)
     .transform(frame);
 
-  return wasm.Manifold.difference([
-    wasm.Manifold.union([base, corner]),
-    cylinder,
-  ]);
+  // Crescent = corner minus cylinder arc. For concave edges, this is the
+  // material to ADD to fill the groove up to the smooth arc surface.
+  const crescent = wasm.Manifold.difference([corner, cylinder]);
+  return wasm.Manifold.union([base, crescent]);
 }
 
 export function applyConcaveChamferSelectionToManifold(
