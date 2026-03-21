@@ -9,7 +9,7 @@
 //! or any constraint pattern that creates a semi-rigid structure.
 
 use std::collections::{HashMap, HashSet};
-use crate::types::{Constraint, Line, LocalPoint, ParamCoord, Point, SketchGroup};
+use crate::types::{Constraint, Line, LocalPoint, ParamCoord, Point, Shape, SketchGroup};
 use super::coord_reduction::CoordReduction;
 
 /// Result of subgraph detection: new groups to add and constraints to absorb.
@@ -363,10 +363,9 @@ pub fn detect_subgraphs(
                 Constraint::Ccw { points: pts, .. } => {
                     pts.iter().all(|p| member_ids.contains(p.as_str()))
                 }
-                Constraint::BlockRotation { points: pts, axis, .. } => {
-                    let pts_in = pts.iter().all(|p| member_ids.contains(p.as_str()));
-                    let axis_in = member_ids.contains(axis.as_str());
-                    pts_in && axis_in
+                Constraint::BlockRotation { points: pts, .. } => {
+                    // axis is "x" or "y" (not a point ID), so only check points.
+                    pts.iter().all(|p| member_ids.contains(p.as_str()))
                 }
                 Constraint::Midpoint { point, line, .. } => {
                     let p_in = member_ids.contains(point.as_str());
@@ -413,6 +412,252 @@ pub fn detect_subgraphs(
     DetectionResult {
         new_groups,
         absorbed_constraint_indices: all_absorbed,
+    }
+}
+
+// ─── Constraint classification for bottom-up decomposition ──────────────────
+
+/// Result of classifying constraints into per-cluster internal vs bridge.
+pub struct ConstraintClassification {
+    /// Each cluster: (point indices, constraint indices internal to this cluster).
+    pub clusters: Vec<(Vec<usize>, Vec<usize>)>,
+    /// Indices of constraints that span multiple clusters (bridges).
+    pub bridge_indices: Vec<usize>,
+    /// Total number of line-connected components found (for diagnostics).
+    pub total_components: usize,
+    /// Sizes of all components found (sorted descending, for diagnostics).
+    pub component_sizes: Vec<usize>,
+}
+
+/// Collect all point indices that a constraint references (directly or through lines).
+fn constraint_point_indices(
+    c: &Constraint,
+    pt_idx: &HashMap<&str, usize>,
+    line_map: &HashMap<&str, &Line>,
+    _shape_map: &HashMap<&str, &Shape>,
+) -> Vec<usize> {
+    let mut out = Vec::new();
+
+    // Inline helpers avoid borrow-checker issues with closures.
+    macro_rules! push_pt {
+        ($id:expr) => { if let Some(&i) = pt_idx.get($id.as_str()) { out.push(i); } };
+    }
+    macro_rules! push_line {
+        ($lid:expr) => {
+            if let Some(l) = line_map.get($lid.as_str()) {
+                if let Some(&i) = pt_idx.get(l.a.as_str()) { out.push(i); }
+                if let Some(&i) = pt_idx.get(l.b.as_str()) { out.push(i); }
+            }
+        };
+    }
+
+    match c {
+        Constraint::Coincident { a, b, .. } => { push_pt!(a); push_pt!(b); }
+        Constraint::Horizontal { line, .. } | Constraint::Vertical { line, .. }
+        | Constraint::Length { line, .. } | Constraint::AbsoluteAngle { line, .. } => {
+            push_line!(line);
+        }
+        Constraint::Parallel { a, b, .. } | Constraint::Perpendicular { a, b, .. }
+        | Constraint::Equal { a, b, .. } | Constraint::Angle { a, b, .. }
+        | Constraint::LineDistance { a, b, .. } | Constraint::AngleBetween { a, b, .. }
+        | Constraint::SameDirection { a, b, .. } | Constraint::OppositeDirection { a, b, .. } => {
+            push_line!(a); push_line!(b);
+        }
+        Constraint::Symmetric { a, b, axis, .. } => {
+            push_pt!(a); push_pt!(b); push_line!(axis);
+        }
+        Constraint::Concentric { .. } | Constraint::EqualRadius { .. } => {
+            // Circle/arc-only — no point references for line-based decomposition.
+        }
+        Constraint::Collinear { point, line, .. }
+        | Constraint::Midpoint { point, line, .. }
+        | Constraint::PointOnLine { point, line, .. }
+        | Constraint::PointLineDistance { point, line, .. } => {
+            push_pt!(point); push_line!(line);
+        }
+        Constraint::Fixed { point, .. } => { push_pt!(point); }
+        Constraint::PointOnCircle { point, .. } => { push_pt!(point); }
+        Constraint::Distance { a, b, .. } | Constraint::HDistance { a, b, .. }
+        | Constraint::VDistance { a, b, .. } | Constraint::ShapeEqualCentroid { a, b, .. } => {
+            push_pt!(a); push_pt!(b);
+        }
+        Constraint::Radius { .. } | Constraint::Diameter { .. }
+        | Constraint::ArcLength { .. } => {
+            // Circle/arc-only — no point references.
+        }
+        Constraint::Tangent { line, .. } => {
+            if let Some(lid) = line { push_line!(lid); }
+        }
+        Constraint::LineTangentArc { line, .. } => {
+            push_line!(line);
+        }
+        Constraint::ShapeCentroidX { .. } | Constraint::ShapeCentroidY { .. }
+        | Constraint::ShapeWidth { .. } | Constraint::ShapeHeight { .. }
+        | Constraint::ShapeArea { .. } => {
+            // Shape constraints — treated as bridges for line-based decomposition.
+        }
+        Constraint::Ccw { points: pts, .. } => {
+            for p in pts { push_pt!(p); }
+        }
+        Constraint::BlockRotation { points: pts, .. } => {
+            // axis is "x" or "y" (not a point ID), only points matter.
+            for p in pts { push_pt!(p); }
+        }
+    }
+
+    out
+}
+
+/// Classify constraints into per-cluster internal constraints and bridge constraints.
+///
+/// Uses line-based union-find (same as `detect_subgraphs`) to identify connected
+/// components of non-fixed, non-group-owned points. A constraint is "internal" to
+/// a cluster if all its referenced points belong to that cluster. Otherwise it's a bridge.
+///
+/// Only returns clusters with ≥4 points (minimum for profitable group creation).
+pub fn classify_constraints(
+    points: &[Point],
+    lines: &[Line],
+    shapes: &[Shape],
+    constraints: &[Constraint],
+    existing_groups: &[SketchGroup],
+) -> ConstraintClassification {
+    if points.is_empty() {
+        return ConstraintClassification { clusters: vec![], bridge_indices: vec![], total_components: 0, component_sizes: vec![] };
+    }
+
+    let n = points.len();
+    let pt_idx: HashMap<&str, usize> = points.iter().enumerate()
+        .map(|(i, p)| (p.id.as_str(), i))
+        .collect();
+    let line_map: HashMap<&str, &Line> = lines.iter()
+        .map(|l| (l.id.as_str(), l))
+        .collect();
+    let shape_map: HashMap<&str, &Shape> = shapes.iter()
+        .map(|s| (s.id.as_str(), s))
+        .collect();
+
+    // Set of point IDs already owned by existing groups.
+    let group_owned: HashSet<&str> = existing_groups.iter()
+        .flat_map(|g| g.points.iter().map(|lp| lp.id.as_str()))
+        .collect();
+
+    // Union-find over points — connect via lines only.
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut rank: Vec<usize> = vec![0; n];
+
+    fn uf_find_local(parent: &mut [usize], x: usize) -> usize {
+        if parent[x] != x {
+            parent[x] = uf_find_local(parent, parent[x]);
+        }
+        parent[x]
+    }
+    fn uf_union_local(parent: &mut [usize], rank: &mut [usize], a: usize, b: usize) {
+        let ra = uf_find_local(parent, a);
+        let rb = uf_find_local(parent, b);
+        if ra == rb { return; }
+        match rank[ra].cmp(&rank[rb]) {
+            std::cmp::Ordering::Less => parent[ra] = rb,
+            std::cmp::Ordering::Greater => parent[rb] = ra,
+            std::cmp::Ordering::Equal => { parent[rb] = ra; rank[ra] += 1; }
+        }
+    }
+
+    for line in lines {
+        if let (Some(&ai), Some(&bi)) = (pt_idx.get(line.a.as_str()), pt_idx.get(line.b.as_str())) {
+            uf_union_local(&mut parent, &mut rank, ai, bi);
+        }
+    }
+
+    // Group non-fixed, non-group-owned points by component root.
+    let mut components: HashMap<usize, Vec<usize>> = HashMap::new();
+    for i in 0..n {
+        if points[i].fixed || group_owned.contains(points[i].id.as_str()) {
+            continue;
+        }
+        let root = uf_find_local(&mut parent, i);
+        components.entry(root).or_default().push(i);
+    }
+
+    let total_components = components.len();
+    let mut component_sizes: Vec<usize> = components.values().map(|v| v.len()).collect();
+    component_sizes.sort_unstable();
+    component_sizes.reverse();
+
+    // Filter to components with ≥4 points (minimum for profitable grouping).
+    let large_components: Vec<(usize, Vec<usize>)> = components.into_iter()
+        .filter(|(_, members)| members.len() >= 4)
+        .collect();
+
+    if large_components.len() < 2 {
+        // Need at least 2 clusters for bottom-up to be worthwhile.
+        return ConstraintClassification {
+            clusters: vec![], bridge_indices: vec![],
+            total_components, component_sizes,
+        };
+    }
+
+    // Build point-index → cluster-index mapping.
+    let mut point_to_cluster: HashMap<usize, usize> = HashMap::new();
+    for (ci, (_, members)) in large_components.iter().enumerate() {
+        for &pi in members {
+            point_to_cluster.insert(pi, ci);
+        }
+    }
+
+    // Classify each constraint.
+    let mut cluster_constraints: Vec<Vec<usize>> = vec![vec![]; large_components.len()];
+    let mut bridge_indices = Vec::new();
+
+    for (ci, c) in constraints.iter().enumerate() {
+        let pts = constraint_point_indices(c, &pt_idx, &line_map, &shape_map);
+        if pts.is_empty() {
+            // No point references (circle/arc-only) — treat as bridge.
+            bridge_indices.push(ci);
+            continue;
+        }
+
+        // Find which cluster(s) this constraint's points belong to.
+        let mut cluster_id: Option<usize> = None;
+        let mut is_bridge = false;
+        for &pi in &pts {
+            match point_to_cluster.get(&pi) {
+                Some(&cid) => {
+                    if let Some(prev) = cluster_id {
+                        if prev != cid {
+                            is_bridge = true;
+                            break;
+                        }
+                    } else {
+                        cluster_id = Some(cid);
+                    }
+                }
+                None => {
+                    // Point not in any large cluster (fixed, group-owned, or small component).
+                    is_bridge = true;
+                    break;
+                }
+            }
+        }
+
+        if is_bridge {
+            bridge_indices.push(ci);
+        } else if let Some(cid) = cluster_id {
+            cluster_constraints[cid].push(ci);
+        } else {
+            bridge_indices.push(ci);
+        }
+    }
+
+    let clusters = large_components.into_iter().enumerate()
+        .map(|(ci, (_, members))| (members, cluster_constraints[ci].clone()))
+        .collect();
+
+    ConstraintClassification {
+        clusters,
+        bridge_indices,
+        total_components,
+        component_sizes,
     }
 }
 
@@ -596,5 +841,92 @@ mod tests {
         let coord_red = super::super::coord_reduction::build_coord_reduction(&points, &lines, &constraints);
         let result = detect_subgraphs(&points, &lines, &constraints, &existing, &coord_red);
         assert_eq!(result.new_groups.len(), 0, "already-grouped points should be skipped");
+    }
+
+    #[test]
+    fn classify_two_rects_finds_two_clusters() {
+        let points = vec![
+            // Rect A corners
+            pt("a_bl", 0.0, 0.0),   // 0
+            pt("a_br", 10.0, 0.0),  // 1
+            pt("a_tr", 10.0, 5.0),  // 2
+            pt("a_tl", 0.0, 5.0),   // 3
+            // Rect B corners
+            pt("b_bl", 20.0, 0.0),  // 4
+            pt("b_br", 30.0, 0.0),  // 5
+            pt("b_tr", 30.0, 5.0),  // 6
+            pt("b_tl", 20.0, 5.0),  // 7
+            // Bridge midpoints
+            pt("mid1", 10.0, 2.5),  // 8
+            pt("mid2", 20.0, 2.5),  // 9
+        ];
+        let lines = vec![
+            ln("a_bottom", "a_bl", "a_br"),
+            ln("a_right", "a_br", "a_tr"),
+            ln("a_top", "a_tr", "a_tl"),
+            ln("a_left", "a_tl", "a_bl"),
+            ln("b_bottom", "b_bl", "b_br"),
+            ln("b_right", "b_br", "b_tr"),
+            ln("b_top", "b_tr", "b_tl"),
+            ln("b_left", "b_tl", "b_bl"),
+            ln("bridge", "mid1", "mid2"),
+        ];
+        let constraints = vec![
+            // Rect A structural
+            Constraint::Horizontal { id: "ah1".into(), line: "a_bottom".into() },
+            Constraint::Horizontal { id: "ah2".into(), line: "a_top".into() },
+            Constraint::Vertical { id: "av1".into(), line: "a_right".into() },
+            Constraint::Vertical { id: "av2".into(), line: "a_left".into() },
+            // Rect B structural
+            Constraint::Horizontal { id: "bh1".into(), line: "b_bottom".into() },
+            Constraint::Horizontal { id: "bh2".into(), line: "b_top".into() },
+            Constraint::Vertical { id: "bv1".into(), line: "b_right".into() },
+            Constraint::Vertical { id: "bv2".into(), line: "b_left".into() },
+            // Bridge constraints (cross-shape)
+            Constraint::Midpoint { id: "mp1".into(), point: "mid1".into(), line: "a_right".into() },
+            Constraint::Midpoint { id: "mp2".into(), point: "mid2".into(), line: "b_left".into() },
+            Constraint::Horizontal { id: "bh".into(), line: "bridge".into() },
+        ];
+
+        let classification = classify_constraints(&points, &lines, &[], &constraints, &[]);
+        assert_eq!(classification.clusters.len(), 2,
+            "should find 2 clusters (one per rect), got {} clusters",
+            classification.clusters.len());
+
+        // Each cluster should have 4 points and 4 internal constraints (H/V).
+        for (pts, cis) in &classification.clusters {
+            assert_eq!(pts.len(), 4, "each cluster should have 4 points");
+            assert_eq!(cis.len(), 4, "each cluster should have 4 internal constraints (H/V)");
+        }
+
+        // Bridge constraints: mp1, mp2, and bh (3 total).
+        assert_eq!(classification.bridge_indices.len(), 3,
+            "should have 3 bridge constraints");
+    }
+
+    #[test]
+    fn classify_single_cluster_returns_empty() {
+        // Spectrometer-like: single component, no profitable decomposition.
+        let points = vec![
+            pt("a", 0.0, 0.0),
+            pt("b", 10.0, 0.0),
+            pt("c", 10.0, 5.0),
+            pt("d", 0.0, 5.0),
+        ];
+        let lines = vec![
+            ln("l1", "a", "b"),
+            ln("l2", "b", "c"),
+            ln("l3", "c", "d"),
+            ln("l4", "d", "a"),
+        ];
+        let constraints = vec![
+            Constraint::Horizontal { id: "h1".into(), line: "l1".into() },
+            Constraint::Vertical { id: "v1".into(), line: "l2".into() },
+        ];
+
+        let classification = classify_constraints(&points, &lines, &[], &constraints, &[]);
+        // Single cluster → returns empty (not profitable for bottom-up).
+        assert_eq!(classification.clusters.len(), 0,
+            "single cluster should return empty classification");
     }
 }

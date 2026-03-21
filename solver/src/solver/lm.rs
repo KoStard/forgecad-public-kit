@@ -31,25 +31,24 @@ pub fn trail_take() -> Vec<SolveTrailStep> {
 // ─── Variable abstraction ─────────────────────────────────────────────────────
 
 /// A solver variable: index into the flat state vector, with physical scale and entity id.
-pub struct Variable {
+pub(crate) struct Variable {
     pub entity_id: String,
     pub scale: f64,
 }
 
-/// Build the variable list and extract initial state.
 /// Per-point variable index pair: x and y can be independently present or absent.
 #[derive(Clone, Copy)]
-struct PtVarIdx {
-    x: usize,  // usize::MAX = not a variable (fixed/linked/group-owned)
-    y: usize,  // usize::MAX = not a variable
+pub(crate) struct PtVarIdx {
+    pub x: usize,  // usize::MAX = not a variable (fixed/linked/group-owned)
+    pub y: usize,  // usize::MAX = not a variable
 }
 
 impl PtVarIdx {
-    fn skip() -> Self { PtVarIdx { x: usize::MAX, y: usize::MAX } }
-    fn is_skip(&self) -> bool { self.x == usize::MAX && self.y == usize::MAX }
+    pub fn skip() -> Self { PtVarIdx { x: usize::MAX, y: usize::MAX } }
+    pub fn is_skip(&self) -> bool { self.x == usize::MAX && self.y == usize::MAX }
 }
 
-fn build_variables(
+pub(crate) fn build_variables(
     points: &Vec<Point>,
     circles: &Vec<Circle>,
     arcs: &Vec<Arc>,
@@ -134,7 +133,7 @@ fn build_variables(
     (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx)
 }
 
-fn capture_state(
+pub(crate) fn capture_state(
     points: &Vec<Point>,
     circles: &Vec<Circle>,
     arcs: &Vec<Arc>,
@@ -178,7 +177,7 @@ fn capture_state(
     state
 }
 
-fn apply_state(
+pub(crate) fn apply_state(
     state: &Vec<f64>,
     points: &mut Vec<Point>,
     circles: &mut Vec<Circle>,
@@ -253,7 +252,7 @@ fn propagate_coord_links_fast(points: &mut Vec<Point>, link_map: &super::coord_r
 
 // ─── Reference length ─────────────────────────────────────────────────────────
 
-fn compute_reference_length(points: &Vec<Point>, circles: &Vec<Circle>, arcs: &Vec<Arc>, constraints: &Vec<Constraint>) -> f64 {
+pub(crate) fn compute_reference_length(points: &Vec<Point>, circles: &Vec<Circle>, arcs: &Vec<Arc>, constraints: &Vec<Constraint>) -> f64 {
     let mut xs: Vec<f64> = points.iter().map(|p| p.x).collect();
     let mut ys: Vec<f64> = points.iter().map(|p| p.y).collect();
     for c in circles {
@@ -336,6 +335,18 @@ fn eval_residuals_full(
     Some((vals, max_abs))
 }
 
+/// Public wrapper for eval_residuals_full (used by session module).
+pub fn eval_residuals_pub(
+    points: &Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &Vec<Circle>,
+    arcs: &Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+) -> Option<(Vec<f64>, f64)> {
+    eval_residuals_full(points, lines, circles, arcs, shapes, constraints)
+}
+
 pub fn current_max_error(
     points: &Vec<Point>,
     lines: &Vec<Line>,
@@ -352,24 +363,24 @@ pub fn current_max_error(
 
 // ─── Sparsity map ─────────────────────────────────────────────────────────────
 
-struct SparsityMap {
+pub(crate) struct SparsityMap {
     /// Per variable: which constraint residual ranges it affects.
-    var_to_constraint_rows: Vec<Vec<(usize, usize)>>, // (start_row, row_count)
+    pub var_to_constraint_rows: Vec<Vec<(usize, usize)>>, // (start_row, row_count)
     /// Per variable: which arc consistency rows it affects.
-    var_to_arc_rows: Vec<Vec<usize>>,
-    arc_row_start: usize,
+    pub var_to_arc_rows: Vec<Vec<usize>>,
+    pub arc_row_start: usize,
     /// Set of variable column indices that are group frame variables.
-    group_var_cols: HashSet<usize>,
+    pub group_var_cols: HashSet<usize>,
     /// Set of variable column indices that affect reconstructed points
     /// (require calling reconstruct() during FD).
-    reconstruction_var_cols: HashSet<usize>,
+    pub reconstruction_var_cols: HashSet<usize>,
     /// Per constraint: (row_start, row_count). Avoids re-evaluating residuals just for row layout.
-    constraint_row_layout: Vec<(usize, usize)>,
+    pub constraint_row_layout: Vec<(usize, usize)>,
     /// row_start → constraint_index for O(1) lookup in FD loop.
-    row_to_constraint: HashMap<usize, usize>,
+    pub row_to_constraint: HashMap<usize, usize>,
 }
 
-fn build_sparsity(
+pub(crate) fn build_sparsity(
     points: &Vec<Point>,
     lines: &Vec<Line>,
     circles: &Vec<Circle>,
@@ -744,6 +755,18 @@ pub fn extract_structural_info(
 
 // ─── Jacobian + linearization ─────────────────────────────────────────────────
 
+/// Broyden hint for reusing a cached Jacobian across seed steps.
+pub(crate) struct BroydenHint {
+    /// Previous raw Jacobian (unweighted). Rows 0..n_old_rows are valid.
+    pub old_jacobian: Vec<Vec<f64>>,
+    /// Variable values when old_jacobian was computed.
+    pub old_x: Vec<f64>,
+    /// Residuals when old_jacobian was computed.
+    pub old_residual: Vec<f64>,
+    /// Number of valid rows in old_jacobian (constraint rows only, not arc rows).
+    pub n_old_rows: usize,
+}
+
 fn fd_step(value: f64, scale: f64) -> f64 {
     1e-6 * 1.0_f64.max(value.abs()).max(scale)
 }
@@ -765,6 +788,7 @@ fn linearize(
     n_rows: usize,
     graph: &ReconstructionGraph,
     link_map: Option<&super::coord_reduction::CoordLinkMap>,
+    broyden: Option<&BroydenHint>,
 ) -> Option<LinearizedSystem> {
     let t_resid = profiler::platform::now_us();
     let (base, max_abs) = eval_residuals_full(points, lines, circles, arcs, shapes, constraints)?;
@@ -778,6 +802,69 @@ fn linearize(
     }
 
     let mut jacobian = vec![vec![0.0f64; n_vars]; n_eq];
+
+    // ── Build col → (entity_kind, entity_index) for O(1) get/set ──
+    // (moved before Broyden to enable x_current extraction)
+    let col_to_entity: Vec<(u8, usize)> = {
+        let mut map = vec![(255u8, 0usize); n_vars];
+        for (i, pv) in pt_var_idx.iter().enumerate() {
+            if pv.x != usize::MAX { map[pv.x] = (0, i); }
+            if pv.y != usize::MAX { map[pv.y] = (1, i); }
+        }
+        for (i, &vi) in circ_var_idx.iter().enumerate() {
+            if vi != usize::MAX { map[vi] = (2, i); }
+        }
+        for (i, &vi) in arc_var_idx.iter().enumerate() {
+            if vi != usize::MAX { map[vi] = (3, i); }
+        }
+        for (i, &vi) in group_var_idx.iter().enumerate() {
+            if vi != usize::MAX {
+                map[vi] = (4, i);
+                map[vi + 1] = (5, i);
+                let mut offset = 2;
+                if !groups[i].fixed_rotation {
+                    map[vi + offset] = (6, i);
+                    offset += 1;
+                }
+                for pi in 0..groups[i].params.len() {
+                    map[vi + offset + pi] = (7, i * 256 + pi);
+                }
+            }
+        }
+        map
+    };
+
+    // ── Broyden rank-1 update for cached rows ──
+    let broyden_row_count = if let Some(bh) = broyden {
+        let n_old = bh.n_old_rows.min(n_eq);
+        // Copy cached Jacobian rows
+        for r in 0..n_old {
+            if r < bh.old_jacobian.len() && bh.old_jacobian[r].len() == n_vars {
+                jacobian[r] = bh.old_jacobian[r].clone();
+            }
+        }
+        // s = x_current - x_old
+        if n_old > 0 && bh.old_x.len() == n_vars {
+            let s: Vec<f64> = (0..n_vars)
+                .map(|c| get_var_fast(c, points, circles, arcs, groups, &col_to_entity) - bh.old_x[c])
+                .collect();
+            let s_norm_sq: f64 = s.iter().map(|v| v * v).sum();
+            if s_norm_sq > 1e-30 {
+                // y = r_current[0..n_old] - r_old[0..n_old]
+                let old_len = bh.old_residual.len().min(n_old);
+                for r in 0..old_len {
+                    let j_dot_s: f64 = jacobian[r].iter().zip(&s).map(|(j, sv)| j * sv).sum();
+                    let correction = (base[r] - bh.old_residual[r] - j_dot_s) / s_norm_sq;
+                    for c in 0..n_vars {
+                        jacobian[r][c] += correction * s[c];
+                    }
+                }
+            }
+        }
+        n_old
+    } else {
+        0
+    };
 
     let t_analytic = profiler::platform::now_us();
     let pts_map: HashMap<String, usize> = points.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
@@ -842,42 +929,6 @@ fn linearize(
     }
     profiler::add(|p| p.linearize_analytic_us += profiler::platform::now_us() - t_analytic);
 
-    // ── Build col → (entity_kind, entity_index, field) for O(1) get/set ──
-    // 0=point.x, 1=point.y, 2=circle.r, 3=arc.r, 4=group.x, 5=group.y, 6=group.theta
-    let col_to_entity: Vec<(u8, usize)> = {
-        let mut map = vec![(255u8, 0usize); n_vars];
-        for (i, pv) in pt_var_idx.iter().enumerate() {
-            if pv.x != usize::MAX { map[pv.x] = (0, i); }  // point.x
-            if pv.y != usize::MAX { map[pv.y] = (1, i); }  // point.y
-        }
-        for (i, &vi) in circ_var_idx.iter().enumerate() {
-            if vi != usize::MAX {
-                map[vi] = (2, i);       // circle.r
-            }
-        }
-        for (i, &vi) in arc_var_idx.iter().enumerate() {
-            if vi != usize::MAX {
-                map[vi] = (3, i);       // arc.r
-            }
-        }
-        for (i, &vi) in group_var_idx.iter().enumerate() {
-            if vi != usize::MAX {
-                map[vi] = (4, i);       // group.x
-                map[vi + 1] = (5, i);   // group.y
-                let mut offset = 2;
-                if !groups[i].fixed_rotation {
-                    map[vi + offset] = (6, i); // group.theta
-                    offset += 1;
-                }
-                // Param vars: kind=7, idx = group_idx * 256 + param_idx
-                for pi in 0..groups[i].params.len() {
-                    map[vi + offset + pi] = (7, i * 256 + pi);
-                }
-            }
-        }
-        map
-    };
-
     let t_fd = profiler::platform::now_us();
     let mut fd_cols_run = 0u32;
     let mut fd_cols_skipped = 0u32;
@@ -887,10 +938,10 @@ fn linearize(
         // Skip FD entirely if all constraint rows for this column have analytics
         // and there are no arc rows to evaluate — the analytic pass already filled them.
         if !is_group {
-            let all_analytic = sparsity.var_to_constraint_rows[col]
+            let all_covered = sparsity.var_to_constraint_rows[col]
                 .iter()
-                .all(|&(row_start, _)| analytic_rows.contains_key(&row_start));
-            if all_analytic && sparsity.var_to_arc_rows[col].is_empty() {
+                .all(|&(row_start, _)| analytic_rows.contains_key(&row_start) || row_start < broyden_row_count);
+            if all_covered && sparsity.var_to_arc_rows[col].is_empty() {
                 fd_cols_skipped += 1;
                 continue;
             }
@@ -910,7 +961,7 @@ fn linearize(
 
         let mut fwd_constraint_res: Vec<(usize, usize, Vec<f64>)> = Vec::new();
         for &(row_start, row_count) in &sparsity.var_to_constraint_rows[col] {
-            if analytic_rows.contains_key(&row_start) && !is_group {
+            if !is_group && (analytic_rows.contains_key(&row_start) || row_start < broyden_row_count) {
                 continue;
             }
             if let Some(&ci) = sparsity.row_to_constraint.get(&row_start) {
@@ -943,7 +994,7 @@ fn linearize(
         let two_h = 2.0 * step;
         let mut bwd_idx = 0usize;
         for &(row_start, row_count) in &sparsity.var_to_constraint_rows[col] {
-            if analytic_rows.contains_key(&row_start) && !is_group {
+            if !is_group && (analytic_rows.contains_key(&row_start) || row_start < broyden_row_count) {
                 continue;
             }
             if let Some(&ci) = sparsity.row_to_constraint.get(&row_start) {
@@ -1035,6 +1086,7 @@ fn linearize(
         weighted_jacobian,
         max_abs,
         weighted_cost,
+        raw_jacobian: if broyden.is_some() { Some(jacobian) } else { None },
     })
 }
 
@@ -1199,7 +1251,7 @@ fn set_var_fast(
     }
 }
 
-fn compute_row_weights(jacobian: &Vec<Vec<f64>>, reference_length: f64) -> Vec<f64> {
+pub(crate) fn compute_row_weights(jacobian: &Vec<Vec<f64>>, reference_length: f64) -> Vec<f64> {
     let min_norm = 1e-9 / reference_length.max(1.0);
     jacobian
         .iter()
@@ -1210,23 +1262,25 @@ fn compute_row_weights(jacobian: &Vec<Vec<f64>>, reference_length: f64) -> Vec<f
         .collect()
 }
 
-struct LinearizedSystem {
-    residual: Vec<f64>,
-    weights: Vec<f64>,
-    weighted_residual: Vec<f64>,
-    weighted_jacobian: Vec<Vec<f64>>,
-    max_abs: f64,
-    weighted_cost: f64,
+pub(crate) struct LinearizedSystem {
+    pub residual: Vec<f64>,
+    pub weights: Vec<f64>,
+    pub weighted_residual: Vec<f64>,
+    pub weighted_jacobian: Vec<Vec<f64>>,
+    pub max_abs: f64,
+    pub weighted_cost: f64,
+    /// Raw (unweighted) Jacobian — populated when Broyden cache is requested.
+    pub raw_jacobian: Option<Vec<Vec<f64>>>,
 }
 
 // ─── Levenberg–Marquardt step ─────────────────────────────────────────────────
 
-struct LmStep {
-    dx: Vec<f64>,
-    predicted_reduction: f64,
+pub(crate) struct LmStep {
+    pub dx: Vec<f64>,
+    pub predicted_reduction: f64,
 }
 
-fn lm_step(
+pub(crate) fn lm_step(
     wj: &Vec<Vec<f64>>,
     wr: &Vec<f64>,
     lambda: f64,
@@ -1294,7 +1348,7 @@ fn scaled_step_norm(dx: &[f64], scale: f64) -> f64 {
     dx.iter().map(|v| (v / scale.max(1e-9)).powi(2)).sum::<f64>().sqrt()
 }
 
-fn limit_step(dx: Vec<f64>, scale: f64, max_norm: f64) -> Vec<f64> {
+pub(crate) fn limit_step(dx: Vec<f64>, scale: f64, max_norm: f64) -> Vec<f64> {
     let norm = scaled_step_norm(&dx, scale);
     if norm <= max_norm || norm < 1e-12 {
         dx
@@ -1467,7 +1521,7 @@ fn compute_nullspace_basis(
 
     let lin = match linearize(
         points, lines, circles, arcs, shapes, constraints, groups,
-        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, None,
+        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, None, None,
     ) {
         Some(l) => l,
         None => return Vec::new(),
@@ -1762,6 +1816,151 @@ pub fn solve_global(
     best_error
 }
 
+/// Simplified LM loop for session seed steps.
+/// Uses Broyden-updated Jacobian for cached rows, FD only for new rows.
+/// Returns (max_error, raw_jacobian, residual, x_snapshot) for caching.
+pub(crate) fn seed_step_lm(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+    groups: &mut Vec<SketchGroup>,
+    vars: &Vec<Variable>,
+    pt_var_idx: &Vec<PtVarIdx>,
+    circ_var_idx: &Vec<usize>,
+    arc_var_idx: &Vec<usize>,
+    group_var_idx: &Vec<usize>,
+    sparsity: &SparsityMap,
+    n_rows: usize,
+    iterations: u32,
+    tolerance: f64,
+    max_scaled_step: f64,
+    broyden_hint: Option<&BroydenHint>,
+    graph: &ReconstructionGraph,
+    link_map: Option<&super::coord_reduction::CoordLinkMap>,
+) -> (f64, Option<Vec<Vec<f64>>>, Vec<f64>, Vec<f64>) {
+    let n_vars = vars.len();
+    let scale = vars.first().map(|v| v.scale).unwrap_or(1.0);
+    let anchor_state = capture_state(
+        points, circles, arcs, groups,
+        pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, n_vars,
+    );
+
+    // GS warm-start before LM (same as solve_global)
+    projector_warm_start(points, lines, circles, arcs, shapes, constraints, groups, 4, tolerance);
+
+    let mut lambda = 1e-3f64;
+    let mut nu = 2.0f64;
+
+    // First linearize with Broyden hint
+    let mut lin = match linearize(
+        points, lines, circles, arcs, shapes, constraints, groups,
+        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, link_map,
+        broyden_hint,
+    ) {
+        Some(l) => l,
+        None => {
+            let empty_x: Vec<f64> = (0..n_vars).map(|_| 0.0).collect();
+            return (f64::INFINITY, None, Vec::new(), empty_x);
+        }
+    };
+
+    let mut best_state = anchor_state.clone();
+    let mut best_error = lin.max_abs;
+
+    for _ in 0..iterations {
+        if lin.max_abs <= tolerance { break; }
+
+        let state = capture_state(
+            points, circles, arcs, groups,
+            pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, n_vars,
+        );
+        let prior_offset: Vec<f64> = state.iter().zip(anchor_state.iter()).map(|(s, a)| s - a).collect();
+
+        let step = match lm_step(&lin.weighted_jacobian, &lin.weighted_residual, lambda, Some(&prior_offset), 0.0) {
+            Some(s) => s,
+            None => break,
+        };
+        let dx = limit_step(step.dx.clone(), scale, max_scaled_step);
+
+        let trial_state: Vec<f64> = state.iter().zip(&dx).map(|(s, d)| s + d).collect();
+        apply_state(&trial_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+        if let Some(cr) = link_map { propagate_coord_links_fast(points, cr); }
+        if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
+
+        // Re-linearize without Broyden (we already have updated positions)
+        let trial = match linearize(
+            points, lines, circles, arcs, shapes, constraints, groups,
+            vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, link_map, None,
+        ) {
+            Some(l) => l,
+            None => {
+                apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+                break;
+            }
+        };
+
+        let actual = lin.weighted_cost - trial.weighted_cost;
+        let pred = step.predicted_reduction
+            * (1.0_f64).min(max_scaled_step / scaled_step_norm(&step.dx, scale).max(max_scaled_step));
+        let rho = if pred > 0.0 { actual / pred } else { 0.0 };
+
+        if actual > 0.0 {
+            lambda = if rho > 0.0 {
+                let factor = 1.0 - (2.0 * rho - 1.0).powi(3);
+                lambda * (1.0_f64 / 3.0).max(factor)
+            } else {
+                lambda
+            };
+            nu = 2.0;
+            if trial.max_abs < best_error {
+                best_error = trial.max_abs;
+                best_state = trial_state;
+            }
+            lin = trial;
+        } else {
+            apply_state(&state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+            if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
+            lambda *= nu;
+            nu *= 2.0;
+            if lambda > 1e16 { break; }
+        }
+    }
+
+    // Restore best state
+    apply_state(&best_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+    if let Some(cr) = link_map { propagate_coord_links_fast(points, cr); }
+    if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
+
+    // Capture final x snapshot from best_state (variable values in column order)
+    let x_snapshot = best_state.clone();
+
+    let (residual, _) = match eval_residuals_full(points, lines, circles, arcs, shapes, constraints) {
+        Some(r) => r,
+        None => return (best_error, None, Vec::new(), x_snapshot),
+    };
+
+    // Recover raw Jacobian from weighted_jacobian / weights for Broyden caching.
+    // This avoids an extra linearize call.
+    let raw_j = if best_error <= tolerance * 100.0 {
+        let n_eq = lin.weighted_jacobian.len();
+        let mut j = vec![vec![0.0f64; n_vars]; n_eq];
+        for r in 0..n_eq {
+            let w = if lin.weights[r].abs() > 1e-30 { lin.weights[r] } else { 1.0 };
+            for c in 0..n_vars {
+                j[r][c] = lin.weighted_jacobian[r][c] / w;
+            }
+        }
+        Some(j)
+    } else {
+        None
+    };
+
+    (best_error, raw_j, residual, x_snapshot)
+}
+
 fn run_lm_pass(
     points: &mut Vec<Point>,
     lines: &Vec<Line>,
@@ -1796,7 +1995,7 @@ fn run_lm_pass(
     let mut lin = match profiler::timed(|p, us| { p.linearize_us += us; p.linearize_count += 1; }, || {
         linearize(
             points, lines, circles, arcs, shapes, constraints, groups,
-            vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, link_map,
+            vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, link_map, None,
         )
     }) {
         Some(l) => l,
@@ -1845,7 +2044,7 @@ fn run_lm_pass(
             let trial = match profiler::timed(|p, us| { p.linearize_us += us; p.linearize_count += 1; }, || {
                 linearize(
                     points, lines, circles, arcs, shapes, constraints, groups,
-                    vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, link_map,
+                    vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, link_map, None,
                 )
             }) {
                 Some(l) => l,

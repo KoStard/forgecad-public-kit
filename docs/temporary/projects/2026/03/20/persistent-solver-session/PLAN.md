@@ -65,6 +65,8 @@ For each outer iteration:
 | P5 | O(1) get/set_var + row→CI cache | 5,709ms | 540ms | 0.000016 | ✅ FD 8.6× faster |
 | P6 | Precomputed row layout in SparsityMap | **400ms** | **2.5ms** | 0.000016 | ✅ **40× total** |
 | P7 | (evaluate) Forward differences | — | — | — | 🤔 May not be needed |
+| P8 | Cluster merge solve (16-rect) | 1848ms prog | — | — | ❌ Only 28%, reverted |
+| P9 | Bottom-up decomposition (16-rect) | **1062ms** | — | 0.000243 | ✅ **5.7× faster** |
 
 *Note: 22.7s→16s drop may be unrelated to profiler; needs investigation.
 
@@ -154,13 +156,72 @@ The derivative is discontinuous at `area = 0`. Analytic Jacobian captures this d
 | `src/forge/sketch/constraints/solver-wasm.ts` | JS-side profile access |
 | `cli/test-run.ts` | Profile output in CLI |
 
+### Experiment 6: Cluster Merge Solve (FAILED — reverted)
+**What**: Replace progressive warm-up (202 incremental LM calls) with cluster-based solving:
+1. Detect line-connected shape clusters via `build_line_components()`
+2. Solve each cluster independently (tiny LM: 4 points, 8 constraints)
+3. Progressive bridge warm-up to position clusters relative to each other
+4. Final LM solve with parameterized groups
+
+**Predicted**: 30× speedup (202 LM calls → ~18 cluster solves + 1 final)
+
+**Result**: Only **28% faster** on 16-rect case_wood (1848ms vs 2561ms progressive).
+- Cluster solves: fast (~1ms each) ✅
+- Bridge warm-up: **still 48 progressive steps**, each including ALL internal constraints (128+) to prevent geometry breakage → 1600ms
+- Total Rust solve: ~6.8s (actually worse overall due to overhead)
+
+**Why it failed**: The bridge warm-up reintroduces the progressive overhead. Each bridge step must include all internal constraints to prevent cluster geometry from collapsing during LM. With 48 bridges × 128+ constraints per step, each bridge step costs more than the old per-constraint progressive step. The approach trades many cheap steps for fewer expensive steps — no net win.
+
+**Root cause**: The plan assumed bridges could be solved independently of internal constraints. But LM is a global solver — it moves all variables, not just bridge-related ones. Without internal constraints, LM destroys cluster geometry. With them, the system is nearly as large as the full problem.
+
+**GCS paper insight (Zou et al. 2022, Section 5)**: "The overall solving efficiency is governed by the largest subsystems." The cluster merge approach's bridge warm-up creates subsystems nearly as large as the full system (all internal + progressive bridges), defeating the decomposition.
+
+**Lesson**: True decomposition requires solving subsystems in isolation with frozen frame DOF (position/rotation), then solving only frame DOF in a reduced inter-cluster system. The current LM infrastructure doesn't support freezing variables — it optimizes all variables simultaneously. A proper decomposition would need either:
+1. Variable freezing/masking in LM (only optimize subset of columns)
+2. Two-phase LM: first internal-only, then frame-only with internal geometry frozen via equality constraints
+3. Graph-based decomposition (Owen/Fudos/Hoffmann) that produces truly independent well-constrained subsystems
+
+**Commits**: `6944bab`, `929fa4e`, `23cf4fc` — all reverted in `31bfb79`.
+
+### Experiment 7: Bottom-Up Decomposition (SUCCESS — P9)
+**What**: Early group creation before progressive warm-up:
+1. `classify_constraints()` partitions constraints into per-cluster internal + bridges using line-based union-find
+2. Phase 1: Solve each cluster independently (~12ms total for 16 clusters)
+3. Phase 2: `detect_subgraphs()` creates parameterized groups from pre-solved geometry (80 constraints absorbed)
+4. Phase 3: Progressive warm-up on non-absorbed constraints only (122 steps instead of 202)
+5. Phase 4: Final solve with groups (unchanged)
+
+**Result**: Final solve **1062ms** (was ~6000ms) = **5.7× faster** on 16-rect case_wood 03/18.
+- Cluster solves: 12ms (16 × ~0.7ms) ✅
+- Group creation: ~2ms ✅
+- Bridge warm-up: ~1000ms (122 non-absorbed constraints, 152 vars)
+- No regression: spectrometer 646ms (was ~1.9s, actually faster), case_wood 03/20 222ms (was ~1s)
+
+**Why it worked (vs failed cluster merge)**:
+- Cluster merge (P8) failed because bridge warm-up included ALL 128+ internal constraints per step to prevent LM from destroying geometry.
+- Bottom-up (P9) succeeds because `detect_subgraphs()` creates SketchGroups that freeze internal geometry via `build_variables()` (usize::MAX sentinel). LM can't move group-owned points. Bridge steps only need non-absorbed constraints.
+
+**Key insight**: The existing `detect_subgraphs` + `build_variables` infrastructure already implements variable freezing. The P8 approach tried to build custom freezing; P9 reuses the proven mechanism by invoking `detect_subgraphs` earlier.
+
+**Remaining headroom**: 122 bridge constraints include ~46 Length/Ccw/BlockRotation constraints that are purely internal to clusters but not absorbed by `detect_subgraphs`. Absorbing them would reduce bridge steps to ~76, potentially cutting bridge warm-up time by 38%.
+
+## Success Metrics for Future Decomposition Work
+
+Based on the GCS paper (Zou et al. 2022) and this experiment:
+
+1. **Progressive step reduction**: Must reduce LM invocations by ≥5× (not just constraint count per invocation)
+2. **Per-step cost**: Each decomposed subsystem must be ≤20% the size of the full system
+3. **No regression on existing models**: spectrometer, case_wood 03/20 must not slow down
+4. **Total solve time**: ≥3× improvement on 16-rect case_wood (from ~2.5s to <1s)
+5. **Clean code**: No complexity that doesn't earn its keep. Revert if metrics aren't met.
+
 ## Next Steps
 
 1. ~~**P5**: Build O(1) reverse lookup for `get_var`/`set_var`~~ ✅ Done
 2. ~~**P6**: Cache `row_start → constraint_index` mapping~~ ✅ Done
-3. **P7**: Test forward differences vs central differences (may not be needed at 2.5ms FD)
-4. Test native Rust vs WASM performance (user request)
-5. Measure profiler overhead (user request)
-6. **Persistent solver session is no longer needed** — serialization was never the bottleneck, and the solver is now 400ms total
+3. ~~**P8**: Cluster merge solve~~ ❌ Reverted — 28% gain doesn't justify complexity
+4. ~~**P9**: Bottom-up decomposition~~ ✅ Done — 5.7× faster on 16-rect case_wood
+5. **P7**: Test forward differences vs central differences (may not be needed at 2.5ms FD)
+6. **P10**: Absorb more constraint types in detect_subgraphs (Length, Ccw, BlockRotation already internal) to reduce bridge steps from 122 to ~76
 7. Fix 2 pre-existing test failures: `cold_start_full_spectrometer` and `cold_start_with_camera`
 8. Clean up debug code (FD column counters in state_capture/state_apply, console.warn diagnostic)

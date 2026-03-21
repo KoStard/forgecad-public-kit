@@ -26,6 +26,7 @@ import type {
 } from './types';
 import { DEFAULT_TOLERANCE, getPendingBuilderMethods, solveConstraints } from './registry';
 import { ConstraintSketch, solveConstraintDefinition } from './sketch';
+import { getSessionApi, type WasmSessionApi } from './solver-wasm';
 
 const toRad = (deg: number): number => (deg * Math.PI) / 180;
 
@@ -61,6 +62,10 @@ export class ConstrainedSketchBuilder {
   private seedTimeMs = 0;
   /** Max cumulative time for all seed calls (ms). After this, seeding is skipped. */
   private static readonly SEED_BUDGET_MS = 5_000;
+  /** WASM solver session handle — persists state across seed steps. */
+  private _sessionHandle: number | null = null;
+  private _sessionApi: WasmSessionApi | null = null;
+  private _sessionFailed = false;
 
   constructor(options: ConstrainedSketchOptions = {}) {
     this.strict = options.strict ?? false;
@@ -72,6 +77,28 @@ export class ConstrainedSketchBuilder {
         proto[type] = fn;
       }
     });
+  }
+
+  /** Try to create a WASM solver session. Returns true if session is active. */
+  private ensureSession(): boolean {
+    if (this._sessionHandle !== null) return true;
+    if (this._sessionFailed) return false;
+    const api = getSessionApi();
+    if (!api) {
+      this._sessionFailed = true;
+      return false;
+    }
+    this._sessionApi = api;
+    this._sessionHandle = api.session_create();
+    return true;
+  }
+
+  private destroySession(): void {
+    if (this._sessionHandle !== null && this._sessionApi) {
+      this._sessionApi.session_destroy(this._sessionHandle);
+      this._sessionHandle = null;
+      this._sessionApi = null;
+    }
   }
 
   point(x?: number, y?: number, fixed = false): PointId {
@@ -92,6 +119,9 @@ export class ConstrainedSketchBuilder {
       throw new Error(`point(): coordinates must be finite numbers, got (${x}, ${y})`);
     }
     this.points.push({ id, x, y, fixed });
+    if (this.ensureSession()) {
+      this._sessionApi!.session_add_point(this._sessionHandle!, id, x, y, fixed);
+    }
     return id;
   }
 
@@ -110,6 +140,9 @@ export class ConstrainedSketchBuilder {
     }
     const id = `ln-${this.nextId++}`;
     this.lines.push({ id, a, b, construction });
+    if (this._sessionHandle !== null) {
+      this._sessionApi!.session_add_line(this._sessionHandle, id, a, b);
+    }
     return id;
   }
 
@@ -128,6 +161,9 @@ export class ConstrainedSketchBuilder {
     }
     const id = `c-${this.nextId++}`;
     this.circles.push({ id, center, radius, construction, fixedRadius: false, segments });
+    if (this._sessionHandle !== null) {
+      this._sessionApi!.session_add_circle(this._sessionHandle, id, center, radius, false);
+    }
     if (!construction) {
       this.loops.push({ type: 'circle', circle: id });
     }
@@ -204,6 +240,9 @@ export class ConstrainedSketchBuilder {
     const radius = Math.hypot(start.x - center.x, start.y - center.y);
     const id: ArcId = `arc-${this.nextId++}`;
     this.arcs.push({ id, center: centerId, start: startId, end: endId, radius, clockwise, construction: false });
+    if (this._sessionHandle !== null) {
+      this._sessionApi!.session_add_arc(this._sessionHandle, id, centerId, startId, endId, radius, clockwise);
+    }
     return id;
   }
 
@@ -228,6 +267,9 @@ export class ConstrainedSketchBuilder {
   shape(lines: LineId[]): ShapeId {
     const id: ShapeId = `shp-${this.nextId++}`;
     this.shapes.push({ id, lines: [...lines] });
+    if (this._sessionHandle !== null) {
+      this._sessionApi!.session_add_shape(this._sessionHandle, id, JSON.stringify(lines));
+    }
     return id;
   }
 
@@ -263,6 +305,18 @@ export class ConstrainedSketchBuilder {
     for (const l of group.lines) {
       this.groupOwnedLineIds.add(l.id);
     }
+    if (this._sessionHandle !== null) {
+      this._sessionApi!.session_add_group(this._sessionHandle, JSON.stringify({
+        id: group.id,
+        x: group.x,
+        y: group.y,
+        theta: group.theta,
+        fixed: group.fixed,
+        fixed_rotation: group.fixedRotation,
+        points: group.points.map((p) => ({ id: p.id, lx: p.lx, ly: p.ly })),
+        lines: group.lines.map((l) => ({ id: l.id, a: l.a, b: l.b })),
+      }));
+    }
   }
 
   constrain(constraint: Omit<SketchConstraint, 'id'>): this {
@@ -292,10 +346,28 @@ export class ConstrainedSketchBuilder {
     // Skip seeding if cumulative time budget is exhausted.
     if (this.seedTimeMs >= ConstrainedSketchBuilder.SEED_BUDGET_MS) return;
 
+    // Session path: constraint is added to persistent WASM state and seeded in-place.
+    // No buildDefinition() or JSON round-trip for the full problem.
+    if (this._sessionHandle !== null && this._sessionApi) {
+      try {
+        const t0 = performance.now();
+        const constraintJson = this.serializeConstraintForSession(constraint);
+        const err = this._sessionApi.session_add_constraint(this._sessionHandle, constraintJson, true);
+        this.seedTimeMs += performance.now() - t0;
+
+        if (err >= 0 && err <= DEFAULT_TOLERANCE * 100) {
+          this.syncPointsFromSession();
+        }
+      } catch (error) {
+        if (this.strict) throw error;
+      }
+      return;
+    }
+
+    // Fallback: stateless buildDefinition + solve path.
     try {
       const t0 = performance.now();
       const remaining = ConstrainedSketchBuilder.SEED_BUDGET_MS - this.seedTimeMs;
-      // Per-call budget: at most 500ms, but capped by remaining budget.
       const perCallBudget = Math.min(500, remaining);
 
       const working = this.buildDefinition();
@@ -320,6 +392,29 @@ export class ConstrainedSketchBuilder {
       }
     } catch (error) {
       if (this.strict) throw error;
+    }
+  }
+
+  /** Serialize a constraint for the session API (matches Rust serde format). */
+  private serializeConstraintForSession(c: SketchConstraint): string {
+    const raw = c as Record<string, unknown>;
+    if (raw['type'] === 'lineTangentArc') {
+      const { atStart, ...rest } = raw as any;
+      return JSON.stringify({ ...rest, at_start: atStart });
+    }
+    return JSON.stringify(raw);
+  }
+
+  /** Sync point positions from session state back to builder entities. */
+  private syncPointsFromSession(): void {
+    if (this._sessionHandle === null || !this._sessionApi) return;
+    const json = this._sessionApi.session_get_points(this._sessionHandle);
+    const sessionPoints: Array<{ id: string; x: number; y: number }> = JSON.parse(json);
+    const map = new Map(sessionPoints.map((p) => [p.id, p]));
+    for (const p of this.points) {
+      if (this.groupOwnedPointIds.has(p.id)) continue;
+      const sp = map.get(p.id);
+      if (sp) { p.x = sp.x; p.y = sp.y; }
     }
   }
 
@@ -691,6 +786,9 @@ export class ConstrainedSketchBuilder {
   }
 
   solve(options: SolveOptions = {}): ConstraintSketch {
+    // Release the session — the final solve uses the stateless path which
+    // benefits from progressive + analysis + DOF metadata.
+    this.destroySession();
     return solveConstraintDefinition(this.buildDefinition(), {
       iterations: options.iterations ?? 80,
       restarts: options.restarts ?? 6,
@@ -881,6 +979,9 @@ export class ConstrainedSketchBuilder {
     const centerId = this.point(cx, cy);
     const id: ArcId = `arc-${this.nextId++}`;
     this.arcs.push({ id, center: centerId, start: startId, end: endId, radius: r, clockwise, construction: false });
+    if (this._sessionHandle !== null) {
+      this._sessionApi!.session_add_arc(this._sessionHandle, id, centerId, startId, endId, r, clockwise);
+    }
     return id;
   }
 

@@ -206,6 +206,29 @@ type WasmProfileFn = () => string;
 
 let _wasm_solve: WasmSolveFn | null = null;
 let _wasm_get_profile: WasmProfileFn | null = null;
+
+// ─── Session API bindings ────────────────────────────────────────────────────
+
+export interface WasmSessionApi {
+  session_create: () => number;
+  session_destroy: (handle: number) => void;
+  session_add_point: (handle: number, id: string, x: number, y: number, fixed: boolean) => void;
+  session_add_line: (handle: number, id: string, a: string, b: string) => void;
+  session_add_circle: (handle: number, id: string, center: string, radius: number, fixedRadius: boolean) => void;
+  session_add_arc: (handle: number, id: string, center: string, start: string, end: string, radius: number, clockwise: boolean) => void;
+  session_add_shape: (handle: number, id: string, lineIdsJson: string) => void;
+  session_add_group: (handle: number, groupJson: string) => void;
+  session_add_constraint: (handle: number, constraintJson: string, seed: boolean) => number;
+  session_solve: (handle: number, optionsJson: string) => string;
+  session_get_points: (handle: number) => string;
+}
+
+let _sessionApi: WasmSessionApi | null = null;
+
+/** Get the session API (available after initSolverWasm()). */
+export function getSessionApi(): WasmSessionApi | null {
+  return _sessionApi;
+}
 let _initPromise: Promise<void> | null = null;
 const MAX_EXCHANGE_HISTORY = 64;
 const DEBUG_STORAGE_KEY = 'fc:solver-debug';
@@ -608,6 +631,24 @@ export async function initSolverWasm(): Promise<void> {
 
       _wasm_solve = solverModule.solve as WasmSolveFn;
       _wasm_get_profile = (solverModule as any).get_last_profile as WasmProfileFn | undefined ?? null;
+
+      // Session API — available if WASM was built with session support.
+      const sm = solverModule as any;
+      if (typeof sm.session_create === 'function') {
+        _sessionApi = {
+          session_create: sm.session_create,
+          session_destroy: sm.session_destroy,
+          session_add_point: sm.session_add_point,
+          session_add_line: sm.session_add_line,
+          session_add_circle: sm.session_add_circle,
+          session_add_arc: sm.session_add_arc,
+          session_add_shape: sm.session_add_shape,
+          session_add_group: sm.session_add_group,
+          session_add_constraint: sm.session_add_constraint,
+          session_solve: sm.session_solve,
+          session_get_points: sm.session_get_points,
+        };
+      }
     } catch (err) {
       throw new Error(
         `[solver-wasm] Failed to load WASM solver.\n` +

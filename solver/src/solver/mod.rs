@@ -6,6 +6,7 @@ pub mod linear;
 pub mod lm;
 pub mod profiler;
 pub mod reconstruction;
+pub mod session;
 pub mod subgraph_detection;
 
 use std::collections::{HashMap, HashSet};
@@ -193,10 +194,13 @@ pub fn solve(
 /// This replicates the TS solver's incremental constrain() behavior but in a
 /// single Rust call, avoiding N WASM round-trips.
 ///
-/// Works best when the TS builder's seedIncrementalGeometry has already placed
-/// entities near their targets via separate WASM calls.  The progressive phase
-/// then refines progressively.
-fn progressive_solve(
+/// When multiple line-connected clusters are detected (e.g., multi-rect layouts),
+/// uses bottom-up decomposition: solve clusters independently, create groups to
+/// freeze internal geometry, then progressively warm-up only bridge constraints.
+///
+/// Falls back to legacy progressive warm-up for single-cluster problems (e.g.,
+/// spectrometer) where decomposition isn't profitable.
+pub(crate) fn progressive_solve(
     points: &mut Vec<Point>,
     lines: &Vec<Line>,
     circles: &mut Vec<Circle>,
@@ -227,11 +231,57 @@ fn progressive_solve(
     // Spread overlapping shapes apart before progressive warm-up.
     spread_overlapping_shapes(points, lines, constraints, ref_scale);
 
-    // Phase 1: Progressive warm-up — add constraints one by one with short solves.
+    // Try bottom-up decomposition: classify constraints into clusters + bridges.
+    let classification = subgraph_detection::classify_constraints(
+        points, lines, shapes, constraints, groups,
+    );
+
+    lm::trail_push(&format!("classify: {} clusters (sizes: {:?}), {} bridges, {} total comps (top: {:?})",
+        classification.clusters.len(),
+        classification.clusters.iter().map(|(pts, _)| pts.len()).collect::<Vec<_>>(),
+        classification.bridge_indices.len(),
+        classification.total_components,
+        &classification.component_sizes[..classification.component_sizes.len().min(10)],
+    ), 0.0);
+
+    if classification.clusters.len() >= 2 {
+        // Bottom-up path: solve clusters independently, then bridge progressively.
+        bottom_up_progressive(
+            points, lines, circles, arcs, shapes, constraints, options,
+            groups, &classification, tolerance, &entity_ref_count, ref_scale,
+            progressive_deadline_us, deadline_us,
+        )
+    } else {
+        // Legacy path: progressive warm-up one constraint at a time.
+        legacy_progressive_warmup(
+            points, lines, circles, arcs, shapes, constraints,
+            groups, tolerance, &entity_ref_count, ref_scale,
+            progressive_deadline_us, deadline_us,
+        )
+    }
+}
+
+/// Legacy progressive warm-up: add constraints one by one with short LM solves.
+/// Used when decomposition isn't profitable (single cluster or spectrometer-like).
+fn legacy_progressive_warmup(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+    groups: &mut Vec<SketchGroup>,
+    tolerance: f64,
+    entity_ref_count: &HashMap<String, usize>,
+    ref_scale: f64,
+    progressive_deadline_us: u64,
+    deadline_us: u64,
+) -> f64 {
+    let t0_prog = profiler::platform::now_us();
+
     let recon_graph = reconstruction::ReconstructionGraph::empty();
     let mut progressive_timed_out = false;
     for i in 0..constraints.len() {
-        // Time budget check: skip remaining progressive steps if running out of time.
         if progressive_deadline_us > 0 && profiler::platform::now_us() >= progressive_deadline_us {
             lm::trail_push(&format!("progressive-timeout at step {}/{}", i, constraints.len()), 0.0);
             progressive_timed_out = true;
@@ -241,10 +291,9 @@ fn progressive_solve(
         let sub = constraints[..=i].to_vec();
 
         let pts_idx: HashMap<String, usize> = points.iter().enumerate().map(|(j, p)| (p.id.clone(), j)).collect();
-        apply_presolve_constraint(points, lines, &pts_idx, &entity_ref_count, &constraints[i], ref_scale);
+        apply_presolve_constraint(points, lines, &pts_idx, entity_ref_count, &constraints[i], ref_scale);
         run_analytical_presolve(points, lines, &sub);
 
-        // Coordinate equivalence propagation: ensure linked coordinates are consistent.
         let cr = coord_reduction::build_coord_reduction(points, lines, &sub);
         for j in 0..points.len() {
             let rx = cr.repr_x[j];
@@ -258,15 +307,19 @@ fn progressive_solve(
         let has_residual = sub.iter().any(|c| crate::constraints::has_residual(c));
         if !has_residual { continue; }
 
-        // Each progressive step gets a per-step deadline: at most 500ms per step.
         let step_deadline = if progressive_deadline_us > 0 {
             let now = profiler::platform::now_us();
             let remaining = progressive_deadline_us.saturating_sub(now);
-            let per_step = remaining.min(500_000); // max 500ms per step
+            let per_step = remaining.min(500_000);
             now + per_step
         } else {
             0
         };
+
+        // Snapshot positions before LM so we can roll back on divergence.
+        let snap_pts: Vec<(f64, f64)> = points.iter().map(|p| (p.x, p.y)).collect();
+        let snap_circles: Vec<f64> = circles.iter().map(|c| c.radius).collect();
+        let err_before = lm::current_max_error(points, lines, circles, arcs, shapes, &sub);
 
         lm::solve_global(
             points, lines, circles, arcs, shapes, &sub,
@@ -274,6 +327,20 @@ fn progressive_solve(
             groups, &recon_graph, step_deadline, None,
         );
         profiler::add(|p| p.progressive_steps += 1);
+
+        // Reject: if LM made error significantly worse, restore pre-step positions.
+        // This mirrors the TS seedIncrementalGeometry rejection: only accept if the
+        // solve improved things or didn't make them much worse.
+        let err_after = lm::current_max_error(points, lines, circles, arcs, shapes, &sub);
+        if err_after > err_before * 2.0 + 1.0 && err_after > tolerance * 100.0 {
+            for (j, &(sx, sy)) in snap_pts.iter().enumerate() {
+                points[j].x = sx;
+                points[j].y = sy;
+            }
+            for (j, &sr) in snap_circles.iter().enumerate() {
+                circles[j].radius = sr;
+            }
+        }
     }
 
     let progressive_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
@@ -284,7 +351,196 @@ fn progressive_solve(
 
     profiler::add(|p| p.progressive_total_us += profiler::platform::now_us() - t0_prog);
 
-    // Phase 2: Full solve from the warmed geometry
+    // Final solve from the warmed geometry.
+    let iterations = 80;
+    let restarts = 6;
+    let warm_start_iters = 6;
+    let max_scaled_step = 2.5;
+
+    solve_single_system(
+        points, lines, circles, arcs, shapes, constraints,
+        iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
+        groups, false, deadline_us,
+    )
+}
+
+/// Bottom-up decomposition: solve clusters independently, create groups, then
+/// progressively warm-up only bridge constraints on the reduced variable set.
+fn bottom_up_progressive(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &Vec<Constraint>,
+    options: &SolveOptions,
+    groups: &mut Vec<SketchGroup>,
+    classification: &subgraph_detection::ConstraintClassification,
+    tolerance: f64,
+    entity_ref_count: &HashMap<String, usize>,
+    ref_scale: f64,
+    progressive_deadline_us: u64,
+    deadline_us: u64,
+) -> f64 {
+    let t0_prog = profiler::platform::now_us();
+    let n_clusters = classification.clusters.len();
+    profiler::add(|p| p.bottom_up_clusters = n_clusters as u32);
+    lm::trail_push(&format!("bottom-up: {} clusters, {} bridges",
+        n_clusters, classification.bridge_indices.len()), 0.0);
+
+    let recon_graph = reconstruction::ReconstructionGraph::empty();
+
+    // ── Phase 1: Solve each cluster independently ────────────────────────────
+    let t1 = profiler::platform::now_us();
+    for (cluster_idx, (_, constraint_indices)) in classification.clusters.iter().enumerate() {
+        let cluster_constraints: Vec<Constraint> = constraint_indices.iter()
+            .map(|&ci| constraints[ci].clone())
+            .collect();
+
+        if cluster_constraints.is_empty() { continue; }
+
+        // Presolve + analytical for this cluster's constraints.
+        let pts_idx: HashMap<String, usize> = points.iter().enumerate()
+            .map(|(j, p)| (p.id.clone(), j))
+            .collect();
+        for c in &cluster_constraints {
+            apply_presolve_constraint(points, lines, &pts_idx, entity_ref_count, c, ref_scale);
+        }
+        run_analytical_presolve(points, lines, &cluster_constraints);
+
+        let cr = coord_reduction::build_coord_reduction(points, lines, &cluster_constraints);
+        for j in 0..points.len() {
+            let rx = cr.repr_x[j];
+            if rx != j { points[j].x = points[rx].x; }
+            let ry = cr.repr_y[j];
+            if ry != j { points[j].y = points[ry].y; }
+        }
+
+        let has_residual = cluster_constraints.iter().any(|c| crate::constraints::has_residual(c));
+        if !has_residual { continue; }
+
+        // Short LM solve for this cluster. The sparsity map ensures only
+        // cluster-relevant variables get nonzero gradients.
+        lm::solve_global(
+            points, lines, circles, arcs, shapes, &cluster_constraints,
+            30, tolerance, 1, 4, 2.5,
+            groups, &recon_graph, 0, None,
+        );
+
+        let cluster_err = lm::current_max_error(points, lines, circles, arcs, shapes, &cluster_constraints);
+        lm::trail_push(&format!("bottom-up-internal[{}]", cluster_idx), cluster_err);
+    }
+    profiler::add(|p| p.bottom_up_internal_us += profiler::platform::now_us() - t1);
+
+    // ── Phase 2: Create groups from pre-solved geometry ──────────────────────
+    // Run coord_reduction on ALL constraints to get proper equivalence classes,
+    // then detect_subgraphs to create parameterized groups.
+    let cr = coord_reduction::build_coord_reduction(points, lines, constraints);
+    for j in 0..points.len() {
+        let rx = cr.repr_x[j];
+        if rx != j { points[j].x = points[rx].x; }
+        let ry = cr.repr_y[j];
+        if ry != j { points[j].y = points[ry].y; }
+    }
+
+    let detection = subgraph_detection::detect_subgraphs(
+        points, lines, constraints, groups, &cr,
+    );
+    let absorbed_constraints = detection.absorbed_constraint_indices;
+
+    if !detection.new_groups.is_empty() {
+        let n_new = detection.new_groups.len();
+        let n_absorbed = absorbed_constraints.len();
+        groups.extend(detection.new_groups);
+        resolve_group_points(points, groups);
+        lm::trail_push(
+            &format!("bottom-up-groups: {} groups, {} absorbed", n_new, n_absorbed),
+            lm::current_max_error(points, lines, circles, arcs, shapes, constraints),
+        );
+    }
+
+    // ── Phase 3: Progressive warm-up on bridge constraints only ──────────────
+    // Non-absorbed constraints = bridges + any dimension constraints on groups.
+    let t3 = profiler::platform::now_us();
+    let bridge_constraints: Vec<Constraint> = constraints.iter().enumerate()
+        .filter(|(i, _)| !absorbed_constraints.contains(i))
+        .map(|(_, c)| c.clone())
+        .collect();
+
+    lm::trail_push(&format!("bottom-up-bridge-warmup: {} constraints", bridge_constraints.len()), 0.0);
+
+    let mut progressive_timed_out = false;
+    for i in 0..bridge_constraints.len() {
+        if progressive_deadline_us > 0 && profiler::platform::now_us() >= progressive_deadline_us {
+            lm::trail_push(&format!("progressive-timeout at bridge step {}/{}", i, bridge_constraints.len()), 0.0);
+            progressive_timed_out = true;
+            break;
+        }
+
+        let sub = bridge_constraints[..=i].to_vec();
+
+        let pts_idx: HashMap<String, usize> = points.iter().enumerate()
+            .map(|(j, p)| (p.id.clone(), j))
+            .collect();
+        apply_presolve_constraint(points, lines, &pts_idx, entity_ref_count, &bridge_constraints[i], ref_scale);
+        run_analytical_presolve(points, lines, &sub);
+
+        let cr = coord_reduction::build_coord_reduction(points, lines, &sub);
+        for j in 0..points.len() {
+            let rx = cr.repr_x[j];
+            if rx != j { points[j].x = points[rx].x; }
+            let ry = cr.repr_y[j];
+            if ry != j { points[j].y = points[ry].y; }
+        }
+
+        resolve_group_points(points, groups);
+
+        let has_residual = sub.iter().any(|c| crate::constraints::has_residual(c));
+        if !has_residual { continue; }
+
+        let step_deadline = if progressive_deadline_us > 0 {
+            let now = profiler::platform::now_us();
+            let remaining = progressive_deadline_us.saturating_sub(now);
+            let per_step = remaining.min(500_000);
+            now + per_step
+        } else {
+            0
+        };
+
+        // Snapshot positions before LM so we can roll back on divergence.
+        let snap_pts: Vec<(f64, f64)> = points.iter().map(|p| (p.x, p.y)).collect();
+        let snap_circles: Vec<f64> = circles.iter().map(|c| c.radius).collect();
+        let err_before = lm::current_max_error(points, lines, circles, arcs, shapes, &sub);
+
+        lm::solve_global(
+            points, lines, circles, arcs, shapes, &sub,
+            30, tolerance, 1, 4, 2.5,
+            groups, &recon_graph, step_deadline, None,
+        );
+        profiler::add(|p| p.progressive_steps += 1);
+
+        // Reject: if LM made error significantly worse, restore pre-step positions.
+        let err_after = lm::current_max_error(points, lines, circles, arcs, shapes, &sub);
+        if err_after > err_before * 2.0 + 1.0 && err_after > tolerance * 100.0 {
+            for (j, &(sx, sy)) in snap_pts.iter().enumerate() {
+                points[j].x = sx;
+                points[j].y = sy;
+            }
+            for (j, &sr) in snap_circles.iter().enumerate() {
+                circles[j].radius = sr;
+            }
+        }
+    }
+
+    let bridge_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
+    lm::trail_push(
+        if progressive_timed_out { "bottom-up-bridge-warmup (partial)" } else { "bottom-up-bridge-warmup" },
+        bridge_error,
+    );
+    profiler::add(|p| p.bottom_up_bridge_us += profiler::platform::now_us() - t3);
+    profiler::add(|p| p.progressive_total_us += profiler::platform::now_us() - t0_prog);
+
+    // ── Phase 4: Final solve (unchanged) ─────────────────────────────────────
     let iterations = options.iterations.unwrap_or(80);
     let restarts = options.restarts.unwrap_or(6);
     let warm_start_iters = options.warm_start_iterations.unwrap_or(6);
@@ -298,7 +554,7 @@ fn progressive_solve(
 }
 
 /// Inner solve dispatch — decompose into independent components when possible.
-fn solve_system(
+pub(crate) fn solve_system(
     points: &mut Vec<Point>,
     lines: &Vec<Line>,
     circles: &mut Vec<Circle>,
@@ -961,7 +1217,7 @@ fn shape_vertex_ids(shape: &Shape, lines_map: &HashMap<&str, &Line>) -> Vec<Stri
     result
 }
 
-fn compute_presolve_ref_scale(constraints: &Vec<Constraint>) -> f64 {
+pub(crate) fn compute_presolve_ref_scale(constraints: &Vec<Constraint>) -> f64 {
     let mut max_val: f64 = 1.0;
     for c in constraints {
         let v = match c {
@@ -1882,7 +2138,7 @@ pub fn presolve_constraint(
     ))
 }
 
-fn apply_presolve_constraint(
+pub(crate) fn apply_presolve_constraint(
     points: &mut Vec<Point>,
     lines: &Vec<Line>,
     pts: &HashMap<String, usize>,
@@ -2280,7 +2536,7 @@ fn apply_presolve_constraint(
         }
 }
 
-fn build_entity_ref_count(constraints: &Vec<Constraint>) -> HashMap<String, usize> {
+pub(crate) fn build_entity_ref_count(constraints: &Vec<Constraint>) -> HashMap<String, usize> {
     let mut counts = HashMap::new();
     let add = |id: &str, counts: &mut HashMap<String, usize>| {
         *counts.entry(id.to_string()).or_insert(0) += 1;
