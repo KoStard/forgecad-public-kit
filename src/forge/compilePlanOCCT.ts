@@ -908,13 +908,24 @@ function _lowerShapeCompilePlanToOCCTInner(
 
     case 'revolve': {
       const face = lowerProfileToFace(oc, plan.profile);
+      // Manifold revolve maps 2D-X → radial distance, 2D-Y → 3D-Z height,
+      // revolving around Z. The OCCT face lives in XY (z=0), so rotate it
+      // 90° around X to move it into the XZ plane before revolving around Z.
+      const rot = new oc.gp_Trsf_1();
+      rot.SetRotation_1(
+        new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(1, 0, 0)),
+        Math.PI / 2,
+      );
+      const rotated = new oc.BRepBuilderAPI_Transform_2(face, rot, true);
+      const rotatedFace = rotated.Shape();
+
       const axis = new oc.gp_Ax1_2(
         new oc.gp_Pnt_3(0, 0, 0),
         new oc.gp_Dir_4(0, 0, 1),
       );
       const degrees = plan.degrees ?? 360;
       const radians = degrees * Math.PI / 180;
-      const revol = new oc.BRepPrimAPI_MakeRevol_1(face, axis, radians, true);
+      const revol = new oc.BRepPrimAPI_MakeRevol_1(rotatedFace, axis, radians, true);
       revol.Build(new oc.Message_ProgressRange_1());
       if (!revol.IsDone()) {
         throw new Error('OCCT revolve failed — profile may be too complex or self-intersecting');
