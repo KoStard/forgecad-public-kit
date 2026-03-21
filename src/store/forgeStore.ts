@@ -48,12 +48,12 @@ function lookupCache(
   quality: string,
   backend: string,
 ): RunResult | null {
-  const entry = runResultCache.get(filePath);
+  const key = `${filePath}::${backend}`;
+  const entry = runResultCache.get(key);
   if (!entry) return null;
   if (
     entry.code !== code ||
     entry.quality !== quality ||
-    entry.backend !== backend ||
     JSON.stringify(entry.paramOverrides) !== JSON.stringify(paramOverrides) ||
     JSON.stringify(entry.files) !== JSON.stringify(files)
   ) return null;
@@ -69,8 +69,9 @@ function storeCache(
   backend: string,
   result: RunResult,
 ): void {
-  runResultCache.delete(filePath); // re-insert to mark as recently used
-  runResultCache.set(filePath, { code, files, paramOverrides, quality, backend, result });
+  const key = `${filePath}::${backend}`;
+  runResultCache.delete(key); // re-insert to mark as recently used
+  runResultCache.set(key, { code, files, paramOverrides, quality, backend, result });
   if (runResultCache.size > RUN_RESULT_CACHE_MAX) {
     runResultCache.delete(runResultCache.keys().next().value!);
   }
