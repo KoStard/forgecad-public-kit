@@ -163,10 +163,12 @@ The current runtime only handles straight edges (extrude along axis → subtract
 | # | Change | Status |
 |---|--------|--------|
 | — | Baseline: only box vertical edges supported | ✅ Current |
-| P1 | Mesh edge extraction with structured data | ✅ Done |
-| P2 | Edge query API (selectEdge/selectEdges) | ✅ Done |
-| P3 | Bridge to fillet runtime | ✅ Done (14/14 tests pass) |
-| P4 | Curved edge support | 🔲 Future |
+| P1 | Mesh edge extraction with structured data | ✅ Done — works well |
+| P2 | Edge query API (selectEdge/selectEdges) | ✅ Done — works well |
+| P3 | Bridge to fillet runtime (direct Manifold) | ⚠️ Flat-face only, bypasses compile plans |
+| P3b | Crescent subtraction fix | ⚠️ Correct for flat faces, artifacts on curved |
+| P4 | Curved edge / general fillet | 🔲 Needs proper surface-offset algorithm |
+| P5 | Integrate with compile plan system | 🔲 Required for BREP export |
 
 ## Experiment Log
 
@@ -222,6 +224,55 @@ The model has very few meaningful **straight** edges — the tooth edges from `h
 1. `smoothOut(minSharpAngle) + refine()` — Manifold's built-in edge smoothing. Applies to ALL sharp edges above the angle threshold, not selectable per-edge. Good for "fillet everything" but no per-edge control.
 2. Sweep a fillet cross-section along the circular edge path — requires computing the edge curve from mesh data and constructing sweep geometry. Complex but precise.
 3. Revolution approach — for axisymmetric parts, fillet the 2D profile before revolving. Doesn't help for post-boolean edges.
+
+#### Cylinder-on-edge fillet attempt (FAILED — wrong geometry)
+
+**What**: First attempt placed a full cylinder with its axis ON the edge and union'd it raw. This produced visible tubes sticking out of the surface.
+
+**Fix attempted**: Offset the cylinder center to (qx×r, qy×r) in local frame (inside the body) and used a "crescent subtraction" approach: `diff(base, diff(corner, offset_cylinder))`. This correctly removes only the sharp crescent between the square corner and the cylinder arc.
+
+**Result on box edges**: Correct. Volume decreases by (1−π/4)×r²×length as expected.
+
+**Result on AMS adapter horizontal edges**: **Artifacts.** The crescent approach assumes both adjacent faces are flat planes. On the AMS adapter, one face is the flat top surface but the other is the **curved cylinder wall**. The square corner block doesn't match the actual wedge-shaped material at the edge — it overshoots into the curved body, creating visible bite marks.
+
+**Root cause**: The "square corner + cylinder" construction is a **flat-face-only heuristic**, not a general fillet algorithm. It works for:
+- 90° edges between two flat faces (boxes) ✓
+- Edges between two flat faces at other angles (approximately) ✓
+
+It fails for:
+- Edges where one or both adjacent faces are curved ✗
+- Edges where the dihedral angle varies along the edge length ✗
+
+**Lesson**: A correct general fillet needs to derive its cutting/filling geometry from the actual adjacent surfaces, not from an assumed square cross-section. This is fundamentally a surface-offset problem.
+
+#### Architecture mistake: bypassing the compile plan system (FAILED)
+
+**What**: `filletEdgeSegment()` / `chamferEdgeSegment()` call the Manifold runtime directly, bypassing the compile plan system entirely.
+
+**Why this is wrong**:
+1. **BREP export breaks** — The compile plan is what gets lowered to CadQuery/OCCT for B-Rep output. By going straight to Manifold, BREP export has no idea fillets happened. The exported STEP/IGES file would have sharp edges where the viewport shows rounds.
+2. **No undo/parameter history** — Compile plans record the full construction history. Direct Manifold calls produce an opaque mesh blob with no provenance.
+3. **No topology propagation** — The TrackedShape query system loses all edge/face tracking after a direct Manifold operation. Subsequent operations that depend on topology (hole placement, further fillets, shell) would fail.
+
+**Correct approach**: Edge selection (Phase 1-2) should produce an `EdgeQueryRef` that feeds into the existing compile plan system. The compile plan would record `{ kind: 'fillet', edge: EdgeQueryRef, radius, ... }` and get lowered to both Manifold and CadQuery correctly. This means extending the resolution system rather than bypassing it.
+
+## Fundamental Problem: Fillet on Curved Surfaces
+
+The "square corner + cylinder" boolean approach is a geometric shortcut that only works when both faces adjacent to the edge are flat planes. For real-world models (cylinders, spheres, lofts, boolean results), at least one face is typically curved.
+
+**What a real fillet algorithm needs:**
+1. **Surface offset** — Compute the offset surface of each adjacent face, moved inward by the fillet radius
+2. **Spine curve** — Find the intersection of the two offset surfaces. This is the fillet center curve.
+3. **Rolling ball** — The fillet surface is the envelope of a sphere of radius r rolling along the spine, tangent to both original faces
+4. **Trimming** — Trim the original faces at the tangent curves and insert the fillet surface
+
+This is what OpenCascade's `BRepFilletAPI_MakeFillet` does natively. Manifold (mesh-based) has no concept of surfaces, offsets, or tangent curves.
+
+**Possible paths forward:**
+1. **Route through CadQuery/OCCT for fillet** — Use the BREP export path to perform the fillet in OpenCascade, then re-import the result as a mesh. Heavy but correct.
+2. **Manifold `smoothOut` + `refine`** — Marks edges for subdivision smoothing. Not a true fillet (radius isn't controllable), but produces smooth edges on any geometry.
+3. **Analytical special cases** — For common configurations (flat+flat, flat+cylinder, cylinder+cylinder), derive the correct fillet geometry analytically. Cover 80% of practical cases.
+4. **SDF-based fillet** — Use signed-distance-field blending (`levelSet`) to produce smooth transitions. Approximate but works on any geometry.
 
 ## Risks and Open Questions
 
