@@ -127,6 +127,7 @@ The speedup is super-linear because the FD Jacobian is O(n²) in variable count 
 | E2 | Variable elimination (final solve) | 138 vars, 16s, maxError=340 | 78 vars, 4.15s | 60 vars, 12s | ✅ Vars reduced, no convergence help |
 | E3 | + Absorbed constraint filtering | 138 vars × 186 rows, maxError=420 | — | — | ❌ Worse convergence |
 | E4 | Variable elimination only (revert E3) | 138 vars × 264 rows, 16s | 78 vars, 4.15s | 60 vars, 12s | ✅ Final implementation |
+| E5 | Spread overlapping shapes (grid + jitter) | 138 vars, 3.2s final, ✅ converges | 533ms ✅ | 3.0s ✅ | ✅ Case_wood 03/18 now solves! |
 
 ## Experiment Log
 
@@ -165,17 +166,42 @@ The speedup is super-linear because the FD Jacobian is O(n²) in variable count 
 **Result**: Same metrics as E2. 61/63 Rust tests pass (2 pre-existing failures on mainline). No regressions on groupRect or spectrometer.
 **Lesson**: The clean win is per-coordinate variable elimination via union-find equivalence classes. It's generic, automatic, and correctly handles the sparsity/FD propagation.
 
-## Root Cause: Bad Initial Geometry
+#### E5: Spread overlapping shapes before presolve (SUCCESS)
+**What**: New `spread_overlapping_shapes` function in `mod.rs`:
+- Uses union-find over line connectivity + structural constraints (Coincident, PointOnLine, Midpoint) to identify connected components (shapes)
+- Computes each shape's centroid and bounding box
+- If ≥4 shapes are clustered (centroids within expected grid extent), spreads them in a grid with deterministic jitter
+- Spacing = 2× average shape bbox (conservative — keeps shapes close enough for solver to bridge)
+- Deterministic jitter via Knuth's golden ratio hash of component root index
+- Each component is translated as a unit (preserves internal geometry)
+- Called at start of both `run_presolve` and `progressive_solve`
 
-The case_wood 03/18 convergence failure is NOT caused by too many variables. It's caused by:
+**Iterations**:
+1. First attempt used `ref_scale * 0.8` as spacing → shapes spread 1000+ units apart → maxError=709961 (WORSE). Solver couldn't bridge huge distances.
+2. Fixed: use average shape bbox × 2 as spacing. For 10×10 rects, spacing = 20 → 16 shapes in 4×4 grid cover ~80×80 area.
+3. Spectrometer regression: shapes connected by Coincident (not lines) were treated as separate components → spread apart incorrectly. Fixed by also connecting via Coincident/PointOnLine/Midpoint constraints in union-find.
+4. Added ≥4 shape minimum threshold — solver handles 2-3 overlapping shapes fine.
+
+**Result**:
+- case_wood 03/18: **CONVERGES** — 3.2s final solve (was never finishing), 111 outer iterations, 107 accepted steps. LM itself only 19ms, progressive warm-up 3.1s.
+- case_wood 03/20: 533ms (no regression from 542ms baseline)
+- spectrometer: 3.0s (no regression from 2.4s baseline)
+- 61/63 Rust tests pass (2 pre-existing failures)
+
+**Why it worked**: The root cause was 16 rects at identical positions → degenerate line normals → LineDistance presolve couldn't compute shift directions → seeds timed out → progressive solve got bad initial geometry. Spreading shapes apart by just 2× their size gives each shape a unique position, making normals well-defined and presolve effective.
+**Lesson**: Initial geometry quality matters more than solver sophistication. A simple grid spread (~20 lines of logic) solved a convergence problem that variable reduction (200+ lines of complex refactoring) could not.
+
+## Root Cause: Bad Initial Geometry (FIXED by E5)
+
+The case_wood 03/18 convergence failure was caused by:
 1. 16 rects created at the same default position (x=0, y=0, w=10, h=10)
 2. `seedIncrementalGeometry` tries to separate them incrementally but exceeds the 5s seed budget
 3. Progressive solve gets initial geometry where all rects are overlapping
 4. Solver can't untangle 16 overlapping rects within the 10s time budget
 
-Possible fixes (future work):
-- **Smarter initial positioning**: Spread rects apart based on `lineDistance`/`attachCentered` constraints before solving
-- **Analytical presolve for distance-based constraints**: Detect `lineDistance(side1, side2, gap) + vertical(bridge)` and compute y offsets directly
+**Fix**: `spread_overlapping_shapes` detects clustered shapes and spreads them in a deterministic grid before presolve runs. This gives each shape a unique position, making the existing presolve and progressive solve effective.
+
+Remaining future work:
 - **Full parameterized groups**: Collapse each rect into a 5-DOF group (x, y, θ, w, h), reducing 16 rects from 138 vars to ~80 vars
 
 ## Files Modified
@@ -183,5 +209,5 @@ Possible fixes (future work):
 | File | Change |
 |------|--------|
 | `solver/src/solver/coord_reduction.rs` | **NEW**: Coordinate equivalence via union-find. Scans H/V/Coincident constraints, builds equivalence classes. Includes `CoordLinkMap` for fast FD propagation. |
-| `solver/src/solver/mod.rs` | Added `pub mod coord_reduction`. Integrated into `solve_single_system` (non-incremental path). Coord propagation in progressive solve loop. |
+| `solver/src/solver/mod.rs` | Added `pub mod coord_reduction`. Integrated into `solve_single_system` (non-incremental path). Coord propagation in progressive solve loop. Added `spread_overlapping_shapes` for initial geometry improvement. |
 | `solver/src/solver/lm.rs` | Refactored `build_variables` to use `PtVarIdx` (per-coord indices). Added `propagate_coord_links_fast`. Updated `set_var_fast` for FD propagation. Updated sparsity to include representative vars for linked points. Threading of `coord_red`/`link_map` through solve_global → run_lm_pass → linearize. |

@@ -223,6 +223,9 @@ fn progressive_solve(
     let entity_ref_count = build_entity_ref_count(constraints);
     let ref_scale = compute_presolve_ref_scale(constraints);
 
+    // Spread overlapping shapes apart before progressive warm-up.
+    spread_overlapping_shapes(points, lines, constraints, ref_scale);
+
     // Phase 1: Progressive warm-up — add constraints one by one with short solves.
     let recon_graph = reconstruction::ReconstructionGraph::empty();
     let mut progressive_timed_out = false;
@@ -1546,6 +1549,183 @@ fn propagate_light_locked_camera(
     }
 }
 
+/// Detect overlapping shapes (connected components via lines) and spread them
+/// apart deterministically. This gives the solver distinct initial positions
+/// for shapes that would otherwise all start at the same default location.
+///
+/// Uses union-find over line connectivity to identify shapes, computes each
+/// shape's centroid, and if many shapes are clustered in a small region,
+/// spreads them in a grid with deterministic jitter based on component index.
+fn spread_overlapping_shapes(
+    points: &mut Vec<Point>,
+    lines: &[Line],
+    constraints: &[Constraint],
+    ref_scale: f64,
+) {
+    if points.is_empty() || ref_scale < 1e-6 { return; }
+
+    let n = points.len();
+    let pt_idx: HashMap<String, usize> = points.iter().enumerate()
+        .map(|(i, p)| (p.id.clone(), i))
+        .collect();
+
+    // Build line endpoint lookup for constraint processing.
+    let line_map: HashMap<&str, &Line> = lines.iter()
+        .map(|l| (l.id.as_str(), l))
+        .collect();
+
+    // Union-find over points via line connectivity AND structural constraints.
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut rank: Vec<usize> = vec![0; n];
+
+    fn uf_find(parent: &mut Vec<usize>, x: usize) -> usize {
+        if parent[x] != x {
+            parent[x] = uf_find(parent, parent[x]);
+        }
+        parent[x]
+    }
+    fn uf_union(parent: &mut Vec<usize>, rank: &mut Vec<usize>, a: usize, b: usize) {
+        let ra = uf_find(parent, a);
+        let rb = uf_find(parent, b);
+        if ra == rb { return; }
+        match rank[ra].cmp(&rank[rb]) {
+            std::cmp::Ordering::Less => parent[ra] = rb,
+            std::cmp::Ordering::Greater => parent[rb] = ra,
+            std::cmp::Ordering::Equal => { parent[rb] = ra; rank[ra] += 1; }
+        }
+    }
+
+    // Connect via lines.
+    for line in lines {
+        if let (Some(&ai), Some(&bi)) = (pt_idx.get(&line.a), pt_idx.get(&line.b)) {
+            uf_union(&mut parent, &mut rank, ai, bi);
+        }
+    }
+
+    // Connect via structural constraints (Coincident, PointOnLine, Midpoint).
+    // These create physical connections between points that should be treated
+    // as part of the same shape for spreading purposes.
+    for c in constraints {
+        match c {
+            Constraint::Coincident { a, b, .. } => {
+                if let (Some(&ai), Some(&bi)) = (pt_idx.get(a.as_str()), pt_idx.get(b.as_str())) {
+                    uf_union(&mut parent, &mut rank, ai, bi);
+                }
+            }
+            Constraint::PointOnLine { point, line, .. } => {
+                if let Some(&pi) = pt_idx.get(point.as_str()) {
+                    if let Some(l) = line_map.get(line.as_str()) {
+                        if let Some(&ai) = pt_idx.get(l.a.as_str()) {
+                            uf_union(&mut parent, &mut rank, pi, ai);
+                        }
+                    }
+                }
+            }
+            Constraint::Midpoint { point, line, .. } => {
+                if let Some(&pi) = pt_idx.get(point.as_str()) {
+                    if let Some(l) = line_map.get(line.as_str()) {
+                        if let Some(&ai) = pt_idx.get(l.a.as_str()) {
+                            uf_union(&mut parent, &mut rank, pi, ai);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Group non-fixed points by connected component.
+    let mut components: HashMap<usize, Vec<usize>> = HashMap::new();
+    for i in 0..n {
+        if !points[i].fixed {
+            let root = uf_find(&mut parent, i);
+            components.entry(root).or_default().push(i);
+        }
+    }
+
+    // Compute centroid and bounding box of each component (shape).
+    // Only consider components with ≥3 points (actual shapes, not lone bridges).
+    struct ShapeInfo {
+        root: usize,
+        cx: f64,
+        cy: f64,
+        bbox_size: f64,
+        members: Vec<usize>,
+    }
+    let mut shape_list: Vec<ShapeInfo> = Vec::new();
+    for (root, members) in &components {
+        if members.len() < 3 { continue; }
+        let cx = members.iter().map(|&i| points[i].x).sum::<f64>() / members.len() as f64;
+        let cy = members.iter().map(|&i| points[i].y).sum::<f64>() / members.len() as f64;
+        let min_x = members.iter().map(|&i| points[i].x).fold(f64::INFINITY, f64::min);
+        let max_x = members.iter().map(|&i| points[i].x).fold(f64::NEG_INFINITY, f64::max);
+        let min_y = members.iter().map(|&i| points[i].y).fold(f64::INFINITY, f64::min);
+        let max_y = members.iter().map(|&i| points[i].y).fold(f64::NEG_INFINITY, f64::max);
+        let bbox_size = (max_x - min_x).max(max_y - min_y);
+        shape_list.push(ShapeInfo { root: *root, cx, cy, bbox_size, members: members.clone() });
+    }
+
+    // Only spread when there are many overlapping shapes (≥4).
+    // A few overlapping shapes (2-3) are handled fine by the solver.
+    // The problem arises with many (16+) shapes at the same position.
+    if shape_list.len() < 4 { return; }
+
+    // Sort by root index for deterministic ordering.
+    shape_list.sort_by_key(|s| s.root);
+
+    // Compute average shape bounding box for spacing.
+    let avg_bbox = shape_list.iter().map(|s| s.bbox_size).sum::<f64>() / shape_list.len() as f64;
+    // Use 2× average bbox as spacing — enough to separate shapes without being excessive.
+    // At minimum, use ref_scale * 0.1 so shapes still move apart when all have zero bbox.
+    let spacing = (avg_bbox * 2.0).max(ref_scale * 0.1);
+
+    // Compute global centroid and check if shapes are clustered.
+    let gcx = shape_list.iter().map(|s| s.cx).sum::<f64>() / shape_list.len() as f64;
+    let gcy = shape_list.iter().map(|s| s.cy).sum::<f64>() / shape_list.len() as f64;
+    let max_dist = shape_list.iter()
+        .map(|s| ((s.cx - gcx).powi(2) + (s.cy - gcy).powi(2)).sqrt())
+        .fold(0.0f64, f64::max);
+
+    // If shapes are already spread out, skip. Compare to expected grid extent.
+    let n_shapes = shape_list.len();
+    let cols = (n_shapes as f64).sqrt().ceil() as usize;
+    let rows = (n_shapes + cols - 1) / cols;
+    let expected_extent = spacing * (cols.max(rows) as f64) / 2.0;
+    if max_dist > expected_extent * 0.3 { return; }
+
+    for (k, shape) in shape_list.iter().enumerate() {
+        let row = k / cols;
+        let col = k % cols;
+
+        // Grid position centered on global centroid.
+        let grid_x = gcx + (col as f64 - (cols as f64 - 1.0) / 2.0) * spacing;
+        let grid_y = gcy + (row as f64 - (rows as f64 - 1.0) / 2.0) * spacing;
+
+        // Deterministic jitter based on component root index to break grid symmetry.
+        // Uses a simple multiplicative hash (Knuth's golden ratio hash).
+        let hash = shape.root.wrapping_mul(2654435761);
+        let jx = ((hash >> 16) & 0xFF) as f64 / 255.0 - 0.5; // [-0.5, 0.5]
+        let jy = ((hash >> 8) & 0xFF) as f64 / 255.0 - 0.5;
+        let jitter_scale = spacing * 0.15;
+
+        let new_cx = grid_x + jx * jitter_scale;
+        let new_cy = grid_y + jy * jitter_scale;
+        let dx = new_cx - shape.cx;
+        let dy = new_cy - shape.cy;
+
+        // Translate entire component as a unit (preserves internal geometry).
+        for &i in &shape.members {
+            points[i].x += dx;
+            points[i].y += dy;
+        }
+    }
+
+    lm::trail_push(
+        &format!("spread: {} shapes spread in {}×{} grid", n_shapes, cols, rows),
+        0.0,
+    );
+}
+
 fn run_presolve(
     points: &mut Vec<Point>,
     lines: &Vec<Line>,
@@ -1556,6 +1736,11 @@ fn run_presolve(
     _tolerance: f64,
 ) {
     let ref_scale = compute_presolve_ref_scale(constraints);
+
+    // Spread overlapping shapes apart before constraint-based presolve.
+    // This gives each shape a distinct initial position so that distance/angle
+    // presolve can compute meaningful normals and directions.
+    spread_overlapping_shapes(points, lines, constraints, ref_scale);
 
     // Stage 1: Establish base geometry (Fixed, CCW, AbsoluteAngle, Length, BlockRotation).
     // These set positions, orientations, and scales that derived constraints depend on.
