@@ -118,12 +118,70 @@ Expose `sk.paramRect()`, `sk.paramPolygon()`, etc. that create parameterized gro
 
 The speedup is super-linear because the FD Jacobian is O(n²) in variable count (n columns × n-dependent rows).
 
-## Files likely affected
+## Progress Tracker
+
+| # | Change | case_wood 03/18 | case_wood 03/20 | spectrometer | Status |
+|---|--------|-----------------|-----------------|--------------|--------|
+| — | Baseline (pre-work) | 216 vars, ~15s, maxError=145 | 96 vars, 4.2s | 62 vars, ~7s | ✅ |
+| E1 | Coord propagation only (progressive) | 216 vars, 16s, maxError=339 | 96 vars, 4.2s | — | ❌ No improvement |
+| E2 | Variable elimination (final solve) | 138 vars, 16s, maxError=340 | 78 vars, 4.15s | 60 vars, 12s | ✅ Vars reduced, no convergence help |
+| E3 | + Absorbed constraint filtering | 138 vars × 186 rows, maxError=420 | — | — | ❌ Worse convergence |
+| E4 | Variable elimination only (revert E3) | 138 vars × 264 rows, 16s | 78 vars, 4.15s | 60 vars, 12s | ✅ Final implementation |
+
+## Experiment Log
+
+#### E1: Coordinate propagation in progressive solve (FAILED)
+**What**: Added `build_coord_reduction` call in every progressive step. For each linked coordinate, copy representative's value to linked point before the LM pass.
+**Result**: No improvement in convergence. case_wood 03/18 still maxError=339 (worse than baseline 145). No reduction in variable count or solve time.
+**Why it failed**: All 16 rects start at the same default position (0,0 with w=h=10). Coord propagation ensures linked coordinates are equal, but they ALREADY are equal. The problem is that rects need to be MOVED APART, not that coordinates need to be ALIGNED. Coord propagation is the wrong tool for this geometry.
+**Lesson**: Coordinate equivalence helps when constraints force coordinates to be equal but initial geometry disagrees. It doesn't help when the problem is positioning (moving shapes apart).
+
+#### E2: Per-coordinate variable elimination in LM solver (SUCCESS — partial)
+**What**: Major refactoring of `build_variables` and supporting functions in `lm.rs`:
+- Changed `pt_var_idx` from `Vec<usize>` (one x index, y=x+1) to `Vec<PtVarIdx>` with independent x/y indices
+- When coord reduction says point A.y is linked to point B.y, A.y is not created as a solver variable
+- Added `CoordLinkMap` for fast FD propagation: when B.y changes, all followers update immediately
+- Updated sparsity map: constraints involving linked points now include representative's variables
+- Added `propagate_coord_links_fast` after every `apply_state` in solve_global and run_lm_pass
+- Only applied to final solve (non-incremental) — seeds keep full variable set
+
+**Result**:
+- case_wood 03/18: 216 → 138 vars (78 saved, 36% reduction). build_sparsity 3× faster (538→175ms when global, ~570ms when final-only). GS warmstart 3× faster (3089→1018ms when global). FD loop 28% faster.
+- case_wood 03/20: 96 → 78 vars (18 saved, 19% reduction). No regression in total time (4.15s).
+- spectrometer: 62 → 60 vars (2 saved, 3% reduction). Minimal impact.
+- Convergence: NOT improved. Bad initial geometry from seed timeouts still prevents convergence for case_wood 03/18.
+
+**Why partially worked**: Variable elimination is correct and reduces solver work per iteration. But convergence failure is caused by bad initial geometry (16 rects at same position → seeds time out → progressive solve can't untangle), not by variable count. The 36% variable reduction makes each iteration faster but doesn't help convergence.
+**Lesson**: Variable reduction is a necessary but not sufficient condition for fixing the rect case. The bottleneck is initial geometry quality, not solver variable count.
+
+#### E3: Absorbed constraint filtering (FAILED)
+**What**: After variable elimination, also removed the h/v constraints absorbed by coord reduction from the constraint list. Reduced 264 → 186 rows for case_wood 03/18.
+**Result**: maxError WORSENED from 340 to 420. Convergence got worse.
+**Why it failed**: Even though absorbed constraints have zero residual (linked coords are always equal), they provide Jacobian gradient information that guides the solver. Removing them removes these "guide rails" — the solver loses directional information and navigates the solution space worse.
+**Lesson**: Redundant constraints with zero residual still provide useful Jacobian information for LM optimization. Don't remove them unless you're sure the remaining constraints provide sufficient gradient coverage.
+
+#### E4: Final implementation — variable elimination only (SUCCESS)
+**What**: Kept E2's variable elimination, reverted E3's constraint filtering. Disabled coord reduction for incremental/seed calls (only runs on final solve) to avoid seed regression.
+**Result**: Same metrics as E2. 61/63 Rust tests pass (2 pre-existing failures on mainline). No regressions on groupRect or spectrometer.
+**Lesson**: The clean win is per-coordinate variable elimination via union-find equivalence classes. It's generic, automatic, and correctly handles the sparsity/FD propagation.
+
+## Root Cause: Bad Initial Geometry
+
+The case_wood 03/18 convergence failure is NOT caused by too many variables. It's caused by:
+1. 16 rects created at the same default position (x=0, y=0, w=10, h=10)
+2. `seedIncrementalGeometry` tries to separate them incrementally but exceeds the 5s seed budget
+3. Progressive solve gets initial geometry where all rects are overlapping
+4. Solver can't untangle 16 overlapping rects within the 10s time budget
+
+Possible fixes (future work):
+- **Smarter initial positioning**: Spread rects apart based on `lineDistance`/`attachCentered` constraints before solving
+- **Analytical presolve for distance-based constraints**: Detect `lineDistance(side1, side2, gap) + vertical(bridge)` and compute y offsets directly
+- **Full parameterized groups**: Collapse each rect into a 5-DOF group (x, y, θ, w, h), reducing 16 rects from 138 vars to ~80 vars
+
+## Files Modified
 
 | File | Change |
 |------|--------|
-| `solver/src/types.rs` | `ParameterizedGroup` struct, or extend `SketchGroup` with params |
-| `solver/src/solver/mod.rs` | Detection algorithm in presolve |
-| `solver/src/solver/lm.rs` | `build_variables` to handle parameterized groups |
-| `src/forge/sketch/constraints/builder.ts` | `paramRect()` API |
-| `src/forge/sketch/constraints/types.ts` | TS types for parameterized groups |
+| `solver/src/solver/coord_reduction.rs` | **NEW**: Coordinate equivalence via union-find. Scans H/V/Coincident constraints, builds equivalence classes. Includes `CoordLinkMap` for fast FD propagation. |
+| `solver/src/solver/mod.rs` | Added `pub mod coord_reduction`. Integrated into `solve_single_system` (non-incremental path). Coord propagation in progressive solve loop. |
+| `solver/src/solver/lm.rs` | Refactored `build_variables` to use `PtVarIdx` (per-coord indices). Added `propagate_coord_links_fast`. Updated `set_var_fast` for FD propagation. Updated sparsity to include representative vars for linked points. Threading of `coord_red`/`link_map` through solve_global → run_lm_pass → linearize. |

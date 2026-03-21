@@ -37,6 +37,18 @@ pub struct Variable {
 }
 
 /// Build the variable list and extract initial state.
+/// Per-point variable index pair: x and y can be independently present or absent.
+#[derive(Clone, Copy)]
+struct PtVarIdx {
+    x: usize,  // usize::MAX = not a variable (fixed/linked/group-owned)
+    y: usize,  // usize::MAX = not a variable
+}
+
+impl PtVarIdx {
+    fn skip() -> Self { PtVarIdx { x: usize::MAX, y: usize::MAX } }
+    fn is_skip(&self) -> bool { self.x == usize::MAX && self.y == usize::MAX }
+}
+
 fn build_variables(
     points: &Vec<Point>,
     circles: &Vec<Circle>,
@@ -44,14 +56,13 @@ fn build_variables(
     groups: &Vec<SketchGroup>,
     scale: f64,
     graph: &ReconstructionGraph,
-) -> (Vec<Variable>, Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>) {
+    coord_red: Option<&super::coord_reduction::CoordReduction>,
+) -> (Vec<Variable>, Vec<PtVarIdx>, Vec<usize>, Vec<usize>, Vec<usize>) {
     // Returns: (vars, point_indices, circle_indices, arc_indices, group_indices)
-    // point_indices[i] → variable index for points[i].x (y = +1)
-    // circle_indices[i] → variable index for circles[i].radius
-    // arc_indices[i] → variable index for arcs[i].radius
-    // group_indices[i] → variable index for groups[i].x (y = +1, theta = +2 if not fixed_rotation)
+    // point_indices[i].x → variable index for points[i].x (usize::MAX = skipped)
+    // point_indices[i].y → variable index for points[i].y (usize::MAX = skipped)
     let mut vars: Vec<Variable> = Vec::new();
-    let mut pt_var_idx = Vec::new();
+    let mut pt_var_idx: Vec<PtVarIdx> = Vec::new();
     let mut circ_var_idx = Vec::new();
     let mut arc_var_idx = Vec::new();
     let mut group_var_idx = Vec::new();
@@ -67,11 +78,23 @@ fn build_variables(
     for (i, p) in points.iter().enumerate() {
         // Skip: fixed, group-owned, or reconstructed (determined by constructive geometry).
         if p.fixed || group_owned_points.contains(&p.id) || graph.determined_point_indices.contains(&i) {
-            pt_var_idx.push(usize::MAX);
+            pt_var_idx.push(PtVarIdx::skip());
         } else {
-            pt_var_idx.push(vars.len());
-            vars.push(Variable { entity_id: p.id.clone(), scale });
-            vars.push(Variable { entity_id: p.id.clone(), scale });
+            // Check coordinate reduction: skip linked coordinates.
+            let x_linked = coord_red.map_or(false, |cr| cr.x_is_linked(i));
+            let y_linked = coord_red.map_or(false, |cr| cr.y_is_linked(i));
+
+            let x_idx = if x_linked { usize::MAX } else {
+                let idx = vars.len();
+                vars.push(Variable { entity_id: p.id.clone(), scale });
+                idx
+            };
+            let y_idx = if y_linked { usize::MAX } else {
+                let idx = vars.len();
+                vars.push(Variable { entity_id: p.id.clone(), scale });
+                idx
+            };
+            pt_var_idx.push(PtVarIdx { x: x_idx, y: y_idx });
         }
         let _ = i;
     }
@@ -112,7 +135,7 @@ fn capture_state(
     circles: &Vec<Circle>,
     arcs: &Vec<Arc>,
     groups: &Vec<SketchGroup>,
-    pt_var_idx: &Vec<usize>,
+    pt_var_idx: &Vec<PtVarIdx>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
@@ -120,11 +143,9 @@ fn capture_state(
 ) -> Vec<f64> {
     let mut state = vec![0.0f64; n_vars];
     for (i, p) in points.iter().enumerate() {
-        let vi = pt_var_idx[i];
-        if vi != usize::MAX {
-            state[vi] = p.x;
-            state[vi + 1] = p.y;
-        }
+        let pv = &pt_var_idx[i];
+        if pv.x != usize::MAX { state[pv.x] = p.x; }
+        if pv.y != usize::MAX { state[pv.y] = p.y; }
     }
     for (i, c) in circles.iter().enumerate() {
         let vi = circ_var_idx[i];
@@ -154,17 +175,15 @@ fn apply_state(
     circles: &mut Vec<Circle>,
     arcs: &mut Vec<Arc>,
     groups: &mut Vec<SketchGroup>,
-    pt_var_idx: &Vec<usize>,
+    pt_var_idx: &Vec<PtVarIdx>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
 ) {
     for (i, p) in points.iter_mut().enumerate() {
-        let vi = pt_var_idx[i];
-        if vi != usize::MAX {
-            p.x = state[vi];
-            p.y = state[vi + 1];
-        }
+        let pv = &pt_var_idx[i];
+        if pv.x != usize::MAX { p.x = state[pv.x]; }
+        if pv.y != usize::MAX { p.y = state[pv.y]; }
     }
     for (i, c) in circles.iter_mut().enumerate() {
         let vi = circ_var_idx[i];
@@ -187,6 +206,34 @@ fn apply_state(
     }
     // Resolve group-owned points to world coordinates.
     resolve_group_points(points, groups);
+}
+
+/// Copy representative coordinate values to linked (slaved) points.
+/// Must be called after every apply_state when coord_red is active,
+/// otherwise residuals will read stale values for linked coordinates.
+fn propagate_coord_links(points: &mut Vec<Point>, coord_red: &super::coord_reduction::CoordReduction) {
+    for i in 0..points.len() {
+        let rx = coord_red.repr_x[i];
+        if rx != i { points[i].x = points[rx].x; }
+        let ry = coord_red.repr_y[i];
+        if ry != i { points[i].y = points[ry].y; }
+    }
+}
+
+/// Fast coord link propagation using the prebuilt link map.
+fn propagate_coord_links_fast(points: &mut Vec<Point>, link_map: &super::coord_reduction::CoordLinkMap) {
+    for (repr_idx, followers) in link_map.x_followers.iter().enumerate() {
+        if !followers.is_empty() {
+            let val = points[repr_idx].x;
+            for &fi in followers { points[fi].x = val; }
+        }
+    }
+    for (repr_idx, followers) in link_map.y_followers.iter().enumerate() {
+        if !followers.is_empty() {
+            let val = points[repr_idx].y;
+            for &fi in followers { points[fi].y = val; }
+        }
+    }
 }
 
 // ─── Reference length ─────────────────────────────────────────────────────────
@@ -316,11 +363,12 @@ fn build_sparsity(
     constraints: &Vec<Constraint>,
     groups: &Vec<SketchGroup>,
     vars: &Vec<Variable>,
-    pt_var_idx: &Vec<usize>,
+    pt_var_idx: &Vec<PtVarIdx>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
     graph: &ReconstructionGraph,
+    coord_red: Option<&super::coord_reduction::CoordReduction>,
 ) -> (SparsityMap, usize) {
     let n_vars = vars.len();
 
@@ -348,10 +396,27 @@ fn build_sparsity(
     // Map entity_id → variable indices it contributes.
     let mut entity_to_vars: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, p) in points.iter().enumerate() {
-        let vi = pt_var_idx[i];
-        if vi != usize::MAX {
-            // Non-group-owned, non-fixed, non-reconstructed point — maps to its own x/y variables.
-            entity_to_vars.entry(p.id.clone()).or_default().extend([vi, vi + 1]);
+        let pv = &pt_var_idx[i];
+        // Check if this point has any own variables OR linked coordinates.
+        let has_own_vars = pv.x != usize::MAX || pv.y != usize::MAX;
+        let has_linked_coords = coord_red.map_or(false, |cr| cr.x_is_linked(i) || cr.y_is_linked(i));
+
+        if has_own_vars || has_linked_coords {
+            let entry = entity_to_vars.entry(p.id.clone()).or_default();
+            // Add own variables.
+            if pv.x != usize::MAX { entry.push(pv.x); }
+            if pv.y != usize::MAX { entry.push(pv.y); }
+            // For linked coordinates, add the representative's variable.
+            if let Some(cr) = coord_red {
+                if cr.x_is_linked(i) {
+                    let repr_pv = &pt_var_idx[cr.repr_x[i]];
+                    if repr_pv.x != usize::MAX { entry.push(repr_pv.x); }
+                }
+                if cr.y_is_linked(i) {
+                    let repr_pv = &pt_var_idx[cr.repr_y[i]];
+                    if repr_pv.y != usize::MAX { entry.push(repr_pv.y); }
+                }
+            }
         } else if let Some(&gi) = group_point_to_group_idx.get(&p.id) {
             // Group-owned point — maps to the group's frame variables.
             let gvi = group_var_idx[gi];
@@ -514,18 +579,16 @@ pub fn extract_structural_info(
     let scale = ref_len.max(1.0);
 
     let (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx) =
-        build_variables(points, circles, arcs, groups, scale, graph);
+        build_variables(points, circles, arcs, groups, scale, graph, None);
 
     let n_vars = vars.len();
 
     // Build var_origins: what entity/DOF each variable column represents.
     let mut var_origins: Vec<VarOrigin> = vec![VarOrigin::PointX(0); n_vars];
     for (i, _p) in points.iter().enumerate() {
-        let vi = pt_var_idx[i];
-        if vi != usize::MAX {
-            var_origins[vi] = VarOrigin::PointX(i);
-            var_origins[vi + 1] = VarOrigin::PointY(i);
-        }
+        let pv = &pt_var_idx[i];
+        if pv.x != usize::MAX { var_origins[pv.x] = VarOrigin::PointX(i); }
+        if pv.y != usize::MAX { var_origins[pv.y] = VarOrigin::PointY(i); }
     }
     for (i, _c) in circles.iter().enumerate() {
         let vi = circ_var_idx[i];
@@ -558,9 +621,11 @@ pub fn extract_structural_info(
 
     let mut entity_to_vars: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, p) in points.iter().enumerate() {
-        let vi = pt_var_idx[i];
-        if vi != usize::MAX {
-            entity_to_vars.entry(p.id.clone()).or_default().extend([vi, vi + 1]);
+        let pv = &pt_var_idx[i];
+        if pv.x != usize::MAX || pv.y != usize::MAX {
+            let entry = entity_to_vars.entry(p.id.clone()).or_default();
+            if pv.x != usize::MAX { entry.push(pv.x); }
+            if pv.y != usize::MAX { entry.push(pv.y); }
         } else if let Some(&gi) = group_point_to_group_idx.get(&p.id) {
             let gvi = group_var_idx[gi];
             if gvi != usize::MAX {
@@ -667,13 +732,14 @@ fn linearize(
     constraints: &Vec<Constraint>,
     groups: &mut Vec<SketchGroup>,
     vars: &Vec<Variable>,
-    pt_var_idx: &Vec<usize>,
+    pt_var_idx: &Vec<PtVarIdx>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
     sparsity: &SparsityMap,
     n_rows: usize,
     graph: &ReconstructionGraph,
+    link_map: Option<&super::coord_reduction::CoordLinkMap>,
 ) -> Option<LinearizedSystem> {
     let t_resid = profiler::platform::now_us();
     let (base, max_abs) = eval_residuals_full(points, lines, circles, arcs, shapes, constraints)?;
@@ -694,11 +760,9 @@ fn linearize(
     let arcs_map_idx: HashMap<String, usize> = arcs.iter().enumerate().map(|(i, a)| (a.id.clone(), i)).collect();
     let mut key_to_col: HashMap<String, usize> = HashMap::new();
     for (i, point) in points.iter().enumerate() {
-        let vi = pt_var_idx[i];
-        if vi != usize::MAX {
-            key_to_col.insert(format!("{}.x", point.id), vi);
-            key_to_col.insert(format!("{}.y", point.id), vi + 1);
-        }
+        let pv = &pt_var_idx[i];
+        if pv.x != usize::MAX { key_to_col.insert(format!("{}.x", point.id), pv.x); }
+        if pv.y != usize::MAX { key_to_col.insert(format!("{}.y", point.id), pv.y); }
     }
     for (i, circle) in circles.iter().enumerate() {
         let vi = circ_var_idx[i];
@@ -757,11 +821,9 @@ fn linearize(
     // 0=point.x, 1=point.y, 2=circle.r, 3=arc.r, 4=group.x, 5=group.y, 6=group.theta
     let col_to_entity: Vec<(u8, usize)> = {
         let mut map = vec![(255u8, 0usize); n_vars];
-        for (i, &vi) in pt_var_idx.iter().enumerate() {
-            if vi != usize::MAX {
-                map[vi] = (0, i);       // point.x
-                map[vi + 1] = (1, i);   // point.y
-            }
+        for (i, pv) in pt_var_idx.iter().enumerate() {
+            if pv.x != usize::MAX { map[pv.x] = (0, i); }  // point.x
+            if pv.y != usize::MAX { map[pv.y] = (1, i); }  // point.y
         }
         for (i, &vi) in circ_var_idx.iter().enumerate() {
             if vi != usize::MAX {
@@ -811,7 +873,7 @@ fn linearize(
 
         // Central differences: evaluate at x+h and x-h, derivative = (f(x+h) - f(x-h)) / (2h)
         // Collect forward residuals (x+h).
-        set_var_fast(col, base_val + step, points, circles, arcs, groups, &col_to_entity);
+        set_var_fast(col, base_val + step, points, circles, arcs, groups, &col_to_entity, link_map);
         if is_group { resolve_group_points(points, groups); }
         if needs_reconstruct { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
@@ -843,7 +905,7 @@ fn linearize(
         }
 
         // Collect backward residuals (x-h).
-        set_var_fast(col, base_val - step, points, circles, arcs, groups, &col_to_entity);
+        set_var_fast(col, base_val - step, points, circles, arcs, groups, &col_to_entity, link_map);
         if is_group { resolve_group_points(points, groups); }
         if needs_reconstruct { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
@@ -893,7 +955,7 @@ fn linearize(
         }
 
         // Restore original value.
-        set_var_fast(col, base_val, points, circles, arcs, groups, &col_to_entity);
+        set_var_fast(col, base_val, points, circles, arcs, groups, &col_to_entity, link_map);
         if is_group { resolve_group_points(points, groups); }
         if needs_reconstruct { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
@@ -975,15 +1037,15 @@ fn get_var(
     circles: &Vec<Circle>,
     arcs: &Vec<Arc>,
     groups: &Vec<SketchGroup>,
-    pt_var_idx: &Vec<usize>,
+    pt_var_idx: &Vec<PtVarIdx>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
 ) -> f64 {
     for (i, p) in points.iter().enumerate() {
-        let vi = pt_var_idx[i];
-        if vi == col { return p.x; }
-        if vi != usize::MAX && vi + 1 == col { return p.y; }
+        let pv = &pt_var_idx[i];
+        if pv.x == col { return p.x; }
+        if pv.y == col { return p.y; }
     }
     for (i, c) in circles.iter().enumerate() {
         let vi = circ_var_idx[i];
@@ -1009,15 +1071,15 @@ fn set_var(
     circles: &mut Vec<Circle>,
     arcs: &mut Vec<Arc>,
     groups: &mut Vec<SketchGroup>,
-    pt_var_idx: &Vec<usize>,
+    pt_var_idx: &Vec<PtVarIdx>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
 ) {
     for (i, p) in points.iter_mut().enumerate() {
-        let vi = pt_var_idx[i];
-        if vi == col { p.x = value; return; }
-        if vi != usize::MAX && vi + 1 == col { p.y = value; return; }
+        let pv = &pt_var_idx[i];
+        if pv.x == col { p.x = value; return; }
+        if pv.y == col { p.y = value; return; }
     }
     for (i, c) in circles.iter_mut().enumerate() {
         let vi = circ_var_idx[i];
@@ -1068,11 +1130,24 @@ fn set_var_fast(
     arcs: &mut [Arc],
     groups: &mut [SketchGroup],
     col_to_entity: &[(u8, usize)],
+    link_map: Option<&super::coord_reduction::CoordLinkMap>,
 ) {
     let (kind, idx) = col_to_entity[col];
     match kind {
-        0 => points[idx].x = value,
-        1 => points[idx].y = value,
+        0 => {
+            points[idx].x = value;
+            // Propagate to x-followers.
+            if let Some(lm) = link_map {
+                for &fi in &lm.x_followers[idx] { points[fi].x = value; }
+            }
+        }
+        1 => {
+            points[idx].y = value;
+            // Propagate to y-followers.
+            if let Some(lm) = link_map {
+                for &fi in &lm.y_followers[idx] { points[fi].y = value; }
+            }
+        }
         2 => circles[idx].radius = value.max(1e-9),
         3 => arcs[idx].radius = value.max(1e-9),
         4 => groups[idx].x = value,
@@ -1226,7 +1301,7 @@ fn seed_restart(
     arcs: &mut Vec<Arc>,
     groups: &mut Vec<SketchGroup>,
     initial_state: &Vec<f64>,
-    pt_var_idx: &Vec<usize>,
+    pt_var_idx: &Vec<PtVarIdx>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
@@ -1284,7 +1359,7 @@ fn seed_nullspace_restart(
     arcs: &mut Vec<Arc>,
     groups: &mut Vec<SketchGroup>,
     best_state: &Vec<f64>,
-    pt_var_idx: &Vec<usize>,
+    pt_var_idx: &Vec<PtVarIdx>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
@@ -1335,7 +1410,7 @@ fn compute_nullspace_basis(
     constraints: &Vec<Constraint>,
     groups: &mut Vec<SketchGroup>,
     vars: &Vec<Variable>,
-    pt_var_idx: &Vec<usize>,
+    pt_var_idx: &Vec<PtVarIdx>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
@@ -1350,7 +1425,7 @@ fn compute_nullspace_basis(
 
     let lin = match linearize(
         points, lines, circles, arcs, shapes, constraints, groups,
-        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
+        vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, None,
     ) {
         Some(l) => l,
         None => return Vec::new(),
@@ -1472,13 +1547,14 @@ pub fn solve_global(
     groups: &mut Vec<SketchGroup>,
     graph: &ReconstructionGraph,
     deadline_us: u64,
+    coord_red: Option<&super::coord_reduction::CoordReduction>,
 ) -> f64 {
     let ref_len = compute_reference_length(points, circles, arcs, constraints);
     let scale = ref_len.max(1.0);
 
     let (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx) = profiler::timed(
         |p, us| p.build_variables_us += us,
-        || build_variables(points, circles, arcs, groups, scale, graph),
+        || build_variables(points, circles, arcs, groups, scale, graph, coord_red),
     );
 
     if vars.is_empty() {
@@ -1493,12 +1569,16 @@ pub fn solve_global(
         || build_sparsity(
             points, lines, circles, arcs, shapes, constraints, groups,
             &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
-            graph,
+            graph, coord_red,
         ),
     );
 
     profiler::add(|p| { p.n_vars = vars.len() as u32; p.n_rows = n_rows as u32; });
     trail_push(&format!("init: vars={} rows={} ref_len={:.2}", vars.len(), n_rows, ref_len), 0.0);
+
+    // Build coord link map for fast FD propagation (if coord_red is active).
+    let link_map = coord_red.map(|cr| cr.build_link_map());
+    let link_map_ref = link_map.as_ref();
 
     let initial_state = capture_state(points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx, vars.len());
     let mut best_state = initial_state.clone();
@@ -1558,7 +1638,7 @@ pub fn solve_global(
             points, lines, circles, arcs, shapes, constraints, groups,
             &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
             &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
-            graph, deadline_us,
+            graph, deadline_us, link_map_ref,
         );
         trail_push(&format!("lm-pass[{}]", attempt), error);
 
@@ -1621,7 +1701,7 @@ pub fn solve_global(
                 points, lines, circles, arcs, shapes, constraints, groups,
                 &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
                 &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
-                graph, deadline_us,
+                graph, deadline_us, link_map_ref,
             );
             trail_push(&format!("lm-escape[{}]", gs_round), error);
 
@@ -1634,6 +1714,7 @@ pub fn solve_global(
     }
 
     apply_state(&best_state, points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx);
+    if let Some(ref lm) = link_map { propagate_coord_links_fast(points, lm); }
     if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
     trail_push("done", best_error);
     best_error
@@ -1648,7 +1729,7 @@ fn run_lm_pass(
     constraints: &Vec<Constraint>,
     groups: &mut Vec<SketchGroup>,
     vars: &Vec<Variable>,
-    pt_var_idx: &Vec<usize>,
+    pt_var_idx: &Vec<PtVarIdx>,
     circ_var_idx: &Vec<usize>,
     arc_var_idx: &Vec<usize>,
     group_var_idx: &Vec<usize>,
@@ -1661,6 +1742,7 @@ fn run_lm_pass(
     anchor_state: &Vec<f64>,
     graph: &ReconstructionGraph,
     deadline_us: u64,
+    link_map: Option<&super::coord_reduction::CoordLinkMap>,
 ) -> f64 {
     let mut lambda = 1e-3f64;
     let mut nu = 2.0f64;
@@ -1672,7 +1754,7 @@ fn run_lm_pass(
     let mut lin = match profiler::timed(|p, us| { p.linearize_us += us; p.linearize_count += 1; }, || {
         linearize(
             points, lines, circles, arcs, shapes, constraints, groups,
-            vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
+            vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, link_map,
         )
     }) {
         Some(l) => l,
@@ -1715,12 +1797,13 @@ fn run_lm_pass(
 
             let trial_state: Vec<f64> = state.iter().zip(&dx).map(|(s, d)| s + d).collect();
             apply_state(&trial_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+            if let Some(cr) = link_map { propagate_coord_links_fast(points, cr); }
             if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
             let trial = match profiler::timed(|p, us| { p.linearize_us += us; p.linearize_count += 1; }, || {
                 linearize(
                     points, lines, circles, arcs, shapes, constraints, groups,
-                    vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph,
+                    vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, sparsity, n_rows, graph, link_map,
                 )
             }) {
                 Some(l) => l,
@@ -1781,6 +1864,7 @@ fn run_lm_pass(
     }
 
     apply_state(&best_pass_state, points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx);
+    if let Some(lm) = link_map { propagate_coord_links_fast(points, lm); }
     if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
 
     match eval_residuals_full(points, lines, circles, arcs, shapes, constraints) {

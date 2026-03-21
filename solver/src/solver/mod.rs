@@ -1,4 +1,5 @@
 pub mod analytical;
+pub mod coord_reduction;
 pub mod decompose;
 pub mod graph;
 pub mod linear;
@@ -238,6 +239,16 @@ fn progressive_solve(
         let pts_idx: HashMap<String, usize> = points.iter().enumerate().map(|(j, p)| (p.id.clone(), j)).collect();
         apply_presolve_constraint(points, lines, &pts_idx, &entity_ref_count, &constraints[i], ref_scale);
         run_analytical_presolve(points, lines, &sub);
+
+        // Coordinate equivalence propagation: ensure linked coordinates are consistent.
+        let cr = coord_reduction::build_coord_reduction(points, lines, &sub);
+        for j in 0..points.len() {
+            let rx = cr.repr_x[j];
+            if rx != j { points[j].x = points[rx].x; }
+            let ry = cr.repr_y[j];
+            if ry != j { points[j].y = points[ry].y; }
+        }
+
         resolve_group_points(points, groups);
 
         let has_residual = sub.iter().any(|c| crate::constraints::has_residual(c));
@@ -256,7 +267,7 @@ fn progressive_solve(
         lm::solve_global(
             points, lines, circles, arcs, shapes, &sub,
             30, tolerance, 1, 4, 2.5,
-            groups, &recon_graph, step_deadline,
+            groups, &recon_graph, step_deadline, None,
         );
         profiler::add(|p| p.progressive_steps += 1);
     }
@@ -553,6 +564,31 @@ fn solve_single_system(
         || run_analytical_presolve(points, lines, constraints),
     );
 
+    // Coordinate equivalence reduction: only for non-incremental (final) solves.
+    // For seeds/progressive steps, the overhead outweighs the benefit.
+    let coord_red = if !incremental {
+        let cr = coord_reduction::build_coord_reduction(points, lines, constraints);
+        if cr.vars_saved > 0 {
+            // Propagate representative coordinate values to linked points.
+            for i in 0..points.len() {
+                let rx = cr.repr_x[i];
+                if rx != i { points[i].x = points[rx].x; }
+                let ry = cr.repr_y[i];
+                if ry != i { points[i].y = points[ry].y; }
+            }
+            lm::trail_push(
+                &format!("coord-reduction: {} vars saved", cr.vars_saved),
+                lm::current_max_error(points, lines, circles, arcs, shapes, constraints),
+            );
+        }
+        cr
+    } else {
+        coord_reduction::CoordReduction {
+            repr_x: vec![], repr_y: vec![],
+            absorbed_constraints: vec![], vars_saved: 0,
+        }
+    };
+
     // For incremental calls (progressive warm-up or builder warm-seeding),
     // skip the heavy reconstruction graph and DAG analysis but still run LM.
     let recon_graph = if incremental {
@@ -609,6 +645,7 @@ fn solve_single_system(
         });
     }
 
+    let cr_ref = if coord_red.vars_saved > 0 { Some(&coord_red) } else { None };
     let final_error = profiler::timed(
         |p, us| p.lm_total_us += us,
         || lm::solve_global(
@@ -617,6 +654,7 @@ fn solve_single_system(
             groups,
             &recon_graph,
             deadline_us,
+            cr_ref,
         ),
     );
     sanitize_max_error(final_error)
@@ -793,7 +831,7 @@ fn progressive_sub_solve(
         let err = lm::solve_global(
             points, lines, circles, arcs, shapes, &sub_constraints,
             sub_iters, tolerance, sub_restarts, warm_iters, max_step,
-            groups, graph, 0,
+            groups, graph, 0, None,
         );
         lm::trail_push(&format!("sub-layer[{}] ({} constraints, {} pts)", layer, sub_constraints.len(), sub_point_ids.len()), err);
 
