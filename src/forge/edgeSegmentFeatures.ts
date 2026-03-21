@@ -22,7 +22,12 @@ import { TrackedShape } from './sketch/topology';
 import type { EdgeSegment } from './meshEdgeExtraction';
 import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
 import type { Vec3 } from './transform';
-import { applyFilletSelectionToManifold, applyChamferSelectionToManifold } from './edgeFeatureRuntime';
+import {
+  applyFilletSelectionToManifold,
+  applyChamferSelectionToManifold,
+  applyConcaveFilletSelectionToManifold,
+  applyConcaveChamferSelectionToManifold,
+} from './edgeFeatureRuntime';
 
 type ShapeArg = Shape | TrackedShape;
 
@@ -39,7 +44,7 @@ function unwrapShape(value: ShapeArg): Shape {
  * the quadrant tells which corner to remove.
  */
 function edgeSegmentToSelection(segment: EdgeSegment): ResolvedEdgeFeatureSelection {
-  const { start, end, direction: axis, normalA, normalB } = segment;
+  const { start, end, direction: axis, normalA, normalB, convex } = segment;
 
   // Project normalA onto the plane perpendicular to axis
   const dotA = normalA[0] * axis[0] + normalA[1] * axis[1] + normalA[2] * axis[2];
@@ -71,9 +76,7 @@ function edgeSegmentToSelection(segment: EdgeSegment): ResolvedEdgeFeatureSelect
     axis[0] * by - axis[1] * bx,
   ];
 
-  // Quadrant: for a convex edge, the material is on the OPPOSITE side of both normals.
-  // Project the average outward normal (nA + nB) onto basisX and basisY.
-  // The material is in the direction opposite to the outward normal.
+  // Project the average outward normal onto the basis to determine quadrant.
   const avgNx = normalA[0] + normalB[0];
   const avgNy = normalA[1] + normalB[1];
   const avgNz = normalA[2] + normalB[2];
@@ -81,10 +84,14 @@ function edgeSegmentToSelection(segment: EdgeSegment): ResolvedEdgeFeatureSelect
   const projX = avgNx * basisX[0] + avgNy * basisX[1] + avgNz * basisX[2];
   const projY = avgNx * basisY[0] + avgNy * basisY[1] + avgNz * basisY[2];
 
-  // Material is opposite the outward normal direction
+  // For convex edges: the corner is on the MATERIAL side (opposite outward normal).
+  //   The runtime removes the corner and adds a cylinder.
+  // For concave edges: the corner is on the AIR side (same as outward normal).
+  //   The runtime adds the corner and carves with a cylinder.
+  const sign = convex ? -1 : 1;
   const quadrant: [number, number] = [
-    projX >= 0 ? -1 : 1,
-    projY >= 0 ? -1 : 1,
+    projX >= 0 ? sign : -sign,
+    projY >= 0 ? sign : -sign,
   ];
 
   return {
@@ -152,7 +159,10 @@ export function filletEdgeSegment(
   const wasm = getWasm();
 
   const selection = edgeSegmentToSelection(segment);
-  const result = applyFilletSelectionToManifold(manifold, selection, radius, Math.round(segments), wasm);
+  const apply = segment.convex
+    ? applyFilletSelectionToManifold
+    : applyConcaveFilletSelectionToManifold;
+  const result = apply(manifold, selection, radius, Math.round(segments), wasm);
 
   return buildResult(target, result, 'fillet');
 }
@@ -184,7 +194,10 @@ export function chamferEdgeSegment(
   const wasm = getWasm();
 
   const selection = edgeSegmentToSelection(segment);
-  const result = applyChamferSelectionToManifold(manifold, selection, size, wasm);
+  const apply = segment.convex
+    ? applyChamferSelectionToManifold
+    : applyConcaveChamferSelectionToManifold;
+  const result = apply(manifold, selection, size, wasm);
 
   return buildResult(target, result, 'chamfer');
 }
