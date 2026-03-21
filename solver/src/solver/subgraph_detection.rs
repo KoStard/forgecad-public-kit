@@ -363,10 +363,9 @@ pub fn detect_subgraphs(
                 Constraint::Ccw { points: pts, .. } => {
                     pts.iter().all(|p| member_ids.contains(p.as_str()))
                 }
-                Constraint::BlockRotation { points: pts, axis, .. } => {
-                    let pts_in = pts.iter().all(|p| member_ids.contains(p.as_str()));
-                    let axis_in = member_ids.contains(axis.as_str());
-                    pts_in && axis_in
+                Constraint::BlockRotation { points: pts, .. } => {
+                    // axis is "x" or "y" (not a point ID), so only check points.
+                    pts.iter().all(|p| member_ids.contains(p.as_str()))
                 }
                 Constraint::Midpoint { point, line, .. } => {
                     let p_in = member_ids.contains(point.as_str());
@@ -500,9 +499,9 @@ fn constraint_point_indices(
         Constraint::Ccw { points: pts, .. } => {
             for p in pts { push_pt!(p); }
         }
-        Constraint::BlockRotation { points: pts, axis, .. } => {
+        Constraint::BlockRotation { points: pts, .. } => {
+            // axis is "x" or "y" (not a point ID), only points matter.
             for p in pts { push_pt!(p); }
-            push_pt!(axis);
         }
     }
 
