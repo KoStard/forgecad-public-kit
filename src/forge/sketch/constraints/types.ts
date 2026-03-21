@@ -186,6 +186,8 @@ export interface SketchConstraintMeta {
     arcs: { id: string; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
     points: { id: string; pos: [number, number] }[];
   };
+  /** True when the solver hit its time budget before fully converging. */
+  timedOut?: boolean;
 }
 
 export interface ConstraintDefinition {
@@ -243,6 +245,8 @@ export interface SolverMetadata {
   redundantConstraintIds: string[];
   conflictingConstraintIds: string[];
   solveTrail?: SolveTrailStep[];
+  /** True when the solver hit its wall-clock time budget before converging. */
+  timedOut?: boolean;
 }
 
 // ─── Extension interfaces (augmented by each constraint def file via declare module) ───

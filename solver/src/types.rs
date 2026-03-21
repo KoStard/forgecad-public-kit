@@ -317,6 +317,9 @@ pub struct SolveMetadata {
     pub conflicting_constraint_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub solve_trail: Vec<SolveTrailStep>,
+    /// True when the solver hit its wall-clock time budget before converging.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub timed_out: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

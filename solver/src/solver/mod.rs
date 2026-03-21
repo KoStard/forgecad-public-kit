@@ -2214,13 +2214,20 @@ pub fn analyze_solution(
         Vec::new()
     };
 
+    let solve_trail = lm::trail_take();
+    // Only report timed_out if the solver actually failed to converge.
+    // The progressive phase may time out but the final solve still succeeds.
+    let timed_out = max_error > tolerance
+        && solve_trail.iter().any(|s| s.phase.contains("timeout"));
+
     SolveMetadata {
         status,
         dof,
         constraint_residuals,
         redundant_constraint_ids,
         conflicting_constraint_ids,
-        solve_trail: lm::trail_take(),
+        solve_trail,
+        timed_out,
     }
 }
 
