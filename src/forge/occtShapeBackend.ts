@@ -320,13 +320,13 @@ export class OCCTShapeBackend implements ShapeBackend {
     const oc = getOCCT();
     // Create a large half-space box to cut with
     const dir = new oc.gp_Dir_4(normal[0], normal[1], normal[2]);
-    const pln = new oc.gp_Pln_2(new oc.gp_Pnt_3(
+    const pln = new oc.gp_Pln_3(new oc.gp_Pnt_3(
       normal[0] * originOffset,
       normal[1] * originOffset,
       normal[2] * originOffset,
     ), dir);
     const halfSpace = new oc.BRepPrimAPI_MakeHalfSpace_1(
-      new oc.BRepBuilderAPI_MakeFace_4(pln, -1e6, 1e6, -1e6, 1e6).Shape(),
+      new oc.BRepBuilderAPI_MakeFace_9(pln, -1e6, 1e6, -1e6, 1e6).Face(),
       new oc.gp_Pnt_3(
         normal[0] * (originOffset + 1),
         normal[1] * (originOffset + 1),

@@ -37,6 +37,8 @@ function buildWireFromPoints(oc: OCCTModule, points: [number, number][]): any {
   for (let i = 0; i < points.length; i++) {
     const [x1, y1] = points[i];
     const [x2, y2] = points[(i + 1) % points.length];
+    // Skip degenerate (zero-length) edges from duplicate consecutive vertices
+    if (Math.abs(x1 - x2) < 1e-10 && Math.abs(y1 - y2) < 1e-10) continue;
     const edge = new oc.BRepBuilderAPI_MakeEdge_3(
       new oc.gp_Pnt_3(x1, y1, 0),
       new oc.gp_Pnt_3(x2, y2, 0),
@@ -57,6 +59,49 @@ function buildWireFromPoints(oc: OCCTModule, points: [number, number][]): any {
 function buildFaceFromWire(oc: OCCTModule, wire: any): any {
   const face = new oc.BRepBuilderAPI_MakeFace_15(wire, true);
   return face.Face();
+}
+
+/**
+ * Convert an arbitrary TopoDS_Shape to a TopoDS_Face.
+ * Handles compounds (from offset/boolean ops) by extracting the first wire
+ * and building a face from it. If the shape is already a face, returns it as-is.
+ */
+function shapeToFace(oc: OCCTModule, shape: any): any {
+  const shapeType = shape.ShapeType();
+  // Already a face
+  if (shapeType === oc.TopAbs_ShapeEnum.TopAbs_FACE) {
+    return shape;
+  }
+  // It's a wire — make a face from it
+  if (shapeType === oc.TopAbs_ShapeEnum.TopAbs_WIRE) {
+    return buildFaceFromWire(oc, oc.TopoDS.Wire_1(shape));
+  }
+  // Compound or other — extract wires and build a face.
+  // If there are multiple wires, the first is the outer boundary and the rest are holes.
+  const wires: any[] = [];
+  const wireExpl = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_WIRE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+  while (wireExpl.More()) {
+    wires.push(oc.TopoDS.Wire_1(wireExpl.Current()));
+    wireExpl.Next();
+  }
+  if (wires.length === 0) {
+    // Try to find faces directly
+    const faceExpl = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+    if (faceExpl.More()) {
+      return oc.TopoDS.Face_1(faceExpl.Current());
+    }
+    throw new Error('Cannot convert shape to face — no wires or faces found');
+  }
+  // Build face from the outer wire (largest area)
+  if (wires.length === 1) {
+    return buildFaceFromWire(oc, wires[0]);
+  }
+  // Multiple wires: outer boundary + holes
+  const mkFace = new oc.BRepBuilderAPI_MakeFace_15(wires[0], true);
+  for (let i = 1; i < wires.length; i++) {
+    mkFace.Add(wires[i]);
+  }
+  return mkFace.Face();
 }
 
 /**
@@ -82,26 +127,70 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
     }
 
     case 'roundedRect': {
-      // Build rounded rect: inner rect + offset
-      const radius = Math.min(plan.radius, plan.width / 2, plan.height / 2);
-      const innerW = plan.width - 2 * radius;
-      const innerH = plan.height - 2 * radius;
-      const cx = plan.center ? 0 : plan.width / 2;
-      const cy = plan.center ? 0 : plan.height / 2;
-      // Build inner rect centered, then offset
-      const points: [number, number][] = [
-        [cx - innerW / 2, cy - innerH / 2],
-        [cx + innerW / 2, cy - innerH / 2],
-        [cx + innerW / 2, cy + innerH / 2],
-        [cx - innerW / 2, cy + innerH / 2],
-      ];
-      const wire = buildWireFromPoints(oc, points);
-      face = buildFaceFromWire(oc, wire);
-      // Offset the face to create rounded corners
-      const offsetMaker = new oc.BRepOffsetAPI_MakeOffset_3(face, oc.GeomAbs_JoinType.GeomAbs_Arc, false);
-      offsetMaker.Perform(radius, 0);
-      if (offsetMaker.IsDone()) {
-        face = offsetMaker.Shape();
+      // Build rounded rect directly with line segments and arc corners.
+      const r = Math.min(plan.radius, plan.width / 2, plan.height / 2);
+      const w = plan.width;
+      const h = plan.height;
+      const cx = plan.center ? 0 : w / 2;
+      const cy = plan.center ? 0 : h / 2;
+      const hw = w / 2;
+      const hh = h / 2;
+
+      if (r < 1e-10) {
+        // No rounding — plain rect
+        const pts: [number, number][] = [
+          [cx - hw, cy - hh], [cx + hw, cy - hh],
+          [cx + hw, cy + hh], [cx - hw, cy + hh],
+        ];
+        face = buildFaceFromWire(oc, buildWireFromPoints(oc, pts));
+      } else {
+        // Rounded rect: 4 line edges + 4 arc edges (90° each).
+        // Walk counter-clockwise starting from bottom-right corner.
+        const mkWire = new oc.BRepBuilderAPI_MakeWire_1();
+
+        // Corner arc centers and their start angle (radians, CCW from +X)
+        const arcs: { acx: number; acy: number; startRad: number }[] = [
+          { acx: cx + hw - r, acy: cy - hh + r, startRad: -Math.PI / 2 },  // bottom-right
+          { acx: cx + hw - r, acy: cy + hh - r, startRad: 0 },              // top-right
+          { acx: cx - hw + r, acy: cy + hh - r, startRad: Math.PI / 2 },    // top-left
+          { acx: cx - hw + r, acy: cy - hh + r, startRad: Math.PI },         // bottom-left
+        ];
+
+        // Each segment: line from prev arc end → this arc start, then 90° arc.
+        for (let i = 0; i < 4; i++) {
+          const arc = arcs[i];
+          const prevArc = arcs[(i + 3) % 4];
+          // Previous arc end point
+          const prevEndAngle = prevArc.startRad + Math.PI / 2;
+          const lx1 = prevArc.acx + r * Math.cos(prevEndAngle);
+          const ly1 = prevArc.acy + r * Math.sin(prevEndAngle);
+          // This arc start point
+          const lx2 = arc.acx + r * Math.cos(arc.startRad);
+          const ly2 = arc.acy + r * Math.sin(arc.startRad);
+
+          // Line segment (skip if degenerate)
+          if (Math.abs(lx1 - lx2) > 1e-10 || Math.abs(ly1 - ly2) > 1e-10) {
+            mkWire.Add_1(new oc.BRepBuilderAPI_MakeEdge_3(
+              new oc.gp_Pnt_3(lx1, ly1, 0),
+              new oc.gp_Pnt_3(lx2, ly2, 0),
+            ).Edge());
+          }
+
+          // 90° arc
+          const axis = new oc.gp_Ax2_3(
+            new oc.gp_Pnt_3(arc.acx, arc.acy, 0),
+            new oc.gp_Dir_4(0, 0, 1),
+          );
+          const circ = new oc.gp_Circ_2(axis, r);
+          const arcEdge = new oc.BRepBuilderAPI_MakeEdge_9(
+            circ,
+            arc.startRad,
+            arc.startRad + Math.PI / 2,
+          ).Edge();
+          mkWire.Add_1(arcEdge);
+        }
+
+        face = buildFaceFromWire(oc, mkWire.Wire());
       }
       break;
     }
@@ -148,16 +237,19 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
         op.Build(new oc.Message_ProgressRange_1());
         result = op.Shape();
       }
-      face = result;
+      // Boolean on 2D profiles can return a compound; ensure it's a face.
+      face = shapeToFace(oc, result);
       break;
     }
 
     case 'offset': {
       const baseFace = lowerProfileToFace(oc, plan.base);
-      const offsetMaker = new oc.BRepOffsetAPI_MakeOffset_3(baseFace, oc.GeomAbs_JoinType.GeomAbs_Arc, false);
+      const offsetMaker = new oc.BRepOffsetAPI_MakeOffset_2(baseFace, oc.GeomAbs_JoinType.GeomAbs_Arc, false);
       offsetMaker.Perform(plan.delta, 0);
       if (offsetMaker.IsDone()) {
-        face = offsetMaker.Shape();
+        // MakeOffset returns a compound of wires, not a face.
+        // Extract the outermost wire and rebuild a face.
+        face = shapeToFace(oc, offsetMaker.Shape());
       } else {
         face = baseFace; // Fallback
       }
@@ -165,10 +257,10 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
     }
 
     case 'hull':
-      throw new Error('OCCT lowering does not support profile hull — falling back to Manifold');
+      throw new OCCTUnsupportedError('profile hull');
 
     case 'project':
-      throw new Error('OCCT lowering does not support profile project — falling back to Manifold');
+      throw new OCCTUnsupportedError('profile project');
   }
 
   // Apply 2D transforms
@@ -572,8 +664,8 @@ export function lowerShapeCompilePlanToOCCT(
         normal[1] * plan.originOffset,
         normal[2] * plan.originOffset,
       );
-      const pln = new oc.gp_Pln_2(pnt, new oc.gp_Dir_4(normal[0], normal[1], normal[2]));
-      const halfSpaceFace = new oc.BRepBuilderAPI_MakeFace_4(pln, -1e6, 1e6, -1e6, 1e6).Shape();
+      const pln = new oc.gp_Pln_3(pnt, new oc.gp_Dir_4(normal[0], normal[1], normal[2]));
+      const halfSpaceFace = new oc.BRepBuilderAPI_MakeFace_9(pln, -1e6, 1e6, -1e6, 1e6).Face();
       const halfSpace = new oc.BRepPrimAPI_MakeHalfSpace_1(
         halfSpaceFace,
         new oc.gp_Pnt_3(
