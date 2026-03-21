@@ -889,7 +889,7 @@ function _lowerShapeCompilePlanToOCCTInner(
       const vec = new oc.gp_Vec_4(0, 0, height);
 
       if (plan.scaleTop && (plan.scaleTop[0] !== 1 || plan.scaleTop[1] !== 1)) {
-        throw new OCCTUnsupportedError('extrude with scaleTop');
+        return lowerExtrudeWithScaleTop(oc, plan);
       }
 
       const prism = new oc.BRepPrimAPI_MakePrism_1(face, vec, false, true);
@@ -1016,15 +1016,188 @@ function _lowerShapeCompilePlanToOCCTInner(
     case 'sheetMetal':
       return lowerShapeCompilePlanToOCCT(lowerSheetMetalBasePlan(plan.model, plan.output), oc);
 
-    // These require Manifold's levelSet or specialized mesh ops.
-    // The caller should catch and fall back.
     case 'loft':
-      throw new OCCTUnsupportedError('loft');
+      return lowerLoftPlan(oc, plan);
     case 'sweep':
-      throw new OCCTUnsupportedError('sweep');
+      return lowerSweepPlan(oc, plan);
     case 'hull':
       throw new OCCTUnsupportedError('hull');
   }
+}
+
+// ─── Loft via BRepOffsetAPI_ThruSections ──────────────────────────────
+
+/**
+ * Extract the outer wire from a profile face.
+ */
+function extractOuterWire(oc: OCCTModule, face: any): any {
+  const faceCast = oc.TopoDS.Face_1(face);
+  return oc.BRepTools.OuterWire(faceCast);
+}
+
+/**
+ * Loft between multiple 2D profiles at given heights.
+ * Each profile is lowered to an OCCT face, then its outer wire is
+ * translated to z = heights[i] and added to ThruSections.
+ */
+function lowerLoftPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'loft' }>): any {
+  if (plan.profiles.length < 2) throw new Error('Loft requires at least 2 profiles');
+
+  const ts = new oc.BRepOffsetAPI_ThruSections(true, false, 1e-6);
+
+  for (let i = 0; i < plan.profiles.length; i++) {
+    const face = lowerProfileToFace(oc, plan.profiles[i]);
+    const wire = extractOuterWire(oc, face);
+    const z = plan.heights[i];
+    if (Math.abs(z) > 1e-10) {
+      const trsf = new oc.gp_Trsf_1();
+      trsf.SetTranslation_1(new oc.gp_Vec_4(0, 0, z));
+      const transformed = new oc.BRepBuilderAPI_Transform_2(wire, trsf, true);
+      ts.AddWire(oc.TopoDS.Wire_1(transformed.Shape()));
+    } else {
+      ts.AddWire(wire);
+    }
+  }
+
+  ts.CheckCompatibility(true);
+  ts.Build(new oc.Message_ProgressRange_1());
+
+  if (!ts.IsDone()) {
+    throw new Error('OCCT loft (ThruSections) failed — profiles may be incompatible');
+  }
+
+  return ts.Shape();
+}
+
+// ─── Sweep via BRepOffsetAPI_MakePipe ─────────────────────────────────
+
+/**
+ * Build an OCCT wire from a polyline of 3D points.
+ */
+function buildSpineWire(oc: OCCTModule, points: [number, number, number][]): any {
+  if (points.length < 2) throw new Error('Sweep path needs at least 2 points');
+
+  const mkWire = new oc.BRepBuilderAPI_MakeWire_1();
+  for (let i = 0; i < points.length - 1; i++) {
+    const [x1, y1, z1] = points[i];
+    const [x2, y2, z2] = points[i + 1];
+    const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+    if (dx * dx + dy * dy + dz * dz < 1e-20) continue;
+    const edge = new oc.BRepBuilderAPI_MakeEdge_3(
+      new oc.gp_Pnt_3(x1, y1, z1),
+      new oc.gp_Pnt_3(x2, y2, z2),
+    ).Edge();
+    mkWire.Add_1(edge);
+  }
+  return mkWire.Wire();
+}
+
+/**
+ * Sweep a 2D profile along a 3D polyline path.
+ */
+function lowerSweepPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'sweep' }>): any {
+  const pathPoints = plan.path.points;
+  if (pathPoints.length < 2) throw new Error('Sweep path needs at least 2 points');
+
+  const spineWire = buildSpineWire(oc, pathPoints);
+  const profileFace = lowerProfileToFace(oc, plan.profile);
+
+  // Orient the profile at the start of the path, perpendicular to the
+  // first segment. The profile is built on the XY plane (normal = Z).
+  const [sx, sy, sz] = pathPoints[0];
+  const [nx, ny, nz] = pathPoints[1];
+  const tx = nx - sx, ty = ny - sy, tz = nz - sz;
+  const tLen = Math.sqrt(tx * tx + ty * ty + tz * tz);
+
+  let orientedProfile: any;
+  if (tLen > 1e-10) {
+    const tangentX = tx / tLen, tangentY = ty / tLen, tangentZ = tz / tLen;
+    // Cross product: Z × tangent = rotation axis
+    const crossX = -tangentY, crossY = tangentX, crossZ = 0;
+    const crossLen = Math.sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
+
+    const trsf = new oc.gp_Trsf_1();
+    if (crossLen > 1e-10) {
+      const dot = tangentZ;
+      const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+      trsf.SetRotation_1(
+        new oc.gp_Ax1_2(
+          new oc.gp_Pnt_3(0, 0, 0),
+          new oc.gp_Dir_4(crossX / crossLen, crossY / crossLen, crossZ / crossLen),
+        ),
+        angle,
+      );
+    } else if (tangentZ < 0) {
+      trsf.SetRotation_1(
+        new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(1, 0, 0)),
+        Math.PI,
+      );
+    }
+
+    const rotated = new oc.BRepBuilderAPI_Transform_2(profileFace, trsf, true);
+    const trsfT = new oc.gp_Trsf_1();
+    trsfT.SetTranslation_1(new oc.gp_Vec_4(sx, sy, sz));
+    const translated = new oc.BRepBuilderAPI_Transform_2(rotated.Shape(), trsfT, true);
+    orientedProfile = translated.Shape();
+  } else {
+    orientedProfile = profileFace;
+  }
+
+  const pipe = new oc.BRepOffsetAPI_MakePipe_1(spineWire, orientedProfile);
+  pipe.Build(new oc.Message_ProgressRange_1());
+
+  if (!pipe.IsDone()) {
+    throw new Error('OCCT sweep (MakePipe) failed — path or profile may be incompatible');
+  }
+
+  return pipe.Shape();
+}
+
+// ─── Extrude with scaleTop via ThruSections ───────────────────────────
+
+/**
+ * Extrude with non-uniform top scaling: 2-section loft from bottom wire
+ * (original profile) to top wire (scaled profile at z=height).
+ */
+function lowerExtrudeWithScaleTop(
+  oc: OCCTModule,
+  plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>,
+): any {
+  const bottomFace = lowerProfileToFace(oc, plan.profile);
+  const bottomWire = extractOuterWire(oc, bottomFace);
+
+  const scaleX = plan.scaleTop![0];
+  const scaleY = plan.scaleTop![1];
+  const height = plan.height;
+
+  const gtrsf = new oc.gp_GTrsf_1();
+  gtrsf.SetValue(1, 1, scaleX);
+  gtrsf.SetValue(2, 2, scaleY);
+  gtrsf.SetValue(3, 3, 1);
+  gtrsf.SetValue(3, 4, height);
+  const scaledShape = new oc.BRepBuilderAPI_GTransform_2(bottomWire, gtrsf, true);
+  const topWire = oc.TopoDS.Wire_1(scaledShape.Shape());
+
+  const ts = new oc.BRepOffsetAPI_ThruSections(true, false, 1e-6);
+  ts.AddWire(bottomWire);
+  ts.AddWire(topWire);
+  ts.CheckCompatibility(true);
+  ts.Build(new oc.Message_ProgressRange_1());
+
+  if (!ts.IsDone()) {
+    throw new Error('OCCT extrude-with-scaleTop (ThruSections) failed');
+  }
+
+  let result = ts.Shape();
+
+  if (plan.center) {
+    const trsf = new oc.gp_Trsf_1();
+    trsf.SetTranslation_1(new oc.gp_Vec_4(0, 0, -height / 2));
+    const transformed = new oc.BRepBuilderAPI_Transform_2(result, trsf, true);
+    result = transformed.Shape();
+  }
+
+  return result;
 }
 
 /**

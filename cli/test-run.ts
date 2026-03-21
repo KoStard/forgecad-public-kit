@@ -9,6 +9,7 @@ import { init, runScript } from "../src/forge/headless";
 import { collectProjectFiles } from "./collect-files";
 import { materializeNotebookPreviewScript } from "./notebook-entry";
 import type { Shape } from "../src/forge/kernel";
+import { setActiveBackend, type ActiveBackend } from "../src/forge/kernel";
 import { lastSolveProfile } from "../src/forge/sketch/constraints/sketch";
 import { lastSolverProfile, getSolverStats, resetSolverStats, getLastSolveTrail } from "../src/forge/sketch/constraints/registry";
 import { getLastRustProfile } from "../src/forge/sketch/constraints/solver-wasm";
@@ -153,13 +154,25 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
 }
 
 function usage(): never {
-  console.error("Usage: forgecad run <script.forge.js|notebook.forge-notebook.json> [--debug-imports]");
+  console.error("Usage: forgecad run <script.forge.js|notebook.forge-notebook.json> [--debug-imports] [--backend manifold|occt]");
   process.exit(1);
+}
+
+function parseBackendArg(argv: string[]): ActiveBackend | undefined {
+  const idx = argv.indexOf('--backend');
+  if (idx === -1) return undefined;
+  const val = argv[idx + 1];
+  if (val !== 'manifold' && val !== 'occt') {
+    console.error(`Invalid backend: ${val}. Must be 'manifold' or 'occt'.`);
+    process.exit(1);
+  }
+  return val;
 }
 
 export async function runScriptCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const debugImports = argv.includes('--debug-imports');
-  const positional = argv.filter((arg) => arg !== '--debug-imports');
+  const backend = parseBackendArg(argv);
+  const positional = argv.filter((arg, i) => arg !== '--debug-imports' && arg !== '--backend' && argv[i - 1] !== '--backend');
   const scriptPath = positional[0];
   if (!scriptPath) usage();
 
@@ -170,6 +183,7 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
     const { allFiles, fileName } = collectProjectFiles(materialized.runnablePath);
 
     await init();
+    if (backend) setActiveBackend(backend);
     resetSolverStats();
     const result = runScript(code, fileName, allFiles, { debugImports });
 
