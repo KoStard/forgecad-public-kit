@@ -1,4 +1,5 @@
 import { init, runScript, setParamOverrides, setActiveBackend } from '@forge/index';
+import { initOCCT } from '../forge/occtInit';
 import type { RunResult } from '@forge/runner';
 import {
   getSolverWasmRunDebugSnapshot,
@@ -37,6 +38,9 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
     const t0 = performance.now();
     worker.postMessage({ type: 'progress', payload: { seq, phase: 'kernel-init' } });
     await ensureKernelReady();
+    // Only load OCCT WASM (~13MB) when the user has selected the OCCT backend.
+    // Manifold mode skips this entirely, keeping startup fast.
+    if (activeBackend === 'occt') await initOCCT();
     const tKernel = performance.now();
 
     worker.postMessage({ type: 'progress', payload: { seq, phase: 'evaluating' } });
