@@ -59,6 +59,7 @@ import {
 import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
 import { lowerShapeCompilePlanToOCCTBackend, OCCTUnsupportedError } from './compilePlanOCCT';
 import { isOCCTShapeBackend } from './occtShapeBackend';
+import { initOCCT } from './occtInit';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './shapeFaces';
@@ -77,15 +78,20 @@ let _wasm: ManifoldToplevel | null = null;
 
 export async function initKernel(): Promise<ManifoldToplevel> {
   if (_wasm) return _wasm;
-  // Initialize Manifold eagerly — it's always needed.
-  // OCCT is loaded lazily on first use (via initOCCT()) to avoid the ~13MB
-  // WASM download blocking startup when the user is in Manifold mode.
-  const Module = (await import('manifold-3d')).default;
-  const wasm = await Module();
-  wasm.setup();
-  wasm.setMinCircularAngle(2);
-  wasm.setMinCircularEdgeLength(0.5);
-  _wasm = wasm;
+  // Initialize Manifold and OCCT WASM modules in parallel.
+  // Both are cached as singletons — subsequent calls are instant.
+  const [manifoldModule] = await Promise.all([
+    (async () => {
+      const Module = (await import('manifold-3d')).default;
+      const wasm = await Module();
+      wasm.setup();
+      wasm.setMinCircularAngle(2);
+      wasm.setMinCircularEdgeLength(0.5);
+      return wasm;
+    })(),
+    initOCCT(),
+  ]);
+  _wasm = manifoldModule;
   return _wasm;
 }
 
