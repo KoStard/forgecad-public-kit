@@ -128,7 +128,74 @@ The speedup is super-linear because the FD Jacobian is O(n²) in variable count 
 | E3 | + Absorbed constraint filtering | 138 vars × 186 rows, maxError=420 | — | — | ❌ Worse convergence |
 | E4 | Variable elimination only (revert E3) | 138 vars × 264 rows, 16s | 78 vars, 4.15s | 60 vars, 12s | ✅ Final implementation |
 | E5 | Spread overlapping shapes (grid + jitter) | 138 vars, 3.2s final, ✅ converges | 533ms ✅ | 3.0s ✅ | ✅ Case_wood 03/18 now solves! |
-| E6 | General parameterized groups | TBD | TBD | TBD | 🔄 Implementation complete, needs browser testing |
+| E6 | General parameterized groups (whole-component) | No improvement (single component) | No improvement | No improvement | ❌ See analysis below |
+| E7 | Line-only connectivity (sub-component detection) | 16 groups detected, 50% var reduction, ~8.4s | No change | No change | ✅ Detection works, but no timing improvement (progressive dominates) |
+
+## Detailed Baseline (E6 — 2026-03-21)
+
+### case_wood_cut_from_wood.forge.js (03/18 — 16 rects)
+```
+Total wall time:     7787ms
+  build (203 WASM calls): 7645ms
+  final solve (1 call):   2938ms
+
+Final solve breakdown:
+  progressive warm-up: 2826.8ms  (202 steps)     ← 96% of final solve
+  presolve:              0.4ms
+  coord-reduction:       (78 vars saved, 216→138)
+  gs_warmstart:       1338.4ms
+  build_sparsity:       89.7ms
+  lm_total:             73.7ms                    ← actual LM work
+    linearize:         713.9ms  (318 calls)
+      FD loop:         495.0ms
+      analytic J:      191.7ms
+    lm_step:           731.1ms  (118 calls)
+  analyze:              35.8ms
+
+Problem size: 138 vars × 82 rows, 202 constraints, 108 points
+Subgraph detection: NOT triggered (all shapes in one connected component)
+```
+
+### case_wood_cut.forge.js (03/18 — 6 rects)
+```
+Total wall time:     5632ms
+  build (138 WASM calls): 5527ms
+  final solve (1 call):    586ms
+
+Final solve breakdown:
+  progressive warm-up:  550.2ms  (137 steps)      ← 94% of final solve
+  gs_warmstart:         380.3ms
+  build_sparsity:        27.5ms
+  lm_total:              23.4ms
+    linearize:          133.4ms  (150 calls)
+    lm_step:             20.6ms  (12 calls)
+
+Problem size: 93 vars × 57 rows, 137 constraints, 73 points
+```
+
+### spectrogram.forge.js (03/16 — triangles + rectangles)
+```
+Total wall time:     2580ms
+  build (55 WASM calls):  2512ms
+  final solve (1 call):    646ms
+
+Final solve breakdown:
+  progressive warm-up:  629.4ms  (54 steps)        ← 97% of final solve
+  gs_warmstart:          75.3ms
+  build_sparsity:         3.1ms
+  lm_total:              13.7ms
+    linearize:          372.5ms  (1379 calls)
+    lm_step:            181.5ms  (1410 calls)
+
+Problem size: 60 vars × 71 rows, 54 constraints, 31 points
+Subgraph detection: NOT triggered (no H/V constraints → coord_red.vars_saved=0)
+```
+
+### Key Observation: Progressive Warm-up Dominates
+
+In ALL three cases, the progressive warm-up phase consumes 94-97% of the final solve time. The actual LM solve of the full system (13-73ms) is negligible. Variable reduction from parameterized groups would only speed up the already-fast final LM phase.
+
+The progressive warm-up does N incremental LM solves (one per constraint), each going through build_variables + build_sparsity + LM. This is the primary optimization target.
 
 ## Experiment Log
 
@@ -192,35 +259,28 @@ The speedup is super-linear because the FD Jacobian is O(n²) in variable count 
 **Why it worked**: The root cause was 16 rects at identical positions → degenerate line normals → LineDistance presolve couldn't compute shift directions → seeds timed out → progressive solve got bad initial geometry. Spreading shapes apart by just 2× their size gives each shape a unique position, making normals well-defined and presolve effective.
 **Lesson**: Initial geometry quality matters more than solver sophistication. A simple grid spread (~20 lines of logic) solved a convergence problem that variable reduction (200+ lines of complex refactoring) could not.
 
-#### E6: General parameterized groups (IN PROGRESS)
-**What**: Full implementation of general subgraph detection and parameterized group creation:
-- `ParamCoord` enum in types.rs: `Constant(f64)`, `Param(usize)`, `ParamOffset(usize, f64)`
-- Extended `SketchGroup` with `params`, `param_point_map`, `auto_detected` fields
-- `update_local_coords_from_params()` method recomputes local coords from params
-- `subgraph_detection.rs`: general connected-component analysis + DOF computation via coord_reduction equivalence classes
-- `lm.rs`: kind=7 for param variables, capture/apply state includes params, FD Jacobian perturbs params + resolves group points
-- `mod.rs`: integrated into solve pipeline after coord_reduction, before LM solve
+#### E6: General parameterized groups — whole-component (FAILED)
+**What**: Full implementation of general subgraph detection and parameterized group creation. Used union-find over lines AND structural constraints (Coincident, PointOnLine, Midpoint) to build connected components.
+**Result**: Detection never fires on real sketches. In case_wood, all 16 rects are connected via `attachCentered` bridges (which create Midpoint/PointOnLine constraints), forming one giant component. In spectrometer, no H/V constraints → coord_reduction finds 0 equivalences → detection gate not satisfied.
+**Why it failed**: Using constraints for connectivity merges separate shapes into one component. Bridge constraints (connecting shapes) are indistinguishable from internal constraints.
+**Lesson**: Need to find sub-groups WITHIN connected components, not just collapse whole components.
 
-**Algorithm**:
-1. Build connected components via lines + structural constraints (same union-find as spread_overlapping_shapes)
-2. For each component with ≥4 non-fixed, non-group-owned points:
-   - Count unique representative coordinates (from coord_reduction equivalence classes)
-   - Determine rotation lock (all lines H/V constrained, or BlockRotation present)
-   - frame_DOF = 2 (rotation locked) or 3
-   - internal_DOF = unique_repr_coords - frame_DOF
-   - variables_saved = 2*N_points - frame_DOF - internal_DOF
-   - Skip if variables_saved < 2
-3. Compute frame (centroid + first edge angle), transform to local coords
-4. Map local coords to params via representative analysis (ParamCoord expressions)
-5. Create auto-detected SketchGroup with params + param_point_map
-6. Absorb structural constraints internal to the component (H/V/Coincident/Ccw/BlockRotation/Midpoint)
-7. Auto-detected groups are stripped before DOF analysis and result serialization
+#### E7: Line-only connectivity — sub-component detection (SUCCESS — partial)
+**What**: Changed union-find to use ONLY lines (not constraints) for building connected components. This naturally separates shapes: each rect's 4 corners are connected by their 4 edges + diagonal, while bridge points (from `attachCentered`) form their own tiny components.
 
-**Result**: 61/63 Rust tests pass (same pre-existing failures). WASM builds. Browser testing pending.
-**Key design decisions**:
-- Shape-agnostic: works for any constraint pattern, not rect-specific
-- coord_reduction disabled when subgraph detection absorbs constraints (groups subsume the equivalences)
-- Auto-detected groups are internal to solver, invisible to TS side
+Added frame anchor absorption: the first representative in each axis becomes a `Constant` (absorbed by frame centroid), remaining representatives become params. For a rect: 2 unique x-reprs → 1 anchor + 1 param, 2 unique y-reprs → 1 anchor + 1 param = 2 params total. With frame DOF=2: 4 vars per rect (50% reduction from 8 DOF).
+
+Also fixed: coord_reduction must be disabled when auto-detected groups exist (it can link non-group coordinates to group-owned coordinates, eliminating needed variables).
+
+**Result**:
+- case_wood 03/18: 16 groups detected, 96 constraints absorbed, 64 pts → 64 vars (was 128). Total time ~8.4s, err=0.000188.
+- spectrometer: No improvement (no H/V → detection gate not met).
+- case_wood 03/20 (groupRect): No change (points already group-owned).
+- 62/64 Rust tests pass.
+
+**Why partial success**: Detection works correctly and reduces variables by 50%. But timing doesn't improve because progressive warm-up (94-97% of solve time) runs without groups — it's N incremental LM solves done before `solve_single_system` where detection runs. The final LM solve (already 13-73ms) gets faster but that's negligible.
+
+**Lesson**: Variable reduction helps the final LM solve but not the progressive warm-up phase. To get real timing improvements, either (a) eliminate progressive warm-up entirely via better initial geometry, or (b) apply groups during progressive warm-up too.
 
 ## Root Cause: Bad Initial Geometry (FIXED by E5)
 
