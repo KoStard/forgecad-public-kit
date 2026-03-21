@@ -172,6 +172,94 @@ describe('filletEdgeSegment', () => {
     expect(result).toBeInstanceOf(Shape);
   });
 
+  test('fillets a non-90° edge (triangular prism)', () => {
+    // Build an equilateral triangular prism: 60° dihedral angles
+    const wasm = getWasm();
+    const side = 20;
+    const h = side * Math.sqrt(3) / 2; // height of equilateral triangle
+    const prismLength = 30;
+    // Equilateral triangle in XY plane, extruded along Z
+    const cs = new wasm.CrossSection([[
+      [0, 0],
+      [side, 0],
+      [side / 2, h],
+    ]]);
+    const prism = new Shape(cs.extrude(prismLength, 0, 0, undefined, false));
+
+    // Select a vertical edge (along Z) — should have ~60° dihedral angle
+    const edges = selectEdges(prism, { parallel: [0, 0, 1] });
+    expect(edges.length).toBe(3);
+    for (const e of edges) {
+      // Equilateral triangle prism edges have 60° dihedral angle
+      expect(e.dihedralAngle).toBeCloseTo(60, 0);
+      expect(e.length).toBeCloseTo(prismLength, 1);
+    }
+
+    // Fillet one edge
+    const edge = selectEdge(prism, { parallel: [0, 0, 1], near: [0, 0, 15] });
+    const prismVol = prism.volume();
+    const r = 2;
+    const result = filletEdgeSegment(prism, edge, r);
+    expect(result).toBeInstanceOf(Shape);
+    expect(result.volume()).toBeLessThan(prismVol);
+    // For a 60° dihedral angle (α = π/3):
+    //   Kite area   = r² / tan(α/2)      (quadrilateral: origin, tangentA, center, tangentB)
+    //   Arc sector  = r² × (π - α) / 2   (120° arc sector)
+    //   Crescent/length = kite - arc ≈ 2.74 × (for r=1)
+    const alpha = 60 * Math.PI / 180;
+    const expectedLoss = (1 / Math.tan(alpha / 2) - (Math.PI - alpha) / 2) * r * r * prismLength;
+    expect(result.volume()).toBeGreaterThan(prismVol - expectedLoss - 10);
+  });
+
+  test('fillets obtuse angle edge (hexagonal prism)', () => {
+    // Regular hexagon prism: 120° dihedral angles at each edge
+    const wasm = getWasm();
+    const nSides = 6;
+    const outerR = 15;
+    const prismLength = 25;
+    // Build regular hexagon as polygon
+    const hexPoints: [number, number][] = [];
+    for (let i = 0; i < nSides; i++) {
+      const angle = (2 * Math.PI * i) / nSides;
+      hexPoints.push([outerR * Math.cos(angle), outerR * Math.sin(angle)]);
+    }
+    const cs = new wasm.CrossSection([hexPoints]);
+    const hex = new Shape(cs.extrude(prismLength, 0, 0, undefined, false));
+
+    // Vertical edges should have 120° dihedral
+    const edges = selectEdges(hex, { parallel: [0, 0, 1] });
+    expect(edges.length).toBe(6);
+    for (const e of edges) {
+      expect(e.dihedralAngle).toBeCloseTo(120, 0);
+    }
+
+    // Fillet one edge
+    const edge = selectEdge(hex, { parallel: [0, 0, 1], near: [outerR, 0, 12] });
+    const hexVol = hex.volume();
+    const result = filletEdgeSegment(hex, edge, 2);
+    expect(result).toBeInstanceOf(Shape);
+    expect(result.volume()).toBeLessThan(hexVol);
+    expect(result.volume()).toBeGreaterThan(hexVol * 0.95);
+  });
+
+  test('chamfers a non-90° edge', () => {
+    // Equilateral triangular prism
+    const wasm = getWasm();
+    const side = 20;
+    const h = side * Math.sqrt(3) / 2;
+    const cs = new wasm.CrossSection([[
+      [0, 0],
+      [side, 0],
+      [side / 2, h],
+    ]]);
+    const prism = new Shape(cs.extrude(30, 0, 0, undefined, false));
+
+    const edge = selectEdge(prism, { parallel: [0, 0, 1], near: [0, 0, 15] });
+    const result = chamferEdgeSegment(prism, edge, 2);
+    expect(result).toBeInstanceOf(Shape);
+    expect(result.volume()).toBeLessThan(prism.volume());
+  });
+
   test('rejects zero-length edge', () => {
     const box = makeBox(10, 10, 10);
     const fakeEdge = {
