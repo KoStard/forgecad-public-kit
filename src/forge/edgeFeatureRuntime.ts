@@ -11,6 +11,13 @@ import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
 const MIN_EDGE_PAD = 0.01;
 /** Small absolute extension past tangent points to ensure clean boolean cuts */
 const WEDGE_PAD = 0.02;
+/**
+ * Small offset to shift the kite origin past the edge vertex, breaking
+ * coplanarity between the kite sides and the body's face surfaces.
+ * Without this, boolean operations produce degenerate zero-thickness
+ * surface artifacts where the two geometries share an exact face plane.
+ */
+const COPLANAR_BREAK = 0.005;
 
 function edgeFrameMatrix(selection: ResolvedEdgeFeatureSelection, originOffset = 0): Mat4 {
   const origin: [number, number, number] = [
@@ -76,6 +83,13 @@ function buildFilletCrossSection(
   // Kite polygon: the correct shape for any dihedral angle.
   // Vertices: origin (edge vertex), tangent point A, cylinder center, tangent point B.
   // For 90° edges this degenerates to the same square as the legacy approach.
+  //
+  // The origin is shifted slightly past the edge vertex (opposite the bisector)
+  // so the kite sides don't lie exactly on the body's face surfaces. This breaks
+  // coplanarity and prevents degenerate zero-thickness surface artifacts from
+  // the boolean operation.
+  const ox = -bNx * COPLANAR_BREAK;
+  const oy = -bNy * COPLANAR_BREAK;
   const tAx = surfaceDirA[0] * tangentDist;
   const tAy = surfaceDirA[1] * tangentDist;
   const tBx = surfaceDirB[0] * tangentDist;
@@ -88,11 +102,11 @@ function buildFilletCrossSection(
   // Ensure counter-clockwise winding.
   // Check signed area of (origin, tangentA, center, tangentB).
   // Using shoelace: sum of cross products of consecutive edge vectors.
-  const crossWinding = (tAx * cyExt - tAy * cxExt)
-    + (cxExt * tBy - cyExt * tBx);
+  const crossWinding = ((tAx - ox) * (cyExt - oy) - (tAy - oy) * (cxExt - ox))
+    + ((cxExt - ox) * (tBy - oy) - (cyExt - oy) * (tBx - ox));
   const kiteVerts: [number, number][] = crossWinding >= 0
-    ? [[0, 0], [tAx, tAy], [cxExt, cyExt], [tBx, tBy]]
-    : [[0, 0], [tBx, tBy], [cxExt, cyExt], [tAx, tAy]];
+    ? [[ox, oy], [tAx, tAy], [cxExt, cyExt], [tBx, tBy]]
+    : [[ox, oy], [tBx, tBy], [cxExt, cyExt], [tAx, tAy]];
 
   const wedge = new wasm.CrossSection([kiteVerts]);
 
