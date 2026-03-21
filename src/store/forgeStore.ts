@@ -954,7 +954,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   isEvaluating: false,
   evaluationPhase: 'idle' as const,
-  activeBackend: (initialViewPreferences.activeBackend as 'occt' | 'manifold') || 'occt',
+  activeBackend: (initialViewPreferences.activeBackend as 'occt' | 'manifold') || 'manifold',
   setActiveBackend: (backend) => {
     writeViewPreferences({ activeBackend: backend });
     set({ activeBackend: backend });
