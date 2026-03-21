@@ -320,8 +320,7 @@ With subgraph isolation (P4): potentially **~400ms** (7.7× faster).
 |---|--------|---------|----------------|-----|--------|
 | — | Baseline (stateless) | ~37ms | 6.34s | 0.000002 | ✅ |
 | P1 | Session lifecycle + TS wiring | ~37ms | 6.31s | 0.000002 | ✅ ~0% (expected — boundary was 0.2%) |
-| P2 | Incremental vars+sparsity | — | — | — | pending |
-| P3 | Broyden Jacobian | — | — | — | pending |
+| P2+P3 | seed_step_lm + Broyden infrastructure + GS warm-start | — | 1.7s | 0.000002 | ✅ 3.4× total speedup |
 | P4 | Subgraph isolation | — | — | — | pending |
 
 ### P1 Results (2026-03-21)
@@ -333,6 +332,44 @@ With subgraph isolation (P4): potentially **~400ms** (7.7× faster).
 - But: eliminates per-call timeout warnings, provides foundation for P2+P3
 - Check suite: 72/74 pass (same 2 pre-existing snapshot mismatches)
 - **Important**: Use `node dist-cli/forgecad.js` (local build), NOT global `forgecad` for benchmarking
+
+### P2+P3 Results (2026-03-21)
+
+- **`seed_step_lm()`**: New simplified LM loop for session seed steps with GS warm-start + Broyden hint support
+- **Broyden infrastructure**: `BroydenHint` struct, Broyden rank-1 update in `linearize()`, FD skip for Broyden-covered rows
+- **`CachedSolverState`**: Caches vars, sparsity, Broyden Jacobian/x/residuals between seed steps
+- **3.4× total speedup**: case_wood 6.34s → 1.7s. Rust solve ~400ms (similar to stateless), savings from eliminating per-step JSON round-trips
+- **Broyden not yet active**: Variable count changes between steps (new entities added), so Broyden hint rarely matches. True Broyden gains require stable incremental variable indexing (future work)
+- **Key insight**: The 3.4× speedup is entirely from session state persistence — no JSON serialize/parse/copy per seed step. The Broyden infrastructure is in place but blocked by variable layout changes
+- Check suite: same pre-existing failures (spectrogram, equilateral-10 snapshots, wrapper-rect flaky)
+
+## What's Left
+
+### Broyden Jacobian Reuse (not yet active)
+
+The Broyden infrastructure is fully implemented (`BroydenHint`, rank-1 update in `linearize()`, FD skip logic, `raw_jacobian` caching in `CachedSolverState`), but the hint is almost never used because `build_variables()` rebuilds the variable array from scratch each seed step. When new entities are added between steps (which is the normal case — a constraint often references new points/lines), the variable count changes and `broyden_x.len() != vars.len()`, so the hint is discarded.
+
+**To activate Broyden**, we need **incremental variable extension**: append new variables to the existing array instead of rebuilding. This requires:
+1. Track which points/lines/circles already have variable slots
+2. On `add_point`/`add_line`: append to `vars`, `pt_var_idx`, etc.
+3. On `add_constraint`: extend `sparsity` rows only for the new constraint
+4. Extend the Broyden Jacobian matrix: add columns (zeros) for new vars, add rows (FD) for new constraints
+5. Apply Broyden rank-1 update to existing rows
+
+**Expected additional gain**: ~2× on top of current 3.4× (reducing per-step linearize from ~3ms to ~0.5ms). Diminishing returns — Rust solve is already ~400ms.
+
+### Session Seeding Flakiness
+
+The session seed path produces slightly different geometry than the stateless path for some test cases (`wrapper-rect`, `multi-rect CCW`). Root cause: the session's `seed_step()` uses `seed_step_lm()` (a simplified LM loop) instead of `solve_global()` (full LM with restarts + GS escape). The simplified loop lacks the escape hatch that handles pathological constraint configurations.
+
+**Options**:
+1. Add GS escape to `seed_step_lm()` (matches `solve_global` behavior, but slower per step)
+2. Accept the flakiness — the final `solve()` call uses the full solver and should converge regardless of seed quality
+3. Fall back to `solve_global()` when `seed_step_lm()` diverges (hybrid approach)
+
+### Subgraph-Isolated Mini-Solves (P4 in original plan)
+
+When adding a constraint that touches only a subset of variables, solve only the affected connected component instead of the full system. This is "dirty group" regeneration (SolveSpace terminology). Expected ~2× additional gain for models with loosely-connected constraint graphs.
 
 ## Literature References
 

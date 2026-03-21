@@ -22,19 +22,25 @@ use super::{
 use super::lm;
 use super::profiler;
 
-/// Cached Jacobian and associated state for Broyden updates.
-struct JacobianCache {
-    /// Dense Jacobian: n_rows × n_vars.
-    matrix: Vec<Vec<f64>>,
-    /// Variable values when this Jacobian was computed.
-    x_snapshot: Vec<f64>,
-    /// Residuals when this Jacobian was computed.
-    residual: Vec<f64>,
-    /// How many constraints were in the system when this J was built.
-    n_constraints: usize,
-    /// Number of rows in the Jacobian (constraint rows only, before arcs).
-    n_constraint_rows: usize,
-    /// Number of successful Broyden updates since last full FD.
+/// Cached solver state for incremental seed steps.
+struct CachedSolverState {
+    /// Cached variables from build_variables.
+    vars: Vec<lm::Variable>,
+    pt_var_idx: Vec<lm::PtVarIdx>,
+    circ_var_idx: Vec<usize>,
+    arc_var_idx: Vec<usize>,
+    group_var_idx: Vec<usize>,
+    /// Cached sparsity from build_sparsity.
+    sparsity: lm::SparsityMap,
+    /// Number of Jacobian rows.
+    n_rows: usize,
+    /// Broyden cache: raw Jacobian, variable snapshot, residuals.
+    broyden_jacobian: Option<Vec<Vec<f64>>>,
+    broyden_x: Vec<f64>,
+    broyden_residual: Vec<f64>,
+    /// Number of constraint rows when Broyden J was built.
+    broyden_n_rows: usize,
+    /// Number of Broyden updates since last full FD.
     broyden_age: usize,
 }
 
@@ -55,11 +61,8 @@ pub struct SolverSession {
     entity_ref_count: HashMap<String, usize>,
     ref_scale: f64,
 
-    // ── Jacobian cache for Broyden updates ──────────────────
-    jcache: Option<JacobianCache>,
-
-    // ── LM warm state ───────────────────────────────────────
-    lambda: f64,
+    // ── Cached solver state for incremental steps ────────────
+    cached: Option<CachedSolverState>,
 }
 
 impl SolverSession {
@@ -75,8 +78,7 @@ impl SolverSession {
             tolerance: 1e-3,
             entity_ref_count: HashMap::new(),
             ref_scale: 1.0,
-            jcache: None,
-            lambda: 1e-3,
+            cached: None,
         }
     }
 
@@ -133,7 +135,7 @@ impl SolverSession {
         // 2. Analytical presolve on all constraints
         run_analytical_presolve(&mut self.points, &self.lines, &self.constraints);
 
-        // 3. Coord reduction
+        // 3. Coord reduction — propagate linked coordinates
         let cr = coord_reduction::build_coord_reduction(
             &self.points, &self.lines, &self.constraints,
         );
@@ -152,12 +154,91 @@ impl SolverSession {
             return 0.0;
         }
 
-        // 4. Run LM solve with Broyden-enhanced Jacobian
+        // 4. Build variables + sparsity
         let graph = ReconstructionGraph::empty();
-        let err = self.solve_with_broyden(30, 1, 4, 2.5, &graph, Some(&cr));
+        let ref_len = lm::compute_reference_length(
+            &self.points, &self.circles, &self.arcs, &self.constraints,
+        );
+        let scale = ref_len.max(1.0);
+        let (vars, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx) =
+            lm::build_variables(
+                &self.points, &self.circles, &self.arcs, &self.groups,
+                scale, &graph, Some(&cr),
+            );
 
-        // 5. Rollback on divergence (mirror TS seedIncrementalGeometry rejection)
-        // The solve_with_broyden already handles this internally.
+        if vars.is_empty() {
+            return 0.0;
+        }
+
+        let (sparsity, n_rows) = lm::build_sparsity(
+            &self.points, &self.lines, &self.circles, &self.arcs,
+            &self.shapes, &self.constraints, &self.groups,
+            &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
+            &graph, Some(&cr),
+        );
+
+        // 5. Build Broyden hint from cached state
+        let broyden_hint = self.cached.as_ref().and_then(|c| {
+            if c.broyden_jacobian.is_some() && c.broyden_age < 8 && c.broyden_x.len() == vars.len() {
+                Some(lm::BroydenHint {
+                    old_jacobian: c.broyden_jacobian.as_ref().unwrap().clone(),
+                    old_x: c.broyden_x.clone(),
+                    old_residual: c.broyden_residual.clone(),
+                    n_old_rows: c.broyden_n_rows,
+                })
+            } else {
+                None
+            }
+        });
+
+        // 6. Snapshot for rollback
+        let snap_pts: Vec<(f64, f64)> = self.points.iter().map(|p| (p.x, p.y)).collect();
+        let snap_circles: Vec<f64> = self.circles.iter().map(|c| c.radius).collect();
+        let err_before = lm::current_max_error(
+            &self.points, &self.lines, &self.circles, &self.arcs,
+            &self.shapes, &self.constraints,
+        );
+
+        // 7. Run LM with Broyden hint + GS warm-start
+        let link_map = cr.build_link_map();
+        let (err, raw_j, residual, x_snapshot) = lm::seed_step_lm(
+            &mut self.points, &self.lines, &mut self.circles, &mut self.arcs,
+            &self.shapes, &self.constraints, &mut self.groups,
+            &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
+            &sparsity, n_rows, 30, self.tolerance, 2.5,
+            broyden_hint.as_ref(),
+            &graph, Some(&link_map),
+        );
+
+        // 8. Rollback on divergence
+        if err > err_before * 2.0 + 1.0 && err > self.tolerance * 100.0 {
+            for (j, &(sx, sy)) in snap_pts.iter().enumerate() {
+                self.points[j].x = sx;
+                self.points[j].y = sy;
+            }
+            for (j, &sr) in snap_circles.iter().enumerate() {
+                self.circles[j].radius = sr;
+            }
+            return err_before;
+        }
+
+        // 9. Cache state for next seed step
+        let age = self.cached.as_ref().map(|c| c.broyden_age).unwrap_or(0);
+        self.cached = Some(CachedSolverState {
+            vars,
+            pt_var_idx,
+            circ_var_idx,
+            arc_var_idx,
+            group_var_idx,
+            sparsity,
+            n_rows,
+            broyden_jacobian: raw_j,
+            broyden_x: x_snapshot,
+            broyden_residual: residual,
+            broyden_n_rows: n_rows,
+            broyden_age: age + 1,
+        });
+
         err
     }
 
@@ -170,6 +251,9 @@ impl SolverSession {
         let max_step = options.max_scaled_step.unwrap_or(2.5);
         self.tolerance = tolerance;
 
+        // Clear cached state — final solve rebuilds everything.
+        self.cached = None;
+
         // Use the progressive solve path for the final solve, same as stateless API.
         if options.progressive.unwrap_or(false) && self.constraints.len() > 1 {
             return super::progressive_solve(
@@ -178,7 +262,7 @@ impl SolverSession {
             );
         }
 
-        let graph = ReconstructionGraph::empty();
+        let _graph = ReconstructionGraph::empty();
 
         let deadline_us = match options.time_budget_ms {
             Some(ms) if ms > 0 => profiler::platform::now_us() + (ms as u64) * 1000,
@@ -191,78 +275,6 @@ impl SolverSession {
             iterations, tolerance, restarts, warm_start, max_step,
             &mut self.groups, false, deadline_us,
         )
-    }
-
-    /// Solve with Broyden-updated Jacobian: reuse cached J for existing rows,
-    /// compute FD only for new constraint rows.
-    fn solve_with_broyden(
-        &mut self,
-        iterations: u32,
-        restarts: u32,
-        warm_start_iters: u32,
-        max_scaled_step: f64,
-        graph: &ReconstructionGraph,
-        coord_red: Option<&coord_reduction::CoordReduction>,
-    ) -> f64 {
-        // Snapshot positions for rollback
-        let snap_pts: Vec<(f64, f64)> = self.points.iter().map(|p| (p.x, p.y)).collect();
-        let snap_circles: Vec<f64> = self.circles.iter().map(|c| c.radius).collect();
-        let err_before = lm::current_max_error(
-            &self.points, &self.lines, &self.circles, &self.arcs,
-            &self.shapes, &self.constraints,
-        );
-
-        // Run LM solve using the standard path.
-        // The Broyden optimization will be applied inside linearize via the cache.
-        let err = lm::solve_global(
-            &mut self.points, &self.lines, &mut self.circles, &mut self.arcs,
-            &self.shapes, &self.constraints,
-            iterations, self.tolerance, restarts, warm_start_iters, max_scaled_step,
-            &mut self.groups, graph, 0, coord_red,
-        );
-
-        // Rollback on divergence
-        if err > err_before * 2.0 + 1.0 && err > self.tolerance * 100.0 {
-            for (j, &(sx, sy)) in snap_pts.iter().enumerate() {
-                self.points[j].x = sx;
-                self.points[j].y = sy;
-            }
-            for (j, &sr) in snap_circles.iter().enumerate() {
-                self.circles[j].radius = sr;
-            }
-            return err_before;
-        }
-
-        // Cache the Jacobian state after successful solve
-        self.update_jacobian_cache();
-
-        err
-    }
-
-    /// After a successful solve, snapshot the current state for Broyden updates.
-    fn update_jacobian_cache(&mut self) {
-        // For now, we cache the variable positions and residuals.
-        // The actual Jacobian matrix will be cached in Phase 3 when we modify linearize().
-        let residual = match lm::eval_residuals_pub(
-            &self.points, &self.lines, &self.circles, &self.arcs,
-            &self.shapes, &self.constraints,
-        ) {
-            Some((res, _)) => res,
-            None => return,
-        };
-
-        let x_snapshot: Vec<f64> = self.points.iter()
-            .flat_map(|p| vec![p.x, p.y])
-            .collect();
-
-        self.jcache = Some(JacobianCache {
-            matrix: Vec::new(), // Will be populated in Phase 3
-            x_snapshot,
-            residual,
-            n_constraints: self.constraints.len(),
-            n_constraint_rows: 0, // Will be populated in Phase 3
-            broyden_age: 0,
-        });
     }
 }
 
