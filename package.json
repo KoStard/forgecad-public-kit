@@ -55,6 +55,7 @@
     "gifenc": "^1.0.3",
     "lz-string": "^1.5.0",
     "manifold-3d": "^3.4.0",
+    "opencascade.js": "2.0.0-beta.b5ff984",
     "pngjs": "^7.0.0",
     "puppeteer-core": "^24.37.2",
     "typescript": "^5.8.3"

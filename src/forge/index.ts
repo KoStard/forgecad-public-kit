@@ -5,7 +5,7 @@
  * plus the browser-specific initKernel for the App bootstrap.
  */
 
-export { initKernel } from './kernel';
+export { initKernel, setActiveBackend, getActiveBackend, type ActiveBackend } from './kernel';
 export {
   Shape, box, cylinder, sphere, union, difference, intersection, hull3d, levelSet, getWasm,
   Transform, composeChain,

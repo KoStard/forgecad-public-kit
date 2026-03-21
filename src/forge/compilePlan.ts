@@ -638,11 +638,13 @@ export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): Profil
 
 export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompilePlan | null {
   if (!plan) return null;
+  let result: ShapeCompilePlan;
   switch (plan.kind) {
     case 'box':
-      return { kind: 'box', x: plan.x, y: plan.y, z: plan.z, center: plan.center };
+      result = { kind: 'box', x: plan.x, y: plan.y, z: plan.z, center: plan.center };
+      break;
     case 'cylinder':
-      return {
+      result = {
         kind: 'cylinder',
         height: plan.height,
         radius: plan.radius,
@@ -650,32 +652,37 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         segments: plan.segments,
         center: plan.center,
       };
+      break;
     case 'sphere':
-      return { kind: 'sphere', radius: plan.radius, segments: plan.segments };
+      result = { kind: 'sphere', radius: plan.radius, segments: plan.segments };
+      break;
     case 'extrude':
-      return {
+      result = {
         kind: 'extrude',
         profile: cloneProfileCompilePlan(plan.profile)!,
         height: plan.height,
         center: plan.center,
         scaleTop: plan.scaleTop ? [plan.scaleTop[0], plan.scaleTop[1]] : undefined,
       };
+      break;
     case 'sheetMetal':
-      return {
+      result = {
         kind: 'sheetMetal',
         model: cloneSheetMetalModel(plan.model)!,
         output: plan.output,
       };
+      break;
     case 'shell':
-      return {
+      result = {
         kind: 'shell',
         base: cloneShapeCompilePlan(plan.base)!,
         thickness: plan.thickness,
         openFaces: [...plan.openFaces],
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
+      break;
     case 'hole':
-      return {
+      result = {
         kind: 'hole',
         base: cloneShapeCompilePlan(plan.base)!,
         placement: cloneShapeWorkplanePlacementValue(plan.placement),
@@ -683,8 +690,9 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         extent: cloneFeatureCutExtent(plan.extent),
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
+      break;
     case 'cut':
-      return {
+      result = {
         kind: 'cut',
         base: cloneShapeCompilePlan(plan.base)!,
         placement: cloneShapeWorkplanePlacementValue(plan.placement),
@@ -693,23 +701,26 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         taper: plan.taper ? cloneCutTaperCompilePlan(plan.taper) : undefined,
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
+      break;
     case 'revolve':
-      return {
+      result = {
         kind: 'revolve',
         profile: cloneProfileCompilePlan(plan.profile)!,
         degrees: plan.degrees,
         segments: plan.segments,
       };
+      break;
     case 'loft':
-      return {
+      result = {
         kind: 'loft',
         profiles: plan.profiles.map((profile) => cloneProfileCompilePlan(profile)!),
         heights: plan.heights.map((height) => height),
         edgeLength: plan.edgeLength,
         boundsPadding: plan.boundsPadding,
       };
+      break;
     case 'sweep':
-      return {
+      result = {
         kind: 'sweep',
         profile: cloneProfileCompilePlan(plan.profile)!,
         path: cloneSweepPathCompilePlan(plan.path),
@@ -717,34 +728,39 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         boundsPadding: plan.boundsPadding,
         up: [plan.up[0], plan.up[1], plan.up[2]],
       };
+      break;
     case 'boolean':
-      return {
+      result = {
         kind: 'boolean',
         op: plan.op,
         shapes: plan.shapes.map((shape) => cloneShapeCompilePlan(shape)!),
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
+      break;
     case 'transform':
-      return {
+      result = {
         kind: 'transform',
         base: cloneShapeCompilePlan(plan.base)!,
         steps: plan.steps.map(cloneShapeTransform),
       };
+      break;
     case 'queryOwner':
-      return {
+      result = {
         kind: 'queryOwner',
         owner: cloneShapeQueryOwnerValue(plan.owner),
         base: cloneShapeCompilePlan(plan.base)!,
       };
+      break;
     case 'hull':
-      return {
+      result = {
         kind: 'hull',
         shapes: plan.shapes.map((shape) => cloneShapeCompilePlan(shape)!),
         points: plan.points.map(([x, y, z]) => [x, y, z]),
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
+      break;
     case 'trimByPlane':
-      return {
+      result = {
         kind: 'trimByPlane',
         base: cloneShapeCompilePlan(plan.base)!,
         normalX: plan.normalX,
@@ -753,8 +769,9 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         originOffset: plan.originOffset,
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
+      break;
     case 'fillet':
-      return {
+      result = {
         kind: 'fillet',
         base: cloneShapeCompilePlan(plan.base)!,
         edge: cloneEdgeQueryRef(plan.edge)!,
@@ -764,8 +781,9 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         resolvedEdge: cloneEdgeFeatureResolvedSelector(plan.resolvedEdge),
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
+      break;
     case 'chamfer':
-      return {
+      result = {
         kind: 'chamfer',
         base: cloneShapeCompilePlan(plan.base)!,
         edge: cloneEdgeQueryRef(plan.edge)!,
@@ -774,7 +792,11 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         resolvedEdge: cloneEdgeFeatureResolvedSelector(plan.resolvedEdge),
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
+      break;
   }
+  // Preserve OCCT shape cache across clones (set by compilePlanOCCT.ts)
+  if ((plan as any)._occtCache) (result as any)._occtCache = (plan as any)._occtCache;
+  return result;
 }
 
 export function appendProfileCompileTransform(

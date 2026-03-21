@@ -229,6 +229,8 @@ function VisibilityCheckbox({
 }
 
 export function ViewPanel() {
+  const activeBackend = useForgeStore((s) => s.activeBackend);
+  const setActiveBackend = useForgeStore((s) => s.setActiveBackend);
   const renderMode = useForgeStore((s) => s.renderMode);
   const setRenderMode = useForgeStore((s) => s.setRenderMode);
   const projectionMode = useForgeStore((s) => s.projectionMode);
@@ -545,6 +547,14 @@ export function ViewPanel() {
       </div>
 
       <div style={{ ...sectionStyle, borderTop: 'none' }}>
+        <div style={labelStyle}>Backend</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button style={btnStyle(activeBackend === 'manifold')} onClick={() => setActiveBackend('manifold')}>Manifold (fast)</button>
+          <button style={btnStyle(activeBackend === 'occt')} onClick={() => setActiveBackend('occt')}>OCCT (exact)</button>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
         <div style={labelStyle}>Render Mode</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button style={btnStyle(renderMode === 'solid')} onClick={() => setRenderMode('solid')}>Solid</button>

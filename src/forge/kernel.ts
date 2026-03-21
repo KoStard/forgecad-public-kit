@@ -57,6 +57,9 @@ import {
   wrapManifoldShapeBackend,
 } from './shapeBackend';
 import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
+import { lowerShapeCompilePlanToOCCTBackend, OCCTUnsupportedError } from './compilePlanOCCT';
+import { isOCCTShapeBackend } from './occtShapeBackend';
+import { initOCCT } from './occtInit';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './shapeFaces';
@@ -75,17 +78,42 @@ let _wasm: ManifoldToplevel | null = null;
 
 export async function initKernel(): Promise<ManifoldToplevel> {
   if (_wasm) return _wasm;
-  const Module = (await import('manifold-3d')).default;
-  _wasm = await Module();
-  _wasm.setup();
-  _wasm.setMinCircularAngle(2);
-  _wasm.setMinCircularEdgeLength(0.5);
+  // Initialize Manifold and OCCT WASM modules in parallel.
+  // Both are cached as singletons — subsequent calls are instant.
+  const [manifoldModule] = await Promise.all([
+    (async () => {
+      const Module = (await import('manifold-3d')).default;
+      const wasm = await Module();
+      wasm.setup();
+      wasm.setMinCircularAngle(2);
+      wasm.setMinCircularEdgeLength(0.5);
+      return wasm;
+    })(),
+    initOCCT(),
+  ]);
+  _wasm = manifoldModule;
   return _wasm;
 }
 
 export function getWasm(): ManifoldToplevel {
   if (!_wasm) throw new Error('Kernel not initialized — call initKernel() first');
   return _wasm;
+}
+
+/**
+ * Active geometry backend selector.
+ * - 'occt'     — OCCT primary, Manifold fallback for unsupported ops
+ * - 'manifold' — Manifold only (original behaviour)
+ */
+export type ActiveBackend = 'occt' | 'manifold';
+let _activeBackend: ActiveBackend = 'manifold';
+
+export function setActiveBackend(backend: ActiveBackend): void {
+  _activeBackend = backend;
+}
+
+export function getActiveBackend(): ActiveBackend {
+  return _activeBackend;
 }
 
 export type GeometryBackend = 'manifold' | 'occt' | 'hybrid' | 'unknown';
@@ -664,8 +692,23 @@ export function buildShapeFromCompilePlan(
   color?: string,
   geometryInfo?: Partial<GeometryInfo>,
 ): Shape {
+  let backend: ShapeBackend;
+  if (_activeBackend === 'manifold') {
+    backend = lowerShapeCompilePlanToShapeBackend(plan, getWasm());
+  } else {
+    // OCCT primary — falls back to Manifold for unsupported ops
+    try {
+      backend = lowerShapeCompilePlanToOCCTBackend(plan);
+    } catch (e) {
+      if (e instanceof OCCTUnsupportedError) {
+        backend = lowerShapeCompilePlanToShapeBackend(plan, getWasm());
+      } else {
+        throw e;
+      }
+    }
+  }
   return setShapeCompilePlan(
-    new Shape(lowerShapeCompilePlanToShapeBackend(plan, getWasm()), color, geometryInfo),
+    new Shape(backend, color, geometryInfo),
     plan,
   );
 }
@@ -1441,9 +1484,25 @@ function normalizePoint3(value: unknown, apiName: string, index: number): [numbe
   throw new Error(`${apiName} argument ${index}: expected a [x, y, z] point, got ${describeApiArg(value)}`);
 }
 
+function requireManifoldOrConvert(backend: ShapeBackend, apiName: string): Manifold {
+  if (isOCCTShapeBackend(backend)) {
+    const wasm = getWasm();
+    const mesh = backend.getMesh();
+    const wasmMesh = new wasm.Mesh({
+      numProp: mesh.numProp,
+      triVerts: mesh.triVerts,
+      vertProperties: mesh.vertProperties,
+      mergeFromVert: mesh.mergeFromVert,
+      mergeToVert: mesh.mergeToVert,
+    });
+    return new wasm.Manifold(wasmMesh);
+  }
+  return requireManifoldShapeBackend(backend, apiName);
+}
+
 function requireManifoldOperands(apiName: string, shapes: Shape[]): Manifold[] {
   return shapes.map((shape, index) =>
-    requireManifoldShapeBackend(getShapeRuntimeBackendInternal(shape), `${apiName} operand ${index + 1}`));
+    requireManifoldOrConvert(getShapeRuntimeBackendInternal(shape), `${apiName} operand ${index + 1}`));
 }
 
 // --- Boolean helpers ---
@@ -1532,7 +1591,7 @@ export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]
     if (arg instanceof Shape || (arg && typeof arg === 'object' && typeof (arg as { toShape?: unknown }).toShape === 'function')) {
       const shape = unwrapShapeLike(arg);
       shapeArgs.push(shape);
-      return requireManifoldShapeBackend(getShapeRuntimeBackendInternal(shape), `hull3d() shape ${shapeArgs.length}`);
+      return requireManifoldOrConvert(getShapeRuntimeBackendInternal(shape), `hull3d() shape ${shapeArgs.length}`);
     }
     const point = normalizePoint3(arg, 'hull3d()', index + 1);
     pointArgs.push(point);

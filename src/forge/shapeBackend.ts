@@ -7,6 +7,15 @@ export type ShapeRuntimeBounds = ReturnType<Manifold['boundingBox']>;
 export type ShapeRuntimeMesh = ReturnType<Manifold['getMesh']>;
 export type ShapeRuntimeCrossSection = ReturnType<Manifold['slice']>;
 
+/** Geometric description of an edge to fillet/chamfer, backend-agnostic. */
+export interface EdgeFeatureTarget {
+  midpoint: [number, number, number];
+  start: [number, number, number];
+  end: [number, number, number];
+  convex: boolean;
+}
+
+
 export interface ShapeBackend {
   readonly [SHAPE_BACKEND_MARKER]: true;
 
