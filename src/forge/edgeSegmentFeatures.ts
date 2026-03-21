@@ -17,7 +17,8 @@ import {
   setShapePlacementReferences,
   getShapeRuntimeBackend,
 } from './kernel';
-import { requireManifoldShapeBackend, wrapManifoldShapeBackend } from './shapeBackend';
+import { requireManifoldShapeBackend, wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
+import { isOCCTShapeBackend } from './occtShapeBackend';
 import { TrackedShape } from './sketch/topology';
 import type { EdgeSegment } from './meshEdgeExtraction';
 import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
@@ -28,6 +29,23 @@ import {
   applyConcaveFilletSelectionToManifold,
   applyConcaveChamferSelectionToManifold,
 } from './edgeFeatureRuntime';
+
+import type { Manifold } from 'manifold-3d';
+import type { OCCTShapeBackend } from './occtShapeBackend';
+
+/** Convert an OCCT backend to a Manifold object via mesh reconstruction. */
+function occtToManifold(backend: OCCTShapeBackend): Manifold {
+  const wasm = getWasm();
+  const mesh = backend.getMesh();
+  const wasmMesh = new wasm.Mesh({
+    numProp: mesh.numProp,
+    triVerts: mesh.triVerts,
+    vertProperties: mesh.vertProperties,
+    mergeFromVert: mesh.mergeFromVert,
+    mergeToVert: mesh.mergeToVert,
+  });
+  return new wasm.Manifold(wasmMesh);
+}
 
 type ShapeArg = Shape | TrackedShape;
 
@@ -139,15 +157,15 @@ function edgeSegmentToSelection(segment: EdgeSegment): ResolvedEdgeFeatureSelect
   };
 }
 
-function buildResult(target: Shape, manifold: import('manifold-3d').Manifold, source: string): Shape {
+function buildResult(target: Shape, backend: ShapeBackend, source: string): Shape {
   const targetInfo = getShapeGeometryInfo(target);
-  const result = new Shape(wrapManifoldShapeBackend(manifold), target.colorHex);
+  const result = new Shape(backend, target.colorHex);
   setShapeDimensions(result, getShapeDimensions(target));
   setShapePlacementReferences(result, getShapePlacementReferences(target), { merge: false });
   setShapeGeometryInfo(result, {
     backend: targetInfo.backend,
     representation: targetInfo.representation,
-    fidelity: 'deformed',
+    fidelity: isOCCTShapeBackend(backend) ? 'kernel-native' : 'deformed',
     topology: 'none',
     sources: [source as any, ...targetInfo.sources],
   });
@@ -183,16 +201,33 @@ export function filletEdgeSegment(
 
   const target = unwrapShape(shape);
   const backend = getShapeRuntimeBackend(target);
-  const manifold = requireManifoldShapeBackend(backend, 'filletEdgeSegment()');
-  const wasm = getWasm();
 
+  if (isOCCTShapeBackend(backend)) {
+    const edgeTarget = {
+      midpoint: segment.midpoint as [number, number, number],
+      start: segment.start as [number, number, number],
+      end: segment.end as [number, number, number],
+      convex: segment.convex,
+    };
+    try {
+      const result = backend.filletEdgeByMidpoint(edgeTarget, radius);
+      return buildResult(target, result, 'fillet');
+    } catch {
+      // OCCT fillet failed — fall back to Manifold mesh-based fillet
+      // via mesh reconstruction from the OCCT shape
+    }
+  }
+
+  const manifold = isOCCTShapeBackend(backend)
+    ? occtToManifold(backend)
+    : requireManifoldShapeBackend(backend, 'filletEdgeSegment()');
+  const wasm = getWasm();
   const selection = edgeSegmentToSelection(segment);
   const apply = segment.convex
     ? applyFilletSelectionToManifold
     : applyConcaveFilletSelectionToManifold;
-  const result = apply(manifold, selection, radius, Math.round(segments), wasm);
-
-  return buildResult(target, result, 'fillet');
+  const manifoldResult = apply(manifold, selection, radius, Math.round(segments), wasm);
+  return buildResult(target, wrapManifoldShapeBackend(manifoldResult), 'fillet');
 }
 
 /**
@@ -218,14 +253,30 @@ export function chamferEdgeSegment(
 
   const target = unwrapShape(shape);
   const backend = getShapeRuntimeBackend(target);
-  const manifold = requireManifoldShapeBackend(backend, 'chamferEdgeSegment()');
-  const wasm = getWasm();
 
+  if (isOCCTShapeBackend(backend)) {
+    const edgeTarget = {
+      midpoint: segment.midpoint as [number, number, number],
+      start: segment.start as [number, number, number],
+      end: segment.end as [number, number, number],
+      convex: segment.convex,
+    };
+    try {
+      const result = backend.chamferEdgeByMidpoint(edgeTarget, size);
+      return buildResult(target, result, 'chamfer');
+    } catch {
+      // OCCT chamfer failed — fall back to Manifold mesh-based chamfer
+    }
+  }
+
+  const manifold = isOCCTShapeBackend(backend)
+    ? occtToManifold(backend)
+    : requireManifoldShapeBackend(backend, 'chamferEdgeSegment()');
+  const wasm = getWasm();
   const selection = edgeSegmentToSelection(segment);
   const apply = segment.convex
     ? applyChamferSelectionToManifold
     : applyConcaveChamferSelectionToManifold;
-  const result = apply(manifold, selection, size, wasm);
-
-  return buildResult(target, result, 'chamfer');
+  const manifoldResult = apply(manifold, selection, size, wasm);
+  return buildResult(target, wrapManifoldShapeBackend(manifoldResult), 'chamfer');
 }

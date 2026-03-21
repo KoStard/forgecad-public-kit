@@ -15,6 +15,7 @@ import {
   type ShapeRuntimeBounds,
   type ShapeRuntimeMesh,
   type ShapeRuntimeCrossSection,
+  type EdgeFeatureTarget,
 } from './shapeBackend';
 import { getOCCT, type OCCTModule } from './occtInit';
 
@@ -170,6 +171,40 @@ function applyTransform(oc: OCCTModule, shape: any, m: Mat4): any {
   );
   const transformed = new oc.BRepBuilderAPI_Transform_2(shape, trsf, true);
   return transformed.Shape();
+}
+
+/**
+ * Find the OCCT edge whose midpoint is closest to the target midpoint.
+ */
+function findEdgeByMidpoint(oc: OCCTModule, shape: any, midpoint: [number, number, number]): any {
+  let bestEdge: any = null;
+  let bestDist = Infinity;
+
+  const edgeExpl = new oc.TopExp_Explorer_2(
+    shape,
+    oc.TopAbs_ShapeEnum.TopAbs_EDGE,
+    oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
+  );
+  while (edgeExpl.More()) {
+    const edge = oc.TopoDS.Edge_1(edgeExpl.Current());
+    const first = { current: 0 };
+    const last = { current: 0 };
+    const curve = oc.BRep_Tool.Curve_2(edge, first, last);
+    if (!curve.IsNull()) {
+      const midParam = (first.current + last.current) / 2;
+      const pt = curve.get().Value(midParam);
+      const dx = pt.X() - midpoint[0];
+      const dy = pt.Y() - midpoint[1];
+      const dz = pt.Z() - midpoint[2];
+      const dist = dx * dx + dy * dy + dz * dz;
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestEdge = edge;
+      }
+    }
+    edgeExpl.Next();
+  }
+  return bestEdge;
 }
 
 export class OCCTShapeBackend implements ShapeBackend {
@@ -374,6 +409,38 @@ export class OCCTShapeBackend implements ShapeBackend {
 
   project(): ShapeRuntimeCrossSection {
     throw new Error('project() not yet implemented for OCCT backend');
+  }
+
+  filletEdgeByMidpoint(edge: EdgeFeatureTarget, radius: number): OCCTShapeBackend {
+    const oc = getOCCT();
+    const matchedEdge = findEdgeByMidpoint(oc, this._shape, edge.midpoint);
+    if (!matchedEdge) throw new Error('OCCT filletEdgeByMidpoint: could not find matching edge');
+
+    const mkFillet = new oc.BRepFilletAPI_MakeFillet(
+      this._shape,
+      oc.ChFi3d_FilletShape.ChFi3d_Rational,
+    );
+    mkFillet.Add_2(radius, matchedEdge);
+    mkFillet.Build(new oc.Message_ProgressRange_1());
+    if (!mkFillet.IsDone()) {
+      throw new Error(
+        `OCCT fillet operation failed (radius=${radius}, ` +
+        `midpoint=[${edge.midpoint.map(v => v.toFixed(3))}])`,
+      );
+    }
+    return new OCCTShapeBackend(mkFillet.Shape());
+  }
+
+  chamferEdgeByMidpoint(edge: EdgeFeatureTarget, size: number): OCCTShapeBackend {
+    const oc = getOCCT();
+    const matchedEdge = findEdgeByMidpoint(oc, this._shape, edge.midpoint);
+    if (!matchedEdge) throw new Error('OCCT chamferEdgeByMidpoint: could not find matching edge');
+
+    const mkChamfer = new oc.BRepFilletAPI_MakeChamfer(this._shape);
+    mkChamfer.Add_2(size, matchedEdge);
+    mkChamfer.Build(new oc.Message_ProgressRange_1());
+    if (!mkChamfer.IsDone()) throw new Error('OCCT chamfer operation failed');
+    return new OCCTShapeBackend(mkChamfer.Shape());
   }
 
   requireManifold(apiName = 'requireManifold()'): Manifold {
