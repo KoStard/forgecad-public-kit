@@ -9,7 +9,7 @@ pub mod reconstruction;
 pub mod subgraph_detection;
 
 use std::collections::{HashMap, HashSet};
-use crate::constraints::{constraint_jacobian_impl, constraint_residual_impl, evaluate_residuals, has_residual};
+use crate::constraints::{constraint_entity_ids, constraint_jacobian_impl, constraint_residual_impl, evaluate_residuals, has_residual};
 use crate::types::{
     Arc, Circle, Constraint, ConstraintResidual, Line, Point, Shape, SketchGroup, SolveMetadata,
     SolveOptions, SolveStatus, Problem,
@@ -221,66 +221,82 @@ fn progressive_solve(
     };
 
     let tolerance = options.tolerance.unwrap_or(1e-3);
-    let entity_ref_count = build_entity_ref_count(constraints);
     let ref_scale = compute_presolve_ref_scale(constraints);
 
-    // Spread overlapping shapes apart before progressive warm-up.
+    // Spread overlapping shapes apart before warm-up.
     spread_overlapping_shapes(points, lines, constraints, ref_scale);
 
-    // Phase 1: Progressive warm-up — add constraints one by one with short solves.
-    let recon_graph = reconstruction::ReconstructionGraph::empty();
-    let mut progressive_timed_out = false;
-    for i in 0..constraints.len() {
-        // Time budget check: skip remaining progressive steps if running out of time.
-        if progressive_deadline_us > 0 && profiler::platform::now_us() >= progressive_deadline_us {
-            lm::trail_push(&format!("progressive-timeout at step {}/{}", i, constraints.len()), 0.0);
-            progressive_timed_out = true;
-            break;
-        }
+    // Classify constraints into clusters vs bridges.
+    let plan = classify_constraints(points, lines, constraints, groups);
 
-        let sub = constraints[..=i].to_vec();
-
-        let pts_idx: HashMap<String, usize> = points.iter().enumerate().map(|(j, p)| (p.id.clone(), j)).collect();
-        apply_presolve_constraint(points, lines, &pts_idx, &entity_ref_count, &constraints[i], ref_scale);
-        run_analytical_presolve(points, lines, &sub);
-
-        // Coordinate equivalence propagation: ensure linked coordinates are consistent.
-        let cr = coord_reduction::build_coord_reduction(points, lines, &sub);
-        for j in 0..points.len() {
-            let rx = cr.repr_x[j];
-            if rx != j { points[j].x = points[rx].x; }
-            let ry = cr.repr_y[j];
-            if ry != j { points[j].y = points[ry].y; }
-        }
-
-        resolve_group_points(points, groups);
-
-        let has_residual = sub.iter().any(|c| crate::constraints::has_residual(c));
-        if !has_residual { continue; }
-
-        // Each progressive step gets a per-step deadline: at most 500ms per step.
-        let step_deadline = if progressive_deadline_us > 0 {
-            let now = profiler::platform::now_us();
-            let remaining = progressive_deadline_us.saturating_sub(now);
-            let per_step = remaining.min(500_000); // max 500ms per step
-            now + per_step
-        } else {
-            0
-        };
-
-        lm::solve_global(
-            points, lines, circles, arcs, shapes, &sub,
-            30, tolerance, 1, 4, 2.5,
-            groups, &recon_graph, step_deadline, None,
+    if plan.clusters.len() >= 2 {
+        // ── Cluster path: solve each shape independently, then full solve ──
+        solve_clusters(
+            points, lines, circles, arcs, shapes, constraints,
+            &plan, groups, tolerance, progressive_deadline_us,
         );
-        profiler::add(|p| p.progressive_steps += 1);
-    }
 
-    let progressive_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
-    lm::trail_push(
-        if progressive_timed_out { "progressive-warmup (partial)" } else { "progressive-warmup" },
-        progressive_error,
-    );
+        let cluster_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
+        lm::trail_push(
+            &format!("cluster-warmup: {} clusters, {} bridges",
+                plan.clusters.len(), plan.bridge_indices.len()),
+            cluster_error,
+        );
+    } else {
+        // ── Legacy progressive path: single-component or trivial cases ──
+        let entity_ref_count = build_entity_ref_count(constraints);
+        let recon_graph = reconstruction::ReconstructionGraph::empty();
+        let mut progressive_timed_out = false;
+
+        for i in 0..constraints.len() {
+            if progressive_deadline_us > 0 && profiler::platform::now_us() >= progressive_deadline_us {
+                lm::trail_push(&format!("progressive-timeout at step {}/{}", i, constraints.len()), 0.0);
+                progressive_timed_out = true;
+                break;
+            }
+
+            let sub = constraints[..=i].to_vec();
+
+            let pts_idx: HashMap<String, usize> = points.iter().enumerate().map(|(j, p)| (p.id.clone(), j)).collect();
+            apply_presolve_constraint(points, lines, &pts_idx, &entity_ref_count, &constraints[i], ref_scale);
+            run_analytical_presolve(points, lines, &sub);
+
+            let cr = coord_reduction::build_coord_reduction(points, lines, &sub);
+            for j in 0..points.len() {
+                let rx = cr.repr_x[j];
+                if rx != j { points[j].x = points[rx].x; }
+                let ry = cr.repr_y[j];
+                if ry != j { points[j].y = points[ry].y; }
+            }
+
+            resolve_group_points(points, groups);
+
+            let has_residual = sub.iter().any(|c| crate::constraints::has_residual(c));
+            if !has_residual { continue; }
+
+            let step_deadline = if progressive_deadline_us > 0 {
+                let now = profiler::platform::now_us();
+                let remaining = progressive_deadline_us.saturating_sub(now);
+                let per_step = remaining.min(500_000);
+                now + per_step
+            } else {
+                0
+            };
+
+            lm::solve_global(
+                points, lines, circles, arcs, shapes, &sub,
+                30, tolerance, 1, 4, 2.5,
+                groups, &recon_graph, step_deadline, None,
+            );
+            profiler::add(|p| p.progressive_steps += 1);
+        }
+
+        let progressive_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
+        lm::trail_push(
+            if progressive_timed_out { "progressive-warmup (partial)" } else { "progressive-warmup" },
+            progressive_error,
+        );
+    }
 
     profiler::add(|p| p.progressive_total_us += profiler::platform::now_us() - t0_prog);
 
@@ -295,6 +311,200 @@ fn progressive_solve(
         iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
         groups, false, deadline_us,
     )
+}
+
+// ── Cluster merge solve ──────────────────────────────────────────────────
+
+/// Plan for cluster-based solving: which constraints are internal to each
+/// line-connected cluster, and which are bridges between clusters.
+struct ClusterPlan {
+    /// Each cluster: (point_indices, internal_constraint_indices).
+    clusters: Vec<(Vec<usize>, Vec<usize>)>,
+    /// Indices of bridge/orphan constraints (span multiple clusters or reference
+    /// non-cluster points).
+    bridge_indices: Vec<usize>,
+}
+
+/// Partition constraints into cluster-internal vs bridge.
+///
+/// Uses line-only connectivity (via `build_line_components`) to find natural
+/// shape clusters. Each constraint is classified as internal to one cluster
+/// (all referenced points in the same component) or as a bridge.
+fn classify_constraints(
+    points: &[Point],
+    lines: &[Line],
+    constraints: &[Constraint],
+    existing_groups: &[SketchGroup],
+) -> ClusterPlan {
+    let n = points.len();
+    let (mut parent, _rank) = subgraph_detection::build_line_components(points, lines);
+
+    let pt_idx: HashMap<&str, usize> = points.iter().enumerate()
+        .map(|(i, p)| (p.id.as_str(), i))
+        .collect();
+
+    // Set of point IDs already owned by existing groups — exclude from clusters.
+    let group_owned: HashSet<&str> = existing_groups.iter()
+        .flat_map(|g| g.points.iter().map(|lp| lp.id.as_str()))
+        .collect();
+
+    // Group non-fixed, non-group-owned points by component root.
+    let mut components: HashMap<usize, Vec<usize>> = HashMap::new();
+    for i in 0..n {
+        if points[i].fixed || group_owned.contains(points[i].id.as_str()) {
+            continue;
+        }
+        let root = subgraph_detection::uf_find(&mut parent, i);
+        components.entry(root).or_default().push(i);
+    }
+
+    // Keep only clusters with ≥4 points (smaller ones aren't worth solving independently).
+    let clusters_by_root: HashMap<usize, Vec<usize>> = components.into_iter()
+        .filter(|(_, members)| members.len() >= 4)
+        .collect();
+
+    // Map point index → cluster root (for fast lookup).
+    let mut point_to_cluster: HashMap<usize, usize> = HashMap::new();
+    for (&root, members) in &clusters_by_root {
+        for &i in members {
+            point_to_cluster.insert(i, root);
+        }
+    }
+
+    // Build entity lookups for constraint_entity_ids.
+    let lines_map: HashMap<&str, &Line> = lines.iter().map(|l| (l.id.as_str(), l)).collect();
+    let circles_map: HashMap<&str, &crate::types::Circle> = HashMap::new();
+    let arcs_map: HashMap<&str, &crate::types::Arc> = HashMap::new();
+    let shapes_map: HashMap<&str, &Shape> = HashMap::new();
+
+    // Classify each constraint.
+    let mut cluster_constraints: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut bridge_indices: Vec<usize> = Vec::new();
+
+    for (ci, c) in constraints.iter().enumerate() {
+        let entity_ids = constraint_entity_ids(c, &lines_map, &circles_map, &arcs_map, &shapes_map);
+        // Find point indices referenced by this constraint.
+        let point_indices: Vec<usize> = entity_ids.iter()
+            .filter_map(|id| pt_idx.get(id.as_str()).copied())
+            .collect();
+
+        if point_indices.is_empty() {
+            bridge_indices.push(ci);
+            continue;
+        }
+
+        // Check if all referenced points are in the same cluster.
+        let mut cluster_root: Option<usize> = None;
+        let mut all_in_one = true;
+        for &pi in &point_indices {
+            if let Some(&root) = point_to_cluster.get(&pi) {
+                match cluster_root {
+                    None => cluster_root = Some(root),
+                    Some(r) if r == root => {}
+                    Some(_) => { all_in_one = false; break; }
+                }
+            } else {
+                // Point not in any cluster (fixed, group-owned, or small component).
+                all_in_one = false;
+                break;
+            }
+        }
+
+        if all_in_one {
+            if let Some(root) = cluster_root {
+                cluster_constraints.entry(root).or_default().push(ci);
+            } else {
+                bridge_indices.push(ci);
+            }
+        } else {
+            bridge_indices.push(ci);
+        }
+    }
+
+    // Build final cluster list.
+    let clusters: Vec<(Vec<usize>, Vec<usize>)> = clusters_by_root.into_iter()
+        .map(|(root, members)| {
+            let c_indices = cluster_constraints.remove(&root).unwrap_or_default();
+            (members, c_indices)
+        })
+        .collect();
+
+    ClusterPlan { clusters, bridge_indices }
+}
+
+/// Solve each cluster independently: presolve + analytical + coord reduction + tiny LM.
+///
+/// Each cluster is a line-connected component (typically one shape like a rect).
+/// After this, each shape has correct internal geometry; only inter-cluster
+/// positioning remains for the full solve.
+fn solve_clusters(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &[Constraint],
+    plan: &ClusterPlan,
+    groups: &mut Vec<SketchGroup>,
+    tolerance: f64,
+    deadline_us: u64,
+) {
+    let entity_ref_count = build_entity_ref_count(&constraints.to_vec());
+    let ref_scale = compute_presolve_ref_scale(&constraints.to_vec());
+    let recon_graph = reconstruction::ReconstructionGraph::empty();
+
+    for (_cluster_idx, (member_indices, constraint_indices)) in plan.clusters.iter().enumerate() {
+        // Time check.
+        if deadline_us > 0 && profiler::platform::now_us() >= deadline_us {
+            break;
+        }
+
+        if constraint_indices.is_empty() { continue; }
+
+        // Collect the cluster's constraints.
+        let cluster_constraints: Vec<Constraint> = constraint_indices.iter()
+            .map(|&ci| constraints[ci].clone())
+            .collect();
+
+        // Run per-constraint presolve.
+        let pts_idx: HashMap<String, usize> = points.iter().enumerate()
+            .map(|(j, p)| (p.id.clone(), j))
+            .collect();
+        for &ci in constraint_indices {
+            apply_presolve_constraint(points, lines, &pts_idx, &entity_ref_count, &constraints[ci], ref_scale);
+        }
+
+        // Analytical presolve on the cluster's constraints.
+        run_analytical_presolve(points, lines, &cluster_constraints);
+
+        // Coordinate reduction within the cluster.
+        let cr = coord_reduction::build_coord_reduction(points, lines, &cluster_constraints);
+        if cr.vars_saved > 0 {
+            for &i in member_indices {
+                if i < cr.repr_x.len() {
+                    let rx = cr.repr_x[i];
+                    if rx != i && rx < points.len() { points[i].x = points[rx].x; }
+                }
+                if i < cr.repr_y.len() {
+                    let ry = cr.repr_y[i];
+                    if ry != i && ry < points.len() { points[i].y = points[ry].y; }
+                }
+            }
+        }
+
+        // Check if any residual constraints remain.
+        let has_residual_c = cluster_constraints.iter().any(|c| has_residual(c));
+        if !has_residual_c { continue; }
+
+        // Tiny LM solve for just this cluster.
+        lm::solve_global(
+            points, lines, circles, arcs, shapes, &cluster_constraints,
+            30, tolerance, 1, 4, 2.5,
+            groups, &recon_graph, deadline_us, None,
+        );
+
+        profiler::add(|p| p.progressive_steps += 1);
+    }
 }
 
 /// Inner solve dispatch — decompose into independent components when possible.

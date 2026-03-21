@@ -12,6 +12,52 @@ use std::collections::{HashMap, HashSet};
 use crate::types::{Constraint, Line, LocalPoint, ParamCoord, Point, SketchGroup};
 use super::coord_reduction::CoordReduction;
 
+// ── Union-find helpers (used by both build_line_components and detect_subgraphs) ──
+
+pub fn uf_find(parent: &mut [usize], x: usize) -> usize {
+    if parent[x] != x {
+        parent[x] = uf_find(parent, parent[x]);
+    }
+    parent[x]
+}
+
+fn uf_union(parent: &mut [usize], rank: &mut [usize], a: usize, b: usize) {
+    let ra = uf_find(parent, a);
+    let rb = uf_find(parent, b);
+    if ra == rb { return; }
+    match rank[ra].cmp(&rank[rb]) {
+        std::cmp::Ordering::Less => parent[ra] = rb,
+        std::cmp::Ordering::Greater => parent[rb] = ra,
+        std::cmp::Ordering::Equal => { parent[rb] = ra; rank[ra] += 1; }
+    }
+}
+
+/// Build connected components using only line connectivity.
+///
+/// Returns `(parent, rank)` arrays for the union-find over point indices.
+/// Each shape connected by lines forms one component; bridge constraints
+/// (Midpoint, Coincident, etc.) do NOT merge components.
+pub fn build_line_components(
+    points: &[Point],
+    lines: &[Line],
+) -> (Vec<usize>, Vec<usize>) {
+    let n = points.len();
+    let pt_idx: HashMap<&str, usize> = points.iter().enumerate()
+        .map(|(i, p)| (p.id.as_str(), i))
+        .collect();
+
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut rank: Vec<usize> = vec![0; n];
+
+    for line in lines {
+        if let (Some(&ai), Some(&bi)) = (pt_idx.get(line.a.as_str()), pt_idx.get(line.b.as_str())) {
+            uf_union(&mut parent, &mut rank, ai, bi);
+        }
+    }
+
+    (parent, rank)
+}
+
 /// Result of subgraph detection: new groups to add and constraints to absorb.
 pub struct DetectionResult {
     /// New parameterized groups created from detected subgraphs.
@@ -51,38 +97,8 @@ pub fn detect_subgraphs(
         .flat_map(|g| g.points.iter().map(|lp| lp.id.as_str()))
         .collect();
 
-    // ── Union-find over points ──────────────────────────────────────────────
-    let mut parent: Vec<usize> = (0..n).collect();
-    let mut rank: Vec<usize> = vec![0; n];
-
-    fn uf_find(parent: &mut [usize], x: usize) -> usize {
-        if parent[x] != x {
-            parent[x] = uf_find(parent, parent[x]);
-        }
-        parent[x]
-    }
-    fn uf_union(parent: &mut [usize], rank: &mut [usize], a: usize, b: usize) {
-        let ra = uf_find(parent, a);
-        let rb = uf_find(parent, b);
-        if ra == rb { return; }
-        match rank[ra].cmp(&rank[rb]) {
-            std::cmp::Ordering::Less => parent[ra] = rb,
-            std::cmp::Ordering::Greater => parent[rb] = ra,
-            std::cmp::Ordering::Equal => { parent[rb] = ra; rank[ra] += 1; }
-        }
-    }
-
-    // Connect via lines.
-    for line in lines {
-        if let (Some(&ai), Some(&bi)) = (pt_idx.get(line.a.as_str()), pt_idx.get(line.b.as_str())) {
-            uf_union(&mut parent, &mut rank, ai, bi);
-        }
-    }
-
-    // NOTE: We intentionally do NOT union via structural constraints (Coincident,
-    // PointOnLine, Midpoint). This ensures that bridge points (e.g., from
-    // attachCentered) don't merge separate shapes into one giant component.
-    // Each shape's natural boundary is defined by its lines.
+    // ── Build line components ───────────────────────────────────────────────
+    let (mut parent, _rank) = build_line_components(points, lines);
 
     // ── Group non-fixed, non-group-owned points by component ────────────────
     let mut components: HashMap<usize, Vec<usize>> = HashMap::new();
