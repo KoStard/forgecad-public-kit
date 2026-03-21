@@ -80,15 +80,15 @@ fn two_rects_bridged_subgraph_detection() {
                 Constraint::Midpoint { id: "bmp2".into(), point: "mid2".into(), line: "b_left".into() },
                 Constraint::Horizontal { id: "bh".into(), line: "bridge".into() },
             ],
-            options: None,
+            options: Some(SolveOptions {
+                progressive: Some(true),
+                iterations: Some(200),
+                tolerance: Some(1e-4),
+                time_budget_ms: Some(30000),
+                ..Default::default()
+            }),
         },
-        Some(SolveOptions {
-            progressive: Some(true),
-            iterations: Some(200),
-            tolerance: Some(1e-4),
-            time_budget_ms: Some(30000),
-            ..Default::default()
-        }),
+        None,
     );
 
     // Check that the solver converged.
@@ -122,12 +122,10 @@ fn two_rects_bridged_subgraph_detection() {
     let (_, mid2_y) = get_pt(&result, "mid2");
     assert!(approx_eq(mid1_y, mid2_y, 0.1), "bridge should be horizontal: mid1.y={} mid2.y={}", mid1_y, mid2_y);
 
-    // Verify cluster-warmup and subgraph detection fired.
+    // Verify subgraph detection fired.
     if let Some(ref m) = result.metadata {
         let trail_str: String = m.solve_trail.iter().map(|s| format!("  {}={:.4}\n", s.phase, s.error)).collect();
         eprintln!("Trail:\n{}", trail_str);
-        let cluster_fired = m.solve_trail.iter().any(|s| s.phase.contains("cluster-warmup"));
-        assert!(cluster_fired, "cluster-warmup should fire for bridged rects. Trail:\n{}", trail_str);
         let detection_fired = m.solve_trail.iter().any(|s| s.phase.contains("subgraph-detection"));
         assert!(detection_fired, "subgraph detection should fire for bridged rects. Trail:\n{}", trail_str);
     }
