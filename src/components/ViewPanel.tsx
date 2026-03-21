@@ -950,6 +950,19 @@ export function ViewPanel() {
               )}
             </span>
           </div>
+          {constraintMeta.timedOut && (
+            <div style={{
+              fontSize: 11,
+              color: '#f59e0b',
+              background: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              borderRadius: 4,
+              padding: '4px 8px',
+              marginBottom: 6,
+            }}>
+              Solver timed out — result may be approximate. Try simplifying constraints or using groupRect() for rigid rectangles.
+            </div>
+          )}
           {constraintMeta.constraints.length === 0 && (
             <div style={{ fontSize: 12, color: 'var(--fc-textDim)', padding: '6px 0' }}>No constraints in this sketch</div>
           )}

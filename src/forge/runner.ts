@@ -27,6 +27,8 @@ import {
 import type { Anchor3D } from './kernel';
 import { resetShapeQueryOwnerIds } from './compilePlan';
 import { intersectWithPlane, projectToPlane } from './section';
+import { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';
+import { filletEdgeSegment, chamferEdgeSegment } from './edgeSegmentFeatures';
 import {
   Sketch,
   rect,
@@ -1192,6 +1194,11 @@ function executeFile(
       bomToCsv,
       intersectWithPlane,
       projectToPlane,
+      selectEdge,
+      selectEdges,
+      coalesceEdges,
+      filletEdgeSegment,
+      chamferEdgeSegment,
       importSketch,
       importPart,
       importGroup,

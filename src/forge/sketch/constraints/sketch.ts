@@ -486,7 +486,7 @@ export const solveConstraintDefinition = (
 
   return new ConstraintSketch(
     sketch.cross,
-    { status, dof, maxError, constraints, rejected, surfaces, construction, edges },
+    { status, dof, maxError, constraints, rejected, surfaces, construction, edges, timedOut: metadata?.timedOut },
     working,
   );
 };

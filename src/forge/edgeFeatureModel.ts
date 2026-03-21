@@ -15,6 +15,22 @@ export interface ResolvedEdgeFeatureSelection extends EdgeFeatureResolvedSelecto
   basisX: Vec3;
   basisY: Vec3;
   quadrant: EdgeFinishQuadrant;
+  /**
+   * Dihedral angle between the two adjacent faces, in degrees (0–180).
+   * When present, the runtime uses angle-aware wedge geometry instead of a
+   * hard-coded square cross-section.
+   */
+  dihedralAngleDeg?: number;
+  /**
+   * Unit direction along face A's surface in the (basisX, basisY) cross-section
+   * plane, pointing toward the sharp feature (into material for convex, into
+   * groove for concave).
+   */
+  surfaceDirA?: [number, number];
+  /** Same as surfaceDirA but for face B. */
+  surfaceDirB?: [number, number];
+  /** Whether this edge is convex (external corner). */
+  isConvex?: boolean;
 }
 
 export function cloneEdgeFinishQuadrant(
@@ -51,5 +67,9 @@ export function cloneResolvedEdgeFeatureSelection(
     basisX: [selection.basisX[0], selection.basisX[1], selection.basisX[2]],
     basisY: [selection.basisY[0], selection.basisY[1], selection.basisY[2]],
     quadrant: [selection.quadrant[0], selection.quadrant[1]],
+    dihedralAngleDeg: selection.dihedralAngleDeg,
+    surfaceDirA: selection.surfaceDirA ? [selection.surfaceDirA[0], selection.surfaceDirA[1]] : undefined,
+    surfaceDirB: selection.surfaceDirB ? [selection.surfaceDirB[0], selection.surfaceDirB[1]] : undefined,
+    isConvex: selection.isConvex,
   };
 }

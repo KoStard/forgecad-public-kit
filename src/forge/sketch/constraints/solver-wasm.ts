@@ -75,6 +75,7 @@ interface WasmOptions {
   presolve_constraint_id?: string;
   fallback_restarts?: number;
   progressive?: boolean;
+  time_budget_ms?: number;
 }
 
 interface WasmProblem {
@@ -132,6 +133,7 @@ interface WasmSolveMetadata {
   redundant_constraint_ids: string[];
   conflicting_constraint_ids: string[];
   solve_trail?: { phase: string; error: number }[];
+  timed_out?: boolean;
 }
 
 export type SolverWasmExchangeKind = 'solve' | 'presolve' | 'presolve-single';
@@ -691,6 +693,7 @@ function serializeProblem(def: ConstraintDefinition, options: SolveOptions): Was
       presolve_constraint_id: options.presolveConstraintId,
       fallback_restarts: options.fallbackRestarts,
       progressive: options.progressive,
+      time_budget_ms: options.timeBudgetMs,
     },
   };
 }
@@ -766,6 +769,7 @@ function toSolverMetadata(result: WasmSolveResult): SolverMetadata | null {
       phase: s.phase,
       error: s.error,
     })),
+    timedOut: result.metadata.timed_out || false,
   } : null;
 }
 
@@ -942,10 +946,14 @@ export function solveConstraintsWasm(
     parseError: '[solver-wasm] WASM solver returned invalid JSON',
     finalize: (result) => {
       applyResult(def, result);
-      return {
-        maxError: result.max_error,
-        metadata: toSolverMetadata(result),
-      };
+      const metadata = toSolverMetadata(result);
+      if (metadata?.timedOut) {
+        console.warn(
+          `[solver] Solver timed out (maxError=${result.max_error.toFixed(4)}, source=${source}). ` +
+          `Result may be approximate. Consider simplifying constraints.`,
+        );
+      }
+      return { maxError: result.max_error, metadata };
     },
   });
 }

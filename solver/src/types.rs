@@ -43,6 +43,28 @@ pub struct Shape {
 
 // ─── Sketch groups (rigid-body DOF) ──────────────────────────────────────────
 
+/// How a local coordinate is determined: constant, directly a param, or param + offset.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ParamCoord {
+    /// Fixed value (not parameterized).
+    Constant(f64),
+    /// Equals params[i].
+    Param(usize),
+    /// Equals params[i] + offset.
+    ParamOffset(usize, f64),
+}
+
+impl ParamCoord {
+    /// Evaluate this coordinate expression given the current param values.
+    pub fn eval(&self, params: &[f64]) -> f64 {
+        match self {
+            ParamCoord::Constant(v) => *v,
+            ParamCoord::Param(i) => params[*i],
+            ParamCoord::ParamOffset(i, off) => params[*i] + off,
+        }
+    }
+}
+
 /// A point stored in a group's local coordinate frame.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalPoint {
@@ -72,6 +94,19 @@ pub struct SketchGroup {
     /// Lines connecting local points (using their global IDs).
     #[serde(default)]
     pub lines: Vec<Line>,
+    /// Shape parameter values (internal DOF beyond the rigid frame).
+    /// Empty for rigid groups (backward compatible).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub params: Vec<f64>,
+    /// Per-point expressions: (lx_expr, ly_expr) as functions of params.
+    /// When non-empty, local coords are recomputed from params before resolve_point.
+    /// Must have the same length as `points`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub param_point_map: Vec<(ParamCoord, ParamCoord)>,
+    /// True for solver-created groups (auto-detected subgraphs).
+    /// These are not serialized back to the TS side.
+    #[serde(default, skip_serializing)]
+    pub auto_detected: bool,
 }
 
 impl SketchGroup {
@@ -86,9 +121,20 @@ impl SketchGroup {
 
     /// Number of solver DOF this group contributes.
     pub fn dof_count(&self) -> i32 {
-        if self.fixed { 0 }
-        else if self.fixed_rotation { 2 }
-        else { 3 }
+        let frame = if self.fixed { 0 }
+            else if self.fixed_rotation { 2 }
+            else { 3 };
+        frame + self.params.len() as i32
+    }
+
+    /// Recompute local point coordinates from the current param values.
+    /// No-op if param_point_map is empty (rigid group).
+    pub fn update_local_coords_from_params(&mut self) {
+        if self.param_point_map.is_empty() { return; }
+        for (lp, (lx_expr, ly_expr)) in self.points.iter_mut().zip(self.param_point_map.iter()) {
+            lp.lx = lx_expr.eval(&self.params);
+            lp.ly = ly_expr.eval(&self.params);
+        }
     }
 }
 
@@ -231,6 +277,10 @@ pub struct SolveOptions {
     /// This replicates the TS solver's incremental constrain() behavior without
     /// 54 separate WASM round-trips.
     pub progressive: Option<bool>,
+    /// Wall-clock time budget in milliseconds for the entire solve (progressive +
+    /// final). 0 or None = no limit.  When exceeded the solver returns its best
+    /// result so far rather than spinning indefinitely.
+    pub time_budget_ms: Option<u32>,
 }
 
 impl Default for SolveOptions {
@@ -245,6 +295,7 @@ impl Default for SolveOptions {
             presolve_constraint_id: None,
             fallback_restarts: None,
             progressive: None,
+            time_budget_ms: None,
         }
     }
 }
@@ -312,6 +363,9 @@ pub struct SolveMetadata {
     pub conflicting_constraint_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub solve_trail: Vec<SolveTrailStep>,
+    /// True when the solver hit its wall-clock time budget before converging.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub timed_out: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

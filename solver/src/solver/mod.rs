@@ -1,13 +1,15 @@
 pub mod analytical;
+pub mod coord_reduction;
 pub mod decompose;
 pub mod graph;
 pub mod linear;
 pub mod lm;
 pub mod profiler;
 pub mod reconstruction;
+pub mod subgraph_detection;
 
 use std::collections::{HashMap, HashSet};
-use crate::constraints::{constraint_jacobian_impl, constraint_residual_impl, evaluate_residuals, has_residual};
+use crate::constraints::{constraint_entity_ids, constraint_jacobian_impl, constraint_residual_impl, evaluate_residuals, has_residual};
 use crate::types::{
     Arc, Circle, Constraint, ConstraintResidual, Line, Point, Shape, SketchGroup, SolveMetadata,
     SolveOptions, SolveStatus, Problem,
@@ -149,10 +151,16 @@ pub fn solve(
 
     let incremental = options.presolve_constraint_id.is_some();
 
+    // Compute wall-clock deadline for the entire solve.
+    let deadline_us = match options.time_budget_ms {
+        Some(ms) if ms > 0 => profiler::platform::now_us() + (ms as u64) * 1000,
+        _ => 0, // 0 = no limit
+    };
+
     let max_error = solve_system(
         points, lines, circles, arcs, shapes, constraints,
         iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
-        groups, incremental,
+        groups, incremental, deadline_us,
     );
 
     // Fallback: if the first solve exceeded tolerance * 5 and a fallback is
@@ -161,6 +169,9 @@ pub fn solve(
         (options.fallback_restarts, snapshot)
     {
         if max_error > tolerance * 5.0 {
+            if deadline_us > 0 && profiler::platform::now_us() >= deadline_us {
+                return max_error; // no time for fallback
+            }
             *points = snap_pts;
             *circles = snap_circles;
             *arcs = snap_arcs;
@@ -170,7 +181,7 @@ pub fn solve(
             return solve_system(
                 points, lines, circles, arcs, shapes, constraints,
                 iterations, tolerance, fb_restarts, fb_warm, max_scaled_step,
-                groups, false,
+                groups, false, deadline_us,
             );
         }
     }
@@ -197,33 +208,95 @@ fn progressive_solve(
 ) -> f64 {
     let t0_prog = profiler::platform::now_us();
 
+    // Compute a wall-clock deadline for the entire solve (progressive + final).
+    let deadline_us = match options.time_budget_ms {
+        Some(ms) if ms > 0 => t0_prog + (ms as u64) * 1000,
+        _ => 0, // 0 = no limit
+    };
+    // Progressive phase gets at most 60% of the total budget (rest for final solve).
+    let progressive_deadline_us = if deadline_us > 0 {
+        t0_prog + ((deadline_us - t0_prog) * 60 / 100)
+    } else {
+        0
+    };
+
     let tolerance = options.tolerance.unwrap_or(1e-3);
-    let entity_ref_count = build_entity_ref_count(constraints);
     let ref_scale = compute_presolve_ref_scale(constraints);
 
-    // Phase 1: Progressive warm-up — add constraints one by one with short solves.
-    let recon_graph = reconstruction::ReconstructionGraph::empty();
-    for i in 0..constraints.len() {
-        let sub = constraints[..=i].to_vec();
+    // Spread overlapping shapes apart before warm-up.
+    spread_overlapping_shapes(points, lines, constraints, ref_scale);
 
-        let pts_idx: HashMap<String, usize> = points.iter().enumerate().map(|(j, p)| (p.id.clone(), j)).collect();
-        apply_presolve_constraint(points, lines, &pts_idx, &entity_ref_count, &constraints[i], ref_scale);
-        run_analytical_presolve(points, lines, &sub);
-        resolve_group_points(points, groups);
+    // Classify constraints into clusters vs bridges.
+    let plan = classify_constraints(points, lines, constraints, groups);
 
-        let has_residual = sub.iter().any(|c| crate::constraints::has_residual(c));
-        if !has_residual { continue; }
-
-        lm::solve_global(
-            points, lines, circles, arcs, shapes, &sub,
-            30, tolerance, 1, 4, 2.5,
-            groups, &recon_graph,
+    if plan.clusters.len() >= 2 {
+        // ── Cluster path: solve each shape independently, then full solve ──
+        solve_clusters(
+            points, lines, circles, arcs, shapes, constraints,
+            &plan, groups, tolerance, progressive_deadline_us,
         );
-        profiler::add(|p| p.progressive_steps += 1);
-    }
 
-    let progressive_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
-    lm::trail_push("progressive-warmup", progressive_error);
+        let cluster_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
+        lm::trail_push(
+            &format!("cluster-warmup: {} clusters, {} bridges",
+                plan.clusters.len(), plan.bridge_indices.len()),
+            cluster_error,
+        );
+    } else {
+        // ── Legacy progressive path: single-component or trivial cases ──
+        let entity_ref_count = build_entity_ref_count(constraints);
+        let recon_graph = reconstruction::ReconstructionGraph::empty();
+        let mut progressive_timed_out = false;
+
+        for i in 0..constraints.len() {
+            if progressive_deadline_us > 0 && profiler::platform::now_us() >= progressive_deadline_us {
+                lm::trail_push(&format!("progressive-timeout at step {}/{}", i, constraints.len()), 0.0);
+                progressive_timed_out = true;
+                break;
+            }
+
+            let sub = constraints[..=i].to_vec();
+
+            let pts_idx: HashMap<String, usize> = points.iter().enumerate().map(|(j, p)| (p.id.clone(), j)).collect();
+            apply_presolve_constraint(points, lines, &pts_idx, &entity_ref_count, &constraints[i], ref_scale);
+            run_analytical_presolve(points, lines, &sub);
+
+            let cr = coord_reduction::build_coord_reduction(points, lines, &sub);
+            for j in 0..points.len() {
+                let rx = cr.repr_x[j];
+                if rx != j { points[j].x = points[rx].x; }
+                let ry = cr.repr_y[j];
+                if ry != j { points[j].y = points[ry].y; }
+            }
+
+            resolve_group_points(points, groups);
+
+            let has_residual = sub.iter().any(|c| crate::constraints::has_residual(c));
+            if !has_residual { continue; }
+
+            let step_deadline = if progressive_deadline_us > 0 {
+                let now = profiler::platform::now_us();
+                let remaining = progressive_deadline_us.saturating_sub(now);
+                let per_step = remaining.min(500_000);
+                now + per_step
+            } else {
+                0
+            };
+
+            lm::solve_global(
+                points, lines, circles, arcs, shapes, &sub,
+                30, tolerance, 1, 4, 2.5,
+                groups, &recon_graph, step_deadline, None,
+            );
+            profiler::add(|p| p.progressive_steps += 1);
+        }
+
+        let progressive_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
+        lm::trail_push(
+            if progressive_timed_out { "progressive-warmup (partial)" } else { "progressive-warmup" },
+            progressive_error,
+        );
+    }
 
     profiler::add(|p| p.progressive_total_us += profiler::platform::now_us() - t0_prog);
 
@@ -236,8 +309,202 @@ fn progressive_solve(
     solve_single_system(
         points, lines, circles, arcs, shapes, constraints,
         iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
-        groups, false,
+        groups, false, deadline_us,
     )
+}
+
+// ── Cluster merge solve ──────────────────────────────────────────────────
+
+/// Plan for cluster-based solving: which constraints are internal to each
+/// line-connected cluster, and which are bridges between clusters.
+struct ClusterPlan {
+    /// Each cluster: (point_indices, internal_constraint_indices).
+    clusters: Vec<(Vec<usize>, Vec<usize>)>,
+    /// Indices of bridge/orphan constraints (span multiple clusters or reference
+    /// non-cluster points).
+    bridge_indices: Vec<usize>,
+}
+
+/// Partition constraints into cluster-internal vs bridge.
+///
+/// Uses line-only connectivity (via `build_line_components`) to find natural
+/// shape clusters. Each constraint is classified as internal to one cluster
+/// (all referenced points in the same component) or as a bridge.
+fn classify_constraints(
+    points: &[Point],
+    lines: &[Line],
+    constraints: &[Constraint],
+    existing_groups: &[SketchGroup],
+) -> ClusterPlan {
+    let n = points.len();
+    let (mut parent, _rank) = subgraph_detection::build_line_components(points, lines);
+
+    let pt_idx: HashMap<&str, usize> = points.iter().enumerate()
+        .map(|(i, p)| (p.id.as_str(), i))
+        .collect();
+
+    // Set of point IDs already owned by existing groups — exclude from clusters.
+    let group_owned: HashSet<&str> = existing_groups.iter()
+        .flat_map(|g| g.points.iter().map(|lp| lp.id.as_str()))
+        .collect();
+
+    // Group non-fixed, non-group-owned points by component root.
+    let mut components: HashMap<usize, Vec<usize>> = HashMap::new();
+    for i in 0..n {
+        if points[i].fixed || group_owned.contains(points[i].id.as_str()) {
+            continue;
+        }
+        let root = subgraph_detection::uf_find(&mut parent, i);
+        components.entry(root).or_default().push(i);
+    }
+
+    // Keep only clusters with ≥4 points (smaller ones aren't worth solving independently).
+    let clusters_by_root: HashMap<usize, Vec<usize>> = components.into_iter()
+        .filter(|(_, members)| members.len() >= 4)
+        .collect();
+
+    // Map point index → cluster root (for fast lookup).
+    let mut point_to_cluster: HashMap<usize, usize> = HashMap::new();
+    for (&root, members) in &clusters_by_root {
+        for &i in members {
+            point_to_cluster.insert(i, root);
+        }
+    }
+
+    // Build entity lookups for constraint_entity_ids.
+    let lines_map: HashMap<&str, &Line> = lines.iter().map(|l| (l.id.as_str(), l)).collect();
+    let circles_map: HashMap<&str, &crate::types::Circle> = HashMap::new();
+    let arcs_map: HashMap<&str, &crate::types::Arc> = HashMap::new();
+    let shapes_map: HashMap<&str, &Shape> = HashMap::new();
+
+    // Classify each constraint.
+    let mut cluster_constraints: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut bridge_indices: Vec<usize> = Vec::new();
+
+    for (ci, c) in constraints.iter().enumerate() {
+        let entity_ids = constraint_entity_ids(c, &lines_map, &circles_map, &arcs_map, &shapes_map);
+        // Find point indices referenced by this constraint.
+        let point_indices: Vec<usize> = entity_ids.iter()
+            .filter_map(|id| pt_idx.get(id.as_str()).copied())
+            .collect();
+
+        if point_indices.is_empty() {
+            bridge_indices.push(ci);
+            continue;
+        }
+
+        // Check if all referenced points are in the same cluster.
+        let mut cluster_root: Option<usize> = None;
+        let mut all_in_one = true;
+        for &pi in &point_indices {
+            if let Some(&root) = point_to_cluster.get(&pi) {
+                match cluster_root {
+                    None => cluster_root = Some(root),
+                    Some(r) if r == root => {}
+                    Some(_) => { all_in_one = false; break; }
+                }
+            } else {
+                // Point not in any cluster (fixed, group-owned, or small component).
+                all_in_one = false;
+                break;
+            }
+        }
+
+        if all_in_one {
+            if let Some(root) = cluster_root {
+                cluster_constraints.entry(root).or_default().push(ci);
+            } else {
+                bridge_indices.push(ci);
+            }
+        } else {
+            bridge_indices.push(ci);
+        }
+    }
+
+    // Build final cluster list.
+    let clusters: Vec<(Vec<usize>, Vec<usize>)> = clusters_by_root.into_iter()
+        .map(|(root, members)| {
+            let c_indices = cluster_constraints.remove(&root).unwrap_or_default();
+            (members, c_indices)
+        })
+        .collect();
+
+    ClusterPlan { clusters, bridge_indices }
+}
+
+/// Solve each cluster independently: presolve + analytical + coord reduction + tiny LM.
+///
+/// Each cluster is a line-connected component (typically one shape like a rect).
+/// After this, each shape has correct internal geometry; only inter-cluster
+/// positioning remains for the full solve.
+fn solve_clusters(
+    points: &mut Vec<Point>,
+    lines: &Vec<Line>,
+    circles: &mut Vec<Circle>,
+    arcs: &mut Vec<Arc>,
+    shapes: &Vec<Shape>,
+    constraints: &[Constraint],
+    plan: &ClusterPlan,
+    groups: &mut Vec<SketchGroup>,
+    tolerance: f64,
+    deadline_us: u64,
+) {
+    let entity_ref_count = build_entity_ref_count(&constraints.to_vec());
+    let ref_scale = compute_presolve_ref_scale(&constraints.to_vec());
+    let recon_graph = reconstruction::ReconstructionGraph::empty();
+
+    for (_cluster_idx, (member_indices, constraint_indices)) in plan.clusters.iter().enumerate() {
+        // Time check.
+        if deadline_us > 0 && profiler::platform::now_us() >= deadline_us {
+            break;
+        }
+
+        if constraint_indices.is_empty() { continue; }
+
+        // Collect the cluster's constraints.
+        let cluster_constraints: Vec<Constraint> = constraint_indices.iter()
+            .map(|&ci| constraints[ci].clone())
+            .collect();
+
+        // Run per-constraint presolve.
+        let pts_idx: HashMap<String, usize> = points.iter().enumerate()
+            .map(|(j, p)| (p.id.clone(), j))
+            .collect();
+        for &ci in constraint_indices {
+            apply_presolve_constraint(points, lines, &pts_idx, &entity_ref_count, &constraints[ci], ref_scale);
+        }
+
+        // Analytical presolve on the cluster's constraints.
+        run_analytical_presolve(points, lines, &cluster_constraints);
+
+        // Coordinate reduction within the cluster.
+        let cr = coord_reduction::build_coord_reduction(points, lines, &cluster_constraints);
+        if cr.vars_saved > 0 {
+            for &i in member_indices {
+                if i < cr.repr_x.len() {
+                    let rx = cr.repr_x[i];
+                    if rx != i && rx < points.len() { points[i].x = points[rx].x; }
+                }
+                if i < cr.repr_y.len() {
+                    let ry = cr.repr_y[i];
+                    if ry != i && ry < points.len() { points[i].y = points[ry].y; }
+                }
+            }
+        }
+
+        // Check if any residual constraints remain.
+        let has_residual_c = cluster_constraints.iter().any(|c| has_residual(c));
+        if !has_residual_c { continue; }
+
+        // Tiny LM solve for just this cluster.
+        lm::solve_global(
+            points, lines, circles, arcs, shapes, &cluster_constraints,
+            30, tolerance, 1, 4, 2.5,
+            groups, &recon_graph, deadline_us, None,
+        );
+
+        profiler::add(|p| p.progressive_steps += 1);
+    }
 }
 
 /// Inner solve dispatch — decompose into independent components when possible.
@@ -255,10 +522,11 @@ fn solve_system(
     max_scaled_step: f64,
     groups: &mut Vec<SketchGroup>,
     incremental: bool,
+    deadline_us: u64,
 ) -> f64 {
     if let Some(plan) = build_solve_plan(points, lines, circles, arcs, shapes, constraints) {
         // Build a set of group-owned point IDs for quick lookup.
-        let group_point_ids: std::collections::HashSet<String> = groups.iter()
+        let _group_point_ids: std::collections::HashSet<String> = groups.iter()
             .flat_map(|g| g.points.iter().map(|p| p.id.clone()))
             .collect();
 
@@ -316,6 +584,7 @@ fn solve_system(
                 max_scaled_step,
                 &mut sub_groups,
                 incremental,
+                deadline_us,
             );
             max_error = max_error.max(component_error);
 
@@ -367,6 +636,7 @@ fn solve_system(
             max_scaled_step,
             groups,
             incremental,
+            deadline_us,
         )
     }
 }
@@ -494,6 +764,7 @@ fn solve_single_system(
     max_scaled_step: f64,
     groups: &mut Vec<SketchGroup>,
     incremental: bool,
+    deadline_us: u64,
 ) -> f64 {
     profiler::timed(
         |p, us| p.presolve_us += us,
@@ -507,6 +778,71 @@ fn solve_single_system(
         || run_analytical_presolve(points, lines, constraints),
     );
 
+    // Coordinate equivalence reduction: only for non-incremental (final) solves.
+    // For seeds/progressive steps, the overhead outweighs the benefit.
+    let coord_red = if !incremental {
+        let cr = coord_reduction::build_coord_reduction(points, lines, constraints);
+        if cr.vars_saved > 0 {
+            // Propagate representative coordinate values to linked points.
+            for i in 0..points.len() {
+                let rx = cr.repr_x[i];
+                if rx != i { points[i].x = points[rx].x; }
+                let ry = cr.repr_y[i];
+                if ry != i { points[i].y = points[ry].y; }
+            }
+            lm::trail_push(
+                &format!("coord-reduction: {} vars saved", cr.vars_saved),
+                lm::current_max_error(points, lines, circles, arcs, shapes, constraints),
+            );
+        }
+        cr
+    } else {
+        coord_reduction::CoordReduction {
+            repr_x: vec![], repr_y: vec![],
+            absorbed_constraints: vec![], vars_saved: 0,
+        }
+    };
+
+    // Subgraph detection: collapse rigid/semi-rigid components into parameterized groups.
+    // Only for non-incremental (final) solves.
+    let mut absorbed_constraints: std::collections::HashSet<usize> = std::collections::HashSet::new();
+    if !incremental && coord_red.vars_saved > 0 {
+        let detection = subgraph_detection::detect_subgraphs(
+            points, lines, constraints, groups, &coord_red,
+        );
+        if !detection.new_groups.is_empty() {
+            let n_new = detection.new_groups.len();
+            let n_absorbed = detection.absorbed_constraint_indices.len();
+            absorbed_constraints = detection.absorbed_constraint_indices;
+            groups.extend(detection.new_groups);
+            resolve_group_points(points, groups);
+            let n_group_points: usize = groups.iter().filter(|g| g.auto_detected).map(|g| g.points.len()).sum();
+            let n_group_params: usize = groups.iter().filter(|g| g.auto_detected).map(|g| g.params.len()).sum();
+            let frame_vars: usize = groups.iter().filter(|g| g.auto_detected).map(|g| if g.fixed_rotation { 2 } else { 3 }).sum();
+            let vars_before = n_group_points * 2;
+            let vars_after = frame_vars + n_group_params;
+            lm::trail_push(
+                &format!("subgraph-detection: {} groups, {} absorbed, {} pts → {} vars (was {})",
+                    n_new, n_absorbed, n_group_points, vars_after, vars_before),
+                lm::current_max_error(points, lines, circles, arcs, shapes, constraints),
+            );
+        }
+    }
+
+    // Build filtered constraint list excluding absorbed constraints.
+    // Absorbed constraints are internal to parameterized groups — they're
+    // structurally satisfied by the group parameterization.
+    let filtered_constraints: Vec<Constraint>;
+    let effective_constraints: &Vec<Constraint> = if absorbed_constraints.is_empty() {
+        constraints
+    } else {
+        filtered_constraints = constraints.iter().enumerate()
+            .filter(|(i, _)| !absorbed_constraints.contains(i))
+            .map(|(_, c)| c.clone())
+            .collect();
+        &filtered_constraints
+    };
+
     // For incremental calls (progressive warm-up or builder warm-seeding),
     // skip the heavy reconstruction graph and DAG analysis but still run LM.
     let recon_graph = if incremental {
@@ -517,10 +853,10 @@ fn solve_single_system(
                 .flat_map(|g| g.points.iter().map(|p| p.id.clone()))
                 .collect();
             let graph = reconstruction::build_reconstruction_graph(
-                points, lines, constraints, &group_owned_ids,
+                points, lines, effective_constraints, &group_owned_ids,
             );
             if !graph.is_empty() {
-                reconstruction::reconstruct(&graph, points, lines, constraints);
+                reconstruction::reconstruct(&graph, points, lines, effective_constraints);
             }
             graph
         })
@@ -528,12 +864,12 @@ fn solve_single_system(
 
     resolve_group_points(points, groups);
 
-    let has_any_residual = constraints.iter().any(|c| crate::constraints::has_residual(c))
+    let has_any_residual = effective_constraints.iter().any(|c| crate::constraints::has_residual(c))
         || !arcs.is_empty();
 
     if !has_any_residual {
         return sanitize_max_error(gauss_seidel_solve(
-            points, lines, circles, arcs, shapes, constraints,
+            points, lines, circles, arcs, shapes, effective_constraints,
             iterations, tolerance,
         ));
     }
@@ -542,7 +878,7 @@ fn solve_single_system(
         // ── Graph decomposition: extract structural info and build solve DAG ──
         profiler::timed(|p, us| p.dag_decompose_us += us, || {
             let info = lm::extract_structural_info(
-                points, lines, circles, arcs, shapes, constraints, groups, &recon_graph,
+                points, lines, circles, arcs, shapes, effective_constraints, groups, &recon_graph,
             );
 
             if info.n_vars > 0 {
@@ -563,13 +899,25 @@ fn solve_single_system(
         });
     }
 
+    // When subgraph detection created groups, disable coord_reduction for LM.
+    // Coord_reduction might link a non-group point's coordinate to a group-owned
+    // point's coordinate. Since group-owned points have no variables, this would
+    // silently eliminate the non-group point's coordinate from the solver.
+    let has_auto_groups = groups.iter().any(|g| g.auto_detected);
+    let cr_ref = if coord_red.vars_saved > 0 && !has_auto_groups {
+        Some(&coord_red)
+    } else {
+        None
+    };
     let final_error = profiler::timed(
         |p, us| p.lm_total_us += us,
         || lm::solve_global(
-            points, lines, circles, arcs, shapes, constraints,
+            points, lines, circles, arcs, shapes, effective_constraints,
             iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
             groups,
             &recon_graph,
+            deadline_us,
+            cr_ref,
         ),
     );
     sanitize_max_error(final_error)
@@ -746,7 +1094,7 @@ fn progressive_sub_solve(
         let err = lm::solve_global(
             points, lines, circles, arcs, shapes, &sub_constraints,
             sub_iters, tolerance, sub_restarts, warm_iters, max_step,
-            groups, graph,
+            groups, graph, 0, None,
         );
         lm::trail_push(&format!("sub-layer[{}] ({} constraints, {} pts)", layer, sub_constraints.len(), sub_point_ids.len()), err);
 
@@ -1461,6 +1809,183 @@ fn propagate_light_locked_camera(
     }
 }
 
+/// Detect overlapping shapes (connected components via lines) and spread them
+/// apart deterministically. This gives the solver distinct initial positions
+/// for shapes that would otherwise all start at the same default location.
+///
+/// Uses union-find over line connectivity to identify shapes, computes each
+/// shape's centroid, and if many shapes are clustered in a small region,
+/// spreads them in a grid with deterministic jitter based on component index.
+fn spread_overlapping_shapes(
+    points: &mut Vec<Point>,
+    lines: &[Line],
+    constraints: &[Constraint],
+    ref_scale: f64,
+) {
+    if points.is_empty() || ref_scale < 1e-6 { return; }
+
+    let n = points.len();
+    let pt_idx: HashMap<String, usize> = points.iter().enumerate()
+        .map(|(i, p)| (p.id.clone(), i))
+        .collect();
+
+    // Build line endpoint lookup for constraint processing.
+    let line_map: HashMap<&str, &Line> = lines.iter()
+        .map(|l| (l.id.as_str(), l))
+        .collect();
+
+    // Union-find over points via line connectivity AND structural constraints.
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut rank: Vec<usize> = vec![0; n];
+
+    fn uf_find(parent: &mut Vec<usize>, x: usize) -> usize {
+        if parent[x] != x {
+            parent[x] = uf_find(parent, parent[x]);
+        }
+        parent[x]
+    }
+    fn uf_union(parent: &mut Vec<usize>, rank: &mut Vec<usize>, a: usize, b: usize) {
+        let ra = uf_find(parent, a);
+        let rb = uf_find(parent, b);
+        if ra == rb { return; }
+        match rank[ra].cmp(&rank[rb]) {
+            std::cmp::Ordering::Less => parent[ra] = rb,
+            std::cmp::Ordering::Greater => parent[rb] = ra,
+            std::cmp::Ordering::Equal => { parent[rb] = ra; rank[ra] += 1; }
+        }
+    }
+
+    // Connect via lines.
+    for line in lines {
+        if let (Some(&ai), Some(&bi)) = (pt_idx.get(&line.a), pt_idx.get(&line.b)) {
+            uf_union(&mut parent, &mut rank, ai, bi);
+        }
+    }
+
+    // Connect via structural constraints (Coincident, PointOnLine, Midpoint).
+    // These create physical connections between points that should be treated
+    // as part of the same shape for spreading purposes.
+    for c in constraints {
+        match c {
+            Constraint::Coincident { a, b, .. } => {
+                if let (Some(&ai), Some(&bi)) = (pt_idx.get(a.as_str()), pt_idx.get(b.as_str())) {
+                    uf_union(&mut parent, &mut rank, ai, bi);
+                }
+            }
+            Constraint::PointOnLine { point, line, .. } => {
+                if let Some(&pi) = pt_idx.get(point.as_str()) {
+                    if let Some(l) = line_map.get(line.as_str()) {
+                        if let Some(&ai) = pt_idx.get(l.a.as_str()) {
+                            uf_union(&mut parent, &mut rank, pi, ai);
+                        }
+                    }
+                }
+            }
+            Constraint::Midpoint { point, line, .. } => {
+                if let Some(&pi) = pt_idx.get(point.as_str()) {
+                    if let Some(l) = line_map.get(line.as_str()) {
+                        if let Some(&ai) = pt_idx.get(l.a.as_str()) {
+                            uf_union(&mut parent, &mut rank, pi, ai);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Group non-fixed points by connected component.
+    let mut components: HashMap<usize, Vec<usize>> = HashMap::new();
+    for i in 0..n {
+        if !points[i].fixed {
+            let root = uf_find(&mut parent, i);
+            components.entry(root).or_default().push(i);
+        }
+    }
+
+    // Compute centroid and bounding box of each component (shape).
+    // Only consider components with ≥3 points (actual shapes, not lone bridges).
+    struct ShapeInfo {
+        root: usize,
+        cx: f64,
+        cy: f64,
+        bbox_size: f64,
+        members: Vec<usize>,
+    }
+    let mut shape_list: Vec<ShapeInfo> = Vec::new();
+    for (root, members) in &components {
+        if members.len() < 3 { continue; }
+        let cx = members.iter().map(|&i| points[i].x).sum::<f64>() / members.len() as f64;
+        let cy = members.iter().map(|&i| points[i].y).sum::<f64>() / members.len() as f64;
+        let min_x = members.iter().map(|&i| points[i].x).fold(f64::INFINITY, f64::min);
+        let max_x = members.iter().map(|&i| points[i].x).fold(f64::NEG_INFINITY, f64::max);
+        let min_y = members.iter().map(|&i| points[i].y).fold(f64::INFINITY, f64::min);
+        let max_y = members.iter().map(|&i| points[i].y).fold(f64::NEG_INFINITY, f64::max);
+        let bbox_size = (max_x - min_x).max(max_y - min_y);
+        shape_list.push(ShapeInfo { root: *root, cx, cy, bbox_size, members: members.clone() });
+    }
+
+    // Only spread when there are many overlapping shapes (≥4).
+    // A few overlapping shapes (2-3) are handled fine by the solver.
+    // The problem arises with many (16+) shapes at the same position.
+    if shape_list.len() < 4 { return; }
+
+    // Sort by root index for deterministic ordering.
+    shape_list.sort_by_key(|s| s.root);
+
+    // Compute average shape bounding box for spacing.
+    let avg_bbox = shape_list.iter().map(|s| s.bbox_size).sum::<f64>() / shape_list.len() as f64;
+    // Use 2× average bbox as spacing — enough to separate shapes without being excessive.
+    // At minimum, use ref_scale * 0.1 so shapes still move apart when all have zero bbox.
+    let spacing = (avg_bbox * 2.0).max(ref_scale * 0.1);
+
+    // Compute global centroid and check if shapes are clustered.
+    let gcx = shape_list.iter().map(|s| s.cx).sum::<f64>() / shape_list.len() as f64;
+    let gcy = shape_list.iter().map(|s| s.cy).sum::<f64>() / shape_list.len() as f64;
+    let max_dist = shape_list.iter()
+        .map(|s| ((s.cx - gcx).powi(2) + (s.cy - gcy).powi(2)).sqrt())
+        .fold(0.0f64, f64::max);
+
+    // If shapes are already spread out, skip. Compare to expected grid extent.
+    let n_shapes = shape_list.len();
+    let cols = (n_shapes as f64).sqrt().ceil() as usize;
+    let rows = (n_shapes + cols - 1) / cols;
+    let expected_extent = spacing * (cols.max(rows) as f64) / 2.0;
+    if max_dist > expected_extent * 0.3 { return; }
+
+    for (k, shape) in shape_list.iter().enumerate() {
+        let row = k / cols;
+        let col = k % cols;
+
+        // Grid position centered on global centroid.
+        let grid_x = gcx + (col as f64 - (cols as f64 - 1.0) / 2.0) * spacing;
+        let grid_y = gcy + (row as f64 - (rows as f64 - 1.0) / 2.0) * spacing;
+
+        // Deterministic jitter based on component root index to break grid symmetry.
+        // Uses a simple multiplicative hash (Knuth's golden ratio hash).
+        let hash = shape.root.wrapping_mul(2654435761);
+        let jx = ((hash >> 16) & 0xFF) as f64 / 255.0 - 0.5; // [-0.5, 0.5]
+        let jy = ((hash >> 8) & 0xFF) as f64 / 255.0 - 0.5;
+        let jitter_scale = spacing * 0.15;
+
+        let new_cx = grid_x + jx * jitter_scale;
+        let new_cy = grid_y + jy * jitter_scale;
+        let dx = new_cx - shape.cx;
+        let dy = new_cy - shape.cy;
+
+        // Translate entire component as a unit (preserves internal geometry).
+        for &i in &shape.members {
+            points[i].x += dx;
+            points[i].y += dy;
+        }
+    }
+
+    lm::trail_push(
+        &format!("spread: {} shapes spread in {}×{} grid", n_shapes, cols, rows),
+        0.0,
+    );
+}
+
 fn run_presolve(
     points: &mut Vec<Point>,
     lines: &Vec<Line>,
@@ -1471,6 +1996,11 @@ fn run_presolve(
     _tolerance: f64,
 ) {
     let ref_scale = compute_presolve_ref_scale(constraints);
+
+    // Spread overlapping shapes apart before constraint-based presolve.
+    // This gives each shape a distinct initial position so that distance/angle
+    // presolve can compute meaningful normals and directions.
+    spread_overlapping_shapes(points, lines, constraints, ref_scale);
 
     // Stage 1: Establish base geometry (Fixed, CCW, AbsoluteAngle, Length, BlockRotation).
     // These set positions, orientations, and scales that derived constraints depend on.
@@ -2167,13 +2697,20 @@ pub fn analyze_solution(
         Vec::new()
     };
 
+    let solve_trail = lm::trail_take();
+    // Only report timed_out if the solver actually failed to converge.
+    // The progressive phase may time out but the final solve still succeeds.
+    let timed_out = max_error > tolerance
+        && solve_trail.iter().any(|s| s.phase.contains("timeout"));
+
     SolveMetadata {
         status,
         dof,
         constraint_residuals,
         redundant_constraint_ids,
         conflicting_constraint_ids,
-        solve_trail: lm::trail_take(),
+        solve_trail,
+        timed_out,
     }
 }
 
