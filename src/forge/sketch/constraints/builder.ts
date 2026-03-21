@@ -57,6 +57,10 @@ export class ConstrainedSketchBuilder {
   private loopStart: PointId | null = null;
   private nextId = 1;
   private strict: boolean;
+  /** Cumulative time spent in seedIncrementalGeometry calls (ms). */
+  private seedTimeMs = 0;
+  /** Max cumulative time for all seed calls (ms). After this, seeding is skipped. */
+  private static readonly SEED_BUDGET_MS = 5_000;
 
   constructor(options: ConstrainedSketchOptions = {}) {
     this.strict = options.strict ?? false;
@@ -285,7 +289,15 @@ export class ConstrainedSketchBuilder {
    * without rejecting constraints or changing the final solve API.
    */
   private seedIncrementalGeometry(constraint: SketchConstraint): void {
+    // Skip seeding if cumulative time budget is exhausted.
+    if (this.seedTimeMs >= ConstrainedSketchBuilder.SEED_BUDGET_MS) return;
+
     try {
+      const t0 = performance.now();
+      const remaining = ConstrainedSketchBuilder.SEED_BUDGET_MS - this.seedTimeMs;
+      // Per-call budget: at most 500ms, but capped by remaining budget.
+      const perCallBudget = Math.min(500, remaining);
+
       const working = this.buildDefinition();
       const { maxError } = solveConstraints(
         working,
@@ -296,9 +308,12 @@ export class ConstrainedSketchBuilder {
           maxScaledStep: 2.0,
           skipRedundancyCheck: true,
           presolveConstraintId: constraint.id,
+          timeBudgetMs: perCallBudget,
         },
         'builder.seedIncrementalGeometry',
       );
+
+      this.seedTimeMs += performance.now() - t0;
 
       if (Number.isFinite(maxError) && maxError <= DEFAULT_TOLERANCE * 100) {
         this.syncFromDefinition(working);
@@ -686,6 +701,7 @@ export class ConstrainedSketchBuilder {
       skipRedundancyCheck: options.skipRedundancyCheck,
       presolveConstraintId: options.presolveConstraintId,
       progressive: options.progressive ?? true,
+      timeBudgetMs: options.timeBudgetMs ?? 10_000, // default 10s timeout
     });
   }
 

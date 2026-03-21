@@ -222,6 +222,8 @@ export interface SolveOptions {
   fallbackRestarts?: number;
   /** Add constraints progressively with short LM solves, all in one WASM call. */
   progressive?: boolean;
+  /** Wall-clock time budget in ms for the entire solve. 0 = no limit. */
+  timeBudgetMs?: number;
 }
 
 export interface SolverConstraintResidual {

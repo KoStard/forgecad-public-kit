@@ -149,10 +149,16 @@ pub fn solve(
 
     let incremental = options.presolve_constraint_id.is_some();
 
+    // Compute wall-clock deadline for the entire solve.
+    let deadline_us = match options.time_budget_ms {
+        Some(ms) if ms > 0 => profiler::platform::now_us() + (ms as u64) * 1000,
+        _ => 0, // 0 = no limit
+    };
+
     let max_error = solve_system(
         points, lines, circles, arcs, shapes, constraints,
         iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
-        groups, incremental,
+        groups, incremental, deadline_us,
     );
 
     // Fallback: if the first solve exceeded tolerance * 5 and a fallback is
@@ -161,6 +167,9 @@ pub fn solve(
         (options.fallback_restarts, snapshot)
     {
         if max_error > tolerance * 5.0 {
+            if deadline_us > 0 && profiler::platform::now_us() >= deadline_us {
+                return max_error; // no time for fallback
+            }
             *points = snap_pts;
             *circles = snap_circles;
             *arcs = snap_arcs;
@@ -170,7 +179,7 @@ pub fn solve(
             return solve_system(
                 points, lines, circles, arcs, shapes, constraints,
                 iterations, tolerance, fb_restarts, fb_warm, max_scaled_step,
-                groups, false,
+                groups, false, deadline_us,
             );
         }
     }
@@ -197,13 +206,33 @@ fn progressive_solve(
 ) -> f64 {
     let t0_prog = profiler::platform::now_us();
 
+    // Compute a wall-clock deadline for the entire solve (progressive + final).
+    let deadline_us = match options.time_budget_ms {
+        Some(ms) if ms > 0 => t0_prog + (ms as u64) * 1000,
+        _ => 0, // 0 = no limit
+    };
+    // Progressive phase gets at most 60% of the total budget (rest for final solve).
+    let progressive_deadline_us = if deadline_us > 0 {
+        t0_prog + ((deadline_us - t0_prog) * 60 / 100)
+    } else {
+        0
+    };
+
     let tolerance = options.tolerance.unwrap_or(1e-3);
     let entity_ref_count = build_entity_ref_count(constraints);
     let ref_scale = compute_presolve_ref_scale(constraints);
 
     // Phase 1: Progressive warm-up — add constraints one by one with short solves.
     let recon_graph = reconstruction::ReconstructionGraph::empty();
+    let mut progressive_timed_out = false;
     for i in 0..constraints.len() {
+        // Time budget check: skip remaining progressive steps if running out of time.
+        if progressive_deadline_us > 0 && profiler::platform::now_us() >= progressive_deadline_us {
+            lm::trail_push(&format!("progressive-timeout at step {}/{}", i, constraints.len()), 0.0);
+            progressive_timed_out = true;
+            break;
+        }
+
         let sub = constraints[..=i].to_vec();
 
         let pts_idx: HashMap<String, usize> = points.iter().enumerate().map(|(j, p)| (p.id.clone(), j)).collect();
@@ -214,16 +243,29 @@ fn progressive_solve(
         let has_residual = sub.iter().any(|c| crate::constraints::has_residual(c));
         if !has_residual { continue; }
 
+        // Each progressive step gets a per-step deadline: at most 500ms per step.
+        let step_deadline = if progressive_deadline_us > 0 {
+            let now = profiler::platform::now_us();
+            let remaining = progressive_deadline_us.saturating_sub(now);
+            let per_step = remaining.min(500_000); // max 500ms per step
+            now + per_step
+        } else {
+            0
+        };
+
         lm::solve_global(
             points, lines, circles, arcs, shapes, &sub,
             30, tolerance, 1, 4, 2.5,
-            groups, &recon_graph,
+            groups, &recon_graph, step_deadline,
         );
         profiler::add(|p| p.progressive_steps += 1);
     }
 
     let progressive_error = lm::current_max_error(points, lines, circles, arcs, shapes, constraints);
-    lm::trail_push("progressive-warmup", progressive_error);
+    lm::trail_push(
+        if progressive_timed_out { "progressive-warmup (partial)" } else { "progressive-warmup" },
+        progressive_error,
+    );
 
     profiler::add(|p| p.progressive_total_us += profiler::platform::now_us() - t0_prog);
 
@@ -236,7 +278,7 @@ fn progressive_solve(
     solve_single_system(
         points, lines, circles, arcs, shapes, constraints,
         iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
-        groups, false,
+        groups, false, deadline_us,
     )
 }
 
@@ -255,6 +297,7 @@ fn solve_system(
     max_scaled_step: f64,
     groups: &mut Vec<SketchGroup>,
     incremental: bool,
+    deadline_us: u64,
 ) -> f64 {
     if let Some(plan) = build_solve_plan(points, lines, circles, arcs, shapes, constraints) {
         // Build a set of group-owned point IDs for quick lookup.
@@ -316,6 +359,7 @@ fn solve_system(
                 max_scaled_step,
                 &mut sub_groups,
                 incremental,
+                deadline_us,
             );
             max_error = max_error.max(component_error);
 
@@ -367,6 +411,7 @@ fn solve_system(
             max_scaled_step,
             groups,
             incremental,
+            deadline_us,
         )
     }
 }
@@ -494,6 +539,7 @@ fn solve_single_system(
     max_scaled_step: f64,
     groups: &mut Vec<SketchGroup>,
     incremental: bool,
+    deadline_us: u64,
 ) -> f64 {
     profiler::timed(
         |p, us| p.presolve_us += us,
@@ -570,6 +616,7 @@ fn solve_single_system(
             iterations, tolerance, restarts, warm_start_iters, max_scaled_step,
             groups,
             &recon_graph,
+            deadline_us,
         ),
     );
     sanitize_max_error(final_error)
@@ -746,7 +793,7 @@ fn progressive_sub_solve(
         let err = lm::solve_global(
             points, lines, circles, arcs, shapes, &sub_constraints,
             sub_iters, tolerance, sub_restarts, warm_iters, max_step,
-            groups, graph,
+            groups, graph, 0,
         );
         lm::trail_push(&format!("sub-layer[{}] ({} constraints, {} pts)", layer, sub_constraints.len(), sub_point_ids.len()), err);
 

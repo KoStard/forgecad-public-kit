@@ -231,6 +231,10 @@ pub struct SolveOptions {
     /// This replicates the TS solver's incremental constrain() behavior without
     /// 54 separate WASM round-trips.
     pub progressive: Option<bool>,
+    /// Wall-clock time budget in milliseconds for the entire solve (progressive +
+    /// final). 0 or None = no limit.  When exceeded the solver returns its best
+    /// result so far rather than spinning indefinitely.
+    pub time_budget_ms: Option<u32>,
 }
 
 impl Default for SolveOptions {
@@ -245,6 +249,7 @@ impl Default for SolveOptions {
             presolve_constraint_id: None,
             fallback_restarts: None,
             progressive: None,
+            time_budget_ms: None,
         }
     }
 }

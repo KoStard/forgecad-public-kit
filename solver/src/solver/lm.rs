@@ -1471,6 +1471,7 @@ pub fn solve_global(
     max_scaled_step: f64,
     groups: &mut Vec<SketchGroup>,
     graph: &ReconstructionGraph,
+    deadline_us: u64,
 ) -> f64 {
     let ref_len = compute_reference_length(points, circles, arcs, constraints);
     let scale = ref_len.max(1.0);
@@ -1505,6 +1506,11 @@ pub fn solve_global(
     let mut nullspace_basis: Vec<Vec<f64>> = Vec::new();
 
     for attempt in 0..restarts {
+        // Wall-clock timeout: bail out if we've exceeded the deadline.
+        if deadline_us > 0 && profiler::platform::now_us() >= deadline_us {
+            trail_push("timeout (restart loop)", best_error);
+            break;
+        }
         profiler::add(|p| p.lm_restarts += 1);
 
         if attempt > 0 && !nullspace_basis.is_empty() {
@@ -1552,7 +1558,7 @@ pub fn solve_global(
             points, lines, circles, arcs, shapes, constraints, groups,
             &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
             &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
-            graph,
+            graph, deadline_us,
         );
         trail_push(&format!("lm-pass[{}]", attempt), error);
 
@@ -1577,6 +1583,10 @@ pub fn solve_global(
     // GS escape: 3 rounds of GS warm-start + another LM pass.
     if best_error > tolerance {
         for gs_round in 0..3u32 {
+            if deadline_us > 0 && profiler::platform::now_us() >= deadline_us {
+                trail_push("timeout (gs escape)", best_error);
+                break;
+            }
             profiler::add(|p| p.gs_escape_rounds += 1);
             apply_state(&best_state, points, circles, arcs, groups, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx);
             if !graph.is_empty() { super::reconstruction::reconstruct(graph, points, lines, constraints); }
@@ -1611,7 +1621,7 @@ pub fn solve_global(
                 points, lines, circles, arcs, shapes, constraints, groups,
                 &vars, &pt_var_idx, &circ_var_idx, &arc_var_idx, &group_var_idx,
                 &sparsity, n_rows, iterations, tolerance, max_scaled_step, scale, &pass_anchor_state,
-                graph,
+                graph, deadline_us,
             );
             trail_push(&format!("lm-escape[{}]", gs_round), error);
 
@@ -1650,6 +1660,7 @@ fn run_lm_pass(
     scale: f64,
     anchor_state: &Vec<f64>,
     graph: &ReconstructionGraph,
+    deadline_us: u64,
 ) -> f64 {
     let mut lambda = 1e-3f64;
     let mut nu = 2.0f64;
@@ -1673,6 +1684,7 @@ fn run_lm_pass(
 
     for _ in 0..iterations {
         if lin.max_abs <= tolerance { break; }
+        if deadline_us > 0 && profiler::platform::now_us() >= deadline_us { break; }
         profiler::add(|p| p.lm_outer_iterations += 1);
 
         let state = capture_state(points, circles, arcs, groups, pt_var_idx, circ_var_idx, arc_var_idx, group_var_idx, vars.len());

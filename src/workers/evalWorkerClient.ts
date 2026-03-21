@@ -16,12 +16,16 @@ interface PendingFaceInfo {
   reject: (error: Error) => void;
 }
 
+/** Maximum wall-clock time (ms) a run may take before the worker is killed. */
+const RUN_TIMEOUT_MS = 30_000;
+
 class EvalWorkerClient {
   private worker: Worker | null = null;
   private seq = 0;
   private faceInfoReqId = 0;
   private readonly pendingRuns = new Map<number, PendingRun>();
   private readonly pendingFaceInfo = new Map<number, PendingFaceInfo>();
+  private runTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   private getWorker(): Worker {
     if (this.worker) return this.worker;
@@ -32,6 +36,7 @@ class EvalWorkerClient {
       const { data } = event;
 
       if (data.type === 'run-success' || data.type === 'run-error') {
+        this.clearRunTimeout();
         const req = this.pendingRuns.get(data.payload.seq);
         if (!req) return; // stale
         this.pendingRuns.delete(data.payload.seq);
@@ -56,6 +61,7 @@ class EvalWorkerClient {
     };
 
     this.worker.onerror = (event) => {
+      this.clearRunTimeout();
       const err = new Error(event.message || 'Eval worker crashed');
       for (const req of this.pendingRuns.values()) req.reject(err);
       for (const req of this.pendingFaceInfo.values()) req.reject(err);
@@ -67,9 +73,37 @@ class EvalWorkerClient {
     return this.worker;
   }
 
+  private clearRunTimeout(): void {
+    if (this.runTimeoutId !== null) {
+      clearTimeout(this.runTimeoutId);
+      this.runTimeoutId = null;
+    }
+  }
+
+  /**
+   * Kill the current worker and reject all pending requests.
+   * A fresh worker is created lazily on the next `run()` or `fetchFaceInfo()`.
+   */
+  private killWorker(reason: string): void {
+    console.warn(`[evalWorkerClient] ${reason} — terminating worker`);
+    this.clearRunTimeout();
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    const err = new Error(reason);
+    for (const req of this.pendingRuns.values()) req.reject(err);
+    for (const req of this.pendingFaceInfo.values()) req.reject(err);
+    this.pendingRuns.clear();
+    this.pendingFaceInfo.clear();
+  }
+
   /**
    * Run an eval in the worker. Any in-flight run is cancelled (its promise rejects
    * with 'cancelled'). Only the latest run's result is resolved.
+   *
+   * If the worker doesn't respond within RUN_TIMEOUT_MS, it is terminated and
+   * recreated on the next call — preventing hung scripts from blocking the UI.
    */
   run(options: {
     code: string;
@@ -81,11 +115,18 @@ class EvalWorkerClient {
   }): Promise<SerializedRunResult> {
     for (const req of this.pendingRuns.values()) req.reject(new Error('cancelled'));
     this.pendingRuns.clear();
+    this.clearRunTimeout();
 
     const seq = ++this.seq;
 
     return new Promise<SerializedRunResult>((resolve, reject) => {
       this.pendingRuns.set(seq, { resolve, reject });
+
+      // Start timeout watchdog — kills the worker if the run takes too long.
+      this.runTimeoutId = setTimeout(() => {
+        this.killWorker(`Script execution timed out after ${RUN_TIMEOUT_MS / 1000}s`);
+      }, RUN_TIMEOUT_MS);
+
       const request: EvalWorkerRequest = { type: 'run', payload: { seq, ...options } };
       this.getWorker().postMessage(request);
     });
@@ -105,6 +146,7 @@ class EvalWorkerClient {
   }
 
   terminate(): void {
+    this.clearRunTimeout();
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;

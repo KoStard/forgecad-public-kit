@@ -75,6 +75,7 @@ interface WasmOptions {
   presolve_constraint_id?: string;
   fallback_restarts?: number;
   progressive?: boolean;
+  time_budget_ms?: number;
 }
 
 interface WasmProblem {
@@ -691,6 +692,7 @@ function serializeProblem(def: ConstraintDefinition, options: SolveOptions): Was
       presolve_constraint_id: options.presolveConstraintId,
       fallback_restarts: options.fallbackRestarts,
       progressive: options.progressive,
+      time_budget_ms: options.timeBudgetMs,
     },
   };
 }
