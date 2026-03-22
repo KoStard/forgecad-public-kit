@@ -180,6 +180,10 @@ export function FileExplorer() {
     }
     const fromPath = e.dataTransfer.getData('application/x-forge-path') || e.dataTransfer.getData('text/plain');
     if (!fromPath) return;
+    // Prevent dropping a folder into itself or any of its descendants
+    if (targetFolder === fromPath || targetFolder.startsWith(fromPath + '/')) return;
+    // Prevent no-op when already in the target folder
+    if (getParentPath(fromPath) === targetFolder) return;
     const base = getBaseName(fromPath);
     const destination = targetFolder ? normalizePath(`${targetFolder}/${base}`) : base;
     if (destination === fromPath) return;
@@ -203,7 +207,11 @@ export function FileExplorer() {
     const paddingLeft = 8 + depth * 12;
 
     return (
-      <div key={node.path}>
+      <div
+        key={node.path}
+        onDragOver={isFolder ? (e) => { e.preventDefault(); e.stopPropagation(); } : undefined}
+        onDrop={isFolder ? (e) => { e.stopPropagation(); handleDropToFolder(e, node.path); } : undefined}
+      >
         <div
           draggable
           onDragStart={(e) => {
@@ -211,8 +219,6 @@ export function FileExplorer() {
             e.dataTransfer.setData('text/plain', node.path);
             e.dataTransfer.effectAllowed = 'move';
           }}
-          onDragOver={(e) => { if (isFolder) e.preventDefault(); }}
-          onDrop={(e) => { if (isFolder) handleDropToFolder(e, node.path); }}
           onClick={() => {
             if (isFolder) setFocusedFolder(node.path);
             if (node.type === 'file') setActiveFile(node.path);
