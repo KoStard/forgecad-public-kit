@@ -492,7 +492,7 @@ function rigidTransformStepsFromMatrix(m: Mat4): ShapeCompileTransformStep[] | n
   // Matrix is confirmed rigid — use workplanePlacement which both backends handle natively.
   // This avoids fragile axis/angle decomposition that can fail on numerical edge cases
   // (e.g. rotation matrices built from cross products with floating-point imprecision).
-  return [{ kind: 'workplanePlacement', matrix: Array.from(m) as number[] }];
+  return [{ kind: 'workplanePlacement', matrix: Array.from(m) as Mat4 }];
 }
 
 function withCopiedDimensions(source: Shape, out: Shape): Shape {

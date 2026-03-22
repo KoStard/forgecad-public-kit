@@ -113,7 +113,7 @@ export type ShapeCompileTransformStep =
   | {
       kind: 'workplanePlacement';
       matrix: Mat4;
-      placement: ShapeWorkplanePlacement['placement'];
+      placement?: ShapeWorkplanePlacement['placement'];
     };
 
 export type SweepPathCompilePlan = {
@@ -559,7 +559,7 @@ function cloneShapeTransform(step: ShapeCompileTransformStep): ShapeCompileTrans
       return {
         kind: 'workplanePlacement',
         matrix: cloneShapeTransformMatrix(step.matrix),
-        placement: cloneSketchPlacementModel(step.placement)!,
+        placement: step.placement ? cloneSketchPlacementModel(step.placement)! : undefined,
       };
   }
 }
@@ -971,10 +971,12 @@ export function findShapeWorkplanePlacement(
       let current = findShapeWorkplanePlacement(plan.base);
       for (const step of plan.steps) {
         if (step.kind === 'workplanePlacement') {
-          current = cloneShapeWorkplanePlacementValue({
-            matrix: step.matrix,
-            placement: step.placement,
-          });
+          current = step.placement
+            ? cloneShapeWorkplanePlacementValue({
+                matrix: step.matrix,
+                placement: step.placement,
+              })
+            : null;
           continue;
         }
         if (!current) continue;

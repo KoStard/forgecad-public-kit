@@ -370,10 +370,12 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
       let current = cloneProjectionReplayContext(base.context);
       for (const step of plan.steps) {
         if (step.kind === 'workplanePlacement') {
-          current.placement = cloneShapeWorkplanePlacement({
-            matrix: step.matrix,
-            placement: step.placement,
-          })!;
+          if (step.placement) {
+            current.placement = cloneShapeWorkplanePlacement({
+              matrix: step.matrix,
+              placement: step.placement,
+            })!;
+          }
           continue;
         }
         current.placement = applyShapeTransformToPlacement(current.placement, step);
