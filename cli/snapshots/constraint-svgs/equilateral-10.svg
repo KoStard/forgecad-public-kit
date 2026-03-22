@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 14 12.66">
-  <g transform="translate(0, 8.66) scale(1, -1)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 14 12.6603">
+  <g transform="translate(0, 8.6603) scale(1, -1)">
     <line x1="0" y1="0" x2="10" y2="0" stroke="black" stroke-width="0.5"/>
-    <line x1="10" y1="0" x2="5" y2="8.66" stroke="black" stroke-width="0.5"/>
-    <line x1="5" y1="8.66" x2="0" y2="0" stroke="black" stroke-width="0.5"/>
+    <line x1="10" y1="0" x2="5" y2="8.6603" stroke="black" stroke-width="0.5"/>
+    <line x1="5" y1="8.6603" x2="0" y2="0" stroke="black" stroke-width="0.5"/>
   </g>
 </svg>

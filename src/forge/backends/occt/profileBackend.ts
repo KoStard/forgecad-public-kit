@@ -18,7 +18,7 @@ import { wrapOCCTShapeBackend } from './shapeBackend';
 
 /** Extract 2D bounding box from a planar face. */
 function extractFaceBounds(oc: OCCTModule, face: any): ProfileBounds {
-  const bndBox = new oc.Bnd_Box();
+  const bndBox = new oc.Bnd_Box_1();
   oc.BRepBndLib.Add(face, bndBox, false);
   if (bndBox.IsVoid()) {
     return { min: [0, 0], max: [0, 0] };
