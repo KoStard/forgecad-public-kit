@@ -119,7 +119,10 @@ export async function initOCCT(): Promise<OCCTModule> {
 
     if (isNode) {
       // Node.js — no IDB caching, use the Node entry point directly.
-      const initOpenCascade = (await import('opencascade.js/dist/node.js')).default;
+      // Node-only path — use variable to prevent Vite/Rollup from statically
+      // analyzing and bundling the Node entry point into browser worker bundles.
+      const nodeEntry = 'opencascade.js' + '/dist/node.js';
+      const initOpenCascade = (await import(/* @vite-ignore */ nodeEntry)).default;
       const oc = await initOpenCascade();
       _occt = oc;
       return oc;
