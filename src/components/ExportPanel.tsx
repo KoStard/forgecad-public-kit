@@ -6,10 +6,12 @@ import {
   exportMeshFromStore,
   exportReportFromStore,
   exportSketchFromStore,
+  exportExactFromStore,
   type ExportQualityChoice,
   type MeshExportFormat,
   type SketchExportFormat,
 } from './exportActions';
+import type { ExactExportFormat } from '../workers/evalWorkerProtocol';
 
 function waitForNextPaint(): Promise<void> {
   return new Promise((resolve) => {
@@ -34,6 +36,7 @@ export function ExportPanel() {
   const [meshFileStem, setMeshFileStem] = useState('forge-export');
   const [gifBusy, setGifBusy] = useState(false);
   const [reportBusy, setReportBusy] = useState(false);
+  const [exactBusy, setExactBusy] = useState(false);
 
   const shapeObjects = result?.objects?.filter((obj) => obj.shape) ?? [];
   const sketchObjects = result?.objects?.filter((obj) => obj.sketch) ?? [];
@@ -62,8 +65,10 @@ export function ExportPanel() {
     setDialogOpen(true);
   };
 
+  const anyBusy = meshBusy || gifBusy || reportBusy || exactBusy;
+
   const closeDialog = () => {
-    if (meshBusy || gifBusy || reportBusy) return;
+    if (anyBusy) return;
     setDialogOpen(false);
   };
 
@@ -112,6 +117,22 @@ export function ExportPanel() {
       alert(`GIF export failed: ${message}`);
     } finally {
       setGifBusy(false);
+    }
+  };
+
+  const exportExact = async (format: ExactExportFormat) => {
+    if (!hasShapes || exactBusy) return;
+    setExactBusy(true);
+    try {
+      await waitForNextPaint();
+      await exportExactFromStore(format, meshFileStem || defaultMeshStem);
+      setDialogOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`${format.toUpperCase()} export failed:`, err);
+      alert(`${format.toUpperCase()} export failed: ${message}`);
+    } finally {
+      setExactBusy(false);
     }
   };
 
@@ -172,7 +193,7 @@ export function ExportPanel() {
               </div>
               <button
                 onClick={closeDialog}
-                disabled={meshBusy || gifBusy || reportBusy}
+                disabled={anyBusy}
                 style={{
                   border: '1px solid var(--fc-border)',
                   background: 'transparent',
@@ -180,7 +201,7 @@ export function ExportPanel() {
                   borderRadius: 4,
                   width: 28,
                   height: 28,
-                  cursor: (meshBusy || gifBusy || reportBusy) ? 'default' : 'pointer',
+                  cursor: anyBusy ? 'default' : 'pointer',
                   fontSize: 17,
                   lineHeight: 1,
                 }}
@@ -343,7 +364,7 @@ export function ExportPanel() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <button
                 onClick={closeDialog}
-                disabled={meshBusy || gifBusy || reportBusy}
+                disabled={anyBusy}
                 style={{
                   border: '1px solid var(--fc-border)',
                   background: 'transparent',
@@ -351,7 +372,7 @@ export function ExportPanel() {
                   borderRadius: 4,
                   padding: '6px 10px',
                   fontSize: 12,
-                  cursor: (meshBusy || gifBusy || reportBusy) ? 'default' : 'pointer',
+                  cursor: anyBusy ? 'default' : 'pointer',
                 }}
               >
                 Cancel
@@ -372,6 +393,77 @@ export function ExportPanel() {
                 {meshBusy ? `Exporting ${meshFormat.toUpperCase()}...` : `Export ${meshFormat.toUpperCase()}`}
               </button>
             </div>
+
+            {hasShapes && (
+              <div style={{ borderTop: '1px solid var(--fc-borderLight)', marginTop: 12, paddingTop: 12 }}>
+                <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginBottom: 6 }}>Exact Geometry (OCCT)</div>
+                <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 7 }}>
+                  Export as exact boundary representation. Will re-evaluate with OCCT if needed.
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => exportExact('step')}
+                    disabled={exactBusy}
+                    style={{
+                      flex: 1,
+                      padding: '7px 8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      background: !exactBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
+                      color: !exactBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: !exactBusy ? 'pointer' : 'default',
+                      fontSize: 12,
+                    }}
+                  >
+                    {exactBusy ? (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+                          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+                          <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2">
+                            <animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="0.75s" repeatCount="indefinite" />
+                          </path>
+                        </svg>
+                        <span>Exporting...</span>
+                      </>
+                    ) : 'Export STEP'}
+                  </button>
+                  <button
+                    onClick={() => exportExact('brep')}
+                    disabled={exactBusy}
+                    style={{
+                      flex: 1,
+                      padding: '7px 8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      background: !exactBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
+                      color: !exactBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: !exactBusy ? 'pointer' : 'default',
+                      fontSize: 12,
+                    }}
+                  >
+                    {exactBusy ? (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+                          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+                          <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2">
+                            <animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="0.75s" repeatCount="indefinite" />
+                          </path>
+                        </svg>
+                        <span>Exporting...</span>
+                      </>
+                    ) : 'Export BREP'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div style={{ borderTop: '1px solid var(--fc-borderLight)', marginTop: 12, paddingTop: 12 }}>
               <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginBottom: 6 }}>Animation</div>

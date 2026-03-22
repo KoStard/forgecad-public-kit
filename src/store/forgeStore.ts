@@ -1738,7 +1738,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 }));
 
-// Wire up worker progress reporting → store evaluationPhase
+// Wire up worker progress reporting → store evaluationPhase.
+// Export phases (export-evaluating, export-writing) are handled by the export
+// timeout logic in evalWorkerClient and don't affect the UI status indicator.
 evalWorkerClient.onProgress = (phase) => {
+  if (phase === 'export-evaluating' || phase === 'export-writing') return;
   useForgeStore.setState({ evaluationPhase: phase });
 };

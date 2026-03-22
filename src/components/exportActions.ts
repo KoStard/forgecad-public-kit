@@ -6,6 +6,9 @@ import { generateSketchPdf } from '@forge/sketch/exportSketchPdf';
 import { setParamOverrides } from '@forge/params';
 import { useForgeStore, type ObjectSettings } from '../store/forgeStore';
 import { generateReportInWorker } from '../workers/reportWorkerClient';
+import { evalWorkerClient } from '../workers/evalWorkerClient';
+import type { ExactExportFormat } from '../workers/evalWorkerProtocol';
+import { isNotebookFile } from '../notebook/model';
 
 export type MeshExportFormat = '3mf' | 'stl';
 export type SketchExportFormat = 'svg' | 'dxf' | 'pdf';
@@ -239,4 +242,32 @@ export function exportSketchFromStore(
       triggerDownload(blob, `${name}.dxf`);
     }
   }
+}
+
+const EXACT_MIME_TYPES: Record<ExactExportFormat, string> = {
+  step: 'application/step',
+  brep: 'application/octet-stream',
+};
+
+export async function exportExactFromStore(
+  format: ExactExportFormat,
+  preferredStem?: string,
+): Promise<void> {
+  const { files, activeFile, paramOverrides, runQuality } = useForgeStore.getState();
+  const code = files[activeFile];
+  if (!code) throw new Error(`Active file "${activeFile}" is missing.`);
+
+  const stem = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
+  const buffer = await evalWorkerClient.exportExact({
+    format,
+    code,
+    file: activeFile,
+    files,
+    quality: runQuality ?? 'default',
+    paramOverrides,
+    isNotebook: isNotebookFile(activeFile),
+  });
+
+  const blob = new Blob([buffer], { type: EXACT_MIME_TYPES[format] });
+  triggerDownload(blob, `${stem}.${format}`);
 }

@@ -7,7 +7,10 @@ import {
 import { isNotebookFile, parseNotebook, resolveNotebookPreviewCellId } from '../notebook/model';
 import { runNotebook } from '../notebook/runtime';
 import { serializeRunResult } from '../forge/serializeRunResult';
-import type { EvalWorkerRequest, EvalWorkerResponse, EvalWorkerRunPayload } from './evalWorkerProtocol';
+import { getShapeRuntimeBackend } from '../forge/kernel';
+import { isOCCTShapeBackend, requireOCCTShape } from '../forge/backends/occt/shapeBackend';
+import { getOCCT } from '../forge/backends/occt/init';
+import type { EvalWorkerRequest, EvalWorkerResponse, EvalWorkerRunPayload, EvalWorkerExportExactRequest } from './evalWorkerProtocol';
 
 type WorkerContext = {
   onmessage: ((event: MessageEvent<EvalWorkerRequest>) => void) | null;
@@ -85,8 +88,130 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
   }
 }
 
+// ─── Export Exact (STEP / BREP) ─────────────────────────────────────
+
+function ensureOCCTRunResult(request: EvalWorkerExportExactRequest): RunResult {
+  const { code, file, files, quality, paramOverrides, isNotebook } = request.payload;
+
+  // Check if lastRunResult has OCCT-backed shapes
+  if (lastRunResult) {
+    const shapes = lastRunResult.objects.filter((o) => o.shape);
+    const allOCCT = shapes.length > 0 && shapes.every((o) => isOCCTShapeBackend(getShapeRuntimeBackend(o.shape!)));
+    if (allOCCT) return lastRunResult;
+  }
+
+  // Re-run with OCCT backend
+  setParamOverrides(paramOverrides);
+  setActiveBackend('occt');
+  let result: RunResult;
+  if (isNotebook) {
+    const notebook = parseNotebook(code);
+    const targetCellId = resolveNotebookPreviewCellId(notebook);
+    result = runNotebook(notebook, file, files, { quality, targetCellId }).displayResult;
+  } else {
+    result = runScript(code, file, files, { quality });
+  }
+  if (result.error) throw new Error(`Script error during export re-evaluation: ${result.error}`);
+  lastRunResult = result;
+  return result;
+}
+
+function writeStepBlob(shapes: { name: string; topoShape: any }[]): ArrayBuffer {
+  const oc = getOCCT();
+  const writer = new oc.STEPControl_Writer_1();
+
+  for (const { topoShape } of shapes) {
+    const status = writer.Transfer(
+      topoShape,
+      oc.STEPControl_StepModelType.STEPControl_AsIs,
+      true,
+      new oc.Message_ProgressRange_1(),
+    );
+    if (status !== oc.IFSelect_ReturnStatus.IFSelect_RetDone) {
+      throw new Error(`STEP Transfer failed with status ${status}`);
+    }
+  }
+
+  const virtualPath = '/tmp/forge-export.step';
+  const writeStatus = writer.Write(virtualPath);
+  if (writeStatus !== oc.IFSelect_ReturnStatus.IFSelect_RetDone) {
+    throw new Error(`STEP Write failed with status ${writeStatus}`);
+  }
+
+  const fileData = oc.FS.readFile(virtualPath, { encoding: 'binary' });
+  oc.FS.unlink(virtualPath);
+  return fileData.buffer;
+}
+
+function writeBrepBlob(shapes: { name: string; topoShape: any }[]): ArrayBuffer {
+  const oc = getOCCT();
+
+  // For multiple shapes, create a compound
+  let exportShape: any;
+  if (shapes.length === 1) {
+    exportShape = shapes[0].topoShape;
+  } else {
+    const builder = new oc.BRep_Builder();
+    const compound = new oc.TopoDS_Compound();
+    builder.MakeCompound(compound);
+    for (const { topoShape } of shapes) {
+      builder.Add(compound, topoShape);
+    }
+    exportShape = compound;
+  }
+
+  const virtualPath = '/tmp/forge-export.brep';
+  oc.BRepTools.Write_3(exportShape, virtualPath, new oc.Message_ProgressRange_1());
+
+  const fileData = oc.FS.readFile(virtualPath, { encoding: 'binary' });
+  oc.FS.unlink(virtualPath);
+  return fileData.buffer;
+}
+
+async function handleExportExact(request: EvalWorkerExportExactRequest): Promise<void> {
+  const { reqId, format } = request.payload;
+
+  try {
+    // Use a fake seq for progress reporting
+    const seq = -reqId;
+    worker.postMessage({ type: 'progress', payload: { seq, phase: 'export-evaluating' } });
+    await ensureKernelReady();
+
+    const result = ensureOCCTRunResult(request);
+    const shapeObjects = result.objects.filter((o) => o.shape);
+    if (shapeObjects.length === 0) {
+      throw new Error('No 3D shapes available for exact export.');
+    }
+
+    // Extract OCCT TopoDS_Shapes
+    const shapes = shapeObjects.map((o) => ({
+      name: o.name,
+      topoShape: requireOCCTShape(getShapeRuntimeBackend(o.shape!), `${format.toUpperCase()} export`),
+    }));
+
+    worker.postMessage({ type: 'progress', payload: { seq, phase: 'export-writing' } });
+
+    const buffer = format === 'step' ? writeStepBlob(shapes) : writeBrepBlob(shapes);
+
+    worker.postMessage(
+      { type: 'export-exact-success', payload: { reqId, blob: buffer } },
+      [buffer],
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    worker.postMessage({ type: 'export-exact-error', payload: { reqId, message } });
+  }
+}
+
+// ─── Message Handler ────────────────────────────────────────────────
+
 worker.onmessage = async (event) => {
   const { data } = event;
+
+  if (data.type === 'export-exact') {
+    await handleExportExact(data);
+    return;
+  }
 
   if (data.type === 'face-info') {
     const { reqId, objectId } = data.payload;
@@ -113,7 +238,7 @@ worker.onmessage = async (event) => {
     return;
   }
 
-  if (data.type !== 'run') return;
+  if (data.type !== 'run') return; // unknown message type — ignore
 
   if (isExecuting) {
     // Drop the previous queued payload — only the latest matters.
