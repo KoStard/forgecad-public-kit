@@ -4,7 +4,7 @@
  * A Shape subclass that uses pre-computed mesh and face data transferred from
  * the eval worker. The underlying ShapeBackend is lazy — it answers getMesh(),
  * boundingBox(), isEmpty(), and numTri() from cached data with zero WASM calls.
- * A real Manifold is only reconstructed on demand, when geometric operations
+ * A real backend is only reconstructed on demand, when geometric operations
  * like splitByPlane() are actually needed (e.g. cut planes).
  *
  * Also exposes pre-computed Three.js-ready geometry arrays (positions, normals,
@@ -12,11 +12,9 @@
  * is a zero-cost BufferGeometry assembly with no CPU work.
  */
 
-import type { Manifold } from './backends/manifold/wasm';
 import { Shape } from './kernel';
-import { getWasm } from './backends/manifold/wasm';
 import { SHAPE_BACKEND_MARKER, type ShapeBackend, type ShapeRuntimeBounds, type ShapeRuntimeMesh, type ShapeRuntimeCrossSection } from './shapeBackend';
-import { ManifoldShapeBackend, type ManifoldCapableBackend } from './backends/manifold/shapeBackend';
+import { reconstructBackendFromMesh } from './backends/manifold';
 import type { FaceRef } from './sketch/topology';
 import type { FaceTransformationHistory } from './faceHistory';
 import type { SerializedShapeData } from '../workers/evalWorkerProtocol';
@@ -29,13 +27,17 @@ export interface PrecomputedGeometry {
 
 /**
  * A ShapeBackend that serves rendering data from cached TypedArrays and only
- * builds a real Manifold when an actual geometric operation is requested.
+ * reconstructs a real backend when an actual geometric operation is requested.
+ *
+ * Reconstruction always uses Manifold (via reconstructBackendFromMesh) because
+ * it can construct a solid directly from a triangle mesh. OCCT requires B-rep
+ * topology that cannot be recovered from mesh data alone.
  */
-class FrozenShapeBackend implements ManifoldCapableBackend {
+class FrozenShapeBackend implements ShapeBackend {
   readonly [SHAPE_BACKEND_MARKER] = true as const;
 
   private readonly _data: SerializedShapeData;
-  private _manifoldBackend: ShapeBackend | null = null;
+  private _reconstructedBackend: ShapeBackend | null = null;
 
   constructor(data: SerializedShapeData) {
     this._data = data;
@@ -49,26 +51,22 @@ class FrozenShapeBackend implements ManifoldCapableBackend {
     };
   }
 
-  private getManifoldBackend(): ShapeBackend {
-    if (!this._manifoldBackend) {
-      const wasm = getWasm();
+  /**
+   * Lazily reconstruct a real ShapeBackend from cached mesh data.
+   * Uses Manifold regardless of the active backend — see class doc for why.
+   */
+  private getReconstructedBackend(): ShapeBackend {
+    if (!this._reconstructedBackend) {
       const data = this._data;
-      const wasmMesh = new wasm.Mesh({
+      this._reconstructedBackend = reconstructBackendFromMesh({
         numProp: data.meshNumProp,
         triVerts: data.meshTriVerts,
         vertProperties: data.meshVertProperties,
-        mergeFromVert: data.meshMergeFromVert.length > 0 ? data.meshMergeFromVert : undefined,
-        mergeToVert: data.meshMergeToVert.length > 0 ? data.meshMergeToVert : undefined,
+        mergeFromVert: data.meshMergeFromVert,
+        mergeToVert: data.meshMergeToVert,
       });
-      let manifold;
-      try {
-        manifold = new wasm.Manifold(wasmMesh);
-      } catch {
-        manifold = wasm.Manifold.cube([0, 0, 0]);
-      }
-      this._manifoldBackend = new ManifoldShapeBackend(manifold);
     }
-    return this._manifoldBackend;
+    return this._reconstructedBackend;
   }
 
   // --- Served from cache — no WASM ---
@@ -102,23 +100,22 @@ class FrozenShapeBackend implements ManifoldCapableBackend {
     return this._data.numTriangles;
   }
 
-  // --- Delegated to lazy Manifold ---
+  // --- Delegated to lazy reconstructed backend ---
 
-  clone(): ShapeBackend { return this.getManifoldBackend().clone(); }
-  translate(x: number, y: number, z: number): ShapeBackend { return this.getManifoldBackend().translate(x, y, z); }
-  rotate(x: number, y: number, z: number): ShapeBackend { return this.getManifoldBackend().rotate(x, y, z); }
-  transform(m: Parameters<ShapeBackend['transform']>[0]): ShapeBackend { return this.getManifoldBackend().transform(m); }
-  scale(v: number | [number, number, number]): ShapeBackend { return this.getManifoldBackend().scale(v); }
-  mirror(normal: [number, number, number]): ShapeBackend { return this.getManifoldBackend().mirror(normal); }
-  split(other: ShapeBackend): [ShapeBackend, ShapeBackend] { return this.getManifoldBackend().split(other); }
-  splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend] { return this.getManifoldBackend().splitByPlane(normal, originOffset); }
-  trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend { return this.getManifoldBackend().trimByPlane(normal, originOffset); }
-  hull(): ShapeBackend { return this.getManifoldBackend().hull(); }
-  volume(): number { return this.getManifoldBackend().volume(); }
-  surfaceArea(): number { return this.getManifoldBackend().surfaceArea(); }
-  slice(offset: number): ShapeRuntimeCrossSection { return this.getManifoldBackend().slice(offset); }
-  project(): ShapeRuntimeCrossSection { return this.getManifoldBackend().project(); }
-  requireManifold(apiName?: string): Manifold { return (this.getManifoldBackend() as ManifoldCapableBackend).requireManifold(apiName); }
+  clone(): ShapeBackend { return this.getReconstructedBackend().clone(); }
+  translate(x: number, y: number, z: number): ShapeBackend { return this.getReconstructedBackend().translate(x, y, z); }
+  rotate(x: number, y: number, z: number): ShapeBackend { return this.getReconstructedBackend().rotate(x, y, z); }
+  transform(m: Parameters<ShapeBackend['transform']>[0]): ShapeBackend { return this.getReconstructedBackend().transform(m); }
+  scale(v: number | [number, number, number]): ShapeBackend { return this.getReconstructedBackend().scale(v); }
+  mirror(normal: [number, number, number]): ShapeBackend { return this.getReconstructedBackend().mirror(normal); }
+  split(other: ShapeBackend): [ShapeBackend, ShapeBackend] { return this.getReconstructedBackend().split(other); }
+  splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend] { return this.getReconstructedBackend().splitByPlane(normal, originOffset); }
+  trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend { return this.getReconstructedBackend().trimByPlane(normal, originOffset); }
+  hull(): ShapeBackend { return this.getReconstructedBackend().hull(); }
+  volume(): number { return this.getReconstructedBackend().volume(); }
+  surfaceArea(): number { return this.getReconstructedBackend().surfaceArea(); }
+  slice(offset: number): ShapeRuntimeCrossSection { return this.getReconstructedBackend().slice(offset); }
+  project(): ShapeRuntimeCrossSection { return this.getReconstructedBackend().project(); }
 }
 
 export class FrozenShape extends Shape {

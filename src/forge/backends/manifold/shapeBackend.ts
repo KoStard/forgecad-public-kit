@@ -7,11 +7,11 @@ import {
   type ShapeRuntimeMesh,
   type ShapeRuntimeCrossSection,
 } from '../../shapeBackend';
+import { getWasm } from './wasm';
 
 /**
  * A ShapeBackend that can provide a raw Manifold object.
- * Only backends that wrap a real Manifold (ManifoldShapeBackend, FrozenShapeBackend)
- * should implement this.
+ * Only ManifoldShapeBackend implements this directly.
  */
 export interface ManifoldCapableBackend extends ShapeBackend {
   requireManifold(apiName?: string): Manifold;
@@ -135,6 +135,39 @@ export class ManifoldShapeBackend implements ManifoldCapableBackend {
 }
 
 export function wrapManifoldShapeBackend(manifold: Manifold): ShapeBackend {
+  return new ManifoldShapeBackend(manifold);
+}
+
+/**
+ * Reconstruct a ShapeBackend from pre-computed mesh data using the Manifold backend.
+ *
+ * This is used by FrozenShapeBackend to lazily thaw a shape when geometric
+ * operations are requested. Manifold is always used for reconstruction because
+ * it can construct a solid directly from a triangle mesh, whereas OCCT requires
+ * B-rep topology (faces, edges, wires) that cannot be recovered from triangles
+ * alone.
+ */
+export function reconstructBackendFromMesh(mesh: {
+  numProp: number;
+  triVerts: Uint32Array;
+  vertProperties: Float32Array;
+  mergeFromVert: Uint32Array;
+  mergeToVert: Uint32Array;
+}): ShapeBackend {
+  const wasm = getWasm();
+  const wasmMesh = new wasm.Mesh({
+    numProp: mesh.numProp,
+    triVerts: mesh.triVerts,
+    vertProperties: mesh.vertProperties,
+    mergeFromVert: mesh.mergeFromVert.length > 0 ? mesh.mergeFromVert : undefined,
+    mergeToVert: mesh.mergeToVert.length > 0 ? mesh.mergeToVert : undefined,
+  });
+  let manifold;
+  try {
+    manifold = new wasm.Manifold(wasmMesh);
+  } catch {
+    manifold = wasm.Manifold.cube([0, 0, 0]);
+  }
   return new ManifoldShapeBackend(manifold);
 }
 

@@ -3,8 +3,7 @@ import type { Mat4 } from './transform';
 export const SHAPE_BACKEND_MARKER = Symbol.for('forgecad.shapeBackend');
 
 /**
- * Runtime bounding box — structurally matches Manifold's boundingBox() return.
- * Defined here so shapeBackend.ts has no manifold-3d import.
+ * Runtime bounding box — axis-aligned min/max corners.
  */
 export interface ShapeRuntimeBounds {
   readonly min: [number, number, number];
@@ -12,9 +11,8 @@ export interface ShapeRuntimeBounds {
 }
 
 /**
- * Runtime triangle mesh — structurally matches Manifold's getMesh() return.
- * Backends produce this; consumers that need the full Manifold Mesh type
- * should cast in the backend-specific layer.
+ * Runtime triangle mesh — the common exchange format produced by all backends.
+ * Contains indexed triangles with per-vertex properties (position + optional normals/UVs).
  */
 export interface ShapeRuntimeMesh {
   readonly numProp: number;
@@ -32,11 +30,8 @@ export interface ShapeRuntimeMesh {
 }
 
 /**
- * Runtime 2D cross-section — opaque handle.
- * In Manifold backend this is a CrossSection instance; in OCCT it may differ.
- * Code that needs CrossSection-specific APIs should import and cast through
- * the backend layer. Typed as `any` to avoid leaking manifold-3d into the
- * backend-agnostic contract.
+ * Runtime 2D cross-section — opaque handle to a backend-specific 2D profile.
+ * Code that needs backend-specific APIs should cast through the backend layer.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ShapeRuntimeCrossSection = any;
