@@ -502,6 +502,23 @@ function stripBrokenManifoldSourceMaps() {
 
 const forgeMode = process.env.FORGE_MODE === 'web' ? 'web' : 'studio';
 
+/**
+ * Copies dist-skill/ into dist/skill/ during web builds so the AI skill files
+ * are served as static assets on GitHub Pages (e.g. /ForgeCAD/skill/CONTEXT.md).
+ */
+function forgeSkillStaticPlugin() {
+  return {
+    name: 'forge-skill-static',
+    closeBundle() {
+      const src = path.resolve(__dirname, 'dist-skill');
+      const dest = path.resolve(__dirname, 'dist/skill');
+      if (!fs.existsSync(src)) return;
+      fs.cpSync(src, dest, { recursive: true });
+      console.log('✓ Skill files copied to dist/skill/');
+    },
+  };
+}
+
 export default defineConfig(({ command }) => ({
   plugins: [
     // Auto-build & watch the Rust solver (dev server only)
@@ -511,6 +528,8 @@ export default defineConfig(({ command }) => ({
     ...(command === 'serve' ? [forgeTypesPlugin()] : []),
     stripBrokenManifoldSourceMaps(),
     react(),
+    // Copy skill files into the web build output for static serving
+    ...(forgeMode === 'web' && command === 'build' ? [forgeSkillStaticPlugin()] : []),
   ],
   // GitHub Pages serves at /ForgeCAD/; local dev serves at /
   base: forgeMode === 'web' ? '/ForgeCAD/' : '/',

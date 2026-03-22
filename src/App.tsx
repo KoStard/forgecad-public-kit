@@ -20,6 +20,7 @@ import { isSaveShortcut, shouldBlockBrowserShortcut, type EditorSurface } from '
 import { isNotebookFile } from './notebook/model';
 import { buildShareUrl, buildEmbedUrl, buildEmbedSnippet, isEmbedMode } from './share';
 import { EmbedViewer } from './components/EmbedViewer';
+import { AISkillDialog } from './components/AISkillDialog';
 
 const GITHUB_REPO = 'KoStard/ForgeCAD';
 
@@ -220,6 +221,7 @@ function Toolbar() {
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
   const toggleViewPanel = useForgeStore((s) => s.toggleViewPanel);
   const openCommandPalette = useForgeStore((s) => s.openCommandPalette);
+  const [skillDialogOpen, setSkillDialogOpen] = React.useState(false);
 
   return (
     <div style={{ padding: '6px 12px', background: 'var(--fc-bgHover)', borderBottom: '1px solid var(--fc-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -265,9 +267,11 @@ function Toolbar() {
         <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
         <AutoBuildToggle />
         <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
+        <button style={btnStyle()} onClick={() => setSkillDialogOpen(true)} title="Get AI skill for writing ForgeCAD models">🤖 AI Skill</button>
         <ShareButton />
         {__FORGE_MODE__ === 'web' && <GitHubStarButton />}
       </div>
+      {skillDialogOpen && <AISkillDialog onClose={() => setSkillDialogOpen(false)} />}
     </div>
   );
 }
