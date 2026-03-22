@@ -166,10 +166,12 @@ export function FileExplorer() {
 
   const handleFileDrop = (e: DragEvent, targetFolder: string) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    const targetName = targetFolder ? `${targetFolder}/${file.name}` : file.name;
-    file.text().then((text) => loadFromText(text, targetName));
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length === 0) return;
+    droppedFiles.forEach((file) => {
+      const targetName = targetFolder ? `${targetFolder}/${file.name}` : file.name;
+      file.text().then((text) => loadFromText(text, targetName));
+    });
   };
 
   const handleDropToFolder = (e: DragEvent, targetFolder: string) => {

@@ -1415,9 +1415,11 @@ export function CodeEditor() {
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const file = e.dataTransfer.files[0];
-      if (!file) return;
-      file.text().then((text) => loadFromText(text, file.name));
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      if (droppedFiles.length === 0) return;
+      droppedFiles.forEach((file) => {
+        file.text().then((text) => loadFromText(text, file.name));
+      });
     },
     [loadFromText],
   );
