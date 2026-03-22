@@ -48,23 +48,19 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
   const scaleTop = typeof opts?.scaleTop === 'number'
     ? [opts.scaleTop, opts.scaleTop] as [number, number]
     : opts?.scaleTop;
-  const basePlan = (
-    opts?.twist == null || opts.twist === 0
-  ) && (
-    opts?.divisions == null || opts.divisions === 0
-  )
-    ? (() => {
-        const profile = getSketchCompileProfilePlan(sketch);
-        if (!profile) return null;
-        return {
-          kind: 'extrude' as const,
-          profile,
-          height,
-          center: opts?.center ?? false,
-          scaleTop,
-        };
-      })()
-    : null;
+  const basePlan = (() => {
+    const profile = getSketchCompileProfilePlan(sketch);
+    if (!profile) return null;
+    return {
+      kind: 'extrude' as const,
+      profile,
+      height,
+      center: opts?.center ?? false,
+      scaleTop,
+      twist: opts?.twist != null && opts.twist !== 0 ? opts.twist : undefined,
+      twistSegments: opts?.divisions != null && opts.divisions > 0 ? opts.divisions : undefined,
+    };
+  })();
   const placement = getSketchPlacement3D(sketch);
   const placementModel = getSketchPlacementModel(sketch);
   const plan = basePlan && placement && placementModel

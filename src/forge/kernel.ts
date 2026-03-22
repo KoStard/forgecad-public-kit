@@ -771,7 +771,13 @@ export class Shape {
   // --- Transforms (all return new Shape, immutable) ---
 
   translate(x: number, y: number, z: number): Shape {
-    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'translate', x, y, z })!;
+    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'translate', x, y, z });
+    if (!nextPlan) {
+      throw new Error(
+        'Shape.translate() failed: shape has no compile plan. '
+        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
+      );
+    }
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
       buildShapeFromCompilePlan(nextPlan, this.colorHex),
@@ -793,7 +799,13 @@ export class Shape {
   }
 
   rotate(x: number, y: number, z: number): Shape {
-    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'rotate', xDeg: x, yDeg: y, zDeg: z })!;
+    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'rotate', xDeg: x, yDeg: y, zDeg: z });
+    if (!nextPlan) {
+      throw new Error(
+        'Shape.rotate() failed: shape has no compile plan. '
+        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
+      );
+    }
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
       buildShapeFromCompilePlan(nextPlan, this.colorHex),
