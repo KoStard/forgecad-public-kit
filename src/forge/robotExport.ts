@@ -8,7 +8,7 @@ import type {
 export interface RobotLinkExportOptions {
   massKg?: number;
   densityKgM3?: number;
-  collision?: 'visual' | 'none';
+  collision?: 'visual' | 'convex' | 'box' | 'none';
 }
 
 export interface RobotJointExportOptions {

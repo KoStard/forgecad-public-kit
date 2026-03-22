@@ -1,6 +1,7 @@
 import { buildBinaryStl } from './exportMesh';
 import type {
   AssemblyDefinition,
+  AssemblyJointCouplingDef,
   AssemblyJointDef,
   AssemblyPart,
   AssemblyPartDef,
@@ -8,10 +9,11 @@ import type {
   PartMetadata,
 } from './assembly';
 import type { CollectedRobotExport, RobotWorldOptions } from './robotExport';
-import { Shape } from './kernel';
+import { Shape, hull3d, union } from './kernel';
 import { ShapeGroup } from './group';
 import { TrackedShape } from './sketch/topology';
 import { Transform, composeChain, type Vec3 } from './transform';
+import { computeMeshInertia } from './meshInertia';
 
 const DEFAULT_DENSITY_KG_M3 = 1000;
 const STL_SCALE_METERS = 0.001;
@@ -220,11 +222,6 @@ function resolveJointValues(
   state: Record<string, number | undefined>,
   warnings: string[],
 ): Record<string, number> {
-  if (assembly.jointCouplings.length > 0) {
-    const coupled = assembly.jointCouplings.map((joint) => joint.joint).join(', ');
-    throw new Error(`SDF export does not support coupled joints yet: ${coupled}`);
-  }
-
   const out: Record<string, number> = {};
   assembly.joints.forEach((joint) => {
     const raw = state[joint.name] ?? joint.defaultValue;
@@ -234,6 +231,16 @@ function resolveJointValues(
       warnings.push(`Joint "${joint.name}" was clamped from ${raw} to ${value}${joint.unit ?? ''}`);
     }
   });
+
+  // Propagate coupled joint values from their source joints.
+  for (const coupling of assembly.jointCouplings) {
+    let value = coupling.offset;
+    for (const term of coupling.terms) {
+      value += term.ratio * (out[term.joint] ?? 0);
+    }
+    out[coupling.joint] = value;
+  }
+
   return out;
 }
 
@@ -280,11 +287,12 @@ function combineMetadataNumber(
 
 function resolveCollisionMode(
   metadata: PartMetadata | undefined,
-  collision: 'visual' | 'none' | undefined,
-): 'visual' | 'none' {
+  collision: 'visual' | 'convex' | 'box' | 'none' | undefined,
+): 'visual' | 'convex' | 'box' | 'none' {
   if (collision) return collision;
   const fromMetadata = metadata?.collision;
-  return fromMetadata === 'none' ? 'none' : 'visual';
+  if (fromMetadata === 'none' || fromMetadata === 'visual' || fromMetadata === 'box' || fromMetadata === 'convex') return fromMetadata;
+  return 'convex';
 }
 
 function estimateLinkMassKg(
@@ -692,13 +700,35 @@ function modelXml(
   const cmdVelTopic = spec.plugins.diffDrive?.topic || `/model/${modelName}/cmd_vel`;
   const jointStateTopic = spec.plugins.jointStatePublisher?.topic || `/model/${modelName}/joint_state`;
 
+  // Build coupling lookup: driven joint name -> coupling definition
+  const couplingByJoint = new Map<string, AssemblyJointCouplingDef>();
+  for (const coupling of spec.assembly.jointCouplings) {
+    couplingByJoint.set(coupling.joint, coupling);
+  }
+
   const linksXml = spec.assembly.parts.map((part) => {
     const sdfLinkName = linkNameMap.get(part.name)!;
     const geometry = geometries.get(part.name)!;
     const worldPose = transformToPose(linkWorlds.get(part.name) ?? Transform.identity());
     const linkOptions = spec.links[part.name];
     const massKg = estimateLinkMassKg(geometry, linkOptions?.massKg, linkOptions?.densityKgM3);
-    const inertia = inertiaFromBounds(geometry, massKg);
+    // Compute inertia from mesh (divergence theorem), falling back to bounding-box approximation
+    let inertia: { pose: PoseParts; ixx: number; iyy: number; izz: number; ixy: number; ixz: number; iyz: number };
+    const combinedMesh = geometry.shapes.length === 1
+      ? geometry.shapes[0].getMesh()
+      : union(...geometry.shapes).getMesh();
+    if (combinedMesh.numTri > 0) {
+      const mi = computeMeshInertia(combinedMesh, massKg);
+      inertia = {
+        pose: { xyzM: [mmToM(mi.centerOfMass[0]), mmToM(mi.centerOfMass[1]), mmToM(mi.centerOfMass[2])], rpyRad: [0, 0, 0] },
+        ixx: mi.ixx, iyy: mi.iyy, izz: mi.izz,
+        ixy: mi.ixy, ixz: mi.ixz, iyz: mi.iyz,
+      };
+    } else {
+      const bb = inertiaFromBounds(geometry, massKg);
+      inertia = { ...bb, ixy: 0, ixz: 0, iyz: 0 };
+    }
+
     const collisionMode = resolveCollisionMode(part.metadata, linkOptions?.collision);
     const meshPath = `model://${modelName}/meshes/${sdfLinkName}.stl`;
     const color = sRgbFloat(geometry.shapes[0]?.colorHex);
@@ -717,10 +747,10 @@ function modelXml(
         <mass>${formatNumber(massKg, 6)}</mass>
         <inertia>
           <ixx>${formatNumber(inertia.ixx, 8)}</ixx>
-          <ixy>0</ixy>
-          <ixz>0</ixz>
+          <ixy>${formatNumber(inertia.ixy, 8)}</ixy>
+          <ixz>${formatNumber(inertia.ixz, 8)}</ixz>
           <iyy>${formatNumber(inertia.iyy, 8)}</iyy>
-          <iyz>0</iyz>
+          <iyz>${formatNumber(inertia.iyz, 8)}</iyz>
           <izz>${formatNumber(inertia.izz, 8)}</izz>
         </inertia>
       </inertial>
@@ -731,7 +761,9 @@ function modelXml(
             <scale>${formatNumber(STL_SCALE_METERS, 6)} ${formatNumber(STL_SCALE_METERS, 6)} ${formatNumber(STL_SCALE_METERS, 6)}</scale>
           </mesh>
         </geometry>${materialXml}
-      </visual>${collisionMode === 'visual' ? `
+      </visual>${(() => {
+        if (collisionMode === 'visual') {
+          return `
       <collision name="${escapeXml(sdfLinkName)}_collision">
         <geometry>
           <mesh>
@@ -739,7 +771,37 @@ function modelXml(
             <scale>${formatNumber(STL_SCALE_METERS, 6)} ${formatNumber(STL_SCALE_METERS, 6)} ${formatNumber(STL_SCALE_METERS, 6)}</scale>
           </mesh>
         </geometry>
-      </collision>` : ''}
+      </collision>`;
+        }
+        if (collisionMode === 'convex') {
+          const collisionMeshPath = `model://${modelName}/meshes/${sdfLinkName}_collision.stl`;
+          return `
+      <collision name="${escapeXml(sdfLinkName)}_collision">
+        <geometry>
+          <mesh>
+            <uri>${escapeXml(collisionMeshPath)}</uri>
+            <scale>${formatNumber(STL_SCALE_METERS, 6)} ${formatNumber(STL_SCALE_METERS, 6)} ${formatNumber(STL_SCALE_METERS, 6)}</scale>
+          </mesh>
+        </geometry>
+      </collision>`;
+        }
+        if (collisionMode === 'box') {
+          const bDx = mmToM(geometry.bboxMax[0] - geometry.bboxMin[0]);
+          const bDy = mmToM(geometry.bboxMax[1] - geometry.bboxMin[1]);
+          const bDz = mmToM(geometry.bboxMax[2] - geometry.bboxMin[2]);
+          const bCx = mmToM((geometry.bboxMin[0] + geometry.bboxMax[0]) * 0.5);
+          const bCy = mmToM((geometry.bboxMin[1] + geometry.bboxMax[1]) * 0.5);
+          const bCz = mmToM((geometry.bboxMin[2] + geometry.bboxMax[2]) * 0.5);
+          return `
+      <collision name="${escapeXml(sdfLinkName)}_collision">
+        <pose>${formatNumber(bCx, 6)} ${formatNumber(bCy, 6)} ${formatNumber(bCz, 6)} 0 0 0</pose>
+        <geometry>
+          <box><size>${formatNumber(bDx, 6)} ${formatNumber(bDy, 6)} ${formatNumber(bDz, 6)}</size></box>
+        </geometry>
+      </collision>`;
+        }
+        return '';
+      })()}
     </link>`;
   }).join('\n');
 
@@ -756,12 +818,31 @@ function modelXml(
     const friction = sourceOverrides?.friction ?? joint.friction;
     const jointPose = transformToPose(joint.frame);
 
+    // Build <mimic> element if this joint is driven by a coupling
+    let mimicXml = '';
+    const coupling = couplingByJoint.get(joint.name);
+    if (coupling && coupling.terms.length > 0) {
+      const primary = coupling.terms.reduce((a, b) =>
+        Math.abs(a.ratio) >= Math.abs(b.ratio) ? a : b);
+      const leaderSdfName = jointNameMap.get(`${primary.joint}_joint`)!;
+      mimicXml = `
+        <mimic joint="${escapeXml(leaderSdfName)}">
+          <multiplier>${formatNumber(primary.ratio, 6)}</multiplier>
+          <offset>${formatNumber(coupling.offset, 6)}</offset>
+        </mimic>`;
+      if (coupling.terms.length > 1) {
+        warnings.push(
+          `Joint "${joint.name}" coupling has ${coupling.terms.length} terms but SDF mimic only supports 1. Using primary term (ratio=${primary.ratio} from "${primary.joint}").`,
+        );
+      }
+    }
+
     return `    <joint name="${escapeXml(sdfJointName)}" type="${joint.type}">
       <parent>${escapeXml(sdfParent)}</parent>
       <child>${escapeXml(sdfChild)}</child>
       <pose relative_to="${escapeXml(sdfParent)}">${formatPose(jointPose)}</pose>${joint.type !== 'fixed' ? `
       <axis>
-        <xyz>${axisToText(joint.axis)}</xyz>${limitLower !== null || limitUpper !== null || effort !== undefined || velocity !== null ? `
+        <xyz>${axisToText(joint.axis)}</xyz>${mimicXml}${limitLower !== null || limitUpper !== null || effort !== undefined || velocity !== null ? `
         <limit>${limitLower !== null ? `
           <lower>${limitLower}</lower>` : ''}${limitUpper !== null ? `
           <upper>${limitUpper}</upper>` : ''}${effort !== undefined ? `
@@ -869,6 +950,20 @@ export function buildSdfRobotPackage(spec: CollectedRobotExport): SdfPackageOutp
         shape,
       }))])),
     });
+
+    const collisionMode = resolveCollisionMode(part.metadata, linkOptions?.collision);
+    if (collisionMode === 'convex') {
+      const collisionMeshPath = `${modelFolder}/meshes/${sdfLinkName}_collision.stl`;
+      const unionedShape = geometry.shapes.length === 1
+        ? geometry.shapes[0]
+        : union(...geometry.shapes);
+      const hullShape = hull3d(unionedShape);
+      files.push({
+        path: collisionMeshPath,
+        bytes: new Uint8Array(buildBinaryStl([{ name: `${part.name}_collision`, shape: hullShape }])),
+      });
+    }
+
     manifestLinks.push({
       sourceName: part.name,
       sdfName: sdfLinkName,
