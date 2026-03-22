@@ -9,7 +9,7 @@ import { buildHullProfileCompilePlan, buildOffsetProfileCompilePlan } from '../c
 
 
 export function sketchOffset(sketch: Sketch, delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
-  const nextPlan = join === 'Round' ? buildOffsetProfileCompilePlan(getSketchCompileProfilePlan(sketch), delta, 'Round') : null;
+  const nextPlan = buildOffsetProfileCompilePlan(getSketchCompileProfilePlan(sketch), delta, join);
   return copySketchPlacement3D(
     sketch,
     nextPlan

@@ -2,7 +2,6 @@ import { difference2d, union2d } from './booleans';
 import { Sketch } from './core';
 import { stroke as strokePolyline } from './path';
 import { polygon } from './primitives';
-import { createPolygonProfile } from '../profileOps';
 
 type Vec2 = [number, number];
 type Mat2 = [number, number, number, number, number, number];
@@ -1475,5 +1474,7 @@ export function sketchFromSvgLoops(loops: Vec2[][]): Sketch {
   if (validLoops.length === 0) {
     throw new Error('sketchFromSvgLoops did not receive any valid non-degenerate loops');
   }
-  return new Sketch(createPolygonProfile(validLoops as number[][][]));
+  // Build each loop as a polygon sketch (with compile plan) and union them.
+  const sketches = validLoops.map((loop) => polygon(loop as [number, number][]));
+  return sketches.length === 1 ? sketches[0] : union2d(...sketches);
 }

@@ -6,12 +6,13 @@
  * raw coordinate-based primitives and the constraint system.
  */
 
-import { Sketch } from './core';
+import { Sketch, setSketchCompileProfilePlan } from './core';
 import { polygon } from './primitives';
 import { sketchExtrude } from './extrude';
 import { ConstrainedSketchBuilder, type PointId, type LineId } from './constraints';
 import { TrackedShape, buildRectExtrusionTopology, buildCircleExtrusionTopology } from './topology';
 import { createCircleProfile } from '../profileOps';
+import type { ProfileCompilePlan } from '../compilePlan';
 
 // ─── Point ───────────────────────────────────────────────────────
 
@@ -162,7 +163,13 @@ export class Circle2D {
   toSketch(segments?: number): Sketch {
     const cross = createCircleProfile(this.radius, segments ?? 0)
       .translate(this.center.x, this.center.y);
-    return new Sketch(cross);
+    const plan: ProfileCompilePlan = {
+      kind: 'circle',
+      radius: this.radius,
+      segments: segments != null && segments > 0 ? segments : undefined,
+      transforms: [{ kind: 'translate', x: this.center.x, y: this.center.y }],
+    };
+    return setSketchCompileProfilePlan(new Sketch(cross), plan);
   }
 
   /** Extrude to TrackedShape with top/bottom/side faces */

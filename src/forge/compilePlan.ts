@@ -70,7 +70,7 @@ export type ProfileCompilePlan =
       kind: 'offset';
       base: ProfileCompilePlan;
       delta: number;
-      join: 'Round';
+      join: 'Square' | 'Round' | 'Miter';
       transforms: ProfileCompileTransformStep[];
     }
   | {
@@ -1024,7 +1024,7 @@ export function buildBooleanProfileCompilePlan(
 export function buildOffsetProfileCompilePlan(
   base: ProfileCompilePlan | null,
   delta: number,
-  join: 'Round',
+  join: 'Square' | 'Round' | 'Miter',
 ): ProfileCompilePlan | null {
   if (!base) return null;
   return {
