@@ -10,15 +10,7 @@ import { formatRenderSceneCliSpec, type ViewportRenderSceneState } from '../capt
 import { ConstructionTreePanel } from './ConstructionTreePanel';
 import { formatArea } from '@forge/units';
 
-const btnStyle = (active = false): CSSProperties => ({
-  padding: '4px 8px',
-  background: active ? 'var(--fc-accent)' : 'transparent',
-  color: active ? 'var(--fc-accentText)' : 'var(--fc-textMuted)',
-  border: '1px solid var(--fc-border)',
-  borderRadius: 3,
-  cursor: 'pointer',
-  fontSize: 12,
-});
+const btn = (active = false) => `fc-btn${active ? ' active' : ''}`;
 
 const sectionStyle: CSSProperties = {
   borderTop: '1px solid var(--fc-borderLight)',
@@ -549,25 +541,25 @@ export function ViewPanel() {
       <div style={{ ...sectionStyle, borderTop: 'none' }}>
         <div style={labelStyle}>Backend</div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button style={btnStyle(activeBackend === 'manifold')} onClick={() => setActiveBackend('manifold')}>Manifold (fast)</button>
-          <button style={btnStyle(activeBackend === 'occt')} onClick={() => setActiveBackend('occt')}>OCCT (exact)</button>
+          <button className={btn(activeBackend === 'manifold')} onClick={() => setActiveBackend('manifold')}>Manifold (fast)</button>
+          <button className={btn(activeBackend === 'occt')} onClick={() => setActiveBackend('occt')}>OCCT (exact)</button>
         </div>
       </div>
 
       <div style={sectionStyle}>
         <div style={labelStyle}>Render Mode</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <button style={btnStyle(renderMode === 'solid')} onClick={() => setRenderMode('solid')}>Solid</button>
-          <button style={btnStyle(renderMode === 'wireframe')} onClick={() => setRenderMode('wireframe')}>Wireframe</button>
-          <button style={btnStyle(renderMode === 'overlay')} onClick={() => setRenderMode('overlay')}>Overlay</button>
+          <button className={btn(renderMode === 'solid')} onClick={() => setRenderMode('solid')}>Solid</button>
+          <button className={btn(renderMode === 'wireframe')} onClick={() => setRenderMode('wireframe')}>Wireframe</button>
+          <button className={btn(renderMode === 'overlay')} onClick={() => setRenderMode('overlay')}>Overlay</button>
         </div>
       </div>
 
       <div style={sectionStyle}>
         <div style={labelStyle}>Projection</div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button style={btnStyle(projectionMode === 'perspective')} onClick={() => setProjectionMode('perspective')}>Perspective</button>
-          <button style={btnStyle(projectionMode === 'orthographic')} onClick={() => setProjectionMode('orthographic')}>Orthographic</button>
+          <button className={btn(projectionMode === 'perspective')} onClick={() => setProjectionMode('perspective')}>Perspective</button>
+          <button className={btn(projectionMode === 'orthographic')} onClick={() => setProjectionMode('orthographic')}>Orthographic</button>
         </div>
       </div>
 
@@ -575,7 +567,7 @@ export function ViewPanel() {
         <div style={labelStyle}>Units</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['mm', 'cm', 'm', 'in', 'ft'] as const).map((u) => (
-            <button key={u} style={btnStyle(lengthUnit === u)} onClick={() => useForgeStore.getState().setLengthUnit(u)}>
+            <button key={u} className={btn(lengthUnit === u)} onClick={() => useForgeStore.getState().setLengthUnit(u)}>
               {u}
             </button>
           ))}
@@ -585,10 +577,10 @@ export function ViewPanel() {
       <div style={sectionStyle}>
         <div style={labelStyle}>Views</div>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: 'iso' })}>⌂ Home</button>
-          <button style={btnStyle()} onClick={() => requestViewCommand({ type: 'fit' })}>Fit</button>
+          <button className={btn()} onClick={() => requestViewCommand({ type: 'snap', view: 'iso' })}>⌂ Home</button>
+          <button className={btn()} onClick={() => requestViewCommand({ type: 'fit' })}>Fit</button>
           <button
-            style={btnStyle()}
+            className={btn()}
             onClick={() => requestViewCommand({ type: 'zoom', targetId: selectedObjectId })}
             disabled={!selectedObjectId}
           >
@@ -597,7 +589,7 @@ export function ViewPanel() {
         </div>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
           {(['front', 'back', 'left', 'right', 'top', 'bottom'] as const).map((v) => (
-            <button key={v} style={btnStyle()} onClick={() => requestViewCommand({ type: 'snap', view: v })}>
+            <button key={v} className={btn()} onClick={() => requestViewCommand({ type: 'snap', view: v })}>
               {v[0].toUpperCase() + v.slice(1)}
             </button>
           ))}
@@ -631,7 +623,8 @@ export function ViewPanel() {
               <div>Up: {formatVector(viewportCameraState.up)}</div>
             </div>
             <button
-              style={{ ...btnStyle(), width: '100%', marginTop: 8 }}
+              className={btn()}
+              style={{ width: '100%', marginTop: 8 }}
               onClick={() => { void copySceneCliArg(); }}
             >
               Copy CLI `--scene`
@@ -693,7 +686,7 @@ export function ViewPanel() {
               ))}
             </select>
             <button
-              style={btnStyle(jointAnimationPlaying)}
+              className={btn(jointAnimationPlaying)}
               onClick={toggleJointAnimationPlayback}
               disabled={!activeAnimationClip}
               title={activeAnimationClip ? 'Play or pause clip playback' : 'Select a clip first'}

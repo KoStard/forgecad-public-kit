@@ -165,18 +165,7 @@ export function VerificationsPanel() {
     }}>
       <div
         onClick={() => setCollapsed(!collapsed)}
-        style={{
-          padding: '6px 12px',
-          fontSize: 11,
-          color: 'var(--fc-textDim)',
-          textTransform: 'uppercase',
-          letterSpacing: 1,
-          cursor: 'pointer',
-          userSelect: 'none',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
+        className="fc-panel-header"
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ color: headerColor, fontSize: 13 }}>

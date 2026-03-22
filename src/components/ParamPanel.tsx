@@ -19,18 +19,7 @@ export function ParamPanel() {
     <div style={{ maxHeight: '50%', display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--fc-border)', background: 'var(--fc-bg)' }}>
       <div
         onClick={() => setCollapsed(!collapsed)}
-        style={{
-          padding: '6px 12px',
-          fontSize: 11,
-          color: 'var(--fc-textDim)',
-          textTransform: 'uppercase',
-          letterSpacing: 1,
-          cursor: 'pointer',
-          userSelect: 'none',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
+        className="fc-panel-header"
       >
         <span>Parameters ({params.length})</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

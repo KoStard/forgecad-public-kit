@@ -184,6 +184,7 @@ export function ResizablePanel({
       onPointerDown={handlePointerDown}
       onDoubleClick={() => setWidth(defaultWidth)}
       onKeyDown={handleKeyDown}
+      className="fc-resize-handle"
       style={handleStyle}
     >
       <div
@@ -196,6 +197,7 @@ export function ResizablePanel({
           height: 44,
           borderRadius: 999,
           background: isDragging ? 'var(--fc-accent)' : 'var(--fc-borderLight)',
+          transition: 'background 0.15s ease',
         }}
       />
     </div>
