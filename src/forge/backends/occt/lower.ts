@@ -2,8 +2,8 @@
  * ForgeCAD — Compile Plan → OCCT Lowering
  *
  * Lowers the backend-agnostic CompilePlan IR into OCCT TopoDS_Shape operations.
- * Handles: primitives, booleans, extrude, revolve, fillet, chamfer, transforms.
- * Falls back to Manifold for: loft, sweep (levelSet-based), hull.
+ * Handles: primitives, booleans, extrude, revolve, loft, sweep, fillet, chamfer, transforms.
+ * Pure OCCT — no Manifold dependencies.
  */
 
 import type {
@@ -22,31 +22,9 @@ import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolutio
 import { getOCCT, type OCCTModule } from './init';
 import { wrapOCCTShapeBackend } from './shapeBackend';
 import type { ShapeBackend } from '../../shapeBackend';
-import { wrapManifoldShapeBackend } from '../manifold/shapeBackend';
 import { Transform } from '../../transform';
 import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
-import { getWasm } from '../manifold/wasm';
 
-// ─── Hybrid Boolean Sentinel ────────────────────────────────────────
-// When a 3D boolean is performed via Manifold (because OCCT's boolean
-// engine is unreliable for coincident geometry), the Manifold result
-// is wrapped in this sentinel. The OCCT pipeline passes it through
-// unchanged, and lowerShapeCompilePlanToOCCTBackend detects it and
-// returns a ManifoldShapeBackend instead of an OCCTShapeBackend.
-const MANIFOLD_SENTINEL = Symbol('manifoldBooleanResult');
-
-interface ManifoldSentinel {
-  [MANIFOLD_SENTINEL]: true;
-  manifold: any;
-}
-
-function isManifoldSentinel(x: any): x is ManifoldSentinel {
-  return x != null && x[MANIFOLD_SENTINEL] === true;
-}
-
-function wrapManifoldSentinel(manifold: any): ManifoldSentinel {
-  return { [MANIFOLD_SENTINEL]: true, manifold };
-}
 
 // ─── Profile → OCCT Wire/Face ──────────────────────────────────────
 
@@ -478,202 +456,11 @@ function lowerBooleanPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind
   if (shapes.length === 0) throw new Error('Cannot lower empty boolean');
   if (shapes.length === 1) return shapes[0];
 
-  // OCCT's boolean engine is unreliable for coincident/coplanar faces and
-  // edges — a common situation when models share faces at junctions.
-  // Use a hybrid approach: each operand is built in OCCT (preserving B-rep
-  // quality for extrudes, fillets, etc.), then tessellated and booleaned
-  // in Manifold, which handles these cases robustly. The Manifold result
-  // is converted back to an OCCT shape (triangulated face in a compound).
-  return hybridBooleanViaManifold(oc, plan.op, shapes);
+  return occtNativeBoolean(oc, plan.op, shapes);
 }
 
 /**
- * Tessellate an OCCT shape and return raw mesh arrays.
- * Mirrors the logic in occtShapeBackend.ts extractMeshFromShape.
- */
-function tessellateOCCTShape(
-  oc: OCCTModule,
-  shape: any,
-  linearDeflection = 0.1,
-  angularDeflection = 0.5,
-): { vertProperties: Float32Array; triVerts: Uint32Array; numVerts: number; numTris: number } {
-  new oc.BRepMesh_IncrementalMesh_2(shape, linearDeflection, false, angularDeflection, false);
-
-  let totalVerts = 0;
-  let totalTris = 0;
-  const allPositions: number[] = [];
-  const allIndices: number[] = [];
-
-  const expl = new oc.TopExp_Explorer_2(
-    shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  );
-  while (expl.More()) {
-    const face = oc.TopoDS.Face_1(expl.Current());
-    const loc = new oc.TopLoc_Location_1();
-    const triangulation = oc.BRep_Tool.Triangulation(face, loc, 0);
-    if (!triangulation.IsNull()) {
-      const tri = triangulation.get();
-      const nVerts = tri.NbNodes();
-      const nTris = tri.NbTriangles();
-      const baseIndex = totalVerts;
-      const orientation = face.Orientation_1();
-      const reversed = orientation === oc.TopAbs_Orientation.TopAbs_REVERSED;
-      const trsf = loc.Transformation();
-      for (let i = 1; i <= nVerts; i++) {
-        const pt = tri.Node(i).Transformed(trsf);
-        allPositions.push(pt.X(), pt.Y(), pt.Z());
-      }
-      for (let i = 1; i <= nTris; i++) {
-        const triangle = tri.Triangle(i);
-        const i1 = triangle.Value(1) - 1 + baseIndex;
-        const i2 = triangle.Value(2) - 1 + baseIndex;
-        const i3 = triangle.Value(3) - 1 + baseIndex;
-        if (reversed) {
-          allIndices.push(i1, i3, i2);
-        } else {
-          allIndices.push(i1, i2, i3);
-        }
-      }
-      totalVerts += nVerts;
-      totalTris += nTris;
-    }
-    expl.Next();
-  }
-  return {
-    vertProperties: new Float32Array(allPositions),
-    triVerts: new Uint32Array(allIndices),
-    numVerts: totalVerts,
-    numTris: totalTris,
-  };
-}
-
-/**
- * Build merge maps for welding duplicate vertices at the given tolerance.
- */
-function buildMergeMaps(mesh: { vertProperties: Float32Array; numVerts: number }, eps: number) {
-  const mergeFrom: number[] = [];
-  const mergeTo: number[] = [];
-  const vertMap = new Map<string, number>();
-  for (let i = 0; i < mesh.numVerts; i++) {
-    const x = mesh.vertProperties[i * 3];
-    const y = mesh.vertProperties[i * 3 + 1];
-    const z = mesh.vertProperties[i * 3 + 2];
-    const key = `${Math.round(x / eps)}:${Math.round(y / eps)}:${Math.round(z / eps)}`;
-    const existing = vertMap.get(key);
-    if (existing !== undefined && existing !== i) {
-      mergeFrom.push(i);
-      mergeTo.push(existing);
-    } else {
-      vertMap.set(key, i);
-    }
-  }
-  return { mergeFrom, mergeTo };
-}
-
-/**
- * Tessellate an OCCT shape and create a Manifold object from it.
- * Tries progressively looser welding tolerances and finer tessellation
- * to handle OCCT tessellation gaps that produce non-manifold meshes.
- */
-function occtShapeToManifold(oc: OCCTModule, shape: any, wasm: any): any {
-  // Strategy: try multiple (tessellation, welding) combinations.
-  // Finer tessellation reduces gaps; looser welding tolerance merges them.
-  const attempts: Array<{ linearDeflection: number; angularDeflection: number; eps: number }> = [
-    { linearDeflection: 0.1,  angularDeflection: 0.5, eps: 1e-5 },
-    { linearDeflection: 0.05, angularDeflection: 0.3, eps: 1e-5 },
-    { linearDeflection: 0.1,  angularDeflection: 0.5, eps: 1e-4 },
-    { linearDeflection: 0.02, angularDeflection: 0.2, eps: 1e-4 },
-    { linearDeflection: 0.1,  angularDeflection: 0.5, eps: 1e-3 },
-  ];
-
-  let lastError: unknown;
-  for (const { linearDeflection, angularDeflection, eps } of attempts) {
-    try {
-      const mesh = tessellateOCCTShape(oc, shape, linearDeflection, angularDeflection);
-      if (mesh.numTris === 0) continue; // empty tessellation, try finer
-      const { mergeFrom, mergeTo } = buildMergeMaps(mesh, eps);
-      return new wasm.Manifold(
-        new wasm.Mesh({
-          numProp: 3,
-          vertProperties: mesh.vertProperties,
-          triVerts: mesh.triVerts,
-          mergeFromVert: new Uint32Array(mergeFrom),
-          mergeToVert: new Uint32Array(mergeTo),
-        }),
-      );
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  throw lastError;
-}
-
-/**
- * Perform a 3D boolean by tessellating OCCT operands, running the
- * boolean in Manifold (robust mesh-based CSG), and converting the
- * result back to an OCCT shape.
- *
- * Falls back to OCCT's native boolean if Manifold rejects the mesh
- * (e.g. non-manifold tessellation that can't be welded).
- */
-function hybridBooleanViaManifold(oc: OCCTModule, boolOp: string, shapes: any[]): any {
-  const wasm = getWasm();
-
-  // Convert each operand to Manifold.
-  // Sentinels (from nested booleans) already contain a Manifold.
-  // OCCT shapes are tessellated and imported.
-  const manifolds: any[] = [];
-  let conversionFailed = false;
-  for (const shape of shapes) {
-    if (isManifoldSentinel(shape)) {
-      manifolds.push(shape.manifold);
-    } else {
-      try {
-        manifolds.push(occtShapeToManifold(oc, shape, wasm));
-      } catch {
-        conversionFailed = true;
-        break;
-      }
-    }
-  }
-
-  if (conversionFailed) {
-    // Some OCCT shapes couldn't be converted to Manifold even after
-    // multiple tolerance attempts. Fall back:
-    // - If no sentinels, try OCCT native boolean
-    // - If sentinels present, bail to full Manifold pipeline via kernel
-    const hasSentinel = shapes.some(isManifoldSentinel);
-    if (hasSentinel) {
-      throw new OCCTUnsupportedError('hybrid boolean: non-manifold OCCT mesh');
-    }
-    return occtNativeBoolean(oc, boolOp, shapes);
-  }
-
-  // Boolean in Manifold
-  let result: any;
-  switch (boolOp) {
-    case 'union':
-      result = wasm.Manifold.union(manifolds);
-      break;
-    case 'difference': {
-      result = manifolds[0];
-      for (let i = 1; i < manifolds.length; i++) {
-        result = result.subtract(manifolds[i]);
-      }
-      break;
-    }
-    case 'intersection':
-      result = wasm.Manifold.intersection(manifolds);
-      break;
-    default:
-      throw new Error(`Unknown boolean op: ${boolOp}`);
-  }
-
-  return wrapManifoldSentinel(result);
-}
-
-/**
- * OCCT native boolean — used as fallback when Manifold rejects the mesh.
+ * OCCT native boolean via BRepAlgoAPI.
  */
 function occtNativeBoolean(oc: OCCTModule, boolOp: string, shapes: any[]): any {
   if (shapes.length === 2) {
@@ -702,7 +489,6 @@ function occtNativeBoolean(oc: OCCTModule, boolOp: string, shapes: any[]): any {
 
 function lowerFilletPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'fillet' }>): any {
   const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
-  if (isManifoldSentinel(base)) throw new OCCTUnsupportedError('fillet after hybrid boolean');
 
   const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
   if (!selection.ok) throw new Error(selection.issue.reason);
@@ -771,7 +557,6 @@ function lowerFilletPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind:
 
 function lowerChamferPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'chamfer' }>): any {
   const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
-  if (isManifoldSentinel(base)) throw new OCCTUnsupportedError('chamfer after hybrid boolean');
 
   const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
   if (!selection.ok) throw new Error(selection.issue.reason);
@@ -939,25 +724,6 @@ function _lowerShapeCompilePlanToOCCTInner(
 
     case 'transform': {
       const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
-      // If the base is a Manifold sentinel (from a hybrid boolean),
-      // apply transforms to the Manifold object and keep the sentinel.
-      if (isManifoldSentinel(base)) {
-        let m = base.manifold;
-        for (const step of plan.steps) {
-          switch (step.kind) {
-            case 'translate':
-              m = m.translate(step.x, step.y, step.z);
-              break;
-            case 'rotate':
-              m = m.rotate([step.xDeg, step.yDeg, step.zDeg]);
-              break;
-            case 'scale':
-              m = m.scale([step.x, step.y, step.z]);
-              break;
-          }
-        }
-        return wrapManifoldSentinel(m);
-      }
       return applyShapeTransforms(oc, base, plan.steps);
     }
 
@@ -972,7 +738,6 @@ function _lowerShapeCompilePlanToOCCTInner(
 
     case 'trimByPlane': {
       const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
-      if (isManifoldSentinel(base)) throw new OCCTUnsupportedError('trimByPlane after hybrid boolean');
       const normal = [plan.normalX, plan.normalY, plan.normalZ] as [number, number, number];
       const pnt = new oc.gp_Pnt_3(
         normal[0] * plan.originOffset,
@@ -1151,17 +916,12 @@ export class OCCTUnsupportedError extends Error {
 }
 
 /**
- * Lower a ShapeCompilePlan to a ShapeBackend (OCCT primary, Manifold fallback).
+ * Lower a ShapeCompilePlan to an OCCTShapeBackend.
  */
 export function lowerShapeCompilePlanToOCCTBackend(
   plan: ShapeCompilePlan,
 ): ShapeBackend {
   const oc = getOCCT();
   const shape = lowerShapeCompilePlanToOCCT(plan, oc);
-  // If the plan contained a 3D boolean, the result is a Manifold sentinel
-  // (because OCCT's boolean engine is unreliable for coincident geometry).
-  if (isManifoldSentinel(shape)) {
-    return wrapManifoldShapeBackend(shape.manifold);
-  }
   return wrapOCCTShapeBackend(shape);
 }
