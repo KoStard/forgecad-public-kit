@@ -83,7 +83,7 @@ type FaceRef = {
   vAxis?: [number, number, number];
   descendant?: FaceDescendantMetadata;
 };
-/** Import a 2D sketch from another file. Supports ".sketch.js" and ".svg". */
+/** Import a 2D sketch from another file. Supports ".forge.js" and ".svg". */
 declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch;
 /** Import a 3D part from another file. The file must return a Shape or TrackedShape. */
 declare function importPart(fileName: string, paramOverrides?: Record<string, number>): Shape;

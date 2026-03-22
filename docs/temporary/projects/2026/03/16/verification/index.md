@@ -114,7 +114,7 @@ The `new Function()` sandbox doesn't always produce clean stack frames. Browsers
 - `at myFile.forge.js:14:5` — Node / some Chromium variants
 - `at <anonymous>:14:5` — when sourceURL annotation is missing
 
-The regex handles all these variants. The `.forge.js` / `.sketch.js` extension filter ensures we pick up user files and not internal ForgeCAD frames.
+The regex handles all these variants. The `.forge.js` extension filter ensures we pick up user files and not internal ForgeCAD frames.
 
 ### 2. Keeping `verification.ts` kernel-agnostic
 

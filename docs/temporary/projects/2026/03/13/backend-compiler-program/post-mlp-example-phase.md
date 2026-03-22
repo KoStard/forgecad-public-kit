@@ -21,7 +21,7 @@ lands after MLP.
 
 `forgecad check examples` now does four things together:
 
-1. inventories every `.forge.js`, `.sketch.js`, and `.forge-notebook.json` under `examples/`
+1. inventories every `.forge.js` and `.forge-notebook.json` under `examples/`
 2. fails if any example artifact is unclassified or if a manifest entry points at a missing file
 3. runs the validation path assigned to each example class
 4. enforces declared compiler-route expectations for part examples that are inside the active architecture gate

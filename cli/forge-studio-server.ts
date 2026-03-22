@@ -24,7 +24,7 @@ export interface StudioServerOptions {
   strictPort: boolean;
 }
 
-const PROJECT_FILE_EXTS = ['.forge.js', '.sketch.js', '.js', '.svg', '.forge-notebook.json'];
+const PROJECT_FILE_EXTS = ['.forge.js', '.js', '.svg', '.forge-notebook.json'];
 const isProjectFile = (name: string): boolean => PROJECT_FILE_EXTS.some((ext) => name.endsWith(ext));
 
 const MIME: Record<string, string> = {

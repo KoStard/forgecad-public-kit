@@ -37,7 +37,7 @@ Those are backend and topology problems, not evidence that the Forge language is
 
 ## What should stay unchanged
 
-- `.forge.js` / `.sketch.js` as the source format
+- `.forge.js` as the source format
 - `param(...)`, imports, assemblies, BOM/report APIs
 - script-level composition patterns
 - the idea that code is the feature tree

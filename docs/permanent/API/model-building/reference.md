@@ -1128,37 +1128,37 @@ Use [entities.md](entities.md) for:
 
 ## Multi-File Projects
 
-ForgeCAD supports multi-file projects. Files are either **sketches** (`.sketch.js`, return a `Sketch`), **parts** (`.forge.js`, return a `Shape`, `TrackedShape`, or `ShapeGroup`), or **SVG assets** (`.svg`, parsed into a `Sketch`).
+ForgeCAD supports multi-file projects. Files are either **sketches** (`.forge.js` returning a `Sketch`), **parts** (`.forge.js` returning a `Shape`, `TrackedShape`, or `ShapeGroup`), or **SVG assets** (`.svg`, parsed into a `Sketch`). Sketch vs. part is determined by content (return type), not by file extension.
 
 ### File Types
-- `*.sketch.js` — 2D sketch file; when used with `importSketch()`, must return a `Sketch`
-- `*.forge.js` — 3D Forge file:
+- `*.forge.js` — ForgeCAD script file:
+  - when used with `importSketch()`, must return a `Sketch`
   - when used with `importPart()`, must return a `Shape` or `TrackedShape`
   - when used with `importGroup()`, must return a `ShapeGroup` (via `group(...)`)
 - `*.svg` — vector artwork file, imported as sketch geometry
 
 ### Import Path Resolution
-- `./file.forge.js`, `./file.sketch.js`, `./asset.svg` (and `../...`) resolve relative to the file that calls imports
+- `./file.forge.js`, `./asset.svg` (and `../...`) resolve relative to the file that calls imports
 - Bare paths like `api/bracket.forge.js` resolve from the opened project root
 - Leading `/` is treated as project-root relative
 
 ### `importSketch(fileName, paramOverridesOrSvgOptions?)`
 Imports a sketch and returns `Sketch`.
 
-- For `*.sketch.js`: executes the file (must return `Sketch`)
+- For `*.forge.js`: executes the file (must return `Sketch`)
 - For `*.svg`: parses vector geometry into a `Sketch`
 
 **Parameters:**
-- `fileName` (string) — Import path (e.g. `"./profile.sketch.js"` or `"api/profile.sketch.js"`)
+- `fileName` (string) — Import path (e.g. `"./profile.forge.js"` or `"api/profile.forge.js"`)
 - `paramOverridesOrSvgOptions` (optional object)
-  - For `*.sketch.js`: import-time param overrides by param name
+  - For `*.forge.js`: import-time param overrides by param name
   - For `*.svg`: SVG import options (see `importSvgSketch`)
 
 **Returns:** `Sketch`
 
 ```javascript
 // In a .forge.js file:
-const profile = importSketch("bracket-profile.sketch.js", {
+const profile = importSketch("bracket-profile.forge.js", {
   "Width": 42,
   "Height": 18,
 });
@@ -1466,7 +1466,7 @@ const cap = box(18, 18, 8, true)
 ### Typical Project Structure
 ```
 my-project/
-├── base-profile.sketch.js    ← 2D cross-section
+├── base-profile.forge.js     ← 2D cross-section (returns Sketch)
 ├── bracket.forge.js           ← extrudes the sketch, adds holes
 └── assembly.forge.js          ← imports multiple parts, positions them
 ```

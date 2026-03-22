@@ -77,7 +77,7 @@ function captureSourceLine(): number | undefined {
     const lines = stack.split('\n');
 
     // Walk the stack from the top; the first frame that references a
-    // `.forge.js` or `.sketch.js` user file is the caller.
+    // `.forge.js` user file is the caller (`.sketch.js` kept for legacy compat).
     for (const line of lines) {
       const match = line.match(/\(([^)]+\.(?:forge|sketch)\.js):(\d+):\d+\)/u)
         ?? line.match(/at ([^:]+\.(?:forge|sketch)\.js):(\d+):\d+/u)

@@ -8,7 +8,7 @@ Make ForgeCAD compile one modeling system to multiple geometry backends without 
 
 The target is:
 
-- user-facing source stays `.forge.js` / `.sketch.js`
+- user-facing source stays `.forge.js`
 - Forge owns the semantic modeling layer
 - Manifold and CadQuery/OpenCascade become backend lowerers
 - backend capabilities and losses stay explicit instead of hidden

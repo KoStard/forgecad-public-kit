@@ -15,7 +15,7 @@ Create the example-architecture gate: a checked inventory/manifest plus validati
 
 This task should:
 
-- inventory every `.forge.js`, `.sketch.js`, and `.forge-notebook.json` artifact under `examples/`
+- inventory every `.forge.js` and `.forge-notebook.json` artifact under `examples/`
 - classify each artifact by validation class
 - attach an intentional validation path to each class
 - attach an intentional compiler-route expectation to each `part` example

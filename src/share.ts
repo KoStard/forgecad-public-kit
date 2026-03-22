@@ -76,14 +76,14 @@ export function getGistId(): string | null {
   return getQueryParams().get('gist');
 }
 
-/** Fetch a ForgeCAD model from a GitHub Gist. Returns the first .forge.js or .sketch.js file found. */
+/** Fetch a ForgeCAD model from a GitHub Gist. Returns the first .forge.js file found. */
 export async function fetchGistModel(gistId: string): Promise<SharedModel> {
   const res = await fetch(`https://api.github.com/gists/${gistId}`);
   if (!res.ok) throw new Error(`Failed to fetch gist: ${res.status} ${res.statusText}`);
   const data = await res.json();
   const files = data.files as Record<string, { filename: string; content: string }>;
 
-  // Prefer .forge.js, then .sketch.js, then first file
+  // Prefer .forge.js, then .sketch.js (legacy), then first file
   const entries = Object.values(files);
   const forgeFile = entries.find((f) => f.filename.endsWith('.forge.js'))
     || entries.find((f) => f.filename.endsWith('.sketch.js'))

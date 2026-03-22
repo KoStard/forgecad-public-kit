@@ -13,7 +13,7 @@ npm run preview      # Preview production build
 
 ### CLI Tools
 ```bash
-forgecad export svg examples/frame.sketch.js     # Export sketch to SVG (Node, no browser)
+forgecad export svg examples/constraints/01-fully-constrained-rect.forge.js  # Export sketch to SVG
 forgecad render examples/cup.forge.js            # Render to PNG (Puppeteer + Chrome)
 ```
 
@@ -68,8 +68,8 @@ cli/
 └── render.html           # HTML shell for headless render
 
 examples/                 # Example scripts
-├── *.forge.js            # 3D part examples
-└── *.sketch.js           # 2D sketch examples
+├── *.forge.js            # 3D part and 2D sketch examples
+└── constraints/          # Constrained sketch examples
 ```
 
 ## Coding Standards

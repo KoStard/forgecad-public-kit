@@ -233,7 +233,7 @@ const collectInitialFolders = (files: Record<string, string>): string[] => {
 const INITIAL_FOLDERS = collectInitialFolders(INITIAL_FILES);
 const isModelFile = (name: string): boolean => (
   name.endsWith('.forge.js')
-  || name.endsWith('.sketch.js')
+  || name.endsWith('.sketch.js') // legacy compat
 );
 const isRunnableFile = isModelFile;
 const findPreferredEntryFile = (names: string[]): string | null => (
@@ -934,9 +934,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   <path d="M 10 10 L 90 10 L 90 90 L 10 90 Z" fill="none" stroke="#000" stroke-width="4" />
 </svg>
 `
-      : normalized.endsWith('.sketch.js')
-        ? '// 2D Sketch\n\nreturn rect(50, 30, true);\n'
-        : normalized.endsWith('.forge.js')
+      : normalized.endsWith('.forge.js')
           ? '// 3D Part\n\nreturn box(50, 30, 10);\n'
           : '// Shared JS utilities for ForgeCAD.\n\nexport function exampleValue() {\n  return 42;\n}\n';
     const newFolders = Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort();
@@ -1619,7 +1617,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         const handle = await (window as any).showSaveFilePicker({
           suggestedName: activeFile,
           types: [
-            { description: 'ForgeCAD scripts', accept: { 'text/javascript': ['.forge.js', '.sketch.js', '.js'] } },
+            { description: 'ForgeCAD scripts', accept: { 'text/javascript': ['.forge.js', '.js'] } },
             { description: 'ForgeCAD notebooks', accept: { 'application/json': ['.forge-notebook.json'] } },
             { description: 'SVG', accept: { 'image/svg+xml': ['.svg'] } },
           ],

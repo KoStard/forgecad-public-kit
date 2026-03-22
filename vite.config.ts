@@ -28,7 +28,7 @@ function resolveProjectDir(): string | null {
 }
 
 const projectDir = resolveProjectDir();
-const PROJECT_FILE_EXTS = ['.forge.js', '.sketch.js', '.js', '.svg', '.forge-notebook.json'];
+const PROJECT_FILE_EXTS = ['.forge.js', '.js', '.svg', '.forge-notebook.json'];
 const isProjectFile = (name: string): boolean => PROJECT_FILE_EXTS.some((ext) => name.endsWith(ext));
 
 let notebookKernelReady: Promise<void> | null = null;
