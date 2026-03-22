@@ -1870,9 +1870,16 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
     const hashFile = getActiveFileFromHash();
     const availableFiles = Object.keys(nextFiles);
+
+    // Check if the hash points to a mesh file — if so, set up mesh preview
+    const MESH_EXTS = ['.stl', '.obj', '.3mf'];
+    const isMeshHash = hashFile && MESH_EXTS.some((ext) => hashFile.toLowerCase().endsWith(ext));
+    const meshPreview = isMeshHash && nextFiles[hashFile] !== undefined ? hashFile : null;
+
+    // For mesh preview, pick a script file as the active file (not the mesh itself)
     const newActiveFile = sharedModel
       ? sharedModel.filename
-      : (hashFile && nextFiles[hashFile])
+      : (hashFile && !isMeshHash && nextFiles[hashFile] !== undefined)
         ? hashFile
         : (activeFile && nextFiles[activeFile]
           ? activeFile
@@ -1891,11 +1898,14 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       savedFiles: nextSaved,
       folders: Array.from(newFolders).sort(),
       activeFile: newActiveFile,
+      meshPreviewFile: meshPreview,
       dirty: nextDirty,
       objectSettingsByFile: nextObjectSettingsByFile,
     });
 
-    if (newActiveFile && newActiveFile !== activeFile) {
+    if (meshPreview) {
+      setTimeout(() => get().execute(), 0);
+    } else if (newActiveFile && newActiveFile !== activeFile) {
       set({ paramOverrides: {}, lastValidResult: null });
       setParamOverrides({});
       window.history.replaceState(null, '', `#${newActiveFile}`);
