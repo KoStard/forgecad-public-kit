@@ -9,6 +9,7 @@ import { init, runScript } from "../src/forge/headless";
 import { collectProjectFiles } from "./collect-files";
 import { materializeNotebookPreviewScript } from "./notebook-entry";
 import type { Shape } from "../src/forge/kernel";
+import { setActiveBackend, type ActiveBackend } from "../src/forge/kernel";
 import { lastSolveProfile } from "../src/forge/sketch/constraints/sketch";
 import { lastSolverProfile, getSolverStats, resetSolverStats, getLastSolveTrail } from "../src/forge/sketch/constraints/registry";
 import { getLastRustProfile } from "../src/forge/sketch/constraints/solver-wasm";
@@ -152,14 +153,34 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
   return deduped;
 }
 
+function parseBackendArg(argv: string[]): { backend?: ActiveBackend; rest: string[] } {
+  const rest: string[] = [];
+  let backend: ActiveBackend | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--backend') {
+      const val = argv[i + 1];
+      if (val !== 'manifold' && val !== 'occt') {
+        console.error('--backend must be manifold or occt');
+        process.exit(1);
+      }
+      backend = val;
+      i += 1;
+    } else {
+      rest.push(argv[i]);
+    }
+  }
+  return { backend, rest };
+}
+
 function usage(): never {
-  console.error("Usage: forgecad run <script.forge.js|notebook.forge-notebook.json> [--debug-imports]");
+  console.error("Usage: forgecad run <script.forge.js|notebook.forge-notebook.json> [--debug-imports] [--backend manifold|occt]");
   process.exit(1);
 }
 
 export async function runScriptCli(argv: string[] = process.argv.slice(2)): Promise<void> {
-  const debugImports = argv.includes('--debug-imports');
-  const positional = argv.filter((arg) => arg !== '--debug-imports');
+  const { backend, rest: filteredArgv } = parseBackendArg(argv);
+  const debugImports = filteredArgv.includes('--debug-imports');
+  const positional = filteredArgv.filter((arg) => arg !== '--debug-imports');
   const scriptPath = positional[0];
   if (!scriptPath) usage();
 
@@ -170,6 +191,7 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
     const { allFiles, fileName } = collectProjectFiles(materialized.runnablePath);
 
     await init();
+    if (backend) setActiveBackend(backend);
     resetSolverStats();
     const result = runScript(code, fileName, allFiles, { debugImports });
 

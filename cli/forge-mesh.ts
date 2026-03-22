@@ -7,7 +7,7 @@ import {
   buildBinaryStl,
   type MeshExportObject,
 } from '../src/forge/headless';
-import { initKernel } from '../src/forge/kernel';
+import { initKernel, setActiveBackend, type ActiveBackend } from '../src/forge/kernel';
 import { collectProjectFiles } from './collect-files';
 
 type MeshFormat = '3mf' | 'stl';
@@ -16,12 +16,14 @@ interface ParsedArgs {
   scriptPath: string;
   outputPath?: string;
   quality?: 'default' | 'live' | 'high';
+  backend?: ActiveBackend;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
   let scriptPath: string | undefined;
   let outputPath: string | undefined;
   let quality: 'default' | 'live' | 'high' | undefined;
+  let backend: ActiveBackend | undefined;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -40,6 +42,15 @@ function parseArgs(argv: string[]): ParsedArgs {
       i += 1;
       continue;
     }
+    if (arg === '--backend') {
+      const val = argv[i + 1];
+      if (val !== 'manifold' && val !== 'occt') {
+        throw new Error('--backend must be manifold or occt');
+      }
+      backend = val;
+      i += 1;
+      continue;
+    }
     if (arg.startsWith('--')) {
       throw new Error(`Unknown flag: ${arg}`);
     }
@@ -48,10 +59,10 @@ function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (!scriptPath) {
-    throw new Error('Usage: forgecad export <3mf|stl> <script.forge.js> [--output path] [--quality default|live|high]');
+    throw new Error('Usage: forgecad export <3mf|stl> <script.forge.js> [--output path] [--quality default|live|high] [--backend manifold|occt]');
   }
 
-  return { scriptPath, outputPath, quality };
+  return { scriptPath, outputPath, quality, backend };
 }
 
 function defaultOutputPath(scriptPath: string, format: MeshFormat): string {
@@ -76,11 +87,12 @@ export async function runMeshExportCli(
   format: MeshFormat,
   argv: string[],
 ): Promise<void> {
-  const { scriptPath, outputPath, quality } = parseArgs(argv);
+  const { scriptPath, outputPath, quality, backend } = parseArgs(argv);
   const code = (await import('fs')).readFileSync(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
   await initKernel();
+  if (backend) setActiveBackend(backend);
 
   const qualityPreset = quality && quality !== 'default' ? quality : undefined;
   const result = runScript(code, fileName, allFiles, qualityPreset ? { quality: qualityPreset } : undefined);

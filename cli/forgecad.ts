@@ -287,7 +287,7 @@ const commands: CommandDefinition[] = [
     group: 'Modeling',
     path: ['run'],
     summary: 'Execute a Forge script or notebook preview with the real runtime and print geometry diagnostics.',
-    usage: ['forgecad run <script.forge.js|notebook.forge-notebook.json> [--debug-imports]'],
+    usage: ['forgecad run <script.forge.js|notebook.forge-notebook.json> [--debug-imports] [--backend manifold|occt]'],
     examples: [
       'forgecad run examples/cup.forge.js',
       'forgecad run examples/api/notebook-iteration.forge-notebook.json',
@@ -296,6 +296,7 @@ const commands: CommandDefinition[] = [
     completion: {
       options: [
         { name: '--debug-imports', description: 'Print the import trace' },
+        { name: '--backend', description: 'Geometry backend', argument: 'required', valueLabel: '<manifold|occt>', values: [{ value: 'manifold', description: 'Manifold backend (default)' }, { value: 'occt', description: 'OCCT backend' }] },
       ],
       positionals: [
         { description: 'Forge script or notebook', valueKind: 'renderable' },
@@ -544,7 +545,7 @@ const commands: CommandDefinition[] = [
     path: ['export', '3mf'],
     summary: 'Export a Forge script to 3MF (3D Manufacturing Format) for 3D printing.',
     usage: [
-      'forgecad export 3mf <script.forge.js> [--output path] [--quality default|live|high]',
+      'forgecad export 3mf <script.forge.js> [--output path] [--quality default|live|high] [--backend manifold|occt]',
     ],
     examples: [
       'forgecad export 3mf examples/cup.forge.js',
@@ -555,6 +556,7 @@ const commands: CommandDefinition[] = [
       options: [
         { name: '--output', description: 'Output 3MF path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
         { name: '--quality', description: 'Forge quality preset', argument: 'required', valueLabel: '<default|live|high>', values: QUALITY_VALUES },
+        { name: '--backend', description: 'Geometry backend', argument: 'required', valueLabel: '<manifold|occt>', values: [{ value: 'manifold', description: 'Manifold backend (default)' }, { value: 'occt', description: 'OCCT backend' }] },
       ],
       positionals: [
         { description: 'Forge script', valueKind: 'forge-script' },
@@ -567,7 +569,7 @@ const commands: CommandDefinition[] = [
     path: ['export', 'stl'],
     summary: 'Export a Forge script to binary STL.',
     usage: [
-      'forgecad export stl <script.forge.js> [--output path] [--quality default|live|high]',
+      'forgecad export stl <script.forge.js> [--output path] [--quality default|live|high] [--backend manifold|occt]',
     ],
     examples: [
       'forgecad export stl examples/cup.forge.js',
@@ -578,6 +580,7 @@ const commands: CommandDefinition[] = [
       options: [
         { name: '--output', description: 'Output STL path', argument: 'required', valueLabel: '<path>', valueKind: 'path' },
         { name: '--quality', description: 'Forge quality preset', argument: 'required', valueLabel: '<default|live|high>', values: QUALITY_VALUES },
+        { name: '--backend', description: 'Geometry backend', argument: 'required', valueLabel: '<manifold|occt>', values: [{ value: 'manifold', description: 'Manifold backend (default)' }, { value: 'occt', description: 'OCCT backend' }] },
       ],
       positionals: [
         { description: 'Forge script', valueKind: 'forge-script' },
