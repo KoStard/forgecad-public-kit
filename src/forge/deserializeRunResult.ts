@@ -56,6 +56,7 @@ export function deserializeRunResult(s: SerializedRunResult): RunResult {
     objects: s.objects.map(deserializeSceneObject),
     params: s.params,
     dimensions: s.dimensions,
+    highlights: s.highlights ?? [],
     bom: s.bom,
     cutPlanes: s.cutPlanes,
     explodeView: s.explodeView,

@@ -5,6 +5,7 @@ import type {
   VerificationResult,
 } from '@forge/index';
 import type { DimensionDef } from '../forge/sketch/dimensions';
+import type { HighlightDef } from '../forge/sketch/highlights';
 import type { BomDef } from '../forge/bom';
 import type { CutPlaneDef } from '../forge/cutPlane';
 import type { ExplodeViewOptions } from '../forge/explodeView';
@@ -71,6 +72,7 @@ export interface SerializedRunResult {
   objects: SerializedSceneObject[];
   params: ParamDef[];
   dimensions: DimensionDef[];
+  highlights: HighlightDef[];
   bom: BomDef[];
   cutPlanes: CutPlaneDef[];
   explodeView: ExplodeViewOptions | null;

@@ -186,6 +186,7 @@ export function serializeRunResult(
     objects,
     params: result.params,
     dimensions: result.dimensions,
+    highlights: result.highlights,
     bom: result.bom,
     cutPlanes: result.cutPlanes,
     explodeView: result.explodeView,

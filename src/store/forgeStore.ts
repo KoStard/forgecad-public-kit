@@ -766,6 +766,7 @@ function createErrorRunResult(message: string, quality: ForgeQualityPreset): Run
     objects: [],
     params: [],
     dimensions: [],
+    highlights: [],
     bom: [],
     cutPlanes: [],
     explodeView: null,

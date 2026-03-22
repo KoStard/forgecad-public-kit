@@ -12,6 +12,7 @@ import type {
   JointOverlayViewConfig,
 } from '@forge/index';
 import type { DimensionDef } from '@forge/sketch/dimensions';
+import type { HighlightDef } from '@forge/sketch/highlights';
 import type { SketchConstraintMeta, AnnotationElement } from '@forge/sketch/constraints/types';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
@@ -2356,6 +2357,23 @@ function SketchObject({
     });
   }, [obj.sketchMeta, sketchTheme]);
 
+  // Pulse animation for highlighted entities — oscillates between 0.5 and 1.0.
+  const highlightPulseRef = useRef(1.0);
+  useFrame(({ clock }) => {
+    highlightPulseRef.current = 0.75 + 0.25 * Math.sin(clock.elapsedTime * 4);
+  });
+
+  // Build a lookup set for programmatic highlights.
+  const highlightMap = useMemo(() => {
+    const map = new Map<string, HighlightDef>();
+    const highlights = obj.sketchMeta?.highlights;
+    if (!highlights) return map;
+    for (const h of highlights) {
+      map.set(h.entityId, h);
+    }
+    return map;
+  }, [obj.sketchMeta]);
+
   // Bounding box covering all sketch geometry — used as a transparent hit plane so
   // pointer events fire even when the cursor is over edges/vertices outside the fill.
   const hitPlaneBounds = useMemo(() => {
@@ -2542,6 +2560,125 @@ function SketchObject({
               boxShadow: isEntitySelected ? '0 0 6px #4aa3ff' : '0 0 2px #000',
               transition: 'all 0.1s',
             }} />
+          </Html>
+        );
+      })}
+      {/* Programmatic debug highlights — thicker overlay lines on highlighted edges */}
+      {highlightMap.size > 0 && edgeLines.lines.map((edge) => {
+        const hl = highlightMap.get(edge.id);
+        if (!hl) return null;
+        const color = hl.color ?? '#ff00ff';
+        return (
+          <primitive
+            key={`hl-${edge.id}`}
+            object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({
+              color,
+              linewidth: 4,
+              transparent: true,
+              opacity: hl.pulse ? highlightPulseRef.current : 0.9,
+              depthWrite: false,
+            }))}
+            raycast={() => null}
+          />
+        );
+      })}
+      {highlightMap.size > 0 && edgeLines.circles.map((edge) => {
+        const hl = highlightMap.get(edge.id);
+        if (!hl) return null;
+        const color = hl.color ?? '#ff00ff';
+        return (
+          <primitive
+            key={`hl-${edge.id}`}
+            object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({
+              color,
+              linewidth: 4,
+              transparent: true,
+              opacity: hl.pulse ? highlightPulseRef.current : 0.9,
+              depthWrite: false,
+            }))}
+            raycast={() => null}
+          />
+        );
+      })}
+      {highlightMap.size > 0 && edgeLines.points.map((pt) => {
+        const hl = highlightMap.get(pt.id);
+        if (!hl) return null;
+        const color = hl.color ?? '#ff00ff';
+        return (
+          <Html
+            key={`hl-${pt.id}`}
+            position={[pt.pos[0], pt.pos[1], 0.06]}
+            center
+            zIndexRange={[0, 0]}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              background: color,
+              opacity: hl.pulse ? highlightPulseRef.current : 0.9,
+              boxShadow: `0 0 8px ${color}`,
+            }} />
+          </Html>
+        );
+      })}
+      {/* Highlight labels rendered near highlighted entities */}
+      {highlightMap.size > 0 && edgeLines.points.map((pt) => {
+        const hl = highlightMap.get(pt.id);
+        if (!hl?.label) return null;
+        return (
+          <Html
+            key={`hl-label-${pt.id}`}
+            position={[pt.pos[0], pt.pos[1], 0.07]}
+            center
+            zIndexRange={[0, 0]}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div style={{
+              position: 'absolute',
+              left: 8,
+              top: -8,
+              background: 'rgba(0,0,0,0.75)',
+              color: hl.color ?? '#ff00ff',
+              fontSize: 11,
+              padding: '1px 5px',
+              borderRadius: 3,
+              whiteSpace: 'nowrap',
+              fontFamily: 'monospace',
+            }}>
+              {hl.label}
+            </div>
+          </Html>
+        );
+      })}
+      {/* Highlight labels for lines — positioned at midpoint */}
+      {highlightMap.size > 0 && edgeLines.lines.map((edge) => {
+        const hl = highlightMap.get(edge.id);
+        if (!hl?.label) return null;
+        const pos = edge.geo.attributes.position;
+        if (!pos || pos.count < 2) return null;
+        const mx = (pos.getX(0) + pos.getX(pos.count - 1)) / 2;
+        const my = (pos.getY(0) + pos.getY(pos.count - 1)) / 2;
+        return (
+          <Html
+            key={`hl-label-${edge.id}`}
+            position={[mx, my, 0.07]}
+            center
+            zIndexRange={[0, 0]}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div style={{
+              background: 'rgba(0,0,0,0.75)',
+              color: hl.color ?? '#ff00ff',
+              fontSize: 11,
+              padding: '1px 5px',
+              borderRadius: 3,
+              whiteSpace: 'nowrap',
+              fontFamily: 'monospace',
+            }}>
+              {hl.label}
+            </div>
           </Html>
         );
       })}

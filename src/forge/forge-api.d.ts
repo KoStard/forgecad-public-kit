@@ -1911,6 +1911,13 @@ declare function dim(from: PointArg$1, to: PointArg$1, opts?: DimOpts): void;
  * Add a dimension annotation along a Line2D.
  */
 declare function dimLine(l: Line2D, opts?: DimOpts): void;
+/**
+ * Mark an entity for visual highlighting in the viewport (debugging aid).
+ *
+ * @param entityId - The ID of the entity to highlight (e.g. 'L0', 'P0', 'C0')
+ * @param opts - Optional styling: color, label, pulse animation
+ */
+declare function highlight(entityId: string, opts?: { color?: string; label?: string; pulse?: boolean }): void;
 type Vec2 = [
 	number,
 	number

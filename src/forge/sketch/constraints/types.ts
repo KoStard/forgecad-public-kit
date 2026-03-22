@@ -3,6 +3,7 @@
  *
  * These types describe the Rust-backed boundary and the remaining UI/builder surface.
  */
+import type { HighlightDef } from '../highlights';
 export type PointId = string;
 export type LineId = string;
 export type CircleId = string;
@@ -188,6 +189,8 @@ export interface SketchConstraintMeta {
   };
   /** True when the solver hit its time budget before fully converging. */
   timedOut?: boolean;
+  /** Programmatic debug highlights from user code. */
+  highlights?: HighlightDef[];
 }
 
 export interface ConstraintDefinition {
