@@ -18,7 +18,8 @@ import { VerificationsPanel } from './components/VerificationsPanel';
 import { ResizablePanel } from './components/ResizablePanel';
 import { isSaveShortcut, shouldBlockBrowserShortcut, type EditorSurface } from './editorShortcuts';
 import { isNotebookFile } from './notebook/model';
-import { buildShareUrl, buildEmbedUrl, buildEmbedSnippet, isEmbedMode } from './share';
+import { buildShareUrl, buildEmbedUrl, buildBundleShareUrl, buildBundleEmbedUrl, buildEmbedSnippet, isEmbedMode } from './share';
+import { collectDependencies, hasImports } from './importAnalysis';
 import { EmbedViewer } from './components/EmbedViewer';
 import { AISkillDialog } from './components/AISkillDialog';
 import { useDrawStore } from './draw/drawStore';
@@ -77,36 +78,59 @@ function ShareButton() {
     });
   };
 
-  const handleShare = () => {
-    if (!activeFile) return;
+  const buildUrl = (mode: 'share' | 'embed'): string | null => {
+    if (!activeFile) return null;
     const code = files[activeFile];
-    if (!code) return;
-    const url = buildShareUrl(activeFile, code);
+    if (!code) return null;
 
-    if (url.length > 8000) {
-      const ok = window.confirm(
-        `The share URL is ${(url.length / 1024).toFixed(0)} KB — some browsers or services may truncate it. Copy anyway?`,
-      );
-      if (!ok) return;
+    // Check if the file has imports that need bundling
+    if (hasImports(code)) {
+      const deps = collectDependencies(activeFile, files);
+      const fileCount = Object.keys(deps.codeFiles).length;
+
+      if (deps.meshFiles.length > 0) {
+        showToast(
+          `Note: mesh imports (${deps.meshFiles.join(', ')}) are not included in the share link — they resolve from the hosted server.`,
+          'info',
+          5000,
+        );
+      }
+
+      if (fileCount > 1) {
+        const bundle = { entry: activeFile, files: deps.codeFiles };
+        return mode === 'share'
+          ? buildBundleShareUrl(bundle)
+          : buildBundleEmbedUrl(bundle);
+      }
     }
 
+    // Single file — use the original compact format
+    return mode === 'share'
+      ? buildShareUrl(activeFile, code)
+      : buildEmbedUrl(activeFile, code);
+  };
+
+  const confirmLargeUrl = (url: string, label: string): boolean => {
+    if (url.length > 8000) {
+      return window.confirm(
+        `The ${label} URL is ${(url.length / 1024).toFixed(0)} KB — some browsers or services may truncate it.\nFor large models, consider creating a GitHub Gist and using ?gist=<id> instead.\nCopy anyway?`,
+      );
+    }
+    return true;
+  };
+
+  const handleShare = () => {
+    const url = buildUrl('share');
+    if (!url) return;
+    if (!confirmLargeUrl(url, 'share')) return;
     copyToClipboard(url, 'Share link');
   };
 
   const handleEmbed = () => {
-    if (!activeFile) return;
-    const code = files[activeFile];
-    if (!code) return;
-    const embedUrl = buildEmbedUrl(activeFile, code);
-
-    if (embedUrl.length > 8000) {
-      const ok = window.confirm(
-        `The embed URL is ${(embedUrl.length / 1024).toFixed(0)} KB — some browsers or services may truncate it.\nFor large models, consider creating a GitHub Gist and using ?gist=<id> instead.\nCopy anyway?`,
-      );
-      if (!ok) return;
-    }
-
-    copyToClipboard(buildEmbedSnippet(embedUrl), 'Embed snippet');
+    const url = buildUrl('embed');
+    if (!url) return;
+    if (!confirmLargeUrl(url, 'embed')) return;
+    copyToClipboard(buildEmbedSnippet(url), 'Embed snippet');
   };
 
   return (

@@ -22,7 +22,7 @@ import { type ThemeName, applyTheme } from '../theme';
 import type { LengthUnit } from '@forge/units';
 import { clampAnimationSpeed } from '../animationSpeed';
 import type { ViewportCameraState } from '../capture/cameraState';
-import { decodeSharedHash, getGistId } from '../share';
+import { decodeSharedHash, decodeSharedBundle, getGistId } from '../share';
 
 // ---------------------------------------------------------------------------
 // Run result LRU cache — avoids re-evaluating a file you just switched away from.
@@ -244,7 +244,7 @@ const findPreferredEntryFile = (names: string[]): string | null => (
 
 const getActiveFileFromHash = (): string | null => {
   const hash = window.location.hash.slice(1); // Remove the #
-  if (hash.startsWith('code/')) return null; // handled by shared model logic
+  if (hash.startsWith('code/') || hash.startsWith('bundle/')) return null; // handled by shared model / bundle logic
   return hash || null;
 };
 
@@ -254,10 +254,19 @@ if (sharedModel) {
   INITIAL_FILES[sharedModel.filename] = sharedModel.code;
 }
 
+/** If the URL contains a multi-file bundle (`#bundle/...`), decode and inject all files. */
+const sharedBundle = decodeSharedBundle(window.location.hash);
+if (sharedBundle) {
+  for (const [name, code] of Object.entries(sharedBundle.files)) {
+    INITIAL_FILES[name] = code;
+  }
+}
+
 /** Exported so applyServerSnapshot can inject the shared model into the file set. */
-export { sharedModel };
+export { sharedModel, sharedBundle };
 
 const initialActive = (() => {
+  if (sharedBundle) return sharedBundle.entry;
   if (sharedModel) return sharedModel.filename;
   const hashFile = getActiveFileFromHash();
   if (hashFile && INITIAL_FILES[hashFile]) {
@@ -1830,10 +1839,21 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       collectParentPaths(sharedModel.filename).forEach((folder) => newFolders.add(folder));
     }
 
+    // Inject shared bundle files from URL (if any) so they survive server snapshots
+    if (sharedBundle) {
+      for (const [name, code] of Object.entries(sharedBundle.files)) {
+        nextFiles[name] = code;
+        nextSaved[name] = code;
+        collectParentPaths(name).forEach((folder) => newFolders.add(folder));
+      }
+    }
+
     const hashFile = getActiveFileFromHash();
     const availableFiles = Object.keys(nextFiles);
-    const newActiveFile = sharedModel
-      ? sharedModel.filename
+    const newActiveFile = sharedBundle
+      ? sharedBundle.entry
+      : sharedModel
+        ? sharedModel.filename
       : (hashFile && nextFiles[hashFile])
         ? hashFile
         : (activeFile && nextFiles[activeFile]
