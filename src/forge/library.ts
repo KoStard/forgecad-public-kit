@@ -7,7 +7,8 @@
 
 import { box, cylinder, sphere, union, difference, intersection, Shape, buildShapeFromCompilePlan } from './kernel';
 import { ShapeGroup } from './group';
-import { Sketch } from './sketch/core';
+import { Sketch, setSketchCompileProfilePlan } from './sketch/core';
+import type { ProfileCompilePlan } from './compilePlan';
 import { TrackedShape } from './sketch/topology';
 import { rect, roundedRect, circle2d, polygon } from './sketch/primitives';
 import { union2d, difference2d } from './sketch/booleans';
@@ -1494,7 +1495,11 @@ export function sideGear(options: SideGearOptions): Shape {
     circle2d(meta.rootRadius, Math.max(48, normalized.teeth * 2)),
   );
   // Use backend-level simplify for polygon cleanup (not a public Sketch API).
-  const toothBandProfile = new Sketch(toothBandRaw.cross.simplify(1e-6), toothBandRaw.colorHex);
+  const opaquePlan: ProfileCompilePlan = { kind: 'opaque', transforms: [] };
+  const toothBandProfile = setSketchCompileProfilePlan(
+    new Sketch(toothBandRaw.cross.simplify(1e-6), toothBandRaw.colorHex),
+    opaquePlan,
+  );
 
   const teethBand = sketchExtrude(toothBandProfile, normalized.toothHeight, { center: false })
     .toShape()

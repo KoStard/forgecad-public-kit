@@ -334,6 +334,9 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
 
     case 'project':
       throw new OCCTUnsupportedError('profile project');
+
+    case 'opaque':
+      throw new Error('Cannot lower an opaque profile compile plan — the profile was computed at runtime and cannot be reconstructed from the plan.');
   }
 
   // Apply 2D transforms

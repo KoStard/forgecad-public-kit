@@ -17,12 +17,14 @@ import {
 type SketchPlacement3D = Mat4;
 export type SketchOperandInput = Sketch | readonly Sketch[];
 
-const _sketchCompileProfilePlans = new WeakMap<Sketch, ProfileCompilePlan | null>();
+const OPAQUE_PROFILE_PLAN: ProfileCompilePlan = { kind: 'opaque', transforms: [] };
+
+const _sketchCompileProfilePlans = new WeakMap<Sketch, ProfileCompilePlan>();
 const _sketchPlacement3D = new WeakMap<Sketch, SketchPlacement3D | null>();
 const _sketchPlacementModels = new WeakMap<Sketch, SketchPlacementModel | null>();
 
-function setSketchCompileProfilePlanInternal(sketch: Sketch, plan: ProfileCompilePlan | null): Sketch {
-  _sketchCompileProfilePlans.set(sketch, cloneProfileCompilePlan(plan));
+function setSketchCompileProfilePlanInternal(sketch: Sketch, plan: ProfileCompilePlan): Sketch {
+  _sketchCompileProfilePlans.set(sketch, cloneProfileCompilePlan(plan)!);
   return sketch;
 }
 
@@ -45,7 +47,7 @@ export class Sketch {
 
   constructor(public readonly cross: ProfileBackend, color?: string) {
     this.colorHex = color;
-    setSketchCompileProfilePlanInternal(this, null);
+    setSketchCompileProfilePlanInternal(this, OPAQUE_PROFILE_PLAN);
     setSketchPlacement3DInternal(this, null);
     setSketchPlacementModelInternal(this, null);
   }
@@ -92,12 +94,8 @@ export class Sketch {
   add(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
   subtract(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
   intersect(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
-  offset(delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
-    return copySketchPlacement3D(this, new Sketch(this.cross.offset(delta, join), this.colorHex));
-  }
-  hull(): Sketch {
-    return copySketchPlacement3D(this, new Sketch(this.cross.hull(), this.colorHex));
-  }
+  offset(delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch { throw new Error('Not implemented'); }
+  hull(): Sketch { throw new Error('Not implemented'); }
   /**
    * Decompose this sketch into its distinct filled regions. See `sketchRegions()`.
    * Regions are returned largest-first by area.
@@ -127,11 +125,11 @@ export type {
   SketchWorkplane,
 } from './workplaneModel';
 
-export function getSketchCompileProfilePlan(sketch: Sketch): ProfileCompilePlan | null {
-  return cloneProfileCompilePlan(_sketchCompileProfilePlans.get(sketch) ?? null);
+export function getSketchCompileProfilePlan(sketch: Sketch): ProfileCompilePlan {
+  return cloneProfileCompilePlan(_sketchCompileProfilePlans.get(sketch) ?? OPAQUE_PROFILE_PLAN)!;
 }
 
-export function setSketchCompileProfilePlan(sketch: Sketch, plan: ProfileCompilePlan | null): Sketch {
+export function setSketchCompileProfilePlan(sketch: Sketch, plan: ProfileCompilePlan): Sketch {
   return setSketchCompileProfilePlanInternal(sketch, plan);
 }
 

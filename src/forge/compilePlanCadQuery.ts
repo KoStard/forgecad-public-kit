@@ -186,6 +186,8 @@ function lowerProfileCompilePlanToCadQueryResultAtPath(
     }
     case 'hull':
       return compilerFailure(unsupportedNodeDiagnostic('profile-hull', path));
+    case 'opaque':
+      return compilerFailure(unsupportedNodeDiagnostic('profile-opaque', path));
   }
 }
 

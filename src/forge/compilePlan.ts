@@ -88,6 +88,11 @@ export type ProfileCompilePlan =
       replayProfile?: ProfileCompilePlan;
       replayReason?: string;
       transforms: ProfileCompileTransformStep[];
+    }
+  | {
+      /** Wraps a pre-built ProfileBackend that can't be expressed as compile plan IR. */
+      kind: 'opaque';
+      transforms: ProfileCompileTransformStep[];
     };
 
 export type ShapeCompileTransformStep =
@@ -641,6 +646,11 @@ export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): Profil
         replayReason: plan.replayReason,
         transforms: plan.transforms.map(cloneProfileTransform),
       };
+    case 'opaque':
+      return {
+        kind: 'opaque',
+        transforms: plan.transforms.map(cloneProfileTransform),
+      };
   }
 }
 
@@ -814,10 +824,9 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
 }
 
 export function appendProfileCompileTransform(
-  plan: ProfileCompilePlan | null,
+  plan: ProfileCompilePlan,
   step: ProfileCompileTransformStep,
-): ProfileCompilePlan | null {
-  if (!plan) return null;
+): ProfileCompilePlan {
   const out = cloneProfileCompilePlan(plan)!;
   out.transforms.push(cloneProfileTransform(step));
   return out;
@@ -1010,9 +1019,8 @@ export function findShapeWorkplanePlacement(
 
 export function buildBooleanProfileCompilePlan(
   op: 'union' | 'difference' | 'intersection',
-  profiles: Array<ProfileCompilePlan | null>,
-): ProfileCompilePlan | null {
-  if (profiles.some((profile) => profile == null)) return null;
+  profiles: ProfileCompilePlan[],
+): ProfileCompilePlan {
   return {
     kind: 'boolean',
     op,
@@ -1022,11 +1030,10 @@ export function buildBooleanProfileCompilePlan(
 }
 
 export function buildOffsetProfileCompilePlan(
-  base: ProfileCompilePlan | null,
+  base: ProfileCompilePlan,
   delta: number,
   join: 'Square' | 'Round' | 'Miter',
-): ProfileCompilePlan | null {
-  if (!base) return null;
+): ProfileCompilePlan {
   return {
     kind: 'offset',
     base: cloneProfileCompilePlan(base)!,
@@ -1037,9 +1044,8 @@ export function buildOffsetProfileCompilePlan(
 }
 
 export function buildHullProfileCompilePlan(
-  profiles: Array<ProfileCompilePlan | null>,
-): ProfileCompilePlan | null {
-  if (profiles.some((profile) => profile == null)) return null;
+  profiles: ProfileCompilePlan[],
+): ProfileCompilePlan {
   return {
     kind: 'hull',
     profiles: profiles.map((profile) => cloneProfileCompilePlan(profile)!),
@@ -1113,11 +1119,10 @@ export function buildChamferShapeCompilePlan(
 }
 
 export function buildLoftShapeCompilePlan(
-  profiles: Array<ProfileCompilePlan | null>,
+  profiles: ProfileCompilePlan[],
   heights: number[],
   options: { edgeLength: number; boundsPadding: number },
-): ShapeCompilePlan | null {
-  if (profiles.some((profile) => profile == null)) return null;
+): ShapeCompilePlan {
   return {
     kind: 'loft',
     profiles: profiles.map((profile) => cloneProfileCompilePlan(profile)!),
@@ -1128,15 +1133,14 @@ export function buildLoftShapeCompilePlan(
 }
 
 export function buildSweepShapeCompilePlan(
-  profile: ProfileCompilePlan | null,
+  profile: ProfileCompilePlan,
   path: SweepPathCompilePlan,
   options: {
     edgeLength: number;
     boundsPadding: number;
     up: [number, number, number];
   },
-): ShapeCompilePlan | null {
-  if (!profile) return null;
+): ShapeCompilePlan {
   return {
     kind: 'sweep',
     profile: cloneProfileCompilePlan(profile)!,

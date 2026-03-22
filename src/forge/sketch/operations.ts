@@ -3,7 +3,6 @@ import {
   Sketch,
   copySketchPlacement3D,
   getSketchCompileProfilePlan,
-  setSketchCompileProfilePlan,
 } from './core';
 import { buildHullProfileCompilePlan, buildOffsetProfileCompilePlan } from '../compilePlan';
 
@@ -12,9 +11,7 @@ export function sketchOffset(sketch: Sketch, delta: number, join: 'Square' | 'Ro
   const nextPlan = buildOffsetProfileCompilePlan(getSketchCompileProfilePlan(sketch), delta, join);
   return copySketchPlacement3D(
     sketch,
-    nextPlan
-      ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(sketch.cross.offset(delta, join), sketch.colorHex), null),
+    buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex),
   );
 }
 
@@ -22,9 +19,7 @@ export function sketchHull(sketch: Sketch): Sketch {
   const nextPlan = buildHullProfileCompilePlan([getSketchCompileProfilePlan(sketch)]);
   return copySketchPlacement3D(
     sketch,
-    nextPlan
-      ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(sketch.cross.hull(), sketch.colorHex), null),
+    buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex),
   );
 }
 

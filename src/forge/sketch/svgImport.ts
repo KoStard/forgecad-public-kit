@@ -1,5 +1,6 @@
 import { difference2d, union2d } from './booleans';
-import { Sketch } from './core';
+import { Sketch, setSketchCompileProfilePlan } from './core';
+import type { ProfileCompilePlan } from '../compilePlan';
 import { stroke as strokePolyline } from './path';
 import { polygon } from './primitives';
 
@@ -1455,7 +1456,11 @@ export function sketchFromSvg(svgText: string, options: SvgImportOptions = {}): 
   sketch = fitSketchToMaxDimensions(sketch, normalized);
   if (normalized.simplify > 0) {
     // Use backend-level simplify for polygon cleanup (not a public Sketch API).
-    sketch = new Sketch(sketch.cross.simplify(normalized.simplify), sketch.colorHex);
+    const opaquePlan: ProfileCompilePlan = { kind: 'opaque', transforms: [] };
+    sketch = setSketchCompileProfilePlan(
+      new Sketch(sketch.cross.simplify(normalized.simplify), sketch.colorHex),
+      opaquePlan,
+    );
   }
   if (sketch.isEmpty()) {
     throw new Error('SVG import generated an empty sketch');
