@@ -205,7 +205,6 @@ export function FileExplorer() {
     const isModified = node.type === 'file' && files[node.path] !== savedFiles[node.path];
     const isRenaming = renamingPath === node.path;
     const isFocused = isFolder && focusedFolder === node.path;
-    const canDeleteFolder = isFolder && (!node.children || node.children.length === 0);
     const paddingLeft = 8 + depth * 12;
 
     return (
@@ -287,14 +286,17 @@ export function FileExplorer() {
                   e.stopPropagation();
                   if (node.type === 'file') {
                     if (confirm(`Delete "${node.name}"?`)) deleteFile(node.path);
-                  } else if (canDeleteFolder) {
-                    if (confirm(`Delete folder "${node.name}"?`)) deleteFolder(node.path);
+                  } else {
+                    const childCount = node.children?.length ?? 0;
+                    const msg = childCount > 0
+                      ? `Delete folder "${node.name}" and all its contents (${childCount} item${childCount > 1 ? 's' : ''})?`
+                      : `Delete folder "${node.name}"?`;
+                    if (confirm(msg)) deleteFolder(node.path);
                   }
                 }}
                 style={{
                   color: 'var(--fc-textDim)',
                   fontSize: 10,
-                  visibility: node.type === 'file' || canDeleteFolder ? 'visible' : 'hidden',
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--fc-error)')}
                 onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--fc-textDim)')}
@@ -367,6 +369,21 @@ export function FileExplorer() {
               setContextMenu(null);
             }}
           >Rename</div>
+          <div
+            style={{ padding: '5px 12px', cursor: 'pointer', color: 'var(--fc-error)', fontSize: 12 }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--fc-bgHover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            onClick={() => {
+              const path = contextMenu.path;
+              const name = getBaseName(path);
+              setContextMenu(null);
+              if (contextMenu.type === 'file') {
+                if (confirm(`Delete "${name}"?`)) deleteFile(path);
+              } else {
+                if (confirm(`Delete folder "${name}" and all its contents?`)) deleteFolder(path);
+              }
+            }}
+          >Delete</div>
         </div>
       )}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--fc-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

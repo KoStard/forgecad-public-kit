@@ -1076,13 +1076,61 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   deleteFolder: (path) => {
     const normalized = normalizePath(path);
     if (!normalized) return;
-    const { folders, files } = get();
+    const { folders, files, savedFiles, activeFile, objectSettingsByFile } = get();
     if (!folders.includes(normalized)) return;
-    const hasFileContents = Object.keys(files).some((file) => file.startsWith(`${normalized}/`));
-    if (hasFileContents) return;
-    const hasChildFolder = folders.some((folder) => folder.startsWith(`${normalized}/`));
-    if (hasChildFolder) return;
-    set({ folders: folders.filter((folder) => folder !== normalized) });
+    const prefix = `${normalized}/`;
+
+    // Remove all files inside this folder
+    const remainingFiles: Record<string, string> = {};
+    const remainingSaved: Record<string, string> = {};
+    const deletedFiles: string[] = [];
+    for (const key of Object.keys(files)) {
+      if (key.startsWith(prefix)) {
+        deletedFiles.push(key);
+      } else {
+        remainingFiles[key] = files[key];
+      }
+    }
+    for (const key of Object.keys(savedFiles)) {
+      if (!key.startsWith(prefix)) {
+        remainingSaved[key] = savedFiles[key];
+      }
+    }
+
+    // Ensure we still have at least one file
+    if (Object.keys(remainingFiles).length === 0) return;
+
+    // Remove this folder and all child folders
+    const remainingFolders = folders.filter((f) => f !== normalized && !f.startsWith(prefix));
+
+    // Pick a new active file if the current one was deleted
+    const newActive = activeFile && (activeFile.startsWith(prefix))
+      ? Object.keys(remainingFiles)[0]
+      : activeFile;
+
+    let nextObjectSettingsByFile = objectSettingsByFile;
+    for (const f of deletedFiles) {
+      nextObjectSettingsByFile = removeObjectSettingsForFile(nextObjectSettingsByFile, f);
+    }
+    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+
+    set({
+      files: remainingFiles,
+      savedFiles: remainingSaved,
+      folders: remainingFolders,
+      activeFile: newActive,
+      objectSettingsByFile: nextObjectSettingsByFile,
+      paramOverrides: {},
+      jointValues: {},
+      jointAnimationClip: null,
+      jointAnimationProgress: 0,
+      jointAnimationPlaying: false,
+      hoveredJointName: null,
+    });
+    for (const f of deletedFiles) {
+      fileSystem.delete(f).catch((e) => console.error('Delete failed:', e));
+    }
+    setTimeout(() => get().execute(), 0);
   },
   moveEntry: (oldPath, newPath) => {
     const normalizedOld = normalizePath(oldPath);
