@@ -23,6 +23,8 @@ import { EmbedViewer } from './components/EmbedViewer';
 import { AISkillDialog } from './components/AISkillDialog';
 import { useDrawStore } from './draw/drawStore';
 import { useFeatureFlag } from './featureFlags';
+import { isMobile } from './mobile/isMobile';
+import { MobileApp } from './mobile/MobileApp';
 import { ToastContainer, showToast } from './components/Toast';
 import { StatusBar } from './components/StatusBar';
 
@@ -226,12 +228,15 @@ function Toolbar() {
   );
 }
 
-// Module-level constant — URL params don't change during session
+// Module-level constants — URL params don't change during session
 const embedMode = isEmbedMode();
 
 export function App() {
   if (embedMode) {
     return <EmbedViewer />;
+  }
+  if (isMobile) {
+    return <MobileApp />;
   }
   return <FullApp />;
 }
