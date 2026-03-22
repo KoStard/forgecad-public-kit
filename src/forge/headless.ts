@@ -140,6 +140,22 @@ export type {
   JointOverlayViewConfig,
   JointOverlayViewConfigOptions,
 } from './viewConfig';
+export { scene, resetScene, getCollectedScene } from './scene';
+export type {
+  SceneConfig,
+  SceneOptions,
+  SceneCameraConfig,
+  SceneLightConfig,
+  SceneLightType,
+  SceneEnvironmentConfig,
+  SceneBackgroundGradient,
+  SceneFogConfig,
+  SceneBloomConfig,
+  SceneVignetteConfig,
+  SceneGrainConfig,
+  ScenePostProcessingConfig,
+  SceneGroundConfig,
+} from './scene';
 export { clampAnimationProgress, findJointAnimationClip, resolveJointAnimation } from './jointAnimation';
 export { bom, resetBom, getCollectedBom } from './bom';
 export type { BomDef, BomOpts } from './bom';

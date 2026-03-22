@@ -802,6 +802,7 @@ function createErrorRunResult(message: string, quality: ForgeQualityPreset): Run
     explodeView: null,
     jointsView: null,
     viewConfig: null,
+    sceneConfig: null,
     robotExport: null,
     quality,
     error: message,

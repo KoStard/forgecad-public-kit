@@ -51,6 +51,8 @@ import { DrawCanvas } from './DrawCanvas';
 import { DrawToolbar } from './DrawToolbar';
 import { useDrawStore } from '../draw/drawStore';
 import { useFeatureFlag } from '../featureFlags';
+import { SceneConfigurator } from './SceneConfigurator';
+import type { SceneConfig } from '@forge/scene';
 
 interface ObjectContextMenuState {
   objectId: string;
@@ -4788,6 +4790,11 @@ export function Viewport() {
   const explodeConfig: ExplodeViewOptions | null = result?.explodeView ?? null;
   const jointsConfig = result?.jointsView ?? null;
   const jointOverlayConfig = result?.viewConfig?.jointOverlay ?? DEFAULT_VIEW_CONFIG.jointOverlay;
+  const sceneConfig: SceneConfig | null = result?.sceneConfig ?? null;
+  const [defaultLightsOverridden, setDefaultLightsOverridden] = useState(false);
+  const [defaultEnvironmentOverridden, setDefaultEnvironmentOverridden] = useState(false);
+  const handleDefaultLightsOverridden = useCallback((v: boolean) => setDefaultLightsOverridden(v), []);
+  const handleDefaultEnvironmentOverridden = useCallback((v: boolean) => setDefaultEnvironmentOverridden(v), []);
   const joints = useMemo(
     () => jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? []),
     [jointsConfig],
@@ -5433,12 +5440,26 @@ export function Viewport() {
           <PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={100000} up={[0, 0, 1]} />
         )}
 
-        {/* Local environment map (offline-safe) */}
-        <LocalStudioEnvironment />
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[100, 150, 80]} intensity={1.2} castShadow />
-        <directionalLight position={[-60, -40, -80]} intensity={0.3} />
-        <hemisphereLight args={['#b1e1ff', '#444444', 0.4]} />
+        {/* Scene configurator — applies script scene() settings */}
+        {sceneConfig && (
+          <SceneConfigurator
+            config={sceneConfig}
+            onDefaultLightsOverridden={handleDefaultLightsOverridden}
+            onDefaultEnvironmentOverridden={handleDefaultEnvironmentOverridden}
+          />
+        )}
+
+        {/* Default environment map (offline-safe) — hidden when script overrides */}
+        {!defaultEnvironmentOverridden && <LocalStudioEnvironment />}
+        {/* Default lights — hidden when script provides custom lights */}
+        {!defaultLightsOverridden && (
+          <>
+            <ambientLight intensity={0.3} />
+            <directionalLight position={[100, 150, 80]} intensity={1.2} castShadow />
+            <directionalLight position={[-60, -40, -80]} intensity={0.3} />
+            <hemisphereLight args={['#b1e1ff', '#444444', 0.4]} />
+          </>
+        )}
 
         <ClippingManager active={hasAnyObjectCutPlanes} />
         {sectionPlaneGuidesEnabled && activeCutPlaneDefs.length > 0 && (

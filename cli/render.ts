@@ -23,6 +23,8 @@ import {
   type JointViewDef,
   type RunResult,
   type SceneObject,
+  type SceneConfig,
+  type SceneLightConfig,
 } from '../src/forge/headless';
 import { parseCameraCliSpec, type ViewportCameraState } from '../src/capture/cameraState';
 import {
@@ -197,6 +199,88 @@ function addDefaultLights(scene: THREE.Scene): void {
   scene.add(dir2);
 
   scene.add(new THREE.HemisphereLight(0xb1e1ff, 0x444444, 0.4));
+}
+
+function createSceneLight(def: SceneLightConfig): THREE.Light {
+  const color = def.color ? new THREE.Color(def.color) : new THREE.Color(0xffffff);
+  const intensity = def.intensity ?? 1;
+  switch (def.type) {
+    case 'ambient': return new THREE.AmbientLight(color, intensity);
+    case 'directional': {
+      const l = new THREE.DirectionalLight(color, intensity);
+      if (def.position) l.position.set(...def.position);
+      if (def.target) l.target.position.set(...def.target);
+      return l;
+    }
+    case 'point': {
+      const l = new THREE.PointLight(color, intensity, def.distance ?? 0, def.decay ?? 2);
+      if (def.position) l.position.set(...def.position);
+      return l;
+    }
+    case 'spot': {
+      const l = new THREE.SpotLight(color, intensity, def.distance ?? 0, def.angle ?? Math.PI / 6, def.penumbra ?? 0, def.decay ?? 2);
+      if (def.position) l.position.set(...def.position);
+      if (def.target) l.target.position.set(...def.target);
+      return l;
+    }
+    case 'hemisphere': {
+      const sky = def.skyColor ? new THREE.Color(def.skyColor) : color;
+      const ground = def.groundColor ? new THREE.Color(def.groundColor) : new THREE.Color(0x444444);
+      return new THREE.HemisphereLight(sky, ground, intensity);
+    }
+    default: return new THREE.AmbientLight(color, intensity);
+  }
+}
+
+function applySceneConfig(scene: THREE.Scene, config: SceneConfig, r: THREE.WebGLRenderer): void {
+  // Background
+  if (config.background !== null) {
+    if (typeof config.background === 'string') {
+      scene.background = new THREE.Color(config.background);
+    } else {
+      // Gradient — render to a small texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 2;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d')!;
+      const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+      gradient.addColorStop(0, config.background.top);
+      gradient.addColorStop(1, config.background.bottom);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 2, 256);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      scene.background = tex;
+    }
+  }
+
+  // Lights — replace defaults
+  if (config.lights !== null) {
+    config.lights.forEach((def) => {
+      const light = createSceneLight(def);
+      scene.add(light);
+      if ('target' in light && light.target instanceof THREE.Object3D) {
+        scene.add(light.target);
+      }
+    });
+  } else {
+    addDefaultLights(scene);
+  }
+
+  // Fog
+  if (config.fog) {
+    const fogColor = config.fog.color ? new THREE.Color(config.fog.color) : new THREE.Color(0x000000);
+    if (config.fog.density !== undefined) {
+      scene.fog = new THREE.FogExp2(fogColor, config.fog.density);
+    } else {
+      scene.fog = new THREE.Fog(fogColor, config.fog.near ?? 100, config.fog.far ?? 1000);
+    }
+  }
+
+  // Tone mapping exposure
+  if (config.postProcessing?.toneMappingExposure !== undefined) {
+    r.toneMappingExposure = config.postProcessing.toneMappingExposure;
+  }
 }
 
 function parseColor(input: string | undefined, fallback: number): THREE.Color {
@@ -591,9 +675,15 @@ function createSession(
   const boundsObjs = visibleObjs.length > 0 ? visibleObjs : objs;
 
   const scene = new THREE.Scene();
+  const sceneConfig: SceneConfig | null = result.sceneConfig ?? null;
   scene.background = parseColor(opts?.background, DEFAULT_BACKGROUND);
   scene.environment = getStudioEnvironment(r);
-  addDefaultLights(scene);
+
+  if (sceneConfig) {
+    applySceneConfig(scene, sceneConfig, r);
+  } else {
+    addDefaultLights(scene);
+  }
 
   const allShape = boundsObjs.slice(1).reduce((acc, cur) => acc.add(cur.shape), boundsObjs[0].shape);
   const shapeBB = allShape.boundingBox();
@@ -693,7 +783,30 @@ function createSession(
     });
   }
 
-  const cameraRig = buildCameraRig(center, distance, maxDim, requestedSceneState?.camera);
+  // Scene config camera — apply as default if no explicit camera was requested via CLI/state
+  let sceneConfigCameraState: ViewportCameraState | null = null;
+  if (sceneConfig?.camera && !requestedSceneState?.camera) {
+    const cam = sceneConfig.camera;
+    sceneConfigCameraState = {
+      projectionMode: cam.type ?? 'perspective',
+      position: cam.position ?? [
+        center.x + DEFAULT_FIXED_DIR.x * distance,
+        center.y + DEFAULT_FIXED_DIR.y * distance,
+        center.z + DEFAULT_FIXED_DIR.z * distance,
+      ],
+      target: cam.target ?? [center.x, center.y, center.z],
+      up: cam.up ?? [0, 0, 1],
+    };
+  }
+
+  const cameraRig = buildCameraRig(center, distance, maxDim, requestedSceneState?.camera ?? sceneConfigCameraState);
+
+  // Apply FOV from scene config
+  if (sceneConfig?.camera?.fov && cameraRig.camera instanceof THREE.PerspectiveCamera) {
+    cameraRig.camera.fov = sceneConfig.camera.fov;
+    cameraRig.camera.updateProjectionMatrix();
+  }
+
   const session: CaptureSession = {
     scene,
     camera: cameraRig.camera,

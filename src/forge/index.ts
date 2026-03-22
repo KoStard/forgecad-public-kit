@@ -17,6 +17,7 @@ export {
   explodeView, resetExplodeView, getCollectedExplodeView,
   jointsView, resetJointsView, getCollectedJointsView, resolveJointViewValues,
   viewConfig, resetViewConfig, getCollectedViewConfig, DEFAULT_VIEW_CONFIG, DEFAULT_JOINT_OVERLAY_VIEW_CONFIG,
+  scene, resetScene, getCollectedScene,
   clampAnimationProgress, findJointAnimationClip, resolveJointAnimation,
   runScript,
   FORGE_QUALITY_PRESETS,
@@ -104,6 +105,21 @@ export type {
   JointViewAnimationKeyframeDef,
   JointsViewOptions,
   CollectedJointsView,
+} from './headless';
+export type {
+  SceneConfig,
+  SceneOptions,
+  SceneCameraConfig,
+  SceneLightConfig,
+  SceneLightType,
+  SceneEnvironmentConfig,
+  SceneBackgroundGradient,
+  SceneFogConfig,
+  SceneBloomConfig,
+  SceneVignetteConfig,
+  SceneGrainConfig,
+  ScenePostProcessingConfig,
+  SceneGroundConfig,
 } from './headless';
 export type { RunResult, SceneObject, LogEntry } from './headless';
 export type { VerificationResult, VerificationStatus } from './headless';

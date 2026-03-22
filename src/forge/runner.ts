@@ -133,6 +133,12 @@ import {
   getCollectedViewConfig,
   type ViewConfig,
 } from './viewConfig';
+import {
+  scene,
+  resetScene,
+  getCollectedScene,
+  type SceneConfig,
+} from './scene';
 import type { SolverWasmRunDebugSnapshot } from './sketch/constraints/solver-wasm';
 import {
   resolveForgeQualityPreset,
@@ -173,6 +179,7 @@ export interface RunResult {
   explodeView: ExplodeViewOptions | null;
   jointsView: CollectedJointsView | null;
   viewConfig: ViewConfig | null;
+  sceneConfig: SceneConfig | null;
   robotExport: CollectedRobotExport | null;
   quality: ForgeQualityPreset;
   error: string | null;
@@ -1284,6 +1291,7 @@ function executeFile(
       explodeView,
       jointsView,
       viewConfig,
+      scene,
       verify,
     };
 
@@ -1435,6 +1443,7 @@ export function runScript(
   resetExplodeView();
   resetJointsView();
   resetViewConfig();
+  resetScene();
   resetVerifications();
   _collectedLogs = [];
   const t0 = performance.now();
@@ -1714,6 +1723,7 @@ export function runScript(
         explodeView: getCollectedExplodeView(),
         jointsView: getCollectedJointsView(),
         viewConfig: getCollectedViewConfig(),
+        sceneConfig: getCollectedScene(),
         robotExport: getCollectedRobotExport(),
         quality,
         error: objects.length > 0 || options.allowEmptyResult ? null : 'Script must return a Shape or Sketch',
@@ -1745,6 +1755,7 @@ export function runScript(
       explodeView: getCollectedExplodeView(),
       jointsView: getCollectedJointsView(),
       viewConfig: getCollectedViewConfig(),
+      sceneConfig: getCollectedScene(),
       robotExport: getCollectedRobotExport(),
       quality,
       error: `${msg}${lineInfo}`,
