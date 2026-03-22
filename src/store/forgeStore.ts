@@ -1015,8 +1015,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       objectSettingsByFile: nextObjectSettingsByFile,
       folders: Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort(),
     });
-    fileSystem.delete(oldName).catch((e) => console.error('Delete old file failed:', e));
-    fileSystem.save(normalized, code).catch((e) => console.error('Save renamed file failed:', e));
+    fileSystem.delete(oldName)
+      .then(() => fileSystem.save(normalized, code))
+      .catch((e) => console.error('Rename persist failed:', e));
   },
   renameFolder: (oldPath, newPath) => {
     const normalizedOld = normalizePath(oldPath);
@@ -1086,10 +1087,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationPlaying: false,
       hoveredJointName: null,
     });
-    for (const { oldKey, newKey, content } of movedFiles) {
-      fileSystem.delete(oldKey).catch((e) => console.error('Delete old file failed:', e));
-      fileSystem.save(newKey, content).catch((e) => console.error('Save moved file failed:', e));
-    }
+    // Delete old files first, then save at new paths (ordering prevents watcher from re-adding old files)
+    Promise.all(movedFiles.map(({ oldKey }) => fileSystem.delete(oldKey)))
+      .then(() => Promise.all(movedFiles.map(({ newKey, content }) => fileSystem.save(newKey, content))))
+      .catch((e) => console.error('Folder rename persist failed:', e));
     setTimeout(() => get().execute(), 0);
   },
   deleteFolder: (path) => {

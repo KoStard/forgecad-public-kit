@@ -357,6 +357,47 @@ function forgeProjectPlugin(enableInitialScan = true) {
           return;
         }
 
+        // Handle /api/delete - delete a file
+        if (req.method === 'POST' && req.url === '/api/delete') {
+          readJsonBody(req)
+            .then((body) => {
+              const { filename } = body;
+              if (!projectDir) {
+                sendJson(res, 400, { error: 'No project directory' });
+                return;
+              }
+              if (!filename) {
+                sendJson(res, 400, { error: 'Invalid request' });
+                return;
+              }
+              const resolved = resolveProjectFileRequest(projectDir, filename);
+              if (fs.existsSync(resolved.filePath)) {
+                fs.unlinkSync(resolved.filePath);
+                // Clean up empty parent directories up to project root
+                let dir = path.dirname(resolved.filePath);
+                const absProject = path.resolve(projectDir);
+                while (dir !== absProject && dir.startsWith(absProject)) {
+                  try {
+                    const entries = fs.readdirSync(dir);
+                    if (entries.length === 0) {
+                      fs.rmdirSync(dir);
+                      dir = path.dirname(dir);
+                    } else {
+                      break;
+                    }
+                  } catch {
+                    break;
+                  }
+                }
+              }
+              sendJson(res, 200, { success: true });
+            })
+            .catch((e: any) => {
+              sendJson(res, 500, { error: e.message });
+            });
+          return;
+        }
+
         if (req.method === 'POST' && req.url === '/api/notebook/execute') {
           readJsonBody(req)
             .then((body) => executeNotebookRequest(body, true))
