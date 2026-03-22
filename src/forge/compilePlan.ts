@@ -302,6 +302,24 @@ export type ShapeCompilePlan =
       /** Wraps a pre-built ShapeBackend that can't be expressed as compile plan IR. */
       kind: 'opaque';
       backend: ShapeBackend;
+    }
+  | {
+      /**
+       * Imported external mesh file (STL, OBJ, 3MF).
+       *
+       * The compile plan captures *intent* — "load this file" — not resolved data.
+       * `fileData` holds the raw bytes read at IR construction time so that lowering
+       * does not require file-system access.  Each backend parses independently:
+       * Manifold triangulates into a mesh solid.  OCCT does not support
+       * mesh import — it throws a clear error directing the user to switch backends.
+       */
+      kind: 'importedMesh';
+      /** Resolved path — used for error messages and caching, not re-read at lowering. */
+      filePath: string;
+      /** Detected or explicit format. */
+      format: 'stl' | 'obj' | '3mf';
+      /** Raw file bytes, read once at IR construction time. */
+      fileData: ArrayBuffer;
     };
 
 function cloneProfileTransform(step: ProfileCompileTransformStep): ProfileCompileTransformStep {
@@ -809,6 +827,10 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
       // Opaque plans hold a pre-built backend — clone shares the same backend reference.
       result = { kind: 'opaque', backend: plan.backend };
       break;
+    case 'importedMesh':
+      // Imported mesh — fileData is immutable raw bytes, share the reference.
+      result = { kind: 'importedMesh', filePath: plan.filePath, format: plan.format, fileData: plan.fileData };
+      break;
   }
   // Preserve OCCT shape cache across clones (set by compilePlanOCCT.ts)
   if ((plan as any)._occtCache) (result as any)._occtCache = (plan as any)._occtCache;
@@ -910,6 +932,7 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan | null): Shape
     case 'boolean':
     case 'hull':
     case 'opaque':
+    case 'importedMesh':
       return null;
   }
 }
@@ -952,6 +975,7 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan | null): ShapeQue
       case 'loft':
       case 'sweep':
       case 'opaque':
+      case 'importedMesh':
         return;
     }
   }
@@ -1005,6 +1029,7 @@ export function findShapeWorkplanePlacement(
     case 'hull':
     case 'revolve':
     case 'opaque':
+    case 'importedMesh':
       return null;
   }
 }

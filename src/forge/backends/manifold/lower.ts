@@ -19,6 +19,8 @@ import { Transform } from '../../transform';
 import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
 import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolution';
 import { applyChamferSelectionToManifold, applyFilletSelectionToManifold } from './edgeFeatureRuntime';
+import { parseMeshFile } from '../../meshParsers';
+import type { MeshFormat } from '../../meshParsers';
 
 function applyProfileCompileTransform(
   crossSection: CrossSection,
@@ -327,8 +329,37 @@ export function lowerShapeCompilePlanToManifold(
       return lowerShapeHullCompilePlan(plan, wasm);
     case 'trimByPlane':
       return lowerShapeTrimByPlaneCompilePlan(plan, wasm);
+    case 'importedMesh':
+      return lowerImportedMeshToManifold(plan.fileData, plan.format, plan.filePath, wasm);
     case 'opaque':
       throw new Error('Cannot lower opaque compile plan to Manifold — opaque plans must be intercepted before lowering');
+  }
+}
+
+function lowerImportedMeshToManifold(
+  fileData: ArrayBuffer,
+  format: MeshFormat,
+  filePath: string,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const parsed = parseMeshFile(fileData, format);
+  if (parsed.triVerts.length === 0) {
+    throw new Error(`importMesh("${filePath}"): file contains no triangles`);
+  }
+  const wasmMesh = new wasm.Mesh({
+    numProp: parsed.numProp,
+    triVerts: parsed.triVerts,
+    vertProperties: parsed.vertProperties,
+    mergeFromVert: parsed.mergeFromVert.length > 0 ? parsed.mergeFromVert : undefined,
+    mergeToVert: parsed.mergeToVert.length > 0 ? parsed.mergeToVert : undefined,
+  });
+  try {
+    return new wasm.Manifold(wasmMesh);
+  } catch (e) {
+    throw new Error(
+      `importMesh("${filePath}"): Manifold rejected the mesh — it may be non-manifold (non-watertight, self-intersecting, or degenerate). ` +
+      `Original error: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 }
 

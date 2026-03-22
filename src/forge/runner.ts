@@ -22,9 +22,11 @@ import {
   getShapeDimensions,
   type ShapeDimension,
   type GeometryInfo,
+  buildShapeFromCompilePlan,
 } from './kernel';
 import type { Anchor3D } from './kernel';
-import { resetShapeQueryOwnerIds } from './compilePlan';
+import { resetShapeQueryOwnerIds, createOwnedShapeCompilePlan, appendShapeCompileTransform } from './compilePlan';
+import type { ShapeCompilePlan } from './compilePlan';
 import { intersectWithPlane, projectToPlane } from './section';
 import { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';
 import { filletEdgeSegment, chamferEdgeSegment } from './edgeSegmentFeatures';
@@ -97,6 +99,7 @@ import { joint } from './joint';
 import { Assembly, ImportedAssembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
 import { Transform, composeChain } from './transform';
 import { partLibrary } from './library';
+import { detectMeshFormat } from './meshParsers';
 import { ShapeGroup, group } from './group';
 import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
 import { bom, resetBom, getCollectedBom, type BomDef } from './bom';
@@ -179,6 +182,13 @@ export interface RunResult {
   solverDebug?: SolverWasmRunDebugSnapshot | null;
 }
 
+export interface MeshImportOptions {
+  /** Uniform scale factor applied to the imported mesh (e.g. 25.4 for inch→mm). */
+  scale?: number;
+  /** Center the mesh at the origin based on its bounding box. */
+  center?: boolean;
+}
+
 export interface RunScriptOptions {
   /** Emit structured import trace logs into result.logs (CLI-friendly debugging). */
   debugImports?: boolean;
@@ -186,6 +196,11 @@ export interface RunScriptOptions {
   quality?: ForgeQualityPreset;
   /** Allow successful runs that intentionally do not return renderable objects. */
   allowEmptyResult?: boolean;
+  /**
+   * Read a binary file by resolved path.  Required for importMesh() support.
+   * Browser: fetches via /api endpoint.  CLI: reads from disk.
+   */
+  readBinaryFile?: (resolvedPath: string) => ArrayBuffer;
 }
 
 // Collected logs from the current script execution
@@ -201,6 +216,7 @@ interface RunnerExecutionOptions {
   fileIndex: Map<string, string>;
   compiledFiles: Map<string, CompiledScript>;
   moduleCache: Map<string, ModuleCacheEntry>;
+  readBinaryFile?: (resolvedPath: string) => ArrayBuffer;
 }
 
 const LOG_MAX_DEPTH = 4;
@@ -1028,6 +1044,48 @@ function executeFile(
       }
     };
 
+    // importMesh("name.stl", options?) — imports a mesh file as a Shape
+    const importMesh = (name: string, meshOptions?: MeshImportOptions): Shape => {
+      if (typeof name !== 'string' || name.trim().length === 0) {
+        throw new Error('importMesh() requires a non-empty file path string');
+      }
+      const resolvedPath = resolveImportPath(fileName, name.trim());
+      const format = detectMeshFormat(resolvedPath);
+      if (!format) {
+        const ext = resolvedPath.split('.').pop() ?? '';
+        throw new Error(`importMesh("${name}"): unsupported format ".${ext}". Supported: .stl, .obj, .3mf`);
+      }
+      if (!options.readBinaryFile) {
+        throw new Error(
+          `importMesh("${name}"): binary file reading is not available in this environment. ` +
+          'Provide a readBinaryFile callback in RunScriptOptions.',
+        );
+      }
+      const fileData = options.readBinaryFile(resolvedPath);
+
+      let plan: ShapeCompilePlan = {
+        kind: 'importedMesh',
+        filePath: resolvedPath,
+        format,
+        fileData,
+      };
+
+      // Apply scale as a transform node
+      if (meshOptions?.scale != null && meshOptions.scale !== 1) {
+        const s = meshOptions.scale;
+        if (!Number.isFinite(s) || s <= 0) {
+          throw new Error(`importMesh("${name}"): scale must be a positive finite number, got ${s}`);
+        }
+        plan = appendShapeCompileTransform(plan, { kind: 'scale', x: s, y: s, z: s })!;
+      }
+
+      return buildShapeFromCompilePlan(
+        createOwnedShapeCompilePlan(plan, 'importedMesh')!,
+        undefined,
+        { fidelity: 'sampled', sources: ['imported'] },
+      );
+    };
+
     // importPart("name", { ...paramOverrides }) — executes another file, expects a Shape result
     const importPart = (name: string, paramOverrides?: Record<string, number>): Shape => {
       const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
@@ -1208,6 +1266,7 @@ function executeFile(
       importGroup,
       importAssembly,
       importSvgSketch,
+      importMesh,
       text2d,
       textWidth,
       loadFont,
@@ -1384,6 +1443,7 @@ export function runScript(
     fileIndex: buildFileIndex(allFiles),
     compiledFiles: new Map(),
     moduleCache: new Map(),
+    readBinaryFile: options.readBinaryFile,
   };
   const quality = resolveForgeQualityPreset(options.quality);
 

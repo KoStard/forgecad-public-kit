@@ -82,10 +82,17 @@ export function findProjectRoot(scriptPath: string): string {
 export function collectProjectFiles(scriptPath: string): {
   allFiles: Record<string, string>;
   fileName: string;
+  /** Read a binary file by path (relative to project root). For importMesh(). */
+  readBinaryFile: (relativePath: string) => ArrayBuffer;
 } {
   const absScript = resolve(scriptPath);
   const root = findProjectRoot(scriptPath);
   const allFiles = collectFilesRecursive(root, root);
   const fileName = relative(root, absScript);
-  return { allFiles, fileName };
+  const readBinaryFile = (relativePath: string): ArrayBuffer => {
+    const absPath = resolve(root, relativePath);
+    const buf = readFileSync(absPath);
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  };
+  return { allFiles, fileName, readBinaryFile };
 }

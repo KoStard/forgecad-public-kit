@@ -808,6 +808,11 @@ function _lowerShapeCompilePlanToOCCTInner(
       return lowerSweepPlan(oc, plan);
     case 'hull':
       throw new OCCTUnsupportedError('hull');
+    case 'importedMesh':
+      throw new Error(
+        `importMesh("${plan.filePath}") is not supported with the OCCT backend. ` +
+        'Switch to the Manifold backend or use the default backend.',
+      );
     case 'opaque':
       throw new Error('Cannot lower opaque compile plan to OCCT — opaque plans must be intercepted before lowering');
   }

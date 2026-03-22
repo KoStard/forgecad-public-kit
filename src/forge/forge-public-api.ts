@@ -154,3 +154,5 @@ export declare function importPart(fileName: string, paramOverrides?: Record<str
 export declare function importGroup(fileName: string, paramOverrides?: Record<string, number>): _ShapeGroup;
 export declare function importAssembly(fileName: string, paramOverrides?: Record<string, number>): _ImportedAssembly;
 export declare function importSvgSketch(fileName: string, options?: _SvgImportOptions): _Sketch;
+/** Import an external mesh file (STL, OBJ, 3MF) as a Shape. */
+export declare function importMesh(fileName: string, options?: { scale?: number; center?: boolean }): _Shape;

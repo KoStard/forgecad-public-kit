@@ -73,6 +73,7 @@ function rootTopologyRewritePropagation(plan: ShapeCompilePlan | null): Topology
     case 'loft':
     case 'sweep':
     case 'opaque':
+    case 'importedMesh':
       return null;
   }
 }
