@@ -29,6 +29,7 @@ import { runNotebookCli } from './forge-notebook';
 import { runReportCli } from './forge-report';
 import { runRenderCli } from './forge-render.mjs';
 import { runSdfCli } from './forge-sdf';
+import { runUrdfCli } from './forge-urdf';
 import { runDevCli } from './forge-dev';
 import { runStudioCli } from './forge-studio';
 import { runWebCli } from './forge-web';
@@ -608,6 +609,25 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: runSdfCli,
+  },
+  {
+    group: 'Export',
+    path: ['export', 'urdf'],
+    summary: 'Export a robot assembly as a URDF package (ROS/PyBullet/MuJoCo).',
+    usage: ['forgecad export urdf <script.forge.js> [--output dir]'],
+    examples: [
+      'forgecad export urdf examples/api/sdf-rover-demo.forge.js',
+      'forgecad export urdf examples/api/sdf-rover-demo.forge.js --output out/rover_urdf',
+    ],
+    completion: {
+      options: [
+        { name: '--output', description: 'Output package directory', argument: 'required', valueLabel: '<dir>', valueKind: 'directory' },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+      ],
+    },
+    run: runUrdfCli,
   },
   {
     group: 'Export',
