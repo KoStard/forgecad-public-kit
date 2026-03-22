@@ -1001,11 +1001,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const remaining = { ...files };
     delete remaining[oldName];
     remaining[normalized] = code;
-    
-    // Note: We do NOT update savedFiles with the new name because it hasn't been saved to disk yet
-    // But we should remove the old name from savedFiles
+
     const remainingSaved = { ...savedFiles };
     delete remainingSaved[oldName];
+    remainingSaved[normalized] = code;
     const nextObjectSettingsByFile = remapObjectSettingsByFile(objectSettingsByFile, oldName, normalized);
     writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
 
@@ -1016,6 +1015,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       objectSettingsByFile: nextObjectSettingsByFile,
       folders: Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort(),
     });
+    fileSystem.delete(oldName).catch((e) => console.error('Delete old file failed:', e));
+    fileSystem.save(normalized, code).catch((e) => console.error('Save renamed file failed:', e));
   },
   renameFolder: (oldPath, newPath) => {
     const normalizedOld = normalizePath(oldPath);
@@ -1041,9 +1042,23 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     });
 
     const updatedSaved: Record<string, string> = {};
+    const movedFiles: { oldKey: string; newKey: string; content: string }[] = [];
     Object.keys(savedFiles).forEach((key) => {
-      if (key === normalizedOld || key.startsWith(`${normalizedOld}/`)) return;
-      updatedSaved[key] = savedFiles[key];
+      if (key === normalizedOld || key.startsWith(`${normalizedOld}/`)) {
+        const newKey = movePath(key, normalizedOld, normalizedNew);
+        updatedSaved[newKey] = savedFiles[key];
+        movedFiles.push({ oldKey: key, newKey, content: savedFiles[key] });
+      } else {
+        updatedSaved[key] = savedFiles[key];
+      }
+    });
+    // Also persist any files that were in `files` but not in `savedFiles` (newly created, never saved)
+    Object.keys(files).forEach((key) => {
+      if ((key === normalizedOld || key.startsWith(`${normalizedOld}/`)) && !savedFiles[key]) {
+        const newKey = movePath(key, normalizedOld, normalizedNew);
+        updatedSaved[newKey] = files[key];
+        movedFiles.push({ oldKey: key, newKey, content: files[key] });
+      }
     });
 
     const updatedFolders = Array.from(new Set(
@@ -1071,6 +1086,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationPlaying: false,
       hoveredJointName: null,
     });
+    for (const { oldKey, newKey, content } of movedFiles) {
+      fileSystem.delete(oldKey).catch((e) => console.error('Delete old file failed:', e));
+      fileSystem.save(newKey, content).catch((e) => console.error('Save moved file failed:', e));
+    }
     setTimeout(() => get().execute(), 0);
   },
   deleteFolder: (path) => {
