@@ -6,6 +6,7 @@ import {
   setSketchCompileProfilePlan,
 } from './core';
 import { appendProfileCompileTransform } from '../compilePlan';
+import { asCrossSection, fromCrossSection } from '../backends/manifold/profileCast';
 
 export function sketchTranslate(sketch: Sketch, x: number, y = 0): Sketch {
   const nextPlan = appendProfileCompileTransform(getSketchCompileProfilePlan(sketch), { kind: 'translate', x, y });
@@ -13,7 +14,7 @@ export function sketchTranslate(sketch: Sketch, x: number, y = 0): Sketch {
     sketch,
     nextPlan
       ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(sketch.cross.translate(x, y), sketch.colorHex), null),
+      : setSketchCompileProfilePlan(new Sketch(fromCrossSection(asCrossSection(sketch.cross).translate(x, y)), sketch.colorHex), null),
   );
 }
 
@@ -23,7 +24,7 @@ export function sketchRotate(sketch: Sketch, degrees: number): Sketch {
     sketch,
     nextPlan
       ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(sketch.cross.rotate(degrees), sketch.colorHex), null),
+      : setSketchCompileProfilePlan(new Sketch(fromCrossSection(asCrossSection(sketch.cross).rotate(degrees)), sketch.colorHex), null),
   );
 }
 
@@ -38,7 +39,7 @@ export function sketchScale(sketch: Sketch, v: number | [number, number]): Sketc
     sketch,
     nextPlan
       ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(sketch.cross.scale(v as any), sketch.colorHex), null),
+      : setSketchCompileProfilePlan(new Sketch(fromCrossSection(asCrossSection(sketch.cross).scale(v as any)), sketch.colorHex), null),
   );
 }
 
@@ -52,7 +53,7 @@ export function sketchMirror(sketch: Sketch, ax: [number, number]): Sketch {
     sketch,
     nextPlan
       ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(sketch.cross.mirror(ax), sketch.colorHex), null),
+      : setSketchCompileProfilePlan(new Sketch(fromCrossSection(asCrossSection(sketch.cross).mirror(ax)), sketch.colorHex), null),
   );
 }
 

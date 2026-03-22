@@ -12,6 +12,7 @@ import { sketchExtrude } from './extrude';
 import { ConstrainedSketchBuilder, type PointId, type LineId } from './constraints';
 import { TrackedShape, buildRectExtrusionTopology, buildCircleExtrusionTopology } from './topology';
 import { getWasm } from '../backends/manifold/wasm';
+import { fromCrossSection } from '../backends/manifold/profileCast';
 
 // ─── Point ───────────────────────────────────────────────────────
 
@@ -163,7 +164,7 @@ export class Circle2D {
     const wasm = getWasm();
     const cross = wasm.CrossSection.circle(this.radius, segments ?? 0)
       .translate([this.center.x, this.center.y]);
-    return new Sketch(cross);
+    return new Sketch(fromCrossSection(cross));
   }
 
   /** Extrude to TrackedShape with top/bottom/side faces */
