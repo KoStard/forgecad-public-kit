@@ -193,6 +193,23 @@ Open `http://localhost:5173`.
 
 `npm run build:cli` is the fast daily-driver build. Run `npm run build` (20s+) only when you need the production SPA in `dist/` — e.g. before publishing or testing the production server path.
 
+### Troubleshooting
+
+**`wasm32-unknown-unknown target not found` during solver build**
+
+The solver compiles to WebAssembly via `wasm-pack`, which requires the `wasm32-unknown-unknown` Rust target. If you installed Rust through Homebrew (`brew install rust`), this target isn't available and the build will fail.
+
+Fix: switch to [rustup](https://rustup.rs), which manages targets natively:
+
+```bash
+brew uninstall rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env        # or: source ~/.cargo/env.fish
+rustup target add wasm32-unknown-unknown
+```
+
+Then re-run `npm run build`.
+
 ### Open your own project folder
 
 ```bash
