@@ -74,6 +74,8 @@ function scanProjectFiles(projectDir: string | null): Record<string, string> {
       if (item.isDirectory()) { scan(path.join(dir, item.name), rel); }
       else if (item.isFile() && isProjectFile(item.name)) {
         entries[rel] = fs.readFileSync(path.join(dir, item.name), 'utf-8');
+      } else if (item.isFile() && isMeshFile(item.name)) {
+        entries[rel] = '';
       }
     }
   }
@@ -233,17 +235,23 @@ export async function startStudioServer(
     const abs = path.resolve(projectDir);
     watcher = chokidar.watch(abs, { ignoreInitial: true, ignored: /(^|[/\\])\../ });
     watcher.on('add', (f) => {
-      if (!isProjectFile(f)) return;
       const rel = path.relative(abs, f).replace(/\\/g, '/');
-      try { broadcast('change', { filename: rel, content: fs.readFileSync(f, 'utf-8') }); } catch {}
+      if (isProjectFile(f)) {
+        try { broadcast('change', { filename: rel, content: fs.readFileSync(f, 'utf-8') }); } catch {}
+      } else if (isMeshFile(f)) {
+        broadcast('change', { filename: rel, content: '' });
+      }
     });
     watcher.on('change', (f) => {
-      if (!isProjectFile(f)) return;
       const rel = path.relative(abs, f).replace(/\\/g, '/');
-      try { broadcast('change', { filename: rel, content: fs.readFileSync(f, 'utf-8') }); } catch {}
+      if (isProjectFile(f)) {
+        try { broadcast('change', { filename: rel, content: fs.readFileSync(f, 'utf-8') }); } catch {}
+      } else if (isMeshFile(f)) {
+        broadcast('change', { filename: rel, content: '' });
+      }
     });
     watcher.on('unlink', (f) => {
-      if (!isProjectFile(f)) return;
+      if (!isProjectFile(f) && !isMeshFile(f)) return;
       broadcast('delete', { filename: path.relative(abs, f).replace(/\\/g, '/') });
     });
   }

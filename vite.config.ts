@@ -64,6 +64,10 @@ function scanProjectFiles(projectPath: string | null): { files: Record<string, s
       } else if (item.isFile() && isProjectFile(item.name)) {
         files[relativePath] = fs.readFileSync(fullPath, 'utf-8');
         hasContent = true;
+      } else if (item.isFile() && isMeshFile(item.name)) {
+        // Mesh files: include path only (binary content fetched on demand via /api/read-binary)
+        files[relativePath] = '';
+        hasContent = true;
       }
     }
     if (!hasContent && prefix) {
@@ -298,17 +302,23 @@ function forgeProjectPlugin(enableInitialScan = true) {
           ignored: /(^|[/\\])\../,
         });
         watcher.on('add', (filePath) => {
-          if (!isProjectFile(filePath)) return;
           const rel = path.relative(abs, filePath).replace(/\\/g, '/');
-          try { broadcast('change', { filename: rel, content: fs.readFileSync(filePath, 'utf-8') }); } catch {}
+          if (isProjectFile(filePath)) {
+            try { broadcast('change', { filename: rel, content: fs.readFileSync(filePath, 'utf-8') }); } catch {}
+          } else if (isMeshFile(filePath)) {
+            broadcast('change', { filename: rel, content: '' });
+          }
         });
         watcher.on('change', (filePath) => {
-          if (!isProjectFile(filePath)) return;
           const rel = path.relative(abs, filePath).replace(/\\/g, '/');
-          try { broadcast('change', { filename: rel, content: fs.readFileSync(filePath, 'utf-8') }); } catch {}
+          if (isProjectFile(filePath)) {
+            try { broadcast('change', { filename: rel, content: fs.readFileSync(filePath, 'utf-8') }); } catch {}
+          } else if (isMeshFile(filePath)) {
+            broadcast('change', { filename: rel, content: '' });
+          }
         });
         watcher.on('unlink', (filePath) => {
-          if (!isProjectFile(filePath)) return;
+          if (!isProjectFile(filePath) && !isMeshFile(filePath)) return;
           const rel = path.relative(abs, filePath).replace(/\\/g, '/');
           broadcast('delete', { filename: rel });
         });
