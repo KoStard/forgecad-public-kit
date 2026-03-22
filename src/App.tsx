@@ -21,6 +21,8 @@ import { isNotebookFile } from './notebook/model';
 import { buildShareUrl, buildEmbedUrl, buildEmbedSnippet, isEmbedMode } from './share';
 import { EmbedViewer } from './components/EmbedViewer';
 import { AISkillDialog } from './components/AISkillDialog';
+import { useDrawStore } from './draw/drawStore';
+import { useFeatureFlag } from './featureFlags';
 import { ToastContainer, showToast } from './components/Toast';
 import { StatusBar } from './components/StatusBar';
 
@@ -167,6 +169,10 @@ function Toolbar() {
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
   const toggleViewPanel = useForgeStore((s) => s.toggleViewPanel);
   const openCommandPalette = useForgeStore((s) => s.openCommandPalette);
+  const drawEnabled = useFeatureFlag('drawMode');
+  const drawModeActive = useDrawStore((s) => s.active);
+  const enterDrawMode = useDrawStore((s) => s.enterDrawMode);
+  const exitDrawMode = useDrawStore((s) => s.exitDrawMode);
   const [skillDialogOpen, setSkillDialogOpen] = React.useState(false);
 
   return (
@@ -194,6 +200,15 @@ function Toolbar() {
         <button className={btn()} onClick={saveFile} title="Save (⌘S)">Save</button>
         <button className={btn()} onClick={saveFileAs} title="Save as new file">Save As</button>
         <div className="fc-separator" />
+        {drawEnabled && (
+          <button
+            className={btn(drawModeActive)}
+            onClick={drawModeActive ? exitDrawMode : enterDrawMode}
+            title={drawModeActive ? 'Exit draw mode (Esc)' : 'Enter draw mode to sketch interactively'}
+          >
+            ✏️ Draw
+          </button>
+        )}
         <button className={btn(measureMode)} onClick={toggleMeasure} title="Toggle measurement tool (M)">📏 Measure</button>
         {measureMode && measureSelections.length > 0 && (
           <button className={btn()} onClick={clearMeasureSelections} title="Clear selections">Clear</button>
