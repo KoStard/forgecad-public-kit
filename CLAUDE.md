@@ -1,6 +1,6 @@
 # ForgeCAD — Development Guidelines
 
-Read [docs/permanent/CODING_BEST_PRACTICES.md](docs/permanent/CODING_BEST_PRACTICES.md) for coding best practices (TypeScript, React, performance, self-review).
+Read [docs/permanent/project/coding-best-practices.md](docs/permanent/project/coding-best-practices.md) for coding best practices (TypeScript, React, performance, self-review).
 
 ## CLI vs npm scripts — which layer to use
 

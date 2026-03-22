@@ -14,31 +14,62 @@ const installDocsOutputDir = path.join(repoRoot, "dist-skill/docs");
 const sourceDocsDir = path.join(repoRoot, "docs/permanent");
 
 const docs = {
-  apiReference: "docs/permanent/API/model-building/reference.md",
-  coordinateSystem: "docs/permanent/API/model-building/coordinate-system.md",
-  geometryConventions: "docs/permanent/API/model-building/geometry-conventions.md",
-  positioning: "docs/permanent/API/model-building/positioning.md",
-  entities: "docs/permanent/API/model-building/entities.md",
-  assembly: "docs/permanent/API/model-building/assembly.md",
+  // Core API
+  apiReference: "docs/permanent/API/core/reference.md",
+  topology: "docs/permanent/API/core/topology.md",
+  parameters: "docs/permanent/API/core/parameters.md",
+  edgeQueries: "docs/permanent/API/core/edge-queries.md",
+
+  // Guides
+  coordinateSystem: "docs/permanent/guides/coordinate-system.md",
+  geometryConventions: "docs/permanent/guides/geometry-conventions.md",
+  positioning: "docs/permanent/guides/positioning.md",
+  modelingRecipes: "docs/permanent/guides/modeling-recipes.md",
+
+  // Sketch
+  sketchCore: "docs/permanent/API/sketch/core.md",
+  sketchPrimitives: "docs/permanent/API/sketch/primitives.md",
+  sketchPath: "docs/permanent/API/sketch/path.md",
+  sketchTransforms: "docs/permanent/API/sketch/transforms.md",
+  sketchBooleans: "docs/permanent/API/sketch/booleans.md",
+  sketchOperations: "docs/permanent/API/sketch/operations.md",
+  sketchOnFace: "docs/permanent/API/sketch/on-face.md",
+  sketchExtrude: "docs/permanent/API/sketch/extrude.md",
+  sketchAnchor: "docs/permanent/API/sketch/anchor.md",
+  sketchText: "docs/permanent/API/sketch/text.md",
+  sketchRegions: "docs/permanent/API/sketch/regions.md",
+
+  // Assembly
+  assembly: "docs/permanent/API/assembly/assembly.md",
+
+  // Sheet Metal
+  sheetMetal: "docs/permanent/API/sheet-metal/sheet-metal.md",
+
+  // Runtime
   viewport: "docs/permanent/API/runtime/viewport.md",
-  sketchCore: "docs/permanent/API/model-building/sketch-core.md",
-  sketchPrimitives: "docs/permanent/API/model-building/sketch-primitives.md",
-  sketchPath: "docs/permanent/API/model-building/sketch-path.md",
-  sketchTransforms: "docs/permanent/API/model-building/sketch-transforms.md",
-  sketchBooleans: "docs/permanent/API/model-building/sketch-booleans.md",
-  sketchOperations: "docs/permanent/API/model-building/sketch-operations.md",
-  sketchOnFace: "docs/permanent/API/model-building/sketch-on-face.md",
-  sketchExtrude: "docs/permanent/API/model-building/sketch-extrude.md",
-  sketchAnchor: "docs/permanent/API/model-building/sketch-anchor.md",
-  modelingRecipes: "docs/permanent/API/guides/modeling-recipes.md",
+
+  // Output
+  export: "docs/permanent/API/output/export.md",
+  brepExport: "docs/permanent/API/output/brep-export.md",
+  bom: "docs/permanent/API/output/bom.md",
+  dimensions: "docs/permanent/API/output/dimensions.md",
+
+  // Toolbox
+  fasteners: "docs/permanent/API/toolbox/fasteners.md",
+
+  // CLI
   cli: "docs/permanent/CLI.md",
+
+  // Auto-generated
+  generatedApiRef: "docs/permanent/generated/api-reference.md",
 };
 
 const docGroups = [
   {
     title: "1. Core API (always read first)",
-    guidance: "Primitives, transforms, booleans, imports, topology, return formats, curves/surfacing.",
-    paths: [docs.apiReference],
+    guidance:
+      "Primitives, transforms, booleans, imports, parameters, topology, edge queries, return formats, curves/surfacing.",
+    paths: [docs.apiReference, docs.parameters, docs.topology, docs.edgeQueries],
   },
   {
     title: "2. Geometry and Positioning (when placement/orientation matters)",
@@ -47,7 +78,8 @@ const docGroups = [
   },
   {
     title: "3. Sketch APIs (when the task is sketch-heavy)",
-    guidance: "2D construction, transforms, booleans, paths, on-face sketching, extrusion, anchors.",
+    guidance:
+      "2D construction, transforms, booleans, paths, on-face sketching, extrusion, anchors, text, regions.",
     paths: [
       docs.sketchCore,
       docs.sketchPrimitives,
@@ -58,32 +90,50 @@ const docGroups = [
       docs.sketchOnFace,
       docs.sketchExtrude,
       docs.sketchAnchor,
+      docs.sketchText,
+      docs.sketchRegions,
     ],
   },
   {
-    title: "4. Entities and Topology (for tracked references, constraints, patterns)",
-    guidance: "Named entities, tracked 3D topology, constraints, patterns, fillet/chamfer helpers.",
-    paths: [docs.entities],
-  },
-  {
-    title: "5. Assemblies and Mechanisms (for joints or kinematics)",
+    title: "4. Assemblies and Mechanisms (for joints or kinematics)",
     guidance: "Assembly graph, joint types, couplings, validation, robot export.",
     paths: [docs.assembly],
   },
   {
-    title: "6. Runtime Viewport APIs (for cut planes, jointsView, and animation playback)",
+    title: "5. Sheet Metal (for bent parts, K-factor, flat patterns)",
+    guidance: "Bend operations, flat pattern unfolding, K-factor configuration.",
+    paths: [docs.sheetMetal],
+  },
+  {
+    title: "6. Output and Export (for STL/3MF/STEP, BOM, dimensions)",
+    guidance: "Mesh export, exact geometry export, bill of materials, dimension annotations.",
+    paths: [docs.export, docs.brepExport, docs.bom, docs.dimensions],
+  },
+  {
+    title: "7. Toolbox (fasteners and standard parts)",
+    guidance: "Parametric bolts, nuts, washers, and standard hardware.",
+    paths: [docs.fasteners],
+  },
+  {
+    title: "8. Runtime Viewport APIs (for cut planes, jointsView, and animation playback)",
     guidance: "Viewer-only APIs such as cutPlane, explodeView, jointsView, and animation behavior.",
     paths: [docs.viewport],
   },
   {
-    title: "7. Recipes and Debugging (for patterns and troubleshooting)",
+    title: "9. Recipes and Debugging (for patterns and troubleshooting)",
     guidance: "Modeling patterns, debugging tactics, copyable snippets.",
     paths: [docs.modelingRecipes],
   },
   {
-    title: "8. CLI and Exports (for validation/render/export tasks)",
+    title: "10. CLI (for validation/render/export tasks)",
     guidance: "Test-run, notebook execution, export pipelines, debug flags.",
     paths: [docs.cli],
+  },
+  {
+    title: "11. Auto-Generated API Index (lookup unknown functions)",
+    guidance:
+      "Complete function/class/constant index auto-generated from the type definitions. Use when you encounter an unfamiliar API name.",
+    paths: [docs.generatedApiRef],
   },
 ];
 
@@ -120,7 +170,7 @@ function renderDocGroupsForDev(groups) {
 
 const devSkillContent = `---
 name: forgecad
-description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .sketch.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when Codex needs to build or modify ForgeCAD geometry, structure multi-file projects, run notebook cells, validate scripts, or use ForgeCAD export/render tooling.
+description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when building or modifying ForgeCAD geometry, structuring multi-file projects, running notebook cells, validating scripts, or using ForgeCAD export/render tooling.
 ---
 
 # ForgeCAD
@@ -129,7 +179,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 ## Workflow
 
-1. Identify the artifact: \`.forge.js\`, \`.sketch.js\`, \`.forge-notebook.json\`, SVG asset, or CLI/export task.
+1. Identify the artifact: \`.forge.js\`, \`.forge-notebook.json\`, SVG asset, or CLI/export task.
 2. Load only the docs the task needs (see Source Map below). Start from the top group, add others as needed.
 3. Reuse patterns from \`examples/api/\` before inventing from scratch.
 4. Default to a concrete first pass — easy iteration beats speculative design review.
@@ -152,7 +202,7 @@ Use \`.forge-notebook.json\` for stateful iteration and debugging. Cells share s
 Load groups top-to-bottom, stopping when you have what the task needs.
 
 ${renderDocGroupsForDev(docGroups)}
-### 9. Check API examples for more context
+### 12. Check API examples for more context
 
 - \`examples/api/*\`
 `;
@@ -184,7 +234,7 @@ function renderDocGroupsForInstall(groups) {
 function buildInstallSkillContent() {
   return `---
 name: forgecad
-description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .sketch.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when Codex needs to build or modify ForgeCAD geometry, structure multi-file projects, run notebook cells, validate scripts, or use ForgeCAD export/render tooling.
+description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when building or modifying ForgeCAD geometry, structuring multi-file projects, running notebook cells, validating scripts, or using ForgeCAD export/render tooling.
 ---
 
 # ForgeCAD
@@ -193,7 +243,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 ## Workflow
 
-1. Identify the artifact: \`.forge.js\`, \`.sketch.js\`, \`.forge-notebook.json\`, SVG asset, or CLI/export task.
+1. Identify the artifact: \`.forge.js\`, \`.forge-notebook.json\`, SVG asset, or CLI/export task.
 2. Load only the docs the task needs (see Source Map below). Start from the top group, add others as needed.
 3. Default to a concrete first pass — easy iteration beats speculative design review.
 4. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
@@ -274,8 +324,7 @@ Prefer documented primitives, import rules, and placement strategies over invent
 
 ### Model files
 
-- \`.forge.js\` — parametric part or assembly script; default export is a \`Shape\` or \`Assembly\`.
-- \`.sketch.js\` — 2D sketch script; default export is a \`Sketch\`.
+- \`.forge.js\` — parametric part or assembly script; default export is a \`Shape\`, \`Sketch\`, or \`Assembly\`.
 - \`.forge-notebook.json\` — multi-cell notebook for iterative work; preview cell is the active output.
 
 ### Import and composition
