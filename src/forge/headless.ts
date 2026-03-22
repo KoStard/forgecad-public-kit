@@ -27,7 +27,6 @@ export {
   difference,
   intersection,
   hull3d,
-  levelSet,
   getWasm,
   isAnchor3D,
   resolveAnchor3D,

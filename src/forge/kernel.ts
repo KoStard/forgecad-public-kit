@@ -7,7 +7,6 @@
 
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import { Transform, solveRotateAroundAngle, type Mat4, type RotateAroundToOptions, type Vec3 } from './transform';
-import { scaleRefineSteps, scaleRefineToLength, scaleRefineToTolerance } from './quality';
 import type { ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
 import { type Anchor3D, isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
 import {
@@ -714,7 +713,7 @@ export const setShapeBrepPlan = setShapeCompilePlan;
 /**
  * Wrap a pre-built ShapeBackend as an opaque compile plan.
  * Used for shapes that can't be expressed as compile plan IR
- * (levelSet, warp, smoothOut, refine, etc.).
+ * (e.g. shapes that bypass compile plan IR).
  */
 export function wrapOpaquePlan(shape: Shape): Shape {
   const backend = getShapeRuntimeBackendInternal(shape);
@@ -1000,52 +999,6 @@ export class Shape {
     return this.rotateAround(axis, angleDeg, pivot);
   }
 
-  // --- Smoothing ---
-
-  /** Mark edges for smoothing based on angle. Call refine() after to apply. */
-  smoothOut(minSharpAngle = 60, minSmoothness = 0): Shape {
-    return wrapOpaquePlan(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).smoothOut(minSharpAngle, minSmoothness), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ));
-  }
-
-  /** Subdivide mesh, interpolating smooth surfaces set by smoothOut(). */
-  refine(n: number): Shape {
-    const steps = scaleRefineSteps(n);
-    if (steps <= 0) return this.clone();
-    return wrapOpaquePlan(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).refine(steps), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ));
-  }
-
-  /** Subdivide until edges are shorter than length. */
-  refineToLength(length: number): Shape {
-    const effectiveLength = scaleRefineToLength(length);
-    return wrapOpaquePlan(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).refineToLength(effectiveLength), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ));
-  }
-
-  /** Subdivide until surface is within tolerance of smooth surface. */
-  refineToTolerance(tolerance: number): Shape {
-    const effectiveTolerance = scaleRefineToTolerance(tolerance);
-    return wrapOpaquePlan(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).refineToTolerance(effectiveTolerance), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ));
-  }
-
-  /** Warp vertices with a function. */
-  warp(fn: (vert: [number, number, number]) => void): Shape {
-    return wrapOpaquePlan(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).warp(fn), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ));
-  }
-
   // --- Booleans ---
 
   /** Unwrap TrackedShape (or any object with toShape()) without circular import. */
@@ -1252,16 +1205,6 @@ export class Shape {
     ), nextPlan);
   }
 
-  // --- Simplification ---
-
-  /** Reduce mesh complexity. Vertices closer than tolerance are merged. */
-  simplify(tolerance?: number): Shape {
-    return wrapOpaquePlan(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).simplify(tolerance), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ));
-  }
-
   // --- Query ---
 
   boundingBox() {
@@ -1274,12 +1217,6 @@ export class Shape {
 
   surfaceArea(): number {
     return getShapeRuntimeBackendInternal(this).surfaceArea();
-  }
-
-  /** Minimum distance between this shape and another. */
-  minGap(other: Shape | { toShape(): Shape }, searchLength: number): number {
-    const s = 'toShape' in other ? other.toShape() : other;
-    return getShapeRuntimeBackendInternal(this).minGap(getShapeRuntimeBackendInternal(s), searchLength);
   }
 
   isEmpty(): boolean {
@@ -1565,9 +1502,8 @@ export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]
 /**
  * Create shape from a signed distance function. Positive = inside.
  *
- * This operation is inherently Manifold-only — it evaluates the SDF on a grid
- * and constructs a mesh via marching cubes. It works regardless of the active
- * backend setting because the result is always a Manifold mesh.
+ * This is an internal helper used by loft/sweep fallback paths.
+ * Not part of the public API — it is inherently Manifold-only (marching cubes).
  */
 export function levelSet(
   sdf: (point: [number, number, number]) => number,
@@ -1587,3 +1523,4 @@ export function levelSet(
     sources: ['level-set'],
   }));
 }
+

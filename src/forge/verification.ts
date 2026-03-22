@@ -117,7 +117,25 @@ interface ShapeLike {
   isEmpty(): boolean;
   volume(): number;
   surfaceArea(): number;
-  minGap(other: ShapeLike, searchLength: number): number;
+}
+
+/**
+ * Compute minGap between two ShapeLike objects via their Manifold backends.
+ * minGap is a Manifold-specific operation not in the backend-agnostic Shape API.
+ */
+function computeMinGap(a: ShapeLike, b: ShapeLike, searchLength: number): number {
+  const { getShapeRuntimeBackend } = require('./kernel') as typeof import('./kernel');
+  const { isManifoldCapableBackend, requireManifoldShapeBackend } = require('./backends/manifold/shapeBackend') as typeof import('./backends/manifold/shapeBackend');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const backendA = getShapeRuntimeBackend(a as any);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const backendB = getShapeRuntimeBackend(b as any);
+  if (!isManifoldCapableBackend(backendA)) {
+    throw new Error('notColliding/minClearance require Manifold-backed shapes');
+  }
+  const manifoldA = backendA.requireManifold('verification.minGap');
+  const manifoldB = requireManifoldShapeBackend(backendB, 'verification.minGap');
+  return manifoldA.minGap(manifoldB, searchLength);
 }
 
 interface FaceRefLike {
@@ -301,7 +319,7 @@ export const verify = {
   notColliding(label: string, a: ShapeLike, b: ShapeLike, searchLength = 1.0): void {
     const line = captureSourceLine();
     try {
-      const gap = a.minGap(b, searchLength);
+      const gap = computeMinGap(a, b, searchLength);
       const passed = gap > 0;
       push({
         id: nextId(),
@@ -325,7 +343,7 @@ export const verify = {
   minClearance(label: string, a: ShapeLike, b: ShapeLike, minGap: number, searchLength = 10.0): void {
     const line = captureSourceLine();
     try {
-      const gap = a.minGap(b, searchLength);
+      const gap = computeMinGap(a, b, searchLength);
       const passed = gap >= minGap;
       push({
         id: nextId(),

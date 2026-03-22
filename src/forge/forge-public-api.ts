@@ -147,13 +147,6 @@ export declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _
 export declare function difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
 export declare function intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
 export declare function hull3d(...args: (_Shape | TrackedShape | [number, number, number])[]): _Shape;
-export declare function levelSet(
-  sdf: (p: [number, number, number]) => number,
-  bounds: { min: [number, number, number]; max: [number, number, number] },
-  edgeLength: number,
-  level?: number,
-): _Shape;
-
 // Cross-file imports (runtime-provided; types declared here for completeness)
 export declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | _SvgImportOptions): _Sketch;
 export declare function importPart(fileName: string, paramOverrides?: Record<string, number>): _Shape;

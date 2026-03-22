@@ -109,19 +109,12 @@ class FrozenShapeBackend implements ManifoldCapableBackend {
   transform(m: Parameters<ShapeBackend['transform']>[0]): ShapeBackend { return this.getManifoldBackend().transform(m); }
   scale(v: number | [number, number, number]): ShapeBackend { return this.getManifoldBackend().scale(v); }
   mirror(normal: [number, number, number]): ShapeBackend { return this.getManifoldBackend().mirror(normal); }
-  smoothOut(minSharpAngle: number, minSmoothness: number): ShapeBackend { return this.getManifoldBackend().smoothOut(minSharpAngle, minSmoothness); }
-  refine(steps: number): ShapeBackend { return this.getManifoldBackend().refine(steps); }
-  refineToLength(length: number): ShapeBackend { return this.getManifoldBackend().refineToLength(length); }
-  refineToTolerance(tolerance: number): ShapeBackend { return this.getManifoldBackend().refineToTolerance(tolerance); }
-  warp(fn: (vert: [number, number, number]) => void): ShapeBackend { return this.getManifoldBackend().warp(fn); }
   split(other: ShapeBackend): [ShapeBackend, ShapeBackend] { return this.getManifoldBackend().split(other); }
   splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend] { return this.getManifoldBackend().splitByPlane(normal, originOffset); }
   trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend { return this.getManifoldBackend().trimByPlane(normal, originOffset); }
   hull(): ShapeBackend { return this.getManifoldBackend().hull(); }
-  simplify(tolerance?: number): ShapeBackend { return this.getManifoldBackend().simplify(tolerance); }
   volume(): number { return this.getManifoldBackend().volume(); }
   surfaceArea(): number { return this.getManifoldBackend().surfaceArea(); }
-  minGap(other: ShapeBackend, searchLength: number): number { return this.getManifoldBackend().minGap(other, searchLength); }
   slice(offset: number): ShapeRuntimeCrossSection { return this.getManifoldBackend().slice(offset); }
   project(): ShapeRuntimeCrossSection { return this.getManifoldBackend().project(); }
   requireManifold(apiName?: string): Manifold { return (this.getManifoldBackend() as ManifoldCapableBackend).requireManifold(apiName); }

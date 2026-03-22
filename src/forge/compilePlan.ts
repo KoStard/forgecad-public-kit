@@ -295,7 +295,7 @@ export type ShapeCompilePlan =
       queryPropagation?: TopologyRewritePropagation;
     }
   | {
-      /** Wraps a pre-built ShapeBackend that can't be expressed as IR (levelSet, warp, smoothOut, etc.). */
+      /** Wraps a pre-built ShapeBackend that can't be expressed as compile plan IR. */
       kind: 'opaque';
       backend: ShapeBackend;
     };
