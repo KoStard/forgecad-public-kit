@@ -133,11 +133,12 @@ export function FileExplorer() {
   }, [files, folders]);
 
   useEffect(() => {
-    if (!activeFile) return;
-    const parents = collectParentPaths(activeFile);
+    const target = meshPreviewFile || activeFile;
+    if (!target) return;
+    const parents = collectParentPaths(target);
     if (parents.length === 0) return;
     setExpandedFolders((prev) => Array.from(new Set([...prev, ...parents])));
-  }, [activeFile]);
+  }, [activeFile, meshPreviewFile]);
 
   const handleCreate = () => {
     const name = normalizePath(newName.trim());
