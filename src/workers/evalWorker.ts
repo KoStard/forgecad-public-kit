@@ -18,6 +18,21 @@ type WorkerContext = {
   postMessage: (message: EvalWorkerResponse, transfer?: Transferable[]) => void;
 };
 
+/**
+ * Synchronous binary file reader for importMesh() in the browser.
+ * Uses sync XMLHttpRequest (allowed in web workers) to fetch from the server.
+ */
+function readBinaryFile(resolvedPath: string): ArrayBuffer {
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', `/api/read-binary?path=${encodeURIComponent(resolvedPath)}`, false);
+  xhr.responseType = 'arraybuffer';
+  xhr.send();
+  if (xhr.status !== 200) {
+    throw new Error(`Failed to read binary file "${resolvedPath}": ${xhr.statusText || `HTTP ${xhr.status}`}`);
+  }
+  return xhr.response as ArrayBuffer;
+}
+
 const worker = globalThis as unknown as WorkerContext;
 
 // Cache the init() promise so concurrent handlers await the same instance.
@@ -54,7 +69,7 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
       const targetCellId = resolveNotebookPreviewCellId(notebook);
       runResult = runNotebook(notebook, file, files, { quality, targetCellId }).displayResult;
     } else {
-      runResult = runScript(code, file, files, { quality });
+      runResult = runScript(code, file, files, { quality, readBinaryFile });
     }
     const tRun = performance.now();
 
@@ -111,7 +126,7 @@ async function handleExportExact(data: EvalWorkerExportExactRequest): Promise<vo
         const targetCellId = resolveNotebookPreviewCellId(notebook);
         lastRunResult = runNotebook(notebook, file, files, { quality, targetCellId }).displayResult;
       } else {
-        lastRunResult = runScript(code, file, files, { quality });
+        lastRunResult = runScript(code, file, files, { quality, readBinaryFile });
       }
 
       if (lastRunResult.error) {

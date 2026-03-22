@@ -26,6 +26,8 @@ export interface StudioServerOptions {
 
 const PROJECT_FILE_EXTS = ['.forge.js', '.js', '.svg', '.forge-notebook.json'];
 const isProjectFile = (name: string): boolean => PROJECT_FILE_EXTS.some((ext) => name.endsWith(ext));
+const MESH_FILE_EXTS = ['.stl', '.obj', '.3mf'];
+const isMeshFile = (name: string): boolean => MESH_FILE_EXTS.some((ext) => name.toLowerCase().endsWith(ext));
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -299,6 +301,38 @@ export async function startStudioServer(
           sendJson(res, 200, { success: true });
         })
         .catch((e: any) => sendJson(res, 500, { error: e.message }));
+      return;
+    }
+
+    if (method === 'GET' && url?.startsWith('/api/read-binary?')) {
+      try {
+        const params = new URLSearchParams(url.split('?')[1]);
+        const filename = params.get('path');
+        if (!projectDir || !filename) {
+          sendJson(res, 400, { error: 'Missing project dir or path' });
+          return;
+        }
+        const absProject = path.resolve(projectDir);
+        const filePath = path.resolve(absProject, filename);
+        const rel = path.relative(absProject, filePath);
+        if (rel.startsWith('..') || path.isAbsolute(rel)) {
+          sendJson(res, 403, { error: 'Path outside project root' });
+          return;
+        }
+        if (!isMeshFile(filePath)) {
+          sendJson(res, 400, { error: `Not a mesh file: ${filename}` });
+          return;
+        }
+        if (!fs.existsSync(filePath)) {
+          sendJson(res, 404, { error: `File not found: ${filename}` });
+          return;
+        }
+        const data = fs.readFileSync(filePath);
+        res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+        res.end(data);
+      } catch (e: any) {
+        sendJson(res, 500, { error: e.message });
+      }
       return;
     }
 
