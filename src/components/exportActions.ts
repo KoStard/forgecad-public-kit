@@ -7,6 +7,7 @@ import { setParamOverrides } from '@forge/params';
 import { useForgeStore, type ObjectSettings } from '../store/forgeStore';
 import { generateReportInWorker } from '../workers/reportWorkerClient';
 import { evalWorkerClient } from '../workers/evalWorkerClient';
+import { isNotebookFile } from '../notebook/model';
 
 export type MeshExportFormat = '3mf' | 'stl' | 'obj';
 export type ExactExportFormat = 'step' | 'brep';
@@ -160,16 +161,26 @@ export async function exportExactFromStore(
   format: ExactExportFormat,
   preferredStem?: string,
 ): Promise<void> {
-  const { result, activeFile } = useForgeStore.getState();
+  const { result, activeFile, files, paramOverrides, runQuality } = useForgeStore.getState();
   requireSuccessfulRunResult(result);
 
   const stem = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
+  const code = files[activeFile];
+  if (!code) throw new Error(`Active file "${activeFile}" is missing.`);
 
   // Export runs in the eval worker where live OCCT TopoDS_Shape objects exist.
   // The main thread only has FrozenShapes (Manifold-backed mesh reconstructions)
   // which lack the B-rep topology needed for STEP/BREP export.
+  // Script context is passed so the worker can re-evaluate if needed (e.g. cache hit).
   try {
-    const blob = await evalWorkerClient.exportExact(format);
+    const blob = await evalWorkerClient.exportExact(format, {
+      code,
+      file: activeFile,
+      files,
+      quality: runQuality,
+      paramOverrides,
+      isNotebook: isNotebookFile(activeFile),
+    });
     triggerDownload(blob, `${stem}.${format}`);
   } finally {
     useForgeStore.setState({ evaluationPhase: 'idle' });

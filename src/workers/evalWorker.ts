@@ -11,7 +11,7 @@ import { getShapeRuntimeBackend } from '../forge/kernel';
 import { isOCCTShapeBackend } from '../forge/backends/occt/shapeBackend';
 import { buildStepBlob } from '../forge/exportStep';
 import { buildBrepBlob } from '../forge/exportBrepNative';
-import type { EvalWorkerRequest, EvalWorkerResponse, EvalWorkerRunPayload, ExactExportFormat } from './evalWorkerProtocol';
+import type { EvalWorkerRequest, EvalWorkerResponse, EvalWorkerRunPayload, EvalWorkerExportExactRequest } from './evalWorkerProtocol';
 
 type WorkerContext = {
   onmessage: ((event: MessageEvent<EvalWorkerRequest>) => void) | null;
@@ -89,14 +89,29 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
   }
 }
 
-async function handleExportExact(reqId: number, format: ExactExportFormat): Promise<void> {
+async function handleExportExact(payload: EvalWorkerExportExactRequest['payload']): Promise<void> {
+  const { reqId, format, code, file, files, quality, paramOverrides, isNotebook } = payload;
   try {
-    if (!lastRunResult) {
-      throw new Error('No model has been evaluated yet. Run the script first.');
-    }
+    // If the worker has no live result (e.g. main thread loaded from cache),
+    // re-run the script here so we have OCCT shapes to export.
+    if (!lastRunResult || getActiveBackend() !== 'occt') {
+      worker.postMessage({ type: 'progress', payload: { seq: -1, phase: 'evaluating' } });
+      await ensureKernelReady();
+      resetSolverWasmStats();
+      setParamOverrides(paramOverrides);
+      setActiveBackend('occt');
 
-    if (getActiveBackend() !== 'occt') {
-      throw new Error('STEP/BREP export requires the OCCT backend. Switch to OCCT and re-evaluate.');
+      if (isNotebook) {
+        const notebook = parseNotebook(code);
+        const targetCellId = resolveNotebookPreviewCellId(notebook);
+        lastRunResult = runNotebook(notebook, file, files, { quality, targetCellId }).displayResult;
+      } else {
+        lastRunResult = runScript(code, file, files, { quality });
+      }
+
+      if (lastRunResult.error) {
+        throw new Error(`Script has errors: ${lastRunResult.error}`);
+      }
     }
 
     const shapeObjects = lastRunResult.objects.filter((obj) => obj.shape);
@@ -167,8 +182,7 @@ worker.onmessage = async (event) => {
   }
 
   if (data.type === 'export-exact') {
-    const { reqId, format } = data.payload;
-    handleExportExact(reqId, format);
+    handleExportExact(data.payload);
     return;
   }
 

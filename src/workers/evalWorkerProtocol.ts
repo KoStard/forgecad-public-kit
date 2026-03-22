@@ -167,6 +167,13 @@ export interface EvalWorkerExportExactRequest {
   payload: {
     reqId: number;
     format: ExactExportFormat;
+    /** Script context so the worker can re-evaluate if lastRunResult is stale/missing (e.g. cache hit). */
+    code: string;
+    file: string;
+    files: Record<string, string>;
+    quality: ForgeQualityPreset;
+    paramOverrides: Record<string, number>;
+    isNotebook: boolean;
   };
 }
 

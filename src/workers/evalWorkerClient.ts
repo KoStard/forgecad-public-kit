@@ -193,9 +193,16 @@ class EvalWorkerClient {
 
   /**
    * Export exact geometry (STEP/BREP) using live OCCT shapes in the worker.
-   * Returns a Blob with the exported file data.
+   * Includes script context so the worker can re-evaluate if needed (e.g. cache hit).
    */
-  exportExact(format: ExactExportFormat): Promise<Blob> {
+  exportExact(format: ExactExportFormat, scriptContext: {
+    code: string;
+    file: string;
+    files: Record<string, string>;
+    quality: ForgeQualityPreset;
+    paramOverrides: Record<string, number>;
+    isNotebook: boolean;
+  }): Promise<Blob> {
     const reqId = ++this.exportExactReqId;
     return new Promise<Blob>((resolve, reject) => {
       this.pendingExportExact.set(reqId, {
@@ -205,7 +212,10 @@ class EvalWorkerClient {
         },
         reject,
       });
-      const request: EvalWorkerRequest = { type: 'export-exact', payload: { reqId, format } };
+      const request: EvalWorkerRequest = {
+        type: 'export-exact',
+        payload: { reqId, format, ...scriptContext },
+      };
       this.getWorker().postMessage(request);
     });
   }

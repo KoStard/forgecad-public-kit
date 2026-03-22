@@ -54,34 +54,30 @@ export async function buildBrepBlob(objects: BrepNativeExportObject[]): Promise<
   // Write BREP to the Emscripten virtual filesystem.
   const path = '/tmp/forgecad-export.brep';
 
-  // BRepTools has several Write overloads in opencascade.js.
-  // Some overloads accept ostream (C++ type not bound in WASM) and will throw at runtime.
-  // Try file-path overloads first, falling through on unbound-type errors.
+  // BRepTools.Write has multiple overloads in opencascade.js:
+  //   Write_1(shape, ostream)            — unbound ostream, unusable
+  //   Write_2(shape, ostream, progress)  — unbound ostream, unusable
+  //   Write_3(shape, filePath)           — file-path variant ✓
+  //   Write_4(shape, filePath, progress) — file-path with progress ✓
+  // Try all numbered overloads that accept a file path, then the base name.
+  const overloads: Array<{ name: string; call: () => boolean }> = [
+    { name: 'Write_3', call: () => oc.BRepTools.Write_3?.(topoShape, path) },
+    { name: 'Write_4', call: () => oc.BRepTools.Write_4?.(topoShape, path, new oc.Message_ProgressRange_1()) },
+    { name: 'Write_1', call: () => oc.BRepTools.Write_1?.(topoShape, path) },
+    { name: 'Write_2', call: () => oc.BRepTools.Write_2?.(topoShape, path, new oc.Message_ProgressRange_1()) },
+    { name: 'Write',   call: () => oc.BRepTools.Write?.(topoShape, path) },
+  ];
+
   let writeSuccess = false;
   let lastError: string | null = null;
 
-  // Write_1(shape, path) — file-path overload, no progress
-  if (!writeSuccess && typeof oc.BRepTools.Write_1 === 'function') {
+  for (const overload of overloads) {
     try {
-      writeSuccess = oc.BRepTools.Write_1(topoShape, path);
-    } catch (err: any) {
-      lastError = err.message || String(err);
-    }
-  }
-
-  // Write_2(shape, path, progressRange) — file-path with progress
-  if (!writeSuccess && typeof oc.BRepTools.Write_2 === 'function') {
-    try {
-      writeSuccess = oc.BRepTools.Write_2(topoShape, path, new oc.Message_ProgressRange_1());
-    } catch (err: any) {
-      lastError = err.message || String(err);
-    }
-  }
-
-  // Write(shape, path) — unversioned overload
-  if (!writeSuccess && typeof oc.BRepTools.Write === 'function') {
-    try {
-      writeSuccess = oc.BRepTools.Write(topoShape, path);
+      const result = overload.call();
+      if (result !== undefined && result !== false) {
+        writeSuccess = true;
+        break;
+      }
     } catch (err: any) {
       lastError = err.message || String(err);
     }
