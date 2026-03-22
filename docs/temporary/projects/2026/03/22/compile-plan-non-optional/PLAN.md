@@ -128,20 +128,28 @@ Plans are lost in three categories:
 
 1. Remove inline implementations in `core.ts` for offset/hull/simplify/warp (lines 95-106) -- they're dead code overridden by operations.ts prototype assignments
 
-## Files to Modify
+## Files Modified
 
-| File | Changes |
-|------|---------|
-| `src/forge/sketch/core.ts` | Remove warp/simplify stubs, remove null from plan type |
-| `src/forge/sketch/operations.ts` | Remove warp/simplify, remove fallback paths |
-| `src/forge/sketch/transforms.ts` | Remove fallback paths |
-| `src/forge/sketch/booleans.ts` | Remove fallback paths |
-| `src/forge/compilePlan.ts` | Extend offset join types, remove null from builder params |
-| `src/forge/sketch/text.ts` | Add polygon plan for text glyphs |
-| `src/forge/sketch/entities.ts` | Add circle plan for Circle2D.toSketch |
-| `src/forge/sketch/constraints/sketch.ts` | Add plans for constrained sketch output |
-| `src/forge/sketch/svgImport.ts` | Add polygon plan for SVG import |
-| `src/forge/section.ts` | Handle plan for intersectWithPlane |
-| `src/forge/library.ts` | Use backend-level simplify for gear profile |
-| `src/forge/profileBackend.ts` | Keep simplify/warp on backend interface |
-| `src/forge/forge-api.d.ts` | Remove warp/simplify from API types |
+| File | Changes | Status |
+|------|---------|--------|
+| `src/forge/sketch/core.ts` | Remove warp/simplify stubs, remove null from plan type, default to opaque | DONE |
+| `src/forge/sketch/operations.ts` | Remove warp/simplify, remove fallback paths | DONE |
+| `src/forge/sketch/transforms.ts` | Remove fallback paths, always use plan | DONE |
+| `src/forge/sketch/booleans.ts` | Remove fallback paths, always use plan | DONE |
+| `src/forge/compilePlan.ts` | Add opaque kind, extend offset join types, remove null from builder params | DONE |
+| `src/forge/sketch/text.ts` | Use difference2d for ring glyph | DONE |
+| `src/forge/sketch/entities.ts` | Add circle plan for Circle2D.toSketch | DONE |
+| `src/forge/sketch/constraints/sketch.ts` | Use circle2d(), add empty polygon plan | DONE |
+| `src/forge/sketch/svgImport.ts` | Use polygon() + union2d, opaque plan for simplify | DONE |
+| `src/forge/section.ts` | Opaque plan for intersectWithPlane, fallback for projectToPlane | DONE |
+| `src/forge/library.ts` | Backend-level simplify with opaque plan | DONE |
+| `src/forge/forge-api.d.ts` | Remove warp/simplify from Sketch API types | DONE |
+| `src/forge/backends/manifold/lower.ts` | Handle opaque plan kind | DONE |
+| `src/forge/backends/occt/lower.ts` | Handle opaque plan kind | DONE |
+| `src/forge/compilePlanCadQuery.ts` | Handle opaque plan kind | DONE |
+
+## Remaining Work
+
+- The `ProfileBackend` interface still has `simplify()` and `warp()` methods for internal use
+- Some downstream code (shellCompilePlan, projectionCompile) still has dead null-checks on builders that now always return non-null; these are harmless but could be cleaned up
+- The `opaque` plan kind is a compromise -- ideally section cuts would get proper `kind: 'slice'` IR nodes
