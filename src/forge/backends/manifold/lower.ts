@@ -4,19 +4,20 @@ import type {
   ProfileCompileTransformStep,
   ShapeCompilePlan,
   ShapeCompileTransformStep,
-} from './compilePlan';
+} from '../../compilePlan';
 import {
   lowerCutShapeCompilePlanToConcretePlan,
   lowerHoleShapeCompilePlanToConcretePlan,
-} from './holeCutCompilePlan';
-import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
-import { lowerSheetMetalBasePlan } from './sheetMetalModel';
-import { wrapManifoldShapeBackend, type ShapeBackend } from './shapeBackend';
-import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './sketch/loftSweepLowering';
-import { loftStitched } from './sketch/loftStitched';
-import { Transform } from './transform';
-import { planeFrameToWorldToPlaneMatrix } from './planeFrame';
-import { resolveSupportedEdgeFeatureSelection } from './edgeFeatureResolution';
+} from '../../holeCutCompilePlan';
+import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
+import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
+import type { ShapeBackend } from '../../shapeBackend';
+import { wrapManifoldShapeBackend } from './shapeBackend';
+import { buildLoftLevelSetInput, buildSweepLevelSetInput } from '../../sketch/loftSweepLowering';
+import { loftStitched } from './loftStitched';
+import { Transform } from '../../transform';
+import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
+import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolution';
 import { applyChamferSelectionToManifold, applyFilletSelectionToManifold } from './edgeFeatureRuntime';
 
 function applyProfileCompileTransform(
@@ -326,6 +327,8 @@ export function lowerShapeCompilePlanToManifold(
       return lowerShapeHullCompilePlan(plan, wasm);
     case 'trimByPlane':
       return lowerShapeTrimByPlaneCompilePlan(plan, wasm);
+    case 'opaque':
+      throw new Error('Cannot lower opaque compile plan to Manifold — opaque plans must be intercepted before lowering');
   }
 }
 

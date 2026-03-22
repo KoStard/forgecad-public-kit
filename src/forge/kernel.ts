@@ -5,9 +5,7 @@
  * behind a clean, chainable Shape API.
  */
 
-import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import { Transform, solveRotateAroundAngle, type Mat4, type RotateAroundToOptions, type Vec3 } from './transform';
-import { scaleRefineSteps, scaleRefineToLength, scaleRefineToTolerance } from './quality';
 import type { ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
 import { type Anchor3D, isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
 import {
@@ -53,13 +51,10 @@ import { wrapRepeatedShapeCompilePlan } from './repetitionOwnership';
 import {
   type ShapeBackend,
   isShapeBackend,
-  requireManifoldShapeBackend,
-  wrapManifoldShapeBackend,
 } from './shapeBackend';
-import { lowerShapeCompilePlanToShapeBackend } from './compilePlanManifold';
-import { lowerShapeCompilePlanToOCCTBackend, OCCTUnsupportedError } from './compilePlanOCCT';
-import { isOCCTShapeBackend } from './occtShapeBackend';
-import { initOCCT } from './occtInit';
+import { wrapManifoldShapeBackend, lowerShapeCompilePlanToShapeBackend, initManifoldWasm, getWasm } from './backends/manifold';
+import type { Manifold } from './backends/manifold';
+import { lowerShapeCompilePlanToOCCTBackend, initOCCT } from './backends/occt';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './shapeFaces';
@@ -74,35 +69,22 @@ export type {
 } from './placement';
 export type { FaceTransformationHistory, TransformationStep } from './faceHistory';
 
-let _wasm: ManifoldToplevel | null = null;
-
-export async function initKernel(): Promise<ManifoldToplevel> {
-  if (_wasm) return _wasm;
+export async function initKernel() {
   // Initialize Manifold and OCCT WASM modules in parallel.
   // Both are cached as singletons — subsequent calls are instant.
   const [manifoldModule] = await Promise.all([
-    (async () => {
-      const Module = (await import('manifold-3d')).default;
-      const wasm = await Module();
-      wasm.setup();
-      wasm.setMinCircularAngle(2);
-      wasm.setMinCircularEdgeLength(0.5);
-      return wasm;
-    })(),
+    initManifoldWasm(),
     initOCCT(),
   ]);
-  _wasm = manifoldModule;
-  return _wasm;
+  return manifoldModule;
 }
 
-export function getWasm(): ManifoldToplevel {
-  if (!_wasm) throw new Error('Kernel not initialized — call initKernel() first');
-  return _wasm;
-}
+// TODO: Remove getWasm re-export from kernel once all callers import from backends/manifold/wasm
+export { getWasm };
 
 /**
  * Active geometry backend selector.
- * - 'occt'     — OCCT primary, Manifold fallback for unsupported ops
+ * - 'occt'     — OCCT primary
  * - 'manifold' — Manifold only (original behaviour)
  */
 export type ActiveBackend = 'occt' | 'manifold';
@@ -692,20 +674,19 @@ export function buildShapeFromCompilePlan(
   color?: string,
   geometryInfo?: Partial<GeometryInfo>,
 ): Shape {
+  // Opaque plans wrap a pre-built backend — no lowering needed.
+  if (plan.kind === 'opaque') {
+    return setShapeCompilePlan(
+      new Shape(plan.backend, color, geometryInfo),
+      plan,
+    );
+  }
+
   let backend: ShapeBackend;
   if (_activeBackend === 'manifold') {
     backend = lowerShapeCompilePlanToShapeBackend(plan, getWasm());
   } else {
-    // OCCT primary — falls back to Manifold for unsupported ops
-    try {
-      backend = lowerShapeCompilePlanToOCCTBackend(plan);
-    } catch (e) {
-      if (e instanceof OCCTUnsupportedError) {
-        backend = lowerShapeCompilePlanToShapeBackend(plan, getWasm());
-      } else {
-        throw e;
-      }
-    }
+    backend = lowerShapeCompilePlanToOCCTBackend(plan);
   }
   return setShapeCompilePlan(
     new Shape(backend, color, geometryInfo),
@@ -715,6 +696,16 @@ export function buildShapeFromCompilePlan(
 
 export const getShapeBrepPlan = getShapeCompilePlan;
 export const setShapeBrepPlan = setShapeCompilePlan;
+
+/**
+ * Wrap a pre-built ShapeBackend as an opaque compile plan.
+ * Used for shapes that can't be expressed as compile plan IR
+ * (e.g. shapes that bypass compile plan IR).
+ */
+export function wrapOpaquePlan(shape: Shape): Shape {
+  const backend = getShapeRuntimeBackendInternal(shape);
+  return setShapeCompilePlanInternal(shape, { kind: 'opaque', backend });
+}
 
 function createOwnedTopologyRewritePlan(
   plan: ShapeCompilePlan | null,
@@ -824,12 +815,10 @@ export class Shape {
   // --- Transforms (all return new Shape, immutable) ---
 
   translate(x: number, y: number, z: number): Shape {
-    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'translate', x, y, z });
+    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'translate', x, y, z })!;
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
-      nextPlan
-        ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-        : new Shape(getShapeRuntimeBackendInternal(this).translate(x, y, z), this.colorHex),
+      buildShapeFromCompilePlan(nextPlan, this.colorHex),
       Transform.translation(x, y, z).toArray(),
     ), nextPlan);
   }
@@ -848,12 +837,10 @@ export class Shape {
   }
 
   rotate(x: number, y: number, z: number): Shape {
-    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'rotate', xDeg: x, yDeg: y, zDeg: z });
+    const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'rotate', xDeg: x, yDeg: y, zDeg: z })!;
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
-      nextPlan
-        ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-        : new Shape(getShapeRuntimeBackendInternal(this).rotate(x, y, z), this.colorHex),
+      buildShapeFromCompilePlan(nextPlan, this.colorHex),
       rotationEulerMatrix(x, y, z),
     ), nextPlan);
   }
@@ -867,35 +854,43 @@ export class Shape {
       if (steps.length === 0) return getShapeCompilePlanInternal(this);
       return appendShapeCompileTransforms(getShapeCompilePlanInternal(this), steps);
     })();
-    return setShapeCompilePlanInternal(
+    if (nextPlan) {
+      return setShapeCompilePlanInternal(
+        withTransformedDimensions(this, buildShapeFromCompilePlan(nextPlan, this.colorHex), mat),
+        nextPlan,
+      );
+    }
+    // Non-rigid matrix can't be expressed in compile plan — wrap result as opaque.
+    return wrapOpaquePlan(
       withTransformedDimensions(
         this,
-        nextPlan
-          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-          : new Shape(getShapeRuntimeBackendInternal(this).transform(mat), this.colorHex),
+        new Shape(getShapeRuntimeBackendInternal(this).transform(mat), this.colorHex),
         mat,
       ),
-      nextPlan,
     );
   }
 
   scale(v: number | [number, number, number]): Shape {
     const scale = normalizeShapeScale(v);
-    const nextPlan = scale
-      ? appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
-          kind: 'scale',
-          x: scale[0],
-          y: scale[1],
-          z: scale[2],
-        })
-      : null;
-    return setShapeCompilePlanInternal(withTransformedDimensions(
+    if (scale) {
+      const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
+        kind: 'scale',
+        x: scale[0],
+        y: scale[1],
+        z: scale[2],
+      })!;
+      return setShapeCompilePlanInternal(withTransformedDimensions(
+        this,
+        buildShapeFromCompilePlan(nextPlan, this.colorHex),
+        Transform.scale(v).toArray(),
+      ), nextPlan);
+    }
+    // Degenerate scale — wrap result as opaque.
+    return wrapOpaquePlan(withTransformedDimensions(
       this,
-      nextPlan
-        ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-        : new Shape(getShapeRuntimeBackendInternal(this).scale(v), this.colorHex),
+      new Shape(getShapeRuntimeBackendInternal(this).scale(v), this.colorHex),
       Transform.scale(v).toArray(),
-    ), nextPlan);
+    ));
   }
 
   mirror(normal: [number, number, number]): Shape {
@@ -904,13 +899,11 @@ export class Shape {
       normalX: normal[0],
       normalY: normal[1],
       normalZ: normal[2],
-    });
-    const nextPlan = wrapRepeatedShapeCompilePlan(transformedPlan, 'mirror');
+    })!;
+    const nextPlan = wrapRepeatedShapeCompilePlan(transformedPlan, 'mirror')!;
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
-      nextPlan
-        ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-        : new Shape(getShapeRuntimeBackendInternal(this).mirror(normal), this.colorHex),
+      buildShapeFromCompilePlan(nextPlan, this.colorHex),
       mirrorMatrix(normal),
     ), nextPlan);
   }
@@ -965,13 +958,11 @@ export class Shape {
       pivotX: pivot[0],
       pivotY: pivot[1],
       pivotZ: pivot[2],
-    });
+    })!;
     return setShapeCompilePlanInternal(
       withTransformedDimensions(
         this,
-        nextPlan
-          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-          : new Shape(getShapeRuntimeBackendInternal(this).transform(matrix), this.colorHex),
+        buildShapeFromCompilePlan(nextPlan, this.colorHex),
         matrix,
       ),
       nextPlan,
@@ -995,52 +986,6 @@ export class Shape {
     return this.rotateAround(axis, angleDeg, pivot);
   }
 
-  // --- Smoothing ---
-
-  /** Mark edges for smoothing based on angle. Call refine() after to apply. */
-  smoothOut(minSharpAngle = 60, minSmoothness = 0): Shape {
-    return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).smoothOut(minSharpAngle, minSmoothness), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ), null);
-  }
-
-  /** Subdivide mesh, interpolating smooth surfaces set by smoothOut(). */
-  refine(n: number): Shape {
-    const steps = scaleRefineSteps(n);
-    if (steps <= 0) return this.clone();
-    return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).refine(steps), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ), null);
-  }
-
-  /** Subdivide until edges are shorter than length. */
-  refineToLength(length: number): Shape {
-    const effectiveLength = scaleRefineToLength(length);
-    return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).refineToLength(effectiveLength), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ), null);
-  }
-
-  /** Subdivide until surface is within tolerance of smooth surface. */
-  refineToTolerance(tolerance: number): Shape {
-    const effectiveTolerance = scaleRefineToTolerance(tolerance);
-    return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).refineToTolerance(effectiveTolerance), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ), null);
-  }
-
-  /** Warp vertices with a function. */
-  warp(fn: (vert: [number, number, number]) => void): Shape {
-    return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).warp(fn), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ), null);
-  }
-
   // --- Booleans ---
 
   /** Unwrap TrackedShape (or any object with toShape()) without circular import. */
@@ -1060,13 +1005,11 @@ export class Shape {
       buildBooleanShapeCompilePlan('union', operandPlans),
       'boolean:union',
       (owner) => buildBooleanTopologyRewritePropagation('union', owner, operandPlans),
-    );
+    )!;
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withMergedDimensions(
         shapes,
-        nextPlan
-          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-          : new Shape(getWasm().Manifold.union(requireManifoldOperands('Shape.add()', shapes)), this.colorHex),
+        buildShapeFromCompilePlan(nextPlan, this.colorHex),
       ),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
     ), nextPlan);
@@ -1084,13 +1027,11 @@ export class Shape {
       buildBooleanShapeCompilePlan('difference', operandPlans),
       'boolean:difference',
       (owner) => buildBooleanTopologyRewritePropagation('difference', owner, operandPlans),
-    );
+    )!;
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
         this,
-        nextPlan
-          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-          : new Shape(getWasm().Manifold.difference(requireManifoldOperands('Shape.subtract()', shapes)), this.colorHex),
+        buildShapeFromCompilePlan(nextPlan, this.colorHex),
       ),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
     ), nextPlan);
@@ -1108,13 +1049,11 @@ export class Shape {
       buildBooleanShapeCompilePlan('intersection', operandPlans),
       'boolean:intersection',
       (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, operandPlans),
-    );
+    )!;
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withMergedDimensions(
         shapes,
-        nextPlan
-          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-          : new Shape(getWasm().Manifold.intersection(requireManifoldOperands('Shape.intersect()', shapes)), this.colorHex),
+        buildShapeFromCompilePlan(nextPlan, this.colorHex),
       ),
       mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
     ), nextPlan);
@@ -1133,7 +1072,7 @@ export class Shape {
       buildBooleanShapeCompilePlan('intersection', insideOperandPlans),
       'split:inside',
       (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, insideOperandPlans),
-    );
+    )!;
     const outsideOperandPlans = [
       getShapeCompilePlanInternal(this),
       getShapeCompilePlanInternal(c),
@@ -1142,81 +1081,64 @@ export class Shape {
       buildBooleanShapeCompilePlan('difference', outsideOperandPlans),
       'split:outside',
       (owner) => buildBooleanTopologyRewritePropagation('difference', owner, outsideOperandPlans),
-    );
+    )!;
     const info = mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(c)], 'boolean', { topology: 'none' });
-    if (insidePlan && outsidePlan) {
-      return [
-        setShapeCompilePlanInternal(
-          setShapeGeometryInfoInternal(
-            withBaseDimensions(this, buildShapeFromCompilePlan(insidePlan, this.colorHex)),
-            info,
-          ),
-          insidePlan,
-        ),
-        setShapeCompilePlanInternal(
-          setShapeGeometryInfoInternal(
-            withBaseDimensions(this, buildShapeFromCompilePlan(outsidePlan, this.colorHex)),
-            info,
-          ),
-          outsidePlan,
-        ),
-      ];
-    }
-
-    const [a, b] = getShapeRuntimeBackendInternal(this).split(getShapeRuntimeBackendInternal(c));
     return [
-      setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(a, this.colorHex)), info), null),
-      setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(b, this.colorHex)), info), null),
+      setShapeCompilePlanInternal(
+        setShapeGeometryInfoInternal(
+          withBaseDimensions(this, buildShapeFromCompilePlan(insidePlan, this.colorHex)),
+          info,
+        ),
+        insidePlan,
+      ),
+      setShapeCompilePlanInternal(
+        setShapeGeometryInfoInternal(
+          withBaseDimensions(this, buildShapeFromCompilePlan(outsidePlan, this.colorHex)),
+          info,
+        ),
+        outsidePlan,
+      ),
     ];
   }
 
   /** Split by infinite plane. Returns [positive-side, negative-side]. */
   splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
     const info = deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' });
-    const basePlan = getShapeCompilePlanInternal(this);
+    const basePlan = getShapeCompilePlanInternal(this)!;
     const firstPlan = createOwnedTopologyRewritePlan(
       buildTrimByPlaneShapeCompilePlan(basePlan, normal, originOffset),
       'splitByPlane:positive',
-      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan!),
-    );
+      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan),
+    )!;
     const secondPlan = createOwnedTopologyRewritePlan(
       buildTrimByPlaneShapeCompilePlan(basePlan, [-normal[0], -normal[1], -normal[2]], -originOffset),
       'splitByPlane:opposite',
-      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan!),
-    );
-    if (firstPlan && secondPlan) {
-      return [
-        setShapeCompilePlanInternal(
-          setShapeGeometryInfoInternal(withBaseDimensions(this, buildShapeFromCompilePlan(firstPlan, this.colorHex)), info),
-          firstPlan,
-        ),
-        setShapeCompilePlanInternal(
-          setShapeGeometryInfoInternal(withBaseDimensions(this, buildShapeFromCompilePlan(secondPlan, this.colorHex)), info),
-          secondPlan,
-        ),
-      ];
-    }
-    const [a, b] = getShapeRuntimeBackendInternal(this).splitByPlane(normal, originOffset);
+      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan),
+    )!;
     return [
-      setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(a, this.colorHex)), info), null),
-      setShapeCompilePlanInternal(setShapeGeometryInfoInternal(withBaseDimensions(this, new Shape(b, this.colorHex)), info), null),
+      setShapeCompilePlanInternal(
+        setShapeGeometryInfoInternal(withBaseDimensions(this, buildShapeFromCompilePlan(firstPlan, this.colorHex)), info),
+        firstPlan,
+      ),
+      setShapeCompilePlanInternal(
+        setShapeGeometryInfoInternal(withBaseDimensions(this, buildShapeFromCompilePlan(secondPlan, this.colorHex)), info),
+        secondPlan,
+      ),
     ];
   }
 
   /** Keep the positive side of the plane and discard the opposite side. */
   trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
-    const basePlan = getShapeCompilePlanInternal(this);
+    const basePlan = getShapeCompilePlanInternal(this)!;
     const nextPlan = createOwnedTopologyRewritePlan(
       buildTrimByPlaneShapeCompilePlan(basePlan, normal, originOffset),
       'trimByPlane',
-      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan!),
-    );
+      (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan),
+    )!;
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
         this,
-        nextPlan
-          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-          : new Shape(getShapeRuntimeBackendInternal(this).trimByPlane(normal, originOffset), this.colorHex),
+        buildShapeFromCompilePlan(nextPlan, this.colorHex),
       ),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' }),
     ), nextPlan);
@@ -1260,26 +1182,14 @@ export class Shape {
       buildHullShapeCompilePlan([getShapeCompilePlanInternal(this)]),
       'hull',
       (owner) => buildHullTopologyRewritePropagation(owner),
-    );
+    )!;
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
         this,
-        nextPlan
-          ? buildShapeFromCompilePlan(nextPlan, this.colorHex)
-          : new Shape(getShapeRuntimeBackendInternal(this).hull(), this.colorHex),
+        buildShapeFromCompilePlan(nextPlan, this.colorHex),
       ),
       deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'hull', { topology: 'none' }),
     ), nextPlan);
-  }
-
-  // --- Simplification ---
-
-  /** Reduce mesh complexity. Vertices closer than tolerance are merged. */
-  simplify(tolerance?: number): Shape {
-    return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).simplify(tolerance), this.colorHex)),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'deform', { fidelity: 'deformed', topology: 'none' }),
-    ), null);
   }
 
   // --- Query ---
@@ -1294,12 +1204,6 @@ export class Shape {
 
   surfaceArea(): number {
     return getShapeRuntimeBackendInternal(this).surfaceArea();
-  }
-
-  /** Minimum distance between this shape and another. */
-  minGap(other: Shape | { toShape(): Shape }, searchLength: number): number {
-    const s = 'toShape' in other ? other.toShape() : other;
-    return getShapeRuntimeBackendInternal(this).minGap(getShapeRuntimeBackendInternal(s), searchLength);
   }
 
   isEmpty(): boolean {
@@ -1484,27 +1388,6 @@ function normalizePoint3(value: unknown, apiName: string, index: number): [numbe
   throw new Error(`${apiName} argument ${index}: expected a [x, y, z] point, got ${describeApiArg(value)}`);
 }
 
-function requireManifoldOrConvert(backend: ShapeBackend, apiName: string): Manifold {
-  if (isOCCTShapeBackend(backend)) {
-    const wasm = getWasm();
-    const mesh = backend.getMesh();
-    const wasmMesh = new wasm.Mesh({
-      numProp: mesh.numProp,
-      triVerts: mesh.triVerts,
-      vertProperties: mesh.vertProperties,
-      mergeFromVert: mesh.mergeFromVert,
-      mergeToVert: mesh.mergeToVert,
-    });
-    return new wasm.Manifold(wasmMesh);
-  }
-  return requireManifoldShapeBackend(backend, apiName);
-}
-
-function requireManifoldOperands(apiName: string, shapes: Shape[]): Manifold[] {
-  return shapes.map((shape, index) =>
-    requireManifoldOrConvert(getShapeRuntimeBackendInternal(shape), `${apiName} operand ${index + 1}`));
-}
-
 // --- Boolean helpers ---
 
 export function union(...inputs: ShapeOperandInput[]): Shape {
@@ -1521,13 +1404,11 @@ export function union(...inputs: ShapeOperandInput[]): Shape {
     buildBooleanShapeCompilePlan('union', operandPlans),
     'boolean:union',
     (owner) => buildBooleanTopologyRewritePropagation('union', owner, operandPlans),
-  );
+  )!;
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(
       shapes,
-      nextPlan
-        ? buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex)
-        : new Shape(getWasm().Manifold.union(requireManifoldOperands('union()', shapes)), shapes[0].colorHex),
+      buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex),
     ),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), nextPlan);
@@ -1546,13 +1427,11 @@ export function difference(...inputs: ShapeOperandInput[]): Shape {
     buildBooleanShapeCompilePlan('difference', operandPlans),
     'boolean:difference',
     (owner) => buildBooleanTopologyRewritePropagation('difference', owner, operandPlans),
-  );
+  )!;
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withBaseDimensions(
       shapes[0],
-      nextPlan
-        ? buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex)
-        : new Shape(getWasm().Manifold.difference(requireManifoldOperands('difference()', shapes)), shapes[0].colorHex),
+      buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex),
     ),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), nextPlan);
@@ -1571,13 +1450,11 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
     buildBooleanShapeCompilePlan('intersection', operandPlans),
     'boolean:intersection',
     (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, operandPlans),
-  );
+  )!;
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(
       shapes,
-      nextPlan
-        ? buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex)
-        : new Shape(getWasm().Manifold.intersection(requireManifoldOperands('intersection()', shapes)), shapes[0].colorHex),
+      buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex),
     ),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
   ), nextPlan);
@@ -1587,24 +1464,20 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
 export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]): Shape {
   const shapeArgs: Shape[] = [];
   const pointArgs: [number, number, number][] = [];
-  const items = args.map((arg, index) => {
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
     if (arg instanceof Shape || (arg && typeof arg === 'object' && typeof (arg as { toShape?: unknown }).toShape === 'function')) {
-      const shape = unwrapShapeLike(arg);
-      shapeArgs.push(shape);
-      return requireManifoldOrConvert(getShapeRuntimeBackendInternal(shape), `hull3d() shape ${shapeArgs.length}`);
+      shapeArgs.push(unwrapShapeLike(arg));
+    } else {
+      pointArgs.push(normalizePoint3(arg, 'hull3d()', index + 1));
     }
-    const point = normalizePoint3(arg, 'hull3d()', index + 1);
-    pointArgs.push(point);
-    return point;
-  });
+  }
   const nextPlan = createOwnedTopologyRewritePlan(
     buildHullShapeCompilePlan(shapeArgs.map((shape) => getShapeCompilePlanInternal(shape)), pointArgs),
     'hull',
     (owner) => buildHullTopologyRewritePropagation(owner),
-  );
-  const out = nextPlan
-    ? buildShapeFromCompilePlan(nextPlan, shapeArgs[0]?.colorHex)
-    : new Shape(getWasm().Manifold.hull(items), shapeArgs[0]?.colorHex);
+  )!;
+  const out = buildShapeFromCompilePlan(nextPlan, shapeArgs[0]?.colorHex);
   return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
     withMergedDimensions(shapeArgs, out),
     shapeArgs.length > 0
@@ -1613,20 +1486,28 @@ export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]
   ), nextPlan);
 }
 
-/** Create shape from a signed distance function. Positive = inside. */
+/**
+ * Create shape from a signed distance function. Positive = inside.
+ *
+ * This is an internal helper used by loft/sweep fallback paths.
+ * Not part of the public API — it is inherently Manifold-only (marching cubes).
+ */
 export function levelSet(
   sdf: (point: [number, number, number]) => number,
   bounds: { min: [number, number, number]; max: [number, number, number] },
   edgeLength: number,
   level = 0,
 ): Shape {
-  return new Shape(getWasm().Manifold.levelSet(
+  const wasm = getWasm();
+  const manifold = wasm.Manifold.levelSet(
     sdf as any,
     { min: bounds.min, max: bounds.max },
     edgeLength,
     level,
-  ), undefined, {
+  );
+  return wrapOpaquePlan(new Shape(wrapManifoldShapeBackend(manifold), undefined, {
     fidelity: 'sampled',
     sources: ['level-set'],
-  });
+  }));
 }
+

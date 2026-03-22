@@ -5,7 +5,8 @@
  * Each part is a function that returns a Shape, taking parameters.
  */
 
-import { box, cylinder, sphere, union, difference, intersection, Shape, getWasm } from './kernel';
+import { box, cylinder, sphere, union, difference, intersection, Shape, wrapOpaquePlan } from './kernel';
+import { getWasm } from './backends/manifold/wasm';
 import { ShapeGroup } from './group';
 import { Sketch } from './sketch/core';
 import { TrackedShape } from './sketch/topology';
@@ -915,12 +916,12 @@ export function pipeRoute(
     const bendSegs = Math.max(4, Math.ceil(segs * angleDeg / 360));
 
     const outerCross = wasm.CrossSection.ofPolygons([circlePts]);
-    let bendShape = new Shape(wasm.Manifold.revolve(outerCross, bendSegs, angleDeg), undefined);
+    let bendShape = wrapOpaquePlan(new Shape(wasm.Manifold.revolve(outerCross, bendSegs, angleDeg), undefined));
     outerCross.delete();
 
     if (innerPts) {
       const innerCross = wasm.CrossSection.ofPolygons([innerPts]);
-      const innerBend = new Shape(wasm.Manifold.revolve(innerCross, bendSegs, angleDeg), undefined);
+      const innerBend = wrapOpaquePlan(new Shape(wasm.Manifold.revolve(innerCross, bendSegs, angleDeg), undefined));
       innerCross.delete();
       bendShape = bendShape.subtract(innerBend);
     }
@@ -1076,7 +1077,7 @@ export function elbow(
 
   const bendSegs = Math.max(4, Math.ceil(segs * angleDeg / 360));
   const outerCross = wasm.CrossSection.ofPolygons([circlePts]);
-  let bendShape = new Shape(wasm.Manifold.revolve(outerCross, bendSegs, angleDeg), undefined);
+  let bendShape = wrapOpaquePlan(new Shape(wasm.Manifold.revolve(outerCross, bendSegs, angleDeg), undefined));
   outerCross.delete();
 
   if (wall != null && wall > 0) {
@@ -1087,7 +1088,7 @@ export function elbow(
       innerPts.push([bendRadius + innerR * Math.cos(a), innerR * Math.sin(a)]);
     }
     const innerCross = wasm.CrossSection.ofPolygons([innerPts]);
-    const innerBend = new Shape(wasm.Manifold.revolve(innerCross, bendSegs, angleDeg), undefined);
+    const innerBend = wrapOpaquePlan(new Shape(wasm.Manifold.revolve(innerCross, bendSegs, angleDeg), undefined));
     innerCross.delete();
     bendShape = bendShape.subtract(innerBend);
   }
@@ -2678,7 +2679,7 @@ export function thread(
   const cross = wasm.CrossSection.ofPolygons([pts]);
   const m = wasm.Manifold.extrude(cross, length, divisions, turns * 360);
   cross.delete();
-  return new Shape(m);
+  return wrapOpaquePlan(new Shape(m));
 }
 
 /**

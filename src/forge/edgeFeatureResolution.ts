@@ -309,6 +309,7 @@ function searchOwnerMatch(
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'opaque':
       return {
         issue: {
           code: 'edge-owner-not-found',
@@ -429,6 +430,7 @@ function resolvePropagatedEdgeQueryAtOwnerBase(
     || ownerBase.kind === 'sweep'
     || ownerBase.kind === 'transform'
     || ownerBase.kind === 'queryOwner'
+    || ownerBase.kind === 'opaque'
   ) {
     return edgeIssue(
       'edge-query-propagation-mismatch',
@@ -707,6 +709,7 @@ function resolveSelectionFromOwnerBase(
     case 'sweep':
     case 'hull':
     case 'trimByPlane':
+    case 'opaque':
       return edgeIssue(
         'unsupported-edge-base',
         'Edge finishing v1 currently supports tracked vertical edges from compile-covered box() bodies and rectangle extrusions before topology-changing edits.',
@@ -762,6 +765,7 @@ function resolveEdgeChainAtOwnerBase(
     || ownerBase.kind === 'sweep'
     || ownerBase.kind === 'transform'
     || ownerBase.kind === 'queryOwner'
+    || ownerBase.kind === 'opaque'
   ) {
     return {
       kind: 'unsupported',
@@ -813,6 +817,7 @@ function resolveCreatedEdgeChainAtOwnerBase(
     || ownerBase.kind === 'sweep'
     || ownerBase.kind === 'transform'
     || ownerBase.kind === 'queryOwner'
+    || ownerBase.kind === 'opaque'
   ) {
     return {
       kind: 'unsupported',

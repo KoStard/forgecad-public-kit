@@ -6,9 +6,8 @@
  * producing data compatible with Manifold's getMesh() format.
  */
 
-import type { Manifold } from 'manifold-3d';
-import type { Mat4 } from './transform';
-import { Transform } from './transform';
+import type { Mat4 } from '../../transform';
+import { Transform } from '../../transform';
 import {
   SHAPE_BACKEND_MARKER,
   type ShapeBackend,
@@ -16,8 +15,8 @@ import {
   type ShapeRuntimeMesh,
   type ShapeRuntimeCrossSection,
   type EdgeFeatureTarget,
-} from './shapeBackend';
-import { getOCCT, type OCCTModule } from './occtInit';
+} from '../../shapeBackend';
+import { getOCCT, type OCCTModule } from './init';
 
 /** Default tessellation linear deflection. Lower = finer mesh. */
 const DEFAULT_LINEAR_DEFLECTION = 0.1;
@@ -270,31 +269,6 @@ export class OCCTShapeBackend implements ShapeBackend {
     return new OCCTShapeBackend(transformed.Shape());
   }
 
-  smoothOut(_minSharpAngle: number, _minSmoothness: number): ShapeBackend {
-    // OCCT doesn't have mesh smoothing — this is a Manifold-specific op.
-    // Return self (B-rep surfaces are already smooth).
-    return this;
-  }
-
-  refine(_steps: number): ShapeBackend {
-    // B-rep doesn't need mesh refinement — tessellation quality is controlled at extraction time.
-    return this;
-  }
-
-  refineToLength(_length: number): ShapeBackend {
-    return this;
-  }
-
-  refineToTolerance(_tolerance: number): ShapeBackend {
-    return this;
-  }
-
-  warp(_fn: (vert: [number, number, number]) => void): ShapeBackend {
-    // Warp is a mesh-level vertex deformation. Not supported on B-rep.
-    // For now, throw. If needed, could tessellate → warp → re-wrap.
-    throw new Error('warp() is not supported on OCCT B-rep shapes. Use Manifold backend for vertex deformation.');
-  }
-
   split(other: ShapeBackend): [ShapeBackend, ShapeBackend] {
     const oc = getOCCT();
     const otherShape = requireOCCTShape(other, 'split()');
@@ -360,11 +334,6 @@ export class OCCTShapeBackend implements ShapeBackend {
     throw new Error('hull() is not supported on OCCT B-rep shapes. Use Manifold backend for convex hull.');
   }
 
-  simplify(_tolerance?: number): ShapeBackend {
-    // B-rep is already exact — simplification is a mesh concept.
-    return this;
-  }
-
   boundingBox(): ShapeRuntimeBounds {
     return extractBoundingBox(getOCCT(), this._shape);
   }
@@ -381,11 +350,6 @@ export class OCCTShapeBackend implements ShapeBackend {
     const props = new oc.GProp_GProps_1();
     oc.BRepGProp.SurfaceProperties_1(this._shape, props, false, false);
     return props.Mass();
-  }
-
-  minGap(_other: ShapeBackend, _searchLength: number): number {
-    // TODO: implement with BRepExtrema_DistShapeShape
-    throw new Error('minGap() not yet implemented for OCCT backend');
   }
 
   isEmpty(): boolean {
@@ -443,12 +407,6 @@ export class OCCTShapeBackend implements ShapeBackend {
     return new OCCTShapeBackend(mkChamfer.Shape());
   }
 
-  requireManifold(apiName = 'requireManifold()'): Manifold {
-    throw new Error(
-      `${apiName}: this shape uses the OCCT backend. ` +
-      `Direct Manifold access is not available. Use ShapeBackend methods instead.`,
-    );
-  }
 }
 
 export function wrapOCCTShapeBackend(shape: any): ShapeBackend {

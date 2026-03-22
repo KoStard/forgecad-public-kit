@@ -1,6 +1,6 @@
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
-import type { Mat4 } from './transform';
-import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
+import type { Mat4 } from '../../transform';
+import type { ResolvedEdgeFeatureSelection } from '../../edgeFeatureModel';
 
 /**
  * Minimum extrusion overshoot past each end of the edge.

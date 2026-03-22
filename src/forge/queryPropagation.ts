@@ -80,6 +80,7 @@ function rootPlanPropagation(plan: ShapeCompilePlan): TopologyRewritePropagation
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'opaque':
       return undefined;
   }
 }
@@ -749,6 +750,7 @@ export function findShapeTopologyRewritePropagation(
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'opaque':
       return null;
   }
 }
@@ -798,6 +800,7 @@ export function collectShapeTopologyRewritePropagations(
       case 'revolve':
       case 'loft':
       case 'sweep':
+      case 'opaque':
         return;
     }
   }

@@ -9,9 +9,10 @@ import {
   setSketchPlacement3D,
   setSketchPlacementModel,
 } from './core';
-import { getWasm } from '../kernel';
+import { getWasm } from '../backends/manifold/wasm';
 import { buildBooleanProfileCompilePlan, buildHullProfileCompilePlan } from '../compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from '../apiArgs';
+import { asCrossSection, fromCrossSection } from '../backends/manifold/profileCast';
 
 function normalizeSketchOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Sketch[] {
   return normalizeVariadicArgs({
@@ -39,7 +40,7 @@ export function sketchAdd(sketch: Sketch, ...others: SketchOperandInput[]): Sket
     setSketchPlacement3D(
       nextPlan
         ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.union(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
+        : setSketchCompileProfilePlan(new Sketch(fromCrossSection(getWasm().CrossSection.union(sketches.map((entry) => asCrossSection(entry.cross)))), sketch.colorHex), null),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -58,7 +59,7 @@ export function sketchSubtract(sketch: Sketch, ...others: SketchOperandInput[]):
     setSketchPlacement3D(
       nextPlan
         ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.difference(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
+        : setSketchCompileProfilePlan(new Sketch(fromCrossSection(getWasm().CrossSection.difference(sketches.map((entry) => asCrossSection(entry.cross)))), sketch.colorHex), null),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -77,7 +78,7 @@ export function sketchIntersect(sketch: Sketch, ...others: SketchOperandInput[])
     setSketchPlacement3D(
       nextPlan
         ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.intersection(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
+        : setSketchCompileProfilePlan(new Sketch(fromCrossSection(getWasm().CrossSection.intersection(sketches.map((entry) => asCrossSection(entry.cross)))), sketch.colorHex), null),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -98,7 +99,7 @@ export function union2d(...inputs: SketchOperandInput[]): Sketch {
     setSketchPlacement3D(
       nextPlan
         ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.union(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+        : setSketchCompileProfilePlan(new Sketch(fromCrossSection(getWasm().CrossSection.union(sketches.map(s => asCrossSection(s.cross)))), sketches[0].colorHex), null),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -118,7 +119,7 @@ export function difference2d(...inputs: SketchOperandInput[]): Sketch {
     setSketchPlacement3D(
       nextPlan
         ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.difference(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+        : setSketchCompileProfilePlan(new Sketch(fromCrossSection(getWasm().CrossSection.difference(sketches.map(s => asCrossSection(s.cross)))), sketches[0].colorHex), null),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -138,7 +139,7 @@ export function intersection2d(...inputs: SketchOperandInput[]): Sketch {
     setSketchPlacement3D(
       nextPlan
         ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.intersection(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+        : setSketchCompileProfilePlan(new Sketch(fromCrossSection(getWasm().CrossSection.intersection(sketches.map(s => asCrossSection(s.cross)))), sketches[0].colorHex), null),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -158,7 +159,7 @@ export function hull2d(...inputs: SketchOperandInput[]): Sketch {
     setSketchPlacement3D(
       nextPlan
         ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-        : setSketchCompileProfilePlan(new Sketch(getWasm().CrossSection.hull(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+        : setSketchCompileProfilePlan(new Sketch(fromCrossSection(getWasm().CrossSection.hull(sketches.map(s => asCrossSection(s.cross)))), sketches[0].colorHex), null),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),

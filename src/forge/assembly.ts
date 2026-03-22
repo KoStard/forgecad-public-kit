@@ -1,4 +1,5 @@
-import { Shape, union } from './kernel';
+import { Shape, union, getShapeRuntimeBackend } from './kernel';
+import { isManifoldCapableBackend, requireManifoldShapeBackend } from './backends/manifold/shapeBackend';
 import { ShapeGroup, group } from './group';
 import { TrackedShape } from './sketch/topology';
 import { Transform, composeChain, normalizeAxis, type TransformInput, type Vec3, type Mat4 } from './transform';
@@ -541,7 +542,14 @@ export class SolvedAssembly {
     } catch {
       // Fall through to minGap.
     }
-    return a.minGap(b, searchLength);
+    const backendA = getShapeRuntimeBackend(a);
+    const backendB = getShapeRuntimeBackend(b);
+    if (!isManifoldCapableBackend(backendA)) {
+      throw new Error('minClearance() requires the Manifold backend');
+    }
+    const manifoldA = backendA.requireManifold('minClearance()');
+    const manifoldB = requireManifoldShapeBackend(backendB, 'minClearance()');
+    return manifoldA.minGap(manifoldB, searchLength);
   }
 }
 

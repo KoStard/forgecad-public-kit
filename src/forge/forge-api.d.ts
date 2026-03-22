@@ -1,4 +1,5 @@
 // External type stubs (opaque — not user-facing)
+type ProfileBackend = unknown;
 type CrossSection = unknown;
 type Manifold = unknown;
 
@@ -128,9 +129,9 @@ type EdgeQueryRef = TrackedEdgeQueryRef | DirectEdgeQueryRef | PropagatedEdgeQue
 type Anchor = "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right" | "top" | "bottom" | "left" | "right";
 type SketchOperandInput = Sketch | readonly Sketch[];
 declare class Sketch {
-	readonly cross: CrossSection;
+	readonly cross: ProfileBackend;
 	colorHex: string | undefined;
-	constructor(cross: CrossSection, color?: string);
+	constructor(cross: ProfileBackend, color?: string);
 	/** Set the color of this sketch (hex string, e.g. "#ff0000") */
 	color(value: string | undefined): Sketch;
 	/** Return a new Sketch wrapper for explicit duplication in scripts. */
@@ -1776,7 +1777,6 @@ interface ShapeBackend {
 	getMesh(): ShapeRuntimeMesh;
 	slice(offset: number): ShapeRuntimeCrossSection;
 	project(): ShapeRuntimeCrossSection;
-	requireManifold(apiName?: string): Manifold;
 }
 interface TransformationStep {
 	kind: string;

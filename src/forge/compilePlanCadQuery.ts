@@ -399,6 +399,8 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
     }
     case 'hull':
       return compilerFailure(unsupportedNodeDiagnostic('shape-hull', path));
+    case 'opaque':
+      return compilerFailure(unsupportedNodeDiagnostic('shape-opaque', path));
   }
 }
 

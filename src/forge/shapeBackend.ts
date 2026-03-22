@@ -1,11 +1,40 @@
-import type { Manifold } from 'manifold-3d';
 import type { Mat4 } from './transform';
 
 export const SHAPE_BACKEND_MARKER = Symbol.for('forgecad.shapeBackend');
 
-export type ShapeRuntimeBounds = ReturnType<Manifold['boundingBox']>;
-export type ShapeRuntimeMesh = ReturnType<Manifold['getMesh']>;
-export type ShapeRuntimeCrossSection = ReturnType<Manifold['slice']>;
+/**
+ * Runtime bounding box — axis-aligned min/max corners.
+ */
+export interface ShapeRuntimeBounds {
+  readonly min: [number, number, number];
+  readonly max: [number, number, number];
+}
+
+/**
+ * Runtime triangle mesh — the common exchange format produced by all backends.
+ * Contains indexed triangles with per-vertex properties (position + optional normals/UVs).
+ */
+export interface ShapeRuntimeMesh {
+  readonly numProp: number;
+  readonly numTri: number;
+  readonly triVerts: Uint32Array;
+  readonly vertProperties: Float32Array;
+  readonly numVert?: number;
+  readonly mergeFromVert?: Uint32Array;
+  readonly mergeToVert?: Uint32Array;
+  readonly runIndex?: Uint32Array;
+  readonly runOriginalID?: Uint32Array;
+  readonly runTransform?: Float32Array;
+  readonly faceID?: Uint32Array | Int32Array;
+  readonly halfedgeTangent?: Float32Array;
+}
+
+/**
+ * Runtime 2D cross-section — opaque handle to a backend-specific 2D profile.
+ * Code that needs backend-specific APIs should cast through the backend layer.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ShapeRuntimeCrossSection = any;
 
 /** Geometric description of an edge to fillet/chamfer, backend-agnostic. */
 export interface EdgeFeatureTarget {
@@ -25,153 +54,20 @@ export interface ShapeBackend {
   transform(m: Mat4): ShapeBackend;
   scale(v: number | [number, number, number]): ShapeBackend;
   mirror(normal: [number, number, number]): ShapeBackend;
-  smoothOut(minSharpAngle: number, minSmoothness: number): ShapeBackend;
-  refine(steps: number): ShapeBackend;
-  refineToLength(length: number): ShapeBackend;
-  refineToTolerance(tolerance: number): ShapeBackend;
-  warp(fn: (vert: [number, number, number]) => void): ShapeBackend;
   split(other: ShapeBackend): [ShapeBackend, ShapeBackend];
   splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend];
   trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend;
   hull(): ShapeBackend;
-  simplify(tolerance?: number): ShapeBackend;
   boundingBox(): ShapeRuntimeBounds;
   volume(): number;
   surfaceArea(): number;
-  minGap(other: ShapeBackend, searchLength: number): number;
   isEmpty(): boolean;
   numTri(): number;
   getMesh(): ShapeRuntimeMesh;
   slice(offset: number): ShapeRuntimeCrossSection;
   project(): ShapeRuntimeCrossSection;
-  requireManifold(apiName?: string): Manifold;
-}
-
-export class ManifoldShapeBackend implements ShapeBackend {
-  readonly [SHAPE_BACKEND_MARKER] = true as const;
-
-  constructor(private readonly manifold: Manifold) {}
-
-  clone(): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold);
-  }
-
-  translate(x: number, y: number, z: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.translate(x, y, z));
-  }
-
-  rotate(x: number, y: number, z: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.rotate(x, y, z));
-  }
-
-  transform(m: Mat4): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.transform(m));
-  }
-
-  scale(v: number | [number, number, number]): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.scale(v as any));
-  }
-
-  mirror(normal: [number, number, number]): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.mirror(normal));
-  }
-
-  smoothOut(minSharpAngle: number, minSmoothness: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.smoothOut(minSharpAngle, minSmoothness));
-  }
-
-  refine(steps: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.refine(steps));
-  }
-
-  refineToLength(length: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.refineToLength(length));
-  }
-
-  refineToTolerance(tolerance: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.refineToTolerance(tolerance));
-  }
-
-  warp(fn: (vert: [number, number, number]) => void): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.warp(fn as any));
-  }
-
-  split(other: ShapeBackend): [ShapeBackend, ShapeBackend] {
-    const [inside, outside] = this.manifold.split(requireManifoldShapeBackend(other, 'ShapeBackend.split()'));
-    return [new ManifoldShapeBackend(inside), new ManifoldShapeBackend(outside)];
-  }
-
-  splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend] {
-    const [inside, outside] = this.manifold.splitByPlane(normal, originOffset);
-    return [new ManifoldShapeBackend(inside), new ManifoldShapeBackend(outside)];
-  }
-
-  trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.trimByPlane(normal, originOffset));
-  }
-
-  hull(): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.hull());
-  }
-
-  simplify(tolerance?: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.simplify(tolerance));
-  }
-
-  boundingBox(): ShapeRuntimeBounds {
-    return this.manifold.boundingBox();
-  }
-
-  volume(): number {
-    return this.manifold.volume();
-  }
-
-  surfaceArea(): number {
-    return this.manifold.surfaceArea();
-  }
-
-  minGap(other: ShapeBackend, searchLength: number): number {
-    return this.manifold.minGap(requireManifoldShapeBackend(other, 'ShapeBackend.minGap()'), searchLength);
-  }
-
-  isEmpty(): boolean {
-    return this.manifold.isEmpty();
-  }
-
-  numTri(): number {
-    return this.manifold.numTri();
-  }
-
-  getMesh(): ShapeRuntimeMesh {
-    return this.manifold.getMesh();
-  }
-
-  slice(offset: number): ShapeRuntimeCrossSection {
-    return this.manifold.slice(offset);
-  }
-
-  project(): ShapeRuntimeCrossSection {
-    return this.manifold.project();
-  }
-
-  requireManifold(): Manifold {
-    return this.manifold;
-  }
 }
 
 export function isShapeBackend(value: unknown): value is ShapeBackend {
   return Boolean(value && typeof value === 'object' && (value as Record<PropertyKey, unknown>)[SHAPE_BACKEND_MARKER] === true);
-}
-
-export function wrapManifoldShapeBackend(manifold: Manifold): ShapeBackend {
-  return new ManifoldShapeBackend(manifold);
-}
-
-export function requireManifoldShapeBackend(backend: ShapeBackend, apiName = 'requireManifoldShapeBackend()'): Manifold {
-  try {
-    return backend.requireManifold(apiName);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`${apiName} currently requires a Manifold-backed runtime shape. ${message}`);
-  }
 }
