@@ -16,6 +16,7 @@ import { runCheckPlacementReferencesCli } from './check-placement-references';
 import { runCheckQueryPropagationCli } from './check-query-propagation';
 import { runCheckConstraintsCli } from './check-constraints';
 import { runCheckTransformsCli } from './check-transforms';
+import { runCheckOcctLowerCli } from './check-occt-lower';
 
 /* ── Animated progress ─────────────────────────────────────────────── */
 
@@ -53,6 +54,7 @@ const STAGES: Stage[] = [
   { label: 'Examples',              insight: 'example gallery architecture gate',            run: () => runCheckExamplesCli([]) },
   { label: 'API contracts',         insight: 'public script API surface stability',          run: () => runCheckApiContractsCli() },
   { label: 'Text',                  insight: 'text2d rendering contracts',                   run: () => runCheckTextCli() },
+  { label: 'OCCT lowerer',          insight: 'compile-plan → OCCT geometry invariants',       run: () => runCheckOcctLowerCli() },
 ];
 
 function progressBar(done: number, total: number, width: number): string {

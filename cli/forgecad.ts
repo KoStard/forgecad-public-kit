@@ -13,6 +13,7 @@ import { runCheckJsModulesCli } from './check-js-modules';
 import { runCheckPlacementReferencesCli } from './check-placement-references';
 import { runCheckTransformsCli } from './check-transforms';
 import { runCheckConstraintsCli } from './check-constraints';
+import { runCheckOcctLowerCli } from './check-occt-lower';
 import {
   runCompletionCli,
   runHiddenCompletionCli,
@@ -774,6 +775,14 @@ const commands: CommandDefinition[] = [
     usage: ['forgecad check text'],
     examples: ['forgecad check text'],
     run: () => runCheckTextCli(),
+  },
+  {
+    group: 'Checks',
+    path: ['check', 'occt-lower'],
+    summary: 'Run OCCT lowerer geometry invariant tests.',
+    usage: ['forgecad check occt-lower'],
+    examples: ['forgecad check occt-lower'],
+    run: () => runCheckOcctLowerCli(),
   },
   {
     group: 'Debug',
