@@ -1,6 +1,6 @@
 export { initManifoldWasm, getManifoldWasm, getWasm } from './wasm';
 export type { Manifold, ManifoldToplevel } from './wasm';
-export { ManifoldShapeBackend, wrapManifoldShapeBackend, requireManifoldShapeBackend, isManifoldCapableBackend, type ManifoldCapableBackend } from './shapeBackend';
+export { ManifoldShapeBackend, wrapManifoldShapeBackend, requireManifoldShapeBackend, reconstructBackendFromMesh, isManifoldCapableBackend, type ManifoldCapableBackend } from './shapeBackend';
 export { lowerProfileCompilePlanToCrossSection, lowerShapeCompilePlanToManifold, lowerShapeCompilePlanToShapeBackend } from './lower';
 export {
   applyFilletSelectionToManifold,
@@ -8,4 +8,3 @@ export {
   applyChamferSelectionToManifold,
   applyConcaveChamferSelectionToManifold,
 } from './edgeFeatureRuntime';
-export { buildSceneBuilderPayloadForShape } from './sceneBuilder';
