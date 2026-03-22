@@ -790,6 +790,8 @@ const syncJointAnimationState = (
 };
 
 function createErrorRunResult(message: string, quality: ForgeQualityPreset): RunResult {
+  // `satisfies RunResult` ensures a compile error if RunResult gains a new
+  // required field — prevents the silent-null bug that hit sceneConfig.
   return {
     shape: null,
     sketch: null,
@@ -809,7 +811,7 @@ function createErrorRunResult(message: string, quality: ForgeQualityPreset): Run
     timeMs: 0,
     logs: [{ level: 'error', args: [message], timestamp: Date.now() }],
     verifications: [],
-  };
+  } satisfies RunResult;
 }
 
 

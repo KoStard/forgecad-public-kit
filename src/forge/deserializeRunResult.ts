@@ -47,27 +47,22 @@ function deserializeSceneObject(s: SerializedSceneObject): SceneObject {
   } as SceneObject;
 }
 
-/** Reconstruct a RunResult from the worker's serialized wire format. */
+/**
+ * Reconstruct a RunResult from the worker's serialized wire format.
+ *
+ * Spreads all plain-data fields, then reconstructs WASM-backed objects.
+ * New fields added to RunResult automatically flow through without
+ * touching this code.
+ */
 export function deserializeRunResult(s: SerializedRunResult): RunResult {
+  const { objects: serializedObjects, ...passthrough } = s;
   return {
+    ...passthrough,
     // Top-level shape/sketch are unused by the store/viewport
     shape: null,
     sketch: null,
-    objects: s.objects.map(deserializeSceneObject),
-    params: s.params,
-    dimensions: s.dimensions,
+    objects: serializedObjects.map(deserializeSceneObject),
     highlights: s.highlights ?? [],
-    bom: s.bom,
-    cutPlanes: s.cutPlanes,
-    explodeView: s.explodeView,
-    jointsView: s.jointsView,
-    viewConfig: s.viewConfig,
-    sceneConfig: s.sceneConfig,
-    robotExport: s.robotExport,
-    quality: s.quality,
-    error: s.error,
-    timeMs: s.timeMs,
-    logs: s.logs,
     verifications: s.verifications ?? [],
     solverDebug: s.solverDebug ?? null,
   } as RunResult;
