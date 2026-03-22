@@ -46,7 +46,11 @@ import type { EvalWorkerFaceInfoResult } from '../workers/evalWorkerProtocol';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
-import { MOUSE_BUTTONS_3D, MOUSE_BUTTONS_SKETCH, TOUCH_GESTURES_3D, TOUCH_GESTURES_SKETCH } from '../capture/controlsConfig';
+import { MOUSE_BUTTONS_3D, MOUSE_BUTTONS_SKETCH, MOUSE_BUTTONS_DRAW, TOUCH_GESTURES_3D, TOUCH_GESTURES_SKETCH } from '../capture/controlsConfig';
+import { DrawCanvas } from './DrawCanvas';
+import { DrawToolbar } from './DrawToolbar';
+import { useDrawStore } from '../draw/drawStore';
+import { useFeatureFlag } from '../featureFlags';
 
 interface ObjectContextMenuState {
   objectId: string;
@@ -4781,6 +4785,8 @@ export function Viewport() {
   const sectionPlaneFillOpacity = useForgeStore((s) => s.sectionPlaneFillOpacity);
   const sectionPlaneBorderEnabled = useForgeStore((s) => s.sectionPlaneBorderEnabled);
   const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
+  const drawFlagEnabled = useFeatureFlag('drawMode');
+  const drawModeActive = useDrawStore((s) => s.active) && drawFlagEnabled;
   const [performanceInfo, setPerformanceInfo] = useState<ViewportPerformanceInfo | null>(null);
   const reactRenderCountRef = useRef(0);
   reactRenderCountRef.current += 1;
@@ -5525,6 +5531,7 @@ export function Viewport() {
           <DimensionAnnotation key={d.id} def={d} lengthUnit={lengthUnit} />
         ))}
         <MeasureTool />
+        {drawFlagEnabled && <DrawCanvas />}
         <PerformanceInfoSampler
           enabled={showPerformanceInfo}
           sceneObjects={visibleSceneObjectCount}
@@ -5572,7 +5579,7 @@ export function Viewport() {
           minPolarAngle={0}
           maxPolarAngle={Math.PI}
           enableRotate={!isSketchOnly}
-          mouseButtons={isSketchOnly ? MOUSE_BUTTONS_SKETCH : MOUSE_BUTTONS_3D}
+          mouseButtons={drawModeActive ? MOUSE_BUTTONS_DRAW : isSketchOnly ? MOUSE_BUTTONS_SKETCH : MOUSE_BUTTONS_3D}
           touches={isSketchOnly ? TOUCH_GESTURES_SKETCH : TOUCH_GESTURES_3D}
         />
 
@@ -5609,6 +5616,8 @@ export function Viewport() {
         enabled={showPerformanceInfo}
         stats={performanceInfo}
       />
+
+      {drawFlagEnabled && <DrawToolbar />}
 
       {/* Measure mode indicator */}
       {measureMode && (

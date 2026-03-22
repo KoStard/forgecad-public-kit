@@ -3,6 +3,7 @@ import { useForgeStore } from '../store/forgeStore';
 import { exportMeshFromStore, exportOrbitGifFromStore, exportReportFromStore, exportSketchFromStore } from './exportActions';
 import { fileSystem } from '../fs';
 import { fetchGistModel } from '../share';
+import { FLAG_DEFINITIONS, useFeatureFlagStore } from '../featureFlags';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 const mod = isMac ? '⌘' : 'Ctrl';
@@ -40,6 +41,8 @@ export function CommandPalette() {
   const toggleViewPanel = useForgeStore((s) => s.toggleViewPanel);
   const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
   const openShortcutsOverlay = useForgeStore((s) => s.openShortcutsOverlay);
+  const featureFlags = useFeatureFlagStore((s) => s.flags);
+  const toggleFeatureFlag = useFeatureFlagStore((s) => s.toggle);
 
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
@@ -191,6 +194,16 @@ export function CommandPalette() {
     },
     { id: 'export', label: 'Export', children: exportChoices, action: () => {} },
     { id: 'theme', label: 'Change Theme', children: themeChoices, action: () => {} },
+    {
+      id: 'advanced',
+      label: 'Advanced',
+      action: () => {},
+      children: Object.entries(FLAG_DEFINITIONS).map(([name, def]) => ({
+        id: `ff-${name}`,
+        label: `${featureFlags[name] ?? def.defaultEnabled ? '✓' : '✗'}  ${def.label}`,
+        action: () => { toggleFeatureFlag(name); close(); },
+      })),
+    },
     {
       id: 'keyboard-shortcuts',
       label: 'Keyboard Shortcuts',
