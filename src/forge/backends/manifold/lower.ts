@@ -117,8 +117,6 @@ export function lowerProfileCompilePlanToCrossSection(
         .project();
       return applyProfileCompileTransforms(projected, plan.transforms);
     }
-    case 'opaque':
-      throw new Error('Cannot lower an opaque profile compile plan — the profile was computed at runtime and cannot be reconstructed from the plan.');
   }
 }
 

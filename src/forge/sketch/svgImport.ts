@@ -1,6 +1,6 @@
 import { difference2d, union2d } from './booleans';
 import { Sketch, setSketchCompileProfilePlan } from './core';
-import type { ProfileCompilePlan } from '../compilePlan';
+import { profilePlanFromCrossSection } from '../compilePlan';
 import { stroke as strokePolyline } from './path';
 import { polygon } from './primitives';
 
@@ -1456,10 +1456,10 @@ export function sketchFromSvg(svgText: string, options: SvgImportOptions = {}): 
   sketch = fitSketchToMaxDimensions(sketch, normalized);
   if (normalized.simplify > 0) {
     // Use backend-level simplify for polygon cleanup (not a public Sketch API).
-    const opaquePlan: ProfileCompilePlan = { kind: 'opaque', transforms: [] };
+    const simplified = sketch.cross.simplify(normalized.simplify);
     sketch = setSketchCompileProfilePlan(
-      new Sketch(sketch.cross.simplify(normalized.simplify), sketch.colorHex),
-      opaquePlan,
+      new Sketch(simplified, sketch.colorHex),
+      profilePlanFromCrossSection(simplified),
     );
   }
   if (sketch.isEmpty()) {

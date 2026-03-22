@@ -1,7 +1,7 @@
 import type { ProfileBackend } from '../profileBackend';
 import { Shape } from '../kernel';
 import type { ProfileCompilePlan } from '../compilePlan';
-import { cloneProfileCompilePlan } from '../compilePlan';
+import { cloneProfileCompilePlan, profilePlanFromCrossSection } from '../compilePlan';
 import type { Mat4 } from '../transform';
 import type { FaceRef } from './topology';
 import { lowerProfileCompilePlan } from '../profileOps';
@@ -17,7 +17,6 @@ import {
 type SketchPlacement3D = Mat4;
 export type SketchOperandInput = Sketch | readonly Sketch[];
 
-const OPAQUE_PROFILE_PLAN: ProfileCompilePlan = { kind: 'opaque', transforms: [] };
 
 const _sketchCompileProfilePlans = new WeakMap<Sketch, ProfileCompilePlan>();
 const _sketchPlacement3D = new WeakMap<Sketch, SketchPlacement3D | null>();
@@ -47,7 +46,7 @@ export class Sketch {
 
   constructor(public readonly cross: ProfileBackend, color?: string) {
     this.colorHex = color;
-    setSketchCompileProfilePlanInternal(this, OPAQUE_PROFILE_PLAN);
+    setSketchCompileProfilePlanInternal(this, profilePlanFromCrossSection(cross));
     setSketchPlacement3DInternal(this, null);
     setSketchPlacementModelInternal(this, null);
   }
@@ -126,7 +125,14 @@ export type {
 } from './workplaneModel';
 
 export function getSketchCompileProfilePlan(sketch: Sketch): ProfileCompilePlan {
-  return cloneProfileCompilePlan(_sketchCompileProfilePlans.get(sketch) ?? OPAQUE_PROFILE_PLAN)!;
+  const stored = _sketchCompileProfilePlans.get(sketch);
+  if (!stored) {
+    // Fallback: snapshot the cross-section geometry as polygon plan.
+    const fallback = profilePlanFromCrossSection(sketch.cross);
+    _sketchCompileProfilePlans.set(sketch, fallback);
+    return cloneProfileCompilePlan(fallback)!;
+  }
+  return cloneProfileCompilePlan(stored)!;
 }
 
 export function setSketchCompileProfilePlan(sketch: Sketch, plan: ProfileCompilePlan): Sketch {

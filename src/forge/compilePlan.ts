@@ -26,6 +26,7 @@ import type {
   SheetMetalOutput,
 } from './sheetMetalModel';
 import { cloneSheetMetalModel } from './sheetMetalModel';
+import type { ProfileBackend } from './profileBackend';
 
 export type ProfileCompileTransformStep =
   | { kind: 'translate'; x: number; y: number }
@@ -89,11 +90,7 @@ export type ProfileCompilePlan =
       replayReason?: string;
       transforms: ProfileCompileTransformStep[];
     }
-  | {
-      /** Wraps a pre-built ProfileBackend that can't be expressed as compile plan IR. */
-      kind: 'opaque';
-      transforms: ProfileCompileTransformStep[];
-    };
+;
 
 export type ShapeCompileTransformStep =
   | { kind: 'translate'; x: number; y: number; z: number }
@@ -646,11 +643,6 @@ export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): Profil
         replayReason: plan.replayReason,
         transforms: plan.transforms.map(cloneProfileTransform),
       };
-    case 'opaque':
-      return {
-        kind: 'opaque',
-        transforms: plan.transforms.map(cloneProfileTransform),
-      };
   }
 }
 
@@ -1051,6 +1043,25 @@ export function buildHullProfileCompilePlan(
     profiles: profiles.map((profile) => cloneProfileCompilePlan(profile)!),
     transforms: [],
   };
+}
+
+/**
+ * Snapshot a ProfileBackend (cross-section) as a concrete polygon compile plan.
+ * This replaces the former 'opaque' plan kind: every cross-section IS polygon
+ * loops, so there's never a reason to lose the parametric description.
+ */
+export function profilePlanFromCrossSection(cross: ProfileBackend): ProfileCompilePlan {
+  const loops = cross.toPolygons();
+  if (loops.length === 0) {
+    return { kind: 'polygon', points: [], transforms: [] };
+  }
+  const plans: ProfileCompilePlan[] = loops.map((loop) => ({
+    kind: 'polygon' as const,
+    points: loop.map((pt) => [pt[0], pt[1]] as [number, number]),
+    transforms: [],
+  }));
+  if (plans.length === 1) return plans[0];
+  return { kind: 'boolean', op: 'union', profiles: plans, transforms: [] };
 }
 
 export function buildHullShapeCompilePlan(
