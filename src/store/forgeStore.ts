@@ -1223,10 +1223,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     let previewFile: string | null;
     let code: string | undefined;
     if (meshPreviewFile) {
-      // Use the mesh file's directory as the script location so importMesh resolves correctly
+      // Use the mesh file's directory as the script location so importMesh resolves correctly.
+      // "./" prefix makes it resolve relative to the script (bare names resolve at project root).
       previewFile = meshPreviewFile.replace(/\.[^.]+$/, '.forge.js');
       const meshFileName = meshPreviewFile.split('/').pop() ?? meshPreviewFile;
-      code = `return importMesh("${meshFileName}");`;
+      code = `return importMesh("./${meshFileName}");`;
     } else {
       previewFile = resolvePreviewFile(activeFile, files);
       if (!previewFile) {
