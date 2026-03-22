@@ -26,14 +26,14 @@ scene({
 
   lights: [
     { type: 'ambient', color: '#0d0820', intensity: 0.15 },
-    { type: 'point', position: [200, -100, 40], color: '#ff6b35', intensity: 3, distance: 600, decay: 1.5 },
-    { type: 'point', position: [-150, 80, 250], color: '#4ecdc4', intensity: 2.5, distance: 500, decay: 1.5 },
+    { type: 'point', position: [200, -100, 40], color: '#ff6b35', intensity: 2.5, distance: 600, decay: 1.5 },
+    { type: 'point', position: [-150, 80, 250], color: '#4ecdc4', intensity: 2, distance: 500, decay: 1.5 },
     { type: 'point', position: [-80, -200, 100], color: '#c44dff', intensity: 2, distance: 400, decay: 1.5 },
-    { type: 'point', position: [0, 0, -20], color: '#ff3366', intensity: 1, distance: 200, decay: 2 },
+    { type: 'point', position: [0, 0, -20], color: '#ff3366', intensity: 1.5, distance: 300, decay: 1.5 },
     { type: 'hemisphere', skyColor: '#1a0a3e', groundColor: '#0a0612', intensity: 0.3 },
   ],
 
-  fog: { color: '#0a0612', near: 200, far: 700 },
+  fog: { color: '#0a0612', near: 350, far: 900 },
 
   postProcessing: {
     bloom: { intensity: param('bloom', 1.2, 0, 3), threshold: 0.6, radius: 0.5 },
@@ -69,24 +69,18 @@ const rand = (min, max) => min + rng() * (max - min);
 // Crystal Generator
 // ---------------------------------------------------------------------------
 function crystal(h, baseW) {
-  // A crystal is a box with chamfered edges via boolean subtraction
-  const base = box(baseW, baseW * 0.6, h, true);
+  const r = baseW / 2;
 
-  // Faceted sides via chamfers
-  const chamfer1 = box(baseW * 0.5, baseW, h + 2, true)
-    .rotate(0, 0, 45)
-    .translate(baseW * 0.45, 0, 0);
-  const chamfer2 = box(baseW * 0.5, baseW, h + 2, true)
-    .rotate(0, 0, -45)
-    .translate(-baseW * 0.45, 0, 0);
+  // Hexagonal prism body
+  const bodyH = h * (1 - taperFactor);
+  const body = ngon(6, r).extrude(bodyH);
 
-  // Taper the top
-  const taperCut = box(baseW * 2, baseW * 2, h * (1 - taperFactor), true)
-    .rotate(rand(-10, 10), rand(8, 15), 0)
-    .translate(0, 0, h * 0.85);
+  // Pointed hexagonal pyramid tip
+  const tipH = h * taperFactor;
+  const tip = ngon(6, r).extrude(tipH, { scaleTop: 0.05 })
+    .translate(0, 0, bodyH);
 
-  return difference(base, chamfer1, chamfer2, taperCut)
-    .translate(0, 0, h / 2);
+  return union(body, tip);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,14 +88,20 @@ function crystal(h, baseW) {
 // ---------------------------------------------------------------------------
 const crystals = [];
 
+// Crystal palette — gemstone colors
+const crystalColors = ['#8b5cf6', '#a855f7', '#6d28d9', '#7c3aed', '#c084fc', '#5b21b6', '#4c1d95', '#9333ea'];
+function pickColor() { return crystalColors[Math.floor(rand(0, crystalColors.length - 0.01))]; }
+
 // Central dominant crystal
 const mainH = maxHeight * rand(0.85, 1.0);
 const mainW = rand(14, 20);
-crystals.push(
-  crystal(mainH, mainW)
+crystals.push({
+  name: 'Main Crystal',
+  shape: crystal(mainH, mainW)
     .rotate(0, 0, rand(0, 360))
-    .translate(rand(-5, 5), rand(-5, 5), 0)
-);
+    .translate(rand(-5, 5), rand(-5, 5), 0),
+  color: '#a855f7',
+});
 
 // Surrounding crystals
 for (let i = 0; i < crystalCount - 1; i++) {
@@ -110,11 +110,13 @@ for (let i = 0; i < crystalCount - 1; i++) {
   const h = maxHeight * rand(0.2, 0.75);
   const w = rand(6, 16);
 
-  crystals.push(
-    crystal(h, w)
+  crystals.push({
+    name: `Crystal ${i + 2}`,
+    shape: crystal(h, w)
       .rotate(rand(-8, 8), rand(-12, 12), rand(0, 360))
-      .translate(Math.cos(angle) * dist, Math.sin(angle) * dist, 0)
-  );
+      .translate(Math.cos(angle) * dist, Math.sin(angle) * dist, 0),
+    color: pickColor(),
+  });
 }
 
 // Base rock
@@ -122,4 +124,4 @@ const baseRock = sphere(baseRadius * 0.5)
   .scale([1, 1, 0.3])
   .translate(0, 0, -baseRadius * 0.05);
 
-return [baseRock, ...crystals];
+return [{ name: 'Base Rock', shape: baseRock, color: '#1a1a2e' }, ...crystals];
