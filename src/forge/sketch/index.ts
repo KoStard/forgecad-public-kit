@@ -16,6 +16,8 @@ export * from './arcBridge';
 export * from './dimensions';
 export * from './highlights';
 export * from './curves';
+export * from './hermiteCurve';
+export * from './transition';
 export * from './regions';
 export * from './arrangement';
 export * from './svgImport';
