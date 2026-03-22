@@ -54,37 +54,16 @@ export async function buildBrepBlob(objects: BrepNativeExportObject[]): Promise<
   // Write BREP to the Emscripten virtual filesystem.
   const path = '/tmp/forgecad-export.brep';
 
-  // BRepTools.Write has multiple overloads in opencascade.js:
-  //   Write_1(shape, ostream)            — unbound ostream, unusable
-  //   Write_2(shape, ostream, progress)  — unbound ostream, unusable
-  //   Write_3(shape, filePath)           — file-path variant ✓
-  //   Write_4(shape, filePath, progress) — file-path with progress ✓
-  // Try all numbered overloads that accept a file path, then the base name.
-  const overloads: Array<{ name: string; call: () => boolean }> = [
-    { name: 'Write_3', call: () => oc.BRepTools.Write_3?.(topoShape, path) },
-    { name: 'Write_4', call: () => oc.BRepTools.Write_4?.(topoShape, path, new oc.Message_ProgressRange_1()) },
-    { name: 'Write_1', call: () => oc.BRepTools.Write_1?.(topoShape, path) },
-    { name: 'Write_2', call: () => oc.BRepTools.Write_2?.(topoShape, path, new oc.Message_ProgressRange_1()) },
-    { name: 'Write',   call: () => oc.BRepTools.Write?.(topoShape, path) },
-  ];
-
-  let writeSuccess = false;
-  let lastError: string | null = null;
-
-  for (const overload of overloads) {
-    try {
-      const result = overload.call();
-      if (result !== undefined && result !== false) {
-        writeSuccess = true;
-        break;
-      }
-    } catch (err: any) {
-      lastError = err.message || String(err);
-    }
-  }
+  // BRepTools.Write overloads in opencascade.js:
+  //   Write_1(shape, ostream, progress)                                  — unbound ostream
+  //   Write_2(shape, ostream, withTriangles, withNormals, ver, progress) — unbound ostream
+  //   Write_3(shape, filePath, progress)                                 — file-path ✓
+  //   Write_4(shape, filePath, withTriangles, withNormals, ver, progress)— file-path ✓
+  const pr = new oc.Message_ProgressRange_1();
+  const writeSuccess = oc.BRepTools.Write_3(topoShape, path, pr);
 
   if (!writeSuccess) {
-    throw new Error(`BREP export: BRepTools.Write failed${lastError ? ` — ${lastError}` : '. No compatible overload found.'}`);
+    throw new Error('BREP export: BRepTools.Write_3 returned failure.');
   }
 
   // Read the file back from the virtual FS.
