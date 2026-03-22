@@ -21,6 +21,8 @@ import { isNotebookFile } from './notebook/model';
 import { buildShareUrl, buildEmbedUrl, buildEmbedSnippet, isEmbedMode } from './share';
 import { EmbedViewer } from './components/EmbedViewer';
 import { AISkillDialog } from './components/AISkillDialog';
+import { ToastContainer, showToast } from './components/Toast';
+import { StatusBar } from './components/StatusBar';
 
 const GITHUB_REPO = 'KoStard/ForgeCAD';
 
@@ -44,20 +46,8 @@ function GitHubStarButton() {
       target="_blank"
       rel="noopener noreferrer"
       title="Star on GitHub"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 5,
-        padding: '3px 8px',
-        background: 'transparent',
-        color: 'var(--fc-textMuted)',
-        border: '1px solid var(--fc-border)',
-        borderRadius: 3,
-        fontSize: 12,
-        textDecoration: 'none',
-        lineHeight: 1,
-        whiteSpace: 'nowrap',
-      }}
+      className="fc-btn"
+      style={{ textDecoration: 'none', padding: '3px 8px' }}
     >
       <svg height="13" width="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
         <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
@@ -76,12 +66,10 @@ function GitHubStarButton() {
 function ShareButton() {
   const activeFile = useForgeStore((s) => s.activeFile);
   const files = useForgeStore((s) => s.files);
-  const [copied, setCopied] = React.useState<'share' | 'embed' | false>(false);
 
-  const copyToClipboard = (text: string, type: 'share' | 'embed') => {
+  const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      setCopied(type);
-      setTimeout(() => setCopied(false), 2000);
+      showToast(`${label} copied to clipboard`, 'success', 2500);
     });
   };
 
@@ -98,7 +86,7 @@ function ShareButton() {
       if (!ok) return;
     }
 
-    copyToClipboard(url, 'share');
+    copyToClipboard(url, 'Share link');
   };
 
   const handleEmbed = () => {
@@ -114,69 +102,28 @@ function ShareButton() {
       if (!ok) return;
     }
 
-    copyToClipboard(buildEmbedSnippet(embedUrl), 'embed');
-  };
-
-  const shareBtnStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 5,
-    padding: '3px 8px',
-    background: copied === 'share' ? 'var(--fc-success, #2ea043)' : 'transparent',
-    color: copied === 'share' ? '#fff' : 'var(--fc-textMuted)',
-    border: '1px solid var(--fc-border)',
-    borderRadius: '3px 0 0 3px',
-    fontSize: 12,
-    cursor: 'pointer',
-    lineHeight: 1,
-    whiteSpace: 'nowrap',
-    transition: 'background 0.15s, color 0.15s',
-  };
-
-  const embedBtnStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 4,
-    padding: '3px 8px',
-    background: copied === 'embed' ? 'var(--fc-success, #2ea043)' : 'transparent',
-    color: copied === 'embed' ? '#fff' : 'var(--fc-textMuted)',
-    border: '1px solid var(--fc-border)',
-    borderLeft: 'none',
-    borderRadius: '0 3px 3px 0',
-    fontSize: 12,
-    cursor: 'pointer',
-    lineHeight: 1,
-    whiteSpace: 'nowrap',
-    transition: 'background 0.15s, color 0.15s',
+    copyToClipboard(buildEmbedSnippet(embedUrl), 'Embed snippet');
   };
 
   return (
     <span style={{ display: 'inline-flex' }}>
-      <button onClick={handleShare} title="Copy shareable link to clipboard" style={shareBtnStyle}>
+      <button onClick={handleShare} title="Copy shareable link to clipboard" className="fc-btn" style={{ borderRadius: '4px 0 0 4px' }}>
         <svg height="12" width="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M3.75 2h3.5a.75.75 0 010 1.5h-3.5a.25.25 0 00-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-3.5a.75.75 0 011.5 0v3.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-8.5C2 2.784 2.784 2 3.75 2zm6.854-.22a.75.75 0 011.062 0l2.554 2.553a.75.75 0 010 1.062l-5.5 5.5a.75.75 0 01-.53.22H5.75a.75.75 0 01-.75-.75V7.914a.75.75 0 01.22-.53l5.384-5.604zm.69 1.28L6.5 7.854v1.396h1.396l4.793-4.794-1.395-1.396z" />
         </svg>
-        {copied === 'share' ? 'Copied!' : 'Share'}
+        Share
       </button>
-      <button onClick={handleEmbed} title="Copy embed iframe snippet to clipboard" style={embedBtnStyle}>
+      <button onClick={handleEmbed} title="Copy embed iframe snippet to clipboard" className="fc-btn" style={{ borderLeft: 'none', borderRadius: '0 4px 4px 0' }}>
         <svg height="12" width="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0114.25 16H1.75A1.75 1.75 0 010 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 00.25-.25V1.75a.25.25 0 00-.25-.25H1.75zM4.47 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L7.19 8 4.47 5.28a.75.75 0 010-1.06z" />
         </svg>
-        {copied === 'embed' ? 'Copied!' : 'Embed'}
+        Embed
       </button>
     </span>
   );
 }
 
-const btnStyle = (active = false): React.CSSProperties => ({
-  padding: '4px 10px',
-  background: active ? 'var(--fc-accent)' : 'transparent',
-  color: active ? 'var(--fc-accentText)' : 'var(--fc-textMuted)',
-  border: '1px solid var(--fc-border)',
-  borderRadius: 3,
-  cursor: 'pointer',
-  fontSize: 12,
-});
+const btn = (active = false) => `fc-btn${active ? ' active' : ''}`;
 
 const FILE_EXPLORER_PANEL_WIDTH_KEY = 'fc-layout-file-panel-width-v1';
 const CODE_PANEL_WIDTH_KEY = 'fc-layout-code-panel-width-v1';
@@ -189,16 +136,15 @@ function AutoBuildToggle() {
   return (
     <>
       <button
-        style={pauseAutoEval
-          ? { ...btnStyle(), color: 'var(--fc-warning, #e6a817)', borderColor: 'var(--fc-warning, #e6a817)' }
-          : btnStyle(true)}
+        className={btn(!pauseAutoEval)}
+        style={pauseAutoEval ? { color: 'var(--fc-warning, #e6a817)', borderColor: 'var(--fc-warning, #e6a817)' } : undefined}
         onClick={togglePauseAutoEval}
         title={pauseAutoEval ? 'Auto-build paused — click to enable' : 'Auto-build active — click to pause'}
       >
         {pauseAutoEval ? '⏸ Manual' : '▶ Auto'}
       </button>
       {pauseAutoEval && (
-        <button style={btnStyle(true)} onClick={() => execute()} title="Build now (⌘↵)">
+        <button className={btn(true)} onClick={() => execute()} title="Build now (⌘↵)">
           Build
         </button>
       )}
@@ -224,7 +170,7 @@ function Toolbar() {
   const [skillDialogOpen, setSkillDialogOpen] = React.useState(false);
 
   return (
-    <div style={{ padding: '6px 12px', background: 'var(--fc-bgHover)', borderBottom: '1px solid var(--fc-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div className="fc-toolbar">
       <span style={{ fontSize: 16 }}>⚒</span>
       <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--fc-accent)' }}>ForgeCAD</span>
       <span style={{ color: 'var(--fc-textDim)', fontSize: 12, marginLeft: 4 }}>
@@ -233,41 +179,30 @@ function Toolbar() {
       <button
         onClick={openCommandPalette}
         title="Open command palette (⌘⇧P)"
-        style={{
-          marginLeft: 8,
-          padding: '2px 8px',
-          background: 'var(--fc-bgSurface)',
-          border: '1px solid var(--fc-border)',
-          borderRadius: 4,
-          color: 'var(--fc-textDim)',
-          fontSize: 11,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          fontFamily: 'inherit',
-        }}
+        className="fc-btn"
+        style={{ marginLeft: 8, padding: '2px 8px', fontSize: 11, background: 'var(--fc-bgSurface)' }}
       >
         <span>Commands</span>
         <kbd style={{ fontSize: 10, opacity: 0.7, fontFamily: 'inherit' }}>⌘⇧P</kbd>
       </button>
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
-        <button style={btnStyle(fileExplorerOpen)} onClick={toggleFileExplorer} title="Toggle file explorer">📁 Files</button>
-        <button style={btnStyle(viewPanelOpen)} onClick={toggleViewPanel} title="Toggle view panel">🧭 View</button>
-        <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
-        <button style={btnStyle()} onClick={newProject} title="New project">New Project</button>
-        <button style={btnStyle()} onClick={saveFile} title="Save (⌘S)">Save</button>
-        <button style={btnStyle()} onClick={saveFileAs} title="Save as new file">Save As</button>
-        <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
-        <button style={btnStyle(measureMode)} onClick={toggleMeasure} title="Toggle measurement tool (M)">📏 Measure</button>
+        <button className={btn(fileExplorerOpen)} onClick={toggleFileExplorer} title="Toggle file explorer">📁 Files</button>
+        <button className={btn(viewPanelOpen)} onClick={toggleViewPanel} title="Toggle view panel">🧭 View</button>
+        <div className="fc-separator" />
+        <button className={btn()} onClick={newProject} title="New project">New Project</button>
+        <button className={btn()} onClick={saveFile} title="Save (⌘S)">Save</button>
+        <button className={btn()} onClick={saveFileAs} title="Save as new file">Save As</button>
+        <div className="fc-separator" />
+        <button className={btn(measureMode)} onClick={toggleMeasure} title="Toggle measurement tool (M)">📏 Measure</button>
         {measureMode && measureSelections.length > 0 && (
-          <button style={btnStyle()} onClick={clearMeasureSelections} title="Clear selections">Clear</button>
+          <button className={btn()} onClick={clearMeasureSelections} title="Clear selections">Clear</button>
         )}
-        <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
+        <div className="fc-separator" />
         <AutoBuildToggle />
-        <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
-        <button style={btnStyle()} onClick={() => setSkillDialogOpen(true)} title="Get AI skill for writing ForgeCAD models">🤖 AI Skill</button>
+        <div className="fc-separator" />
+        <button className={btn()} onClick={() => setSkillDialogOpen(true)} title="Get AI skill for writing ForgeCAD models">🤖 AI Skill</button>
+        <div className="fc-separator" />
         <ShareButton />
         {__FORGE_MODE__ === 'web' && <GitHubStarButton />}
       </div>
@@ -381,10 +316,53 @@ function FullApp() {
 
   if (!kernelReady) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--fc-textDim)' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        color: 'var(--fc-textDim)',
+        animation: 'fc-fadein 0.3s ease-out',
+      }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 24, marginBottom: 8 }}>⚒ ForgeCAD</div>
-          <div style={{ fontSize: 14 }}>Loading geometry kernel...</div>
+          {/* Anvil icon with gentle pulse */}
+          <div style={{
+            fontSize: 48,
+            marginBottom: 16,
+            animation: 'fc-pulse 2s ease-in-out infinite',
+          }}>
+            ⚒
+          </div>
+          <div style={{
+            fontSize: 18,
+            fontWeight: 600,
+            color: 'var(--fc-accent)',
+            marginBottom: 6,
+            letterSpacing: 1,
+          }}>
+            ForgeCAD
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--fc-textDim)', marginBottom: 20 }}>
+            Loading geometry kernel...
+          </div>
+          {/* Shimmer progress bar */}
+          <div style={{
+            width: 200,
+            height: 3,
+            borderRadius: 2,
+            background: 'var(--fc-border)',
+            overflow: 'hidden',
+            margin: '0 auto',
+          }}>
+            <div style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: 2,
+              background: 'linear-gradient(90deg, transparent, var(--fc-accent), transparent)',
+              backgroundSize: '200% 100%',
+              animation: 'fc-shimmer 1.5s ease-in-out infinite',
+            }} />
+          </div>
         </div>
       </div>
     );
@@ -442,9 +420,11 @@ function FullApp() {
           )}
         </div>
       </div>
+      <StatusBar />
       <CommandPalette />
       <FileSwitcher />
       <KeyboardShortcutsOverlay />
+      <ToastContainer />
     </div>
   );
 }

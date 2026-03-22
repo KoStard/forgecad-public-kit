@@ -4650,16 +4650,19 @@ function ConstructionGhostOverlay({ matrix }: { matrix: THREE.Matrix4 }) {
   );
 }
 
-/* ── Evaluation progress indicator ────────────────────────────────── */
+/* --- Evaluation Indicator --- */
 
-const BRAILLE_SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+const BRAILLE_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const;
 
-const EVAL_PHASE_CONFIG: Record<string, { label: string; color: string }> = {
-  'kernel-init':  { label: 'Loading geometry kernel',  color: '#f5a623' },
-  'evaluating':   { label: 'Evaluating model',         color: '#4a9eff' },
-  'serializing':  { label: 'Preparing display',        color: '#7c4dff' },
-  'exporting':    { label: 'Exporting geometry',       color: '#4caf50' },
+const PHASE_CONFIG: Record<string, { color: string; label: string }> = {
+  'kernel-init': { color: '#f5a623', label: 'Loading geometry kernel' },
+  'evaluating':  { color: '#4a9eff', label: 'Evaluating model' },
+  'serializing': { color: '#7c4dff', label: 'Preparing display' },
+  'exporting':   { color: '#4caf50', label: 'Exporting geometry' },
+  'idle':        { color: '#888',    label: '' },
 };
+
+const PHASE_ORDER: Array<string> = ['kernel-init', 'evaluating', 'serializing'];
 
 function EvaluationIndicator({ phase }: { phase: string }) {
   const [frame, setFrame] = useState(0);
@@ -4670,22 +4673,14 @@ function EvaluationIndicator({ phase }: { phase: string }) {
   useEffect(() => { startRef.current = Date.now(); setElapsed(0); }, [phase]);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setFrame((f) => (f + 1) % BRAILLE_SPINNER.length);
-      setElapsed(Date.now() - startRef.current);
-    }, 80);
-    return () => clearInterval(id);
+    const spinnerInterval = setInterval(() => setFrame((f) => (f + 1) % BRAILLE_FRAMES.length), 80);
+    const timerInterval = setInterval(() => setElapsed(Date.now() - startRef.current), 100);
+    return () => { clearInterval(spinnerInterval); clearInterval(timerInterval); };
   }, []);
 
-  const cfg = EVAL_PHASE_CONFIG[phase] ?? EVAL_PHASE_CONFIG['evaluating'];
-  const spinner = BRAILLE_SPINNER[frame];
-  const secs = (elapsed / 1000).toFixed(1);
-
-  // Progress dots animation: phase index determines filled dots
-  const phaseIdx = phase === 'kernel-init' ? 0 : phase === 'evaluating' ? 1 : 2;
-  const dots = [0, 1, 2].map((i) =>
-    i <= phaseIdx ? cfg.color : 'var(--fc-border)',
-  );
+  const config = PHASE_CONFIG[phase] ?? PHASE_CONFIG['evaluating'];
+  const elapsedSec = (elapsed / 1000).toFixed(1);
+  const phaseIdx = PHASE_ORDER.indexOf(phase);
 
   return (
     <div
@@ -4694,60 +4689,48 @@ function EvaluationIndicator({ phase }: { phase: string }) {
         bottom: 16,
         right: 16,
         background: 'var(--fc-bgPanel)',
-        color: 'var(--fc-text, #e0e0e0)',
-        padding: '8px 14px',
-        borderRadius: 8,
-        fontSize: 13,
-        fontWeight: 500,
         border: '1px solid var(--fc-border)',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+        borderRadius: 8,
+        padding: '8px 14px',
         pointerEvents: 'none',
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        fontFamily: 'inherit',
-        animation: 'fc-eval-fadein 0.2s ease-out',
+        fontSize: 12,
+        animation: 'fc-fadein 0.2s ease-out',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
       }}
     >
-      {/* Inject keyframes once */}
-      <style>{`
-        @keyframes fc-eval-fadein {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fc-eval-pulse {
-          0%, 100% { opacity: 0.45; }
-          50%      { opacity: 1; }
-        }
-      `}</style>
-
-      {/* Braille spinner */}
-      <span style={{ fontSize: 16, color: cfg.color, width: 16, textAlign: 'center' }}>
-        {spinner}
+      {/* Spinner */}
+      <span style={{ color: config.color, fontSize: 16, fontWeight: 700, width: 16, textAlign: 'center' }}>
+        {BRAILLE_FRAMES[frame]}
       </span>
 
       {/* Label */}
-      <span>{cfg.label}</span>
+      <span style={{ color: 'var(--fc-text)', fontWeight: 500 }}>
+        {config.label}
+      </span>
 
       {/* Phase dots */}
-      <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-        {dots.map((color, i) => (
+      <span style={{ display: 'flex', gap: 4, alignItems: 'center', marginLeft: 2 }}>
+        {PHASE_ORDER.map((p, i) => (
           <span
-            key={i}
+            key={p}
             style={{
-              width: 5,
-              height: 5,
+              width: 6,
+              height: 6,
               borderRadius: '50%',
-              background: color,
-              animation: i === phaseIdx ? 'fc-eval-pulse 1.2s ease-in-out infinite' : 'none',
+              background: i <= phaseIdx ? (PHASE_CONFIG[p]?.color ?? 'var(--fc-border)') : 'var(--fc-border)',
+              transition: 'background 0.3s ease',
+              animation: i === phaseIdx ? 'fc-pulse 1.2s ease-in-out infinite' : undefined,
             }}
           />
         ))}
       </span>
 
       {/* Elapsed time */}
-      <span style={{ fontSize: 11, color: 'var(--fc-textDim)', fontVariantNumeric: 'tabular-nums' }}>
-        {secs}s
+      <span style={{ color: 'var(--fc-textDim)', fontVariantNumeric: 'tabular-nums', fontSize: 11 }}>
+        {elapsedSec}s
       </span>
     </div>
   );
