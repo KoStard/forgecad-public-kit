@@ -22,7 +22,7 @@ const sharp = ngon(6, 20).offset(3, 'Miter');
 Use the common `offset(-r).offset(+r)` pattern when you want to round **every convex corner** of a closed sketch.
 
 ### `filletCorners(points, corners)`
-Round only specific convex corners of a polygon point list.
+Round specific corners of a polygon point list (both convex and concave).
 
 **Parameters:**
 - `points` (([number, number] | Point2D)[]) - Closed polygon vertices in order
@@ -49,7 +49,8 @@ const roof = filletCorners(roofPoints, [
 ```
 
 Notes:
-- only convex corners are supported
+- both convex and concave corners are supported; convex fillets cut the corner, concave fillets fill the concavity
+- collinear corners (straight edges) cannot be filleted
 - if two neighboring fillets would overlap on the same edge, the function throws
 - compare `polygon(points)` and `filletCorners(points, ...)` before extruding when debugging mixed sharp-and-rounded outlines
 
