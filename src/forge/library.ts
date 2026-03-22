@@ -7,7 +7,8 @@
 
 import { box, cylinder, sphere, union, difference, intersection, Shape, buildShapeFromCompilePlan } from './kernel';
 import { ShapeGroup } from './group';
-import { Sketch } from './sketch/core';
+import { Sketch, setSketchCompileProfilePlan } from './sketch/core';
+import { profilePlanFromCrossSection } from './compilePlan';
 import { TrackedShape } from './sketch/topology';
 import { rect, roundedRect, circle2d, polygon } from './sketch/primitives';
 import { union2d, difference2d } from './sketch/booleans';
@@ -1489,10 +1490,16 @@ export function sideGear(options: SideGearOptions): Shape {
   const segments = Math.max(48, normalized.teeth * normalized.segmentsPerTooth);
   const rootDisk = cylinder(normalized.faceWidth, meta.rootRadius, undefined, segments, normalized.center);
   const profile = buildSpurGearProfile(spurMeta, normalized.segmentsPerTooth);
-  const toothBandProfile = difference2d(
+  const toothBandRaw = difference2d(
     profile,
     circle2d(meta.rootRadius, Math.max(48, normalized.teeth * 2)),
-  ).simplify(1e-6);
+  );
+  // Use backend-level simplify for polygon cleanup (not a public Sketch API).
+  const simplifiedCross = toothBandRaw.cross.simplify(1e-6);
+  const toothBandProfile = setSketchCompileProfilePlan(
+    new Sketch(simplifiedCross, toothBandRaw.colorHex),
+    profilePlanFromCrossSection(simplifiedCross),
+  );
 
   const teethBand = sketchExtrude(toothBandProfile, normalized.toothHeight, { center: false })
     .toShape()

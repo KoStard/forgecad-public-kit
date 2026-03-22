@@ -19,7 +19,7 @@
 
 import { Sketch } from './core';
 import { circle2d, polygon, slot } from './primitives';
-import { union2d } from './booleans';
+import { union2d, difference2d } from './booleans';
 
 
 // ---------------------------------------------------------------------------
@@ -88,11 +88,8 @@ function ringFull(cx: number, cy: number, R: number, sw: number): Sketch {
     outer.push([cx + outerR * Math.cos(a), cy + outerR * Math.sin(a)]);
     inner.push([cx + innerR * Math.cos(a), cy + innerR * Math.sin(a)]);
   }
-  // Manifold expects outer CCW and inner CW (hole).  outer is CCW by the loop
-  // direction; inner must be CW — reverse it.
-  return new Sketch(
-    (polygon(outer)).cross.subtract((polygon(inner)).cross),
-  );
+  // Build ring as boolean difference of outer and inner polygons (preserves compile plan).
+  return difference2d(polygon(outer), polygon(inner));
 }
 
 /** Small filled dot (for i, j, !, ?, :, ;, period). */

@@ -4,10 +4,11 @@
  * Rust/WASM produces the solved constraint state; this file turns it into arrangement,
  * display, and warm-start-friendly TS objects.
  */
-import { Sketch } from '../core';
-import { polygon } from '../primitives';
+import { Sketch, setSketchCompileProfilePlan } from '../core';
+import { polygon, circle2d } from '../primitives';
 import { union2d } from '../booleans';
-import { createCircleProfile, createEmptyProfile } from '../../profileOps';
+import { createEmptyProfile } from '../../profileOps';
+import type { ProfileCompilePlan } from '../../compilePlan';
 import type {
   ConstraintDefinition,
   SketchConstraintMeta,
@@ -92,7 +93,7 @@ export const buildSketchFromDefinition = (def: ConstraintDefinition): Sketch => 
       if (!circleDef) throw new Error(`Missing circle ${loop.circle}`);
       const center = ptMap.get(circleDef.center);
       if (!center) throw new Error(`Missing center ${circleDef.center}`);
-      const circle = new Sketch(createCircleProfile(circleDef.radius, circleDef.segments));
+      const circle = circle2d(circleDef.radius, circleDef.segments);
       loops.push(circle.translate(center.x, center.y));
     } else if (loop.type === 'profile') {
       // Build a polyline by concatenating line endpoints and arc tessellations.
@@ -127,7 +128,8 @@ export const buildSketchFromDefinition = (def: ConstraintDefinition): Sketch => 
   });
 
   if (loops.length === 0) {
-    return new Sketch(createEmptyProfile());
+    const emptyPlan: ProfileCompilePlan = { kind: 'polygon', points: [], transforms: [] };
+    return setSketchCompileProfilePlan(new Sketch(createEmptyProfile()), emptyPlan);
   }
 
   return union2d(...loops);

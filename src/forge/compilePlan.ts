@@ -26,6 +26,7 @@ import type {
   SheetMetalOutput,
 } from './sheetMetalModel';
 import { cloneSheetMetalModel } from './sheetMetalModel';
+import type { ProfileBackend } from './profileBackend';
 
 export type ProfileCompileTransformStep =
   | { kind: 'translate'; x: number; y: number }
@@ -70,7 +71,7 @@ export type ProfileCompilePlan =
       kind: 'offset';
       base: ProfileCompilePlan;
       delta: number;
-      join: 'Round';
+      join: 'Square' | 'Round' | 'Miter';
       transforms: ProfileCompileTransformStep[];
     }
   | {
@@ -88,7 +89,8 @@ export type ProfileCompilePlan =
       replayProfile?: ProfileCompilePlan;
       replayReason?: string;
       transforms: ProfileCompileTransformStep[];
-    };
+    }
+;
 
 export type ShapeCompileTransformStep =
   | { kind: 'translate'; x: number; y: number; z: number }
@@ -814,10 +816,9 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
 }
 
 export function appendProfileCompileTransform(
-  plan: ProfileCompilePlan | null,
+  plan: ProfileCompilePlan,
   step: ProfileCompileTransformStep,
-): ProfileCompilePlan | null {
-  if (!plan) return null;
+): ProfileCompilePlan {
   const out = cloneProfileCompilePlan(plan)!;
   out.transforms.push(cloneProfileTransform(step));
   return out;
@@ -1010,9 +1011,8 @@ export function findShapeWorkplanePlacement(
 
 export function buildBooleanProfileCompilePlan(
   op: 'union' | 'difference' | 'intersection',
-  profiles: Array<ProfileCompilePlan | null>,
-): ProfileCompilePlan | null {
-  if (profiles.some((profile) => profile == null)) return null;
+  profiles: ProfileCompilePlan[],
+): ProfileCompilePlan {
   return {
     kind: 'boolean',
     op,
@@ -1022,11 +1022,10 @@ export function buildBooleanProfileCompilePlan(
 }
 
 export function buildOffsetProfileCompilePlan(
-  base: ProfileCompilePlan | null,
+  base: ProfileCompilePlan,
   delta: number,
-  join: 'Round',
-): ProfileCompilePlan | null {
-  if (!base) return null;
+  join: 'Square' | 'Round' | 'Miter',
+): ProfileCompilePlan {
   return {
     kind: 'offset',
     base: cloneProfileCompilePlan(base)!,
@@ -1037,14 +1036,32 @@ export function buildOffsetProfileCompilePlan(
 }
 
 export function buildHullProfileCompilePlan(
-  profiles: Array<ProfileCompilePlan | null>,
-): ProfileCompilePlan | null {
-  if (profiles.some((profile) => profile == null)) return null;
+  profiles: ProfileCompilePlan[],
+): ProfileCompilePlan {
   return {
     kind: 'hull',
     profiles: profiles.map((profile) => cloneProfileCompilePlan(profile)!),
     transforms: [],
   };
+}
+
+/**
+ * Snapshot a ProfileBackend (cross-section) as a concrete polygon compile plan.
+ * This replaces the former 'opaque' plan kind: every cross-section IS polygon
+ * loops, so there's never a reason to lose the parametric description.
+ */
+export function profilePlanFromCrossSection(cross: ProfileBackend): ProfileCompilePlan {
+  const loops = cross.toPolygons();
+  if (loops.length === 0) {
+    return { kind: 'polygon', points: [], transforms: [] };
+  }
+  const plans: ProfileCompilePlan[] = loops.map((loop) => ({
+    kind: 'polygon' as const,
+    points: loop.map((pt) => [pt[0], pt[1]] as [number, number]),
+    transforms: [],
+  }));
+  if (plans.length === 1) return plans[0];
+  return { kind: 'boolean', op: 'union', profiles: plans, transforms: [] };
 }
 
 export function buildHullShapeCompilePlan(
@@ -1113,11 +1130,10 @@ export function buildChamferShapeCompilePlan(
 }
 
 export function buildLoftShapeCompilePlan(
-  profiles: Array<ProfileCompilePlan | null>,
+  profiles: ProfileCompilePlan[],
   heights: number[],
   options: { edgeLength: number; boundsPadding: number },
-): ShapeCompilePlan | null {
-  if (profiles.some((profile) => profile == null)) return null;
+): ShapeCompilePlan {
   return {
     kind: 'loft',
     profiles: profiles.map((profile) => cloneProfileCompilePlan(profile)!),
@@ -1128,15 +1144,14 @@ export function buildLoftShapeCompilePlan(
 }
 
 export function buildSweepShapeCompilePlan(
-  profile: ProfileCompilePlan | null,
+  profile: ProfileCompilePlan,
   path: SweepPathCompilePlan,
   options: {
     edgeLength: number;
     boundsPadding: number;
     up: [number, number, number];
   },
-): ShapeCompilePlan | null {
-  if (!profile) return null;
+): ShapeCompilePlan {
   return {
     kind: 'sweep',
     profile: cloneProfileCompilePlan(profile)!,

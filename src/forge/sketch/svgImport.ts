@@ -1,8 +1,8 @@
 import { difference2d, union2d } from './booleans';
-import { Sketch } from './core';
+import { Sketch, setSketchCompileProfilePlan } from './core';
+import { profilePlanFromCrossSection } from '../compilePlan';
 import { stroke as strokePolyline } from './path';
 import { polygon } from './primitives';
-import { createPolygonProfile } from '../profileOps';
 
 type Vec2 = [number, number];
 type Mat2 = [number, number, number, number, number, number];
@@ -1455,7 +1455,12 @@ export function sketchFromSvg(svgText: string, options: SvgImportOptions = {}): 
   sketch = filterRegions(sketch, normalized);
   sketch = fitSketchToMaxDimensions(sketch, normalized);
   if (normalized.simplify > 0) {
-    sketch = sketch.simplify(normalized.simplify);
+    // Use backend-level simplify for polygon cleanup (not a public Sketch API).
+    const simplified = sketch.cross.simplify(normalized.simplify);
+    sketch = setSketchCompileProfilePlan(
+      new Sketch(simplified, sketch.colorHex),
+      profilePlanFromCrossSection(simplified),
+    );
   }
   if (sketch.isEmpty()) {
     throw new Error('SVG import generated an empty sketch');
@@ -1474,5 +1479,7 @@ export function sketchFromSvgLoops(loops: Vec2[][]): Sketch {
   if (validLoops.length === 0) {
     throw new Error('sketchFromSvgLoops did not receive any valid non-degenerate loops');
   }
-  return new Sketch(createPolygonProfile(validLoops as number[][][]));
+  // Build each loop as a polygon sketch (with compile plan) and union them.
+  const sketches = validLoops.map((loop) => polygon(loop as [number, number][]));
+  return sketches.length === 1 ? sketches[0] : union2d(...sketches);
 }

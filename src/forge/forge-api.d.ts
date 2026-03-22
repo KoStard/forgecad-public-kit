@@ -162,11 +162,6 @@ declare class Sketch {
 	intersect(...others: SketchOperandInput[]): Sketch;
 	offset(delta: number, join?: "Square" | "Round" | "Miter"): Sketch;
 	hull(): Sketch;
-	simplify(epsilon?: number): Sketch;
-	warp(fn: (vert: [
-		number,
-		number
-	]) => void): Sketch;
 	/**
 	 * Decompose this sketch into its distinct filled regions. See `sketchRegions()`.
 	 * Regions are returned largest-first by area.

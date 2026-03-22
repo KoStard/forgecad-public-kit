@@ -334,6 +334,7 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
 
     case 'project':
       throw new OCCTUnsupportedError('profile project');
+
   }
 
   // Apply 2D transforms

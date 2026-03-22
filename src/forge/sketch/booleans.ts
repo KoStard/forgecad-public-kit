@@ -5,13 +5,11 @@ import {
   getSketchCompileProfilePlan,
   mergeSketchPlacementModel,
   mergeSketchPlacement3D,
-  setSketchCompileProfilePlan,
   setSketchPlacement3D,
   setSketchPlacementModel,
 } from './core';
 import { buildBooleanProfileCompilePlan, buildHullProfileCompilePlan } from '../compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from '../apiArgs';
-import { profileUnion, profileDifference, profileIntersection } from '../profileOps';
 
 function normalizeSketchOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Sketch[] {
   return normalizeVariadicArgs({
@@ -37,9 +35,7 @@ export function sketchAdd(sketch: Sketch, ...others: SketchOperandInput[]): Sket
   const nextPlan = buildBooleanProfileCompilePlan('union', sketches.map((entry) => getSketchCompileProfilePlan(entry)));
   return setSketchPlacementModel(
     setSketchPlacement3D(
-      nextPlan
-        ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-        : setSketchCompileProfilePlan(new Sketch(profileUnion(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
+      buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -56,9 +52,7 @@ export function sketchSubtract(sketch: Sketch, ...others: SketchOperandInput[]):
   const nextPlan = buildBooleanProfileCompilePlan('difference', sketches.map((entry) => getSketchCompileProfilePlan(entry)));
   return setSketchPlacementModel(
     setSketchPlacement3D(
-      nextPlan
-        ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-        : setSketchCompileProfilePlan(new Sketch(profileDifference(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
+      buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -75,9 +69,7 @@ export function sketchIntersect(sketch: Sketch, ...others: SketchOperandInput[])
   const nextPlan = buildBooleanProfileCompilePlan('intersection', sketches.map((entry) => getSketchCompileProfilePlan(entry)));
   return setSketchPlacementModel(
     setSketchPlacement3D(
-      nextPlan
-        ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-        : setSketchCompileProfilePlan(new Sketch(profileIntersection(sketches.map((entry) => entry.cross)), sketch.colorHex), null),
+      buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -96,9 +88,7 @@ export function union2d(...inputs: SketchOperandInput[]): Sketch {
   const nextPlan = buildBooleanProfileCompilePlan('union', sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
   return setSketchPlacementModel(
     setSketchPlacement3D(
-      nextPlan
-        ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-        : setSketchCompileProfilePlan(new Sketch(profileUnion(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+      buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -116,9 +106,7 @@ export function difference2d(...inputs: SketchOperandInput[]): Sketch {
   const nextPlan = buildBooleanProfileCompilePlan('difference', sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
   return setSketchPlacementModel(
     setSketchPlacement3D(
-      nextPlan
-        ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-        : setSketchCompileProfilePlan(new Sketch(profileDifference(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+      buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -136,9 +124,7 @@ export function intersection2d(...inputs: SketchOperandInput[]): Sketch {
   const nextPlan = buildBooleanProfileCompilePlan('intersection', sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
   return setSketchPlacementModel(
     setSketchPlacement3D(
-      nextPlan
-        ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-        : setSketchCompileProfilePlan(new Sketch(profileIntersection(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+      buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
@@ -156,9 +142,7 @@ export function hull2d(...inputs: SketchOperandInput[]): Sketch {
   const nextPlan = buildHullProfileCompilePlan(sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
   return setSketchPlacementModel(
     setSketchPlacement3D(
-      nextPlan
-        ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-        : setSketchCompileProfilePlan(new Sketch(profileUnion(sketches.map(s => s.cross)).hull(), sketches[0].colorHex), null),
+      buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
