@@ -924,8 +924,6 @@ export function ViewPanel() {
           {/* Points */}
           {constraintMeta.edges.points.length > 0 && (
             <CollapsibleSection title="Points" count={constraintMeta.edges.points.length}>
-                Points ({constraintMeta.edges.points.length})
-              </div>
               {constraintMeta.edges.points.map((pt) => {
                 const isSelected = selectedSketchEntityId === pt.id;
                 return (

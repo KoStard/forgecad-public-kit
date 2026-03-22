@@ -2048,6 +2048,7 @@ function SketchObject({
   onVertexHover?: (pointId: string, event: ThreeEvent<PointerEvent>) => void;
 }) {
   const sketchTheme = useForgeStore((s) => themes[s.theme]);
+  const surfacesVisible = useForgeStore((s) => s.surfacesVisible);
   const [hoveredEntity, setHoveredEntity] = useState<SketchHoveredEntity | null>(null);
   const [hoveredSurfIdx, setHoveredSurfIdx] = useState<number | null>(null);
   const worldThresholdRef = useRef(5);
