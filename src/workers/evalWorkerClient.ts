@@ -28,6 +28,8 @@ interface PendingExportExact {
 const INIT_TIMEOUT_MS = 120_000;
 /** Maximum wall-clock time (ms) a script evaluation may take. */
 const RUN_TIMEOUT_MS = 30_000;
+/** Maximum wall-clock time (ms) for export operations (OCCT re-run + STEP/BREP writing). Reset on each progress update. */
+const EXPORT_TIMEOUT_MS = 300_000;
 
 class EvalWorkerClient {
   private worker: Worker | null = null;
@@ -38,6 +40,7 @@ class EvalWorkerClient {
   private readonly pendingFaceInfo = new Map<number, PendingFaceInfo>();
   private readonly pendingExportExact = new Map<number, PendingExportExact>();
   private runTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private exportTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   /** Called when the worker reports a progress phase change. */
   public onProgress: ((phase: EvalPhase) => void) | null = null;
@@ -52,6 +55,13 @@ class EvalWorkerClient {
 
       if (data.type === 'progress') {
         this.onProgress?.(data.payload.phase);
+
+        // Export progress — reset the export timeout on each phase change
+        if (data.payload.phase === 'export-evaluating' || data.payload.phase === 'export-writing') {
+          this.resetExportTimeout();
+          return;
+        }
+
         // When evaluation starts, switch from the generous init timeout
         // to the shorter run timeout.
         if (data.payload.phase === 'evaluating') {
@@ -89,6 +99,7 @@ class EvalWorkerClient {
       }
 
       if (data.type === 'export-exact-success' || data.type === 'export-exact-error') {
+        this.clearExportTimeout();
         const req = this.pendingExportExact.get(data.payload.reqId);
         if (!req) return;
         this.pendingExportExact.delete(data.payload.reqId);
@@ -102,6 +113,7 @@ class EvalWorkerClient {
 
     this.worker.onerror = (event) => {
       this.clearRunTimeout();
+      this.clearExportTimeout();
       const err = new Error(event.message || 'Eval worker crashed');
       for (const req of this.pendingRuns.values()) req.reject(err);
       for (const req of this.pendingFaceInfo.values()) req.reject(err);
@@ -122,6 +134,23 @@ class EvalWorkerClient {
     }
   }
 
+  private clearExportTimeout(): void {
+    if (this.exportTimeoutId !== null) {
+      clearTimeout(this.exportTimeoutId);
+      this.exportTimeoutId = null;
+    }
+  }
+
+  private resetExportTimeout(): void {
+    this.clearExportTimeout();
+    this.exportTimeoutId = setTimeout(() => {
+      // Only reject export requests — don't kill the worker for export timeout
+      const err = new Error(`Export timed out after ${EXPORT_TIMEOUT_MS / 1000}s`);
+      for (const req of this.pendingExportExact.values()) req.reject(err);
+      this.pendingExportExact.clear();
+    }, EXPORT_TIMEOUT_MS);
+  }
+
   /**
    * Kill the current worker and reject all pending requests.
    * A fresh worker is created lazily on the next `run()` or `fetchFaceInfo()`.
@@ -129,6 +158,7 @@ class EvalWorkerClient {
   private killWorker(reason: string): void {
     console.warn(`[evalWorkerClient] ${reason} — terminating worker`);
     this.clearRunTimeout();
+    this.clearExportTimeout();
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;
@@ -193,7 +223,8 @@ class EvalWorkerClient {
 
   /**
    * Export exact geometry (STEP/BREP) using live OCCT shapes in the worker.
-   * Includes script context so the worker can re-evaluate if needed (e.g. cache hit).
+   * Includes script context so the worker can re-evaluate if needed.
+   * Uses a generous 5-minute timeout that resets on each progress phase.
    */
   exportExact(format: ExactExportFormat, scriptContext: {
     code: string;
@@ -212,6 +243,10 @@ class EvalWorkerClient {
         },
         reject,
       });
+
+      // Start export timeout
+      this.resetExportTimeout();
+
       const request: EvalWorkerRequest = {
         type: 'export-exact',
         payload: { reqId, format, ...scriptContext },
@@ -222,6 +257,7 @@ class EvalWorkerClient {
 
   terminate(): void {
     this.clearRunTimeout();
+    this.clearExportTimeout();
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;

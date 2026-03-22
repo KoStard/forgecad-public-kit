@@ -93,7 +93,7 @@ export type ActiveBackend = 'occt' | 'manifold';
 
 export type ExactExportFormat = 'step' | 'brep';
 
-export type EvalPhase = 'kernel-init' | 'evaluating' | 'serializing' | 'exporting';
+export type EvalPhase = 'kernel-init' | 'evaluating' | 'serializing' | 'export-evaluating' | 'export-writing';
 
 export interface EvalWorkerRunPayload {
   seq: number;
@@ -167,7 +167,7 @@ export interface EvalWorkerExportExactRequest {
   payload: {
     reqId: number;
     format: ExactExportFormat;
-    /** Script context so the worker can re-evaluate if lastRunResult is stale/missing (e.g. cache hit). */
+    /** Script context so the worker can re-evaluate if lastRunResult is stale/missing. */
     code: string;
     file: string;
     files: Record<string, string>;

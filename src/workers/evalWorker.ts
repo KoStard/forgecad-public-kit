@@ -89,14 +89,19 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
   }
 }
 
-async function handleExportExact(payload: EvalWorkerExportExactRequest['payload']): Promise<void> {
-  const { reqId, format, code, file, files, quality, paramOverrides, isNotebook } = payload;
+// ─── Export Exact (STEP / BREP) ─────────────────────────────────────
+
+async function handleExportExact(data: EvalWorkerExportExactRequest): Promise<void> {
+  const { reqId, format, code, file, files, quality, paramOverrides, isNotebook } = data.payload;
+  const seq = -reqId; // negative seq for export progress messages
+
   try {
-    // If the worker has no live result (e.g. main thread loaded from cache),
-    // re-run the script here so we have OCCT shapes to export.
+    // Phase 1: ensure we have OCCT-backed shapes
+    worker.postMessage({ type: 'progress', payload: { seq, phase: 'export-evaluating' } });
+    await ensureKernelReady();
+
+    // If the worker has no live result or isn't OCCT-backed, re-run with OCCT
     if (!lastRunResult || getActiveBackend() !== 'occt') {
-      worker.postMessage({ type: 'progress', payload: { seq: -1, phase: 'evaluating' } });
-      await ensureKernelReady();
       resetSolverWasmStats();
       setParamOverrides(paramOverrides);
       setActiveBackend('occt');
@@ -130,8 +135,8 @@ async function handleExportExact(payload: EvalWorkerExportExactRequest['payload'
       return { name: obj.name, shape: backend, color: obj.color };
     });
 
-    // Signal progress to the main thread
-    worker.postMessage({ type: 'progress', payload: { seq: -1, phase: 'exporting' } });
+    // Phase 2: write the export file
+    worker.postMessage({ type: 'progress', payload: { seq, phase: 'export-writing' } });
 
     let blob: Blob;
     if (format === 'step') {
@@ -153,8 +158,15 @@ async function handleExportExact(payload: EvalWorkerExportExactRequest['payload'
   }
 }
 
+// ─── Message Handler ────────────────────────────────────────────────
+
 worker.onmessage = async (event) => {
   const { data } = event;
+
+  if (data.type === 'export-exact') {
+    await handleExportExact(data);
+    return;
+  }
 
   if (data.type === 'face-info') {
     const { reqId, objectId } = data.payload;
@@ -178,11 +190,6 @@ worker.onmessage = async (event) => {
     } catch (err) {
       worker.postMessage({ type: 'face-info-error', payload: { reqId, message: String(err) } });
     }
-    return;
-  }
-
-  if (data.type === 'export-exact') {
-    handleExportExact(data.payload);
     return;
   }
 

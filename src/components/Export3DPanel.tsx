@@ -34,8 +34,6 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
   const [gifBusy, setGifBusy] = useState(false);
   const [reportBusy, setReportBusy] = useState(false);
   const anyBusy = meshBusy || exactBusy || gifBusy || reportBusy;
-  const isOCCT = activeBackend === 'occt';
-
   const exportMesh = async () => {
     if (meshBusy) return;
     setMeshBusy(true);
@@ -159,51 +157,48 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
         </div>
       )}
 
-      {/* Exact Geometry Formats (OCCT only) */}
+      {/* Exact Geometry Formats — always available, worker re-evaluates with OCCT if needed */}
       <div style={sectionBorder}>
         <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginBottom: 6 }}>
-          Exact geometry
-          {!isOCCT && <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.7 }}>(requires OCCT backend)</span>}
+          Exact geometry (OCCT)
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => exportExact('step')}
-            disabled={!isOCCT || exactBusy}
+            disabled={exactBusy}
             style={{
               flex: 1,
               padding: '7px 8px',
-              background: isOCCT && !exactBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
-              color: isOCCT && !exactBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
+              background: !exactBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
+              color: !exactBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
               border: 'none',
               borderRadius: 4,
-              cursor: isOCCT && !exactBusy ? 'pointer' : 'default',
+              cursor: !exactBusy ? 'pointer' : 'default',
               fontSize: 12,
-              opacity: isOCCT ? 1 : 0.5,
             }}
           >
             {exactBusy ? 'Exporting...' : 'Export STEP'}
           </button>
           <button
             onClick={() => exportExact('brep')}
-            disabled={!isOCCT || exactBusy}
+            disabled={exactBusy}
             style={{
               flex: 1,
               padding: '7px 8px',
-              background: isOCCT && !exactBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
-              color: isOCCT && !exactBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
+              background: !exactBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
+              color: !exactBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
               border: 'none',
               borderRadius: 4,
-              cursor: isOCCT && !exactBusy ? 'pointer' : 'default',
+              cursor: !exactBusy ? 'pointer' : 'default',
               fontSize: 12,
-              opacity: isOCCT ? 1 : 0.5,
             }}
           >
             {exactBusy ? 'Exporting...' : 'Export BREP'}
           </button>
         </div>
-        {!isOCCT && (
+        {activeBackend !== 'occt' && (
           <div style={{ fontSize: 10, color: 'var(--fc-textDim)', marginTop: 4 }}>
-            Switch to OCCT backend for STEP/BREP export with exact B-rep geometry.
+            Will re-evaluate with OCCT backend for exact B-rep geometry.
           </div>
         )}
       </div>
