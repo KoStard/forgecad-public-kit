@@ -192,6 +192,7 @@ export function serializeRunResult(
     explodeView: result.explodeView,
     jointsView: result.jointsView,
     viewConfig: result.viewConfig,
+    sceneConfig: result.sceneConfig,
     robotExport: result.robotExport,
     quality: result.quality,
     error: result.error,

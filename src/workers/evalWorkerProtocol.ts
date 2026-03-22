@@ -11,6 +11,7 @@ import type { CutPlaneDef } from '../forge/cutPlane';
 import type { ExplodeViewOptions } from '../forge/explodeView';
 import type { CollectedJointsView } from '../forge/jointsView';
 import type { ViewConfig } from '../forge/viewConfig';
+import type { SceneConfig } from '../forge/scene';
 import type { CollectedRobotExport } from '../forge/robotExport';
 import type { FaceRef } from '../forge/sketch/topology';
 import type { FaceTransformationHistory } from '../forge/faceHistory';
@@ -78,6 +79,7 @@ export interface SerializedRunResult {
   explodeView: ExplodeViewOptions | null;
   jointsView: CollectedJointsView | null;
   viewConfig: ViewConfig | null;
+  sceneConfig: SceneConfig | null;
   robotExport: CollectedRobotExport | null;
   quality: ForgeQualityPreset;
   error: string | null;
