@@ -257,17 +257,29 @@ if (sharedModel) {
 /** Exported so applyServerSnapshot can inject the shared model into the file set. */
 export { sharedModel };
 
+const LAST_ACTIVE_FILE_KEY = 'fc-last-active-file';
+
 const initialActive = (() => {
   if (sharedModel) return sharedModel.filename;
   const hashFile = getActiveFileFromHash();
   if (hashFile && INITIAL_FILES[hashFile]) {
     return hashFile;
   }
+  // Restore last opened file from localStorage
+  try {
+    const last = localStorage.getItem(LAST_ACTIVE_FILE_KEY);
+    if (last && INITIAL_FILES[last]) {
+      window.history.replaceState(null, '', `#${last}`);
+      return last;
+    }
+  } catch { /* localStorage unavailable */ }
   const names = Object.keys(INITIAL_FILES);
-  return findPreferredEntryFile(names)
+  const fallback = findPreferredEntryFile(names)
     || names.find((n) => n.endsWith('.js'))
     || names.find((n) => isNotebookFile(n))
     || names[0];
+  if (fallback) window.history.replaceState(null, '', `#${fallback}`);
+  return fallback;
 })();
 
 const INITIAL_SAVED = projectFiles && Object.keys(projectFiles).length > 0
@@ -894,6 +906,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     // Update URL hash when active file changes
     if (name) {
       window.history.replaceState(null, '', `#${name}`);
+      try { localStorage.setItem(LAST_ACTIVE_FILE_KEY, name); } catch { /* */ }
     }
     // Save current file's param overrides before switching
     const { activeFile: prevFile, paramOverrides, paramOverridesByFile } = get();
