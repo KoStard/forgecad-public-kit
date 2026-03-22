@@ -1,4 +1,4 @@
-import { init, runScript, setParamOverrides, setActiveBackend } from '@forge/index';
+import { init, runScript, setParamOverrides, setActiveBackend, getActiveBackend } from '@forge/index';
 import type { RunResult } from '@forge/runner';
 import {
   getSolverWasmRunDebugSnapshot,
@@ -7,7 +7,11 @@ import {
 import { isNotebookFile, parseNotebook, resolveNotebookPreviewCellId } from '../notebook/model';
 import { runNotebook } from '../notebook/runtime';
 import { serializeRunResult } from '../forge/serializeRunResult';
-import type { EvalWorkerRequest, EvalWorkerResponse, EvalWorkerRunPayload } from './evalWorkerProtocol';
+import { getShapeRuntimeBackend } from '../forge/kernel';
+import { isOCCTShapeBackend } from '../forge/backends/occt/shapeBackend';
+import { buildStepBlob } from '../forge/exportStep';
+import { buildBrepBlob } from '../forge/exportBrepNative';
+import type { EvalWorkerRequest, EvalWorkerResponse, EvalWorkerRunPayload, ExactExportFormat } from './evalWorkerProtocol';
 
 type WorkerContext = {
   onmessage: ((event: MessageEvent<EvalWorkerRequest>) => void) | null;
@@ -85,6 +89,55 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
   }
 }
 
+async function handleExportExact(reqId: number, format: ExactExportFormat): Promise<void> {
+  try {
+    if (!lastRunResult) {
+      throw new Error('No model has been evaluated yet. Run the script first.');
+    }
+
+    if (getActiveBackend() !== 'occt') {
+      throw new Error('STEP/BREP export requires the OCCT backend. Switch to OCCT and re-evaluate.');
+    }
+
+    const shapeObjects = lastRunResult.objects.filter((obj) => obj.shape);
+    if (shapeObjects.length === 0) {
+      throw new Error('No 3D shapes available for export.');
+    }
+
+    // Verify shapes are actually OCCT-backed
+    const exportObjects = shapeObjects.map((obj) => {
+      const backend = getShapeRuntimeBackend(obj.shape!);
+      if (!isOCCTShapeBackend(backend)) {
+        throw new Error(
+          `Object "${obj.name}" is not OCCT-backed. Re-evaluate with the OCCT backend selected.`,
+        );
+      }
+      return { name: obj.name, shape: backend, color: obj.color };
+    });
+
+    // Signal progress to the main thread
+    worker.postMessage({ type: 'progress', payload: { seq: -1, phase: 'exporting' } });
+
+    let blob: Blob;
+    if (format === 'step') {
+      blob = await buildStepBlob(exportObjects);
+    } else {
+      blob = await buildBrepBlob(exportObjects);
+    }
+
+    const buffer = await blob.arrayBuffer();
+    worker.postMessage(
+      { type: 'export-exact-success', payload: { reqId, data: buffer, format } },
+      [buffer],
+    );
+  } catch (err) {
+    worker.postMessage({
+      type: 'export-exact-error',
+      payload: { reqId, message: err instanceof Error ? err.message : String(err) },
+    });
+  }
+}
+
 worker.onmessage = async (event) => {
   const { data } = event;
 
@@ -110,6 +163,12 @@ worker.onmessage = async (event) => {
     } catch (err) {
       worker.postMessage({ type: 'face-info-error', payload: { reqId, message: String(err) } });
     }
+    return;
+  }
+
+  if (data.type === 'export-exact') {
+    const { reqId, format } = data.payload;
+    handleExportExact(reqId, format);
     return;
   }
 

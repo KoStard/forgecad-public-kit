@@ -1,6 +1,4 @@
 import { build3mfBlob, buildBinaryStl, buildObjBlob, type MeshExportObject } from '@forge/exportMesh';
-import { buildStepBlob } from '@forge/exportStep';
-import { buildBrepBlob } from '@forge/exportBrepNative';
 import { runScript, type ForgeQualityPreset, type RunResult } from '@forge/index';
 import { sketchToSvg } from '@forge/sketch/exportSvg';
 import { sketchToDxf } from '@forge/sketch/exportDxf';
@@ -8,6 +6,7 @@ import { generateSketchPdf } from '@forge/sketch/exportSketchPdf';
 import { setParamOverrides } from '@forge/params';
 import { useForgeStore, type ObjectSettings } from '../store/forgeStore';
 import { generateReportInWorker } from '../workers/reportWorkerClient';
+import { evalWorkerClient } from '../workers/evalWorkerClient';
 
 export type MeshExportFormat = '3mf' | 'stl' | 'obj';
 export type ExactExportFormat = 'step' | 'brep';
@@ -161,30 +160,20 @@ export async function exportExactFromStore(
   format: ExactExportFormat,
   preferredStem?: string,
 ): Promise<void> {
-  const { result, activeFile, objectSettings } = useForgeStore.getState();
-  const current = requireSuccessfulRunResult(result);
-  const shapeObjects = current.objects.filter((obj) => obj.shape);
-  if (shapeObjects.length === 0) {
-    throw new Error('No 3D objects available for exact export.');
-  }
+  const { result, activeFile } = useForgeStore.getState();
+  requireSuccessfulRunResult(result);
 
   const stem = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
 
-  // Build export objects — pass the shape backends directly (OCCT needs the raw backend)
-  const exportObjects = shapeObjects.map((obj) => ({
-    name: obj.name,
-    shape: obj.shape!,
-    color: objectSettings[obj.id]?.color || obj.color,
-  }));
-
-  if (format === 'step') {
-    const blob = await buildStepBlob(exportObjects);
-    triggerDownload(blob, `${stem}.step`);
-    return;
+  // Export runs in the eval worker where live OCCT TopoDS_Shape objects exist.
+  // The main thread only has FrozenShapes (Manifold-backed mesh reconstructions)
+  // which lack the B-rep topology needed for STEP/BREP export.
+  try {
+    const blob = await evalWorkerClient.exportExact(format);
+    triggerDownload(blob, `${stem}.${format}`);
+  } finally {
+    useForgeStore.setState({ evaluationPhase: 'idle' });
   }
-
-  const blob = await buildBrepBlob(exportObjects);
-  triggerDownload(blob, `${stem}.brep`);
 }
 
 export async function exportReportFromStore(

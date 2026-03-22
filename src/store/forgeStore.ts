@@ -430,7 +430,7 @@ interface ForgeStore {
   jointAnimationSpeed: number;
 
   isEvaluating: boolean;
-  evaluationPhase: 'idle' | 'kernel-init' | 'evaluating' | 'serializing';
+  evaluationPhase: 'idle' | 'kernel-init' | 'evaluating' | 'serializing' | 'exporting';
   pauseAutoEval: boolean;
   togglePauseAutoEval: () => void;
   activeBackend: 'occt' | 'manifold';

@@ -91,7 +91,9 @@ export interface SerializedRunResult {
 
 export type ActiveBackend = 'occt' | 'manifold';
 
-export type EvalPhase = 'kernel-init' | 'evaluating' | 'serializing';
+export type ExactExportFormat = 'step' | 'brep';
+
+export type EvalPhase = 'kernel-init' | 'evaluating' | 'serializing' | 'exporting';
 
 export interface EvalWorkerRunPayload {
   seq: number;
@@ -159,5 +161,24 @@ export interface EvalWorkerProgressMessage {
   };
 }
 
-export type EvalWorkerRequest = EvalWorkerRunRequest | EvalWorkerFaceInfoRequest;
-export type EvalWorkerResponse = EvalWorkerRunSuccess | EvalWorkerRunError | EvalWorkerProgressMessage | EvalWorkerFaceInfoSuccess | EvalWorkerFaceInfoError;
+/** Request exact-geometry export (STEP/BREP) using live OCCT shapes in the worker. */
+export interface EvalWorkerExportExactRequest {
+  type: 'export-exact';
+  payload: {
+    reqId: number;
+    format: ExactExportFormat;
+  };
+}
+
+export interface EvalWorkerExportExactSuccess {
+  type: 'export-exact-success';
+  payload: { reqId: number; data: ArrayBuffer; format: ExactExportFormat };
+}
+
+export interface EvalWorkerExportExactError {
+  type: 'export-exact-error';
+  payload: { reqId: number; message: string };
+}
+
+export type EvalWorkerRequest = EvalWorkerRunRequest | EvalWorkerFaceInfoRequest | EvalWorkerExportExactRequest;
+export type EvalWorkerResponse = EvalWorkerRunSuccess | EvalWorkerRunError | EvalWorkerProgressMessage | EvalWorkerFaceInfoSuccess | EvalWorkerFaceInfoError | EvalWorkerExportExactSuccess | EvalWorkerExportExactError;

@@ -4658,6 +4658,7 @@ const EVAL_PHASE_CONFIG: Record<string, { label: string; color: string }> = {
   'kernel-init':  { label: 'Loading geometry kernel',  color: '#f5a623' },
   'evaluating':   { label: 'Evaluating model',         color: '#4a9eff' },
   'serializing':  { label: 'Preparing display',        color: '#7c4dff' },
+  'exporting':    { label: 'Exporting geometry',       color: '#4caf50' },
 };
 
 function EvaluationIndicator({ phase }: { phase: string }) {
@@ -5649,7 +5650,7 @@ export function Viewport() {
       {/* Measure info panel */}
       {measureMode && <MeasureInfoPanel />}
 
-      {isEvaluating && (
+      {(isEvaluating || evaluationPhase === 'exporting') && (
         <EvaluationIndicator phase={evaluationPhase} />
       )}
 
