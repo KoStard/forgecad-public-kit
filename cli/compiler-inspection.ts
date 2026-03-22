@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import type { CrossSection } from 'manifold-3d';
+import type { CrossSection } from '../src/forge/backends/manifold/wasm';
 import { buildBrepExportManifest, type BrepExportManifest } from '../src/forge/brepExport';
 import {
   buildCompiledSceneReport,
