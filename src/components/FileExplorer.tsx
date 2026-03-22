@@ -22,7 +22,7 @@ export function FileExplorer() {
   const [renameValue, setRenameValue] = useState('');
   const [focusedFolder, setFocusedFolder] = useState<string>('');
   const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string; type: 'file' | 'folder' } | null>(null);
 
   const normalizePath = (value: string): string => value
     .replace(/\\/g, '/')
@@ -228,7 +228,7 @@ export function FileExplorer() {
           }}
           onContextMenu={(e) => {
             e.preventDefault();
-            setContextMenu({ x: e.clientX, y: e.clientY, path: node.path });
+            setContextMenu({ x: e.clientX, y: e.clientY, path: node.path, type: node.type });
           }}
           style={{
             padding: '5px 8px',
@@ -328,6 +328,33 @@ export function FileExplorer() {
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          {contextMenu.type === 'folder' && (
+            <>
+              <div
+                style={{ padding: '5px 12px', cursor: 'pointer', color: 'var(--fc-text)', fontSize: 12 }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--fc-bgHover)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                onClick={() => {
+                  setFocusedFolder(contextMenu.path);
+                  setExpandedFolders((prev) => Array.from(new Set([...prev, contextMenu.path])));
+                  setCreating('file');
+                  setContextMenu(null);
+                }}
+              >New File</div>
+              <div
+                style={{ padding: '5px 12px', cursor: 'pointer', color: 'var(--fc-text)', fontSize: 12 }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--fc-bgHover)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                onClick={() => {
+                  setFocusedFolder(contextMenu.path);
+                  setExpandedFolders((prev) => Array.from(new Set([...prev, contextMenu.path])));
+                  setCreating('folder');
+                  setContextMenu(null);
+                }}
+              >New Folder</div>
+              <div style={{ borderTop: '1px solid var(--fc-border)', margin: '4px 0' }} />
+            </>
+          )}
           <div
             style={{ padding: '5px 12px', cursor: 'pointer', color: 'var(--fc-text)', fontSize: 12 }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--fc-bgHover)')}
