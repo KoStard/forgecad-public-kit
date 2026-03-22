@@ -225,6 +225,30 @@ uv run scripts/brep/rerun_failures.py tmp/brep-matrix-step-20260306T120000Z.json
 
 These scripts use the repo-local `.venv-brep/.venv/bin/python` by default, run exports through a bounded parallel worker pool, and write JSON reports under `tmp/`.
 
+### G-code Toolpath Export
+
+```bash
+forgecad export gcode examples/gcode/parametric-vase.forge.js
+forgecad export gcode examples/gcode/parametric-vase.forge.js --output out/vase.gcode
+```
+
+Exports a G-code toolpath script directly to `.gcode` for FDM 3D printing. The script must return a `GCodeBuilder` instance (created via the `gcode()` factory function).
+
+This is a **toolpath scripting API**, not a slicer. You define print movements directly in code — enabling parametric vases, mathematical surfaces, non-planar paths, and other geometries that conventional slicers cannot produce.
+
+**How it works:** Initializes the forge kernel, runs the script, extracts the `GCodeBuilder` result, and writes the generated G-code text to disk. Prints segment count, estimated time, filament usage, and bounding box.
+
+**Options:**
+- `--output <path>` / `-o <path>` — Output file path (default: replaces `.forge.js` with `.gcode`)
+
+**Demo scripts:**
+- `examples/gcode/parametric-vase.forge.js` — Sine-wave modulated continuous spiral vase
+- `examples/gcode/spiral-tower.forge.js` — Twisted hexagonal polygon tower
+- `examples/gcode/math-surface.forge.js` — Non-planar bowl with wave rim
+- `examples/gcode/lissajous-vase.forge.js` — Lissajous curve vase with morphing profile
+
+See [`docs/permanent/API/output/export.md`](API/output/export.md) for the full `GCodeBuilder` API reference.
+
 ### SDF Robot Export (Gazebo package)
 
 ```bash
@@ -669,6 +693,9 @@ for (const obj of result.objects) {
   }
   if (obj.sketch) {
     console.log(`${obj.name}: area=${obj.sketch.area().toFixed(1)}mm²`);
+  }
+  if (obj.toolpath) {
+    console.log(`${obj.name}: ${obj.toolpath.segments.length} G-code segments`);
   }
 }
 ```
