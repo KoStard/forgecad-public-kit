@@ -260,7 +260,7 @@ export { sharedModel };
 const initialActive = (() => {
   if (sharedModel) return sharedModel.filename;
   const hashFile = getActiveFileFromHash();
-  if (hashFile && INITIAL_FILES[hashFile]) {
+  if (hashFile && hashFile in INITIAL_FILES) {
     return hashFile;
   }
   const names = Object.keys(INITIAL_FILES);
