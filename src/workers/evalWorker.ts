@@ -21,16 +21,26 @@ type WorkerContext = {
 /**
  * Synchronous binary file reader for importMesh() in the browser.
  * Uses sync XMLHttpRequest (allowed in web workers) to fetch from the server.
+ *
+ * Note: sync XHR ignores `responseType = 'arraybuffer'`, so we use
+ * `overrideMimeType` to get raw binary bytes as a latin-1 string, then
+ * manually convert to ArrayBuffer.
  */
 function readBinaryFile(resolvedPath: string): ArrayBuffer {
   const xhr = new XMLHttpRequest();
   xhr.open('GET', `/api/read-binary?path=${encodeURIComponent(resolvedPath)}`, false);
-  xhr.responseType = 'arraybuffer';
+  xhr.overrideMimeType('text/plain; charset=x-user-defined');
   xhr.send();
   if (xhr.status !== 200) {
     throw new Error(`Failed to read binary file "${resolvedPath}": ${xhr.statusText || `HTTP ${xhr.status}`}`);
   }
-  return xhr.response as ArrayBuffer;
+  const text = xhr.responseText;
+  const buf = new ArrayBuffer(text.length);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < text.length; i++) {
+    view[i] = text.charCodeAt(i) & 0xff;
+  }
+  return buf;
 }
 
 const worker = globalThis as unknown as WorkerContext;
