@@ -401,6 +401,12 @@ function computeSceneObjectBounds(
       return null;
     }
   }
+  if (obj.toolpath) {
+    const b = obj.toolpath.bounds;
+    const out = new THREE.Box3();
+    expandBoundsByTransformedAabb(out, b.min, b.max, matrix);
+    return out;
+  }
   return null;
 }
 
@@ -2007,6 +2013,96 @@ function HoveredJointOverlay({
         </>
       )}
 
+    </group>
+  );
+}
+
+// ---- Toolpath (G-code) rendering ----
+
+/** Color a toolpath segment based on type and speed. */
+function toolpathSegmentColor(extrude: boolean, speed: number, maxSpeed: number): THREE.Color {
+  if (!extrude) return new THREE.Color(0.3, 0.3, 0.8); // blue for travel
+  // Gradient from green (slow) to red (fast) for extrusion
+  const t = Math.min(1, speed / Math.max(1, maxSpeed));
+  return new THREE.Color().setHSL(0.33 * (1 - t), 0.9, 0.5);
+}
+
+function ToolpathObject({
+  obj,
+  settings,
+  matrix,
+  maxLayerZ,
+}: {
+  obj: SceneObject;
+  settings: ObjectSettings;
+  matrix: THREE.Matrix4;
+  maxLayerZ: number;
+}) {
+  const toolpath = obj.toolpath;
+  if (!toolpath || toolpath.segments.length === 0) return null;
+
+  const { extrudeGeo, travelGeo } = useMemo(() => {
+    const maxSpeed = toolpath.segments.reduce(
+      (max, seg) => (seg.extrude && seg.speed > max ? seg.speed : max),
+      0,
+    );
+
+    const extrudePositions: number[] = [];
+    const extrudeColors: number[] = [];
+    const travelPositions: number[] = [];
+
+    for (const seg of toolpath.segments) {
+      // Filter by layer slider
+      if (seg.from[2] > maxLayerZ + 0.01 && seg.to[2] > maxLayerZ + 0.01) continue;
+
+      if (seg.extrude) {
+        extrudePositions.push(seg.from[0], seg.from[1], seg.from[2]);
+        extrudePositions.push(seg.to[0], seg.to[1], seg.to[2]);
+        const color = toolpathSegmentColor(true, seg.speed, maxSpeed);
+        extrudeColors.push(color.r, color.g, color.b);
+        extrudeColors.push(color.r, color.g, color.b);
+      } else {
+        travelPositions.push(seg.from[0], seg.from[1], seg.from[2]);
+        travelPositions.push(seg.to[0], seg.to[1], seg.to[2]);
+      }
+    }
+
+    const extGeo = new THREE.BufferGeometry();
+    if (extrudePositions.length > 0) {
+      extGeo.setAttribute('position', new THREE.Float32BufferAttribute(extrudePositions, 3));
+      extGeo.setAttribute('color', new THREE.Float32BufferAttribute(extrudeColors, 3));
+    }
+
+    const trvGeo = new THREE.BufferGeometry();
+    if (travelPositions.length > 0) {
+      trvGeo.setAttribute('position', new THREE.Float32BufferAttribute(travelPositions, 3));
+    }
+
+    return { extrudeGeo: extGeo, travelGeo: trvGeo };
+  }, [toolpath, maxLayerZ]);
+
+  return (
+    <group matrix={matrix} matrixAutoUpdate={false}>
+      {extrudeGeo.getAttribute('position') && (
+        <lineSegments geometry={extrudeGeo}>
+          <lineBasicMaterial
+            vertexColors
+            linewidth={1}
+            transparent
+            opacity={settings.opacity}
+          />
+        </lineSegments>
+      )}
+      {travelGeo.getAttribute('position') && settings.opacity > 0.5 && (
+        <lineSegments geometry={travelGeo}>
+          <lineBasicMaterial
+            color={0x4466cc}
+            linewidth={1}
+            transparent
+            opacity={settings.opacity * 0.3}
+          />
+        </lineSegments>
+      )}
     </group>
   );
 }
@@ -4989,6 +5085,12 @@ export function Viewport() {
         } catch {
           // Ignore bad sketch bounds from partial execution failures.
         }
+        return;
+      }
+      if (obj.toolpath) {
+        const tb = obj.toolpath.bounds;
+        expandBoundsByTransformedAabb(bounds, tb.min, tb.max, matrix);
+        hasBounds = true;
       }
     });
 
@@ -5028,6 +5130,12 @@ export function Viewport() {
         } catch {
           // Ignore bad sketch bounds from partial execution failures.
         }
+        return;
+      }
+      if (obj.toolpath) {
+        const tb = obj.toolpath.bounds;
+        expandBoundsByTransformedAabb(bounds, tb.min, tb.max, IDENTITY_MATRIX);
+        hasBounds = true;
       }
     });
 
@@ -5534,6 +5642,17 @@ export function Viewport() {
                     y: event.clientY - rect.top + 12,
                   });
                 }}
+              />
+            );
+          }
+          if (obj.toolpath) {
+            return (
+              <ToolpathObject
+                key={obj.id}
+                obj={obj}
+                settings={effectiveSettings}
+                matrix={matrix}
+                maxLayerZ={obj.toolpath.bounds.max[2]}
               />
             );
           }

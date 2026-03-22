@@ -170,6 +170,9 @@ export type {
 export { build3mfBuffer, buildBinaryStl } from './exportMesh';
 export type { MeshExportObject, ThreeMfExportOptions } from './exportMesh';
 
+export { GCodeBuilder, gcode } from './gcode';
+export type { PrinterProfile, PreheatOptions, ToolpathSegment, ToolpathData } from './gcode';
+
 /**
  * Initialize the geometry kernel. Must be called once before using any forge API.
  * Safe to call multiple times (idempotent).

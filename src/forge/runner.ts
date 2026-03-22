@@ -146,12 +146,15 @@ import {
   type ForgeQualityPreset,
 } from './quality';
 import { sheetMetal, SheetMetalPart } from './sheetMetal';
+import { GCodeBuilder, gcode } from './gcode';
+import type { ToolpathData } from './gcode';
 
 export interface SceneObject {
   id: string;
   name: string;
   shape: Shape | null;
   sketch: Sketch | null;
+  toolpath?: ToolpathData | null;
   color?: string;
   geometryInfo?: GeometryInfo | null;
   sketchMeta?: SketchConstraintMeta;
@@ -579,6 +582,7 @@ function describeScriptResultType(value: unknown): string {
   if (value instanceof Sketch) return 'Sketch';
   if (value instanceof TrackedShape) return 'TrackedShape';
   if (value instanceof ShapeGroup) return 'ShapeGroup';
+  if (value instanceof GCodeBuilder) return 'GCodeBuilder';
   if (value instanceof Assembly) return 'Assembly';
   if (value instanceof ImportedAssembly) return 'ImportedAssembly';
   if (Array.isArray(value)) return 'Array';
@@ -916,6 +920,7 @@ function isRenderableEntryResult(value: unknown): boolean {
     || value instanceof Sketch
     || value instanceof TrackedShape
     || value instanceof ShapeGroup
+    || value instanceof GCodeBuilder
     || Array.isArray(value)
   );
 }
@@ -1293,6 +1298,8 @@ function executeFile(
       viewConfig,
       scene,
       verify,
+      gcode,
+      GCodeBuilder,
     };
 
     const requireModule = (requestedName: string): unknown => {
@@ -1696,6 +1703,16 @@ export function runScript(
       pushShape(result, fileName, undefined, undefined, undefined, [fileName]);
     } else if (result instanceof Sketch) {
       pushSketch(result, fileName, undefined, [fileName]);
+    } else if (result instanceof GCodeBuilder) {
+      objects.push({
+        id: `obj-${objects.length + 1}`,
+        name: fileName,
+        shape: null,
+        sketch: null,
+        toolpath: result.build(),
+        geometryInfo: null,
+        treePath: [fileName],
+      });
     }
 
     // Inject collected highlights into sketch objects' meta for rendering.

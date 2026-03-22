@@ -36,6 +36,7 @@ import { runSvgCli } from './forge-svg';
 import { runSketchPdfCli } from './forge-sketch-pdf';
 import { runBrepCli } from './forge-brep';
 import { runMeshExportCli } from './forge-mesh';
+import { runGcodeExportCli } from './forge-gcode';
 import { isDirectCliRun, resolvePackagePath } from './package-runtime';
 import { runParamCheckCli } from './param-check';
 import { runScriptCli } from './test-run';
@@ -589,6 +590,27 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: (args) => runMeshExportCli('stl', args),
+  },
+  {
+    group: 'Export',
+    path: ['export', 'gcode'],
+    summary: 'Export a G-code toolpath script to .gcode for direct 3D printing.',
+    usage: [
+      'forgecad export gcode <script.forge.js> [--output path]',
+    ],
+    examples: [
+      'forgecad export gcode examples/gcode/parametric-vase.forge.js',
+      'forgecad export gcode examples/gcode/parametric-vase.forge.js --output out/vase.gcode',
+    ],
+    completion: {
+      options: [
+        { flag: '--output', alias: '-o', description: 'Output file path' },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+      ],
+    },
+    run: (args) => runGcodeExportCli(args),
   },
   {
     group: 'Export',

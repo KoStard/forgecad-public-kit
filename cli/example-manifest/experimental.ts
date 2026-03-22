@@ -56,6 +56,26 @@ export const EXPERIMENTAL_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
     'Mesh import example depends on external STL asset and is not part of the maintained architecture-phase surface.',
     'tasks/280-example-gap-recovery-and-legacy-fence.md',
   ),
+  experimentalExample(
+    'examples/gcode/parametric-vase.forge.js',
+    'G-code toolpath demo: returns GCodeBuilder, needs dedicated gcode validator.',
+    'gcode-export-mvp',
+  ),
+  experimentalExample(
+    'examples/gcode/spiral-tower.forge.js',
+    'G-code toolpath demo: returns GCodeBuilder, needs dedicated gcode validator.',
+    'gcode-export-mvp',
+  ),
+  experimentalExample(
+    'examples/gcode/math-surface.forge.js',
+    'G-code toolpath demo: returns GCodeBuilder, needs dedicated gcode validator.',
+    'gcode-export-mvp',
+  ),
+  experimentalExample(
+    'examples/gcode/lissajous-vase.forge.js',
+    'G-code toolpath demo: returns GCodeBuilder, needs dedicated gcode validator.',
+    'gcode-export-mvp',
+  ),
   ...Array.from({ length: 13 }, (_, i) => {
     const num = String(i + 1).padStart(2, '0');
     const names = [

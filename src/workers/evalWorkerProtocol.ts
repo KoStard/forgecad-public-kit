@@ -18,6 +18,7 @@ import type { GeometryInfo } from '../forge/kernel';
 import type { ShapeCompilePlan } from '../forge/compilePlan';
 import type { SketchConstraintMeta, ConstraintDefinition } from '../forge/sketch/constraints';
 import type { SolverWasmRunDebugSnapshot } from '../forge/sketch/constraints/solver-wasm';
+import type { ToolpathData } from '../forge/gcode';
 
 /** Wire format for a serialized Shape — all WASM data extracted into transferable TypedArrays. */
 export interface SerializedShapeData {
@@ -59,6 +60,7 @@ export interface SerializedSceneObject {
   name: string;
   shapeData: SerializedShapeData | null;
   sketchData: SerializedSketchData | null;
+  toolpathData?: ToolpathData | null;
   compilePlan?: ShapeCompilePlan | null;
   color?: string;
   geometryInfo?: GeometryInfo | null;
