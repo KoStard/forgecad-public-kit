@@ -144,13 +144,6 @@ export function profileIntersection(profiles: ProfileBackend[]): ProfileBackend 
   );
 }
 
-export function profileHull(profiles: ProfileBackend[]): ProfileBackend {
-  // Hull is Manifold-only — OCCT doesn't have a 2D convex hull for faces
-  return wrapManifoldProfileBackend(
-    getWasm().CrossSection.hull(profiles.map(requireManifoldCrossSection)),
-  );
-}
-
 // ── Compile plan lowering ─────────────────────────────────────────
 
 export function lowerProfileCompilePlan(plan: ProfileCompilePlan): ProfileBackend {

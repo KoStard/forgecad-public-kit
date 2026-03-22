@@ -11,7 +11,7 @@ import {
 } from './core';
 import { buildBooleanProfileCompilePlan, buildHullProfileCompilePlan } from '../compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from '../apiArgs';
-import { profileUnion, profileDifference, profileIntersection, profileHull } from '../profileOps';
+import { profileUnion, profileDifference, profileIntersection } from '../profileOps';
 
 function normalizeSketchOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Sketch[] {
   return normalizeVariadicArgs({
@@ -158,7 +158,7 @@ export function hull2d(...inputs: SketchOperandInput[]): Sketch {
     setSketchPlacement3D(
       nextPlan
         ? buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex)
-        : setSketchCompileProfilePlan(new Sketch(profileHull(sketches.map(s => s.cross)), sketches[0].colorHex), null),
+        : setSketchCompileProfilePlan(new Sketch(profileUnion(sketches.map(s => s.cross)).hull(), sketches[0].colorHex), null),
       mergeSketchPlacement3D(sketches),
     ),
     mergeSketchPlacementModel(sketches),
