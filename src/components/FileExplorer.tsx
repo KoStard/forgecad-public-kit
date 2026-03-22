@@ -1,6 +1,12 @@
 import { useMemo, useState, useCallback, DragEvent, useEffect, useRef } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 
+const MESH_EXTS = ['.stl', '.obj', '.3mf'];
+function isMeshFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return MESH_EXTS.some((ext) => lower.endsWith(ext));
+}
+
 export function FileExplorer() {
   const files = useForgeStore((s) => s.files);
   const savedFiles = useForgeStore((s) => s.savedFiles);
@@ -264,14 +270,35 @@ export function FileExplorer() {
     }
 
     if (node.type === 'folder') setFocusedFolder(node.path);
-    if (node.type === 'file' && !metaKey && !shiftKey) setActiveFile(node.path);
-  }, [flatVisiblePaths, setActiveFile]);
+    if (node.type === 'file' && !metaKey && !shiftKey) {
+      if (isMeshFile(node.path)) {
+        // Mesh file clicked — create a companion .forge.js that imports it, or switch to existing one
+        const baseName = node.path.replace(/\.[^.]+$/, '');
+        const scriptName = `${baseName}.forge.js`;
+        if (!files[scriptName]) {
+          // Create new script that imports the mesh
+          createFile(scriptName);
+          // Defer content update to next tick so the file exists in store
+          setTimeout(() => {
+            const store = useForgeStore.getState();
+            store.updateFileCode(scriptName, `// Imported mesh: ${node.path}\nreturn importMesh("${node.path}");\n`);
+            store.setActiveFile(scriptName);
+          }, 0);
+        } else {
+          setActiveFile(scriptName);
+        }
+      } else {
+        setActiveFile(node.path);
+      }
+    }
+  }, [flatVisiblePaths, setActiveFile, files, createFile]);
 
   const renderNode = (node: TreeNode, depth: number) => {
     const isFolder = node.type === 'folder';
     const isExpanded = !isFolder || expandedFolders.includes(node.path);
     const isActive = node.type === 'file' && node.path === activeFile;
-    const isModified = node.type === 'file' && files[node.path] !== savedFiles[node.path];
+    const isMesh = node.type === 'file' && isMeshFile(node.path);
+    const isModified = node.type === 'file' && !isMesh && files[node.path] !== savedFiles[node.path];
     const isRenaming = renamingPath === node.path;
     const isSelected = selection.has(node.path);
     const paddingLeft = 8 + depth * 12;
@@ -331,7 +358,7 @@ export function FileExplorer() {
           ) : (
             <span style={{ width: 14, flexShrink: 0 }} />
           )}
-          <span style={{ width: 16 }}>{isFolder ? '📁' : '📄'}</span>
+          <span style={{ width: 16 }}>{isFolder ? '📁' : isMeshFile(node.path) ? '🔶' : '📄'}</span>
           {isRenaming ? (
             <input
               autoFocus
