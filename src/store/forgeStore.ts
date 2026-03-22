@@ -238,6 +238,34 @@ export interface Measurement {
   points: number[][];
 }
 
+export type MeasureEntityKind = 'face' | 'edge' | 'vertex';
+
+export interface MeasureFaceEntity {
+  kind: 'face';
+  normal: [number, number, number];
+  center: [number, number, number];
+  area: number;
+  triangleIndices: number[];
+  meshUuid: string;
+}
+
+export interface MeasureEdgeEntity {
+  kind: 'edge';
+  start: [number, number, number];
+  end: [number, number, number];
+  length: number;
+  direction: [number, number, number];
+  meshUuid: string;
+}
+
+export interface MeasureVertexEntity {
+  kind: 'vertex';
+  position: [number, number, number];
+  meshUuid: string;
+}
+
+export type MeasureEntity = MeasureFaceEntity | MeasureEdgeEntity | MeasureVertexEntity;
+
 interface ForgeStore {
   files: Record<string, string>;
   savedFiles: Record<string, string>;
@@ -337,6 +365,9 @@ interface ForgeStore {
 
   measureMode: boolean;
   toggleMeasure: () => void;
+  measureSelections: MeasureEntity[];
+  addMeasureSelection: (entity: MeasureEntity) => void;
+  clearMeasureSelections: () => void;
   measurements: Measurement[];
   addMeasurePoint: (pt: number[]) => void;
   updateMeasurePoint: (id: string, index: number, pt: number[]) => void;
@@ -1312,8 +1343,25 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   measureMode: false,
   toggleMeasure: () => {
-    set((s) => ({ measureMode: !s.measureMode }));
+    set((s) => {
+      const next = !s.measureMode;
+      // Clear all measure state when deactivating
+      if (!next) {
+        return { measureMode: false, measureSelections: [], measurements: [] };
+      }
+      return { measureMode: true };
+    });
   },
+  measureSelections: [],
+  addMeasureSelection: (entity) => {
+    set((s) => {
+      const sels = s.measureSelections;
+      if (sels.length < 2) return { measureSelections: [...sels, entity] };
+      // Third click: start fresh with just the new entity
+      return { measureSelections: [entity] };
+    });
+  },
+  clearMeasureSelections: () => set({ measureSelections: [] }),
   measurements: [],
   addMeasurePoint: (pt) => {
     const measurements = get().measurements;

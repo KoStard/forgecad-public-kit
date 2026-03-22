@@ -19,7 +19,6 @@ import { ResizablePanel } from './components/ResizablePanel';
 import { isSaveShortcut, shouldBlockBrowserShortcut, type EditorSurface } from './editorShortcuts';
 import { isNotebookFile } from './notebook/model';
 import { buildShareUrl, buildEmbedUrl, buildEmbedSnippet, isEmbedMode } from './share';
-import { formatLength } from '@forge/units';
 import { EmbedViewer } from './components/EmbedViewer';
 
 const GITHUB_REPO = 'KoStard/ForgeCAD';
@@ -190,30 +189,13 @@ function Toolbar() {
   const saveFileAs = useForgeStore((s) => s.saveFileAs);
   const measureMode = useForgeStore((s) => s.measureMode);
   const toggleMeasure = useForgeStore((s) => s.toggleMeasure);
-  const clearMeasure = useForgeStore((s) => s.clearMeasure);
-  const measurements = useForgeStore((s) => s.measurements);
-  const removeMeasurement = useForgeStore((s) => s.removeMeasurement);
-  const lengthUnit = useForgeStore((s) => s.lengthUnit);
+  const clearMeasureSelections = useForgeStore((s) => s.clearMeasureSelections);
+  const measureSelections = useForgeStore((s) => s.measureSelections);
   const fileExplorerOpen = useForgeStore((s) => s.fileExplorerOpen);
   const toggleFileExplorer = useForgeStore((s) => s.toggleFileExplorer);
   const viewPanelOpen = useForgeStore((s) => s.viewPanelOpen);
   const toggleViewPanel = useForgeStore((s) => s.toggleViewPanel);
   const openCommandPalette = useForgeStore((s) => s.openCommandPalette);
-
-  const measureDistances = measurements.map((measurement, index) => {
-    if (measurement.points.length !== 2) return null;
-    const [a, b] = measurement.points;
-    const dist = Math.sqrt(
-      (b[0] - a[0]) ** 2 +
-        (b[1] - a[1]) ** 2 +
-        (b[2] - a[2]) ** 2,
-    );
-    return {
-      id: measurement.id,
-      label: `M${index + 1}`,
-      dist,
-    };
-  }).filter((entry): entry is { id: string; label: string; dist: number } => entry !== null);
 
   return (
     <div style={{ padding: '6px 12px', background: 'var(--fc-bgHover)', borderBottom: '1px solid var(--fc-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -252,47 +234,13 @@ function Toolbar() {
         <button style={btnStyle()} onClick={saveFile} title="Save (⌘S)">Save</button>
         <button style={btnStyle()} onClick={saveFileAs} title="Save as new file">Save As</button>
         <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
-        <button style={btnStyle(measureMode)} onClick={toggleMeasure} title="Toggle measurement tool">📏 Measure</button>
-        {measureMode && <button style={btnStyle()} onClick={clearMeasure}>Clear All</button>}
+        <button style={btnStyle(measureMode)} onClick={toggleMeasure} title="Toggle measurement tool (M)">📏 Measure</button>
+        {measureMode && measureSelections.length > 0 && (
+          <button style={btnStyle()} onClick={clearMeasureSelections} title="Clear selections">Clear</button>
+        )}
         <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
         <ShareButton />
         {__FORGE_MODE__ === 'web' && <GitHubStarButton />}
-        {measureDistances.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            {measureDistances.map((measurement) => (
-              <span
-                key={measurement.id}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '2px 6px',
-                  border: '1px solid var(--fc-border)',
-                  borderRadius: 4,
-                  fontSize: 11,
-                  color: 'var(--fc-warning)',
-                  fontFamily: 'monospace',
-                }}
-              >
-                {measurement.label} {formatLength(measurement.dist, lengthUnit)}
-                <button
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--fc-warning)',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    lineHeight: 1,
-                  }}
-                  onClick={() => removeMeasurement(measurement.id)}
-                  title={`Remove ${measurement.label}`}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
