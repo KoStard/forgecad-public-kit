@@ -85,8 +85,10 @@ function buildCornerGeometry(
   const [outDirX, outDirY] = normalize(next[0] - current[0], next[1] - current[1]);
 
   const turn = inDirX * outDirY - inDirY * outDirX;
-  if (turn * winding <= EPSILON) {
-    throw new Error(`filletCorners corner ${spec.index} is concave or collinear; only convex corners are supported`);
+  const isConvex = turn * winding > EPSILON;
+  const isConcave = turn * winding < -EPSILON;
+  if (!isConvex && !isConcave) {
+    throw new Error(`filletCorners corner ${spec.index} is collinear; cannot fillet a straight edge`);
   }
 
   const toPrev: [number, number] = [-inDirX, -inDirY];
@@ -113,6 +115,9 @@ function buildCornerGeometry(
     current[1] + outDirY * tangentDistance,
   ];
 
+  // For convex corners the bisector (toPrev+toNext) points inward; for concave it
+  // naturally points outward into the concavity — both are the correct direction
+  // for the arc center.
   const [bisectorX, bisectorY] = normalize(toPrev[0] + toNext[0], toPrev[1] + toNext[1]);
   const centerDistance = spec.radius / Math.sin(interiorAngle / 2);
   const center: [number, number] = [
@@ -120,7 +125,10 @@ function buildCornerGeometry(
     current[1] + bisectorY * centerDistance,
   ];
 
-  const requestedSegments = spec.segments == null ? defaultSegmentsForSweep(interiorAngle) : Math.round(spec.segments);
+  // Convex: arc sweeps in winding direction. Concave: arc sweeps opposite.
+  const sweep = isConcave ? -winding * interiorAngle : winding * interiorAngle;
+
+  const requestedSegments = spec.segments == null ? defaultSegmentsForSweep(sweep) : Math.round(spec.segments);
   const segments = Math.max(2, requestedSegments);
 
   return {
@@ -131,7 +139,7 @@ function buildCornerGeometry(
     end,
     center,
     startAngle: Math.atan2(start[1] - center[1], start[0] - center[0]),
-    sweep: winding * interiorAngle,
+    sweep,
   };
 }
 
