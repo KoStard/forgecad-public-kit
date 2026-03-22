@@ -1,5 +1,5 @@
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
-import { resamplePolygon } from './polygonSampling';
+import { resamplePolygon } from '../../sketch/polygonSampling';
 
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
@@ -113,7 +113,7 @@ function stitchSingleLoopLoft(
 
   // Top/Bottom caps
   // We use wasm.triangulate to handle concave loops safely.
-  
+
   // Triangulate bottom (flipped normal)
   const bottomResampled2D = resampled[0].map(([x, y]) => [x, y] as Vec2);
   const bottomTrisResampled = wasm.triangulate([bottomResampled2D]);

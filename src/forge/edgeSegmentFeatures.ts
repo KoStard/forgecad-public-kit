@@ -27,27 +27,12 @@ import {
   applyConcaveFilletSelectionToManifold,
   applyConcaveChamferSelectionToManifold,
 } from './backends/manifold/edgeFeatureRuntime';
-import { isOCCTShapeBackend, type OCCTShapeBackend } from './backends/occt/shapeBackend';
+import { isOCCTShapeBackend } from './backends/occt/shapeBackend';
 import { TrackedShape } from './sketch/topology';
 import type { EdgeSegment } from './meshEdgeExtraction';
 import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
 import type { Vec3 } from './transform';
 
-import type { Manifold } from 'manifold-3d';
-
-/** Convert an OCCT backend to a Manifold object via mesh reconstruction. */
-function occtToManifold(backend: OCCTShapeBackend): Manifold {
-  const wasm = getWasm();
-  const mesh = backend.getMesh();
-  const wasmMesh = new wasm.Mesh({
-    numProp: mesh.numProp,
-    triVerts: mesh.triVerts,
-    vertProperties: mesh.vertProperties,
-    mergeFromVert: mesh.mergeFromVert,
-    mergeToVert: mesh.mergeToVert,
-  });
-  return new wasm.Manifold(wasmMesh);
-}
 
 type ShapeArg = Shape | TrackedShape;
 
@@ -212,18 +197,11 @@ export function filletEdgeSegment(
       end: segment.end as [number, number, number],
       convex: segment.convex,
     };
-    try {
-      const result = backend.filletEdgeByMidpoint(edgeTarget, radius);
-      return buildResult(target, result, 'fillet');
-    } catch {
-      // OCCT fillet failed — fall back to Manifold mesh-based fillet
-      // via mesh reconstruction from the OCCT shape
-    }
+    const result = backend.filletEdgeByMidpoint(edgeTarget, radius);
+    return buildResult(target, result, 'fillet');
   }
 
-  const manifold = isOCCTShapeBackend(backend)
-    ? occtToManifold(backend)
-    : requireManifoldShapeBackend(backend, 'filletEdgeSegment()');
+  const manifold = requireManifoldShapeBackend(backend, 'filletEdgeSegment()');
   const wasm = getWasm();
   const selection = edgeSegmentToSelection(segment);
   const apply = segment.convex
@@ -264,17 +242,11 @@ export function chamferEdgeSegment(
       end: segment.end as [number, number, number],
       convex: segment.convex,
     };
-    try {
-      const result = backend.chamferEdgeByMidpoint(edgeTarget, size);
-      return buildResult(target, result, 'chamfer');
-    } catch {
-      // OCCT chamfer failed — fall back to Manifold mesh-based chamfer
-    }
+    const result = backend.chamferEdgeByMidpoint(edgeTarget, size);
+    return buildResult(target, result, 'chamfer');
   }
 
-  const manifold = isOCCTShapeBackend(backend)
-    ? occtToManifold(backend)
-    : requireManifoldShapeBackend(backend, 'chamferEdgeSegment()');
+  const manifold = requireManifoldShapeBackend(backend, 'chamferEdgeSegment()');
   const wasm = getWasm();
   const selection = edgeSegmentToSelection(segment);
   const apply = segment.convex

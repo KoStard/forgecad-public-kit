@@ -14,7 +14,7 @@ import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
 import type { ShapeBackend } from '../../shapeBackend';
 import { wrapManifoldShapeBackend } from './shapeBackend';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput } from '../../sketch/loftSweepLowering';
-import { loftStitched } from '../../sketch/loftStitched';
+import { loftStitched } from './loftStitched';
 import { Transform } from '../../transform';
 import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
 import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolution';
