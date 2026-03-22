@@ -281,7 +281,9 @@ export function FileExplorer() {
           // Defer content update to next tick so the file exists in store
           setTimeout(() => {
             const store = useForgeStore.getState();
-            store.updateFileCode(scriptName, `// Imported mesh: ${node.path}\nreturn importMesh("${node.path}");\n`);
+            // importMesh path is relative to the script — use just the filename since they're in the same directory
+            const meshFileName = node.path.split('/').pop() ?? node.path;
+            store.updateFileCode(scriptName, `// Imported mesh: ${node.path}\nreturn importMesh("${meshFileName}");\n`);
             store.setActiveFile(scriptName);
           }, 0);
         } else {
