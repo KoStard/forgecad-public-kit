@@ -1586,6 +1586,21 @@ declare class TrackedShape {
 	add(...others: ShapeOperandInput[]): Shape;
 	/** Boolean intersect — returns plain Shape (topology lost) */
 	intersect(...others: ShapeOperandInput[]): Shape;
+	/** Split by infinite plane. Returns [positive-side, negative-side] as plain Shapes. */
+	splitByPlane(normal: [
+		number,
+		number,
+		number
+	], originOffset?: number): [
+		Shape,
+		Shape
+	];
+	/** Keep the positive side of the plane and discard the opposite side. Returns plain Shape. */
+	trimByPlane(normal: [
+		number,
+		number,
+		number
+	], originOffset?: number): Shape;
 	/** Shelling returns a plain Shape because tracked topology is not preserved. */
 	shell(thickness: number, opts?: {
 		openFaces?: Array<"top" | "bottom">;

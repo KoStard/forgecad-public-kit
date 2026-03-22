@@ -417,6 +417,16 @@ export class TrackedShape {
     return this.shape.intersect(...others);
   }
 
+  /** Split by infinite plane. Returns [positive-side, negative-side] as plain Shapes. */
+  splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
+    return this.shape.splitByPlane(normal, originOffset);
+  }
+
+  /** Keep the positive side of the plane and discard the opposite side. Returns plain Shape. */
+  trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
+    return this.shape.trimByPlane(normal, originOffset);
+  }
+
   /** Shelling returns a plain Shape because tracked topology is not preserved. */
   shell(
     thickness: number,
