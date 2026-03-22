@@ -22,6 +22,8 @@ import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolutio
 import { getOCCT, type OCCTModule } from './init';
 import { wrapOCCTShapeBackend } from './shapeBackend';
 import type { ShapeBackend } from '../../shapeBackend';
+import type { ProfileBackend } from '../../profileBackend';
+import { wrapOCCTProfileBackend } from './profileBackend';
 import { Transform } from '../../transform';
 import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
 
@@ -982,4 +984,14 @@ export function lowerShapeCompilePlanToOCCTBackend(
   const oc = getOCCT();
   const shape = lowerShapeCompilePlanToOCCT(plan, oc);
   return wrapOCCTShapeBackend(shape);
+}
+
+/**
+ * Lower a ProfileCompilePlan to a ProfileBackend (OCCT TopoDS_Face).
+ */
+export function lowerProfileCompilePlanToOCCTProfileBackend(
+  plan: ProfileCompilePlan,
+): ProfileBackend {
+  const oc = getOCCT();
+  return wrapOCCTProfileBackend(lowerProfileToFace(oc, plan));
 }

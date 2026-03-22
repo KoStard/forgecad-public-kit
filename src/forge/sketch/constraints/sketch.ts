@@ -7,8 +7,7 @@
 import { Sketch } from '../core';
 import { polygon } from '../primitives';
 import { union2d } from '../booleans';
-import { getWasm } from '../../backends/manifold/wasm';
-import { fromCrossSection } from '../../backends/manifold/profileCast';
+import { createCircleProfile, createEmptyProfile } from '../../profileOps';
 import type {
   ConstraintDefinition,
   SketchConstraintMeta,
@@ -93,7 +92,7 @@ export const buildSketchFromDefinition = (def: ConstraintDefinition): Sketch => 
       if (!circleDef) throw new Error(`Missing circle ${loop.circle}`);
       const center = ptMap.get(circleDef.center);
       if (!center) throw new Error(`Missing center ${circleDef.center}`);
-      const circle = new Sketch(fromCrossSection(getWasm().CrossSection.circle(circleDef.radius, circleDef.segments)));
+      const circle = new Sketch(createCircleProfile(circleDef.radius, circleDef.segments));
       loops.push(circle.translate(center.x, center.y));
     } else if (loop.type === 'profile') {
       // Build a polyline by concatenating line endpoints and arc tessellations.
@@ -128,8 +127,7 @@ export const buildSketchFromDefinition = (def: ConstraintDefinition): Sketch => 
   });
 
   if (loops.length === 0) {
-    const unit = getWasm().CrossSection.square([1, 1], false);
-    return new Sketch(fromCrossSection(getWasm().CrossSection.difference([unit, unit])));
+    return new Sketch(createEmptyProfile());
   }
 
   return union2d(...loops);

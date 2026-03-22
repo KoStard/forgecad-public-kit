@@ -2,7 +2,7 @@ import { appendShapeCompileTransform, createOwnedShapeCompilePlan } from '../com
 import { Sketch, getSketchCompileProfilePlan, getSketchPlacement3D, getSketchPlacementModel } from './core';
 import { Shape, buildShapeFromCompilePlan, setShapeCompilePlan } from '../kernel';
 import { TrackedShape, transformTopology, type Topology, type FaceName, type FaceRef, type EdgeName, type EdgeRef } from './topology';
-import { asCrossSection } from '../backends/manifold/profileCast';
+
 
 function buildGenericExtrusionTopology(sketch: Sketch, height: number, center: boolean): Topology {
   const faces = new Map<FaceName, FaceRef>();
@@ -80,11 +80,11 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
         fidelity: 'kernel-native',
         sources: ['extrude'],
       })
-    : setShapeCompilePlan(new Shape(asCrossSection(sketch.cross).extrude(
+    : setShapeCompilePlan(new Shape(sketch.cross.extrude(
       height,
       opts?.divisions ?? 0,
       opts?.twist ?? 0,
-      scaleTop as any,
+      scaleTop as [number, number] | undefined,
       opts?.center ?? false,
     ), sketch.colorHex, {
       fidelity: 'kernel-native',
@@ -123,7 +123,7 @@ export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number):
         fidelity: 'kernel-native',
         sources: ['revolve'],
       })
-    : setShapeCompilePlan(new Shape(asCrossSection(sketch.cross).revolve(segments ?? 0, degrees), sketch.colorHex, {
+    : setShapeCompilePlan(new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex, {
       fidelity: 'kernel-native',
       sources: ['revolve'],
     }), null);

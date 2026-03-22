@@ -20,7 +20,7 @@
 import { Sketch } from './core';
 import { circle2d, polygon, slot } from './primitives';
 import { union2d } from './booleans';
-import { asCrossSection, fromCrossSection } from '../backends/manifold/profileCast';
+
 
 // ---------------------------------------------------------------------------
 // Internal design parameters (1 unit = 1 model unit when size=1)
@@ -91,7 +91,7 @@ function ringFull(cx: number, cy: number, R: number, sw: number): Sketch {
   // Manifold expects outer CCW and inner CW (hole).  outer is CCW by the loop
   // direction; inner must be CW — reverse it.
   return new Sketch(
-    fromCrossSection(asCrossSection((polygon(outer)).cross).subtract(asCrossSection((polygon(inner)).cross))),
+    (polygon(outer)).cross.subtract((polygon(inner)).cross),
   );
 }
 

@@ -1,9 +1,8 @@
-import { getWasm } from '../backends/manifold/wasm';
 import { difference2d, union2d } from './booleans';
 import { Sketch } from './core';
 import { stroke as strokePolyline } from './path';
 import { polygon } from './primitives';
-import { fromCrossSection } from '../backends/manifold/profileCast';
+import { createPolygonProfile } from '../profileOps';
 
 type Vec2 = [number, number];
 type Mat2 = [number, number, number, number, number, number];
@@ -1475,5 +1474,5 @@ export function sketchFromSvgLoops(loops: Vec2[][]): Sketch {
   if (validLoops.length === 0) {
     throw new Error('sketchFromSvgLoops did not receive any valid non-degenerate loops');
   }
-  return new Sketch(fromCrossSection(new (getWasm().CrossSection)(validLoops as any)));
+  return new Sketch(createPolygonProfile(validLoops as number[][][]));
 }
