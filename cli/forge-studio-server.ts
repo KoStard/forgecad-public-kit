@@ -286,6 +286,22 @@ export async function startStudioServer(
       return;
     }
 
+    if (method === 'POST' && url === '/api/delete') {
+      readJsonBody(req)
+        .then((body) => {
+          if (!projectDir) { sendJson(res, 400, { error: 'No project directory' }); return; }
+          const { filename } = body;
+          if (!filename || typeof filename !== 'string') { sendJson(res, 400, { error: 'Invalid request' }); return; }
+          const resolved = resolveProjectFile(projectDir, filename);
+          if (fs.existsSync(resolved.filePath)) {
+            fs.unlinkSync(resolved.filePath);
+          }
+          sendJson(res, 200, { success: true });
+        })
+        .catch((e: any) => sendJson(res, 500, { error: e.message }));
+      return;
+    }
+
     if (method === 'POST' && url === '/api/notebook/execute') {
       readJsonBody(req)
         .then((body) => executeNotebookRequest(projectDir, body, true))

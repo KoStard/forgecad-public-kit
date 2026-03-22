@@ -36,6 +36,15 @@ export class BrowserStorageProvider implements FileSystemProvider {
     }
   }
 
+  async delete(filename: string): Promise<void> {
+    delete this._files[filename];
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this._files));
+    } catch (e) {
+      console.warn('ForgeCAD: localStorage write failed — deletion is in-memory only.', e);
+    }
+  }
+
   async projectPath(): Promise<string | null> {
     return null;
   }

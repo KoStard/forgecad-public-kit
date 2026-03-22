@@ -41,6 +41,18 @@ export class LocalStudioProvider implements FileSystemProvider {
     }
   }
 
+  async delete(filename: string): Promise<void> {
+    const response = await fetch('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename }),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error((payload as { error?: string }).error || 'Delete failed');
+    }
+  }
+
   async projectPath(): Promise<string | null> {
     try {
       const response = await fetch('/api/project-path');

@@ -985,6 +985,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       jointAnimationPlaying: false,
       hoveredJointName: null,
     });
+    fileSystem.delete(name).catch((e) => console.error('Delete failed:', e));
     setTimeout(() => get().execute(), 0);
   },
   renameFile: (oldName, newName) => {

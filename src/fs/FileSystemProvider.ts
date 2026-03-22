@@ -24,6 +24,9 @@ export interface FileSystemProvider {
   /** Persist a file. Throws on unrecoverable failure. */
   save(filename: string, content: string): Promise<void>;
 
+  /** Delete a file from persistent storage. */
+  delete(filename: string): Promise<void>;
+
   /** Return the absolute project directory path, or null if not applicable. */
   projectPath(): Promise<string | null>;
 }
