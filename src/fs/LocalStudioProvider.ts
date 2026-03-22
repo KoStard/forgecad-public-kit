@@ -15,7 +15,13 @@ export class LocalStudioProvider implements FileSystemProvider {
     const es = new EventSource('/api/watch');
 
     es.addEventListener('init', (e) => {
-      onChange({ type: 'init', files: JSON.parse((e as MessageEvent).data) });
+      const data = JSON.parse((e as MessageEvent).data);
+      // Server may send { files, folders } or just a flat files record (legacy)
+      if (data && typeof data === 'object' && 'files' in data) {
+        onChange({ type: 'init', files: data.files, folders: data.folders });
+      } else {
+        onChange({ type: 'init', files: data });
+      }
     });
     es.addEventListener('change', (e) => {
       const { filename, content } = JSON.parse((e as MessageEvent).data);
@@ -38,6 +44,18 @@ export class LocalStudioProvider implements FileSystemProvider {
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
       throw new Error((payload as { error?: string }).error || 'Save failed');
+    }
+  }
+
+  async mkdir(dirPath: string): Promise<void> {
+    const response = await fetch('/api/mkdir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dirPath }),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error((payload as { error?: string }).error || 'mkdir failed');
     }
   }
 

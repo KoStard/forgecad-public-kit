@@ -543,7 +543,7 @@ interface ForgeStore {
 
   updateSketchConstraint: (objectId: string, constraintId: string, value: number) => void;
 
-  applyServerSnapshot: (serverFiles: Record<string, string>) => void;
+  applyServerSnapshot: (serverFiles: Record<string, string>, serverFolders?: string[]) => void;
   applyServerFileChange: (filename: string, content: string) => void;
   applyServerFileDelete: (filename: string) => void;
 
@@ -963,6 +963,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (folders.includes(normalized)) return;
     const next = Array.from(new Set([...folders, normalized, ...collectParentPaths(normalized)])).sort();
     set({ folders: next });
+    fileSystem.mkdir(normalized).catch((e) => console.error('mkdir failed:', e));
   },
   deleteFile: (name) => {
     const { files, savedFiles, activeFile, objectSettingsByFile } = get();
@@ -1789,7 +1790,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set({ lastValidResult: { ...current, objects } });
   },
 
-  applyServerSnapshot: (serverFiles: Record<string, string>) => {
+  applyServerSnapshot: (serverFiles: Record<string, string>, serverFolders?: string[]) => {
     const { files, savedFiles, activeFile, objectSettingsByFile } = get();
 
     const dirtyFiles = new Set<string>();
@@ -1800,6 +1801,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const nextFiles: Record<string, string> = {};
     const nextSaved: Record<string, string> = {};
     const newFolders = new Set<string>();
+    // Include empty folders reported by the server
+    if (serverFolders) serverFolders.forEach((f) => newFolders.add(f));
 
     Object.keys(serverFiles).forEach((p) => {
       if (dirtyFiles.has(p)) {

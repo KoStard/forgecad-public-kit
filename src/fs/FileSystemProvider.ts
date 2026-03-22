@@ -1,5 +1,5 @@
 export type FileChangeEvent =
-  | { type: 'init'; files: Record<string, string> }
+  | { type: 'init'; files: Record<string, string>; folders?: string[] }
   | { type: 'change'; filename: string; content: string }
   | { type: 'delete'; filename: string };
 
@@ -26,6 +26,9 @@ export interface FileSystemProvider {
 
   /** Delete a file from persistent storage. */
   delete(filename: string): Promise<void>;
+
+  /** Create a directory. No-op if it already exists. */
+  mkdir(dirPath: string): Promise<void>;
 
   /** Return the absolute project directory path, or null if not applicable. */
   projectPath(): Promise<string | null>;

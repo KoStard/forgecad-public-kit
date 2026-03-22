@@ -41,32 +41,41 @@ function ensureNotebookKernel(): Promise<void> {
 }
 
 // Helper to scan project directory for forge/sketch files
-function scanProjectFiles(projectPath: string | null): Record<string, string> {
-  if (!projectPath) return {};
+function scanProjectFiles(projectPath: string | null): { files: Record<string, string>; folders: string[] } {
+  if (!projectPath) return { files: {}, folders: [] };
   const abs = path.resolve(projectPath);
-  const entries: Record<string, string> = {};
-  
+  const files: Record<string, string> = {};
+  const emptyFolders: string[] = [];
+
   function scanDir(dirPath: string, prefix: string = '') {
     const items = fs.readdirSync(dirPath, { withFileTypes: true });
+    // Check if this directory has any project-relevant content
+    let hasContent = false;
     for (const item of items) {
       const fullPath = path.join(dirPath, item.name);
       const relativePath = prefix ? `${prefix}/${item.name}` : item.name;
-      
+
       if (item.isDirectory()) {
+        if (item.name.startsWith('.')) continue;
         scanDir(fullPath, relativePath);
+        hasContent = true;
       } else if (item.isFile() && isProjectFile(item.name)) {
-        entries[relativePath] = fs.readFileSync(fullPath, 'utf-8');
+        files[relativePath] = fs.readFileSync(fullPath, 'utf-8');
+        hasContent = true;
       }
     }
+    if (!hasContent && prefix) {
+      emptyFolders.push(prefix);
+    }
   }
-  
+
   try {
     scanDir(abs);
   } catch (e) {
     // Directory might not exist
   }
-  
-  return entries;
+
+  return { files, folders: emptyFolders };
 }
 
 function sendJson(res: any, statusCode: number, payload: unknown): void {
@@ -159,7 +168,7 @@ async function executeNotebookRequest(body: any, createIfMissing = false) {
 
   const notebookText = serializeNotebook(notebook);
   const allFiles = {
-    ...scanProjectFiles(projectDir),
+    ...scanProjectFiles(projectDir).files,
     [filename]: notebookText,
   };
   const quality = resolveForgeQualityPreset(typeof body.quality === 'string' ? body.quality : undefined);
@@ -259,7 +268,7 @@ function forgeProjectPlugin(enableInitialScan = true) {
       // Never bake project files into the production build — the production
       // server always delivers the real project via the SSE /api/watch init event.
       if (!enableInitialScan || !projectDir) return 'export default null;';
-      const entries = scanProjectFiles(projectDir);
+      const { files: entries } = scanProjectFiles(projectDir);
       return `export default ${JSON.stringify(entries)};`;
     },
     handleHotUpdate({ file, server }: any) {
@@ -322,8 +331,8 @@ function forgeProjectPlugin(enableInitialScan = true) {
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
           res.flushHeaders();
-          const entries = scanProjectFiles(projectDir);
-          res.write(`event: init\ndata: ${JSON.stringify(entries)}\n\n`);
+          const scan = scanProjectFiles(projectDir);
+          res.write(`event: init\ndata: ${JSON.stringify(scan)}\n\n`);
           if (projectDir) {
             sseClients.add(res);
             req.on('close', () => sseClients.delete(res));
@@ -390,6 +399,35 @@ function forgeProjectPlugin(enableInitialScan = true) {
                   }
                 }
               }
+              sendJson(res, 200, { success: true });
+            })
+            .catch((e: any) => {
+              sendJson(res, 500, { error: e.message });
+            });
+          return;
+        }
+
+        // Handle /api/mkdir - create a directory
+        if (req.method === 'POST' && req.url === '/api/mkdir') {
+          readJsonBody(req)
+            .then((body) => {
+              const { dirPath: dirName } = body;
+              if (!projectDir) {
+                sendJson(res, 400, { error: 'No project directory' });
+                return;
+              }
+              if (!dirName || typeof dirName !== 'string') {
+                sendJson(res, 400, { error: 'Invalid request' });
+                return;
+              }
+              const absProject = path.resolve(projectDir);
+              const absDir = path.resolve(absProject, dirName);
+              const rel = path.relative(absProject, absDir);
+              if (rel.startsWith('..') || path.isAbsolute(rel)) {
+                sendJson(res, 400, { error: 'Path is outside the project root' });
+                return;
+              }
+              fs.mkdirSync(absDir, { recursive: true });
               sendJson(res, 200, { success: true });
             })
             .catch((e: any) => {

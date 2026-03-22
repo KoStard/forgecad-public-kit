@@ -45,6 +45,10 @@ export class BrowserStorageProvider implements FileSystemProvider {
     }
   }
 
+  async mkdir(_dirPath: string): Promise<void> {
+    // Folders in browser mode are tracked in-memory only
+  }
+
   async projectPath(): Promise<string | null> {
     return null;
   }
