@@ -1200,6 +1200,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   togglePauseAutoEval: () => set((s) => ({ pauseAutoEval: !s.pauseAutoEval })),
   meshPreviewFile: null,
   setMeshPreview: (meshPath) => {
+    if (meshPath) {
+      window.history.replaceState(null, '', `#${meshPath}`);
+    }
     set({ meshPreviewFile: meshPath });
     if (meshPath) get().execute();
   },
