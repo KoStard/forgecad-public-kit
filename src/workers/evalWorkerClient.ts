@@ -6,6 +6,7 @@ import type {
   SerializedRunResult,
   ActiveBackend,
   EvalPhase,
+  ExactExportFormat,
 } from './evalWorkerProtocol';
 
 interface PendingRun {
@@ -18,6 +19,11 @@ interface PendingFaceInfo {
   reject: (error: Error) => void;
 }
 
+interface PendingExportExact {
+  resolve: (result: { data: ArrayBuffer; format: ExactExportFormat }) => void;
+  reject: (error: Error) => void;
+}
+
 /** Maximum wall-clock time (ms) for kernel init (WASM loading). */
 const INIT_TIMEOUT_MS = 120_000;
 /** Maximum wall-clock time (ms) a script evaluation may take. */
@@ -27,8 +33,10 @@ class EvalWorkerClient {
   private worker: Worker | null = null;
   private seq = 0;
   private faceInfoReqId = 0;
+  private exportExactReqId = 0;
   private readonly pendingRuns = new Map<number, PendingRun>();
   private readonly pendingFaceInfo = new Map<number, PendingFaceInfo>();
+  private readonly pendingExportExact = new Map<number, PendingExportExact>();
   private runTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   /** Called when the worker reports a progress phase change. */
@@ -77,6 +85,18 @@ class EvalWorkerClient {
         } else {
           req.reject(new Error(data.payload.message));
         }
+        return;
+      }
+
+      if (data.type === 'export-exact-success' || data.type === 'export-exact-error') {
+        const req = this.pendingExportExact.get(data.payload.reqId);
+        if (!req) return;
+        this.pendingExportExact.delete(data.payload.reqId);
+        if (data.type === 'export-exact-success') {
+          req.resolve({ data: data.payload.data, format: data.payload.format });
+        } else {
+          req.reject(new Error(data.payload.message));
+        }
       }
     };
 
@@ -85,8 +105,10 @@ class EvalWorkerClient {
       const err = new Error(event.message || 'Eval worker crashed');
       for (const req of this.pendingRuns.values()) req.reject(err);
       for (const req of this.pendingFaceInfo.values()) req.reject(err);
+      for (const req of this.pendingExportExact.values()) req.reject(err);
       this.pendingRuns.clear();
       this.pendingFaceInfo.clear();
+      this.pendingExportExact.clear();
       this.worker = null;
     };
 
@@ -114,8 +136,10 @@ class EvalWorkerClient {
     const err = new Error(reason);
     for (const req of this.pendingRuns.values()) req.reject(err);
     for (const req of this.pendingFaceInfo.values()) req.reject(err);
+    for (const req of this.pendingExportExact.values()) req.reject(err);
     this.pendingRuns.clear();
     this.pendingFaceInfo.clear();
+    this.pendingExportExact.clear();
   }
 
   /**
@@ -167,6 +191,25 @@ class EvalWorkerClient {
     });
   }
 
+  /**
+   * Export exact geometry (STEP/BREP) using live OCCT shapes in the worker.
+   * Returns a Blob with the exported file data.
+   */
+  exportExact(format: ExactExportFormat): Promise<Blob> {
+    const reqId = ++this.exportExactReqId;
+    return new Promise<Blob>((resolve, reject) => {
+      this.pendingExportExact.set(reqId, {
+        resolve: (result) => {
+          const mimeType = format === 'step' ? 'application/step' : 'application/octet-stream';
+          resolve(new Blob([result.data], { type: mimeType }));
+        },
+        reject,
+      });
+      const request: EvalWorkerRequest = { type: 'export-exact', payload: { reqId, format } };
+      this.getWorker().postMessage(request);
+    });
+  }
+
   terminate(): void {
     this.clearRunTimeout();
     if (this.worker) {
@@ -175,8 +218,10 @@ class EvalWorkerClient {
     }
     for (const req of this.pendingRuns.values()) req.reject(new Error('worker terminated'));
     for (const req of this.pendingFaceInfo.values()) req.reject(new Error('worker terminated'));
+    for (const req of this.pendingExportExact.values()) req.reject(new Error('worker terminated'));
     this.pendingRuns.clear();
     this.pendingFaceInfo.clear();
+    this.pendingExportExact.clear();
   }
 }
 
