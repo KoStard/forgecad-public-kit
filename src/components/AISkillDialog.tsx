@@ -1,27 +1,19 @@
 import React, { useState } from 'react';
-
-const SKILL_BASE = `${import.meta.env.BASE_URL}skill/`;
+import contextMd from '../../dist-skill/CONTEXT.md?raw';
 
 type Tab = 'paste' | 'install';
 
 export function AISkillDialog({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('paste');
   const [copied, setCopied] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const handleCopyContext = async () => {
-    setLoading(true);
     try {
-      const res = await fetch(`${SKILL_BASE}CONTEXT.md`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(contextMd);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch (e) {
-      alert(`Failed to fetch context file: ${e instanceof Error ? e.message : e}`);
-    } finally {
-      setLoading(false);
+      alert(`Failed to copy to clipboard: ${e instanceof Error ? e.message : e}`);
     }
   };
 
@@ -126,33 +118,21 @@ export function AISkillDialog({ onClose }: { onClose: () => void }) {
               </p>
               <button
                 onClick={handleCopyContext}
-                disabled={loading}
                 style={{
                   padding: '8px 16px',
                   background: copied ? 'var(--fc-success, #2ea043)' : 'var(--fc-accent)',
                   color: copied ? '#fff' : 'var(--fc-accentText)',
                   border: 'none',
                   borderRadius: 4,
-                  cursor: loading ? 'wait' : 'pointer',
+                  cursor: 'pointer',
                   fontSize: 13,
                   fontWeight: 600,
                   fontFamily: 'inherit',
                   transition: 'background 0.15s',
                 }}
               >
-                {loading ? 'Loading…' : copied ? 'Copied to clipboard!' : 'Copy ForgeCAD Context'}
+                {copied ? 'Copied to clipboard!' : 'Copy ForgeCAD Context'}
               </button>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--fc-textDim)', lineHeight: 1.4 }}>
-                Or open the file directly:{' '}
-                <a
-                  href={`${SKILL_BASE}CONTEXT.md`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: 'var(--fc-accent)' }}
-                >
-                  CONTEXT.md
-                </a>
-              </p>
             </div>
           )}
 
