@@ -79,6 +79,14 @@ export async function initKernel() {
   return manifoldModule;
 }
 
+/**
+ * Lightweight kernel init — Manifold only, skips OCCT (~13MB).
+ * Used on mobile devices where memory is constrained.
+ */
+export async function initKernelManifoldOnly() {
+  return initManifoldWasm();
+}
+
 // TODO: Remove getWasm re-export from kernel once all callers import from backends/manifold/wasm
 export { getWasm };
 
