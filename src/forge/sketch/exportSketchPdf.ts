@@ -283,9 +283,9 @@ function computeTransform(meta: SketchConstraintMeta, ptsPerMm: number, marginPt
 
 // ─── Symbol rendering ───────────────────────────────────────────────────────
 
-function renderSymbolPdf(tx: SketchToPdfTransform, pos: [number, number], symbol: ConstraintSymbol, color: [number, number, number], _rotation?: number): string {
+function renderSymbolPdf(tx: SketchToPdfTransform, pos: [number, number], symbol: ConstraintSymbol, color: [number, number, number], fontScale: number = 1, _rotation?: number): string {
   const [px, py] = toPage(tx, pos[0], pos[1]);
-  const S = 4;
+  const S = 4 * fontScale;
   const cmds: string[] = ['q', strokeColor(color[0], color[1], color[2]), fillColor(color[0], color[1], color[2])];
 
   switch (symbol) {
@@ -304,8 +304,8 @@ function renderSymbolPdf(tx: SketchToPdfTransform, pos: [number, number], symbol
     case 'perpendicular':
       cmds.push(`${f(0.8)} w`, moveTo(px + S * 0.6, py), lineTo(px, py), lineTo(px, py + S * 0.6), 'S');
       break;
-    case 'horizontal': cmds.push(textCmd('H', px - 3, py - 3.5, 8)); break;
-    case 'vertical': cmds.push(textCmd('V', px - 3, py - 3.5, 8)); break;
+    case 'horizontal': cmds.push(textCmd('H', px - 3 * fontScale, py - 3.5 * fontScale, 8 * fontScale)); break;
+    case 'vertical': cmds.push(textCmd('V', px - 3 * fontScale, py - 3.5 * fontScale, 8 * fontScale)); break;
     case 'fixed':
       cmds.push(`${f(0.6)} w`, lineCmd(px - S, py + S * 0.3, px + S, py + S * 0.3));
       for (let i = -0.7; i <= 0.8; i += 0.5)
@@ -322,7 +322,7 @@ function renderSymbolPdf(tx: SketchToPdfTransform, pos: [number, number], symbol
       cmds.push(`${f(0.6)} w`, circleStroke(px, py, S * 0.5), circleFill(px, py, S * 0.15));
       break;
     case 'collinear': cmds.push(circleFill(px, py, S * 0.3)); break;
-    case 'tangent': cmds.push(textCmd('T', px - 3, py - 3.5, 7)); break;
+    case 'tangent': cmds.push(textCmd('T', px - 3 * fontScale, py - 3.5 * fontScale, 7 * fontScale)); break;
     case 'concentric':
       cmds.push(`${f(0.6)} w`, circleStroke(px, py, S * 0.3), circleStroke(px, py, S * 0.6));
       break;
@@ -340,14 +340,14 @@ function renderSymbolPdf(tx: SketchToPdfTransform, pos: [number, number], symbol
       cmds.push(moveTo(px - S * 0.3, py - S * 0.3), lineTo(px, py), lineTo(px - S * 0.3, py + S * 0.3), 'h f');
       cmds.push(moveTo(px + S * 0.3, py - S * 0.3), lineTo(px, py), lineTo(px + S * 0.3, py + S * 0.3), 'h f');
       break;
-    default: cmds.push(textCmd('?', px - 2, py - 3, 7)); break;
+    default: cmds.push(textCmd('?', px - 2 * fontScale, py - 3 * fontScale, 7 * fontScale)); break;
   }
 
   cmds.push('Q');
   return cmds.join('\n');
 }
 
-function renderDimensionPdf(tx: SketchToPdfTransform, ann: Extract<AnnotationElement, { kind: 'dimension' }>, color: [number, number, number]): string {
+function renderDimensionPdf(tx: SketchToPdfTransform, ann: Extract<AnnotationElement, { kind: 'dimension' }>, color: [number, number, number], fontScale: number = 1): string {
   const { from, to, offset, value } = ann;
   const dx = to[0] - from[0], dy = to[1] - from[1];
   const len = Math.hypot(dx, dy);
@@ -389,13 +389,13 @@ function renderDimensionPdf(tx: SketchToPdfTransform, ann: Extract<AnnotationEle
   cmds.push(moveTo(a2tip[0], a2tip[1]), lineTo(a2l[0], a2l[1]), lineTo(a2r[0], a2r[1]), 'h f');
 
   const mid = toPage(tx, (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2);
-  cmds.push(textCmd(value, mid[0] - value.length * 2.5, mid[1] + 3, 7));
+  cmds.push(textCmd(value, mid[0] - value.length * 2.5 * fontScale, mid[1] + 3 * fontScale, 7 * fontScale));
 
   cmds.push('Q');
   return cmds.join('\n');
 }
 
-function renderAngleArcPdf(tx: SketchToPdfTransform, ann: Extract<AnnotationElement, { kind: 'angle-arc' }>, color: [number, number, number]): string {
+function renderAngleArcPdf(tx: SketchToPdfTransform, ann: Extract<AnnotationElement, { kind: 'angle-arc' }>, color: [number, number, number], fontScale: number = 1): string {
   const { center, startAngle, endAngle, radius, value } = ann;
   let sweep = endAngle - startAngle;
   while (sweep > Math.PI) sweep -= 2 * Math.PI;
@@ -412,25 +412,25 @@ function renderAngleArcPdf(tx: SketchToPdfTransform, ann: Extract<AnnotationElem
   const midAngle = startAngle + sweep / 2;
   const textR = radius + 1.2;
   const [lx, ly] = toPage(tx, center[0] + textR * Math.cos(midAngle), center[1] + textR * Math.sin(midAngle));
-  cmds.push(textCmd(value, lx - value.length * 2, ly - 3, 6), 'Q');
+  cmds.push(textCmd(value, lx - value.length * 2 * fontScale, ly - 3 * fontScale, 6 * fontScale), 'Q');
   return cmds.join('\n');
 }
 
-function renderAnnotationPdf(tx: SketchToPdfTransform, ann: AnnotationElement, color: [number, number, number]): string {
+function renderAnnotationPdf(tx: SketchToPdfTransform, ann: AnnotationElement, color: [number, number, number], fontScale: number = 1): string {
   switch (ann.kind) {
-    case 'symbol': return renderSymbolPdf(tx, ann.position, ann.symbol, color, ann.rotation);
-    case 'dimension': return renderDimensionPdf(tx, ann, color);
-    case 'angle-arc': return renderAngleArcPdf(tx, ann, color);
+    case 'symbol': return renderSymbolPdf(tx, ann.position, ann.symbol, color, fontScale, ann.rotation);
+    case 'dimension': return renderDimensionPdf(tx, ann, color, fontScale);
+    case 'angle-arc': return renderAngleArcPdf(tx, ann, color, fontScale);
     case 'text': {
       const [px, py] = toPage(tx, ann.position[0], ann.position[1]);
-      return ['q', fillColor(color[0], color[1], color[2]), textCmd(ann.text, px - ann.text.length * 2.5, py - 3, 7), 'Q'].join('\n');
+      return ['q', fillColor(color[0], color[1], color[2]), textCmd(ann.text, px - ann.text.length * 2.5 * fontScale, py - 3 * fontScale, 7 * fontScale), 'Q'].join('\n');
     }
   }
 }
 
 // ─── Main page content builder ──────────────────────────────────────────────
 
-function buildSketchPdfContent(meta: SketchConstraintMeta, tx: SketchToPdfTransform): string {
+function buildSketchPdfContent(meta: SketchConstraintMeta, tx: SketchToPdfTransform, fontScale: number = 1): string {
   const cmds: string[] = [];
 
   // Background
@@ -448,7 +448,7 @@ function buildSketchPdfContent(meta: SketchConstraintMeta, tx: SketchToPdfTransf
       const [r, g, b] = hexToRgb(SURFACE_PALETTE[s.index % SURFACE_PALETTE.length]);
       cmds.push(fillColor(r, g, b));
       const [cx, cy] = toPage(tx, s.centroid[0], s.centroid[1]);
-      cmds.push(textCmd(`[${s.index}]`, cx - 5, cy - 4, 9));
+      cmds.push(textCmd(`[${s.index}]`, cx - 5 * fontScale, cy - 4 * fontScale, 9 * fontScale));
     }
     cmds.push('Q');
   }
@@ -493,16 +493,16 @@ function buildSketchPdfContent(meta: SketchConstraintMeta, tx: SketchToPdfTransf
   // Constraint annotations
   for (const c of meta.constraints) {
     const color = hexToRgb(constraintColorHex(c));
-    for (const ann of c.annotations) cmds.push(renderAnnotationPdf(tx, ann, color));
+    for (const ann of c.annotations) cmds.push(renderAnnotationPdf(tx, ann, color, fontScale));
   }
 
   // Status badge (top-left)
   {
     const statusText = `${meta.status.toUpperCase()} DOF=${meta.dof} err=${meta.maxError.toFixed(4)}`;
     const [r, g, b] = hexToRgb(statusColorHex(meta.status));
-    const bx = 10, by = tx.pageHeight - 24;
-    cmds.push('q', fillColor(r, g, b), `${f(bx)} ${f(by)} ${f(statusText.length * 6.5 + 10)} ${f(18)} re f`);
-    cmds.push(fillColor(0, 0, 0), textCmd(statusText, bx + 5, by + 5, 10), 'Q');
+    const bx = 10, by = tx.pageHeight - 24 * fontScale;
+    cmds.push('q', fillColor(r, g, b), `${f(bx)} ${f(by)} ${f(statusText.length * 6.5 * fontScale + 10)} ${f(18 * fontScale)} re f`);
+    cmds.push(fillColor(0, 0, 0), textCmd(statusText, bx + 5, by + 5 * fontScale, 10 * fontScale), 'Q');
   }
 
   // Constraint summary table (top-right)
@@ -516,29 +516,29 @@ function buildSketchPdfContent(meta: SketchConstraintMeta, tx: SketchToPdfTransf
     if (meta.rejected.length > 0) textLines.push(`  Rejected: ${meta.rejected.length}`);
     if (meta.surfaces && meta.surfaces.length > 0) textLines.push(`Surfaces: ${meta.surfaces.length}`);
 
-    const tableX = tx.pageWidth - 160;
-    let tableY = tx.pageHeight - 24;
+    const tableX = tx.pageWidth - 160 * fontScale;
+    let tableY = tx.pageHeight - 24 * fontScale;
     cmds.push('q', fillColor(0.1, 0.1, 0.15));
-    cmds.push(`${f(tableX - 5)} ${f(tableY - textLines.length * 13 - 2)} ${f(155)} ${f(textLines.length * 13 + 20)} re f`);
+    cmds.push(`${f(tableX - 5)} ${f(tableY - textLines.length * 13 * fontScale - 2)} ${f(155 * fontScale)} ${f(textLines.length * 13 * fontScale + 20 * fontScale)} re f`);
     cmds.push(fillColor(0.8, 0.8, 0.85));
-    for (const line of textLines) { cmds.push(textCmd(line, tableX, tableY, 9)); tableY -= 13; }
+    for (const line of textLines) { cmds.push(textCmd(line, tableX, tableY, 9 * fontScale)); tableY -= 13 * fontScale; }
     cmds.push('Q');
   }
 
   // Constraint detail list (right side, below summary)
   {
-    const listX = tx.pageWidth - 160;
-    let listY = tx.pageHeight - 24 - 120;
-    cmds.push('q', fillColor(0.7, 0.7, 0.75), textCmd('Constraint Details:', listX, listY, 8));
-    listY -= 13.5;
+    const listX = tx.pageWidth - 160 * fontScale;
+    let listY = tx.pageHeight - 24 * fontScale - 120 * fontScale;
+    cmds.push('q', fillColor(0.7, 0.7, 0.75), textCmd('Constraint Details:', listX, listY, 8 * fontScale));
+    listY -= 13.5 * fontScale;
     for (const c of meta.constraints) {
       if (listY < 20) break;
       const [r, g, b] = hexToRgb(constraintColorHex(c));
       cmds.push(fillColor(r, g, b));
       const valueStr = c.value !== undefined ? ` = ${c.value}` : '';
       const residualStr = c.residual > 0.0001 ? ` err=${c.residual.toFixed(4)}` : '';
-      cmds.push(textCmd(`${c.type}${valueStr}${residualStr}`, listX, listY, 6.5));
-      listY -= 9;
+      cmds.push(textCmd(`${c.type}${valueStr}${residualStr}`, listX, listY, 6.5 * fontScale));
+      listY -= 9 * fontScale;
     }
     cmds.push('Q');
   }
@@ -548,11 +548,11 @@ function buildSketchPdfContent(meta: SketchConstraintMeta, tx: SketchToPdfTransf
     cmds.push('q');
     const [r, g, b] = hexToRgb('#ff6b6b');
     cmds.push(fillColor(r, g, b));
-    let ry = 10 + meta.rejected.length * 12;
+    let ry = 10 + meta.rejected.length * 12 * fontScale;
     for (const rej of meta.rejected) {
       const reason = rej.rejectionReason ? ` \u2014 ${rej.rejectionReason}` : '';
-      cmds.push(textCmd(`REJECTED: ${rej.label} ${rej.type}${reason}`, 10, ry, 7));
-      ry -= 12;
+      cmds.push(textCmd(`REJECTED: ${rej.label} ${rej.type}${reason}`, 10, ry, 7 * fontScale));
+      ry -= 12 * fontScale;
     }
     cmds.push('Q');
   }
@@ -568,21 +568,39 @@ export interface SketchPdfResult {
   pageHeight: number;
 }
 
+export interface SketchPdfOptions {
+  /** Scale factor for all text elements. Default: auto-calculated from sketch bounds. */
+  fontScale?: number;
+  /** Points per mm of sketch space. Default: 8. */
+  pointsPerMm?: number;
+  /** Page margin in PDF points. Default: 100. */
+  margin?: number;
+}
+
 /**
  * Generate a single-page PDF from a constrained sketch's metadata.
  * Pure function — no filesystem or DOM dependencies.
  */
-export function generateSketchPdf(meta: SketchConstraintMeta): SketchPdfResult {
-  const POINTS_PER_MM = 8;
-  const MARGIN = 100;
+export function generateSketchPdf(meta: SketchConstraintMeta, options?: SketchPdfOptions): SketchPdfResult {
+  const POINTS_PER_MM = options?.pointsPerMm ?? 8;
+  const MARGIN = options?.margin ?? 100;
   const tx = computeTransform(meta, POINTS_PER_MM, MARGIN);
   tx.pageWidth = Math.max(tx.pageWidth, 600);
   tx.pageHeight = Math.max(tx.pageHeight, 400);
 
+  // Auto-scale font sizes based on sketch extent.
+  // Base reference: a ~100mm sketch looks good with the hardcoded sizes.
+  // For larger sketches, scale up proportionally.
+  const bounds = computeBounds(meta);
+  const extent = Math.max(bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1], 1);
+  const baseExtent = 100; // mm — reference size where hardcoded fonts look right
+  const autoFontScale = Math.max(1, extent / baseExtent);
+  const fontScale = options?.fontScale ?? autoFontScale;
+
   const pdf = new PdfBuilder();
   const fontId = pdf.addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
   const resourcesId = pdf.addObject(`<< /Font << /F1 ${fontId} 0 R >> >>`);
-  const content = buildSketchPdfContent(meta, tx);
+  const content = buildSketchPdfContent(meta, tx, fontScale);
   const contentId = pdf.addStreamObject('', content);
 
   const pagesId = 5;

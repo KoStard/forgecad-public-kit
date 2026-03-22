@@ -55,10 +55,10 @@ interface ObjectContextMenuState {
 }
 
 const VIEWPORT_CAMERA_STORAGE_KEY = 'fc-viewport-camera-v1';
-const GIF_DEFAULT_SIZE = 720;
-const GIF_DEFAULT_FPS = 18;
-const GIF_DEFAULT_FRAMES_PER_TURN = 54;
-const GIF_DEFAULT_HOLD_FRAMES = 4;
+const GIF_DEFAULT_SIZE = 960;
+const GIF_DEFAULT_FPS = 24;
+const GIF_DEFAULT_FRAMES_PER_TURN = 72;
+const GIF_DEFAULT_HOLD_FRAMES = 6;
 const GIF_DEFAULT_PITCH_DEG = 18;
 const FOCUS_MODE_DIM_OPACITY = 0.1;
 const PERFORMANCE_SAMPLE_INTERVAL_SEC = 0.25;
@@ -4379,7 +4379,7 @@ function OrbitGifExporterBridge({
 
     try {
       if (controls && !overrideSession) controls.enableDamping = false;
-      gl.setPixelRatio(1);
+      gl.setPixelRatio(2);
       gl.setSize(size, size, false);
 
       for (const mode of modePlan) {

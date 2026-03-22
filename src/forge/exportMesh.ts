@@ -308,3 +308,77 @@ export async function build3mfBlob(
     type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
   });
 }
+
+/**
+ * Build a Wavefront OBJ string from mesh export objects.
+ * Each object becomes a named group (`g`). Includes vertex normals.
+ */
+export function buildObjString(objects: MeshExportObject[]): string {
+  const lines: string[] = [];
+  lines.push('# ForgeCAD OBJ Export');
+
+  let vertexOffset = 0;
+  let normalOffset = 0;
+
+  for (const obj of objects) {
+    const objectName = obj.name || 'Object';
+    lines.push(`g ${objectName}`);
+
+    const mesh = obj.shape.getMesh();
+    const { numProp, triVerts, vertProperties, numTri } = mesh;
+    const numVerts = vertProperties.length / numProp;
+
+    // Emit vertices
+    for (let v = 0; v < numVerts; v++) {
+      const x = vertProperties[v * numProp];
+      const y = vertProperties[v * numProp + 1];
+      const z = vertProperties[v * numProp + 2];
+      lines.push(`v ${x} ${y} ${z}`);
+    }
+
+    // Emit per-face normals and faces
+    for (let tri = 0; tri < numTri; tri++) {
+      const i0 = triVerts[tri * 3];
+      const i1 = triVerts[tri * 3 + 1];
+      const i2 = triVerts[tri * 3 + 2];
+
+      const v0x = vertProperties[i0 * numProp];
+      const v0y = vertProperties[i0 * numProp + 1];
+      const v0z = vertProperties[i0 * numProp + 2];
+      const v1x = vertProperties[i1 * numProp];
+      const v1y = vertProperties[i1 * numProp + 1];
+      const v1z = vertProperties[i1 * numProp + 2];
+      const v2x = vertProperties[i2 * numProp];
+      const v2y = vertProperties[i2 * numProp + 1];
+      const v2z = vertProperties[i2 * numProp + 2];
+
+      const e1x = v1x - v0x;
+      const e1y = v1y - v0y;
+      const e1z = v1z - v0z;
+      const e2x = v2x - v0x;
+      const e2y = v2y - v0y;
+      const e2z = v2z - v0z;
+      const nx = e1y * e2z - e1z * e2y;
+      const ny = e1z * e2x - e1x * e2z;
+      const nz = e1x * e2y - e1y * e2x;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+
+      lines.push(`vn ${nx / len} ${ny / len} ${nz / len}`);
+
+      // OBJ uses 1-based indices
+      const vBase = vertexOffset + 1;
+      const nIdx = normalOffset + tri + 1;
+      lines.push(`f ${i0 + vBase}//${nIdx} ${i1 + vBase}//${nIdx} ${i2 + vBase}//${nIdx}`);
+    }
+
+    vertexOffset += numVerts;
+    normalOffset += numTri;
+  }
+
+  return lines.join('\n') + '\n';
+}
+
+export function buildObjBlob(objects: MeshExportObject[]): Blob {
+  const obj = buildObjString(objects);
+  return new Blob([obj], { type: 'model/obj' });
+}

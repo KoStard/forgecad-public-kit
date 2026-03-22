@@ -1,4 +1,6 @@
-import { build3mfBlob, buildBinaryStl, type MeshExportObject } from '@forge/exportMesh';
+import { build3mfBlob, buildBinaryStl, buildObjBlob, type MeshExportObject } from '@forge/exportMesh';
+import { buildStepBlob } from '@forge/exportStep';
+import { buildBrepBlob } from '@forge/exportBrepNative';
 import { runScript, type ForgeQualityPreset, type RunResult } from '@forge/index';
 import { sketchToSvg } from '@forge/sketch/exportSvg';
 import { sketchToDxf } from '@forge/sketch/exportDxf';
@@ -7,7 +9,8 @@ import { setParamOverrides } from '@forge/params';
 import { useForgeStore, type ObjectSettings } from '../store/forgeStore';
 import { generateReportInWorker } from '../workers/reportWorkerClient';
 
-export type MeshExportFormat = '3mf' | 'stl';
+export type MeshExportFormat = '3mf' | 'stl' | 'obj';
+export type ExactExportFormat = 'step' | 'brep';
 export type SketchExportFormat = 'svg' | 'dxf' | 'pdf';
 export type OrbitGifMode = 'solid' | 'wireframe';
 export type ExportQualityChoice = 'default' | 'live' | 'high';
@@ -143,9 +146,45 @@ export async function exportMeshFromStore(
     return;
   }
 
+  if (format === 'obj') {
+    const blob = buildObjBlob(meshObjects);
+    triggerDownload(blob, `${stem}.obj`);
+    return;
+  }
+
   const stlBuffer = buildBinaryStl(meshObjects);
   const stlBlob = new Blob([stlBuffer], { type: 'model/stl' });
   triggerDownload(stlBlob, `${stem}.stl`);
+}
+
+export async function exportExactFromStore(
+  format: ExactExportFormat,
+  preferredStem?: string,
+): Promise<void> {
+  const { result, activeFile, objectSettings } = useForgeStore.getState();
+  const current = requireSuccessfulRunResult(result);
+  const shapeObjects = current.objects.filter((obj) => obj.shape);
+  if (shapeObjects.length === 0) {
+    throw new Error('No 3D objects available for exact export.');
+  }
+
+  const stem = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
+
+  // Build export objects — pass the shape backends directly (OCCT needs the raw backend)
+  const exportObjects = shapeObjects.map((obj) => ({
+    name: obj.name,
+    shape: obj.shape!,
+    color: objectSettings[obj.id]?.color || obj.color,
+  }));
+
+  if (format === 'step') {
+    const blob = await buildStepBlob(exportObjects);
+    triggerDownload(blob, `${stem}.step`);
+    return;
+  }
+
+  const blob = await buildBrepBlob(exportObjects);
+  triggerDownload(blob, `${stem}.brep`);
 }
 
 export async function exportReportFromStore(
