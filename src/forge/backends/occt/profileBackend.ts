@@ -87,7 +87,7 @@ function extractPolygonsFromFace(oc: OCCTModule, face: any): number[][][] {
         // Fall back to adaptor curve sampling
         const first = { current: 0 };
         const last = { current: 0 };
-        const curve = oc.BRep_Tool.Curve_2(edge, loc, first, last);
+        const curve = oc.BRep_Tool.Curve_2(edge, first, last);
         if (!curve.IsNull()) {
           const curveObj = curve.get();
           const steps = 16;
