@@ -183,23 +183,13 @@ export function serializeRunResult(
     ` sketch=${timings.sketchMs.toFixed(0)}ms`,
   );
 
+  // Spread all plain-data fields from RunResult, then override the WASM-backed
+  // ones with their serialized equivalents. New fields added to RunResult
+  // automatically flow through without touching this code.
+  const { shape: _s, sketch: _sk, objects: _objs, ...passthrough } = result;
   const serialized: SerializedRunResult = {
+    ...passthrough,
     objects,
-    params: result.params,
-    dimensions: result.dimensions,
-    highlights: result.highlights,
-    bom: result.bom,
-    cutPlanes: result.cutPlanes,
-    explodeView: result.explodeView,
-    jointsView: result.jointsView,
-    viewConfig: result.viewConfig,
-    sceneConfig: result.sceneConfig,
-    robotExport: result.robotExport,
-    quality: result.quality,
-    error: result.error,
-    timeMs: result.timeMs,
-    logs: result.logs,
-    verifications: result.verifications,
     solverDebug,
   };
 

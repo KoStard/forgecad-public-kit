@@ -1,18 +1,9 @@
 import type {
   ForgeQualityPreset,
   LogEntry,
-  ParamDef,
   VerificationResult,
 } from '@forge/index';
-import type { DimensionDef } from '../forge/sketch/dimensions';
-import type { HighlightDef } from '../forge/sketch/highlights';
-import type { BomDef } from '../forge/bom';
-import type { CutPlaneDef } from '../forge/cutPlane';
-import type { ExplodeViewOptions } from '../forge/explodeView';
-import type { CollectedJointsView } from '../forge/jointsView';
-import type { ViewConfig } from '../forge/viewConfig';
-import type { SceneConfig } from '../forge/scene';
-import type { CollectedRobotExport } from '../forge/robotExport';
+import type { RunResult } from '../forge/runner';
 import type { FaceRef } from '../forge/sketch/topology';
 import type { FaceTransformationHistory } from '../forge/faceHistory';
 import type { GeometryInfo } from '../forge/kernel';
@@ -70,26 +61,19 @@ export interface SerializedSceneObject {
   treePath?: string[];
 }
 
-/** Full serialized RunResult — no WASM objects, safe to postMessage. */
-export interface SerializedRunResult {
-  objects: SerializedSceneObject[];
-  params: ParamDef[];
-  dimensions: DimensionDef[];
-  highlights: HighlightDef[];
-  bom: BomDef[];
-  cutPlanes: CutPlaneDef[];
-  explodeView: ExplodeViewOptions | null;
-  jointsView: CollectedJointsView | null;
-  viewConfig: ViewConfig | null;
-  sceneConfig: SceneConfig | null;
-  robotExport: CollectedRobotExport | null;
-  quality: ForgeQualityPreset;
-  error: string | null;
-  timeMs: number;
-  logs: LogEntry[];
-  verifications: VerificationResult[];
-  solverDebug?: SolverWasmRunDebugSnapshot | null;
-}
+/**
+ * Full serialized RunResult — no WASM objects, safe to postMessage.
+ *
+ * Derived from RunResult: drops `shape` and `sketch` (WASM-only),
+ * replaces `objects` with serialized equivalents, adds `solverDebug`.
+ * All other fields pass through unchanged — adding a new plain-data
+ * field to RunResult automatically includes it here.
+ */
+export type SerializedRunResult =
+  Omit<RunResult, 'shape' | 'sketch' | 'objects'> & {
+    objects: SerializedSceneObject[];
+    solverDebug?: SolverWasmRunDebugSnapshot | null;
+  };
 
 // ---- Message types ----
 
