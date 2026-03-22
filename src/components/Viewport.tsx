@@ -4483,6 +4483,108 @@ function ConstructionGhostOverlay({ matrix }: { matrix: THREE.Matrix4 }) {
   );
 }
 
+/* ── Evaluation progress indicator ────────────────────────────────── */
+
+const BRAILLE_SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+const EVAL_PHASE_CONFIG: Record<string, { label: string; color: string }> = {
+  'kernel-init':  { label: 'Loading geometry kernel',  color: '#f5a623' },
+  'evaluating':   { label: 'Evaluating model',         color: '#4a9eff' },
+  'serializing':  { label: 'Preparing display',        color: '#7c4dff' },
+};
+
+function EvaluationIndicator({ phase }: { phase: string }) {
+  const [frame, setFrame] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef(Date.now());
+
+  // Reset timer when phase changes
+  useEffect(() => { startRef.current = Date.now(); setElapsed(0); }, [phase]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setFrame((f) => (f + 1) % BRAILLE_SPINNER.length);
+      setElapsed(Date.now() - startRef.current);
+    }, 80);
+    return () => clearInterval(id);
+  }, []);
+
+  const cfg = EVAL_PHASE_CONFIG[phase] ?? EVAL_PHASE_CONFIG['evaluating'];
+  const spinner = BRAILLE_SPINNER[frame];
+  const secs = (elapsed / 1000).toFixed(1);
+
+  // Progress dots animation: phase index determines filled dots
+  const phaseIdx = phase === 'kernel-init' ? 0 : phase === 'evaluating' ? 1 : 2;
+  const dots = [0, 1, 2].map((i) =>
+    i <= phaseIdx ? cfg.color : 'var(--fc-border)',
+  );
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: 16,
+        right: 16,
+        background: 'var(--fc-bgPanel)',
+        color: 'var(--fc-text, #e0e0e0)',
+        padding: '8px 14px',
+        borderRadius: 8,
+        fontSize: 13,
+        fontWeight: 500,
+        border: '1px solid var(--fc-border)',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+        pointerEvents: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        fontFamily: 'inherit',
+        animation: 'fc-eval-fadein 0.2s ease-out',
+      }}
+    >
+      {/* Inject keyframes once */}
+      <style>{`
+        @keyframes fc-eval-fadein {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fc-eval-pulse {
+          0%, 100% { opacity: 0.45; }
+          50%      { opacity: 1; }
+        }
+      `}</style>
+
+      {/* Braille spinner */}
+      <span style={{ fontSize: 16, color: cfg.color, width: 16, textAlign: 'center' }}>
+        {spinner}
+      </span>
+
+      {/* Label */}
+      <span>{cfg.label}</span>
+
+      {/* Phase dots */}
+      <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        {dots.map((color, i) => (
+          <span
+            key={i}
+            style={{
+              width: 5,
+              height: 5,
+              borderRadius: '50%',
+              background: color,
+              animation: i === phaseIdx ? 'fc-eval-pulse 1.2s ease-in-out infinite' : 'none',
+            }}
+          />
+        ))}
+      </span>
+
+      {/* Elapsed time */}
+      <span style={{ fontSize: 11, color: 'var(--fc-textDim)', fontVariantNumeric: 'tabular-nums' }}>
+        {secs}s
+      </span>
+    </div>
+  );
+}
+
 export function Viewport() {
   const measureMode = useForgeStore((s) => s.measureMode);
   const isEvaluating = useForgeStore((s) => s.isEvaluating);
@@ -5380,24 +5482,7 @@ export function Viewport() {
       {measureMode && <MeasureInfoPanel />}
 
       {isEvaluating && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 12,
-            right: 12,
-            background: 'var(--fc-bgPanel)',
-            color: 'var(--fc-textDim)',
-            padding: '4px 10px',
-            borderRadius: 4,
-            fontSize: 12,
-            border: '1px solid var(--fc-border)',
-            pointerEvents: 'none',
-          }}
-        >
-          {evaluationPhase === 'kernel-init' ? 'Loading geometry kernel…'
-            : evaluationPhase === 'serializing' ? 'Preparing display…'
-            : 'Evaluating model…'}
-        </div>
+        <EvaluationIndicator phase={evaluationPhase} />
       )}
 
       {objectPickSyncEnabled && !measureMode && (
