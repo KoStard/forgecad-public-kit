@@ -259,6 +259,7 @@ function FullApp() {
   const minViewPanelWidth = 220;
   const maxViewPanelWidth = 460;
   const notebookMode = isNotebookFile(activeFile);
+  const meshPreviewFile = useForgeStore((s) => s.meshPreviewFile);
 
   useEffect(() => {
     Promise.all([initKernel(), initSolverWasm()]).then(() => {
@@ -404,23 +405,25 @@ function FullApp() {
             <FileExplorer />
           </ResizablePanel>
         )}
-        <ResizablePanel
-          storageKey={CODE_PANEL_WIDTH_KEY}
-          defaultWidth={520}
-          minWidth={minCodePanelWidth}
-          maxWidth={maxCodePanelWidth}
-          edge="right"
-          handleLabel="Resize code editor panel"
-          panelStyle={{ borderRight: '1px solid var(--fc-border)' }}
-        >
-          <div style={{ flex: 1, minHeight: 0 }}>
-            {notebookMode ? <NotebookEditor /> : <CodeEditor />}
-          </div>
-          <ParamPanel />
-          <VerificationsPanel />
-          <ConsolePanel />
-          <ExportPanel />
-        </ResizablePanel>
+        {!meshPreviewFile && (
+          <ResizablePanel
+            storageKey={CODE_PANEL_WIDTH_KEY}
+            defaultWidth={520}
+            minWidth={minCodePanelWidth}
+            maxWidth={maxCodePanelWidth}
+            edge="right"
+            handleLabel="Resize code editor panel"
+            panelStyle={{ borderRight: '1px solid var(--fc-border)' }}
+          >
+            <div style={{ flex: 1, minHeight: 0 }}>
+              {notebookMode ? <NotebookEditor /> : <CodeEditor />}
+            </div>
+            <ParamPanel />
+            <VerificationsPanel />
+            <ConsolePanel />
+            <ExportPanel />
+          </ResizablePanel>
+        )}
         <div style={{ flex: 1, display: 'flex', minWidth: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <Viewport />
