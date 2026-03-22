@@ -51,12 +51,45 @@ export class BrowserStorageProvider implements FileSystemProvider {
           !Array.isArray(parsed) &&
           Object.keys(parsed).length > 0
         ) {
-          return parsed as Record<string, string>;
+          const stored = parsed as Record<string, string>;
+          return this._reconcileWithExamples(stored);
         }
       }
     } catch {
       // Corrupt or missing entry — fall through to defaults
     }
     return { ...EXAMPLE_FILES };
+  }
+
+  /**
+   * Reconcile cached localStorage files with the current bundle's examples:
+   * - Remove cached example files that no longer exist in EXAMPLE_FILES
+   * - Add new example files that weren't in the cache yet
+   * - Preserve user edits to existing example files
+   */
+  private _reconcileWithExamples(stored: Record<string, string>): Record<string, string> {
+    const result: Record<string, string> = {};
+
+    // Keep non-example files and still-valid example files
+    for (const [path, content] of Object.entries(stored)) {
+      if (path.startsWith('examples/')) {
+        // Only keep if the example still exists in the bundle
+        if (path in EXAMPLE_FILES) {
+          result[path] = content;
+        }
+      } else {
+        // User-created files — always keep
+        result[path] = content;
+      }
+    }
+
+    // Add any new examples not already in storage
+    for (const [path, content] of Object.entries(EXAMPLE_FILES)) {
+      if (!(path in result)) {
+        result[path] = content;
+      }
+    }
+
+    return result;
   }
 }
