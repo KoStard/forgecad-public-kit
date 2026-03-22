@@ -181,4 +181,15 @@ Option A is the clear winner:
 | # | Change | Status |
 |---|--------|--------|
 | — | Baseline: STEP/BREP export always fails with OCCT backend | Bug confirmed |
-| P1 | (pending) Implement Option A | Not started |
+| P1 | Export in worker via `export-exact` message type | Done |
+| P2 | BREP: fix Write overload (ostream vs file-path) | Done |
+| P3 | Cached model: worker re-evaluates if lastRunResult missing | Done |
+| P4 | BREP: fix Write_3 arity (needs progressRange arg) | Done |
+| P5 | Add `exporting` phase to viewport progress indicator | Done |
+
+## Resolved — 2026-03-22
+
+All STEP and BREP exports work with OCCT backend. Key lessons:
+- OCCT shapes can't cross the worker boundary (B-rep topology lost in mesh serialization)
+- opencascade.js overload numbering doesn't match C++ declaration order — must check `.d.ts`
+- `BRepTools.Write_3` is file-path variant but takes 3 args (shape, path, progressRange)
