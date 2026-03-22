@@ -22,6 +22,7 @@ export function FileExplorer() {
   const [renameValue, setRenameValue] = useState('');
   const [focusedFolder, setFocusedFolder] = useState<string>('');
   const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string } | null>(null);
 
   const normalizePath = (value: string): string => value
     .replace(/\\/g, '/')
@@ -217,8 +218,11 @@ export function FileExplorer() {
             if (node.type === 'file') setActiveFile(node.path);
           }}
           onDoubleClick={() => {
-            setRenamingPath(node.path);
-            setRenameValue(getBaseName(node.path));
+            if (isFolder) toggleFolder(node.path);
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setContextMenu({ x: e.clientX, y: e.clientY, path: node.path });
           }}
           style={{
             padding: '5px 8px',
@@ -234,13 +238,15 @@ export function FileExplorer() {
           onMouseEnter={(e) => { if (!isActive && !isFocused) e.currentTarget.style.background = 'var(--fc-bgHover)'; }}
           onMouseLeave={(e) => { if (!isActive && !isFocused) e.currentTarget.style.background = 'transparent'; }}
         >
-          {isFolder && (
+          {isFolder ? (
             <span
               onClick={(e) => { e.stopPropagation(); toggleFolder(node.path); }}
-              style={{ width: 14, textAlign: 'center', color: 'var(--fc-textDim)' }}
+              style={{ width: 14, textAlign: 'center', color: 'var(--fc-textDim)', flexShrink: 0 }}
             >
               {isExpanded ? '▾' : '▸'}
             </span>
+          ) : (
+            <span style={{ width: 14, flexShrink: 0 }} />
           )}
           <span style={{ width: 16 }}>{isFolder ? '📁' : '📄'}</span>
           {isRenaming ? (
@@ -298,7 +304,36 @@ export function FileExplorer() {
       style={{ width: '100%', minWidth: 0, minHeight: 0, flex: 1, background: 'var(--fc-bgSurface)', borderRight: '1px solid var(--fc-border)', display: 'flex', flexDirection: 'column', fontSize: 13 }}
       onDrop={(e) => handleDropToFolder(e, '')}
       onDragOver={(e) => e.preventDefault()}
+      onClick={() => setContextMenu(null)}
     >
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            background: 'var(--fc-bgSurface)',
+            border: '1px solid var(--fc-border)',
+            borderRadius: 4,
+            padding: '4px 0',
+            zIndex: 1000,
+            minWidth: 120,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            style={{ padding: '5px 12px', cursor: 'pointer', color: 'var(--fc-text)', fontSize: 12 }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--fc-bgHover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            onClick={() => {
+              setRenamingPath(contextMenu.path);
+              setRenameValue(getBaseName(contextMenu.path));
+              setContextMenu(null);
+            }}
+          >Rename</div>
+        </div>
+      )}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--fc-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontWeight: 600, color: 'var(--fc-textMuted)', fontSize: 12 }}>Project Files</span>
         <div style={{ display: 'flex', gap: 6 }}>
