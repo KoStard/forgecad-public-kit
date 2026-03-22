@@ -74,10 +74,10 @@ export function addGroupRect(
   const tl = g.point(0, height);
 
   // Sides
-  const bottom = g.line(bl, br);
-  const right = g.line(br, tr);
-  const top = g.line(tr, tl);
-  const left = g.line(tl, bl);
+  const bottom = g.line(bl, br, 'bottom');
+  const right = g.line(br, tr, 'right');
+  const top = g.line(tr, tl, 'top');
+  const left = g.line(tl, bl, 'left');
 
   if (!allowRotation) {
     g.fixRotation();

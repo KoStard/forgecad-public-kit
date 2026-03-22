@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * ForgeCAD CLI — Render a .sketch.js to SVG
+ * ForgeCAD CLI — Render a sketch .forge.js to SVG
  *
- * Usage: npx tsx cli/forge-svg.ts <script.sketch.js> [output.svg]
+ * Usage: npx tsx cli/forge-svg.ts <script.forge.js> [output.svg]
  *
  * Uses the real forge engine — no code duplication.
  */
@@ -15,7 +15,7 @@ import { collectProjectFiles } from './collect-files';
 import { buildSketchSvgDocument, buildConstraintSvgDocument } from './sketch-svg';
 
 function usage(): never {
-  console.error('Usage: forgecad export svg <script.sketch.js> [output.svg]');
+  console.error('Usage: forgecad export svg <script.forge.js> [output.svg]');
   process.exit(1);
 }
 

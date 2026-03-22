@@ -7,7 +7,7 @@ import { PRODUCT_DEMO_EXAMPLE_MANIFEST } from './product-demos';
 import type { ExampleManifestEntry, ExampleManifestFamily } from './types';
 import { packageRootFrom } from '../package-runtime';
 
-const EXAMPLE_ARTIFACT_EXTENSIONS = ['.forge.js', '.sketch.js', '.forge-notebook.json'] as const;
+const EXAMPLE_ARTIFACT_EXTENSIONS = ['.forge.js', '.forge-notebook.json'] as const;
 
 export const EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
   ...API_AND_CORPUS_EXAMPLE_MANIFEST,

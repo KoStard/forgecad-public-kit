@@ -120,7 +120,7 @@ function renderDocGroupsForDev(groups) {
 
 const devSkillContent = `---
 name: forgecad
-description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .sketch.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when Codex needs to build or modify ForgeCAD geometry, structure multi-file projects, run notebook cells, validate scripts, or use ForgeCAD export/render tooling.
+description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when Codex needs to build or modify ForgeCAD geometry, structure multi-file projects, run notebook cells, validate scripts, or use ForgeCAD export/render tooling.
 ---
 
 # ForgeCAD
@@ -129,7 +129,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 ## Workflow
 
-1. Identify the artifact: \`.forge.js\`, \`.sketch.js\`, \`.forge-notebook.json\`, SVG asset, or CLI/export task.
+1. Identify the artifact: \`.forge.js\`, \`.forge-notebook.json\`, SVG asset, or CLI/export task.
 2. Load only the docs the task needs (see Source Map below). Start from the top group, add others as needed.
 3. Reuse patterns from \`examples/api/\` before inventing from scratch.
 4. Default to a concrete first pass — easy iteration beats speculative design review.
@@ -184,7 +184,7 @@ function renderDocGroupsForInstall(groups) {
 function buildInstallSkillContent() {
   return `---
 name: forgecad
-description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .sketch.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when Codex needs to build or modify ForgeCAD geometry, structure multi-file projects, run notebook cells, validate scripts, or use ForgeCAD export/render tooling.
+description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when Codex needs to build or modify ForgeCAD geometry, structure multi-file projects, run notebook cells, validate scripts, or use ForgeCAD export/render tooling.
 ---
 
 # ForgeCAD
@@ -193,7 +193,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 ## Workflow
 
-1. Identify the artifact: \`.forge.js\`, \`.sketch.js\`, \`.forge-notebook.json\`, SVG asset, or CLI/export task.
+1. Identify the artifact: \`.forge.js\`, \`.forge-notebook.json\`, SVG asset, or CLI/export task.
 2. Load only the docs the task needs (see Source Map below). Start from the top group, add others as needed.
 3. Default to a concrete first pass — easy iteration beats speculative design review.
 4. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
@@ -275,7 +275,7 @@ Prefer documented primitives, import rules, and placement strategies over invent
 ### Model files
 
 - \`.forge.js\` — parametric part or assembly script; default export is a \`Shape\` or \`Assembly\`.
-- \`.sketch.js\` — 2D sketch script; default export is a \`Sketch\`.
+- \`.forge.js\` files can also be 2D sketch scripts (returning a \`Sketch\`) — sketch vs. part is determined by content, not extension.
 - \`.forge-notebook.json\` — multi-cell notebook for iterative work; preview cell is the active output.
 
 ### Import and composition

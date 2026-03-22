@@ -51,7 +51,7 @@ The result is a CAD workflow that is version-control friendly, AI-editable, and 
 
 ### JS utility modules
 
-ForgeCAD model files (`.forge.js`, `.sketch.js`) can now use standard JS imports for shared helpers:
+ForgeCAD model files (`.forge.js`) can now use standard JS imports for shared helpers:
 
 ```javascript
 import { buildAssembly } from "./assembly-utils.js";
@@ -105,7 +105,7 @@ When an AI model is asked to generate ForgeCAD models, require this workflow:
 2. Read every file listed there.
 3. Read the relevant files in `examples/api/` next.
 4. If the task is exploratory, unfamiliar, or likely to need debugging, start in a `.forge-notebook.json` and iterate there first.
-5. Only then stabilize the result as `.forge.js` / `.sketch.js`, or keep using the notebook when iteration is still active.
+5. Only then stabilize the result as `.forge.js`, or keep using the notebook when iteration is still active.
 6. Read `docs/permanent/API/runtime/` or `docs/permanent/API/output/` only if the task explicitly needs viewport behavior, reporting, or export.
 
 Use this instruction in prompts to avoid missing API capabilities or producing invalid model code:
@@ -199,7 +199,7 @@ Open `http://localhost:5173`.
 forgecad studio /path/to/your/project
 ```
 
-ForgeCAD loads `.forge.js` and `.sketch.js` files from that folder, with disk-backed save.
+ForgeCAD loads `.forge.js` files from that folder, with disk-backed save.
 
 ### Blank scratch mode (optional)
 
@@ -252,7 +252,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 | Render a notebook preview | `forgecad render examples/api/notebook-iteration.forge-notebook.json` |
 | Render orbit GIF (solid + wireframe) | `forgecad capture gif examples/cup.forge.js` |
 | List notebook capture options | `forgecad capture gif examples/api/notebook-assembly-debug.forge-notebook.json --list` |
-| Export sketch SVG | `forgecad export svg examples/frame.sketch.js` |
+| Export sketch SVG | `forgecad export svg examples/constraints/01-fully-constrained-rect.forge.js` |
 | Export exact STEP (supported subset only) | `forgecad export step examples/api/brep-exportable.forge.js` |
 | Export exact BREP (supported subset only) | `forgecad export brep examples/api/brep-exportable.forge.js` |
 | Generate report PDF | `forgecad export report examples/cup.forge.js` |
@@ -294,7 +294,7 @@ BREP export support is intentionally tracked as a living parity table in [docs/p
 ## Core architecture
 
 ```text
-User script (.forge.js / .sketch.js)
+User script (.forge.js)
         |
         v
 ForgeCAD modeling layer

@@ -2164,7 +2164,7 @@ fn lm_camera_from_solution() {
     assert_solved(&result, TOL, "LM camera from solution");
 }
 
-/// Full spectrometer from cold start — mirrors the real 06-complex-spectrogram.sketch.js
+/// Full spectrometer from cold start — mirrors the real 06-complex-spectrogram.forge.js
 /// with all constraints including inner camera, light line, etc.
 #[test]
 fn cold_start_full_spectrometer() {

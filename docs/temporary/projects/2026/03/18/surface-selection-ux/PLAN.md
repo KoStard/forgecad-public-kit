@@ -116,15 +116,15 @@ Just `console.log` the surface list from `detectArrangement()`.
 
 Test files in `examples/constraints/` that exercise surface selection:
 
-### 11-surface-grid.sketch.js
+### 11-surface-grid.forge.js
 3×2 grid (6 cells) — tests basic arrangement detection, surface listing, area computation.
 Expected: 6 surfaces detected, each ~2500mm², centroids at grid cell centers.
 
-### 12-surface-nested.sketch.js
+### 12-surface-nested.forge.js
 Outer rectangle with inner rectangle forming a frame — tests hole/frame topology.
 Expected: 2 surfaces (frame ring + inner rectangle), correct areas.
 
-### 13-surface-complex.sketch.js
+### 13-surface-complex.forge.js
 L-shaped profile with diagonal divider — tests non-rectangular regions, triangular faces.
 Expected: Multiple surfaces with different shapes and areas.
 
@@ -143,6 +143,6 @@ Expected: Multiple surfaces with different shapes and areas.
 | `cli/forge-svg.ts` | Fall back to constraint SVG for ConstraintSketch objects |
 | `src/components/Viewport.tsx` | Added `surfaceFills` memo and colored fill mesh rendering |
 | `src/components/ViewPanel.tsx` | Added surfaces section with color swatch, area, and seed |
-| `examples/constraints/11-surface-grid.sketch.js` | **New** — 3×2 grid test (6 surfaces) |
-| `examples/constraints/12-surface-nested.sketch.js` | **New** — nested rectangles test (frame + inner) |
-| `examples/constraints/13-surface-complex.sketch.js` | **New** — L-shape with diagonals test (3 surfaces) |
+| `examples/constraints/11-surface-grid.forge.js` | **New** — 3×2 grid test (6 surfaces) |
+| `examples/constraints/12-surface-nested.forge.js` | **New** — nested rectangles test (frame + inner) |
+| `examples/constraints/13-surface-complex.forge.js` | **New** — L-shape with diagonals test (3 surfaces) |

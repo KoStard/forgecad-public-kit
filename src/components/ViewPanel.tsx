@@ -1,5 +1,5 @@
 import { useForgeStore } from '../store/forgeStore';
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactElement, type ReactNode } from 'react';
 import type { SceneObject } from '@forge/index';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
@@ -9,6 +9,33 @@ import { getCameraForwardVector, type ViewportCameraState } from '../capture/cam
 import { formatRenderSceneCliSpec, type ViewportRenderSceneState } from '../capture/renderSceneState';
 import { ConstructionTreePanel } from './ConstructionTreePanel';
 import { formatArea } from '@forge/units';
+
+function CollapsibleSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <div
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          fontSize: 10,
+          color: 'var(--fc-textDim)',
+          marginBottom: open ? 2 : 0,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          cursor: 'pointer',
+          userSelect: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+        }}
+      >
+        <span style={{ fontSize: 8 }}>{open ? '\u25BE' : '\u25B8'}</span>
+        {title} ({count})
+      </div>
+      {open && children}
+    </div>
+  );
+}
 
 const btnStyle = (active = false): CSSProperties => ({
   padding: '4px 8px',
@@ -288,6 +315,7 @@ export function ViewPanel() {
   const setHoveredSurfaceIndex = useForgeStore((s) => s.setHoveredSurfaceIndex);
   const selectedSketchEntityId = useForgeStore((s) => s.selectedSketchEntityId);
   const setSelectedSketchEntityId = useForgeStore((s) => s.setSelectedSketchEntityId);
+  const surfacesVisible = useForgeStore((s) => s.surfacesVisible);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
   const setCutPlaneEnabled = useForgeStore((s) => s.setCutPlaneEnabled);
   const sectionPlaneGuidesEnabled = useForgeStore((s) => s.sectionPlaneGuidesEnabled);
@@ -326,6 +354,7 @@ export function ViewPanel() {
   );
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
   const [sceneCopyStatus, setSceneCopyStatus] = useState<string | null>(null);
+  const [constraintsSectionOpen, setConstraintsSectionOpen] = useState(true);
   const sceneCopyTimeoutRef = useRef<number | null>(null);
   const cameraForward = useMemo(
     () => (viewportCameraState ? getCameraForwardVector(viewportCameraState) : null),
@@ -819,10 +848,7 @@ export function ViewPanel() {
           <div style={labelStyle}>Sketch Geometry</div>
           {/* Edges */}
           {(constraintMeta.edges.lines.length > 0 || constraintMeta.edges.circles.length > 0 || constraintMeta.edges.arcs.length > 0) && (
-            <div style={{ marginBottom: 4 }}>
-              <div style={{ fontSize: 10, color: 'var(--fc-textDim)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Edges ({constraintMeta.edges.lines.length + constraintMeta.edges.circles.length + constraintMeta.edges.arcs.length})
-              </div>
+            <CollapsibleSection title="Edges" count={constraintMeta.edges.lines.length + constraintMeta.edges.circles.length + constraintMeta.edges.arcs.length}>
               {constraintMeta.edges.lines.map((line) => {
                 const isSelected = selectedSketchEntityId === line.id;
                 const len = Math.hypot(line.b[0] - line.a[0], line.b[1] - line.a[1]);
@@ -842,7 +868,7 @@ export function ViewPanel() {
                       color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
                     }}
                   >
-                    <span>{line.id}</span>
+                    <span>{line.name ? <>{line.name} <span style={{ color: 'var(--fc-textDim)', fontSize: 9, opacity: 0.6 }}>{line.id}</span></> : line.id}</span>
                     <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>{len.toFixed(1)}mm</span>
                   </div>
                 );
@@ -865,7 +891,7 @@ export function ViewPanel() {
                       color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
                     }}
                   >
-                    <span>{c.id}</span>
+                    <span>{c.name ? <>{c.name} <span style={{ color: 'var(--fc-textDim)', fontSize: 9, opacity: 0.6 }}>{c.id}</span></> : c.id}</span>
                     <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>r={c.radius.toFixed(1)}mm</span>
                   </div>
                 );
@@ -888,19 +914,16 @@ export function ViewPanel() {
                       color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
                     }}
                   >
-                    <span>{a.id}</span>
+                    <span>{a.name ? <>{a.name} <span style={{ color: 'var(--fc-textDim)', fontSize: 9, opacity: 0.6 }}>{a.id}</span></> : a.id}</span>
                     <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>r={a.radius.toFixed(1)}mm</span>
                   </div>
                 );
               })}
-            </div>
+            </CollapsibleSection>
           )}
           {/* Points */}
           {constraintMeta.edges.points.length > 0 && (
-            <div style={{ marginBottom: 4 }}>
-              <div style={{ fontSize: 10, color: 'var(--fc-textDim)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Points ({constraintMeta.edges.points.length})
-              </div>
+            <CollapsibleSection title="Points" count={constraintMeta.edges.points.length}>
               {constraintMeta.edges.points.map((pt) => {
                 const isSelected = selectedSketchEntityId === pt.id;
                 return (
@@ -913,25 +936,24 @@ export function ViewPanel() {
                       borderRadius: 3,
                       cursor: 'pointer',
                       display: 'flex',
-                      justifyContent: 'space-between',
+                      flexDirection: 'column',
                       background: isSelected ? 'rgba(74,163,255,0.15)' : 'transparent',
                       border: isSelected ? '1px solid rgba(74,163,255,0.4)' : '1px solid transparent',
                       color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
                     }}
                   >
                     <span>{pt.id}</span>
-                    <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>({pt.pos[0].toFixed(1)}, {pt.pos[1].toFixed(1)})</span>
+                    {isSelected && (
+                      <span style={{ color: 'var(--fc-textDim)', fontSize: 10, paddingLeft: 8 }}>({pt.pos[0].toFixed(1)}, {pt.pos[1].toFixed(1)})</span>
+                    )}
                   </div>
                 );
               })}
-            </div>
+            </CollapsibleSection>
           )}
           {/* Construction */}
           {(constraintMeta.construction.lines.length > 0 || constraintMeta.construction.circles.length > 0) && (
-            <div style={{ marginBottom: 4 }}>
-              <div style={{ fontSize: 10, color: 'var(--fc-textDim)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Construction ({constraintMeta.construction.lines.length + constraintMeta.construction.circles.length + constraintMeta.construction.arcs.length})
-              </div>
+            <CollapsibleSection title="Construction" count={constraintMeta.construction.lines.length + constraintMeta.construction.circles.length + constraintMeta.construction.arcs.length}>
               {constraintMeta.construction.lines.map((line) => (
                 <div key={line.id} style={{ fontSize: 11, padding: '2px 6px', color: '#888', fontStyle: 'italic' }}>
                   {line.id}
@@ -942,15 +964,18 @@ export function ViewPanel() {
                   {c.id} — r={c.radius.toFixed(1)}mm
                 </div>
               ))}
-            </div>
+            </CollapsibleSection>
           )}
         </div>
       )}
 
       {constraintMeta && (
         <div style={sectionStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>Constraints</span>
+          <div
+            onClick={() => setConstraintsSectionOpen((v) => !v)}
+            style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}
+          >
+            <span><span style={{ fontSize: 8, marginRight: 4 }}>{constraintsSectionOpen ? '\u25BE' : '\u25B8'}</span>Constraints ({constraintMeta.constraints.length})</span>
             <span style={{ fontSize: 11, color: constraintStatusColor }}>
               {constraintMeta.status}
               {constraintMeta.dof !== 0 && (
@@ -960,6 +985,7 @@ export function ViewPanel() {
               )}
             </span>
           </div>
+          {constraintsSectionOpen && (<>
           {constraintMeta.timedOut && (
             <div style={{
               fontSize: 11,
@@ -998,17 +1024,7 @@ export function ViewPanel() {
                 {constraint.label}
               </span>
               {constraint.isDimension && constraint.value !== undefined ? (
-                <input
-                  type="number"
-                  value={constraint.value}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                    const nextValue = Number(e.target.value);
-                    if (Number.isNaN(nextValue) || !selectedObject) return;
-                    updateSketchConstraint(selectedObject.id, constraint.id, nextValue);
-                  }}
-                  style={inputStyle}
-                />
+                <span style={{ fontSize: 12, color: 'var(--fc-text)' }}>{constraint.value.toFixed(2)} {lengthUnit}</span>
               ) : (
                 <span style={{ fontSize: 12, color: 'var(--fc-textDim)' }}>{constraint.type}</span>
               )}
@@ -1027,10 +1043,16 @@ export function ViewPanel() {
               ))}
             </div>
           )}
+          </>)}
           {constraintMeta.surfaces && constraintMeta.surfaces.length > 0 && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 4 }}>
-                Surfaces ({constraintMeta.surfaces.length})
+              <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Surfaces ({constraintMeta.surfaces.length})</span>
+                <span
+                  onClick={(e) => { e.stopPropagation(); useForgeStore.getState().toggleSurfaces(); }}
+                  style={{ cursor: 'pointer', fontSize: 13, opacity: surfacesVisible ? 1 : 0.4, userSelect: 'none' }}
+                  title={surfacesVisible ? 'Hide surfaces' : 'Show surfaces'}
+                >{surfacesVisible ? '\u25C9' : '\u25CE'}</span>
               </div>
               {constraintMeta.surfaces.map((s) => {
                 const palette = ['#4488cc', '#44cc88', '#cc8844', '#cc44aa', '#88cc44', '#44aacc', '#aa44cc', '#cccc44'];

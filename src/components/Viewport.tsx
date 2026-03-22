@@ -12,6 +12,7 @@ import type {
   JointOverlayViewConfig,
 } from '@forge/index';
 import type { DimensionDef } from '@forge/sketch/dimensions';
+import type { HighlightDef } from '@forge/sketch/highlights';
 import type { SketchConstraintMeta, AnnotationElement } from '@forge/sketch/constraints/types';
 import type { CutPlaneDef } from '@forge/cutPlane';
 import { shapeToGeometry } from '@forge/meshToGeometry';
@@ -2047,6 +2048,7 @@ function SketchObject({
   onVertexHover?: (pointId: string, event: ThreeEvent<PointerEvent>) => void;
 }) {
   const sketchTheme = useForgeStore((s) => themes[s.theme]);
+  const surfacesVisible = useForgeStore((s) => s.surfacesVisible);
   const [hoveredEntity, setHoveredEntity] = useState<SketchHoveredEntity | null>(null);
   const [hoveredSurfIdx, setHoveredSurfIdx] = useState<number | null>(null);
   const worldThresholdRef = useRef(5);
@@ -2169,6 +2171,14 @@ function SketchObject({
 
     if (!obj.sketchMeta) return { labels, lines, triangles, arcs };
 
+    // Compute centroid of all sketch points to determine "inside" direction
+    const allPts = obj.sketchMeta.edges.points;
+    let cx = 0, cy = 0;
+    if (allPts.length > 0) {
+      for (const pt of allPts) { cx += pt.pos[0]; cy += pt.pos[1]; }
+      cx /= allPts.length; cy /= allPts.length;
+    }
+
     for (const c of obj.sketchMeta.constraints) {
       const color = c.isConflicting ? sketchTheme.sketchConflicting : c.isRedundant ? sketchTheme.sketchRedundant : sketchTheme.sketchConstraint;
       let annIdx = 0;
@@ -2185,7 +2195,22 @@ function SketchObject({
           // Extension lines (from → dimension line, to → dimension line)
           const dx = ann.to[0] - ann.from[0], dy = ann.to[1] - ann.from[1];
           const len = Math.sqrt(dx * dx + dy * dy) || 1;
-          const nx = -dy / len * ann.offset, ny = dx / len * ann.offset;
+          // Perpendicular direction: (-dy, dx) / len
+          let perpX = -dy / len, perpY = dx / len;
+          // Flip perpendicular if it points toward the centroid (inside the body)
+          const segMidX = (ann.from[0] + ann.to[0]) / 2;
+          const segMidY = (ann.from[1] + ann.to[1]) / 2;
+          const toCentroidX = cx - segMidX, toCentroidY = cy - segMidY;
+          const toCentroidLen = Math.sqrt(toCentroidX * toCentroidX + toCentroidY * toCentroidY);
+          if (toCentroidLen > 1e-6) {
+            // If perpendicular points toward centroid, flip the offset sign
+            const dot = perpX * toCentroidX + perpY * toCentroidY;
+            if (dot * ann.offset > 0) {
+              // Perpendicular and offset both point toward centroid — flip
+              perpX = -perpX; perpY = -perpY;
+            }
+          }
+          const nx = perpX * ann.offset, ny = perpY * ann.offset;
           const f: [number, number] = [ann.from[0] + nx, ann.from[1] + ny];
           const t: [number, number] = [ann.to[0] + nx, ann.to[1] + ny];
           // Extension lines
@@ -2333,6 +2358,23 @@ function SketchObject({
     });
   }, [obj.sketchMeta, sketchTheme]);
 
+  // Pulse animation for highlighted entities — oscillates between 0.5 and 1.0.
+  const highlightPulseRef = useRef(1.0);
+  useFrame(({ clock }) => {
+    highlightPulseRef.current = 0.75 + 0.25 * Math.sin(clock.elapsedTime * 4);
+  });
+
+  // Build a lookup set for programmatic highlights.
+  const highlightMap = useMemo(() => {
+    const map = new Map<string, HighlightDef>();
+    const highlights = obj.sketchMeta?.highlights;
+    if (!highlights) return map;
+    for (const h of highlights) {
+      map.set(h.entityId, h);
+    }
+    return map;
+  }, [obj.sketchMeta]);
+
   // Bounding box covering all sketch geometry — used as a transparent hit plane so
   // pointer events fire even when the cursor is over edges/vertices outside the fill.
   const hitPlaneBounds = useMemo(() => {
@@ -2421,7 +2463,7 @@ function SketchObject({
         </mesh>
       )}
       {/* Surface region fills from arrangement detection */}
-      {surfaceFills.length > 0 && surfaceFills.map((sf) => {
+      {surfacesVisible && surfaceFills.length > 0 && surfaceFills.map((sf) => {
         const isHovered = hoveredSurfIdx === sf.index;
         const isSelected = selectedSurfaceIndex === sf.index;
         const opacity = isSelected ? 0.45 : isHovered ? 0.35 : 0.15;
@@ -2432,7 +2474,7 @@ function SketchObject({
         );
       })}
       {/* Transparent hit plane for detecting hovers near edges when no fill is present */}
-      {isSketchMode && obj.sketchMeta && !fillGeo && (
+      {isSketchMode && obj.sketchMeta && (
         <mesh
           position={[0, 0, -0.5]}
           onPointerMove={(e) => {
@@ -2522,6 +2564,125 @@ function SketchObject({
           </Html>
         );
       })}
+      {/* Programmatic debug highlights — thicker overlay lines on highlighted edges */}
+      {highlightMap.size > 0 && edgeLines.lines.map((edge) => {
+        const hl = highlightMap.get(edge.id);
+        if (!hl) return null;
+        const color = hl.color ?? '#ff00ff';
+        return (
+          <primitive
+            key={`hl-${edge.id}`}
+            object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({
+              color,
+              linewidth: 4,
+              transparent: true,
+              opacity: hl.pulse ? highlightPulseRef.current : 0.9,
+              depthWrite: false,
+            }))}
+            raycast={() => null}
+          />
+        );
+      })}
+      {highlightMap.size > 0 && edgeLines.circles.map((edge) => {
+        const hl = highlightMap.get(edge.id);
+        if (!hl) return null;
+        const color = hl.color ?? '#ff00ff';
+        return (
+          <primitive
+            key={`hl-${edge.id}`}
+            object={new THREE.Line(edge.geo, new THREE.LineBasicMaterial({
+              color,
+              linewidth: 4,
+              transparent: true,
+              opacity: hl.pulse ? highlightPulseRef.current : 0.9,
+              depthWrite: false,
+            }))}
+            raycast={() => null}
+          />
+        );
+      })}
+      {highlightMap.size > 0 && edgeLines.points.map((pt) => {
+        const hl = highlightMap.get(pt.id);
+        if (!hl) return null;
+        const color = hl.color ?? '#ff00ff';
+        return (
+          <Html
+            key={`hl-${pt.id}`}
+            position={[pt.pos[0], pt.pos[1], 0.06]}
+            center
+            zIndexRange={[0, 0]}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              background: color,
+              opacity: hl.pulse ? highlightPulseRef.current : 0.9,
+              boxShadow: `0 0 8px ${color}`,
+            }} />
+          </Html>
+        );
+      })}
+      {/* Highlight labels rendered near highlighted entities */}
+      {highlightMap.size > 0 && edgeLines.points.map((pt) => {
+        const hl = highlightMap.get(pt.id);
+        if (!hl?.label) return null;
+        return (
+          <Html
+            key={`hl-label-${pt.id}`}
+            position={[pt.pos[0], pt.pos[1], 0.07]}
+            center
+            zIndexRange={[0, 0]}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div style={{
+              position: 'absolute',
+              left: 8,
+              top: -8,
+              background: 'rgba(0,0,0,0.75)',
+              color: hl.color ?? '#ff00ff',
+              fontSize: 11,
+              padding: '1px 5px',
+              borderRadius: 3,
+              whiteSpace: 'nowrap',
+              fontFamily: 'monospace',
+            }}>
+              {hl.label}
+            </div>
+          </Html>
+        );
+      })}
+      {/* Highlight labels for lines — positioned at midpoint */}
+      {highlightMap.size > 0 && edgeLines.lines.map((edge) => {
+        const hl = highlightMap.get(edge.id);
+        if (!hl?.label) return null;
+        const pos = edge.geo.attributes.position;
+        if (!pos || pos.count < 2) return null;
+        const mx = (pos.getX(0) + pos.getX(pos.count - 1)) / 2;
+        const my = (pos.getY(0) + pos.getY(pos.count - 1)) / 2;
+        return (
+          <Html
+            key={`hl-label-${edge.id}`}
+            position={[mx, my, 0.07]}
+            center
+            zIndexRange={[0, 0]}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div style={{
+              background: 'rgba(0,0,0,0.75)',
+              color: hl.color ?? '#ff00ff',
+              fontSize: 11,
+              padding: '1px 5px',
+              borderRadius: 3,
+              whiteSpace: 'nowrap',
+              fontFamily: 'monospace',
+            }}>
+              {hl.label}
+            </div>
+          </Html>
+        );
+      })}
       {hitPlaneBounds && (
         <mesh position={[hitPlaneBounds.cx, hitPlaneBounds.cy, -0.02]}>
           <planeGeometry args={[hitPlaneBounds.w, hitPlaneBounds.h]} />
@@ -2541,8 +2702,8 @@ function SketchObject({
         );
         return (
           <primitive key={line.key} object={new THREE.Line(geo,
-            new THREE.LineBasicMaterial({ color: line.color, transparent: true, opacity: line.opacity ?? 1, depthWrite: false })
-          )} raycast={() => null} />
+            new THREE.LineBasicMaterial({ color: line.color, transparent: true, opacity: line.opacity ?? 1, depthWrite: false, depthTest: false })
+          )} renderOrder={5} raycast={() => null} />
         );
       })}
       {constraintAnnotations.arcs.map((arc) => {
@@ -2551,8 +2712,8 @@ function SketchObject({
         );
         return (
           <primitive key={arc.key} object={new THREE.Line(geo,
-            new THREE.LineBasicMaterial({ color: arc.color, depthWrite: false })
-          )} raycast={() => null} />
+            new THREE.LineBasicMaterial({ color: arc.color, depthWrite: false, depthTest: false })
+          )} renderOrder={5} raycast={() => null} />
         );
       })}
       {constraintAnnotations.triangles.map((tri) => {
@@ -2563,9 +2724,9 @@ function SketchObject({
         shape.closePath();
         const geo = new THREE.ShapeGeometry(shape);
         return (
-          <mesh key={tri.key} position={[0, 0, 0.08]}>
+          <mesh key={tri.key} position={[0, 0, 0.08]} renderOrder={5}>
             <primitive object={geo} attach="geometry" />
-            <meshBasicMaterial color={tri.color} depthWrite={false} side={THREE.DoubleSide} />
+            <meshBasicMaterial color={tri.color} depthWrite={false} depthTest={false} side={THREE.DoubleSide} />
           </mesh>
         );
       })}
@@ -2777,18 +2938,24 @@ function DimensionAnnotation({ def, lengthUnit: dimUnit }: { def: DimensionDef; 
     const dirN = dir.clone().normalize();
     const ax = Math.abs(dirN.x), ay = Math.abs(dirN.y), az = Math.abs(dirN.z);
 
-    // Pick a perpendicular axis that pushes "outward" for typical geometry at origin:
-    // X-aligned → −Y, Y-aligned → −X, Z-aligned → −Y, diagonal → cross with Z then fallback
+    // Pick a perpendicular that pushes AWAY from the sketch origin (0,0).
+    // Compute the two possible perpendiculars and choose the one whose dot product
+    // with (midpoint - origin) is positive, so dims go outside the body.
     let perp: THREE.Vector3;
     if (az > ax && az > ay) {
-      // Mostly Z-aligned → offset in −Y
       perp = new THREE.Vector3(0, -1, 0);
     } else if (ay > ax) {
-      // Mostly Y-aligned → offset in −X
       perp = new THREE.Vector3(-1, 0, 0);
     } else {
-      // Mostly X-aligned → offset in −Y
       perp = new THREE.Vector3(0, -1, 0);
+    }
+    // Flip perpendicular so it points away from origin relative to the segment midpoint
+    const segMid = from.clone().add(to).multiplyScalar(0.5);
+    if (segMid.lengthSq() > 1e-8) {
+      // If perp points toward origin (dot < 0), flip it
+      if (perp.dot(segMid) < 0) {
+        perp.negate();
+      }
     }
     perp.multiplyScalar(def.offset);
 
@@ -2896,23 +3063,23 @@ function DimensionAnnotation({ def, lengthUnit: dimUnit }: { def: DimensionDef; 
   if (dist < 1e-6) return null;
 
   return (
-    <group>
+    <group renderOrder={10}>
       <lineSegments geometry={extAGeo}>
-        <lineBasicMaterial color={color} transparent opacity={0.4} />
+        <lineBasicMaterial color={color} transparent opacity={0.4} depthTest={false} depthWrite={false} />
       </lineSegments>
       <lineSegments geometry={extBGeo}>
-        <lineBasicMaterial color={color} transparent opacity={0.4} />
+        <lineBasicMaterial color={color} transparent opacity={0.4} depthTest={false} depthWrite={false} />
       </lineSegments>
       <lineSegments geometry={dimLineGeo}>
-        <lineBasicMaterial color={color} transparent opacity={0.8} />
+        <lineBasicMaterial color={color} transparent opacity={0.8} depthTest={false} depthWrite={false} />
       </lineSegments>
       <mesh ref={arrowStartRef} position={dimStart} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dimDir)}>
         <coneGeometry args={[0.5, 1, 8]} />
-        <meshBasicMaterial color={color} />
+        <meshBasicMaterial color={color} depthTest={false} depthWrite={false} />
       </mesh>
       <mesh ref={arrowEndRef} position={dimEnd} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dimDir.clone().negate())}>
         <coneGeometry args={[0.5, 1, 8]} />
-        <meshBasicMaterial color={color} />
+        <meshBasicMaterial color={color} depthTest={false} depthWrite={false} />
       </mesh>
       <sprite ref={labelSpriteRef} position={mid}>
         <spriteMaterial map={labelTextureData.texture} depthTest={false} transparent />
@@ -4623,6 +4790,7 @@ export function Viewport() {
   const objects = result?.objects ?? [];
   const dimensions = result?.dimensions ?? [];
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
+  const surfacesVisible = useForgeStore((s) => s.surfacesVisible);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
   const sectionPlaneGuidesEnabled = useForgeStore((s) => s.sectionPlaneGuidesEnabled);
   const sectionPlaneFillEnabled = useForgeStore((s) => s.sectionPlaneFillEnabled);

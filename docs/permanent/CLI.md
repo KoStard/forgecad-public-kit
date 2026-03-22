@@ -74,7 +74,7 @@ The completions are contextual:
 
 - nested subcommands such as `forgecad notebook view` and `forgecad export step`
 - command-specific flags and common enum values
-- ForgeCAD file suggestions where a command expects `.forge.js`, `.sketch.js`, or `.forge-notebook.json`
+- ForgeCAD file suggestions where a command expects `.forge.js` or `.forge-notebook.json`
 
 ## Available Commands
 
@@ -176,17 +176,17 @@ forgecad run examples/api/notebook-iteration.forge-notebook.json
 forgecad run examples/cup.forge.js --debug-imports
 ```
 
-Runs a `.forge.js`, `.sketch.js`, or notebook preview cell in the real runtime and prints object stats, diagnostics, and execution time.
+Runs a `.forge.js` or notebook preview cell in the real runtime and prints object stats, diagnostics, and execution time.
 
 `--debug-imports` adds an import trace (source file, target file, overrides, return type, success/error phase), useful when debugging `importPart()`/`importSketch()` behavior.
 
 ### SVG Export (no browser needed)
 
 ```bash
-forgecad export svg examples/frame.sketch.js [output.svg]
+forgecad export svg examples/constraints/01-fully-constrained-rect.forge.js [output.svg]
 ```
 
-Runs a `.sketch.js` script in Node.js using the real forge engine and outputs SVG. No browser, no Puppeteer — pure Node.
+Runs a sketch `.forge.js` script in Node.js using the real forge engine and outputs SVG. No browser, no Puppeteer — pure Node.
 
 **How it works:** Initializes the Manifold WASM kernel, runs the script through `runScript()`, extracts the Sketch result, converts polygons to SVG paths.
 
@@ -512,7 +512,6 @@ Runs the checked example manifest for the entire `examples/` tree.
 The manifest currently lives in `cli/example-manifest/` and covers every:
 
 - `.forge.js`
-- `.sketch.js`
 - `.forge-notebook.json`
 
 The command always verifies manifest coverage first, so it fails if:
@@ -683,7 +682,7 @@ import { readdirSync, readFileSync } from 'fs';
 
 const allFiles: Record<string, string> = {};
 for (const f of readdirSync(scriptDir)) {
-  if (f.endsWith('.forge.js') || f.endsWith('.sketch.js') || f.endsWith('.js') || f.endsWith('.svg')) {
+  if (f.endsWith('.forge.js') || f.endsWith('.js') || f.endsWith('.svg')) {
     allFiles[f] = readFileSync(join(scriptDir, f), 'utf-8');
   }
 }

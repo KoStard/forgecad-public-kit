@@ -83,7 +83,11 @@ import {
   takeCollectedDimensions,
   sketchToSvg,
   sketchToDxf,
+  highlight,
+  resetHighlights,
+  getCollectedHighlights,
   type DimensionDef,
+  type HighlightDef,
   type SvgImportOptions,
   type TextOptions,
 } from './sketch';
@@ -159,6 +163,7 @@ export interface RunResult {
   objects: SceneObject[];
   params: ParamDef[];
   dimensions: DimensionDef[];
+  highlights: HighlightDef[];
   bom: BomDef[];
   cutPlanes: CutPlaneDef[];
   explodeView: ExplodeViewOptions | null;
@@ -1206,6 +1211,7 @@ function executeFile(
       textWidth,
       dim,
       dimLine,
+      highlight,
       sketchToSvg,
       sketchToDxf,
       bom,
@@ -1361,6 +1367,7 @@ export function runScript(
   resetParams();
   resetShapeQueryOwnerIds();
   resetDimensions();
+  resetHighlights();
   resetBom();
   resetRobotExport();
   resetCutPlanes();
@@ -1620,6 +1627,16 @@ export function runScript(
       pushSketch(result, fileName, undefined, [fileName]);
     }
 
+    // Inject collected highlights into sketch objects' meta for rendering.
+    const highlights = getCollectedHighlights();
+    if (highlights.length > 0) {
+      for (const obj of objects) {
+        if (obj.sketchMeta) {
+          obj.sketchMeta = { ...obj.sketchMeta, highlights };
+        }
+      }
+    }
+
     const shape = objects.length === 1 ? objects[0].shape : null;
     const sketch = objects.length === 1 ? objects[0].sketch : null;
 
@@ -1629,6 +1646,7 @@ export function runScript(
         objects,
         params: getCollectedParams(),
         dimensions: [...getCollectedDimensions(), ...shapeDimensions],
+        highlights: getCollectedHighlights(),
         bom: getCollectedBom(),
         cutPlanes: getCollectedCutPlanes(),
         explodeView: getCollectedExplodeView(),
@@ -1659,6 +1677,7 @@ export function runScript(
       objects: [],
       params: getCollectedParams(),
       dimensions: getCollectedDimensions(),
+      highlights: getCollectedHighlights(),
       bom: getCollectedBom(),
       cutPlanes: getCollectedCutPlanes(),
       explodeView: getCollectedExplodeView(),

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * ForgeCAD CLI — Export a .sketch.js to a single-page PDF with full constraint visualization.
+ * ForgeCAD CLI — Export a sketch .forge.js to a single-page PDF with full constraint visualization.
  */
 
 import { readFile, writeFile } from 'fs/promises';
@@ -11,7 +11,7 @@ import { collectProjectFiles } from './collect-files';
 import { generateSketchPdf } from '../src/forge/sketch/exportSketchPdf';
 
 function usage(): never {
-  console.error('Usage: forgecad export sketch-pdf <script.sketch.js> [output.pdf]');
+  console.error('Usage: forgecad export sketch-pdf <script.forge.js> [output.pdf]');
   process.exit(1);
 }
 

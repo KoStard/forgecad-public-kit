@@ -101,7 +101,7 @@ const RUNTIME_SCENE_ENTRIES: readonly NonPartEntry[] = [
 
 const SKETCH_ENTRIES: readonly NonPartEntry[] = [
   {
-    path: 'examples/frame.sketch.js',
+    path: 'examples/frame.forge.js',
     note: 'Sketch-only examples validate through the sketch export path instead of scene routing.',
   },
   {
@@ -110,11 +110,11 @@ const SKETCH_ENTRIES: readonly NonPartEntry[] = [
     expect: { minSketchObjects: 5 },
   },
   {
-    path: 'examples/headphone-hanger-profile.sketch.js',
+    path: 'examples/headphone-hanger-profile.forge.js',
     note: 'Sketch-only examples validate through the sketch export path instead of scene routing.',
   },
   {
-    path: 'examples/lamp-shade.sketch.js',
+    path: 'examples/lamp-shade.forge.js',
     note: 'Sketch-only examples validate through the sketch export path instead of scene routing.',
   },
 ] as const;

@@ -171,7 +171,7 @@ function parseCli(argv) {
 // Collect all project files recursively with correct relative paths
 // (mirrors collect-files.ts logic for plain Node)
 
-const FORGE_EXTS = ['.forge.js', '.sketch.js', '.js', '.svg'];
+const FORGE_EXTS = ['.forge.js', '.js', '.svg'];
 const isForgeFile = (f) => FORGE_EXTS.some(ext => f.endsWith(ext));
 
 function collectRec(dir, root) {

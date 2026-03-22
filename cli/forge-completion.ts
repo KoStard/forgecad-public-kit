@@ -102,7 +102,7 @@ const PATH_RULES: Record<CompletionValueKind, PathCompletionRule> = {
   'sketch-script': {
     allowFiles: true,
     allowDirectories: true,
-    fileExtensions: ['.sketch.js'],
+    fileExtensions: ['.forge.js'],
     fileDescription: 'Sketch script',
   },
   png: {

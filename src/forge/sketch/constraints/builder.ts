@@ -131,7 +131,7 @@ export class ConstrainedSketchBuilder {
     return pt.id;
   }
 
-  line(a: PointId, b: PointId, construction = false): LineId {
+  line(a: PointId, b: PointId, construction = false, name?: string): LineId {
     if (!this.points.some((p) => p.id === a)) {
       throw new Error(`line(): point "${a}" not found in sketch`);
     }
@@ -139,7 +139,7 @@ export class ConstrainedSketchBuilder {
       throw new Error(`line(): point "${b}" not found in sketch`);
     }
     const id = `ln-${this.nextId++}`;
-    this.lines.push({ id, a, b, construction });
+    this.lines.push({ id, a, b, construction, name });
     if (this._sessionHandle !== null) {
       this._sessionApi!.session_add_line(this._sessionHandle, id, a, b);
     }
@@ -152,7 +152,7 @@ export class ConstrainedSketchBuilder {
     return line.id;
   }
 
-  circle(center: PointId, radius: number, construction = false, segments = 48): CircleId {
+  circle(center: PointId, radius: number, construction = false, segments = 48, name?: string): CircleId {
     if (!Number.isFinite(radius)) {
       throw new Error(`circle(): radius must be a finite number, got ${radius}`);
     }
@@ -160,7 +160,7 @@ export class ConstrainedSketchBuilder {
       throw new Error(`circle(): center point "${center}" not found in sketch`);
     }
     const id = `c-${this.nextId++}`;
-    this.circles.push({ id, center, radius, construction, fixedRadius: false, segments });
+    this.circles.push({ id, center, radius, construction, fixedRadius: false, segments, name });
     if (this._sessionHandle !== null) {
       this._sessionApi!.session_add_circle(this._sessionHandle, id, center, radius, false);
     }
@@ -233,13 +233,13 @@ export class ConstrainedSketchBuilder {
    * `start` and `end` are existing PointIds that must lie on the arc's circle.
    * Returns the ArcId. Does NOT advance the cursor.
    */
-  arcByCenter(centerId: PointId, startId: PointId, endId: PointId, clockwise = false): ArcId {
+  arcByCenter(centerId: PointId, startId: PointId, endId: PointId, clockwise = false, name?: string): ArcId {
     const center = this.getPoint(centerId);
     const start = this.getPoint(startId);
     if (!center || !start) throw new Error('arcByCenter: invalid point IDs');
     const radius = Math.hypot(start.x - center.x, start.y - center.y);
     const id: ArcId = `arc-${this.nextId++}`;
-    this.arcs.push({ id, center: centerId, start: startId, end: endId, radius, clockwise, construction: false });
+    this.arcs.push({ id, center: centerId, start: startId, end: endId, radius, clockwise, construction: false, name });
     if (this._sessionHandle !== null) {
       this._sessionApi!.session_add_arc(this._sessionHandle, id, centerId, startId, endId, radius, clockwise);
     }
@@ -1162,11 +1162,11 @@ export class SketchGroupBuilder {
   }
 
   /** Connect two group points with a line. Both must be PointIds from this group. */
-  line(a: PointId, b: PointId): LineId {
+  line(a: PointId, b: PointId, name?: string): LineId {
     const id: LineId = `ln-${(this.sk as any).nextId++}`;
     this.localLines.push({ id, a, b });
     // Register in the builder's lines array for constraint resolution.
-    (this.sk as any).lines.push({ id, a, b, construction: false });
+    (this.sk as any).lines.push({ id, a, b, construction: false, name });
     return id;
   }
 

@@ -461,11 +461,11 @@ const commands: CommandDefinition[] = [
   {
     group: 'Export',
     path: ['export', 'svg'],
-    summary: 'Export a `.sketch.js` file to SVG.',
-    usage: ['forgecad export svg <script.sketch.js> [output.svg]'],
+    summary: 'Export a sketch `.forge.js` file to SVG.',
+    usage: ['forgecad export svg <script.forge.js> [output.svg]'],
     examples: [
-      'forgecad export svg examples/frame.sketch.js',
-      'forgecad export svg examples/frame.sketch.js out/frame.svg',
+      'forgecad export svg examples/01-fully-constrained-rect.forge.js',
+      'forgecad export svg examples/01-fully-constrained-rect.forge.js out/rect.svg',
     ],
     completion: {
       positionals: [
@@ -478,11 +478,11 @@ const commands: CommandDefinition[] = [
   {
     group: 'Export',
     path: ['export', 'sketch-pdf'],
-    summary: 'Export a constrained `.sketch.js` to a single-page PDF with dimensions, constraints, and surfaces.',
-    usage: ['forgecad export sketch-pdf <script.sketch.js> [output.pdf]'],
+    summary: 'Export a constrained sketch `.forge.js` to a single-page PDF with dimensions, constraints, and surfaces.',
+    usage: ['forgecad export sketch-pdf <script.forge.js> [output.pdf]'],
     examples: [
-      'forgecad export sketch-pdf examples/frame.sketch.js',
-      'forgecad export sketch-pdf examples/frame.sketch.js out/frame.pdf',
+      'forgecad export sketch-pdf examples/constraints/01-fully-constrained-rect.forge.js',
+      'forgecad export sketch-pdf examples/constraints/01-fully-constrained-rect.forge.js out/rect.pdf',
     ],
     completion: {
       positionals: [

@@ -14,6 +14,7 @@ export * from './patterns';
 export * from './fillets';
 export * from './arcBridge';
 export * from './dimensions';
+export * from './highlights';
 export * from './curves';
 export * from './regions';
 export * from './arrangement';

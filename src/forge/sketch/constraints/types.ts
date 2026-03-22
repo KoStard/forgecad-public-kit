@@ -3,6 +3,7 @@
  *
  * These types describe the Rust-backed boundary and the remaining UI/builder surface.
  */
+import type { HighlightDef } from '../highlights';
 export type PointId = string;
 export type LineId = string;
 export type CircleId = string;
@@ -23,6 +24,8 @@ export interface SketchArc {
   /** True → arc sweeps clockwise from start to end; false → counter-clockwise. */
   clockwise: boolean;
   construction: boolean;
+  /** Optional human-readable name for display. */
+  name?: string;
 }
 
 export interface SketchShape {
@@ -71,6 +74,8 @@ export interface SketchLine {
   a: PointId;
   b: PointId;
   construction: boolean;
+  /** Optional human-readable name for display (e.g. "top", "bottom"). */
+  name?: string;
 }
 
 export interface SketchCircle {
@@ -80,6 +85,8 @@ export interface SketchCircle {
   construction: boolean;
   fixedRadius: boolean;
   segments: number;
+  /** Optional human-readable name for display. */
+  name?: string;
 }
 
 /** A segment in a mixed line/arc profile loop. */
@@ -181,13 +188,15 @@ export interface SketchConstraintMeta {
   };
   /** Non-construction geometry edges rendered as solid wireframe overlay. */
   edges: {
-    lines: { id: string; a: [number, number]; b: [number, number] }[];
-    circles: { id: string; center: [number, number]; radius: number }[];
-    arcs: { id: string; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
+    lines: { id: string; name?: string; a: [number, number]; b: [number, number] }[];
+    circles: { id: string; name?: string; center: [number, number]; radius: number }[];
+    arcs: { id: string; name?: string; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
     points: { id: string; pos: [number, number] }[];
   };
   /** True when the solver hit its time budget before fully converging. */
   timedOut?: boolean;
+  /** Programmatic debug highlights from user code. */
+  highlights?: HighlightDef[];
 }
 
 export interface ConstraintDefinition {
