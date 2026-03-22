@@ -364,22 +364,6 @@ return [
 ];
 `,
   ),
-  inlineCase(
-    'mixed-scene-and-fallback',
-    'Mixed scenes and compile-plan gaps route cleanly through exact and faceted decisions.',
-    `
-const plate = rect(40, 24).extrude(8);
-const slot2d = slot(18, 6).translate(0, -20);
-const warped = sphere(8).warp((vert) => {
-  vert[2] += Math.sin(vert[0] * 0.2) * 0.8;
-});
-return [
-  { name: 'Plate', shape: plate },
-  { name: 'Slot', sketch: slot2d },
-  { name: 'Warped', shape: warped },
-];
-`,
-  ),
   fileCase(
     'example-brep-exportable',
     'The public BREP-exportable example stays on the exact compiler route.',

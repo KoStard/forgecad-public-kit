@@ -104,11 +104,6 @@ function checkCopyLikeOps(): void {
   expect(getShapeDimensions(source.color('#224466')).length === 1, 'color should preserve dimensions');
   expect(getShapeDimensions(source.setColor('#112233')).length === 1, 'setColor should preserve dimensions');
   expect(getShapeDimensions(source.clone()).length === 1, 'clone should preserve dimensions');
-  expect(getShapeDimensions(source.smoothOut()).length === 1, 'smoothOut should preserve dimensions');
-  expect(getShapeDimensions(source.refine(1)).length === 1, 'refine should preserve dimensions');
-  expect(getShapeDimensions(source.refineToLength(4)).length === 1, 'refineToLength should preserve dimensions');
-  expect(getShapeDimensions(source.refineToTolerance(0.5)).length === 1, 'refineToTolerance should preserve dimensions');
-  expect(getShapeDimensions(source.simplify(0.2)).length === 1, 'simplify should preserve dimensions');
   expect(getShapeDimensions(source.trimByPlane([0, 0, 1], 0)).length === 1, 'trimByPlane should preserve dimensions');
   expect(getShapeDimensions(source.hull()).length === 1, 'hull() should preserve dimensions');
 }

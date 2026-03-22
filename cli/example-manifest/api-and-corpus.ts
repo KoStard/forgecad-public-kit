@@ -31,26 +31,13 @@ const API_EXACT_PART_PATHS = [
   'examples/api/rotate-around-to.forge.js',
   'examples/api/sketch-basics.forge.js',
   'examples/api/sketch-on-face.forge.js',
-  'examples/api/spatial-recipes.forge.js',
+  'examples/api/text2d-basics.forge.js',
+  'examples/api/text2d-font.forge.js',
+  'examples/api/extrude-options.forge.js',
+  'examples/api/verification-demo.forge.js',
 ] as const;
 
 const API_FACETED_PARTS = [
-  {
-    path: 'examples/api/benchy-style-hull.forge.js',
-    blocker: 'The lofted/smoothed hull still lacks an exact compile plan, so the primary hull solid intentionally relies on allow-faceted export.',
-    note: 'The cabin and chimney stay exact; the route contract focuses on the hull body.',
-    primaryShapes: ['Hull'],
-  },
-  {
-    path: 'examples/api/curves-surfacing-basics.forge.js',
-    blocker: 'This surfacing demo still depends on loft/sweep geometry outside the exact CadQuery/OCCT subset, so the bottle scene is intentionally faceted.',
-    note: 'The example remains part of the maintained API surface, but only through the faceted route today.',
-  },
-  {
-    path: 'examples/api/elbow-test.forge.js',
-    blocker: 'The shared elbow helper still emits runtime geometry without an exact compile plan, so these elbow variants must use allow-faceted export.',
-    note: 'Keep the helper runtime-covered here while its exact replay story catches up.',
-  },
   {
     path: 'examples/api/face-gears.forge.js',
     blocker: 'Face-gear and perpendicular gear helpers still rely on sampled tooth/profile geometry outside the exact export subset.',
@@ -65,12 +52,6 @@ const API_FACETED_PARTS = [
 
 const API_RECOVERED_FACETED_PARTS = [
   {
-    path: 'examples/api/extrude-options.forge.js',
-    blocker: 'Twisted extrude replay still lacks exact compile intent, so the twist-driven variants intentionally stay on the faceted route.',
-    note: 'The plain, tapered, and centered variants still stay exact; this contract scopes the route claim to the two twist-owned solids in the gallery.',
-    primaryShapes: ['Twisted', 'Twist + Taper'],
-  },
-  {
     path: 'examples/api/gears-tier1.forge.js',
     blocker: 'The spur and ring gear helpers still lower through segmented circle profile geometry outside the exact CadQuery/OCCT subset, so those gears intentionally stay on the faceted route.',
     note: 'The rack gear already stays exact; this contract scopes the route claim to the three gear solids that still require faceted fallback.',
@@ -84,10 +65,12 @@ const COMPILER_CORPUS_PATHS = [
   'examples/compiler-corpus/fastener-plate-variants.forge.js',
   'examples/compiler-corpus/folded-service-panel-cover.forge.js',
   'examples/compiler-corpus/motor-mount-plate.forge.js',
+  'examples/compiler-corpus/post-rewrite-edge-finish.forge.js',
   'examples/compiler-corpus/projection-face-target.forge.js',
   'examples/compiler-corpus/projection-relay-cover.forge.js',
   'examples/compiler-corpus/sensor-bracket.forge.js',
   'examples/compiler-corpus/service-panel-cover.forge.js',
+  'examples/compiler-corpus/shell-box-side-opening.forge.js',
   'examples/compiler-corpus/trimmed-access-cover.forge.js',
 ] as const;
 
@@ -112,5 +95,15 @@ export const API_AND_CORPUS_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
       path,
       exactRoute('The compiler corpus is the defended ordinary-part exact subset and must stay exact.'),
     ),
+  ),
+  partExample(
+    'compiler-corpus',
+    'examples/compiler-corpus/edge-query-demo.forge.js',
+    facetedRoute(
+      'The chamfered-union and pipe shapes use hull/runtime geometry outside the exact subset.',
+      'Most shapes stay exact; this contract scopes the faceted claim to the hull-dependent solids.',
+    ),
+    undefined,
+    ['Chamfered Union', 'Pipe (16 edges)'],
   ),
 ];

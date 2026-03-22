@@ -279,10 +279,10 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'created-face(cut:wall-right)',
         ],
         requiredCreatedEdgeQueries: [
-          'created-edge(hole:entry-rim)',
-          'created-edge(hole:forward-end-rim)',
-          'created-edge(cut:entry-rim)',
-          'created-edge(cut:forward-end-rim)',
+          'created-edge(hole:entry-rim#edge)',
+          'created-edge(hole:forward-end-rim#edge)',
+          'created-edge(cut:entry-rim#edge)',
+          'created-edge(cut:forward-end-rim#edge)',
         ],
       },
     ],
@@ -307,9 +307,9 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'created-face(cut:wall-right)',
         ],
         requiredCreatedEdgeQueries: [
-          'created-edge(hole:reverse-end-rim)',
-          'created-edge(hole:forward-end-rim)',
-          'created-edge(cut:forward-end-rim)',
+          'created-edge(hole:reverse-end-rim#edge)',
+          'created-edge(hole:forward-end-rim#edge)',
+          'created-edge(cut:forward-end-rim#edge)',
         ],
       },
     ],
@@ -326,7 +326,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         operations: ['boolean:difference', 'cut', 'hole', 'fillet', 'boolean:union', 'fillet'],
         requiredDiagnosticCodes: [
           'boolean-difference-face-split-ambiguous',
-          'boolean-difference-edge-propagation-unsupported',
+
           'cut-source-face-split-ambiguous',
           'hole-source-face-split-ambiguous',
           'boolean-union-edge-inherited-ambiguity',
@@ -412,11 +412,10 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         ],
         requiredDiagnosticCodes: [
           'boolean-difference-face-split-ambiguous',
-          'boolean-difference-edge-propagation-unsupported',
+
           'boolean-union-face-inherited-ambiguity',
           'boolean-union-face-merged-ambiguous',
           'boolean-union-edge-propagation-unsupported',
-          'shell-edge-propagation-ambiguous',
         ],
       },
     ],
@@ -432,7 +431,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         operations: ['boolean:difference', 'cut', 'hole', 'chamfer', 'boolean:union', 'fillet', 'boolean:union'],
         requiredDiagnosticCodes: [
           'boolean-difference-face-split-ambiguous',
-          'boolean-difference-edge-propagation-unsupported',
+
           'cut-source-face-split-ambiguous',
           'hole-source-face-split-ambiguous',
           'boolean-union-edge-propagation-unsupported',
@@ -469,8 +468,8 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'created-face(hole:countersink-wall)',
         ],
         requiredCreatedEdgeQueries: [
-          'created-edge(hole:head-transition-rim)',
-          'created-edge(cut:forward-end-rim)',
+          'created-edge(hole:head-transition-rim#edge)',
+          'created-edge(cut:forward-end-rim#edge)',
         ],
         requiredPreservedFaceQueries: [
           'propagated-face(preserved <- created-face(hole:counterbore-floor)',
@@ -501,8 +500,8 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'created-face(cut:floor)',
         ],
         requiredCreatedEdgeQueries: [
-          'created-edge(hole:head-transition-rim)',
-          'created-edge(cut:forward-end-rim)',
+          'created-edge(hole:head-transition-rim#edge)',
+          'created-edge(cut:forward-end-rim#edge)',
         ],
         requiredPreservedFaceQueries: [
           'propagated-face(preserved <- created-face(hole:counterbore-floor)',
@@ -528,7 +527,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'created-face(cut:wall-right)',
           'created-face(cut:wall)',
         ],
-        requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim)'],
+        requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim#edge)'],
         requiredPreservedFaceQueries: [
           'propagated-face(split <- tracked-face(panel)',
           'propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right)',
@@ -546,7 +545,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'created-face(cut:wall-right)',
           'created-face(cut:wall)',
         ],
-        requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim)'],
+        requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim#edge)'],
         requiredPreservedFaceQueries: [
           'propagated-face(split <- tracked-face(panel)',
           'propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right)',

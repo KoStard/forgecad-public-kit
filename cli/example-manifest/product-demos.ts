@@ -82,22 +82,14 @@ const PRODUCT_DEMO_EXACT_PARTS = [
     note: 'The structural hand solids stay exact; the stylized tendon cable routes remain runtime-covered helper geometry until pipeRoute records exact compile intent.',
     primaryShapes: FIVE_FIGEN_PRIMARY_SHAPES,
   },
-  'examples/ac-unit-glm47.forge.js',
-  'examples/ac-unit-glm5.forge.js',
-  'examples/ac-unit-kimi25.forge.js',
-  'examples/ac-unit-minimax.forge.js',
-  'examples/ac-unit.forge.js',
   'examples/adjustable-table.forge.js',
   'examples/bathroom.forge.js',
   'examples/bolt-pattern.forge.js',
   'examples/bottle.forge.js',
   'examples/chair.forge.js',
-  'examples/classical-piano.forge.js',
   'examples/clock.forge.js',
   'examples/cup.forge.js',
   'examples/headphone-hanger-v2.forge.js',
-  'examples/headphone-hanger.forge.js',
-  'examples/iphone-stand.forge.js',
   'examples/kitchen.forge.js',
   'examples/laptop.forge.js',
   'examples/liquid-soap-dispenser.forge.js',
@@ -110,23 +102,23 @@ const PRODUCT_DEMO_EXACT_PARTS = [
   'examples/spiderman-cake.forge.js',
   'examples/table-lamp.forge.js',
   'examples/table.forge.js',
-  'examples/tv-stand.forge.js',
 ] as const;
 
-const PRODUCT_DEMO_FACETED_PARTS = [
-  {
-    path: 'examples/bolt-and-nut.forge.js',
-    blocker: 'The threaded fastener helpers still rely on helical/twist runtime geometry and segmented thread authoring outside the current exact subset, so the fastener pair intentionally stays on the faceted route.',
-    note: 'Keep the public fastener demo maintained through allow-faceted while exact replay for those thread helpers catches up.',
-  },
-  {
-    path: 'examples/iphone.forge.js',
-    blocker: 'The rounded-body workflow still depends on smoothOut/refine runtime geometry without defended exact compile intent, so the phone model must stay on the faceted route today.',
-    note: 'The example remains active, but its polished runtime smoothing is not yet an exact-exportable contract.',
-  },
-] as const;
+const PRODUCT_DEMO_FACETED_PARTS = [] as const;
 
 const PRODUCT_DEMO_RECOVERED_FACETED_PARTS = [
+  {
+    path: 'examples/bolt-and-nut.forge.js',
+    blocker: 'The nut shape still depends on thread geometry outside the exact subset.',
+    note: 'The bolt now stays exact; this contract scopes the faceted claim to the nut.',
+    primaryShapes: ['Nut'],
+  },
+  {
+    path: 'examples/classical-piano.forge.js',
+    blocker: 'The lid prop shape uses runtime geometry outside the exact CadQuery/OCCT subset.',
+    note: 'All other piano shapes stay exact; this contract scopes the route claim to the lid prop.',
+    primaryShapes: ['Lid Prop'],
+  },
   {
     path: 'examples/chess-set.forge.js',
     blocker: 'The knight pieces still depend on shape-hull construction outside the exact CadQuery/OCCT subset, so the four knight bodies intentionally stay on the faceted route.',

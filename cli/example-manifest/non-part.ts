@@ -24,6 +24,18 @@ const ASSEMBLY_ENTRIES: readonly NonPartEntry[] = [
     expect: { minUniqueGroups: 1 },
   },
   {
+    path: 'examples/api/import-assembly.forge.js',
+    note: 'Assemblies are in the architecture-phase gate through runtime solve and scene emission, not exact part-routing parity.',
+  },
+  {
+    path: 'examples/api/import-assembly-merge.forge.js',
+    note: 'Assemblies are in the architecture-phase gate through runtime solve and scene emission, not exact part-routing parity.',
+  },
+  {
+    path: 'examples/api/import-assembly-placed.forge.js',
+    note: 'Assemblies are in the architecture-phase gate through runtime solve and scene emission, not exact part-routing parity.',
+  },
+  {
     path: 'examples/api/runtime-joints-view.forge.js',
     note: 'Assemblies are in the architecture-phase gate through runtime solve and scene emission, not exact part-routing parity.',
     expect: { minJoints: 3, minAnimations: 1 },
@@ -70,11 +82,6 @@ const RUNTIME_SCENE_ENTRIES: readonly NonPartEntry[] = [
     expect: { minUniqueGroups: 3 },
   },
   {
-    path: 'examples/api/import-group-assembly.forge.js',
-    note: 'Multipart importGroup() demo: validates group import, child access, and param overrides at runtime.',
-    expect: { minUniqueGroups: 1 },
-  },
-  {
     path: 'examples/api/section-plane-visualization.forge.js',
     note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
     expect: { minCutPlanes: 2 },
@@ -97,21 +104,21 @@ const RUNTIME_SCENE_ENTRIES: readonly NonPartEntry[] = [
     path: 'examples/shoe-rack-doors.forge.js',
     note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
   },
+  {
+    path: 'examples/sketch-regions.forge.js',
+    note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
+  },
+  {
+    path: 'examples/toolbox/bolted-joint.forge.js',
+    note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
+  },
 ] as const;
 
 const SKETCH_ENTRIES: readonly NonPartEntry[] = [
   {
-    path: 'examples/frame.forge.js',
-    note: 'Sketch-only examples validate through the sketch export path instead of scene routing.',
-  },
-  {
     path: 'examples/api/sketch-rounding-strategies.forge.js',
     note: 'Sketch-only examples validate through the sketch export path instead of scene routing.',
     expect: { minSketchObjects: 5 },
-  },
-  {
-    path: 'examples/headphone-hanger-profile.forge.js',
-    note: 'Sketch-only examples validate through the sketch export path instead of scene routing.',
   },
   {
     path: 'examples/lamp-shade.forge.js',

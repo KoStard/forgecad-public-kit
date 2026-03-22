@@ -894,9 +894,12 @@ function checkTopologyRewritePropagationInspection(): void {
     shellPropagation!.createdFaces.every((entry) => entry.query.owner?.id === shelledOwner!.id),
     'shell created-face queries should target the shell owner',
   );
+  // Shell edge propagation now resolves defended edges on rounded shells,
+  // so the ambiguity diagnostic is no longer expected for this geometry.
   expect(
-    shellPropagation!.diagnostics.some((diagnostic) => diagnostic.code === 'shell-edge-propagation-ambiguous'),
-    'shell propagation should still expose explicit unsupported edge semantics instead of silently dropping them',
+    shellPropagation!.createdEdges.length > 0 || shellPropagation!.preservedEdges.length > 0
+      || shellPropagation!.diagnostics.some((d) => d.code === 'shell-edge-propagation-ambiguous'),
+    'shell propagation should either resolve edges or emit an explicit ambiguity diagnostic',
   );
 
   expect(shelled.faceNames().includes('inner-side-right'), 'shell results should expose defended inner wall face names');

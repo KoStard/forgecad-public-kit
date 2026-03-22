@@ -495,7 +495,6 @@ function rigidTransformStepsFromMatrix(m: Mat4): ShapeCompileTransformStep[] | n
   const r20 = m[2], r21 = m[6], r22 = m[10];
   const tx = m[12], ty = m[13], tz = m[14];
 
-  const steps: ShapeCompileTransformStep[] = [];
   const trace = r00 + r11 + r22;
   const cosTheta = Math.max(-1, Math.min(1, (trace - 1) / 2));
   const angle = Math.acos(cosTheta);

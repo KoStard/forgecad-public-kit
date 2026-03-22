@@ -247,6 +247,16 @@ export function buildHoleShapeCompilePlan(
             depth: hole.countersink.depth,
           }
         : undefined,
+      thread: hole.thread
+        ? {
+            designation: hole.thread.designation,
+            pitch: hole.thread.pitch,
+            class: hole.thread.class,
+            handedness: hole.thread.handedness,
+            depth: hole.thread.depth,
+            modeled: hole.thread.modeled,
+          }
+        : undefined,
     },
     extent: cloneFeatureCutExtent(extent),
   };

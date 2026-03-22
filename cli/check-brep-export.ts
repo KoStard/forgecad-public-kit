@@ -439,18 +439,24 @@ return [{ name: 'Moved', shape: moved }];
 `);
 
   const steps = collectShapeTransforms(plan);
-  const rotateAround = steps.find((step) => step.kind === 'rotateAround');
-  assert(rotateAround, 'Expected rigid transform(matrix) to preserve an exact rotation step');
-  assert.equal(Math.round(rotateAround.axisX), 0);
-  assert.equal(Math.round(rotateAround.axisY), 0);
-  assert.equal(Math.round(rotateAround.axisZ), 1);
-  assert.equal(Math.round(rotateAround.degrees), 90);
-
-  const translate = steps.find((step) => step.kind === 'translate');
-  assert(translate, 'Expected rigid transform(matrix) to preserve an exact translation step');
-  assert.equal(Math.round(translate.x), 4);
-  assert.equal(Math.round(translate.y), 15);
-  assert.equal(Math.round(translate.z), 2);
+  // Rigid matrix transforms are preserved as a single workplanePlacement step
+  // containing the full 4×4 matrix. This avoids fragile axis/angle decomposition.
+  const placement = steps.find((step) => step.kind === 'workplanePlacement');
+  assert(placement, 'Expected rigid transform(matrix) to preserve a workplanePlacement step');
+  const m = placement.matrix;
+  assert(Array.isArray(m) && m.length === 16, 'workplanePlacement matrix should be a 16-element array');
+  // Verify the matrix encodes the expected rotation (90° around Z) + translation
+  // Rotation 90° around Z: col0=[0,1,0], col1=[-1,0,0], col2=[0,0,1]
+  assert.equal(Math.round(m[0]), 0, 'r00 should be ~0');   // cos(90)
+  assert.equal(Math.round(m[1]), 1, 'r10 should be ~1');   // sin(90)
+  assert.equal(Math.round(m[4]), -1, 'r01 should be ~-1'); // -sin(90)
+  assert.equal(Math.round(m[5]), 0, 'r11 should be ~0');   // cos(90)
+  assert.equal(Math.round(m[10]), 1, 'r22 should be ~1');
+  // Translation is embedded after rotation: T·R applied to a point
+  // The matrix stores column-major, so m[12..14] are the translation
+  assert.equal(Math.round(m[12]), 4, 'tx should be ~4');
+  assert.equal(Math.round(m[13]), 15, 'ty should be ~15');
+  assert.equal(Math.round(m[14]), 2, 'tz should be ~2');
 }
 
 function checkPointAlongOnPrimitiveBoolean(): void {

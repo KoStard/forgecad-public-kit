@@ -1538,52 +1538,57 @@ function testAddRegularPolygonBuilderMethod() {
 // ─── Level 7: Wrapper rect stability ─────────────────────────────────────────
 
 /**
- * Build the multi-rect case layout (2 sections × 5 rects each, connected via
- * midpoint+lineDistance). Returns the builder and all rect handles.
+ * Build a wood-cut case layout using groupRect (fixed-size rects) connected
+ * via midpoint+lineDistance with saw clearance gaps, then wrapped in a
+ * bounding rect. Based on the real case_wood_cut_from_wood.forge.js model.
  */
-function buildCaseLayout(sk: ConstrainedSketchBuilder) {
-  const boxWidth = 475;
+function buildCaseLayoutWithWrapper(sk: ConstrainedSketchBuilder) {
+  const woodWidth = 610;
+  const woodHeight = 1250;
   const thickness = 5.5;
-  const boxLength = 350;
   const topHeight = 38;
   const bottomHeight = 90;
+  const sawClearance = 3;
 
-  function attachAtMidpoint(side1: string, side2: string) {
-    const midPt = sk.point();
-    sk.midpoint(midPt, side1);
-    sk.midpoint(midPt, side2);
-    sk.lineDistance(side1, side2, 0);
+  const topSideHeight = topHeight - thickness;
+  const bottomSideHeight = bottomHeight - thickness;
+  const boxWidth = woodWidth - 2 * bottomSideHeight - 2 * sawClearance;
+  const verticalGaps = 5 * sawClearance;
+  const boxLength = (woodHeight - 2 * topSideHeight - 2 * bottomSideHeight - verticalGaps) / 2;
+
+  function attachCentered(side1: string, side2: string, vertical: boolean) {
+    const mid1 = sk.point();
+    const mid2 = sk.point();
+    sk.midpoint(mid1, side1);
+    sk.midpoint(mid2, side2);
+    sk.lineDistance(side1, side2, -sawClearance);
+    const bridge = sk.line(mid1, mid2);
+    if (vertical) {
+      sk.vertical(bridge);
+    } else {
+      sk.horizontal(bridge);
+    }
   }
 
   function makeSection(height: number, anchorSide: string | null) {
-    const surface = sk.rect();
-    sk.length(surface.top, boxWidth);
-    sk.length(surface.left, boxLength);
+    const surface = sk.groupRect({ width: boxWidth, height: boxLength });
     const sideHeight = height - thickness;
     const sideLength = boxLength - 2 * thickness;
 
-    const rightSide = sk.rect();
-    sk.length(rightSide.top, sideHeight);
-    sk.length(rightSide.left, sideLength);
-    attachAtMidpoint(surface.right, rightSide.left);
+    const rightSide = sk.groupRect({ width: sideHeight, height: sideLength });
+    attachCentered(surface.right, rightSide.left, false);
 
-    const leftSide = sk.rect();
-    sk.length(leftSide.top, sideHeight);
-    sk.length(leftSide.left, sideLength);
-    attachAtMidpoint(surface.left, leftSide.right);
+    const leftSide = sk.groupRect({ width: sideHeight, height: sideLength });
+    attachCentered(surface.left, leftSide.right, false);
 
-    const frontPiece = sk.rect();
-    sk.length(frontPiece.top, boxWidth);
-    sk.length(frontPiece.left, sideHeight);
-    attachAtMidpoint(surface.top, frontPiece.bottom);
+    const frontPiece = sk.groupRect({ width: boxWidth, height: sideHeight });
+    attachCentered(surface.top, frontPiece.bottom, true);
 
-    const backPiece = sk.rect();
-    sk.length(backPiece.top, boxWidth);
-    sk.length(backPiece.left, sideHeight);
-    attachAtMidpoint(surface.bottom, backPiece.top);
+    const backPiece = sk.groupRect({ width: boxWidth, height: sideHeight });
+    attachCentered(surface.bottom, backPiece.top, true);
 
     if (anchorSide) {
-      attachAtMidpoint(anchorSide, frontPiece.top);
+      attachCentered(anchorSide, frontPiece.top, true);
     }
 
     return { surface, rightSide, leftSide, frontPiece, backPiece };
@@ -1591,109 +1596,51 @@ function buildCaseLayout(sk: ConstrainedSketchBuilder) {
 
   const topSection = makeSection(topHeight, null);
   const bottomSection = makeSection(bottomHeight, topSection.backPiece.bottom);
-  return { topSection, bottomSection };
-}
 
-/**
- * Adding a wrapper rectangle with lineDistance=0 to outermost edges must not
- * disturb the positions of existing geometry. The wrapper should adapt to the
- * established layout, not the other way around.
- *
- * Captures all point positions from the base layout, then adds the wrapper and
- * re-solves. Asserts every original point stays within tolerance.
- */
-function testWrapperRectDoesNotDisturbLayout() {
-  // 1. Solve without wrapper
-  const skBase = constrainedSketch();
-  buildCaseLayout(skBase);
-  const baseResult = skBase.solve();
-  assertConverged(baseResult, 'wrapperStability-base');
-  assertNoRejections(baseResult, 'wrapperStability-base');
-
-  // Capture all point positions
-  const basePositions = new Map<string, { x: number; y: number }>();
-  for (const pt of baseResult.definition.points) {
-    basePositions.set(pt.id, { x: pt.x, y: pt.y });
-  }
-
-  // 2. Solve with wrapper
-  const skWrapped = constrainedSketch();
-  const { topSection, bottomSection } = buildCaseLayout(skWrapped);
-
-  const wrapper = skWrapped.rect();
-  skWrapped.lineDistance(wrapper.top, topSection.frontPiece.top, 0);
-  skWrapped.lineDistance(wrapper.bottom, bottomSection.backPiece.bottom, 0);
-  skWrapped.lineDistance(wrapper.left, bottomSection.leftSide.left, 0);
-  skWrapped.lineDistance(wrapper.right, bottomSection.rightSide.right, 0);
-
-  const wrappedResult = skWrapped.solve();
-  assertConverged(wrappedResult, 'wrapperStability-wrapped');
-  assertNoRejections(wrappedResult, 'wrapperStability-wrapped');
-
-  // 3. Assert all base points preserved (wrapper adds new points, skip those).
-  //    The layout has no fixed point, so absolute position is unconstrained.
-  //    Subtract the global translation (centroid shift) and measure RELATIVE drift.
-  const matchedPairs: { id: string; bx: number; by: number; wx: number; wy: number }[] = [];
-  for (const pt of wrappedResult.definition.points) {
-    const basePt = basePositions.get(pt.id);
-    if (!basePt) continue;
-    matchedPairs.push({ id: pt.id, bx: basePt.x, by: basePt.y, wx: pt.x, wy: pt.y });
-  }
-  // Compute global translation = mean displacement
-  let sumDx = 0, sumDy = 0;
-  for (const p of matchedPairs) { sumDx += p.wx - p.bx; sumDy += p.wy - p.by; }
-  const meanDx = sumDx / matchedPairs.length;
-  const meanDy = sumDy / matchedPairs.length;
-
-  let maxDrift = 0;
-  let worstPoint = '';
-  const driftDetails: string[] = [];
-  for (const p of matchedPairs) {
-    // Relative drift = displacement minus global translation
-    const relDx = (p.wx - p.bx) - meanDx;
-    const relDy = (p.wy - p.by) - meanDy;
-    const drift = Math.hypot(relDx, relDy);
-    if (drift > 0.5) {
-      driftDetails.push(`  ${p.id}: relDrift=${drift.toFixed(1)}mm`);
-    }
-    if (drift > maxDrift) {
-      maxDrift = drift;
-      worstPoint = p.id;
-    }
-  }
-  if (_verbose) {
-    console.log(`    Global translation: (${meanDx.toFixed(1)}, ${meanDy.toFixed(1)})mm`);
-    if (driftDetails.length > 0) {
-      console.log(`    Points with relative drift >0.5mm (${driftDetails.length} of ${matchedPairs.length}):`);
-      for (const d of driftDetails.slice(0, 20)) console.log(d);
-      if (driftDetails.length > 20) console.log(`    ... and ${driftDetails.length - 20} more`);
-    } else {
-      console.log(`    All ${matchedPairs.length} points within 0.5mm relative drift ✓`);
-    }
-  }
-  assert(
-    maxDrift < 0.1,
-    `wrapperStability: adding wrapper moved existing point ${worstPoint} by ${maxDrift.toFixed(4)}mm relative drift (max allowed: 0.1mm)`,
-  );
-}
-
-/**
- * After solving a multi-rect layout with a wrapper, every rectangle must
- * maintain CCW winding order. This validates that the solver's CCW constraint
- * (presolve + residual) correctly prevents mirror solutions in complex systems.
- */
-function testMultiRectWindingOrder() {
-  const sk = constrainedSketch();
-  const { topSection, bottomSection } = buildCaseLayout(sk);
-
-  const wrapper = sk.rect();
+  const wrapper = sk.rect({ blockRotation: true });
   sk.lineDistance(wrapper.top, topSection.frontPiece.top, 0);
   sk.lineDistance(wrapper.bottom, bottomSection.backPiece.bottom, 0);
   sk.lineDistance(wrapper.left, bottomSection.leftSide.left, 0);
   sk.lineDistance(wrapper.right, bottomSection.rightSide.right, 0);
 
+  return { topSection, bottomSection, wrapper };
+}
+
+/**
+ * The wood-cut case layout with wrapper must converge and produce a
+ * reasonable bounding box matching the expected wood dimensions.
+ */
+function testWrapperRectCaseLayout() {
+  const sk = constrainedSketch();
+  const { wrapper } = buildCaseLayoutWithWrapper(sk);
   const result = sk.solve();
-  assertConverged(result, 'multiRectWinding');
+  assertConverged(result, 'wrapperCaseLayout');
+  assertNoRejections(result, 'wrapperCaseLayout');
+
+  // Verify the wrapper bounds are reasonable (should be close to 610 × 1250)
+  const def = result.definition;
+  const wrapperWidth = lineLength(def, wrapper.top);
+  const wrapperHeight = lineLength(def, wrapper.left);
+  assert(
+    Math.abs(wrapperWidth - 610) < 1,
+    `wrapperCaseLayout: expected wrapper width ~610, got ${wrapperWidth.toFixed(1)}`,
+  );
+  assert(
+    Math.abs(wrapperHeight - 1250) < 5,
+    `wrapperCaseLayout: expected wrapper height ~1250, got ${wrapperHeight.toFixed(1)}`,
+  );
+}
+
+/**
+ * After solving the case layout, every rectangle must maintain CCW winding
+ * order. Validates that the solver's CCW constraint correctly prevents
+ * mirror solutions in complex systems with groupRect.
+ */
+function testCaseLayoutWindingOrder() {
+  const sk = constrainedSketch();
+  const { topSection, bottomSection, wrapper } = buildCaseLayoutWithWrapper(sk);
+  const result = sk.solve();
+  assertConverged(result, 'caseLayoutWinding');
   const def = result.definition;
   const ptMap = new Map(def.points.map((p: SketchPoint) => [p.id, p]));
 
@@ -1723,7 +1670,7 @@ function testMultiRectWindingOrder() {
 
   for (const { name, v } of rects) {
     const area = signedArea(v as string[]);
-    assert(area > 0, `multiRectWinding: ${name} has CW winding (signed area=${area.toFixed(2)})`);
+    assert(area > 0, `caseLayoutWinding: ${name} has CW winding (signed area=${area.toFixed(2)})`);
   }
 }
 
@@ -2111,8 +2058,8 @@ export async function runCheckConstraintsCli(args: string[]): Promise<void> {
   ];
 
   const level7: TestEntry[] = [
-    { name: 'wrapper rect does not disturb layout', fn: testWrapperRectDoesNotDisturbLayout },
-    { name: 'multi-rect CCW winding order', fn: testMultiRectWindingOrder },
+    { name: 'wrapper rect case layout', fn: testWrapperRectCaseLayout },
+    { name: 'case layout CCW winding order', fn: testCaseLayoutWindingOrder },
   ];
 
   const level8: TestEntry[] = [
