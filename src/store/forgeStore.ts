@@ -262,7 +262,7 @@ const LAST_ACTIVE_FILE_KEY = 'fc-last-active-file';
 const initialActive = (() => {
   if (sharedModel) return sharedModel.filename;
   const hashFile = getActiveFileFromHash();
-  if (hashFile && INITIAL_FILES[hashFile]) {
+  if (hashFile && hashFile in INITIAL_FILES) {
     return hashFile;
   }
   // Restore last opened file from localStorage
