@@ -439,7 +439,7 @@ const CATEGORIES = [
   {
     title: "Viewport & Runtime",
     desc: "Configure viewport behavior: cut planes, exploded views, joint controls.",
-    names: ["cutPlane", "explodeView", "jointsView", "viewConfig"],
+    names: ["cutPlane", "explodeView", "jointsView", "viewConfig", "scene"],
   },
   {
     title: "Annotations & Output",

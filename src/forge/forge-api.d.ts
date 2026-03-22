@@ -3392,6 +3392,82 @@ interface ViewConfigOptions {
  * Multiple calls merge; later values override earlier ones.
  */
 declare function viewConfig(options?: ViewConfigOptions): void;
+interface SceneCameraConfig {
+	position?: [number, number, number];
+	target?: [number, number, number];
+	up?: [number, number, number];
+	fov?: number;
+	type?: "perspective" | "orthographic";
+}
+type SceneLightType = "ambient" | "directional" | "point" | "spot" | "hemisphere";
+interface SceneLightConfig {
+	type: SceneLightType;
+	color?: string;
+	intensity?: number;
+	position?: [number, number, number];
+	target?: [number, number, number];
+	groundColor?: string;
+	skyColor?: string;
+	angle?: number;
+	penumbra?: number;
+	decay?: number;
+	distance?: number;
+	castShadow?: boolean;
+}
+interface SceneEnvironmentConfig {
+	preset?: "studio" | "sunset" | "dawn" | "warehouse" | "forest" | "apartment" | "lobby" | "city" | "park" | "night" | "none";
+	intensity?: number;
+	background?: boolean;
+}
+interface SceneBackgroundGradient {
+	top: string;
+	bottom: string;
+}
+interface SceneFogConfig {
+	color?: string;
+	near?: number;
+	far?: number;
+	density?: number;
+}
+interface SceneBloomConfig {
+	intensity?: number;
+	threshold?: number;
+	radius?: number;
+}
+interface SceneVignetteConfig {
+	darkness?: number;
+	offset?: number;
+}
+interface SceneGrainConfig {
+	intensity?: number;
+}
+interface ScenePostProcessingConfig {
+	bloom?: SceneBloomConfig;
+	vignette?: SceneVignetteConfig;
+	grain?: SceneGrainConfig;
+	toneMappingExposure?: number;
+}
+interface SceneGroundConfig {
+	visible?: boolean;
+	color?: string;
+	height?: number;
+	receiveShadow?: boolean;
+}
+interface SceneOptions {
+	background?: string | SceneBackgroundGradient;
+	camera?: SceneCameraConfig;
+	lights?: SceneLightConfig[];
+	environment?: SceneEnvironmentConfig;
+	fog?: SceneFogConfig;
+	postProcessing?: ScenePostProcessingConfig;
+	ground?: SceneGroundConfig;
+}
+/**
+ * Configure the scene environment for the current script execution.
+ * Controls camera, lighting, background, fog, and post-processing.
+ * Multiple calls merge; later values override earlier ones.
+ */
+declare function scene(options: SceneOptions): void;
 interface ShapeFeatureExtentSideOptions {
 	depth?: number;
 	upToFace?: SketchFaceTarget | FaceRef;
