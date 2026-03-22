@@ -71,7 +71,3 @@ export interface ShapeBackend {
 export function isShapeBackend(value: unknown): value is ShapeBackend {
   return Boolean(value && typeof value === 'object' && (value as Record<PropertyKey, unknown>)[SHAPE_BACKEND_MARKER] === true);
 }
-
-// Re-exports from backends/manifold for backward compatibility
-export { ManifoldShapeBackend, wrapManifoldShapeBackend } from './backends/manifold/shapeBackend';
-export { isManifoldCapableBackend, type ManifoldCapableBackend } from './backends/manifold/shapeBackend';
