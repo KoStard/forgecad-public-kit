@@ -63,6 +63,7 @@ export function deserializeRunResult(s: SerializedRunResult): RunResult {
     explodeView: s.explodeView,
     jointsView: s.jointsView,
     viewConfig: s.viewConfig,
+    sceneConfig: s.sceneConfig,
     robotExport: s.robotExport,
     quality: s.quality,
     error: s.error,
