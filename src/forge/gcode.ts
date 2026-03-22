@@ -86,6 +86,7 @@ const DEFAULT_PROFILE: Required<PrinterProfile> = {
 export class GCodeBuilder {
   private profile: Required<PrinterProfile>;
   private pos: [number, number, number] = [0, 0, 0];
+  private posInitialized = false; // true after first explicit move
   private e = 0; // cumulative extrusion
   private retracted = false;
   private currentSpeed: number;
@@ -180,9 +181,14 @@ export class GCodeBuilder {
     this.retract();
     const from: [number, number, number] = [...this.pos];
     this.lines.push(`G0 X${f(x)} Y${f(y)} Z${f(z)} F${Math.round(this.profile.travelSpeed)}`);
+    // Only record a visual segment if position was already initialized
+    // (skip the initial home→start travel so it doesn't render as a line from 0,0,0)
+    if (this.posInitialized) {
+      this._segments.push({ from, to: [x, y, z], extrude: false, speed: this.profile.travelSpeed });
+    }
     this.pos = [x, y, z];
+    this.posInitialized = true;
     this._updateBounds(x, y, z);
-    this._segments.push({ from, to: [x, y, z], extrude: false, speed: this.profile.travelSpeed });
     return this;
   }
 
@@ -206,9 +212,12 @@ export class GCodeBuilder {
     this.lines.push(
       `G1 X${f(x)} Y${f(y)} Z${f(z)} E${f(this.e)} F${Math.round(this.currentSpeed)}`,
     );
+    if (this.posInitialized) {
+      this._segments.push({ from, to: [x, y, z], extrude: true, speed: this.currentSpeed });
+    }
     this.pos = [x, y, z];
+    this.posInitialized = true;
     this._updateBounds(x, y, z);
-    this._segments.push({ from, to: [x, y, z], extrude: true, speed: this.currentSpeed });
     return this;
   }
 
