@@ -119,6 +119,21 @@ export { verify } from './verification';
 export { explodeView } from './explodeView';
 export { jointsView } from './jointsView';
 export { viewConfig } from './viewConfig';
+export { scene } from './scene';
+export type {
+  SceneOptions,
+  SceneCameraConfig,
+  SceneLightConfig,
+  SceneLightType,
+  SceneEnvironmentConfig,
+  SceneBackgroundGradient,
+  SceneFogConfig,
+  SceneBloomConfig,
+  SceneVignetteConfig,
+  SceneGrainConfig,
+  ScenePostProcessingConfig,
+  SceneGroundConfig,
+} from './scene';
 export { sheetMetal, SheetMetalPart } from './sheetMetal';
 export { intersectWithPlane, projectToPlane } from './section';
 export { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';

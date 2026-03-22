@@ -2,6 +2,89 @@
 
 These APIs affect the viewer and scene presentation. They do not change the underlying model geometry contract, so they are not part of the required model-building reading set.
 
+## `scene(options)`
+
+Control the full visual environment — camera, lighting, background, fog, and post-processing. Essential for generative art, presentations, and dramatic renders.
+
+When `scene()` is called, it **replaces** the default viewer settings for the specified properties. Properties not specified keep their defaults. Multiple calls merge (later overrides earlier).
+
+**Parameters:**
+- `background` (string or `{ top, bottom }`) — solid color (`'#0a0a0a'`) or vertical gradient
+- `camera` (object):
+  - `position` (`[x, y, z]`) — camera world position (overrides auto-framing)
+  - `target` (`[x, y, z]`) — look-at point
+  - `fov` (number) — field of view in degrees (1–179)
+  - `up` (`[x, y, z]`) — up vector (default `[0, 0, 1]`)
+  - `type` (`'perspective' | 'orthographic'`)
+- `lights` (array) — **replaces** all default lights. Each entry:
+  - `type` (`'ambient' | 'directional' | 'point' | 'spot' | 'hemisphere'`) — required
+  - `color` (string) — CSS color
+  - `intensity` (number)
+  - `position` (`[x, y, z]`) — for directional, point, spot
+  - `target` (`[x, y, z]`) — for directional, spot
+  - `groundColor` / `skyColor` (string) — for hemisphere
+  - `angle` (number) — spot cone angle in radians
+  - `penumbra` (number, 0–1) — spot penumbra
+  - `decay` (number) — point/spot light decay
+  - `distance` (number) — point/spot max range (0 = infinite)
+  - `castShadow` (boolean)
+- `environment` (object):
+  - `preset` (`'studio' | 'sunset' | 'dawn' | 'warehouse' | 'forest' | 'apartment' | 'lobby' | 'city' | 'park' | 'night' | 'none'`)
+  - `intensity` (number) — environment map intensity
+  - `background` (boolean) — use environment map as scene background
+- `fog` (object):
+  - `color` (string)
+  - `near` / `far` (number) — linear fog
+  - `density` (number) — if set, uses exponential fog instead of linear
+- `postProcessing` (object):
+  - `bloom` — `{ intensity?, threshold?, radius? }`
+  - `vignette` — `{ darkness?, offset? }`
+  - `grain` — `{ intensity? }`
+  - `toneMappingExposure` (number)
+- `ground` (object):
+  - `visible` (boolean)
+  - `color` (string)
+  - `height` (number) — Z offset
+  - `receiveShadow` (boolean)
+
+**Returns:** `void`
+
+```javascript
+scene({
+  background: { top: '#000814', bottom: '#001d3d' },
+
+  camera: {
+    position: [160, -120, 100],
+    target: [0, 0, 50],
+    fov: 52,
+  },
+
+  lights: [
+    { type: 'ambient', color: '#001233', intensity: 0.08 },
+    { type: 'point', position: [120, -80, 130], color: '#00f5d4', intensity: 4, distance: 400, decay: 1 },
+    { type: 'point', position: [-100, 60, 20], color: '#f72585', intensity: 3, distance: 350 },
+    { type: 'directional', position: [50, -30, 200], color: '#ffd60a', intensity: 1.2 },
+    { type: 'hemisphere', skyColor: '#003566', groundColor: '#000814', intensity: 0.2 },
+  ],
+
+  fog: { color: '#000814', near: 100, far: 450 },
+
+  postProcessing: {
+    bloom: { intensity: param('bloom', 1.5, 0, 4), threshold: 0.5, radius: 0.7 },
+    vignette: { darkness: 0.8, offset: 0.25 },
+    grain: { intensity: 0.08 },
+    toneMappingExposure: param('exposure', 1.5, 0.5, 4),
+  },
+});
+```
+
+Notes:
+- All values work with `param()` for real-time slider control
+- When `lights` is specified, **all** default lights are removed — you must provide your own ambient light or the scene will be very dark
+- Post-processing (bloom, vignette, grain) works in the browser viewport only — CLI renders apply camera, lights, background, fog, and exposure but not shader-based effects
+- Camera `position` overrides the auto-frame behavior — the viewport will not auto-fit the geometry to view
+- See `examples/generative-art/` for full demos
+
 ## `cutPlane(name, normal, offsetOrOptions?, options?)`
 
 Define a named section plane for inspection.

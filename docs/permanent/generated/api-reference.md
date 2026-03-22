@@ -23,14 +23,14 @@
 - [Assembly & Joints](#assembly-joints) — `bomToCsv`, `assembly`, `joint`
 - [Sheet Metal](#sheet-metal) — `sheetMetal`
 - [Section & Projection](#section-projection) — `intersectWithPlane`, `projectToPlane`
-- [Viewport & Runtime](#viewport-runtime) — `cutPlane`, `cutPlane`, `explodeView`, `jointsView`, `viewConfig`
+- [Viewport & Runtime](#viewport-runtime) — `cutPlane`, `cutPlane`, `explodeView`, `jointsView`, `viewConfig`, `scene`
 - [Annotations & Output](#annotations-output) — `dim`, `dimLine`, `bom`, `robotExport`
 - [Fasteners & Hardware](#fasteners-hardware) — `boltHole`, `fastenerHole`, `counterbore`, `hexNut`, `holePattern`, `thread`, `bolt`, `nut`, `washer`, `fastenerSet`
 - [Structural Profiles](#structural-profiles) — `tSlotProfile`, `tSlotExtrusion`, `profile2020BSlot6Profile`, `profile2020BSlot6`
 - [Pipes & Routing](#pipes-routing) — `tube`, `pipe`, `pipeRoute`, `elbow`
 - [Gears](#gears) — `spurGear`, `sideGear`, `faceGear`, `ringGear`, `rackGear`, `bevelGear`, `gearPair`, `bevelGearPair`, `sideGearPair`, `faceGearPair`
 - [Utility Shapes](#utility-shapes) — `roundedBox`, `bracket`, `explode`
-- [Other](#other) — `composeChain`
+- [Other](#other) — `composeChain`, `highlight`
 
 **Classes:**
 - [`Transform`](#transform)
@@ -554,6 +554,14 @@ viewConfig(options?: ViewConfigOptions): void
 
 Configure runtime viewport visuals for the current script execution. Multiple calls merge; later values override earlier ones.
 
+#### `scene()`
+
+```ts
+scene(options: SceneOptions): void
+```
+
+Configure the scene environment for the current script execution. Controls camera, lighting, background, fog, and post-processing. Multiple calls merge; later values override earlier ones.
+
 ### Annotations & Output
 
 Add dimensions, BOM entries, verification checks, and robot export.
@@ -804,6 +812,14 @@ composeChain(...steps: TransformInput[]): Transform
 
 Compose transforms in chain order. Equivalent to Transform.identity().mul(a).mul(b).mul(c)...
 
+#### `highlight()`
+
+```ts
+highlight(entityId: string, opts?: { color?: string; label?: string; pulse?: boolean }): void
+```
+
+Mark an entity for visual highlighting in the viewport (debugging aid).
+
 ---
 
 ## Classes
@@ -854,8 +870,6 @@ Compose transforms in chain order. Equivalent to Transform.identity().mul(a).mul
 - `intersect()` — intersect(...others: SketchOperandInput[]): Sketch
 - `offset()` — offset(delta: number, join?: "Square" | "Round" | "Miter"): Sketch
 - `hull()` — hull(): Sketch
-- `simplify()` — simplify(epsilon?: number): Sketch
-- `warp()` — warp(fn: (vert: [ number, number ]) => void): Sketch
 - `regions()` — Decompose this sketch into its distinct filled regions. See `sketchRegions()`. Regions are returned largest-first by area.
 - `region()` — Select the single filled region that contains the given 2D seed point. Throws if the seed is outside all regions. See `sketchRegion()`.
 - `extrude()` — extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: 
@@ -1072,6 +1086,8 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `subtract()` — Boolean subtract — returns plain Shape (topology lost)
 - `add()` — Boolean add — returns plain Shape (topology lost)
 - `intersect()` — Boolean intersect — returns plain Shape (topology lost)
+- `splitByPlane()` — Split by infinite plane. Returns [positive-side, negative-side] as plain Shapes.
+- `trimByPlane()` — Keep the positive side of the plane and discard the opposite side. Returns plain Shape.
 - `shell()` — Shelling returns a plain Shape because tracked topology is not preserved.
 - `boundingBox()` — boundingBox(): unknown
 - `get volume()` — get volume(): number
