@@ -942,6 +942,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const newFolders = Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort();
     set((s) => ({
       files: { ...s.files, [normalized]: template },
+      savedFiles: { ...s.savedFiles, [normalized]: template },
       activeFile: normalized,
       paramOverrides: {},
       jointValues: {},
@@ -951,6 +952,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       hoveredJointName: null,
       folders: newFolders,
     }));
+    fileSystem.save(normalized, template).catch((e) => console.error('Save failed:', e));
     setTimeout(() => get().execute(), 0);
   },
   createFolder: (name) => {
@@ -1674,10 +1676,6 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const newFolders = Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort();
     set((s) => ({
       files: { ...s.files, [normalized]: text },
-      // When loading from text, we assume it's like opening a file, so it's "saved" state initially?
-      // Or is it a drop?
-      // If it's a drop, it's like opening.
-      // So we should update savedFiles.
       savedFiles: { ...s.savedFiles, [normalized]: text },
       activeFile: normalized,
       fileHandle: null,
@@ -1692,6 +1690,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       hoveredJointName: null,
       folders: newFolders,
     }));
+    fileSystem.save(normalized, text).catch((e) => console.error('Save failed:', e));
     setTimeout(() => get().execute(), 0);
   },
 
