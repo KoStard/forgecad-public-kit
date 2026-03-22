@@ -106,6 +106,8 @@ export type {
   CollectedJointsView,
 } from './headless';
 export type { RunResult, SceneObject, LogEntry } from './headless';
+export { GCodeBuilder, gcode } from './headless';
+export type { PrinterProfile, PreheatOptions, ToolpathSegment, ToolpathData } from './headless';
 export type { VerificationResult, VerificationStatus } from './headless';
 export type { ForgeGeometry } from './headless';
 export type { ForgeQualityPreset, ForgeQualityProfile } from './headless';
