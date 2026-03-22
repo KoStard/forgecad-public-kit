@@ -472,6 +472,20 @@ function occtNativeBoolean(oc: OCCTModule, boolOp: string, shapes: any[]): any {
     return op.Shape();
   }
 
+  // Intersection must be applied pairwise: A ∩ B ∩ C.
+  // The N-shape BRepAlgoAPI_Common computes A ∩ (B ∪ C), which is wrong for 3+ shapes.
+  if (boolOp === 'intersection') {
+    let result = shapes[0];
+    for (let i = 1; i < shapes.length; i++) {
+      const op = new oc.BRepAlgoAPI_Common_3(result, shapes[i], new oc.Message_ProgressRange_1());
+      op.Build(new oc.Message_ProgressRange_1());
+      result = op.Shape();
+    }
+    return result;
+  }
+
+  // Union and difference: N-shape API is correct.
+  // Union: A ∪ (B ∪ C) = A ∪ B ∪ C. Difference: A - (B ∪ C) = A - B - C.
   const args = new oc.TopTools_ListOfShape_1();
   args.Append_1(shapes[0]);
   const tools = new oc.TopTools_ListOfShape_1();
@@ -479,8 +493,7 @@ function occtNativeBoolean(oc: OCCTModule, boolOp: string, shapes: any[]): any {
 
   const op =
     boolOp === 'union' ? new oc.BRepAlgoAPI_Fuse_1() :
-    boolOp === 'difference' ? new oc.BRepAlgoAPI_Cut_1() :
-    new oc.BRepAlgoAPI_Common_1();
+    new oc.BRepAlgoAPI_Cut_1();
   op.SetArguments(args);
   op.SetTools(tools);
   op.Build(new oc.Message_ProgressRange_1());

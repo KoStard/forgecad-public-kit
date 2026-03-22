@@ -131,6 +131,13 @@ function testPolygonTriangle(): void {
   expectBBox(b, [0, 0, 0], [10, 6, 1], 'polygon triangle');
 }
 
+function testPolygonDegenerateEdges(): void {
+  // Pentagon with two duplicate consecutive vertices — degenerate edges should be skipped
+  // Effective triangle: (0,0), (10,0), (0,6). Area = 30
+  const b = lower(extrudePlan(polygonProfile([[0, 0], [10, 0], [10, 0], [0, 6], [0, 6]]), 1));
+  expectClose(b.volume(), 30, 'polygon degenerate edges volume');
+}
+
 function testProfileBooleanUnion(): void {
   // Two non-overlapping 5x5 rects: one at origin, one translated by (10,0)
   const profile: ProfileCompilePlan = {
@@ -235,6 +242,61 @@ function testProfileRotate90(): void {
   const b = lower(extrudePlan(profile, 1));
   expectClose(b.volume(), 200, 'rotate90 volume');
   expectBBox(b, [-20, 0, 0], [0, 10, 1], 'rotate90');
+}
+
+function testProfileMirror(): void {
+  // Rect [0,0]->[10,20] mirrored across Y axis (normalX=1, normalY=0)
+  // bbox: [-10,0,0]->[0,20,1]
+  const profile: ProfileCompilePlan = {
+    kind: 'rect',
+    width: 10,
+    height: 20,
+    center: false,
+    transforms: [{ kind: 'mirror', normalX: 1, normalY: 0 }],
+  };
+  const b = lower(extrudePlan(profile, 1));
+  expectClose(b.volume(), 200, 'profile mirror volume');
+  expectBBox(b, [-10, 0, 0], [0, 20, 1], 'profile mirror');
+}
+
+function testProfileScale(): void {
+  // Rect 10x20 scaled by (2, 0.5) => 20x10 => area = 200
+  const profile: ProfileCompilePlan = {
+    kind: 'rect',
+    width: 10,
+    height: 20,
+    center: false,
+    transforms: [{ kind: 'scale', x: 2, y: 0.5 }],
+  };
+  const b = lower(extrudePlan(profile, 1));
+  expectClose(b.volume(), 200, 'profile scale volume');
+  expectBBox(b, [0, 0, 0], [20, 10, 1], 'profile scale');
+}
+
+function testProfileHullThrows(): void {
+  const profile: ProfileCompilePlan = {
+    kind: 'hull',
+    profiles: [rectProfile(5, 5)],
+    transforms: [],
+  };
+  assert.throws(
+    () => lower(extrudePlan(profile, 1)),
+    (err: any) => err instanceof OCCTUnsupportedError,
+    'profile hull should throw OCCTUnsupportedError',
+  );
+}
+
+function testProfileProjectThrows(): void {
+  const profile: ProfileCompilePlan = {
+    kind: 'project',
+    base: boxPlan(10, 10, 10),
+    transforms: [],
+  };
+  assert.throws(
+    () => lower(extrudePlan(profile, 1)),
+    (err: any) => err instanceof OCCTUnsupportedError,
+    'profile project should throw OCCTUnsupportedError',
+  );
 }
 
 /* ── Group 2: Primitives ──────────────────────────────────────────────── */
@@ -483,6 +545,39 @@ function testBooleanMultiUnion(): void {
   expectClose(b.volume(), 375, 'boolean multi-union volume');
 }
 
+function testBooleanMultiDifference(): void {
+  // box(10,10,10) minus two 2x2x2 boxes at (2,2,2) and (6,6,6) (both fully inside)
+  // Volume = 1000 - 8 - 8 = 984
+  const plan: ShapeCompilePlan = {
+    kind: 'boolean',
+    op: 'difference',
+    shapes: [
+      boxPlan(10, 10, 10),
+      { kind: 'transform', base: boxPlan(2, 2, 2), steps: [{ kind: 'translate', x: 2, y: 2, z: 2 }] },
+      { kind: 'transform', base: boxPlan(2, 2, 2), steps: [{ kind: 'translate', x: 6, y: 6, z: 6 }] },
+    ],
+  };
+  const b = lower(plan);
+  expectClose(b.volume(), 984, 'boolean multi-difference volume');
+}
+
+function testBooleanMultiIntersection(): void {
+  // Three 10x10x10 boxes: one at origin, one at (5,0,0), one at (0,5,0)
+  // Intersection of first two: [5,0,0]->[10,10,10] (vol=500)
+  // Intersection with third: [5,5,0]->[10,10,10] (vol=250)
+  const plan: ShapeCompilePlan = {
+    kind: 'boolean',
+    op: 'intersection',
+    shapes: [
+      boxPlan(10, 10, 10),
+      { kind: 'transform', base: boxPlan(10, 10, 10), steps: [{ kind: 'translate', x: 5, y: 0, z: 0 }] },
+      { kind: 'transform', base: boxPlan(10, 10, 10), steps: [{ kind: 'translate', x: 0, y: 5, z: 0 }] },
+    ],
+  };
+  const b = lower(plan);
+  expectClose(b.volume(), 250, 'boolean multi-intersection volume');
+}
+
 function testBooleanSinglePassthrough(): void {
   const plan: ShapeCompilePlan = {
     kind: 'boolean',
@@ -593,6 +688,42 @@ function testTransformChained(): void {
   const b = lower(plan);
   expectClose(b.volume(), 6000, 'transform chained volume');
   expectBBox(b, [-20, 10, 0], [0, 20, 30], 'transform chained');
+}
+
+function testTransformWorkplanePlacement(): void {
+  // Identity matrix — shape should be unchanged
+  const identity: number[] = [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
+  ];
+  const plan: ShapeCompilePlan = {
+    kind: 'transform',
+    base: boxPlan(10, 20, 30),
+    steps: [{ kind: 'workplanePlacement', matrix: identity as any, placement: {} as any }],
+  };
+  const b = lower(plan);
+  expectClose(b.volume(), 6000, 'workplanePlacement identity volume');
+  expectBBox(b, [0, 0, 0], [10, 20, 30], 'workplanePlacement identity');
+}
+
+function testTransformWorkplanePlacementTranslate(): void {
+  // Translation matrix: move by (5, 10, 15)
+  const mat: number[] = [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    5, 10, 15, 1,
+  ];
+  const plan: ShapeCompilePlan = {
+    kind: 'transform',
+    base: boxPlan(10, 20, 30),
+    steps: [{ kind: 'workplanePlacement', matrix: mat as any, placement: {} as any }],
+  };
+  const b = lower(plan);
+  expectClose(b.volume(), 6000, 'workplanePlacement translate volume');
+  expectBBox(b, [5, 10, 15], [15, 30, 45], 'workplanePlacement translate');
 }
 
 /* ── Group 6: Edge Features (via runScript) ──────────────────────────── */
@@ -775,6 +906,21 @@ function testShellViaScript(): void {
   assert(vol > 0 && vol < 4000, `shell should remove material: got vol=${vol}`);
 }
 
+function testHoleViaScript(): void {
+  const code = `
+    const b = box(20, 20, 10);
+    return [{ name: 'result', shape: b.hole('top', { diameter: 6 }) }];
+  `;
+  const result = runScript(code, 'test.forge.js', { 'test.forge.js': code });
+  assert.equal(result.error, null, `runScript error: ${result.error}`);
+  assert(result.objects.length >= 1, 'expected at least 1 hole object');
+  const shape = result.objects[0].shape!;
+  const vol = shape.volume();
+  // Hole removes a cylinder: V_box - pi*r^2*h = 4000 - pi*9*10 ≈ 3717
+  const expected = 4000 - Math.PI * 9 * 10;
+  expectClose(vol, expected, 'hole volume', 5);
+}
+
 function testLowerToBackend(): void {
   const plan = boxPlan(10, 20, 30);
   const backend = lowerShapeCompilePlanToOCCTBackend(plan);
@@ -800,6 +946,11 @@ export async function runCheckOcctLowerCli(): Promise<void> {
   testProfileOffsetPositive();
   testProfileTranslate();
   testProfileRotate90();
+  testProfileMirror();
+  testProfileScale();
+  testPolygonDegenerateEdges();
+  testProfileHullThrows();
+  testProfileProjectThrows();
 
   // Group 2: Primitives
   testBoxCorner();
@@ -826,6 +977,8 @@ export async function runCheckOcctLowerCli(): Promise<void> {
   testBooleanDifference();
   testBooleanIntersection();
   testBooleanMultiUnion();
+  testBooleanMultiDifference();
+  testBooleanMultiIntersection();
   testBooleanSinglePassthrough();
   testBooleanEmptyThrows();
 
@@ -837,6 +990,8 @@ export async function runCheckOcctLowerCli(): Promise<void> {
   testTransformMirror();
   testTransformRotateAround();
   testTransformChained();
+  testTransformWorkplanePlacement();
+  testTransformWorkplanePlacementTranslate();
 
   // Group 6: Edge Features
   testFilletOnBox();
@@ -860,6 +1015,7 @@ export async function runCheckOcctLowerCli(): Promise<void> {
 
   // Group 10: Delegated plans
   testShellViaScript();
+  testHoleViaScript();
   testLowerToBackend();
 
   console.log('✓ OCCT lowerer invariants passed');
