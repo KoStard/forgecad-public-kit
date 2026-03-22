@@ -1,0 +1,68 @@
+# Mesh Export
+
+ForgeCAD supports exporting 3D geometry to several mesh formats. Export is available both from the CLI and programmatically in the browser.
+
+## CLI Export
+
+The CLI provides the primary export workflow. See [`../../cli.md`](../../cli.md) for full details.
+
+```bash
+# STL export (binary)
+forgecad export stl model.forge.js -o output.stl
+
+# 3MF export (with colors and metadata)
+forgecad export 3mf model.forge.js -o output.3mf
+
+# STEP/BREP export (exact geometry via OCCT)
+forgecad export step model.forge.js -o output.step
+forgecad export brep model.forge.js -o output.brep
+```
+
+## Browser-Side Export Functions
+
+These functions are available in the browser runtime for programmatic export. They operate on mesh data and return binary buffers.
+
+### `buildBinaryStl(objects)`
+
+Generate a binary STL file from an array of shape objects.
+
+**Parameters:**
+- `objects` — Array of `{ name: string, shape: Shape, color?: string }`
+  - `color` is a hex string (`'#RRGGBB'`) for per-object coloring
+
+**Returns:** `ArrayBuffer` — Binary STL data
+
+> **Callout:** STL supports per-facet color via the legacy VisCAM/SolidView RGB555 convention (bit 15 flag). Not all slicers read this — for reliable color export, prefer 3MF.
+
+### `build3mfBuffer(objects, options?)`
+
+Generate a 3MF archive from an array of shape objects. 3MF is the recommended format for 3D printing — it preserves colors, metadata, and multiple objects in a single file.
+
+**Parameters:**
+- `objects` — Array of `{ name: string, shape: Shape, color?: string }`
+- `options` (optional):
+  - `title` (string) — Metadata title. Default: `'ForgeCAD model'`
+  - `application` (string) — Application name. Default: `'ForgeCAD'`
+  - `description` (string) — Metadata description. Default: same as title
+
+**Returns:** `Promise<Uint8Array>` — 3MF archive as binary data
+
+> **Callout:** This is a pure JavaScript implementation — no native dependencies needed. Colors are encoded as 3MF material resources with automatic grouping to minimize file size.
+
+## 2D Sketch Export
+
+Sketches can be exported to vector formats:
+
+### `sketchToSvg(sketch, options?)`
+
+Export a 2D sketch to an SVG string.
+
+### `sketchToDxf(sketch, options?)`
+
+Export a 2D sketch to a DXF string.
+
+See the auto-generated [API reference](../../generated/api-reference.md) for full signatures.
+
+## Exact Geometry Export (STEP/BREP)
+
+For exact geometry (no tessellation), ForgeCAD uses the OCCT backend. See [`brep-export.md`](brep-export.md) for the parity matrix showing which operations produce exact vs. mesh geometry.

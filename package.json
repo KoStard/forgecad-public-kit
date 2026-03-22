@@ -48,7 +48,8 @@
     "meta:init": "bash scripts/local-meta.sh init",
     "meta:status": "bash scripts/local-meta.sh status",
     "meta:path": "bash scripts/local-meta.sh path",
-    "gen:types": "node scripts/gen-forge-types.mjs"
+    "gen:types": "node scripts/gen-forge-types.mjs",
+    "gen:docs": "node scripts/gen-api-docs.mjs"
   },
   "dependencies": {
     "chokidar": "^4.0.0",
