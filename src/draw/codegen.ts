@@ -1,6 +1,6 @@
 /**
  * Code generation for the draw mode.
- * Converts a list of draw statements into a complete .sketch.js file.
+ * Converts a list of draw statements into a complete .forge.js file.
  */
 
 export interface DrawnPoint {
@@ -26,16 +26,19 @@ export interface DrawSessionState {
 }
 
 /**
- * Generate a complete .sketch.js file from the draw session state.
+ * Generate a complete .forge.js file from the draw session state.
  */
 export function generateSketchCode(session: DrawSessionState): string {
   const lines: string[] = [];
-  lines.push('const sketch = constrainedSketch((sk) => {');
+  lines.push('const sk = constrainedSketch();');
+  lines.push('');
   for (const stmt of session.statements) {
-    lines.push(`  ${stmt}`);
+    lines.push(stmt);
   }
-  lines.push('});');
-  lines.push('return sketch;');
+  if (session.statements.length > 0) {
+    lines.push('');
+  }
+  lines.push('return sk.solve();');
   lines.push('');
   return lines.join('\n');
 }

@@ -153,21 +153,19 @@ export const useDrawStore = create<DrawState>((set, get) => ({
     const forgeStore = useForgeStore.getState();
     let targetFile = forgeStore.activeFile;
 
-    // If the file has content, create a new sketch file
+    // If the file has content, create a new drawing file
     const existingCode = forgeStore.files[targetFile] ?? '';
     if (existingCode.trim().length > 0) {
-      // Find a unique name
       let idx = 1;
-      while (forgeStore.files[`drawing-${idx}.sketch.js`]) idx++;
-      targetFile = `drawing-${idx}.sketch.js`;
+      while (forgeStore.files[`drawing-${idx}.forge.js`]) idx++;
+      targetFile = `drawing-${idx}.forge.js`;
       forgeStore.createFile(targetFile);
       forgeStore.setActiveFile(targetFile);
     }
 
-    // Ensure it's a .sketch.js file
-    if (!targetFile.endsWith('.sketch.js')) {
-      // Rename by creating a new file
-      const newName = targetFile.replace(/\.(js|sketch\.js)$/, '') + '.sketch.js';
+    // Ensure it's a .forge.js file
+    if (!targetFile.endsWith('.forge.js')) {
+      const newName = targetFile.replace(/\.js$/, '') + '.forge.js';
       if (newName !== targetFile && !forgeStore.files[newName]) {
         forgeStore.createFile(newName);
         forgeStore.setActiveFile(newName);
