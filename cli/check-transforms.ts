@@ -414,7 +414,14 @@ function testRuntimeJointCouplingResolution() {
   assert(approx(values.Steer, 30), `Expected Steer=30, got ${values.Steer}`);
   assert(approx(values.Drive, 70), `Expected Drive=70, got ${values.Drive}`);
   assert(approx(values['Top Gear'], 130), `Expected Top Gear=130, got ${values['Top Gear']}`);
-  assert(approx(values.Motor, -200), `Expected Motor=-200 after clamp, got ${values.Motor}`);
+  // Default is now unclamped: Motor = -2 * 130 = -260
+  assert(approx(values.Motor, -260), `Expected Motor=-260 (unclamped), got ${values.Motor}`);
+
+  // Explicit clamp: true still respects min/max
+  const clamped = resolveJointViewValues(joints, couplings, {
+    Steer: 30, Drive: 70, 'Top Gear': 999, Motor: 999,
+  }, { clamp: true });
+  assert(approx(clamped.Motor, -200), `Expected Motor=-200 after clamp, got ${clamped.Motor}`);
 }
 
 function testContinuousRuntimeJointAnimation() {
@@ -451,9 +458,12 @@ function testContinuousRuntimeJointAnimation() {
   assert(approx(secondCycle['Input Drive'], 900), `Expected second-cycle drive=900, got ${secondCycle['Input Drive']}`);
   assert(approx(thirdCycle['Input Drive'], 1800), `Expected third-cycle drive=1800, got ${thirdCycle['Input Drive']}`);
 
-  const clamped = resolveJointViewValues(joints, [], thirdCycle);
+  // Default is now unclamped; explicit clamp: true still works
+  const defaultResolved = resolveJointViewValues(joints, [], thirdCycle);
+  const clamped = resolveJointViewValues(joints, [], thirdCycle, { clamp: true });
   const unclamped = resolveJointViewValues(joints, [], thirdCycle, { clamp: false });
 
+  assert(approx(defaultResolved['Input Drive'], 1800), `Expected default (unclamped) drive=1800, got ${defaultResolved['Input Drive']}`);
   assert(approx(clamped['Input Drive'], 1440), `Expected clamped drive=1440, got ${clamped['Input Drive']}`);
   assert(approx(unclamped['Input Drive'], 1800), `Expected unclamped drive=1800, got ${unclamped['Input Drive']}`);
 }

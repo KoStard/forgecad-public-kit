@@ -388,7 +388,7 @@ export function resolveJointViewValues(
   baseValues: Record<string, number> = {},
   options: ResolveJointViewValueOptions = {},
 ): Record<string, number> {
-  const shouldClamp = options.clamp ?? true;
+  const shouldClamp = options.clamp ?? false;
   const jointByName = new Map<string, JointViewDef>();
   joints.forEach((joint) => jointByName.set(joint.name, joint));
   const couplingByJoint = new Map<string, JointViewCouplingDef>();

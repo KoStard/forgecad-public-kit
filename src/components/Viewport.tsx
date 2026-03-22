@@ -918,13 +918,6 @@ const computeExplodeTreeOffsets = (
   return offsets;
 };
 
-const clampJointValue = (joint: JointViewDef, value: number): number => {
-  let clamped = Number.isFinite(value) ? value : joint.defaultValue;
-  if (joint.min !== undefined) clamped = Math.max(joint.min, clamped);
-  if (joint.max !== undefined) clamped = Math.min(joint.max, clamped);
-  return clamped;
-};
-
 const resolveVisualArcAngleDeg = (
   valueDeg: number,
   visualLimitDeg: number,
@@ -1018,7 +1011,8 @@ const computeJointNodeMatrices = (
     if (axisWorld.lengthSq() <= 1e-8) axisWorld.copy(axis);
     axisWorld.normalize();
 
-    const value = clampJointValue(joint, jointValues[joint.name] ?? joint.defaultValue);
+    const raw = jointValues[joint.name] ?? joint.defaultValue;
+    const value = Number.isFinite(raw) ? raw : joint.defaultValue;
     let motion = new THREE.Matrix4();
     if (joint.type === 'prismatic') {
       motion.makeTranslation(axisWorld.x * value, axisWorld.y * value, axisWorld.z * value);
@@ -4813,9 +4807,9 @@ export function Viewport() {
       joints,
       jointCouplings,
       animatedJointValues,
-      { clamp: !(activeJointAnimation?.continuous ?? false) },
+      { clamp: false },
     ),
-    [activeJointAnimation?.continuous, animatedJointValues, jointCouplings, joints],
+    [animatedJointValues, jointCouplings, joints],
   );
 
   const activeCutPlaneDefs = useMemo(() => {
@@ -5053,7 +5047,8 @@ export function Viewport() {
       pivotWorld.add(new THREE.Vector3(offset[0], offset[1], offset[2]));
     }
 
-    const value = clampJointValue(joint, effectiveJointValues[joint.name] ?? joint.defaultValue);
+    const rawOverlay = effectiveJointValues[joint.name] ?? joint.defaultValue;
+    const value = Number.isFinite(rawOverlay) ? rawOverlay : joint.defaultValue;
     const axisLength = Math.max(jointOverlayConfig.axisLengthMin, jointOverlayBaseSize * jointOverlayConfig.axisLengthScale);
     return {
       joint,

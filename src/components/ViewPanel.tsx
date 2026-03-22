@@ -333,11 +333,11 @@ export function ViewPanel() {
     [activeAnimationClip, jointAnimationProgress, jointValues],
   );
   const displayedJointValues = useMemo(
-    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues),
+    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues, { clamp: true }),
     [animatedJointValues, jointCouplings, joints],
   );
   const displayedRawJointValues = useMemo(
-    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues, { clamp: false }),
+    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues),
     [animatedJointValues, jointCouplings, joints],
   );
   const coupledJointNames = useMemo(

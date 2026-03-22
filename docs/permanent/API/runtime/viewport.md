@@ -82,7 +82,7 @@ that globally would break intentional multi-turn tracks.
 
 **Key options:**
 - `enabled`
-- `joints`: `{ name, child, parent?, type?, axis?, pivot?, min?, max?, default?, unit? }[]`
+- `joints`: `{ name, child, parent?, type?, axis?, pivot?, min?, max?, default?, unit? }[]` — `min`/`max` control the slider range in the UI; they do **not** clamp animation keyframe values
 - `couplings`: `{ joint, terms, offset? }[]`
 - `animations`: `{ name, duration?, loop?, continuous?, keyframes }[]`
 - `defaultAnimation`

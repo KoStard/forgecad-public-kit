@@ -208,13 +208,6 @@ function parseColor(input: string | undefined, fallback: number): THREE.Color {
   }
 }
 
-function clampJointValue(joint: JointViewDef, value: number): number {
-  let clamped = Number.isFinite(value) ? value : joint.defaultValue;
-  if (joint.min !== undefined) clamped = Math.max(joint.min, clamped);
-  if (joint.max !== undefined) clamped = Math.min(joint.max, clamped);
-  return clamped;
-}
-
 function buildRevoluteMatrix(
   axisWorld: THREE.Vector3,
   pivotWorld: THREE.Vector3,
@@ -262,7 +255,8 @@ function computeJointNodeMatrices(
     if (axisWorld.lengthSq() <= 1e-8) axisWorld.copy(axis);
     axisWorld.normalize();
 
-    const value = clampJointValue(joint, jointValues[joint.name] ?? joint.defaultValue);
+    const raw = jointValues[joint.name] ?? joint.defaultValue;
+    const value = Number.isFinite(raw) ? raw : joint.defaultValue;
     let motion = new THREE.Matrix4();
     if (joint.type === 'prismatic') {
       motion.makeTranslation(axisWorld.x * value, axisWorld.y * value, axisWorld.z * value);
