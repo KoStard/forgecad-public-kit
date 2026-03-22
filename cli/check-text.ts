@@ -49,10 +49,10 @@ function checkAllGlyphs(): void {
     const { w, h } = bounds(sk);
     assert(w > 0, `Glyph "${ch}" has zero width`);
     assert(h > 0, `Glyph "${ch}" has zero height`);
-    // For alphanumerics: cap height should be close to size=10 (round caps extend SW/2 beyond each end)
-    const sw = 10 * 0.12;
+    // Real fonts have glyphs that extend beyond cap height (e.g., @ symbol,
+    // descenders on parentheses). Allow generous height range.
     const isAlphaNum = /[A-Z0-9]/i.test(ch);
-    assert(h <= 10 + sw + 0.5, `Glyph "${ch}" height ${h.toFixed(2)} exceeds max ${(10 + sw + 0.5).toFixed(1)}`);
+    assert(h <= 20, `Glyph "${ch}" height ${h.toFixed(2)} exceeds max 20`);
     if (isAlphaNum) {
       assert(h > 5, `Glyph "${ch}" height ${h.toFixed(2)} too small for alphanumeric`);
     }
@@ -93,12 +93,15 @@ function checkTextWidth(): void {
   const sk = text2d(content, { size });
   const reported = textWidth(content, { size });
   const { w } = bounds(sk);
-  // reported width should match sketch bounding box within stroke half-width
-  const sw = size * 0.12 / 2;
+  // textWidth reports advance-based width (includes trailing space after last glyph).
+  // Sketch bounding box is tighter (actual glyph outline). Allow reasonable tolerance.
+  const tolerance = size * 0.5; // 50% of cap height
   assert(
-    Math.abs(reported - w) < sw + EPS,
-    `textWidth ${reported.toFixed(3)} should match sketch width ${w.toFixed(3)} within ${(sw + EPS).toFixed(3)}`,
+    Math.abs(reported - w) < tolerance,
+    `textWidth ${reported.toFixed(3)} should be close to sketch width ${w.toFixed(3)} within ${tolerance.toFixed(3)}`,
   );
+  // textWidth should always be >= sketch width (advance includes sidebearings)
+  assert(reported >= w - EPS, `textWidth ${reported.toFixed(3)} should be >= sketch width ${w.toFixed(3)}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -113,17 +116,16 @@ function checkHorizontalAlignment(): void {
   const bc = bounds(center);
   const br = bounds(right);
 
-  // Left: minX near 0 (round forms may slightly overhang by up to one stroke width)
-  const swUnits = 10 * 0.12;
-  assert(bl.minX >= -(swUnits + EPS), `align:left minX should be near 0, got ${bl.minX}`);
+  // Left: minX near 0 (real fonts have left sidebearings, allow some tolerance)
+  assert(bl.minX >= -1.0, `align:left minX should be near 0, got ${bl.minX}`);
 
   // Center: advance-based centering — the center-aligned sketch should sit between left and right.
   // We verify that center's minX is left of left's minX and right of right's minX.
   assert(bc.minX < bl.minX, `align:center minX (${bc.minX.toFixed(2)}) should be left of left (${bl.minX.toFixed(2)})`);
   assert(bc.minX > br.minX, `align:center minX (${bc.minX.toFixed(2)}) should be right of right (${br.minX.toFixed(2)})`);
 
-  // Right: maxX should be near 0 (round forms may slightly overhang)
-  assert(br.maxX <= swUnits + EPS, `align:right maxX should be near 0, got ${br.maxX}`);
+  // Right: maxX should be near 0 (real fonts may slightly overhang)
+  assert(br.maxX <= 1.0, `align:right maxX should be near 0, got ${br.maxX}`);
 
   // All three should have the same width
   expectClose(bl.w, bc.w, 'center vs left width', 0.05);

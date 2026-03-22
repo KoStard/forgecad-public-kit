@@ -23,6 +23,7 @@ export * from './exportSvg';
 export * from './exportDxf';
 export { text2d, textWidth } from './text';
 export type { TextOptions } from './text';
+export { loadFont } from './fontText';
 export {
   addRect,
   addPolygon,

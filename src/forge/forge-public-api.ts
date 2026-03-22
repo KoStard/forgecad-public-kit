@@ -64,6 +64,7 @@ export {
   sweep,
   text2d,
   textWidth,
+  loadFont,
   dim,
   dimLine,
   addRect,
