@@ -225,6 +225,7 @@ return solved.toScene();
 - Returns `parent` for chaining.
 
 ## Common pitfalls
+- **Animating assemblies with `jointsView`**: If you use [`jointsView()`](../runtime/viewport.md) to animate an assembly, solve the assembly at rest pose (all animated joints = 0) and let `jointsView` control posing via `default` values and animation keyframes. Solving at non-zero angles and then animating will double-rotate parts. See the [viewport docs](../runtime/viewport.md#using-jointsview-with-assemblies) for the full pattern.
 - If parts vanish in the viewport, check whether a cut plane is active before debugging kinematics. The viewer-side APIs live in [../runtime/viewport.md](../runtime/viewport.md).
 - If a returned object is empty, Forge logs a warning in script output.
 - `importAssembly()` requires the source file to return the `Assembly` object before calling `.solve()`. If you call `.solve()` in the source file and return a `SolvedAssembly`, use `importGroup()` instead (convert with `.toScene()` → group).

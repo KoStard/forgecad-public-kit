@@ -117,6 +117,45 @@ jointsView({
 });
 ```
 
+### Using `jointsView` with assemblies
+
+When combining `jointsView` animations with an `assembly().solve()` pipeline, the assembly must be solved at **rest pose** (all animated joints = 0). The viewport applies `jointsView` transforms on top of the scene objects' existing positions — if the assembly is already solved at non-zero joint angles, the animation will double-rotate everything.
+
+```javascript
+// BAD — assembly bakes in slider angles, then jointsView rotates again
+const solved = mech.solve({ shoulder: 45, elbow: 30 });
+jointsView({
+  joints: [{ name: "shoulder", child: "Upper Arm", ... }],
+  animations: [{ ... keyframes with shoulder values ... }],
+});
+return solved.toScene(); // double-rotated mess
+
+// GOOD — assembly at rest, jointsView controls all posing
+const solved = mech.solve({ shoulder: 0, elbow: 0 });
+jointsView({
+  joints: [
+    { name: "shoulder", child: "Upper Arm", default: 45, ... },
+    { name: "elbow", child: "Forearm", parent: "Upper Arm", default: 30, ... },
+  ],
+  animations: [{ ... }],
+});
+return solved.toScene(); // jointsView handles static pose via defaults AND animation
+```
+
+**Pivot coordinates** are the world-space position of each joint origin at rest pose. For an assembly with `addRevolute("shoulder", "Base", "Link", { frame: Transform.identity().translate(0, 0, 20) })` where "Base" is at the world origin, the pivot is `[0, 0, 20]`.
+
+For kinematic chains, child joint pivots are specified in the parent joint's rest-pose space — the viewport resolves them through the parent chain automatically.
+
+**Fixed attachments** (e.g. an end effector bolted to the last link) need a zero-angle revolute joint in the `jointsView` chain so they follow the parent during animation:
+
+```javascript
+{ name: "EE_Follow", child: "End Effector", parent: "Last Link",
+  type: "revolute", axis: [0, 0, 1], pivot: [linkLength, 0, 0],
+  min: 0, max: 0, default: 0 }
+```
+
+**Slider-driven posing** still works: use `param()` for interactive angles, compute dependent joint values (FK/IK), and pass them as `default` values on the `jointsView` joints. When an animation plays it overrides the defaults; when stopped the slider defaults take over.
+
 `continuous: true` is for looping tracks that should keep accumulating across
 cycles instead of snapping back to the first keyframe each time. Use it for
 monotonic multi-turn drives such as `0 -> 360 -> 720`.
