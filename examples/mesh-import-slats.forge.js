@@ -26,7 +26,6 @@ for (let i = 0; i < slatCount; i++) {
 const slatBlock = union(...slats);
 
 // Intersect: keep only the parts of the mesh inside the slats
-const carved = intersection(mesh, slatBlock);
-carved.color = "#cc3333";
+const carved = intersection(mesh, slatBlock).color("#cc3333");
 
 return carved;
