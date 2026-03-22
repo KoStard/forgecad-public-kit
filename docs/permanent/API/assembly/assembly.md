@@ -294,7 +294,35 @@ robotExport({
 });
 ```
 
-Notes:
-- Revolute joint `velocity` values are expressed in degrees/second in Forge; the SDF exporter converts them to radians/second.
+### Export formats
+
+```bash
+# SDF package (Gazebo/Ignition) — generates model.sdf + world + STL meshes
+forgecad export sdf model.forge.js
+
+# URDF package (ROS/PyBullet/MuJoCo) — generates .urdf + STL meshes
+forgecad export urdf model.forge.js
+```
+
+Both exporters produce:
+- **Mesh-based inertia tensors** — computed from actual triangle geometry via divergence theorem (not bounding-box approximation). Includes full 6-component tensor (Ixx, Iyy, Izz, Ixy, Ixz, Iyz) and center of mass.
+- **Separate collision meshes** — controlled per-link via `collision` option.
+- **Joint mimic elements** — joint couplings (`addJointCoupling`, `addGearCoupling`) are exported as `<mimic>` elements in both SDF and URDF.
+
+### Collision mesh modes
+
+Set per-link in `robotExport({ links: { "PartName": { collision: mode } } })`:
+
+| Mode | Description | Default |
+|------|-------------|---------|
+| `'convex'` | Convex hull of visual geometry (separate `_collision.stl`). Typically 50-80% smaller. | **Yes** |
+| `'box'` | Axis-aligned bounding box primitive. Fastest physics but least accurate. | |
+| `'visual'` | Same mesh as visual. Exact but slow for simulation. | |
+| `'none'` | No collision geometry. Link passes through other objects. | |
+
+### Notes
+
+- Revolute joint `velocity` values are expressed in degrees/second in Forge; the exporters convert them to radians/second.
 - Prismatic distances are authored in millimeters and exported in meters.
 - `massKg` is preferred for demo robots; `densityKgM3` is a decent fallback when mass is unknown.
+- Joint couplings with multiple terms use the primary term (largest ratio) for `<mimic>` since SDF/URDF only support single-leader mimic. A warning is emitted for dropped terms.
