@@ -14,6 +14,7 @@ import { runCheckPlacementReferencesCli } from './check-placement-references';
 import { runCheckTransformsCli } from './check-transforms';
 import { runCheckConstraintsCli } from './check-constraints';
 import { runCheckOcctLowerCli } from './check-occt-lower';
+import { runCheckBackendParityCli } from './check-backend-parity';
 import {
   runCompletionCli,
   runHiddenCompletionCli,
@@ -783,6 +784,14 @@ const commands: CommandDefinition[] = [
     usage: ['forgecad check occt-lower'],
     examples: ['forgecad check occt-lower'],
     run: () => runCheckOcctLowerCli(),
+  },
+  {
+    group: 'Checks',
+    path: ['check', 'backend-parity'],
+    summary: 'Compare Manifold vs OCCT backend outputs across example files.',
+    usage: ['forgecad check backend-parity [files...]'],
+    examples: ['forgecad check backend-parity', 'forgecad check backend-parity examples/api/bolt-and-nut.forge.js'],
+    run: (args: string[]) => runCheckBackendParityCli(args),
   },
   {
     group: 'Debug',

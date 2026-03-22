@@ -193,6 +193,8 @@ export type ShapeCompilePlan =
       height: number;
       center: boolean;
       scaleTop?: [number, number];
+      twist?: number;
+      twistSegments?: number;
     }
   | {
       kind: 'sheetMetal';
@@ -669,6 +671,8 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         height: plan.height,
         center: plan.center,
         scaleTop: plan.scaleTop ? [plan.scaleTop[0], plan.scaleTop[1]] : undefined,
+        twist: plan.twist,
+        twistSegments: plan.twistSegments,
       };
       break;
     case 'sheetMetal':

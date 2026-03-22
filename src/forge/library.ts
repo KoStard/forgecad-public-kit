@@ -5,8 +5,7 @@
  * Each part is a function that returns a Shape, taking parameters.
  */
 
-import { box, cylinder, sphere, union, difference, intersection, Shape, wrapOpaquePlan } from './kernel';
-import { getWasm } from './backends/manifold/wasm';
+import { box, cylinder, sphere, union, difference, intersection, Shape, buildShapeFromCompilePlan } from './kernel';
 import { ShapeGroup } from './group';
 import { Sketch } from './sketch/core';
 import { TrackedShape } from './sketch/topology';
@@ -891,10 +890,6 @@ export function pipeRoute(
 
   // Helper: create a torus bend section
   const makeBend = (info: BendInfo) => {
-    // Create a circle cross-section at (bendR, 0) in XY, revolve around Z axis.
-    // Manifold revolve() revolves around Z. Cross-section X = radial distance, Y = Z height.
-    // At angle=0: centerline at (bendR, 0, 0). Tangent = +Y (sweeping X→Y around Z).
-    const wasm = getWasm();
     const circlePts: [number, number][] = [];
     for (let i = 0; i < segs; i++) {
       const a = (i / segs) * Math.PI * 2;
@@ -903,26 +898,30 @@ export function pipeRoute(
       circlePts.push([cx, cy]);
     }
 
-    let innerPts: [number, number][] | null = null;
+    const angleDeg = info.angle * 180 / Math.PI;
+    const bendSegs = Math.max(4, Math.ceil(segs * angleDeg / 360));
+
+    const outerPlan: import('./compilePlan').ShapeCompilePlan = {
+      kind: 'revolve',
+      profile: { kind: 'polygon', points: circlePts, transforms: [] },
+      degrees: angleDeg,
+      segments: bendSegs,
+    };
+    let bendShape = buildShapeFromCompilePlan(outerPlan);
+
     if (wall != null && wall > 0) {
-      innerPts = [];
+      const innerPts: [number, number][] = [];
       for (let i = 0; i < segs; i++) {
         const a = (i / segs) * Math.PI * 2;
         innerPts.push([bendR + (radius - wall) * Math.cos(a), (radius - wall) * Math.sin(a)]);
       }
-    }
-
-    const angleDeg = info.angle * 180 / Math.PI;
-    const bendSegs = Math.max(4, Math.ceil(segs * angleDeg / 360));
-
-    const outerCross = wasm.CrossSection.ofPolygons([circlePts]);
-    let bendShape = wrapOpaquePlan(new Shape(wasm.Manifold.revolve(outerCross, bendSegs, angleDeg), undefined));
-    outerCross.delete();
-
-    if (innerPts) {
-      const innerCross = wasm.CrossSection.ofPolygons([innerPts]);
-      const innerBend = wrapOpaquePlan(new Shape(wasm.Manifold.revolve(innerCross, bendSegs, angleDeg), undefined));
-      innerCross.delete();
+      const innerPlan: import('./compilePlan').ShapeCompilePlan = {
+        kind: 'revolve',
+        profile: { kind: 'polygon', points: innerPts, transforms: [] },
+        degrees: angleDeg,
+        segments: bendSegs,
+      };
+      const innerBend = buildShapeFromCompilePlan(innerPlan);
       bendShape = bendShape.subtract(innerBend);
     }
 
@@ -1066,7 +1065,6 @@ export function elbow(
   if (angleDeg < 0.01) throw new Error('elbow: angle too small');
 
   const angleRad = angleDeg * Math.PI / 180;
-  const wasm = getWasm();
 
   // Build torus cross-section: circle at distance bendRadius from Z axis
   const circlePts: [number, number][] = [];
@@ -1076,9 +1074,14 @@ export function elbow(
   }
 
   const bendSegs = Math.max(4, Math.ceil(segs * angleDeg / 360));
-  const outerCross = wasm.CrossSection.ofPolygons([circlePts]);
-  let bendShape = wrapOpaquePlan(new Shape(wasm.Manifold.revolve(outerCross, bendSegs, angleDeg), undefined));
-  outerCross.delete();
+
+  const outerPlan: import('./compilePlan').ShapeCompilePlan = {
+    kind: 'revolve',
+    profile: { kind: 'polygon', points: circlePts, transforms: [] },
+    degrees: angleDeg,
+    segments: bendSegs,
+  };
+  let bendShape = buildShapeFromCompilePlan(outerPlan);
 
   if (wall != null && wall > 0) {
     const innerPts: [number, number][] = [];
@@ -1087,9 +1090,13 @@ export function elbow(
       const a = (i / segs) * Math.PI * 2;
       innerPts.push([bendRadius + innerR * Math.cos(a), innerR * Math.sin(a)]);
     }
-    const innerCross = wasm.CrossSection.ofPolygons([innerPts]);
-    const innerBend = wrapOpaquePlan(new Shape(wasm.Manifold.revolve(innerCross, bendSegs, angleDeg), undefined));
-    innerCross.delete();
+    const innerPlan: import('./compilePlan').ShapeCompilePlan = {
+      kind: 'revolve',
+      profile: { kind: 'polygon', points: innerPts, transforms: [] },
+      degrees: angleDeg,
+      segments: bendSegs,
+    };
+    const innerBend = buildShapeFromCompilePlan(innerPlan);
     bendShape = bendShape.subtract(innerBend);
   }
 
@@ -2675,11 +2682,15 @@ export function thread(
     pts.push([radius * Math.cos(a), radius * Math.sin(a)]);
   }
 
-  const wasm = getWasm();
-  const cross = wasm.CrossSection.ofPolygons([pts]);
-  const m = wasm.Manifold.extrude(cross, length, divisions, turns * 360);
-  cross.delete();
-  return wrapOpaquePlan(new Shape(m));
+  const plan: import('./compilePlan').ShapeCompilePlan = {
+    kind: 'extrude',
+    profile: { kind: 'polygon', points: pts, transforms: [] },
+    height: length,
+    center: false,
+    twist: turns * 360,
+    twistSegments: divisions,
+  };
+  return buildShapeFromCompilePlan(plan);
 }
 
 /**

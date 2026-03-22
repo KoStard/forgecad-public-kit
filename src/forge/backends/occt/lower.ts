@@ -685,12 +685,16 @@ function _lowerShapeCompilePlanToOCCTInner(
     case 'extrude': {
       const face = lowerProfileToFace(oc, plan.profile);
       const height = plan.height;
-      const vec = new oc.gp_Vec_4(0, 0, height);
 
       if (plan.scaleTop && (plan.scaleTop[0] !== 1 || plan.scaleTop[1] !== 1)) {
         return lowerExtrudeWithScaleTop(oc, plan);
       }
 
+      if (plan.twist && Math.abs(plan.twist) > 1e-6) {
+        return lowerExtrudeWithTwist(oc, plan, face);
+      }
+
+      const vec = new oc.gp_Vec_4(0, 0, height);
       const prism = new oc.BRepPrimAPI_MakePrism_1(face, vec, false, true);
       prism.Build(new oc.Message_ProgressRange_1());
       let result = prism.Shape();
@@ -886,6 +890,47 @@ function lowerSweepPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 
   pipe.Build(new oc.Message_ProgressRange_1());
   if (!pipe.IsDone()) throw new Error('OCCT sweep (MakePipe) failed');
   return pipe.Shape();
+}
+
+function lowerExtrudeWithTwist(
+  oc: OCCTModule,
+  plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>,
+  bottomFace: any,
+): any {
+  const height = plan.height;
+  const totalTwistDeg = plan.twist ?? 0;
+  const nSections = Math.max(2, (plan.twistSegments ?? 12) + 1);
+  const bottomWire = extractOuterWire(oc, bottomFace);
+
+  const thruSections = new oc.BRepOffsetAPI_ThruSections(true, false, 1e-6);
+  for (let i = 0; i < nSections; i++) {
+    const t = i / (nSections - 1);
+    const z = height * t;
+    const angleDeg = totalTwistDeg * t;
+
+    const trsf = new oc.gp_Trsf_1();
+    const angleRad = angleDeg * Math.PI / 180;
+    trsf.SetRotation_1(
+      new oc.gp_Ax1_2(new oc.gp_Pnt_1(), new oc.gp_Dir_4(0, 0, 1)),
+      angleRad,
+    );
+    const trsf2 = new oc.gp_Trsf_1();
+    trsf2.SetTranslation_1(new oc.gp_Vec_4(0, 0, z));
+    trsf.Multiply(trsf2);
+
+    const transformed = new oc.BRepBuilderAPI_Transform_2(bottomWire, trsf, true);
+    thruSections.AddWire(oc.TopoDS.Wire_1(transformed.Shape()));
+  }
+  thruSections.Build(new oc.Message_ProgressRange_1());
+  let result = thruSections.Shape();
+
+  if (plan.center) {
+    const trsf = new oc.gp_Trsf_1();
+    trsf.SetTranslation_1(new oc.gp_Vec_4(0, 0, -height / 2));
+    const transformed = new oc.BRepBuilderAPI_Transform_2(result, trsf, true);
+    result = transformed.Shape();
+  }
+  return result;
 }
 
 function lowerExtrudeWithScaleTop(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>): any {

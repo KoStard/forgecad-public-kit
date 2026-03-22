@@ -285,8 +285,8 @@ export function lowerShapeCompilePlanToManifold(
     case 'extrude':
       return lowerProfileCompilePlanToCrossSection(plan.profile, wasm).extrude(
         plan.height,
-        0,
-        0,
+        plan.twistSegments ?? 0,
+        plan.twist ?? 0,
         plan.scaleTop as [number, number] | undefined,
         plan.center,
       );

@@ -489,53 +489,10 @@ function rigidTransformStepsFromMatrix(m: Mat4): ShapeCompileTransformStep[] | n
   const angle = Math.acos(cosTheta);
   const angleDeg = angle * 180 / Math.PI;
 
-  if (angleDeg > 1e-6) {
-    let axis: [number, number, number];
-
-    if (Math.PI - angle < 1e-5) {
-      const xx = Math.max(0, (r00 + 1) / 2);
-      const yy = Math.max(0, (r11 + 1) / 2);
-      const zz = Math.max(0, (r22 + 1) / 2);
-      const xy = (r01 + r10) / 4;
-      const xz = (r02 + r20) / 4;
-      const yz = (r12 + r21) / 4;
-
-      if (xx >= yy && xx >= zz) {
-        const x = Math.sqrt(xx);
-        axis = [x, x > eps ? xy / x : 0, x > eps ? xz / x : 0];
-      } else if (yy >= zz) {
-        const y = Math.sqrt(yy);
-        axis = [y > eps ? xy / y : 0, y, y > eps ? yz / y : 0];
-      } else {
-        const z = Math.sqrt(zz);
-        axis = [z > eps ? xz / z : 0, z > eps ? yz / z : 0, z];
-      }
-    } else {
-      axis = normalizeVec3([
-        r21 - r12,
-        r02 - r20,
-        r10 - r01,
-      ]);
-    }
-
-    axis = normalizeVec3(axis);
-    steps.push({
-      kind: 'rotateAround',
-      axisX: axis[0],
-      axisY: axis[1],
-      axisZ: axis[2],
-      degrees: angleDeg,
-      pivotX: 0,
-      pivotY: 0,
-      pivotZ: 0,
-    });
-  }
-
-  if (Math.abs(tx) > eps || Math.abs(ty) > eps || Math.abs(tz) > eps) {
-    steps.push({ kind: 'translate', x: tx, y: ty, z: tz });
-  }
-
-  return steps;
+  // Matrix is confirmed rigid — use workplanePlacement which both backends handle natively.
+  // This avoids fragile axis/angle decomposition that can fail on numerical edge cases
+  // (e.g. rotation matrices built from cross products with floating-point imprecision).
+  return [{ kind: 'workplanePlacement', matrix: Array.from(m) as number[] }];
 }
 
 function withCopiedDimensions(source: Shape, out: Shape): Shape {
@@ -697,15 +654,6 @@ export function buildShapeFromCompilePlan(
 export const getShapeBrepPlan = getShapeCompilePlan;
 export const setShapeBrepPlan = setShapeCompilePlan;
 
-/**
- * Wrap a pre-built ShapeBackend as an opaque compile plan.
- * Used for shapes that can't be expressed as compile plan IR
- * (e.g. shapes that bypass compile plan IR).
- */
-export function wrapOpaquePlan(shape: Shape): Shape {
-  const backend = getShapeRuntimeBackendInternal(shape);
-  return setShapeCompilePlanInternal(shape, { kind: 'opaque', backend });
-}
 
 function createOwnedTopologyRewritePlan(
   plan: ShapeCompilePlan | null,
@@ -860,13 +808,10 @@ export class Shape {
         nextPlan,
       );
     }
-    // Non-rigid matrix can't be expressed in compile plan — wrap result as opaque.
-    return wrapOpaquePlan(
-      withTransformedDimensions(
-        this,
-        new Shape(getShapeRuntimeBackendInternal(this).transform(mat), this.colorHex),
-        mat,
-      ),
+    // Non-rigid transforms (shear, perspective) are not supported in the compile plan IR.
+    throw new Error(
+      'Shape.transform() received a non-rigid matrix (contains shear, perspective, or non-uniform scale). '
+      + 'Only rigid transforms (rotation + translation) are supported.',
     );
   }
 
@@ -885,12 +830,11 @@ export class Shape {
         Transform.scale(v).toArray(),
       ), nextPlan);
     }
-    // Degenerate scale — wrap result as opaque.
-    return wrapOpaquePlan(withTransformedDimensions(
-      this,
-      new Shape(getShapeRuntimeBackendInternal(this).scale(v), this.colorHex),
-      Transform.scale(v).toArray(),
-    ));
+    // Degenerate scale (zero or non-finite component) produces degenerate geometry.
+    throw new Error(
+      `Shape.scale() received a degenerate scale value (${JSON.stringify(v)}). `
+      + 'All scale components must be finite and non-zero.',
+    );
   }
 
   mirror(normal: [number, number, number]): Shape {
@@ -1486,28 +1430,4 @@ export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]
   ), nextPlan);
 }
 
-/**
- * Create shape from a signed distance function. Positive = inside.
- *
- * This is an internal helper used by loft/sweep fallback paths.
- * Not part of the public API — it is inherently Manifold-only (marching cubes).
- */
-export function levelSet(
-  sdf: (point: [number, number, number]) => number,
-  bounds: { min: [number, number, number]; max: [number, number, number] },
-  edgeLength: number,
-  level = 0,
-): Shape {
-  const wasm = getWasm();
-  const manifold = wasm.Manifold.levelSet(
-    sdf as any,
-    { min: bounds.min, max: bounds.max },
-    edgeLength,
-    level,
-  );
-  return wrapOpaquePlan(new Shape(wrapManifoldShapeBackend(manifold), undefined, {
-    fidelity: 'sampled',
-    sources: ['level-set'],
-  }));
-}
 

@@ -1,11 +1,11 @@
-# OCCT Backend Purity — Eliminate Manifold Fallbacks
+# OCCT Backend Purity — Eliminate Manifold Fallbacks & Opaque Plans
 
 **Date**: 2026-03-22
-**Goal**: Make `compilePlanOCCT.ts` fully self-contained with zero Manifold dependencies. Every operation that the compile plan IR describes should be lowered to native OCCT APIs.
+**Goal**: Make the OCCT backend fully self-contained with zero Manifold dependencies. Every operation that the compile plan IR describes should be lowered to native OCCT APIs. Additionally, eliminate all `wrapOpaquePlan` usage so nothing upstream of the lowerers touches Manifold directly — everything goes through compile plan IR.
 
 ## Current State (Baseline)
 
-`compilePlanOCCT.ts` falls back to Manifold in 5 places:
+`src/forge/backends/occt/lower.ts` falls back to Manifold in 5 places:
 
 | # | Operation | Current behavior | Manifold dependency |
 |---|-----------|-----------------|-------------------|
@@ -15,108 +15,78 @@
 | 4 | **Hull** | `throw OCCTUnsupportedError('hull')` → full Manifold fallback | Caller catches, runs Manifold pipeline |
 | 5 | **Extrude with scaleTop** | `throw OCCTUnsupportedError('extrude with scaleTop')` | Caller catches, runs Manifold pipeline |
 
-Additionally, the **Manifold sentinel system** (lines 29–48, 618–672) propagates through transforms, and blocks fillet/chamfer/trimByPlane after any boolean.
+Additionally, `wrapOpaquePlan` in `kernel.ts` wraps pre-built Manifold backends, bypassing compile plan IR:
+
+| # | Source | Where |
+|---|--------|-------|
+| O1 | **library.ts** — thread(), pipe makeBend(), elbow() | Direct `getWasm().Manifold.revolve/extrude` calls |
+| O2 | **kernel.ts Shape.transform()** — non-rigid matrix | Falls back to opaque when `rigidTransformStepsFromMatrix` returns null |
+| O3 | **kernel.ts Shape.scale()** — degenerate scale | Falls back to opaque for zero/NaN scale |
+| O4 | **kernel.ts levelSet()** — SDF function | Directly calls `wasm.Manifold.levelSet` |
 
 ## Architecture Summary
 
+Before:
 ```
+library.ts ──(direct Manifold calls)──> wrapOpaquePlan ──> ShapeBackend
+kernel.ts  ──(transform fallback)────> wrapOpaquePlan ──> ShapeBackend
+curves.ts  ──(levelSet fallback)─────> wrapOpaquePlan ──> ShapeBackend
+
 ShapeCompilePlan (backend-agnostic IR)
-    |
-    +---> compilePlanOCCT.ts -------> OCCTShapeBackend (or ManifoldShapeBackend via sentinel!)
-    |
-    +---> compilePlanManifold.ts ---> ManifoldShapeBackend
+    +---> occt/lower.ts ──(hybrid boolean)──> ManifoldShapeBackend sentinel
+    +---> manifold/lower.ts ──> ManifoldShapeBackend
 ```
 
-After this work:
+After:
 ```
+All upstream code ──> ShapeCompilePlan IR (always)
+
 ShapeCompilePlan (backend-agnostic IR)
-    |
-    +---> compilePlanOCCT.ts -------> OCCTShapeBackend (always, no sentinel)
-    |
-    +---> compilePlanManifold.ts ---> ManifoldShapeBackend
+    +---> occt/lower.ts ──> OCCTShapeBackend (always, no sentinel)
+    +---> manifold/lower.ts ──> ManifoldShapeBackend
 ```
-
-## OCCT API Availability (Verified)
-
-All required APIs are present in `opencascade.js@2.0.0-beta.b5ff984`:
-
-| API | Purpose | Status |
-|-----|---------|--------|
-| `BRepAlgoAPI_Fuse_3` / `_Cut_3` / `_Common_3` | Native 3D booleans | Available, tested |
-| `BRepOffsetAPI_ThruSections` | Loft (interpolate between wire sections) | Available, tested |
-| `BRepOffsetAPI_MakePipe_1` | Sweep (extrude profile along spine wire) | Available, tested |
-| `BRepOffsetAPI_MakePipeShell` | Advanced sweep with framing control | Available, tested |
-| `GeomAPI_PointsToBSpline_2` | Smooth spline from polyline points | Available |
-| `TColgp_Array1OfPnt_2` | Point array for spline construction | Available |
-
-**Hull**: No native OCCT convex hull API. Will compute inline using tessellation + Manifold.hull + convert back to OCCT shape (contained within the file, not a full pipeline fallback).
-
-## Experiment Plan
-
-### P1: Native OCCT Booleans (replace hybrid Manifold)
-
-**What**: Remove `hybridBooleanViaManifold()`, `MANIFOLD_SENTINEL`, `occtShapeToManifold()`, `tessellateOCCTShape()`, `buildMergeMaps()`. Use `occtNativeBoolean()` directly.
-
-**Why**: Tested all four coincident-geometry cases (adjacent faces, overlapping, coplanar base, identical boxes) — OCCT handles them correctly. The hybrid approach was defensive but unnecessary, and it breaks downstream fillet/chamfer/trimByPlane.
-
-**Risk**: Some exotic coincident geometry might fail. Mitigation: `HasErrors()` check on the boolean result.
-
-### P2: Native Loft via BRepOffsetAPI_ThruSections
-
-**What**: Convert each `ProfileCompilePlan` to an OCCT wire at its corresponding height, feed to `ThruSections(isSolid=true, isRuled=false)`.
-
-**Mapping**: `plan.profiles[i]` → `lowerProfileToFace()` → extract outer wire → translate to `z = plan.heights[i]` → `AddWire()`.
-
-### P3: Native Sweep via BRepOffsetAPI_MakePipe
-
-**What**: Convert `SweepPathCompilePlan.points` to an OCCT wire spine (polyline edges). Convert profile to face at spine start. `MakePipe(spine, profile)`.
-
-**For smooth paths**: Use `GeomAPI_PointsToBSpline` to create a B-spline curve from path points, then make a wire from that curve.
-
-### P4: Hull (inline Manifold, no full fallback)
-
-**What**: Instead of throwing `OCCTUnsupportedError`, compute hull inline:
-1. For each shape operand: lower to OCCT, tessellate, extract vertices
-2. For point operands: use directly
-3. Call `Manifold.hull()` on the combined point cloud
-4. Convert result back to OCCT compound shape
-
-This keeps `compilePlanOCCT.ts` as the controlling pipeline. The Manifold usage is a contained utility, not a pipeline escape.
-
-### P5: Extrude with scaleTop via ThruSections
-
-**What**: 2-section loft — bottom wire at z=0 (original profile), top wire at z=height (scaled profile).
-
-### P6: Remove all Manifold imports
-
-**What**: After P1–P5, remove all Manifold-related code:
-- `MANIFOLD_SENTINEL` type/functions
-- `getWasm()` import
-- `wrapManifoldShapeBackend` import
-- `hybridBooleanViaManifold`, `occtShapeToManifold`, `tessellateOCCTShape`, `buildMergeMaps`
-- Sentinel checks in transform/fillet/chamfer/trimByPlane
-
-Exception: P4 (hull) may still need a contained `getWasm()` call for `Manifold.hull()`. This is acceptable — it's a utility, not a pipeline escape.
-
-### P7: Build + Test
-
-Verify: `npm run build:cli && node dist-cli/forgecad.js check suite`
 
 ## Progress Tracker
 
 | # | Change | Result | Status |
 |---|--------|--------|--------|
-| — | Baseline | 5 Manifold fallbacks, sentinel system | |
-| P1 | Native OCCT booleans | Removed hybrid boolean + sentinel system (~170 lines). Triggered by ams_lite_adapter.forge.js crash. | ✅ DONE |
-| P2 | Native loft (ThruSections) | | |
-| P3 | Native sweep (MakePipe) | | |
-| P4 | Hull (inline Manifold) | | |
-| P5 | Extrude scaleTop (ThruSections) | | |
-| P6 | Remove Manifold imports | | |
-| P7 | Build + test | | |
+| — | Baseline | 5 Manifold fallbacks, sentinel system, 4 opaque sources | |
+| P1 | Native OCCT booleans | Removed hybrid boolean + sentinel system (~170 lines). Triggered by ams_lite_adapter.forge.js crash. Fixed multi-intersection bug (pairwise for `BRepAlgoAPI_Common`). | ✅ DONE |
+| P2 | Native loft (ThruSections) | Already implemented in prior work | ✅ DONE |
+| P3 | Native sweep (MakePipe) | Already implemented in prior work | ✅ DONE |
+| P5 | Extrude scaleTop (ThruSections) | Already implemented in prior work | ✅ DONE |
+| P4 | Hull (inline Manifold) | Throws OCCTUnsupportedError — acceptable, no OCCT convex hull API | ⚠️ DEFERRED |
+| O1 | library.ts opaque removal | Rewrote thread() (twisted extrude), makeBend() (revolve), elbow() (revolve) to use compile plan IR. Added `twist`/`twistSegments` fields to extrude compile plan. | ✅ DONE |
+| O2 | kernel.ts transform opaque | Replaced fragile axis/angle decomposition with `workplanePlacement` step. Non-rigid matrices now throw instead of wrapping opaque. | ✅ DONE |
+| O3 | kernel.ts scale opaque | Degenerate scales now throw instead of wrapping opaque. | ✅ DONE |
+| O4 | kernel.ts levelSet opaque | Removed `levelSet()` function. loft/sweep in curves.ts now require compile profile plans (throw if missing). | ✅ DONE |
+| — | Remove wrapOpaquePlan | Function removed entirely — zero callers remain. | ✅ DONE |
+| P6 | Remove Manifold imports from library.ts | Removed `getWasm()` and `wrapOpaquePlan` imports. | ✅ DONE |
+| P7 | OCCT twist extrude | Added `lowerExtrudeWithTwist()` to OCCT lowerer using `BRepOffsetAPI_ThruSections` with rotated wire sections. | ✅ DONE |
+| P8 | Backend parity tool | Created `cli/check-backend-parity.ts` — runs files with both backends, compares volume/surfaceArea/bbox, generates report. | ✅ DONE |
+| — | Verification | ams_lite_adapter.forge.js: 100% parity. bolt-and-nut.forge.js: 100% parity. OCCT lowerer tests: all pass. | ✅ |
+
+## Key Findings
+
+### Multi-intersection bug (P1)
+`BRepAlgoAPI_Common` with `SetArguments`/`SetTools` computes `A ∩ (B ∪ C)`, not `A ∩ B ∩ C`. Fixed by iterating pairwise for intersection with 3+ shapes. Caught by unit test `testBooleanMultiIntersection`.
+
+### Transform opaque fallback (O2)
+`rigidTransformStepsFromMatrix()` tried to decompose rotation matrices into axis+angle, which failed on numerical edge cases (e.g. matrices built from cross products in pipe/elbow). Fixed by using `workplanePlacement` compile plan step instead — both backends handle raw matrices natively.
+
+### Opaque elimination principle
+Nothing upstream of the lowerers should touch Manifold directly. Everything must go through compile plan IR. This ensures both backends produce equivalent results and prevents the "non-manifold OCCT mesh" error that triggered this investigation.
 
 ## Files Modified
 
 | File | Purpose |
 |------|---------|
-| `src/forge/compilePlanOCCT.ts` | Main target — all changes here |
+| `src/forge/backends/occt/lower.ts` | Native booleans, multi-intersection fix, twist extrude |
+| `src/forge/kernel.ts` | Removed `wrapOpaquePlan`, `levelSet`; transform/scale now throw on non-rigid/degenerate |
+| `src/forge/library.ts` | Rewrote thread/makeBend/elbow to use compile plan IR |
+| `src/forge/compilePlan.ts` | Added `twist`/`twistSegments` to extrude plan type |
+| `src/forge/backends/manifold/lower.ts` | Pass twist fields through to Manifold extrude |
+| `src/forge/sketch/curves.ts` | Removed levelSet fallback, throw if compile plan missing |
+| `cli/check-backend-parity.ts` | NEW — backend comparison tool |
+| `cli/check-occt-lower.ts` | OCCT lowerer unit tests (68 tests) |
+| `cli/forgecad.ts` | Registered backend-parity CLI command |

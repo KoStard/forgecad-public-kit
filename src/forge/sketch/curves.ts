@@ -2,14 +2,13 @@ import { Sketch, getSketchCompileProfilePlan } from './core';
 import { polygon } from './primitives';
 import { stroke } from './path';
 import { buildLoftShapeCompilePlan, buildSweepShapeCompilePlan, createOwnedShapeCompilePlan } from '../compilePlan';
-import { buildShapeFromCompilePlan, levelSet, setShapeGeometryInfo, type Shape } from '../kernel';
+import { buildShapeFromCompilePlan, type Shape } from '../kernel';
 import {
   scaleLevelSetBoundsPadding,
   scaleLevelSetEdgeLength,
   scaleSplineSamples,
   scaleSweepPathSamples,
 } from '../quality';
-import { buildLoftLevelSetInput, buildSweepLevelSetInput } from './loftSweepLowering';
 
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
@@ -335,20 +334,11 @@ export function loft(
     zs,
     { edgeLength, boundsPadding: pad },
   );
-  const ownedPlan = createOwnedShapeCompilePlan(plan, 'loft');
-  if (ownedPlan) {
-    return buildShapeFromCompilePlan(ownedPlan, pairs[0]?.profile.colorHex, {
-      fidelity: 'sampled',
-      sources: ['loft', 'level-set'],
-    });
+  if (!plan) {
+    throw new Error('loft: one or more profiles is missing a compile plan. All sketches must have compile profile plans.');
   }
-
-  const input = buildLoftLevelSetInput(
-    pairs.map((entry) => entry.profile.toPolygons() as Vec2[][]),
-    zs,
-    { edgeLength, boundsPadding: pad },
-  );
-  return setShapeGeometryInfo(levelSet(input.sdf, input.bounds, input.edgeLength), {
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'loft')!;
+  return buildShapeFromCompilePlan(ownedPlan, pairs[0]?.profile.colorHex, {
     fidelity: 'sampled',
     sources: ['loft', 'level-set'],
   });
@@ -417,20 +407,11 @@ export function sweep(
     },
     { edgeLength, boundsPadding: pad, up },
   );
-  const ownedPlan = createOwnedShapeCompilePlan(plan, 'sweep');
-  if (ownedPlan) {
-    return buildShapeFromCompilePlan(ownedPlan, profile.colorHex, {
-      fidelity: 'sampled',
-      sources: ['sweep', 'level-set'],
-    });
+  if (!plan) {
+    throw new Error('sweep: profile is missing a compile plan. The sketch must have a compile profile plan.');
   }
-
-  const input = buildSweepLevelSetInput(
-    profile.toPolygons() as Vec2[][],
-    pathPts.map(([x, y, z]) => [x, y, z]),
-    { edgeLength, boundsPadding: pad, up },
-  );
-  return setShapeGeometryInfo(levelSet(input.sdf, input.bounds, input.edgeLength), {
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'sweep')!;
+  return buildShapeFromCompilePlan(ownedPlan, profile.colorHex, {
     fidelity: 'sampled',
     sources: ['sweep', 'level-set'],
   });
