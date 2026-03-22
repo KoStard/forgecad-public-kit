@@ -6,6 +6,8 @@
  * can feed into its native geometry constructor.
  */
 
+import { unzipSync } from 'fflate';
+
 // ─── Public types ────────────────────────────────────────────────────────────
 
 export interface ParsedMesh {
@@ -176,6 +178,155 @@ function weldVertices(
   };
 }
 
+// ─── OBJ Parser ─────────────────────────────────────────────────────────────
+
+/**
+ * Parse a Wavefront OBJ file into an indexed triangle mesh.
+ *
+ * Supported:
+ *   v x y z          — vertex positions
+ *   f v1 v2 v3 ...   — faces (triangles, quads, n-gons; fan-triangulated)
+ *   f v1/vt1/vn1 ... — faces with texture/normal indices (only vertex index used)
+ *   f v1//vn1 ...    — faces with normal indices (only vertex index used)
+ *   Negative indices  — relative to current vertex count (-1 = last vertex)
+ *
+ * Ignored: vn, vt, #, o, g, s, mtllib, usemtl, and any other lines.
+ */
+export function parseObj(data: ArrayBuffer): ParsedMesh {
+  const text = new TextDecoder().decode(data);
+  const lines = text.split('\n');
+
+  const positions: number[] = [];
+  const triIndices: number[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.length === 0 || line.charCodeAt(0) === 35 /* # */) continue;
+
+    if (line.startsWith('v ')) {
+      const parts = line.split(/\s+/);
+      const x = parseFloat(parts[1]);
+      const y = parseFloat(parts[2]);
+      const z = parseFloat(parts[3]);
+      positions.push(x, y, z);
+    } else if (line.startsWith('f ')) {
+      const parts = line.split(/\s+/);
+      const vertCount = positions.length / 3;
+      const faceVerts: number[] = [];
+
+      for (let j = 1; j < parts.length; j++) {
+        const token = parts[j];
+        if (token.length === 0) continue;
+        // Extract vertex index from v, v/vt, v/vt/vn, or v//vn
+        const slashIdx = token.indexOf('/');
+        const idxStr = slashIdx === -1 ? token : token.substring(0, slashIdx);
+        let idx = parseInt(idxStr, 10);
+        if (isNaN(idx)) continue;
+        // OBJ indices are 1-based; negative means relative to end
+        if (idx < 0) {
+          idx = vertCount + idx; // -1 → vertCount - 1
+        } else {
+          idx = idx - 1; // 1-based → 0-based
+        }
+        faceVerts.push(idx);
+      }
+
+      // Fan-triangulate from first vertex
+      for (let j = 1; j < faceVerts.length - 1; j++) {
+        triIndices.push(faceVerts[0], faceVerts[j], faceVerts[j + 1]);
+      }
+    }
+    // All other line types (vn, vt, o, g, s, mtllib, usemtl, etc.) are ignored.
+  }
+
+  return {
+    vertProperties: new Float32Array(positions),
+    triVerts: new Uint32Array(triIndices),
+    numProp: 3,
+    mergeFromVert: new Uint32Array(0),
+    mergeToVert: new Uint32Array(0),
+  };
+}
+
+// ─── 3MF Parser ─────────────────────────────────────────────────────────────
+
+/**
+ * Parse a 3MF file (ZIP archive containing XML model data) into an indexed
+ * triangle mesh.
+ *
+ * 3MF is a ZIP archive. The main model lives at `3D/3dmodel.model`.
+ * Each `<object>` element may contain a `<mesh>` with `<vertices>` and
+ * `<triangles>`. Multiple objects are merged into a single mesh with
+ * triangle indices offset accordingly.
+ */
+export function parse3mf(data: ArrayBuffer): ParsedMesh {
+  // Decompress the ZIP archive
+  const zip = unzipSync(new Uint8Array(data));
+
+  // Find the main model file — try common path variants
+  let modelBytes: Uint8Array | undefined;
+  for (const path of Object.keys(zip)) {
+    if (path.toLowerCase() === '3d/3dmodel.model') {
+      modelBytes = zip[path];
+      break;
+    }
+  }
+  if (!modelBytes) {
+    throw new Error('3MF archive does not contain 3D/3dmodel.model');
+  }
+
+  const xml = new TextDecoder().decode(modelBytes);
+
+  // Extract all <mesh>...</mesh> blocks (one per object)
+  const meshPattern = /<mesh\b[^>]*>([\s\S]*?)<\/mesh>/gi;
+  const vertexPattern = /<vertex\s+x="([^"]+)"\s+y="([^"]+)"\s+z="([^"]+)"\s*\/>/gi;
+  const trianglePattern = /<triangle\s+v1="([^"]+)"\s+v2="([^"]+)"\s+v3="([^"]+)"[^/]*\/>/gi;
+
+  const allPositions: number[] = [];
+  const allTriIndices: number[] = [];
+  let vertexOffset = 0;
+
+  let meshMatch;
+  while ((meshMatch = meshPattern.exec(xml)) !== null) {
+    const meshXml = meshMatch[1];
+
+    // Parse vertices for this mesh
+    const meshVerts: number[] = [];
+    vertexPattern.lastIndex = 0;
+    let vMatch;
+    while ((vMatch = vertexPattern.exec(meshXml)) !== null) {
+      const x = parseFloat(vMatch[1]);
+      const y = parseFloat(vMatch[2]);
+      const z = parseFloat(vMatch[3]);
+      meshVerts.push(x, y, z);
+    }
+
+    // Parse triangles for this mesh, offsetting indices
+    trianglePattern.lastIndex = 0;
+    let tMatch;
+    while ((tMatch = trianglePattern.exec(meshXml)) !== null) {
+      const v1 = parseInt(tMatch[1], 10) + vertexOffset;
+      const v2 = parseInt(tMatch[2], 10) + vertexOffset;
+      const v3 = parseInt(tMatch[3], 10) + vertexOffset;
+      allTriIndices.push(v1, v2, v3);
+    }
+
+    // Append vertices and advance offset
+    for (let i = 0; i < meshVerts.length; i++) {
+      allPositions.push(meshVerts[i]);
+    }
+    vertexOffset += meshVerts.length / 3;
+  }
+
+  return {
+    vertProperties: new Float32Array(allPositions),
+    triVerts: new Uint32Array(allTriIndices),
+    numProp: 3,
+    mergeFromVert: new Uint32Array(0),
+    mergeToVert: new Uint32Array(0),
+  };
+}
+
 // ─── Dispatch ────────────────────────────────────────────────────────────────
 
 /**
@@ -186,8 +337,8 @@ export function parseMeshFile(data: ArrayBuffer, format: MeshFormat): ParsedMesh
     case 'stl':
       return parseStl(data);
     case 'obj':
-      throw new Error('OBJ import is not yet implemented. Use STL format for now.');
+      return parseObj(data);
     case '3mf':
-      throw new Error('3MF import is not yet implemented. Use STL format for now.');
+      return parse3mf(data);
   }
 }
