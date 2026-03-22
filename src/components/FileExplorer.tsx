@@ -1,4 +1,4 @@
-import { useMemo, useState, DragEvent, useEffect } from 'react';
+import { useMemo, useState, useCallback, DragEvent, useEffect, useRef } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 
 export function FileExplorer() {
@@ -23,6 +23,9 @@ export function FileExplorer() {
   const [focusedFolder, setFocusedFolder] = useState<string>('');
   const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string; type: 'file' | 'folder' } | null>(null);
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+  const lastClickedPath = useRef<string | null>(null);
+  const treeContainerRef = useRef<HTMLDivElement>(null);
 
   const normalizePath = (value: string): string => value
     .replace(/\\/g, '/')
@@ -180,16 +183,22 @@ export function FileExplorer() {
       handleFileDrop(e, targetFolder);
       return;
     }
-    const fromPath = e.dataTransfer.getData('application/x-forge-path') || e.dataTransfer.getData('text/plain');
-    if (!fromPath) return;
-    // Prevent dropping a folder into itself or any of its descendants
-    if (targetFolder === fromPath || targetFolder.startsWith(fromPath + '/')) return;
-    // Prevent no-op when already in the target folder
-    if (getParentPath(fromPath) === targetFolder) return;
-    const base = getBaseName(fromPath);
-    const destination = targetFolder ? normalizePath(`${targetFolder}/${base}`) : base;
-    if (destination === fromPath) return;
-    moveEntry(fromPath, destination);
+    // Try multi-path first, fall back to single path
+    const multiRaw = e.dataTransfer.getData('application/x-forge-paths');
+    const paths: string[] = multiRaw
+      ? JSON.parse(multiRaw)
+      : [e.dataTransfer.getData('application/x-forge-path') || e.dataTransfer.getData('text/plain')].filter(Boolean);
+    if (paths.length === 0) return;
+    for (const fromPath of paths) {
+      // Prevent dropping a folder into itself or any of its descendants
+      if (targetFolder === fromPath || targetFolder.startsWith(fromPath + '/')) continue;
+      // Prevent no-op when already in the target folder
+      if (getParentPath(fromPath) === targetFolder) continue;
+      const base = getBaseName(fromPath);
+      const destination = targetFolder ? normalizePath(`${targetFolder}/${base}`) : base;
+      if (destination === fromPath) continue;
+      moveEntry(fromPath, destination);
+    }
   };
 
   const toggleFolder = (path: string) => {
@@ -198,13 +207,73 @@ export function FileExplorer() {
     ));
   };
 
+  // Flat list of visible paths for shift-click range selection
+  const flatVisiblePaths = useMemo(() => {
+    const result: string[] = [];
+    const walk = (nodes: TreeNode[]) => {
+      for (const node of nodes) {
+        result.push(node.path);
+        if (node.type === 'folder' && expandedFolders.includes(node.path) && node.children) {
+          walk(node.children);
+        }
+      }
+    };
+    walk(tree);
+    return result;
+  }, [tree, expandedFolders]);
+
+  const handleDeleteSelection = useCallback(() => {
+    if (selection.size === 0) return;
+    const paths = Array.from(selection);
+    const label = paths.length === 1 ? `"${getBaseName(paths[0])}"` : `${paths.length} items`;
+    if (!confirm(`Delete ${label}?`)) return;
+    // Delete files first, then folders (folders may already be emptied by file deletes)
+    const filePaths = paths.filter((p) => files[p]);
+    const folderPaths = paths.filter((p) => !files[p]);
+    for (const f of filePaths) deleteFile(f);
+    for (const f of folderPaths) deleteFolder(f);
+    setSelection(new Set());
+  }, [selection, files, deleteFile, deleteFolder]);
+
+  const handleNodeClick = useCallback((e: React.MouseEvent, node: TreeNode) => {
+    const metaKey = e.metaKey || e.ctrlKey;
+    const { shiftKey } = e;
+
+    if (metaKey) {
+      // Toggle this item in selection
+      setSelection((prev) => {
+        const next = new Set(prev);
+        if (next.has(node.path)) next.delete(node.path);
+        else next.add(node.path);
+        return next;
+      });
+      lastClickedPath.current = node.path;
+    } else if (shiftKey && lastClickedPath.current) {
+      // Range select between last clicked and this node
+      const startIdx = flatVisiblePaths.indexOf(lastClickedPath.current);
+      const endIdx = flatVisiblePaths.indexOf(node.path);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const lo = Math.min(startIdx, endIdx);
+        const hi = Math.max(startIdx, endIdx);
+        setSelection(new Set(flatVisiblePaths.slice(lo, hi + 1)));
+      }
+    } else {
+      // Single click — select only this item
+      setSelection(new Set([node.path]));
+      lastClickedPath.current = node.path;
+    }
+
+    if (node.type === 'folder') setFocusedFolder(node.path);
+    if (node.type === 'file' && !metaKey && !shiftKey) setActiveFile(node.path);
+  }, [flatVisiblePaths, setActiveFile]);
+
   const renderNode = (node: TreeNode, depth: number) => {
     const isFolder = node.type === 'folder';
     const isExpanded = !isFolder || expandedFolders.includes(node.path);
     const isActive = node.type === 'file' && node.path === activeFile;
     const isModified = node.type === 'file' && files[node.path] !== savedFiles[node.path];
     const isRenaming = renamingPath === node.path;
-    const isFocused = isFolder && focusedFolder === node.path;
+    const isSelected = selection.has(node.path);
     const paddingLeft = 8 + depth * 12;
 
     return (
@@ -216,19 +285,26 @@ export function FileExplorer() {
         <div
           draggable
           onDragStart={(e) => {
+            // If dragging a selected item, drag all selected; otherwise drag just this one
+            const paths = selection.has(node.path) && selection.size > 1
+              ? Array.from(selection)
+              : [node.path];
+            e.dataTransfer.setData('application/x-forge-paths', JSON.stringify(paths));
             e.dataTransfer.setData('application/x-forge-path', node.path);
             e.dataTransfer.setData('text/plain', node.path);
             e.dataTransfer.effectAllowed = 'move';
           }}
-          onClick={() => {
-            if (isFolder) setFocusedFolder(node.path);
-            if (node.type === 'file') setActiveFile(node.path);
-          }}
+          onClick={(e) => handleNodeClick(e, node)}
           onDoubleClick={() => {
             if (isFolder) toggleFolder(node.path);
           }}
           onContextMenu={(e) => {
             e.preventDefault();
+            // If right-clicking a non-selected item, select just that item
+            if (!selection.has(node.path)) {
+              setSelection(new Set([node.path]));
+              lastClickedPath.current = node.path;
+            }
             setContextMenu({ x: e.clientX, y: e.clientY, path: node.path, type: node.type });
           }}
           style={{
@@ -236,14 +312,14 @@ export function FileExplorer() {
             paddingLeft,
             cursor: 'pointer',
             color: isActive ? 'var(--fc-accentText)' : 'var(--fc-textMuted)',
-            background: isActive ? 'var(--fc-bgActive)' : (isFocused ? 'var(--fc-bgHover)' : 'transparent'),
+            background: isSelected ? 'var(--fc-bgActive)' : 'transparent',
             fontSize: 12,
             display: 'flex',
             alignItems: 'center',
             gap: 6,
           }}
-          onMouseEnter={(e) => { if (!isActive && !isFocused) e.currentTarget.style.background = 'var(--fc-bgHover)'; }}
-          onMouseLeave={(e) => { if (!isActive && !isFocused) e.currentTarget.style.background = 'transparent'; }}
+          onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'var(--fc-bgHover)'; }}
+          onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
         >
           {isFolder ? (
             <span
@@ -281,26 +357,6 @@ export function FileExplorer() {
                   }}
                 />
               )}
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (node.type === 'file') {
-                    if (confirm(`Delete "${node.name}"?`)) deleteFile(node.path);
-                  } else {
-                    const childCount = node.children?.length ?? 0;
-                    const msg = childCount > 0
-                      ? `Delete folder "${node.name}" and all its contents (${childCount} item${childCount > 1 ? 's' : ''})?`
-                      : `Delete folder "${node.name}"?`;
-                    if (confirm(msg)) deleteFolder(node.path);
-                  }
-                }}
-                style={{
-                  color: 'var(--fc-textDim)',
-                  fontSize: 10,
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--fc-error)')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--fc-textDim)')}
-              >✕</span>
             </>
           )}
         </div>
@@ -311,10 +367,26 @@ export function FileExplorer() {
 
   return (
     <div
-      style={{ width: '100%', minWidth: 0, minHeight: 0, flex: 1, background: 'var(--fc-bgSurface)', borderRight: '1px solid var(--fc-border)', display: 'flex', flexDirection: 'column', fontSize: 13 }}
+      ref={treeContainerRef}
+      tabIndex={0}
+      style={{ width: '100%', minWidth: 0, minHeight: 0, flex: 1, background: 'var(--fc-bgSurface)', borderRight: '1px solid var(--fc-border)', display: 'flex', flexDirection: 'column', fontSize: 13, outline: 'none' }}
       onDrop={(e) => handleDropToFolder(e, '')}
       onDragOver={(e) => e.preventDefault()}
-      onClick={() => setContextMenu(null)}
+      onClick={(e) => {
+        setContextMenu(null);
+        // Click on background clears selection
+        if (e.target === e.currentTarget || (e.target as HTMLElement).dataset?.fcEditorSurface) {
+          setSelection(new Set());
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (selection.size > 0 && !renamingPath && !creating) {
+            e.preventDefault();
+            handleDeleteSelection();
+          }
+        }
+      }}
     >
       {contextMenu && (
         <div
@@ -374,16 +446,10 @@ export function FileExplorer() {
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--fc-bgHover)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             onClick={() => {
-              const path = contextMenu.path;
-              const name = getBaseName(path);
               setContextMenu(null);
-              if (contextMenu.type === 'file') {
-                if (confirm(`Delete "${name}"?`)) deleteFile(path);
-              } else {
-                if (confirm(`Delete folder "${name}" and all its contents?`)) deleteFolder(path);
-              }
+              handleDeleteSelection();
             }}
-          >Delete</div>
+          >Delete{selection.size > 1 ? ` (${selection.size})` : ''}</div>
         </div>
       )}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--fc-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
