@@ -532,6 +532,11 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
         ok: false,
         reason: 'projection replay cannot derive a planar projection basis from opaque (pre-built) shapes.',
       };
+    case 'importedMesh':
+      return {
+        ok: false,
+        reason: 'projection replay cannot derive a planar projection basis from imported mesh files.',
+      };
   }
 }
 

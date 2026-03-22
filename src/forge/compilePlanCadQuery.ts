@@ -401,6 +401,8 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
       return compilerFailure(unsupportedNodeDiagnostic('shape-hull', path));
     case 'opaque':
       return compilerFailure(unsupportedNodeDiagnostic('shape-opaque', path));
+    case 'importedMesh':
+      return compilerFailure(unsupportedNodeDiagnostic('shape-importedMesh', path));
   }
 }
 

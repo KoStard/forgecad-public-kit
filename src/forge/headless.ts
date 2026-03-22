@@ -93,7 +93,7 @@ export type {
   CollectedRobotExport,
 } from './robotExport';
 export { runScript } from './runner';
-export type { RunResult, SceneObject, LogEntry, RunScriptOptions } from './runner';
+export type { RunResult, SceneObject, LogEntry, RunScriptOptions, MeshImportOptions } from './runner';
 export type { VerificationResult, VerificationStatus } from './verification';
 export {
   FORGE_QUALITY_PRESETS,

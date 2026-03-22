@@ -188,12 +188,12 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
 
   try {
     const code = readFileSync(resolve(materialized.runnablePath), "utf-8");
-    const { allFiles, fileName } = collectProjectFiles(materialized.runnablePath);
+    const { allFiles, fileName, readBinaryFile } = collectProjectFiles(materialized.runnablePath);
 
     await init();
     if (backend) setActiveBackend(backend);
     resetSolverStats();
-    const result = runScript(code, fileName, allFiles, { debugImports });
+    const result = runScript(code, fileName, allFiles, { debugImports, readBinaryFile });
 
     if (result.error) {
       console.error("ERROR:", result.error);

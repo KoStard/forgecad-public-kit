@@ -81,6 +81,7 @@ function rootPlanPropagation(plan: ShapeCompilePlan): TopologyRewritePropagation
     case 'loft':
     case 'sweep':
     case 'opaque':
+    case 'importedMesh':
       return undefined;
   }
 }
@@ -751,6 +752,7 @@ export function findShapeTopologyRewritePropagation(
     case 'loft':
     case 'sweep':
     case 'opaque':
+    case 'importedMesh':
       return null;
   }
 }
@@ -801,6 +803,7 @@ export function collectShapeTopologyRewritePropagations(
       case 'loft':
       case 'sweep':
       case 'opaque':
+      case 'importedMesh':
         return;
     }
   }

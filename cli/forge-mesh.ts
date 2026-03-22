@@ -89,13 +89,13 @@ export async function runMeshExportCli(
 ): Promise<void> {
   const { scriptPath, outputPath, quality, backend } = parseArgs(argv);
   const code = (await import('fs')).readFileSync(resolve(scriptPath), 'utf-8');
-  const { allFiles, fileName } = collectProjectFiles(scriptPath);
+  const { allFiles, fileName, readBinaryFile } = collectProjectFiles(scriptPath);
 
   await initKernel();
   if (backend) setActiveBackend(backend);
 
   const qualityPreset = quality && quality !== 'default' ? quality : undefined;
-  const result = runScript(code, fileName, allFiles, qualityPreset ? { quality: qualityPreset } : undefined);
+  const result = runScript(code, fileName, allFiles, { ...(qualityPreset ? { quality: qualityPreset } : {}), readBinaryFile });
   if (result.error) {
     console.error(`ERROR: ${result.error}`);
     process.exit(1);

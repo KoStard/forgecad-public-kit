@@ -1495,6 +1495,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       return table;
     }
     case 'opaque':
+    case 'importedMesh':
       return emptyFaceTable();
   }
 }

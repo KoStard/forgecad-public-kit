@@ -124,6 +124,7 @@ export type GeometrySource =
   | 'loft'
   | 'sweep'
   | 'deform'
+  | 'imported'
   | 'unknown';
 
 export interface GeometryInfo {
