@@ -55,24 +55,40 @@ export async function buildBrepBlob(objects: BrepNativeExportObject[]): Promise<
   const path = '/tmp/forgecad-export.brep';
 
   // BRepTools has several Write overloads in opencascade.js.
-  // Try Write_2(shape, path, progressRange) first, fall back to Write_1(shape, path).
+  // Some overloads accept ostream (C++ type not bound in WASM) and will throw at runtime.
+  // Try file-path overloads first, falling through on unbound-type errors.
   let writeSuccess = false;
-  try {
-    if (typeof oc.BRepTools.Write_2 === 'function') {
-      writeSuccess = oc.BRepTools.Write_2(topoShape, path, new oc.Message_ProgressRange_1());
-    } else if (typeof oc.BRepTools.Write_1 === 'function') {
+  let lastError: string | null = null;
+
+  // Write_1(shape, path) — file-path overload, no progress
+  if (!writeSuccess && typeof oc.BRepTools.Write_1 === 'function') {
+    try {
       writeSuccess = oc.BRepTools.Write_1(topoShape, path);
-    } else if (typeof oc.BRepTools.Write === 'function') {
-      writeSuccess = oc.BRepTools.Write(topoShape, path);
-    } else {
-      throw new Error('BREP export: BRepTools.Write is not available in this opencascade.js build.');
+    } catch (err: any) {
+      lastError = err.message || String(err);
     }
-  } catch (err: any) {
-    throw new Error(`BREP export: BRepTools.Write failed — ${err.message || err}`);
   }
 
-  if (writeSuccess === false) {
-    throw new Error('BREP export: BRepTools.Write returned failure.');
+  // Write_2(shape, path, progressRange) — file-path with progress
+  if (!writeSuccess && typeof oc.BRepTools.Write_2 === 'function') {
+    try {
+      writeSuccess = oc.BRepTools.Write_2(topoShape, path, new oc.Message_ProgressRange_1());
+    } catch (err: any) {
+      lastError = err.message || String(err);
+    }
+  }
+
+  // Write(shape, path) — unversioned overload
+  if (!writeSuccess && typeof oc.BRepTools.Write === 'function') {
+    try {
+      writeSuccess = oc.BRepTools.Write(topoShape, path);
+    } catch (err: any) {
+      lastError = err.message || String(err);
+    }
+  }
+
+  if (!writeSuccess) {
+    throw new Error(`BREP export: BRepTools.Write failed${lastError ? ` — ${lastError}` : '. No compatible overload found.'}`);
   }
 
   // Read the file back from the virtual FS.
