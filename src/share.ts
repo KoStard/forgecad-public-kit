@@ -4,10 +4,19 @@ import {
 } from 'lz-string';
 
 const SHARED_PREFIX = 'code/';
+const BUNDLE_PREFIX = 'bundle/';
 
 export interface SharedModel {
   filename: string;
   code: string;
+}
+
+/** A multi-file bundle: an entry file plus all its dependencies. */
+export interface SharedBundle {
+  /** The entry filename to open/run. */
+  entry: string;
+  /** All files in the bundle (filename → code), including the entry file. */
+  files: Record<string, string>;
 }
 
 /** Encode a file into a shareable URL hash fragment: `#code/<filename>/<compressed>` */
@@ -31,6 +40,56 @@ export function decodeSharedHash(hash: string): SharedModel | null {
   if (!code) return null;
 
   return { filename, code };
+}
+
+// ---------------------------------------------------------------------------
+// Multi-file bundle encoding / decoding
+// Format: #bundle/<compressed-packed>
+// Packed format: entry\0filename1\0code1\0filename2\0code2...
+// Uses \0 (null byte) as separator — more compact than JSON after compression.
+// ---------------------------------------------------------------------------
+
+/** Encode a multi-file bundle into a shareable URL hash fragment. */
+export function encodeSharedBundle(bundle: SharedBundle): string {
+  const parts = [bundle.entry];
+  for (const [name, code] of Object.entries(bundle.files)) {
+    parts.push(name, code);
+  }
+  const packed = parts.join('\0');
+  const compressed = compressToEncodedURIComponent(packed);
+  return `#${BUNDLE_PREFIX}${compressed}`;
+}
+
+/** Try to decode a multi-file bundle from the current URL hash. Returns null if not a bundle link. */
+export function decodeSharedBundle(hash: string): SharedBundle | null {
+  const raw = hash.startsWith('#') ? hash.slice(1) : hash;
+  if (!raw.startsWith(BUNDLE_PREFIX)) return null;
+
+  const compressed = raw.slice(BUNDLE_PREFIX.length);
+  const packed = decompressFromEncodedURIComponent(compressed);
+  if (!packed) return null;
+
+  const parts = packed.split('\0');
+  if (parts.length < 3 || parts.length % 2 === 0) return null; // need entry + N*(name,code) pairs
+
+  const entry = parts[0];
+  const files: Record<string, string> = {};
+  for (let i = 1; i < parts.length; i += 2) {
+    files[parts[i]] = parts[i + 1];
+  }
+
+  if (!files[entry]) return null; // entry must be in the bundle
+  return { entry, files };
+}
+
+/** Build a full shareable URL for a multi-file bundle. */
+export function buildBundleShareUrl(bundle: SharedBundle): string {
+  return `${PROD_BASE}${encodeSharedBundle(bundle)}`;
+}
+
+/** Build an embed URL for a multi-file bundle. */
+export function buildBundleEmbedUrl(bundle: SharedBundle): string {
+  return `${PROD_BASE}?embed=1${encodeSharedBundle(bundle)}`;
 }
 
 /** Production base URL — share links always point here, even from a local dev server. */
