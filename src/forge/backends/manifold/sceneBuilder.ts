@@ -1,6 +1,7 @@
 import { setMaterial } from 'manifold-3d/lib/scene-builder.js';
 import type { Shape } from '../../kernel';
-import { getShapeRuntimeBackend, getWasm } from '../../kernel';
+import { getShapeRuntimeBackend } from '../../kernel';
+import { getWasm } from './wasm';
 import { isManifoldCapableBackend } from './shapeBackend';
 import { isOCCTShapeBackend } from '../occt/shapeBackend';
 

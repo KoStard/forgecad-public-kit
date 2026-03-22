@@ -5,7 +5,6 @@
  * behind a clean, chainable Shape API.
  */
 
-import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import { Transform, solveRotateAroundAngle, type Mat4, type RotateAroundToOptions, type Vec3 } from './transform';
 import type { ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
 import { type Anchor3D, isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -53,7 +52,8 @@ import {
   type ShapeBackend,
   isShapeBackend,
 } from './shapeBackend';
-import { wrapManifoldShapeBackend, lowerShapeCompilePlanToShapeBackend } from './backends/manifold';
+import { wrapManifoldShapeBackend, lowerShapeCompilePlanToShapeBackend, initManifoldWasm, getWasm } from './backends/manifold';
+import type { Manifold } from './backends/manifold';
 import { lowerShapeCompilePlanToOCCTBackend, initOCCT } from './backends/occt';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
@@ -69,31 +69,18 @@ export type {
 } from './placement';
 export type { FaceTransformationHistory, TransformationStep } from './faceHistory';
 
-let _wasm: ManifoldToplevel | null = null;
-
-export async function initKernel(): Promise<ManifoldToplevel> {
-  if (_wasm) return _wasm;
+export async function initKernel() {
   // Initialize Manifold and OCCT WASM modules in parallel.
   // Both are cached as singletons — subsequent calls are instant.
   const [manifoldModule] = await Promise.all([
-    (async () => {
-      const Module = (await import('manifold-3d')).default;
-      const wasm = await Module();
-      wasm.setup();
-      wasm.setMinCircularAngle(2);
-      wasm.setMinCircularEdgeLength(0.5);
-      return wasm;
-    })(),
+    initManifoldWasm(),
     initOCCT(),
   ]);
-  _wasm = manifoldModule;
-  return _wasm;
+  return manifoldModule;
 }
 
-export function getWasm(): ManifoldToplevel {
-  if (!_wasm) throw new Error('Kernel not initialized — call initKernel() first');
-  return _wasm;
-}
+// TODO: Remove getWasm re-export from kernel once all callers import from backends/manifold/wasm
+export { getWasm };
 
 /**
  * Active geometry backend selector.

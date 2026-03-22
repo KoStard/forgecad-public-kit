@@ -1,4 +1,4 @@
-import { getWasm } from '../kernel';
+import { getWasm } from '../backends/manifold/wasm';
 import { difference2d, union2d } from './booleans';
 import { Sketch } from './core';
 import { stroke as strokePolyline } from './path';

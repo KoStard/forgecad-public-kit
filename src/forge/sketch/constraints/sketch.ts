@@ -7,7 +7,7 @@
 import { Sketch } from '../core';
 import { polygon } from '../primitives';
 import { union2d } from '../booleans';
-import { getWasm } from '../../kernel';
+import { getWasm } from '../../backends/manifold/wasm';
 import type {
   ConstraintDefinition,
   SketchConstraintMeta,

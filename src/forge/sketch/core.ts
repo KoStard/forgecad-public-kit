@@ -1,5 +1,6 @@
 import type { CrossSection } from 'manifold-3d';
-import { Shape, getWasm } from '../kernel';
+import { Shape } from '../kernel';
+import { getWasm } from '../backends/manifold/wasm';
 import type { ProfileCompilePlan } from '../compilePlan';
 import { cloneProfileCompilePlan } from '../compilePlan';
 import type { Mat4 } from '../transform';

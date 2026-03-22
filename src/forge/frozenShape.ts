@@ -12,8 +12,9 @@
  * is a zero-cost BufferGeometry assembly with no CPU work.
  */
 
-import type { Manifold } from 'manifold-3d';
-import { Shape, getWasm } from './kernel';
+import type { Manifold } from './backends/manifold/wasm';
+import { Shape } from './kernel';
+import { getWasm } from './backends/manifold/wasm';
 import { SHAPE_BACKEND_MARKER, type ShapeBackend, type ShapeRuntimeBounds, type ShapeRuntimeMesh, type ShapeRuntimeCrossSection } from './shapeBackend';
 import { ManifoldShapeBackend, type ManifoldCapableBackend } from './backends/manifold/shapeBackend';
 import type { FaceRef } from './sketch/topology';

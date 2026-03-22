@@ -11,7 +11,7 @@ import { polygon } from './primitives';
 import { sketchExtrude } from './extrude';
 import { ConstrainedSketchBuilder, type PointId, type LineId } from './constraints';
 import { TrackedShape, buildRectExtrusionTopology, buildCircleExtrusionTopology } from './topology';
-import { getWasm } from '../kernel';
+import { getWasm } from '../backends/manifold/wasm';
 
 // ─── Point ───────────────────────────────────────────────────────
 

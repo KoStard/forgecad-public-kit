@@ -5,7 +5,8 @@
  * Each part is a function that returns a Shape, taking parameters.
  */
 
-import { box, cylinder, sphere, union, difference, intersection, Shape, getWasm, wrapOpaquePlan } from './kernel';
+import { box, cylinder, sphere, union, difference, intersection, Shape, wrapOpaquePlan } from './kernel';
+import { getWasm } from './backends/manifold/wasm';
 import { ShapeGroup } from './group';
 import { Sketch } from './sketch/core';
 import { TrackedShape } from './sketch/topology';

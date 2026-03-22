@@ -25,7 +25,7 @@ import type { ShapeBackend } from '../../shapeBackend';
 import { wrapManifoldShapeBackend } from '../manifold/shapeBackend';
 import { Transform } from '../../transform';
 import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
-import { getWasm } from '../../kernel';
+import { getWasm } from '../manifold/wasm';
 
 // ─── Hybrid Boolean Sentinel ────────────────────────────────────────
 // When a 3D boolean is performed via Manifold (because OCCT's boolean

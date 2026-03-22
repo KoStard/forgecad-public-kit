@@ -9,7 +9,7 @@ import {
   setSketchPlacement3D,
   setSketchPlacementModel,
 } from './core';
-import { getWasm } from '../kernel';
+import { getWasm } from '../backends/manifold/wasm';
 import { buildBooleanProfileCompilePlan, buildHullProfileCompilePlan } from '../compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from '../apiArgs';
 
