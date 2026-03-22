@@ -436,6 +436,9 @@ interface ForgeStore {
   activeBackend: 'occt' | 'manifold';
   setActiveBackend: (backend: 'occt' | 'manifold') => void;
 
+  /** When set, execute() renders this mesh file instead of the active script. Cleared on file switch or code edit. */
+  meshPreviewFile: string | null;
+  setMeshPreview: (meshPath: string | null) => void;
   execute: () => Promise<void>;
   setParam: (name: string, value: number) => void;
   resetParamOverrides: () => void;
@@ -909,6 +912,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const restored = (name && nextByFile[name]) ? nextByFile[name] : {};
     set({
       activeFile: name,
+      meshPreviewFile: null, // Clear mesh preview when switching files
       lastValidResult: null,
       paramOverrides: restored,
       paramOverridesByFile: nextByFile,
@@ -922,7 +926,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     setTimeout(() => get().execute(), 0);
   },
   updateFileCode: (name, code) => {
-    set((s) => ({ files: { ...s.files, [name]: code }, dirty: true }));
+    set((s) => ({ files: { ...s.files, [name]: code }, dirty: true, meshPreviewFile: null }));
   },
   createFile: (name) => {
     const normalized = normalizePath(name);
@@ -1194,6 +1198,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   evaluationPhase: 'idle' as const,
   pauseAutoEval: false,
   togglePauseAutoEval: () => set((s) => ({ pauseAutoEval: !s.pauseAutoEval })),
+  meshPreviewFile: null,
+  setMeshPreview: (meshPath) => {
+    set({ meshPreviewFile: meshPath });
+    if (meshPath) get().execute();
+  },
   activeBackend: (initialViewPreferences.activeBackend as 'occt' | 'manifold') || 'manifold',
   setActiveBackend: (backend) => {
     writeViewPreferences({ activeBackend: backend });
@@ -1205,15 +1214,27 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const {
       files,
       activeFile,
+      meshPreviewFile,
       runQuality,
       paramOverrides,
     } = get();
-    const previewFile = resolvePreviewFile(activeFile, files);
-    if (!previewFile) {
-      set({ result: null, lastValidResult: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
-      return;
+
+    // Mesh preview mode: render a temporary importMesh() script
+    let previewFile: string | null;
+    let code: string | undefined;
+    if (meshPreviewFile) {
+      // Use the mesh file's directory as the script location so importMesh resolves correctly
+      previewFile = meshPreviewFile.replace(/\.[^.]+$/, '.forge.js');
+      const meshFileName = meshPreviewFile.split('/').pop() ?? meshPreviewFile;
+      code = `return importMesh("${meshFileName}");`;
+    } else {
+      previewFile = resolvePreviewFile(activeFile, files);
+      if (!previewFile) {
+        set({ result: null, lastValidResult: null, consoleLogs: [], params: [], previewFile: null, objectSettings: {} });
+        return;
+      }
+      code = files[previewFile];
     }
-    const code = files[previewFile];
     if (!code) return;
 
     // Cache hit — show previous result immediately, no worker round-trip

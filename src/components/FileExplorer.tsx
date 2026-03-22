@@ -21,6 +21,8 @@ export function FileExplorer() {
   const renameFolder = useForgeStore((s) => s.renameFolder);
   const moveEntry = useForgeStore((s) => s.moveEntry);
   const loadFromText = useForgeStore((s) => s.loadFromText);
+  const setMeshPreview = useForgeStore((s) => s.setMeshPreview);
+  const meshPreviewFile = useForgeStore((s) => s.meshPreviewFile);
 
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState<'file' | 'folder' | null>(null);
@@ -272,33 +274,18 @@ export function FileExplorer() {
     if (node.type === 'folder') setFocusedFolder(node.path);
     if (node.type === 'file' && !metaKey && !shiftKey) {
       if (isMeshFile(node.path)) {
-        // Mesh file clicked — create a companion .forge.js that imports it, or switch to existing one
-        const baseName = node.path.replace(/\.[^.]+$/, '');
-        const scriptName = `${baseName}.forge.js`;
-        if (!files[scriptName]) {
-          // Create new script that imports the mesh
-          createFile(scriptName);
-          // Defer content update to next tick so the file exists in store
-          setTimeout(() => {
-            const store = useForgeStore.getState();
-            // importMesh path is relative to the script — use just the filename since they're in the same directory
-            const meshFileName = node.path.split('/').pop() ?? node.path;
-            store.updateFileCode(scriptName, `// Imported mesh: ${node.path}\nreturn importMesh("${meshFileName}");\n`);
-            store.setActiveFile(scriptName);
-          }, 0);
-        } else {
-          setActiveFile(scriptName);
-        }
+        // Mesh file clicked — preview it in the viewport without changing active file
+        setMeshPreview(node.path);
       } else {
         setActiveFile(node.path);
       }
     }
-  }, [flatVisiblePaths, setActiveFile, files, createFile]);
+  }, [flatVisiblePaths, setActiveFile, setMeshPreview]);
 
   const renderNode = (node: TreeNode, depth: number) => {
     const isFolder = node.type === 'folder';
     const isExpanded = !isFolder || expandedFolders.includes(node.path);
-    const isActive = node.type === 'file' && node.path === activeFile;
+    const isActive = node.type === 'file' && (node.path === activeFile || node.path === meshPreviewFile);
     const isMesh = node.type === 'file' && isMeshFile(node.path);
     const isModified = node.type === 'file' && !isMesh && files[node.path] !== savedFiles[node.path];
     const isRenaming = renamingPath === node.path;
