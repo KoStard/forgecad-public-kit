@@ -16,6 +16,23 @@ function waitForNextPaint(): Promise<void> {
   });
 }
 
+type ExportFormat = MeshExportFormat | ExactExportFormat;
+
+const FORMAT_META: Record<ExportFormat, { label: string; desc: string; accent?: string }> = {
+  '3mf': { label: '3MF (recommended)', desc: 'Preserves manifold topology and object structure.' },
+  obj: { label: 'OBJ (universal)', desc: 'Wavefront OBJ — widely supported by 3D tools, renderers, and game engines.' },
+  stl: { label: 'STL (legacy)', desc: 'Triangle-only export, may not preserve manifold topology on re-import.', accent: 'var(--fc-warning)' },
+  step: { label: 'STEP (exact)', desc: 'Industry-standard exact geometry exchange format (OCCT).' },
+  brep: { label: 'BREP (exact)', desc: 'Native OpenCascade boundary representation format.' },
+};
+
+const MESH_FORMATS: MeshExportFormat[] = ['3mf', 'obj', 'stl'];
+const EXACT_FORMATS: ExactExportFormat[] = ['step', 'brep'];
+
+function isExactFormat(f: ExportFormat): f is ExactExportFormat {
+  return f === 'step' || f === 'brep';
+}
+
 interface Export3DPanelProps {
   fileStem: string;
   defaultStem: string;
@@ -26,39 +43,31 @@ interface Export3DPanelProps {
 
 export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, totalTriangles, onClose }: Export3DPanelProps) {
   const activeBackend = useForgeStore((s) => s.activeBackend);
-  const [meshFormat, setMeshFormat] = useState<MeshExportFormat>('3mf');
+  const [format, setFormat] = useState<ExportFormat>('3mf');
   const [exportQuality, setExportQuality] = useState<ExportQualityChoice>('default');
-  const [meshFileStem, setMeshFileStem] = useState(initialStem);
-  const [meshBusy, setMeshBusy] = useState(false);
-  const [exactBusy, setExactBusy] = useState(false);
+  const [fileStem, setFileStem] = useState(initialStem);
+  const [exportBusy, setExportBusy] = useState(false);
   const [gifBusy, setGifBusy] = useState(false);
   const [reportBusy, setReportBusy] = useState(false);
-  const anyBusy = meshBusy || exactBusy || gifBusy || reportBusy;
-  const exportMesh = async () => {
-    if (meshBusy) return;
-    setMeshBusy(true);
-    try {
-      await exportMeshFromStore(meshFormat, meshFileStem || defaultStem, { quality: exportQuality });
-      onClose();
-    } catch (err) {
-      console.error('Mesh export failed:', err);
-      alert(`Mesh export failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setMeshBusy(false);
-    }
-  };
+  const anyBusy = exportBusy || gifBusy || reportBusy;
+  const isExact = isExactFormat(format);
 
-  const exportExact = async (format: ExactExportFormat) => {
-    if (exactBusy) return;
-    setExactBusy(true);
+  const doExport = async () => {
+    if (exportBusy) return;
+    setExportBusy(true);
     try {
-      await exportExactFromStore(format, meshFileStem || defaultStem);
+      const stem = fileStem || defaultStem;
+      if (isExactFormat(format)) {
+        await exportExactFromStore(format, stem);
+      } else {
+        await exportMeshFromStore(format, stem, { quality: exportQuality });
+      }
       onClose();
     } catch (err) {
-      console.error(`${format.toUpperCase()} export failed:`, err);
-      alert(`${format.toUpperCase()} export failed: ${err instanceof Error ? err.message : String(err)}`);
+      console.error('Export failed:', err);
+      alert(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setExactBusy(false);
+      setExportBusy(false);
     }
   };
 
@@ -67,7 +76,7 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
     setGifBusy(true);
     try {
       await waitForNextPaint();
-      await exportOrbitGifFromStore(meshFileStem || defaultStem, { quality: exportQuality });
+      await exportOrbitGifFromStore(fileStem || defaultStem, { quality: exportQuality });
       onClose();
     } catch (err) {
       console.error('GIF export failed:', err);
@@ -82,7 +91,7 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
     setReportBusy(true);
     try {
       await waitForNextPaint();
-      await exportReportFromStore(meshFileStem || defaultStem, { quality: exportQuality });
+      await exportReportFromStore(fileStem || defaultStem, { quality: exportQuality });
     } catch (err) {
       console.error('Report export failed:', err);
       alert(`Report export failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -102,6 +111,16 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
     padding: '9px 10px',
     cursor: 'pointer',
   });
+  const disabledFormatBtn = () => ({
+    textAlign: 'left' as const,
+    border: '1px solid var(--fc-border)',
+    background: 'var(--fc-bgOverlay)',
+    color: 'var(--fc-textDim)',
+    borderRadius: 6,
+    padding: '9px 10px',
+    cursor: 'default' as const,
+    opacity: 0.45,
+  });
   const actionBtn = (busy: boolean) => ({
     width: '100%',
     padding: '7px 8px',
@@ -119,30 +138,34 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
 
   return (
     <>
-      {/* Mesh Format Selection */}
-      <div style={{ marginTop: 12, fontSize: 12, color: 'var(--fc-textDim)' }}>Mesh format</div>
+      {/* Format Selection */}
+      <div style={{ marginTop: 12, fontSize: 12, color: 'var(--fc-textDim)' }}>Format</div>
       <div style={{ marginTop: 6, display: 'grid', gap: 8 }}>
-        <button onClick={() => setMeshFormat('3mf')} style={formatBtn(meshFormat === '3mf')}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>3MF (recommended)</div>
-          <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
-            Preserves manifold topology and object structure.
-          </div>
-        </button>
-        <button onClick={() => setMeshFormat('obj')} style={formatBtn(meshFormat === 'obj')}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>OBJ (universal)</div>
-          <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
-            Wavefront OBJ — widely supported by 3D tools, renderers, and game engines.
-          </div>
-        </button>
-        <button onClick={() => setMeshFormat('stl')} style={formatBtn(meshFormat === 'stl', 'var(--fc-warning)')}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>STL (legacy)</div>
-          <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
-            Triangle-only export, may not preserve manifold topology on re-import.
-          </div>
-        </button>
+        {/* Mesh formats */}
+        {MESH_FORMATS.map((f) => {
+          const meta = FORMAT_META[f];
+          return (
+            <button key={f} onClick={() => setFormat(f)} style={formatBtn(format === f, meta.accent)}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{meta.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>{meta.desc}</div>
+            </button>
+          );
+        })}
+
+        {/* Exact formats */}
+        <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 4 }}>Exact geometry (OCCT)</div>
+        {EXACT_FORMATS.map((f) => {
+          const meta = FORMAT_META[f];
+          return (
+            <button key={f} onClick={() => setFormat(f)} style={formatBtn(format === f)}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{meta.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>{meta.desc}</div>
+            </button>
+          );
+        })}
       </div>
 
-      {meshFormat === 'stl' && (
+      {format === 'stl' && (
         <div style={{
           marginTop: 8,
           border: '1px solid var(--fc-warning)',
@@ -157,76 +180,51 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
         </div>
       )}
 
-      {/* Exact Geometry Formats — always available, worker re-evaluates with OCCT if needed */}
-      <div style={sectionBorder}>
-        <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginBottom: 6 }}>
-          Exact geometry (OCCT)
+      {isExact && activeBackend !== 'occt' && (
+        <div style={{ fontSize: 10, color: 'var(--fc-textDim)', marginTop: 4 }}>
+          Will re-evaluate with OCCT backend for exact B-rep geometry.
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => exportExact('step')}
-            disabled={exactBusy}
-            style={{
-              flex: 1,
-              padding: '7px 8px',
-              background: !exactBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
-              color: !exactBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
-              border: 'none',
-              borderRadius: 4,
-              cursor: !exactBusy ? 'pointer' : 'default',
-              fontSize: 12,
-            }}
-          >
-            {exactBusy ? 'Exporting...' : 'Export STEP'}
-          </button>
-          <button
-            onClick={() => exportExact('brep')}
-            disabled={exactBusy}
-            style={{
-              flex: 1,
-              padding: '7px 8px',
-              background: !exactBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
-              color: !exactBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
-              border: 'none',
-              borderRadius: 4,
-              cursor: !exactBusy ? 'pointer' : 'default',
-              fontSize: 12,
-            }}
-          >
-            {exactBusy ? 'Exporting...' : 'Export BREP'}
-          </button>
-        </div>
-        {activeBackend !== 'occt' && (
-          <div style={{ fontSize: 10, color: 'var(--fc-textDim)', marginTop: 4 }}>
-            Will re-evaluate with OCCT backend for exact B-rep geometry.
-          </div>
-        )}
-      </div>
+      )}
 
-      {/* Geometry Quality — always visible */}
+      {/* Geometry Quality — disabled for exact formats */}
       <div style={sectionBorder}>
-        <div style={{ fontSize: 12, color: 'var(--fc-textDim)' }}>Geometry quality</div>
+        <div style={{ fontSize: 12, color: 'var(--fc-textDim)' }}>
+          Geometry quality
+          {isExact && <span style={{ fontSize: 10, marginLeft: 6 }}>(not applicable for exact formats)</span>}
+        </div>
         <div style={{ marginTop: 6, display: 'grid', gap: 8 }}>
-          <button onClick={() => setExportQuality('default')} style={formatBtn(exportQuality === 'default')}>
+          <button
+            onClick={() => !isExact && setExportQuality('default')}
+            style={isExact ? disabledFormatBtn() : formatBtn(exportQuality === 'default')}
+            disabled={isExact}
+          >
             <div style={{ fontSize: 13, fontWeight: 600 }}>Default (current scene)</div>
             <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
               Uses the geometry already loaded in the viewport.
             </div>
           </button>
-          <button onClick={() => setExportQuality('live')} style={formatBtn(exportQuality === 'live')}>
+          <button
+            onClick={() => !isExact && setExportQuality('live')}
+            style={isExact ? disabledFormatBtn() : formatBtn(exportQuality === 'live')}
+            disabled={isExact}
+          >
             <div style={{ fontSize: 13, fontWeight: 600 }}>Live (fast)</div>
             <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
               Re-runs script with faster tessellation before export.
             </div>
           </button>
-          <button onClick={() => setExportQuality('high')} style={formatBtn(exportQuality === 'high')}>
+          <button
+            onClick={() => !isExact && setExportQuality('high')}
+            style={isExact ? disabledFormatBtn() : formatBtn(exportQuality === 'high')}
+            disabled={isExact}
+          >
             <div style={{ fontSize: 13, fontWeight: 600 }}>High (export)</div>
             <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
               Re-runs script with denser tessellation for final output.
             </div>
           </button>
         </div>
-        {exportQuality !== 'default' && (
+        {!isExact && exportQuality !== 'default' && (
           <div style={{
             marginTop: 8,
             border: '1px solid var(--fc-border)',
@@ -248,8 +246,8 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
         <div style={{ display: 'flex', alignItems: 'center', marginTop: 5, gap: 6 }}>
           <input
             type="text"
-            value={meshFileStem}
-            onChange={(event) => setMeshFileStem(event.target.value)}
+            value={fileStem}
+            onChange={(event) => setFileStem(event.target.value)}
             spellCheck={false}
             style={{
               flex: 1,
@@ -262,12 +260,12 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
             }}
           />
           <span style={{ fontSize: 12, color: 'var(--fc-textDim)', width: 44, textAlign: 'left' }}>
-            .{meshFormat}
+            .{format}
           </span>
         </div>
       </label>
 
-      {/* Primary Mesh Export Button */}
+      {/* Single Export Button */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
         <button
           onClick={onClose}
@@ -285,19 +283,19 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
           Cancel
         </button>
         <button
-          onClick={exportMesh}
-          disabled={meshBusy}
+          onClick={doExport}
+          disabled={exportBusy}
           style={{
             border: 'none',
-            background: 'var(--fc-accent)',
-            color: 'var(--fc-accentText)',
+            background: !exportBusy ? 'var(--fc-accent)' : 'var(--fc-border)',
+            color: !exportBusy ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
             borderRadius: 4,
             padding: '6px 10px',
             fontSize: 12,
-            cursor: meshBusy ? 'default' : 'pointer',
+            cursor: exportBusy ? 'default' : 'pointer',
           }}
         >
-          {meshBusy ? `Exporting ${meshFormat.toUpperCase()}...` : `Export ${meshFormat.toUpperCase()}`}
+          {exportBusy ? `Exporting ${format.toUpperCase()}...` : `Export ${format.toUpperCase()}`}
         </button>
       </div>
 
