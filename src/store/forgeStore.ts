@@ -302,6 +302,8 @@ interface ForgeStore {
 
   isEvaluating: boolean;
   evaluationPhase: 'idle' | 'kernel-init' | 'evaluating' | 'serializing';
+  pauseAutoEval: boolean;
+  togglePauseAutoEval: () => void;
   activeBackend: 'occt' | 'manifold';
   setActiveBackend: (backend: 'occt' | 'manifold') => void;
 
@@ -986,6 +988,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
 
   isEvaluating: false,
   evaluationPhase: 'idle' as const,
+  pauseAutoEval: false,
+  togglePauseAutoEval: () => set((s) => ({ pauseAutoEval: !s.pauseAutoEval })),
   activeBackend: (initialViewPreferences.activeBackend as 'occt' | 'manifold') || 'manifold',
   setActiveBackend: (backend) => {
     writeViewPreferences({ activeBackend: backend });

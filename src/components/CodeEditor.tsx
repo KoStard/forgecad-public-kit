@@ -1258,6 +1258,7 @@ export function CodeEditor() {
   const loadFromText = useForgeStore((s) => s.loadFromText);
   const theme = useForgeStore((s) => s.theme);
   const saveFile = useForgeStore((s) => s.saveFile);
+  const pauseAutoEval = useForgeStore((s) => s.pauseAutoEval);
   const editorNavigate = useForgeStore((s) => s.editorNavigate);
   const clearEditorNavigate = useForgeStore((s) => s.clearEditorNavigate);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -1390,6 +1391,11 @@ export function CodeEditor() {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => {
       useForgeStore.getState().openFileSwitcher();
     });
+
+    // Cmd+Enter — always trigger a build (useful in manual mode)
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      useForgeStore.getState().execute();
+    });
   };
 
   const handleChange = useCallback(
@@ -1397,11 +1403,13 @@ export function CodeEditor() {
       if (!value) return;
       updateFileCode(activeFile, value);
       clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => execute(), 400);
+      if (!pauseAutoEval) {
+        timerRef.current = setTimeout(() => execute(), 400);
+      }
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => saveFile(), 1500);
     },
-    [activeFile, updateFileCode, execute, saveFile],
+    [activeFile, updateFileCode, execute, saveFile, pauseAutoEval],
   );
 
   const handleDrop = useCallback(

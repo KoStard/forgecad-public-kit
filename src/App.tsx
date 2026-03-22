@@ -181,6 +181,30 @@ const FILE_EXPLORER_PANEL_WIDTH_KEY = 'fc-layout-file-panel-width-v1';
 const CODE_PANEL_WIDTH_KEY = 'fc-layout-code-panel-width-v1';
 const VIEW_PANEL_WIDTH_KEY = 'fc-layout-view-panel-width-v1';
 
+function AutoBuildToggle() {
+  const pauseAutoEval = useForgeStore((s) => s.pauseAutoEval);
+  const togglePauseAutoEval = useForgeStore((s) => s.togglePauseAutoEval);
+  const execute = useForgeStore((s) => s.execute);
+  return (
+    <>
+      <button
+        style={pauseAutoEval
+          ? { ...btnStyle(), color: 'var(--fc-warning, #e6a817)', borderColor: 'var(--fc-warning, #e6a817)' }
+          : btnStyle(true)}
+        onClick={togglePauseAutoEval}
+        title={pauseAutoEval ? 'Auto-build paused — click to enable' : 'Auto-build active — click to pause'}
+      >
+        {pauseAutoEval ? '⏸ Manual' : '▶ Auto'}
+      </button>
+      {pauseAutoEval && (
+        <button style={btnStyle(true)} onClick={() => execute()} title="Build now (⌘↵)">
+          Build
+        </button>
+      )}
+    </>
+  );
+}
+
 function Toolbar() {
   const activeFile = useForgeStore((s) => s.activeFile);
   const dirty = useForgeStore((s) => s.dirty);
@@ -238,6 +262,8 @@ function Toolbar() {
         {measureMode && measureSelections.length > 0 && (
           <button style={btnStyle()} onClick={clearMeasureSelections} title="Clear selections">Clear</button>
         )}
+        <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
+        <AutoBuildToggle />
         <div style={{ width: 1, height: 20, background: 'var(--fc-border)', margin: '0 4px' }} />
         <ShareButton />
         {__FORGE_MODE__ === 'web' && <GitHubStarButton />}
