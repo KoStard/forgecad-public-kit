@@ -11,8 +11,7 @@ import { polygon } from './primitives';
 import { sketchExtrude } from './extrude';
 import { ConstrainedSketchBuilder, type PointId, type LineId } from './constraints';
 import { TrackedShape, buildRectExtrusionTopology, buildCircleExtrusionTopology } from './topology';
-import { getWasm } from '../backends/manifold/wasm';
-import { fromCrossSection } from '../backends/manifold/profileCast';
+import { createCircleProfile } from '../profileOps';
 
 // ─── Point ───────────────────────────────────────────────────────
 
@@ -161,10 +160,9 @@ export class Circle2D {
   }
 
   toSketch(segments?: number): Sketch {
-    const wasm = getWasm();
-    const cross = wasm.CrossSection.circle(this.radius, segments ?? 0)
-      .translate([this.center.x, this.center.y]);
-    return new Sketch(fromCrossSection(cross));
+    const cross = createCircleProfile(this.radius, segments ?? 0)
+      .translate(this.center.x, this.center.y);
+    return new Sketch(cross);
   }
 
   /** Extrude to TrackedShape with top/bottom/side faces */

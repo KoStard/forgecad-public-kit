@@ -1,12 +1,10 @@
 import type { ProfileBackend } from '../profileBackend';
 import { Shape } from '../kernel';
-import { getWasm } from '../backends/manifold/wasm';
 import type { ProfileCompilePlan } from '../compilePlan';
 import { cloneProfileCompilePlan } from '../compilePlan';
 import type { Mat4 } from '../transform';
 import type { FaceRef } from './topology';
-import { lowerProfileCompilePlanToCrossSection } from '../backends/manifold/lower';
-import { asCrossSection, fromCrossSection } from '../backends/manifold/profileCast';
+import { lowerProfileCompilePlan } from '../profileOps';
 import { faceQueryRefsEqual } from '../queryModel';
 import {
   cloneSketchPlacementModel,
@@ -79,11 +77,11 @@ export class Sketch {
     return this.clone();
   }
 
-  area(): number { return asCrossSection(this.cross).area(); }
-  bounds() { return asCrossSection(this.cross).bounds(); }
-  isEmpty(): boolean { return asCrossSection(this.cross).isEmpty(); }
-  numVert(): number { return asCrossSection(this.cross).numVert(); }
-  toPolygons() { return asCrossSection(this.cross).toPolygons(); }
+  area(): number { return this.cross.area(); }
+  bounds() { return this.cross.bounds(); }
+  isEmpty(): boolean { return this.cross.isEmpty(); }
+  numVert(): number { return this.cross.numVert(); }
+  toPolygons() { return this.cross.toPolygons(); }
 
   // Method declarations (implementations added by feature modules)
   translate(x: number, y?: number): Sketch { throw new Error('Not implemented'); }
@@ -95,16 +93,16 @@ export class Sketch {
   subtract(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
   intersect(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
   offset(delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
-    return copySketchPlacement3D(this, new Sketch(fromCrossSection(asCrossSection(this.cross).offset(delta, join)), this.colorHex));
+    return copySketchPlacement3D(this, new Sketch(this.cross.offset(delta, join), this.colorHex));
   }
   hull(): Sketch {
-    return copySketchPlacement3D(this, new Sketch(fromCrossSection(asCrossSection(this.cross).hull()), this.colorHex));
+    return copySketchPlacement3D(this, new Sketch(this.cross.hull(), this.colorHex));
   }
   simplify(epsilon = 1e-6): Sketch {
-    return copySketchPlacement3D(this, new Sketch(fromCrossSection(asCrossSection(this.cross).simplify(epsilon)), this.colorHex));
+    return copySketchPlacement3D(this, new Sketch(this.cross.simplify(epsilon), this.colorHex));
   }
   warp(fn: (vert: [number, number]) => void): Sketch {
-    return copySketchPlacement3D(this, new Sketch(fromCrossSection(asCrossSection(this.cross).warp(fn as any)), this.colorHex));
+    return copySketchPlacement3D(this, new Sketch(this.cross.warp(fn), this.colorHex));
   }
   /**
    * Decompose this sketch into its distinct filled regions. See `sketchRegions()`.
@@ -145,7 +143,7 @@ export function setSketchCompileProfilePlan(sketch: Sketch, plan: ProfileCompile
 
 export function buildSketchFromCompileProfilePlan(plan: ProfileCompilePlan, color?: string): Sketch {
   return setSketchCompileProfilePlan(
-    new Sketch(fromCrossSection(lowerProfileCompilePlanToCrossSection(plan, getWasm())), color),
+    new Sketch(lowerProfileCompilePlan(plan), color),
     plan,
   );
 }

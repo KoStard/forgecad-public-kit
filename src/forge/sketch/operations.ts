@@ -6,7 +6,7 @@ import {
   setSketchCompileProfilePlan,
 } from './core';
 import { buildHullProfileCompilePlan, buildOffsetProfileCompilePlan } from '../compilePlan';
-import { asCrossSection, fromCrossSection } from '../backends/manifold/profileCast';
+
 
 export function sketchOffset(sketch: Sketch, delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
   const nextPlan = join === 'Round' ? buildOffsetProfileCompilePlan(getSketchCompileProfilePlan(sketch), delta, 'Round') : null;
@@ -14,7 +14,7 @@ export function sketchOffset(sketch: Sketch, delta: number, join: 'Square' | 'Ro
     sketch,
     nextPlan
       ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(fromCrossSection(asCrossSection(sketch.cross).offset(delta, join)), sketch.colorHex), null),
+      : setSketchCompileProfilePlan(new Sketch(sketch.cross.offset(delta, join), sketch.colorHex), null),
   );
 }
 
@@ -24,16 +24,16 @@ export function sketchHull(sketch: Sketch): Sketch {
     sketch,
     nextPlan
       ? buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex)
-      : setSketchCompileProfilePlan(new Sketch(fromCrossSection(asCrossSection(sketch.cross).hull()), sketch.colorHex), null),
+      : setSketchCompileProfilePlan(new Sketch(sketch.cross.hull(), sketch.colorHex), null),
   );
 }
 
 export function sketchSimplify(sketch: Sketch, epsilon = 1e-6): Sketch {
-  return copySketchPlacement3D(sketch, new Sketch(fromCrossSection(asCrossSection(sketch.cross).simplify(epsilon)), sketch.colorHex));
+  return copySketchPlacement3D(sketch, new Sketch(sketch.cross.simplify(epsilon), sketch.colorHex));
 }
 
 export function sketchWarp(sketch: Sketch, fn: (vert: [number, number]) => void): Sketch {
-  return copySketchPlacement3D(sketch, new Sketch(fromCrossSection(asCrossSection(sketch.cross).warp(fn as any)), sketch.colorHex));
+  return copySketchPlacement3D(sketch, new Sketch(sketch.cross.warp(fn), sketch.colorHex));
 }
 
 Sketch.prototype.offset = function(delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round') { return sketchOffset(this, delta, join); };
