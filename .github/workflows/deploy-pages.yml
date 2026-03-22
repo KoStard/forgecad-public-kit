@@ -37,6 +37,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build skill context
+        run: npm run build:skill:forgecad
+
       - name: Build web app
         run: npm run build:web
 
