@@ -1500,6 +1500,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
 }
 
 function resolveShapeFaceTable(plan: ShapeCompilePlan | null): FaceTable {
+  if (!plan) return emptyFaceTable();
   return resolveShapeFaceTableInternal(plan, findShapePrimaryQueryOwner(plan));
 }
 

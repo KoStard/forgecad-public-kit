@@ -164,7 +164,7 @@ function unwrapShapeLike(value: unknown): Shape {
 
 const _shapeDimensions = new WeakMap<Shape, ShapeDimension[]>();
 const _shapeGeometryInfo = new WeakMap<Shape, GeometryInfo>();
-const _shapeCompilePlans = new WeakMap<Shape, ShapeCompilePlan | null>();
+const _shapeCompilePlans = new WeakMap<Shape, ShapeCompilePlan>();
 const _shapePlacementRefs = new WeakMap<Shape, PlacementReferences>();
 const _shapeRuntimeBackends = new WeakMap<Shape, ShapeBackend>();
 let _shapeDimensionCounter = 0;
@@ -221,7 +221,7 @@ function setShapeRuntimeBackendInternal(shape: Shape, payload: ShapeRuntimePaylo
   return shape;
 }
 
-function setShapeCompilePlanInternal(shape: Shape, plan: ShapeCompilePlan | null): Shape {
+function setShapeCompilePlanInternal(shape: Shape, plan: ShapeCompilePlan): Shape {
   _shapeCompilePlans.set(shape, cloneShapeCompilePlan(plan));
   return shape;
 }
@@ -245,8 +245,11 @@ function getShapeRuntimeBackendInternal(shape: Shape): ShapeBackend {
   return backend;
 }
 
-function getShapeCompilePlanInternal(shape: Shape): ShapeCompilePlan | null {
-  return cloneShapeCompilePlan(_shapeCompilePlans.get(shape) ?? null);
+function getShapeCompilePlanInternal(shape: Shape): ShapeCompilePlan {
+  const stored = _shapeCompilePlans.get(shape);
+  if (stored) return cloneShapeCompilePlan(stored);
+  // Auto-opaque fallback for shapes created without an explicit plan
+  return { kind: 'opaque', backend: getShapeRuntimeBackendInternal(shape) };
 }
 
 function getShapePlacementRefsInternal(shape: Shape): PlacementReferences {
@@ -531,8 +534,10 @@ function withMergedDimensions(sources: Shape[], out: Shape): Shape {
     out,
     mergePlacementReferences(...sources.map((shape) => getShapePlacementRefsInternal(shape))),
   );
-  const basePlan = sources.length > 0 ? getShapeCompilePlanInternal(sources[0]) : null;
-  return setShapeCompilePlanInternal(out, basePlan);
+  if (sources.length > 0) {
+    setShapeCompilePlanInternal(out, getShapeCompilePlanInternal(sources[0]));
+  }
+  return out;
 }
 
 function withBaseDimensions(base: Shape, out: Shape): Shape {
@@ -606,11 +611,11 @@ export function setShapeGeometryInfo(shape: Shape, info: Partial<GeometryInfo>):
   }));
 }
 
-export function getShapeCompilePlan(shape: Shape): ShapeCompilePlan | null {
+export function getShapeCompilePlan(shape: Shape): ShapeCompilePlan {
   return getShapeCompilePlanInternal(shape);
 }
 
-export function setShapeCompilePlan(shape: Shape, plan: ShapeCompilePlan | null): Shape {
+export function setShapeCompilePlan(shape: Shape, plan: ShapeCompilePlan): Shape {
   return setShapeCompilePlanInternal(shape, plan);
 }
 
@@ -664,11 +669,10 @@ export const setShapeBrepPlan = setShapeCompilePlan;
 
 
 function createOwnedTopologyRewritePlan(
-  plan: ShapeCompilePlan | null,
+  plan: ShapeCompilePlan,
   operation: string,
   buildPropagation: (owner: ShapeQueryOwner) => TopologyRewritePropagation,
-): ShapeCompilePlan | null {
-  if (!plan) return null;
+): ShapeCompilePlan {
   const owner = createShapeQueryOwner(operation);
   return wrapShapeCompilePlanWithQueryOwner(
     attachTopologyRewritePropagation(plan, buildPropagation(owner)),
@@ -684,7 +688,8 @@ export class Shape {
     this.colorHex = color;
     setShapeRuntimeBackendInternal(this, payload);
     setShapeGeometryInfoInternal(this, createGeometryInfo(geometryInfo));
-    setShapeCompilePlanInternal(this, null);
+    // Compile plan defaults to opaque via getShapeCompilePlanInternal fallback.
+    // Callers (buildShapeFromCompilePlan, etc.) set the real plan immediately after.
   }
 
   /** Set the color of this shape (hex string, e.g. "#ff0000") */
@@ -772,12 +777,6 @@ export class Shape {
 
   translate(x: number, y: number, z: number): Shape {
     const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'translate', x, y, z });
-    if (!nextPlan) {
-      throw new Error(
-        'Shape.translate() failed: shape has no compile plan. '
-        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
-      );
-    }
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
       buildShapeFromCompilePlan(nextPlan, this.colorHex),
@@ -800,12 +799,6 @@ export class Shape {
 
   rotate(x: number, y: number, z: number): Shape {
     const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'rotate', xDeg: x, yDeg: y, zDeg: z });
-    if (!nextPlan) {
-      throw new Error(
-        'Shape.rotate() failed: shape has no compile plan. '
-        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
-      );
-    }
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
       buildShapeFromCompilePlan(nextPlan, this.colorHex),
@@ -816,22 +809,20 @@ export class Shape {
   /** Apply a 4x4 affine transform matrix (column-major) or a Transform object. */
   transform(m: Mat4 | Transform): Shape {
     const mat = m instanceof Transform ? m.toArray() : m;
-    const nextPlan = (() => {
-      const steps = rigidTransformStepsFromMatrix(mat);
-      if (steps == null) return null;
-      if (steps.length === 0) return getShapeCompilePlanInternal(this);
-      return appendShapeCompileTransforms(getShapeCompilePlanInternal(this), steps);
-    })();
-    if (nextPlan) {
-      return setShapeCompilePlanInternal(
-        withTransformedDimensions(this, buildShapeFromCompilePlan(nextPlan, this.colorHex), mat),
-        nextPlan,
+    const steps = rigidTransformStepsFromMatrix(mat);
+    if (steps == null) {
+      // Non-rigid transforms (shear, perspective) are not supported in the compile plan IR.
+      throw new Error(
+        'Shape.transform() received a non-rigid matrix (contains shear, perspective, or non-uniform scale). '
+        + 'Only rigid transforms (rotation + translation) are supported.',
       );
     }
-    // Non-rigid transforms (shear, perspective) are not supported in the compile plan IR.
-    throw new Error(
-      'Shape.transform() received a non-rigid matrix (contains shear, perspective, or non-uniform scale). '
-      + 'Only rigid transforms (rotation + translation) are supported.',
+    const nextPlan = steps.length === 0
+      ? getShapeCompilePlanInternal(this)
+      : appendShapeCompileTransforms(getShapeCompilePlanInternal(this), steps);
+    return setShapeCompilePlanInternal(
+      withTransformedDimensions(this, buildShapeFromCompilePlan(nextPlan, this.colorHex), mat),
+      nextPlan,
     );
   }
 
@@ -844,12 +835,6 @@ export class Shape {
         y: scale[1],
         z: scale[2],
       });
-      if (!nextPlan) {
-        throw new Error(
-          'Shape.scale() failed: shape has no compile plan. '
-          + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
-        );
-      }
       return setShapeCompilePlanInternal(withTransformedDimensions(
         this,
         buildShapeFromCompilePlan(nextPlan, this.colorHex),
@@ -870,13 +855,7 @@ export class Shape {
       normalY: normal[1],
       normalZ: normal[2],
     });
-    if (!transformedPlan) {
-      throw new Error(
-        'Shape.mirror() failed: shape has no compile plan. '
-        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
-      );
-    }
-    const nextPlan = wrapRepeatedShapeCompilePlan(transformedPlan, 'mirror')!;
+    const nextPlan = wrapRepeatedShapeCompilePlan(transformedPlan, 'mirror');
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
       buildShapeFromCompilePlan(nextPlan, this.colorHex),
@@ -935,12 +914,6 @@ export class Shape {
       pivotY: pivot[1],
       pivotZ: pivot[2],
     });
-    if (!nextPlan) {
-      throw new Error(
-        'Shape.rotateAround() failed: shape has no compile plan. '
-        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
-      );
-    }
     return setShapeCompilePlanInternal(
       withTransformedDimensions(
         this,
@@ -1046,35 +1019,24 @@ export class Shape {
   /** Split into [inside, outside] by another shape. */
   split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
     const c = Shape._unwrap(cutter);
-    const thisPlan = getShapeCompilePlanInternal(this);
-    const cutterPlan = getShapeCompilePlanInternal(c);
-    if (!thisPlan) {
-      throw new Error(
-        'Shape.split() failed: shape has no compile plan. '
-        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
-      );
-    }
-    if (!cutterPlan) {
-      throw new Error(
-        'Shape.split() failed: cutter shape has no compile plan. '
-        + 'This is an internal error — the operation that created the cutter shape did not produce a compile plan.',
-      );
-    }
-    const insideOperandPlans = [thisPlan, cutterPlan];
+    const insideOperandPlans = [
+      getShapeCompilePlanInternal(this),
+      getShapeCompilePlanInternal(c),
+    ];
     const insidePlan = createOwnedTopologyRewritePlan(
       buildBooleanShapeCompilePlan('intersection', insideOperandPlans),
       'split:inside',
       (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, insideOperandPlans),
-    )!;
+    );
     const outsideOperandPlans = [
-      getShapeCompilePlanInternal(this)!,
-      getShapeCompilePlanInternal(c)!,
+      getShapeCompilePlanInternal(this),
+      getShapeCompilePlanInternal(c),
     ];
     const outsidePlan = createOwnedTopologyRewritePlan(
       buildBooleanShapeCompilePlan('difference', outsideOperandPlans),
       'split:outside',
       (owner) => buildBooleanTopologyRewritePropagation('difference', owner, outsideOperandPlans),
-    )!;
+    );
     const info = mergeGeometryInfos([getShapeGeometryInfoInternal(this), getShapeGeometryInfoInternal(c)], 'boolean', { topology: 'none' });
     return [
       setShapeCompilePlanInternal(
@@ -1098,22 +1060,16 @@ export class Shape {
   splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
     const info = deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' });
     const basePlan = getShapeCompilePlanInternal(this);
-    if (!basePlan) {
-      throw new Error(
-        'Shape.splitByPlane() failed: shape has no compile plan. '
-        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
-      );
-    }
     const firstPlan = createOwnedTopologyRewritePlan(
       buildTrimByPlaneShapeCompilePlan(basePlan, normal, originOffset),
       'splitByPlane:positive',
       (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan),
-    )!;
+    );
     const secondPlan = createOwnedTopologyRewritePlan(
       buildTrimByPlaneShapeCompilePlan(basePlan, [-normal[0], -normal[1], -normal[2]], -originOffset),
       'splitByPlane:opposite',
       (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan),
-    )!;
+    );
     return [
       setShapeCompilePlanInternal(
         setShapeGeometryInfoInternal(withBaseDimensions(this, buildShapeFromCompilePlan(firstPlan, this.colorHex)), info),
@@ -1129,17 +1085,11 @@ export class Shape {
   /** Keep the positive side of the plane and discard the opposite side. */
   trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
     const basePlan = getShapeCompilePlanInternal(this);
-    if (!basePlan) {
-      throw new Error(
-        'Shape.trimByPlane() failed: shape has no compile plan. '
-        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
-      );
-    }
     const nextPlan = createOwnedTopologyRewritePlan(
       buildTrimByPlaneShapeCompilePlan(basePlan, normal, originOffset),
       'trimByPlane',
       (owner) => buildTrimByPlaneTopologyRewritePropagation(owner, basePlan),
-    )!;
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
         this,
@@ -1160,16 +1110,17 @@ export class Shape {
     opts: { openFaces?: string[] } = {},
   ): Shape {
     const basePlan = getShapeCompilePlanInternal(this);
-    const nextPlan = createOwnedTopologyRewritePlan(
-      buildShellShapeCompilePlan(basePlan, thickness, opts.openFaces),
-      'shell',
-      (owner) => buildShellTopologyRewritePropagation(owner, basePlan!, opts.openFaces ?? []),
-    );
-    if (!nextPlan) {
+    const shellPlan = buildShellShapeCompilePlan(basePlan, thickness, opts.openFaces);
+    if (!shellPlan) {
       throw new Error(
         'Shape.shell() supports compile-covered box(), cylinder(), and straight extrude() solids with optional face openings and rigid transforms.',
       );
     }
+    const nextPlan = createOwnedTopologyRewritePlan(
+      shellPlan,
+      'shell',
+      (owner) => buildShellTopologyRewritePropagation(owner, basePlan, opts.openFaces ?? []),
+    );
     return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
       withBaseDimensions(
         this,

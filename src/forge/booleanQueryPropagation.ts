@@ -118,6 +118,7 @@ function canonicalFaceSeedsForOwner(owner: ShapeQueryOwner | null): FacePropagat
 }
 
 function collectFaceSeeds(plan: ShapeCompilePlan | null): FacePropagationSeed[] {
+  if (!plan) return [];
   const propagation = rootTopologyRewritePropagation(plan);
   if (!propagation) {
     return canonicalFaceSeedsForOwner(findShapePrimaryQueryOwner(plan));

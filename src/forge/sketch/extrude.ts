@@ -66,7 +66,7 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
         placement: placementModel,
       })
     : basePlan;
-  const ownedPlan = createOwnedShapeCompilePlan(plan, 'extrude')!;
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'extrude');
   const shape = buildShapeFromCompilePlan(ownedPlan, sketch.colorHex, {
     fidelity: 'kernel-native',
     sources: ['extrude'],
@@ -94,7 +94,7 @@ export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number):
         placement: placementModel,
       })
     : basePlan;
-  const ownedPlan = createOwnedShapeCompilePlan(plan, 'revolve')!;
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'revolve');
   const revolved = buildShapeFromCompilePlan(ownedPlan, sketch.colorHex, {
     fidelity: 'kernel-native',
     sources: ['revolve'],

@@ -646,6 +646,8 @@ export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): Profil
   }
 }
 
+export function cloneShapeCompilePlan(plan: ShapeCompilePlan): ShapeCompilePlan;
+export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompilePlan | null;
 export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompilePlan | null {
   if (!plan) return null;
   let result: ShapeCompilePlan;
@@ -825,6 +827,14 @@ export function appendProfileCompileTransform(
 }
 
 export function appendShapeCompileTransform(
+  plan: ShapeCompilePlan,
+  step: ShapeCompileTransformStep,
+): ShapeCompilePlan;
+export function appendShapeCompileTransform(
+  plan: ShapeCompilePlan | null,
+  step: ShapeCompileTransformStep,
+): ShapeCompilePlan | null;
+export function appendShapeCompileTransform(
   plan: ShapeCompilePlan | null,
   step: ShapeCompileTransformStep,
 ): ShapeCompilePlan | null {
@@ -832,17 +842,25 @@ export function appendShapeCompileTransform(
   if (plan.kind === 'transform') {
     return {
       kind: 'transform',
-      base: cloneShapeCompilePlan(plan.base)!,
+      base: cloneShapeCompilePlan(plan.base),
       steps: [...plan.steps.map(cloneShapeTransform), cloneShapeTransform(step)],
     };
   }
   return {
     kind: 'transform',
-    base: cloneShapeCompilePlan(plan)!,
+    base: cloneShapeCompilePlan(plan),
     steps: [cloneShapeTransform(step)],
   };
 }
 
+export function appendShapeCompileTransforms(
+  plan: ShapeCompilePlan,
+  steps: ShapeCompileTransformStep[],
+): ShapeCompilePlan;
+export function appendShapeCompileTransforms(
+  plan: ShapeCompilePlan | null,
+  steps: ShapeCompileTransformStep[],
+): ShapeCompilePlan | null;
 export function appendShapeCompileTransforms(
   plan: ShapeCompilePlan | null,
   steps: ShapeCompileTransformStep[],
@@ -855,6 +873,14 @@ export function appendShapeCompileTransforms(
 }
 
 export function wrapShapeCompilePlanWithQueryOwner(
+  plan: ShapeCompilePlan,
+  owner: ShapeQueryOwner,
+): ShapeCompilePlan;
+export function wrapShapeCompilePlanWithQueryOwner(
+  plan: ShapeCompilePlan | null,
+  owner: ShapeQueryOwner,
+): ShapeCompilePlan | null;
+export function wrapShapeCompilePlanWithQueryOwner(
   plan: ShapeCompilePlan | null,
   owner: ShapeQueryOwner,
 ): ShapeCompilePlan | null {
@@ -862,10 +888,18 @@ export function wrapShapeCompilePlanWithQueryOwner(
   return {
     kind: 'queryOwner',
     owner: cloneShapeQueryOwnerValue(owner),
-    base: cloneShapeCompilePlan(plan)!,
+    base: cloneShapeCompilePlan(plan),
   };
 }
 
+export function createOwnedShapeCompilePlan(
+  plan: ShapeCompilePlan,
+  operation: string,
+): ShapeCompilePlan;
+export function createOwnedShapeCompilePlan(
+  plan: ShapeCompilePlan | null,
+  operation: string,
+): ShapeCompilePlan | null;
 export function createOwnedShapeCompilePlan(
   plan: ShapeCompilePlan | null,
   operation: string,
@@ -876,18 +910,16 @@ export function createOwnedShapeCompilePlan(
 
 export function buildBooleanShapeCompilePlan(
   op: 'union' | 'difference' | 'intersection',
-  shapes: Array<ShapeCompilePlan | null>,
-): ShapeCompilePlan | null {
-  if (shapes.some((shape) => shape == null)) return null;
+  shapes: ShapeCompilePlan[],
+): ShapeCompilePlan {
   return {
     kind: 'boolean',
     op,
-    shapes: shapes.map((shape) => cloneShapeCompilePlan(shape)!),
+    shapes: shapes.map((shape) => cloneShapeCompilePlan(shape)),
   };
 }
 
-export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan | null): ShapeQueryOwner | null {
-  if (!plan) return null;
+export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan): ShapeQueryOwner | null {
   switch (plan.kind) {
     case 'queryOwner':
       return cloneShapeQueryOwnerValue(plan.owner);
@@ -914,12 +946,11 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan | null): Shape
   }
 }
 
-export function collectShapeQueryOwners(plan: ShapeCompilePlan | null): ShapeQueryOwner[] {
+export function collectShapeQueryOwners(plan: ShapeCompilePlan): ShapeQueryOwner[] {
   const out: ShapeQueryOwner[] = [];
   const seen = new Set<string>();
 
-  function visit(current: ShapeCompilePlan | null): void {
-    if (!current) return;
+  function visit(current: ShapeCompilePlan): void {
     switch (current.kind) {
       case 'queryOwner':
         if (!seen.has(current.owner.id)) {
@@ -961,10 +992,8 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan | null): ShapeQue
 }
 
 export function findShapeWorkplanePlacement(
-  plan: ShapeCompilePlan | null,
+  plan: ShapeCompilePlan,
 ): ShapeWorkplanePlacement | null {
-  if (!plan) return null;
-
   switch (plan.kind) {
     case 'queryOwner':
       return findShapeWorkplanePlacement(plan.base);
@@ -1065,26 +1094,24 @@ export function profilePlanFromCrossSection(cross: ProfileBackend): ProfileCompi
 }
 
 export function buildHullShapeCompilePlan(
-  shapes: Array<ShapeCompilePlan | null>,
+  shapes: ShapeCompilePlan[],
   points: [number, number, number][] = [],
-): ShapeCompilePlan | null {
-  if (shapes.some((shape) => shape == null)) return null;
+): ShapeCompilePlan {
   return {
     kind: 'hull',
-    shapes: shapes.map((shape) => cloneShapeCompilePlan(shape)!),
+    shapes: shapes.map((shape) => cloneShapeCompilePlan(shape)),
     points: points.map(([x, y, z]) => [x, y, z]),
   };
 }
 
 export function buildTrimByPlaneShapeCompilePlan(
-  base: ShapeCompilePlan | null,
+  base: ShapeCompilePlan,
   normal: [number, number, number],
   originOffset: number,
-): ShapeCompilePlan | null {
-  if (!base) return null;
+): ShapeCompilePlan {
   return {
     kind: 'trimByPlane',
-    base: cloneShapeCompilePlan(base)!,
+    base: cloneShapeCompilePlan(base),
     normalX: canonicalNumber(normal[0]),
     normalY: canonicalNumber(normal[1]),
     normalZ: canonicalNumber(normal[2]),

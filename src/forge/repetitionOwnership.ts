@@ -4,9 +4,9 @@ import { createOwnedShapeCompilePlan } from './compilePlan';
 export type PatternOwnershipKind = 'linear' | 'circular';
 
 export function wrapRepeatedShapeCompilePlan(
-  plan: ShapeCompilePlan | null,
+  plan: ShapeCompilePlan,
   operation: string,
-): ShapeCompilePlan | null {
+): ShapeCompilePlan {
   return createOwnedShapeCompilePlan(plan, operation);
 }
 
