@@ -187,7 +187,7 @@ export const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMe
       const a = pointMap.get(line.a);
       const b = pointMap.get(line.b);
       if (!a || !b) return null;
-      return { id: line.id, a: [a.x, a.y] as [number, number], b: [b.x, b.y] as [number, number] };
+      return { id: line.id, name: line.name, a: [a.x, a.y] as [number, number], b: [b.x, b.y] as [number, number] };
     })
     .filter((line): line is NonNullable<typeof line> => line !== null);
 
@@ -196,7 +196,7 @@ export const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMe
     .map((circle) => {
       const center = pointMap.get(circle.center);
       if (!center) return null;
-      return { id: circle.id, center: [center.x, center.y] as [number, number], radius: circle.radius };
+      return { id: circle.id, name: circle.name, center: [center.x, center.y] as [number, number], radius: circle.radius };
     })
     .filter((circle): circle is NonNullable<typeof circle> => circle !== null);
 
@@ -209,6 +209,7 @@ export const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMe
       if (!center || !start || !end) return null;
       return {
         id: arc.id,
+        name: arc.name,
         center: [center.x, center.y] as [number, number],
         start: [start.x, start.y] as [number, number],
         end: [end.x, end.y] as [number, number],

@@ -682,6 +682,7 @@ interface SketchConstraintMeta {
 	edges: {
 		lines: {
 			id: string;
+			name?: string;
 			a: [
 				number,
 				number
@@ -693,6 +694,7 @@ interface SketchConstraintMeta {
 		}[];
 		circles: {
 			id: string;
+			name?: string;
 			center: [
 				number,
 				number
@@ -701,6 +703,7 @@ interface SketchConstraintMeta {
 		}[];
 		arcs: {
 			id: string;
+			name?: string;
 			center: [
 				number,
 				number

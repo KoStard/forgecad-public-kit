@@ -508,6 +508,9 @@ interface ForgeStore {
   dimensionsVisible: boolean;
   toggleDimensions: () => void;
 
+  surfacesVisible: boolean;
+  toggleSurfaces: () => void;
+
   explodeAmount: number;
   setExplodeAmount: (amount: number) => void;
 
@@ -578,6 +581,7 @@ interface ViewPreferencesState {
   objectPickSyncEnabled: boolean;
   measureSnapPx: number;
   dimensionsVisible: boolean;
+  surfacesVisible: boolean;
   explodeAmount: number;
   jointAnimationSpeed: number;
   cutPlaneEnabled: Record<string, boolean>;
@@ -1522,6 +1526,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const nextDimensionsVisible = !s.dimensionsVisible;
     writeViewPreferences({ dimensionsVisible: nextDimensionsVisible });
     return { dimensionsVisible: nextDimensionsVisible };
+  }),
+
+  surfacesVisible: initialViewPreferences.surfacesVisible ?? true,
+  toggleSurfaces: () => set((s) => {
+    const nextSurfacesVisible = !s.surfacesVisible;
+    writeViewPreferences({ surfacesVisible: nextSurfacesVisible });
+    return { surfacesVisible: nextSurfacesVisible };
   }),
 
   explodeAmount: initialViewPreferences.explodeAmount ?? 0,

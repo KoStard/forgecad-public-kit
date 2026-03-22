@@ -2462,7 +2462,7 @@ function SketchObject({
         </mesh>
       )}
       {/* Surface region fills from arrangement detection */}
-      {surfaceFills.length > 0 && surfaceFills.map((sf) => {
+      {surfacesVisible && surfaceFills.length > 0 && surfaceFills.map((sf) => {
         const isHovered = hoveredSurfIdx === sf.index;
         const isSelected = selectedSurfaceIndex === sf.index;
         const opacity = isSelected ? 0.45 : isHovered ? 0.35 : 0.15;
@@ -4687,6 +4687,7 @@ export function Viewport() {
   const objects = result?.objects ?? [];
   const dimensions = result?.dimensions ?? [];
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
+  const surfacesVisible = useForgeStore((s) => s.surfacesVisible);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
   const sectionPlaneGuidesEnabled = useForgeStore((s) => s.sectionPlaneGuidesEnabled);
   const sectionPlaneFillEnabled = useForgeStore((s) => s.sectionPlaneFillEnabled);
