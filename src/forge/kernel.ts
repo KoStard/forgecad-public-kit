@@ -843,7 +843,13 @@ export class Shape {
         x: scale[0],
         y: scale[1],
         z: scale[2],
-      })!;
+      });
+      if (!nextPlan) {
+        throw new Error(
+          'Shape.scale() failed: shape has no compile plan. '
+          + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
+        );
+      }
       return setShapeCompilePlanInternal(withTransformedDimensions(
         this,
         buildShapeFromCompilePlan(nextPlan, this.colorHex),
@@ -863,7 +869,13 @@ export class Shape {
       normalX: normal[0],
       normalY: normal[1],
       normalZ: normal[2],
-    })!;
+    });
+    if (!transformedPlan) {
+      throw new Error(
+        'Shape.mirror() failed: shape has no compile plan. '
+        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
+      );
+    }
     const nextPlan = wrapRepeatedShapeCompilePlan(transformedPlan, 'mirror')!;
     return setShapeCompilePlanInternal(withTransformedDimensions(
       this,
@@ -922,7 +934,13 @@ export class Shape {
       pivotX: pivot[0],
       pivotY: pivot[1],
       pivotZ: pivot[2],
-    })!;
+    });
+    if (!nextPlan) {
+      throw new Error(
+        'Shape.rotateAround() failed: shape has no compile plan. '
+        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
+      );
+    }
     return setShapeCompilePlanInternal(
       withTransformedDimensions(
         this,
@@ -1028,18 +1046,29 @@ export class Shape {
   /** Split into [inside, outside] by another shape. */
   split(cutter: Shape | { toShape(): Shape }): [Shape, Shape] {
     const c = Shape._unwrap(cutter);
-    const insideOperandPlans = [
-      getShapeCompilePlanInternal(this),
-      getShapeCompilePlanInternal(c),
-    ];
+    const thisPlan = getShapeCompilePlanInternal(this);
+    const cutterPlan = getShapeCompilePlanInternal(c);
+    if (!thisPlan) {
+      throw new Error(
+        'Shape.split() failed: shape has no compile plan. '
+        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
+      );
+    }
+    if (!cutterPlan) {
+      throw new Error(
+        'Shape.split() failed: cutter shape has no compile plan. '
+        + 'This is an internal error — the operation that created the cutter shape did not produce a compile plan.',
+      );
+    }
+    const insideOperandPlans = [thisPlan, cutterPlan];
     const insidePlan = createOwnedTopologyRewritePlan(
       buildBooleanShapeCompilePlan('intersection', insideOperandPlans),
       'split:inside',
       (owner) => buildBooleanTopologyRewritePropagation('intersection', owner, insideOperandPlans),
     )!;
     const outsideOperandPlans = [
-      getShapeCompilePlanInternal(this),
-      getShapeCompilePlanInternal(c),
+      getShapeCompilePlanInternal(this)!,
+      getShapeCompilePlanInternal(c)!,
     ];
     const outsidePlan = createOwnedTopologyRewritePlan(
       buildBooleanShapeCompilePlan('difference', outsideOperandPlans),
@@ -1068,7 +1097,13 @@ export class Shape {
   /** Split by infinite plane. Returns [positive-side, negative-side]. */
   splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
     const info = deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'boolean', { topology: 'none' });
-    const basePlan = getShapeCompilePlanInternal(this)!;
+    const basePlan = getShapeCompilePlanInternal(this);
+    if (!basePlan) {
+      throw new Error(
+        'Shape.splitByPlane() failed: shape has no compile plan. '
+        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
+      );
+    }
     const firstPlan = createOwnedTopologyRewritePlan(
       buildTrimByPlaneShapeCompilePlan(basePlan, normal, originOffset),
       'splitByPlane:positive',
@@ -1093,7 +1128,13 @@ export class Shape {
 
   /** Keep the positive side of the plane and discard the opposite side. */
   trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
-    const basePlan = getShapeCompilePlanInternal(this)!;
+    const basePlan = getShapeCompilePlanInternal(this);
+    if (!basePlan) {
+      throw new Error(
+        'Shape.trimByPlane() failed: shape has no compile plan. '
+        + 'This is an internal error — the operation that created this shape did not produce a compile plan.',
+      );
+    }
     const nextPlan = createOwnedTopologyRewritePlan(
       buildTrimByPlaneShapeCompilePlan(basePlan, normal, originOffset),
       'trimByPlane',

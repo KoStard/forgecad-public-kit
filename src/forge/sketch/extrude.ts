@@ -1,6 +1,6 @@
 import { appendShapeCompileTransform, createOwnedShapeCompilePlan } from '../compilePlan';
 import { Sketch, getSketchCompileProfilePlan, getSketchPlacement3D, getSketchPlacementModel } from './core';
-import { Shape, buildShapeFromCompilePlan, setShapeCompilePlan } from '../kernel';
+import { Shape, buildShapeFromCompilePlan } from '../kernel';
 import { TrackedShape, transformTopology, type Topology, type FaceName, type FaceRef, type EdgeName, type EdgeRef } from './topology';
 
 
@@ -48,82 +48,58 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
   const scaleTop = typeof opts?.scaleTop === 'number'
     ? [opts.scaleTop, opts.scaleTop] as [number, number]
     : opts?.scaleTop;
-  const basePlan = (() => {
-    const profile = getSketchCompileProfilePlan(sketch);
-    if (!profile) return null;
-    return {
-      kind: 'extrude' as const,
-      profile,
-      height,
-      center: opts?.center ?? false,
-      scaleTop,
-      twist: opts?.twist != null && opts.twist !== 0 ? opts.twist : undefined,
-      twistSegments: opts?.divisions != null && opts.divisions > 0 ? opts.divisions : undefined,
-    };
-  })();
+  const basePlan = {
+    kind: 'extrude' as const,
+    profile: getSketchCompileProfilePlan(sketch),
+    height,
+    center: opts?.center ?? false,
+    scaleTop,
+    twist: opts?.twist != null && opts.twist !== 0 ? opts.twist : undefined,
+    twistSegments: opts?.divisions != null && opts.divisions > 0 ? opts.divisions : undefined,
+  };
   const placement = getSketchPlacement3D(sketch);
   const placementModel = getSketchPlacementModel(sketch);
-  const plan = basePlan && placement && placementModel
+  const plan = placement && placementModel
     ? appendShapeCompileTransform(basePlan, {
         kind: 'workplanePlacement',
         matrix: placement,
         placement: placementModel,
       })
     : basePlan;
-  const ownedPlan = createOwnedShapeCompilePlan(plan, 'extrude');
-  const shape = ownedPlan
-    ? buildShapeFromCompilePlan(ownedPlan, sketch.colorHex, {
-        fidelity: 'kernel-native',
-        sources: ['extrude'],
-      })
-    : setShapeCompilePlan(new Shape(sketch.cross.extrude(
-      height,
-      opts?.divisions ?? 0,
-      opts?.twist ?? 0,
-      scaleTop as [number, number] | undefined,
-      opts?.center ?? false,
-    ), sketch.colorHex, {
-      fidelity: 'kernel-native',
-      sources: ['extrude'],
-    }), null);
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'extrude')!;
+  const shape = buildShapeFromCompilePlan(ownedPlan, sketch.colorHex, {
+    fidelity: 'kernel-native',
+    sources: ['extrude'],
+  });
   const topo = buildGenericExtrusionTopology(sketch, height, opts?.center ?? false);
   if (!placement) return new TrackedShape(shape, topo, 0, true);
   const transformedTopology = transformTopology(topo, placement);
-  if (ownedPlan && placementModel) return new TrackedShape(shape, transformedTopology, 0, true);
+  if (placementModel) return new TrackedShape(shape, transformedTopology, 0, true);
   return new TrackedShape(shape.transform(placement), transformedTopology, 0, true);
 }
 
 export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number): Shape {
-  const basePlan = (() => {
-    const profile = getSketchCompileProfilePlan(sketch);
-    if (!profile) return null;
-    return {
-      kind: 'revolve' as const,
-      profile,
-      degrees,
-      segments: segments != null && segments > 0 ? segments : undefined,
-    };
-  })();
+  const basePlan = {
+    kind: 'revolve' as const,
+    profile: getSketchCompileProfilePlan(sketch),
+    degrees,
+    segments: segments != null && segments > 0 ? segments : undefined,
+  };
   const placement = getSketchPlacement3D(sketch);
   const placementModel = getSketchPlacementModel(sketch);
-  const plan = basePlan && placement && placementModel
+  const plan = placement && placementModel
     ? appendShapeCompileTransform(basePlan, {
         kind: 'workplanePlacement',
         matrix: placement,
         placement: placementModel,
       })
     : basePlan;
-  const ownedPlan = createOwnedShapeCompilePlan(plan, 'revolve');
-  const revolved = ownedPlan
-    ? buildShapeFromCompilePlan(ownedPlan, sketch.colorHex, {
-        fidelity: 'kernel-native',
-        sources: ['revolve'],
-      })
-    : setShapeCompilePlan(new Shape(sketch.cross.revolve(segments ?? 0, degrees), sketch.colorHex, {
-      fidelity: 'kernel-native',
-      sources: ['revolve'],
-    }), null);
-  if (!placement || (ownedPlan && placementModel)) return revolved;
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'revolve')!;
+  const revolved = buildShapeFromCompilePlan(ownedPlan, sketch.colorHex, {
+    fidelity: 'kernel-native',
+    sources: ['revolve'],
+  });
+  if (!placement || placementModel) return revolved;
   return revolved.transform(placement);
 }
 
