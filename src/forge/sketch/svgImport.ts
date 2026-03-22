@@ -1455,7 +1455,8 @@ export function sketchFromSvg(svgText: string, options: SvgImportOptions = {}): 
   sketch = filterRegions(sketch, normalized);
   sketch = fitSketchToMaxDimensions(sketch, normalized);
   if (normalized.simplify > 0) {
-    sketch = sketch.simplify(normalized.simplify);
+    // Use backend-level simplify for polygon cleanup (not a public Sketch API).
+    sketch = new Sketch(sketch.cross.simplify(normalized.simplify), sketch.colorHex);
   }
   if (sketch.isEmpty()) {
     throw new Error('SVG import generated an empty sketch');

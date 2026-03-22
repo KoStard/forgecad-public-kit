@@ -98,12 +98,6 @@ export class Sketch {
   hull(): Sketch {
     return copySketchPlacement3D(this, new Sketch(this.cross.hull(), this.colorHex));
   }
-  simplify(epsilon = 1e-6): Sketch {
-    return copySketchPlacement3D(this, new Sketch(this.cross.simplify(epsilon), this.colorHex));
-  }
-  warp(fn: (vert: [number, number]) => void): Sketch {
-    return copySketchPlacement3D(this, new Sketch(this.cross.warp(fn), this.colorHex));
-  }
   /**
    * Decompose this sketch into its distinct filled regions. See `sketchRegions()`.
    * Regions are returned largest-first by area.
