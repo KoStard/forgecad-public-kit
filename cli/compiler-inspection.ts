@@ -8,11 +8,12 @@ import {
   type CompiledSceneObjectReport,
 } from '../src/forge/compiledScene';
 import { lowerProfileCompilePlanToCadQueryResult } from '../src/forge/compilePlanCadQuery';
-import { lowerProfileCompilePlanToCrossSection, lowerShapeCompilePlanToShapeBackend } from '../src/forge/compilePlanManifold';
+import { lowerProfileCompilePlanToCrossSection, lowerShapeCompilePlanToShapeBackend } from '../src/forge/backends/manifold/lower';
 import type { ShapeCompilerReport } from '../src/forge/compilerReport';
 import type { ProfileCompilePlan, ShapeCompilePlan } from '../src/forge/compilePlan';
 import type { CadQueryProfilePlan, CadQueryShapePlan } from '../src/forge/cadqueryPlan';
-import { getWasm, type GeometryInfo, type Shape } from '../src/forge/kernel';
+import { getWasm } from '../src/forge/backends/manifold/wasm';
+import { type GeometryInfo, type Shape } from '../src/forge/kernel';
 import { runScript, type SceneObject } from '../src/forge/headless';
 import { getSketchCompileProfilePlan, getSketchPlacementModel } from '../src/forge/sketch/core';
 import type { SketchPlacementModel } from '../src/forge/sketch/core';
