@@ -61,12 +61,21 @@ function isStlBinary(data: ArrayBuffer): boolean {
     const sampleStr = String.fromCharCode(...sample);
     if (sampleStr.includes('facet') || sampleStr.includes('vertex')) return false;
   }
-  return true;
+  // If the triangle count doesn't match the file size AND it doesn't look like
+  // ASCII STL, the data is likely not an STL file at all — don't default to binary.
+  return false;
 }
 
 function parseStlBinary(data: ArrayBuffer): { positions: Float32Array; numTriangles: number } {
   const view = new DataView(data);
   const numTriangles = view.getUint32(80, true);
+  const expectedSize = 84 + numTriangles * 50;
+  if (Math.abs(data.byteLength - expectedSize) > 10) {
+    throw new Error(
+      `Binary STL corrupt: header says ${numTriangles} triangles (expecting ${expectedSize} bytes) but file is ${data.byteLength} bytes. ` +
+      `The file data may not be a valid STL — check that the mesh file was loaded correctly.`,
+    );
+  }
   const positions = new Float32Array(numTriangles * 9); // 3 verts × 3 coords
 
   let offset = 84;

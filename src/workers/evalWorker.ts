@@ -34,7 +34,18 @@ function readBinaryFile(resolvedPath: string): ArrayBuffer {
   if (xhr.status !== 200) {
     throw new Error(`Failed to read binary file "${resolvedPath}": ${xhr.statusText || `HTTP ${xhr.status}`}`);
   }
+  const contentType = xhr.getResponseHeader('Content-Type') || '';
   const text = xhr.responseText;
+  if (text.length === 0) {
+    throw new Error(`readBinaryFile("${resolvedPath}"): server returned empty response`);
+  }
+  // Detect if the server returned an error page (HTML/JSON) instead of binary data
+  if (contentType.includes('text/html') || contentType.includes('application/json')) {
+    throw new Error(
+      `readBinaryFile("${resolvedPath}"): server returned ${contentType} instead of binary data. ` +
+      `Response starts with: "${text.slice(0, 100)}"`,
+    );
+  }
   const buf = new ArrayBuffer(text.length);
   const view = new Uint8Array(buf);
   for (let i = 0; i < text.length; i++) {
