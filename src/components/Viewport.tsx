@@ -1,6 +1,9 @@
 import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, Lightformer, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand, type MeasureEntity, type MeasureFaceEntity, type MeasureEdgeEntity, type MeasureVertexEntity } from '../store/forgeStore';
 import { formatLength, formatCoord, convertFromMm, type LengthUnit } from '@forge/units';
 import { DEFAULT_VIEW_CONFIG, intersectWithPlane } from '@forge/index';
@@ -2057,81 +2060,128 @@ function toolpathSegmentColor(extrude: boolean, speed: number, maxSpeed: number)
   return new THREE.Color().setHSL(0.33 * (1 - t), 0.9, 0.5);
 }
 
+/** Fat-line mesh for toolpath segments using LineMaterial for screen-space width. */
+function FatLineSegments({
+  positions,
+  colors,
+  lineWidth,
+  opacity,
+  dashed,
+  uniformColor,
+}: {
+  positions: Float32Array;
+  colors?: Float32Array;
+  lineWidth: number;
+  opacity: number;
+  dashed?: boolean;
+  uniformColor?: THREE.Color;
+}) {
+  const { size } = useThree();
+  const ref = useRef<LineSegments2>(null);
+
+  const lineObj = useMemo(() => {
+    const g = new LineSegmentsGeometry();
+    g.setPositions(positions);
+    if (colors) g.setColors(colors);
+
+    const m = new LineMaterial({
+      linewidth: lineWidth,
+      worldUnits: false, // screen-space pixels, not world units
+      vertexColors: !!colors,
+      color: uniformColor ? uniformColor.getHex() : 0xffffff,
+      transparent: true,
+      opacity,
+      dashed: !!dashed,
+      dashScale: dashed ? 0.5 : 1,
+      dashSize: dashed ? 3 : 1,
+      gapSize: dashed ? 2 : 0,
+      resolution: new THREE.Vector2(size.width, size.height),
+    });
+    const obj = new LineSegments2(g, m);
+    if (dashed) obj.computeLineDistances();
+    return obj;
+  }, [positions, colors, lineWidth, opacity, dashed, uniformColor, size.width, size.height]);
+
+  useEffect(() => {
+    (lineObj.material as LineMaterial).resolution.set(size.width, size.height);
+  }, [lineObj, size.width, size.height]);
+
+  useEffect(() => () => {
+    lineObj.geometry.dispose();
+    (lineObj.material as LineMaterial).dispose();
+  }, [lineObj]);
+
+  return <primitive ref={ref} object={lineObj} />;
+}
+
 function ToolpathObject({
   obj,
   settings,
   matrix,
-  maxLayerZ,
+  maxSegmentIndex,
 }: {
   obj: SceneObject;
   settings: ObjectSettings;
   matrix: THREE.Matrix4;
-  maxLayerZ: number;
+  maxSegmentIndex: number;
 }) {
   const toolpath = obj.toolpath;
   if (!toolpath || toolpath.segments.length === 0) return null;
 
-  const { extrudeGeo, travelGeo } = useMemo(() => {
+  const { extrudePositions, extrudeColors, travelPositions, hasExtrude, hasTravel } = useMemo(() => {
     const maxSpeed = toolpath.segments.reduce(
       (max, seg) => (seg.extrude && seg.speed > max ? seg.speed : max),
       0,
     );
 
-    const extrudePositions: number[] = [];
-    const extrudeColors: number[] = [];
-    const travelPositions: number[] = [];
+    const ePosArr: number[] = [];
+    const eColArr: number[] = [];
+    const tPosArr: number[] = [];
 
-    for (const seg of toolpath.segments) {
-      // Filter by layer slider
-      if (seg.from[2] > maxLayerZ + 0.01 && seg.to[2] > maxLayerZ + 0.01) continue;
-
+    const limit = Math.min(maxSegmentIndex, toolpath.segments.length);
+    for (let i = 0; i < limit; i++) {
+      const seg = toolpath.segments[i];
       if (seg.extrude) {
-        extrudePositions.push(seg.from[0], seg.from[1], seg.from[2]);
-        extrudePositions.push(seg.to[0], seg.to[1], seg.to[2]);
+        ePosArr.push(seg.from[0], seg.from[1], seg.from[2]);
+        ePosArr.push(seg.to[0], seg.to[1], seg.to[2]);
         const color = toolpathSegmentColor(true, seg.speed, maxSpeed);
-        extrudeColors.push(color.r, color.g, color.b);
-        extrudeColors.push(color.r, color.g, color.b);
+        eColArr.push(color.r, color.g, color.b);
+        eColArr.push(color.r, color.g, color.b);
       } else {
-        travelPositions.push(seg.from[0], seg.from[1], seg.from[2]);
-        travelPositions.push(seg.to[0], seg.to[1], seg.to[2]);
+        tPosArr.push(seg.from[0], seg.from[1], seg.from[2]);
+        tPosArr.push(seg.to[0], seg.to[1], seg.to[2]);
       }
     }
 
-    const extGeo = new THREE.BufferGeometry();
-    if (extrudePositions.length > 0) {
-      extGeo.setAttribute('position', new THREE.Float32BufferAttribute(extrudePositions, 3));
-      extGeo.setAttribute('color', new THREE.Float32BufferAttribute(extrudeColors, 3));
-    }
+    return {
+      extrudePositions: new Float32Array(ePosArr),
+      extrudeColors: new Float32Array(eColArr),
+      travelPositions: new Float32Array(tPosArr),
+      hasExtrude: ePosArr.length > 0,
+      hasTravel: tPosArr.length > 0,
+    };
+  }, [toolpath, maxSegmentIndex]);
 
-    const trvGeo = new THREE.BufferGeometry();
-    if (travelPositions.length > 0) {
-      trvGeo.setAttribute('position', new THREE.Float32BufferAttribute(travelPositions, 3));
-    }
-
-    return { extrudeGeo: extGeo, travelGeo: trvGeo };
-  }, [toolpath, maxLayerZ]);
+  const travelColor = useMemo(() => new THREE.Color(0x4466cc), []);
 
   return (
     <group matrix={matrix} matrixAutoUpdate={false}>
-      {extrudeGeo.getAttribute('position') && (
-        <lineSegments geometry={extrudeGeo}>
-          <lineBasicMaterial
-            vertexColors
-            linewidth={1}
-            transparent
-            opacity={settings.opacity}
-          />
-        </lineSegments>
+      {hasExtrude && (
+        <FatLineSegments
+          positions={extrudePositions}
+          colors={extrudeColors}
+          lineWidth={3}
+          opacity={settings.opacity}
+        />
       )}
-      {travelGeo.getAttribute('position') && settings.opacity > 0.5 && (
-        <lineSegments geometry={travelGeo}>
-          <lineBasicMaterial
-            color={0x4466cc}
-            linewidth={1}
-            transparent
-            opacity={settings.opacity * 0.3}
-          />
-        </lineSegments>
+      {hasTravel && settings.opacity > 0.5 && (
+        <FatLineSegments
+          positions={travelPositions}
+          lineWidth={1}
+          opacity={settings.opacity * 0.25}
+          dashed
+          uniformColor={travelColor}
+        />
       )}
     </group>
   );
@@ -5065,6 +5115,13 @@ export function Viewport() {
   const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
   const drawFlagEnabled = useFeatureFlag('drawMode');
   const drawModeActive = useDrawStore((s) => s.active) && drawFlagEnabled;
+  const [toolpathProgress, setToolpathProgress] = useState(1); // 0..1 — fraction of segments to show
+  const prevResultRef = useRef(result);
+  if (prevResultRef.current !== result) {
+    prevResultRef.current = result;
+    // Reset to full when the script re-evaluates
+    if (toolpathProgress !== 1) setToolpathProgress(1);
+  }
   const [performanceInfo, setPerformanceInfo] = useState<ViewportPerformanceInfo | null>(null);
   const reactRenderCountRef = useRef(0);
   reactRenderCountRef.current += 1;
@@ -5841,7 +5898,7 @@ export function Viewport() {
                 obj={obj}
                 settings={effectiveSettings}
                 matrix={matrix}
-                maxLayerZ={obj.toolpath.bounds.max[2]}
+                maxSegmentIndex={Math.round(toolpathProgress * obj.toolpath.segments.length)}
               />
             );
           }
@@ -5936,6 +5993,61 @@ export function Viewport() {
           clearCommand={clearViewCommand}
         />
       </Canvas>
+
+      {/* Toolpath timeline slider */}
+      {(() => {
+        const toolpathObj = objects.find((o) => o.toolpath && o.toolpath.segments.length > 0);
+        if (!toolpathObj?.toolpath) return null;
+        const tp = toolpathObj.toolpath;
+        const totalSegs = tp.segments.length;
+        const elapsed = tp.estimatedTimeSeconds * toolpathProgress;
+        const fmtTime = (s: number) => {
+          const m = Math.floor(s / 60);
+          const sec = Math.floor(s % 60);
+          return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+        };
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 16,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'var(--fc-bgPanel)',
+              border: '1px solid var(--fc-border)',
+              borderRadius: 8,
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              minWidth: 340,
+              maxWidth: 520,
+              pointerEvents: 'auto',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              zIndex: 10,
+            }}
+          >
+            <span style={{ fontSize: 11, color: 'var(--fc-textDim)', whiteSpace: 'nowrap' }}>
+              {fmtTime(elapsed)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={1 / Math.max(1, totalSegs)}
+              value={toolpathProgress}
+              onChange={(e) => setToolpathProgress(parseFloat(e.target.value))}
+              style={{ flex: 1, accentColor: 'var(--fc-accent)' }}
+            />
+            <span style={{ fontSize: 11, color: 'var(--fc-textDim)', whiteSpace: 'nowrap' }}>
+              {fmtTime(tp.estimatedTimeSeconds)}
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--fc-textMuted)', whiteSpace: 'nowrap', minWidth: 36, textAlign: 'right' }}>
+              {Math.round(toolpathProgress * 100)}%
+            </span>
+          </div>
+        );
+      })()}
 
       <PerformanceInfoPanel
         enabled={showPerformanceInfo}
