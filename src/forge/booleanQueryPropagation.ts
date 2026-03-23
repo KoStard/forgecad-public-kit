@@ -72,6 +72,8 @@ function rootTopologyRewritePropagation(plan: ShapeCompilePlan | null): Topology
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'filletEdges':
+    case 'chamferEdges':
     case 'opaque':
     case 'importedMesh':
       return null;

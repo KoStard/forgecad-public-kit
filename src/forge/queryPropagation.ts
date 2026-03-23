@@ -80,6 +80,8 @@ function rootPlanPropagation(plan: ShapeCompilePlan): TopologyRewritePropagation
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'filletEdges':
+    case 'chamferEdges':
     case 'opaque':
     case 'importedMesh':
       return undefined;
@@ -751,6 +753,8 @@ export function findShapeTopologyRewritePropagation(
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'filletEdges':
+    case 'chamferEdges':
     case 'opaque':
     case 'importedMesh':
       return null;
@@ -794,6 +798,10 @@ export function collectShapeTopologyRewritePropagations(
         for (const child of children) visit(child);
         return;
       }
+      case 'filletEdges':
+      case 'chamferEdges':
+        visit(current.base);
+        return;
       case 'box':
       case 'cylinder':
       case 'sphere':

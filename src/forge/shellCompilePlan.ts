@@ -222,6 +222,8 @@ function lowerBaseShellPlanToConcretePlan(
       };
     case 'fillet':
     case 'chamfer':
+    case 'filletEdges':
+    case 'chamferEdges':
       return {
         ok: false,
         reason: 'Shape.shell() does not support edge-finished bodies (fillet/chamfer). Apply shell before edge finishing.',

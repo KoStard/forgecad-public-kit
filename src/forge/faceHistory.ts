@@ -112,6 +112,8 @@ function tracePlanTransformations(plan: ShapeCompilePlan | null): Transformation
     case 'cut':
     case 'fillet':
     case 'chamfer':
+    case 'filletEdges':
+    case 'chamferEdges':
     case 'trimByPlane':
       steps.push(...tracePlanTransformations(plan.base));
       break;
@@ -146,6 +148,8 @@ function findOriginOperation(plan: ShapeCompilePlan | null): { operation: string
     case 'cut':
     case 'fillet':
     case 'chamfer':
+    case 'filletEdges':
+    case 'chamferEdges':
     case 'trimByPlane':
       return findOriginOperation(plan.base);
 
@@ -213,6 +217,16 @@ function collectTimelineEntries(plan: ShapeCompilePlan, entries: TimelineEntry[]
     case 'chamfer':
       collectTimelineEntries(plan.base, entries);
       entries.push({ kind: 'chamfer', label: 'Chamfer', summary: `size = ${plan.size}`, category: 'modifier' });
+      return;
+
+    case 'filletEdges':
+      collectTimelineEntries(plan.base, entries);
+      entries.push({ kind: 'filletEdges', label: 'Fillet Edges', summary: `r = ${plan.radius}`, category: 'modifier' });
+      return;
+
+    case 'chamferEdges':
+      collectTimelineEntries(plan.base, entries);
+      entries.push({ kind: 'chamferEdges', label: 'Chamfer Edges', summary: `size = ${plan.size}`, category: 'modifier' });
       return;
 
     case 'trimByPlane':

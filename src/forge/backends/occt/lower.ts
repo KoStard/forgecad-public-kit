@@ -624,6 +624,85 @@ function lowerChamferPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind
   return mkChamfer.Shape();
 }
 
+function findOCCTEdgeByMidpoint(oc: OCCTModule, shape: any, midpoint: [number, number, number]): any {
+  let bestEdge: any = null;
+  let bestDist = Infinity;
+  const edgeExpl = new oc.TopExp_Explorer_2(
+    shape,
+    oc.TopAbs_ShapeEnum.TopAbs_EDGE,
+    oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
+  );
+  while (edgeExpl.More()) {
+    const edge = oc.TopoDS.Edge_1(edgeExpl.Current());
+    const first = { current: 0 };
+    const last = { current: 0 };
+    const curve = oc.BRep_Tool.Curve_2(edge, first, last);
+    if (!curve.IsNull()) {
+      const midParam = (first.current + last.current) / 2;
+      const pt = curve.get().Value(midParam);
+      const dx = pt.X() - midpoint[0];
+      const dy = pt.Y() - midpoint[1];
+      const dz = pt.Z() - midpoint[2];
+      const dist = dx * dx + dy * dy + dz * dz;
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestEdge = edge;
+      }
+    }
+    edgeExpl.Next();
+  }
+  return bestEdge;
+}
+
+function lowerFilletEdgesPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'filletEdges' }>): any {
+  const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
+  const mkFillet = new oc.BRepFilletAPI_MakeFillet(
+    base,
+    oc.ChFi3d_FilletShape.ChFi3d_Rational,
+  );
+  let addedCount = 0;
+  for (const target of plan.edgeTargets) {
+    const matchedEdge = findOCCTEdgeByMidpoint(oc, base, target.midpoint);
+    if (matchedEdge) {
+      mkFillet.Add_2(plan.radius, matchedEdge);
+      addedCount++;
+    }
+  }
+  if (addedCount === 0) {
+    throw new Error('filletEdges(): no matching OCCT edges found for the given selection.');
+  }
+  mkFillet.Build(new oc.Message_ProgressRange_1());
+  if (!mkFillet.IsDone()) {
+    throw new Error(
+      `filletEdges(): OCCT fillet operation failed (radius=${plan.radius}, ${addedCount} edges).`,
+    );
+  }
+  return mkFillet.Shape();
+}
+
+function lowerChamferEdgesPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'chamferEdges' }>): any {
+  const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
+  const mkChamfer = new oc.BRepFilletAPI_MakeChamfer(base);
+  let addedCount = 0;
+  for (const target of plan.edgeTargets) {
+    const matchedEdge = findOCCTEdgeByMidpoint(oc, base, target.midpoint);
+    if (matchedEdge) {
+      mkChamfer.Add_2(plan.size, matchedEdge);
+      addedCount++;
+    }
+  }
+  if (addedCount === 0) {
+    throw new Error('chamferEdges(): no matching OCCT edges found for the given selection.');
+  }
+  mkChamfer.Build(new oc.Message_ProgressRange_1());
+  if (!mkChamfer.IsDone()) {
+    throw new Error(
+      `chamferEdges(): OCCT chamfer operation failed (size=${plan.size}, ${addedCount} edges).`,
+    );
+  }
+  return mkChamfer.Shape();
+}
+
 /**
  * Lower a ShapeCompilePlan into an OCCT TopoDS_Shape.
  *
@@ -756,6 +835,12 @@ function _lowerShapeCompilePlanToOCCTInner(
     case 'chamfer':
       return lowerChamferPlan(oc, plan);
 
+    case 'filletEdges':
+      return lowerFilletEdgesPlan(oc, plan);
+
+    case 'chamferEdges':
+      return lowerChamferEdgesPlan(oc, plan);
+
     case 'trimByPlane': {
       const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
       const normal = [plan.normalX, plan.normalY, plan.normalZ] as [number, number, number];
@@ -814,7 +899,7 @@ function _lowerShapeCompilePlanToOCCTInner(
         'Switch to the Manifold backend or use the default backend.',
       );
     case 'opaque':
-      throw new Error('Cannot lower opaque compile plan to OCCT — opaque plans must be intercepted before lowering');
+      throw new Error('Cannot lower opaque compile plan to OCCT — opaque plans require runtime evaluation');
   }
 }
 
