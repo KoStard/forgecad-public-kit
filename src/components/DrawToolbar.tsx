@@ -35,7 +35,7 @@ const drawTools: ToolDef[] = [
   { id: 'polyline', label: 'Polyline', icon: '⏍', shortcut: 'W', tip: 'Click points, double-click to finish', section: 'draw' },
   { id: 'rectangle', label: 'Rect', icon: '▭', shortcut: 'R', tip: 'Click two corners to draw a rectangle', section: 'draw' },
   { id: 'circle', label: 'Circle', icon: '○', shortcut: 'C', tip: 'Click center, then edge to draw a circle', section: 'draw' },
-  { id: 'arc', label: 'Arc', icon: '⌒', shortcut: 'A', tip: 'Click 3 points to draw an arc', section: 'draw' },
+  { id: 'arc', label: 'Arc', icon: '⌒', shortcut: 'A', tip: 'Click center, start point, end point', section: 'draw' },
   { id: 'polygon', label: 'Polygon', icon: '⬡', shortcut: 'G', tip: 'Click center, then vertex for regular polygon', section: 'draw' },
   { id: 'ellipse', label: 'Ellipse', icon: '⬮', shortcut: 'E', tip: 'Click center, then bounding box corner', section: 'draw' },
   { id: 'slot', label: 'Slot', icon: '⊝', shortcut: 'S', tip: 'Click two centers, then set width', section: 'draw' },
@@ -391,27 +391,35 @@ export function DrawToolbar() {
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     if ((e.target as HTMLElement)?.closest('[data-fc-editor-surface]')) return;
 
+    // Undo: Cmd/Ctrl+Z — handle before the modifier guard
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z')) {
+      undo();
+      e.preventDefault();
+      return;
+    }
+
+    // Don't intercept single-key shortcuts when Cmd/Ctrl/Alt is held
+    // so system shortcuts (Cmd+L, Cmd+R, Cmd+C, etc.) still work
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
     switch (e.key) {
       case 'Escape':
         if (dimInput) {
           setDimInput(null);
         } else if (pendingClicks.length > 0) {
-          // For polyline, finish the chain on Escape
           if (tool === 'polyline' && pendingClicks.length >= 2) {
             useDrawStore.getState().handleDoubleClick(0, 0);
           } else {
             cancelPending();
           }
         } else if (isDrawingTool(tool) || isEditTool(tool) || isConstraintTool(tool)) {
-          // Deactivate tool → go to select mode
           setTool('select');
         } else {
-          // Already in select mode → request exit
           requestExit();
         }
         e.preventDefault();
         break;
-      // Drawing tools
+      // Drawing tools (single key, no modifiers)
       case 'v': case 'V': setTool('select'); e.preventDefault(); break;
       case 'p': case 'P': setTool('point'); e.preventDefault(); break;
       case 'l': case 'L': setTool('line'); e.preventDefault(); break;
@@ -430,10 +438,6 @@ export function DrawToolbar() {
       case 'h': case 'H': setTool('c:horizontal'); e.preventDefault(); break;
       case 'd': case 'D': setTool('c:length'); e.preventDefault(); break;
       case 'o': case 'O': setTool('c:pointOnLine'); e.preventDefault(); break;
-      // Undo
-      case 'z': case 'Z':
-        if (e.metaKey || e.ctrlKey) { undo(); e.preventDefault(); }
-        break;
       // Enter to finish polyline
       case 'Enter':
         if (tool === 'polyline' && pendingClicks.length >= 2) {
@@ -464,8 +468,8 @@ export function DrawToolbar() {
     else if (tool === 'polyline') statusMessage = `${pendingClicks.length} points — double-click or Enter to finish`;
     else if (tool === 'rectangle') statusMessage = 'Click opposite corner...';
     else if (tool === 'circle') statusMessage = 'Click edge point for radius...';
-    else if (tool === 'arc' && pendingClicks.length === 1) statusMessage = 'Click second point...';
-    else if (tool === 'arc' && pendingClicks.length === 2) statusMessage = 'Click third point to finish arc...';
+    else if (tool === 'arc' && pendingClicks.length === 1) statusMessage = 'Click start point...';
+    else if (tool === 'arc' && pendingClicks.length === 2) statusMessage = 'Click end point to finish arc...';
     else if (tool === 'polygon') statusMessage = 'Click vertex point...';
     else if (tool === 'ellipse') statusMessage = 'Click bounding box corner...';
     else if (tool === 'slot' && pendingClicks.length === 1) statusMessage = 'Click second center...';
