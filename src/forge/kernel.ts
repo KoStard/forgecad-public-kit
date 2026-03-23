@@ -510,6 +510,7 @@ function withCopiedDimensions(source: Shape, out: Shape): Shape {
   setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(source), true));
   setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(source));
   setShapePlacementRefsInternal(out, getShapePlacementRefsInternal(source));
+  if (source.materialProps) out.materialProps = { ...source.materialProps };
   return setShapeCompilePlanInternal(out, getShapeCompilePlanInternal(source));
 }
 
@@ -522,6 +523,7 @@ function withTransformedDimensions(source: Shape, out: Shape, m: Mat4): Shape {
   }
   setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(source));
   setShapePlacementRefsInternal(out, transformPlacementReferences(getShapePlacementRefsInternal(source), m));
+  if (source.materialProps) out.materialProps = { ...source.materialProps };
   return setShapeCompilePlanInternal(out, getShapeCompilePlanInternal(source));
 }
 
@@ -536,6 +538,7 @@ function withMergedDimensions(sources: Shape[], out: Shape): Shape {
   );
   if (sources.length > 0) {
     setShapeCompilePlanInternal(out, getShapeCompilePlanInternal(sources[0]));
+    if (sources[0].materialProps) out.materialProps = { ...sources[0].materialProps };
   }
   return out;
 }
@@ -680,9 +683,30 @@ function createOwnedTopologyRewritePlan(
   );
 }
 
+/** Per-object material properties for controlling visual appearance. */
+export interface ShapeMaterialProps {
+  /** Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 */
+  metalness?: number;
+  /** Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 */
+  roughness?: number;
+  /** Emissive glow color (hex string, e.g. "#ff6b35"). */
+  emissive?: string;
+  /** Emissive intensity multiplier. Default: 1 */
+  emissiveIntensity?: number;
+  /** Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 */
+  opacity?: number;
+  /** Render as wireframe. Default: false */
+  wireframe?: boolean;
+  /** Clearcoat intensity (0–1). Default: 0.1 */
+  clearcoat?: number;
+  /** Clearcoat roughness (0–1). Default: 0.4 */
+  clearcoatRoughness?: number;
+}
+
 /** Thin immutable wrapper around a runtime geometry backend payload. */
 export class Shape {
   public colorHex: string | undefined;
+  public materialProps: ShapeMaterialProps | undefined;
 
   constructor(payload: ShapeRuntimePayload, color?: string, geometryInfo?: Partial<GeometryInfo>) {
     this.colorHex = color;
@@ -694,7 +718,9 @@ export class Shape {
 
   /** Set the color of this shape (hex string, e.g. "#ff0000") */
   setColor(value: string | undefined): Shape {
-    return withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).clone(), value));
+    const out = withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).clone(), value));
+    out.materialProps = this.materialProps ? { ...this.materialProps } : undefined;
+    return out;
   }
 
   /** Alias for setColor */
@@ -702,9 +728,31 @@ export class Shape {
     return this.setColor(value);
   }
 
+  /**
+   * Set material properties for this shape's visual appearance.
+   * Returns a new Shape with the specified material properties merged.
+   *
+   * @example
+   * ```js
+   * box(50, 50, 50).material({ metalness: 0.9, roughness: 0.1 });
+   * sphere(30).material({ emissive: '#ff6b35', emissiveIntensity: 2 });
+   * cylinder(40, 20).material({ opacity: 0.3 });
+   * ```
+   */
+  material(props: ShapeMaterialProps): Shape {
+    if (!props || typeof props !== 'object') {
+      throw new Error('material() expects an object with material properties');
+    }
+    const out = this.clone();
+    out.materialProps = { ...(this.materialProps ?? {}), ...props };
+    return out;
+  }
+
   /** Return a new Shape wrapper for explicit duplication in scripts. */
   clone(): Shape {
-    return withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).clone(), this.colorHex));
+    const out = withCopiedDimensions(this, new Shape(getShapeRuntimeBackendInternal(this).clone(), this.colorHex));
+    out.materialProps = this.materialProps ? { ...this.materialProps } : undefined;
+    return out;
   }
 
   /** Alias for clone() */

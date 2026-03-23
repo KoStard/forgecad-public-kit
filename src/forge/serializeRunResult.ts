@@ -155,6 +155,7 @@ export function serializeRunResult(
       toolpathData: obj.toolpath ?? null,
       compilePlan: obj.shape ? getShapeCompilePlan(obj.shape) : null,
       color: obj.color,
+      materialProps: obj.materialProps,
       geometryInfo: obj.geometryInfo,
       sketchMeta: (obj as any).sketchMeta,
       groupName: obj.groupName,

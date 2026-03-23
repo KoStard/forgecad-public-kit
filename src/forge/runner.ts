@@ -160,6 +160,8 @@ export interface SceneObject {
   sketch: Sketch | null;
   toolpath?: ToolpathData | null;
   color?: string;
+  /** Per-object material properties (metalness, roughness, emissive, etc.) */
+  materialProps?: import('./kernel').ShapeMaterialProps;
   geometryInfo?: GeometryInfo | null;
   sketchMeta?: SketchConstraintMeta;
   /** If this object belongs to a named group (assembly), the group name */
@@ -1489,6 +1491,7 @@ export function runScript(
         shape,
         sketch: null,
         color: color || shape.colorHex,
+        materialProps: shape.materialProps,
         geometryInfo: geometryInfo ?? shape.geometryInfo(),
         groupName,
         treePath: treePath && treePath.length > 0 ? [...treePath] : [name],

@@ -120,6 +120,8 @@ export type {
   SceneGrainConfig,
   ScenePostProcessingConfig,
   SceneGroundConfig,
+  SceneCaptureConfig,
+  ShapeMaterialProps,
 } from './headless';
 export type { RunResult, SceneObject, LogEntry } from './headless';
 export { GCodeBuilder, gcode } from './headless';

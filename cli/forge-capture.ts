@@ -71,6 +71,8 @@ interface CliOptions {
   ffmpegPath?: string;
   scene?: ViewportRenderSceneState;
   listOnly: boolean;
+  /** Tracks which capture-related options were explicitly set by CLI flags or env vars. */
+  explicitFlags: Set<string>;
 }
 
 interface BrowserCaptureInitResult {
@@ -90,6 +92,14 @@ interface BrowserCaptureInitResult {
   defaultAnimation?: string | null;
   selectedAnimation?: string | null;
   cutPlanes?: string[];
+  captureDefaults?: {
+    framesPerTurn?: number;
+    holdFrames?: number;
+    pitchDeg?: number;
+    fps?: number;
+    size?: number;
+    background?: string;
+  } | null;
 }
 
 interface BrowserCaptureFrameResult {
@@ -278,6 +288,15 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
   let ffmpegPath = process.env.FFMPEG_PATH;
   let scene: ViewportRenderSceneState | undefined;
   let listOnly = false;
+  const explicitFlags = new Set<string>();
+
+  // Mark flags that were set via environment variables
+  if (process.env.FORGE_CAPTURE_SIZE || process.env.FORGE_GIF_SIZE) explicitFlags.add('size');
+  if (process.env.FORGE_CAPTURE_FPS || process.env.FORGE_GIF_FPS) explicitFlags.add('fps');
+  if (process.env.FORGE_CAPTURE_FRAMES_PER_TURN || process.env.FORGE_GIF_FRAMES_PER_TURN) explicitFlags.add('framesPerTurn');
+  if (process.env.FORGE_CAPTURE_HOLD_FRAMES || process.env.FORGE_GIF_HOLD_FRAMES) explicitFlags.add('holdFrames');
+  if (process.env.FORGE_CAPTURE_PITCH_DEG || process.env.FORGE_GIF_PITCH_DEG) explicitFlags.add('pitchDeg');
+  if (process.env.FORGE_CAPTURE_BACKGROUND || process.env.FORGE_GIF_BACKGROUND) explicitFlags.add('background');
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -334,6 +353,7 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
     }
     if (arg === '--size') {
       size = Number.parseInt(readValue(argv, i, arg), 10);
+      explicitFlags.add('size');
       i += 1;
       continue;
     }
@@ -344,26 +364,31 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
     }
     if (arg === '--fps') {
       fps = Number.parseInt(readValue(argv, i, arg), 10);
+      explicitFlags.add('fps');
       i += 1;
       continue;
     }
     if (arg === '--frames-per-turn') {
       framesPerTurn = Number.parseInt(readValue(argv, i, arg), 10);
+      explicitFlags.add('framesPerTurn');
       i += 1;
       continue;
     }
     if (arg === '--hold-frames') {
       holdFrames = Number.parseInt(readValue(argv, i, arg), 10);
+      explicitFlags.add('holdFrames');
       i += 1;
       continue;
     }
     if (arg === '--pitch') {
       pitchDeg = Number.parseFloat(readValue(argv, i, arg));
+      explicitFlags.add('pitchDeg');
       i += 1;
       continue;
     }
     if (arg === '--background') {
       background = readValue(argv, i, arg);
+      explicitFlags.add('background');
       i += 1;
       continue;
     }
@@ -490,6 +515,7 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
     ffmpegPath,
     scene,
     listOnly,
+    explicitFlags,
   };
 }
 
@@ -696,6 +722,34 @@ function resolveLoopProgress(index: number, totalFrames: number, loops: number):
   if (index === totalFrames - 1) return 1;
   const absolute = (index / (totalFrames - 1)) * loops;
   return absolute - Math.floor(absolute);
+}
+
+/**
+ * Apply script-provided capture defaults (from scene({ capture: {...} }))
+ * for any values not explicitly set by CLI flags or env vars.
+ */
+function applyScriptCaptureDefaults(options: CliOptions, init: BrowserCaptureInitResult): void {
+  const defaults = init.captureDefaults;
+  if (!defaults) return;
+
+  if (defaults.framesPerTurn !== undefined && !options.explicitFlags.has('framesPerTurn')) {
+    options.framesPerTurn = defaults.framesPerTurn;
+  }
+  if (defaults.holdFrames !== undefined && !options.explicitFlags.has('holdFrames')) {
+    options.holdFrames = defaults.holdFrames;
+  }
+  if (defaults.pitchDeg !== undefined && !options.explicitFlags.has('pitchDeg')) {
+    options.pitchDeg = defaults.pitchDeg;
+  }
+  if (defaults.fps !== undefined && !options.explicitFlags.has('fps')) {
+    options.fps = defaults.fps;
+  }
+  if (defaults.size !== undefined && !options.explicitFlags.has('size')) {
+    options.size = defaults.size;
+  }
+  if (defaults.background !== undefined && !options.explicitFlags.has('background')) {
+    options.background = defaults.background;
+  }
 }
 
 function buildFramePlan(options: CliOptions, init: BrowserCaptureInitResult): CaptureFrameStep[] {
@@ -1077,6 +1131,9 @@ export async function runCaptureCli(
     if (!init?.ok) {
       throw new Error(init?.error || 'Script failed to initialize in renderer');
     }
+
+    // Apply script-provided capture defaults (from scene({ capture: {...} }))
+    applyScriptCaptureDefaults(options, init);
 
     if (options.listOnly) {
       printList(options.scriptPath, init);

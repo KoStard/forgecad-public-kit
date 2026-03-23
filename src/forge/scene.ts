@@ -101,6 +101,21 @@ export interface SceneGroundConfig {
   receiveShadow?: boolean;
 }
 
+export interface SceneCaptureConfig {
+  /** Frames for one full orbit rotation (default: 72) */
+  framesPerTurn?: number;
+  /** Frozen frames before motion starts (default: 6) */
+  holdFrames?: number;
+  /** Orbit pitch angle in degrees (default: auto from camera) */
+  pitchDeg?: number;
+  /** Output frame rate (default: 24) */
+  fps?: number;
+  /** Output frame size in pixels (default: 960) */
+  size?: number;
+  /** Canvas background color for capture (default: '#252526') */
+  background?: string;
+}
+
 export interface SceneConfig {
   background: string | SceneBackgroundGradient | null;
   camera: SceneCameraConfig | null;
@@ -109,6 +124,7 @@ export interface SceneConfig {
   fog: SceneFogConfig | null;
   postProcessing: ScenePostProcessingConfig | null;
   ground: SceneGroundConfig | null;
+  capture: SceneCaptureConfig | null;
 }
 
 export interface SceneOptions {
@@ -119,6 +135,8 @@ export interface SceneOptions {
   fog?: SceneFogConfig;
   postProcessing?: ScenePostProcessingConfig;
   ground?: SceneGroundConfig;
+  /** Default capture parameters for `forgecad capture` — CLI flags override these. */
+  capture?: SceneCaptureConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -268,6 +286,44 @@ function validateGround(ground: SceneGroundConfig, label: string): SceneGroundCo
   return out;
 }
 
+function validateCapture(cap: SceneCaptureConfig, label: string): SceneCaptureConfig {
+  const out: SceneCaptureConfig = {};
+  if (cap.framesPerTurn !== undefined) {
+    out.framesPerTurn = requireFinite(cap.framesPerTurn, `${label}.framesPerTurn`);
+    if (out.framesPerTurn < 12 || out.framesPerTurn > 720) {
+      throw new Error(`${label}.framesPerTurn must be between 12 and 720`);
+    }
+  }
+  if (cap.holdFrames !== undefined) {
+    out.holdFrames = requireFinite(cap.holdFrames, `${label}.holdFrames`);
+    if (out.holdFrames < 0 || out.holdFrames > 300) {
+      throw new Error(`${label}.holdFrames must be between 0 and 300`);
+    }
+  }
+  if (cap.pitchDeg !== undefined) {
+    out.pitchDeg = requireFinite(cap.pitchDeg, `${label}.pitchDeg`);
+    if (out.pitchDeg < -80 || out.pitchDeg > 80) {
+      throw new Error(`${label}.pitchDeg must be between -80 and 80`);
+    }
+  }
+  if (cap.fps !== undefined) {
+    out.fps = requireFinite(cap.fps, `${label}.fps`);
+    if (out.fps < 1 || out.fps > 60) {
+      throw new Error(`${label}.fps must be between 1 and 60`);
+    }
+  }
+  if (cap.size !== undefined) {
+    out.size = requireFinite(cap.size, `${label}.size`);
+    if (out.size < 1) {
+      throw new Error(`${label}.size must be positive`);
+    }
+  }
+  if (cap.background !== undefined) {
+    out.background = requireColor(cap.background, `${label}.background`);
+  }
+  return out;
+}
+
 function validateBackground(bg: unknown, label: string): string | SceneBackgroundGradient {
   if (typeof bg === 'string') return requireColor(bg, label);
   if (bg && typeof bg === 'object' && 'top' in bg && 'bottom' in bg) {
@@ -322,7 +378,7 @@ export function scene(options: SceneOptions): void {
 
   const current: SceneConfig = _collected
     ? { ..._collected }
-    : { background: null, camera: null, lights: null, environment: null, fog: null, postProcessing: null, ground: null };
+    : { background: null, camera: null, lights: null, environment: null, fog: null, postProcessing: null, ground: null, capture: null };
 
   if (options.background !== undefined) {
     current.background = validateBackground(options.background, 'scene.background');
@@ -365,6 +421,13 @@ export function scene(options: SceneOptions): void {
       throw new Error('scene.ground must be an object');
     }
     current.ground = validateGround(options.ground, 'scene.ground');
+  }
+  if (options.capture !== undefined) {
+    if (!options.capture || typeof options.capture !== 'object') {
+      throw new Error('scene.capture must be an object');
+    }
+    const validated = validateCapture(options.capture, 'scene.capture');
+    current.capture = current.capture ? { ...current.capture, ...validated } : validated;
   }
 
   _collected = current;

@@ -37,6 +37,12 @@ scene({
     grain: { intensity: 0.08 },
     toneMappingExposure: param('exposure', 1.5, 0.5, 4),
   },
+
+  capture: {
+    framesPerTurn: 120,
+    pitchDeg: 20,
+    holdFrames: 8,
+  },
 });
 
 // ---------------------------------------------------------------------------

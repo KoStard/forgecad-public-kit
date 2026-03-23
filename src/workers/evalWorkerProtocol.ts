@@ -55,6 +55,7 @@ export interface SerializedSceneObject {
   toolpathData?: ToolpathData | null;
   compilePlan?: ShapeCompilePlan | null;
   color?: string;
+  materialProps?: import('../forge/kernel').ShapeMaterialProps;
   geometryInfo?: GeometryInfo | null;
   sketchMeta?: SketchConstraintMeta;
   groupName?: string;
