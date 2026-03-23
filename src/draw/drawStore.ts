@@ -25,28 +25,37 @@ import { useForgeStore } from '../store/forgeStore';
 /** Drawing tools create geometry. */
 export type DrawingTool =
   | 'point' | 'line' | 'polyline' | 'rectangle' | 'circle'
-  | 'arc' | 'polygon';
+  | 'arc' | 'polygon' | 'ellipse' | 'slot';
+
+/** Edit tools modify existing geometry. */
+export type EditTool = 'trim' | 'mirror' | 'offset';
 
 /** Constraint tools apply constraints to selected entities. */
 export type ConstraintTool =
   | 'c:horizontal' | 'c:vertical' | 'c:length' | 'c:distance'
   | 'c:angle' | 'c:radius' | 'c:parallel' | 'c:perpendicular'
   | 'c:coincident' | 'c:tangent' | 'c:equal' | 'c:fixed'
-  | 'c:midpoint' | 'c:symmetric' | 'c:concentric';
+  | 'c:midpoint' | 'c:symmetric' | 'c:concentric'
+  | 'c:pointOnLine' | 'c:pointOnCircle';
 
 /** Special mode for selection without a specific tool. */
 export type SelectTool = 'select';
 
-export type DrawTool = DrawingTool | ConstraintTool | SelectTool;
+export type DrawTool = DrawingTool | EditTool | ConstraintTool | SelectTool;
 
 /** Whether the given tool is a constraint tool. */
 export function isConstraintTool(tool: DrawTool): tool is ConstraintTool {
   return tool.startsWith('c:');
 }
 
+/** Whether the given tool is an edit tool. */
+export function isEditTool(tool: DrawTool): tool is EditTool {
+  return tool === 'trim' || tool === 'mirror' || tool === 'offset';
+}
+
 /** Whether the given tool is a drawing tool. */
 export function isDrawingTool(tool: DrawTool): tool is DrawingTool {
-  return !tool.startsWith('c:') && tool !== 'select';
+  return !tool.startsWith('c:') && tool !== 'select' && !isEditTool(tool);
 }
 
 // ─── Entity selection ────────────────────────────────────────────────────────
@@ -60,6 +69,9 @@ export interface SelectedEntity {
 
 // ─── Snap ────────────────────────────────────────────────────────────────────
 
+/** Snap type for visual indicator differentiation. */
+export type SnapType = 'point' | 'midpoint' | 'intersection' | 'perpendicular' | 'grid' | 'none';
+
 /** Snap result: the snapped coordinate and whether it snapped to an existing point. */
 export interface SnapResult {
   x: number;
@@ -70,6 +82,8 @@ export interface SnapResult {
   xAligned: boolean;
   /** Whether y was axis-snapped to an existing point. */
   yAligned: boolean;
+  /** Type of snap for visual indicator. */
+  snapType: SnapType;
 }
 
 // ─── Tracked entities (for constraint selection) ─────────────────────────────
@@ -118,6 +132,9 @@ interface DrawState {
   // Entity selection (for constraint tools)
   selectedEntities: SelectedEntity[];
 
+  // Hovered entity (for visual highlight feedback)
+  hoveredEntity: SelectedEntity | null;
+
   // Dimension input state
   dimensionInput: { constraintType: string; resolve: (value: number) => void } | null;
 
@@ -126,6 +143,12 @@ interface DrawState {
 
   // Construction mode toggle
   constructionMode: boolean;
+
+  // Construction entities (varNames of entities created in construction mode)
+  constructionEntities: Set<string>;
+
+  // Mirror line variable name (for mirror tool)
+  mirrorLineVar: string | null;
 
   // Polygon sides
   polygonSides: number;
@@ -149,21 +172,63 @@ interface DrawState {
   clearSelection: () => void;
   applyConstraint: (tool: ConstraintTool, value?: number) => void;
   setDimensionInput: (input: DrawState['dimensionInput']) => void;
+  setHoveredEntity: (entity: SelectedEntity | null) => void;
   toggleConstructionMode: () => void;
   setPolygonSides: (n: number) => void;
+  deleteEntity: (varName: string) => void;
 }
 
 const POINT_SNAP_THRESHOLD = 3; // world units (mm)
 const AXIS_SNAP_THRESHOLD = 1.5; // world units for axis alignment
 const ANGLE_SNAP_THRESHOLD_DEG = 3; // degrees for near-H/V detection
 
+/** Resolve line endpoint coordinates from points array. */
+function resolveLineEndpoints(
+  line: DrawnLine,
+  points: DrawnPoint[],
+): { x1: number; y1: number; x2: number; y2: number } | null {
+  const p1 = points.find((p) => p.varName === line.startVar);
+  const p2 = points.find((p) => p.varName === line.endVar);
+  if (!p1 || !p2) return null;
+  return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
+}
+
+/** Compute intersection of two line segments. Returns null if parallel or outside both segments. */
+function lineLineIntersection(
+  x1: number, y1: number, x2: number, y2: number,
+  x3: number, y3: number, x4: number, y4: number,
+): { x: number; y: number } | null {
+  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(denom) < 1e-10) return null; // parallel or coincident
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+  // Allow intersection slightly beyond segment ends (5% extension) for usability
+  if (t < -0.05 || t > 1.05 || u < -0.05 || u > 1.05) return null;
+  return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
+}
+
+/** Project a point onto a line segment. Returns the foot and parameter t (0..1 = on segment). */
+function projectPointOntoSegment(
+  px: number, py: number,
+  x1: number, y1: number, x2: number, y2: number,
+): { x: number; y: number; t: number } {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-10) return { x: x1, y: y1, t: 0 };
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / len2));
+  return { x: x1 + t * dx, y: y1 + t * dy, t };
+}
+
 function findSnapTarget(
   x: number,
   y: number,
   points: DrawnPoint[],
+  lines: DrawnLine[],
   gridSize: number,
+  pendingOrigin: { x: number; y: number } | null,
 ): SnapResult {
-  // 1. Check point snap
+  // 1. Check point snap (highest priority)
   let bestDist = POINT_SNAP_THRESHOLD;
   let bestPoint: DrawnPoint | null = null;
   for (const p of points) {
@@ -174,10 +239,71 @@ function findSnapTarget(
     }
   }
   if (bestPoint) {
-    return { x: bestPoint.x, y: bestPoint.y, snappedToVar: bestPoint.varName, xAligned: true, yAligned: true };
+    return { x: bestPoint.x, y: bestPoint.y, snappedToVar: bestPoint.varName, xAligned: true, yAligned: true, snapType: 'point' };
   }
 
-  // 2. Check axis alignment with existing points
+  // 2. Midpoint snap — check midpoints of all lines
+  let bestMidDist = POINT_SNAP_THRESHOLD;
+  let bestMidpoint: { x: number; y: number } | null = null;
+  for (const ln of lines) {
+    const ep = resolveLineEndpoints(ln, points);
+    if (!ep) continue;
+    const mx = (ep.x1 + ep.x2) / 2;
+    const my = (ep.y1 + ep.y2) / 2;
+    const d = Math.hypot(x - mx, y - my);
+    if (d < bestMidDist) {
+      bestMidDist = d;
+      bestMidpoint = { x: mx, y: my };
+    }
+  }
+  if (bestMidpoint) {
+    return { x: roundCoord(bestMidpoint.x), y: roundCoord(bestMidpoint.y), snappedToVar: null, xAligned: true, yAligned: true, snapType: 'midpoint' };
+  }
+
+  // 3. Intersection snap — check all pairs of lines (O(n^2), fine for <100 lines)
+  let bestIsectDist = POINT_SNAP_THRESHOLD;
+  let bestIsect: { x: number; y: number } | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const ep1 = resolveLineEndpoints(lines[i], points);
+    if (!ep1) continue;
+    for (let j = i + 1; j < lines.length; j++) {
+      const ep2 = resolveLineEndpoints(lines[j], points);
+      if (!ep2) continue;
+      const isect = lineLineIntersection(ep1.x1, ep1.y1, ep1.x2, ep1.y2, ep2.x1, ep2.y1, ep2.x2, ep2.y2);
+      if (!isect) continue;
+      const d = Math.hypot(x - isect.x, y - isect.y);
+      if (d < bestIsectDist) {
+        bestIsectDist = d;
+        bestIsect = isect;
+      }
+    }
+  }
+  if (bestIsect) {
+    return { x: roundCoord(bestIsect.x), y: roundCoord(bestIsect.y), snappedToVar: null, xAligned: true, yAligned: true, snapType: 'intersection' };
+  }
+
+  // 4. Perpendicular snap — only when we have a pending first click (drawing a line)
+  if (pendingOrigin) {
+    let bestPerpDist = POINT_SNAP_THRESHOLD;
+    let bestPerp: { x: number; y: number } | null = null;
+    for (const ln of lines) {
+      const ep = resolveLineEndpoints(ln, points);
+      if (!ep) continue;
+      const proj = projectPointOntoSegment(pendingOrigin.x, pendingOrigin.y, ep.x1, ep.y1, ep.x2, ep.y2);
+      // Foot of perpendicular from pendingOrigin onto the line — snap cursor to it
+      if (proj.t <= 0 || proj.t >= 1) continue; // must be on the segment interior
+      const d = Math.hypot(x - proj.x, y - proj.y);
+      if (d < bestPerpDist) {
+        bestPerpDist = d;
+        bestPerp = { x: proj.x, y: proj.y };
+      }
+    }
+    if (bestPerp) {
+      return { x: roundCoord(bestPerp.x), y: roundCoord(bestPerp.y), snappedToVar: null, xAligned: true, yAligned: true, snapType: 'perpendicular' };
+    }
+  }
+
+  // 5. Check axis alignment with existing points
   let snapX = x;
   let snapY = y;
   let xAligned = false;
@@ -193,12 +319,24 @@ function findSnapTarget(
     }
   }
 
-  // 3. Grid snap on non-axis-aligned coordinates
+  // 6. Threshold-based grid snap — only snap if within 30% of a grid line
   const gridSnap = Math.max(1, gridSize / 5);
-  if (!xAligned) snapX = Math.round(snapX / gridSnap) * gridSnap;
-  if (!yAligned) snapY = Math.round(snapY / gridSnap) * gridSnap;
+  const gridThreshold = gridSnap * 0.3;
+  if (!xAligned) {
+    const nearestGridX = Math.round(snapX / gridSnap) * gridSnap;
+    snapX = Math.abs(snapX - nearestGridX) < gridThreshold
+      ? nearestGridX
+      : Math.round(snapX * 10) / 10;
+  }
+  if (!yAligned) {
+    const nearestGridY = Math.round(snapY / gridSnap) * gridSnap;
+    snapY = Math.abs(snapY - nearestGridY) < gridThreshold
+      ? nearestGridY
+      : Math.round(snapY * 10) / 10;
+  }
 
-  return { x: roundCoord(snapX), y: roundCoord(snapY), snappedToVar: null, xAligned, yAligned };
+  const snapType: SnapType = (xAligned || yAligned) ? 'none' : 'grid';
+  return { x: roundCoord(snapX), y: roundCoord(snapY), snappedToVar: null, xAligned, yAligned, snapType };
 }
 
 /** Check if a line is nearly horizontal or vertical. */
@@ -225,7 +363,7 @@ function syncCodeToFile(state: { statements: string[]; points: DrawnPoint[]; tar
 }
 
 /** Find the nearest entity (point, line, circle) to a given coordinate. */
-function findNearestEntity(
+export function findNearestEntity(
   x: number,
   y: number,
   state: Pick<DrawState, 'points' | 'lines' | 'circles' | 'arcs'>,
@@ -334,9 +472,12 @@ const emptySession = {
   previewPoint: null as { x: number; y: number } | null,
   snapResult: null as SnapResult | null,
   selectedEntities: [] as SelectedEntity[],
+  hoveredEntity: null as SelectedEntity | null,
   dimensionInput: null as DrawState['dimensionInput'],
   showExitConfirm: false,
   constructionMode: false,
+  constructionEntities: new Set<string>(),
+  mirrorLineVar: null as string | null,
   polygonSides: 6,
 };
 
@@ -424,11 +565,19 @@ export const useDrawStore = create<DrawState>((set, get) => ({
   },
 
   setTool: (tool) => {
-    set({ tool, pendingClicks: [], selectedEntities: [] });
+    set({ tool, pendingClicks: [], selectedEntities: [], mirrorLineVar: null });
   },
 
   cancelPending: () => {
     set({ pendingClicks: [], selectedEntities: [] });
+  },
+
+  setHoveredEntity: (entity) => {
+    const current = get().hoveredEntity;
+    // Avoid unnecessary state updates
+    if (entity === null && current === null) return;
+    if (entity && current && entity.varName === current.varName) return;
+    set({ hoveredEntity: entity });
   },
 
   toggleConstructionMode: () => {
@@ -437,6 +586,35 @@ export const useDrawStore = create<DrawState>((set, get) => ({
 
   setPolygonSides: (n) => {
     set({ polygonSides: Math.max(3, Math.min(32, n)) });
+  },
+
+  deleteEntity: (varName) => {
+    const state = get();
+    // Remove all statements that reference this varName
+    const newStatements = state.statements.filter((stmt) => !stmt.includes(varName));
+
+    // Rebuild entity lists from remaining statements
+    const newPoints: DrawnPoint[] = [];
+    const newLines: DrawnLine[] = [];
+    const newCircles: DrawnCircle[] = [];
+    const newArcs: DrawnArc[] = [];
+    const pointRegex = /^const (p\d+) = sk\.point\((-?[\d.]+), (-?[\d.]+)\);$/;
+    const lineRegex = /^const (l\d+) = sk\.line\((p\d+), (p\d+)\);$/;
+    const circleRegex = /^const (c\d+) = sk\.circle\((p\d+), (-?[\d.]+)\);$/;
+    const arcRegex = /^const (a\d+) = sk\.arc\((p\d+), (p\d+), (p\d+)\);$/;
+    for (const stmt of newStatements) {
+      let m = stmt.match(pointRegex);
+      if (m) { newPoints.push({ varName: m[1], x: parseFloat(m[2]), y: parseFloat(m[3]) }); continue; }
+      m = stmt.match(lineRegex);
+      if (m) { newLines.push({ varName: m[1], startVar: m[2], endVar: m[3] }); continue; }
+      m = stmt.match(circleRegex);
+      if (m) { newCircles.push({ varName: m[1], centerVar: m[2], radius: parseFloat(m[3]) }); continue; }
+      m = stmt.match(arcRegex);
+      if (m) { newArcs.push({ varName: m[1], p1Var: m[2], p2Var: m[3], p3Var: m[4] }); continue; }
+    }
+
+    set({ statements: newStatements, points: newPoints, lines: newLines, circles: newCircles, arcs: newArcs });
+    syncCodeToFile({ statements: newStatements, points: newPoints, targetFile: state.targetFile });
   },
 
   // ─── Entity selection (for constraint tools) ────────────────────────────
@@ -565,6 +743,20 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         newStatements.push(constraintStatement('concentric', circs[0].varName, circs[1].varName));
         break;
       }
+      case 'pointOnLine': {
+        const pt = sel.find((e) => e.type === 'point');
+        const line = sel.find((e) => e.type === 'line');
+        if (!pt || !line) return;
+        newStatements.push(constraintStatement('pointOnLine', pt.varName, line.varName));
+        break;
+      }
+      case 'pointOnCircle': {
+        const pt = sel.find((e) => e.type === 'point');
+        const circ = sel.find((e) => e.type === 'circle');
+        if (!pt || !circ) return;
+        newStatements.push(constraintStatement('pointOnCircle', pt.varName, circ.varName));
+        break;
+      }
       default:
         return;
     }
@@ -580,7 +772,8 @@ export const useDrawStore = create<DrawState>((set, get) => ({
     if (!state.active) return;
 
     const gridSize = useForgeStore.getState().gridSize;
-    const snap = findSnapTarget(rawX, rawY, state.points, gridSize);
+    const pendingOrigin = state.pendingClicks.length > 0 ? state.pendingClicks[state.pendingClicks.length - 1] : null;
+    const snap = findSnapTarget(rawX, rawY, state.points, state.lines, gridSize, pendingOrigin);
     const { x, y, snappedToVar } = snap;
 
     // In select mode or constraint mode, try to select an entity
@@ -624,6 +817,13 @@ export const useDrawStore = create<DrawState>((set, get) => ({
           nextLineIdx: state.nextLineIdx,
         });
 
+        // Track construction entities
+        const newConstructionEntities = new Set(state.constructionEntities);
+        if (state.constructionMode) {
+          const newLine = result.lines[result.lines.length - 1];
+          if (newLine) newConstructionEntities.add(newLine.varName);
+        }
+
         set({
           statements: result.statements,
           points: result.points,
@@ -631,6 +831,7 @@ export const useDrawStore = create<DrawState>((set, get) => ({
           nextPointIdx: result.nextPointIdx,
           nextLineIdx: result.nextLineIdx,
           pendingClicks: [],
+          constructionEntities: newConstructionEntities,
         });
         syncCodeToFile({ statements: result.statements, points: result.points, targetFile: state.targetFile });
         break;
@@ -778,6 +979,10 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         newStatements.push(circleStatement(circleVar, centerVar, radius));
         newCircles.push({ varName: circleVar, centerVar, radius });
 
+        // Track construction entities
+        const newCECircle = new Set(state.constructionEntities);
+        if (state.constructionMode) newCECircle.add(circleVar);
+
         set({
           statements: newStatements,
           points: newPoints,
@@ -785,6 +990,7 @@ export const useDrawStore = create<DrawState>((set, get) => ({
           nextPointIdx: nextPIdx,
           nextCircleIdx: nextCIdx + 1,
           pendingClicks: [],
+          constructionEntities: newCECircle,
         });
         syncCodeToFile({ statements: newStatements, points: newPoints, targetFile: state.targetFile });
         break;
@@ -851,6 +1057,347 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         syncCodeToFile({ statements: newStatements, points: newPoints, targetFile: state.targetFile });
         break;
       }
+
+      case 'ellipse': {
+        // Click center, then click corner of bounding box -> derives rx, ry
+        const pending = [...state.pendingClicks, { x, y, snappedToVar }];
+        if (pending.length < 2) {
+          set({ pendingClicks: pending });
+          return;
+        }
+
+        const [centerE, cornerE] = pending;
+        const rx = roundCoord(Math.abs(cornerE.x - centerE.x));
+        const ry = roundCoord(Math.abs(cornerE.y - centerE.y));
+        if (rx < 0.1 || ry < 0.1) {
+          set({ pendingClicks: [] });
+          return;
+        }
+
+        // Approximate ellipse with 4 arcs (quadrant arcs through axis endpoints)
+        const eStmts = [...state.statements];
+        const ePts = [...state.points];
+        const eArcs = [...state.arcs];
+        let ePIdx = state.nextPointIdx;
+        let eAIdx = state.nextArcIdx;
+
+        // Center point (for reference)
+        let eCenterVar = centerE.snappedToVar;
+        if (!eCenterVar) {
+          eCenterVar = `p${ePIdx}`;
+          eStmts.push(pointStatement(eCenterVar, centerE.x, centerE.y));
+          ePts.push({ varName: eCenterVar, x: centerE.x, y: centerE.y });
+          ePIdx++;
+        }
+
+        // Axis endpoints: right, top, left, bottom
+        const axisPts: { vn: string; px: number; py: number }[] = [
+          { vn: `p${ePIdx}`, px: roundCoord(centerE.x + rx), py: centerE.y },
+          { vn: `p${ePIdx + 1}`, px: centerE.x, py: roundCoord(centerE.y + ry) },
+          { vn: `p${ePIdx + 2}`, px: roundCoord(centerE.x - rx), py: centerE.y },
+          { vn: `p${ePIdx + 3}`, px: centerE.x, py: roundCoord(centerE.y - ry) },
+        ];
+        ePIdx += 4;
+
+        for (const ap of axisPts) {
+          eStmts.push(pointStatement(ap.vn, ap.px, ap.py));
+          ePts.push({ varName: ap.vn, x: ap.px, y: ap.py });
+        }
+
+        // Mid-arc points on the ellipse (at 45, 135, 225, 315 degrees)
+        const midPts: { vn: string; px: number; py: number }[] = [];
+        for (let q = 0; q < 4; q++) {
+          const angle = (Math.PI / 4) + (q * Math.PI / 2);
+          const mx = roundCoord(centerE.x + rx * Math.cos(angle));
+          const my = roundCoord(centerE.y + ry * Math.sin(angle));
+          const vn = `p${ePIdx++}`;
+          midPts.push({ vn, px: mx, py: my });
+          eStmts.push(pointStatement(vn, mx, my));
+          ePts.push({ varName: vn, x: mx, y: my });
+        }
+
+        // 4 arcs: right->top, top->left, left->bottom, bottom->right
+        eStmts.push('// Ellipse approximated with 4 arcs');
+        for (let q = 0; q < 4; q++) {
+          const arcVar = `a${eAIdx++}`;
+          const p1v = axisPts[q].vn;
+          const pMidv = midPts[q].vn;
+          const p2v = axisPts[(q + 1) % 4].vn;
+          eStmts.push(arcStatement(arcVar, p1v, pMidv, p2v));
+          eArcs.push({ varName: arcVar, p1Var: p1v, p2Var: pMidv, p3Var: p2v });
+        }
+
+        set({
+          statements: eStmts,
+          points: ePts,
+          arcs: eArcs,
+          nextPointIdx: ePIdx,
+          nextArcIdx: eAIdx,
+          pendingClicks: [],
+        });
+        syncCodeToFile({ statements: eStmts, points: ePts, targetFile: state.targetFile });
+        break;
+      }
+
+      case 'slot': {
+        // Click center1, click center2, click to set width/radius
+        const pending = [...state.pendingClicks, { x, y, snappedToVar }];
+        if (pending.length < 3) {
+          set({ pendingClicks: pending });
+          return;
+        }
+
+        const [sc1, sc2, widthPt] = pending;
+        const sdx = sc2.x - sc1.x;
+        const sdy = sc2.y - sc1.y;
+        const sLineLen = Math.hypot(sdx, sdy);
+        if (sLineLen < 0.1) {
+          set({ pendingClicks: [] });
+          return;
+        }
+        // Perpendicular distance from widthPt to line c1->c2
+        const sPerpDist = Math.abs(sdx * (sc1.y - widthPt.y) - sdy * (sc1.x - widthPt.x)) / sLineLen;
+        const sRadius = roundCoord(Math.max(0.5, sPerpDist));
+
+        // Direction perpendicular to c1->c2
+        const snx = -sdy / sLineLen;
+        const sny = sdx / sLineLen;
+
+        const sStmts = [...state.statements];
+        const sPts = [...state.points];
+        const sLines = [...state.lines];
+        const sArcs = [...state.arcs];
+        let sPIdx = state.nextPointIdx;
+        let sLIdx = state.nextLineIdx;
+        let sAIdx = state.nextArcIdx;
+
+        sStmts.push('// Slot (stadium shape)');
+
+        // 4 corner points of the slot
+        const slotCorners = [
+          { sx: roundCoord(sc1.x + snx * sRadius), sy: roundCoord(sc1.y + sny * sRadius) },
+          { sx: roundCoord(sc2.x + snx * sRadius), sy: roundCoord(sc2.y + sny * sRadius) },
+          { sx: roundCoord(sc2.x - snx * sRadius), sy: roundCoord(sc2.y - sny * sRadius) },
+          { sx: roundCoord(sc1.x - snx * sRadius), sy: roundCoord(sc1.y - sny * sRadius) },
+        ];
+        const slotPtVars: string[] = [];
+        for (const sp of slotCorners) {
+          const v = `p${sPIdx++}`;
+          sStmts.push(pointStatement(v, sp.sx, sp.sy));
+          sPts.push({ varName: v, x: sp.sx, y: sp.sy });
+          slotPtVars.push(v);
+        }
+
+        // Semicircle arc midpoints
+        const sDirX = sdx / sLineLen;
+        const sDirY = sdy / sLineLen;
+        const sArcMid1 = { x: roundCoord(sc2.x + sDirX * sRadius), y: roundCoord(sc2.y + sDirY * sRadius) };
+        const sArcMid2 = { x: roundCoord(sc1.x - sDirX * sRadius), y: roundCoord(sc1.y - sDirY * sRadius) };
+        const sArcMid1Var = `p${sPIdx++}`;
+        const sArcMid2Var = `p${sPIdx++}`;
+        sStmts.push(pointStatement(sArcMid1Var, sArcMid1.x, sArcMid1.y));
+        sPts.push({ varName: sArcMid1Var, x: sArcMid1.x, y: sArcMid1.y });
+        sStmts.push(pointStatement(sArcMid2Var, sArcMid2.x, sArcMid2.y));
+        sPts.push({ varName: sArcMid2Var, x: sArcMid2.x, y: sArcMid2.y });
+
+        // Two straight lines
+        const sLv1 = `l${sLIdx++}`;
+        sStmts.push(lineStatement(sLv1, slotPtVars[0], slotPtVars[1]));
+        sLines.push({ varName: sLv1, startVar: slotPtVars[0], endVar: slotPtVars[1] });
+
+        const sLv2 = `l${sLIdx++}`;
+        sStmts.push(lineStatement(sLv2, slotPtVars[2], slotPtVars[3]));
+        sLines.push({ varName: sLv2, startVar: slotPtVars[2], endVar: slotPtVars[3] });
+
+        // Two semicircle arcs
+        const sAv1 = `a${sAIdx++}`;
+        sStmts.push(arcStatement(sAv1, slotPtVars[1], sArcMid1Var, slotPtVars[2]));
+        sArcs.push({ varName: sAv1, p1Var: slotPtVars[1], p2Var: sArcMid1Var, p3Var: slotPtVars[2] });
+
+        const sAv2 = `a${sAIdx++}`;
+        sStmts.push(arcStatement(sAv2, slotPtVars[3], sArcMid2Var, slotPtVars[0]));
+        sArcs.push({ varName: sAv2, p1Var: slotPtVars[3], p2Var: sArcMid2Var, p3Var: slotPtVars[0] });
+
+        // Parallel + equal constraints for the two straight lines
+        sStmts.push(constraintStatement('parallel', sLv1, sLv2));
+        sStmts.push(constraintStatement('equal', sLv1, sLv2));
+
+        set({
+          statements: sStmts,
+          points: sPts,
+          lines: sLines,
+          arcs: sArcs,
+          nextPointIdx: sPIdx,
+          nextLineIdx: sLIdx,
+          nextArcIdx: sAIdx,
+          pendingClicks: [],
+        });
+        syncCodeToFile({ statements: sStmts, points: sPts, targetFile: state.targetFile });
+        break;
+      }
+
+      case 'trim': {
+        // MVP: click near an entity to delete it and all referencing statements
+        const trimEntity = findNearestEntity(x, y, state, POINT_SNAP_THRESHOLD * 2);
+        if (trimEntity) {
+          get().deleteEntity(trimEntity.varName);
+        }
+        break;
+      }
+
+      case 'mirror': {
+        // Step 1: select a mirror line (first click on a line)
+        // Step 2: subsequent clicks create mirrored points
+        if (!state.mirrorLineVar) {
+          const mirEntity = findNearestEntity(x, y, state, POINT_SNAP_THRESHOLD * 2);
+          if (mirEntity && mirEntity.type === 'line') {
+            set({ mirrorLineVar: mirEntity.varName });
+          }
+          return;
+        }
+
+        // Mirror line is set -- create a mirrored point
+        const mirLine = state.lines.find((l) => l.varName === state.mirrorLineVar);
+        if (!mirLine) return;
+        const mlp1 = state.points.find((p) => p.varName === mirLine.startVar);
+        const mlp2 = state.points.find((p) => p.varName === mirLine.endVar);
+        if (!mlp1 || !mlp2) return;
+
+        const mldx = mlp2.x - mlp1.x;
+        const mldy = mlp2.y - mlp1.y;
+        const mllen2 = mldx * mldx + mldy * mldy;
+        if (mllen2 < 1e-10) return;
+
+        const mlt = ((x - mlp1.x) * mldx + (y - mlp1.y) * mldy) / mllen2;
+        const projMx = mlp1.x + mlt * mldx;
+        const projMy = mlp1.y + mlt * mldy;
+        const mirX = roundCoord(2 * projMx - x);
+        const mirY = roundCoord(2 * projMy - y);
+
+        const mStmts = [...state.statements];
+        const mPts = [...state.points];
+        let mPIdx = state.nextPointIdx;
+
+        let origVar = snappedToVar;
+        if (!origVar) {
+          origVar = `p${mPIdx}`;
+          mStmts.push(pointStatement(origVar, x, y));
+          mPts.push({ varName: origVar, x, y });
+          mPIdx++;
+        }
+
+        const mirVar = `p${mPIdx}`;
+        mStmts.push(pointStatement(mirVar, mirX, mirY));
+        mPts.push({ varName: mirVar, x: mirX, y: mirY });
+        mPIdx++;
+
+        mStmts.push(constraintStatement('symmetric', origVar, mirVar, state.mirrorLineVar));
+
+        set({
+          statements: mStmts,
+          points: mPts,
+          nextPointIdx: mPIdx,
+        });
+        syncCodeToFile({ statements: mStmts, points: mPts, targetFile: state.targetFile });
+        break;
+      }
+
+      case 'offset': {
+        // Click 1: select entity, Click 2: set offset distance
+        const pending = [...state.pendingClicks, { x, y, snappedToVar }];
+        if (pending.length < 2) {
+          set({ pendingClicks: pending });
+          return;
+        }
+
+        const [selectClick, distClick] = pending;
+        const offEntity = findNearestEntity(selectClick.x, selectClick.y, state, POINT_SNAP_THRESHOLD * 2);
+        if (!offEntity) {
+          set({ pendingClicks: [] });
+          return;
+        }
+
+        const oStmts = [...state.statements];
+        const oPts = [...state.points];
+        const oLines = [...state.lines];
+        const oCircles = [...state.circles];
+        let oPIdx = state.nextPointIdx;
+        let oLIdx = state.nextLineIdx;
+        let oCIdx = state.nextCircleIdx;
+
+        if (offEntity.type === 'line') {
+          const srcLine = state.lines.find((l) => l.varName === offEntity.varName);
+          if (!srcLine) { set({ pendingClicks: [] }); return; }
+          const osp1 = state.points.find((p) => p.varName === srcLine.startVar);
+          const osp2 = state.points.find((p) => p.varName === srcLine.endVar);
+          if (!osp1 || !osp2) { set({ pendingClicks: [] }); return; }
+
+          const oldx = osp2.x - osp1.x;
+          const oldy = osp2.y - osp1.y;
+          const ollen = Math.hypot(oldx, oldy);
+          if (ollen < 0.1) { set({ pendingClicks: [] }); return; }
+
+          const ocross = oldx * (distClick.y - osp1.y) - oldy * (distClick.x - osp1.x);
+          const osign = ocross >= 0 ? 1 : -1;
+          const onx = -oldy / ollen * osign;
+          const ony = oldx / ollen * osign;
+          const offsetDist = roundCoord(Math.abs(ocross) / ollen);
+          if (offsetDist < 0.1) { set({ pendingClicks: [] }); return; }
+
+          const op1Var = `p${oPIdx++}`;
+          const op2Var = `p${oPIdx++}`;
+          const op1x = roundCoord(osp1.x + onx * offsetDist);
+          const op1y = roundCoord(osp1.y + ony * offsetDist);
+          const op2x = roundCoord(osp2.x + onx * offsetDist);
+          const op2y = roundCoord(osp2.y + ony * offsetDist);
+
+          oStmts.push(pointStatement(op1Var, op1x, op1y));
+          oPts.push({ varName: op1Var, x: op1x, y: op1y });
+          oStmts.push(pointStatement(op2Var, op2x, op2y));
+          oPts.push({ varName: op2Var, x: op2x, y: op2y });
+
+          const newLineVar = `l${oLIdx++}`;
+          oStmts.push(lineStatement(newLineVar, op1Var, op2Var));
+          oLines.push({ varName: newLineVar, startVar: op1Var, endVar: op2Var });
+          oStmts.push(constraintStatement('parallel', offEntity.varName, newLineVar));
+
+          set({
+            statements: oStmts,
+            points: oPts,
+            lines: oLines,
+            nextPointIdx: oPIdx,
+            nextLineIdx: oLIdx,
+            pendingClicks: [],
+          });
+        } else if (offEntity.type === 'circle') {
+          const srcCircle = state.circles.find((c) => c.varName === offEntity.varName);
+          if (!srcCircle) { set({ pendingClicks: [] }); return; }
+          const centerPt = state.points.find((p) => p.varName === srcCircle.centerVar);
+          if (!centerPt) { set({ pendingClicks: [] }); return; }
+
+          const distFromCenter = Math.hypot(distClick.x - centerPt.x, distClick.y - centerPt.y);
+          const newRadius = roundCoord(Math.max(0.5, distFromCenter));
+
+          const newCircleVar = `c${oCIdx++}`;
+          oStmts.push(circleStatement(newCircleVar, srcCircle.centerVar, newRadius));
+          oCircles.push({ varName: newCircleVar, centerVar: srcCircle.centerVar, radius: newRadius });
+          oStmts.push(constraintStatement('concentric', offEntity.varName, newCircleVar));
+
+          set({
+            statements: oStmts,
+            points: oPts,
+            circles: oCircles,
+            nextCircleIdx: oCIdx,
+            pendingClicks: [],
+          });
+        } else {
+          set({ pendingClicks: [] });
+          return;
+        }
+
+        syncCodeToFile({ statements: oStmts, points: oPts, targetFile: state.targetFile });
+        break;
+      }
     }
   },
 
@@ -892,7 +1439,8 @@ export const useDrawStore = create<DrawState>((set, get) => ({
     }
     const state = get();
     const gridSize = useForgeStore.getState().gridSize;
-    const snap = findSnapTarget(pt.x, pt.y, state.points, gridSize);
+    const pendingOrigin = state.pendingClicks.length > 0 ? state.pendingClicks[state.pendingClicks.length - 1] : null;
+    const snap = findSnapTarget(pt.x, pt.y, state.points, state.lines, gridSize, pendingOrigin);
     set({ previewPoint: { x: snap.x, y: snap.y }, snapResult: snap });
   },
 

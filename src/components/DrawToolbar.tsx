@@ -2,13 +2,14 @@
  * Draw mode toolbar — floating tool palette, constraint palette, and status bar.
  * Provides tool selection, constraint application, and keyboard shortcut handling.
  */
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef, type CSSProperties } from 'react';
 import {
   useDrawStore,
   type DrawTool,
   type ConstraintTool,
   isConstraintTool,
   isDrawingTool,
+  isEditTool,
 } from '../draw/drawStore';
 
 // ─── Tool definitions ────────────────────────────────────────────────────────
@@ -35,6 +36,8 @@ const drawTools: ToolDef[] = [
   { id: 'circle', label: 'Circle', icon: '○', shortcut: 'C', tip: 'Click center, then edge to draw a circle', section: 'draw' },
   { id: 'arc', label: 'Arc', icon: '⌒', shortcut: 'A', tip: 'Click 3 points to draw an arc', section: 'draw' },
   { id: 'polygon', label: 'Polygon', icon: '⬡', shortcut: 'G', tip: 'Click center, then vertex for regular polygon', section: 'draw' },
+  { id: 'ellipse', label: 'Ellipse', icon: '⬮', shortcut: 'E', tip: 'Click center, then bounding box corner', section: 'draw' },
+  { id: 'slot', label: 'Slot', icon: '⊝', shortcut: 'S', tip: 'Click two centers, then set width', section: 'draw' },
 ];
 
 const constraintTools: ToolDef[] = [
@@ -53,9 +56,17 @@ const constraintTools: ToolDef[] = [
   { id: 'c:midpoint', label: 'Midpoint', icon: '⊥·', tip: 'Point at midpoint of line', section: 'constraint', requires: ['point', 'line'] },
   { id: 'c:symmetric', label: 'Symmetric', icon: '⇄', tip: 'Make points symmetric about line', section: 'constraint', requires: ['point', 'point'] },
   { id: 'c:concentric', label: 'Concentric', icon: '◎', tip: 'Make circles concentric', section: 'constraint', requires: ['circle', 'circle'] },
+  { id: 'c:pointOnLine', label: 'On Line', icon: '⊶', shortcut: 'O', tip: 'Constrain point onto a line', section: 'constraint', requires: ['point', 'line'] },
+  { id: 'c:pointOnCircle', label: 'On Circle', icon: '⊕', tip: 'Constrain point onto a circle', section: 'constraint', requires: ['point', 'circle'] },
 ];
 
-const allTools = [...drawTools, ...constraintTools];
+const editTools: ToolDef[] = [
+  { id: 'trim', label: 'Trim', icon: '✂', shortcut: 'T', tip: 'Click entity to remove it', section: 'edit' },
+  { id: 'mirror', label: 'Mirror', icon: '⧓', shortcut: 'I', tip: 'Select mirror line, then click to place mirrored points', section: 'edit' },
+  { id: 'offset', label: 'Offset', icon: '⧈', shortcut: 'F', tip: 'Click entity, then click to set offset distance', section: 'edit' },
+];
+
+const allTools = [...drawTools, ...editTools, ...constraintTools];
 
 // ─── Dimension Input Popup ───────────────────────────────────────────────────
 
@@ -222,13 +233,77 @@ function ExitConfirmDialog() {
   );
 }
 
+// ─── Tooltip ─────────────────────────────────────────────────────────────────
+
+const tooltipStyle: CSSProperties = {
+  position: 'absolute',
+  left: 'calc(100% + 8px)',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  background: '#1e1e2e',
+  color: '#e0e0e0',
+  padding: '6px 10px',
+  borderRadius: 6,
+  fontSize: 11,
+  lineHeight: 1.4,
+  whiteSpace: 'nowrap',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+  pointerEvents: 'none' as const,
+  zIndex: 100,
+  border: '1px solid rgba(255,255,255,0.08)',
+};
+
+function Tooltip({ def, visible }: { def: ToolDef; visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <div style={tooltipStyle}>
+      <div style={{ fontWeight: 600, marginBottom: 2 }}>
+        {def.label}
+        {def.shortcut && (
+          <kbd style={{
+            marginLeft: 6,
+            fontSize: 10,
+            background: 'rgba(255,255,255,0.1)',
+            padding: '1px 5px',
+            borderRadius: 3,
+            fontFamily: 'inherit',
+          }}>
+            {def.shortcut}
+          </kbd>
+        )}
+      </div>
+      <div style={{ opacity: 0.7, fontSize: 10 }}>{def.tip}</div>
+    </div>
+  );
+}
+
 // ─── Tool Button ─────────────────────────────────────────────────────────────
 
 function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const [showTip, setShowTip] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const onEnter = useCallback(() => {
+    setHovered(true);
+    timerRef.current = setTimeout(() => setShowTip(true), 100);
+  }, []);
+
+  const onLeave = useCallback(() => {
+    setHovered(false);
+    setShowTip(false);
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
   return (
     <button
       onClick={onClick}
-      title={`${def.label}${def.shortcut ? ` (${def.shortcut})` : ''} — ${def.tip}`}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
       style={{
         width: 36,
         height: 36,
@@ -237,7 +312,7 @@ function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; o
         justifyContent: 'center',
         border: 'none',
         borderRadius: 6,
-        background: active ? 'var(--fc-accent)' : 'transparent',
+        background: active ? 'var(--fc-accent)' : hovered ? 'rgba(255,255,255,0.06)' : 'transparent',
         color: active ? 'var(--fc-accentText)' : 'var(--fc-text)',
         fontSize: def.icon.length > 1 ? 12 : 18,
         cursor: 'pointer',
@@ -258,6 +333,7 @@ function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; o
           {def.shortcut}
         </span>
       )}
+      <Tooltip def={def} visible={showTip} />
     </button>
   );
 }
@@ -321,7 +397,7 @@ export function DrawToolbar() {
           } else {
             cancelPending();
           }
-        } else if (isDrawingTool(tool) || isConstraintTool(tool)) {
+        } else if (isDrawingTool(tool) || isEditTool(tool) || isConstraintTool(tool)) {
           // Deactivate tool → go to select mode
           setTool('select');
         } else {
@@ -339,9 +415,16 @@ export function DrawToolbar() {
       case 'c': case 'C': setTool('circle'); e.preventDefault(); break;
       case 'a': case 'A': setTool('arc'); e.preventDefault(); break;
       case 'g': case 'G': setTool('polygon'); e.preventDefault(); break;
+      case 'e': case 'E': setTool('ellipse'); e.preventDefault(); break;
+      case 's': case 'S': setTool('slot'); e.preventDefault(); break;
+      // Edit tool shortcuts
+      case 't': case 'T': setTool('trim'); e.preventDefault(); break;
+      case 'i': case 'I': setTool('mirror'); e.preventDefault(); break;
+      case 'f': case 'F': setTool('offset'); e.preventDefault(); break;
       // Constraint shortcuts
       case 'h': case 'H': setTool('c:horizontal'); e.preventDefault(); break;
       case 'd': case 'D': setTool('c:length'); e.preventDefault(); break;
+      case 'o': case 'O': setTool('c:pointOnLine'); e.preventDefault(); break;
       // Undo
       case 'z': case 'Z':
         if (e.metaKey || e.ctrlKey) { undo(); e.preventDefault(); }
@@ -379,6 +462,10 @@ export function DrawToolbar() {
     else if (tool === 'arc' && pendingClicks.length === 1) statusMessage = 'Click second point...';
     else if (tool === 'arc' && pendingClicks.length === 2) statusMessage = 'Click third point to finish arc...';
     else if (tool === 'polygon') statusMessage = 'Click vertex point...';
+    else if (tool === 'ellipse') statusMessage = 'Click bounding box corner...';
+    else if (tool === 'slot' && pendingClicks.length === 1) statusMessage = 'Click second center...';
+    else if (tool === 'slot' && pendingClicks.length === 2) statusMessage = 'Click to set width...';
+    else if (tool === 'offset') statusMessage = 'Click to set offset distance...';
   }
   if (isConstraintTool(tool)) {
     const needed = currentDef?.requires ?? [];
@@ -391,6 +478,14 @@ export function DrawToolbar() {
   }
   if (tool === 'select' && selectedEntities.length > 0) {
     statusMessage = `Selected: ${selectedEntities.map((e) => `${e.type} ${e.varName}`).join(', ')}`;
+  }
+  if (tool === 'mirror') {
+    const mirrorLineVar = useDrawStore.getState().mirrorLineVar;
+    if (mirrorLineVar) {
+      statusMessage = `Mirror axis: ${mirrorLineVar} — click to place points (mirrored automatically)`;
+    } else {
+      statusMessage = 'Click a line to set as mirror axis';
+    }
   }
 
   // Auto-apply constraints when selection is complete (for non-value constraints)
@@ -435,6 +530,12 @@ export function DrawToolbar() {
         ))}
 
         <Divider />
+        <SectionLabel text="Edit" />
+        {editTools.map((t) => (
+          <ToolButton key={t.id} def={t} active={tool === t.id} onClick={() => setTool(t.id)} />
+        ))}
+
+        <Divider />
         <SectionLabel text="Constrain" />
         {constraintTools.map((t) => (
           <ToolButton key={t.id} def={t} active={tool === t.id} onClick={() => handleConstraintToolClick(t)} />
@@ -443,50 +544,20 @@ export function DrawToolbar() {
         <Divider />
 
         {/* Construction mode toggle */}
-        <button
+        <ToolButton
+          def={{ id: 'select' as DrawTool, label: 'Construction', icon: '┈┈', shortcut: 'X', tip: 'Toggle construction mode — dashed lines', section: 'draw' }}
+          active={constructionMode}
           onClick={toggleConstructionMode}
-          title="Construction mode (X) — dashed lines"
-          style={{
-            width: 36,
-            height: 36,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            borderRadius: 6,
-            background: constructionMode ? '#7c3aed' : 'transparent',
-            color: constructionMode ? '#fff' : 'var(--fc-textMuted)',
-            fontSize: 11,
-            cursor: 'pointer',
-            fontFamily: 'monospace',
-          }}
-        >
-          ┈┈
-        </button>
+        />
 
         <Divider />
 
         {/* Done button */}
-        <button
+        <ToolButton
+          def={{ id: 'select' as DrawTool, label: 'Done', icon: '\u2713', tip: 'Leave draw mode (Esc x2)', section: 'draw' }}
+          active={false}
           onClick={requestExit}
-          title="Done drawing (Esc → Esc)"
-          style={{
-            width: 36,
-            height: 36,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            borderRadius: 6,
-            background: 'var(--fc-success)',
-            color: '#fff',
-            fontSize: 14,
-            cursor: 'pointer',
-            fontWeight: 700,
-          }}
-        >
-          ✓
-        </button>
+        />
       </div>
 
       {/* Top status bar */}
