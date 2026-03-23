@@ -161,6 +161,8 @@ export type {
 export { clampAnimationProgress, findJointAnimationClip, resolveJointAnimation } from './jointAnimation';
 export { bom, resetBom, getCollectedBom } from './bom';
 export type { BomDef, BomOpts } from './bom';
+export { sheetStock, resetSheetStock, getCollectedSheetStock } from './sheetStock';
+export type { SheetStockDef, SheetStockOpts } from './sheetStock';
 export { generateReportPdf } from './report';
 export type {
   ReportViewId,

@@ -3,6 +3,7 @@ import { useForgeStore } from '../store/forgeStore';
 import { deriveExportStem } from './exportActions';
 import { Export3DPanel } from './Export3DPanel';
 import { ExportSketchPanel } from './ExportSketchPanel';
+import { CuttingLayoutPanel } from './CuttingLayoutPanel';
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
@@ -15,8 +16,10 @@ export function ExportPanel() {
 
   const shapeObjects = result?.objects?.filter((obj) => obj.shape) ?? [];
   const sketchObjects = result?.objects?.filter((obj) => obj.sketch) ?? [];
+  const sheetStockEntries = useMemo(() => result?.sheetStock ?? [], [result]);
   const hasShapes = shapeObjects.length > 0;
   const hasSketches = sketchObjects.length > 0;
+  const hasSheetStock = sheetStockEntries.length > 0;
   const defaultMeshStem = useMemo(() => deriveExportStem(activeFile), [activeFile]);
 
   const totalTriangles = useMemo(
@@ -24,32 +27,37 @@ export function ExportPanel() {
     [shapeObjects],
   );
 
+  const hasAnything = hasShapes || hasSketches || hasSheetStock;
+
   const openDialog = () => {
-    if (!hasShapes && !hasSketches) return;
+    if (!hasAnything) return;
     setDialogOpen(true);
   };
 
   const closeDialog = () => setDialogOpen(false);
 
   // Determine dialog title based on content
-  const dialogTitle = hasShapes && hasSketches ? 'Export' : hasShapes ? 'Export 3D' : 'Export Sketch';
-  const subtitle = hasShapes
-    ? `${pluralize(shapeObjects.length, 'object')} · ${pluralize(totalTriangles, 'triangle')}`
-    : `${pluralize(sketchObjects.length, 'sketch', 'sketches')}`;
+  const multiType = [hasShapes, hasSketches, hasSheetStock].filter(Boolean).length > 1;
+  const dialogTitle = multiType ? 'Export' : hasShapes ? 'Export 3D' : hasSketches ? 'Export Sketch' : 'Export Cutting Layout';
+  const subtitleParts: string[] = [];
+  if (hasShapes) subtitleParts.push(`${pluralize(shapeObjects.length, 'object')} \u00b7 ${pluralize(totalTriangles, 'triangle')}`);
+  if (hasSketches) subtitleParts.push(pluralize(sketchObjects.length, 'sketch', 'sketches'));
+  if (hasSheetStock) subtitleParts.push(`${sheetStockEntries.length} sheet stock entr${sheetStockEntries.length === 1 ? 'y' : 'ies'}`);
+  const subtitle = subtitleParts.join(' \u00b7 ');
 
   return (
     <div style={{ padding: '8px 12px', borderTop: '1px solid var(--fc-border)' }}>
       <button
         onClick={openDialog}
-        disabled={!hasShapes && !hasSketches}
+        disabled={!hasAnything}
         style={{
           width: '100%',
           padding: '7px 8px',
-          background: (hasShapes || hasSketches) ? 'var(--fc-accent)' : 'var(--fc-border)',
-          color: (hasShapes || hasSketches) ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
+          background: hasAnything ? 'var(--fc-accent)' : 'var(--fc-border)',
+          color: hasAnything ? 'var(--fc-accentText)' : 'var(--fc-textDim)',
           border: 'none',
           borderRadius: 4,
-          cursor: (hasShapes || hasSketches) ? 'pointer' : 'default',
+          cursor: hasAnything ? 'pointer' : 'default',
           fontSize: 13,
           fontWeight: 600,
         }}
@@ -127,6 +135,13 @@ export function ExportPanel() {
             {hasSketches && (
               <div style={hasShapes ? { borderTop: '1px solid var(--fc-borderLight)', marginTop: 12, paddingTop: 12 } : undefined}>
                 <ExportSketchPanel fileStem={defaultMeshStem} />
+              </div>
+            )}
+
+            {/* Sheet Cutting Layout */}
+            {hasSheetStock && (
+              <div style={(hasShapes || hasSketches) ? { borderTop: '1px solid var(--fc-borderLight)', marginTop: 12, paddingTop: 12 } : undefined}>
+                <CuttingLayoutPanel fileStem={defaultMeshStem} entries={sheetStockEntries} />
               </div>
             )}
           </div>

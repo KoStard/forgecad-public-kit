@@ -5,6 +5,23 @@ import type { DimensionDef } from './sketch/dimensions';
 import type { BomDef } from './bom';
 import { mapDimensionsToOwnerIds } from './reportDimensionOwnership';
 import { formatLength, type LengthUnit } from './units';
+import {
+  PdfBuilder,
+  byteLength,
+  formatNumber,
+  escapePdfText,
+  commandSetFill,
+  commandSetStroke,
+  commandText,
+  commandLine,
+  estimateTextWidth,
+  truncateToWidth,
+  PAGE_WIDTH,
+  PAGE_HEIGHT,
+  PAGE_MARGIN,
+  type ColorRgb,
+  type Vec2,
+} from './pdfUtils';
 
 export type ReportViewId = 'front' | 'right' | 'top' | 'iso';
 
@@ -36,13 +53,11 @@ export interface ReportGenerationResult {
   bomItemCount: number;
 }
 
-type Vec2 = [number, number];
 type Vec3 = [number, number, number];
 type Segment2 = { a: Vec2; b: Vec2 };
 
 type Bounds2 = { minX: number; minY: number; maxX: number; maxY: number };
 type Bounds3 = { min: Vec3; max: Vec3 };
-type ColorRgb = [number, number, number];
 
 interface ProjectedEdge {
   modelA: Vec2;
@@ -136,9 +151,6 @@ interface ComponentPageGroup {
 
 const DEFAULT_VIEWS: ReportViewId[] = ['front', 'right', 'top', 'iso'];
 const DEFAULT_COLOR_HEX = '#5b9bd5';
-const PAGE_WIDTH = 842;
-const PAGE_HEIGHT = 595;
-const PAGE_MARGIN = 36;
 const HEADER_HEIGHT = 44;
 const CELL_GAP = 14;
 const CELL_PADDING = 14;
@@ -164,8 +176,6 @@ const MAX_EDGE_SEGMENTS_PER_OBJECT = 45000;
 
 /** Module-level length unit for the current report generation. Set by generateReportPdf. */
 let _reportLengthUnit: LengthUnit = 'mm';
-
-const encoder = new TextEncoder();
 
 function norm(v: Vec3): Vec3 {
   const len = Math.hypot(v[0], v[1], v[2]);
@@ -233,12 +243,6 @@ function bboxCorners(bounds: Bounds3): Vec3[] {
     [x0, y0, z0], [x1, y0, z0], [x0, y1, z0], [x1, y1, z0],
     [x0, y0, z1], [x1, y0, z1], [x0, y1, z1], [x1, y1, z1],
   ];
-}
-
-function formatNumber(v: number): string {
-  if (!Number.isFinite(v)) return '0';
-  const s = v.toFixed(3);
-  return s.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -312,10 +316,6 @@ function splitBomRowsIntoPages(rows: BomReportRow[]): BomReportRow[][] {
     out.push(rows.slice(i, i + perPage));
   }
   return out;
-}
-
-function escapePdfText(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
 
 function hexToRgb01(hex: string | undefined): ColorRgb {
@@ -691,22 +691,6 @@ function makeCellMapper(bounds: Bounds2, cell: CellRect): { map: (p: Vec2) => Ve
   };
 }
 
-function commandSetFill(color: ColorRgb): string {
-  return `${formatNumber(color[0])} ${formatNumber(color[1])} ${formatNumber(color[2])} rg\n`;
-}
-
-function commandSetStroke(color: ColorRgb): string {
-  return `${formatNumber(color[0])} ${formatNumber(color[1])} ${formatNumber(color[2])} RG\n`;
-}
-
-function commandText(text: string, x: number, y: number, size: number): string {
-  return `BT /F1 ${formatNumber(size)} Tf 1 0 0 1 ${formatNumber(x)} ${formatNumber(y)} Tm (${escapePdfText(text)}) Tj ET\n`;
-}
-
-function commandLine(a: Vec2, b: Vec2): string {
-  return `${formatNumber(a[0])} ${formatNumber(a[1])} m ${formatNumber(b[0])} ${formatNumber(b[1])} l S\n`;
-}
-
 function commandTriangleFill(a: Vec2, b: Vec2, c: Vec2): string {
   return `${formatNumber(a[0])} ${formatNumber(a[1])} m ${formatNumber(b[0])} ${formatNumber(b[1])} l ${formatNumber(c[0])} ${formatNumber(c[1])} l h f\n`;
 }
@@ -1056,20 +1040,6 @@ function segmentToBoxDistance(seg: Segment2, box: LabelBox): number {
     best = Math.min(best, pointToSegmentDistance(corner, seg));
   });
   return best;
-}
-
-function estimateTextWidth(text: string, fontSize: number): number {
-  return Math.max(8, text.length * fontSize * 0.52);
-}
-
-function truncateToWidth(text: string, maxWidth: number, fontSize: number): string {
-  if (estimateTextWidth(text, fontSize) <= maxWidth) return text;
-  const safeWidth = Math.max(4, maxWidth);
-  const perChar = Math.max(1, fontSize * 0.52);
-  const maxChars = Math.max(3, Math.floor(safeWidth / perChar));
-  if (maxChars <= 3) return '...';
-  if (text.length <= maxChars) return text;
-  return `${text.slice(0, maxChars - 3)}...`;
 }
 
 function sampleSegments(segments: Segment2[], maxCount: number): Segment2[] {
@@ -2219,55 +2189,6 @@ function segmentIntersectsBounds2(a: Vec2, b: Vec2, bounds: Bounds2): boolean {
     { a: corners[3], b: corners[0] },
   ];
   return edges.some((edge) => segmentsIntersect2(a, b, edge.a, edge.b));
-}
-
-function byteLength(text: string): number {
-  return encoder.encode(text).length;
-}
-
-class PdfBuilder {
-  private objects: string[] = [];
-
-  addObject(content: string): number {
-    this.objects.push(content);
-    return this.objects.length;
-  }
-
-  addStreamObject(dictBody: string, streamContent: string): number {
-    const data = streamContent.endsWith('\n') ? streamContent : `${streamContent}\n`;
-    const length = byteLength(data);
-    return this.addObject(`<< ${dictBody} /Length ${length} >>\nstream\n${data}endstream`);
-  }
-
-  build(rootId: number): Uint8Array {
-    const parts: string[] = [];
-    const offsets: number[] = [0];
-    let cursor = 0;
-
-    const push = (chunk: string) => {
-      parts.push(chunk);
-      cursor += byteLength(chunk);
-    };
-
-    push('%PDF-1.4\n%\u00a0\u00a1\u00a2\u00a3\n');
-
-    for (let i = 0; i < this.objects.length; i += 1) {
-      offsets.push(cursor);
-      push(`${i + 1} 0 obj\n${this.objects[i]}\nendobj\n`);
-    }
-
-    const xrefPos = cursor;
-    push(`xref\n0 ${this.objects.length + 1}\n`);
-    push('0000000000 65535 f \n');
-    for (let i = 1; i <= this.objects.length; i += 1) {
-      push(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
-    }
-
-    push(`trailer\n<< /Size ${this.objects.length + 1} /Root ${rootId} 0 R >>\n`);
-    push(`startxref\n${xrefPos}\n%%EOF\n`);
-
-    return encoder.encode(parts.join(''));
-  }
 }
 
 function buildPages(
