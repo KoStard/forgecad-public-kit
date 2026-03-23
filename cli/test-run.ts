@@ -153,34 +153,26 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
   return deduped;
 }
 
-function parseBackendArg(argv: string[]): { backend?: ActiveBackend; rest: string[] } {
-  const rest: string[] = [];
-  let backend: ActiveBackend | undefined;
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--backend') {
-      const val = argv[i + 1];
-      if (val !== 'manifold' && val !== 'occt') {
-        console.error('--backend must be manifold or occt');
-        process.exit(1);
-      }
-      backend = val;
-      i += 1;
-    } else {
-      rest.push(argv[i]);
-    }
-  }
-  return { backend, rest };
-}
-
 function usage(): never {
   console.error("Usage: forgecad run <script.forge.js|notebook.forge-notebook.json> [--debug-imports] [--backend manifold|occt]");
   process.exit(1);
 }
 
+function parseBackendArg(argv: string[]): ActiveBackend | undefined {
+  const idx = argv.indexOf('--backend');
+  if (idx === -1) return undefined;
+  const val = argv[idx + 1];
+  if (val !== 'manifold' && val !== 'occt') {
+    console.error(`Invalid backend: ${val}. Must be 'manifold' or 'occt'.`);
+    process.exit(1);
+  }
+  return val;
+}
+
 export async function runScriptCli(argv: string[] = process.argv.slice(2)): Promise<void> {
-  const { backend, rest: filteredArgv } = parseBackendArg(argv);
-  const debugImports = filteredArgv.includes('--debug-imports');
-  const positional = filteredArgv.filter((arg) => arg !== '--debug-imports');
+  const debugImports = argv.includes('--debug-imports');
+  const backend = parseBackendArg(argv);
+  const positional = argv.filter((arg, i) => arg !== '--debug-imports' && arg !== '--backend' && argv[i - 1] !== '--backend');
   const scriptPath = positional[0];
   if (!scriptPath) usage();
 

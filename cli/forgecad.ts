@@ -294,6 +294,7 @@ const commands: CommandDefinition[] = [
     usage: ['forgecad run <script.forge.js|notebook.forge-notebook.json> [--debug-imports] [--backend manifold|occt]'],
     examples: [
       'forgecad run examples/cup.forge.js',
+      'forgecad run examples/cup.forge.js --backend occt',
       'forgecad run examples/api/notebook-iteration.forge-notebook.json',
       'forgecad run examples/cup.forge.js --debug-imports',
     ],
@@ -555,6 +556,7 @@ const commands: CommandDefinition[] = [
       'forgecad export 3mf examples/cup.forge.js',
       'forgecad export 3mf examples/cup.forge.js --output out/cup.3mf',
       'forgecad export 3mf examples/cup.forge.js --quality high',
+      'forgecad export 3mf examples/cup.forge.js --backend occt',
     ],
     completion: {
       options: [
@@ -579,6 +581,7 @@ const commands: CommandDefinition[] = [
       'forgecad export stl examples/cup.forge.js',
       'forgecad export stl examples/cup.forge.js --output out/cup.stl',
       'forgecad export stl examples/cup.forge.js --quality high',
+      'forgecad export stl examples/cup.forge.js --backend occt',
     ],
     completion: {
       options: [
