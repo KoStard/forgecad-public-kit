@@ -2,7 +2,7 @@ import { Sketch, getSketchCompileProfilePlan } from './core';
 import { polygon } from './primitives';
 import { stroke } from './path';
 import { buildLoftShapeCompilePlan, buildSweepShapeCompilePlan, createOwnedShapeCompilePlan } from '../compilePlan';
-import { buildShapeFromCompilePlan, type Shape } from '../kernel';
+import { buildShapeFromCompilePlan, getActiveBackend, type Shape } from '../kernel';
 import {
   scaleLevelSetBoundsPadding,
   scaleLevelSetEdgeLength,
@@ -338,9 +338,10 @@ export function loft(
     throw new Error('loft: one or more profiles is missing a compile plan. All sketches must have compile profile plans.');
   }
   const ownedPlan = createOwnedShapeCompilePlan(plan, 'loft')!;
+  const isOCCT = getActiveBackend() === 'occt';
   return buildShapeFromCompilePlan(ownedPlan, pairs[0]?.profile.colorHex, {
-    fidelity: 'sampled',
-    sources: ['loft', 'level-set'],
+    fidelity: isOCCT ? 'exact' : 'sampled',
+    sources: isOCCT ? ['loft'] : ['loft', 'level-set'],
   });
 }
 
@@ -411,8 +412,9 @@ export function sweep(
     throw new Error('sweep: profile is missing a compile plan. The sketch must have a compile profile plan.');
   }
   const ownedPlan = createOwnedShapeCompilePlan(plan, 'sweep')!;
+  const isOCCTSweep = getActiveBackend() === 'occt';
   return buildShapeFromCompilePlan(ownedPlan, profile.colorHex, {
-    fidelity: 'sampled',
-    sources: ['sweep', 'level-set'],
+    fidelity: isOCCTSweep ? 'exact' : 'sampled',
+    sources: isOCCTSweep ? ['sweep'] : ['sweep', 'level-set'],
   });
 }

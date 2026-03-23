@@ -661,8 +661,13 @@ export function buildShapeFromCompilePlan(
   } else {
     backend = lowerShapeCompilePlanToOCCTBackend(plan);
   }
+  // Ensure geometryInfo.backend reflects the actual backend used, not the caller's default.
+  const resolvedInfo: Partial<GeometryInfo> = {
+    ...geometryInfo,
+    backend: _activeBackend,
+  };
   return setShapeCompilePlan(
-    new Shape(backend, color, geometryInfo),
+    new Shape(backend, color, resolvedInfo),
     plan,
   );
 }
