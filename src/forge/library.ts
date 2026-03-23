@@ -1952,6 +1952,10 @@ export interface GearPairResult {
   contactRatio: number;
   jointRatio: number;
   speedReduction: number;
+  /** Phase rotation (degrees) for the gear around its shaft axis for correct tooth
+   *  mesh alignment. When `place: true` this is already baked into `gear`.
+   *  When `place: false`, rotate the gear by this amount before positioning. */
+  phaseDeg: number;
   diagnostics: GearPairDiagnostic[];
   status: 'ok' | 'warn' | 'error';
 }
@@ -2110,6 +2114,7 @@ export function gearPair(options: GearPairOptions): GearPairResult {
     contactRatio,
     jointRatio: -(pinion.meta.teeth / gear.meta.teeth),
     speedReduction: gear.meta.teeth / pinion.meta.teeth,
+    phaseDeg,
     diagnostics,
     status,
   };
@@ -2160,6 +2165,8 @@ export interface BevelGearPairResult extends GearMeshPlacement {
   backlash: number;
   jointRatio: number;
   speedReduction: number;
+  /** Phase rotation (degrees) for gear tooth mesh alignment. See GearPairResult.phaseDeg. */
+  phaseDeg: number;
   diagnostics: GearPairDiagnostic[];
   status: 'ok' | 'warn' | 'error';
 }

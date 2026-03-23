@@ -7,7 +7,7 @@
 
 export { initKernel, setActiveBackend, getActiveBackend, type ActiveBackend } from './kernel';
 export {
-  Shape, box, cylinder, sphere, union, difference, intersection, getWasm,
+  Shape, box, cylinder, sphere, torus, union, difference, intersection, getWasm,
   Transform, composeChain,
   intersectWithPlane, projectToPlane,
   param, resetParams, getCollectedParams, setParamOverrides,

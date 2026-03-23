@@ -292,6 +292,7 @@ function searchOwnerMatch(
     case 'box':
     case 'cylinder':
     case 'sphere':
+    case 'torus':
     case 'extrude':
     case 'sheetMetal':
     case 'revolve':
@@ -698,6 +699,7 @@ function resolveSelectionFromOwnerBase(
     case 'boolean':
     case 'cylinder':
     case 'sphere':
+    case 'torus':
     case 'sheetMetal':
     case 'revolve':
     case 'loft':

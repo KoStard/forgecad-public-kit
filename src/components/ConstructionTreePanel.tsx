@@ -19,6 +19,7 @@ const planLabel = (plan: ShapeCompilePlan): string => {
       return `Cylinder ${rLabel} h=${fmt(plan.height)}`;
     }
     case 'sphere': return `Sphere r=${fmt(plan.radius)}`;
+    case 'torus': return `Torus R=${fmt(plan.majorRadius)} r=${fmt(plan.minorRadius)}`;
     case 'extrude': return `Extrude h=${fmt(plan.height)}`;
     case 'revolve': return `Revolve ${fmt(plan.degrees)}°`;
     case 'loft': return `Loft (${plan.profiles.length} profiles)`;

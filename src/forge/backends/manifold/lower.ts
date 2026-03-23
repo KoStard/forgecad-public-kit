@@ -437,6 +437,12 @@ export function lowerShapeCompilePlanToManifold(
       return wasm.Manifold.cylinder(plan.height, plan.radius, plan.radiusTop ?? -1, plan.segments ?? 0, plan.center);
     case 'sphere':
       return wasm.Manifold.sphere(plan.radius, plan.segments ?? 0);
+    case 'torus': {
+      // Create circle cross-section, translate by majorRadius, revolve 360°
+      const circle = wasm.CrossSection.circle(plan.minorRadius, plan.segments ?? 0);
+      const translated = circle.translate([plan.majorRadius, 0]);
+      return translated.revolve(plan.segments ?? 0, 360);
+    }
     case 'extrude':
       return lowerProfileCompilePlanToCrossSection(plan.profile, wasm).extrude(
         plan.height,

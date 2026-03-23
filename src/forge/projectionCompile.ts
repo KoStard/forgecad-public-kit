@@ -496,6 +496,11 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
         ok: false,
         reason: 'projection replay currently needs a defended planar source basis and does not derive one from spheres yet.',
       };
+    case 'torus':
+      return {
+        ok: false,
+        reason: 'projection replay currently needs a defended planar source basis and does not derive one from tori yet.',
+      };
     case 'sheetMetal':
       return {
         ok: false,

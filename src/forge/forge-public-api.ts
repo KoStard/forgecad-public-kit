@@ -164,6 +164,7 @@ type _ShapeOperand = _Shape | TrackedShape;
 export declare function box(x: number, y: number, z: number, center?: boolean): TrackedShape;
 export declare function cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape;
 export declare function sphere(radius: number, segments?: number): _Shape;
+export declare function torus(majorRadius: number, minorRadius: number, segments?: number): _Shape;
 export declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
 export declare function difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
 export declare function intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;

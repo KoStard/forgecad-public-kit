@@ -66,6 +66,7 @@ function rootTopologyRewritePropagation(plan: ShapeCompilePlan | null): Topology
     case 'box':
     case 'cylinder':
     case 'sphere':
+    case 'torus':
     case 'extrude':
     case 'sheetMetal':
     case 'revolve':

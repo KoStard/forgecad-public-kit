@@ -4083,6 +4083,7 @@ type _ShapeOperand = Shape | TrackedShape;
 declare function box(x: number, y: number, z: number, center?: boolean): TrackedShape;
 declare function cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape;
 declare function sphere(radius: number, segments?: number): Shape;
+declare function torus(majorRadius: number, minorRadius: number, segments?: number): Shape;
 declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
 declare function difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
 declare function intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
