@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import { useDrawStore } from '../draw/drawStore';
+import { useDrawStore, type SnapType } from '../draw/drawStore';
 import * as THREE from 'three';
 
 /**
@@ -27,20 +27,63 @@ function useWorldPixel(): number {
   return wp;
 }
 
+/** Color for each snap type. */
+function snapColor(snapType: SnapType): string {
+  switch (snapType) {
+    case 'point': return '#4ade80';       // green
+    case 'midpoint': return '#22d3ee';    // cyan
+    case 'intersection': return '#e879f9'; // magenta
+    case 'perpendicular': return '#f97316'; // orange
+    default: return '#a3a3a3';            // grey for grid/none
+  }
+}
+
 /** Crosshair rendered at the snap position — constant screen size. */
-function SnapCrosshair({ x, y, snapped, wp }: { x: number; y: number; snapped: boolean; wp: number }) {
+function SnapCrosshair({ x, y, snapType, wp }: { x: number; y: number; snapType: SnapType; wp: number }) {
   const size = wp * 12; // 12 screen pixels
-  const color = snapped ? '#4ade80' : '#a3a3a3';
+  const color = snapColor(snapType);
+
   const geo = useMemo(() => {
-    const pts = [
-      new THREE.Vector3(x - size, y, 0.6),
-      new THREE.Vector3(x + size, y, 0.6),
-      new THREE.Vector3(x, y, 0.6),
-      new THREE.Vector3(x, y - size, 0.6),
-      new THREE.Vector3(x, y + size, 0.6),
-    ];
-    return new THREE.BufferGeometry().setFromPoints(pts);
-  }, [x, y, size]);
+    switch (snapType) {
+      case 'midpoint': {
+        // Diamond marker
+        const s = size * 0.7;
+        return new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x, y + s, 0.6), new THREE.Vector3(x + s, y, 0.6),
+          new THREE.Vector3(x + s, y, 0.6), new THREE.Vector3(x, y - s, 0.6),
+          new THREE.Vector3(x, y - s, 0.6), new THREE.Vector3(x - s, y, 0.6),
+          new THREE.Vector3(x - s, y, 0.6), new THREE.Vector3(x, y + s, 0.6),
+        ]);
+      }
+      case 'intersection': {
+        // X-shaped marker
+        const s = size * 0.7;
+        return new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x - s, y - s, 0.6), new THREE.Vector3(x + s, y + s, 0.6),
+          new THREE.Vector3(x - s, y + s, 0.6), new THREE.Vector3(x + s, y - s, 0.6),
+        ]);
+      }
+      case 'perpendicular': {
+        // Perpendicular indicator (small right-angle bracket)
+        const s = size * 0.6;
+        return new THREE.BufferGeometry().setFromPoints([
+          // Crosshair
+          new THREE.Vector3(x - size, y, 0.6), new THREE.Vector3(x + size, y, 0.6),
+          new THREE.Vector3(x, y - size, 0.6), new THREE.Vector3(x, y + size, 0.6),
+          // Right-angle bracket at bottom-right
+          new THREE.Vector3(x, y - s, 0.6), new THREE.Vector3(x + s, y - s, 0.6),
+          new THREE.Vector3(x + s, y - s, 0.6), new THREE.Vector3(x + s, y, 0.6),
+        ]);
+      }
+      default: {
+        // Standard crosshair for point/grid/none (pairs for lineSegments)
+        return new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x - size, y, 0.6), new THREE.Vector3(x + size, y, 0.6),
+          new THREE.Vector3(x, y - size, 0.6), new THREE.Vector3(x, y + size, 0.6),
+        ]);
+      }
+    }
+  }, [x, y, size, snapType]);
 
   return (
     <lineSegments geometry={geo}>
@@ -137,10 +180,13 @@ function AlignmentGuides({
   x: number;
   y: number;
   points: { x: number; y: number }[];
-  snapResult: { xAligned: boolean; yAligned: boolean; snappedToVar: string | null } | null;
+  snapResult: { xAligned: boolean; yAligned: boolean; snappedToVar: string | null; snapType?: SnapType } | null;
 }) {
   const lineObjs = useMemo(() => {
-    if (!snapResult || snapResult.snappedToVar) return [];
+    if (!snapResult) return [];
+    // Don't show alignment guides when snapped to a specific target
+    const st = snapResult.snapType ?? (snapResult.snappedToVar ? 'point' : 'none');
+    if (st === 'point' || st === 'midpoint' || st === 'intersection' || st === 'perpendicular') return [];
     const result: THREE.Line[] = [];
     const mat = new THREE.LineBasicMaterial({ color: '#34d399', transparent: true, opacity: 0.4 });
 
@@ -208,7 +254,7 @@ export function DrawCanvas() {
 
   if (!active) return null;
 
-  const isSnappedToPoint = !!snapResult?.snappedToVar;
+  const currentSnapType: SnapType = snapResult?.snapType ?? 'none';
 
   return (
     <>
@@ -239,7 +285,7 @@ export function DrawCanvas() {
 
       {/* Snap crosshair */}
       {previewPoint && (
-        <SnapCrosshair x={previewPoint.x} y={previewPoint.y} snapped={isSnappedToPoint} wp={wp} />
+        <SnapCrosshair x={previewPoint.x} y={previewPoint.y} snapType={currentSnapType} wp={wp} />
       )}
 
       {/* Coordinate label */}
