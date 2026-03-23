@@ -845,14 +845,15 @@ export const useDrawStore = create<DrawState>((set, get) => ({
       }
 
       case 'arc': {
+        // Arc: click center, then start point, then end point
+        // Generates: sk.arcByCenter(center, start, end)
         const pending = [...state.pendingClicks, { x, y, snappedToVar }];
         if (pending.length < 3) {
           set({ pendingClicks: pending });
           return;
         }
 
-        // 3-point arc
-        const [p1, p2, p3] = pending;
+        const [center, start, end] = pending;
         const newStatements = [...state.statements];
         const newPoints = [...state.points];
         const newArcs = [...state.arcs];
@@ -860,7 +861,7 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         const nextAIdx = state.nextArcIdx;
 
         const vars: string[] = [];
-        for (const pt of [p1, p2, p3]) {
+        for (const pt of [center, start, end]) {
           let v = pt.snappedToVar;
           if (!v) {
             v = `p${nextPIdx}`;
@@ -872,6 +873,7 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         }
 
         const arcVar = `a${nextAIdx}`;
+        // arcStatement generates: sk.arcByCenter(center, start, end)
         newStatements.push(arcStatement(arcVar, vars[0], vars[1], vars[2]));
         newArcs.push({ varName: arcVar, p1Var: vars[0], p2Var: vars[1], p3Var: vars[2] });
 
@@ -1492,3 +1494,30 @@ export const useDrawStore = create<DrawState>((set, get) => ({
     syncCodeToFile({ statements: newStatements, points: newPoints, targetFile: state.targetFile });
   },
 }));
+
+// ─── File-switch watcher ─────────────────────────────────────────────────────
+// When the user switches to a different file while draw mode is active,
+// pause draw mode. When they return to the draw file, re-activate it.
+
+let _prevActiveFile: string | null = null;
+useForgeStore.subscribe((state) => {
+  const activeFile = state.activeFile;
+  if (activeFile === _prevActiveFile) return;
+  _prevActiveFile = activeFile;
+
+  const drawState = useDrawStore.getState();
+  if (!drawState.targetFile) return;
+
+  if (drawState.active && activeFile !== drawState.targetFile) {
+    // Switched away from draw file — pause (keep state, just deactivate UI)
+    useDrawStore.setState({
+      active: false,
+      pendingClicks: [],
+      previewPoint: null,
+      snapResult: null,
+    });
+  } else if (!drawState.active && activeFile === drawState.targetFile && drawState.statements.length > 0) {
+    // Returned to draw file — re-activate
+    useDrawStore.setState({ active: true, tool: 'select' as DrawTool });
+  }
+});
