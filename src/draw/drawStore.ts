@@ -25,28 +25,37 @@ import { useForgeStore } from '../store/forgeStore';
 /** Drawing tools create geometry. */
 export type DrawingTool =
   | 'point' | 'line' | 'polyline' | 'rectangle' | 'circle'
-  | 'arc' | 'polygon';
+  | 'arc' | 'polygon' | 'ellipse' | 'slot';
+
+/** Edit tools modify existing geometry. */
+export type EditTool = 'trim' | 'mirror' | 'offset';
 
 /** Constraint tools apply constraints to selected entities. */
 export type ConstraintTool =
   | 'c:horizontal' | 'c:vertical' | 'c:length' | 'c:distance'
   | 'c:angle' | 'c:radius' | 'c:parallel' | 'c:perpendicular'
   | 'c:coincident' | 'c:tangent' | 'c:equal' | 'c:fixed'
-  | 'c:midpoint' | 'c:symmetric' | 'c:concentric';
+  | 'c:midpoint' | 'c:symmetric' | 'c:concentric'
+  | 'c:pointOnLine' | 'c:pointOnCircle';
 
 /** Special mode for selection without a specific tool. */
 export type SelectTool = 'select';
 
-export type DrawTool = DrawingTool | ConstraintTool | SelectTool;
+export type DrawTool = DrawingTool | EditTool | ConstraintTool | SelectTool;
 
 /** Whether the given tool is a constraint tool. */
 export function isConstraintTool(tool: DrawTool): tool is ConstraintTool {
   return tool.startsWith('c:');
 }
 
+/** Whether the given tool is an edit tool. */
+export function isEditTool(tool: DrawTool): tool is EditTool {
+  return tool === 'trim' || tool === 'mirror' || tool === 'offset';
+}
+
 /** Whether the given tool is a drawing tool. */
 export function isDrawingTool(tool: DrawTool): tool is DrawingTool {
-  return !tool.startsWith('c:') && tool !== 'select';
+  return !tool.startsWith('c:') && tool !== 'select' && !isEditTool(tool);
 }
 
 // ─── Entity selection ────────────────────────────────────────────────────────
@@ -60,6 +69,9 @@ export interface SelectedEntity {
 
 // ─── Snap ────────────────────────────────────────────────────────────────────
 
+/** Snap type for visual indicator differentiation. */
+export type SnapType = 'point' | 'midpoint' | 'intersection' | 'perpendicular' | 'grid' | 'none';
+
 /** Snap result: the snapped coordinate and whether it snapped to an existing point. */
 export interface SnapResult {
   x: number;
@@ -70,6 +82,8 @@ export interface SnapResult {
   xAligned: boolean;
   /** Whether y was axis-snapped to an existing point. */
   yAligned: boolean;
+  /** Type of snap for visual indicator. */
+  snapType: SnapType;
 }
 
 // ─── Tracked entities (for constraint selection) ─────────────────────────────
@@ -118,6 +132,9 @@ interface DrawState {
   // Entity selection (for constraint tools)
   selectedEntities: SelectedEntity[];
 
+  // Hovered entity (for visual highlight feedback)
+  hoveredEntity: SelectedEntity | null;
+
   // Dimension input state
   dimensionInput: { constraintType: string; resolve: (value: number) => void } | null;
 
@@ -126,6 +143,12 @@ interface DrawState {
 
   // Construction mode toggle
   constructionMode: boolean;
+
+  // Construction entities (varNames of entities created in construction mode)
+  constructionEntities: Set<string>;
+
+  // Mirror line variable name (for mirror tool)
+  mirrorLineVar: string | null;
 
   // Polygon sides
   polygonSides: number;
@@ -149,8 +172,10 @@ interface DrawState {
   clearSelection: () => void;
   applyConstraint: (tool: ConstraintTool, value?: number) => void;
   setDimensionInput: (input: DrawState['dimensionInput']) => void;
+  setHoveredEntity: (entity: SelectedEntity | null) => void;
   toggleConstructionMode: () => void;
   setPolygonSides: (n: number) => void;
+  deleteEntity: (varName: string) => void;
 }
 
 const POINT_SNAP_THRESHOLD = 3; // world units (mm)
@@ -174,7 +199,7 @@ function findSnapTarget(
     }
   }
   if (bestPoint) {
-    return { x: bestPoint.x, y: bestPoint.y, snappedToVar: bestPoint.varName, xAligned: true, yAligned: true };
+    return { x: bestPoint.x, y: bestPoint.y, snappedToVar: bestPoint.varName, xAligned: true, yAligned: true, snapType: 'point' as SnapType };
   }
 
   // 2. Check axis alignment with existing points
@@ -193,12 +218,24 @@ function findSnapTarget(
     }
   }
 
-  // 3. Grid snap on non-axis-aligned coordinates
+  // 3. Threshold-based grid snap — only snap if within 30% of a grid line
   const gridSnap = Math.max(1, gridSize / 5);
-  if (!xAligned) snapX = Math.round(snapX / gridSnap) * gridSnap;
-  if (!yAligned) snapY = Math.round(snapY / gridSnap) * gridSnap;
+  const gridThreshold = gridSnap * 0.3;
+  if (!xAligned) {
+    const nearestGridX = Math.round(snapX / gridSnap) * gridSnap;
+    snapX = Math.abs(snapX - nearestGridX) < gridThreshold
+      ? nearestGridX
+      : Math.round(snapX * 10) / 10; // clean to 0.1 for readable code output
+  }
+  if (!yAligned) {
+    const nearestGridY = Math.round(snapY / gridSnap) * gridSnap;
+    snapY = Math.abs(snapY - nearestGridY) < gridThreshold
+      ? nearestGridY
+      : Math.round(snapY * 10) / 10;
+  }
 
-  return { x: roundCoord(snapX), y: roundCoord(snapY), snappedToVar: null, xAligned, yAligned };
+  const snapType: SnapType = (xAligned || yAligned) ? 'grid' : 'none';
+  return { x: roundCoord(snapX), y: roundCoord(snapY), snappedToVar: null, xAligned, yAligned, snapType };
 }
 
 /** Check if a line is nearly horizontal or vertical. */
@@ -225,7 +262,7 @@ function syncCodeToFile(state: { statements: string[]; points: DrawnPoint[]; tar
 }
 
 /** Find the nearest entity (point, line, circle) to a given coordinate. */
-function findNearestEntity(
+export function findNearestEntity(
   x: number,
   y: number,
   state: Pick<DrawState, 'points' | 'lines' | 'circles' | 'arcs'>,
@@ -334,9 +371,11 @@ const emptySession = {
   previewPoint: null as { x: number; y: number } | null,
   snapResult: null as SnapResult | null,
   selectedEntities: [] as SelectedEntity[],
+  hoveredEntity: null as SelectedEntity | null,
   dimensionInput: null as DrawState['dimensionInput'],
   showExitConfirm: false,
   constructionMode: false,
+  constructionEntities: new Set<string>(),
   polygonSides: 6,
 };
 
@@ -429,6 +468,14 @@ export const useDrawStore = create<DrawState>((set, get) => ({
 
   cancelPending: () => {
     set({ pendingClicks: [], selectedEntities: [] });
+  },
+
+  setHoveredEntity: (entity) => {
+    const current = get().hoveredEntity;
+    // Avoid unnecessary state updates
+    if (entity === null && current === null) return;
+    if (entity && current && entity.varName === current.varName) return;
+    set({ hoveredEntity: entity });
   },
 
   toggleConstructionMode: () => {
@@ -565,6 +612,20 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         newStatements.push(constraintStatement('concentric', circs[0].varName, circs[1].varName));
         break;
       }
+      case 'pointOnLine': {
+        const pt = sel.find((e) => e.type === 'point');
+        const line = sel.find((e) => e.type === 'line');
+        if (!pt || !line) return;
+        newStatements.push(constraintStatement('pointOnLine', pt.varName, line.varName));
+        break;
+      }
+      case 'pointOnCircle': {
+        const pt = sel.find((e) => e.type === 'point');
+        const circ = sel.find((e) => e.type === 'circle');
+        if (!pt || !circ) return;
+        newStatements.push(constraintStatement('pointOnCircle', pt.varName, circ.varName));
+        break;
+      }
       default:
         return;
     }
@@ -624,6 +685,13 @@ export const useDrawStore = create<DrawState>((set, get) => ({
           nextLineIdx: state.nextLineIdx,
         });
 
+        // Track construction entities
+        const newConstructionEntities = new Set(state.constructionEntities);
+        if (state.constructionMode) {
+          const newLine = result.lines[result.lines.length - 1];
+          if (newLine) newConstructionEntities.add(newLine.varName);
+        }
+
         set({
           statements: result.statements,
           points: result.points,
@@ -631,6 +699,7 @@ export const useDrawStore = create<DrawState>((set, get) => ({
           nextPointIdx: result.nextPointIdx,
           nextLineIdx: result.nextLineIdx,
           pendingClicks: [],
+          constructionEntities: newConstructionEntities,
         });
         syncCodeToFile({ statements: result.statements, points: result.points, targetFile: state.targetFile });
         break;
@@ -778,6 +847,10 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         newStatements.push(circleStatement(circleVar, centerVar, radius));
         newCircles.push({ varName: circleVar, centerVar, radius });
 
+        // Track construction entities
+        const newCECircle = new Set(state.constructionEntities);
+        if (state.constructionMode) newCECircle.add(circleVar);
+
         set({
           statements: newStatements,
           points: newPoints,
@@ -785,6 +858,7 @@ export const useDrawStore = create<DrawState>((set, get) => ({
           nextPointIdx: nextPIdx,
           nextCircleIdx: nextCIdx + 1,
           pendingClicks: [],
+          constructionEntities: newCECircle,
         });
         syncCodeToFile({ statements: newStatements, points: newPoints, targetFile: state.targetFile });
         break;

@@ -2,7 +2,7 @@
  * Draw mode toolbar — floating tool palette, constraint palette, and status bar.
  * Provides tool selection, constraint application, and keyboard shortcut handling.
  */
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef, type CSSProperties } from 'react';
 import {
   useDrawStore,
   type DrawTool,
@@ -53,6 +53,8 @@ const constraintTools: ToolDef[] = [
   { id: 'c:midpoint', label: 'Midpoint', icon: '⊥·', tip: 'Point at midpoint of line', section: 'constraint', requires: ['point', 'line'] },
   { id: 'c:symmetric', label: 'Symmetric', icon: '⇄', tip: 'Make points symmetric about line', section: 'constraint', requires: ['point', 'point'] },
   { id: 'c:concentric', label: 'Concentric', icon: '◎', tip: 'Make circles concentric', section: 'constraint', requires: ['circle', 'circle'] },
+  { id: 'c:pointOnLine', label: 'On Line', icon: '⊶', shortcut: 'O', tip: 'Constrain point onto a line', section: 'constraint', requires: ['point', 'line'] },
+  { id: 'c:pointOnCircle', label: 'On Circle', icon: '⊕', tip: 'Constrain point onto a circle', section: 'constraint', requires: ['point', 'circle'] },
 ];
 
 const allTools = [...drawTools, ...constraintTools];
@@ -222,13 +224,77 @@ function ExitConfirmDialog() {
   );
 }
 
+// ─── Tooltip ─────────────────────────────────────────────────────────────────
+
+const tooltipStyle: CSSProperties = {
+  position: 'absolute',
+  left: 'calc(100% + 8px)',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  background: '#1e1e2e',
+  color: '#e0e0e0',
+  padding: '6px 10px',
+  borderRadius: 6,
+  fontSize: 11,
+  lineHeight: 1.4,
+  whiteSpace: 'nowrap',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+  pointerEvents: 'none' as const,
+  zIndex: 100,
+  border: '1px solid rgba(255,255,255,0.08)',
+};
+
+function Tooltip({ def, visible }: { def: ToolDef; visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <div style={tooltipStyle}>
+      <div style={{ fontWeight: 600, marginBottom: 2 }}>
+        {def.label}
+        {def.shortcut && (
+          <kbd style={{
+            marginLeft: 6,
+            fontSize: 10,
+            background: 'rgba(255,255,255,0.1)',
+            padding: '1px 5px',
+            borderRadius: 3,
+            fontFamily: 'inherit',
+          }}>
+            {def.shortcut}
+          </kbd>
+        )}
+      </div>
+      <div style={{ opacity: 0.7, fontSize: 10 }}>{def.tip}</div>
+    </div>
+  );
+}
+
 // ─── Tool Button ─────────────────────────────────────────────────────────────
 
 function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const [showTip, setShowTip] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const onEnter = useCallback(() => {
+    setHovered(true);
+    timerRef.current = setTimeout(() => setShowTip(true), 100);
+  }, []);
+
+  const onLeave = useCallback(() => {
+    setHovered(false);
+    setShowTip(false);
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
   return (
     <button
       onClick={onClick}
-      title={`${def.label}${def.shortcut ? ` (${def.shortcut})` : ''} — ${def.tip}`}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
       style={{
         width: 36,
         height: 36,
@@ -237,7 +303,7 @@ function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; o
         justifyContent: 'center',
         border: 'none',
         borderRadius: 6,
-        background: active ? 'var(--fc-accent)' : 'transparent',
+        background: active ? 'var(--fc-accent)' : hovered ? 'rgba(255,255,255,0.06)' : 'transparent',
         color: active ? 'var(--fc-accentText)' : 'var(--fc-text)',
         fontSize: def.icon.length > 1 ? 12 : 18,
         cursor: 'pointer',
@@ -258,6 +324,7 @@ function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; o
           {def.shortcut}
         </span>
       )}
+      <Tooltip def={def} visible={showTip} />
     </button>
   );
 }
@@ -342,6 +409,7 @@ export function DrawToolbar() {
       // Constraint shortcuts
       case 'h': case 'H': setTool('c:horizontal'); e.preventDefault(); break;
       case 'd': case 'D': setTool('c:length'); e.preventDefault(); break;
+      case 'o': case 'O': setTool('c:pointOnLine'); e.preventDefault(); break;
       // Undo
       case 'z': case 'Z':
         if (e.metaKey || e.ctrlKey) { undo(); e.preventDefault(); }
@@ -443,50 +511,20 @@ export function DrawToolbar() {
         <Divider />
 
         {/* Construction mode toggle */}
-        <button
+        <ToolButton
+          def={{ id: 'select' as DrawTool, label: 'Construction', icon: '┈┈', shortcut: 'X', tip: 'Toggle construction mode — dashed lines', section: 'draw' }}
+          active={constructionMode}
           onClick={toggleConstructionMode}
-          title="Construction mode (X) — dashed lines"
-          style={{
-            width: 36,
-            height: 36,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            borderRadius: 6,
-            background: constructionMode ? '#7c3aed' : 'transparent',
-            color: constructionMode ? '#fff' : 'var(--fc-textMuted)',
-            fontSize: 11,
-            cursor: 'pointer',
-            fontFamily: 'monospace',
-          }}
-        >
-          ┈┈
-        </button>
+        />
 
         <Divider />
 
         {/* Done button */}
-        <button
+        <ToolButton
+          def={{ id: 'select' as DrawTool, label: 'Done', icon: '\u2713', tip: 'Leave draw mode (Esc x2)', section: 'draw' }}
+          active={false}
           onClick={requestExit}
-          title="Done drawing (Esc → Esc)"
-          style={{
-            width: 36,
-            height: 36,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            borderRadius: 6,
-            background: 'var(--fc-success)',
-            color: '#fff',
-            fontSize: 14,
-            cursor: 'pointer',
-            fontWeight: 700,
-          }}
-        >
-          ✓
-        </button>
+        />
       </div>
 
       {/* Top status bar */}
