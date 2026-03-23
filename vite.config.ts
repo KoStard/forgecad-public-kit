@@ -627,6 +627,22 @@ function stripBrokenManifoldSourceMaps() {
 const forgeMode = process.env.FORGE_MODE === 'web' ? 'web' : 'studio';
 
 /**
+ * Ensures dist-skill/CONTEXT.md exists during dev so the ?raw import in
+ * AISkillDialog.tsx doesn't break Vite.  If the real file is missing (e.g.
+ * fresh clone, npm install only), writes a placeholder stub.
+ */
+function ensureSkillContextStub() {
+  const contextPath = path.resolve(__dirname, 'dist-skill/CONTEXT.md');
+  if (!fs.existsSync(contextPath)) {
+    fs.mkdirSync(path.resolve(__dirname, 'dist-skill'), { recursive: true });
+    fs.writeFileSync(
+      contextPath,
+      '<!-- stub: run `npm run build:skill:forgecad` to generate the real file -->\n',
+    );
+  }
+}
+
+/**
  * Copies dist-skill/ into dist/skill/ during web builds so the AI skill files
  * are served as static assets on GitHub Pages (e.g. /ForgeCAD/skill/CONTEXT.md).
  */
@@ -643,7 +659,11 @@ function forgeSkillStaticPlugin() {
   };
 }
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command }) => {
+  // Ensure the CONTEXT.md stub exists so the ?raw import doesn't break dev server
+  if (command === 'serve') ensureSkillContextStub();
+
+  return {
   plugins: [
     // Auto-build & watch the Rust solver (dev server only)
     ...(command === 'serve' ? [forgeSolverPlugin()] : []),
@@ -691,4 +711,5 @@ export default defineConfig(({ command }) => ({
     },
   },
   assetsInclude: ['**/*.wasm'],
-}));
+};
+});
