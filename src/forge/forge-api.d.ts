@@ -1903,6 +1903,12 @@ declare function chamferEdge(shape: ShapeArg$1, edge: EdgeRef, size: number, qua
 	number,
 	number
 ]): Shape;
+declare function draft(shape: Shape | TrackedShape, angleDeg: number, pullDirection?: [
+	number,
+	number,
+	number
+], neutralPlaneOffset?: number): Shape;
+declare function offsetSolid(shape: Shape | TrackedShape, thickness: number): Shape;
 interface FilletCornerSpec {
 	index: number;
 	radius: number;
@@ -2813,6 +2819,7 @@ interface JointCouplingOptions {
 }
 interface GearRatioLike {
 	jointRatio: number;
+	phaseDeg?: number;
 }
 interface GearCouplingOptions {
 	ratio?: number;
@@ -3880,6 +3887,7 @@ interface GearPairResult {
 	contactRatio: number;
 	jointRatio: number;
 	speedReduction: number;
+	phaseDeg: number;
 	diagnostics: GearPairDiagnostic[];
 	status: "ok" | "warn" | "error";
 }
@@ -3941,6 +3949,7 @@ interface BevelGearPairResult extends GearMeshPlacement {
 	backlash: number;
 	jointRatio: number;
 	speedReduction: number;
+	phaseDeg: number;
 	diagnostics: GearPairDiagnostic[];
 	status: "ok" | "warn" | "error";
 }
@@ -3955,6 +3964,7 @@ interface SideGearPairResult {
 	radialOverlap: number;
 	jointRatio: number;
 	speedReduction: number;
+	phaseDeg: number;
 	diagnostics: GearPairDiagnostic[];
 	status: "ok" | "warn" | "error";
 }
@@ -3978,6 +3988,7 @@ interface FaceGearPairResult {
 	radialOverlap: number;
 	jointRatio: number;
 	speedReduction: number;
+	phaseDeg: number;
 	diagnostics: GearPairDiagnostic[];
 	status: "ok" | "warn" | "error";
 }

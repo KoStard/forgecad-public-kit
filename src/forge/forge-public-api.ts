@@ -140,7 +140,7 @@ export { intersectWithPlane, projectToPlane } from './section';
 export { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';
 export type { EdgeSegment, EdgeQuery, BoundingRegion } from './edgeQuery';
 export { filletEdgeSegment, chamferEdgeSegment } from './edgeSegmentFeatures';
-export { fillet, chamfer } from './fillet';
+export { fillet, chamfer, draft, offsetSolid } from './fillet';
 export type { EdgeSelector } from './fillet';
 
 export type { HighlightOptions } from './sketch/highlights';

@@ -114,6 +114,8 @@ function tracePlanTransformations(plan: ShapeCompilePlan | null): Transformation
     case 'chamfer':
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
     case 'trimByPlane':
       steps.push(...tracePlanTransformations(plan.base));
       break;
@@ -146,6 +148,8 @@ function findOriginOperation(plan: ShapeCompilePlan | null): { operation: string
     case 'chamfer':
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
     case 'trimByPlane':
       return findOriginOperation(plan.base);
 
@@ -223,6 +227,16 @@ function collectTimelineEntries(plan: ShapeCompilePlan, entries: TimelineEntry[]
     case 'chamferEdges':
       collectTimelineEntries(plan.base, entries);
       entries.push({ kind: 'chamferEdges', label: 'Chamfer Edges', summary: `size = ${plan.size}`, category: 'modifier' });
+      return;
+
+    case 'draft':
+      collectTimelineEntries(plan.base, entries);
+      entries.push({ kind: 'draft', label: 'Draft', summary: `${plan.angleDeg}°`, category: 'modifier' });
+      return;
+
+    case 'offsetSolid':
+      collectTimelineEntries(plan.base, entries);
+      entries.push({ kind: 'offsetSolid', label: 'Offset Solid', summary: `thickness = ${plan.thickness}`, category: 'modifier' });
       return;
 
     case 'trimByPlane':

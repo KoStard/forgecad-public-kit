@@ -2182,6 +2182,8 @@ export interface SideGearPairResult {
   radialOverlap: number;
   jointRatio: number;
   speedReduction: number;
+  /** Phase rotation (degrees) for the vertical gear. See GearPairResult.phaseDeg. */
+  phaseDeg: number;
   diagnostics: GearPairDiagnostic[];
   status: 'ok' | 'warn' | 'error';
 }
@@ -2207,6 +2209,8 @@ export interface FaceGearPairResult {
   radialOverlap: number;
   jointRatio: number;
   speedReduction: number;
+  /** Phase rotation (degrees) for the vertical gear. See GearPairResult.phaseDeg. */
+  phaseDeg: number;
   diagnostics: GearPairDiagnostic[];
   status: 'ok' | 'warn' | 'error';
 }
@@ -2365,6 +2369,7 @@ export function bevelGearPair(options: BevelGearPairOptions): BevelGearPairResul
     backlash,
     jointRatio: -(pinion.meta.teeth / gear.meta.teeth),
     speedReduction: gear.meta.teeth / pinion.meta.teeth,
+    phaseDeg,
     pinionAxis,
     gearAxis,
     pinionCenter,
@@ -2562,6 +2567,7 @@ export function sideGearPair(options: SideGearPairOptions): SideGearPairResult {
     radialOverlap,
     jointRatio: -(side.meta.teeth / vertical.meta.teeth),
     speedReduction: vertical.meta.teeth / side.meta.teeth,
+    phaseDeg,
     diagnostics,
     status,
   };
@@ -2599,6 +2605,7 @@ export function faceGearPair(options: FaceGearPairOptions): FaceGearPairResult {
     radialOverlap: pair.radialOverlap,
     jointRatio: pair.jointRatio,
     speedReduction: pair.speedReduction,
+    phaseDeg: pair.phaseDeg,
     diagnostics,
     status: pairStatusFromDiagnostics(diagnostics),
   };

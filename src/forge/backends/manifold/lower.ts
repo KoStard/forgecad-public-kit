@@ -488,6 +488,10 @@ export function lowerShapeCompilePlanToManifold(
       return lowerFilletEdgesCompilePlan(plan, wasm);
     case 'chamferEdges':
       return lowerChamferEdgesCompilePlan(plan, wasm);
+    case 'draft':
+      throw new Error('Draft angle is not supported on the Manifold backend — use OCCT backend.');
+    case 'offsetSolid':
+      throw new Error('Offset solid is not supported on the Manifold backend — use OCCT backend.');
     case 'trimByPlane':
       return lowerShapeTrimByPlaneCompilePlan(plan, wasm);
     case 'importedMesh':

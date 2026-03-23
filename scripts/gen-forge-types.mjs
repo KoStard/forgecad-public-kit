@@ -62,9 +62,12 @@ content = content
   .replace(/^export (class |function |const |let |var )/gm, 'declare $1')
   .trim();
 
-// Prepend stubs for external types
+// Prepend header and stubs for external types
+const header = '// AUTO-GENERATED — do not edit by hand.\n// Regenerate: npm run gen:types  (source: src/forge/forge-public-api.ts)\n';
 if (importStubs.length > 0) {
-  content = `// External type stubs (opaque — not user-facing)\n${importStubs.join('\n')}\n\n${content}`;
+  content = `${header}// External type stubs (opaque — not user-facing)\n${importStubs.join('\n')}\n\n${content}`;
+} else {
+  content = `${header}\n${content}`;
 }
 
 writeFileSync(out, content + '\n');

@@ -225,9 +225,11 @@ function lowerBaseShellPlanToConcretePlan(
     case 'chamfer':
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
       return {
         ok: false,
-        reason: 'Shape.shell() does not support edge-finished bodies (fillet/chamfer). Apply shell before edge finishing.',
+        reason: 'Shape.shell() does not support edge-finished bodies (fillet/chamfer/draft/offsetSolid). Apply shell before edge finishing.',
       };
     case 'sphere':
     case 'torus':

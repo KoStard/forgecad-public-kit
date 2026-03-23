@@ -67,6 +67,9 @@ export interface JointCouplingOptions {
 
 export interface GearRatioLike {
   jointRatio: number;
+  /** Phase offset (degrees) for tooth mesh alignment. Auto-applied as coupling
+   *  offset when provided via `addGearCoupling({ pair })` and no explicit offset is set. */
+  phaseDeg?: number;
 }
 
 export interface GearCouplingOptions {
@@ -750,6 +753,12 @@ export class Assembly {
         throw new Error(`Gear coupling "${drivenJointName}" pair must be an object with jointRatio`);
       }
       ratio = pair.jointRatio;
+      // Auto-apply phase offset from gear pair when offset not explicitly set.
+      // This aligns teeth correctly for the common `place: false` + assembly pattern.
+      // Override with `offset: 0` if gear shapes already have phase baked in (place: true).
+      if (options.offset === undefined && typeof pair.phaseDeg === 'number' && Number.isFinite(pair.phaseDeg)) {
+        options = { ...options, offset: pair.phaseDeg };
+      }
     } else {
       if (!Number.isFinite(options.driverTeeth) || !Number.isFinite(options.drivenTeeth)) {
         throw new Error(`Gear coupling "${drivenJointName}" driverTeeth/drivenTeeth must be finite`);

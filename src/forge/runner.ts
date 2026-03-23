@@ -30,7 +30,7 @@ import type { ShapeCompilePlan } from './compilePlan';
 import { intersectWithPlane, projectToPlane } from './section';
 import { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';
 import { filletEdgeSegment, chamferEdgeSegment } from './edgeSegmentFeatures';
-import { fillet, chamfer } from './fillet';
+import { fillet, chamfer, draft, offsetSolid } from './fillet';
 import {
   Sketch,
   rect,
@@ -1282,6 +1282,8 @@ function executeFile(
       chamferEdgeSegment,
       fillet,
       chamfer,
+      draft,
+      offsetSolid,
       importSketch,
       importPart,
       importGroup,

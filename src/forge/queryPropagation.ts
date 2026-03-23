@@ -82,6 +82,8 @@ function rootPlanPropagation(plan: ShapeCompilePlan): TopologyRewritePropagation
     case 'sweep':
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
     case 'importedMesh':
       return undefined;
     default:
@@ -735,6 +737,8 @@ export function findShapeTopologyRewritePropagation(
     case 'sweep':
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
     case 'importedMesh':
       return null;
     default:
@@ -779,6 +783,8 @@ export function collectShapeTopologyRewritePropagations(
       }
       case 'filletEdges':
       case 'chamferEdges':
+      case 'draft':
+      case 'offsetSolid':
         visit(current.base);
         return;
       case 'box':

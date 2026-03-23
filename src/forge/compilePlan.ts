@@ -316,6 +316,21 @@ export type ShapeCompilePlan =
       edgeTargets: EdgeFeatureTarget[];
     }
   | {
+      kind: 'draft';
+      base: ShapeCompilePlan;
+      angleDeg: number;
+      /** Pull direction for draft — typically [0, 0, 1] for Z-up molds */
+      pullDirection: [number, number, number];
+      /** Neutral plane where draft angle is zero */
+      neutralPlaneOffset: number;
+    }
+  | {
+      kind: 'offsetSolid';
+      base: ShapeCompilePlan;
+      /** Positive = outward, negative = inward */
+      thickness: number;
+    }
+  | {
       /**
        * Imported external mesh file (STL, OBJ, 3MF).
        *
@@ -855,6 +870,22 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         })),
       };
       break;
+    case 'draft':
+      result = {
+        kind: 'draft',
+        base: cloneShapeCompilePlan(plan.base)!,
+        angleDeg: plan.angleDeg,
+        pullDirection: [plan.pullDirection[0], plan.pullDirection[1], plan.pullDirection[2]],
+        neutralPlaneOffset: plan.neutralPlaneOffset,
+      };
+      break;
+    case 'offsetSolid':
+      result = {
+        kind: 'offsetSolid',
+        base: cloneShapeCompilePlan(plan.base)!,
+        thickness: plan.thickness,
+      };
+      break;
     case 'importedMesh':
       // Imported mesh — fileData is immutable raw bytes, share the reference.
       result = { kind: 'importedMesh', filePath: plan.filePath, format: plan.format, fileData: plan.fileData };
@@ -981,6 +1012,8 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan): ShapeQueryOw
     case 'chamfer':
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
     case 'trimByPlane':
       return findShapePrimaryQueryOwner(plan.base);
     case 'box':
@@ -1021,6 +1054,8 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan): ShapeQueryOwner
       case 'chamfer':
       case 'filletEdges':
       case 'chamferEdges':
+      case 'draft':
+      case 'offsetSolid':
       case 'trimByPlane':
         visit(current.base);
         return;
@@ -1075,6 +1110,8 @@ export function findShapeWorkplanePlacement(
     case 'chamfer':
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
       return findShapeWorkplanePlacement(plan.base);
     case 'hole':
     case 'cut':

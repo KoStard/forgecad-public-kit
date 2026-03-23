@@ -1414,6 +1414,8 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
     case 'chamfer':
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
       return emptyFaceTable();
     case 'trimByPlane': {
       const table = emptyFaceTable();

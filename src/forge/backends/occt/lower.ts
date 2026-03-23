@@ -703,6 +703,110 @@ function lowerChamferEdgesPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, {
   return mkChamfer.Shape();
 }
 
+function lowerDraftPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'draft' }>): any {
+  const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
+  const angleRad = (plan.angleDeg * Math.PI) / 180;
+  const dir = new oc.gp_Dir_4(plan.pullDirection[0], plan.pullDirection[1], plan.pullDirection[2]);
+  const neutralPln = new oc.gp_Pln_3(
+    new oc.gp_Pnt_3(
+      plan.pullDirection[0] * plan.neutralPlaneOffset,
+      plan.pullDirection[1] * plan.neutralPlaneOffset,
+      plan.pullDirection[2] * plan.neutralPlaneOffset,
+    ),
+    dir,
+  );
+
+  // Check if BRepOffsetAPI_DraftAngle is available in the bindings
+  if (typeof (oc as any).BRepOffsetAPI_DraftAngle_2 !== 'function' &&
+      typeof (oc as any).BRepOffsetAPI_DraftAngle_1 !== 'function') {
+    throw new Error(
+      'draft() is not available — the OCCT WASM build does not include BRepOffsetAPI_DraftAngle. ' +
+      'This operation requires a full OCCT build with the BRepOffsetAPI module.',
+    );
+  }
+
+  // Try _2 (shape constructor) first, fall back to _1
+  let draftMaker: any;
+  if (typeof (oc as any).BRepOffsetAPI_DraftAngle_2 === 'function') {
+    draftMaker = new (oc as any).BRepOffsetAPI_DraftAngle_2(base);
+  } else {
+    draftMaker = new (oc as any).BRepOffsetAPI_DraftAngle_1();
+    draftMaker.Init(base);
+  }
+
+  // Add draft to all faces
+  const explorer = new oc.TopExp_Explorer_2(
+    base,
+    oc.TopAbs_ShapeEnum.TopAbs_FACE,
+    oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
+  );
+  let addedCount = 0;
+  while (explorer.More()) {
+    const face = oc.TopoDS.Face_1(explorer.Current());
+    try {
+      draftMaker.Add(face, dir, angleRad, neutralPln);
+      addedCount++;
+    } catch {
+      // Skip faces that can't be drafted (e.g. perpendicular to pull direction)
+    }
+    explorer.Next();
+  }
+  if (addedCount === 0) {
+    throw new Error('draft(): no faces could be drafted — check pull direction relative to shape geometry.');
+  }
+
+  draftMaker.Build(new oc.Message_ProgressRange_1());
+  if (!draftMaker.IsDone()) {
+    throw new Error(
+      `draft(): OCCT draft operation failed (angle=${plan.angleDeg}°, ${addedCount} faces).`,
+    );
+  }
+  return draftMaker.Shape();
+}
+
+function lowerOffsetSolidPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'offsetSolid' }>): any {
+  const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
+  try {
+    // Check if BRepOffsetAPI_MakeOffsetShape is available
+    if (typeof (oc as any).BRepOffsetAPI_MakeOffsetShape !== 'function' &&
+        typeof (oc as any).BRepOffsetAPI_MakeOffsetShape_1 !== 'function') {
+      throw new Error(
+        'offsetSolid() is not available — the OCCT WASM build does not include BRepOffsetAPI_MakeOffsetShape. ' +
+        'This operation requires a full OCCT build with the BRepOffsetAPI module.',
+      );
+    }
+
+    let offsetMaker: any;
+    if (typeof (oc as any).BRepOffsetAPI_MakeOffsetShape_1 === 'function') {
+      offsetMaker = new (oc as any).BRepOffsetAPI_MakeOffsetShape_1();
+    } else {
+      offsetMaker = new (oc as any).BRepOffsetAPI_MakeOffsetShape();
+    }
+
+    offsetMaker.PerformByJoin(
+      base,
+      plan.thickness,
+      1e-3, // tolerance
+      (oc as any).BRepOffset_Mode.BRepOffset_Skin,
+      false, // intersection
+      false, // selfInter
+      (oc as any).GeomAbs_JoinType.GeomAbs_Arc,
+      false, // thickenSolid
+      new oc.Message_ProgressRange_1(),
+    );
+
+    if (!offsetMaker.IsDone()) {
+      throw new Error('Offset solid operation failed');
+    }
+    return offsetMaker.Shape();
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith('offsetSolid()')) throw e;
+    throw new Error(
+      `offsetSolid() failed: ${e instanceof Error ? e.message : e}. Try a smaller thickness value.`,
+    );
+  }
+}
+
 /**
  * Lower a ShapeCompilePlan into an OCCT TopoDS_Shape.
  *
@@ -843,6 +947,12 @@ function _lowerShapeCompilePlanToOCCTInner(
 
     case 'chamferEdges':
       return lowerChamferEdgesPlan(oc, plan);
+
+    case 'draft':
+      return lowerDraftPlan(oc, plan);
+
+    case 'offsetSolid':
+      return lowerOffsetSolidPlan(oc, plan);
 
     case 'trimByPlane': {
       const base = lowerShapeCompilePlanToOCCT(plan.base, oc);

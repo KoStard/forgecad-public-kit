@@ -526,6 +526,8 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
     case 'chamfer':
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
       return {
         ok: false,
         reason: `projection replay currently does not absorb ${plan.kind} silhouette changes into the exact subset.`,

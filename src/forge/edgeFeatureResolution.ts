@@ -273,6 +273,8 @@ function searchOwnerMatch(
     }
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
       return searchOwnerMatch(plan.base, owner);
     case 'boolean': {
       for (const shape of plan.shapes) {
@@ -693,6 +695,8 @@ function resolveSelectionFromOwnerBase(
     case 'chamfer':
     case 'filletEdges':
     case 'chamferEdges':
+    case 'draft':
+    case 'offsetSolid':
     case 'shell':
     case 'hole':
     case 'cut':
