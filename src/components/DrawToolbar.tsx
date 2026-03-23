@@ -2,7 +2,8 @@
  * Draw mode toolbar — floating tool palette, constraint palette, and status bar.
  * Provides tool selection, constraint application, and keyboard shortcut handling.
  */
-import { useEffect, useCallback, useState, useRef, type CSSProperties } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   useDrawStore,
   type DrawTool,
@@ -233,30 +234,29 @@ function ExitConfirmDialog() {
   );
 }
 
-// ─── Tooltip ─────────────────────────────────────────────────────────────────
+// ─── Tooltip (portalled to body so it escapes toolbar overflow) ──────────────
 
-const tooltipStyle: CSSProperties = {
-  position: 'absolute',
-  left: 'calc(100% + 8px)',
-  top: '50%',
-  transform: 'translateY(-50%)',
-  background: '#1e1e2e',
-  color: '#e0e0e0',
-  padding: '6px 10px',
-  borderRadius: 6,
-  fontSize: 11,
-  lineHeight: 1.4,
-  whiteSpace: 'nowrap',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-  pointerEvents: 'none' as const,
-  zIndex: 100,
-  border: '1px solid rgba(255,255,255,0.08)',
-};
-
-function Tooltip({ def, visible }: { def: ToolDef; visible: boolean }) {
-  if (!visible) return null;
-  return (
-    <div style={tooltipStyle}>
+function TooltipPortal({ def, rect }: { def: ToolDef; rect: DOMRect }) {
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        left: rect.right + 8,
+        top: rect.top + rect.height / 2,
+        transform: 'translateY(-50%)',
+        background: '#1e1e2e',
+        color: '#e0e0e0',
+        padding: '6px 10px',
+        borderRadius: 6,
+        fontSize: 11,
+        lineHeight: 1.4,
+        whiteSpace: 'nowrap',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+        pointerEvents: 'none',
+        zIndex: 10000,
+        border: '1px solid rgba(255,255,255,0.08)',
+      }}
+    >
       <div style={{ fontWeight: 600, marginBottom: 2 }}>
         {def.label}
         {def.shortcut && (
@@ -273,7 +273,8 @@ function Tooltip({ def, visible }: { def: ToolDef; visible: boolean }) {
         )}
       </div>
       <div style={{ opacity: 0.7, fontSize: 10 }}>{def.tip}</div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -282,10 +283,13 @@ function Tooltip({ def, visible }: { def: ToolDef; visible: boolean }) {
 function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
   const [showTip, setShowTip] = useState(false);
+  const [btnRect, setBtnRect] = useState<DOMRect | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const onEnter = useCallback(() => {
     setHovered(true);
+    if (btnRef.current) setBtnRect(btnRef.current.getBoundingClientRect());
     timerRef.current = setTimeout(() => setShowTip(true), 100);
   }, []);
 
@@ -301,6 +305,7 @@ function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; o
 
   return (
     <button
+      ref={btnRef}
       onClick={onClick}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
@@ -333,7 +338,7 @@ function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; o
           {def.shortcut}
         </span>
       )}
-      <Tooltip def={def} visible={showTip} />
+      {showTip && btnRect && <TooltipPortal def={def} rect={btnRect} />}
     </button>
   );
 }
