@@ -3,15 +3,33 @@
  * Provides a hit plane for capturing draw-mode clicks and renders
  * preview geometry (rubber-band lines, snap indicators, etc.).
  */
-import { useMemo, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { useDrawStore } from '../draw/drawStore';
 import * as THREE from 'three';
 
-/** Crosshair rendered at the snap position. */
-function SnapCrosshair({ x, y, snapped }: { x: number; y: number; snapped: boolean }) {
-  const size = 4;
+/**
+ * Hook that returns a world-space pixel size — the number of world units
+ * that correspond to 1 CSS pixel at the current zoom level.
+ * Multiply by desired pixel size to get zoom-independent world dimensions.
+ */
+function useWorldPixel(): number {
+  const [wp, setWp] = useState(1);
+  useFrame(({ camera, size }) => {
+    const ortho = camera as THREE.OrthographicCamera;
+    if (!ortho.isOrthographicCamera) return;
+    const worldH = (ortho.top - ortho.bottom) / Math.max(1e-6, ortho.zoom);
+    const next = worldH / Math.max(1, size.height);
+    // Only update when it changes meaningfully (avoid excessive re-renders)
+    if (Math.abs(next - wp) > wp * 0.02) setWp(next);
+  });
+  return wp;
+}
+
+/** Crosshair rendered at the snap position — constant screen size. */
+function SnapCrosshair({ x, y, snapped, wp }: { x: number; y: number; snapped: boolean; wp: number }) {
+  const size = wp * 12; // 12 screen pixels
   const color = snapped ? '#4ade80' : '#a3a3a3';
   const geo = useMemo(() => {
     const pts = [
@@ -89,10 +107,11 @@ function RubberBandCircle({ center, radius }: { center: { x: number; y: number }
   return <primitive object={lineObj} raycast={() => null} />;
 }
 
-/** Coordinate label showing current position near the cursor. */
-function CoordLabel({ x, y }: { x: number; y: number }) {
+/** Coordinate label showing current position near the cursor — offset is zoom-independent. */
+function CoordLabel({ x, y, wp }: { x: number; y: number; wp: number }) {
+  const offset = wp * 18; // 18 screen pixels away from cursor
   return (
-    <Html position={[x + 5, y - 5, 0.7]} center={false} style={{ pointerEvents: 'none' }}>
+    <Html position={[x + offset, y - offset, 0.7]} center={false} style={{ pointerEvents: 'none' }}>
       <div
         style={{
           background: '#111111d9',
@@ -163,6 +182,17 @@ function AlignmentGuides({
   );
 }
 
+/** Small point dot — zoom-independent size. */
+function PointMarker({ x, y, wp, color = '#60a5fa' }: { x: number; y: number; wp: number; color?: string }) {
+  const radius = wp * 4; // 4 screen pixels
+  return (
+    <mesh position={[x, y, 0.6]}>
+      <circleGeometry args={[radius, 16]} />
+      <meshBasicMaterial color={color} />
+    </mesh>
+  );
+}
+
 export function DrawCanvas() {
   const active = useDrawStore((s) => s.active);
   const tool = useDrawStore((s) => s.tool);
@@ -172,15 +202,9 @@ export function DrawCanvas() {
   const previewPoint = useDrawStore((s) => s.previewPoint);
   const snapResult = useDrawStore((s) => s.snapResult);
   const points = useDrawStore((s) => s.points);
+  const selectedEntities = useDrawStore((s) => s.selectedEntities);
 
-  // Adapt snap threshold to zoom level
-  const worldThresholdRef = useRef(5);
-  useFrame(({ camera, size }) => {
-    const ortho = camera as THREE.OrthographicCamera;
-    if (!ortho.isOrthographicCamera) return;
-    const worldH = (ortho.top - ortho.bottom) / Math.max(1e-6, ortho.zoom);
-    worldThresholdRef.current = (worldH / Math.max(1, size.height)) * 10;
-  });
+  const wp = useWorldPixel();
 
   if (!active) return null;
 
@@ -199,6 +223,10 @@ export function DrawCanvas() {
           e.stopPropagation();
           handleClick(e.point.x, e.point.y);
         }}
+        onDoubleClick={(e: ThreeEvent<MouseEvent>) => {
+          e.stopPropagation();
+          useDrawStore.getState().handleDoubleClick(e.point.x, e.point.y);
+        }}
         onPointerLeave={() => setPreviewPoint(null)}
         onContextMenu={(e: ThreeEvent<MouseEvent>) => {
           e.stopPropagation();
@@ -211,12 +239,12 @@ export function DrawCanvas() {
 
       {/* Snap crosshair */}
       {previewPoint && (
-        <SnapCrosshair x={previewPoint.x} y={previewPoint.y} snapped={isSnappedToPoint} />
+        <SnapCrosshair x={previewPoint.x} y={previewPoint.y} snapped={isSnappedToPoint} wp={wp} />
       )}
 
       {/* Coordinate label */}
       {previewPoint && (
-        <CoordLabel x={previewPoint.x} y={previewPoint.y} />
+        <CoordLabel x={previewPoint.x} y={previewPoint.y} wp={wp} />
       )}
 
       {/* Alignment guides */}
@@ -225,8 +253,8 @@ export function DrawCanvas() {
       )}
 
       {/* Rubber-band preview for line tool */}
-      {tool === 'line' && pendingClicks.length === 1 && previewPoint && (
-        <RubberBandLine from={pendingClicks[0]} to={previewPoint} />
+      {(tool === 'line' || tool === 'polyline') && pendingClicks.length >= 1 && previewPoint && (
+        <RubberBandLine from={pendingClicks[pendingClicks.length - 1]} to={previewPoint} />
       )}
 
       {/* Rubber-band preview for rectangle tool */}
@@ -242,13 +270,90 @@ export function DrawCanvas() {
         />
       )}
 
-      {/* Point markers for pending clicks */}
+      {/* Rubber-band preview for arc tool (3-point) */}
+      {tool === 'arc' && pendingClicks.length >= 1 && previewPoint && (
+        pendingClicks.length === 1
+          ? <RubberBandLine from={pendingClicks[0]} to={previewPoint} />
+          : <RubberBandArc p1={pendingClicks[0]} p2={pendingClicks[1]} p3={previewPoint} />
+      )}
+
+      {/* Polyline segments already committed in this chain */}
+      {tool === 'polyline' && pendingClicks.length >= 2 && pendingClicks.slice(0, -1).map((pt, i) => (
+        <RubberBandLine key={`poly-${i}`} from={pt} to={pendingClicks[i + 1]} />
+      ))}
+
+      {/* Point markers for pending clicks — zoom-independent */}
       {pendingClicks.map((pt, i) => (
-        <mesh key={`pending-${i}`} position={[pt.x, pt.y, 0.6]}>
-          <circleGeometry args={[2, 16]} />
-          <meshBasicMaterial color="#60a5fa" />
-        </mesh>
+        <PointMarker key={`pending-${i}`} x={pt.x} y={pt.y} wp={wp} />
+      ))}
+
+      {/* Highlight selected entities for constraint tools */}
+      {selectedEntities.map((ent, i) => (
+        ent.type === 'point'
+          ? <PointMarker key={`sel-${i}`} x={ent.x!} y={ent.y!} wp={wp} color="#f59e0b" />
+          : null
       ))}
     </>
   );
+}
+
+/** Preview arc through 3 points. */
+function RubberBandArc({ p1, p2, p3 }: {
+  p1: { x: number; y: number };
+  p2: { x: number; y: number };
+  p3: { x: number; y: number };
+}) {
+  const lineObj = useMemo(() => {
+    // Compute circumscribed circle through 3 points
+    const ax = p1.x, ay = p1.y, bx = p2.x, by = p2.y, cx = p3.x, cy = p3.y;
+    const D = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+    if (Math.abs(D) < 1e-10) {
+      // Points are collinear — draw straight lines
+      const pts = [
+        new THREE.Vector3(ax, ay, 0.6),
+        new THREE.Vector3(bx, by, 0.6),
+        new THREE.Vector3(cx, cy, 0.6),
+      ];
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: '#60a5fa', transparent: true, opacity: 0.7 });
+      return new THREE.Line(geo, mat);
+    }
+    const ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / D;
+    const uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / D;
+    const r = Math.hypot(ax - ux, ay - uy);
+
+    // Compute angles
+    let a1 = Math.atan2(ay - uy, ax - ux);
+    let a2 = Math.atan2(by - uy, bx - ux);
+    let a3 = Math.atan2(cy - uy, cx - ux);
+
+    // Determine arc direction: a1 → a2 → a3
+    const cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+    const ccw = cross > 0;
+
+    const normalize = (a: number) => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    a1 = normalize(a1);
+    a3 = normalize(a3);
+
+    let startAngle = a1;
+    let endAngle = a3;
+    if (ccw) {
+      if (endAngle <= startAngle) endAngle += Math.PI * 2;
+    } else {
+      if (endAngle >= startAngle) endAngle -= Math.PI * 2;
+    }
+
+    const segments = 48;
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const angle = startAngle + (endAngle - startAngle) * t;
+      pts.push(new THREE.Vector3(ux + Math.cos(angle) * r, uy + Math.sin(angle) * r, 0.6));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: '#60a5fa', transparent: true, opacity: 0.7 });
+    return new THREE.Line(geo, mat);
+  }, [p1.x, p1.y, p2.x, p2.y, p3.x, p3.y]);
+
+  return <primitive object={lineObj} raycast={() => null} />;
 }

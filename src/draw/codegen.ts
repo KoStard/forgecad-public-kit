@@ -65,6 +65,13 @@ export function circleStatement(varName: string, centerVar: string, radius: numb
 }
 
 /**
+ * Generate an arc statement (3-point arc).
+ */
+export function arcStatement(varName: string, p1Var: string, p2Var: string, p3Var: string): string {
+  return `const ${varName} = sk.arc(${p1Var}, ${p2Var}, ${p3Var});`;
+}
+
+/**
  * Generate a constraint statement (no const, just the call).
  */
 export function constraintStatement(type: string, ...args: (string | number)[]): string {
