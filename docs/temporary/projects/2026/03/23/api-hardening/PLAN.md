@@ -40,7 +40,12 @@ Each backend (Manifold, OCCT) has a lowering file with switch/case on all plan k
 | 3 | Remove opaque compile plan kind | — | — | 0 | — | ✅ |
 | 4 | Add assertExhaustive to 23 switches | — | — | — | — | ✅ compile-time safety |
 | 5 | Update snapshots + fix manifest | 40.3s | 11/12 | 0 | 0 | ✅ |
-| — | **Final** | **40.3s** | **11/12** | **0** | **0** | **✅** |
+| — | After hardening | 40.3s | 11/12 | 0 | 0 | ✅ |
+| 6 | Add linearPattern2d + circularPattern2d | — | — | — | — | ✅ |
+| 7 | Add torus primitive (new ShapeCompilePlan kind) | — | — | — | — | ✅ |
+| 8 | Add draft angle (OCCT: BRepOffsetAPI_DraftAngle) | — | — | — | — | ✅ |
+| 9 | Add offsetSolid (OCCT: BRepOffsetAPI_MakeOffsetShape) | — | — | — | — | ✅ |
+| — | **Final** | **59.2s** | **11/12** | **0** | **0** | **✅** |
 
 *The 1 remaining failure (Examples) is a pre-existing solver WASM parse error in smooth-curve-connections.forge.js*
 
@@ -125,9 +130,18 @@ Each backend (Manifold, OCCT) has a lowering file with switch/case on all plan k
 
 ForgeCAD works with closed manifold solids only. Surface modeling (12 features) is not applicable to the mesh-based architecture. This is acceptable — surfaces are primarily for automotive/aerospace NURBS workflows.
 
-### Coverage excluding surfaces: ~72% YES, 10% PARTIAL, 18% NO
+### Updated Coverage (after implementation)
 
-Key takeaway: The highest-impact gaps are **torus primitive**, **draft angle**, **H/V dimensions**, **2D patterns**, and **construction geometry**. These are achievable additions.
+| Feature | Before | After |
+|---------|--------|-------|
+| Construction geometry | NO | YES (already existed) |
+| H/V distance constraints | PARTIAL | YES (already existed) |
+| 2D Sketch Patterns | NO | **YES** (linearPattern2d, circularPattern2d) |
+| Torus | NO | **YES** (torus primitive) |
+| Draft angle | NO | **YES** (draft with OCCT) |
+| Offset solid / Thicken | NO | **YES** (offsetSolid with OCCT) |
+
+**Coverage: ~75% YES** (up from 57%), excluding surface modeling (OCCT surface ops are a future initiative).
 
 ## Files Modified
 
