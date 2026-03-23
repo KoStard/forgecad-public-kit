@@ -52,6 +52,8 @@ export {
   radians,
   linearPattern,
   circularPattern,
+  linearPattern2d,
+  circularPattern2d,
   mirrorCopy,
   filletCorners,
   filletEdge,

@@ -1887,6 +1887,10 @@ type ShapeArg = Shape | TrackedShape;
 declare function linearPattern(shape: ShapeArg, count: number, dx: number, dy: number, dz?: number): Shape;
 /** Repeat a shape around the Z axis */
 declare function circularPattern(shape: ShapeArg, count: number, centerX?: number, centerY?: number): Shape;
+/** Repeat a sketch in a linear pattern */
+declare function linearPattern2d(sketch: Sketch, count: number, dx: number, dy?: number): Sketch;
+/** Repeat a sketch in a circular pattern around a center point */
+declare function circularPattern2d(sketch: Sketch, count: number, centerX?: number, centerY?: number): Sketch;
 /** Mirror a shape and union with original */
 declare function mirrorCopy(shape: ShapeArg, normal: [
 	number,
