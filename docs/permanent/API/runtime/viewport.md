@@ -46,6 +46,13 @@ When `scene()` is called, it **replaces** the default viewer settings for the sp
   - `color` (string)
   - `height` (number) — Z offset
   - `receiveShadow` (boolean)
+- `capture` (object) — default capture parameters for `forgecad capture`; CLI flags override these:
+  - `framesPerTurn` (number, 12–720) — frames for one orbit rotation (default: 72)
+  - `holdFrames` (number, 0–300) — frozen frames before motion (default: 6)
+  - `pitchDeg` (number, -80–80) — orbit pitch angle (default: auto from camera)
+  - `fps` (number, 1–60) — output frame rate (default: 24)
+  - `size` (number) — output frame size in pixels (default: 960)
+  - `background` (string) — canvas background color (default: '#252526')
 
 **Returns:** `void`
 
@@ -84,6 +91,46 @@ Notes:
 - Post-processing (bloom, vignette, grain) works in the browser viewport only — CLI renders apply camera, lights, background, fog, and exposure but not shader-based effects
 - Camera `position` overrides the auto-frame behavior — the viewport will not auto-fit the geometry to view
 - See `examples/generative-art/` for full demos
+
+## `shape.material(props)`
+
+Set per-object material properties for controlling visual appearance. Returns a new Shape with the specified material properties. Material properties survive transforms (translate, rotate, scale, etc.) and boolean operations.
+
+**Parameters (all optional):**
+- `metalness` (number, 0–1) — metallic vs. dielectric appearance. Default: 0.05
+- `roughness` (number, 0–1) — surface roughness (0 = mirror, 1 = matte). Default: 0.35
+- `emissive` (string) — glow color (hex string, e.g. `'#ff6b35'`)
+- `emissiveIntensity` (number) — glow multiplier. Default: 1
+- `opacity` (number, 0–1) — transparency. Default: 1
+- `wireframe` (boolean) — render as wireframe. Default: false
+- `clearcoat` (number, 0–1) — clearcoat layer intensity. Default: 0.1
+- `clearcoatRoughness` (number, 0–1) — clearcoat roughness. Default: 0.4
+
+**Returns:** `Shape`
+
+```javascript
+// Polished metal
+box(50, 50, 50).material({ metalness: 0.9, roughness: 0.1 });
+
+// Glowing emissive
+sphere(30).material({ emissive: '#ff6b35', emissiveIntensity: 2 });
+
+// Translucent ice
+cylinder(40, 20).material({ opacity: 0.4, clearcoat: 1.0, clearcoatRoughness: 0.02 });
+
+// Chainable with other methods
+box(100, 100, 10)
+  .color('#gold')
+  .material({ metalness: 0.95, roughness: 0.05 })
+  .translate(0, 0, 50);
+```
+
+Notes:
+- Material properties are per-shape — each returned object can have different materials
+- Works in both the browser viewport and CLI renderer
+- `.color()` sets the base diffuse color; `.material()` controls how that color behaves under light
+- Emissive color glows independently of lighting — great for generative art effects like bloom
+- See `examples/generative-art/molten-forge.forge.js` and `frost-spires.forge.js` for full demos
 
 ## `cutPlane(name, normal, offsetOrOptions?, options?)`
 

@@ -616,17 +616,22 @@ function createOverrideSessionFromRunResult(
     if (!obj.shape) return;
 
     const color = objectSettings?.[obj.id]?.color || obj.color;
+    const mp = obj.materialProps;
     const geo = shapeToGeometry(obj.shape);
     const solid = new THREE.Mesh(
       geo.solid,
       new THREE.MeshPhysicalMaterial({
         color: parseExportColor(color, 0x5b9bd5),
-        metalness: 0.05,
-        roughness: 0.35,
-        clearcoat: 0.1,
-        clearcoatRoughness: 0.4,
+        metalness: mp?.metalness ?? 0.05,
+        roughness: mp?.roughness ?? 0.35,
+        clearcoat: mp?.clearcoat ?? 0.1,
+        clearcoatRoughness: mp?.clearcoatRoughness ?? 0.4,
         flatShading: true,
         side: THREE.DoubleSide,
+        ...(mp?.emissive !== undefined && { emissive: new THREE.Color(mp.emissive) }),
+        ...(mp?.emissiveIntensity !== undefined && { emissiveIntensity: mp.emissiveIntensity }),
+        ...(mp?.opacity !== undefined && mp.opacity < 1 && { transparent: true, opacity: mp.opacity }),
+        ...(mp?.wireframe && { wireframe: true }),
       }),
     );
     scene.add(solid);
@@ -1545,16 +1550,17 @@ function ForgeObject({
         <mesh geometry={solidGeo}>
           <meshPhysicalMaterial
             color={settings.color}
-            metalness={0.05}
-            roughness={0.35}
-            clearcoat={0.1}
-            clearcoatRoughness={0.4}
+            metalness={obj.materialProps?.metalness ?? 0.05}
+            roughness={obj.materialProps?.roughness ?? 0.35}
+            clearcoat={obj.materialProps?.clearcoat ?? 0.1}
+            clearcoatRoughness={obj.materialProps?.clearcoatRoughness ?? 0.4}
             flatShading
             side={THREE.DoubleSide}
-            transparent={meshOpacity < 1}
-            opacity={meshOpacity}
-            emissive={isHovered ? settings.color : '#000000'}
-            emissiveIntensity={isHovered ? 0.3 : 0}
+            transparent={meshOpacity < 1 || (obj.materialProps?.opacity !== undefined && obj.materialProps.opacity < 1)}
+            opacity={obj.materialProps?.opacity !== undefined ? Math.min(meshOpacity, obj.materialProps.opacity) : meshOpacity}
+            emissive={isHovered ? settings.color : (obj.materialProps?.emissive ?? '#000000')}
+            emissiveIntensity={isHovered ? 0.3 : (obj.materialProps?.emissiveIntensity ?? 0)}
+            wireframe={obj.materialProps?.wireframe ?? false}
             clippingPlanes={fallbackSolidClippingPlanes}
           />
         </mesh>

@@ -1553,6 +1553,8 @@ declare class TrackedShape {
 	]): TrackedShape;
 	/** Set the display color. Returns a new TrackedShape. */
 	color(value: string | undefined): TrackedShape;
+	/** Set material properties (metalness, roughness, emissive, etc.). Returns a new TrackedShape. */
+	material(props: ShapeMaterialProps): TrackedShape;
 	/** Access the underlying Shape for boolean ops etc */
 	toShape(): Shape;
 	/** Position this tracked shape relative to another using named 3D anchor points */
@@ -2342,13 +2344,45 @@ type ShapeAnchorTarget = Shape | {
 };
 type RotationPointLike = PlacementAnchorLike | Vec3;
 /** Thin immutable wrapper around a runtime geometry backend payload. */
+/** Per-object material properties for controlling visual appearance. */
+interface ShapeMaterialProps {
+	/** Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 */
+	metalness?: number;
+	/** Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 */
+	roughness?: number;
+	/** Emissive glow color (hex string, e.g. "#ff6b35"). */
+	emissive?: string;
+	/** Emissive intensity multiplier. Default: 1 */
+	emissiveIntensity?: number;
+	/** Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 */
+	opacity?: number;
+	/** Render as wireframe. Default: false */
+	wireframe?: boolean;
+	/** Clearcoat intensity (0–1). Default: 0.1 */
+	clearcoat?: number;
+	/** Clearcoat roughness (0–1). Default: 0.4 */
+	clearcoatRoughness?: number;
+}
 declare class Shape {
 	colorHex: string | undefined;
+	materialProps: ShapeMaterialProps | undefined;
 	constructor(payload: ShapeRuntimePayload, color?: string, geometryInfo?: Partial<GeometryInfo>);
 	/** Set the color of this shape (hex string, e.g. "#ff0000") */
 	setColor(value: string | undefined): Shape;
 	/** Alias for setColor */
 	color(value: string | undefined): Shape;
+	/**
+	 * Set material properties for this shape's visual appearance.
+	 * Returns a new Shape with the specified material properties merged.
+	 *
+	 * @example
+	 * ```js
+	 * box(50, 50, 50).material({ metalness: 0.9, roughness: 0.1 });
+	 * sphere(30).material({ emissive: '#ff6b35', emissiveIntensity: 2 });
+	 * cylinder(40, 20).material({ opacity: 0.3 });
+	 * ```
+	 */
+	material(props: ShapeMaterialProps): Shape;
 	/** Return a new Shape wrapper for explicit duplication in scripts. */
 	clone(): Shape;
 	/** Alias for clone() */
@@ -3453,6 +3487,20 @@ interface SceneGroundConfig {
 	height?: number;
 	receiveShadow?: boolean;
 }
+interface SceneCaptureConfig {
+	/** Frames for one full orbit rotation (default: 72) */
+	framesPerTurn?: number;
+	/** Frozen frames before motion starts (default: 6) */
+	holdFrames?: number;
+	/** Orbit pitch angle in degrees (default: auto from camera) */
+	pitchDeg?: number;
+	/** Output frame rate (default: 24) */
+	fps?: number;
+	/** Output frame size in pixels (default: 960) */
+	size?: number;
+	/** Canvas background color for capture (default: '#252526') */
+	background?: string;
+}
 interface SceneOptions {
 	background?: string | SceneBackgroundGradient;
 	camera?: SceneCameraConfig;
@@ -3461,6 +3509,8 @@ interface SceneOptions {
 	fog?: SceneFogConfig;
 	postProcessing?: ScenePostProcessingConfig;
 	ground?: SceneGroundConfig;
+	/** Default capture parameters for `forgecad capture` — CLI flags override these. */
+	capture?: SceneCaptureConfig;
 }
 /**
  * Configure the scene environment for the current script execution.

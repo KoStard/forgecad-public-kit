@@ -41,6 +41,7 @@ function deserializeSceneObject(s: SerializedSceneObject): SceneObject {
     sketch,
     toolpath: s.toolpathData ?? null,
     color: s.color,
+    materialProps: s.materialProps,
     geometryInfo: s.geometryInfo ?? null,
     sketchMeta: s.sketchMeta,
     groupName: s.groupName,

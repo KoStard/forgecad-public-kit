@@ -54,6 +54,30 @@ const ASSEMBLY_ENTRIES: readonly NonPartEntry[] = [
 
 const RUNTIME_SCENE_ENTRIES: readonly NonPartEntry[] = [
   {
+    path: 'examples/api/scene-basics.forge.js',
+    note: 'Scene API demo — judged by runtime scene behavior (camera, lights, post-processing).',
+  },
+  {
+    path: 'examples/generative-art/crystal-growth.forge.js',
+    note: 'Generative art — judged by runtime scene behavior and multi-object output.',
+  },
+  {
+    path: 'examples/generative-art/frost-spires.forge.js',
+    note: 'Generative art — demonstrates per-object material properties (opacity, clearcoat, emissive).',
+  },
+  {
+    path: 'examples/generative-art/golden-spiral-tower.forge.js',
+    note: 'Generative art — golden ratio spiral with scene control.',
+  },
+  {
+    path: 'examples/generative-art/molten-forge.forge.js',
+    note: 'Generative art — demonstrates per-object material properties (metalness, emissive glow).',
+  },
+  {
+    path: 'examples/generative-art/neon-coral.forge.js',
+    note: 'Generative art — multi-object coral colony with dramatic lighting.',
+  },
+  {
     path: 'examples/api/bill-of-materials.forge.js',
     note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
     expect: { minBomEntries: 3 },

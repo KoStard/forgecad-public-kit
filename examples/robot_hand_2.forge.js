@@ -584,7 +584,7 @@ const kinematicsMarkers = [
 
 const payloadShape = placeInHandFrame(payloadLocal.translate(rollTubeLen + 12, 0, 0)).color("#d98bc7");
 
-const scene = [
+const sceneObjects = [
   { name: "Mount System", group: mountGroup },
   { name: "Yaw Base", group: yawGroup },
   { name: "Arm Mechanics", group: armGroup },
@@ -593,10 +593,10 @@ const scene = [
 ];
 
 if (carryPayload === 1) {
-  scene.push({ name: "Payload (Rotates With Hand)", shape: explodeShape(payloadShape, [3.2, 0, 1.05], 2.6) });
+  sceneObjects.push({ name: "Payload (Rotates With Hand)", shape: explodeShape(payloadShape, [3.2, 0, 1.05], 2.6) });
 }
 
-const sceneBounds = collectSceneBounds(scene);
+const sceneBounds = collectSceneBounds(sceneObjects);
 const sectionMarginX = Math.max(30, (sceneBounds.max[0] - sceneBounds.min[0]) * 0.25);
 const sectionMarginZ = Math.max(30, (sceneBounds.max[2] - sceneBounds.min[2]) * 0.25);
 const sectionDefaultX = (sceneBounds.min[0] + sceneBounds.max[0]) * 0.5;
@@ -619,4 +619,4 @@ if (sectionEnabled === 1) {
   cutPlane("Internal Z", [0, 0, 1], sectionZ);
 }
 
-return scene;
+return sceneObjects;

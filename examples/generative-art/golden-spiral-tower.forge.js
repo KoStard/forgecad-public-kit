@@ -35,6 +35,11 @@ scene({
     vignette: { darkness: 0.6, offset: 0.4 },
     toneMappingExposure: param('exposure', 1.4, 0.5, 3),
   },
+
+  capture: {
+    framesPerTurn: 90,
+    pitchDeg: 25,
+  },
 });
 
 // ---------------------------------------------------------------------------

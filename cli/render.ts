@@ -24,7 +24,9 @@ import {
   type RunResult,
   type SceneObject,
   type SceneConfig,
+  type SceneCaptureConfig,
   type SceneLightConfig,
+  type ShapeMaterialProps,
 } from '../src/forge/headless';
 import { parseCameraCliSpec, type ViewportCameraState } from '../src/capture/cameraState';
 import {
@@ -110,6 +112,7 @@ interface CaptureSession {
   orbitRadius: number;
   orbitBaseTurn: number;
   orbitBasePitchDeg: number;
+  captureDefaults: SceneCaptureConfig | null;
 }
 
 function getRenderer(size: number, pixelRatio = 1): THREE.WebGLRenderer {
@@ -656,13 +659,18 @@ function createSession(
       source: obj,
       shape: obj.shape || (obj.sketch ? obj.sketch.extrude(1) : null),
       color: requestedSceneState?.objects?.[obj.id]?.color ?? obj.color,
-      opacity: THREE.MathUtils.clamp(requestedSceneState?.objects?.[obj.id]?.opacity ?? 1, 0, 1),
+      materialProps: obj.materialProps as ShapeMaterialProps | undefined,
+      opacity: THREE.MathUtils.clamp(
+        requestedSceneState?.objects?.[obj.id]?.opacity ?? obj.materialProps?.opacity ?? 1,
+        0, 1,
+      ),
       visible: requestedSceneState?.objects?.[obj.id]?.visible !== false,
     }))
     .filter((entry): entry is {
       source: SceneObject;
       shape: NonNullable<typeof entry.shape>;
       color?: string;
+      materialProps?: ShapeMaterialProps;
       opacity: number;
       visible: boolean;
     } => entry.shape != null);
@@ -742,9 +750,17 @@ function createSession(
 
   for (const obj of visibleObjs) {
     const geo = shapeToGeometry(obj.shape);
+    const mp = obj.materialProps;
     const solidMaterialProps = {
       ...CAD_MATERIAL_PROPS,
       color: parseColor(obj.color, CAD_MATERIAL_PROPS.color),
+      ...(mp?.metalness !== undefined && { metalness: mp.metalness }),
+      ...(mp?.roughness !== undefined && { roughness: mp.roughness }),
+      ...(mp?.clearcoat !== undefined && { clearcoat: mp.clearcoat }),
+      ...(mp?.clearcoatRoughness !== undefined && { clearcoatRoughness: mp.clearcoatRoughness }),
+      ...(mp?.emissive !== undefined && { emissive: new THREE.Color(mp.emissive) }),
+      ...(mp?.emissiveIntensity !== undefined && { emissiveIntensity: mp.emissiveIntensity }),
+      ...(mp?.wireframe && { wireframe: true }),
     };
     const applicableCutPlanes = activeCutPlanes
       .filter((cutPlane) => !isObjectExcludedFromCutPlane(obj.source, cutPlane))
@@ -830,6 +846,7 @@ function createSession(
     orbitRadius: cameraRig.orbitRadius,
     orbitBaseTurn: cameraRig.orbitBaseTurn,
     orbitBasePitchDeg: cameraRig.orbitBasePitchDeg,
+    captureDefaults: sceneConfig?.capture ?? null,
   };
 
   setSessionMode(session, 'solid');
@@ -917,6 +934,7 @@ async function setup() {
     })),
     defaultAnimation: captureSession.defaultAnimation,
     selectedAnimation: captureSession.selectedAnimation?.name ?? null,
+    captureDefaults: captureSession.captureDefaults ?? null,
   };
 };
 

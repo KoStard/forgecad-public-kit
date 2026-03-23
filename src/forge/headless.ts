@@ -45,6 +45,7 @@ export type {
   PlacementReferenceKind,
   PlacementReferences,
   FaceTransformationHistory,
+  ShapeMaterialProps,
   TransformationStep,
 } from './kernel';
 export { Transform, composeChain } from './transform';
@@ -155,6 +156,7 @@ export type {
   SceneGrainConfig,
   ScenePostProcessingConfig,
   SceneGroundConfig,
+  SceneCaptureConfig,
 } from './scene';
 export { clampAnimationProgress, findJointAnimationClip, resolveJointAnimation } from './jointAnimation';
 export { bom, resetBom, getCollectedBom } from './bom';

@@ -353,6 +353,11 @@ export class TrackedShape {
     return new TrackedShape(this.shape.color(value), this.topology, this.baseHeight, this.extrudeUp);
   }
 
+  /** Set material properties (metalness, roughness, emissive, etc.). Returns a new TrackedShape. */
+  material(props: import('../kernel').ShapeMaterialProps): TrackedShape {
+    return new TrackedShape(this.shape.material(props), this.topology, this.baseHeight, this.extrudeUp);
+  }
+
   /** Access the underlying Shape for boolean ops etc */
   toShape(): Shape {
     return this.shape;
