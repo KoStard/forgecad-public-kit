@@ -64,6 +64,7 @@ export function deserializeRunResult(s: SerializedRunResult): RunResult {
     sketch: null,
     objects: serializedObjects.map(deserializeSceneObject),
     highlights: s.highlights ?? [],
+    debugHighlights3D: s.debugHighlights3D ?? [],
     verifications: s.verifications ?? [],
     solverDebug: s.solverDebug ?? null,
   } as RunResult;

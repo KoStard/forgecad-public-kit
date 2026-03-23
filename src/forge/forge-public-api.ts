@@ -140,6 +140,8 @@ export { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';
 export type { EdgeSegment, EdgeQuery, BoundingRegion } from './edgeQuery';
 export { filletEdgeSegment, chamferEdgeSegment } from './edgeSegmentFeatures';
 
+export type { HighlightOptions } from './sketch/highlights';
+
 // `lib` — re-export the partLibrary object as `lib` so its full inferred type
 // (all the gear/pipe/extrusion helpers) is always in sync with library.ts.
 export { partLibrary as lib } from './library';
@@ -171,3 +173,28 @@ export declare function importAssembly(fileName: string, paramOverrides?: Record
 export declare function importSvgSketch(fileName: string, options?: _SvgImportOptions): _Sketch;
 /** Import an external mesh file (STL, OBJ, 3MF) as a Shape. */
 export declare function importMesh(fileName: string, options?: { scale?: number; center?: boolean }): _Shape;
+
+import type { HighlightOptions as _HighlightOptions } from './sketch/highlights';
+import type { FaceRef as _FaceRef, EdgeRef as _EdgeRef } from './sketch/topology';
+
+/**
+ * Highlight any geometry for visual debugging in the viewport.
+ *
+ * Supported inputs:
+ * - `string` — sketch entity ID (e.g. `'L0'`, `'P0'`, `'C0'`)
+ * - `[x, y, z]` — 3D point
+ * - `[[x1,y1,z1], [x2,y2,z2]]` — edge (line segment)
+ * - `{ normal: [x,y,z], offset: number }` — plane by normal + distance from origin
+ * - `{ normal: [x,y,z], point: [x,y,z] }` — plane by normal + point on plane
+ * - `Shape` or `TrackedShape` — highlight entire 3D shape
+ * - `FaceRef` (from `shape.face('top')`) — highlight as plane at face center
+ * - `EdgeRef` (from `shape.edge('left')`) — highlight as edge segment
+ */
+export declare function highlight(entityId: string, opts?: _HighlightOptions): void;
+export declare function highlight(point: [number, number, number], opts?: _HighlightOptions): void;
+export declare function highlight(edge: [[number, number, number], [number, number, number]], opts?: _HighlightOptions): void;
+export declare function highlight(plane: { normal: [number, number, number]; offset: number }, opts?: _HighlightOptions): void;
+export declare function highlight(plane: { normal: [number, number, number]; point: [number, number, number] }, opts?: _HighlightOptions): void;
+export declare function highlight(shape: _Shape | TrackedShape, opts?: _HighlightOptions): void;
+export declare function highlight(face: _FaceRef, opts?: _HighlightOptions): void;
+export declare function highlight(edge: _EdgeRef, opts?: _HighlightOptions): void;
