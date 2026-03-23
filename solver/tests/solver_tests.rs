@@ -51,6 +51,7 @@ fn two_rects_bridged_subgraph_detection() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![],
             groups: vec![],
             constraints: vec![
@@ -754,6 +755,7 @@ fn arc_consistency_maintained() {
         lines: vec![],
         circles: vec![],
         arcs: vec![a],
+        beziers: vec![],
         shapes: vec![],
         groups: vec![],
         constraints: vec![
@@ -1148,6 +1150,7 @@ fn cold_start_equilateral_triangle() {
         ],
         circles: vec![],
         arcs: vec![],
+        beziers: vec![],
         shapes: vec![],
         groups: vec![],
         constraints: vec![
@@ -1190,6 +1193,7 @@ fn cold_start_concentric_triangles() {
         ],
         circles: vec![],
         arcs: vec![],
+        beziers: vec![],
         shapes: vec![
             Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
             Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
@@ -1242,6 +1246,7 @@ fn cold_start_case_frame() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![],
             groups: vec![],
             constraints: vec![
@@ -1304,6 +1309,7 @@ fn cold_start_triangle_plus_case() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![
                 Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
                 Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
@@ -1395,6 +1401,7 @@ fn cold_start_triangle_case_inner() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![
                 Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
                 Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
@@ -1516,6 +1523,7 @@ fn cold_start_with_camera() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![
                 Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
                 Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
@@ -1611,6 +1619,7 @@ fn cold_start_rect_on_parallel_lines() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![],
             groups: vec![],
             constraints: vec![
@@ -1666,6 +1675,7 @@ fn cold_start_rect_on_free_lines() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![],
             groups: vec![],
             constraints: vec![
@@ -1756,6 +1766,7 @@ fn camera_on_lines_problem(offset: f64) -> Problem {
         ],
         circles: vec![],
         arcs: vec![],
+        beziers: vec![],
         shapes: vec![],
         groups: vec![],
         constraints: vec![
@@ -1863,6 +1874,7 @@ fn lm_basin_wrong_scale() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![],
             groups: vec![],
             constraints: vec![
@@ -1919,6 +1931,7 @@ fn lm_basin_no_line_lengths() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![],
             groups: vec![],
             constraints: vec![
@@ -2027,6 +2040,7 @@ fn lm_camera_from_solution() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![
                 Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
                 Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
@@ -2247,6 +2261,7 @@ fn cold_start_full_spectrometer() {
             ],
             circles: vec![],
             arcs: vec![],
+            beziers: vec![],
             shapes: vec![
                 Shape { id: "ishp".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
                 Shape { id: "oshp".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
@@ -2413,6 +2428,7 @@ fn lm_local_minima_landscape() {
                 ],
                 circles: vec![],
                 arcs: vec![],
+                beziers: vec![],
                 shapes: vec![
                     Shape { id: "ishape".into(), lines: vec!["is0".into(), "is1".into(), "is2".into()] },
                     Shape { id: "oshape".into(), lines: vec!["os0".into(), "os1".into(), "os2".into()] },
@@ -2482,4 +2498,263 @@ fn lm_local_minima_landscape() {
             }
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Arc-to-arc tangent constraint (G1 smooth arc connection)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Two arcs sharing an endpoint, constrained to be tangent (G1).
+/// Arc1 ends where Arc2 starts. The tangent constraint ensures the
+/// radius vectors at the junction are collinear.
+#[test]
+fn arc_tangent_arc_basic() {
+    // Arc1: center at (0,0), radius 10, from 0° to 90° CCW
+    // Arc2: center at (0,20), radius 10, from 270° to 360° CCW
+    // Junction point at (0,10) — both arcs share this point.
+    // When tangent, centers (0,0), junction (0,10), center (0,20) are collinear.
+    let result = solve_problem(
+        problem_with_arcs(
+            vec![
+                fixed_point("c1", 0.0, 0.0),      // center of arc1
+                point("start1", 10.0, 0.0),         // arc1 start
+                point("junction", 0.5, 10.5),       // slightly perturbed junction
+                point("c2", 0.5, 20.0),             // center of arc2 (free)
+                point("end2", 10.0, 20.0),           // arc2 end
+            ],
+            vec![],
+            vec![],
+            vec![
+                arc("arc1", "c1", "start1", "junction", 10.0, false),
+                arc("arc2", "c2", "junction", "end2", 10.0, false),
+            ],
+            vec![
+                Constraint::Coincident { id: "co1".into(), a: "junction".into(), b: "junction".into() },
+                Constraint::ArcTangentArc {
+                    id: "ata1".into(),
+                    arc_a: "arc1".into(),
+                    arc_b: "arc2".into(),
+                    a_at_start: false,  // arc1's end
+                    b_at_start: true,   // arc2's start
+                },
+                // Fix arc1 radius
+                Constraint::Radius { id: "r1".into(), circle: "arc1".into(), value: 10.0 },
+                Constraint::Radius { id: "r2".into(), circle: "arc2".into(), value: 10.0 },
+            ],
+        ),
+        Some(tight_options()),
+    );
+    assert_solved(&result, 0.01, "arc_tangent_arc_basic");
+
+    // Verify collinearity: c1, junction, c2 should be on the same line.
+    let (c1x, c1y) = get_pt(&result, "c1");
+    let (jx, jy) = get_pt(&result, "junction");
+    let (c2x, c2y) = get_pt(&result, "c2");
+    // Cross product of (junction-c1) and (c2-c1) should be ~0.
+    let cross = (jx - c1x) * (c2y - c1y) - (jy - c1y) * (c2x - c1x);
+    assert!(cross.abs() < 0.1, "centers and junction not collinear: cross={cross}");
+}
+
+/// Two arcs at 45° angle before constraint — solver must rotate them into tangency.
+#[test]
+fn arc_tangent_arc_non_trivial_angle() {
+    // Arc1 centered at origin, ends at (7.07, 7.07) (45° on radius-10 circle).
+    // Arc2 centered at (14, 14), starts at the same junction.
+    // Initially the radii make ~45° angle; tangent constraint should make them collinear.
+    let r = 10.0;
+    let junction_x = r * (std::f64::consts::PI / 4.0).cos();
+    let junction_y = r * (std::f64::consts::PI / 4.0).sin();
+    let result = solve_problem(
+        problem_with_arcs(
+            vec![
+                fixed_point("c1", 0.0, 0.0),
+                point("s1", r, 0.0),
+                point("j", junction_x, junction_y),
+                point("c2", 14.0, 14.0),        // free center for arc2
+                point("e2", 24.0, 14.0),
+            ],
+            vec![],
+            vec![],
+            vec![
+                arc("a1", "c1", "s1", "j", r, false),
+                arc("a2", "c2", "j", "e2", r, false),
+            ],
+            vec![
+                Constraint::ArcTangentArc {
+                    id: "ata".into(),
+                    arc_a: "a1".into(),
+                    arc_b: "a2".into(),
+                    a_at_start: false,
+                    b_at_start: true,
+                },
+                Constraint::Radius { id: "r1".into(), circle: "a1".into(), value: r },
+                Constraint::Radius { id: "r2".into(), circle: "a2".into(), value: r },
+            ],
+        ),
+        Some(tight_options()),
+    );
+    assert_solved(&result, 0.01, "arc_tangent_arc_angle");
+
+    // Verify tangent directions match at junction.
+    let (c1x, c1y) = get_pt(&result, "c1");
+    let (jx, jy) = get_pt(&result, "j");
+    let (c2x, c2y) = get_pt(&result, "c2");
+    let r1x = jx - c1x; let r1y = jy - c1y;
+    let r2x = jx - c2x; let r2y = jy - c2y;
+    let len1 = r1x.hypot(r1y).max(1e-9);
+    let len2 = r2x.hypot(r2y).max(1e-9);
+    let cross = (r1x / len1) * (r2y / len2) - (r1y / len1) * (r2x / len2);
+    assert!(cross.abs() < 0.01, "tangent directions not matched: cross={cross}");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Bezier-to-arc tangent constraint
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// A Bezier curve tangent to an arc at the arc's end.
+/// The direction P1-P0 must be perpendicular to the arc radius at the contact.
+#[test]
+fn bezier_tangent_arc_at_start() {
+    // Arc centered at origin, radius 10. End point at (0, 10).
+    // Bezier starts at (0, 10) — tangent direction should be horizontal (perpendicular to vertical radius).
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                fixed_point("arc_center", 0.0, 0.0),
+                fixed_point("arc_start", 10.0, 0.0),
+                fixed_point("arc_end", 0.0, 10.0),
+                // Bezier P0 = arc_end (shared), P1 slightly off
+                point("bp1", 3.0, 13.0),
+                point("bp2", 8.0, 15.0),
+                point("bp3", 15.0, 15.0),
+            ],
+            lines: vec![],
+            circles: vec![],
+            arcs: vec![arc("a1", "arc_center", "arc_start", "arc_end", 10.0, false)],
+            beziers: vec![Bezier {
+                id: "b1".into(),
+                p0: "arc_end".into(),
+                p1: "bp1".into(),
+                p2: "bp2".into(),
+                p3: "bp3".into(),
+            }],
+            shapes: vec![],
+            groups: vec![],
+            constraints: vec![
+                Constraint::BezierTangentArc {
+                    id: "bta1".into(),
+                    tangent_base: "arc_end".into(),    // P0
+                    tangent_control: "bp1".into(),     // P1
+                    arc: "a1".into(),
+                    at_arc_start: false,  // arc's end
+                },
+            ],
+            options: None,
+        },
+        Some(tight_options()),
+    );
+    assert_solved(&result, 0.01, "bezier_tangent_arc_start");
+
+    // Verify tangent direction is perpendicular to radius at arc_end.
+    // Arc radius at (0,10): direction = (0,10)-(0,0) = (0,1).
+    // Tangent = P1 - P0 should have dot product ~0 with radius (0,1).
+    let (p0x, p0y) = get_pt(&result, "arc_end");
+    let (p1x, p1y) = get_pt(&result, "bp1");
+    let (cx, cy) = get_pt(&result, "arc_center");
+    let rdx = p0x - cx; let rdy = p0y - cy;
+    let tdx = p1x - p0x; let tdy = p1y - p0y;
+    let len_r = rdx.hypot(rdy).max(1e-9);
+    let len_t = tdx.hypot(tdy).max(1e-9);
+    let dot = (tdx / len_t) * (rdx / len_r) + (tdy / len_t) * (rdy / len_r);
+    assert!(dot.abs() < 0.01, "bezier not tangent to arc: dot={dot}");
+}
+
+/// Combined: two arcs connected by a Bezier blend with tangency at both ends.
+#[test]
+fn bezier_bridge_between_arcs() {
+    // Arc1: center (0,0), radius 10, ends at (0,10).
+    // Arc2: center (30,0), radius 10, starts at (30,10).
+    // Bezier bridge from (0,10) to (30,10) with tangency constraints at both ends.
+    let result = solve_problem(
+        Problem {
+            points: vec![
+                fixed_point("c1", 0.0, 0.0),
+                point("s1", 10.0, 0.0),
+                fixed_point("j1", 0.0, 10.0),
+                fixed_point("c2", 30.0, 0.0),
+                point("e2", 20.0, 0.0),
+                fixed_point("j2", 30.0, 10.0),
+                // Bezier control points (free)
+                point("bp1", 5.0, 12.0),
+                point("bp2", 25.0, 12.0),
+            ],
+            lines: vec![],
+            circles: vec![],
+            arcs: vec![
+                arc("a1", "c1", "s1", "j1", 10.0, false),
+                arc("a2", "c2", "j2", "e2", 10.0, false),
+            ],
+            beziers: vec![Bezier {
+                id: "bez".into(),
+                p0: "j1".into(),
+                p1: "bp1".into(),
+                p2: "bp2".into(),
+                p3: "j2".into(),
+            }],
+            shapes: vec![],
+            groups: vec![],
+            constraints: vec![
+                // Bezier tangent to arc1 at its end (bezier start)
+                Constraint::BezierTangentArc {
+                    id: "bta1".into(),
+                    tangent_base: "j1".into(),
+                    tangent_control: "bp1".into(),
+                    arc: "a1".into(),
+                    at_arc_start: false,
+                },
+                // Bezier tangent to arc2 at its start (bezier end)
+                Constraint::BezierTangentArc {
+                    id: "bta2".into(),
+                    tangent_base: "j2".into(),
+                    tangent_control: "bp2".into(),
+                    arc: "a2".into(),
+                    at_arc_start: true,
+                },
+            ],
+            options: None,
+        },
+        Some(tight_options()),
+    );
+    assert_solved(&result, 0.01, "bezier_bridge");
+
+    // Verify both tangency conditions.
+    // At j1: tangent (bp1-j1) ⊥ radius (j1-c1)
+    let (j1x, j1y) = get_pt(&result, "j1");
+    let (bp1x, bp1y) = get_pt(&result, "bp1");
+    let (c1x, c1y) = get_pt(&result, "c1");
+    let rdx1 = j1x - c1x; let rdy1 = j1y - c1y;
+    let tdx1 = bp1x - j1x; let tdy1 = bp1y - j1y;
+    let dot1 = (tdx1 * rdx1 + tdy1 * rdy1) / (tdx1.hypot(tdy1).max(1e-9) * rdx1.hypot(rdy1).max(1e-9));
+    assert!(dot1.abs() < 0.01, "not tangent at j1: dot={dot1}");
+
+    // At j2: tangent (bp2-j2) ⊥ radius (j2-c2)
+    let (j2x, j2y) = get_pt(&result, "j2");
+    let (bp2x, bp2y) = get_pt(&result, "bp2");
+    let (c2x, c2y) = get_pt(&result, "c2");
+    let rdx2 = j2x - c2x; let rdy2 = j2y - c2y;
+    let tdx2 = bp2x - j2x; let tdy2 = bp2y - j2y;
+    let dot2 = (tdx2 * rdx2 + tdy2 * rdy2) / (tdx2.hypot(tdy2).max(1e-9) * rdx2.hypot(rdy2).max(1e-9));
+    assert!(dot2.abs() < 0.01, "not tangent at j2: dot={dot2}");
+
+    // Control points should be roughly horizontal (tangent to vertical radii)
+    assert!(bp1y.abs() > 9.0, "bp1 should be near y=10, got y={bp1y}");
+    assert!(bp2y.abs() > 9.0, "bp2 should be near y=10, got y={bp2y}");
+}
+
+#[test]
+fn parse_json_with_beziers_field() {
+    let json = r#"{"points":[],"lines":[],"circles":[],"arcs":[],"beziers":[],"shapes":[],"constraints":[{"type":"arcTangentArc","arc_a":"a1","arc_b":"a2","a_at_start":false,"b_at_start":true,"id":"c1"}],"options":null}"#;
+    let problem: Problem = serde_json::from_str(json).expect("should parse");
+    assert_eq!(problem.constraints.len(), 1);
+    assert_eq!(problem.beziers.len(), 0);
 }

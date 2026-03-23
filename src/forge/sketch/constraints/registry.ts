@@ -153,6 +153,7 @@ export const buildConstraintDisplays = (
     lines: new Map(def.lines.map((l) => [l.id, l] as const)),
     circles: new Map(def.circles.map((c) => [c.id, c] as const)),
     arcs: new Map((def.arcs ?? []).map((a) => [a.id, a] as const)),
+    beziers: new Map((def.beziers ?? []).map((b) => [b.id, b] as const)),
     shapes: new Map((def.shapes ?? []).map((s) => [s.id, s] as const)),
   };
 

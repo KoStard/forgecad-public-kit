@@ -146,6 +146,21 @@ pub struct GroupResult {
     pub theta: f64,
 }
 
+/// A cubic Bezier curve defined by four control points.
+/// Shape is determined entirely by the control point positions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Bezier {
+    pub id: String,
+    /// First control point (start of curve).
+    pub p0: String,
+    /// Second control point (controls tangent at start).
+    pub p1: String,
+    /// Third control point (controls tangent at end).
+    pub p2: String,
+    /// Fourth control point (end of curve).
+    pub p3: String,
+}
+
 // ─── Constraint payload ───────────────────────────────────────────────────────
 
 /// All constraint types with their data, discriminated by `kind`.
@@ -207,6 +222,35 @@ pub enum Constraint {
     SameDirection { id: String, a: String, b: String },
     #[serde(rename = "oppositeDirection")]
     OppositeDirection { id: String, a: String, b: String },
+    /// Two arcs are tangent at a shared junction point (G1 continuity).
+    /// The radius vectors at the junction must be collinear (cross product = 0).
+    #[serde(rename = "arcTangentArc")]
+    ArcTangentArc {
+        id: String,
+        arc_a: String,
+        arc_b: String,
+        /// Use arc_a's start (true) or end (false) as the junction point.
+        a_at_start: bool,
+        /// Use arc_b's start (true) or end (false) as the junction point.
+        b_at_start: bool,
+    },
+    /// A cubic Bezier curve is tangent to an arc at one of their endpoints.
+    /// The direction from `tangent_base` to `tangent_control` must be perpendicular
+    /// to the arc's radius at the contact point.
+    /// The TS builder resolves the bezier entity to these two point IDs:
+    ///   - at bezier start: tangent_base=P0, tangent_control=P1
+    ///   - at bezier end: tangent_base=P3, tangent_control=P2
+    #[serde(rename = "bezierTangentArc")]
+    BezierTangentArc {
+        id: String,
+        /// Point on the Bezier curve at the tangent end (P0 for start, P3 for end).
+        tangent_base: String,
+        /// Control point that defines tangent direction (P1 for start, P2 for end).
+        tangent_control: String,
+        arc: String,
+        /// Use arc start (true) or end (false) as the contact point.
+        at_arc_start: bool,
+    },
 }
 
 impl Constraint {
@@ -250,6 +294,8 @@ impl Constraint {
             Constraint::BlockRotation { id, .. } => id,
             Constraint::SameDirection { id, .. } => id,
             Constraint::OppositeDirection { id, .. } => id,
+            Constraint::ArcTangentArc { id, .. } => id,
+            Constraint::BezierTangentArc { id, .. } => id,
         }
     }
 }
@@ -307,6 +353,8 @@ pub struct Problem {
     pub circles: Vec<Circle>,
     pub arcs: Vec<Arc>,
     pub shapes: Vec<Shape>,
+    #[serde(default)]
+    pub beziers: Vec<Bezier>,
     #[serde(default)]
     pub groups: Vec<SketchGroup>,
     pub constraints: Vec<Constraint>,
@@ -438,6 +486,8 @@ impl Constraint {
             Constraint::BlockRotation { .. } => 0,
             Constraint::SameDirection { .. } => 1,
             Constraint::OppositeDirection { .. } => 1,
+            Constraint::ArcTangentArc { .. } => 1,
+            Constraint::BezierTangentArc { .. } => 1,
         }
     }
 }

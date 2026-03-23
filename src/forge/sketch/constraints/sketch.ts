@@ -50,6 +50,32 @@ const tessellateArc = (
   return pts;
 };
 
+// ─── Bezier tessellation ────────────────────────────────────────────────────────
+
+const BEZIER_SEGMENTS = 32;
+
+/**
+ * Tessellate a cubic Bezier curve into a polyline.
+ * Uses de Casteljau evaluation. Returns `segments` points (excluding start point).
+ */
+const tessellateBezier = (
+  p0x: number, p0y: number,
+  p1x: number, p1y: number,
+  p2x: number, p2y: number,
+  p3x: number, p3y: number,
+  segments: number,
+): [number, number][] => {
+  const pts: [number, number][] = [];
+  for (let k = 1; k <= segments; k++) {
+    const t = k / segments;
+    const u = 1 - t;
+    const x = u * u * u * p0x + 3 * u * u * t * p1x + 3 * u * t * t * p2x + t * t * t * p3x;
+    const y = u * u * u * p0y + 3 * u * u * t * p1y + 3 * u * t * t * p2y + t * t * t * p3y;
+    pts.push([x, y]);
+  }
+  return pts;
+};
+
 // ─── Geometry builders ─────────────────────────────────────────────────────────
 
 export const cloneDefinition = (def: ConstraintDefinition): ConstraintDefinition => ({
@@ -57,6 +83,7 @@ export const cloneDefinition = (def: ConstraintDefinition): ConstraintDefinition
   lines: def.lines.map((l) => ({ ...l })),
   circles: def.circles.map((c) => ({ ...c })),
   arcs: (def.arcs ?? []).map((a) => ({ ...a })),
+  beziers: (def.beziers ?? []).map((b) => ({ ...b })),
   shapes: (def.shapes ?? []).map((s) => ({ ...s, lines: [...s.lines] })),
   groups: (def.groups ?? []).map((g) => ({
     ...g,
@@ -78,6 +105,7 @@ export const buildSketchFromDefinition = (def: ConstraintDefinition): Sketch => 
   const ptMap = new Map(def.points.map((p) => [p.id, p] as const));
   const lineMap = new Map(def.lines.map((l) => [l.id, l] as const));
   const arcMap = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
+  const bezMap = new Map((def.beziers ?? []).map((b) => [b.id, b] as const));
   const ARC_SEGMENTS = 32;
 
   def.loops.forEach((loop) => {
@@ -121,6 +149,17 @@ export const buildSketchFromDefinition = (def: ConstraintDefinition): Sketch => 
           const endAngle = Math.atan2(end.y - center.y, end.x - center.x);
           const arcPts = tessellateArc(center.x, center.y, arc.radius, startAngle, endAngle, arc.clockwise, ARC_SEGMENTS);
           pts.push(...arcPts);
+        } else if (seg.kind === 'bezier') {
+          const bez = bezMap.get(seg.bezier);
+          if (!bez) continue;
+          const bp0 = ptMap.get(bez.p0);
+          const bp1 = ptMap.get(bez.p1);
+          const bp2 = ptMap.get(bez.p2);
+          const bp3 = ptMap.get(bez.p3);
+          if (!bp0 || !bp1 || !bp2 || !bp3) continue;
+          if (pts.length === 0) pts.push([bp0.x, bp0.y]);
+          const bezPts = tessellateBezier(bp0.x, bp0.y, bp1.x, bp1.y, bp2.x, bp2.y, bp3.x, bp3.y, BEZIER_SEGMENTS);
+          pts.push(...bezPts);
         }
       }
       if (pts.length >= 3) loops.push(polygon(pts));
@@ -219,9 +258,23 @@ export const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMe
     })
     .filter((arc): arc is NonNullable<typeof arc> => arc !== null);
 
+  const beziers = (def.beziers ?? [])
+    .filter((bez) => !bez.construction)
+    .map((bez) => {
+      const bp0 = pointMap.get(bez.p0);
+      const bp1 = pointMap.get(bez.p1);
+      const bp2 = pointMap.get(bez.p2);
+      const bp3 = pointMap.get(bez.p3);
+      if (!bp0 || !bp1 || !bp2 || !bp3) return null;
+      const tessPoints: [number, number][] = [[bp0.x, bp0.y]];
+      tessPoints.push(...tessellateBezier(bp0.x, bp0.y, bp1.x, bp1.y, bp2.x, bp2.y, bp3.x, bp3.y, BEZIER_SEGMENTS));
+      return { id: bez.id, name: bez.name, points: tessPoints };
+    })
+    .filter((bez): bez is NonNullable<typeof bez> => bez !== null);
+
   const points = def.points.map((p) => ({ id: p.id, pos: [p.x, p.y] as [number, number] }));
 
-  return { lines, circles, arcs, points };
+  return { lines, circles, arcs, beziers, points };
 };
 
 // ─── Surface detection ──────────────────────────────────────────────────────

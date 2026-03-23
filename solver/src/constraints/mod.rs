@@ -768,6 +768,15 @@ pub fn constraint_entity_ids(
                 if let Some(l) = lines_map.get(lid.as_str()) { push!(l.a); push!(l.b); }
             }
         }
+        Constraint::ArcTangentArc { arc_a, arc_b, .. } => {
+            push!(arc_a); push!(arc_b);
+            if let Some(a) = arcs_map.get(arc_a.as_str()) { push!(a.center); push!(a.start); push!(a.end); }
+            if let Some(a) = arcs_map.get(arc_b.as_str()) { push!(a.center); push!(a.start); push!(a.end); }
+        }
+        Constraint::BezierTangentArc { tangent_base, tangent_control, arc, .. } => {
+            push!(tangent_base); push!(tangent_control); push!(arc);
+            if let Some(a) = arcs_map.get(arc.as_str()) { push!(a.center); push!(a.start); push!(a.end); }
+        }
     }
 
     ids.sort();
@@ -1151,6 +1160,47 @@ fn residual(
             } else {
                 vec![cross]
             }
+        }
+
+        // ─── Arc-to-arc G1 tangent ───────────────────────────────────────────
+        // Two arcs are tangent at a shared junction: their radius vectors at the
+        // junction must be collinear (cross product of unit radii = 0).
+        Constraint::ArcTangentArc { arc_a, arc_b, a_at_start, b_at_start, .. } => {
+            let Some(aa) = arcs.get(arc_a.as_str()) else { return vec![0.0]; };
+            let Some(ab) = arcs.get(arc_b.as_str()) else { return vec![0.0]; };
+            let contact_a_id = if *a_at_start { &aa.start } else { &aa.end };
+            let contact_b_id = if *b_at_start { &ab.start } else { &ab.end };
+            let Some(center_a) = pts.get(aa.center.as_str()) else { return vec![0.0]; };
+            let Some(contact_a) = pts.get(contact_a_id.as_str()) else { return vec![0.0]; };
+            let Some(center_b) = pts.get(ab.center.as_str()) else { return vec![0.0]; };
+            let Some(contact_b) = pts.get(contact_b_id.as_str()) else { return vec![0.0]; };
+            // Radius vectors: contact - center
+            let r_ax = contact_a.x - center_a.x; let r_ay = contact_a.y - center_a.y;
+            let r_bx = contact_b.x - center_b.x; let r_by = contact_b.y - center_b.y;
+            let len_a = r_ax.hypot(r_ay).max(1e-9);
+            let len_b = r_bx.hypot(r_by).max(1e-9);
+            // Cross product of unit radius vectors = 0 → collinear
+            vec![(r_ax / len_a) * (r_by / len_b) - (r_ay / len_a) * (r_bx / len_b)]
+        }
+
+        // ─── Bezier-to-arc tangent ───────────────────────────────────────────
+        // The Bezier tangent direction (tangent_control - tangent_base) must be
+        // perpendicular to the arc's radius at the contact point.
+        Constraint::BezierTangentArc { tangent_base, tangent_control, arc, at_arc_start, .. } => {
+            let Some(base) = pts.get(tangent_base.as_str()) else { return vec![0.0]; };
+            let Some(ctrl) = pts.get(tangent_control.as_str()) else { return vec![0.0]; };
+            let Some(arc_obj) = arcs.get(arc.as_str()) else { return vec![0.0]; };
+            let contact_id = if *at_arc_start { &arc_obj.start } else { &arc_obj.end };
+            let Some(center) = pts.get(arc_obj.center.as_str()) else { return vec![0.0]; };
+            let Some(contact) = pts.get(contact_id.as_str()) else { return vec![0.0]; };
+            // Bezier tangent direction
+            let tdx = ctrl.x - base.x; let tdy = ctrl.y - base.y;
+            // Arc radius direction at contact
+            let rdx = contact.x - center.x; let rdy = contact.y - center.y;
+            let len_t = tdx.hypot(tdy).max(1e-9);
+            let len_r = rdx.hypot(rdy).max(1e-9);
+            // dot product = 0 → perpendicular (tangent to arc)
+            vec![(tdx / len_t) * (rdx / len_r) + (tdy / len_t) * (rdy / len_r)]
         }
     }
 }

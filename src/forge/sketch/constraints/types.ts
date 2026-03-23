@@ -8,6 +8,7 @@ export type PointId = string;
 export type LineId = string;
 export type CircleId = string;
 export type ArcId = string;
+export type BezierId = string;
 export type ShapeId = string;
 export type GroupId = string;
 
@@ -89,10 +90,27 @@ export interface SketchCircle {
   name?: string;
 }
 
-/** A segment in a mixed line/arc profile loop. */
+/** A cubic Bezier curve defined by four control points. */
+export interface SketchBezier {
+  id: BezierId;
+  /** First control point (start of curve). */
+  p0: PointId;
+  /** Second control point (controls tangent at start). */
+  p1: PointId;
+  /** Third control point (controls tangent at end). */
+  p2: PointId;
+  /** Fourth control point (end of curve). */
+  p3: PointId;
+  construction: boolean;
+  /** Optional human-readable name for display. */
+  name?: string;
+}
+
+/** A segment in a mixed line/arc/bezier profile loop. */
 export type ProfileSegment =
   | { kind: 'line'; line: LineId }
-  | { kind: 'arc'; arc: ArcId };
+  | { kind: 'arc'; arc: ArcId }
+  | { kind: 'bezier'; bezier: BezierId };
 
 export type SketchLoop =
   | { type: 'poly'; points: PointId[] }
@@ -191,6 +209,7 @@ export interface SketchConstraintMeta {
     lines: { id: string; name?: string; a: [number, number]; b: [number, number] }[];
     circles: { id: string; name?: string; center: [number, number]; radius: number }[];
     arcs: { id: string; name?: string; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
+    beziers: { id: string; name?: string; points: [number, number][] }[];
     points: { id: string; pos: [number, number] }[];
   };
   /** True when the solver hit its time budget before fully converging. */
@@ -204,6 +223,7 @@ export interface ConstraintDefinition {
   lines: SketchLine[];
   circles: SketchCircle[];
   arcs: SketchArc[];
+  beziers: SketchBezier[];
   shapes: SketchShape[];
   /** Rigid-body groups — the solver sees 3 DOF per group instead of 2N per point. */
   groups: SketchGroup[];
@@ -280,6 +300,7 @@ export interface DisplayContext {
   lines: Map<LineId, SketchLine>;
   circles: Map<CircleId, SketchCircle>;
   arcs: Map<ArcId, SketchArc>;
+  beziers: Map<BezierId, SketchBezier>;
   shapes: Map<ShapeId, SketchShape>;
 }
 

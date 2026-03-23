@@ -6,6 +6,7 @@
  */
 import type {
   ArcId,
+  BezierId,
   CircleId,
   ConstraintBuilderMethods,
   ConstraintDefinition,
@@ -14,6 +15,7 @@ import type {
   PointId,
   ShapeId,
   SketchArc,
+  SketchBezier,
   SketchCircle,
   SketchConstraint,
   SketchGroup,
@@ -43,6 +45,7 @@ export class ConstrainedSketchBuilder {
   private lines: SketchLine[] = [];
   private circles: SketchCircle[] = [];
   private arcs: SketchArc[] = [];
+  private beziers: SketchBezier[] = [];
   private shapes: SketchShape[] = [];
   private _groups: SketchGroup[] = [];
   /** Point IDs owned by groups — excluded from the serialized points array. */
@@ -56,6 +59,8 @@ export class ConstrainedSketchBuilder {
   private rejectionReasons = new Map<string, string>();
   private cursor: PointId | null = null;
   private loopStart: PointId | null = null;
+  /** Last arc created by the path API (arcTo), used by blendTo. */
+  private lastPathArc: ArcId | null = null;
   private nextId = 1;
   private strict: boolean;
   /** Cumulative time spent in seedIncrementalGeometry calls (ms). */
@@ -225,6 +230,7 @@ export class ConstrainedSketchBuilder {
     const loop = this.loops[this.loops.length - 1];
     if (loop?.type === 'profile') loop.segments.push({ kind: 'arc', arc: arcId });
     this.cursor = endId;
+    this.lastPathArc = arcId;
     return this;
   }
 
@@ -244,6 +250,92 @@ export class ConstrainedSketchBuilder {
       this._sessionApi!.session_add_arc(this._sessionHandle, id, centerId, startId, endId, radius, clockwise);
     }
     return id;
+  }
+
+  /**
+   * Create a cubic Bezier curve from four control points.
+   * Returns the BezierId. Does NOT advance the cursor.
+   */
+  bezier(p0: any, p1: any, p2: any, p3: any, name?: string): BezierId {
+    const p0Id = this.resolvePointId(p0);
+    const p1Id = this.resolvePointId(p1);
+    const p2Id = this.resolvePointId(p2);
+    const p3Id = this.resolvePointId(p3);
+    const id: BezierId = `bez-${this.nextId++}`;
+    this.beziers.push({ id, p0: p0Id, p1: p1Id, p2: p2Id, p3: p3Id, construction: false, name });
+    return id;
+  }
+
+  /**
+   * Draw a Bezier curve from the current cursor to (x3, y3) with control points (x1, y1) and (x2, y2).
+   * The cursor becomes the Bezier's P0; the end point becomes the new cursor.
+   */
+  bezierTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): this {
+    if (!this.cursor) return this;
+    const cp1 = this.point(x1, y1);
+    const cp2 = this.point(x2, y2);
+    const endPt = this.point(x3, y3);
+    const bezId = this.bezier(this.cursor, cp1, cp2, endPt);
+    const loop = this.loops[this.loops.length - 1];
+    if (loop?.type === 'profile') loop.segments.push({ kind: 'bezier', bezier: bezId });
+    this.cursor = endPt;
+    return this;
+  }
+
+  /**
+   * Draw a smooth Bezier curve from the current cursor to (x, y), tangent to
+   * the previous arc. The cursor must be on the end of a previous `arcTo()`.
+   *
+   * Unlike `bezierTo()`, control points are computed automatically from the
+   * arc's tangent direction — no manual control point placement needed.
+   *
+   * @param weight — 0–1, controls how long the arc's shape is preserved.
+   *                 Higher = arc dominates longer. Default 0.5.
+   */
+  blendTo(x: number, y: number, weight = 0.5): this {
+    if (!this.cursor || !this.lastPathArc) {
+      throw new Error('blendTo: cursor must be on the end of a previous arcTo() call');
+    }
+
+    const arc = this.arcs.find(a => a.id === this.lastPathArc)!;
+    const pt0 = this.getPoint(this.cursor)!;
+    const center = this.getPoint(arc.center)!;
+
+    // Arc tangent at the departure point
+    const rx = pt0.x - center.x;
+    const ry = pt0.y - center.y;
+    let tx: number, ty: number;
+    if (arc.clockwise) { tx = ry; ty = -rx; }
+    else               { tx = -ry; ty = rx; }
+    const tLen = Math.hypot(tx, ty) || 1;
+    tx /= tLen; ty /= tLen;
+
+    const endPt = this.point(x, y);
+    const pt3 = this.getPoint(endPt)!;
+    const dx = pt3.x - pt0.x;
+    const dy = pt3.y - pt0.y;
+    const dist = Math.hypot(dx, dy) || 1;
+
+    // Handle lengths: departure side uses weight, arrival uses (1-weight)
+    const handleBudget = dist * 0.55;
+    const h1 = handleBudget * (weight * 2);
+    const h2 = handleBudget * ((1 - weight) * 2);
+
+    // P1: departure control point, tangent to the arc
+    const p1 = this.point(pt0.x + tx * h1, pt0.y + ty * h1);
+
+    // P2: arrival control point, aimed back along the chord toward P0
+    const ndx = dx / dist, ndy = dy / dist;
+    const p2 = this.point(pt3.x - ndx * h2, pt3.y - ndy * h2);
+
+    const bezId = this.bezier(this.cursor, p1, p2, endPt);
+    this.bezierTangentArc(bezId, this.lastPathArc, true, false);
+
+    const loop = this.loops[this.loops.length - 1];
+    if (loop?.type === 'profile') loop.segments.push({ kind: 'bezier', bezier: bezId });
+    this.cursor = endPt;
+    this.lastPathArc = null;
+    return this;
   }
 
   close(): this {
@@ -402,6 +494,14 @@ export class ConstrainedSketchBuilder {
       const { atStart, ...rest } = raw as any;
       return JSON.stringify({ ...rest, at_start: atStart });
     }
+    if (raw['type'] === 'arcTangentArc') {
+      const { arcA, arcB, aAtStart, bAtStart, ...rest } = raw as any;
+      return JSON.stringify({ ...rest, arc_a: arcA, arc_b: arcB, a_at_start: aAtStart, b_at_start: bAtStart });
+    }
+    if (raw['type'] === 'bezierTangentArc') {
+      const { tangentBase, tangentControl, atArcStart, ...rest } = raw as any;
+      return JSON.stringify({ ...rest, tangent_base: tangentBase, tangent_control: tangentControl, at_arc_start: atArcStart });
+    }
     return JSON.stringify(raw);
   }
 
@@ -492,6 +592,21 @@ export class ConstrainedSketchBuilder {
     }
     if (!this.arcs.some((ar) => ar.id === id)) {
       throw new Error(`Arc "${id}" not found in sketch. Available arcs: ${this.arcs.map((ar) => ar.id).join(', ') || '(none)'}`);
+    }
+    return id;
+  }
+
+  private resolveBezierId(b: any): BezierId {
+    let id: string;
+    if (typeof b === 'string') {
+      id = b;
+    } else if (b && typeof b === 'object' && 'id' in b && typeof b.id === 'string') {
+      id = b.id;
+    } else {
+      throw new Error(`Invalid bezier reference: ${b}`);
+    }
+    if (!this.beziers.some((bz) => bz.id === id)) {
+      throw new Error(`Bezier "${id}" not found in sketch. Available beziers: ${this.beziers.map((bz) => bz.id).join(', ') || '(none)'}`);
     }
     return id;
   }
@@ -726,6 +841,169 @@ export class ConstrainedSketchBuilder {
     return this.constrain({ type: 'lineTangentArc', line: this.resolveLineId(line), arc: this.resolveArcId(arc), atStart } as Omit<SketchConstraint, 'id'>);
   }
 
+  /**
+   * Constrain two arcs to be tangent (G1 smooth) at their shared junction point.
+   * The radius vectors at the junction must be collinear.
+   *
+   * If `aAtStart`/`bAtStart` are omitted, auto-detects the shared endpoint
+   * (i.e., which endpoint of arcA coincides with which endpoint of arcB).
+   */
+  arcTangentArc(arcA: any, arcB: any, aAtStart?: boolean, bAtStart?: boolean): this {
+    const arcAId = this.resolveArcId(arcA);
+    const arcBId = this.resolveArcId(arcB);
+
+    // Auto-detect shared endpoints if not specified
+    if (aAtStart === undefined || bAtStart === undefined) {
+      const a = this.arcs.find(x => x.id === arcAId)!;
+      const b = this.arcs.find(x => x.id === arcBId)!;
+      const matches: Array<[boolean, boolean]> = [];
+      if (a.end === b.start)   matches.push([false, true]);
+      if (a.end === b.end)     matches.push([false, false]);
+      if (a.start === b.start) matches.push([true, true]);
+      if (a.start === b.end)   matches.push([true, false]);
+      if (matches.length === 0) {
+        // Fall back to closest pair by coordinate distance
+        const pts = [
+          { aS: true,  bS: true,  dist: this.pointDist(a.start, b.start) },
+          { aS: true,  bS: false, dist: this.pointDist(a.start, b.end) },
+          { aS: false, bS: true,  dist: this.pointDist(a.end, b.start) },
+          { aS: false, bS: false, dist: this.pointDist(a.end, b.end) },
+        ];
+        pts.sort((x, y) => x.dist - y.dist);
+        aAtStart = pts[0].aS;
+        bAtStart = pts[0].bS;
+      } else {
+        aAtStart = matches[0][0];
+        bAtStart = matches[0][1];
+      }
+    }
+
+    return this.constrain({ type: 'arcTangentArc', arcA: arcAId, arcB: arcBId, aAtStart, bAtStart } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Distance between two points by ID (for internal use). */
+  private pointDist(a: PointId, b: PointId): number {
+    const pa = this.getPoint(a), pb = this.getPoint(b);
+    if (!pa || !pb) return Infinity;
+    return Math.hypot(pa.x - pb.x, pa.y - pb.y);
+  }
+
+  /**
+   * Constrain a Bezier curve to be tangent to an arc.
+   * The Bezier's tangent direction at the specified end must be perpendicular to the arc's radius.
+   *
+   * @param bezier — the Bezier curve
+   * @param arc — the arc to be tangent to
+   * @param atBezierStart — use bezier start (P0→P1 tangent) or end (P3→P2 tangent)
+   * @param atArcStart — use arc's start or end as the contact point
+   */
+  bezierTangentArc(bezier: any, arc: any, atBezierStart: boolean, atArcStart: boolean): this {
+    const bezId = this.resolveBezierId(bezier);
+    const bz = this.beziers.find(b => b.id === bezId)!;
+    // Resolve to the two control points that define the tangent direction
+    const tangentBase = atBezierStart ? bz.p0 : bz.p3;
+    const tangentControl = atBezierStart ? bz.p1 : bz.p2;
+    return this.constrain({ type: 'bezierTangentArc', tangentBase, tangentControl, arc: this.resolveArcId(arc), atArcStart } as Omit<SketchConstraint, 'id'>);
+  }
+
+  // ─── Smooth blend (high-level curve connection) ──────────────────────────
+
+  /**
+   * Create a smooth Bezier bridge between two arcs with controllable weight.
+   *
+   * The Bezier connects `arc1`'s endpoint to `arc2`'s endpoint, tangent to both arcs.
+   * The `weight` parameter controls which arc's shape dominates the blend:
+   *   - 0.5 = symmetric blend (default)
+   *   - > 0.5 = arc1 keeps its shape longer
+   *   - < 0.5 = arc2 keeps its shape longer
+   *
+   * Returns the BezierId of the bridge curve.
+   */
+  smoothBlend(arc1: any, arc2: any, options?: {
+    /** 0–1, controls which arc dominates. 0.5 = symmetric. Default 0.5. */
+    weight?: number;
+    /** Which end of arc1 to blend from. Default 'end'. */
+    arc1End?: 'start' | 'end';
+    /** Which end of arc2 to blend to. Default 'start'. */
+    arc2End?: 'start' | 'end';
+  }): BezierId {
+    const arc1Id = this.resolveArcId(arc1);
+    const arc2Id = this.resolveArcId(arc2);
+    const { weight = 0.5, arc1End = 'end', arc2End = 'start' } = options ?? {};
+
+    const a1 = this.arcs.find(a => a.id === arc1Id)!;
+    const a2 = this.arcs.find(a => a.id === arc2Id)!;
+
+    // Get the junction points
+    const p0Id = arc1End === 'start' ? a1.start : a1.end;
+    const p3Id = arc2End === 'start' ? a2.start : a2.end;
+
+    const pt0 = this.getPoint(p0Id)!;
+    const pt3 = this.getPoint(p3Id)!;
+    const c1 = this.getPoint(a1.center)!;
+    const c2 = this.getPoint(a2.center)!;
+
+    // Compute the arc's forward tangent direction at each junction point.
+    // For a CCW arc, tangent = rotate radius 90° CCW: (-ry, rx)
+    // For a CW arc, tangent = rotate radius 90° CW: (ry, -rx)
+    const r1x = pt0.x - c1.x;
+    const r1y = pt0.y - c1.y;
+    const r2x = pt3.x - c2.x;
+    const r2y = pt3.y - c2.y;
+
+    // Forward tangent of each arc at its junction point
+    let tf1x: number, tf1y: number;
+    if (a1.clockwise) { tf1x = r1y; tf1y = -r1x; }
+    else              { tf1x = -r1y; tf1y = r1x; }
+
+    let tf2x: number, tf2y: number;
+    if (a2.clockwise) { tf2x = r2y; tf2y = -r2x; }
+    else              { tf2x = -r2y; tf2y = r2x; }
+
+    // Bezier departure direction at P0:
+    //   If P0 is arc1's END → depart in same direction as arc's travel: +t_fwd
+    //   If P0 is arc1's START → depart opposite (arc enters here): -t_fwd
+    const sign1 = arc1End === 'end' ? 1 : -1;
+    let t1x = tf1x * sign1;
+    let t1y = tf1y * sign1;
+
+    // Bezier arrival direction at P3:
+    //   The Bezier's tangent at P3 is (P3-P2). For G1 continuity:
+    //   If P3 is arc2's START → arrive in arc's forward direction: P3-P2 ∝ t_fwd, so P2 = P3 - t_fwd*h
+    //   If P3 is arc2's END → arrive in reversed arc direction: P3-P2 ∝ -t_fwd, so P2 = P3 + t_fwd*h
+    const sign2 = arc2End === 'start' ? -1 : 1;
+    let t2x = tf2x * sign2;  // direction to offset P2 from P3
+    let t2y = tf2y * sign2;
+
+    // Normalize tangent directions
+    const len1 = Math.hypot(t1x, t1y) || 1;
+    const len2 = Math.hypot(t2x, t2y) || 1;
+    t1x /= len1; t1y /= len1;
+    t2x /= len2; t2y /= len2;
+
+    // Compute handle lengths based on distance and weight.
+    const dx = pt3.x - pt0.x;
+    const dy = pt3.y - pt0.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const handleBudget = dist * 0.55;
+
+    const handle1 = handleBudget * (weight * 2);
+    const handle2 = handleBudget * ((1 - weight) * 2);
+
+    // Create control points
+    const p1Id = this.point(pt0.x + t1x * handle1, pt0.y + t1y * handle1);
+    const p2Id = this.point(pt3.x + t2x * handle2, pt3.y + t2y * handle2);
+
+    // Create the Bezier curve
+    const bezId = this.bezier(p0Id, p1Id, p2Id, p3Id);
+
+    // Add tangency constraints so the solver can refine the control points
+    this.bezierTangentArc(bezId, arc1Id, true, arc1End === 'start');
+    this.bezierTangentArc(bezId, arc2Id, false, arc2End === 'start');
+
+    return bezId;
+  }
+
   // ─── Shape constraint helpers ─────────────────────────────────────────────
 
   /** Constrain the bounding-box width of a shape. */
@@ -785,6 +1063,21 @@ export class ConstrainedSketchBuilder {
     return this;
   }
 
+  /**
+   * Register a closed profile loop from an explicit ordered list of segments.
+   * Each segment is { kind: 'line', line: LineId }, { kind: 'arc', arc: ArcId },
+   * or { kind: 'bezier', bezier: BezierId }.
+   */
+  addProfileLoop(segments: Array<{ kind: 'line'; line: any } | { kind: 'arc'; arc: any } | { kind: 'bezier'; bezier: any }>): this {
+    const resolved = segments.map(seg => {
+      if (seg.kind === 'line') return { kind: 'line' as const, line: this.resolveLineId(seg.line) };
+      if (seg.kind === 'arc') return { kind: 'arc' as const, arc: this.resolveArcId(seg.arc) };
+      return { kind: 'bezier' as const, bezier: this.resolveBezierId(seg.bezier) };
+    });
+    this.loops.push({ type: 'profile', segments: resolved });
+    return this;
+  }
+
   solve(options: SolveOptions = {}): ConstraintSketch {
     // Release the session — the final solve uses the stateless path which
     // benefits from progressive + analysis + DOF metadata.
@@ -826,6 +1119,7 @@ export class ConstrainedSketchBuilder {
       lines: this.lines.map((l) => ({ ...l })),
       circles: this.circles.map((c) => ({ ...c })),
       arcs: this.arcs.map((a) => ({ ...a })),
+      beziers: this.beziers.map((b) => ({ ...b })),
       shapes: this.shapes.map((s) => ({ ...s, lines: [...s.lines] })),
       groups: this._groups.map((g) => ({
         ...g,
@@ -904,6 +1198,9 @@ export class ConstrainedSketchBuilder {
       }
       for (const a of this.arcs) {
         if (entityIds.has(a.id)) { entityIds.add(a.center); entityIds.add(a.start); entityIds.add(a.end); }
+      }
+      for (const b of this.beziers) {
+        if (entityIds.has(b.id)) { entityIds.add(b.p0); entityIds.add(b.p1); entityIds.add(b.p2); entityIds.add(b.p3); }
       }
       for (const s of this.shapes ?? []) {
         if (entityIds.has(s.id)) {

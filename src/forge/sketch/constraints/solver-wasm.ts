@@ -83,6 +83,7 @@ interface WasmProblem {
   lines: WasmLine[];
   circles: WasmCircle[];
   arcs: WasmArc[];
+  beziers: { id: string; p0: string; p1: string; p2: string; p3: string }[];
   shapes: WasmShape[];
   groups: WasmGroup[];
   constraints: object[];
@@ -707,6 +708,13 @@ function serializeProblem(def: ConstraintDefinition, options: SolveOptions): Was
       radius: a.radius,
       clockwise: a.clockwise,
     })),
+    beziers: (def.beziers ?? []).map((b) => ({
+      id: b.id,
+      p0: b.p0,
+      p1: b.p1,
+      p2: b.p2,
+      p3: b.p3,
+    })),
     shapes: (def.shapes ?? []).map((s) => ({
       id: s.id,
       lines: s.lines,
@@ -745,9 +753,20 @@ function serializeProblem(def: ConstraintDefinition, options: SolveOptions): Was
  */
 function serializeConstraint(c: object): object {
   const raw = c as Record<string, unknown>;
-  // Most constraints are pass-through, but we need to handle at_start → atStart rename.
+  // Rust serde's rename_all="camelCase" on the Constraint enum only affects variant
+  // names, NOT field names within variants. Fields keep their Rust snake_case names.
+  // We must convert TS camelCase → Rust snake_case for multi-word field names.
   if (raw['type'] === 'lineTangentArc') {
-    return { ...raw, at_start: raw['atStart'] };
+    const { atStart, ...rest } = raw as any;
+    return { ...rest, at_start: atStart };
+  }
+  if (raw['type'] === 'arcTangentArc') {
+    const { arcA, arcB, aAtStart, bAtStart, ...rest } = raw as any;
+    return { ...rest, arc_a: arcA, arc_b: arcB, a_at_start: aAtStart, b_at_start: bAtStart };
+  }
+  if (raw['type'] === 'bezierTangentArc') {
+    const { tangentBase, tangentControl, atArcStart, ...rest } = raw as any;
+    return { ...rest, tangent_base: tangentBase, tangent_control: tangentControl, at_arc_start: atArcStart };
   }
   return raw;
 }

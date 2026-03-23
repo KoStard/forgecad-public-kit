@@ -2626,6 +2626,15 @@ pub(crate) fn build_entity_ref_count(constraints: &Vec<Constraint>) -> HashMap<S
                     add(point, &mut counts);
                 }
             }
+            Constraint::ArcTangentArc { arc_a, arc_b, .. } => {
+                add(arc_a, &mut counts);
+                add(arc_b, &mut counts);
+            }
+            Constraint::BezierTangentArc { tangent_base, tangent_control, arc, .. } => {
+                add(tangent_base, &mut counts);
+                add(tangent_control, &mut counts);
+                add(arc, &mut counts);
+            }
         }
     }
 

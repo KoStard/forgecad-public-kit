@@ -497,6 +497,7 @@ type PointId = string;
 type LineId = string;
 type CircleId = string;
 type ArcId = string;
+type BezierId = string;
 type ShapeId = string;
 type GroupId = string;
 interface SketchArc {
@@ -1046,6 +1047,15 @@ declare class ConstrainedSketchBuilder {
 	 * Returns the ArcId. Does NOT advance the cursor.
 	 */
 	arcByCenter(centerId: PointId, startId: PointId, endId: PointId, clockwise?: boolean): ArcId;
+	/**
+	 * Create a cubic Bezier curve from four control points.
+	 * Returns the BezierId. Does NOT advance the cursor.
+	 */
+	bezier(p0: any, p1: any, p2: any, p3: any, name?: string): BezierId;
+	/**
+	 * Draw a Bezier curve from the current cursor to (x3, y3) with control points (x1, y1) and (x2, y2).
+	 */
+	bezierTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): this;
 	close(): this;
 	addLoopCircle(center: PointId, radius: number, segments?: number): this;
 	/**
@@ -1130,6 +1140,29 @@ declare class ConstrainedSketchBuilder {
 	 * Combine with `coincident` to enforce the shared endpoint.
 	 */
 	lineTangentArc(line: any, arc: any, atStart: boolean): this;
+	/**
+	 * Constrain two arcs to be tangent (G1 smooth) at a shared junction point.
+	 */
+	arcTangentArc(arcA: any, arcB: any, aAtStart?: boolean, bAtStart?: boolean): this;
+	/**
+	 * Constrain a Bezier curve to be tangent to an arc.
+	 */
+	bezierTangentArc(bezier: any, arc: any, atBezierStart: boolean, atArcStart: boolean): this;
+	/**
+	 * Create a smooth Bezier bridge between two arcs with controllable weight.
+	 * Returns the BezierId of the bridge curve.
+	 */
+	smoothBlend(arc1: any, arc2: any, options?: {
+		weight?: number;
+		arc1End?: 'start' | 'end';
+		arc2End?: 'start' | 'end';
+	}): BezierId;
+	/**
+	 * Draw a smooth Bezier curve from the current cursor to (x, y), tangent to
+	 * the previous arc. Control points are computed automatically.
+	 * @param weight — 0–1, how long the arc's shape is preserved. Default 0.5.
+	 */
+	blendTo(x: number, y: number, weight?: number): this;
 	/** Constrain the bounding-box width of a shape. */
 	shapeWidth(shape: any, value: number): this;
 	/** Constrain the bounding-box height of a shape. */
