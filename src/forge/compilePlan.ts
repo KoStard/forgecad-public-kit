@@ -190,6 +190,12 @@ export type ShapeCompilePlan =
       segments?: number;
     }
   | {
+      kind: 'torus';
+      majorRadius: number;
+      minorRadius: number;
+      segments?: number;
+    }
+  | {
       kind: 'extrude';
       profile: ProfileCompilePlan;
       height: number;
@@ -703,6 +709,9 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
     case 'sphere':
       result = { kind: 'sphere', radius: plan.radius, segments: plan.segments };
       break;
+    case 'torus':
+      result = { kind: 'torus', majorRadius: plan.majorRadius, minorRadius: plan.minorRadius, segments: plan.segments };
+      break;
     case 'extrude':
       result = {
         kind: 'extrude',
@@ -1002,6 +1011,7 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan): ShapeQueryOw
     case 'box':
     case 'cylinder':
     case 'sphere':
+    case 'torus':
     case 'extrude':
     case 'sheetMetal':
     case 'revolve':
@@ -1048,6 +1058,7 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan): ShapeQueryOwner
       case 'box':
       case 'cylinder':
       case 'sphere':
+      case 'torus':
       case 'extrude':
       case 'sheetMetal':
       case 'revolve':
@@ -1100,6 +1111,7 @@ export function findShapeWorkplanePlacement(
     case 'box':
     case 'cylinder':
     case 'sphere':
+    case 'torus':
     case 'extrude':
     case 'sheetMetal':
     case 'loft':

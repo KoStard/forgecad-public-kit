@@ -23,6 +23,7 @@ export {
   box,
   cylinder,
   sphere,
+  torus,
   union,
   difference,
   intersection,

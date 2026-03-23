@@ -284,6 +284,10 @@ function collectTimelineEntries(plan: ShapeCompilePlan, entries: TimelineEntry[]
       entries.push({ kind: 'sphere', label: 'Sphere', summary: `r = ${plan.radius}`, category: 'primitive' });
       return;
 
+    case 'torus':
+      entries.push({ kind: 'torus', label: 'Torus', summary: `R = ${plan.majorRadius}, r = ${plan.minorRadius}`, category: 'primitive' });
+      return;
+
     case 'sheetMetal':
       entries.push({ kind: 'sheetMetal', label: 'Sheet Metal', summary: '', category: 'primitive' });
       return;

@@ -1405,6 +1405,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       return table;
     }
     case 'sphere':
+    case 'torus':
     case 'revolve':
     case 'loft':
     case 'sweep':

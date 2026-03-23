@@ -764,6 +764,9 @@ function _lowerShapeCompilePlanToOCCTInner(
     case 'sphere':
       return new oc.BRepPrimAPI_MakeSphere_1(plan.radius).Shape();
 
+    case 'torus':
+      return new oc.BRepPrimAPI_MakeTorus_1(plan.majorRadius, plan.minorRadius).Shape();
+
     case 'extrude': {
       const face = lowerProfileToFace(oc, plan.profile);
       const height = plan.height;

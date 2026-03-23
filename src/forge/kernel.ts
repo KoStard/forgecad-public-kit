@@ -1375,6 +1375,20 @@ export function sphere(radius: number, segments?: number): Shape {
   );
 }
 
+export function torus(majorRadius: number, minorRadius: number, segments?: number): Shape {
+  const plan: ShapeCompilePlan = {
+    kind: 'torus',
+    majorRadius,
+    minorRadius,
+    segments: segments != null && segments > 0 ? segments : undefined,
+  };
+  return buildShapeFromCompilePlan(
+    createOwnedShapeCompilePlan(plan, 'primitive:torus')!,
+    undefined,
+    { fidelity: 'kernel-native', sources: ['primitive'] },
+  );
+}
+
 function normalizeShapeOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Shape[] {
   return normalizeVariadicArgs({
     apiName,

@@ -214,6 +214,11 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
         return compilerFailure(segmentedShapeDiagnostic('sphere', path));
       }
       return compilerSuccess({ kind: 'sphere', radius: plan.radius });
+    case 'torus':
+      if (plan.segments != null && plan.segments > 0) {
+        return compilerFailure(segmentedShapeDiagnostic('torus', path));
+      }
+      return compilerSuccess({ kind: 'torus', majorRadius: plan.majorRadius, minorRadius: plan.minorRadius });
     case 'extrude': {
       const profile = lowerProfileCompilePlanToCadQueryResultAtPath(plan.profile, `${path}.profile`);
       if (!profile.ok) return compilerFailure(...profile.diagnostics);
