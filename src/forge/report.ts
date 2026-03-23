@@ -103,16 +103,6 @@ interface StandardPageSpec {
   dimensions: DimensionDef[];
 }
 
-interface DetailPageSpec {
-  kind: 'detail';
-  title: string;
-  subtitle: string;
-  objects: ReportObject[];
-  dimensions: DimensionDef[];
-  view: ViewFrame;
-  source: Bounds2;
-}
-
 interface BomReportRow {
   key: string;
   description: string;
@@ -130,7 +120,7 @@ interface BomPageSpec {
   pageCount: number;
 }
 
-type PageSpec = StandardPageSpec | DetailPageSpec | BomPageSpec;
+type PageSpec = StandardPageSpec | BomPageSpec;
 
 interface DimensionOwnership {
   byId: Map<string, string[]>;
@@ -682,19 +672,6 @@ function expandBounds2(bounds: Bounds2, pad: number): Bounds2 {
   };
 }
 
-function clampBounds2(bounds: Bounds2, limit: Bounds2): Bounds2 {
-  const spanX = bounds.maxX - bounds.minX;
-  const spanY = bounds.maxY - bounds.minY;
-  const cx = clamp((bounds.minX + bounds.maxX) * 0.5, limit.minX + spanX * 0.5, limit.maxX - spanX * 0.5);
-  const cy = clamp((bounds.minY + bounds.maxY) * 0.5, limit.minY + spanY * 0.5, limit.maxY - spanY * 0.5);
-  return {
-    minX: cx - spanX * 0.5,
-    maxX: cx + spanX * 0.5,
-    minY: cy - spanY * 0.5,
-    maxY: cy + spanY * 0.5,
-  };
-}
-
 function boundsCenter2(b: Bounds2): Vec2 {
   return [(b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5];
 }
@@ -819,11 +796,6 @@ function makeMapperForRect(bounds: Bounds2, rect: CellRect, padding = CELL_PADDI
   };
 }
 
-interface DetailRegion {
-  label: string;
-  source: Bounds2;
-  edges: ProjectedEdge[];
-}
 
 function collectProjectedEdges(
   frame: ViewFrame,
@@ -870,103 +842,6 @@ function projectedObjectBounds(
     return { minX: -1, minY: -1, maxX: 1, maxY: 1 };
   }
   return bounds;
-}
-
-function selectDetailRegions(
-  projectedEdges: ProjectedEdge[],
-  modelBounds: Bounds2,
-): DetailRegion[] {
-  const spanX = modelBounds.maxX - modelBounds.minX;
-  const spanY = modelBounds.maxY - modelBounds.minY;
-  const majorIsX = spanX >= spanY;
-  const longSpan = Math.max(spanX, spanY);
-  const shortSpan = Math.max(1e-6, Math.min(spanX, spanY));
-  const aspect = longSpan / shortSpan;
-
-  if (aspect < 2.8) return [];
-  if (projectedEdges.length < 90 || projectedEdges.length > 14000) return [];
-
-  const gridMajor = 14;
-  const gridMinor = 6;
-  const bins = Array.from({ length: gridMajor * gridMinor }, () => ({
-    score: 0,
-    count: 0,
-    major: 0,
-    minor: 0,
-  }));
-
-  const normMajor = (p: Vec2): number => {
-    if (majorIsX) return clamp((p[0] - modelBounds.minX) / Math.max(1e-6, spanX), 0, 1);
-    return clamp((p[1] - modelBounds.minY) / Math.max(1e-6, spanY), 0, 1);
-  };
-  const normMinor = (p: Vec2): number => {
-    if (majorIsX) return clamp((p[1] - modelBounds.minY) / Math.max(1e-6, spanY), 0, 1);
-    return clamp((p[0] - modelBounds.minX) / Math.max(1e-6, spanX), 0, 1);
-  };
-
-  projectedEdges.forEach((edge) => {
-    const u = normMajor(edge.mid);
-    const v = normMinor(edge.mid);
-    const iMaj = Math.min(gridMajor - 1, Math.floor(u * gridMajor));
-    const iMin = Math.min(gridMinor - 1, Math.floor(v * gridMinor));
-    const idx = iMin * gridMajor + iMaj;
-    const bin = bins[idx];
-    const shortBoost = edge.lenModel < longSpan * 0.03 ? 1.7 : 0;
-    bin.score += 1 + shortBoost;
-    bin.count += 1;
-    bin.major = iMaj;
-    bin.minor = iMin;
-  });
-
-  const denseBins = bins
-    .filter((b) => b.count >= 6)
-    .sort((a, b) => b.score - a.score);
-
-  if (denseBins.length === 0) return [];
-
-  const picked: Array<{ major: number; minor: number; score: number }> = [];
-  for (const bin of denseBins) {
-    const tooClose = picked.some((p) => Math.abs(p.major - bin.major) <= 2 && Math.abs(p.minor - bin.minor) <= 1);
-    if (tooClose) continue;
-    picked.push({ major: bin.major, minor: bin.minor, score: bin.score });
-    if (picked.length >= 2) break;
-  }
-  if (picked.length === 0) return [];
-
-  const regions: DetailRegion[] = [];
-  const detailLabels = ['Detail A', 'Detail B'];
-  for (let i = 0; i < Math.min(picked.length, 2); i += 1) {
-    const pick = picked[i];
-    const u = (pick.major + 0.5) / gridMajor;
-    const v = (pick.minor + 0.5) / gridMinor;
-    const cx = majorIsX
-      ? modelBounds.minX + u * spanX
-      : modelBounds.minX + v * spanX;
-    const cy = majorIsX
-      ? modelBounds.minY + v * spanY
-      : modelBounds.minY + u * spanY;
-
-    const source = clampBounds2({
-      minX: cx - (majorIsX ? spanX * 0.18 : Math.max(spanX * 0.55, longSpan * 0.04)) * 0.5,
-      maxX: cx + (majorIsX ? spanX * 0.18 : Math.max(spanX * 0.55, longSpan * 0.04)) * 0.5,
-      minY: cy - (majorIsX ? Math.max(spanY * 0.55, longSpan * 0.04) : spanY * 0.18) * 0.5,
-      maxY: cy + (majorIsX ? Math.max(spanY * 0.55, longSpan * 0.04) : spanY * 0.18) * 0.5,
-    }, modelBounds);
-
-    const insetEdges = projectedEdges.filter((edge) => (
-      edge.mid[0] >= source.minX && edge.mid[0] <= source.maxX
-      && edge.mid[1] >= source.minY && edge.mid[1] <= source.maxY
-    ));
-    if (insetEdges.length < 18) continue;
-
-    regions.push({
-      label: detailLabels[i] ?? `Detail ${i + 1}`,
-      source,
-      edges: insetEdges,
-    });
-  }
-
-  return regions;
 }
 
 type LabelBox = { minX: number; minY: number; maxX: number; maxY: number };
@@ -2056,9 +1931,7 @@ function drawDimension(
 }
 
 interface RenderViewCellOptions {
-  boundsOverride?: Bounds2;
   drawFrame?: boolean;
-  viewLabelOverride?: string;
 }
 
 function renderViewCell(
@@ -2073,10 +1946,10 @@ function renderViewCell(
   const viewDims = dimensions.filter((d) => isDimensionVisibleInView(d, frame, dimDirectionToleranceDeg));
   const baseBounds = projectedBounds(center, frame, objects, viewDims);
   const objectBounds = projectedBounds(center, frame, objects, []);
-  const placementBounds = options.boundsOverride ?? objectBounds;
+  const placementBounds = objectBounds;
   const placementCenter = boundsCenter2(placementBounds);
   const zoomOut = dimensionZoomOutFactor(viewDims.length);
-  const bounds = options.boundsOverride ?? scaleBounds2(baseBounds, zoomOut);
+  const bounds = scaleBounds2(baseBounds, zoomOut);
   const mapper = makeCellMapper(bounds, cell);
 
   const cmd: string[] = [];
@@ -2225,7 +2098,7 @@ function renderViewCell(
     cmd.push('0.7 w\n');
     cmd.push(`${formatNumber(cell.x)} ${formatNumber(cell.y)} ${formatNumber(cell.w)} ${formatNumber(cell.h)} re S\n`);
     cmd.push(commandSetFill([0.2, 0.2, 0.22]));
-    cmd.push(commandText(options.viewLabelOverride ?? frame.label, cell.x + 6, cell.y + cell.h - 16, 10));
+    cmd.push(commandText(frame.label, cell.x + 6, cell.y + cell.h - 16, 10));
   }
 
   return cmd.join('');
@@ -2317,28 +2190,6 @@ function buildPageContent(
   const merged = mergeBounds3(page.objects.map((o) => o.bbox));
   const center = merged ? bboxCenter(merged) : [0, 0, 0] as Vec3;
 
-  if (page.kind === 'detail') {
-    const cell: CellRect = {
-      x: PAGE_MARGIN,
-      y: PAGE_MARGIN,
-      w: PAGE_WIDTH - PAGE_MARGIN * 2,
-      h: PAGE_HEIGHT - PAGE_MARGIN * 2 - HEADER_HEIGHT,
-    };
-    cmd.push(renderViewCell(
-      cell,
-      page.view,
-      center,
-      page.objects,
-      page.dimensions,
-      dimDirectionToleranceDeg,
-      {
-        boundsOverride: page.source,
-        viewLabelOverride: `${page.view.label} - Zoom`,
-      },
-    ));
-    return cmd.join('');
-  }
-
   const cells = buildGridCells(views.length);
   views.forEach((view, i) => {
     const cell = cells[i];
@@ -2368,52 +2219,6 @@ function segmentIntersectsBounds2(a: Vec2, b: Vec2, bounds: Bounds2): boolean {
     { a: corners[3], b: corners[0] },
   ];
   return edges.some((edge) => segmentsIntersect2(a, b, edge.a, edge.b));
-}
-
-function dimensionTouchesBounds(
-  dim: DimensionDef,
-  frame: ViewFrame,
-  center: Vec3,
-  bounds: Bounds2,
-): boolean {
-  const p0 = projectPoint(dim.from, center, frame);
-  const p1 = projectPoint(dim.to, center, frame);
-  return segmentIntersectsBounds2([p0.x, p0.y], [p1.x, p1.y], bounds);
-}
-
-function collectDetailPagesFor(
-  page: StandardPageSpec,
-  views: ViewFrame[],
-  dimDirectionToleranceDeg: number,
-): DetailPageSpec[] {
-  const out: DetailPageSpec[] = [];
-  const merged = mergeBounds3(page.objects.map((o) => o.bbox));
-  const center = merged ? bboxCenter(merged) : [0, 0, 0] as Vec3;
-
-  views.forEach((view) => {
-    const viewDims = page.dimensions.filter((d) => isDimensionVisibleInView(d, view, dimDirectionToleranceDeg));
-    const baseBounds = projectedBounds(center, view, page.objects, viewDims);
-    const zoomOut = dimensionZoomOutFactor(viewDims.length);
-    const drawBounds = scaleBounds2(baseBounds, zoomOut);
-    const regions = selectDetailRegions(collectProjectedEdges(view, center, page.objects), drawBounds);
-    regions.forEach((region) => {
-      const dims = page.dimensions.filter((d) => (
-        isDimensionVisibleInView(d, view, dimDirectionToleranceDeg)
-        && dimensionTouchesBounds(d, view, center, region.source)
-      ));
-      out.push({
-        kind: 'detail',
-        title: `${page.title} | ${view.label.toUpperCase()} ${region.label.toUpperCase()}`,
-        subtitle: 'Zoom continuation',
-        objects: page.objects,
-        dimensions: dims,
-        view,
-        source: scaleBounds2(region.source, 1.08),
-      });
-    });
-  });
-
-  return out;
 }
 
 function byteLength(text: string): number {
@@ -2532,7 +2337,6 @@ function buildPages(
 
   basePages.forEach((base) => {
     pages.push(base);
-    pages.push(...collectDetailPagesFor(base, views, dimDirectionToleranceDeg));
   });
 
   return pages;
