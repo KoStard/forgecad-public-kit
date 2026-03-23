@@ -109,6 +109,7 @@ import { detectMeshFormat } from './meshParsers';
 import { ShapeGroup, group } from './group';
 import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
 import { bom, resetBom, getCollectedBom, type BomDef } from './bom';
+import { sheetStock, resetSheetStock, getCollectedSheetStock, type SheetStockDef } from './sheetStock';
 import {
   robotExport,
   resetRobotExport,
@@ -187,6 +188,7 @@ export interface RunResult {
   highlights: HighlightDef[];
   debugHighlights3D: DebugHighlight3D[];
   bom: BomDef[];
+  sheetStock: SheetStockDef[];
   cutPlanes: CutPlaneDef[];
   explodeView: ExplodeViewOptions | null;
   jointsView: CollectedJointsView | null;
@@ -1299,6 +1301,7 @@ function executeFile(
       sketchToSvg,
       sketchToDxf,
       bom,
+      sheetStock,
       robotExport,
       group,
       ShapeGroup,
@@ -1456,6 +1459,7 @@ export function runScript(
   resetDimensions();
   resetHighlights();
   resetBom();
+  resetSheetStock();
   resetRobotExport();
   resetCutPlanes();
   resetExplodeView();
@@ -1770,6 +1774,7 @@ export function runScript(
         highlights: getCollectedHighlights(),
         debugHighlights3D: getCollectedDebugHighlights3D(),
         bom: getCollectedBom(),
+        sheetStock: getCollectedSheetStock(),
         cutPlanes: getCollectedCutPlanes(),
         explodeView: getCollectedExplodeView(),
         jointsView: getCollectedJointsView(),
@@ -1803,6 +1808,7 @@ export function runScript(
       highlights: getCollectedHighlights(),
       debugHighlights3D: getCollectedDebugHighlights3D(),
       bom: getCollectedBom(),
+      sheetStock: getCollectedSheetStock(),
       cutPlanes: getCollectedCutPlanes(),
       explodeView: getCollectedExplodeView(),
       jointsView: getCollectedJointsView(),

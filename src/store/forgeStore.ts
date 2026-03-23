@@ -801,6 +801,7 @@ function createErrorRunResult(message: string, quality: ForgeQualityPreset): Run
     highlights: [],
     debugHighlights3D: [],
     bom: [],
+    sheetStock: [],
     cutPlanes: [],
     explodeView: null,
     jointsView: null,

@@ -14,6 +14,7 @@ export {
   Assembly, ImportedAssembly, SolvedAssembly, assembly, bomToCsv,
   robotExport, resetRobotExport, getCollectedRobotExport,
   bom, resetBom, getCollectedBom,
+  sheetStock, resetSheetStock, getCollectedSheetStock,
   explodeView, resetExplodeView, getCollectedExplodeView,
   jointsView, resetJointsView, getCollectedJointsView, resolveJointViewValues,
   viewConfig, resetViewConfig, getCollectedViewConfig, DEFAULT_VIEW_CONFIG, DEFAULT_JOINT_OVERLAY_VIEW_CONFIG,
@@ -83,6 +84,7 @@ export type {
   CollectedRobotExport,
 } from './headless';
 export type { BomDef, BomOpts } from './headless';
+export type { SheetStockDef, SheetStockOpts } from './headless';
 export type { CutPlaneDef, CutPlaneExcludeInput, CutPlaneOptions } from './headless';
 export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './headless';
 export type {
