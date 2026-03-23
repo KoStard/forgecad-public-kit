@@ -334,36 +334,6 @@ const profile = difference2d(
 return [{ name: 'Profile', sketch: profile }];
 `,
   ),
-  inlineCase(
-    'hull-runtime-boundary',
-    'Hull intent stays compiler-owned for Manifold lowering while exact export remains explicitly unsupported.',
-    `
-const rib = hull3d(
-  cylinder(20, 3).translate(-10, 0, 0),
-  cylinder(20, 3).translate(10, 0, 0),
-  [0, 0, 26],
-);
-const convexPost = box(12, 8, 20, true)
-  .toShape()
-  .rotateAround([0, 0, 1], 25, [0, 0, 0])
-  .hull();
-const tab = hull2d(
-  circle2d(6).translate(-10, 0),
-  circle2d(6).translate(10, 0),
-).translate(0, 4);
-const collar = polygon([
-  [0, 0],
-  [8, 0],
-  [4, 5],
-]).translate(0, 16).hull();
-return [
-  { name: 'Rib', shape: rib },
-  { name: 'Convex Post', shape: convexPost },
-  { name: 'Tab', sketch: tab },
-  { name: 'Collar', sketch: collar },
-];
-`,
-  ),
   fileCase(
     'example-brep-exportable',
     'The public BREP-exportable example stays on the exact compiler route.',

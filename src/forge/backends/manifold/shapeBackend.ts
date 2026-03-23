@@ -85,10 +85,6 @@ export class ManifoldShapeBackend implements ManifoldCapableBackend {
     return new ManifoldShapeBackend(this.manifold.trimByPlane(normal, originOffset));
   }
 
-  hull(): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.hull());
-  }
-
   simplify(tolerance?: number): ShapeBackend {
     return new ManifoldShapeBackend(this.manifold.simplify(tolerance));
   }

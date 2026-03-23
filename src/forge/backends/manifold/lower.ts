@@ -1,9 +1,10 @@
 import type { CrossSection, Manifold, ManifoldToplevel } from 'manifold-3d';
-import type {
-  ProfileCompilePlan,
-  ProfileCompileTransformStep,
-  ShapeCompilePlan,
-  ShapeCompileTransformStep,
+import {
+  assertExhaustive,
+  type ProfileCompilePlan,
+  type ProfileCompileTransformStep,
+  type ShapeCompilePlan,
+  type ShapeCompileTransformStep,
 } from '../../compilePlan';
 import {
   lowerCutShapeCompilePlanToConcretePlan,
@@ -80,17 +81,6 @@ function lowerProfileBooleanCompilePlan(plan: Extract<ProfileCompilePlan, { kind
   return applyProfileCompileTransforms(combined, plan.transforms);
 }
 
-function lowerProfileHullCompilePlan(plan: Extract<ProfileCompilePlan, { kind: 'hull' }>, wasm: ManifoldToplevel): CrossSection {
-  const profiles = plan.profiles.map((profile) => lowerProfileCompilePlanToCrossSection(profile, wasm));
-  if (profiles.length === 0) {
-    throw new Error('Cannot lower empty profile hull');
-  }
-  if (profiles.length === 1) {
-    return applyProfileCompileTransforms(profiles[0], plan.transforms);
-  }
-  return applyProfileCompileTransforms(wasm.CrossSection.hull(profiles), plan.transforms);
-}
-
 export function lowerProfileCompilePlanToCrossSection(
   plan: ProfileCompilePlan,
   wasm: ManifoldToplevel,
@@ -119,14 +109,14 @@ export function lowerProfileCompilePlanToCrossSection(
         lowerProfileCompilePlanToCrossSection(plan.base, wasm).offset(plan.delta, plan.join),
         plan.transforms,
       );
-    case 'hull':
-      return lowerProfileHullCompilePlan(plan, wasm);
     case 'project': {
       const projected = lowerShapeCompilePlanToManifold(plan.sourceShape, wasm)
         .transform(planeFrameToWorldToPlaneMatrix(plan.plane))
         .project();
       return applyProfileCompileTransforms(projected, plan.transforms);
     }
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -178,15 +168,6 @@ function lowerShapeBooleanCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'b
     case 'intersection':
       return wasm.Manifold.intersection(shapes);
   }
-}
-
-function lowerShapeHullCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'hull' }>, wasm: ManifoldToplevel): Manifold {
-  const shapeItems = plan.shapes.map((shape) => lowerShapeCompilePlanToManifold(shape, wasm));
-  const items = [...shapeItems, ...plan.points.map(([x, y, z]) => [x, y, z] as [number, number, number])];
-  if (items.length === 0) {
-    throw new Error('Cannot lower empty shape hull');
-  }
-  return wasm.Manifold.hull(items);
 }
 
 function lowerShapeTrimByPlaneCompilePlan(
@@ -501,14 +482,12 @@ export function lowerShapeCompilePlanToManifold(
       return lowerFilletEdgesCompilePlan(plan, wasm);
     case 'chamferEdges':
       return lowerChamferEdgesCompilePlan(plan, wasm);
-    case 'hull':
-      return lowerShapeHullCompilePlan(plan, wasm);
     case 'trimByPlane':
       return lowerShapeTrimByPlaneCompilePlan(plan, wasm);
     case 'importedMesh':
       return lowerImportedMeshToManifold(plan.fileData, plan.format, plan.filePath, wasm);
-    case 'opaque':
-      throw new Error('Cannot lower opaque compile plan to Manifold — opaque plans require runtime evaluation');
+    default:
+      assertExhaustive(plan);
   }
 }
 

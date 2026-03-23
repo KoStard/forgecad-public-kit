@@ -1,4 +1,4 @@
-import type { ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
+import { assertExhaustive, type ShapeCompilePlan, type ShapeCompileTransformStep } from './compilePlan';
 import type { ShapeEdgeDescendantResolution } from './descendantResolution';
 import {
   cloneEdgeQueryRef,
@@ -52,7 +52,7 @@ type EdgeFeatureSelectionResult =
 
 type TopologyRewritePlan = Extract<
   ShapeCompilePlan,
-  { kind: 'shell' | 'hole' | 'cut' | 'boolean' | 'hull' | 'trimByPlane' | 'fillet' | 'chamfer' }
+  { kind: 'shell' | 'hole' | 'cut' | 'boolean' | 'trimByPlane' | 'fillet' | 'chamfer' }
 >;
 
 type OwnerSearchStep =
@@ -135,13 +135,13 @@ function defaultUnsupportedReasonForRewrite(plan: TopologyRewritePlan): string {
       return 'This vertical edge is not in the defended post-cut finishing subset: it is adjacent to a face the cut rewrites, or the base shape has no tracked vertical edges in the supported set.';
     case 'boolean':
       return `Edge finishing only accepts propagated edge queries that ${rewriteOperationLabel(plan)} already recorded as supported.`;
-    case 'hull':
-      return 'Edge finishing does not yet defend durable edge queries through hull rewrites.';
     case 'trimByPlane':
       return 'Edge finishing does not yet defend durable edge queries through trimByPlane rewrites.';
     case 'fillet':
     case 'chamfer':
       return `Edge finishing only accepts preserved propagated edge queries after earlier ${plan.kind} rewrites.`;
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -289,21 +289,6 @@ function searchOwnerMatch(
         },
       };
     }
-    case 'hull': {
-      for (const shape of plan.shapes) {
-        const found = searchOwnerMatch(shape, owner);
-        if (found.match) {
-          return { match: appendOwnerSearchStep(found.match, { kind: 'rewrite', plan }) };
-        }
-        if (found.issue?.code === 'unsupported-edge-transform') return found;
-      }
-      return {
-        issue: {
-          code: 'edge-owner-not-found',
-          reason: 'The selected tracked edge is not owned by this target shape or any preserved query ancestor.',
-        },
-      };
-    }
     case 'box':
     case 'cylinder':
     case 'sphere':
@@ -312,7 +297,6 @@ function searchOwnerMatch(
     case 'revolve':
     case 'loft':
     case 'sweep':
-    case 'opaque':
     case 'importedMesh':
       return {
         issue: {
@@ -320,6 +304,8 @@ function searchOwnerMatch(
           reason: 'The selected tracked edge is not owned by this target shape or any preserved query ancestor.',
         },
       };
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -375,8 +361,7 @@ function resolveSourceQueryBeforeRewrite(
     case 'cut':
     case 'trimByPlane':
       return resolveSupportedEdgeFeatureSelection(plan.base, source);
-    case 'boolean':
-    case 'hull': {
+    case 'boolean': {
       let deferred: EdgeFeatureResolutionIssue | null = null;
       for (const shape of plan.shapes) {
         const resolved = resolveSupportedEdgeFeatureSelection(shape, source);
@@ -391,6 +376,8 @@ function resolveSourceQueryBeforeRewrite(
         'The selected propagated edge query does not match the target shape\'s recorded rewrite propagation contract.',
       );
     }
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -436,7 +423,6 @@ function resolvePropagatedEdgeQueryAtOwnerBase(
     || ownerBase.kind === 'queryOwner'
     || ownerBase.kind === 'filletEdges'
     || ownerBase.kind === 'chamferEdges'
-    || ownerBase.kind === 'opaque'
     || ownerBase.kind === 'importedMesh'
   ) {
     return edgeIssue(
@@ -716,14 +702,14 @@ function resolveSelectionFromOwnerBase(
     case 'revolve':
     case 'loft':
     case 'sweep':
-    case 'hull':
     case 'trimByPlane':
-    case 'opaque':
     case 'importedMesh':
       return edgeIssue(
         'unsupported-edge-base',
         'Edge finishing v1 currently supports tracked vertical edges from compile-covered box() bodies and rectangle extrusions before topology-changing edits.',
       );
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -777,7 +763,6 @@ function resolveEdgeChainAtOwnerBase(
     || ownerBase.kind === 'queryOwner'
     || ownerBase.kind === 'filletEdges'
     || ownerBase.kind === 'chamferEdges'
-    || ownerBase.kind === 'opaque'
     || ownerBase.kind === 'importedMesh'
   ) {
     return {
@@ -832,7 +817,6 @@ function resolveCreatedEdgeChainAtOwnerBase(
     || ownerBase.kind === 'queryOwner'
     || ownerBase.kind === 'filletEdges'
     || ownerBase.kind === 'chamferEdges'
-    || ownerBase.kind === 'opaque'
     || ownerBase.kind === 'importedMesh'
   ) {
     return {

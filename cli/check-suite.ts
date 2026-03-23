@@ -69,7 +69,7 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-type StageResult = { label: string; durationMs: number; ok: boolean };
+type StageResult = { label: string; durationMs: number; ok: boolean; error?: string };
 
 /**
  * Render a live spinner line showing current stage progress.
@@ -154,21 +154,20 @@ export async function runCheckSuiteCli(): Promise<void> {
     const stopSpinner = startSpinner(stage, i, STAGES.length);
     const t0 = Date.now();
     let ok = true;
+    let error: string | undefined;
     try {
       await stage.run();
     } catch (err) {
       ok = false;
-      stopSpinner();
-      printStageResult({ label: stage.label, durationMs: Date.now() - t0, ok }, i, STAGES.length);
-      console.error(`    ${ANSI.red}${(err as Error).message}${ANSI.reset}`);
-      // Continue running remaining stages so we see the full picture
-      results.push({ label: stage.label, durationMs: Date.now() - t0, ok });
-      continue;
+      error = (err as Error).message;
     }
     stopSpinner();
-    const result: StageResult = { label: stage.label, durationMs: Date.now() - t0, ok };
+    const result: StageResult = { label: stage.label, durationMs: Date.now() - t0, ok, error };
     results.push(result);
     printStageResult(result, i, STAGES.length);
+    if (!ok && error) {
+      console.error(`    ${ANSI.red}${error}${ANSI.reset}`);
+    }
   }
 
   const totalMs = Date.now() - suiteStart;

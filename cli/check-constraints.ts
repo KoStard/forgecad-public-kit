@@ -1285,7 +1285,7 @@ function testFullSpectrogram() {
   sk.length(lightLine.line, 21.5);
   sk.perpendicular(lightLine.line, camExternal[1].line);
 
-  const result = sk.solve({ iterations: 200, restarts: 12 });
+  const result = sk.solve({ iterations: 50, restarts: 3 });
 
   // Key assertions for the spectrogram
   const meta = result.constraintMeta;

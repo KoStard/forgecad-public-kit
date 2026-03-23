@@ -1,4 +1,4 @@
-import { findShapePrimaryQueryOwner, type ShapeCompilePlan } from './compilePlan';
+import { assertExhaustive, findShapePrimaryQueryOwner, type ShapeCompilePlan } from './compilePlan';
 import {
   cloneEdgeQueryRef,
   cloneFaceQueryRef,
@@ -59,7 +59,6 @@ function rootTopologyRewritePropagation(plan: ShapeCompilePlan | null): Topology
     case 'hole':
     case 'cut':
     case 'boolean':
-    case 'hull':
     case 'trimByPlane':
     case 'fillet':
     case 'chamfer':
@@ -74,9 +73,10 @@ function rootTopologyRewritePropagation(plan: ShapeCompilePlan | null): Topology
     case 'sweep':
     case 'filletEdges':
     case 'chamferEdges':
-    case 'opaque':
     case 'importedMesh':
       return null;
+    default:
+      assertExhaustive(plan);
   }
 }
 

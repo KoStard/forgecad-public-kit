@@ -1,6 +1,7 @@
 import type { ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
 import {
   appendShapeCompileTransform,
+  assertExhaustive,
   buildBooleanShapeCompilePlan,
   buildOffsetProfileCompilePlan,
   cloneShapeCompilePlan,
@@ -236,14 +237,14 @@ function lowerBaseShellPlanToConcretePlan(
     case 'loft':
     case 'sweep':
     case 'boolean':
-    case 'hull':
     case 'trimByPlane':
-    case 'opaque':
     case 'importedMesh':
       return {
         ok: false,
         reason: `Shape.shell() supports compile-covered box(), cylinder(), and straight extrude() bases. "${plan.kind}" bases are not supported.`,
       };
+    default:
+      assertExhaustive(plan);
   }
 }
 

@@ -56,10 +56,6 @@ export class ManifoldProfileBackend implements ProfileBackend {
     return new ManifoldProfileBackend(this.cs.offset(delta, join));
   }
 
-  hull(): ProfileBackend {
-    return new ManifoldProfileBackend(this.cs.hull());
-  }
-
   simplify(epsilon: number): ProfileBackend {
     return new ManifoldProfileBackend(this.cs.simplify(epsilon));
   }

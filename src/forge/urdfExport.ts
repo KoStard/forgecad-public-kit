@@ -9,7 +9,7 @@ import type {
   PartMetadata,
 } from './assembly';
 import type { CollectedRobotExport } from './robotExport';
-import { Shape, hull3d, union } from './kernel';
+import { Shape, union } from './kernel';
 import { ShapeGroup } from './group';
 import { TrackedShape } from './sketch/topology';
 import { Transform, composeChain, type Vec3 } from './transform';
@@ -539,14 +539,13 @@ export function buildUrdfRobotPackage(spec: CollectedRobotExport): UrdfPackageOu
       ])),
     });
 
-    // Collision mesh (convex hull)
+    // Collision mesh (union of all shapes — convex hull was removed)
     if (collisionMode === 'convex') {
       const collisionMeshPath = `meshes/${urdfLinkName}_collision.stl`;
-      const unionedShape = geometry.shapes.length === 1 ? geometry.shapes[0] : union(...geometry.shapes);
-      const hullShape = hull3d(unionedShape);
+      const collisionShape = geometry.shapes.length === 1 ? geometry.shapes[0] : union(...geometry.shapes);
       files.push({
         path: collisionMeshPath,
-        bytes: new Uint8Array(buildBinaryStl([{ name: `${part.name}_collision`, shape: hullShape }])),
+        bytes: new Uint8Array(buildBinaryStl([{ name: `${part.name}_collision`, shape: collisionShape }])),
       });
       collisionMeshes.set(part.name, collisionMeshPath);
     }

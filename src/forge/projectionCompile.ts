@@ -1,5 +1,6 @@
 import {
   appendProfileCompileTransform,
+  assertExhaustive,
   buildBooleanProfileCompilePlan,
   cloneProfileCompilePlan,
   cloneShapeCompilePlan,
@@ -511,11 +512,6 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
         ok: false,
         reason: `projection replay currently does not reduce ${plan.kind} sources to one defended planar projection basis.`,
       };
-    case 'hull':
-      return {
-        ok: false,
-        reason: 'projection replay currently does not reduce hull sources to one defended planar projection basis.',
-      };
     case 'trimByPlane':
       return {
         ok: false,
@@ -529,16 +525,13 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
         ok: false,
         reason: `projection replay currently does not absorb ${plan.kind} silhouette changes into the exact subset.`,
       };
-    case 'opaque':
-      return {
-        ok: false,
-        reason: 'projection replay cannot derive a planar projection basis from opaque (pre-built) shapes.',
-      };
     case 'importedMesh':
       return {
         ok: false,
         reason: 'projection replay cannot derive a planar projection basis from imported mesh files.',
       };
+    default:
+      assertExhaustive(plan);
   }
 }
 

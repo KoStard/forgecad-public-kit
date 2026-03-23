@@ -1,4 +1,5 @@
 import {
+  assertExhaustive,
   type CutTaperCompilePlan,
   findShapePrimaryQueryOwner,
   type FeatureCutExtent,
@@ -655,7 +656,7 @@ function buildExtrudeFaceTable(
 
 type AnyTopologyRewritePropagation = Extract<
   ShapeCompilePlan,
-  { kind: 'shell' | 'hole' | 'cut' | 'boolean' | 'trimByPlane' | 'fillet' | 'chamfer' | 'hull' }
+  { kind: 'shell' | 'hole' | 'cut' | 'boolean' | 'trimByPlane' | 'fillet' | 'chamfer' }
 >['queryPropagation'];
 
 function findCreatedFaceQuery(
@@ -1408,7 +1409,6 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
     case 'revolve':
     case 'loft':
     case 'sweep':
-    case 'hull':
     case 'fillet':
     case 'chamfer':
     case 'filletEdges':
@@ -1496,9 +1496,10 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       registerNamedFaceCandidates(table, candidates, propagation.owner);
       return table;
     }
-    case 'opaque':
     case 'importedMesh':
       return emptyFaceTable();
+    default:
+      assertExhaustive(plan);
   }
 }
 

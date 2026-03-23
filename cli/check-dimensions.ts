@@ -12,7 +12,6 @@ import {
   union,
   difference,
   intersection,
-  hull3d,
   getShapeDimensions,
   setShapeDimensions,
 } from '../src/forge/kernel';
@@ -105,7 +104,6 @@ function checkCopyLikeOps(): void {
   expect(getShapeDimensions(source.setColor('#112233')).length === 1, 'setColor should preserve dimensions');
   expect(getShapeDimensions(source.clone()).length === 1, 'clone should preserve dimensions');
   expect(getShapeDimensions(source.trimByPlane([0, 0, 1], 0)).length === 1, 'trimByPlane should preserve dimensions');
-  expect(getShapeDimensions(source.hull()).length === 1, 'hull() should preserve dimensions');
 }
 
 function checkBooleanPropagation(): void {
@@ -119,8 +117,6 @@ function checkBooleanPropagation(): void {
   expect(getShapeDimensions(union(a, b)).length === 2, 'union() should merge dimensions');
   expect(getShapeDimensions(difference(a, b)).length === 1, 'difference() should keep base dimensions');
   expect(getShapeDimensions(intersection(a, b)).length === 2, 'intersection() should merge dimensions');
-  expect(getShapeDimensions(hull3d(a, b)).length === 2, 'hull3d() should merge dimensions from shape args');
-
   const split = a.splitByPlane([1, 0, 0], 0);
   expect(getShapeDimensions(split[0]).length === 1, 'splitByPlane[0] should keep base dimensions');
   expect(getShapeDimensions(split[1]).length === 1, 'splitByPlane[1] should keep base dimensions');

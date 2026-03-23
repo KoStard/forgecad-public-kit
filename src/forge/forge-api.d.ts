@@ -161,7 +161,6 @@ declare class Sketch {
 	subtract(...others: SketchOperandInput[]): Sketch;
 	intersect(...others: SketchOperandInput[]): Sketch;
 	offset(delta: number, join?: "Square" | "Round" | "Miter"): Sketch;
-	hull(): Sketch;
 	/**
 	 * Decompose this sketch into its distinct filled regions. See `sketchRegions()`.
 	 * Regions are returned largest-first by area.
@@ -1814,7 +1813,6 @@ interface ShapeBackend {
 		number,
 		number
 	], originOffset: number): ShapeBackend;
-	hull(): ShapeBackend;
 	simplify(tolerance?: number): ShapeBackend;
 	boundingBox(): ShapeRuntimeBounds;
 	volume(): number;
@@ -1864,7 +1862,6 @@ type SketchFaceTarget = SketchFace3D | string | FaceRef;
 declare function union2d(...inputs: SketchOperandInput[]): Sketch;
 declare function difference2d(...inputs: SketchOperandInput[]): Sketch;
 declare function intersection2d(...inputs: SketchOperandInput[]): Sketch;
-declare function hull2d(...inputs: SketchOperandInput[]): Sketch;
 declare class PathBuilder {
 	private points;
 	private x;
@@ -2350,7 +2347,7 @@ type GeometryBackend = "manifold" | "occt" | "hybrid" | "unknown";
 type GeometryRepresentation = "mesh-solid" | "brep-solid" | "surface" | "mixed";
 type GeometryFidelity = "kernel-native" | "sampled" | "deformed" | "mixed" | "unknown";
 type GeometryTopology = "none" | "synthetic" | "kernel";
-type GeometrySource = "primitive" | "extrude" | "revolve" | "boolean" | "sheet-metal" | "shell" | "fillet" | "chamfer" | "hull" | "level-set" | "loft" | "sweep" | "deform" | "unknown";
+type GeometrySource = "primitive" | "extrude" | "revolve" | "boolean" | "sheet-metal" | "shell" | "fillet" | "chamfer" | "level-set" | "loft" | "sweep" | "deform" | "unknown";
 interface GeometryInfo {
 	backend: GeometryBackend;
 	representation: GeometryRepresentation;
@@ -2555,8 +2552,6 @@ declare class Shape {
 	shell(thickness: number, opts?: {
 		openFaces?: string[];
 	}): Shape;
-	/** Convex hull of this shape. */
-	hull(): Shape;
 	/** Reduce mesh complexity. Vertices closer than tolerance are merged. */
 	simplify(tolerance?: number): Shape;
 	boundingBox(): unknown;
@@ -4087,11 +4082,6 @@ declare function sphere(radius: number, segments?: number): Shape;
 declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
 declare function difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
 declare function intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
-declare function hull3d(...args: (Shape | TrackedShape | [
-	number,
-	number,
-	number
-])[]): Shape;
 declare function levelSet(sdf: (p: [
 	number,
 	number,

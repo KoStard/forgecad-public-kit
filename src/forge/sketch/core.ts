@@ -94,7 +94,6 @@ export class Sketch {
   subtract(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
   intersect(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
   offset(delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch { throw new Error('Not implemented'); }
-  hull(): Sketch { throw new Error('Not implemented'); }
   /**
    * Decompose this sketch into its distinct filled regions. See `sketchRegions()`.
    * Regions are returned largest-first by area.

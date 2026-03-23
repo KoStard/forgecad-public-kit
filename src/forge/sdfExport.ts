@@ -9,7 +9,7 @@ import type {
   PartMetadata,
 } from './assembly';
 import type { CollectedRobotExport, RobotWorldOptions } from './robotExport';
-import { Shape, hull3d, union } from './kernel';
+import { Shape, union } from './kernel';
 import { ShapeGroup } from './group';
 import { TrackedShape } from './sketch/topology';
 import { Transform, composeChain, type Vec3 } from './transform';
@@ -954,13 +954,12 @@ export function buildSdfRobotPackage(spec: CollectedRobotExport): SdfPackageOutp
     const collisionMode = resolveCollisionMode(part.metadata, linkOptions?.collision);
     if (collisionMode === 'convex') {
       const collisionMeshPath = `${modelFolder}/meshes/${sdfLinkName}_collision.stl`;
-      const unionedShape = geometry.shapes.length === 1
+      const collisionShape = geometry.shapes.length === 1
         ? geometry.shapes[0]
         : union(...geometry.shapes);
-      const hullShape = hull3d(unionedShape);
       files.push({
         path: collisionMeshPath,
-        bytes: new Uint8Array(buildBinaryStl([{ name: `${part.name}_collision`, shape: hullShape }])),
+        bytes: new Uint8Array(buildBinaryStl([{ name: `${part.name}_collision`, shape: collisionShape }])),
       });
     }
 

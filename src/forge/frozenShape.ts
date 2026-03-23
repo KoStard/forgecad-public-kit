@@ -111,7 +111,6 @@ class FrozenShapeBackend implements ShapeBackend {
   split(other: ShapeBackend): [ShapeBackend, ShapeBackend] { return this.getReconstructedBackend().split(other); }
   splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend] { return this.getReconstructedBackend().splitByPlane(normal, originOffset); }
   trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend { return this.getReconstructedBackend().trimByPlane(normal, originOffset); }
-  hull(): ShapeBackend { return this.getReconstructedBackend().hull(); }
   volume(): number { return this.getReconstructedBackend().volume(); }
   surfaceArea(): number { return this.getReconstructedBackend().surfaceArea(); }
   slice(offset: number): ShapeRuntimeCrossSection { return this.getReconstructedBackend().slice(offset); }

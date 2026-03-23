@@ -4,7 +4,7 @@
  * Exposes the transformation chain that led to each surface.
  */
 
-import type { ProfileCompilePlan, ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
+import { assertExhaustive, type ProfileCompilePlan, type ShapeCompilePlan, type ShapeCompileTransformStep } from './compilePlan';
 import type { FaceRef } from './sketch/topology';
 import type { FaceQueryRef, ShapeQueryOwner } from './queryModel';
 
@@ -118,10 +118,6 @@ function tracePlanTransformations(plan: ShapeCompilePlan | null): Transformation
       steps.push(...tracePlanTransformations(plan.base));
       break;
 
-    case 'hull':
-      // For hull, we could trace all shapes, but let's just note it's a hull
-      break;
-
     default:
       // Primitives and other operations don't have base transformations
       break;
@@ -166,8 +162,8 @@ function summarizeProfile(profile: ProfileCompilePlan): string {
     case 'polygon': return `polygon (${profile.points.length} pts)`;
     case 'boolean': return `${profile.op} profile`;
     case 'offset': return 'offset profile';
-    case 'hull': return 'hull profile';
     case 'project': return 'projected profile';
+    default: assertExhaustive(profile);
   }
 }
 
@@ -243,10 +239,6 @@ function collectTimelineEntries(plan: ShapeCompilePlan, entries: TimelineEntry[]
         summary: `${plan.shapes.length} operand${plan.shapes.length !== 1 ? 's' : ''}`,
         category: 'boolean',
       });
-      return;
-
-    case 'hull':
-      entries.push({ kind: 'hull', label: 'Hull', summary: `${plan.shapes.length} shapes`, category: 'boolean' });
       return;
 
     case 'extrude':

@@ -1171,18 +1171,14 @@ function checkChessSetFacetedFallbackManifest(): void {
   const exactManifest = buildBrepExportManifest(result.objects);
   assert.equal(
     exactManifest.unsupported.length,
-    4,
-    `Expected 4 exact-export blockers in chess set, got: ${exactManifest.unsupported.map((item) => item.name).join(', ')}`,
+    0,
+    `Expected 0 exact-export blockers in chess set, got: ${exactManifest.unsupported.map((item) => item.name).join(', ')}`,
   );
 
   const manifest = buildBrepExportManifest(result.objects, { allowFaceted: true });
-  assert.equal(manifest.unsupported.length, 0, 'Faceted fallback should eliminate chess-set blockers');
+  assert.equal(manifest.unsupported.length, 0, 'No unsupported objects in chess set');
   assert.equal(manifest.objects.length, 37, `Expected all 37 chess-set solids to export, got ${manifest.objects.length}`);
-  assert.equal(manifest.fallbacks.length, 4, `Expected 4 faceted fallbacks, got ${manifest.fallbacks.length}`);
-  assert.deepEqual(
-    manifest.fallbacks.map((item) => item.name).sort(),
-    ['Black Knight 2', 'Black Knight 7', 'White Knight 2', 'White Knight 7'],
-  );
+  assert.equal(manifest.fallbacks.length, 0, `Expected 0 faceted fallbacks (hull3d removed), got ${manifest.fallbacks.length}`);
 }
 
 function checkSegmentedRuntimeHintsStayOutOfExactSubset(): void {
@@ -1215,43 +1211,6 @@ return [
   assert.equal(facetedManifest.unsupported.length, 0, 'Faceted fallback should cover segmented runtime-hint shapes');
   assert.equal(facetedManifest.objects.length, 3, 'Expected all segmented shapes to export as faceted objects');
   assert.equal(facetedManifest.fallbacks.length, 3, 'Expected faceted fallbacks for all segmented runtime-hint shapes');
-}
-
-function checkHullRuntimeIntentStaysOutOfExactSubset(): void {
-  const files: Record<string, string> = {
-    'main.forge.js': `
-const rib = hull3d(
-  cylinder(20, 3).translate(-10, 0, 0),
-  cylinder(20, 3).translate(10, 0, 0),
-  [0, 0, 26],
-);
-const convexPost = box(12, 8, 20, true)
-  .toShape()
-  .rotateAround([0, 0, 1], 25, [0, 0, 0])
-  .hull();
-
-return [
-  { name: 'Rib', shape: rib },
-  { name: 'Convex Post', shape: convexPost },
-];
-`,
-  };
-  const result = runScript(files['main.forge.js'], 'main.forge.js', files);
-  assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
-
-  const exactManifest = buildBrepExportManifest(result.objects);
-  assert.equal(exactManifest.objects.length, 0, 'Hull solids should stay out of the exact export subset');
-  assert.equal(exactManifest.unsupported.length, 2, 'Expected hull solids to be rejected by exact export');
-  assert(
-    exactManifest.unsupported.every((item) => item.reason.includes('shape-hull')),
-    `Expected hull-specific exact-export blockers, got: ${exactManifest.unsupported.map((item) => item.reason).join('; ')}`,
-  );
-
-  const facetedManifest = buildBrepExportManifest(result.objects, { allowFaceted: true });
-  assert.equal(facetedManifest.unsupported.length, 0, 'Faceted fallback should cover hull solids');
-  assert.equal(facetedManifest.objects.length, 2, 'Expected hull solids to export as faceted objects');
-  assert.equal(facetedManifest.fallbacks.length, 2, 'Expected faceted fallbacks for all hull solids');
-  assert(facetedManifest.objects.every((item) => item.kind === 'faceted'), 'Expected hull solids to export as faceted geometry');
 }
 
 export async function runCheckBrepExportCli(): Promise<void> {
@@ -1302,6 +1261,5 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkLoftAndSweepExportEndToEnd();
   checkChessSetFacetedFallbackManifest();
   checkSegmentedRuntimeHintsStayOutOfExactSubset();
-  checkHullRuntimeIntentStaysOutOfExactSubset();
   console.log('✓ BREP export invariants passed');
 }

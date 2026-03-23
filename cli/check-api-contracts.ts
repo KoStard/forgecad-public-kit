@@ -22,7 +22,6 @@ import {
   filletEdge,
   chamferEdge,
   intersection2d,
-  hull2d,
   runScript,
   constrainedSketch,
   sketchRegions,
@@ -127,9 +126,6 @@ function checkSketchBooleanForms(): void {
   expectClose(intersectArray.area(), intersectFn.area(), 'Sketch.intersect array');
   expectClose(intersectFnArray.area(), intersectFn.area(), 'intersection2d array');
 
-  const hullVariadic = hull2d(tab1, tab2);
-  const hullArray = hull2d([tab1, tab2]);
-  expectClose(hullVariadic.area(), hullArray.area(), 'hull2d array');
 }
 
 function checkBooleanErrors(): void {

@@ -171,8 +171,7 @@ export function roundedBox(
   z: number,
   radius: number,
 ): Shape {
-  // Use hull of 8 spheres at corners — but Manifold hull is available
-  // For now, intersect 3 axis-aligned rounded slabs
+  // Intersect 3 axis-aligned rounded slabs
   const sx = box(x - radius * 2, y, z, true);
   const sy = box(x, y - radius * 2, z, true);
   const sz = box(x, y, z - radius * 2, true);

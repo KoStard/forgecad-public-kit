@@ -26,7 +26,6 @@ export {
   union,
   difference,
   intersection,
-  hull3d,
   getWasm,
   isAnchor3D,
   resolveAnchor3D,

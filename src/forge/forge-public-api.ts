@@ -39,7 +39,6 @@ export {
   union2d,
   difference2d,
   intersection2d,
-  hull2d,
   path,
   stroke,
   constrainedSketch,
@@ -166,7 +165,6 @@ export declare function sphere(radius: number, segments?: number): _Shape;
 export declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
 export declare function difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
 export declare function intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
-// hull3d removed from public API — Manifold-only, not a standard CAD operation
 // Cross-file imports (runtime-provided; types declared here for completeness)
 export declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | _SvgImportOptions): _Sketch;
 export declare function importPart(fileName: string, paramOverrides?: Record<string, number>): _Shape;

@@ -777,7 +777,7 @@ const commands: CommandDefinition[] = [
     summary: 'Run focused topology-rewrite query-propagation snapshots and invariants.',
     usage: [
       'forgecad check query-propagation',
-      'forgecad check query-propagation --case hull-runtime-boundary',
+      'forgecad check query-propagation --case chamfer-selected-edge',
       'forgecad check query-propagation --update',
     ],
     examples: [

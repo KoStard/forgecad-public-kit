@@ -1,6 +1,6 @@
 import { Transform, type Mat4, type Vec3 } from './transform';
 import type { PlaneFrame } from './planeFrame';
-import type { ShapeBackend, EdgeFeatureTarget } from './shapeBackend';
+import type { EdgeFeatureTarget } from './shapeBackend';
 import {
   cloneEdgeQueryRef,
   cloneFaceQueryRef,
@@ -27,6 +27,11 @@ import type {
 } from './sheetMetalModel';
 import { cloneSheetMetalModel } from './sheetMetalModel';
 import type { ProfileBackend } from './profileBackend';
+
+/** Compile-time exhaustiveness check — call in default case of plan.kind switches. */
+export function assertExhaustive(value: never, message?: string): never {
+  throw new Error(message ?? `Unhandled compile plan kind: ${(value as any).kind}`);
+}
 
 export type ProfileCompileTransformStep =
   | { kind: 'translate'; x: number; y: number }
@@ -72,11 +77,6 @@ export type ProfileCompilePlan =
       base: ProfileCompilePlan;
       delta: number;
       join: 'Square' | 'Round' | 'Miter';
-      transforms: ProfileCompileTransformStep[];
-    }
-  | {
-      kind: 'hull';
-      profiles: ProfileCompilePlan[];
       transforms: ProfileCompileTransformStep[];
     }
   | {
@@ -265,12 +265,6 @@ export type ShapeCompilePlan =
       base: ShapeCompilePlan;
     }
   | {
-      kind: 'hull';
-      shapes: ShapeCompilePlan[];
-      points: [number, number, number][];
-      queryPropagation?: TopologyRewritePropagation;
-    }
-  | {
       kind: 'trimByPlane';
       base: ShapeCompilePlan;
       normalX: number;
@@ -314,11 +308,6 @@ export type ShapeCompilePlan =
       size: number;
       /** Pre-resolved edge targets from mesh extraction. Matched by midpoint at lowering time. */
       edgeTargets: EdgeFeatureTarget[];
-    }
-  | {
-      /** Wraps a pre-built ShapeBackend that can't be expressed as compile plan IR. */
-      kind: 'opaque';
-      backend: ShapeBackend;
     }
   | {
       /**
@@ -656,12 +645,6 @@ export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): Profil
         join: plan.join,
         transforms: plan.transforms.map(cloneProfileTransform),
       };
-    case 'hull':
-      return {
-        kind: 'hull',
-        profiles: plan.profiles.map((profile) => cloneProfileCompilePlan(profile)!),
-        transforms: plan.transforms.map(cloneProfileTransform),
-      };
     case 'project':
       return {
         kind: 'project',
@@ -678,6 +661,8 @@ export function cloneProfileCompilePlan(plan: ProfileCompilePlan | null): Profil
         replayReason: plan.replayReason,
         transforms: plan.transforms.map(cloneProfileTransform),
       };
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -800,14 +785,6 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         base: cloneShapeCompilePlan(plan.base)!,
       };
       break;
-    case 'hull':
-      result = {
-        kind: 'hull',
-        shapes: plan.shapes.map((shape) => cloneShapeCompilePlan(shape)!),
-        points: plan.points.map(([x, y, z]) => [x, y, z]),
-        queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
-      };
-      break;
     case 'trimByPlane':
       result = {
         kind: 'trimByPlane',
@@ -869,14 +846,12 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         })),
       };
       break;
-    case 'opaque':
-      // Opaque plans hold a pre-built backend — clone shares the same backend reference.
-      result = { kind: 'opaque', backend: plan.backend };
-      break;
     case 'importedMesh':
       // Imported mesh — fileData is immutable raw bytes, share the reference.
       result = { kind: 'importedMesh', filePath: plan.filePath, format: plan.format, fileData: plan.fileData };
       break;
+    default:
+      assertExhaustive(plan);
   }
   // Preserve OCCT shape cache across clones (set by compilePlanOCCT.ts)
   if ((plan as any)._occtCache) (result as any)._occtCache = (plan as any)._occtCache;
@@ -1008,10 +983,10 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan): ShapeQueryOw
     case 'loft':
     case 'sweep':
     case 'boolean':
-    case 'hull':
-    case 'opaque':
     case 'importedMesh':
       return null;
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -1042,9 +1017,6 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan): ShapeQueryOwner
       case 'boolean':
         for (const shape of current.shapes) visit(shape);
         return;
-      case 'hull':
-        for (const shape of current.shapes) visit(shape);
-        return;
       case 'box':
       case 'cylinder':
       case 'sphere':
@@ -1053,9 +1025,10 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan): ShapeQueryOwner
       case 'revolve':
       case 'loft':
       case 'sweep':
-      case 'opaque':
       case 'importedMesh':
         return;
+      default:
+        assertExhaustive(current);
     }
   }
 
@@ -1105,11 +1078,11 @@ export function findShapeWorkplanePlacement(
     case 'loft':
     case 'sweep':
     case 'boolean':
-    case 'hull':
     case 'revolve':
-    case 'opaque':
     case 'importedMesh':
       return null;
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -1139,16 +1112,6 @@ export function buildOffsetProfileCompilePlan(
   };
 }
 
-export function buildHullProfileCompilePlan(
-  profiles: ProfileCompilePlan[],
-): ProfileCompilePlan {
-  return {
-    kind: 'hull',
-    profiles: profiles.map((profile) => cloneProfileCompilePlan(profile)!),
-    transforms: [],
-  };
-}
-
 /**
  * Snapshot a ProfileBackend (cross-section) as a concrete polygon compile plan.
  * This replaces the former 'opaque' plan kind: every cross-section IS polygon
@@ -1166,17 +1129,6 @@ export function profilePlanFromCrossSection(cross: ProfileBackend): ProfileCompi
   }));
   if (plans.length === 1) return plans[0];
   return { kind: 'boolean', op: 'union', profiles: plans, transforms: [] };
-}
-
-export function buildHullShapeCompilePlan(
-  shapes: ShapeCompilePlan[],
-  points: [number, number, number][] = [],
-): ShapeCompilePlan {
-  return {
-    kind: 'hull',
-    shapes: shapes.map((shape) => cloneShapeCompilePlan(shape)),
-    points: points.map(([x, y, z]) => [x, y, z]),
-  };
 }
 
 export function buildTrimByPlaneShapeCompilePlan(

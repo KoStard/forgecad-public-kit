@@ -26,7 +26,6 @@ import {
   appendShapeCompileTransform,
   appendShapeCompileTransforms,
   buildBooleanShapeCompilePlan,
-  buildHullShapeCompilePlan,
   buildTrimByPlaneShapeCompilePlan,
   cloneShapeCompilePlan,
   collectShapeQueryOwners,
@@ -41,7 +40,6 @@ import type { ShapeQueryOwner, TopologyRewritePropagation } from './queryModel';
 import {
   attachTopologyRewritePropagation,
   buildBooleanTopologyRewritePropagation,
-  buildHullTopologyRewritePropagation,
   buildShellTopologyRewritePropagation,
   buildTrimByPlaneTopologyRewritePropagation,
   collectShapeTopologyRewritePropagations,
@@ -119,7 +117,6 @@ export type GeometrySource =
   | 'shell'
   | 'fillet'
   | 'chamfer'
-  | 'hull'
   | 'level-set'
   | 'loft'
   | 'sweep'
@@ -248,9 +245,8 @@ function getShapeRuntimeBackendInternal(shape: Shape): ShapeBackend {
 
 function getShapeCompilePlanInternal(shape: Shape): ShapeCompilePlan {
   const stored = _shapeCompilePlans.get(shape);
-  if (stored) return cloneShapeCompilePlan(stored);
-  // Auto-opaque fallback for shapes created without an explicit plan
-  return { kind: 'opaque', backend: getShapeRuntimeBackendInternal(shape) };
+  if (!stored) throw new Error('Shape has no compile plan — every Shape must have an explicit plan set via setShapeCompilePlanInternal()');
+  return cloneShapeCompilePlan(stored);
 }
 
 function getShapePlacementRefsInternal(shape: Shape): PlacementReferences {
@@ -647,14 +643,6 @@ export function buildShapeFromCompilePlan(
   color?: string,
   geometryInfo?: Partial<GeometryInfo>,
 ): Shape {
-  // Opaque plans wrap a pre-built backend — no lowering needed.
-  if (plan.kind === 'opaque') {
-    return setShapeCompilePlan(
-      new Shape(plan.backend, color, geometryInfo),
-      plan,
-    );
-  }
-
   let backend: ShapeBackend;
   if (_activeBackend === 'manifold') {
     backend = lowerShapeCompilePlanToShapeBackend(plan, getWasm());
@@ -717,8 +705,7 @@ export class Shape {
     this.colorHex = color;
     setShapeRuntimeBackendInternal(this, payload);
     setShapeGeometryInfoInternal(this, createGeometryInfo(geometryInfo));
-    // Compile plan defaults to opaque via getShapeCompilePlanInternal fallback.
-    // Callers (buildShapeFromCompilePlan, etc.) set the real plan immediately after.
+    // No compile plan set here — callers (buildShapeFromCompilePlan, etc.) must set it immediately after.
   }
 
   /** Set the color of this shape (hex string, e.g. "#ff0000") */
@@ -1183,24 +1170,6 @@ export class Shape {
     ), nextPlan);
   }
 
-  // --- Hull ---
-
-  /** Convex hull of this shape. */
-  hull(): Shape {
-    const nextPlan = createOwnedTopologyRewritePlan(
-      buildHullShapeCompilePlan([getShapeCompilePlanInternal(this)]),
-      'hull',
-      (owner) => buildHullTopologyRewritePropagation(owner),
-    )!;
-    return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-      withBaseDimensions(
-        this,
-        buildShapeFromCompilePlan(nextPlan, this.colorHex),
-      ),
-      deriveGeometryInfo(getShapeGeometryInfoInternal(this), 'hull', { topology: 'none' }),
-    ), nextPlan);
-  }
-
   // --- Query ---
 
   boundingBox() {
@@ -1466,32 +1435,6 @@ export function intersection(...inputs: ShapeOperandInput[]): Shape {
       buildShapeFromCompilePlan(nextPlan, shapes[0].colorHex),
     ),
     mergeGeometryInfos(shapes.map((shape) => getShapeGeometryInfoInternal(shape)), 'boolean', { topology: 'none' }),
-  ), nextPlan);
-}
-
-/** Convex hull of multiple shapes and/or points. */
-export function hull3d(...args: (Shape | ShapeLike | [number, number, number])[]): Shape {
-  const shapeArgs: Shape[] = [];
-  const pointArgs: [number, number, number][] = [];
-  for (let index = 0; index < args.length; index++) {
-    const arg = args[index];
-    if (arg instanceof Shape || (arg && typeof arg === 'object' && typeof (arg as { toShape?: unknown }).toShape === 'function')) {
-      shapeArgs.push(unwrapShapeLike(arg));
-    } else {
-      pointArgs.push(normalizePoint3(arg, 'hull3d()', index + 1));
-    }
-  }
-  const nextPlan = createOwnedTopologyRewritePlan(
-    buildHullShapeCompilePlan(shapeArgs.map((shape) => getShapeCompilePlanInternal(shape)), pointArgs),
-    'hull',
-    (owner) => buildHullTopologyRewritePropagation(owner),
-  )!;
-  const out = buildShapeFromCompilePlan(nextPlan, shapeArgs[0]?.colorHex);
-  return setShapeCompilePlanInternal(setShapeGeometryInfoInternal(
-    withMergedDimensions(shapeArgs, out),
-    shapeArgs.length > 0
-      ? mergeGeometryInfos(shapeArgs.map((shape) => getShapeGeometryInfoInternal(shape)), 'hull', { topology: 'none' })
-      : createGeometryInfo({ fidelity: 'kernel-native', sources: ['hull'] }),
   ), nextPlan);
 }
 

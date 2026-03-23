@@ -1,4 +1,4 @@
-import type { ProfileCompilePlan, ShapeCompilePlan } from './compilePlan';
+import { assertExhaustive, type ProfileCompilePlan, type ShapeCompilePlan } from './compilePlan';
 import { appendCadQueryProfileTransform, type CadQueryProfilePlan, type CadQueryShapePlan } from './cadqueryPlan';
 import {
   lowerCutShapeCompilePlanToConcretePlan,
@@ -184,8 +184,8 @@ function lowerProfileCompilePlanToCadQueryResultAtPath(
       }
       return compilerSuccess(lowered, replay.diagnostics);
     }
-    case 'hull':
-      return compilerFailure(unsupportedNodeDiagnostic('profile-hull', path));
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -403,12 +403,10 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
       if (!base.ok) return compilerFailure(...base.diagnostics);
       return compilerSuccess(base.value, base.diagnostics);
     }
-    case 'hull':
-      return compilerFailure(unsupportedNodeDiagnostic('shape-hull', path));
-    case 'opaque':
-      return compilerFailure(unsupportedNodeDiagnostic('shape-opaque', path));
     case 'importedMesh':
       return compilerFailure(unsupportedNodeDiagnostic('shape-importedMesh', path));
+    default:
+      assertExhaustive(plan);
   }
 }
 

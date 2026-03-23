@@ -110,17 +110,17 @@ function kingShape() {
 function knightShape() {
   const base = pieceBase(squareSize * 0.32, squareSize * 0.12);
   const chest = sphere(squareSize * 0.18).translate(0, 0, squareSize * 0.45);
-  const neck = hull3d(
+  const neck = union(
     sphere(squareSize * 0.14).translate(0, 0, squareSize * 0.62),
     sphere(squareSize * 0.12).translate(0, squareSize * 0.08, squareSize * 0.82),
     sphere(squareSize * 0.1).translate(0, squareSize * 0.12, squareSize * 1.02)
   );
-  const head = hull3d(
+  const head = union(
     sphere(squareSize * 0.11).translate(0, squareSize * 0.12, squareSize * 1.02),
     sphere(squareSize * 0.08).translate(0, squareSize * 0.22, squareSize * 0.98),
     sphere(squareSize * 0.07).translate(0, squareSize * 0.18, squareSize * 1.14)
   );
-  const muzzle = hull3d(
+  const muzzle = union(
     sphere(squareSize * 0.055).translate(0, squareSize * 0.24, squareSize * 0.98),
     sphere(squareSize * 0.045).translate(0, squareSize * 0.31, squareSize * 0.94)
   );

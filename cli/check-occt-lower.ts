@@ -273,19 +273,6 @@ function testProfileScale(): void {
   expectBBox(b, [0, 0, 0], [20, 10, 1], 'profile scale');
 }
 
-function testProfileHullThrows(): void {
-  const profile: ProfileCompilePlan = {
-    kind: 'hull',
-    profiles: [rectProfile(5, 5)],
-    transforms: [],
-  };
-  assert.throws(
-    () => lower(extrudePlan(profile, 1)),
-    (err: any) => err instanceof OCCTUnsupportedError,
-    'profile hull should throw OCCTUnsupportedError',
-  );
-}
-
 function testProfileProjectThrows(): void {
   const profile: ProfileCompilePlan = {
     kind: 'project',
@@ -802,20 +789,6 @@ function testTrimByPlaneOutside(): void {
 
 /* ── Group 8: Errors ─────────────────────────────────────────────────── */
 
-function testHullThrowsOCCTUnsupported(): void {
-  const plan: ShapeCompilePlan = {
-    kind: 'hull',
-    shapes: [],
-    points: [[0, 0, 0]],
-    queryPropagation: undefined,
-  };
-  assert.throws(
-    () => lowerShapeCompilePlanToOCCT(plan),
-    (err: any) => err instanceof OCCTUnsupportedError,
-    'hull should throw OCCTUnsupportedError',
-  );
-}
-
 function testOpaqueThrows(): void {
   const plan: ShapeCompilePlan = {
     kind: 'opaque',
@@ -949,7 +922,6 @@ export async function runCheckOcctLowerCli(): Promise<void> {
   testProfileMirror();
   testProfileScale();
   testPolygonDegenerateEdges();
-  testProfileHullThrows();
   testProfileProjectThrows();
 
   // Group 2: Primitives
@@ -1003,7 +975,6 @@ export async function runCheckOcctLowerCli(): Promise<void> {
   testTrimByPlaneOutside();
 
   // Group 8: Errors
-  testHullThrowsOCCTUnsupported();
   testOpaqueThrows();
   testEmptyBooleanThrows();
   testLoftTooFewProfilesThrows();

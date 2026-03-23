@@ -5,7 +5,7 @@ import type {
   ProfileCompilePlan,
   ShapeCompilePlan,
 } from './compilePlan';
-import { featureCutExtentForwardSide, featureCutExtentReverseSide, findShapePrimaryQueryOwner } from './compilePlan';
+import { assertExhaustive, featureCutExtentForwardSide, featureCutExtentReverseSide, findShapePrimaryQueryOwner } from './compilePlan';
 import {
   cloneTopologyRewritePropagation,
   type EdgeQueryRef,
@@ -67,7 +67,6 @@ function rootPlanPropagation(plan: ShapeCompilePlan): TopologyRewritePropagation
     case 'hole':
     case 'cut':
     case 'boolean':
-    case 'hull':
     case 'trimByPlane':
     case 'fillet':
     case 'chamfer':
@@ -82,9 +81,10 @@ function rootPlanPropagation(plan: ShapeCompilePlan): TopologyRewritePropagation
     case 'sweep':
     case 'filletEdges':
     case 'chamferEdges':
-    case 'opaque':
     case 'importedMesh':
       return undefined;
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -182,7 +182,6 @@ type TopologyRewriteNodeKind =
   | 'hole'
   | 'cut'
   | 'boolean'
-  | 'hull'
   | 'trimByPlane'
   | 'fillet'
   | 'chamfer';
@@ -566,25 +565,6 @@ export function buildCutTopologyRewritePropagation(
   return propagation;
 }
 
-export function buildHullTopologyRewritePropagation(owner: ShapeQueryOwner): TopologyRewritePropagation {
-  const propagation = createTopologyRewritePropagation('hull', owner);
-  propagation.diagnostics.push(
-    createTopologyRewritePropagationDiagnostic(
-      'hull-face-propagation-unsupported',
-      'unsupported',
-      'face',
-      'Hull combines source solids through a full topology rewrite, so face-query propagation is not defended yet.',
-    ),
-    createTopologyRewritePropagationDiagnostic(
-      'hull-edge-propagation-unsupported',
-      'unsupported',
-      'edge',
-      'Hull combines source solids through a full topology rewrite, so edge-query propagation is not defended yet.',
-    ),
-  );
-  return propagation;
-}
-
 export function buildTrimByPlaneTopologyRewritePropagation(
   owner: ShapeQueryOwner,
   base: ShapeCompilePlan,
@@ -696,7 +676,6 @@ function isTopologyRewriteShapeCompilePlan(plan: ShapeCompilePlan): plan is Topo
     || plan.kind === 'hole'
     || plan.kind === 'cut'
     || plan.kind === 'boolean'
-    || plan.kind === 'hull'
     || plan.kind === 'trimByPlane'
     || plan.kind === 'fillet'
     || plan.kind === 'chamfer';
@@ -740,7 +719,6 @@ export function findShapeTopologyRewritePropagation(
     case 'hole':
     case 'cut':
     case 'boolean':
-    case 'hull':
     case 'trimByPlane':
     case 'fillet':
     case 'chamfer':
@@ -755,9 +733,10 @@ export function findShapeTopologyRewritePropagation(
     case 'sweep':
     case 'filletEdges':
     case 'chamferEdges':
-    case 'opaque':
     case 'importedMesh':
       return null;
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -791,11 +770,9 @@ export function collectShapeTopologyRewritePropagations(
         visit(current.base);
         return;
       }
-      case 'boolean':
-      case 'hull': {
+      case 'boolean': {
         pushPropagation(nodePropagation(current));
-        const children = current.kind === 'boolean' ? current.shapes : current.shapes;
-        for (const child of children) visit(child);
+        for (const child of current.shapes) visit(child);
         return;
       }
       case 'filletEdges':
@@ -810,9 +787,10 @@ export function collectShapeTopologyRewritePropagations(
       case 'revolve':
       case 'loft':
       case 'sweep':
-      case 'opaque':
       case 'importedMesh':
         return;
+      default:
+        assertExhaustive(current);
     }
   }
 

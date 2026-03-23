@@ -142,33 +142,6 @@ return [
 ];
 `;
 
-const HULL_RUNTIME_BOUNDARY_CODE = `
-const rib = hull3d(
-  cylinder(20, 3).translate(-10, 0, 0),
-  cylinder(20, 3).translate(10, 0, 0),
-  [0, 0, 26],
-);
-const convexPost = box(12, 8, 20, true)
-  .toShape()
-  .rotateAround([0, 0, 1], 25, [0, 0, 0])
-  .hull();
-const tab = hull2d(
-  circle2d(6).translate(-10, 0),
-  circle2d(6).translate(10, 0),
-).translate(0, 4);
-const collar = polygon([
-  [0, 0],
-  [8, 0],
-  [4, 5],
-]).translate(0, 16).hull();
-return [
-  { name: 'Rib', shape: rib },
-  { name: 'Convex Post', shape: convexPost },
-  { name: 'Tab', sketch: tab },
-  { name: 'Collar', sketch: collar },
-];
-`;
-
 function inlineCase(
   id: string,
   description: string,
@@ -362,35 +335,6 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         requiredPreservedEdgeQueries: [
           'propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge)',
         ],
-      },
-    ],
-  ),
-  inlineCase(
-    'hull-runtime-boundary',
-    'Hull stays an explicit unsupported propagation boundary instead of pretending to preserve durable post-rewrite queries.',
-    HULL_RUNTIME_BOUNDARY_CODE,
-    [
-      {
-        name: 'Rib',
-        exactRouteKind: 'unsupported',
-        facetedRouteKind: 'faceted',
-        operations: ['hull'],
-        requiredDiagnosticCodes: [
-          'hull-face-propagation-unsupported',
-          'hull-edge-propagation-unsupported',
-        ],
-        requiredRouteDiagnosticCodes: ['cadquery-occt-unsupported-shape-hull'],
-      },
-      {
-        name: 'Convex Post',
-        exactRouteKind: 'unsupported',
-        facetedRouteKind: 'faceted',
-        operations: ['hull'],
-        requiredDiagnosticCodes: [
-          'hull-face-propagation-unsupported',
-          'hull-edge-propagation-unsupported',
-        ],
-        requiredRouteDiagnosticCodes: ['cadquery-occt-unsupported-shape-hull'],
       },
     ],
   ),

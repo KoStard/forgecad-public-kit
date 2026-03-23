@@ -271,10 +271,6 @@ export class OCCTProfileBackend implements ProfileBackend {
     return this; // Fallback: return unchanged
   }
 
-  hull(): ProfileBackend {
-    throw new Error('OCCTProfileBackend.hull() is not supported — use Manifold backend for hull operations');
-  }
-
   simplify(_epsilon: number): ProfileBackend {
     // OCCT works with exact geometry; simplify is a no-op
     return this;

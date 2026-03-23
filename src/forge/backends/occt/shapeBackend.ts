@@ -329,11 +329,6 @@ export class OCCTShapeBackend implements ShapeBackend {
     return inside;
   }
 
-  hull(): ShapeBackend {
-    // OCCT doesn't have a direct convex hull of shapes.
-    throw new Error('hull() is not supported on OCCT B-rep shapes. Use Manifold backend for convex hull.');
-  }
-
   boundingBox(): ShapeRuntimeBounds {
     return extractBoundingBox(getOCCT(), this._shape);
   }

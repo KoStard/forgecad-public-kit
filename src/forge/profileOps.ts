@@ -93,7 +93,7 @@ export function createEmptyProfile(): ProfileBackend {
   return wrapManifoldProfileBackend(wasm.CrossSection.difference([unit, unit]));
 }
 
-// ── Batch booleans / hull ─────────────────────────────────────────
+// ── Batch booleans ───────────────────────────────────────────────
 
 export function profileUnion(profiles: ProfileBackend[]): ProfileBackend {
   if (getActiveBackend() === 'occt') {

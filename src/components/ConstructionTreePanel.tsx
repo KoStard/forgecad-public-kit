@@ -36,7 +36,6 @@ const planLabel = (plan: ShapeCompilePlan): string => {
     case 'shell': return `Shell t=${fmt(plan.thickness)}`;
     case 'hole': return 'Hole';
     case 'cut': return 'Cut';
-    case 'hull': return `Hull (${plan.shapes.length} shapes)`;
     case 'trimByPlane': return 'Trim by Plane';
     case 'sheetMetal': return 'Sheet Metal';
     case 'queryOwner': return planLabel(plan.base);
@@ -47,7 +46,6 @@ const planLabel = (plan: ShapeCompilePlan): string => {
 const planChildren = (plan: ShapeCompilePlan): ShapeCompilePlan[] => {
   switch (plan.kind) {
     case 'boolean': return plan.shapes;
-    case 'hull': return plan.shapes;
     case 'transform': return [plan.base];
     case 'queryOwner': return planChildren(plan.base);
     case 'shell': return [plan.base];

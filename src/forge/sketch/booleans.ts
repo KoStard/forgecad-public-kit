@@ -8,7 +8,7 @@ import {
   setSketchPlacement3D,
   setSketchPlacementModel,
 } from './core';
-import { buildBooleanProfileCompilePlan, buildHullProfileCompilePlan } from '../compilePlan';
+import { buildBooleanProfileCompilePlan } from '../compilePlan';
 import { describeApiArg, normalizeVariadicArgs } from '../apiArgs';
 
 function normalizeSketchOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Sketch[] {
@@ -122,24 +122,6 @@ export function intersection2d(...inputs: SketchOperandInput[]): Sketch {
   );
   if (sketches.length < 2) throw new Error('intersection2d requires at least two sketches');
   const nextPlan = buildBooleanProfileCompilePlan('intersection', sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
-  return setSketchPlacementModel(
-    setSketchPlacement3D(
-      buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex),
-      mergeSketchPlacement3D(sketches),
-    ),
-    mergeSketchPlacementModel(sketches),
-  );
-}
-
-export function hull2d(...inputs: SketchOperandInput[]): Sketch {
-  const sketches = normalizeSketchOperands(
-    'hull2d()',
-    inputs,
-    1,
-    'Use hull2d(sketch1, sketch2) or hull2d([sketch1, sketch2]).',
-  );
-  if (sketches.length === 0) throw new Error('hull2d requires at least one sketch');
-  const nextPlan = buildHullProfileCompilePlan(sketches.map((sketch) => getSketchCompileProfilePlan(sketch)));
   return setSketchPlacementModel(
     setSketchPlacement3D(
       buildSketchFromCompileProfilePlan(nextPlan, sketches[0].colorHex),

@@ -35,7 +35,6 @@ export interface ProfileBackend {
 
   // ── 2D Operations ───────────────────────────────────────────────
   offset(delta: number, join: 'Square' | 'Round' | 'Miter'): ProfileBackend;
-  hull(): ProfileBackend;
   simplify(epsilon: number): ProfileBackend;
   warp(fn: (vert: [number, number]) => void): ProfileBackend;
   subtract(other: ProfileBackend): ProfileBackend;

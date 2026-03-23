@@ -6,11 +6,12 @@
  * Pure OCCT — no Manifold dependencies.
  */
 
-import type {
-  ProfileCompilePlan,
-  ProfileCompileTransformStep,
-  ShapeCompilePlan,
-  ShapeCompileTransformStep,
+import {
+  assertExhaustive,
+  type ProfileCompilePlan,
+  type ProfileCompileTransformStep,
+  type ShapeCompilePlan,
+  type ShapeCompileTransformStep,
 } from '../../compilePlan';
 import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
 import {
@@ -329,12 +330,11 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
       break;
     }
 
-    case 'hull':
-      throw new OCCTUnsupportedError('profile hull');
-
     case 'project':
       throw new OCCTUnsupportedError('profile project');
 
+    default:
+      assertExhaustive(plan);
   }
 
   // Apply 2D transforms
@@ -706,7 +706,7 @@ function lowerChamferEdgesPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, {
 /**
  * Lower a ShapeCompilePlan into an OCCT TopoDS_Shape.
  *
- * Throws for operations that require Manifold (levelSet, hull, etc.)
+ * Throws for operations that require Manifold (levelSet, etc.)
  * — the caller should catch and fall back to the Manifold lowerer.
  */
 export function lowerShapeCompilePlanToOCCT(
@@ -891,15 +891,13 @@ function _lowerShapeCompilePlanToOCCTInner(
       return lowerLoftPlan(oc, plan);
     case 'sweep':
       return lowerSweepPlan(oc, plan);
-    case 'hull':
-      throw new OCCTUnsupportedError('hull');
     case 'importedMesh':
       throw new Error(
         `importMesh("${plan.filePath}") is not supported with the OCCT backend. ` +
         'Switch to the Manifold backend or use the default backend.',
       );
-    case 'opaque':
-      throw new Error('Cannot lower opaque compile plan to OCCT — opaque plans require runtime evaluation');
+    default:
+      assertExhaustive(plan);
   }
 }
 

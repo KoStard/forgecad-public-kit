@@ -41,7 +41,6 @@ class FrozenProfileBackend implements ProfileBackend {
   scale(): ProfileBackend { return frozenError('scale'); }
   mirror(): ProfileBackend { return frozenError('mirror'); }
   offset(): ProfileBackend { return frozenError('offset'); }
-  hull(): ProfileBackend { return frozenError('hull'); }
   simplify(): ProfileBackend { return frozenError('simplify'); }
   warp(): ProfileBackend { return frozenError('warp'); }
   subtract(): ProfileBackend { return frozenError('subtract'); }

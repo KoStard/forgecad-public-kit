@@ -34,6 +34,8 @@ const API_EXACT_PART_PATHS = [
   'examples/api/text2d-basics.forge.js',
   'examples/api/text2d-font.forge.js',
   'examples/api/extrude-options.forge.js',
+  'examples/api/smooth-curve-connections.forge.js',
+  'examples/fillet-showcase.forge.js',
   'examples/api/verification-demo.forge.js',
 ] as const;
 
@@ -100,8 +102,8 @@ export const API_AND_CORPUS_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
     'compiler-corpus',
     'examples/compiler-corpus/edge-query-demo.forge.js',
     facetedRoute(
-      'The chamfered-union and pipe shapes use hull/runtime geometry outside the exact subset.',
-      'Most shapes stay exact; this contract scopes the faceted claim to the hull-dependent solids.',
+      'The chamfered-union and pipe shapes use runtime geometry outside the exact subset.',
+      'Most shapes stay exact; this contract scopes the faceted claim to the runtime-dependent solids.',
     ),
     undefined,
     ['Chamfered Union', 'Pipe (16 edges)'],

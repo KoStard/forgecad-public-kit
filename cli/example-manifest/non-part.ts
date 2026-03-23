@@ -97,6 +97,10 @@ const RUNTIME_SCENE_ENTRIES: readonly NonPartEntry[] = [
     expect: { minJoints: 4, minAnimations: 1 },
   },
   {
+    path: 'examples/api/highlight-debug.forge.js',
+    note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
+  },
+  {
     path: 'examples/api/geometry-info.forge.js',
     note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
   },
