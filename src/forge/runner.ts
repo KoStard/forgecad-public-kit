@@ -89,8 +89,12 @@ import {
   highlight,
   resetHighlights,
   getCollectedHighlights,
+  getCollectedDebugHighlights3D,
+  getPendingShapeHighlights,
+  resetPendingShapeHighlights,
   type DimensionDef,
   type HighlightDef,
+  type DebugHighlight3D,
   type SvgImportOptions,
   type TextOptions,
 } from './sketch';
@@ -177,6 +181,7 @@ export interface RunResult {
   params: ParamDef[];
   dimensions: DimensionDef[];
   highlights: HighlightDef[];
+  debugHighlights3D: DebugHighlight3D[];
   bom: BomDef[];
   cutPlanes: CutPlaneDef[];
   explodeView: ExplodeViewOptions | null;
@@ -1725,6 +1730,27 @@ export function runScript(
       }
     }
 
+    // Resolve pending shape highlights → match shapes to scene object indices.
+    const pendingShapeHls = getPendingShapeHighlights();
+    for (const pending of pendingShapeHls) {
+      const rawShape = pending.shape;
+      // Extract the underlying Shape for TrackedShape
+      const targetShape = (rawShape as any).shape?.getMesh
+        ? (rawShape as any).shape
+        : rawShape;
+      const idx = objects.findIndex((o) => o.shape === targetShape);
+      if (idx >= 0) {
+        getCollectedDebugHighlights3D().push({
+          kind: 'shape',
+          shapeIndex: idx,
+          color: pending.color,
+          label: pending.label,
+          pulse: pending.pulse,
+        });
+      }
+    }
+    resetPendingShapeHighlights();
+
     const shape = objects.length === 1 ? objects[0].shape : null;
     const sketch = objects.length === 1 ? objects[0].sketch : null;
 
@@ -1735,6 +1761,7 @@ export function runScript(
         params: getCollectedParams(),
         dimensions: [...getCollectedDimensions(), ...shapeDimensions],
         highlights: getCollectedHighlights(),
+        debugHighlights3D: getCollectedDebugHighlights3D(),
         bom: getCollectedBom(),
         cutPlanes: getCollectedCutPlanes(),
         explodeView: getCollectedExplodeView(),
@@ -1767,6 +1794,7 @@ export function runScript(
       params: getCollectedParams(),
       dimensions: getCollectedDimensions(),
       highlights: getCollectedHighlights(),
+      debugHighlights3D: getCollectedDebugHighlights3D(),
       bom: getCollectedBom(),
       cutPlanes: getCollectedCutPlanes(),
       explodeView: getCollectedExplodeView(),
