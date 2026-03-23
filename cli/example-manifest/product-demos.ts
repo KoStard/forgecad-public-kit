@@ -88,10 +88,10 @@ const PRODUCT_DEMO_EXACT_PARTS = [
   'examples/bolt-pattern.forge.js',
   'examples/bottle.forge.js',
   'examples/chair.forge.js',
+  'examples/chess-set.forge.js',
+  'examples/classical-piano.forge.js',
   'examples/clock.forge.js',
   'examples/cup.forge.js',
-  'examples/fillet-curved-edges.forge.js',
-  'examples/fillet-enclosure.forge.js',
   'examples/headphone-hanger-v2.forge.js',
   'examples/kitchen.forge.js',
   'examples/laptop.forge.js',
@@ -115,18 +115,6 @@ const PRODUCT_DEMO_RECOVERED_FACETED_PARTS = [
     blocker: 'The nut shape still depends on thread geometry outside the exact subset.',
     note: 'The bolt now stays exact; this contract scopes the faceted claim to the nut.',
     primaryShapes: ['Nut'],
-  },
-  {
-    path: 'examples/classical-piano.forge.js',
-    blocker: 'The lid prop shape uses runtime geometry outside the exact CadQuery/OCCT subset.',
-    note: 'All other piano shapes stay exact; this contract scopes the route claim to the lid prop.',
-    primaryShapes: ['Lid Prop'],
-  },
-  {
-    path: 'examples/chess-set.forge.js',
-    blocker: 'The knight pieces use union of spheres which lacks exact BREP support, so the four knight bodies intentionally stay on the faceted route.',
-    note: 'The board and every non-knight piece still stay exact; this contract scopes the route claim to the four knight bodies that still need faceted fallback.',
-    primaryShapes: ['White Knight 2', 'White Knight 7', 'Black Knight 2', 'Black Knight 7'],
   },
 ] as const;
 

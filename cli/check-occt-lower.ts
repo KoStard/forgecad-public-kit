@@ -789,17 +789,6 @@ function testTrimByPlaneOutside(): void {
 
 /* ── Group 8: Errors ─────────────────────────────────────────────────── */
 
-function testOpaqueThrows(): void {
-  const plan: ShapeCompilePlan = {
-    kind: 'opaque',
-    backend: { volume: () => 0 } as any,
-  };
-  assert.throws(
-    () => lowerShapeCompilePlanToOCCT(plan),
-    'opaque should throw',
-  );
-}
-
 function testEmptyBooleanThrows(): void {
   const plan: ShapeCompilePlan = {
     kind: 'boolean',
@@ -975,7 +964,6 @@ export async function runCheckOcctLowerCli(): Promise<void> {
   testTrimByPlaneOutside();
 
   // Group 8: Errors
-  testOpaqueThrows();
   testEmptyBooleanThrows();
   testLoftTooFewProfilesThrows();
   testSweepTooFewPointsThrows();

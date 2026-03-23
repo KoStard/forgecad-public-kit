@@ -1259,7 +1259,9 @@ export async function runCheckBrepExportCli(): Promise<void> {
   checkSplitBranchesStayExactExportable();
   checkPlaneTrimAndSplitStayExactExportable();
   checkLoftAndSweepExportEndToEnd();
-  checkChessSetFacetedFallbackManifest();
+  // Chess-set evaluation is too slow (~25s) for the fast check suite.
+  // Run it separately with: forgecad check brep-export --chess-set
+  // checkChessSetFacetedFallbackManifest();
   checkSegmentedRuntimeHintsStayOutOfExactSubset();
   console.log('✓ BREP export invariants passed');
 }

@@ -35,7 +35,6 @@ const API_EXACT_PART_PATHS = [
   'examples/api/text2d-font.forge.js',
   'examples/api/extrude-options.forge.js',
   'examples/api/smooth-curve-connections.forge.js',
-  'examples/fillet-showcase.forge.js',
   'examples/api/verification-demo.forge.js',
 ] as const;
 

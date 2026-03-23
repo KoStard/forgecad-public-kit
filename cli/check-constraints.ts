@@ -1291,12 +1291,14 @@ function testFullSpectrogram() {
   const meta = result.constraintMeta;
   console.log(`      status=${meta.status} maxErr=${meta.maxError.toFixed(4)} dof=${meta.dof} rejected=${meta.rejected.length}`);
 
-  // Print solve trail — shows the sequence of solver phases and errors
-  const trail = getLastSolveTrail();
-  if (trail.length > 0) {
-    console.log(`      solve trail:`);
-    for (const step of trail) {
-      console.log(`        ${step.phase}: err=${step.error.toFixed(6)}`);
+  // Print solve trail only in verbose mode
+  if (_verbose) {
+    const trail = getLastSolveTrail();
+    if (trail.length > 0) {
+      console.log(`      solve trail:`);
+      for (const step of trail) {
+        console.log(`        ${step.phase}: err=${step.error.toFixed(6)}`);
+      }
     }
   }
 

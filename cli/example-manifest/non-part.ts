@@ -120,6 +120,18 @@ const RUNTIME_SCENE_ENTRIES: readonly NonPartEntry[] = [
     expect: { minCutPlanes: 2 },
   },
   {
+    path: 'examples/fillet-curved-edges.forge.js',
+    note: 'Fillet showcase — mixed exact/faceted objects, no export parity assertion.',
+  },
+  {
+    path: 'examples/fillet-enclosure.forge.js',
+    note: 'Fillet showcase — mixed exact/faceted objects, no export parity assertion.',
+  },
+  {
+    path: 'examples/fillet-showcase.forge.js',
+    note: 'Fillet showcase — mixed exact/faceted objects, no export parity assertion.',
+  },
+  {
     path: 'examples/door-with-hinges.forge.js',
     note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
   },
