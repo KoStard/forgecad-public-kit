@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import { useDrawStore, type SnapType } from '../draw/drawStore';
+import { useDrawStore, findNearestEntity } from '../draw/drawStore';
 import * as THREE from 'three';
 
 /**
@@ -27,63 +27,20 @@ function useWorldPixel(): number {
   return wp;
 }
 
-/** Color for each snap type. */
-function snapColor(snapType: SnapType): string {
-  switch (snapType) {
-    case 'point': return '#4ade80';       // green
-    case 'midpoint': return '#22d3ee';    // cyan
-    case 'intersection': return '#e879f9'; // magenta
-    case 'perpendicular': return '#f97316'; // orange
-    default: return '#a3a3a3';            // grey for grid/none
-  }
-}
-
 /** Crosshair rendered at the snap position — constant screen size. */
-function SnapCrosshair({ x, y, snapType, wp }: { x: number; y: number; snapType: SnapType; wp: number }) {
+function SnapCrosshair({ x, y, snapped, wp }: { x: number; y: number; snapped: boolean; wp: number }) {
   const size = wp * 12; // 12 screen pixels
-  const color = snapColor(snapType);
-
+  const color = snapped ? '#4ade80' : '#a3a3a3';
   const geo = useMemo(() => {
-    switch (snapType) {
-      case 'midpoint': {
-        // Diamond marker
-        const s = size * 0.7;
-        return new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(x, y + s, 0.6), new THREE.Vector3(x + s, y, 0.6),
-          new THREE.Vector3(x + s, y, 0.6), new THREE.Vector3(x, y - s, 0.6),
-          new THREE.Vector3(x, y - s, 0.6), new THREE.Vector3(x - s, y, 0.6),
-          new THREE.Vector3(x - s, y, 0.6), new THREE.Vector3(x, y + s, 0.6),
-        ]);
-      }
-      case 'intersection': {
-        // X-shaped marker
-        const s = size * 0.7;
-        return new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(x - s, y - s, 0.6), new THREE.Vector3(x + s, y + s, 0.6),
-          new THREE.Vector3(x - s, y + s, 0.6), new THREE.Vector3(x + s, y - s, 0.6),
-        ]);
-      }
-      case 'perpendicular': {
-        // Perpendicular indicator (small right-angle bracket)
-        const s = size * 0.6;
-        return new THREE.BufferGeometry().setFromPoints([
-          // Crosshair
-          new THREE.Vector3(x - size, y, 0.6), new THREE.Vector3(x + size, y, 0.6),
-          new THREE.Vector3(x, y - size, 0.6), new THREE.Vector3(x, y + size, 0.6),
-          // Right-angle bracket at bottom-right
-          new THREE.Vector3(x, y - s, 0.6), new THREE.Vector3(x + s, y - s, 0.6),
-          new THREE.Vector3(x + s, y - s, 0.6), new THREE.Vector3(x + s, y, 0.6),
-        ]);
-      }
-      default: {
-        // Standard crosshair for point/grid/none (pairs for lineSegments)
-        return new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(x - size, y, 0.6), new THREE.Vector3(x + size, y, 0.6),
-          new THREE.Vector3(x, y - size, 0.6), new THREE.Vector3(x, y + size, 0.6),
-        ]);
-      }
-    }
-  }, [x, y, size, snapType]);
+    const pts = [
+      new THREE.Vector3(x - size, y, 0.6),
+      new THREE.Vector3(x + size, y, 0.6),
+      new THREE.Vector3(x, y, 0.6),
+      new THREE.Vector3(x, y - size, 0.6),
+      new THREE.Vector3(x, y + size, 0.6),
+    ];
+    return new THREE.BufferGeometry().setFromPoints(pts);
+  }, [x, y, size]);
 
   return (
     <lineSegments geometry={geo}>
@@ -180,13 +137,10 @@ function AlignmentGuides({
   x: number;
   y: number;
   points: { x: number; y: number }[];
-  snapResult: { xAligned: boolean; yAligned: boolean; snappedToVar: string | null; snapType?: SnapType } | null;
+  snapResult: { xAligned: boolean; yAligned: boolean; snappedToVar: string | null } | null;
 }) {
   const lineObjs = useMemo(() => {
-    if (!snapResult) return [];
-    // Don't show alignment guides when snapped to a specific target
-    const st = snapResult.snapType ?? (snapResult.snappedToVar ? 'point' : 'none');
-    if (st === 'point' || st === 'midpoint' || st === 'intersection' || st === 'perpendicular') return [];
+    if (!snapResult || snapResult.snappedToVar) return [];
     const result: THREE.Line[] = [];
     const mat = new THREE.LineBasicMaterial({ color: '#34d399', transparent: true, opacity: 0.4 });
 
@@ -239,22 +193,181 @@ function PointMarker({ x, y, wp, color = '#60a5fa' }: { x: number; y: number; wp
   );
 }
 
+/** Hover highlight ring for a point — unfilled ring outline in amber. */
+function HoverPointHighlight({ x, y, wp }: { x: number; y: number; wp: number }) {
+  const radius = wp * 6; // slightly larger than PointMarker
+  const lineObj = useMemo(() => {
+    const pts: THREE.Vector3[] = [];
+    const segments = 24;
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      pts.push(new THREE.Vector3(
+        x + Math.cos(angle) * radius,
+        y + Math.sin(angle) * radius,
+        0.65,
+      ));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: '#f59e0b', linewidth: 2, transparent: true, opacity: 0.9 });
+    return new THREE.Line(geo, mat);
+  }, [x, y, radius]);
+
+  return <primitive object={lineObj} raycast={() => null} />;
+}
+
+/** Hover highlight for a line — re-renders the segment in amber. */
+function HoverLineHighlight({ varName }: { varName: string }) {
+  const lines = useDrawStore((s) => s.lines);
+  const storePoints = useDrawStore((s) => s.points);
+
+  const lineObj = useMemo(() => {
+    const ln = lines.find((l) => l.varName === varName);
+    if (!ln) return null;
+    const p1 = storePoints.find((p) => p.varName === ln.startVar);
+    const p2 = storePoints.find((p) => p.varName === ln.endVar);
+    if (!p1 || !p2) return null;
+    const pts = [
+      new THREE.Vector3(p1.x, p1.y, 0.65),
+      new THREE.Vector3(p2.x, p2.y, 0.65),
+    ];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: '#f59e0b', linewidth: 2, transparent: true, opacity: 0.9 });
+    return new THREE.Line(geo, mat);
+  }, [varName, lines, storePoints]);
+
+  if (!lineObj) return null;
+  return <primitive object={lineObj} raycast={() => null} />;
+}
+
+/** Hover highlight for a circle — amber outline. */
+function HoverCircleHighlight({ varName }: { varName: string }) {
+  const circles = useDrawStore((s) => s.circles);
+  const storePoints = useDrawStore((s) => s.points);
+
+  const lineObj = useMemo(() => {
+    const c = circles.find((ci) => ci.varName === varName);
+    if (!c) return null;
+    const center = storePoints.find((p) => p.varName === c.centerVar);
+    if (!center) return null;
+    const segments = 64;
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      pts.push(new THREE.Vector3(
+        center.x + Math.cos(angle) * c.radius,
+        center.y + Math.sin(angle) * c.radius,
+        0.65,
+      ));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: '#f59e0b', linewidth: 2, transparent: true, opacity: 0.9 });
+    return new THREE.Line(geo, mat);
+  }, [varName, circles, storePoints]);
+
+  if (!lineObj) return null;
+  return <primitive object={lineObj} raycast={() => null} />;
+}
+
+/** Construction line overlay — dashed line rendered over the existing entity. */
+function ConstructionLineOverlay({ varName }: { varName: string }) {
+  const lines = useDrawStore((s) => s.lines);
+  const storePoints = useDrawStore((s) => s.points);
+
+  const lineObj = useMemo(() => {
+    const ln = lines.find((l) => l.varName === varName);
+    if (!ln) return null;
+    const p1 = storePoints.find((p) => p.varName === ln.startVar);
+    const p2 = storePoints.find((p) => p.varName === ln.endVar);
+    if (!p1 || !p2) return null;
+    const pts = [
+      new THREE.Vector3(p1.x, p1.y, 0.62),
+      new THREE.Vector3(p2.x, p2.y, 0.62),
+    ];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    geo.computeBoundingSphere();
+    const mat = new THREE.LineDashedMaterial({
+      color: '#9ca3af',
+      dashSize: 2,
+      gapSize: 1.5,
+      transparent: true,
+      opacity: 0.6,
+    });
+    const line = new THREE.Line(geo, mat);
+    line.computeLineDistances();
+    return line;
+  }, [varName, lines, storePoints]);
+
+  if (!lineObj) return null;
+  return <primitive object={lineObj} raycast={() => null} />;
+}
+
+/** Construction circle overlay — dashed circle rendered over the existing entity. */
+function ConstructionCircleOverlay({ varName }: { varName: string }) {
+  const circles = useDrawStore((s) => s.circles);
+  const storePoints = useDrawStore((s) => s.points);
+
+  const lineObj = useMemo(() => {
+    const c = circles.find((ci) => ci.varName === varName);
+    if (!c) return null;
+    const center = storePoints.find((p) => p.varName === c.centerVar);
+    if (!center) return null;
+    const segments = 64;
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      pts.push(new THREE.Vector3(
+        center.x + Math.cos(angle) * c.radius,
+        center.y + Math.sin(angle) * c.radius,
+        0.62,
+      ));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    geo.computeBoundingSphere();
+    const mat = new THREE.LineDashedMaterial({
+      color: '#9ca3af',
+      dashSize: 2,
+      gapSize: 1.5,
+      transparent: true,
+      opacity: 0.6,
+    });
+    const line = new THREE.Line(geo, mat);
+    line.computeLineDistances();
+    return line;
+  }, [varName, circles, storePoints]);
+
+  if (!lineObj) return null;
+  return <primitive object={lineObj} raycast={() => null} />;
+}
+
 export function DrawCanvas() {
   const active = useDrawStore((s) => s.active);
   const tool = useDrawStore((s) => s.tool);
   const handleClick = useDrawStore((s) => s.handleClick);
   const setPreviewPoint = useDrawStore((s) => s.setPreviewPoint);
+  const setHoveredEntity = useDrawStore((s) => s.setHoveredEntity);
   const pendingClicks = useDrawStore((s) => s.pendingClicks);
   const previewPoint = useDrawStore((s) => s.previewPoint);
   const snapResult = useDrawStore((s) => s.snapResult);
   const points = useDrawStore((s) => s.points);
   const selectedEntities = useDrawStore((s) => s.selectedEntities);
+  const hoveredEntity = useDrawStore((s) => s.hoveredEntity);
+  const constructionEntities = useDrawStore((s) => s.constructionEntities);
+  const storeLines = useDrawStore((s) => s.lines);
+  const storeCircles = useDrawStore((s) => s.circles);
 
   const wp = useWorldPixel();
 
   if (!active) return null;
 
-  const currentSnapType: SnapType = snapResult?.snapType ?? 'none';
+  const isSnappedToPoint = !!snapResult?.snappedToVar;
+
+  // Determine which construction entity varNames correspond to lines vs circles
+  const constructionLineVarNames = storeLines
+    .filter((l) => constructionEntities.has(l.varName))
+    .map((l) => l.varName);
+  const constructionCircleVarNames = storeCircles
+    .filter((c) => constructionEntities.has(c.varName))
+    .map((c) => c.varName);
 
   return (
     <>
@@ -264,6 +377,11 @@ export function DrawCanvas() {
         onPointerMove={(e: ThreeEvent<PointerEvent>) => {
           e.stopPropagation();
           setPreviewPoint({ x: e.point.x, y: e.point.y });
+          // Detect hovered entity for highlight feedback
+          const state = useDrawStore.getState();
+          const hoverThreshold = wp * 8; // 8 screen pixels, zoom-independent
+          const nearest = findNearestEntity(e.point.x, e.point.y, state, hoverThreshold);
+          setHoveredEntity(nearest);
         }}
         onClick={(e: ThreeEvent<MouseEvent>) => {
           e.stopPropagation();
@@ -273,7 +391,7 @@ export function DrawCanvas() {
           e.stopPropagation();
           useDrawStore.getState().handleDoubleClick(e.point.x, e.point.y);
         }}
-        onPointerLeave={() => setPreviewPoint(null)}
+        onPointerLeave={() => { setPreviewPoint(null); setHoveredEntity(null); }}
         onContextMenu={(e: ThreeEvent<MouseEvent>) => {
           e.stopPropagation();
           useDrawStore.getState().cancelPending();
@@ -285,7 +403,7 @@ export function DrawCanvas() {
 
       {/* Snap crosshair */}
       {previewPoint && (
-        <SnapCrosshair x={previewPoint.x} y={previewPoint.y} snapType={currentSnapType} wp={wp} />
+        <SnapCrosshair x={previewPoint.x} y={previewPoint.y} snapped={isSnappedToPoint} wp={wp} />
       )}
 
       {/* Coordinate label */}
@@ -339,6 +457,25 @@ export function DrawCanvas() {
           ? <PointMarker key={`sel-${i}`} x={ent.x!} y={ent.y!} wp={wp} color="#f59e0b" />
           : null
       ))}
+
+      {/* Hovered entity highlight */}
+      {hoveredEntity && hoveredEntity.type === 'point' && hoveredEntity.x != null && hoveredEntity.y != null && (
+        <HoverPointHighlight x={hoveredEntity.x} y={hoveredEntity.y} wp={wp} />
+      )}
+      {hoveredEntity && hoveredEntity.type === 'line' && (
+        <HoverLineHighlight varName={hoveredEntity.varName} />
+      )}
+      {hoveredEntity && hoveredEntity.type === 'circle' && (
+        <HoverCircleHighlight varName={hoveredEntity.varName} />
+      )}
+
+      {/* Construction entity overlays — dashed lines for construction geometry */}
+      {constructionLineVarNames.map((varName) => (
+        <ConstructionLineOverlay key={`constr-${varName}`} varName={varName} />
+      ))}
+      {constructionCircleVarNames.map((varName) => (
+        <ConstructionCircleOverlay key={`constr-${varName}`} varName={varName} />
+      ))}
     </>
   );
 }
@@ -370,10 +507,10 @@ function RubberBandArc({ p1, p2, p3 }: {
 
     // Compute angles
     let a1 = Math.atan2(ay - uy, ax - ux);
-    let a2 = Math.atan2(by - uy, bx - ux);
+    const a2 = Math.atan2(by - uy, bx - ux);
     let a3 = Math.atan2(cy - uy, cx - ux);
 
-    // Determine arc direction: a1 → a2 → a3
+    // Determine arc direction
     const cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
     const ccw = cross > 0;
 
@@ -401,5 +538,81 @@ function RubberBandArc({ p1, p2, p3 }: {
     return new THREE.Line(geo, mat);
   }, [p1.x, p1.y, p2.x, p2.y, p3.x, p3.y]);
 
+  return <primitive object={lineObj} raycast={() => null} />;
+}
+
+/** Preview ellipse outline. */
+function RubberBandEllipse({ center, rx, ry }: {
+  center: { x: number; y: number };
+  rx: number;
+  ry: number;
+}) {
+  const lineObj = useMemo(() => {
+    const segments = 64;
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      pts.push(new THREE.Vector3(
+        center.x + Math.cos(angle) * rx,
+        center.y + Math.sin(angle) * ry,
+        0.6,
+      ));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: '#60a5fa', transparent: true, opacity: 0.7 });
+    return new THREE.Line(geo, mat);
+  }, [center.x, center.y, rx, ry]);
+
+  return <primitive object={lineObj} raycast={() => null} />;
+}
+
+/** Preview slot (stadium) outline. */
+function RubberBandSlot({ c1, c2, widthPt }: {
+  c1: { x: number; y: number };
+  c2: { x: number; y: number };
+  widthPt: { x: number; y: number };
+}) {
+  const lineObj = useMemo(() => {
+    const dx = c2.x - c1.x;
+    const dy = c2.y - c1.y;
+    const lineLen = Math.hypot(dx, dy);
+    if (lineLen < 0.1) return null;
+
+    const perpDist = Math.abs(dx * (c1.y - widthPt.y) - dy * (c1.x - widthPt.x)) / lineLen;
+    const radius = Math.max(0.5, perpDist);
+
+    const nx = -dy / lineLen;
+    const ny = dx / lineLen;
+
+    const pts: THREE.Vector3[] = [];
+    const arcSegments = 24;
+
+    // Top line
+    pts.push(new THREE.Vector3(c1.x + nx * radius, c1.y + ny * radius, 0.6));
+    pts.push(new THREE.Vector3(c2.x + nx * radius, c2.y + ny * radius, 0.6));
+
+    // Right semicircle around c2
+    const startAngle1 = Math.atan2(ny, nx);
+    for (let i = 0; i <= arcSegments; i++) {
+      const a = startAngle1 - (i / arcSegments) * Math.PI;
+      pts.push(new THREE.Vector3(c2.x + Math.cos(a) * radius, c2.y + Math.sin(a) * radius, 0.6));
+    }
+
+    // Bottom line
+    pts.push(new THREE.Vector3(c1.x - nx * radius, c1.y - ny * radius, 0.6));
+
+    // Left semicircle around c1
+    const startAngle2 = Math.atan2(-ny, -nx);
+    for (let i = 0; i <= arcSegments; i++) {
+      const a = startAngle2 - (i / arcSegments) * Math.PI;
+      pts.push(new THREE.Vector3(c1.x + Math.cos(a) * radius, c1.y + Math.sin(a) * radius, 0.6));
+    }
+
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: '#60a5fa', transparent: true, opacity: 0.7 });
+    return new THREE.Line(geo, mat);
+  }, [c1.x, c1.y, c2.x, c2.y, widthPt.x, widthPt.y]);
+
+  if (!lineObj) return null;
   return <primitive object={lineObj} raycast={() => null} />;
 }

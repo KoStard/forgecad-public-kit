@@ -9,6 +9,7 @@ import {
   type ConstraintTool,
   isConstraintTool,
   isDrawingTool,
+  isEditTool,
 } from '../draw/drawStore';
 
 // ─── Tool definitions ────────────────────────────────────────────────────────
@@ -35,6 +36,8 @@ const drawTools: ToolDef[] = [
   { id: 'circle', label: 'Circle', icon: '○', shortcut: 'C', tip: 'Click center, then edge to draw a circle', section: 'draw' },
   { id: 'arc', label: 'Arc', icon: '⌒', shortcut: 'A', tip: 'Click 3 points to draw an arc', section: 'draw' },
   { id: 'polygon', label: 'Polygon', icon: '⬡', shortcut: 'G', tip: 'Click center, then vertex for regular polygon', section: 'draw' },
+  { id: 'ellipse', label: 'Ellipse', icon: '⬮', shortcut: 'E', tip: 'Click center, then bounding box corner', section: 'draw' },
+  { id: 'slot', label: 'Slot', icon: '⊝', shortcut: 'S', tip: 'Click two centers, then set width', section: 'draw' },
 ];
 
 const constraintTools: ToolDef[] = [
@@ -57,7 +60,13 @@ const constraintTools: ToolDef[] = [
   { id: 'c:pointOnCircle', label: 'On Circle', icon: '⊕', tip: 'Constrain point onto a circle', section: 'constraint', requires: ['point', 'circle'] },
 ];
 
-const allTools = [...drawTools, ...constraintTools];
+const editTools: ToolDef[] = [
+  { id: 'trim', label: 'Trim', icon: '✂', shortcut: 'T', tip: 'Click entity to remove it', section: 'edit' },
+  { id: 'mirror', label: 'Mirror', icon: '⧓', shortcut: 'I', tip: 'Select mirror line, then click to place mirrored points', section: 'edit' },
+  { id: 'offset', label: 'Offset', icon: '⧈', shortcut: 'F', tip: 'Click entity, then click to set offset distance', section: 'edit' },
+];
+
+const allTools = [...drawTools, ...editTools, ...constraintTools];
 
 // ─── Dimension Input Popup ───────────────────────────────────────────────────
 
@@ -388,7 +397,7 @@ export function DrawToolbar() {
           } else {
             cancelPending();
           }
-        } else if (isDrawingTool(tool) || isConstraintTool(tool)) {
+        } else if (isDrawingTool(tool) || isEditTool(tool) || isConstraintTool(tool)) {
           // Deactivate tool → go to select mode
           setTool('select');
         } else {
@@ -406,6 +415,12 @@ export function DrawToolbar() {
       case 'c': case 'C': setTool('circle'); e.preventDefault(); break;
       case 'a': case 'A': setTool('arc'); e.preventDefault(); break;
       case 'g': case 'G': setTool('polygon'); e.preventDefault(); break;
+      case 'e': case 'E': setTool('ellipse'); e.preventDefault(); break;
+      case 's': case 'S': setTool('slot'); e.preventDefault(); break;
+      // Edit tool shortcuts
+      case 't': case 'T': setTool('trim'); e.preventDefault(); break;
+      case 'i': case 'I': setTool('mirror'); e.preventDefault(); break;
+      case 'f': case 'F': setTool('offset'); e.preventDefault(); break;
       // Constraint shortcuts
       case 'h': case 'H': setTool('c:horizontal'); e.preventDefault(); break;
       case 'd': case 'D': setTool('c:length'); e.preventDefault(); break;
@@ -447,6 +462,10 @@ export function DrawToolbar() {
     else if (tool === 'arc' && pendingClicks.length === 1) statusMessage = 'Click second point...';
     else if (tool === 'arc' && pendingClicks.length === 2) statusMessage = 'Click third point to finish arc...';
     else if (tool === 'polygon') statusMessage = 'Click vertex point...';
+    else if (tool === 'ellipse') statusMessage = 'Click bounding box corner...';
+    else if (tool === 'slot' && pendingClicks.length === 1) statusMessage = 'Click second center...';
+    else if (tool === 'slot' && pendingClicks.length === 2) statusMessage = 'Click to set width...';
+    else if (tool === 'offset') statusMessage = 'Click to set offset distance...';
   }
   if (isConstraintTool(tool)) {
     const needed = currentDef?.requires ?? [];
@@ -459,6 +478,14 @@ export function DrawToolbar() {
   }
   if (tool === 'select' && selectedEntities.length > 0) {
     statusMessage = `Selected: ${selectedEntities.map((e) => `${e.type} ${e.varName}`).join(', ')}`;
+  }
+  if (tool === 'mirror') {
+    const mirrorLineVar = useDrawStore.getState().mirrorLineVar;
+    if (mirrorLineVar) {
+      statusMessage = `Mirror axis: ${mirrorLineVar} — click to place points (mirrored automatically)`;
+    } else {
+      statusMessage = 'Click a line to set as mirror axis';
+    }
   }
 
   // Auto-apply constraints when selection is complete (for non-value constraints)
@@ -499,6 +526,12 @@ export function DrawToolbar() {
       >
         <SectionLabel text="Draw" />
         {drawTools.map((t) => (
+          <ToolButton key={t.id} def={t} active={tool === t.id} onClick={() => setTool(t.id)} />
+        ))}
+
+        <Divider />
+        <SectionLabel text="Edit" />
+        {editTools.map((t) => (
           <ToolButton key={t.id} def={t} active={tool === t.id} onClick={() => setTool(t.id)} />
         ))}
 
