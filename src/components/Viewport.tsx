@@ -2052,66 +2052,188 @@ function HoveredJointOverlay({
 
 // ---- Toolpath (G-code) rendering ----
 
-/** Color a toolpath segment based on type and speed. */
-function toolpathSegmentColor(extrude: boolean, speed: number, maxSpeed: number): THREE.Color {
-  if (!extrude) return new THREE.Color(0.3, 0.3, 0.8); // blue for travel
-  // Gradient from green (slow) to red (fast) for extrusion
+/** Speed → color: green (slow) to red (fast). */
+function toolpathSpeedColor(speed: number, maxSpeed: number): THREE.Color {
   const t = Math.min(1, speed / Math.max(1, maxSpeed));
   return new THREE.Color().setHSL(0.33 * (1 - t), 0.9, 0.5);
 }
 
-/** Fat-line mesh for toolpath segments using LineMaterial for screen-space width. */
-function FatLineSegments({
-  positions,
-  colors,
-  lineWidth,
+// Shared geometry for all extrusion bead instances — a cylinder along +Y,
+// radius 0.5, height 1. Each instance is transformed to span a segment
+// and squished to beadWidth × beadHeight cross-section.
+const BEAD_RADIAL_SEGMENTS = 6;
+const _beadGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, BEAD_RADIAL_SEGMENTS, 1, false);
+
+// Temps reused per-segment to avoid allocation
+const _up = new THREE.Vector3(0, 1, 0);
+const _dir = new THREE.Vector3();
+const _mid = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
+const _scale = new THREE.Vector3();
+const _mat4 = new THREE.Matrix4();
+const _color = new THREE.Color();
+
+/** Renders extrusion segments as instanced 3D cylinders with proper lighting. */
+function ExtrusionBeadMesh({
+  toolpath,
+  maxSegmentIndex,
   opacity,
-  dashed,
-  uniformColor,
 }: {
-  positions: Float32Array;
-  colors?: Float32Array;
-  lineWidth: number;
+  toolpath: NonNullable<SceneObject['toolpath']>;
+  maxSegmentIndex: number;
   opacity: number;
-  dashed?: boolean;
-  uniformColor?: THREE.Color;
+}) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+
+  const { extrudeCount, instanceData } = useMemo(() => {
+    const segs = toolpath.segments;
+    const limit = Math.min(maxSegmentIndex, segs.length);
+    const maxSpeed = segs.reduce(
+      (mx, s) => (s.extrude && s.speed > mx ? s.speed : mx), 0,
+    );
+
+    // First pass: count extrusion segments
+    let count = 0;
+    for (let i = 0; i < limit; i++) if (segs[i].extrude) count++;
+
+    // Allocate arrays for matrices and colors
+    const matrices = new Float32Array(count * 16);
+    const colors = new Float32Array(count * 3);
+
+    const beadW = toolpath.beadWidth ?? 0.4;
+    const beadH = toolpath.beadHeight ?? 0.2;
+
+    let idx = 0;
+    for (let i = 0; i < limit; i++) {
+      const seg = segs[i];
+      if (!seg.extrude) continue;
+
+      _dir.set(
+        seg.to[0] - seg.from[0],
+        seg.to[1] - seg.from[1],
+        seg.to[2] - seg.from[2],
+      );
+      const len = _dir.length();
+      if (len < 1e-6) { idx++; continue; }
+      _dir.divideScalar(len);
+
+      _mid.set(
+        (seg.from[0] + seg.to[0]) * 0.5,
+        (seg.from[1] + seg.to[1]) * 0.5,
+        (seg.from[2] + seg.to[2]) * 0.5,
+      );
+
+      // Rotate unit +Y cylinder to align with segment direction
+      _quat.setFromUnitVectors(_up, _dir);
+      // Scale: X=beadWidth, Y=segment length, Z=beadHeight
+      _scale.set(beadW, len, beadH);
+      _mat4.compose(_mid, _quat, _scale);
+
+      _mat4.toArray(matrices, idx * 16);
+
+      const c = toolpathSpeedColor(seg.speed, maxSpeed);
+      colors[idx * 3] = c.r;
+      colors[idx * 3 + 1] = c.g;
+      colors[idx * 3 + 2] = c.b;
+
+      idx++;
+    }
+
+    return { extrudeCount: idx, instanceData: { matrices, colors } };
+  }, [toolpath, maxSegmentIndex]);
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh || extrudeCount === 0) return;
+
+    const { matrices, colors } = instanceData;
+    for (let i = 0; i < extrudeCount; i++) {
+      _mat4.fromArray(matrices, i * 16);
+      mesh.setMatrixAt(i, _mat4);
+      _color.fromArray(colors, i * 3);
+      mesh.setColorAt(i, _color);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.count = extrudeCount;
+  }, [extrudeCount, instanceData]);
+
+  if (extrudeCount === 0) return null;
+
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[_beadGeo, undefined, extrudeCount]}
+      frustumCulled={false}
+    >
+      <meshStandardMaterial
+        vertexColors
+        roughness={0.65}
+        metalness={0.0}
+        transparent={opacity < 1}
+        opacity={opacity}
+      />
+    </instancedMesh>
+  );
+}
+
+/** Renders travel segments as dashed lines. */
+function TravelLines({
+  toolpath,
+  maxSegmentIndex,
+  opacity,
+}: {
+  toolpath: NonNullable<SceneObject['toolpath']>;
+  maxSegmentIndex: number;
+  opacity: number;
 }) {
   const { size } = useThree();
-  const ref = useRef<LineSegments2>(null);
 
   const lineObj = useMemo(() => {
+    const segs = toolpath.segments;
+    const limit = Math.min(maxSegmentIndex, segs.length);
+    const posArr: number[] = [];
+    for (let i = 0; i < limit; i++) {
+      const seg = segs[i];
+      if (seg.extrude) continue;
+      posArr.push(seg.from[0], seg.from[1], seg.from[2]);
+      posArr.push(seg.to[0], seg.to[1], seg.to[2]);
+    }
+    if (posArr.length === 0) return null;
+
     const g = new LineSegmentsGeometry();
-    g.setPositions(positions);
-    if (colors) g.setColors(colors);
+    g.setPositions(new Float32Array(posArr));
 
     const m = new LineMaterial({
-      linewidth: lineWidth,
-      worldUnits: false, // screen-space pixels, not world units
-      vertexColors: !!colors,
-      color: uniformColor ? uniformColor.getHex() : 0xffffff,
+      linewidth: 1,
+      worldUnits: false,
+      color: 0x4466cc,
       transparent: true,
-      opacity,
-      dashed: !!dashed,
-      dashScale: dashed ? 0.5 : 1,
-      dashSize: dashed ? 3 : 1,
-      gapSize: dashed ? 2 : 0,
+      opacity: opacity * 0.25,
+      dashed: true,
+      dashScale: 0.5,
+      dashSize: 3,
+      gapSize: 2,
       resolution: new THREE.Vector2(size.width, size.height),
     });
     const obj = new LineSegments2(g, m);
-    if (dashed) obj.computeLineDistances();
+    obj.computeLineDistances();
     return obj;
-  }, [positions, colors, lineWidth, opacity, dashed, uniformColor, size.width, size.height]);
+  }, [toolpath, maxSegmentIndex, opacity, size.width, size.height]);
 
   useEffect(() => {
+    if (!lineObj) return;
     (lineObj.material as LineMaterial).resolution.set(size.width, size.height);
   }, [lineObj, size.width, size.height]);
 
   useEffect(() => () => {
+    if (!lineObj) return;
     lineObj.geometry.dispose();
     (lineObj.material as LineMaterial).dispose();
   }, [lineObj]);
 
-  return <primitive ref={ref} object={lineObj} />;
+  if (!lineObj) return null;
+  return <primitive object={lineObj} />;
 }
 
 function ToolpathObject({
@@ -2128,59 +2250,18 @@ function ToolpathObject({
   const toolpath = obj.toolpath;
   if (!toolpath || toolpath.segments.length === 0) return null;
 
-  const { extrudePositions, extrudeColors, travelPositions, hasExtrude, hasTravel } = useMemo(() => {
-    const maxSpeed = toolpath.segments.reduce(
-      (max, seg) => (seg.extrude && seg.speed > max ? seg.speed : max),
-      0,
-    );
-
-    const ePosArr: number[] = [];
-    const eColArr: number[] = [];
-    const tPosArr: number[] = [];
-
-    const limit = Math.min(maxSegmentIndex, toolpath.segments.length);
-    for (let i = 0; i < limit; i++) {
-      const seg = toolpath.segments[i];
-      if (seg.extrude) {
-        ePosArr.push(seg.from[0], seg.from[1], seg.from[2]);
-        ePosArr.push(seg.to[0], seg.to[1], seg.to[2]);
-        const color = toolpathSegmentColor(true, seg.speed, maxSpeed);
-        eColArr.push(color.r, color.g, color.b);
-        eColArr.push(color.r, color.g, color.b);
-      } else {
-        tPosArr.push(seg.from[0], seg.from[1], seg.from[2]);
-        tPosArr.push(seg.to[0], seg.to[1], seg.to[2]);
-      }
-    }
-
-    return {
-      extrudePositions: new Float32Array(ePosArr),
-      extrudeColors: new Float32Array(eColArr),
-      travelPositions: new Float32Array(tPosArr),
-      hasExtrude: ePosArr.length > 0,
-      hasTravel: tPosArr.length > 0,
-    };
-  }, [toolpath, maxSegmentIndex]);
-
-  const travelColor = useMemo(() => new THREE.Color(0x4466cc), []);
-
   return (
     <group matrix={matrix} matrixAutoUpdate={false}>
-      {hasExtrude && (
-        <FatLineSegments
-          positions={extrudePositions}
-          colors={extrudeColors}
-          lineWidth={3}
+      <ExtrusionBeadMesh
+        toolpath={toolpath}
+        maxSegmentIndex={maxSegmentIndex}
+        opacity={settings.opacity}
+      />
+      {settings.opacity > 0.5 && (
+        <TravelLines
+          toolpath={toolpath}
+          maxSegmentIndex={maxSegmentIndex}
           opacity={settings.opacity}
-        />
-      )}
-      {hasTravel && settings.opacity > 0.5 && (
-        <FatLineSegments
-          positions={travelPositions}
-          lineWidth={1}
-          opacity={settings.opacity * 0.25}
-          dashed
-          uniformColor={travelColor}
         />
       )}
     </group>

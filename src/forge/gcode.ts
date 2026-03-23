@@ -64,6 +64,10 @@ export interface ToolpathData {
   totalExtrusionMm: number;
   /** Total filament used in mm */
   totalFilamentMm: number;
+  /** Nozzle diameter in mm — used by the viewer for bead width */
+  beadWidth: number;
+  /** Layer height in mm — used by the viewer for bead height */
+  beadHeight: number;
 }
 
 // ---- Defaults ----
@@ -322,6 +326,8 @@ export class GCodeBuilder {
       estimatedTimeSeconds: totalTimeSeconds,
       totalExtrusionMm,
       totalFilamentMm: this.e,
+      beadWidth: this.profile.nozzle,
+      beadHeight: this.profile.layerHeight,
     };
   }
 
