@@ -1,0 +1,185 @@
+/**
+ * ForgeCAD — Backend-Agnostic Fillet & Chamfer API
+ *
+ * High-level fillet() and chamfer() functions that accept geometric edge queries
+ * and build compile plan nodes. The actual fillet/chamfer is applied at lowering
+ * time by each backend (OCCT native or Manifold CSG).
+ *
+ * Supports:
+ * - Single edge or multiple edges in one call
+ * - Inline edge queries (no separate selectEdges step needed)
+ * - Curved edges (OCCT backend handles natively; Manifold per-segment)
+ * - Both convex and concave edges
+ */
+
+import {
+  Shape,
+  getShapeCompilePlan,
+  buildShapeFromCompilePlan,
+} from './kernel';
+import type { EdgeFeatureTarget } from './shapeBackend';
+import { TrackedShape } from './sketch/topology';
+import { selectEdges, type EdgeQuery } from './edgeQuery';
+import type { EdgeSegment } from './meshEdgeExtraction';
+import type { ShapeCompilePlan } from './compilePlan';
+
+// ─── Types ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Edge selector: what to fillet.
+ * - EdgeSegment: a single edge from selectEdge()
+ * - EdgeSegment[]: multiple edges from selectEdges()
+ * - EdgeQuery: inline query (same options as selectEdges)
+ * - undefined: all sharp edges on the shape
+ */
+export type EdgeSelector = EdgeSegment | EdgeSegment[] | EdgeQuery;
+
+// ─── Internals ──────────────────────────────────────────────────────────────────
+
+type ShapeArg = Shape | TrackedShape;
+
+function unwrapShape(value: ShapeArg): Shape {
+  return value instanceof TrackedShape ? value.toShape() : value;
+}
+
+function resolveEdges(shape: Shape, edges?: EdgeSelector): EdgeSegment[] {
+  if (!edges) {
+    return selectEdges(shape);
+  }
+  if (Array.isArray(edges)) {
+    return edges;
+  }
+  if (isEdgeSegment(edges)) {
+    return [edges];
+  }
+  return selectEdges(shape, edges);
+}
+
+function isEdgeSegment(value: unknown): value is EdgeSegment {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'start' in value &&
+    'end' in value &&
+    'midpoint' in value &&
+    'direction' in value &&
+    'dihedralAngle' in value &&
+    'normalA' in value &&
+    'normalB' in value
+  );
+}
+
+/** Convert EdgeSegments to backend-agnostic EdgeFeatureTargets for the compile plan. */
+function edgesToTargets(edges: EdgeSegment[]): EdgeFeatureTarget[] {
+  return edges.map(e => ({
+    midpoint: [e.midpoint[0], e.midpoint[1], e.midpoint[2]] as [number, number, number],
+    start: [e.start[0], e.start[1], e.start[2]] as [number, number, number],
+    end: [e.end[0], e.end[1], e.end[2]] as [number, number, number],
+    convex: e.convex,
+  }));
+}
+
+// ─── Public API ─────────────────────────────────────────────────────────────────
+
+/**
+ * Apply fillets (rounded edges) to one or more edges of a shape.
+ *
+ * Works on both straight and curved edges. Supports OCCT and Manifold backends.
+ * When using OCCT, all edges are filleted in a single kernel operation for
+ * best quality. When using Manifold, edges are filleted sequentially.
+ *
+ * @param shape - The solid to modify
+ * @param radius - Fillet radius
+ * @param edges - Which edges to fillet:
+ *   - EdgeSegment: a single edge from selectEdge()
+ *   - EdgeSegment[]: multiple edges from selectEdges()
+ *   - EdgeQuery: inline query (same options as selectEdges)
+ *   - undefined: all sharp edges on the shape
+ * @param segments - Arc resolution for Manifold backend (default: 16)
+ *
+ * @example
+ * // Fillet all edges
+ * fillet(myShape, 2)
+ *
+ * // Fillet edges at the top
+ * fillet(myShape, 1.5, { atZ: 20, convex: true })
+ *
+ * // Fillet specific edges
+ * const edges = selectEdges(myShape, { parallel: [0, 0, 1] })
+ * fillet(myShape, 3, edges)
+ */
+export function fillet(
+  shape: ShapeArg,
+  radius: number,
+  edges?: EdgeSelector,
+  segments = 16,
+): Shape {
+  if (!Number.isFinite(radius) || !(radius > 0)) {
+    throw new Error('fillet() requires a positive finite radius.');
+  }
+
+  const target = unwrapShape(shape);
+  const resolvedEdges = resolveEdges(target, edges);
+
+  if (resolvedEdges.length === 0) {
+    throw new Error('fillet(): no edges match the given selection.');
+  }
+
+  const basePlan = getShapeCompilePlan(target);
+  const plan: ShapeCompilePlan = {
+    kind: 'filletEdges',
+    base: basePlan,
+    radius,
+    segments: Math.max(2, Math.round(segments)),
+    edgeTargets: edgesToTargets(resolvedEdges),
+  };
+
+  return buildShapeFromCompilePlan(plan, target.colorHex, {
+    sources: ['fillet'],
+  });
+}
+
+/**
+ * Apply chamfers (beveled edges) to one or more edges of a shape.
+ *
+ * Works on both straight and curved edges. Supports OCCT and Manifold backends.
+ *
+ * @param shape - The solid to modify
+ * @param size - Chamfer size (distance from edge)
+ * @param edges - Which edges to chamfer (same options as fillet)
+ *
+ * @example
+ * // Chamfer all edges
+ * chamfer(myShape, 1)
+ *
+ * // Chamfer vertical edges only
+ * chamfer(myShape, 2, { parallel: [0, 0, 1] })
+ */
+export function chamfer(
+  shape: ShapeArg,
+  size: number,
+  edges?: EdgeSelector,
+): Shape {
+  if (!Number.isFinite(size) || !(size > 0)) {
+    throw new Error('chamfer() requires a positive finite size.');
+  }
+
+  const target = unwrapShape(shape);
+  const resolvedEdges = resolveEdges(target, edges);
+
+  if (resolvedEdges.length === 0) {
+    throw new Error('chamfer(): no edges match the given selection.');
+  }
+
+  const basePlan = getShapeCompilePlan(target);
+  const plan: ShapeCompilePlan = {
+    kind: 'chamferEdges',
+    base: basePlan,
+    size,
+    edgeTargets: edgesToTargets(resolvedEdges),
+  };
+
+  return buildShapeFromCompilePlan(plan, target.colorHex, {
+    sources: ['chamfer'],
+  });
+}

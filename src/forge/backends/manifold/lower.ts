@@ -18,9 +18,17 @@ import { loftStitched } from './loftStitched';
 import { Transform } from '../../transform';
 import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
 import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolution';
-import { applyChamferSelectionToManifold, applyFilletSelectionToManifold } from './edgeFeatureRuntime';
+import {
+  applyChamferSelectionToManifold,
+  applyConcaveChamferSelectionToManifold,
+  applyFilletSelectionToManifold,
+  applyConcaveFilletSelectionToManifold,
+} from './edgeFeatureRuntime';
 import { parseMeshFile } from '../../meshParsers';
 import type { MeshFormat } from '../../meshParsers';
+import { extractEdgeSegments, type EdgeSegment } from '../../meshEdgeExtraction';
+import type { EdgeFeatureTarget } from '../../shapeBackend';
+import type { Vec3 } from '../../transform';
 
 function applyProfileCompileTransform(
   crossSection: CrossSection,
@@ -273,6 +281,170 @@ function lowerShapeChamferCompilePlan(
   );
 }
 
+function edgeSegmentToSelection(segment: EdgeSegment): import('../../edgeFeatureModel').ResolvedEdgeFeatureSelection {
+  const { start, end, direction: axis, normalA, normalB, convex } = segment;
+
+  const dotA = normalA[0] * axis[0] + normalA[1] * axis[1] + normalA[2] * axis[2];
+  let bx = normalA[0] - dotA * axis[0];
+  let by = normalA[1] - dotA * axis[1];
+  let bz = normalA[2] - dotA * axis[2];
+  let bLen = Math.sqrt(bx * bx + by * by + bz * bz);
+  if (bLen < 1e-10) {
+    const dotB = normalB[0] * axis[0] + normalB[1] * axis[1] + normalB[2] * axis[2];
+    bx = normalB[0] - dotB * axis[0];
+    by = normalB[1] - dotB * axis[1];
+    bz = normalB[2] - dotB * axis[2];
+    bLen = Math.sqrt(bx * bx + by * by + bz * bz);
+  }
+  if (bLen < 1e-10) throw new Error('Cannot compute fillet basis: edge normals are degenerate.');
+  bx /= bLen; by /= bLen; bz /= bLen;
+  const basisX: Vec3 = [bx, by, bz];
+  const basisY: Vec3 = [
+    axis[1] * bz - axis[2] * by,
+    axis[2] * bx - axis[0] * bz,
+    axis[0] * by - axis[1] * bx,
+  ];
+
+  const nAx = normalA[0] * basisX[0] + normalA[1] * basisX[1] + normalA[2] * basisX[2];
+  const nAy = normalA[0] * basisY[0] + normalA[1] * basisY[1] + normalA[2] * basisY[2];
+  const nBx = normalB[0] * basisX[0] + normalB[1] * basisX[1] + normalB[2] * basisX[2];
+  const nBy = normalB[0] * basisY[0] + normalB[1] * basisY[1] + normalB[2] * basisY[2];
+
+  const avgX = nAx + nBx;
+  const avgY = nAy + nBy;
+
+  function pickSurfaceDir(nx: number, ny: number): [number, number] {
+    const perpAx = -ny, perpAy = nx;
+    const perpBx = ny, perpBy = -nx;
+    const dotA2 = perpAx * avgX + perpAy * avgY;
+    const dotB2 = perpBx * avgX + perpBy * avgY;
+    if (convex) {
+      return dotA2 < dotB2 ? [perpAx, perpAy] : [perpBx, perpBy];
+    } else {
+      return dotA2 > dotB2 ? [perpAx, perpAy] : [perpBx, perpBy];
+    }
+  }
+
+  const surfaceDirA = pickSurfaceDir(nAx, nAy);
+  const surfaceDirB = pickSurfaceDir(nBx, nBy);
+
+  const projX = avgX;
+  const projY = avgY;
+  const sign = convex ? -1 : 1;
+  const quadrant: [number, number] = [
+    projX >= 0 ? sign : -sign,
+    projY >= 0 ? sign : -sign,
+  ];
+
+  return {
+    kind: 'line-segment',
+    edgeName: `mesh-edge-${segment.index}`,
+    start: [start[0], start[1], start[2]],
+    end: [end[0], end[1], end[2]],
+    midpoint: [
+      (start[0] + end[0]) * 0.5,
+      (start[1] + end[1]) * 0.5,
+      (start[2] + end[2]) * 0.5,
+    ],
+    axis: [axis[0], axis[1], axis[2]],
+    basisX,
+    basisY,
+    quadrant,
+    dihedralAngleDeg: segment.dihedralAngle,
+    surfaceDirA,
+    surfaceDirB,
+    isConvex: convex,
+  };
+}
+
+function matchEdgeSegmentByMidpoint(
+  segments: EdgeSegment[],
+  target: EdgeFeatureTarget,
+): EdgeSegment | null {
+  let best: EdgeSegment | null = null;
+  let bestDist = Infinity;
+  for (const seg of segments) {
+    const dx = seg.midpoint[0] - target.midpoint[0];
+    const dy = seg.midpoint[1] - target.midpoint[1];
+    const dz = seg.midpoint[2] - target.midpoint[2];
+    const dist = dx * dx + dy * dy + dz * dz;
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = seg;
+    }
+  }
+  return best;
+}
+
+function lowerFilletEdgesCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'filletEdges' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  let manifold = lowerShapeCompilePlanToManifold(plan.base, wasm);
+  const mesh = manifold.getMesh();
+  const segments = extractEdgeSegments({
+    numProp: mesh.numProp,
+    numTri: mesh.numTri,
+    triVerts: mesh.triVerts,
+    vertProperties: mesh.vertProperties,
+  });
+
+  // Sort by edge length descending for stability
+  const matched: EdgeSegment[] = [];
+  for (const target of plan.edgeTargets) {
+    const seg = matchEdgeSegmentByMidpoint(segments, target);
+    if (seg && seg.length >= 1e-6) matched.push(seg);
+  }
+  matched.sort((a, b) => b.length - a.length);
+
+  for (const seg of matched) {
+    try {
+      const selection = edgeSegmentToSelection(seg);
+      const apply = seg.convex
+        ? applyFilletSelectionToManifold
+        : applyConcaveFilletSelectionToManifold;
+      manifold = apply(manifold, selection, plan.radius, plan.segments, wasm);
+    } catch {
+      // Edge may have been consumed by a previous fillet — skip silently
+    }
+  }
+  return manifold;
+}
+
+function lowerChamferEdgesCompilePlan(
+  plan: Extract<ShapeCompilePlan, { kind: 'chamferEdges' }>,
+  wasm: ManifoldToplevel,
+): Manifold {
+  let manifold = lowerShapeCompilePlanToManifold(plan.base, wasm);
+  const mesh = manifold.getMesh();
+  const segments = extractEdgeSegments({
+    numProp: mesh.numProp,
+    numTri: mesh.numTri,
+    triVerts: mesh.triVerts,
+    vertProperties: mesh.vertProperties,
+  });
+
+  const matched: EdgeSegment[] = [];
+  for (const target of plan.edgeTargets) {
+    const seg = matchEdgeSegmentByMidpoint(segments, target);
+    if (seg && seg.length >= 1e-6) matched.push(seg);
+  }
+  matched.sort((a, b) => b.length - a.length);
+
+  for (const seg of matched) {
+    try {
+      const selection = edgeSegmentToSelection(seg);
+      const apply = seg.convex
+        ? applyChamferSelectionToManifold
+        : applyConcaveChamferSelectionToManifold;
+      manifold = apply(manifold, selection, plan.size, wasm);
+    } catch {
+      // Edge may have been consumed by a previous chamfer — skip silently
+    }
+  }
+  return manifold;
+}
+
 export function lowerShapeCompilePlanToManifold(
   plan: ShapeCompilePlan,
   wasm: ManifoldToplevel,
@@ -325,6 +497,10 @@ export function lowerShapeCompilePlanToManifold(
       return lowerShapeFilletCompilePlan(plan, wasm);
     case 'chamfer':
       return lowerShapeChamferCompilePlan(plan, wasm);
+    case 'filletEdges':
+      return lowerFilletEdgesCompilePlan(plan, wasm);
+    case 'chamferEdges':
+      return lowerChamferEdgesCompilePlan(plan, wasm);
     case 'hull':
       return lowerShapeHullCompilePlan(plan, wasm);
     case 'trimByPlane':
@@ -332,7 +508,7 @@ export function lowerShapeCompilePlanToManifold(
     case 'importedMesh':
       return lowerImportedMeshToManifold(plan.fileData, plan.format, plan.filePath, wasm);
     case 'opaque':
-      throw new Error('Cannot lower opaque compile plan to Manifold — opaque plans must be intercepted before lowering');
+      throw new Error('Cannot lower opaque compile plan to Manifold — opaque plans require runtime evaluation');
   }
 }
 

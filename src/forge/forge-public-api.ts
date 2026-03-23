@@ -139,6 +139,8 @@ export { intersectWithPlane, projectToPlane } from './section';
 export { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';
 export type { EdgeSegment, EdgeQuery, BoundingRegion } from './edgeQuery';
 export { filletEdgeSegment, chamferEdgeSegment } from './edgeSegmentFeatures';
+export { fillet, chamfer } from './fillet';
+export type { EdgeSelector } from './fillet';
 
 export type { HighlightOptions } from './sketch/highlights';
 
@@ -164,7 +166,7 @@ export declare function sphere(radius: number, segments?: number): _Shape;
 export declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
 export declare function difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
 export declare function intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
-export declare function hull3d(...args: (_Shape | TrackedShape | [number, number, number])[]): _Shape;
+// hull3d removed from public API — Manifold-only, not a standard CAD operation
 // Cross-file imports (runtime-provided; types declared here for completeness)
 export declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | _SvgImportOptions): _Sketch;
 export declare function importPart(fileName: string, paramOverrides?: Record<string, number>): _Shape;

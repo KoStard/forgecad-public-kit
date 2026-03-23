@@ -1,6 +1,6 @@
 import { Transform, type Mat4, type Vec3 } from './transform';
 import type { PlaneFrame } from './planeFrame';
-import type { ShapeBackend } from './shapeBackend';
+import type { ShapeBackend, EdgeFeatureTarget } from './shapeBackend';
 import {
   cloneEdgeQueryRef,
   cloneFaceQueryRef,
@@ -297,6 +297,23 @@ export type ShapeCompilePlan =
       quadrant: [number, number];
       resolvedEdge?: EdgeFeatureResolvedSelector;
       queryPropagation?: TopologyRewritePropagation;
+    }
+  | {
+      /** Multi-edge fillet via geometric edge query. Backend-agnostic — resolved at lowering time. */
+      kind: 'filletEdges';
+      base: ShapeCompilePlan;
+      radius: number;
+      segments: number;
+      /** Pre-resolved edge targets from mesh extraction. Matched by midpoint at lowering time. */
+      edgeTargets: EdgeFeatureTarget[];
+    }
+  | {
+      /** Multi-edge chamfer via geometric edge query. Backend-agnostic — resolved at lowering time. */
+      kind: 'chamferEdges';
+      base: ShapeCompilePlan;
+      size: number;
+      /** Pre-resolved edge targets from mesh extraction. Matched by midpoint at lowering time. */
+      edgeTargets: EdgeFeatureTarget[];
     }
   | {
       /** Wraps a pre-built ShapeBackend that can't be expressed as compile plan IR. */
@@ -825,6 +842,33 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         queryPropagation: cloneTopologyRewritePropagation(plan.queryPropagation),
       };
       break;
+    case 'filletEdges':
+      result = {
+        kind: 'filletEdges',
+        base: cloneShapeCompilePlan(plan.base)!,
+        radius: plan.radius,
+        segments: plan.segments,
+        edgeTargets: plan.edgeTargets.map(t => ({
+          midpoint: [t.midpoint[0], t.midpoint[1], t.midpoint[2]] as [number, number, number],
+          start: [t.start[0], t.start[1], t.start[2]] as [number, number, number],
+          end: [t.end[0], t.end[1], t.end[2]] as [number, number, number],
+          convex: t.convex,
+        })),
+      };
+      break;
+    case 'chamferEdges':
+      result = {
+        kind: 'chamferEdges',
+        base: cloneShapeCompilePlan(plan.base)!,
+        size: plan.size,
+        edgeTargets: plan.edgeTargets.map(t => ({
+          midpoint: [t.midpoint[0], t.midpoint[1], t.midpoint[2]] as [number, number, number],
+          start: [t.start[0], t.start[1], t.start[2]] as [number, number, number],
+          end: [t.end[0], t.end[1], t.end[2]] as [number, number, number],
+          convex: t.convex,
+        })),
+      };
+      break;
     case 'opaque':
       // Opaque plans hold a pre-built backend — clone shares the same backend reference.
       result = { kind: 'opaque', backend: plan.backend };
@@ -951,6 +995,8 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan): ShapeQueryOw
     case 'cut':
     case 'fillet':
     case 'chamfer':
+    case 'filletEdges':
+    case 'chamferEdges':
     case 'trimByPlane':
       return findShapePrimaryQueryOwner(plan.base);
     case 'box':
@@ -988,6 +1034,8 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan): ShapeQueryOwner
       case 'cut':
       case 'fillet':
       case 'chamfer':
+      case 'filletEdges':
+      case 'chamferEdges':
       case 'trimByPlane':
         visit(current.base);
         return;
@@ -1041,6 +1089,8 @@ export function findShapeWorkplanePlacement(
     case 'shell':
     case 'fillet':
     case 'chamfer':
+    case 'filletEdges':
+    case 'chamferEdges':
       return findShapeWorkplanePlacement(plan.base);
     case 'hole':
     case 'cut':

@@ -271,6 +271,9 @@ function searchOwnerMatch(
       if (!found.match) return found;
       return { match: appendOwnerSearchStep(found.match, { kind: 'rewrite', plan }) };
     }
+    case 'filletEdges':
+    case 'chamferEdges':
+      return searchOwnerMatch(plan.base, owner);
     case 'boolean': {
       for (const shape of plan.shapes) {
         const found = searchOwnerMatch(shape, owner);
@@ -431,6 +434,8 @@ function resolvePropagatedEdgeQueryAtOwnerBase(
     || ownerBase.kind === 'sweep'
     || ownerBase.kind === 'transform'
     || ownerBase.kind === 'queryOwner'
+    || ownerBase.kind === 'filletEdges'
+    || ownerBase.kind === 'chamferEdges'
     || ownerBase.kind === 'opaque'
     || ownerBase.kind === 'importedMesh'
   ) {
@@ -699,6 +704,8 @@ function resolveSelectionFromOwnerBase(
       return resolveSelectionFromOwnerBase(plan.base, edgeName);
     case 'fillet':
     case 'chamfer':
+    case 'filletEdges':
+    case 'chamferEdges':
     case 'shell':
     case 'hole':
     case 'cut':
@@ -768,6 +775,8 @@ function resolveEdgeChainAtOwnerBase(
     || ownerBase.kind === 'sweep'
     || ownerBase.kind === 'transform'
     || ownerBase.kind === 'queryOwner'
+    || ownerBase.kind === 'filletEdges'
+    || ownerBase.kind === 'chamferEdges'
     || ownerBase.kind === 'opaque'
     || ownerBase.kind === 'importedMesh'
   ) {
@@ -821,6 +830,8 @@ function resolveCreatedEdgeChainAtOwnerBase(
     || ownerBase.kind === 'sweep'
     || ownerBase.kind === 'transform'
     || ownerBase.kind === 'queryOwner'
+    || ownerBase.kind === 'filletEdges'
+    || ownerBase.kind === 'chamferEdges'
     || ownerBase.kind === 'opaque'
     || ownerBase.kind === 'importedMesh'
   ) {

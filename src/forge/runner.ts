@@ -17,7 +17,6 @@ import {
   union,
   difference,
   intersection,
-  hull3d,
   setShapeDimensions,
   getShapeDimensions,
   type ShapeDimension,
@@ -30,6 +29,7 @@ import type { ShapeCompilePlan } from './compilePlan';
 import { intersectWithPlane, projectToPlane } from './section';
 import { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';
 import { filletEdgeSegment, chamferEdgeSegment } from './edgeSegmentFeatures';
+import { fillet, chamfer } from './fillet';
 import {
   Sketch,
   rect,
@@ -1189,9 +1189,6 @@ function executeFile(
     const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => difference(...shapes.map(unwrap));
     const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => intersection(...shapes.map(unwrap));
 
-    const wrappedHull3d = (...args: (Shape | TrackedShape | [number, number, number])[]) =>
-      hull3d(...args.map(a => a instanceof TrackedShape ? a.toShape() : a));
-
     // Tracked wrappers for primitives — user scripts get TrackedShape with named faces/edges
     const trackedBox = (x: number, y: number, z: number, center = false): TrackedShape => {
       const shape = box(x, y, z, center);
@@ -1219,7 +1216,6 @@ function executeFile(
       union: wrappedUnion,
       difference: wrappedDifference,
       intersection: wrappedIntersection,
-      hull3d: wrappedHull3d,
       rect,
       circle2d,
       roundedRect,
@@ -1280,6 +1276,8 @@ function executeFile(
       coalesceEdges,
       filletEdgeSegment,
       chamferEdgeSegment,
+      fillet,
+      chamfer,
       importSketch,
       importPart,
       importGroup,

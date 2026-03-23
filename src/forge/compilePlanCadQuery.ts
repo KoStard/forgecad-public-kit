@@ -397,6 +397,12 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
         originOffset: plan.originOffset,
       }, base.diagnostics);
     }
+    case 'filletEdges':
+    case 'chamferEdges': {
+      const base = lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
+      if (!base.ok) return compilerFailure(...base.diagnostics);
+      return compilerSuccess(base.value, base.diagnostics);
+    }
     case 'hull':
       return compilerFailure(unsupportedNodeDiagnostic('shape-hull', path));
     case 'opaque':
