@@ -65,6 +65,16 @@ pointOnLine(point: any, line: any): this {
 }
 ```
 
+## Compile Plans Are Non-Optional
+
+**Every `Sketch` must have a real `ProfileCompilePlan`. Every `Shape` must have a real `ShapeCompilePlan`.** There are no nulls, no "opaque" markers, no fallback paths. If a compile plan is missing, that's a bug to fix at the source — never work around it downstream.
+
+Rules:
+1. **Never use `new Sketch(cross)` in isolation.** The constructor snapshots the cross-section as a polygon plan, but prefer the sketch-level API (`circle2d`, `polygon`, `rect`, `.add()`, `.subtract()`) which builds proper parametric plans.
+2. **Never bypass the sketch API with raw `.cross` operations** (e.g. `sketch.cross.subtract(other.cross)`). This drops the compile plan. Use `.subtract()`, `difference2d()`, etc.
+3. **When a downstream transform crashes because a plan is missing, trace back to where the plan was lost and fix the construction** — don't add null-checks or fallbacks in the transform methods.
+4. **If an operation produces a `CrossSection` without a plan** (e.g. section cuts, backend-level simplify), snapshot the result via `profilePlanFromCrossSection(cross)` which captures the polygon loops as a real plan.
+
 ## Approach
 If you hit a moment you don't know how to proceed, take the scientist hat of experiments, only reality can give us the data, so we should run experiments, analyse, capture, iterate. If unsure about the science, take the first principles book approach.
 
