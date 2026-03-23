@@ -198,7 +198,7 @@ function Toolbar() {
   const drawEnabled = useFeatureFlag('drawMode');
   const drawModeActive = useDrawStore((s) => s.active);
   const enterDrawMode = useDrawStore((s) => s.enterDrawMode);
-  const exitDrawMode = useDrawStore((s) => s.exitDrawMode);
+  const requestDrawExit = useDrawStore((s) => s.requestExit);
   const [skillDialogOpen, setSkillDialogOpen] = React.useState(false);
 
   return (
@@ -229,8 +229,8 @@ function Toolbar() {
         {drawEnabled && (
           <button
             className={btn(drawModeActive)}
-            onClick={drawModeActive ? exitDrawMode : enterDrawMode}
-            title={drawModeActive ? 'Exit draw mode (Esc)' : 'Enter draw mode to sketch interactively'}
+            onClick={drawModeActive ? requestDrawExit : enterDrawMode}
+            title={drawModeActive ? 'Exit draw mode' : 'Enter draw mode to sketch interactively'}
           >
             ✏️ Draw
           </button>
