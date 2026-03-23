@@ -2799,6 +2799,7 @@ interface PartOptions {
 }
 interface JointOptions {
 	frame?: TransformInput;
+	origin?: [number, number, number];
 	axis?: Vec3;
 	min?: number;
 	max?: number;
@@ -2828,6 +2829,8 @@ interface GearCouplingOptions {
 	drivenTeeth?: number;
 	mesh?: "external" | "internal" | "bevel" | "face";
 	offset?: number;
+	driverOrigin?: [number, number, number];
+	drivenOrigin?: [number, number, number];
 }
 interface PartRecord {
 	name: string;

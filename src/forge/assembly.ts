@@ -44,6 +44,7 @@ export interface PartOptions {
 
 export interface JointOptions {
   frame?: TransformInput;
+  origin?: [number, number, number];
   axis?: Vec3;
   min?: number;
   max?: number;
@@ -79,6 +80,8 @@ export interface GearCouplingOptions {
   drivenTeeth?: number;
   mesh?: 'external' | 'internal' | 'bevel' | 'face';
   offset?: number;
+  driverOrigin?: [number, number, number];
+  drivenOrigin?: [number, number, number];
 }
 
 interface PartRecord {
@@ -620,13 +623,20 @@ export class Assembly {
     if (!this.parts.has(child)) throw new Error(`Unknown child part "${child}"`);
     if (parent === child) throw new Error(`Joint "${name}" cannot connect a part to itself`);
 
+    if (options.frame && options.origin) {
+      throw new Error(`Joint "${name}" cannot have both frame and origin`);
+    }
+    const frame = options.origin
+      ? Transform.translation(options.origin[0], options.origin[1], options.origin[2])
+      : options.frame ? Transform.from(options.frame) : Transform.identity();
+
     const axis = normalizeAxis(options.axis ?? [0, 0, 1]);
     this.joints.set(name, {
       name,
       type,
       parent,
       child,
-      frame: options.frame ? Transform.from(options.frame) : Transform.identity(),
+      frame,
       axis,
       min: options.min,
       max: options.max,
@@ -773,6 +783,16 @@ export class Assembly {
 
     if (!Number.isFinite(ratio) || ratio === 0) {
       throw new Error(`Gear coupling "${drivenJointName}" resolved ratio must be finite and non-zero`);
+    }
+
+    // Mesh angle correction: when shaft positions are provided, adjust offset
+    // so teeth align correctly for non-X-axis mesh directions.
+    if (options.driverOrigin && options.drivenOrigin) {
+      const dx = options.drivenOrigin[0] - options.driverOrigin[0];
+      const dy = options.drivenOrigin[1] - options.driverOrigin[1];
+      const meshAngleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+      const currentOffset = options.offset ?? 0;
+      options = { ...options, offset: currentOffset + meshAngleDeg * (1 + ratio) };
     }
 
     return this.addJointCoupling(drivenJointName, {
