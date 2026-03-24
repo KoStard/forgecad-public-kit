@@ -1158,12 +1158,31 @@ export class Assembly {
 
     const joints: JointViewInput[] = [];
     for (const j of def.joints) {
-      if (j.type === 'fixed') continue;
-
       const parentWorld = solved.getTransform(j.parent);
 
       // Pivot: the joint frame origin mapped to world space
       const pivot = parentWorld.point(j.frame.point([0, 0, 0]));
+
+      if (j.type === 'fixed') {
+        // Fixed joints become zero-range revolute joints in jointsView so
+        // attached parts follow their parent during viewport animation.
+        const parentAxis = parentWorld.vector([0, 0, 1]);
+        const parentAxisLen = Math.hypot(parentAxis[0], parentAxis[1], parentAxis[2]);
+        joints.push({
+          name: j.name,
+          child: j.child,
+          parent: j.parent,
+          type: 'revolute',
+          axis: (parentAxisLen > 1e-10
+            ? [parentAxis[0] / parentAxisLen, parentAxis[1] / parentAxisLen, parentAxis[2] / parentAxisLen]
+            : [0, 0, 1]) as [number, number, number],
+          pivot: pivot as [number, number, number],
+          min: 0,
+          max: 0,
+          default: 0,
+        });
+        continue;
+      }
 
       // Axis: the joint axis mapped through the frame then to world space
       // motionTransform uses axis in intermediate space; frame maps that to parent-local;
