@@ -1,4 +1,4 @@
-import type { Assembly, AssemblyDefinition, AssemblyJointDef, JointState } from './assembly/assembly';
+import type { Assembly, AssemblyDefinition, AssemblyJointDef, JointState } from '../assembly/assembly';
 
 export interface RobotLinkExportOptions {
   massKg?: number;

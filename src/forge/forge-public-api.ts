@@ -48,7 +48,7 @@ export { Shape } from './kernel';
 // (all the gear/pipe/extrusion helpers) is always in sync with library.ts.
 export { partLibrary as lib } from './library';
 export { boolParam, param } from './params';
-export { robotExport } from './robotExport';
+export { robotExport } from './export/robotExport';
 export type {
   SceneBackgroundGradient,
   SceneBloomConfig,

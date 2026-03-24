@@ -45,10 +45,10 @@ export type { CutPlaneDef, CutPlaneExcludeInput, CutPlaneOptions } from './cutPl
 export { cutPlane, getCollectedCutPlanes, resetCutPlanes } from './cutPlane';
 export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './assembly/explodeView';
 export { explodeView, getCollectedExplodeView, resetExplodeView } from './assembly/explodeView';
-export type { MeshExportObject, ThreeMfExportOptions } from './exportMesh';
-export { build3mfBuffer, buildBinaryStl } from './exportMesh';
-export type { PreheatOptions, PrinterProfile, ToolpathData, ToolpathSegment } from './gcode';
-export { GCodeBuilder, gcode } from './gcode';
+export type { MeshExportObject, ThreeMfExportOptions } from './export/exportMesh';
+export { build3mfBuffer, buildBinaryStl } from './export/exportMesh';
+export type { PreheatOptions, PrinterProfile, ToolpathData, ToolpathSegment } from './export/gcode';
+export { GCodeBuilder, gcode } from './export/gcode';
 export type { GroupChild, GroupInput, NamedGroupChild } from './group';
 export { group, ShapeGroup } from './group';
 export * from './holeCut';
@@ -130,8 +130,8 @@ export type {
   RobotPose6,
   RobotWorldKeyboardTeleopOptions,
   RobotWorldOptions,
-} from './robotExport';
-export { getCollectedRobotExport, resetRobotExport, robotExport } from './robotExport';
+} from './export/robotExport';
+export { getCollectedRobotExport, resetRobotExport, robotExport } from './export/robotExport';
 export type { LogEntry, MeshImportOptions, RunResult, RunScriptOptions, SceneObject } from './runner';
 export { runScript } from './runner';
 export type {
@@ -155,8 +155,8 @@ export { buildScene, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from './scene/sce
 export type { PlaneSpec } from './section';
 export { intersectWithPlane, projectToPlane } from './section';
 export * from './sheetMetal';
-export type { SheetStockDef, SheetStockOpts } from './sheetStock';
-export { getCollectedSheetStock, resetSheetStock, sheetStock } from './sheetStock';
+export type { SheetStockDef, SheetStockOpts } from './export/sheetStock';
+export { getCollectedSheetStock, resetSheetStock, sheetStock } from './export/sheetStock';
 export * from './sketch';
 export type { Mat4, RotateAroundToMode, RotateAroundToOptions, TransformInput, Vec3 } from './transform';
 export { composeChain, Transform } from './transform';

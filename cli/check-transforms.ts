@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict';
 import { assembly } from '../src/forge/assembly';
 import { group } from '../src/forge/group';
-import { resolveJointAnimation } from '../src/forge/jointAnimation';
-import { type JointViewAnimationDef, type JointViewCouplingDef, type JointViewDef, resolveJointViewValues } from '../src/forge/jointsView';
+import { resolveJointAnimation } from '../src/forge/assembly/jointAnimation';
+import { type JointViewAnimationDef, type JointViewCouplingDef, type JointViewDef, resolveJointViewValues } from '../src/forge/assembly/jointsView';
 import { box, initKernel } from '../src/forge/kernel';
 import { bevelGear } from '../src/forge/library';
 import { runScript } from '../src/forge/runner';

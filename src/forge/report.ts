@@ -15,7 +15,7 @@ import {
   PdfBuilder,
   truncateToWidth,
   type Vec2,
-} from './pdfUtils';
+} from './export/pdfUtils';
 import { mapDimensionsToOwnerIds } from './reportDimensionOwnership';
 import type { RunResult, SceneObject } from './runner';
 import type { DimensionDef } from './sketch/dimensions';

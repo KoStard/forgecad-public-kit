@@ -1,7 +1,7 @@
-import type { CadQueryShapePlan } from './cadqueryPlan';
-import { buildCompiledSceneReport, type CompiledSceneReport } from './scene/compiledScene';
-import type { GeometryInfo, Shape } from './kernel';
-import type { SceneObject } from './runner';
+import type { CadQueryShapePlan } from '../cadqueryPlan';
+import { buildCompiledSceneReport, type CompiledSceneReport } from '../scene/compiledScene';
+import type { GeometryInfo, Shape } from '../kernel';
+import type { SceneObject } from '../runner';
 
 export interface BrepMesh {
   vertices: [number, number, number][];

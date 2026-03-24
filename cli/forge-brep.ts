@@ -3,7 +3,7 @@ import { spawnSync } from 'child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { extname, join, resolve } from 'path';
-import { buildBrepExportManifest } from '../src/forge/brepExport';
+import { buildBrepExportManifest } from '../src/forge/export/brepExport';
 import { init, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
 import { resolvePackagePath } from './package-runtime';

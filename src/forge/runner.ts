@@ -18,8 +18,8 @@ import { coalesceEdges, selectEdge, selectEdges } from './edgeQuery';
 import { chamferEdgeSegment, filletEdgeSegment } from './edgeSegmentFeatures';
 import { type ExplodeViewOptions, explodeView, getCollectedExplodeView, resetExplodeView } from './assembly/explodeView';
 import { chamfer, draft, fillet, offsetSolid } from './fillet';
-import type { ToolpathData } from './gcode';
-import { GCodeBuilder, gcode } from './gcode';
+import type { ToolpathData } from './export/gcode';
+import { GCodeBuilder, gcode } from './export/gcode';
 import { group, ShapeGroup } from './group';
 import { joint } from './assembly/joint';
 import { type CollectedJointsView, getCollectedJointsView, jointsView, resetJointsView } from './assembly/jointsView';
@@ -42,11 +42,11 @@ import { partLibrary } from './library';
 import { detectMeshFormat } from './mesh/meshParsers';
 import { boolParam, getCollectedParams, type ParamDef, param, resetParams, runWithParamScope } from './params';
 import { type ForgeQualityPreset, resolveForgeQualityPreset, runWithForgeQuality } from './quality';
-import { type CollectedRobotExport, getCollectedRobotExport, resetRobotExport, robotExport } from './robotExport';
+import { type CollectedRobotExport, getCollectedRobotExport, resetRobotExport, robotExport } from './export/robotExport';
 import { getCollectedScene, resetScene, type SceneConfig, scene } from './scene';
 import { intersectWithPlane, projectToPlane } from './section';
 import { SheetMetalPart, sheetMetal } from './sheetMetal';
-import { getCollectedSheetStock, resetSheetStock, type SheetStockDef, sheetStock } from './sheetStock';
+import { getCollectedSheetStock, resetSheetStock, type SheetStockDef, sheetStock } from './export/sheetStock';
 import {
   arcBridgeBetweenRects,
   buildCircleExtrusionTopology,

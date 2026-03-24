@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { buildCompiledSceneReport } from '../src/forge/compiledScene';
+import { buildCompiledSceneReport } from '../src/forge/scene/compiledScene';
 import { init, type RunResult, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
 import { EXAMPLE_MANIFEST, EXAMPLE_MANIFEST_FAMILIES, listExampleArtifacts } from './example-manifest';

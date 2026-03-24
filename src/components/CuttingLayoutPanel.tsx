@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { generateCuttingLayoutPdf } from '../forge/cuttingLayout';
-import type { SheetStockDef } from '../forge/sheetStock';
+import { generateCuttingLayoutPdf } from '../forge/export/cuttingLayout';
+import type { SheetStockDef } from '../forge/export/sheetStock';
 
 function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);

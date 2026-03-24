@@ -7,7 +7,7 @@
  * Only works when shapes are OCCT-backed (have a TopoDS_Shape).
  */
 
-import { initOCCT } from './backends/occt/init';
+import { initOCCT } from '../backends/occt/init';
 
 export interface StepExportObject {
   name: string;

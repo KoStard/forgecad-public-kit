@@ -1,5 +1,5 @@
 import { strToU8, zipSync } from 'fflate';
-import type { Shape } from './kernel';
+import type { Shape } from '../kernel';
 
 export interface MeshExportObject {
   name: string;

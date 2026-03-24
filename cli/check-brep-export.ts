@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { buildBrepExportManifest } from '../src/forge/brepExport';
+import { buildBrepExportManifest } from '../src/forge/export/brepExport';
 import type { CadQueryProfilePlan, CadQueryShapePlan, CadQueryShapeTransformStep } from '../src/forge/cadqueryPlan';
 import { init, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';

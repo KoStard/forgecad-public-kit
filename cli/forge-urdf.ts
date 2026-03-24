@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, extname, resolve } from 'path';
 import { getCollectedRobotExport, init, runScript } from '../src/forge/headless';
-import { buildUrdfRobotPackage } from '../src/forge/urdfExport';
+import { buildUrdfRobotPackage } from '../src/forge/export/urdfExport';
 import { collectProjectFiles } from './collect-files';
 
 function parseArgs(argv: string[]): { scriptPath: string; outputPath?: string } {

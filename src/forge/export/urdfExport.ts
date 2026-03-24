@@ -6,14 +6,14 @@ import type {
   AssemblyPartDef,
   JointType,
   PartMetadata,
-} from './assembly/assembly';
+} from '../assembly/assembly';
 import { buildBinaryStl } from './exportMesh';
-import { ShapeGroup } from './group';
-import { Shape, union } from './kernel';
-import { computeMeshInertia } from './mesh/meshInertia';
+import { ShapeGroup } from '../group';
+import { Shape, union } from '../kernel';
+import { computeMeshInertia } from '../mesh/meshInertia';
 import type { CollectedRobotExport } from './robotExport';
-import { TrackedShape } from './sketch/topology';
-import { composeChain, Transform } from './transform';
+import { TrackedShape } from '../sketch/topology';
+import { composeChain, Transform } from '../transform';
 
 const DEFAULT_DENSITY_KG_M3 = 1000;
 const STL_SCALE_METERS = 0.001;

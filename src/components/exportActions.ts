@@ -1,4 +1,4 @@
-import { build3mfBlob, buildBinaryStl, buildObjBlob, type MeshExportObject } from '@forge/exportMesh';
+import { build3mfBlob, buildBinaryStl, buildObjBlob, type MeshExportObject } from '@forge/export/exportMesh';
 import { type ForgeQualityPreset, type RunResult, runScript } from '@forge/index';
 import { setParamOverrides } from '@forge/params';
 import { sketchToDxf } from '@forge/sketch/exportDxf';

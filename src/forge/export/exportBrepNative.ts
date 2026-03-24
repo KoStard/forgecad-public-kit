@@ -9,7 +9,7 @@
  * virtual filesystem, then reads the result back as a Blob.
  */
 
-import { initOCCT } from './backends/occt/init';
+import { initOCCT } from '../backends/occt/init';
 
 export interface BrepNativeExportObject {
   name: string;

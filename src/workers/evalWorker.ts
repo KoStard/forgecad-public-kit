@@ -1,8 +1,8 @@
 import { getActiveBackend, init, runScript, setActiveBackend, setParamOverrides } from '@forge/index';
 import type { RunResult } from '@forge/runner';
 import { isOCCTShapeBackend } from '../forge/backends/occt/shapeBackend';
-import { buildBrepBlob } from '../forge/exportBrepNative';
-import { buildStepBlob } from '../forge/exportStep';
+import { buildBrepBlob } from '../forge/export/exportBrepNative';
+import { buildStepBlob } from '../forge/export/exportStep';
 import { getShapeRuntimeBackend } from '../forge/kernel';
 import { serializeRunResult } from '../forge/serializeRunResult';
 import { getSolverWasmRunDebugSnapshot, resetSolverWasmStats } from '../forge/sketch/constraints/solver-wasm';
