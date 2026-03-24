@@ -5,11 +5,7 @@
  * This is the only place outside of `lower.ts` that should touch CrossSection.
  */
 import type { CrossSection } from 'manifold-3d';
-import {
-  PROFILE_BACKEND_MARKER,
-  type ProfileBackend,
-  type ProfileBounds,
-} from '../../profileBackend';
+import { PROFILE_BACKEND_MARKER, type ProfileBackend, type ProfileBounds } from '../../profileBackend';
 import type { ShapeBackend } from '../../shapeBackend';
 import { wrapManifoldShapeBackend } from './shapeBackend';
 
@@ -20,17 +16,25 @@ export class ManifoldProfileBackend implements ProfileBackend {
 
   // ── Queries ──────────────────────────────────────────────────────
 
-  area(): number { return this.cs.area(); }
+  area(): number {
+    return this.cs.area();
+  }
 
   bounds(): ProfileBounds {
     return this.cs.bounds() as unknown as ProfileBounds;
   }
 
-  isEmpty(): boolean { return this.cs.isEmpty(); }
+  isEmpty(): boolean {
+    return this.cs.isEmpty();
+  }
 
-  numVert(): number { return this.cs.numVert(); }
+  numVert(): number {
+    return this.cs.numVert();
+  }
 
-  toPolygons(): number[][][] { return this.cs.toPolygons() as number[][][]; }
+  toPolygons(): number[][][] {
+    return this.cs.toPolygons() as number[][][];
+  }
 
   // ── Transforms ───────────────────────────────────────────────────
 
@@ -65,29 +69,17 @@ export class ManifoldProfileBackend implements ProfileBackend {
   }
 
   subtract(other: ProfileBackend): ProfileBackend {
-    return new ManifoldProfileBackend(
-      this.cs.subtract(requireManifoldCrossSection(other)),
-    );
+    return new ManifoldProfileBackend(this.cs.subtract(requireManifoldCrossSection(other)));
   }
 
   // ── 3D Conversions ──────────────────────────────────────────────
 
-  extrude(
-    height: number,
-    divisions: number,
-    twist: number,
-    scaleTop?: [number, number],
-    center?: boolean,
-  ): ShapeBackend {
-    return wrapManifoldShapeBackend(
-      this.cs.extrude(height, divisions, twist, scaleTop as any, center ?? false),
-    );
+  extrude(height: number, divisions: number, twist: number, scaleTop?: [number, number], center?: boolean): ShapeBackend {
+    return wrapManifoldShapeBackend(this.cs.extrude(height, divisions, twist, scaleTop as any, center ?? false));
   }
 
   revolve(segments: number, degrees: number): ShapeBackend {
-    return wrapManifoldShapeBackend(
-      this.cs.revolve(segments, degrees),
-    );
+    return wrapManifoldShapeBackend(this.cs.revolve(segments, degrees));
   }
 
   /** Access the underlying CrossSection for Manifold-specific lowering code. */

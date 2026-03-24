@@ -1,4 +1,3 @@
-import { buildBinaryStl } from './exportMesh';
 import type {
   AssemblyDefinition,
   AssemblyJointCouplingDef,
@@ -8,12 +7,13 @@ import type {
   JointType,
   PartMetadata,
 } from './assembly';
-import type { CollectedRobotExport } from './robotExport';
-import { Shape, union } from './kernel';
+import { buildBinaryStl } from './exportMesh';
 import { ShapeGroup } from './group';
-import { TrackedShape } from './sketch/topology';
-import { Transform, composeChain, type Vec3 } from './transform';
+import { Shape, union } from './kernel';
 import { computeMeshInertia } from './meshInertia';
+import type { CollectedRobotExport } from './robotExport';
+import { TrackedShape } from './sketch/topology';
+import { composeChain, Transform } from './transform';
 
 const DEFAULT_DENSITY_KG_M3 = 1000;
 const STL_SCALE_METERS = 0.001;
@@ -62,12 +62,7 @@ export interface UrdfPackageOutput {
 // ---------------------------------------------------------------------------
 
 function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
 function sanitizeToken(value: string, fallback: string): string {
@@ -97,7 +92,7 @@ function mmToM(valueMm: number): number {
 }
 
 function degToRad(valueDeg: number): number {
-  return valueDeg * Math.PI / 180;
+  return (valueDeg * Math.PI) / 180;
 }
 
 function formatNumber(value: number, digits = 6): string {
@@ -119,8 +114,14 @@ interface LinkGeometry {
 }
 
 function flattenPartShapes(part: AssemblyPart, out: Shape[]): void {
-  if (part instanceof TrackedShape) { out.push(part.toShape()); return; }
-  if (part instanceof Shape) { out.push(part); return; }
+  if (part instanceof TrackedShape) {
+    out.push(part.toShape());
+    return;
+  }
+  if (part instanceof Shape) {
+    out.push(part);
+    return;
+  }
   if (part instanceof ShapeGroup) {
     part.children.forEach((child) => flattenPartShapes(child as AssemblyPart, out));
   }
@@ -158,9 +159,7 @@ function linkGeometry(part: AssemblyPartDef): LinkGeometry {
 function motionTransform(joint: AssemblyJointDef, value: number): Transform {
   if (joint.type === 'fixed') return Transform.identity();
   if (joint.type === 'revolute') return Transform.identity().rotateAxis(joint.axis, value);
-  return Transform.identity().translate(
-    joint.axis[0] * value, joint.axis[1] * value, joint.axis[2] * value,
-  );
+  return Transform.identity().translate(joint.axis[0] * value, joint.axis[1] * value, joint.axis[2] * value);
 }
 
 function clampJointValue(joint: AssemblyJointDef, value: number): { value: number; clamped: boolean } {
@@ -195,10 +194,7 @@ function resolveJointValues(
   return out;
 }
 
-function computeLinkFrameWorlds(
-  assembly: AssemblyDefinition,
-  jointValues: Record<string, number>,
-): Map<string, Transform> {
+function computeLinkFrameWorlds(assembly: AssemblyDefinition, jointValues: Record<string, number>): Map<string, Transform> {
   const jointsByParent = new Map<string, AssemblyJointDef[]>();
   const incoming = new Set<string>();
   assembly.joints.forEach((joint) => {
@@ -212,11 +208,7 @@ function computeLinkFrameWorlds(
   const visit = (partName: string, world: Transform) => {
     worlds.set(partName, world);
     (jointsByParent.get(partName) ?? []).forEach((joint) => {
-      const childWorld = composeChain(
-        motionTransform(joint, jointValues[joint.name] ?? joint.defaultValue),
-        joint.frame,
-        world,
-      );
+      const childWorld = composeChain(motionTransform(joint, jointValues[joint.name] ?? joint.defaultValue), joint.frame, world);
       visit(joint.child, childWorld);
     });
   };
@@ -246,8 +238,7 @@ function estimateLinkMassKg(
   const metadata = geometry.part.metadata;
   const explicitMass = combineMetadataNumber(metadata, linkOverrideMassKg, 'massKg');
   if (explicitMass !== undefined) return Math.max(MIN_LINK_MASS_KG, explicitMass);
-  const densityKgM3 =
-    combineMetadataNumber(metadata, linkOverrideDensityKgM3, 'densityKgM3') ?? DEFAULT_DENSITY_KG_M3;
+  const densityKgM3 = combineMetadataNumber(metadata, linkOverrideDensityKgM3, 'densityKgM3') ?? DEFAULT_DENSITY_KG_M3;
   const volumeM3 = geometry.volumeMm3 * 1e-9;
   return Math.max(MIN_LINK_MASS_KG, densityKgM3 * volumeM3);
 }
@@ -258,7 +249,8 @@ function resolveCollisionMode(
 ): 'visual' | 'convex' | 'box' | 'none' {
   if (collision) return collision;
   const fromMetadata = metadata?.collision;
-  if (fromMetadata === 'none' || fromMetadata === 'visual' || fromMetadata === 'box' || fromMetadata === 'convex') return fromMetadata as 'visual' | 'convex' | 'box' | 'none';
+  if (fromMetadata === 'none' || fromMetadata === 'visual' || fromMetadata === 'box' || fromMetadata === 'convex')
+    return fromMetadata as 'visual' | 'convex' | 'box' | 'none';
   return 'convex';
 }
 
@@ -268,9 +260,15 @@ function resolveCollisionMode(
 
 function transformToOrigin(transform: Transform): string {
   const m = transform.toArray();
-  const r00 = m[0], r01 = m[4], r02 = m[8];
-  const r10 = m[1], r11 = m[5], r12 = m[9];
-  const r20 = m[2], r21 = m[6], r22 = m[10];
+  const r00 = m[0],
+    _r01 = m[4],
+    _r02 = m[8];
+  const r10 = m[1],
+    r11 = m[5],
+    r12 = m[9];
+  const r20 = m[2],
+    r21 = m[6],
+    r22 = m[10];
   const pitch = Math.atan2(-r20, Math.sqrt(r00 * r00 + r10 * r10));
   let roll: number, yaw: number;
   if (Math.abs(Math.cos(pitch)) < 1e-8) {
@@ -280,7 +278,9 @@ function transformToOrigin(transform: Transform): string {
     roll = Math.atan2(r21, r22);
     yaw = Math.atan2(r10, r00);
   }
-  const x = mmToM(m[12]), y = mmToM(m[13]), z = mmToM(m[14]);
+  const x = mmToM(m[12]),
+    y = mmToM(m[13]),
+    z = mmToM(m[14]);
   return `xyz="${formatNumber(x)} ${formatNumber(y)} ${formatNumber(z)}" rpy="${formatNumber(roll)} ${formatNumber(pitch)} ${formatNumber(yaw)}"`;
 }
 
@@ -307,7 +307,7 @@ function urdfJointType(type: JointType): string {
   return 'fixed';
 }
 
-function urdfJointHasLimits(joint: AssemblyJointDef): boolean {
+function _urdfJointHasLimits(joint: AssemblyJointDef): boolean {
   return joint.type !== 'fixed' && (joint.min !== undefined || joint.max !== undefined);
 }
 
@@ -325,7 +325,7 @@ function urdfXml(
   linkNameMap: Map<string, string>,
   jointNameMap: Map<string, string>,
   geometries: Map<string, LinkGeometry>,
-  linkWorlds: Map<string, Transform>,
+  _linkWorlds: Map<string, Transform>,
   collisionMeshes: Map<string, string>,
   warnings: string[],
 ): string {
@@ -335,82 +335,89 @@ function urdfXml(
     couplingByJoint.set(coupling.joint, coupling);
   }
 
-  const linksXml = spec.assembly.parts.map((part) => {
-    const urdfLinkName = linkNameMap.get(part.name)!;
-    const geometry = geometries.get(part.name)!;
-    const linkOptions = spec.links[part.name];
-    const massKg = estimateLinkMassKg(geometry, linkOptions?.massKg, linkOptions?.densityKgM3);
+  const linksXml = spec.assembly.parts
+    .map((part) => {
+      const urdfLinkName = linkNameMap.get(part.name)!;
+      const geometry = geometries.get(part.name)!;
+      const linkOptions = spec.links[part.name];
+      const massKg = estimateLinkMassKg(geometry, linkOptions?.massKg, linkOptions?.densityKgM3);
 
-    // Inertia from mesh
-    let ixx: number, iyy: number, izz: number, ixy: number, ixz: number, iyz: number;
-    let comX: number, comY: number, comZ: number;
-    const combinedMesh = geometry.shapes.length === 1
-      ? geometry.shapes[0].getMesh()
-      : union(...geometry.shapes).getMesh();
-    if (combinedMesh.numTri > 0) {
-      const mi = computeMeshInertia(combinedMesh, massKg);
-      comX = mmToM(mi.centerOfMass[0]); comY = mmToM(mi.centerOfMass[1]); comZ = mmToM(mi.centerOfMass[2]);
-      ixx = mi.ixx; iyy = mi.iyy; izz = mi.izz;
-      ixy = mi.ixy; ixz = mi.ixz; iyz = mi.iyz;
-    } else {
-      const dx = mmToM(geometry.bboxMax[0] - geometry.bboxMin[0]);
-      const dy = mmToM(geometry.bboxMax[1] - geometry.bboxMin[1]);
-      const dz = mmToM(geometry.bboxMax[2] - geometry.bboxMin[2]);
-      comX = mmToM((geometry.bboxMin[0] + geometry.bboxMax[0]) * 0.5);
-      comY = mmToM((geometry.bboxMin[1] + geometry.bboxMax[1]) * 0.5);
-      comZ = mmToM((geometry.bboxMin[2] + geometry.bboxMax[2]) * 0.5);
-      ixx = massKg * (dy * dy + dz * dz) / 12;
-      iyy = massKg * (dx * dx + dz * dz) / 12;
-      izz = massKg * (dx * dx + dy * dy) / 12;
-      ixy = 0; ixz = 0; iyz = 0;
-    }
+      // Inertia from mesh
+      let ixx: number, iyy: number, izz: number, ixy: number, ixz: number, iyz: number;
+      let comX: number, comY: number, comZ: number;
+      const combinedMesh = geometry.shapes.length === 1 ? geometry.shapes[0].getMesh() : union(...geometry.shapes).getMesh();
+      if (combinedMesh.numTri > 0) {
+        const mi = computeMeshInertia(combinedMesh, massKg);
+        comX = mmToM(mi.centerOfMass[0]);
+        comY = mmToM(mi.centerOfMass[1]);
+        comZ = mmToM(mi.centerOfMass[2]);
+        ixx = mi.ixx;
+        iyy = mi.iyy;
+        izz = mi.izz;
+        ixy = mi.ixy;
+        ixz = mi.ixz;
+        iyz = mi.iyz;
+      } else {
+        const dx = mmToM(geometry.bboxMax[0] - geometry.bboxMin[0]);
+        const dy = mmToM(geometry.bboxMax[1] - geometry.bboxMin[1]);
+        const dz = mmToM(geometry.bboxMax[2] - geometry.bboxMin[2]);
+        comX = mmToM((geometry.bboxMin[0] + geometry.bboxMax[0]) * 0.5);
+        comY = mmToM((geometry.bboxMin[1] + geometry.bboxMax[1]) * 0.5);
+        comZ = mmToM((geometry.bboxMin[2] + geometry.bboxMax[2]) * 0.5);
+        ixx = (massKg * (dy * dy + dz * dz)) / 12;
+        iyy = (massKg * (dx * dx + dz * dz)) / 12;
+        izz = (massKg * (dx * dx + dy * dy)) / 12;
+        ixy = 0;
+        ixz = 0;
+        iyz = 0;
+      }
 
-    const collisionMode = resolveCollisionMode(part.metadata, linkOptions?.collision);
-    const visualMeshPath = `meshes/${urdfLinkName}.stl`;
-    const color = sRgbFloat(geometry.shapes[0]?.colorHex);
-    const materialXml = color
-      ? `
+      const collisionMode = resolveCollisionMode(part.metadata, linkOptions?.collision);
+      const _visualMeshPath = `meshes/${urdfLinkName}.stl`;
+      const color = sRgbFloat(geometry.shapes[0]?.colorHex);
+      const materialXml = color
+        ? `
         <material name="${escapeXml(urdfLinkName)}_material">
           <color rgba="${formatNumber(color[0], 3)} ${formatNumber(color[1], 3)} ${formatNumber(color[2], 3)} 1"/>
         </material>`
-      : '';
+        : '';
 
-    // Collision geometry
-    let collisionXml = '';
-    if (collisionMode === 'visual') {
-      collisionXml = `
+      // Collision geometry
+      let collisionXml = '';
+      if (collisionMode === 'visual') {
+        collisionXml = `
     <collision>
       <geometry>
         <mesh filename="package://${escapeXml(modelName)}/meshes/${escapeXml(urdfLinkName)}.stl" scale="${STL_SCALE_METERS} ${STL_SCALE_METERS} ${STL_SCALE_METERS}"/>
       </geometry>
     </collision>`;
-    } else if (collisionMode === 'convex') {
-      const colPath = collisionMeshes.get(part.name);
-      if (colPath) {
-        collisionXml = `
+      } else if (collisionMode === 'convex') {
+        const colPath = collisionMeshes.get(part.name);
+        if (colPath) {
+          collisionXml = `
     <collision>
       <geometry>
         <mesh filename="package://${escapeXml(modelName)}/meshes/${escapeXml(urdfLinkName)}_collision.stl" scale="${STL_SCALE_METERS} ${STL_SCALE_METERS} ${STL_SCALE_METERS}"/>
       </geometry>
     </collision>`;
-      }
-    } else if (collisionMode === 'box') {
-      const bDx = mmToM(geometry.bboxMax[0] - geometry.bboxMin[0]);
-      const bDy = mmToM(geometry.bboxMax[1] - geometry.bboxMin[1]);
-      const bDz = mmToM(geometry.bboxMax[2] - geometry.bboxMin[2]);
-      const bCx = mmToM((geometry.bboxMin[0] + geometry.bboxMax[0]) * 0.5);
-      const bCy = mmToM((geometry.bboxMin[1] + geometry.bboxMax[1]) * 0.5);
-      const bCz = mmToM((geometry.bboxMin[2] + geometry.bboxMax[2]) * 0.5);
-      collisionXml = `
+        }
+      } else if (collisionMode === 'box') {
+        const bDx = mmToM(geometry.bboxMax[0] - geometry.bboxMin[0]);
+        const bDy = mmToM(geometry.bboxMax[1] - geometry.bboxMin[1]);
+        const bDz = mmToM(geometry.bboxMax[2] - geometry.bboxMin[2]);
+        const bCx = mmToM((geometry.bboxMin[0] + geometry.bboxMax[0]) * 0.5);
+        const bCy = mmToM((geometry.bboxMin[1] + geometry.bboxMax[1]) * 0.5);
+        const bCz = mmToM((geometry.bboxMin[2] + geometry.bboxMax[2]) * 0.5);
+        collisionXml = `
     <collision>
       <origin xyz="${formatNumber(bCx)} ${formatNumber(bCy)} ${formatNumber(bCz)}" rpy="0 0 0"/>
       <geometry>
         <box size="${formatNumber(bDx)} ${formatNumber(bDy)} ${formatNumber(bDz)}"/>
       </geometry>
     </collision>`;
-    }
+      }
 
-    return `  <link name="${escapeXml(urdfLinkName)}">
+      return `  <link name="${escapeXml(urdfLinkName)}">
     <inertial>
       <origin xyz="${formatNumber(comX)} ${formatNumber(comY)} ${formatNumber(comZ)}" rpy="0 0 0"/>
       <mass value="${formatNumber(massKg, 6)}"/>
@@ -422,74 +429,71 @@ function urdfXml(
       </geometry>${materialXml}
     </visual>${collisionXml}
   </link>`;
-  }).join('\n\n');
+    })
+    .join('\n\n');
 
-  const jointsXml = spec.assembly.joints.map((joint) => {
-    const sourceOverrides = spec.joints[joint.name];
-    const urdfJointName = jointNameMap.get(`${joint.name}_joint`)!;
-    const urdfParent = linkNameMap.get(joint.parent) ?? 'world';
-    const urdfChild = linkNameMap.get(joint.child)!;
+  const jointsXml = spec.assembly.joints
+    .map((joint) => {
+      const sourceOverrides = spec.joints[joint.name];
+      const urdfJointName = jointNameMap.get(`${joint.name}_joint`)!;
+      const urdfParent = linkNameMap.get(joint.parent) ?? 'world';
+      const urdfChild = linkNameMap.get(joint.child)!;
 
-    // URDF joint type: continuous if revolute with no limits
-    const jType = urdfJointHasContinuous(joint) ? 'continuous' : urdfJointType(joint.type);
+      // URDF joint type: continuous if revolute with no limits
+      const jType = urdfJointHasContinuous(joint) ? 'continuous' : urdfJointType(joint.type);
 
-    // Origin from joint frame
-    const originAttr = transformToOrigin(joint.frame);
+      // Origin from joint frame
+      const originAttr = transformToOrigin(joint.frame);
 
-    // Axis
-    const axisXml = joint.type !== 'fixed'
-      ? `\n    <axis xyz="${joint.axis.map((v) => formatNumber(v)).join(' ')}"/>`
-      : '';
+      // Axis
+      const axisXml = joint.type !== 'fixed' ? `\n    <axis xyz="${joint.axis.map((v) => formatNumber(v)).join(' ')}"/>` : '';
 
-    // Limits
-    let limitXml = '';
-    if (joint.type !== 'fixed' && jType !== 'continuous') {
-      const lower = joint.min !== undefined
-        ? (joint.type === 'revolute' ? degToRad(joint.min) : mmToM(joint.min))
-        : undefined;
-      const upper = joint.max !== undefined
-        ? (joint.type === 'revolute' ? degToRad(joint.max) : mmToM(joint.max))
-        : undefined;
-      const effort = sourceOverrides?.effort ?? joint.effort ?? 100;
-      const velocity = sourceOverrides?.velocity ?? joint.velocity;
-      const vel = velocity !== undefined
-        ? (joint.type === 'revolute' ? degToRad(velocity) : mmToM(velocity))
-        : 10;
-      limitXml = `\n    <limit${lower !== undefined ? ` lower="${formatNumber(lower)}"` : ''}${upper !== undefined ? ` upper="${formatNumber(upper)}"` : ''} effort="${formatNumber(effort)}" velocity="${formatNumber(vel)}"/>`;
-    } else if (jType === 'continuous') {
-      // Continuous joints still need effort and velocity limits in URDF
-      const effort = sourceOverrides?.effort ?? joint.effort ?? 100;
-      const velocity = sourceOverrides?.velocity ?? joint.velocity;
-      const vel = velocity !== undefined ? degToRad(velocity) : 10;
-      limitXml = `\n    <limit effort="${formatNumber(effort)}" velocity="${formatNumber(vel)}"/>`;
-    }
-
-    // Dynamics
-    let dynamicsXml = '';
-    const damping = sourceOverrides?.damping ?? joint.damping;
-    const friction = sourceOverrides?.friction ?? joint.friction;
-    if (damping !== undefined || friction !== undefined) {
-      dynamicsXml = `\n    <dynamics${damping !== undefined ? ` damping="${formatNumber(damping)}"` : ''}${friction !== undefined ? ` friction="${formatNumber(friction)}"` : ''}/>`;
-    }
-
-    // Mimic (joint coupling)
-    let mimicXml = '';
-    const coupling = couplingByJoint.get(joint.name);
-    if (coupling && coupling.terms.length > 0) {
-      const primary = coupling.terms.reduce((a, b) => Math.abs(a.ratio) >= Math.abs(b.ratio) ? a : b);
-      const leaderUrdfName = jointNameMap.get(`${primary.joint}_joint`)!;
-      mimicXml = `\n    <mimic joint="${escapeXml(leaderUrdfName)}" multiplier="${formatNumber(primary.ratio)}" offset="${formatNumber(coupling.offset)}"/>`;
-      if (coupling.terms.length > 1) {
-        warnings.push(`Joint "${joint.name}" coupling has ${coupling.terms.length} terms but URDF mimic only supports 1. Using primary term (ratio=${primary.ratio} from "${primary.joint}").`);
+      // Limits
+      let limitXml = '';
+      if (joint.type !== 'fixed' && jType !== 'continuous') {
+        const lower = joint.min !== undefined ? (joint.type === 'revolute' ? degToRad(joint.min) : mmToM(joint.min)) : undefined;
+        const upper = joint.max !== undefined ? (joint.type === 'revolute' ? degToRad(joint.max) : mmToM(joint.max)) : undefined;
+        const effort = sourceOverrides?.effort ?? joint.effort ?? 100;
+        const velocity = sourceOverrides?.velocity ?? joint.velocity;
+        const vel = velocity !== undefined ? (joint.type === 'revolute' ? degToRad(velocity) : mmToM(velocity)) : 10;
+        limitXml = `\n    <limit${lower !== undefined ? ` lower="${formatNumber(lower)}"` : ''}${upper !== undefined ? ` upper="${formatNumber(upper)}"` : ''} effort="${formatNumber(effort)}" velocity="${formatNumber(vel)}"/>`;
+      } else if (jType === 'continuous') {
+        // Continuous joints still need effort and velocity limits in URDF
+        const effort = sourceOverrides?.effort ?? joint.effort ?? 100;
+        const velocity = sourceOverrides?.velocity ?? joint.velocity;
+        const vel = velocity !== undefined ? degToRad(velocity) : 10;
+        limitXml = `\n    <limit effort="${formatNumber(effort)}" velocity="${formatNumber(vel)}"/>`;
       }
-    }
 
-    return `  <joint name="${escapeXml(urdfJointName)}" type="${jType}">
+      // Dynamics
+      let dynamicsXml = '';
+      const damping = sourceOverrides?.damping ?? joint.damping;
+      const friction = sourceOverrides?.friction ?? joint.friction;
+      if (damping !== undefined || friction !== undefined) {
+        dynamicsXml = `\n    <dynamics${damping !== undefined ? ` damping="${formatNumber(damping)}"` : ''}${friction !== undefined ? ` friction="${formatNumber(friction)}"` : ''}/>`;
+      }
+
+      // Mimic (joint coupling)
+      let mimicXml = '';
+      const coupling = couplingByJoint.get(joint.name);
+      if (coupling && coupling.terms.length > 0) {
+        const primary = coupling.terms.reduce((a, b) => (Math.abs(a.ratio) >= Math.abs(b.ratio) ? a : b));
+        const leaderUrdfName = jointNameMap.get(`${primary.joint}_joint`)!;
+        mimicXml = `\n    <mimic joint="${escapeXml(leaderUrdfName)}" multiplier="${formatNumber(primary.ratio)}" offset="${formatNumber(coupling.offset)}"/>`;
+        if (coupling.terms.length > 1) {
+          warnings.push(
+            `Joint "${joint.name}" coupling has ${coupling.terms.length} terms but URDF mimic only supports 1. Using primary term (ratio=${primary.ratio} from "${primary.joint}").`,
+          );
+        }
+      }
+
+      return `  <joint name="${escapeXml(urdfJointName)}" type="${jType}">
     <parent link="${escapeXml(urdfParent)}"/>
     <child link="${escapeXml(urdfChild)}"/>
     <origin ${originAttr}/>${axisXml}${limitXml}${dynamicsXml}${mimicXml}
   </joint>`;
-  }).join('\n\n');
+    })
+    .join('\n\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <robot name="${escapeXml(modelName)}">
@@ -507,8 +511,14 @@ ${jointsXml}
 export function buildUrdfRobotPackage(spec: CollectedRobotExport): UrdfPackageOutput {
   const warnings: string[] = [];
   const modelName = sanitizeToken(spec.modelName, 'forgecad_robot');
-  const linkNameMap = uniqueNameMap(spec.assembly.parts.map((part) => part.name), 'link');
-  const jointNameMap = uniqueNameMap(spec.assembly.joints.map((joint) => `${joint.name}_joint`), 'joint');
+  const linkNameMap = uniqueNameMap(
+    spec.assembly.parts.map((part) => part.name),
+    'link',
+  );
+  const jointNameMap = uniqueNameMap(
+    spec.assembly.joints.map((joint) => `${joint.name}_joint`),
+    'joint',
+  );
   const jointValues = resolveJointValues(spec.assembly, spec.state, warnings);
   const linkWorlds = computeLinkFrameWorlds(spec.assembly, jointValues);
 
@@ -533,10 +543,12 @@ export function buildUrdfRobotPackage(spec: CollectedRobotExport): UrdfPackageOu
     const visualMeshPath = `meshes/${urdfLinkName}.stl`;
     files.push({
       path: visualMeshPath,
-      bytes: new Uint8Array(buildBinaryStl([
-        { name: part.name, shape: geometry.shapes[0] },
-        ...geometry.shapes.slice(1).map((shape, index) => ({ name: `${part.name}.${index + 2}`, shape })),
-      ])),
+      bytes: new Uint8Array(
+        buildBinaryStl([
+          { name: part.name, shape: geometry.shapes[0] },
+          ...geometry.shapes.slice(1).map((shape, index) => ({ name: `${part.name}.${index + 2}`, shape })),
+        ]),
+      ),
     });
 
     // Collision mesh (union of all shapes — convex hull was removed)

@@ -11,8 +11,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { init, runScript, type RunResult } from '../src/forge/headless';
 import { buildCompiledSceneReport } from '../src/forge/compiledScene';
+import { init, type RunResult, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
 import { EXAMPLE_MANIFEST, EXAMPLE_MANIFEST_FAMILIES, listExampleArtifacts } from './example-manifest';
 import type {
@@ -166,11 +166,7 @@ function assertMinimum(entryPath: string, actual: number, minimum: number | unde
   assert(actual >= minimum, `${entryPath}: expected at least ${minimum} ${label}, got ${actual}`);
 }
 
-function applyNonPartExpectations(
-  entryPath: string,
-  result: RunResult,
-  expectations: NonPartValidationExpectations | undefined,
-): void {
+function applyNonPartExpectations(entryPath: string, result: RunResult, expectations: NonPartValidationExpectations | undefined): void {
   if (!expectations) return;
 
   const objectCount = result.objects.length;
@@ -193,11 +189,7 @@ function applyNonPartExpectations(
   assertMinimum(entryPath, jointCount, expectations.minJoints, 'jointsView joint(s)');
   assertMinimum(entryPath, animationCount, expectations.minAnimations, 'jointsView animation(s)');
 
-  if (
-    expectations.requireRobotExport
-    || expectations.minRobotParts != null
-    || expectations.minRobotJoints != null
-  ) {
+  if (expectations.requireRobotExport || expectations.minRobotParts != null || expectations.minRobotJoints != null) {
     assert(result.robotExport, `${entryPath}: expected robotExport(...) data to stay available to the example gate`);
     if (!result.robotExport) return;
     assertMinimum(entryPath, result.robotExport.assembly.parts.length, expectations.minRobotParts, 'robot part(s)');
@@ -248,11 +240,7 @@ function validatePartEntry(entry: PartExampleManifestEntry): void {
     const requested = new Set(entry.primaryShapes);
     const matched = allShapeObjects.filter((object) => requested.has(object.name));
     const missing = entry.primaryShapes.filter((name) => !matched.some((object) => object.name === name));
-    assert.equal(
-      missing.length,
-      0,
-      `${entry.path}: manifest primary shape selection references missing object(s): ${missing.join(', ')}`,
-    );
+    assert.equal(missing.length, 0, `${entry.path}: manifest primary shape selection references missing object(s): ${missing.join(', ')}`);
     return matched;
   })();
 
@@ -340,23 +328,21 @@ function validateEntry(entry: ExampleManifestEntry): void {
 }
 
 function familyBreakdown(entries: ExampleManifestEntry[]): string[] {
-  return EXAMPLE_MANIFEST_FAMILIES
-    .map((family) => {
-      const familyEntries = entries.filter((entry) => entry.family === family);
-      if (familyEntries.length === 0) return null;
+  return EXAMPLE_MANIFEST_FAMILIES.map((family) => {
+    const familyEntries = entries.filter((entry) => entry.family === family);
+    if (familyEntries.length === 0) return null;
 
-      const classes = new Map<string, number>();
-      for (const entry of familyEntries) {
-        classes.set(entry.class, (classes.get(entry.class) ?? 0) + 1);
-      }
+    const classes = new Map<string, number>();
+    for (const entry of familyEntries) {
+      classes.set(entry.class, (classes.get(entry.class) ?? 0) + 1);
+    }
 
-      const classSummary = [...classes.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([klass, count]) => `${klass}:${count}`)
-        .join(', ');
-      return `  ${family}: ${familyEntries.length} artifact(s) [${classSummary}]`;
-    })
-    .filter((line): line is string => line != null);
+    const classSummary = [...classes.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([klass, count]) => `${klass}:${count}`)
+      .join(', ');
+    return `  ${family}: ${familyEntries.length} artifact(s) [${classSummary}]`;
+  }).filter((line): line is string => line != null);
 }
 
 function routeBreakdown(entries: ExampleManifestEntry[]): string {
@@ -379,22 +365,26 @@ type TemporaryFenceSummary = {
 function collectTemporaryFences(entries: ExampleManifestEntry[]): TemporaryFenceSummary[] {
   return entries.flatMap((entry) => {
     if (entry.class === 'part' && entry.route.kind === 'holdout') {
-      return [{
-        kind: 'holdout',
-        path: entry.path,
-        blocker: entry.route.blocker,
-        taskRef: entry.route.taskRef,
-        note: entry.route.note ?? entry.note,
-      }];
+      return [
+        {
+          kind: 'holdout',
+          path: entry.path,
+          blocker: entry.route.blocker,
+          taskRef: entry.route.taskRef,
+          note: entry.route.note ?? entry.note,
+        },
+      ];
     }
     if (entry.class === 'experimental') {
-      return [{
-        kind: 'experimental',
-        path: entry.path,
-        blocker: entry.blocker,
-        taskRef: entry.taskRef,
-        note: entry.note,
-      }];
+      return [
+        {
+          kind: 'experimental',
+          path: entry.path,
+          blocker: entry.blocker,
+          taskRef: entry.taskRef,
+          note: entry.note,
+        },
+      ];
     }
     return [];
   });
@@ -409,11 +399,7 @@ function temporaryFenceBreakdown(entries: ExampleManifestEntry[]): string[] {
   return [
     `  temporary fences: ${temporaryFences.length}`,
     ...temporaryFences.flatMap((entry) => {
-      const lines = [
-        `    - ${entry.kind}: ${entry.path}`,
-        `      blocker: ${entry.blocker}`,
-        `      follow-up: ${entry.taskRef}`,
-      ];
+      const lines = [`    - ${entry.kind}: ${entry.path}`, `      blocker: ${entry.blocker}`, `      follow-up: ${entry.taskRef}`];
       if (entry.note) {
         lines.push(`      note: ${entry.note}`);
       }

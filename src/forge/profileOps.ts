@@ -9,31 +9,28 @@
  * buildShapeFromCompilePlan() in kernel.ts.
  */
 
-import type { ProfileBackend } from './profileBackend';
 import type { ProfileCompilePlan } from './compilePlan';
 import { getActiveBackend } from './kernel';
+import type { ProfileBackend } from './profileBackend';
 
 // ── Manifold imports (lazy) ───────────────────────────────────────
 
-import { getWasm } from './backends/manifold/wasm';
-import { wrapManifoldProfileBackend, requireManifoldCrossSection } from './backends/manifold/profileBackend';
 import { lowerProfileCompilePlanToCrossSection } from './backends/manifold/lower';
+import { requireManifoldCrossSection, wrapManifoldProfileBackend } from './backends/manifold/profileBackend';
+import { getWasm } from './backends/manifold/wasm';
 
 // ── OCCT imports (lazy) ───────────────────────────────────────────
 
 import { getOCCT } from './backends/occt/init';
-import { wrapOCCTProfileBackend, requireOCCTFace } from './backends/occt/profileBackend';
 import { lowerProfileCompilePlanToOCCTProfileBackend } from './backends/occt/lower';
+import { requireOCCTFace, wrapOCCTProfileBackend } from './backends/occt/profileBackend';
 
 // ── Factories ─────────────────────────────────────────────────────
 
 export function createCircleProfile(radius: number, segments = 0): ProfileBackend {
   if (getActiveBackend() === 'occt') {
     const oc = getOCCT();
-    const axis = new oc.gp_Ax2_3(
-      new oc.gp_Pnt_3(0, 0, 0),
-      new oc.gp_Dir_4(0, 0, 1),
-    );
+    const axis = new oc.gp_Ax2_3(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(0, 0, 1));
     const circle = new oc.gp_Circ_2(axis, radius);
     const edge = new oc.BRepBuilderAPI_MakeEdge_8(circle).Edge();
     const wire = new oc.BRepBuilderAPI_MakeWire_2(edge).Wire();
@@ -49,8 +46,10 @@ export function createSquareProfile(size: [number, number], center: boolean): Pr
     const x0 = center ? -size[0] / 2 : 0;
     const y0 = center ? -size[1] / 2 : 0;
     const points: [number, number][] = [
-      [x0, y0], [x0 + size[0], y0],
-      [x0 + size[0], y0 + size[1]], [x0, y0 + size[1]],
+      [x0, y0],
+      [x0 + size[0], y0],
+      [x0 + size[0], y0 + size[1]],
+      [x0, y0 + size[1]],
     ];
     const wire = buildOCCTWireFromPoints(oc, points);
     const face = new oc.BRepBuilderAPI_MakeFace_15(wire, true).Face();
@@ -80,7 +79,12 @@ export function createEmptyProfile(): ProfileBackend {
   if (getActiveBackend() === 'occt') {
     const oc = getOCCT();
     // Create a null/empty face via subtracting a square from itself
-    const pts: [number, number][] = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    const pts: [number, number][] = [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ];
     const wire = buildOCCTWireFromPoints(oc, pts);
     const face = new oc.BRepBuilderAPI_MakeFace_15(wire, true).Face();
     const outerWire = oc.BRepTools.OuterWire(oc.TopoDS.Face_1(face));
@@ -107,9 +111,7 @@ export function profileUnion(profiles: ProfileBackend[]): ProfileBackend {
     }
     return wrapOCCTProfileBackend(result);
   }
-  return wrapManifoldProfileBackend(
-    getWasm().CrossSection.union(profiles.map(requireManifoldCrossSection)),
-  );
+  return wrapManifoldProfileBackend(getWasm().CrossSection.union(profiles.map(requireManifoldCrossSection)));
 }
 
 export function profileDifference(profiles: ProfileBackend[]): ProfileBackend {
@@ -122,9 +124,7 @@ export function profileDifference(profiles: ProfileBackend[]): ProfileBackend {
     }
     return wrapOCCTProfileBackend(result);
   }
-  return wrapManifoldProfileBackend(
-    getWasm().CrossSection.difference(profiles.map(requireManifoldCrossSection)),
-  );
+  return wrapManifoldProfileBackend(getWasm().CrossSection.difference(profiles.map(requireManifoldCrossSection)));
 }
 
 export function profileIntersection(profiles: ProfileBackend[]): ProfileBackend {
@@ -139,9 +139,7 @@ export function profileIntersection(profiles: ProfileBackend[]): ProfileBackend 
     }
     return wrapOCCTProfileBackend(result);
   }
-  return wrapManifoldProfileBackend(
-    getWasm().CrossSection.intersection(profiles.map(requireManifoldCrossSection)),
-  );
+  return wrapManifoldProfileBackend(getWasm().CrossSection.intersection(profiles.map(requireManifoldCrossSection)));
 }
 
 // ── Compile plan lowering ─────────────────────────────────────────
@@ -150,9 +148,7 @@ export function lowerProfileCompilePlan(plan: ProfileCompilePlan): ProfileBacken
   if (getActiveBackend() === 'occt') {
     return lowerProfileCompilePlanToOCCTProfileBackend(plan);
   }
-  return wrapManifoldProfileBackend(
-    lowerProfileCompilePlanToCrossSection(plan, getWasm()),
-  );
+  return wrapManifoldProfileBackend(lowerProfileCompilePlanToCrossSection(plan, getWasm()));
 }
 
 // ── OCCT helpers (internal) ───────────────────────────────────────
@@ -164,10 +160,7 @@ function buildOCCTWireFromPoints(oc: any, points: [number, number][]): any {
     const [x1, y1] = points[i];
     const [x2, y2] = points[(i + 1) % points.length];
     if (Math.abs(x1 - x2) < 1e-10 && Math.abs(y1 - y2) < 1e-10) continue;
-    edges.push(new oc.BRepBuilderAPI_MakeEdge_3(
-      new oc.gp_Pnt_3(x1, y1, 0),
-      new oc.gp_Pnt_3(x2, y2, 0),
-    ).Edge());
+    edges.push(new oc.BRepBuilderAPI_MakeEdge_3(new oc.gp_Pnt_3(x1, y1, 0), new oc.gp_Pnt_3(x2, y2, 0)).Edge());
   }
   const mkWire = new oc.BRepBuilderAPI_MakeWire_2(edges[0]);
   for (let i = 1; i < edges.length; i++) mkWire.Add_1(edges[i]);

@@ -1,7 +1,7 @@
-import type { GeometryInfo, Shape } from './kernel';
-import { buildCompiledSceneReport, type CompiledSceneReport } from './compiledScene';
-import type { SceneObject } from './runner';
 import type { CadQueryShapePlan } from './cadqueryPlan';
+import { buildCompiledSceneReport, type CompiledSceneReport } from './compiledScene';
+import type { GeometryInfo, Shape } from './kernel';
+import type { SceneObject } from './runner';
 
 export interface BrepMesh {
   vertices: [number, number, number][];
@@ -60,30 +60,19 @@ function serializeShapeMesh(shape: Shape): BrepMesh {
   const vertices: [number, number, number][] = [];
   for (let index = 0; index < vertexCount; index += 1) {
     const offset = index * mesh.numProp;
-    vertices.push([
-      mesh.vertProperties[offset],
-      mesh.vertProperties[offset + 1],
-      mesh.vertProperties[offset + 2],
-    ]);
+    vertices.push([mesh.vertProperties[offset], mesh.vertProperties[offset + 1], mesh.vertProperties[offset + 2]]);
   }
 
   const triangles: [number, number, number][] = [];
   for (let index = 0; index < mesh.numTri; index += 1) {
     const offset = index * 3;
-    triangles.push([
-      mesh.triVerts[offset],
-      mesh.triVerts[offset + 1],
-      mesh.triVerts[offset + 2],
-    ]);
+    triangles.push([mesh.triVerts[offset], mesh.triVerts[offset + 1], mesh.triVerts[offset + 2]]);
   }
 
   return { vertices, triangles };
 }
 
-export function buildBrepExportManifest(
-  objects: SceneObject[],
-  options: BuildBrepExportOptions = {},
-): BrepExportManifest {
+export function buildBrepExportManifest(objects: SceneObject[], options: BuildBrepExportOptions = {}): BrepExportManifest {
   const compiledSceneReport = options.compiledSceneReport ?? buildCompiledSceneReport(objects);
   const manifest: BrepExportManifest = {
     objects: [],
@@ -106,7 +95,7 @@ export function buildBrepExportManifest(
         manifest.unsupported.push({
           name: object.name,
           reason: route.reason,
-          geometryInfo: route.geometryInfo ?? ('geometryInfo' in object ? object.geometryInfo ?? null : null),
+          geometryInfo: route.geometryInfo ?? ('geometryInfo' in object ? (object.geometryInfo ?? null) : null),
         });
         break;
       case 'exact':

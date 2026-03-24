@@ -10,14 +10,10 @@ import {
   type ShapeCompileTransformStep,
 } from './compilePlan';
 import { getShapeCompilePlan, getShapeWorkplanePlacement, type Shape } from './kernel';
-import { resolvePlaneFrame, type PlaneFrame, type PlaneSpec } from './planeFrame';
+import { type PlaneFrame, type PlaneSpec, resolvePlaneFrame } from './planeFrame';
 import { cloneFaceQueryRef, type FaceQueryRef } from './queryModel';
+import { cloneShapeWorkplanePlacement, cloneSketchPlacementModel, type ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { Transform } from './transform';
-import {
-  cloneShapeWorkplanePlacement,
-  cloneSketchPlacementModel,
-  type ShapeWorkplanePlacement,
-} from './sketch/workplaneModel';
 
 const EPS = 1e-6;
 
@@ -71,9 +67,7 @@ type ProjectionReplayContext = {
   placement: ShapeWorkplanePlacement;
 };
 
-type ProjectionReplayDerivation =
-  | { ok: true; context: ProjectionReplayContext }
-  | { ok: false; reason: string };
+type ProjectionReplayDerivation = { ok: true; context: ProjectionReplayContext } | { ok: false; reason: string };
 
 const DEFAULT_PROJECTION_PLACEMENT: ShapeWorkplanePlacement = {
   matrix: Transform.identity().toArray(),
@@ -101,21 +95,9 @@ function cloneProjectionReplayContext(context: ProjectionReplayContext): Project
 
 function planeFrameFromPlacement(placement: ShapeWorkplanePlacement): PlaneFrame {
   return {
-    origin: [
-      placement.placement.workplane.origin[0],
-      placement.placement.workplane.origin[1],
-      placement.placement.workplane.origin[2],
-    ],
-    u: normalize([
-      placement.placement.workplane.u[0],
-      placement.placement.workplane.u[1],
-      placement.placement.workplane.u[2],
-    ]),
-    v: normalize([
-      placement.placement.workplane.v[0],
-      placement.placement.workplane.v[1],
-      placement.placement.workplane.v[2],
-    ]),
+    origin: [placement.placement.workplane.origin[0], placement.placement.workplane.origin[1], placement.placement.workplane.origin[2]],
+    u: normalize([placement.placement.workplane.u[0], placement.placement.workplane.u[1], placement.placement.workplane.u[2]]),
+    v: normalize([placement.placement.workplane.v[0], placement.placement.workplane.v[1], placement.placement.workplane.v[2]]),
     normal: normalize([
       placement.placement.workplane.normal[0],
       placement.placement.workplane.normal[1],
@@ -131,10 +113,22 @@ function mirrorTransformMatrix(normal: [number, number, number]): ShapeWorkplane
   const ny = normal[1] / len;
   const nz = normal[2] / len;
   return [
-    1 - 2 * nx * nx, -2 * nx * ny, -2 * nx * nz, 0,
-    -2 * ny * nx, 1 - 2 * ny * ny, -2 * ny * nz, 0,
-    -2 * nz * nx, -2 * nz * ny, 1 - 2 * nz * nz, 0,
-    0, 0, 0, 1,
+    1 - 2 * nx * nx,
+    -2 * nx * ny,
+    -2 * nx * nz,
+    0,
+    -2 * ny * nx,
+    1 - 2 * ny * ny,
+    -2 * ny * nz,
+    0,
+    -2 * nz * nx,
+    -2 * nz * ny,
+    1 - 2 * nz * nz,
+    0,
+    0,
+    0,
+    0,
+    1,
   ];
 }
 
@@ -153,11 +147,7 @@ function shapeTransformStepMatrix(
     case 'scale':
       return Transform.scale([step.x, step.y, step.z]).toArray();
     case 'rotateAround':
-      return Transform.rotationAxis(
-        [step.axisX, step.axisY, step.axisZ],
-        step.degrees,
-        [step.pivotX, step.pivotY, step.pivotZ],
-      ).toArray();
+      return Transform.rotationAxis([step.axisX, step.axisY, step.axisZ], step.degrees, [step.pivotX, step.pivotY, step.pivotZ]).toArray();
     case 'mirror':
       return mirrorTransformMatrix([step.normalX, step.normalY, step.normalZ]);
   }
@@ -234,12 +224,12 @@ function mapProfileToPlane(
 
   if (det < 0) {
     next = appendProfileCompileTransform(next, { kind: 'mirror', normalX: 1, normalY: 0 })!;
-    const angle = Math.atan2(-n10, -n00) * 180 / Math.PI;
+    const angle = (Math.atan2(-n10, -n00) * 180) / Math.PI;
     if (!nearlyEqual(angle, 0)) {
       next = appendProfileCompileTransform(next, { kind: 'rotate', degrees: angle })!;
     }
   } else {
-    const angle = Math.atan2(n10, n00) * 180 / Math.PI;
+    const angle = (Math.atan2(n10, n00) * 180) / Math.PI;
     if (!nearlyEqual(angle, 0)) {
       next = appendProfileCompileTransform(next, { kind: 'rotate', degrees: angle })!;
     }
@@ -272,11 +262,7 @@ function circleProjectionProfile(radius: number): ProfileCompilePlan {
 }
 
 function holeProjectionRadius(plan: Extract<ShapeCompilePlan, { kind: 'hole' }>): number {
-  return Math.max(
-    plan.hole.radius,
-    plan.hole.counterbore?.radius ?? 0,
-    plan.hole.countersink?.radius ?? 0,
-  );
+  return Math.max(plan.hole.radius, plan.hole.counterbore?.radius ?? 0, plan.hole.countersink?.radius ?? 0);
 }
 
 function defaultProjectionContext(profile: ProfileCompilePlan): ProjectionReplayContext {
@@ -286,10 +272,7 @@ function defaultProjectionContext(profile: ProfileCompilePlan): ProjectionReplay
   };
 }
 
-function reorientProjectionContext(
-  context: ProjectionReplayContext,
-  targetPlacement: ShapeWorkplanePlacement,
-): ProjectionReplayDerivation {
+function reorientProjectionContext(context: ProjectionReplayContext, targetPlacement: ShapeWorkplanePlacement): ProjectionReplayDerivation {
   const mapped = mapProfileToPlane(context.profile, context.placement, planeFrameFromPlacement(targetPlacement));
   if (!mapped.profile) return { ok: false, reason: mapped.reason ?? 'projection replay could not map a compatible source plane.' };
   return {
@@ -313,7 +296,8 @@ function projectThroughHoleIntoContext(
   if (!mapped.profile) {
     return {
       ok: false,
-      reason: `projection replay can only absorb hole rewrites when the hole axis stays parallel to the projected source basis. ${mapped.reason ?? ''}`.trim(),
+      reason:
+        `projection replay can only absorb hole rewrites when the hole axis stays parallel to the projected source basis. ${mapped.reason ?? ''}`.trim(),
     };
   }
   const profile = buildBooleanProfileCompilePlan('difference', [base.profile, mapped.profile]);
@@ -333,15 +317,12 @@ function projectThroughCutIntoContext(
   base: ProjectionReplayContext,
   plan: Extract<ShapeCompilePlan, { kind: 'cut' }>,
 ): ProjectionReplayDerivation {
-  const mapped = mapProfileToPlane(
-    plan.profile,
-    plan.placement,
-    planeFrameFromPlacement(base.placement),
-  );
+  const mapped = mapProfileToPlane(plan.profile, plan.placement, planeFrameFromPlacement(base.placement));
   if (!mapped.profile) {
     return {
       ok: false,
-      reason: `projection replay can only absorb cut rewrites when the cut workplane stays parallel to the projected source basis. ${mapped.reason ?? ''}`.trim(),
+      reason:
+        `projection replay can only absorb cut rewrites when the cut workplane stays parallel to the projected source basis. ${mapped.reason ?? ''}`.trim(),
     };
   }
   const profile = buildBooleanProfileCompilePlan('difference', [base.profile, mapped.profile]);
@@ -368,7 +349,7 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
     case 'transform': {
       const base = buildProjectionReplayContext(plan.base);
       if (!base.ok) return base;
-      let current = cloneProjectionReplayContext(base.context);
+      const current = cloneProjectionReplayContext(base.context);
       for (const step of plan.steps) {
         if (step.kind === 'workplanePlacement') {
           if (step.placement) {
@@ -405,7 +386,9 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
     case 'cylinder':
       return {
         ok: true,
-        context: defaultProjectionContext(circleProjectionProfile(Math.max(Math.abs(plan.radius), Math.abs(plan.radiusTop ?? plan.radius)))),
+        context: defaultProjectionContext(
+          circleProjectionProfile(Math.max(Math.abs(plan.radius), Math.abs(plan.radiusTop ?? plan.radius))),
+        ),
       };
     case 'shell': {
       const base = buildProjectionReplayContext(plan.base);
@@ -418,7 +401,8 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
       if (plan.extent.kind === 'two-sided' && featureCutExtentForwardSide(plan.extent).kind === 'through') {
         return {
           ok: false,
-          reason: 'projection replay currently supports one-sided through holes only; reverse two-sided spans can change silhouette coverage outside the defended subset.',
+          reason:
+            'projection replay currently supports one-sided through holes only; reverse two-sided spans can change silhouette coverage outside the defended subset.',
         };
       }
       if (featureCutExtentForwardSide(plan.extent).kind !== 'through') {
@@ -432,7 +416,8 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
       if (plan.extent.kind === 'two-sided' && featureCutExtentForwardSide(plan.extent).kind === 'through') {
         return {
           ok: false,
-          reason: 'projection replay currently supports one-sided through cuts only; reverse two-sided spans can change silhouette coverage outside the defended subset.',
+          reason:
+            'projection replay currently supports one-sided through cuts only; reverse two-sided spans can change silhouette coverage outside the defended subset.',
         };
       }
       if (plan.taper || featureCutExtentForwardSide(plan.extent).kind !== 'through') {
@@ -520,7 +505,8 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
     case 'trimByPlane':
       return {
         ok: false,
-        reason: 'projection replay currently does not defend trim-by-plane sources because the kept silhouette depends on the trim half-space.',
+        reason:
+          'projection replay currently does not defend trim-by-plane sources because the kept silhouette depends on the trim half-space.',
       };
     case 'fillet':
     case 'chamfer':
@@ -542,27 +528,16 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
   }
 }
 
-export function buildProjectionProfileCompilePlan(
-  shape: Shape,
-  plane: PlaneSpec,
-): ProfileCompilePlan | null {
+export function buildProjectionProfileCompilePlan(shape: Shape, plane: PlaneSpec): ProfileCompilePlan | null {
   const sourceShape = getShapeCompilePlan(shape);
   if (!sourceShape) return null;
 
-  const targetFaceQuery: FaceQueryRef | undefined = 'face' in plane
-    ? (cloneFaceQueryRef(plane.face.query) ?? undefined)
-    : undefined;
+  const targetFaceQuery: FaceQueryRef | undefined = 'face' in plane ? (cloneFaceQueryRef(plane.face.query) ?? undefined) : undefined;
 
   const targetPlane = resolvePlaneFrame(plane);
   const derived = buildProjectionReplayContext(sourceShape);
   if (!derived.ok) {
-    return projectionReplayFailure(
-      sourceShape,
-      targetPlane,
-      getShapeWorkplanePlacement(shape)?.placement,
-      derived.reason,
-      targetFaceQuery,
-    );
+    return projectionReplayFailure(sourceShape, targetPlane, getShapeWorkplanePlacement(shape)?.placement, derived.reason, targetFaceQuery);
   }
   const replay = buildReplayProfile(derived.context.profile, derived.context.placement, targetPlane);
   if (!replay.profile) {

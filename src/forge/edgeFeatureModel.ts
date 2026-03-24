@@ -33,9 +33,7 @@ export interface ResolvedEdgeFeatureSelection extends EdgeFeatureResolvedSelecto
   isConvex?: boolean;
 }
 
-export function cloneEdgeFinishQuadrant(
-  quadrant: EdgeFinishQuadrant | undefined,
-): EdgeFinishQuadrant | undefined {
+export function cloneEdgeFinishQuadrant(quadrant: EdgeFinishQuadrant | undefined): EdgeFinishQuadrant | undefined {
   if (!quadrant) return undefined;
   return [quadrant[0], quadrant[1]];
 }

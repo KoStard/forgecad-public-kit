@@ -1,12 +1,12 @@
 import type { Manifold } from 'manifold-3d';
-import type { Mat4 } from '../../transform';
 import {
   SHAPE_BACKEND_MARKER,
   type ShapeBackend,
   type ShapeRuntimeBounds,
-  type ShapeRuntimeMesh,
   type ShapeRuntimeCrossSection,
+  type ShapeRuntimeMesh,
 } from '../../shapeBackend';
+import type { Mat4 } from '../../transform';
 import { getWasm } from './wasm';
 
 /**

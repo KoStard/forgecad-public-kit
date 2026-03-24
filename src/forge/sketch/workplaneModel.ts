@@ -1,19 +1,7 @@
+import { cloneFaceQueryRef, type FaceQueryRef } from '../queryModel';
 import type { Mat4 } from '../transform';
-import {
-  cloneFaceQueryRef,
-  type FaceQueryRef,
-} from '../queryModel';
 
-export type Anchor =
-  | 'center'
-  | 'top-left'
-  | 'top-right'
-  | 'bottom-left'
-  | 'bottom-right'
-  | 'top'
-  | 'bottom'
-  | 'left'
-  | 'right';
+export type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 
 export type SketchWorkplaneSource = FaceQueryRef;
 export type { FaceQueryRef, ShapeQueryOwner, SketchFace3D } from '../queryModel';
@@ -68,9 +56,7 @@ export function cloneMat4(matrix: Mat4): Mat4 {
   return [...matrix] as Mat4;
 }
 
-export function cloneShapeWorkplanePlacement(
-  placement: ShapeWorkplanePlacement | null,
-): ShapeWorkplanePlacement | null {
+export function cloneShapeWorkplanePlacement(placement: ShapeWorkplanePlacement | null): ShapeWorkplanePlacement | null {
   if (!placement) return null;
   return {
     matrix: cloneMat4(placement.matrix),

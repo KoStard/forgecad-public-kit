@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { writeFileSync } from 'fs';
-import { resolve, extname } from 'path';
+import { extname, resolve } from 'path';
 import { runScript } from '../src/forge/headless';
 import { initKernel } from '../src/forge/kernel';
 import { collectProjectFiles } from './collect-files';

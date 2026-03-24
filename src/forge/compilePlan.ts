@@ -1,6 +1,6 @@
-import { Transform, type Mat4, type Vec3 } from './transform';
+import { cloneEdgeFeatureResolvedSelector, cloneEdgeFinishQuadrant, type EdgeFeatureResolvedSelector } from './edgeFeatureModel';
 import type { PlaneFrame } from './planeFrame';
-import type { EdgeFeatureTarget } from './shapeBackend';
+import type { ProfileBackend } from './profileBackend';
 import {
   cloneEdgeQueryRef,
   cloneFaceQueryRef,
@@ -11,22 +11,11 @@ import {
   type ShapeQueryOwner,
   type TopologyRewritePropagation,
 } from './queryModel';
-import {
-  cloneShapeWorkplanePlacement,
-  cloneSketchPlacementModel,
-  type ShapeWorkplanePlacement,
-} from './sketch/workplaneModel';
-import {
-  cloneEdgeFeatureResolvedSelector,
-  cloneEdgeFinishQuadrant,
-  type EdgeFeatureResolvedSelector,
-} from './edgeFeatureModel';
-import type {
-  SheetMetalModel,
-  SheetMetalOutput,
-} from './sheetMetalModel';
+import type { EdgeFeatureTarget } from './shapeBackend';
+import type { SheetMetalModel, SheetMetalOutput } from './sheetMetalModel';
 import { cloneSheetMetalModel } from './sheetMetalModel';
-import type { ProfileBackend } from './profileBackend';
+import { cloneShapeWorkplanePlacement, cloneSketchPlacementModel, type ShapeWorkplanePlacement } from './sketch/workplaneModel';
+import { type Mat4, Transform, type Vec3 } from './transform';
 
 /** Compile-time exhaustiveness check — call in default case of plan.kind switches. */
 export function assertExhaustive(value: never, message?: string): never {
@@ -89,8 +78,7 @@ export type ProfileCompilePlan =
       replayProfile?: ProfileCompilePlan;
       replayReason?: string;
       transforms: ProfileCompileTransformStep[];
-    }
-;
+    };
 
 export type ShapeCompileTransformStep =
   | { kind: 'translate'; x: number; y: number; z: number }
@@ -371,16 +359,10 @@ function cloneShapeTransformMatrix(matrix: Mat4): Mat4 {
 }
 
 function canonicalVec3(vec: Vec3): Vec3 {
-  return [
-    canonicalNumber(vec[0]),
-    canonicalNumber(vec[1]),
-    canonicalNumber(vec[2]),
-  ];
+  return [canonicalNumber(vec[0]), canonicalNumber(vec[1]), canonicalNumber(vec[2])];
 }
 
-function cloneShapeWorkplanePlacementValue(
-  placement: ShapeWorkplanePlacement,
-): ShapeWorkplanePlacement {
+function cloneShapeWorkplanePlacementValue(placement: ShapeWorkplanePlacement): ShapeWorkplanePlacement {
   return cloneShapeWorkplanePlacement({
     matrix: cloneShapeTransformMatrix(placement.matrix),
     placement: cloneSketchPlacementModel(placement.placement)!,
@@ -479,7 +461,12 @@ export function featureCutExtentDepth(extent: FeatureCutExtent): number {
 let _shapeQueryOwnerCounter = 0;
 
 function normalizeQueryOwnerOperation(operation: string): string {
-  return operation.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'shape';
+  return (
+    operation
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase() || 'shape'
+  );
 }
 
 export function createShapeQueryOwner(operation: string): ShapeQueryOwner {
@@ -512,12 +499,7 @@ function mirrorTransformMatrix(normal: [number, number, number]): Mat4 {
   const m21 = -2 * nz * ny;
   const m22 = 1 - 2 * nz * nz;
 
-  return [
-    m00, m10, m20, 0,
-    m01, m11, m21, 0,
-    m02, m12, m22, 0,
-    0, 0, 0, 1,
-  ];
+  return [m00, m10, m20, 0, m01, m11, m21, 0, m02, m12, m22, 0, 0, 0, 0, 1];
 }
 
 function shapeTransformStepMatrix(step: Exclude<ShapeCompileTransformStep, { kind: 'workplanePlacement' }>): Mat4 {
@@ -533,11 +515,7 @@ function shapeTransformStepMatrix(step: Exclude<ShapeCompileTransformStep, { kin
     case 'scale':
       return Transform.scale([step.x, step.y, step.z]).toArray();
     case 'rotateAround':
-      return Transform.rotationAxis(
-        [step.axisX, step.axisY, step.axisZ],
-        step.degrees,
-        [step.pivotX, step.pivotY, step.pivotZ],
-      ).toArray();
+      return Transform.rotationAxis([step.axisX, step.axisY, step.axisZ], step.degrees, [step.pivotX, step.pivotY, step.pivotZ]).toArray();
     case 'mirror':
       return mirrorTransformMatrix([step.normalX, step.normalY, step.normalZ]);
   }
@@ -849,7 +827,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         base: cloneShapeCompilePlan(plan.base)!,
         radius: plan.radius,
         segments: plan.segments,
-        edgeTargets: plan.edgeTargets.map(t => ({
+        edgeTargets: plan.edgeTargets.map((t) => ({
           midpoint: [t.midpoint[0], t.midpoint[1], t.midpoint[2]] as [number, number, number],
           start: [t.start[0], t.start[1], t.start[2]] as [number, number, number],
           end: [t.end[0], t.end[1], t.end[2]] as [number, number, number],
@@ -862,7 +840,7 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         kind: 'chamferEdges',
         base: cloneShapeCompilePlan(plan.base)!,
         size: plan.size,
-        edgeTargets: plan.edgeTargets.map(t => ({
+        edgeTargets: plan.edgeTargets.map((t) => ({
           midpoint: [t.midpoint[0], t.midpoint[1], t.midpoint[2]] as [number, number, number],
           start: [t.start[0], t.start[1], t.start[2]] as [number, number, number],
           end: [t.end[0], t.end[1], t.end[2]] as [number, number, number],
@@ -898,27 +876,15 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
   return result;
 }
 
-export function appendProfileCompileTransform(
-  plan: ProfileCompilePlan,
-  step: ProfileCompileTransformStep,
-): ProfileCompilePlan {
+export function appendProfileCompileTransform(plan: ProfileCompilePlan, step: ProfileCompileTransformStep): ProfileCompilePlan {
   const out = cloneProfileCompilePlan(plan)!;
   out.transforms.push(cloneProfileTransform(step));
   return out;
 }
 
-export function appendShapeCompileTransform(
-  plan: ShapeCompilePlan,
-  step: ShapeCompileTransformStep,
-): ShapeCompilePlan;
-export function appendShapeCompileTransform(
-  plan: ShapeCompilePlan | null,
-  step: ShapeCompileTransformStep,
-): ShapeCompilePlan | null;
-export function appendShapeCompileTransform(
-  plan: ShapeCompilePlan | null,
-  step: ShapeCompileTransformStep,
-): ShapeCompilePlan | null {
+export function appendShapeCompileTransform(plan: ShapeCompilePlan, step: ShapeCompileTransformStep): ShapeCompilePlan;
+export function appendShapeCompileTransform(plan: ShapeCompilePlan | null, step: ShapeCompileTransformStep): ShapeCompilePlan | null;
+export function appendShapeCompileTransform(plan: ShapeCompilePlan | null, step: ShapeCompileTransformStep): ShapeCompilePlan | null {
   if (!plan) return null;
   if (plan.kind === 'transform') {
     return {
@@ -934,18 +900,9 @@ export function appendShapeCompileTransform(
   };
 }
 
-export function appendShapeCompileTransforms(
-  plan: ShapeCompilePlan,
-  steps: ShapeCompileTransformStep[],
-): ShapeCompilePlan;
-export function appendShapeCompileTransforms(
-  plan: ShapeCompilePlan | null,
-  steps: ShapeCompileTransformStep[],
-): ShapeCompilePlan | null;
-export function appendShapeCompileTransforms(
-  plan: ShapeCompilePlan | null,
-  steps: ShapeCompileTransformStep[],
-): ShapeCompilePlan | null {
+export function appendShapeCompileTransforms(plan: ShapeCompilePlan, steps: ShapeCompileTransformStep[]): ShapeCompilePlan;
+export function appendShapeCompileTransforms(plan: ShapeCompilePlan | null, steps: ShapeCompileTransformStep[]): ShapeCompilePlan | null;
+export function appendShapeCompileTransforms(plan: ShapeCompilePlan | null, steps: ShapeCompileTransformStep[]): ShapeCompilePlan | null {
   let out = cloneShapeCompilePlan(plan);
   for (const step of steps) {
     out = appendShapeCompileTransform(out, step);
@@ -953,18 +910,9 @@ export function appendShapeCompileTransforms(
   return out;
 }
 
-export function wrapShapeCompilePlanWithQueryOwner(
-  plan: ShapeCompilePlan,
-  owner: ShapeQueryOwner,
-): ShapeCompilePlan;
-export function wrapShapeCompilePlanWithQueryOwner(
-  plan: ShapeCompilePlan | null,
-  owner: ShapeQueryOwner,
-): ShapeCompilePlan | null;
-export function wrapShapeCompilePlanWithQueryOwner(
-  plan: ShapeCompilePlan | null,
-  owner: ShapeQueryOwner,
-): ShapeCompilePlan | null {
+export function wrapShapeCompilePlanWithQueryOwner(plan: ShapeCompilePlan, owner: ShapeQueryOwner): ShapeCompilePlan;
+export function wrapShapeCompilePlanWithQueryOwner(plan: ShapeCompilePlan | null, owner: ShapeQueryOwner): ShapeCompilePlan | null;
+export function wrapShapeCompilePlanWithQueryOwner(plan: ShapeCompilePlan | null, owner: ShapeQueryOwner): ShapeCompilePlan | null {
   if (!plan) return null;
   return {
     kind: 'queryOwner',
@@ -973,26 +921,14 @@ export function wrapShapeCompilePlanWithQueryOwner(
   };
 }
 
-export function createOwnedShapeCompilePlan(
-  plan: ShapeCompilePlan,
-  operation: string,
-): ShapeCompilePlan;
-export function createOwnedShapeCompilePlan(
-  plan: ShapeCompilePlan | null,
-  operation: string,
-): ShapeCompilePlan | null;
-export function createOwnedShapeCompilePlan(
-  plan: ShapeCompilePlan | null,
-  operation: string,
-): ShapeCompilePlan | null {
+export function createOwnedShapeCompilePlan(plan: ShapeCompilePlan, operation: string): ShapeCompilePlan;
+export function createOwnedShapeCompilePlan(plan: ShapeCompilePlan | null, operation: string): ShapeCompilePlan | null;
+export function createOwnedShapeCompilePlan(plan: ShapeCompilePlan | null, operation: string): ShapeCompilePlan | null {
   if (!plan) return null;
   return wrapShapeCompilePlanWithQueryOwner(plan, createShapeQueryOwner(operation));
 }
 
-export function buildBooleanShapeCompilePlan(
-  op: 'union' | 'difference' | 'intersection',
-  shapes: ShapeCompilePlan[],
-): ShapeCompilePlan {
+export function buildBooleanShapeCompilePlan(op: 'union' | 'difference' | 'intersection', shapes: ShapeCompilePlan[]): ShapeCompilePlan {
   return {
     kind: 'boolean',
     op,
@@ -1082,9 +1018,7 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan): ShapeQueryOwner
   return out;
 }
 
-export function findShapeWorkplanePlacement(
-  plan: ShapeCompilePlan,
-): ShapeWorkplanePlacement | null {
+export function findShapeWorkplanePlacement(plan: ShapeCompilePlan): ShapeWorkplanePlacement | null {
   switch (plan.kind) {
     case 'queryOwner':
       return findShapeWorkplanePlacement(plan.base);
@@ -1261,10 +1195,6 @@ export function buildSweepShapeCompilePlan(
     path: cloneSweepPathCompilePlan(path),
     edgeLength: canonicalNumber(options.edgeLength),
     boundsPadding: canonicalNumber(options.boundsPadding),
-    up: [
-      canonicalNumber(options.up[0]),
-      canonicalNumber(options.up[1]),
-      canonicalNumber(options.up[2]),
-    ],
+    up: [canonicalNumber(options.up[0]), canonicalNumber(options.up[1]), canonicalNumber(options.up[2])],
   };
 }

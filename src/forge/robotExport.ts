@@ -1,9 +1,4 @@
-import type {
-  Assembly,
-  AssemblyDefinition,
-  AssemblyJointDef,
-  JointState,
-} from './assembly';
+import type { Assembly, AssemblyDefinition, AssemblyJointDef, JointState } from './assembly';
 
 export interface RobotLinkExportOptions {
   massKg?: number;
@@ -90,23 +85,17 @@ export interface CollectedRobotExport {
 
 let _collectedRobotExport: CollectedRobotExport | null = null;
 
-function cloneLinkOptions(
-  input: Record<string, RobotLinkExportOptions> | undefined,
-): Record<string, RobotLinkExportOptions> {
+function cloneLinkOptions(input: Record<string, RobotLinkExportOptions> | undefined): Record<string, RobotLinkExportOptions> {
   if (!input) return {};
   return Object.fromEntries(Object.entries(input).map(([name, opts]) => [name, { ...opts }]));
 }
 
-function cloneJointOptions(
-  input: Record<string, RobotJointExportOptions> | undefined,
-): Record<string, RobotJointExportOptions> {
+function cloneJointOptions(input: Record<string, RobotJointExportOptions> | undefined): Record<string, RobotJointExportOptions> {
   if (!input) return {};
   return Object.fromEntries(Object.entries(input).map(([name, opts]) => [name, { ...opts }]));
 }
 
-function cloneDiffDrive(
-  input: RobotDiffDrivePluginOptions | undefined,
-): RobotDiffDrivePluginOptions | undefined {
+function cloneDiffDrive(input: RobotDiffDrivePluginOptions | undefined): RobotDiffDrivePluginOptions | undefined {
   if (!input) return undefined;
   return {
     ...input,
@@ -115,9 +104,7 @@ function cloneDiffDrive(
   };
 }
 
-function cloneJointStatePublisher(
-  input: RobotJointStatePublisherOptions | undefined,
-): RobotJointStatePublisherOptions | undefined {
+function cloneJointStatePublisher(input: RobotJointStatePublisherOptions | undefined): RobotJointStatePublisherOptions | undefined {
   if (!input) return undefined;
   return {
     ...input,
@@ -129,7 +116,7 @@ function cloneWorld(input: RobotWorldOptions | undefined): RobotWorldOptions | n
   if (!input) return null;
   return {
     ...input,
-    spawnPose: input.spawnPose ? [...input.spawnPose] as RobotPose6 : undefined,
+    spawnPose: input.spawnPose ? ([...input.spawnPose] as RobotPose6) : undefined,
     keyboardTeleop: input.keyboardTeleop ? { ...input.keyboardTeleop } : undefined,
   };
 }

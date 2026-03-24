@@ -30,6 +30,9 @@
     "build:web": "npm run build:solver && tsc && FORGE_MODE=web vite build",
     "dev:cli": "tsup cli/forgecad.ts --format esm --platform node --target node20 --out-dir dist-cli --sourcemap --external typescript",
     "build:cli": "tsup cli/forgecad.ts --format esm --platform node --target node20 --out-dir dist-cli --clean --sourcemap --external typescript",
+    "lint": "npx biome check .",
+    "lint:fix": "npx biome check . --write",
+    "format": "npx biome format . --write",
     "test": "npm run test:prepare && node dist-cli/forgecad.js check suite",
     "test:prepare": "tsc --noEmit && npm run build:cli",
     "test:compiler": "npm run test:prepare && node dist-cli/forgecad.js check compiler",
@@ -66,6 +69,7 @@
     "typescript": "^5.8.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
     "@monaco-editor/react": "^4.7.0",
     "@react-three/drei": "^10.0.6",
     "@react-three/fiber": "^9.1.2",

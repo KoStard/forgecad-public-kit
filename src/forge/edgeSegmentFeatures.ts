@@ -6,33 +6,32 @@
  * topology system and works directly with mesh-extracted EdgeSegments.
  */
 
-import {
-  Shape,
-  getWasm,
-  getShapeCompilePlan,
-  setShapeCompilePlan,
-  getShapeGeometryInfo,
-  setShapeGeometryInfo,
-  getShapeDimensions,
-  setShapeDimensions,
-  getShapePlacementReferences,
-  setShapePlacementReferences,
-  getShapeRuntimeBackend,
-} from './kernel';
-import type { ShapeBackend } from './shapeBackend';
 import { requireManifoldShapeBackend, wrapManifoldShapeBackend } from './backends/manifold';
 import {
-  applyFilletSelectionToManifold,
   applyChamferSelectionToManifold,
-  applyConcaveFilletSelectionToManifold,
   applyConcaveChamferSelectionToManifold,
+  applyConcaveFilletSelectionToManifold,
+  applyFilletSelectionToManifold,
 } from './backends/manifold/edgeFeatureRuntime';
 import { isOCCTShapeBackend } from './backends/occt/shapeBackend';
-import { TrackedShape } from './sketch/topology';
-import type { EdgeSegment } from './meshEdgeExtraction';
 import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
+import {
+  getShapeCompilePlan,
+  getShapeDimensions,
+  getShapeGeometryInfo,
+  getShapePlacementReferences,
+  getShapeRuntimeBackend,
+  getWasm,
+  Shape,
+  setShapeCompilePlan,
+  setShapeDimensions,
+  setShapeGeometryInfo,
+  setShapePlacementReferences,
+} from './kernel';
+import type { EdgeSegment } from './meshEdgeExtraction';
+import type { ShapeBackend } from './shapeBackend';
+import { TrackedShape } from './sketch/topology';
 import type { Vec3 } from './transform';
-
 
 type ShapeArg = Shape | TrackedShape;
 
@@ -71,15 +70,13 @@ function edgeSegmentToSelection(segment: EdgeSegment): ResolvedEdgeFeatureSelect
     throw new Error('Cannot compute fillet basis: edge normals are degenerate.');
   }
 
-  bx /= bLen; by /= bLen; bz /= bLen;
+  bx /= bLen;
+  by /= bLen;
+  bz /= bLen;
   const basisX: Vec3 = [bx, by, bz];
 
   // basisY = axis × basisX
-  const basisY: Vec3 = [
-    axis[1] * bz - axis[2] * by,
-    axis[2] * bx - axis[0] * bz,
-    axis[0] * by - axis[1] * bx,
-  ];
+  const basisY: Vec3 = [axis[1] * bz - axis[2] * by, axis[2] * bx - axis[0] * bz, axis[0] * by - axis[1] * bx];
 
   // --- Compute surface directions in the (basisX, basisY) cross-section plane ---
 
@@ -99,8 +96,10 @@ function edgeSegmentToSelection(segment: EdgeSegment): ResolvedEdgeFeatureSelect
   // In both cases, the resulting directions define the wedge that the fillet replaces.
   function pickSurfaceDir(nx: number, ny: number): [number, number] {
     // Two perpendiculars of (nx, ny): (-ny, nx) and (ny, -nx)
-    const perpAx = -ny, perpAy = nx;
-    const perpBx = ny, perpBy = -nx;
+    const perpAx = -ny,
+      perpAy = nx;
+    const perpBx = ny,
+      perpBy = -nx;
     const dotA2 = perpAx * avgX + perpAy * avgY;
     const dotB2 = perpBx * avgX + perpBy * avgY;
     // For convex: pick negative dot. For concave: pick positive dot.
@@ -118,21 +117,14 @@ function edgeSegmentToSelection(segment: EdgeSegment): ResolvedEdgeFeatureSelect
   const projX = avgX;
   const projY = avgY;
   const sign = convex ? -1 : 1;
-  const quadrant: [number, number] = [
-    projX >= 0 ? sign : -sign,
-    projY >= 0 ? sign : -sign,
-  ];
+  const quadrant: [number, number] = [projX >= 0 ? sign : -sign, projY >= 0 ? sign : -sign];
 
   return {
     kind: 'line-segment',
     edgeName: `mesh-edge-${segment.index}`,
     start: [start[0], start[1], start[2]],
     end: [end[0], end[1], end[2]],
-    midpoint: [
-      (start[0] + end[0]) * 0.5,
-      (start[1] + end[1]) * 0.5,
-      (start[2] + end[2]) * 0.5,
-    ],
+    midpoint: [(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5, (start[2] + end[2]) * 0.5],
     axis: [axis[0], axis[1], axis[2]],
     basisX,
     basisY,
@@ -171,12 +163,7 @@ function buildResult(target: Shape, backend: ShapeBackend, source: string): Shap
  * @param radius - Fillet radius
  * @param segments - Number of arc segments (default: 16)
  */
-export function filletEdgeSegment(
-  shape: ShapeArg,
-  segment: EdgeSegment,
-  radius: number,
-  segments = 16,
-): Shape {
+export function filletEdgeSegment(shape: ShapeArg, segment: EdgeSegment, radius: number, segments = 16): Shape {
   if (!Number.isFinite(radius) || !(radius > 0)) {
     throw new Error('filletEdgeSegment() requires a positive finite radius.');
   }
@@ -204,9 +191,7 @@ export function filletEdgeSegment(
   const manifold = requireManifoldShapeBackend(backend, 'filletEdgeSegment()');
   const wasm = getWasm();
   const selection = edgeSegmentToSelection(segment);
-  const apply = segment.convex
-    ? applyFilletSelectionToManifold
-    : applyConcaveFilletSelectionToManifold;
+  const apply = segment.convex ? applyFilletSelectionToManifold : applyConcaveFilletSelectionToManifold;
   const manifoldResult = apply(manifold, selection, radius, Math.round(segments), wasm);
   return buildResult(target, wrapManifoldShapeBackend(manifoldResult), 'fillet');
 }
@@ -220,11 +205,7 @@ export function filletEdgeSegment(
  * @param segment - Edge segment from selectEdge() / selectEdges()
  * @param size - Chamfer size (distance from edge)
  */
-export function chamferEdgeSegment(
-  shape: ShapeArg,
-  segment: EdgeSegment,
-  size: number,
-): Shape {
+export function chamferEdgeSegment(shape: ShapeArg, segment: EdgeSegment, size: number): Shape {
   if (!Number.isFinite(size) || !(size > 0)) {
     throw new Error('chamferEdgeSegment() requires a positive finite size.');
   }
@@ -249,9 +230,7 @@ export function chamferEdgeSegment(
   const manifold = requireManifoldShapeBackend(backend, 'chamferEdgeSegment()');
   const wasm = getWasm();
   const selection = edgeSegmentToSelection(segment);
-  const apply = segment.convex
-    ? applyChamferSelectionToManifold
-    : applyConcaveChamferSelectionToManifold;
+  const apply = segment.convex ? applyChamferSelectionToManifold : applyConcaveChamferSelectionToManifold;
   const manifoldResult = apply(manifold, selection, size, wasm);
   return buildResult(target, wrapManifoldShapeBackend(manifoldResult), 'chamfer');
 }

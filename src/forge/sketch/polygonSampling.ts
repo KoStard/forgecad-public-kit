@@ -23,7 +23,7 @@ export function resamplePolygon(poly: Vec2[], targetCount: number): Vec2[] {
   const out: Vec2[] = [];
   for (let i = 0; i < targetCount; i++) {
     const targetDist = (i / targetCount) * totalDist;
-    
+
     // Binary search for segment
     let low = 0;
     let high = dists.length - 1;
@@ -37,13 +37,10 @@ export function resamplePolygon(poly: Vec2[], targetCount: number): Vec2[] {
     }
     const seg = low - 1;
     const t = (targetDist - dists[seg]) / (dists[seg + 1] - dists[seg]);
-    
+
     const p1 = poly[seg % poly.length];
     const p2 = poly[(seg + 1) % poly.length];
-    out.push([
-      p1[0] + (p2[0] - p1[0]) * t,
-      p1[1] + (p2[1] - p1[1]) * t,
-    ]);
+    out.push([p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t]);
   }
 
   return out;

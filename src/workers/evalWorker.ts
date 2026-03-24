@@ -1,17 +1,14 @@
-import { init, runScript, setParamOverrides, setActiveBackend, getActiveBackend } from '@forge/index';
+import { getActiveBackend, init, runScript, setActiveBackend, setParamOverrides } from '@forge/index';
 import type { RunResult } from '@forge/runner';
-import {
-  getSolverWasmRunDebugSnapshot,
-  resetSolverWasmStats,
-} from '../forge/sketch/constraints/solver-wasm';
-import { isNotebookFile, parseNotebook, resolveNotebookPreviewCellId } from '../notebook/model';
-import { runNotebook } from '../notebook/runtime';
-import { serializeRunResult } from '../forge/serializeRunResult';
-import { getShapeRuntimeBackend } from '../forge/kernel';
 import { isOCCTShapeBackend } from '../forge/backends/occt/shapeBackend';
-import { buildStepBlob } from '../forge/exportStep';
 import { buildBrepBlob } from '../forge/exportBrepNative';
-import type { EvalWorkerRequest, EvalWorkerResponse, EvalWorkerRunPayload, EvalWorkerExportExactRequest } from './evalWorkerProtocol';
+import { buildStepBlob } from '../forge/exportStep';
+import { getShapeRuntimeBackend } from '../forge/kernel';
+import { serializeRunResult } from '../forge/serializeRunResult';
+import { getSolverWasmRunDebugSnapshot, resetSolverWasmStats } from '../forge/sketch/constraints/solver-wasm';
+import { parseNotebook, resolveNotebookPreviewCellId } from '../notebook/model';
+import { runNotebook } from '../notebook/runtime';
+import type { EvalWorkerExportExactRequest, EvalWorkerRequest, EvalWorkerResponse, EvalWorkerRunPayload } from './evalWorkerProtocol';
 
 type WorkerContext = {
   onmessage: ((event: MessageEvent<EvalWorkerRequest>) => void) | null;
@@ -43,7 +40,7 @@ function readBinaryFile(resolvedPath: string): ArrayBuffer {
   if (contentType.includes('text/html') || contentType.includes('application/json')) {
     throw new Error(
       `readBinaryFile("${resolvedPath}"): server returned ${contentType} instead of binary data. ` +
-      `Response starts with: "${text.slice(0, 100)}"`,
+        `Response starts with: "${text.slice(0, 100)}"`,
     );
   }
   const buf = new ArrayBuffer(text.length);
@@ -97,9 +94,7 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
     // If a newer run was queued while we were evaluating, skip serialization —
     // the client already rejected this seq's promise.
     if (queuedPayload !== null) {
-      console.log(
-        `[worker] seq=${seq} stale (newer queued) — skipping serialize. run=${(tRun - tKernel).toFixed(0)}ms`,
-      );
+      console.log(`[worker] seq=${seq} stale (newer queued) — skipping serialize. run=${(tRun - tKernel).toFixed(0)}ms`);
       return;
     }
 
@@ -112,10 +107,7 @@ async function runOnce(payload: EvalWorkerRunPayload): Promise<void> {
       `[worker] seq=${seq} kernelInit=${(tKernel - t0).toFixed(0)}ms  run=${(tRun - tKernel).toFixed(0)}ms  serialize=${(tSerialize - tRun).toFixed(0)}ms  total=${(tSerialize - t0).toFixed(0)}ms`,
     );
 
-    worker.postMessage(
-      { type: 'run-success', payload: { seq, result: serialized } },
-      transferables,
-    );
+    worker.postMessage({ type: 'run-success', payload: { seq, result: serialized } }, transferables);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     worker.postMessage({
@@ -164,9 +156,7 @@ async function handleExportExact(data: EvalWorkerExportExactRequest): Promise<vo
     const exportObjects = shapeObjects.map((obj) => {
       const backend = getShapeRuntimeBackend(obj.shape!);
       if (!isOCCTShapeBackend(backend)) {
-        throw new Error(
-          `Object "${obj.name}" is not OCCT-backed. Re-evaluate with the OCCT backend selected.`,
-        );
+        throw new Error(`Object "${obj.name}" is not OCCT-backed. Re-evaluate with the OCCT backend selected.`);
       }
       return { name: obj.name, shape: backend, color: obj.color };
     });
@@ -182,10 +172,7 @@ async function handleExportExact(data: EvalWorkerExportExactRequest): Promise<vo
     }
 
     const buffer = await blob.arrayBuffer();
-    worker.postMessage(
-      { type: 'export-exact-success', payload: { reqId, data: buffer, format } },
-      [buffer],
-    );
+    worker.postMessage({ type: 'export-exact-success', payload: { reqId, data: buffer, format } }, [buffer]);
   } catch (err) {
     worker.postMessage({
       type: 'export-exact-error',
@@ -220,7 +207,9 @@ worker.onmessage = async (event) => {
             faces[name] = ref;
             faceHistories[name] = obj.shape.faceHistory(name);
           }
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
       worker.postMessage({ type: 'face-info-success', payload: { reqId, result: { faceNames, faces, faceHistories } } });
     } catch (err) {

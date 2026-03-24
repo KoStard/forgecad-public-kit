@@ -12,8 +12,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 import { init } from '../src/forge/headless';
 import type { CompilerCaseSnapshot, CompilerInspectionInput } from './compiler-inspection';
-import { COMPILER_REGRESSION_CORPUS } from './compiler-regression-corpus';
 import { inspectCompilerScene, loadCompilerInspectionInput } from './compiler-inspection';
+import { COMPILER_REGRESSION_CORPUS } from './compiler-regression-corpus';
 import { CHAMFER_EDGE_WORKFLOW_CODE, FILLET_EDGE_WORKFLOW_CODE } from './edge-finish-fixtures';
 import { resolvePackagePath } from './package-runtime';
 
@@ -278,9 +278,7 @@ const feature = rect(6, 4)
 return [{ name: 'Feature', shape: feature }];
 `,
   ),
-  ...COMPILER_REGRESSION_CORPUS.map((part) =>
-    fileCase(part.id, part.description, part.scriptPath),
-  ),
+  ...COMPILER_REGRESSION_CORPUS.map((part) => fileCase(part.id, part.description, part.scriptPath)),
   inlineCase(
     'projection-downstream-gasket',
     'Projection-driven downstream sketching keeps explicit projection intent on the sketch and still lowers follow-on face features through both compiler paths.',
@@ -382,33 +380,28 @@ function stripUndefinedDeep<T>(value: T): T {
 }
 
 function generateSnapshots(caseId?: string): CompilerCaseSnapshot[] {
-  const selected = caseId
-    ? COMPILER_CASES.filter((entry) => entry.id === caseId)
-    : COMPILER_CASES;
+  const selected = caseId ? COMPILER_CASES.filter((entry) => entry.id === caseId) : COMPILER_CASES;
   if (selected.length === 0) {
     throw new Error(`Unknown compiler snapshot case: ${caseId}`);
   }
 
-  return selected.map((entry) => stripUndefinedDeep({
-    id: entry.id,
-    description: entry.description,
-    scene: inspectCompilerScene(entry.input),
-  }));
+  return selected.map((entry) =>
+    stripUndefinedDeep({
+      id: entry.id,
+      description: entry.description,
+      scene: inspectCompilerScene(entry.input),
+    }),
+  );
 }
 
 function isFaceQueryKind(kind: unknown): boolean {
-  return kind === 'canonical-face'
-    || kind === 'tracked-face'
-    || kind === 'face-ref'
-    || kind === 'propagated-face'
-    || kind === 'created-face';
+  return (
+    kind === 'canonical-face' || kind === 'tracked-face' || kind === 'face-ref' || kind === 'propagated-face' || kind === 'created-face'
+  );
 }
 
 function isEdgeQueryKind(kind: unknown): boolean {
-  return kind === 'tracked-edge'
-    || kind === 'edge-ref'
-    || kind === 'propagated-edge'
-    || kind === 'created-edge';
+  return kind === 'tracked-edge' || kind === 'edge-ref' || kind === 'propagated-edge' || kind === 'created-edge';
 }
 
 function assertPropagationQueryShape(
@@ -435,9 +428,14 @@ function assertPropagationQueryShape(
     issues.push(`${snapshotId}/${objectName}: ${label} should carry an edge-query ref, got ${String(candidate.kind)}`);
     return;
   }
-  if (enforceRewriteId
-    && (candidate.kind === 'propagated-face' || candidate.kind === 'created-face' || candidate.kind === 'propagated-edge' || candidate.kind === 'created-edge')
-    && candidate.rewriteId !== rewriteId) {
+  if (
+    enforceRewriteId &&
+    (candidate.kind === 'propagated-face' ||
+      candidate.kind === 'created-face' ||
+      candidate.kind === 'propagated-edge' ||
+      candidate.kind === 'created-edge') &&
+    candidate.rewriteId !== rewriteId
+  ) {
     issues.push(
       `${snapshotId}/${objectName}: ${label} rewriteId ${String(candidate.rewriteId)} does not match parent propagation ${rewriteId}`,
     );
@@ -462,11 +460,7 @@ function assertLoweredRuntimeMatches(snapshots: CompilerCaseSnapshot[]): void {
     }
   }
 
-  assert.equal(
-    mismatches.length,
-    0,
-    `Compiler/runtime mismatch:\n${mismatches.map((line) => `- ${line}`).join('\n')}`,
-  );
+  assert.equal(mismatches.length, 0, `Compiler/runtime mismatch:\n${mismatches.map((line) => `- ${line}`).join('\n')}`);
 }
 
 function assertCompilerRoutingIntegrity(snapshots: CompilerCaseSnapshot[]): void {
@@ -583,11 +577,7 @@ function assertCompilerRoutingIntegrity(snapshots: CompilerCaseSnapshot[]): void
     }
   }
 
-  assert.equal(
-    issues.length,
-    0,
-    `Compiler routing integrity failed:\n${issues.map((line) => `- ${line}`).join('\n')}`,
-  );
+  assert.equal(issues.length, 0, `Compiler routing integrity failed:\n${issues.map((line) => `- ${line}`).join('\n')}`);
 }
 
 function assertTopologyRewritePropagationIntegrity(snapshots: CompilerCaseSnapshot[]): void {
@@ -666,11 +656,7 @@ function assertTopologyRewritePropagationIntegrity(snapshots: CompilerCaseSnapsh
     }
   }
 
-  assert.equal(
-    issues.length,
-    0,
-    `Topology-rewrite propagation integrity failed:\n${issues.map((line) => `- ${line}`).join('\n')}`,
-  );
+  assert.equal(issues.length, 0, `Topology-rewrite propagation integrity failed:\n${issues.map((line) => `- ${line}`).join('\n')}`);
 }
 
 function readStoredSnapshots(): CompilerCaseSnapshot[] {
@@ -698,9 +684,7 @@ export async function runCheckCompilerCli(argv: string[] = process.argv.slice(2)
   }
 
   const stored = readStoredSnapshots();
-  const expected = caseId
-    ? stored.filter((entry) => entry.id === caseId)
-    : stored;
+  const expected = caseId ? stored.filter((entry) => entry.id === caseId) : stored;
 
   assert.deepEqual(
     generated,

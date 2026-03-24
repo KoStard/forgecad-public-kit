@@ -1,6 +1,6 @@
+import type { VerificationResult } from '@forge/index';
 import { useEffect, useRef, useState } from 'react';
 import { useForgeStore } from '../store/forgeStore';
-import type { VerificationResult } from '@forge/index';
 
 function PassIcon() {
   return (
@@ -77,57 +77,55 @@ function VerificationRow({ result, onNavigate }: VerificationRowProps) {
         (e.currentTarget as HTMLDivElement).style.background = '';
       }}
     >
-      <div style={{ paddingTop: 1 }}>
-        {isFail ? <FailIcon /> : <PassIcon />}
-      </div>
+      <div style={{ paddingTop: 1 }}>{isFail ? <FailIcon /> : <PassIcon />}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          flexWrap: 'wrap',
-        }}>
-          <span style={{
-            color: isFail ? 'var(--fc-warning, #e6a817)' : 'var(--fc-text)',
-            fontWeight: 500,
-            fontSize: 12,
-          }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span
+            style={{
+              color: isFail ? 'var(--fc-warning, #e6a817)' : 'var(--fc-text)',
+              fontWeight: 500,
+              fontSize: 12,
+            }}
+          >
             {result.label}
           </span>
           {result.line != null && isFail && (
-            <span style={{
-              color: 'var(--fc-textDim)',
-              fontSize: 10,
-              fontFamily: 'monospace',
-              background: 'var(--fc-bgHover)',
-              padding: '1px 4px',
-              borderRadius: 2,
-            }}>
+            <span
+              style={{
+                color: 'var(--fc-textDim)',
+                fontSize: 10,
+                fontFamily: 'monospace',
+                background: 'var(--fc-bgHover)',
+                padding: '1px 4px',
+                borderRadius: 2,
+              }}
+            >
               line {result.line}
             </span>
           )}
         </div>
-        <div style={{
-          color: isFail ? 'var(--fc-textMuted, #999)' : 'var(--fc-textDim)',
-          fontSize: 11,
-          marginTop: 1,
-          fontFamily: 'monospace',
-          wordBreak: 'break-word',
-        }}>
+        <div
+          style={{
+            color: isFail ? 'var(--fc-textMuted, #999)' : 'var(--fc-textDim)',
+            fontSize: 11,
+            marginTop: 1,
+            fontFamily: 'monospace',
+            wordBreak: 'break-word',
+          }}
+        >
           {result.message}
         </div>
         {isFail && (result.expected != null || result.actual != null) && (
           <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 10, fontFamily: 'monospace' }}>
-            {result.expected != null && (
-              <span style={{ color: 'var(--fc-success, #4caf50)' }}>
-                expected: {result.expected}
-              </span>
-            )}
-            {result.actual != null && (
-              <span style={{ color: 'var(--fc-warning, #e6a817)' }}>
-                actual: {result.actual}
-              </span>
-            )}
+            {result.expected != null && <span style={{ color: 'var(--fc-success, #4caf50)' }}>expected: {result.expected}</span>}
+            {result.actual != null && <span style={{ color: 'var(--fc-warning, #e6a817)' }}>actual: {result.actual}</span>}
           </div>
         )}
       </div>
@@ -156,51 +154,52 @@ export function VerificationsPanel() {
   const headerColor = hasFailures ? 'var(--fc-warning, #e6a817)' : 'var(--fc-success, #4caf50)';
 
   return (
-    <div style={{
-      maxHeight: '40%',
-      display: 'flex',
-      flexDirection: 'column',
-      borderTop: '1px solid var(--fc-border)',
-      background: 'var(--fc-bg)',
-    }}>
-      <div
-        onClick={() => setCollapsed(!collapsed)}
-        className="fc-panel-header"
-      >
+    <div
+      style={{
+        maxHeight: '40%',
+        display: 'flex',
+        flexDirection: 'column',
+        borderTop: '1px solid var(--fc-border)',
+        background: 'var(--fc-bg)',
+      }}
+    >
+      <div onClick={() => setCollapsed(!collapsed)} className="fc-panel-header">
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: headerColor, fontSize: 13 }}>
-            {hasFailures ? '⚠' : '✓'}
-          </span>
-          <span>
-            Checks
-          </span>
-          <span style={{
-            display: 'inline-flex',
-            gap: 4,
-            alignItems: 'center',
-            marginLeft: 2,
-          }}>
+          <span style={{ color: headerColor, fontSize: 13 }}>{hasFailures ? '⚠' : '✓'}</span>
+          <span>Checks</span>
+          <span
+            style={{
+              display: 'inline-flex',
+              gap: 4,
+              alignItems: 'center',
+              marginLeft: 2,
+            }}
+          >
             {hasFailures && (
-              <span style={{
-                background: 'var(--fc-warning, #e6a817)',
-                color: 'var(--fc-bg)',
-                borderRadius: 8,
-                padding: '1px 6px',
-                fontSize: 10,
-                fontWeight: 700,
-              }}>
+              <span
+                style={{
+                  background: 'var(--fc-warning, #e6a817)',
+                  color: 'var(--fc-bg)',
+                  borderRadius: 8,
+                  padding: '1px 6px',
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+              >
                 {failures.length} failed
               </span>
             )}
             {passes.length > 0 && (
-              <span style={{
-                background: 'var(--fc-success, #4caf50)',
-                color: 'var(--fc-bg)',
-                borderRadius: 8,
-                padding: '1px 6px',
-                fontSize: 10,
-                fontWeight: 700,
-              }}>
+              <span
+                style={{
+                  background: 'var(--fc-success, #4caf50)',
+                  color: 'var(--fc-bg)',
+                  borderRadius: 8,
+                  padding: '1px 6px',
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+              >
                 {passes.length} passed
               </span>
             )}
@@ -210,23 +209,23 @@ export function VerificationsPanel() {
       </div>
 
       {!collapsed && (
-        <div style={{
-          overflowY: 'auto',
-          padding: '0 12px 8px',
-        }}>
+        <div
+          style={{
+            overflowY: 'auto',
+            padding: '0 12px 8px',
+          }}
+        >
           {/* Show failures first for visibility */}
           {failures.map((v) => (
-            <VerificationRow
-              key={v.id}
-              result={v}
-              onNavigate={requestEditorNavigate}
-            />
+            <VerificationRow key={v.id} result={v} onNavigate={requestEditorNavigate} />
           ))}
           {passes.length > 0 && failures.length > 0 && (
-            <div style={{
-              borderTop: '1px solid var(--fc-border)',
-              margin: '4px 0',
-            }} />
+            <div
+              style={{
+                borderTop: '1px solid var(--fc-border)',
+                margin: '4px 0',
+              }}
+            />
           )}
           {passes.map((v) => (
             <VerificationRow key={v.id} result={v} />

@@ -1,10 +1,10 @@
 import {
   assemblyExample,
+  type ExampleManifestEntry,
+  type NonPartValidationExpectations,
   notebookExample,
   runtimeSceneExample,
   sketchExample,
-  type ExampleManifestEntry,
-  type NonPartValidationExpectations,
 } from './types';
 
 type NonPartEntry = {

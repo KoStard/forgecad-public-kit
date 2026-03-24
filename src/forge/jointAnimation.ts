@@ -5,20 +5,13 @@ export function clampAnimationProgress(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function sanitizeAnimationProgress(
-  clip: JointViewAnimationDef | null | undefined,
-  value: number,
-): number {
+function sanitizeAnimationProgress(clip: JointViewAnimationDef | null | undefined, value: number): number {
   if (!Number.isFinite(value)) return 0;
   if (clip?.loop && clip.continuous) return Math.max(0, value);
   return clampAnimationProgress(value);
 }
 
-function sampleJointValueAt(
-  clip: JointViewAnimationDef,
-  jointName: string,
-  t: number,
-): number | null {
+function sampleJointValueAt(clip: JointViewAnimationDef, jointName: string, t: number): number | null {
   let prev: { at: number; value: number } | null = null;
   let next: { at: number; value: number } | null = null;
 
@@ -40,10 +33,7 @@ function sampleJointValueAt(
   return prev.value + (next.value - prev.value) * alpha;
 }
 
-export function findJointAnimationClip(
-  clips: JointViewAnimationDef[],
-  clipName: string | null | undefined,
-): JointViewAnimationDef | null {
+export function findJointAnimationClip(clips: JointViewAnimationDef[], clipName: string | null | undefined): JointViewAnimationDef | null {
   if (!clipName) return null;
   return clips.find((clip) => clip.name === clipName) ?? null;
 }
@@ -59,7 +49,7 @@ export function resolveJointAnimation(
   const safeProgress = sanitizeAnimationProgress(clip, progress);
   const continuous = clip.loop && clip.continuous;
   const cycle = continuous ? Math.floor(safeProgress) : 0;
-  const t = continuous ? (safeProgress - cycle) : clampAnimationProgress(safeProgress);
+  const t = continuous ? safeProgress - cycle : clampAnimationProgress(safeProgress);
   const out: Record<string, number> = { ...baseValues };
   const jointNames = new Set<string>();
   clip.keyframes.forEach((keyframe) => {

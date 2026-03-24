@@ -46,33 +46,65 @@ export function computeGeometryArrays(mesh: {
     const i1 = triVerts[t * 3 + 1];
     const i2 = triVerts[t * 3 + 2];
 
-    const ax = vertProperties[i0 * numProp], ay = vertProperties[i0 * numProp + 1], az = vertProperties[i0 * numProp + 2];
-    const bx = vertProperties[i1 * numProp], by = vertProperties[i1 * numProp + 1], bz = vertProperties[i1 * numProp + 2];
-    const cx = vertProperties[i2 * numProp], cy = vertProperties[i2 * numProp + 1], cz = vertProperties[i2 * numProp + 2];
+    const ax = vertProperties[i0 * numProp],
+      ay = vertProperties[i0 * numProp + 1],
+      az = vertProperties[i0 * numProp + 2];
+    const bx = vertProperties[i1 * numProp],
+      by = vertProperties[i1 * numProp + 1],
+      bz = vertProperties[i1 * numProp + 2];
+    const cx = vertProperties[i2 * numProp],
+      cy = vertProperties[i2 * numProp + 1],
+      cz = vertProperties[i2 * numProp + 2];
 
-    const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
-    const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
+    const e1x = bx - ax,
+      e1y = by - ay,
+      e1z = bz - az;
+    const e2x = cx - ax,
+      e2y = cy - ay,
+      e2z = cz - az;
     let nx = e1y * e2z - e1z * e2y;
     let ny = e1z * e2x - e1x * e2z;
     let nz = e1x * e2y - e1y * e2x;
     const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-    nx /= len; ny /= len; nz /= len;
+    nx /= len;
+    ny /= len;
+    nz /= len;
 
     const o = t * 9;
-    positions[o    ] = ax; positions[o + 1] = ay; positions[o + 2] = az;
-    positions[o + 3] = bx; positions[o + 4] = by; positions[o + 5] = bz;
-    positions[o + 6] = cx; positions[o + 7] = cy; positions[o + 8] = cz;
-    normals[o    ] = nx; normals[o + 1] = ny; normals[o + 2] = nz;
-    normals[o + 3] = nx; normals[o + 4] = ny; normals[o + 5] = nz;
-    normals[o + 6] = nx; normals[o + 7] = ny; normals[o + 8] = nz;
+    positions[o] = ax;
+    positions[o + 1] = ay;
+    positions[o + 2] = az;
+    positions[o + 3] = bx;
+    positions[o + 4] = by;
+    positions[o + 5] = bz;
+    positions[o + 6] = cx;
+    positions[o + 7] = cy;
+    positions[o + 8] = cz;
+    normals[o] = nx;
+    normals[o + 1] = ny;
+    normals[o + 2] = nz;
+    normals[o + 3] = nx;
+    normals[o + 4] = ny;
+    normals[o + 5] = nz;
+    normals[o + 6] = nx;
+    normals[o + 7] = ny;
+    normals[o + 8] = nz;
 
-    faceNx[t] = nx; faceNy[t] = ny; faceNz[t] = nz;
+    faceNx[t] = nx;
+    faceNy[t] = ny;
+    faceNz[t] = nz;
   }
 
   const edgePositions = computeSharpEdges(
-    triVerts, vertProperties, numProp, triCount,
-    faceNx, faceNy, faceNz,
-    mesh.mergeFromVert, mesh.mergeToVert,
+    triVerts,
+    vertProperties,
+    numProp,
+    triCount,
+    faceNx,
+    faceNy,
+    faceNz,
+    mesh.mergeFromVert,
+    mesh.mergeToVert,
   );
 
   return { positions, normals, edgePositions };
@@ -114,7 +146,8 @@ function computeSharpEdges(
     const tv = [ca, cb, cc] as const;
 
     for (let e = 0; e < 3; e++) {
-      const va = tv[e], vb = tv[(e + 1) % 3];
+      const va = tv[e],
+        vb = tv[(e + 1) % 3];
       const fwdKey = useNumeric ? va * MAX_NUMERIC + vb : `${va},${vb}`;
       const revKey = useNumeric ? vb * MAX_NUMERIC + va : `${vb},${va}`;
 
@@ -127,8 +160,12 @@ function computeSharpEdges(
           const origVa = triVerts[t * 3 + e];
           const origVb = triVerts[t * 3 + ((e + 1) % 3)];
           edgeList.push(
-            vertProperties[origVa * numProp], vertProperties[origVa * numProp + 1], vertProperties[origVa * numProp + 2],
-            vertProperties[origVb * numProp], vertProperties[origVb * numProp + 1], vertProperties[origVb * numProp + 2],
+            vertProperties[origVa * numProp],
+            vertProperties[origVa * numProp + 1],
+            vertProperties[origVa * numProp + 2],
+            vertProperties[origVb * numProp],
+            vertProperties[origVb * numProp + 1],
+            vertProperties[origVb * numProp + 2],
           );
         }
         halfEdges.delete(revKey);
@@ -147,14 +184,19 @@ function computeSharpEdges(
     const cc = canon[triVerts[t * 3 + 2]];
     const tv = [ca, cb, cc] as const;
     for (let e = 0; e < 3; e++) {
-      const va = tv[e], vb = tv[(e + 1) % 3];
+      const va = tv[e],
+        vb = tv[(e + 1) % 3];
       const fwdKey = useNumeric ? va * MAX_NUMERIC + vb : `${va},${vb}`;
       if (fwdKey === key) {
         const origVa = triVerts[t * 3 + e];
         const origVb = triVerts[t * 3 + ((e + 1) % 3)];
         edgeList.push(
-          vertProperties[origVa * numProp], vertProperties[origVa * numProp + 1], vertProperties[origVa * numProp + 2],
-          vertProperties[origVb * numProp], vertProperties[origVb * numProp + 1], vertProperties[origVb * numProp + 2],
+          vertProperties[origVa * numProp],
+          vertProperties[origVa * numProp + 1],
+          vertProperties[origVa * numProp + 2],
+          vertProperties[origVb * numProp],
+          vertProperties[origVb * numProp + 1],
+          vertProperties[origVb * numProp + 2],
         );
         break;
       }
@@ -164,11 +206,7 @@ function computeSharpEdges(
   return new Float32Array(edgeList);
 }
 
-function buildCanonicalMap(
-  numVerts: number,
-  mergeFromVert: Uint32Array | undefined,
-  mergeToVert: Uint32Array | undefined,
-): Uint32Array {
+function buildCanonicalMap(numVerts: number, mergeFromVert: Uint32Array | undefined, mergeToVert: Uint32Array | undefined): Uint32Array {
   const canon = new Uint32Array(numVerts);
   for (let i = 0; i < numVerts; i++) canon[i] = i;
 

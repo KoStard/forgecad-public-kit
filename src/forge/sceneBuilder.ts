@@ -41,7 +41,8 @@ function createSceneLight(def: SceneLightConfig): THREE.Light {
   const color = def.color ? new THREE.Color(def.color) : new THREE.Color(0xffffff);
   const intensity = def.intensity ?? 1;
   switch (def.type) {
-    case 'ambient': return new THREE.AmbientLight(color, intensity);
+    case 'ambient':
+      return new THREE.AmbientLight(color, intensity);
     case 'directional': {
       const l = new THREE.DirectionalLight(color, intensity);
       if (def.position) l.position.set(...def.position);
@@ -62,12 +63,16 @@ function createSceneLight(def: SceneLightConfig): THREE.Light {
       const ground = def.groundColor ? new THREE.Color(def.groundColor) : new THREE.Color(0x444444);
       return new THREE.HemisphereLight(sky, ground, intensity);
     }
-    default: return new THREE.AmbientLight(color, intensity);
+    default:
+      return new THREE.AmbientLight(color, intensity);
   }
 }
 
 /** Build a complete Three.js scene from ForgeGeometry, ready to render. */
-export function buildScene(geo: ForgeGeometry, sceneConfig?: SceneConfig | null): {
+export function buildScene(
+  geo: ForgeGeometry,
+  sceneConfig?: SceneConfig | null,
+): {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
 } {
@@ -134,7 +139,7 @@ export function buildScene(geo: ForgeGeometry, sceneConfig?: SceneConfig | null)
   bb.getSize(size);
   const maxDim = Math.max(size.x, size.y, size.z);
   const fov = sceneConfig?.camera?.fov ?? 45;
-  const dist = maxDim / (2 * Math.tan((fov * Math.PI) / 360)) * 1.6;
+  const dist = (maxDim / (2 * Math.tan((fov * Math.PI) / 360))) * 1.6;
 
   const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, dist * 10);
   camera.up.set(0, 0, 1);

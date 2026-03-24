@@ -8,12 +8,12 @@
  * No parallel Assembly class — this builds RigidBodies from existing parts.
  */
 
-import type { Vec3 } from '../transform';
+import { Shape } from '../kernel';
 import type { FaceRef } from '../sketch/topology';
 import { TrackedShape } from '../sketch/topology';
-import { Shape } from '../kernel';
-import type { RigidBody, AxisRef3D, PointRef3D, Constraint3D, Constraint3DType, Solve3DOptions, Solve3DResult } from './types';
+import type { Vec3 } from '../transform';
 import { solve3D } from './solver';
+import type { AxisRef3D, Constraint3D, Constraint3DType, PointRef3D, RigidBody, Solve3DOptions, Solve3DResult } from './types';
 
 // ─── TrackedShape → RigidBody bridge ────────────────────────────────────────
 
@@ -62,8 +62,8 @@ export function bodyFromTrackedShape(
 
   return {
     id,
-    position: options?.position ? [...options.position] as Vec3 : [0, 0, 0],
-    rotation: options?.rotation ? [...options.rotation] as Vec3 : [0, 0, 0],
+    position: options?.position ? ([...options.position] as Vec3) : [0, 0, 0],
+    rotation: options?.rotation ? ([...options.rotation] as Vec3) : [0, 0, 0],
     grounded: options?.grounded ?? false,
     faces,
     axes,
@@ -107,8 +107,8 @@ export function bodyFromRefs(
 
   return {
     id,
-    position: options?.position ? [...options.position] as Vec3 : [0, 0, 0],
-    rotation: options?.rotation ? [...options.rotation] as Vec3 : [0, 0, 0],
+    position: options?.position ? ([...options.position] as Vec3) : [0, 0, 0],
+    rotation: options?.rotation ? ([...options.rotation] as Vec3) : [0, 0, 0],
     grounded: options?.grounded ?? false,
     faces,
     axes,
@@ -131,9 +131,17 @@ function parseRef(ref: string): { bodyId: string; featureName: string } {
 
 /** Equation counts per constraint type. */
 const CONSTRAINT_EQUATIONS: Record<Constraint3DType, number> = {
-  flush: 3, align: 3, parallel: 2, faceDistance: 3,
-  concentric: 4, axisParallel: 2, pointCoincident: 3,
-  pointOnFace: 1, pointOnAxis: 2, angle: 1, fixed: 0,
+  flush: 3,
+  align: 3,
+  parallel: 2,
+  faceDistance: 3,
+  concentric: 4,
+  axisParallel: 2,
+  pointCoincident: 3,
+  pointOnFace: 1,
+  pointOnAxis: 2,
+  angle: 1,
+  fixed: 0,
 };
 
 /**
@@ -150,16 +158,36 @@ export class MateBuilder {
     return id;
   }
 
-  flush(faceA: string, faceB: string): string { return this.add('flush', faceA, faceB); }
-  align(faceA: string, faceB: string): string { return this.add('align', faceA, faceB); }
-  parallel(faceA: string, faceB: string): string { return this.add('parallel', faceA, faceB); }
-  faceDistance(faceA: string, faceB: string, distance: number): string { return this.add('faceDistance', faceA, faceB, distance); }
-  concentric(axisA: string, axisB: string): string { return this.add('concentric', axisA, axisB); }
-  axisParallel(axisA: string, axisB: string): string { return this.add('axisParallel', axisA, axisB); }
-  pointCoincident(pointA: string, pointB: string): string { return this.add('pointCoincident', pointA, pointB); }
-  pointOnFace(point: string, face: string): string { return this.add('pointOnFace', point, face); }
-  pointOnAxis(point: string, axis: string): string { return this.add('pointOnAxis', point, axis); }
-  angle(faceA: string, faceB: string, degrees: number): string { return this.add('angle', faceA, faceB, degrees); }
+  flush(faceA: string, faceB: string): string {
+    return this.add('flush', faceA, faceB);
+  }
+  align(faceA: string, faceB: string): string {
+    return this.add('align', faceA, faceB);
+  }
+  parallel(faceA: string, faceB: string): string {
+    return this.add('parallel', faceA, faceB);
+  }
+  faceDistance(faceA: string, faceB: string, distance: number): string {
+    return this.add('faceDistance', faceA, faceB, distance);
+  }
+  concentric(axisA: string, axisB: string): string {
+    return this.add('concentric', axisA, axisB);
+  }
+  axisParallel(axisA: string, axisB: string): string {
+    return this.add('axisParallel', axisA, axisB);
+  }
+  pointCoincident(pointA: string, pointB: string): string {
+    return this.add('pointCoincident', pointA, pointB);
+  }
+  pointOnFace(point: string, face: string): string {
+    return this.add('pointOnFace', point, face);
+  }
+  pointOnAxis(point: string, axis: string): string {
+    return this.add('pointOnAxis', point, axis);
+  }
+  angle(faceA: string, faceB: string, degrees: number): string {
+    return this.add('angle', faceA, faceB, degrees);
+  }
 
   /** Total constraint equations. */
   get totalEquations(): number {

@@ -1,4 +1,4 @@
-import type { ExplodeAxis, ExplodeDirective, ExplodeDirection } from './explodeCore';
+import type { ExplodeAxis, ExplodeDirection, ExplodeDirective } from './explodeCore';
 
 export type ExplodeViewDirection = ExplodeDirection;
 export interface ExplodeViewDirective extends ExplodeDirective {}
@@ -26,19 +26,11 @@ export interface ExplodeViewOptions {
 
 let _collected: ExplodeViewOptions | null = null;
 
-const isAxis = (value: unknown): value is ExplodeAxis =>
-  value === 'x' || value === 'y' || value === 'z';
+const isAxis = (value: unknown): value is ExplodeAxis => value === 'x' || value === 'y' || value === 'z';
 
-const normalizeDirection = (
-  value: unknown,
-  label: string,
-): ExplodeViewDirection => {
+const normalizeDirection = (value: unknown, label: string): ExplodeViewDirection => {
   if (value === 'radial' || isAxis(value)) return value;
-  if (
-    Array.isArray(value)
-    && value.length === 3
-    && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
-  ) {
+  if (Array.isArray(value) && value.length === 3 && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))) {
     return [value[0], value[1], value[2]];
   }
   throw new Error(`${label} must be 'radial', 'x'|'y'|'z', or [x, y, z]`);
@@ -48,9 +40,7 @@ const cloneDirective = (directive: ExplodeViewDirective): ExplodeViewDirective =
   const out: ExplodeViewDirective = {};
   if (directive.stage !== undefined) out.stage = directive.stage;
   if (directive.direction !== undefined) {
-    out.direction = Array.isArray(directive.direction)
-      ? [...directive.direction] as [number, number, number]
-      : directive.direction;
+    out.direction = Array.isArray(directive.direction) ? ([...directive.direction] as [number, number, number]) : directive.direction;
   }
   if (directive.axisLock !== undefined) out.axisLock = directive.axisLock;
   return out;
@@ -62,9 +52,7 @@ const cloneOptions = (options: ExplodeViewOptions): ExplodeViewOptions => {
   if (options.amountScale !== undefined) out.amountScale = options.amountScale;
   if (options.stages !== undefined) out.stages = [...options.stages];
   if (options.mode !== undefined) {
-    out.mode = Array.isArray(options.mode)
-      ? [...options.mode] as [number, number, number]
-      : options.mode;
+    out.mode = Array.isArray(options.mode) ? ([...options.mode] as [number, number, number]) : options.mode;
   }
   if (options.axisLock !== undefined) out.axisLock = options.axisLock;
   if (options.byName) {
@@ -84,11 +72,7 @@ const cloneOptions = (options: ExplodeViewOptions): ExplodeViewOptions => {
   return out;
 };
 
-const mergeDirective = (
-  target: ExplodeViewDirective,
-  patch: ExplodeViewDirective,
-  label: string,
-): ExplodeViewDirective => {
+const mergeDirective = (target: ExplodeViewDirective, patch: ExplodeViewDirective, label: string): ExplodeViewDirective => {
   const out = cloneDirective(target);
 
   if (patch.stage !== undefined) {
@@ -147,7 +131,7 @@ export function explodeView(options: ExplodeViewOptions = {}): void {
   }
 
   if (options.axisLock !== undefined) {
-    if (!isAxis(options.axisLock)) throw new Error('explodeView.axisLock must be \'x\', \'y\', or \'z\'');
+    if (!isAxis(options.axisLock)) throw new Error("explodeView.axisLock must be 'x', 'y', or 'z'");
     next.axisLock = options.axisLock;
   }
 

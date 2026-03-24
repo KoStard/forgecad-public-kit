@@ -107,10 +107,7 @@ export interface SketchBezier {
 }
 
 /** A segment in a mixed line/arc/bezier profile loop. */
-export type ProfileSegment =
-  | { kind: 'line'; line: LineId }
-  | { kind: 'arc'; arc: ArcId }
-  | { kind: 'bezier'; bezier: BezierId };
+export type ProfileSegment = { kind: 'line'; line: LineId } | { kind: 'arc'; arc: ArcId } | { kind: 'bezier'; bezier: BezierId };
 
 export type SketchLoop =
   | { type: 'poly'; points: PointId[] }
@@ -127,27 +124,25 @@ export type AnnotationElement =
   /** Dimension line with extension lines (length, distance). */
   | { kind: 'dimension'; from: [number, number]; to: [number, number]; offset: number; value: string }
   /** Angle arc between two directions (angle, absoluteAngle). */
-  | { kind: 'angle-arc'; center: [number, number]; startAngle: number; endAngle: number;
-      radius: number; value: string }
+  | { kind: 'angle-arc'; center: [number, number]; startAngle: number; endAngle: number; radius: number; value: string }
   /** Fallback text label for constraints not yet migrated to annotations. */
   | { kind: 'text'; position: [number, number]; text: string };
 
 /** Named symbols rendered as SVG paths, not Unicode glyphs. */
 export type ConstraintSymbol =
-  | 'parallel'       // >> tick marks
-  | 'equal'          // = double line
-  | 'perpendicular'  // right-angle box
-  | 'horizontal'     // H
-  | 'vertical'       // V
-  | 'fixed'          // ground/anchor hatching
-  | 'midpoint'       // diamond
-  | 'coincident'     // target dot
-  | 'collinear'      // dot on line
-  | 'tangent'        // T
-  | 'concentric'     // concentric circles
-  | 'ccw'            // curved arrow
-  | 'symmetric'      // mirror axis mark
-  ;
+  | 'parallel' // >> tick marks
+  | 'equal' // = double line
+  | 'perpendicular' // right-angle box
+  | 'horizontal' // H
+  | 'vertical' // V
+  | 'fixed' // ground/anchor hatching
+  | 'midpoint' // diamond
+  | 'coincident' // target dot
+  | 'collinear' // dot on line
+  | 'tangent' // T
+  | 'concentric' // concentric circles
+  | 'ccw' // curved arrow
+  | 'symmetric'; // mirror axis mark
 
 // ─── Constraint display ───────────────────────────────────────────────────────
 
@@ -208,7 +203,15 @@ export interface SketchConstraintMeta {
   edges: {
     lines: { id: string; name?: string; a: [number, number]; b: [number, number] }[];
     circles: { id: string; name?: string; center: [number, number]; radius: number }[];
-    arcs: { id: string; name?: string; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
+    arcs: {
+      id: string;
+      name?: string;
+      center: [number, number];
+      start: [number, number];
+      end: [number, number];
+      radius: number;
+      clockwise: boolean;
+    }[];
     beziers: { id: string; name?: string; points: [number, number][] }[];
     points: { id: string; pos: [number, number] }[];
   };

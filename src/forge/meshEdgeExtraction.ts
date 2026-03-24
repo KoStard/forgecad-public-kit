@@ -60,19 +60,33 @@ export function extractEdgeSegments(mesh: MeshData): EdgeSegment[] {
     const i1 = triVerts[t * 3 + 1];
     const i2 = triVerts[t * 3 + 2];
 
-    const ax = vertProperties[i0 * numProp], ay = vertProperties[i0 * numProp + 1], az = vertProperties[i0 * numProp + 2];
-    const bx = vertProperties[i1 * numProp], by = vertProperties[i1 * numProp + 1], bz = vertProperties[i1 * numProp + 2];
-    const cx = vertProperties[i2 * numProp], cy = vertProperties[i2 * numProp + 1], cz = vertProperties[i2 * numProp + 2];
+    const ax = vertProperties[i0 * numProp],
+      ay = vertProperties[i0 * numProp + 1],
+      az = vertProperties[i0 * numProp + 2];
+    const bx = vertProperties[i1 * numProp],
+      by = vertProperties[i1 * numProp + 1],
+      bz = vertProperties[i1 * numProp + 2];
+    const cx = vertProperties[i2 * numProp],
+      cy = vertProperties[i2 * numProp + 1],
+      cz = vertProperties[i2 * numProp + 2];
 
-    const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
-    const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
+    const e1x = bx - ax,
+      e1y = by - ay,
+      e1z = bz - az;
+    const e2x = cx - ax,
+      e2y = cy - ay,
+      e2z = cz - az;
     let nx = e1y * e2z - e1z * e2y;
     let ny = e1z * e2x - e1x * e2z;
     let nz = e1x * e2y - e1y * e2x;
     const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-    nx /= len; ny /= len; nz /= len;
+    nx /= len;
+    ny /= len;
+    nz /= len;
 
-    faceNx[t] = nx; faceNy[t] = ny; faceNz[t] = nz;
+    faceNx[t] = nx;
+    faceNy[t] = ny;
+    faceNz[t] = nz;
   }
 
   // Build canonical vertex map
@@ -101,7 +115,8 @@ export function extractEdgeSegments(mesh: MeshData): EdgeSegment[] {
     const tv = [ca, cb, cc] as const;
 
     for (let e = 0; e < 3; e++) {
-      const va = tv[e], vb = tv[(e + 1) % 3];
+      const va = tv[e],
+        vb = tv[(e + 1) % 3];
       const fwdKey = useNumeric ? va * MAX_NUMERIC + vb : `${va},${vb}`;
       const revKey = useNumeric ? vb * MAX_NUMERIC + va : `${vb},${va}`;
 
@@ -111,10 +126,7 @@ export function extractEdgeSegments(mesh: MeshData): EdgeSegment[] {
         if (dot <= EDGE_THRESHOLD_DOT) {
           const origVa = triVerts[t * 3 + e];
           const origVb = triVerts[t * 3 + ((e + 1) % 3)];
-          const seg = buildEdgeSegment(
-            edgeIndex++, origVa, origVb, vertProperties, numProp,
-            t, adjTri, faceNx, faceNy, faceNz, dot, false,
-          );
+          const seg = buildEdgeSegment(edgeIndex++, origVa, origVb, vertProperties, numProp, t, adjTri, faceNx, faceNy, faceNz, dot, false);
           edges.push(seg);
         }
         halfEdges.delete(revKey);
@@ -133,15 +145,13 @@ export function extractEdgeSegments(mesh: MeshData): EdgeSegment[] {
     const cc = canon[triVerts[t * 3 + 2]];
     const tv = [ca, cb, cc] as const;
     for (let e = 0; e < 3; e++) {
-      const va = tv[e], vb = tv[(e + 1) % 3];
+      const va = tv[e],
+        vb = tv[(e + 1) % 3];
       const fwdKey = useNumeric ? va * MAX_NUMERIC + vb : `${va},${vb}`;
       if (fwdKey === key) {
         const origVa = triVerts[t * 3 + e];
         const origVb = triVerts[t * 3 + ((e + 1) % 3)];
-        const seg = buildEdgeSegment(
-          edgeIndex++, origVa, origVb, vertProperties, numProp,
-          t, t, faceNx, faceNy, faceNz, 1.0, true,
-        );
+        const seg = buildEdgeSegment(edgeIndex++, origVa, origVb, vertProperties, numProp, t, t, faceNx, faceNy, faceNz, 1.0, true);
         edges.push(seg);
         break;
       }
@@ -153,10 +163,15 @@ export function extractEdgeSegments(mesh: MeshData): EdgeSegment[] {
 
 function buildEdgeSegment(
   index: number,
-  origVa: number, origVb: number,
-  vertProperties: Float32Array, numProp: number,
-  triA: number, triB: number,
-  faceNx: Float32Array, faceNy: Float32Array, faceNz: Float32Array,
+  origVa: number,
+  origVb: number,
+  vertProperties: Float32Array,
+  numProp: number,
+  triA: number,
+  triB: number,
+  faceNx: Float32Array,
+  faceNy: Float32Array,
+  faceNz: Float32Array,
   dot: number,
   boundary: boolean,
 ): EdgeSegment {
@@ -167,7 +182,9 @@ function buildEdgeSegment(
   const ey = vertProperties[origVb * numProp + 1];
   const ez = vertProperties[origVb * numProp + 2];
 
-  const dx = ex - sx, dy = ey - sy, dz = ez - sz;
+  const dx = ex - sx,
+    dy = ey - sy,
+    dz = ez - sz;
   const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
   const invLen = length > 1e-12 ? 1 / length : 0;
 
@@ -177,7 +194,7 @@ function buildEdgeSegment(
   // Dihedral angle: angle between face normals.
   // dot = cos(angle between normals). Dihedral = 180° - that angle for outward normals.
   const clampedDot = Math.max(-1, Math.min(1, dot));
-  const dihedralAngle = boundary ? 0 : (180 - Math.acos(clampedDot) * (180 / Math.PI));
+  const dihedralAngle = boundary ? 0 : 180 - Math.acos(clampedDot) * (180 / Math.PI);
 
   // Convexity: the edge is convex if the cross product of the edge direction
   // with the sum of face normals points "outward" relative to the normals.
@@ -206,11 +223,7 @@ function buildEdgeSegment(
   };
 }
 
-function buildCanonicalMap(
-  numVerts: number,
-  mergeFromVert: Uint32Array | undefined,
-  mergeToVert: Uint32Array | undefined,
-): Uint32Array {
+function buildCanonicalMap(numVerts: number, mergeFromVert: Uint32Array | undefined, mergeToVert: Uint32Array | undefined): Uint32Array {
   const canon = new Uint32Array(numVerts);
   for (let i = 0; i < numVerts; i++) canon[i] = i;
 

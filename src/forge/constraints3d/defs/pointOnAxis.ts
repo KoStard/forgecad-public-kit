@@ -7,8 +7,8 @@
  * (cross product is zero when point is on the line)
  */
 
-import type { Constraint3DDef, Constraint3D, Solver3DContext } from '../types';
 import { cross3, sub3 } from '../rodrigues';
+import type { Constraint3D, Constraint3DDef, Solver3DContext } from '../types';
 
 export const pointOnAxisDef: Constraint3DDef<'pointOnAxis'> = {
   type: 'pointOnAxis',

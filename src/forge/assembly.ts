@@ -1,26 +1,26 @@
-import { Shape, union, getShapeRuntimeBackend } from './kernel';
 import { isManifoldCapableBackend, requireManifoldShapeBackend } from './backends/manifold/shapeBackend';
-import { ShapeGroup, group } from './group';
-import { TrackedShape } from './sketch/topology';
-import { Transform, composeChain, normalizeAxis, type TransformInput, type Vec3, type Mat4 } from './transform';
-import type { RigidBody, Constraint3D, Solve3DResult, Solver3DContext } from './constraints3d/types';
 import { bodyFromTrackedShape, MateBuilder } from './constraints3d/builder';
-import { solve3D, createContext } from './constraints3d/solver';
-import { rodrigues, normalize3, sub3 } from './constraints3d/rodrigues';
 import type { Mat3 } from './constraints3d/rodrigues';
-import { explodeView } from './explodeView';
+import { normalize3, rodrigues, sub3 } from './constraints3d/rodrigues';
+import { createContext, solve3D } from './constraints3d/solver';
+import type { Constraint3D, RigidBody, Solve3DResult, Solver3DContext } from './constraints3d/types';
 import type { ExplodeViewDirective } from './explodeView';
+import { explodeView } from './explodeView';
+import { group, ShapeGroup } from './group';
+import { getShapeRuntimeBackend, Shape, union } from './kernel';
 import {
-  type PlacementReferenceInput,
   applyPlacementReferenceInput,
   clonePlacementReferences,
   createPlacementReferences,
   hasPlacementReferences,
-  placementReferenceNames,
-  resolvePlacementReferencePoint,
+  type PlacementReferenceInput,
   type PlacementReferenceKind,
   type PlacementReferences,
+  placementReferenceNames,
+  resolvePlacementReferencePoint,
 } from './placement';
+import { TrackedShape } from './sketch/topology';
+import { composeChain, type Mat4, normalizeAxis, Transform, type TransformInput, type Vec3 } from './transform';
 
 export type AssemblyPart = Shape | TrackedShape | ShapeGroup;
 export type JointType = 'fixed' | 'revolute' | 'prismatic';
@@ -189,14 +189,16 @@ export function bomToCsv(rows: BomRow[]): string {
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
   const lines = [header.join(',')];
   for (const row of rows) {
-    lines.push([
-      esc(row.part),
-      String(row.qty),
-      esc(row.material ?? ''),
-      esc(row.process ?? ''),
-      esc(row.tolerance ?? ''),
-      esc(row.notes ?? ''),
-    ].join(','));
+    lines.push(
+      [
+        esc(row.part),
+        String(row.qty),
+        esc(row.material ?? ''),
+        esc(row.process ?? ''),
+        esc(row.tolerance ?? ''),
+        esc(row.notes ?? ''),
+      ].join(','),
+    );
   }
   return lines.join('\n');
 }
@@ -252,12 +254,7 @@ function solverTransformToTransform(position: Vec3, rotation: Vec3): Transform {
   const R: Mat3 = rodrigues(rotation);
   // Mat3 is row-major: R[0]=r00, R[1]=r01, R[2]=r02, R[3]=r10, ...
   // Mat4 is column-major: [col0, col1, col2, col3]
-  const mat: Mat4 = [
-    R[0], R[3], R[6], 0,
-    R[1], R[4], R[7], 0,
-    R[2], R[5], R[8], 0,
-    position[0], position[1], position[2], 1,
-  ];
+  const mat: Mat4 = [R[0], R[3], R[6], 0, R[1], R[4], R[7], 0, R[2], R[5], R[8], 0, position[0], position[1], position[2], 1];
   return Transform.from(mat);
 }
 
@@ -310,7 +307,7 @@ function buildMateRigidBodies(
     if (!tracked) {
       throw new Error(
         `Part "${id}" must be a TrackedShape (or ShapeGroup containing one) for mate constraints. ` +
-        'Use TrackedShape (from sketch().extrude() etc.) instead of plain Shape.',
+          'Use TrackedShape (from sketch().extrude() etc.) instead of plain Shape.',
       );
     }
 
@@ -364,10 +361,7 @@ function deriveExplodeHintsFromMates(
           const posA = result.transforms.get(c.refA.bodyId);
           const posB = result.transforms.get(c.refB.bodyId);
           if (posA && posB) {
-            const raw = sub3(
-              bodyA.grounded ? posB.position : posA.position,
-              bodyA.grounded ? posA.position : posB.position,
-            );
+            const raw = sub3(bodyA.grounded ? posB.position : posA.position, bodyA.grounded ? posA.position : posB.position);
             dir = normalize3(raw);
           }
           break;
@@ -442,11 +436,7 @@ export class SolvedAssembly {
     group?: Array<{ name: string; shape: Shape }>;
     metadata?: PartMetadata;
   }> {
-    const appendGroupChildren = (
-      grp: ShapeGroup,
-      prefix: string,
-      out: Array<{ name: string; shape: Shape }>,
-    ) => {
+    const appendGroupChildren = (grp: ShapeGroup, prefix: string, out: Array<{ name: string; shape: Shape }>) => {
       grp.children.forEach((child, index) => {
         const childName = grp.childName(index);
         const label = childName ? `${prefix}.${childName}` : `${prefix}.${index + 1}`;
@@ -507,7 +497,7 @@ export class SolvedAssembly {
   }
 
   collisionReport(options: CollisionOptions = {}): CollisionFinding[] {
-    const names = (options.parts ?? [...this.parts.keys()]).filter(name => this.parts.has(name));
+    const names = (options.parts ?? [...this.parts.keys()]).filter((name) => this.parts.has(name));
     const minOverlap = options.minOverlapVolume ?? 0.1;
     const ignore = new Set((options.ignorePairs ?? []).map(([a, b]) => [a, b].sort().join('|')));
     const findings: CollisionFinding[] = [];
@@ -611,13 +601,7 @@ export class Assembly {
     return this;
   }
 
-  addJoint(
-    name: string,
-    type: JointType,
-    parent: string,
-    child: string,
-    options: JointOptions = {},
-  ): Assembly {
+  addJoint(name: string, type: JointType, parent: string, child: string, options: JointOptions = {}): Assembly {
     if (this.joints.has(name)) throw new Error(`Joint "${name}" already exists`);
     if (!this.parts.has(parent)) throw new Error(`Unknown parent part "${parent}"`);
     if (!this.parts.has(child)) throw new Error(`Unknown child part "${child}"`);
@@ -628,7 +612,9 @@ export class Assembly {
     }
     const frame = options.origin
       ? Transform.translation(options.origin[0], options.origin[1], options.origin[2])
-      : options.frame ? Transform.from(options.frame) : Transform.identity();
+      : options.frame
+        ? Transform.from(options.frame)
+        : Transform.identity();
 
     const axis = normalizeAxis(options.axis ?? [0, 0, 1]);
     this.joints.set(name, {
@@ -713,11 +699,7 @@ export class Assembly {
     return this;
   }
 
-  addGearCoupling(
-    drivenJointName: string,
-    driverJointName: string,
-    options: GearCouplingOptions = {},
-  ): Assembly {
+  addGearCoupling(drivenJointName: string, driverJointName: string, options: GearCouplingOptions = {}): Assembly {
     if (!options || typeof options !== 'object') {
       throw new Error('addGearCoupling(...) expects an options object');
     }
@@ -743,15 +725,11 @@ export class Assembly {
     const usingTeeth = options.driverTeeth !== undefined || options.drivenTeeth !== undefined;
     const ratioSourcesUsed = Number(usingExplicitRatio) + Number(usingPairRatio) + Number(usingTeeth);
     if (ratioSourcesUsed !== 1) {
-      throw new Error(
-        `Gear coupling "${drivenJointName}" must provide exactly one ratio source: ratio, pair, or driverTeeth/drivenTeeth`,
-      );
+      throw new Error(`Gear coupling "${drivenJointName}" must provide exactly one ratio source: ratio, pair, or driverTeeth/drivenTeeth`);
     }
 
-    if ((options.mesh !== undefined) && !usingTeeth) {
-      throw new Error(
-        `Gear coupling "${drivenJointName}" mesh may only be set when using driverTeeth/drivenTeeth`,
-      );
+    if (options.mesh !== undefined && !usingTeeth) {
+      throw new Error(`Gear coupling "${drivenJointName}" mesh may only be set when using driverTeeth/drivenTeeth`);
     }
 
     let ratio: number;
@@ -790,7 +768,7 @@ export class Assembly {
     if (options.driverOrigin && options.drivenOrigin) {
       const dx = options.drivenOrigin[0] - options.driverOrigin[0];
       const dy = options.drivenOrigin[1] - options.driverOrigin[1];
-      const meshAngleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+      const meshAngleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
       const currentOffset = options.offset ?? 0;
       options = { ...options, offset: currentOffset + meshAngleDeg * (1 + ratio) };
     }
@@ -838,7 +816,7 @@ export class Assembly {
       jointsByParent.set(joint.parent, list);
     }
 
-    const roots = [...this.parts.keys()].filter(name => !incoming.has(name));
+    const roots = [...this.parts.keys()].filter((name) => !incoming.has(name));
     if (roots.length === 0 && this.parts.size > 0) {
       throw new Error('Assembly has no root part (cyclic joint graph)');
     }
@@ -859,8 +837,7 @@ export class Assembly {
 
         if (!result.converged) {
           warnings.push(
-            `Mate constraints did not fully converge (maxError=${result.maxError.toFixed(6)}). ` +
-            'Using best-found transforms.',
+            `Mate constraints did not fully converge (maxError=${result.maxError.toFixed(6)}). ` + 'Using best-found transforms.',
           );
         }
 
@@ -946,12 +923,7 @@ export class Assembly {
         const childBase = mateBaseOverrides.get(joint.child) ?? child.base;
         // Canonical frame composition order for Forge chain semantics:
         // local -> childBase -> jointMotion -> jointFrame -> parentWorld
-        const childWorld = composeChain(
-          childBase,
-          motionTransform(joint, value),
-          joint.frame,
-          worldTransform,
-        );
+        const childWorld = composeChain(childBase, motionTransform(joint, value), joint.frame, worldTransform);
         dfs(joint.child, childWorld);
       }
       visiting.delete(partName);
@@ -964,7 +936,7 @@ export class Assembly {
     }
 
     if (visited.size !== this.parts.size) {
-      const missing = [...this.parts.keys()].filter(name => !visited.has(name));
+      const missing = [...this.parts.keys()].filter((name) => !visited.has(name));
       throw new Error(`Assembly graph unresolved for parts: ${missing.join(', ')}`);
     }
 
@@ -1113,9 +1085,7 @@ export class ImportedAssembly {
       // Convert internal refs back to input format for ShapeGroup.withReferences().
       // Only point refs are stored on ImportedAssembly; they are already translated.
       const refsInput: PlacementReferenceInput = {
-        points: Object.fromEntries(
-          Object.entries(this._refs.points).map(([k, v]) => [k, [...v] as [number, number, number]]),
-        ),
+        points: Object.fromEntries(Object.entries(this._refs.points).map(([k, v]) => [k, [...v] as [number, number, number]])),
       };
       result = result.withReferences(refsInput);
     }
@@ -1142,11 +1112,7 @@ export class ImportedAssembly {
    * Returns a new ImportedAssembly — does not mutate.
    * All point refs are translated by the same delta.
    */
-  placeReference(
-    ref: string,
-    target: [number, number, number],
-    offset?: [number, number, number],
-  ): ImportedAssembly {
+  placeReference(ref: string, target: [number, number, number], offset?: [number, number, number]): ImportedAssembly {
     const sourcePoint = resolvePlacementReferencePoint(this._refs, ref);
     if (!sourcePoint) {
       const available = this.referenceNames().join(', ') || 'none';
@@ -1161,11 +1127,7 @@ export class ImportedAssembly {
       newPointRefs[name] = [pt[0] + dx, pt[1] + dy, pt[2] + dz];
     }
     const newRefs = applyPlacementReferenceInput(createPlacementReferences(), { points: newPointRefs });
-    const newOffset: [number, number, number] = [
-      this._offset[0] + dx,
-      this._offset[1] + dy,
-      this._offset[2] + dz,
-    ];
+    const newOffset: [number, number, number] = [this._offset[0] + dx, this._offset[1] + dy, this._offset[2] + dz];
     return new ImportedAssembly(this._assembly, newRefs, newOffset);
   }
 
@@ -1187,18 +1149,16 @@ export class ImportedAssembly {
     const pfx = options.prefix ? `${options.prefix}.` : '';
 
     // Identify the single root part (no incoming joint).
-    const childSet = new Set(def.joints.map(j => j.child));
-    const roots = def.parts.filter(p => !childSet.has(p.name));
+    const childSet = new Set(def.joints.map((j) => j.child));
+    const roots = def.parts.filter((p) => !childSet.has(p.name));
     if (roots.length === 0) {
-      throw new Error(
-        `Cannot mergeInto(): sub-assembly "${def.name}" has no root part (cyclic joint graph)`,
-      );
+      throw new Error(`Cannot mergeInto(): sub-assembly "${def.name}" has no root part (cyclic joint graph)`);
     }
     if (roots.length > 1) {
       throw new Error(
         `Cannot mergeInto(): sub-assembly "${def.name}" has multiple root parts ` +
-        `(${roots.map(r => `"${r.name}"`).join(', ')}). ` +
-        'Connect them with addFixed() before merging.',
+          `(${roots.map((r) => `"${r.name}"`).join(', ')}). ` +
+          'Connect them with addFixed() before merging.',
       );
     }
     const root = roots[0];
@@ -1213,30 +1173,24 @@ export class ImportedAssembly {
 
     // Add all joints with prefixed names and prefixed parent/child references.
     for (const j of def.joints) {
-      parent.addJoint(
-        `${pfx}${j.name}`,
-        j.type,
-        `${pfx}${j.parent}`,
-        `${pfx}${j.child}`,
-        {
-          frame: j.frame,
-          axis: [...j.axis] as Vec3,
-          min: j.min,
-          max: j.max,
-          default: j.defaultValue,
-          unit: j.unit,
-          effort: j.effort,
-          velocity: j.velocity,
-          damping: j.damping,
-          friction: j.friction,
-        },
-      );
+      parent.addJoint(`${pfx}${j.name}`, j.type, `${pfx}${j.parent}`, `${pfx}${j.child}`, {
+        frame: j.frame,
+        axis: [...j.axis] as Vec3,
+        min: j.min,
+        max: j.max,
+        default: j.defaultValue,
+        unit: j.unit,
+        effort: j.effort,
+        velocity: j.velocity,
+        damping: j.damping,
+        friction: j.friction,
+      });
     }
 
     // Add all joint couplings with prefixed joint references.
     for (const c of def.jointCouplings) {
       parent.addJointCoupling(`${pfx}${c.joint}`, {
-        terms: c.terms.map(t => ({ joint: `${pfx}${t.joint}`, ratio: t.ratio })),
+        terms: c.terms.map((t) => ({ joint: `${pfx}${t.joint}`, ratio: t.ratio })),
         offset: c.offset,
       });
     }

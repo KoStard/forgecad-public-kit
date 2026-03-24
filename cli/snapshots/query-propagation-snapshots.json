@@ -15,9 +15,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "trimByPlane"
-        ],
+        "propagationOps": ["trimByPlane"],
         "propagations": [
           {
             "rewriteId": "shape-query-trimbyplane-2",
@@ -99,9 +97,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "trimByPlane"
-        ],
+        "propagationOps": ["trimByPlane"],
         "propagations": [
           {
             "rewriteId": "shape-query-splitbyplane-positive-3",
@@ -183,9 +179,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "trimByPlane"
-        ],
+        "propagationOps": ["trimByPlane"],
         "propagations": [
           {
             "rewriteId": "shape-query-splitbyplane-opposite-4",
@@ -273,12 +267,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "cut",
-          "cut",
-          "hole",
-          "hole"
-        ],
+        "propagationOps": ["cut", "cut", "hole", "hole"],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-5",
@@ -711,11 +700,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "cut",
-          "hole",
-          "cut"
-        ],
+        "propagationOps": ["cut", "hole", "cut"],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-4",
@@ -1161,14 +1146,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "boolean:difference",
-          "cut",
-          "hole",
-          "fillet",
-          "boolean:union",
-          "fillet"
-        ],
+        "propagationOps": ["boolean:difference", "cut", "hole", "fillet", "boolean:union", "fillet"],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-difference-9",
@@ -1636,12 +1614,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "hole",
-          "chamfer",
-          "boolean:union",
-          "chamfer"
-        ],
+        "propagationOps": ["hole", "chamfer", "boolean:union", "chamfer"],
         "propagations": [
           {
             "rewriteId": "shape-query-hole-6",
@@ -1883,14 +1856,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "boolean:difference",
-          "boolean:difference",
-          "boolean:union",
-          "shell",
-          "boolean:union",
-          "boolean:union"
-        ],
+        "propagationOps": ["boolean:difference", "boolean:difference", "boolean:union", "shell", "boolean:union", "boolean:union"],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-difference-12",
@@ -3146,15 +3112,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "boolean:difference",
-          "cut",
-          "hole",
-          "chamfer",
-          "boolean:union",
-          "fillet",
-          "boolean:union"
-        ],
+        "propagationOps": ["boolean:difference", "cut", "hole", "chamfer", "boolean:union", "fillet", "boolean:union"],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-difference-11",
@@ -3731,13 +3689,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "cut",
-          "hole",
-          "hole",
-          "hole",
-          "hole"
-        ],
+        "propagationOps": ["cut", "hole", "hole", "hole", "hole"],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-6",
@@ -4434,16 +4386,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "boolean:union",
-          "cut",
-          "hole",
-          "hole",
-          "hole",
-          "hole",
-          "boolean:union",
-          "boolean:union"
-        ],
+        "propagationOps": ["boolean:union", "cut", "hole", "hole", "hole", "hole", "boolean:union", "boolean:union"],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-union-14",
@@ -5389,14 +5332,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "cut",
-          "cut",
-          "cut",
-          "cut",
-          "cut",
-          "cut"
-        ],
+        "propagationOps": ["cut", "cut", "cut", "cut", "cut", "cut"],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-7",
@@ -6282,14 +6218,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "cut",
-          "cut",
-          "cut",
-          "cut",
-          "cut",
-          "cut"
-        ],
+        "propagationOps": ["cut", "cut", "cut", "cut", "cut", "cut"],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-14",
@@ -7181,13 +7110,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "boolean:union",
-          "trimByPlane",
-          "cut",
-          "hole",
-          "boolean:union"
-        ],
+        "propagationOps": ["boolean:union", "trimByPlane", "cut", "hole", "boolean:union"],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-union-8",

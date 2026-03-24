@@ -154,11 +154,7 @@ function requireVec3(value: unknown, label: string): [number, number, number] {
   if (!Array.isArray(value) || value.length !== 3) {
     throw new Error(`${label} must be [x, y, z]`);
   }
-  return [
-    requireFinite(value[0], `${label}[0]`),
-    requireFinite(value[1], `${label}[1]`),
-    requireFinite(value[2], `${label}[2]`),
-  ];
+  return [requireFinite(value[0], `${label}[0]`), requireFinite(value[1], `${label}[1]`), requireFinite(value[2], `${label}[2]`)];
 }
 
 function requireColor(value: unknown, label: string): string {
@@ -171,8 +167,17 @@ function requireColor(value: unknown, label: string): string {
 const VALID_LIGHT_TYPES = new Set<SceneLightType>(['ambient', 'directional', 'point', 'spot', 'hemisphere']);
 
 const VALID_ENVIRONMENT_PRESETS = new Set([
-  'studio', 'sunset', 'dawn', 'warehouse', 'forest',
-  'apartment', 'lobby', 'city', 'park', 'night', 'none',
+  'studio',
+  'sunset',
+  'dawn',
+  'warehouse',
+  'forest',
+  'apartment',
+  'lobby',
+  'city',
+  'park',
+  'night',
+  'none',
 ]);
 
 // ---------------------------------------------------------------------------

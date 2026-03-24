@@ -9,24 +9,56 @@
  */
 
 import { Shape } from '../kernel';
-import { polygon } from './primitives';
-import { sketchExtrude } from './extrude';
 import { Rectangle2D } from './entities';
+import { sketchExtrude } from './extrude';
+import { polygon } from './primitives';
 import { type EdgeRef } from './topology';
 
 type Vec3 = [number, number, number];
-type Mat16 = [number,number,number,number,number,number,number,number,number,number,number,number,number,number,number,number];
+type Mat16 = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
 
-function sub(a: Vec3, b: Vec3): Vec3 { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
-function add(a: Vec3, b: Vec3): Vec3 { return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; }
-function scale(v: Vec3, s: number): Vec3 { return [v[0]*s, v[1]*s, v[2]*s]; }
-function dot(a: Vec3, b: Vec3): number { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
-function cross(a: Vec3, b: Vec3): Vec3 {
-  return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+function sub(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 }
-function len(v: Vec3): number { return Math.sqrt(dot(v, v)); }
-function normalize(v: Vec3): Vec3 { const l = len(v) || 1; return [v[0]/l, v[1]/l, v[2]/l]; }
-function midpoint(a: Vec3, b: Vec3): Vec3 { return [(a[0]+b[0]) / 2, (a[1]+b[1]) / 2, (a[2]+b[2]) / 2]; }
+function add(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+function scale(v: Vec3, s: number): Vec3 {
+  return [v[0] * s, v[1] * s, v[2] * s];
+}
+function dot(a: Vec3, b: Vec3): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+function cross(a: Vec3, b: Vec3): Vec3 {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+function len(v: Vec3): number {
+  return Math.sqrt(dot(v, v));
+}
+function normalize(v: Vec3): Vec3 {
+  const l = len(v) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+}
+function midpoint(a: Vec3, b: Vec3): Vec3 {
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+}
 
 export interface RectAreaRef {
   /** Rectangle corners in order: bottom-left, bottom-right, top-right, top-left */
@@ -64,11 +96,7 @@ function edgeDir(edge: EdgeRef): Vec3 {
   return normalize(sub(edge.end, edge.start));
 }
 
-function arcBridgeBetweenParallelEdges(
-  edgeA: EdgeRef,
-  edgeB: EdgeRef,
-  segments: number,
-): Shape {
+function arcBridgeBetweenParallelEdges(edgeA: EdgeRef, edgeB: EdgeRef, segments: number): Shape {
   const dirA = edgeDir(edgeA);
   const dirB = edgeDir(edgeB);
   const parallel = Math.abs(dot(dirA, dirB)) > 0.999;
@@ -98,11 +126,7 @@ function arcBridgeBetweenParallelEdges(
   const chord = sub(anchorB, anchorA);
   // Remove any component along edge direction
   const alongEdge = dot(chord, dirA);
-  const perpChord: Vec3 = [
-    chord[0] - dirA[0] * alongEdge,
-    chord[1] - dirA[1] * alongEdge,
-    chord[2] - dirA[2] * alongEdge,
-  ];
+  const perpChord: Vec3 = [chord[0] - dirA[0] * alongEdge, chord[1] - dirA[1] * alongEdge, chord[2] - dirA[2] * alongEdge];
   const chordLen = len(perpChord);
   if (chordLen < 1e-6) throw new Error('Edges are coincident — no arc to build');
 
@@ -121,7 +145,7 @@ function arcBridgeBetweenParallelEdges(
   // Generate arc points in 2D (U-V plane), from A(0,0) to B(chordLen, 0) via semicircle
   const pts: [number, number][] = [];
   for (let i = 0; i <= segments; i++) {
-    const t = Math.PI * i / segments; // 0 to PI
+    const t = (Math.PI * i) / segments; // 0 to PI
     const u = arcCenter2D[0] - radius * Math.cos(t);
     const v = radius * Math.sin(t);
     pts.push([u, v]);
@@ -132,7 +156,7 @@ function arcBridgeBetweenParallelEdges(
   const thickness = Math.max(0.5, chordLen * 0.02);
   const innerPts: [number, number][] = [];
   for (let i = segments; i >= 0; i--) {
-    const t = Math.PI * i / segments;
+    const t = (Math.PI * i) / segments;
     const r2 = radius - thickness;
     const u = arcCenter2D[0] - r2 * Math.cos(t);
     const v = r2 * Math.sin(t);
@@ -149,12 +173,7 @@ function arcBridgeBetweenParallelEdges(
   const origin = anchorA;
 
   // Manifold transform() takes 4x4 column-major
-  const m: Mat16 = [
-    U[0], U[1], U[2], 0,
-    V[0], V[1], V[2], 0,
-    dirA[0], dirA[1], dirA[2], 0,
-    origin[0], origin[1], origin[2], 1,
-  ];
+  const m: Mat16 = [U[0], U[1], U[2], 0, V[0], V[1], V[2], 0, dirA[0], dirA[1], dirA[2], 0, origin[0], origin[1], origin[2], 1];
 
   return solid.transform(m);
 }
@@ -167,11 +186,7 @@ function arcBridgeBetweenParallelEdges(
  * @param segments - Number of arc segments (more = smoother)
  * @returns Shape — the arc surface as a thin solid
  */
-export function arcBridgeBetweenRects(
-  rectA: RectAreaArg,
-  rectB: RectAreaArg,
-  segments = 12,
-): Shape {
+export function arcBridgeBetweenRects(rectA: RectAreaArg, rectB: RectAreaArg, segments = 12): Shape {
   const a = rectAreaFrom(rectA);
   const b = rectAreaFrom(rectB);
   const edgesA = rectEdges(a, 'a');

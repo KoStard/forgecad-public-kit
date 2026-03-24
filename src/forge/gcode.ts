@@ -200,11 +200,7 @@ export class GCodeBuilder {
   extrudeTo(x: number, y: number, z: number): this {
     this.unretract();
     const from: [number, number, number] = [...this.pos];
-    const dist = Math.sqrt(
-      (x - this.pos[0]) ** 2 +
-      (y - this.pos[1]) ** 2 +
-      (z - this.pos[2]) ** 2,
-    );
+    const dist = Math.sqrt((x - this.pos[0]) ** 2 + (y - this.pos[1]) ** 2 + (z - this.pos[2]) ** 2);
 
     if (dist < 1e-6) return this; // skip zero-length moves
 
@@ -213,9 +209,7 @@ export class GCodeBuilder {
     const eIncrement = (beadArea * dist) / this.filamentArea;
     this.e += eIncrement;
 
-    this.lines.push(
-      `G1 X${f(x)} Y${f(y)} Z${f(z)} E${f(this.e)} F${Math.round(this.currentSpeed)}`,
-    );
+    this.lines.push(`G1 X${f(x)} Y${f(y)} Z${f(z)} E${f(this.e)} F${Math.round(this.currentSpeed)}`);
     if (this.posInitialized) {
       this._segments.push({ from, to: [x, y, z], extrude: true, speed: this.currentSpeed });
     }
@@ -305,11 +299,7 @@ export class GCodeBuilder {
     let totalTimeSeconds = 0;
     let totalExtrusionMm = 0;
     for (const seg of this._segments) {
-      const dist = Math.sqrt(
-        (seg.to[0] - seg.from[0]) ** 2 +
-        (seg.to[1] - seg.from[1]) ** 2 +
-        (seg.to[2] - seg.from[2]) ** 2,
-      );
+      const dist = Math.sqrt((seg.to[0] - seg.from[0]) ** 2 + (seg.to[1] - seg.from[1]) ** 2 + (seg.to[2] - seg.from[2]) ** 2);
       totalTimeSeconds += dist / (seg.speed / 60); // speed is mm/min, want seconds
       if (seg.extrude) totalExtrusionMm += dist;
     }

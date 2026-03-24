@@ -5,28 +5,22 @@ import {
   type ShapeCompilePlan,
   wrapShapeCompilePlanWithQueryOwner,
 } from './compilePlan';
+import { collectSupportedEdgeFinishPreservedSources, resolveSupportedEdgeFeatureSelection } from './edgeFeatureResolution';
 import {
-  Shape,
   buildShapeFromCompilePlan,
   getShapeCompilePlan,
   getShapeDimensions,
   getShapeGeometryInfo,
   getShapePlacementReferences,
   getShapeQueryOwners,
+  Shape,
   setShapeDimensions,
   setShapeGeometryInfo,
   setShapePlacementReferences,
 } from './kernel';
-import { shapeQueryOwnersEqual, type ShapeQueryOwner } from './queryModel';
-import {
-  attachTopologyRewritePropagation,
-  buildEdgeFeatureTopologyRewritePropagation,
-} from './queryPropagation';
-import {
-  collectSupportedEdgeFinishPreservedSources,
-  resolveSupportedEdgeFeatureSelection,
-} from './edgeFeatureResolution';
-import { TrackedShape, type EdgeRef } from './sketch/topology';
+import { type ShapeQueryOwner, shapeQueryOwnersEqual } from './queryModel';
+import { attachTopologyRewritePropagation, buildEdgeFeatureTopologyRewritePropagation } from './queryPropagation';
+import { type EdgeRef, TrackedShape } from './sketch/topology';
 
 type ShapeArg = Shape | TrackedShape;
 
@@ -34,10 +28,7 @@ function unwrapShape(value: ShapeArg): Shape {
   return value instanceof TrackedShape ? value.toShape() : value;
 }
 
-function normalizeQuadrant(
-  quadrant: [number, number] | undefined,
-  label: string,
-): [number, number] {
+function normalizeQuadrant(quadrant: [number, number] | undefined, label: string): [number, number] {
   const next = quadrant ?? [-1, -1];
   const x = Math.sign(next[0]);
   const y = Math.sign(next[1]);
@@ -54,9 +45,7 @@ function targetRetainsQueryOwner(target: Shape, owner: ShapeQueryOwner | undefin
 
 function requireCompatibleEdgeOwner(target: Shape, edge: EdgeRef, label: string): void {
   if (targetRetainsQueryOwner(target, edge.query?.owner)) return;
-  throw new Error(
-    `${label} requires an edge query owned by the target shape or one of its preserved query ancestors.`,
-  );
+  throw new Error(`${label} requires an edge query owned by the target shape or one of its preserved query ancestors.`);
 }
 
 function createOwnedTopologyRewritePlan(
@@ -70,7 +59,12 @@ function createOwnedTopologyRewritePlan(
   return wrapShapeCompilePlanWithQueryOwner(
     attachTopologyRewritePropagation(
       plan,
-      buildEdgeFeatureTopologyRewritePropagation(operation, owner, edgeQuery, preservedEdges.filter((query): query is NonNullable<typeof query> => query != null)),
+      buildEdgeFeatureTopologyRewritePropagation(
+        operation,
+        owner,
+        edgeQuery,
+        preservedEdges.filter((query): query is NonNullable<typeof query> => query != null),
+      ),
     ),
     owner,
   );
@@ -101,13 +95,7 @@ function buildEdgeFeatureResult(target: Shape, plan: ShapeCompilePlan | null, so
   return result;
 }
 
-export function filletEdge(
-  shape: ShapeArg,
-  edge: EdgeRef,
-  radius: number,
-  quadrant: [number, number] = [-1, -1],
-  segments = 16,
-): Shape {
+export function filletEdge(shape: ShapeArg, edge: EdgeRef, radius: number, quadrant: [number, number] = [-1, -1], segments = 16): Shape {
   if (!Number.isFinite(radius) || !(radius > 0)) {
     throw new Error('filletEdge() requires a positive finite radius.');
   }
@@ -129,10 +117,7 @@ export function filletEdge(
     throw new Error(`filletEdge(): ${selection.issue.reason}`);
   }
   const preservedEdges = collectSupportedEdgeFinishPreservedSources(basePlan, edge.query);
-  if (
-    selection.selection.quadrant[0] !== normalizedQuadrant[0]
-    || selection.selection.quadrant[1] !== normalizedQuadrant[1]
-  ) {
+  if (selection.selection.quadrant[0] !== normalizedQuadrant[0] || selection.selection.quadrant[1] !== normalizedQuadrant[1]) {
     throw new Error(
       `filletEdge() currently supports ${selection.selection.edgeName} only with quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
     );
@@ -147,12 +132,7 @@ export function filletEdge(
   return buildEdgeFeatureResult(target, plan, 'fillet');
 }
 
-export function chamferEdge(
-  shape: ShapeArg,
-  edge: EdgeRef,
-  size: number,
-  quadrant: [number, number] = [-1, -1],
-): Shape {
+export function chamferEdge(shape: ShapeArg, edge: EdgeRef, size: number, quadrant: [number, number] = [-1, -1]): Shape {
   if (!Number.isFinite(size) || !(size > 0)) {
     throw new Error('chamferEdge() requires a positive finite size.');
   }
@@ -171,10 +151,7 @@ export function chamferEdge(
     throw new Error(`chamferEdge(): ${selection.issue.reason}`);
   }
   const preservedEdges = collectSupportedEdgeFinishPreservedSources(basePlan, edge.query);
-  if (
-    selection.selection.quadrant[0] !== normalizedQuadrant[0]
-    || selection.selection.quadrant[1] !== normalizedQuadrant[1]
-  ) {
+  if (selection.selection.quadrant[0] !== normalizedQuadrant[0] || selection.selection.quadrant[1] !== normalizedQuadrant[1]) {
     throw new Error(
       `chamferEdge() currently supports ${selection.selection.edgeName} only with quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
     );

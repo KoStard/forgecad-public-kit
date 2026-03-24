@@ -44,7 +44,6 @@ export interface EdgeFeatureTarget {
   convex: boolean;
 }
 
-
 export interface ShapeBackend {
   readonly [SHAPE_BACKEND_MARKER]: true;
 

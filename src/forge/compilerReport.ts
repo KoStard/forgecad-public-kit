@@ -1,16 +1,16 @@
-import type { ShapeCompilePlan } from './compilePlan';
 import type { CadQueryShapePlan } from './cadqueryPlan';
+import type { ShapeCompilePlan } from './compilePlan';
+import { lowerShapeCompilePlanToCadQueryResult } from './compilePlanCadQuery';
 import {
+  type CompilerDiagnostic,
+  type CompilerTarget,
   compilerDiagnostic,
   describeCompilerTarget,
   primaryCompilerDiagnosticMessage,
-  type CompilerDiagnostic,
-  type CompilerTarget,
 } from './compilerDiagnostics';
-import { lowerShapeCompilePlanToCadQueryResult } from './compilePlanCadQuery';
-import { collectShapeTopologyRewritePropagations } from './queryPropagation';
-import { getShapeCompilePlan, type GeometryInfo, type Shape } from './kernel';
+import { type GeometryInfo, getShapeCompilePlan, type Shape } from './kernel';
 import type { TopologyRewritePropagation } from './queryModel';
+import { collectShapeTopologyRewritePropagations } from './queryPropagation';
 
 export interface CompilerTargetReport<T> {
   target: CompilerTarget;
@@ -27,10 +27,7 @@ export interface ShapeCompilerReport {
   facetedMesh: CompilerTargetReport<null>;
 }
 
-function unsupportedTargetReport<T>(
-  target: CompilerTarget,
-  diagnostics: CompilerDiagnostic[],
-): CompilerTargetReport<T> {
+function unsupportedTargetReport<T>(target: CompilerTarget, diagnostics: CompilerDiagnostic[]): CompilerTargetReport<T> {
   return {
     target,
     supported: false,
@@ -38,11 +35,7 @@ function unsupportedTargetReport<T>(
   };
 }
 
-function supportedTargetReport<T>(
-  target: CompilerTarget,
-  output: T,
-  diagnostics: CompilerDiagnostic[] = [],
-): CompilerTargetReport<T> {
+function supportedTargetReport<T>(target: CompilerTarget, output: T, diagnostics: CompilerDiagnostic[] = []): CompilerTargetReport<T> {
   return {
     target,
     supported: true,
@@ -69,10 +62,7 @@ function nonMeshFacetedFallbackDiagnostic(geometryInfo: GeometryInfo): CompilerD
   );
 }
 
-export function summarizeCompilerDiagnostics(
-  diagnostics: CompilerDiagnostic[],
-  fallback: string,
-): string {
+export function summarizeCompilerDiagnostics(diagnostics: CompilerDiagnostic[], fallback: string): string {
   return primaryCompilerDiagnosticMessage(diagnostics, fallback);
 }
 
@@ -89,9 +79,10 @@ export function buildShapeCompilerReport(shape: Shape): ShapeCompilerReport {
       : unsupportedTargetReport<CadQueryShapePlan>('cadquery-occt', lowered.diagnostics);
   })();
 
-  const facetedMesh = geometryInfo.representation === 'mesh-solid'
-    ? supportedTargetReport('faceted-mesh', null)
-    : unsupportedTargetReport<null>('faceted-mesh', [nonMeshFacetedFallbackDiagnostic(geometryInfo)]);
+  const facetedMesh =
+    geometryInfo.representation === 'mesh-solid'
+      ? supportedTargetReport('faceted-mesh', null)
+      : unsupportedTargetReport<null>('faceted-mesh', [nonMeshFacetedFallbackDiagnostic(geometryInfo)]);
 
   return {
     geometryInfo,

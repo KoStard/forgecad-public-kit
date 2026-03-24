@@ -73,15 +73,12 @@ export function param(
   const scopedLocal = scope?.localOverrides;
   const hasLocalOverride = !!(scopedLocal && hasOwn(scopedLocal, name));
 
-  const raw = (hasLocalOverride ? scopedLocal![name] : undefined)
-    ?? _overrides[scopedName]
-    ?? _overrides[name]
-    ?? defaultValue;
+  const raw = (hasLocalOverride ? scopedLocal![name] : undefined) ?? _overrides[scopedName] ?? _overrides[name] ?? defaultValue;
   const integer = opts.integer ?? false;
   const value = integer ? Math.round(raw) : raw;
   const min = opts.min ?? 0;
   const max = opts.max ?? defaultValue * 4;
-  const step = opts.step ?? (integer ? 1 : (max - min > 100 ? 1 : 0.1));
+  const step = opts.step ?? (integer ? 1 : max - min > 100 ? 1 : 0.1);
 
   if (!hasLocalOverride) {
     const def = integer ? Math.round(defaultValue) : defaultValue;
@@ -101,10 +98,7 @@ export function boolParam(name: string, defaultValue: boolean): boolean {
   const hasLocalOverride = !!(scopedLocal && hasOwn(scopedLocal, name));
 
   const numDefault = defaultValue ? 1 : 0;
-  const raw = (hasLocalOverride ? scopedLocal![name] : undefined)
-    ?? _overrides[scopedName]
-    ?? _overrides[name]
-    ?? numDefault;
+  const raw = (hasLocalOverride ? scopedLocal![name] : undefined) ?? _overrides[scopedName] ?? _overrides[name] ?? numDefault;
   const value = raw >= 0.5 ? 1 : 0;
 
   if (!hasLocalOverride) {

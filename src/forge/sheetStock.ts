@@ -62,12 +62,7 @@ function normalizeMaterial(material: string | undefined): string {
  * @param description human-readable piece name
  * @param opts optional material grouping key and quantity
  */
-export function sheetStock(
-  width: number,
-  height: number,
-  description: string,
-  opts?: SheetStockOpts,
-): void {
+export function sheetStock(width: number, height: number, description: string, opts?: SheetStockOpts): void {
   if (typeof width !== 'number' || !Number.isFinite(width) || width <= 0) {
     throw new Error('sheetStock(width, height, description): width must be a finite number > 0');
   }

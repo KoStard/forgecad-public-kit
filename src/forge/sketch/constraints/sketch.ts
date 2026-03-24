@@ -9,18 +9,8 @@ import { polygon, circle2d } from '../primitives';
 import { union2d } from '../booleans';
 import { createEmptyProfile } from '../../profileOps';
 import type { ProfileCompilePlan } from '../../compilePlan';
-import type {
-  ConstraintDefinition,
-  SketchConstraintMeta,
-  SketchPoint,
-  SolveOptions,
-} from './types';
-import {
-  DEFAULT_TOLERANCE,
-  buildConstraintDisplays,
-  solveConstraints,
-  setConstraintValue,
-} from './registry';
+import type { ConstraintDefinition, SketchConstraintMeta, SolveOptions } from './types';
+import { DEFAULT_TOLERANCE, buildConstraintDisplays, solveConstraints, setConstraintValue } from './registry';
 import { computeFacesFromSegments, pointInPolygon } from '../arrangement-core';
 import type { SurfaceDisplay } from './types';
 
@@ -32,13 +22,15 @@ import type { SurfaceDisplay } from './types';
  * The start point itself is NOT included; the caller must prepend it.
  */
 const tessellateArc = (
-  cx: number, cy: number, radius: number,
-  startAngle: number, endAngle: number,
-  clockwise: boolean, segments: number,
+  cx: number,
+  cy: number,
+  radius: number,
+  startAngle: number,
+  endAngle: number,
+  clockwise: boolean,
+  segments: number,
 ): [number, number][] => {
-  let sweep = clockwise
-    ? (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI)
-    : (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI);
+  let sweep = clockwise ? (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI) : (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI);
   if (sweep < 1e-9) sweep = 2 * Math.PI; // full circle fallback
   const dir = clockwise ? -1 : 1;
   const pts: [number, number][] = [];
@@ -59,10 +51,14 @@ const BEZIER_SEGMENTS = 32;
  * Uses de Casteljau evaluation. Returns `segments` points (excluding start point).
  */
 const tessellateBezier = (
-  p0x: number, p0y: number,
-  p1x: number, p1y: number,
-  p2x: number, p2y: number,
-  p3x: number, p3y: number,
+  p0x: number,
+  p0y: number,
+  p1x: number,
+  p1y: number,
+  p2x: number,
+  p2y: number,
+  p3x: number,
+  p3y: number,
   segments: number,
 ): [number, number][] => {
   const pts: [number, number][] = [];
@@ -95,8 +91,8 @@ export const cloneDefinition = (def: ConstraintDefinition): ConstraintDefinition
     if (loop.type === 'circle') return { type: 'circle', circle: loop.circle };
     return { type: 'profile', segments: loop.segments.map((s) => ({ ...s })) };
   }),
-  constraints: def.constraints.map((c) => ({ ...c } as typeof c)),
-  rejectedConstraints: def.rejectedConstraints.map((c) => ({ ...c } as typeof c)),
+  constraints: def.constraints.map((c) => ({ ...c }) as typeof c),
+  rejectedConstraints: def.rejectedConstraints.map((c) => ({ ...c }) as typeof c),
   rejectionReasons: def.rejectionReasons ? new Map(def.rejectionReasons) : undefined,
 });
 
@@ -174,9 +170,7 @@ export const buildSketchFromDefinition = (def: ConstraintDefinition): Sketch => 
   return union2d(...loops);
 };
 
-export const buildConstructionGeometry = (
-  def: ConstraintDefinition,
-): SketchConstraintMeta['construction'] => {
+export const buildConstructionGeometry = (def: ConstraintDefinition): SketchConstraintMeta['construction'] => {
   const pointMap = new Map(def.points.map((p) => [p.id, p] as const));
   const lines = def.lines
     .filter((line) => line.construction)
@@ -296,7 +290,10 @@ const buildSurfaceDisplays = (def: ConstraintDefinition): SurfaceDisplay[] => {
       let area = 0;
       let cx = 0;
       let cy = 0;
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
       for (let j = 0; j < pts.length; j++) {
         const [x1, y1] = pts[j];
         const [x2, y2] = pts[(j + 1) % pts.length];
@@ -311,8 +308,8 @@ const buildSurfaceDisplays = (def: ConstraintDefinition): SurfaceDisplay[] => {
       }
       area *= 0.5;
       if (Math.abs(area) < 1e-9) return null;
-      cx /= (6 * area);
-      cy /= (6 * area);
+      cx /= 6 * area;
+      cy /= 6 * area;
       return {
         area: Math.abs(area),
         centroid: [cx, cy] as [number, number],
@@ -321,7 +318,7 @@ const buildSurfaceDisplays = (def: ConstraintDefinition): SurfaceDisplay[] => {
       };
     })
     .filter((s): s is NonNullable<typeof s> => s !== null)
-    .filter((s) => s.area >= 0.1);  // Skip degenerate near-zero-area faces
+    .filter((s) => s.area >= 0.1); // Skip degenerate near-zero-area faces
 
   // Sort by area descending
   rawSurfaces.sort((a, b) => b.area - a.area);
@@ -329,45 +326,45 @@ const buildSurfaceDisplays = (def: ConstraintDefinition): SurfaceDisplay[] => {
   // Second pass: compute unique seed points.
   // A seed must be inside its own polygon but NOT inside any smaller polygon.
   // This handles frame/ring regions where the centroid falls inside a nested region.
-  return rawSurfaces.map((s, i) => {
-    const otherPolygons = rawSurfaces.filter((_, j) => j !== i).map((o) => o.polygon);
-    const isUniqueInside = (p: [number, number]) =>
-      pointInPolygon(p, s.polygon) && !otherPolygons.some((op) => pointInPolygon(p, op));
+  return rawSurfaces
+    .map((s, i) => {
+      const otherPolygons = rawSurfaces.filter((_, j) => j !== i).map((o) => o.polygon);
+      const isUniqueInside = (p: [number, number]) => pointInPolygon(p, s.polygon) && !otherPolygons.some((op) => pointInPolygon(p, op));
 
-    // Try centroid first
-    let seed: [number, number] = s.centroid;
-    if (!isUniqueInside(seed)) {
-      // Try edge midpoints nudged slightly inward (right-hand perpendicular for CCW polygon)
-      for (let j = 0; j < s.polygon.length; j++) {
-        const [x1, y1] = s.polygon[j];
-        const [x2, y2] = s.polygon[(j + 1) % s.polygon.length];
-        const mx = (x1 + x2) / 2;
-        const my = (y1 + y2) / 2;
-        // Left-hand perpendicular (inward for CCW winding)
-        const edx = x2 - x1;
-        const edy = y2 - y1;
-        const eLen = Math.sqrt(edx * edx + edy * edy) || 1;
-        // Inward normal for CCW: rotate edge direction 90° CCW → (-dy, dx) normalized
-        const nudge = Math.min(1.0, eLen * 0.01);
-        const candidate: [number, number] = [mx - (edy / eLen) * nudge, my + (edx / eLen) * nudge];
-        if (isUniqueInside(candidate)) {
-          seed = candidate;
-          break;
+      // Try centroid first
+      let seed: [number, number] = s.centroid;
+      if (!isUniqueInside(seed)) {
+        // Try edge midpoints nudged slightly inward (right-hand perpendicular for CCW polygon)
+        for (let j = 0; j < s.polygon.length; j++) {
+          const [x1, y1] = s.polygon[j];
+          const [x2, y2] = s.polygon[(j + 1) % s.polygon.length];
+          const mx = (x1 + x2) / 2;
+          const my = (y1 + y2) / 2;
+          // Left-hand perpendicular (inward for CCW winding)
+          const edx = x2 - x1;
+          const edy = y2 - y1;
+          const eLen = Math.sqrt(edx * edx + edy * edy) || 1;
+          // Inward normal for CCW: rotate edge direction 90° CCW → (-dy, dx) normalized
+          const nudge = Math.min(1.0, eLen * 0.01);
+          const candidate: [number, number] = [mx - (edy / eLen) * nudge, my + (edx / eLen) * nudge];
+          if (isUniqueInside(candidate)) {
+            seed = candidate;
+            break;
+          }
         }
       }
-    }
-    return {
-      index: i,
-      area: s.area,
-      centroid: s.centroid,
-      bounds: s.bounds,
-      seed,
-      polygon: s.polygon,
-    };
+      return {
+        index: i,
+        area: s.area,
+        centroid: s.centroid,
+        bounds: s.bounds,
+        seed,
+        polygon: s.polygon,
+      };
     })
     .filter((s): s is SurfaceDisplay => s !== null)
     .sort((a, b) => b.area - a.area)
-    .map((s, i) => ({ ...s, index: i }));  // re-index after sort
+    .map((s, i) => ({ ...s, index: i })); // re-index after sort
 };
 
 // ─── ConstraintSketch ─────────────────────────────────────────────────────────
@@ -385,13 +382,17 @@ export class ConstraintSketch extends Sketch {
    * Enumerate all bounded regions formed by the line arrangement of this sketch.
    * Construction lines are excluded. Regions are returned largest-first by area.
    */
-  detectArrangement(): Sketch[] { throw new Error('Not implemented'); }
+  detectArrangement(): Sketch[] {
+    throw new Error('Not implemented');
+  }
 
   /**
    * Select the single arrangement region that contains the given seed point.
    * Throws if no region contains the seed.
    */
-  detectArrangementRegion(seed: [number, number]): Sketch { throw new Error('Not implemented'); }
+  detectArrangementRegion(_seed: [number, number]): Sketch {
+    throw new Error('Not implemented');
+  }
 
   withUpdatedConstraint(constraintId: string, value: number): ConstraintSketch {
     const next = cloneDefinition(this.definition);
@@ -483,18 +484,14 @@ export class ConstraintSketch extends Sketch {
   }
 }
 
-export const isConstraintSketch = (sketch: Sketch | null | undefined): sketch is ConstraintSketch =>
-  sketch instanceof ConstraintSketch;
+export const isConstraintSketch = (sketch: Sketch | null | undefined): sketch is ConstraintSketch => sketch instanceof ConstraintSketch;
 
 // ─── solveConstraintDefinition ────────────────────────────────────────────────
 
 /** Solve timing breakdown — populated by solveConstraintDefinition when profiling is enabled. */
 export let lastSolveProfile: Record<string, number> | null = null;
 
-export const solveConstraintDefinition = (
-  def: ConstraintDefinition,
-  options: SolveOptions = {},
-): ConstraintSketch => {
+export const solveConstraintDefinition = (def: ConstraintDefinition, options: SolveOptions = {}): ConstraintSketch => {
   const t0 = performance.now();
   const working = cloneDefinition(def);
 
@@ -507,9 +504,7 @@ export const solveConstraintDefinition = (
   const dof = metadata?.dof ?? 0;
   const conflicts = new Set<string>(metadata?.conflictingConstraintIds ?? []);
   const redundant = new Set<string>(metadata?.redundantConstraintIds ?? []);
-  const residualById = new Map(
-    (metadata?.constraintResiduals ?? []).map((entry) => [entry.id, entry.residual] as const),
-  );
+  const residualById = new Map((metadata?.constraintResiduals ?? []).map((entry) => [entry.id, entry.residual] as const));
   const t4 = performance.now();
 
   const constraints = buildConstraintDisplays(working, conflicts, redundant, undefined, residualById);
@@ -546,11 +541,7 @@ export const solveConstraintDefinition = (
   );
 };
 
-export const updateConstraintValue = (
-  sketch: ConstraintSketch,
-  constraintId: string,
-  value: number,
-): ConstraintSketch => {
+export const updateConstraintValue = (sketch: ConstraintSketch, constraintId: string, value: number): ConstraintSketch => {
   const next = cloneDefinition(sketch.definition);
   const target = next.constraints.find((c) => c.id === constraintId);
   if (!target) return sketch;

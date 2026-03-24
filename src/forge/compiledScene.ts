@@ -1,6 +1,6 @@
 import type { CadQueryShapePlan } from './cadqueryPlan';
 import type { CompilerDiagnostic } from './compilerDiagnostics';
-import { buildShapeCompilerReport, summarizeCompilerDiagnostics, type ShapeCompilerReport } from './compilerReport';
+import { buildShapeCompilerReport, type ShapeCompilerReport, summarizeCompilerDiagnostics } from './compilerReport';
 import type { GeometryInfo, Shape } from './kernel';
 import type { SceneObject } from './runner';
 
@@ -57,10 +57,7 @@ export interface CompiledSceneEmptyObjectReport extends CompiledSceneObjectRepor
   geometryInfo?: GeometryInfo | null;
 }
 
-export type CompiledSceneObjectReport =
-  | CompiledSceneShapeObjectReport
-  | CompiledSceneSketchObjectReport
-  | CompiledSceneEmptyObjectReport;
+export type CompiledSceneObjectReport = CompiledSceneShapeObjectReport | CompiledSceneSketchObjectReport | CompiledSceneEmptyObjectReport;
 
 export interface CompiledSceneReport {
   objects: CompiledSceneObjectReport[];
@@ -110,10 +107,7 @@ function facetedUnsupportedReason(report: ShapeCompilerReport): string {
     report.cadqueryOcct.diagnostics,
     'No exact BREP export plan is available for this geometry.',
   );
-  const facetedReason = summarizeCompilerDiagnostics(
-    report.facetedMesh.diagnostics,
-    'Faceted fallback is unavailable for this geometry.',
-  );
+  const facetedReason = summarizeCompilerDiagnostics(report.facetedMesh.diagnostics, 'Faceted fallback is unavailable for this geometry.');
   return `Exact BREP lowering failed: ${exactReason} Faceted fallback unavailable: ${facetedReason}`;
 }
 
@@ -124,23 +118,20 @@ function buildShapeRoutes(report: ShapeCompilerReport): {
   const exact = report.cadqueryOcct.supported
     ? exactRoute(report)
     : unsupportedRoute(
-      summarizeCompilerDiagnostics(
+        summarizeCompilerDiagnostics(report.cadqueryOcct.diagnostics, 'No exact BREP export plan is available for this geometry.'),
         report.cadqueryOcct.diagnostics,
-        'No exact BREP export plan is available for this geometry.',
-      ),
-      report.cadqueryOcct.diagnostics,
-      report.geometryInfo,
-    );
+        report.geometryInfo,
+      );
 
   const faceted = report.cadqueryOcct.supported
     ? exactRoute(report)
     : report.facetedMesh.supported
       ? facetedRoute(report)
       : unsupportedRoute(
-        facetedUnsupportedReason(report),
-        [...report.cadqueryOcct.diagnostics, ...report.facetedMesh.diagnostics],
-        report.geometryInfo,
-      );
+          facetedUnsupportedReason(report),
+          [...report.cadqueryOcct.diagnostics, ...report.facetedMesh.diagnostics],
+          report.geometryInfo,
+        );
 
   return { exact, faceted };
 }

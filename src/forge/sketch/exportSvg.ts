@@ -1,6 +1,6 @@
-import type { Sketch } from './core';
 import { isConstraintSketch } from './constraints/sketch';
 import type { SketchConstraintMeta } from './constraints/types';
+import type { Sketch } from './core';
 
 export interface SketchSvgOptions {
   /** Stroke color. Default: "black" */
@@ -26,12 +26,7 @@ export interface SketchSvgOptions {
  * space. Coordinates are in sketch units (typically mm).
  */
 export function sketchToSvg(sketch: Sketch, options: SketchSvgOptions = {}): string {
-  const {
-    stroke = 'black',
-    strokeWidth = 0.5,
-    fill = 'none',
-    padding = 2,
-  } = options;
+  const { stroke = 'black', strokeWidth = 0.5, fill = 'none', padding = 2 } = options;
 
   // Constraint sketches: always use edge geometry to preserve all individual
   // lines (including internal/shared edges that toPolygons() would merge away).
@@ -58,7 +53,10 @@ function buildPolygonSvg(
   padding: number,
   pixelsPerUnit?: number,
 ): string {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   for (const loop of loops) {
     for (const [x, y] of loop) {
       if (x < minX) minX = x;
@@ -81,7 +79,12 @@ function buildPolygonSvg(
   }
 
   return wrapSvg(
-    minX, minY, maxX, maxY, padding, pixelsPerUnit,
+    minX,
+    minY,
+    maxX,
+    maxY,
+    padding,
+    pixelsPerUnit,
     `    <path d="${pathParts.join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="${fmt(strokeWidth)}" fill-rule="evenodd"/>`,
   );
 }
@@ -101,7 +104,10 @@ export function buildEdgeSvg(
   }
 
   // Compute bounding box from all edge geometry.
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
 
   const expand = (x: number, y: number) => {
     if (x < minX) minX = x;
@@ -144,8 +150,8 @@ export function buildEdgeSvg(
     const dy1 = a.start[1] - a.center[1];
     const dx2 = a.end[0] - a.center[0];
     const dy2 = a.end[1] - a.center[1];
-    let startAngle = Math.atan2(dy1, dx1);
-    let endAngle = Math.atan2(dy2, dx2);
+    const startAngle = Math.atan2(dy1, dx1);
+    const endAngle = Math.atan2(dy2, dx2);
 
     // Compute sweep angle.
     let sweep: number;
@@ -173,8 +179,12 @@ export function buildEdgeSvg(
 // ─── Shared SVG wrapper ───────────────────────────────────────────────────
 
 function wrapSvg(
-  minX: number, minY: number, maxX: number, maxY: number,
-  padding: number, pixelsPerUnit: number | undefined,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+  padding: number,
+  pixelsPerUnit: number | undefined,
   content: string,
 ): string {
   const vbX = minX - padding;

@@ -35,7 +35,8 @@ registerConstraint<'oppositeDirection', ConstraintTypeMap['oppositeDirection']>(
   displayPosition(c, { lines, points }) {
     const line = lines.get(c.a);
     if (!line) return [0, 0];
-    const a = points.get(line.a), b = points.get(line.b);
+    const a = points.get(line.a),
+      b = points.get(line.b);
     if (!a || !b) return [0, 0];
     return [(a.x + b.x) / 2, (a.y + b.y) / 2];
   },
@@ -45,7 +46,8 @@ registerConstraint<'oppositeDirection', ConstraintTypeMap['oppositeDirection']>(
     for (const lineId of [c.a, c.b]) {
       const line = lines.get(lineId);
       if (!line) continue;
-      const a = points.get(line.a), b = points.get(line.b);
+      const a = points.get(line.a),
+        b = points.get(line.b);
       if (!a || !b) continue;
       const rotation = Math.atan2(b.y - a.y, b.x - a.x);
       annotations.push({

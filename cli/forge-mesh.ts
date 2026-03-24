@@ -1,13 +1,8 @@
 #!/usr/bin/env node
 import { writeFileSync } from 'fs';
-import { resolve, extname } from 'path';
-import {
-  runScript,
-  build3mfBuffer,
-  buildBinaryStl,
-  type MeshExportObject,
-} from '../src/forge/headless';
-import { initKernel, setActiveBackend, type ActiveBackend } from '../src/forge/kernel';
+import { extname, resolve } from 'path';
+import { build3mfBuffer, buildBinaryStl, type MeshExportObject, runScript } from '../src/forge/headless';
+import { type ActiveBackend, initKernel, setActiveBackend } from '../src/forge/kernel';
 import { collectProjectFiles } from './collect-files';
 
 type MeshFormat = '3mf' | 'stl';
@@ -59,7 +54,9 @@ function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (!scriptPath) {
-    throw new Error('Usage: forgecad export <3mf|stl> <script.forge.js> [--output path] [--quality default|live|high] [--backend manifold|occt]');
+    throw new Error(
+      'Usage: forgecad export <3mf|stl> <script.forge.js> [--output path] [--quality default|live|high] [--backend manifold|occt]',
+    );
   }
 
   return { scriptPath, outputPath, quality, backend };
@@ -83,10 +80,7 @@ function extractMeshObjects(result: ReturnType<typeof runScript>): MeshExportObj
     }));
 }
 
-export async function runMeshExportCli(
-  format: MeshFormat,
-  argv: string[],
-): Promise<void> {
+export async function runMeshExportCli(format: MeshFormat, argv: string[]): Promise<void> {
   const { scriptPath, outputPath, quality, backend } = parseArgs(argv);
   const code = (await import('fs')).readFileSync(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName, readBinaryFile } = collectProjectFiles(scriptPath);

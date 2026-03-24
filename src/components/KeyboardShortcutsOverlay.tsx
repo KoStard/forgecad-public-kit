@@ -101,14 +101,16 @@ export function KeyboardShortcutsOverlay() {
         }}
       >
         {/* Header */}
-        <div style={{
-          padding: '14px 18px',
-          borderBottom: '1px solid var(--fc-border)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexShrink: 0,
-        }}>
+        <div
+          style={{
+            padding: '14px 18px',
+            borderBottom: '1px solid var(--fc-border)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexShrink: 0,
+          }}
+        >
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--fc-text)' }}>Keyboard Shortcuts</span>
           <button
             onClick={close}
@@ -131,14 +133,16 @@ export function KeyboardShortcutsOverlay() {
         <div style={{ overflowY: 'auto', flex: 1, padding: '12px 18px 18px' }}>
           {sections.map((section) => (
             <div key={section.title} style={{ marginBottom: 20 }}>
-              <div style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: 'var(--fc-textDim)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                marginBottom: 6,
-              }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: 'var(--fc-textDim)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  marginBottom: 6,
+                }}
+              >
                 {section.title}
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -146,23 +150,23 @@ export function KeyboardShortcutsOverlay() {
                   {section.shortcuts.map(({ keys, description }) => (
                     <tr key={keys} style={{ borderBottom: '1px solid var(--fc-borderLight)' }}>
                       <td style={{ padding: '5px 10px 5px 0', width: 1, whiteSpace: 'nowrap' }}>
-                        <kbd style={{
-                          display: 'inline-block',
-                          padding: '2px 6px',
-                          background: 'var(--fc-bgSurface)',
-                          border: '1px solid var(--fc-border)',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          fontFamily: 'inherit',
-                          color: 'var(--fc-text)',
-                          lineHeight: 1.4,
-                        }}>
+                        <kbd
+                          style={{
+                            display: 'inline-block',
+                            padding: '2px 6px',
+                            background: 'var(--fc-bgSurface)',
+                            border: '1px solid var(--fc-border)',
+                            borderRadius: 4,
+                            fontSize: 12,
+                            fontFamily: 'inherit',
+                            color: 'var(--fc-text)',
+                            lineHeight: 1.4,
+                          }}
+                        >
                           {keys}
                         </kbd>
                       </td>
-                      <td style={{ padding: '5px 0', fontSize: 13, color: 'var(--fc-textMuted)' }}>
-                        {description}
-                      </td>
+                      <td style={{ padding: '5px 0', fontSize: 13, color: 'var(--fc-textMuted)' }}>{description}</td>
                     </tr>
                   ))}
                 </tbody>

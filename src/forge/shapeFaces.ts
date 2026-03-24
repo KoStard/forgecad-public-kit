@@ -1,30 +1,30 @@
 import {
   assertExhaustive,
   type CutTaperCompilePlan,
-  findShapePrimaryQueryOwner,
   type FeatureCutExtent,
+  featureCutExtentForwardSide,
+  featureCutExtentReverseSide,
+  findShapePrimaryQueryOwner,
   type HoleCompilePlan,
   type ProfileCompilePlan,
   type ProfileCompileTransformStep,
   type ShapeCompilePlan,
   type ShapeCompileTransformStep,
-  featureCutExtentForwardSide,
-  featureCutExtentReverseSide,
 } from './compilePlan';
+import type { FaceDescendantMetadata, FaceDescendantSemantic } from './descendantResolution';
 import {
   cloneFaceQueryRef,
   cloneShapeQueryOwner,
-  faceQueryRefsEqual,
-  shapeQueryOwnersEqual,
   type FaceQueryRef,
+  faceQueryRefsEqual,
   type ShapeQueryOwner,
+  shapeQueryOwnersEqual,
   type TopologyRewriteFaceDescendantContract,
 } from './queryModel';
-import type { FaceDescendantMetadata, FaceDescendantSemantic } from './descendantResolution';
 import { describeSheetMetalFaces } from './sheetMetalModel';
-import { Transform, normalizeAxis, type Mat4, type Vec3 } from './transform';
-import type { SketchPlacementModel } from './sketch/workplaneModel';
 import type { FaceRef } from './sketch/topology';
+import type { SketchPlacementModel } from './sketch/workplaneModel';
+import { type Mat4, normalizeAxis, Transform, type Vec3 } from './transform';
 
 type Vec2 = [number, number];
 
@@ -100,11 +100,7 @@ function cloneFaceDescendantMetadata(metadata: FaceDescendantMetadata): FaceDesc
   };
 }
 
-function createFaceDescendantMetadata(
-  semantic: FaceDescendantSemantic,
-  memberNames: string[],
-  coplanar: boolean,
-): FaceDescendantMetadata {
+function createFaceDescendantMetadata(semantic: FaceDescendantSemantic, memberNames: string[], coplanar: boolean): FaceDescendantMetadata {
   return {
     kind: semantic === 'face' && memberNames.length === 1 ? 'single' : 'face-set',
     semantic,
@@ -119,19 +115,11 @@ function facesAreCoplanar(faces: FaceRef[]): boolean {
   const first = faces[0];
   if (first.planar === false || !first.uAxis || !first.vAxis) return false;
   const firstNormal = normalizeAxis(first.normal);
-  const planeOffset = (
-    firstNormal[0] * first.center[0]
-    + firstNormal[1] * first.center[1]
-    + firstNormal[2] * first.center[2]
-  );
+  const planeOffset = firstNormal[0] * first.center[0] + firstNormal[1] * first.center[1] + firstNormal[2] * first.center[2];
   for (const face of faces.slice(1)) {
     if (face.planar === false || !face.uAxis || !face.vAxis) return false;
     const normal = normalizeAxis(face.normal);
-    const alignment = Math.abs(
-      firstNormal[0] * normal[0]
-      + firstNormal[1] * normal[1]
-      + firstNormal[2] * normal[2],
-    );
+    const alignment = Math.abs(firstNormal[0] * normal[0] + firstNormal[1] * normal[1] + firstNormal[2] * normal[2]);
     if (Math.abs(alignment - 1) > 1e-6) return false;
     const offset = firstNormal[0] * face.center[0] + firstNormal[1] * face.center[1] + firstNormal[2] * face.center[2];
     if (Math.abs(offset - planeOffset) > 1e-6) return false;
@@ -139,12 +127,7 @@ function facesAreCoplanar(faces: FaceRef[]): boolean {
   return true;
 }
 
-function attachFaceDescendantMetadata(
-  face: FaceRef,
-  semantic: FaceDescendantSemantic,
-  memberNames: string[],
-  coplanar: boolean,
-): FaceRef {
+function attachFaceDescendantMetadata(face: FaceRef, semantic: FaceDescendantSemantic, memberNames: string[], coplanar: boolean): FaceRef {
   return {
     ...face,
     descendant: createFaceDescendantMetadata(semantic, memberNames, coplanar),
@@ -161,11 +144,7 @@ function representativeFaceForMembers(
   const first = cloned[0];
   const coplanar = facesAreCoplanar(cloned);
   const center = cloned.reduce<[number, number, number]>(
-    (acc, face) => [
-      acc[0] + face.center[0],
-      acc[1] + face.center[1],
-      acc[2] + face.center[2],
-    ],
+    (acc, face) => [acc[0] + face.center[0], acc[1] + face.center[1], acc[2] + face.center[2]],
     [0, 0, 0],
   );
   const count = Math.max(cloned.length, 1);
@@ -277,7 +256,7 @@ function maskNamedFace(table: FaceTable, name: string, reason: string): void {
   table.blockedNames.set(name, reason);
 }
 
-function blockNamedFaceByQuery(table: FaceTable, query: FaceQueryRef | undefined, reason: string): void {
+function _blockNamedFaceByQuery(table: FaceTable, query: FaceQueryRef | undefined, reason: string): void {
   if (!query) return;
   removeSupportedQuery(table, query);
   registerBlockedQuery(table, query, reason);
@@ -321,11 +300,7 @@ function canonicalShapeStepMatrix(step: ShapeCompileTransformStep): Mat4 {
     case 'scale':
       return Transform.scale([step.x, step.y, step.z]).toArray();
     case 'rotateAround':
-      return Transform.rotationAxis(
-        [step.axisX, step.axisY, step.axisZ],
-        step.degrees,
-        [step.pivotX, step.pivotY, step.pivotZ],
-      ).toArray();
+      return Transform.rotationAxis([step.axisX, step.axisY, step.axisZ], step.degrees, [step.pivotX, step.pivotY, step.pivotZ]).toArray();
     case 'mirror':
       return mirrorMatrix([step.normalX, step.normalY, step.normalZ]);
     case 'workplanePlacement':
@@ -340,10 +315,22 @@ function mirrorMatrix(normal: [number, number, number]): Mat4 {
   const ny = normal[1] / len;
   const nz = normal[2] / len;
   return [
-    1 - 2 * nx * nx, -2 * nx * ny, -2 * nx * nz, 0,
-    -2 * ny * nx, 1 - 2 * ny * ny, -2 * ny * nz, 0,
-    -2 * nz * nx, -2 * nz * ny, 1 - 2 * nz * nz, 0,
-    0, 0, 0, 1,
+    1 - 2 * nx * nx,
+    -2 * nx * ny,
+    -2 * nx * nz,
+    0,
+    -2 * ny * nx,
+    1 - 2 * ny * ny,
+    -2 * ny * nz,
+    0,
+    -2 * nz * nx,
+    -2 * nz * ny,
+    1 - 2 * nz * nz,
+    0,
+    0,
+    0,
+    0,
+    1,
   ];
 }
 
@@ -374,18 +361,12 @@ function profilePoint(matrix: Mat4, x: number, y: number): Vec2 {
 }
 
 function midpoint2d(a: Vec2, b: Vec2): Vec2 {
-  return [
-    (a[0] + b[0]) / 2,
-    (a[1] + b[1]) / 2,
-  ];
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 }
 
 function averageVec3(points: Vec3[]): Vec3 {
   if (points.length === 0) return [0, 0, 0];
-  const sum = points.reduce<Vec3>(
-    (acc, point) => [acc[0] + point[0], acc[1] + point[1], acc[2] + point[2]],
-    [0, 0, 0],
-  );
+  const sum = points.reduce<Vec3>((acc, point) => [acc[0] + point[0], acc[1] + point[1], acc[2] + point[2]], [0, 0, 0]);
   return [sum[0] / points.length, sum[1] / points.length, sum[2] / points.length];
 }
 
@@ -393,15 +374,7 @@ function scalePoint2d(point: Vec2, scale: [number, number]): Vec2 {
   return [point[0] * scale[0], point[1] * scale[1]];
 }
 
-function pointOnWorkplane(
-  origin: Vec3,
-  workplaneU: Vec3,
-  workplaneV: Vec3,
-  u: number,
-  v: number,
-  depthDir?: Vec3,
-  depth = 0,
-): Vec3 {
+function pointOnWorkplane(origin: Vec3, workplaneU: Vec3, workplaneV: Vec3, u: number, v: number, depthDir?: Vec3, depth = 0): Vec3 {
   return [
     origin[0] + workplaneU[0] * u + workplaneV[0] * v + (depthDir?.[0] ?? 0) * depth,
     origin[1] + workplaneU[1] * u + workplaneV[1] * v + (depthDir?.[1] ?? 0) * depth,
@@ -416,11 +389,7 @@ function normalize2d(vec: Vec2): Vec2 {
 }
 
 function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function orthonormalBasisFromNormal(normal: Vec3): { u: Vec3; v: Vec3 } {
@@ -431,13 +400,7 @@ function orthonormalBasisFromNormal(normal: Vec3): { u: Vec3; v: Vec3 } {
   return { u, v };
 }
 
-function faceFrom2DEdge(
-  name: string,
-  start: Vec2,
-  end: Vec2,
-  zMid: number,
-  ownerQuery: FaceQueryRef | undefined,
-): FaceRef {
+function faceFrom2DEdge(name: string, start: Vec2, end: Vec2, zMid: number, ownerQuery: FaceQueryRef | undefined): FaceRef {
   const tangent = normalize2d([end[0] - start[0], end[1] - start[1]]);
   const normal2d: Vec2 = [tangent[1], -tangent[0]];
   const center2d = midpoint2d(start, end);
@@ -510,10 +473,7 @@ function buildBoxFaceTable(plan: Extract<ShapeCompilePlan, { kind: 'box' }>, own
   return table;
 }
 
-function buildCylinderFaceTable(
-  plan: Extract<ShapeCompilePlan, { kind: 'cylinder' }>,
-  owner: ShapeQueryOwner | null,
-): FaceTable {
+function buildCylinderFaceTable(plan: Extract<ShapeCompilePlan, { kind: 'cylinder' }>, owner: ShapeQueryOwner | null): FaceTable {
   const table = emptyFaceTable();
   const zBot = plan.center ? -plan.height / 2 : 0;
   const zTop = zBot + plan.height;
@@ -639,10 +599,7 @@ function buildCircleExtrudeFaceTable(
   return table;
 }
 
-function buildExtrudeFaceTable(
-  plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>,
-  owner: ShapeQueryOwner | null,
-): FaceTable {
+function buildExtrudeFaceTable(plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>, owner: ShapeQueryOwner | null): FaceTable {
   switch (plan.profile.kind) {
     case 'rect':
     case 'roundedRect':
@@ -659,10 +616,7 @@ type AnyTopologyRewritePropagation = Extract<
   { kind: 'shell' | 'hole' | 'cut' | 'boolean' | 'trimByPlane' | 'fillet' | 'chamfer' }
 >['queryPropagation'];
 
-function findCreatedFaceQuery(
-  propagation: AnyTopologyRewritePropagation,
-  slot: string,
-): FaceQueryRef | undefined {
+function findCreatedFaceQuery(propagation: AnyTopologyRewritePropagation, slot: string): FaceQueryRef | undefined {
   return propagation?.createdFaces.find((entry) => entry.query.slot === slot)?.query;
 }
 
@@ -671,15 +625,12 @@ function findFaceDescendantContract(
   query: FaceQueryRef | undefined,
 ): TopologyRewriteFaceDescendantContract | undefined {
   if (!query) return undefined;
-  return propagation?.descendants.find((entry): entry is TopologyRewriteFaceDescendantContract =>
-    entry.queryKind === 'face' && faceQueryRefsEqual(entry.query, query),
+  return propagation?.descendants.find(
+    (entry): entry is TopologyRewriteFaceDescendantContract => entry.queryKind === 'face' && faceQueryRefsEqual(entry.query, query),
   );
 }
 
-function findPreservedFaceQuery(
-  propagation: AnyTopologyRewritePropagation,
-  source: FaceQueryRef | undefined,
-): FaceQueryRef | undefined {
+function findPreservedFaceQuery(propagation: AnyTopologyRewritePropagation, source: FaceQueryRef | undefined): FaceQueryRef | undefined {
   if (!source) return undefined;
   return propagation?.preservedFaces.find((entry) => faceQueryRefsEqual(entry.query.source, source))?.query;
 }
@@ -712,11 +663,7 @@ function holeCreatedFaceNames(hole: HoleCompilePlan, extent: FeatureCutExtent): 
   return names;
 }
 
-function cutCreatedFaceNames(
-  profile: ProfileCompilePlan,
-  extent: FeatureCutExtent,
-  _taper?: CutTaperCompilePlan,
-): string[] {
+function cutCreatedFaceNames(profile: ProfileCompilePlan, extent: FeatureCutExtent, _taper?: CutTaperCompilePlan): string[] {
   const names = (() => {
     switch (profile.kind) {
       case 'circle':
@@ -744,11 +691,7 @@ function holeCreatedEdgeNames(hole: HoleCompilePlan, extent: FeatureCutExtent): 
   return names;
 }
 
-function cutCreatedEdgeNames(
-  profile: ProfileCompilePlan,
-  extent: FeatureCutExtent,
-  taper?: CutTaperCompilePlan,
-): string[] {
+function cutCreatedEdgeNames(profile: ProfileCompilePlan, extent: FeatureCutExtent, taper?: CutTaperCompilePlan): string[] {
   if (cutCreatedFaceNames(profile, extent, taper).length === 0) return [];
   const names = ['entry-rim', 'forward-end-rim'];
   if (featureCutExtentReverseSide(extent)) {
@@ -769,13 +712,13 @@ function selectedFaceNamesFromQuery(baseTable: FaceTable, query: FaceQueryRef | 
       case 'canonical-face':
         switch (query.face) {
           case 'front':
-            return available.has('side-bottom') ? ['side-bottom'] : (available.has('side') ? ['side'] : []);
+            return available.has('side-bottom') ? ['side-bottom'] : available.has('side') ? ['side'] : [];
           case 'back':
-            return available.has('side-top') ? ['side-top'] : (available.has('side') ? ['side'] : []);
+            return available.has('side-top') ? ['side-top'] : available.has('side') ? ['side'] : [];
           case 'left':
-            return available.has('side-left') ? ['side-left'] : (available.has('side') ? ['side'] : []);
+            return available.has('side-left') ? ['side-left'] : available.has('side') ? ['side'] : [];
           case 'right':
-            return available.has('side-right') ? ['side-right'] : (available.has('side') ? ['side'] : []);
+            return available.has('side-right') ? ['side-right'] : available.has('side') ? ['side'] : [];
           case 'top':
             return available.has('top') ? ['top'] : [];
           case 'bottom':
@@ -932,10 +875,7 @@ function faceMatchesForQuery(table: FaceTable, query: FaceQueryRef | undefined):
   return matches;
 }
 
-function findBooleanPropagationMatches(
-  operandTables: FaceTable[],
-  query: FaceQueryRef | undefined,
-): FaceMatch[] {
+function findBooleanPropagationMatches(operandTables: FaceTable[], query: FaceQueryRef | undefined): FaceMatch[] {
   return operandTables.flatMap((table) => faceMatchesForQuery(table, query));
 }
 
@@ -945,7 +885,7 @@ function sharedMatchName(matches: FaceMatch[]): string | null {
   return names.length === 1 ? names[0] : null;
 }
 
-function booleanNamedFaceConflictReason(name: string): string {
+function _booleanNamedFaceConflictReason(name: string): string {
   return `Multiple defended propagated descendants now answer to "${name}", so Forge requires an explicit FaceRef/query target instead of guessing one named face.`;
 }
 
@@ -953,10 +893,7 @@ function booleanBlockedFaceReason(note: string | undefined, fallback: string): s
   return note ?? fallback;
 }
 
-function pushNamedFaceCandidate(
-  out: Map<string, NamedFaceCandidate[]>,
-  candidate: NamedFaceCandidate,
-): void {
+function pushNamedFaceCandidate(out: Map<string, NamedFaceCandidate[]>, candidate: NamedFaceCandidate): void {
   const existing = out.get(candidate.name);
   if (existing) {
     existing.push(candidate);
@@ -971,18 +908,15 @@ function registerNamedFaceCandidates(
   owner: ShapeQueryOwner | undefined,
 ): void {
   for (const [name, entries] of candidates.entries()) {
-    const representativeQuery = entries.length === 1
-      ? entries[0].query
-      : {
-        kind: 'face-ref',
-        faceName: name,
-        owner: cloneShapeQueryOwner(owner),
-      } satisfies FaceQueryRef;
-    const semantic = entries.some((entry) => entry.semantic === 'region')
-      ? 'region'
-      : entries.length > 1
-        ? 'set'
-        : entries[0].semantic;
+    const representativeQuery =
+      entries.length === 1
+        ? entries[0].query
+        : ({
+            kind: 'face-ref',
+            faceName: name,
+            owner: cloneShapeQueryOwner(owner),
+          } satisfies FaceQueryRef);
+    const semantic = entries.some((entry) => entry.semantic === 'region') ? 'region' : entries.length > 1 ? 'set' : entries[0].semantic;
     const representative = representativeFaceForMembers(
       name,
       entries.map((entry) => entry.face),
@@ -1032,11 +966,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
           uAxis: descriptor.uAxis ? cloneVec3(descriptor.uAxis) : undefined,
           vAxis: descriptor.vAxis ? cloneVec3(descriptor.vAxis) : undefined,
           query: createTrackedFaceQuery(descriptor.name, owner),
-          descendant: createFaceDescendantMetadata(
-            descriptor.semantic,
-            descriptor.memberNames,
-            descriptor.coplanar,
-          ),
+          descendant: createFaceDescendantMetadata(descriptor.semantic, descriptor.memberNames, descriptor.coplanar),
         });
       }
       return table;
@@ -1165,11 +1095,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
         registerFace(table, {
           name: 'floor',
           normal: cloneVec3(workplane.normal),
-          center: [
-            origin[0] + inward[0] * forward.depth,
-            origin[1] + inward[1] * forward.depth,
-            origin[2] + inward[2] * forward.depth,
-          ],
+          center: [origin[0] + inward[0] * forward.depth, origin[1] + inward[1] * forward.depth, origin[2] + inward[2] * forward.depth],
           planar: true,
           uAxis: cloneVec3(workplane.u),
           vAxis: cloneVec3(workplane.v),
@@ -1181,11 +1107,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
         registerFace(table, {
           name: 'cap',
           normal: [-workplane.normal[0], -workplane.normal[1], -workplane.normal[2]],
-          center: [
-            origin[0] - inward[0] * reverse.depth,
-            origin[1] - inward[1] * reverse.depth,
-            origin[2] - inward[2] * reverse.depth,
-          ],
+          center: [origin[0] - inward[0] * reverse.depth, origin[1] - inward[1] * reverse.depth, origin[2] - inward[2] * reverse.depth],
           planar: true,
           uAxis: cloneVec3(workplane.u),
           vAxis: [-workplane.v[0], -workplane.v[1], -workplane.v[2]],
@@ -1218,11 +1140,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
 
       const placement = plan.placement.placement;
       const origin = placement.workplane.origin;
-      const depthDir: Vec3 = [
-        -placement.workplane.normal[0],
-        -placement.workplane.normal[1],
-        -placement.workplane.normal[2],
-      ];
+      const depthDir: Vec3 = [-placement.workplane.normal[0], -placement.workplane.normal[1], -placement.workplane.normal[2]];
       const forward = featureCutExtentForwardSide(plan.extent);
       const reverse = featureCutExtentReverseSide(plan.extent);
       const reverseDepth = reverse?.depth ?? 0;
@@ -1369,7 +1287,15 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
             const maxY = minY + plan.profile.height;
             const center2d = midpoint2d(profilePoint(matrix, minX, minY), profilePoint(matrix, maxX, maxY));
             const scaledCenter = plan.taper ? scalePoint2d(center2d, plan.taper.scale) : center2d;
-            return pointOnWorkplane(origin, placement.workplane.u, placement.workplane.v, scaledCenter[0], scaledCenter[1], depthDir, forward.depth);
+            return pointOnWorkplane(
+              origin,
+              placement.workplane.u,
+              placement.workplane.v,
+              scaledCenter[0],
+              scaledCenter[1],
+              depthDir,
+              forward.depth,
+            );
           }
           return [
             origin[0] + depthDir[0] * forward.depth,
@@ -1423,12 +1349,12 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       if (!planeCapQuery) return table;
       const baseTable = resolveShapeFaceTable(plan.base);
       const centers = Array.from(baseTable.faces.values()).map((face) => face.center);
-      const averageCenter = centers.length > 0
-        ? centers.reduce<Vec3>(
-          (acc, center) => [acc[0] + center[0], acc[1] + center[1], acc[2] + center[2]],
-          [0, 0, 0],
-        ).map((value) => value / centers.length) as Vec3
-        : [0, 0, plan.originOffset] as Vec3;
+      const averageCenter =
+        centers.length > 0
+          ? (centers
+              .reduce<Vec3>((acc, center) => [acc[0] + center[0], acc[1] + center[1], acc[2] + center[2]], [0, 0, 0])
+              .map((value) => value / centers.length) as Vec3)
+          : ([0, 0, plan.originOffset] as Vec3);
       const normal = normalizeAxis([plan.normalX, plan.normalY, plan.normalZ]);
       const planeDistance = averageCenter[0] * normal[0] + averageCenter[1] * normal[1] + averageCenter[2] * normal[2] - plan.originOffset;
       const center: Vec3 = [
@@ -1476,11 +1402,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
           continue;
         }
 
-        const semantic = contract?.kind === 'face-region'
-          ? 'region'
-          : contract?.kind === 'face-set'
-            ? 'set'
-            : 'face';
+        const semantic = contract?.kind === 'face-region' ? 'region' : contract?.kind === 'face-set' ? 'set' : 'face';
         for (const match of matches) {
           pushNamedFaceCandidate(candidates, {
             name: match.name,
@@ -1551,7 +1473,7 @@ export function validateShapeFaceQuery(plan: ShapeCompilePlan | null, query: Fac
   const blocked = table.blockedQueries.find((entry) => faceQueryRefsEqual(entry.query, query));
   if (blocked) return blocked.reason;
   if (query.kind === 'created-face' || query.kind === 'propagated-face') {
-    return 'This face query is not part of the target shape\'s defended face subset.';
+    return "This face query is not part of the target shape's defended face subset.";
   }
   if (resolvedNames.length === 0 && table.faces.size === 0 && table.blockedQueries.length === 0) {
     return null;
@@ -1559,50 +1481,31 @@ export function validateShapeFaceQuery(plan: ShapeCompilePlan | null, query: Fac
   if (query.kind === 'tracked-face' || query.kind === 'canonical-face' || query.kind === 'face-ref') {
     return null;
   }
-  return 'This face query is not part of the target shape\'s defended face subset.';
+  return "This face query is not part of the target shape's defended face subset.";
 }
 
-export function supportedShellCreatedFaceNames(
-  basePlan: ShapeCompilePlan | null,
-  openFaces: string[],
-): string[] {
+export function supportedShellCreatedFaceNames(basePlan: ShapeCompilePlan | null, openFaces: string[]): string[] {
   if (!basePlan) return [];
   return shellCreatedFaceNames(basePlan, openFaces).sort();
 }
 
-export function supportedHoleCreatedFaceNames(
-  hole: HoleCompilePlan,
-  extent: FeatureCutExtent,
-): string[] {
+export function supportedHoleCreatedFaceNames(hole: HoleCompilePlan, extent: FeatureCutExtent): string[] {
   return holeCreatedFaceNames(hole, extent);
 }
 
-export function supportedCutCreatedFaceNames(
-  profile: ProfileCompilePlan,
-  extent: FeatureCutExtent,
-  taper?: CutTaperCompilePlan,
-): string[] {
+export function supportedCutCreatedFaceNames(profile: ProfileCompilePlan, extent: FeatureCutExtent, taper?: CutTaperCompilePlan): string[] {
   return cutCreatedFaceNames(profile, extent, taper);
 }
 
-export function supportedHoleCreatedEdgeNames(
-  hole: HoleCompilePlan,
-  extent: FeatureCutExtent,
-): string[] {
+export function supportedHoleCreatedEdgeNames(hole: HoleCompilePlan, extent: FeatureCutExtent): string[] {
   return holeCreatedEdgeNames(hole, extent);
 }
 
-export function supportedCutCreatedEdgeNames(
-  profile: ProfileCompilePlan,
-  extent: FeatureCutExtent,
-  taper?: CutTaperCompilePlan,
-): string[] {
+export function supportedCutCreatedEdgeNames(profile: ProfileCompilePlan, extent: FeatureCutExtent, taper?: CutTaperCompilePlan): string[] {
   return cutCreatedEdgeNames(profile, extent, taper);
 }
 
-export function preservedShapeFaceQueries(
-  basePlan: ShapeCompilePlan | null,
-): NamedShapeFaceQuery[] {
+export function preservedShapeFaceQueries(basePlan: ShapeCompilePlan | null): NamedShapeFaceQuery[] {
   return listShapeFaceQueries(basePlan);
 }
 
@@ -1614,18 +1517,12 @@ export function blockedShapeFaceNamesForFeature(
   return blockedShapeFacesForFeature(basePlan, source, extent).map((entry) => entry.name);
 }
 
-export function selectedShapeFaceNamesForQuery(
-  basePlan: ShapeCompilePlan | null,
-  source: FaceQueryRef | undefined,
-): string[] {
+export function selectedShapeFaceNamesForQuery(basePlan: ShapeCompilePlan | null, source: FaceQueryRef | undefined): string[] {
   if (!basePlan) return [];
   return selectedFaceNamesFromQuery(resolveShapeFaceTable(basePlan), source).sort();
 }
 
-export function shellCreatedFaceSource(
-  basePlan: ShapeCompilePlan | null,
-  createdFaceName: string,
-): FaceQueryRef | undefined {
+export function shellCreatedFaceSource(basePlan: ShapeCompilePlan | null, createdFaceName: string): FaceQueryRef | undefined {
   if (!basePlan || !createdFaceName.startsWith('inner-')) return undefined;
   const baseFaceName = createdFaceName.slice('inner-'.length);
   return resolveShapeFace(basePlan, baseFaceName)?.query;

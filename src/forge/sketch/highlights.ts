@@ -79,11 +79,7 @@ export interface DebugHighlightShape {
   pulse?: boolean;
 }
 
-export type DebugHighlight3D =
-  | DebugHighlightPoint
-  | DebugHighlightEdge
-  | DebugHighlightPlane
-  | DebugHighlightShape;
+export type DebugHighlight3D = DebugHighlightPoint | DebugHighlightEdge | DebugHighlightPlane | DebugHighlightShape;
 
 let collectedDebugHighlights3D: DebugHighlight3D[] = [];
 
@@ -117,8 +113,7 @@ export interface HighlightOptions {
 type Vec3 = [number, number, number];
 
 function isVec3(v: unknown): v is Vec3 {
-  return Array.isArray(v) && v.length === 3
-    && typeof v[0] === 'number' && typeof v[1] === 'number' && typeof v[2] === 'number';
+  return Array.isArray(v) && v.length === 3 && typeof v[0] === 'number' && typeof v[1] === 'number' && typeof v[2] === 'number';
 }
 
 function isEdgePair(v: unknown): v is [Vec3, Vec3] {
@@ -177,8 +172,7 @@ function isShapeLike(v: unknown): boolean {
   const obj = v as Record<string, unknown>;
   // Shape has getMesh(), TrackedShape has .shape property with getMesh()
   if (typeof obj.getMesh === 'function') return true;
-  if (typeof obj.shape === 'object' && obj.shape !== null
-    && typeof (obj.shape as any).getMesh === 'function') return true;
+  if (typeof obj.shape === 'object' && obj.shape !== null && typeof (obj.shape as any).getMesh === 'function') return true;
   return false;
 }
 
@@ -197,10 +191,7 @@ function isShapeLike(v: unknown): boolean {
  * - `FaceRef` (from `shape.face('top')`) — highlight as plane at face center
  * - `EdgeRef` (from `shape.edge('left')`) — highlight as edge segment
  */
-export function highlight(
-  target: unknown,
-  opts?: HighlightOptions,
-): void {
+export function highlight(target: unknown, opts?: HighlightOptions): void {
   // 1. String → legacy sketch entity ID
   if (typeof target === 'string') {
     if (target.trim().length === 0) {
@@ -264,9 +255,7 @@ export function highlight(
     requireFiniteVec3(target.normal, 'face normal');
     requireFiniteVec3(target.center, 'face center');
     // Compute offset = dot(normal, center)
-    const offset = target.normal[0] * target.center[0]
-      + target.normal[1] * target.center[1]
-      + target.normal[2] * target.center[2];
+    const offset = target.normal[0] * target.center[0] + target.normal[1] * target.center[1] + target.normal[2] * target.center[2];
     collectedDebugHighlights3D.push({
       kind: 'plane',
       normal: [target.normal[0], target.normal[1], target.normal[2]],
@@ -289,9 +278,7 @@ export function highlight(
       offset = target.offset;
     } else {
       requireFiniteVec3(target.point!, 'plane point');
-      offset = target.normal[0] * target.point![0]
-        + target.normal[1] * target.point![1]
-        + target.normal[2] * target.point![2];
+      offset = target.normal[0] * target.point![0] + target.normal[1] * target.point![1] + target.normal[2] * target.point![2];
     }
     collectedDebugHighlights3D.push({
       kind: 'plane',
@@ -317,7 +304,7 @@ export function highlight(
 
   throw new Error(
     'highlight() expects a string (sketch entity ID), [x,y,z] point, [[start],[end]] edge, ' +
-    '{ normal, offset } plane, FaceRef, EdgeRef, or Shape/TrackedShape. ' +
-    `Got: ${typeof target}`,
+      '{ normal, offset } plane, FaceRef, EdgeRef, or Shape/TrackedShape. ' +
+      `Got: ${typeof target}`,
   );
 }

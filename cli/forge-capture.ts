@@ -11,27 +11,20 @@
  * It falls back to the previous pure-JS encoder when ffmpeg is unavailable.
  */
 
-import puppeteer from 'puppeteer-core';
-import { spawn, execSync, type ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process';
+import { type ChildProcess, type ChildProcessWithoutNullStreams, execSync, spawn } from 'child_process';
 import { once } from 'events';
 import { existsSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
-import { resolve, dirname, basename, extname } from 'path';
-import { createServer } from 'net';
-import { PNG } from 'pngjs';
 import gifenc from 'gifenc';
-import { collectProjectFiles } from './collect-files';
-import {
-  materializeNotebookPreviewScript,
-  replaceRenderableInputExtension,
-} from './notebook-entry';
-import { packageRootFrom, spawnPackageVite } from './package-runtime';
+import { createServer } from 'net';
+import { basename, dirname, extname, resolve } from 'path';
+import { PNG } from 'pngjs';
+import puppeteer from 'puppeteer-core';
 import { parseCameraCliSpec } from '../src/capture/cameraState';
-import {
-  mergeViewportRenderSceneStates,
-  parseRenderSceneCliSpec,
-  type ViewportRenderSceneState,
-} from '../src/capture/renderSceneState';
+import { mergeViewportRenderSceneStates, parseRenderSceneCliSpec, type ViewportRenderSceneState } from '../src/capture/renderSceneState';
+import { collectProjectFiles } from './collect-files';
+import { materializeNotebookPreviewScript, replaceRenderableInputExtension } from './notebook-entry';
+import { packageRootFrom, spawnPackageVite } from './package-runtime';
 
 const { GIFEncoder, quantize, applyPalette } = gifenc;
 
@@ -327,9 +320,10 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
       continue;
     }
     if (arg === '--camera') {
-      scene = mergeViewportRenderSceneStates(scene, {
-        camera: parseCameraCliSpec(readValue(argv, i, arg)),
-      }) ?? undefined;
+      scene =
+        mergeViewportRenderSceneStates(scene, {
+          camera: parseCameraCliSpec(readValue(argv, i, arg)),
+        }) ?? undefined;
       i += 1;
       continue;
     }
@@ -519,11 +513,7 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
   };
 }
 
-function findExecutablePath(
-  explicitPath: string | undefined,
-  staticCandidates: string[],
-  binCandidates: string[],
-): string | null {
+function findExecutablePath(explicitPath: string | undefined, staticCandidates: string[], binCandidates: string[]): string | null {
   if (explicitPath && existsSync(explicitPath)) return explicitPath;
 
   for (const candidate of staticCandidates) {
@@ -533,7 +523,9 @@ function findExecutablePath(
   for (const bin of binCandidates) {
     try {
       const cmd = process.platform === 'win32' ? `where ${bin}` : `command -v ${bin}`;
-      const found = execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+      const found = execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString()
+        .trim();
       if (found && existsSync(found)) return found;
     } catch {
       // Try the next candidate.
@@ -666,11 +658,7 @@ async function ensureDevServer(port: number): Promise<ChildProcess | null> {
           : 'Failed to start Vite dev server (process exited before becoming ready).',
       );
     }
-    throw new Error(
-      detail
-        ? `Timed out waiting for Vite on port ${port}.\n${detail}`
-        : `Timed out waiting for Vite on port ${port}.`,
-    );
+    throw new Error(detail ? `Timed out waiting for Vite on port ${port}.\n${detail}` : `Timed out waiting for Vite on port ${port}.`);
   }
 
   return proc;
@@ -686,7 +674,7 @@ async function stopDevServer(proc: ChildProcess | null): Promise<void> {
 }
 
 async function isPortFree(port: number): Promise<boolean> {
-  const probe = (host: string): Promise<boolean> => (
+  const probe = (host: string): Promise<boolean> =>
     new Promise((resolvePort) => {
       const server = createServer();
       server.once('error', (err: NodeJS.ErrnoException) => {
@@ -700,8 +688,7 @@ async function isPortFree(port: number): Promise<boolean> {
         server.close(() => resolvePort(true));
       });
       server.listen(port, host);
-    })
-  );
+    });
 
   const ipv4Free = await probe('127.0.0.1');
   const ipv6Free = await probe('::1');
@@ -762,9 +749,10 @@ function buildFramePlan(options: CliOptions, init: BrowserCaptureInitResult): Ca
     throw new Error(`This script does not expose an animation clip for capture. Available animations: ${available}`);
   }
 
-  const motionFrames = options.capture === 'animation'
-    ? Math.max(2, Math.round((selectedAnimationMeta?.duration ?? 1) * options.animationLoops * options.fps))
-    : options.framesPerTurn;
+  const motionFrames =
+    options.capture === 'animation'
+      ? Math.max(2, Math.round((selectedAnimationMeta?.duration ?? 1) * options.animationLoops * options.fps))
+      : options.framesPerTurn;
 
   const passModes: FrameMode[] = [options.renderMode];
   if (options.includeWireframePass && options.renderMode !== 'wireframe') {
@@ -786,9 +774,7 @@ function buildFramePlan(options: CliOptions, init: BrowserCaptureInitResult): Ca
         mode,
         turn: options.capture === 'orbit' ? i / motionFrames : 0,
         cameraMotion: options.capture === 'animation' ? 'fixed' : 'orbit',
-        animationProgress: hasSelectedAnimation
-          ? resolveLoopProgress(i, motionFrames, options.animationLoops)
-          : undefined,
+        animationProgress: hasSelectedAnimation ? resolveLoopProgress(i, motionFrames, options.animationLoops) : undefined,
       });
     }
   }
@@ -805,33 +791,51 @@ function startFfmpegEncoder(
   fps: number,
   crf: number,
 ): { proc: ChildProcessWithoutNullStreams; done: Promise<void> } {
-  const args = format === 'gif'
-    ? [
-      '-y',
-      '-f', 'rawvideo',
-      '-pix_fmt', 'rgba',
-      '-video_size', `${width}x${height}`,
-      '-framerate', String(fps),
-      '-i', 'pipe:0',
-      '-filter_complex', 'split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a',
-      '-loop', '0',
-      outputPath,
-    ]
-    : [
-      '-y',
-      '-f', 'rawvideo',
-      '-pix_fmt', 'rgba',
-      '-video_size', `${width}x${height}`,
-      '-framerate', String(fps),
-      '-i', 'pipe:0',
-      '-an',
-      '-c:v', 'libx264',
-      '-preset', 'slow',
-      '-crf', String(crf),
-      '-pix_fmt', 'yuv420p',
-      '-movflags', '+faststart',
-      outputPath,
-    ];
+  const args =
+    format === 'gif'
+      ? [
+          '-y',
+          '-f',
+          'rawvideo',
+          '-pix_fmt',
+          'rgba',
+          '-video_size',
+          `${width}x${height}`,
+          '-framerate',
+          String(fps),
+          '-i',
+          'pipe:0',
+          '-filter_complex',
+          'split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a',
+          '-loop',
+          '0',
+          outputPath,
+        ]
+      : [
+          '-y',
+          '-f',
+          'rawvideo',
+          '-pix_fmt',
+          'rgba',
+          '-video_size',
+          `${width}x${height}`,
+          '-framerate',
+          String(fps),
+          '-i',
+          'pipe:0',
+          '-an',
+          '-c:v',
+          'libx264',
+          '-preset',
+          'slow',
+          '-crf',
+          String(crf),
+          '-pix_fmt',
+          'yuv420p',
+          '-movflags',
+          '+faststart',
+          outputPath,
+        ];
 
   const proc = spawn(ffmpegPath, args, {
     cwd: repoRoot,
@@ -866,11 +870,7 @@ async function writeFrameToProcess(proc: ChildProcessWithoutNullStreams, data: U
   await once(proc.stdin, 'drain');
 }
 
-function resolveEncoderMode(
-  format: OutputFormat,
-  preference: EncoderPreference,
-  ffmpegPath: string | null,
-): 'ffmpeg' | 'js' {
+function resolveEncoderMode(format: OutputFormat, preference: EncoderPreference, ffmpegPath: string | null): 'ffmpeg' | 'js' {
   if (format === 'mp4') {
     if (!ffmpegPath) {
       throw new Error('MP4 output requires ffmpeg. Install ffmpeg or pass --ffmpeg-path.');
@@ -905,15 +905,18 @@ async function captureAndEncode(
 
   for (let i = 0; i < framePlan.length; i += 1) {
     const step = framePlan[i];
-    const frame = await page.evaluate((payload) => {
-      return (window as any).__forgeCaptureFrame(payload) as BrowserCaptureFrameResult;
-    }, {
-      mode: step.mode,
-      turn: step.turn,
-      pitchDeg: options.pitchDeg,
-      cameraMotion: step.cameraMotion,
-      animationProgress: step.animationProgress,
-    });
+    const frame = await page.evaluate(
+      (payload) => {
+        return (window as any).__forgeCaptureFrame(payload) as BrowserCaptureFrameResult;
+      },
+      {
+        mode: step.mode,
+        turn: step.turn,
+        pitchDeg: options.pitchDeg,
+        cameraMotion: step.cameraMotion,
+        animationProgress: step.animationProgress,
+      },
+    );
 
     if (!frame?.ok || !frame.png) {
       throw new Error(frame?.error || 'Failed to capture frame');
@@ -988,10 +991,18 @@ function printList(scriptPath: string, init: BrowserCaptureInitResult): void {
   const cutPlanes = init.cutPlanes ?? [];
 
   console.log(`Capture options for ${basename(scriptPath)}:`);
-  console.log(`  animations: ${animations.length === 0 ? '(none)' : animations.map((entry) => {
-    const isDefault = init.defaultAnimation === entry.name ? ' [default]' : '';
-    return `${entry.name}${isDefault}`;
-  }).join(', ')}`);
+  console.log(
+    `  animations: ${
+      animations.length === 0
+        ? '(none)'
+        : animations
+            .map((entry) => {
+              const isDefault = init.defaultAnimation === entry.name ? ' [default]' : '';
+              return `${entry.name}${isDefault}`;
+            })
+            .join(', ')
+    }`,
+  );
   console.log(`  cut planes: ${cutPlanes.length === 0 ? '(none)' : cutPlanes.join(', ')}`);
 }
 
@@ -1022,10 +1033,7 @@ function printSummary(options: CliOptions, init: BrowserCaptureInitResult, encod
   lines.forEach((line) => console.log(line));
 }
 
-export async function runCaptureCli(
-  config: CaptureCliEntryConfig,
-  argv: string[] = process.argv.slice(2),
-): Promise<void> {
+export async function runCaptureCli(config: CaptureCliEntryConfig, argv: string[] = process.argv.slice(2)): Promise<void> {
   let options: CliOptions;
 
   try {
@@ -1110,23 +1118,26 @@ export async function runCaptureCli(
       throw new Error('Capture runtime did not initialize. Restart the Forge dev server and try again.');
     }
 
-    const init = await page.evaluate((payload) => {
-      return (window as any).__forgeCaptureInit(payload.code, payload.options) as BrowserCaptureInitResult;
-    }, {
-      code: source,
-      options: {
-        size: options.size,
-        pixelRatio: options.pixelRatio,
-        quality: options.quality,
-        allFiles,
-        fileName,
-        background: options.background,
-        enabledCutPlanes: options.cutPlanes,
-        sceneState: options.scene ?? null,
-        animationName: options.animationName ?? null,
-        capture: options.capture,
+    const init = await page.evaluate(
+      (payload) => {
+        return (window as any).__forgeCaptureInit(payload.code, payload.options) as BrowserCaptureInitResult;
       },
-    });
+      {
+        code: source,
+        options: {
+          size: options.size,
+          pixelRatio: options.pixelRatio,
+          quality: options.quality,
+          allFiles,
+          fileName,
+          background: options.background,
+          enabledCutPlanes: options.cutPlanes,
+          sceneState: options.scene ?? null,
+          animationName: options.animationName ?? null,
+          capture: options.capture,
+        },
+      },
+    );
 
     if (!init?.ok) {
       throw new Error(init?.error || 'Script failed to initialize in renderer');

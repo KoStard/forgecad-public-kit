@@ -9,10 +9,10 @@
  */
 
 import { readFile, writeFile } from 'fs/promises';
-import { resolve, basename } from 'path';
+import { basename, resolve } from 'path';
 import { init, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
-import { buildSketchSvgDocument, buildConstraintSvgDocument } from './sketch-svg';
+import { buildConstraintSvgDocument, buildSketchSvgDocument } from './sketch-svg';
 
 function usage(): never {
   console.error('Usage: forgecad export svg <script.forge.js> [output.svg]');
@@ -75,7 +75,5 @@ export async function runSvgCli(argv: string[] = process.argv.slice(2)): Promise
   await writeFile(resolve(outputPath), svgDocument.svg);
 
   const sz = [svgDocument.width.toFixed(1), svgDocument.height.toFixed(1)];
-  console.log(
-    `✓ ${basename(outputPath)}  ${sz[0]} × ${sz[1]} mm  area=${sketch.area().toFixed(1)}mm²  verts=${sketch.numVert()}`,
-  );
+  console.log(`✓ ${basename(outputPath)}  ${sz[0]} × ${sz[1]} mm  area=${sketch.area().toFixed(1)}mm²  verts=${sketch.numVert()}`);
 }

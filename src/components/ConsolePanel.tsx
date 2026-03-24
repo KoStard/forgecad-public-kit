@@ -20,18 +20,31 @@ export function ConsolePanel() {
   if (logs.length === 0) return null;
 
   return (
-    <div style={{ maxHeight: '40%', display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--fc-border)', background: 'var(--fc-bg)' }}>
-      <div
-        onClick={() => setCollapsed(!collapsed)}
-        className="fc-panel-header"
-      >
+    <div
+      style={{
+        maxHeight: '40%',
+        display: 'flex',
+        flexDirection: 'column',
+        borderTop: '1px solid var(--fc-border)',
+        background: 'var(--fc-bg)',
+      }}
+    >
+      <div onClick={() => setCollapsed(!collapsed)} className="fc-panel-header">
         <span>Console ({logs.length})</span>
         <span style={{ fontSize: 10 }}>{collapsed ? '▶' : '▼'}</span>
       </div>
       {!collapsed && (
         <div style={{ overflowY: 'auto', padding: '0 12px 8px', fontFamily: 'monospace', fontSize: 12 }}>
           {logs.map((entry, i) => (
-            <div key={i} style={{ color: levelColors[entry.level] || 'var(--fc-text)', padding: '1px 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            <div
+              key={i}
+              style={{
+                color: levelColors[entry.level] || 'var(--fc-text)',
+                padding: '1px 0',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-all',
+              }}
+            >
               {entry.args.join(' ')}
             </div>
           ))}

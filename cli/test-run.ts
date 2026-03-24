@@ -3,26 +3,26 @@
  * ForgeCAD CLI — Validate a .forge.js or .forge-notebook.json input (no browser needed)
  * Usage: npx tsx cli/test-run.ts [--debug-imports] <script.forge.js|notebook.forge-notebook.json>
  */
-import { readFileSync } from "fs";
-import { resolve } from "path";
-import { init, runScript } from "../src/forge/headless";
-import { collectProjectFiles } from "./collect-files";
-import { materializeNotebookPreviewScript } from "./notebook-entry";
-import type { Shape } from "../src/forge/kernel";
-import { setActiveBackend, type ActiveBackend } from "../src/forge/kernel";
-import { lastSolveProfile } from "../src/forge/sketch/constraints/sketch";
-import { lastSolverProfile, getSolverStats, resetSolverStats, getLastSolveTrail } from "../src/forge/sketch/constraints/registry";
-import { getLastRustProfile } from "../src/forge/sketch/constraints/solver-wasm";
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { init, runScript } from '../src/forge/headless';
+import type { Shape } from '../src/forge/kernel';
+import { type ActiveBackend, setActiveBackend } from '../src/forge/kernel';
+import { getLastSolveTrail, getSolverStats, lastSolverProfile, resetSolverStats } from '../src/forge/sketch/constraints/registry';
+import { lastSolveProfile } from '../src/forge/sketch/constraints/sketch';
+import { getLastRustProfile } from '../src/forge/sketch/constraints/solver-wasm';
+import { collectProjectFiles } from './collect-files';
+import { materializeNotebookPreviewScript } from './notebook-entry';
 
 type ShapeEntry = { name: string; shape: Shape; min: number[]; max: number[]; groupName?: string };
 
 function bboxOverlap(a: ShapeEntry, b: ShapeEntry): boolean {
-  return [0, 1, 2].every(k => a.min[k] < b.max[k] + 0.1 && a.max[k] > b.min[k] - 0.1);
+  return [0, 1, 2].every((k) => a.min[k] < b.max[k] + 0.1 && a.max[k] > b.min[k] - 0.1);
 }
 
 function analyzeSpatial(entries: ShapeEntry[]): string[] {
   const lines: string[] = [];
-  const axisLabel = ['X', 'Y', 'Z'];
+  const _axisLabel = ['X', 'Y', 'Z'];
   const dirLabels: Record<number, [string, string]> = {
     0: ['LEFT of', 'RIGHT of'],
     1: ['IN FRONT of', 'BEHIND'],
@@ -45,7 +45,8 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
   // Skip intra-group collisions (objects in the same assembly group are intentionally overlapping)
   for (let i = 0; i < entries.length; i++) {
     for (let j = i + 1; j < entries.length; j++) {
-      const a = entries[i], b = entries[j];
+      const a = entries[i],
+        b = entries[j];
       if (a.groupName && a.groupName === b.groupName) continue; // same group — skip
       if (!bboxOverlap(a, b)) continue;
       try {
@@ -105,7 +106,10 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
     const match = line.match(/^\s+(.+?) is (?:LEFT of|RIGHT of|IN FRONT of|BEHIND|BELOW|ABOVE) (.+?) \(gap: (\d+)mm\)/);
     if (match) {
       const key = [match[1], match[2]].sort().join('|') + '|' + match[3];
-      if (!seen.has(key)) { seen.add(key); deduped.push(line); }
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(line);
+      }
     } else {
       deduped.push(line);
     }
@@ -128,9 +132,11 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
     deduped.push('  Groups:');
     const groupNames = [...groups.keys()];
     for (let i = 0; i < groupNames.length; i++) {
-      const aName = groupNames[i], a = groups.get(aName)!;
+      const aName = groupNames[i],
+        a = groups.get(aName)!;
       for (let j = i + 1; j < groupNames.length; j++) {
-        const bName = groupNames[j], b = groups.get(bName)!;
+        const bName = groupNames[j],
+          b = groups.get(bName)!;
         for (let ax = 0; ax < 3; ax++) {
           if (a.max[ax] < b.min[ax]) {
             const gap = b.min[ax] - a.max[ax];
@@ -154,7 +160,7 @@ function analyzeSpatial(entries: ShapeEntry[]): string[] {
 }
 
 function usage(): never {
-  console.error("Usage: forgecad run <script.forge.js|notebook.forge-notebook.json> [--debug-imports] [--backend manifold|occt]");
+  console.error('Usage: forgecad run <script.forge.js|notebook.forge-notebook.json> [--debug-imports] [--backend manifold|occt]');
   process.exit(1);
 }
 
@@ -179,7 +185,7 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
   const materialized = materializeNotebookPreviewScript(scriptPath);
 
   try {
-    const code = readFileSync(resolve(materialized.runnablePath), "utf-8");
+    const code = readFileSync(resolve(materialized.runnablePath), 'utf-8');
     const { allFiles, fileName, readBinaryFile } = collectProjectFiles(materialized.runnablePath);
 
     await init();
@@ -188,7 +194,7 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
     const result = runScript(code, fileName, allFiles, { debugImports, readBinaryFile });
 
     if (result.error) {
-      console.error("ERROR:", result.error);
+      console.error('ERROR:', result.error);
       if (result.logs?.length) {
         for (const log of result.logs) {
           console.error(`  [${log.level}]`, ...log.args);
@@ -206,7 +212,7 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       if (obj.shape) {
         const bb = obj.shape.boundingBox();
         console.log(
-          `  ${obj.name}${grpTag}: vol=${obj.shape.volume().toFixed(1)}mm³  bbox=[${bb.min.map((v: number) => v.toFixed(1))}] → [${bb.max.map((v: number) => v.toFixed(1))}]${geomTag}`
+          `  ${obj.name}${grpTag}: vol=${obj.shape.volume().toFixed(1)}mm³  bbox=[${bb.min.map((v: number) => v.toFixed(1))}] → [${bb.max.map((v: number) => v.toFixed(1))}]${geomTag}`,
         );
       }
       if (obj.sketch) {
@@ -214,25 +220,26 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       }
       const meta = obj.sketchMeta;
       if (meta) {
-        const statusLabel = meta.status === 'over-redundant' ? 'OVER-REDUNDANT'
-          : meta.status.toUpperCase();
-        const statusColor = meta.status === 'fully' ? '\x1b[32m'
-          : meta.status === 'over' ? '\x1b[31m'
-          : meta.status === 'over-redundant' ? '\x1b[33m'
-          : '\x1b[34m';
-        console.log(`  ${obj.name}${grpTag}: ${statusColor}${statusLabel}\x1b[0m DOF=${meta.dof} err=${meta.maxError.toFixed(6)} constraints=${meta.constraints.length}`);
+        const statusLabel = meta.status === 'over-redundant' ? 'OVER-REDUNDANT' : meta.status.toUpperCase();
+        const statusColor =
+          meta.status === 'fully'
+            ? '\x1b[32m'
+            : meta.status === 'over'
+              ? '\x1b[31m'
+              : meta.status === 'over-redundant'
+                ? '\x1b[33m'
+                : '\x1b[34m';
+        console.log(
+          `  ${obj.name}${grpTag}: ${statusColor}${statusLabel}\x1b[0m DOF=${meta.dof} err=${meta.maxError.toFixed(6)} constraints=${meta.constraints.length}`,
+        );
 
         // Show problematic constraints
         const problems = meta.constraints.filter((c: any) => c.isConflicting || c.isRedundant || c.residual > 1e-4);
         if (problems.length > 0) {
           for (const c of problems) {
-            const icon = c.isConflicting ? '\x1b[31m✗\x1b[0m'
-              : c.isRedundant ? '\x1b[33m~\x1b[0m'
-              : '\x1b[31m!\x1b[0m';
+            const icon = c.isConflicting ? '\x1b[31m✗\x1b[0m' : c.isRedundant ? '\x1b[33m~\x1b[0m' : '\x1b[31m!\x1b[0m';
             const valueStr = c.value !== undefined ? `=${c.value}` : '';
-            const tag = c.isConflicting ? ' CONFLICT'
-              : c.isRedundant ? ' REDUNDANT'
-              : ` err=${c.residual.toFixed(4)}`;
+            const tag = c.isConflicting ? ' CONFLICT' : c.isRedundant ? ' REDUNDANT' : ` err=${c.residual.toFixed(4)}`;
             console.log(`    ${icon} ${c.label}${valueStr} (${c.entityIds.join(', ')})${tag}`);
           }
         }
@@ -292,7 +299,7 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       }
     }
 
-    console.log(`✓ Params: ${result.params.map((p) => p.name).join(", ")}`);
+    console.log(`✓ Params: ${result.params.map((p) => p.name).join(', ')}`);
     console.log(`✓ Time: ${result.timeMs.toFixed(0)}ms`);
 
     // Constraint solver profiling
@@ -380,7 +387,9 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       console.log(`    analyze:         ${us('analyze_solution_us')}ms`);
       console.log(`    progressive:     ${us('progressive_total_us')}ms  (${rustProfile.progressive_steps ?? 0} steps)`);
       if (rustProfile.bottom_up_clusters > 0) {
-        console.log(`    bottom-up:       ${rustProfile.bottom_up_clusters} clusters, internal=${us('bottom_up_internal_us')}ms, bridge=${us('bottom_up_bridge_us')}ms`);
+        console.log(
+          `    bottom-up:       ${rustProfile.bottom_up_clusters} clusters, internal=${us('bottom_up_internal_us')}ms, bridge=${us('bottom_up_bridge_us')}ms`,
+        );
       }
       console.log(`    --- LM internals ---`);
       console.log(`    linearize:       ${us('linearize_us')}ms  (${rustProfile.linearize_count ?? 0} calls)`);
@@ -393,8 +402,12 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       console.log(`    accepted steps:  ${rustProfile.lm_accepted_steps ?? 0}`);
       console.log(`    restarts:        ${rustProfile.lm_restarts ?? 0}`);
       console.log(`    gs_escape:       ${rustProfile.gs_escape_rounds ?? 0} rounds`);
-      console.log(`    problem size:    ${rustProfile.n_vars ?? 0} vars × ${rustProfile.n_rows ?? 0} rows, ${rustProfile.n_constraints ?? 0} constraints, ${rustProfile.n_points ?? 0} points`);
-      console.log(`    FD debug:        skipped=${rustProfile.state_capture_count ?? 0} cols, ran=${rustProfile.state_apply_count ?? 0} cols`);
+      console.log(
+        `    problem size:    ${rustProfile.n_vars ?? 0} vars × ${rustProfile.n_rows ?? 0} rows, ${rustProfile.n_constraints ?? 0} constraints, ${rustProfile.n_points ?? 0} points`,
+      );
+      console.log(
+        `    FD debug:        skipped=${rustProfile.state_capture_count ?? 0} cols, ran=${rustProfile.state_apply_count ?? 0} cols`,
+      );
     }
     // Print solve trail if available.
     const trail = getLastSolveTrail();

@@ -5,10 +5,10 @@
  */
 
 import { readFile, writeFile } from 'fs/promises';
-import { resolve, basename } from 'path';
+import { basename, resolve } from 'path';
 import { init, runScript } from '../src/forge/headless';
-import { collectProjectFiles } from './collect-files';
 import { generateSketchPdf } from '../src/forge/sketch/exportSketchPdf';
+import { collectProjectFiles } from './collect-files';
 
 function usage(): never {
   console.error('Usage: forgecad export sketch-pdf <script.forge.js> [output.pdf]');

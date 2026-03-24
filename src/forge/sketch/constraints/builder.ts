@@ -297,7 +297,7 @@ export class ConstrainedSketchBuilder {
       throw new Error('blendTo: cursor must be on the end of a previous arcTo() call');
     }
 
-    const arc = this.arcs.find(a => a.id === this.lastPathArc)!;
+    const arc = this.arcs.find((a) => a.id === this.lastPathArc)!;
     const pt0 = this.getPoint(this.cursor)!;
     const center = this.getPoint(arc.center)!;
 
@@ -305,10 +305,16 @@ export class ConstrainedSketchBuilder {
     const rx = pt0.x - center.x;
     const ry = pt0.y - center.y;
     let tx: number, ty: number;
-    if (arc.clockwise) { tx = ry; ty = -rx; }
-    else               { tx = -ry; ty = rx; }
+    if (arc.clockwise) {
+      tx = ry;
+      ty = -rx;
+    } else {
+      tx = -ry;
+      ty = rx;
+    }
     const tLen = Math.hypot(tx, ty) || 1;
-    tx /= tLen; ty /= tLen;
+    tx /= tLen;
+    ty /= tLen;
 
     const endPt = this.point(x, y);
     const pt3 = this.getPoint(endPt)!;
@@ -325,7 +331,8 @@ export class ConstrainedSketchBuilder {
     const p1 = this.point(pt0.x + tx * h1, pt0.y + ty * h1);
 
     // P2: arrival control point, aimed back along the chord toward P0
-    const ndx = dx / dist, ndy = dy / dist;
+    const ndx = dx / dist,
+      ndy = dy / dist;
     const p2 = this.point(pt3.x - ndx * h2, pt3.y - ndy * h2);
 
     const bezId = this.bezier(this.cursor, p1, p2, endPt);
@@ -398,16 +405,19 @@ export class ConstrainedSketchBuilder {
       this.groupOwnedLineIds.add(l.id);
     }
     if (this._sessionHandle !== null) {
-      this._sessionApi!.session_add_group(this._sessionHandle, JSON.stringify({
-        id: group.id,
-        x: group.x,
-        y: group.y,
-        theta: group.theta,
-        fixed: group.fixed,
-        fixed_rotation: group.fixedRotation,
-        points: group.points.map((p) => ({ id: p.id, lx: p.lx, ly: p.ly })),
-        lines: group.lines.map((l) => ({ id: l.id, a: l.a, b: l.b })),
-      }));
+      this._sessionApi!.session_add_group(
+        this._sessionHandle,
+        JSON.stringify({
+          id: group.id,
+          x: group.x,
+          y: group.y,
+          theta: group.theta,
+          fixed: group.fixed,
+          fixed_rotation: group.fixedRotation,
+          points: group.points.map((p) => ({ id: p.id, lx: p.lx, ly: p.ly })),
+          lines: group.lines.map((l) => ({ id: l.id, a: l.a, b: l.b })),
+        }),
+      );
     }
   }
 
@@ -514,7 +524,10 @@ export class ConstrainedSketchBuilder {
     for (const p of this.points) {
       if (this.groupOwnedPointIds.has(p.id)) continue;
       const sp = map.get(p.id);
-      if (sp) { p.x = sp.x; p.y = sp.y; }
+      if (sp) {
+        p.x = sp.x;
+        p.y = sp.y;
+      }
     }
   }
 
@@ -660,7 +673,10 @@ export class ConstrainedSketchBuilder {
 
   /** Constrain two lines to point in opposite directions (anti-parallel). */
   oppositeDirection(a: any, b: any): this {
-    return this.constrain({ type: 'oppositeDirection', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'oppositeDirection', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /**
@@ -688,7 +704,7 @@ export class ConstrainedSketchBuilder {
     let aId: string;
     try {
       aId = this.resolveLineId(a);
-      if (!this.lines.some(l => l.id === aId)) throw new Error();
+      if (!this.lines.some((l) => l.id === aId)) throw new Error();
       return this.constrain({ type: 'tangent', line: aId, circle: this.resolveCircleId(b) } as Omit<SketchConstraint, 'id'>);
     } catch {
       aId = this.resolveCircleId(a);
@@ -713,12 +729,20 @@ export class ConstrainedSketchBuilder {
 
   /** Constrain a point to lie on an infinite line (collinear). */
   collinear(point: any, line: any): this {
-    return this.constrain({ type: 'collinear', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'collinear', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /** Constrain two points to be symmetric about an axis line. */
   symmetric(a: any, b: any, axis: any): this {
-    return this.constrain({ type: 'symmetric', a: this.resolvePointId(a), b: this.resolvePointId(b), axis: this.resolveLineId(axis) } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({
+      type: 'symmetric',
+      a: this.resolvePointId(a),
+      b: this.resolvePointId(b),
+      axis: this.resolveLineId(axis),
+    } as Omit<SketchConstraint, 'id'>);
   }
 
   /** Fix a point at a specific location (or at its current position if x/y are omitted). */
@@ -729,7 +753,7 @@ export class ConstrainedSketchBuilder {
     if (this.groupOwnedPointIds.has(ptId)) {
       throw new Error(
         `fix(): point "${ptId}" belongs to a group — use group.fix() to freeze the entire group frame, ` +
-        `or constrain the group via coincident/distance constraints on its points.`
+          `or constrain the group via coincident/distance constraints on its points.`,
       );
     }
     if (x !== undefined) this.requireFinite(x, 'fix (x)');
@@ -739,23 +763,35 @@ export class ConstrainedSketchBuilder {
 
   /** Constrain a point to lie at the midpoint of a line. */
   midpoint(point: any, line: any): this {
-    return this.constrain({ type: 'midpoint', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'midpoint', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /** Constrain a point to lie on the perimeter of a circle. */
   pointOnCircle(point: any, circle: any): this {
-    return this.constrain({ type: 'pointOnCircle', point: this.resolvePointId(point), circle: this.resolveCircleId(circle) } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'pointOnCircle', point: this.resolvePointId(point), circle: this.resolveCircleId(circle) } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /** Constrain a point to lie on a bounded line segment (not its infinite extension). */
   pointOnLine(point: any, line: any): this {
-    return this.constrain({ type: 'pointOnLine', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'pointOnLine', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /** Constrain the distance between two points. */
   distance(a: any, b: any, value: number): this {
     this.requireFinite(value, 'distance');
-    return this.constrain({ type: 'distance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'distance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /** Constrain the length of a line. */
@@ -785,13 +821,19 @@ export class ConstrainedSketchBuilder {
   /** Constrain the horizontal distance between two points (b.x − a.x = value). */
   hDistance(a: any, b: any, value: number): this {
     this.requireFinite(value, 'hDistance');
-    return this.constrain({ type: 'hDistance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'hDistance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /** Constrain the vertical distance between two points (b.y − a.y = value). */
   vDistance(a: any, b: any, value: number): this {
     this.requireFinite(value, 'vDistance');
-    return this.constrain({ type: 'vDistance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'vDistance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /**
@@ -801,7 +843,10 @@ export class ConstrainedSketchBuilder {
    */
   pointLineDistance(point: any, line: any, value: number): this {
     this.requireFinite(value, 'pointLineDistance');
-    return this.constrain({ type: 'pointLineDistance', point: this.resolvePointId(point), line: this.resolveLineId(line), value } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'pointLineDistance', point: this.resolvePointId(point), line: this.resolveLineId(line), value } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /**
@@ -813,7 +858,10 @@ export class ConstrainedSketchBuilder {
    */
   lineDistance(a: any, b: any, value: number): this {
     this.requireFinite(value, 'lineDistance');
-    return this.constrain({ type: 'lineDistance', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'lineDistance', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /** Constrain the absolute angle of a line from the positive X-axis (degrees). */
@@ -838,7 +886,10 @@ export class ConstrainedSketchBuilder {
    * Combine with `coincident` to enforce the shared endpoint.
    */
   lineTangentArc(line: any, arc: any, atStart: boolean): this {
-    return this.constrain({ type: 'lineTangentArc', line: this.resolveLineId(line), arc: this.resolveArcId(arc), atStart } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'lineTangentArc', line: this.resolveLineId(line), arc: this.resolveArcId(arc), atStart } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /**
@@ -854,19 +905,19 @@ export class ConstrainedSketchBuilder {
 
     // Auto-detect shared endpoints if not specified
     if (aAtStart === undefined || bAtStart === undefined) {
-      const a = this.arcs.find(x => x.id === arcAId)!;
-      const b = this.arcs.find(x => x.id === arcBId)!;
+      const a = this.arcs.find((x) => x.id === arcAId)!;
+      const b = this.arcs.find((x) => x.id === arcBId)!;
       const matches: Array<[boolean, boolean]> = [];
-      if (a.end === b.start)   matches.push([false, true]);
-      if (a.end === b.end)     matches.push([false, false]);
+      if (a.end === b.start) matches.push([false, true]);
+      if (a.end === b.end) matches.push([false, false]);
       if (a.start === b.start) matches.push([true, true]);
-      if (a.start === b.end)   matches.push([true, false]);
+      if (a.start === b.end) matches.push([true, false]);
       if (matches.length === 0) {
         // Fall back to closest pair by coordinate distance
         const pts = [
-          { aS: true,  bS: true,  dist: this.pointDist(a.start, b.start) },
-          { aS: true,  bS: false, dist: this.pointDist(a.start, b.end) },
-          { aS: false, bS: true,  dist: this.pointDist(a.end, b.start) },
+          { aS: true, bS: true, dist: this.pointDist(a.start, b.start) },
+          { aS: true, bS: false, dist: this.pointDist(a.start, b.end) },
+          { aS: false, bS: true, dist: this.pointDist(a.end, b.start) },
           { aS: false, bS: false, dist: this.pointDist(a.end, b.end) },
         ];
         pts.sort((x, y) => x.dist - y.dist);
@@ -883,7 +934,8 @@ export class ConstrainedSketchBuilder {
 
   /** Distance between two points by ID (for internal use). */
   private pointDist(a: PointId, b: PointId): number {
-    const pa = this.getPoint(a), pb = this.getPoint(b);
+    const pa = this.getPoint(a),
+      pb = this.getPoint(b);
     if (!pa || !pb) return Infinity;
     return Math.hypot(pa.x - pb.x, pa.y - pb.y);
   }
@@ -899,11 +951,14 @@ export class ConstrainedSketchBuilder {
    */
   bezierTangentArc(bezier: any, arc: any, atBezierStart: boolean, atArcStart: boolean): this {
     const bezId = this.resolveBezierId(bezier);
-    const bz = this.beziers.find(b => b.id === bezId)!;
+    const bz = this.beziers.find((b) => b.id === bezId)!;
     // Resolve to the two control points that define the tangent direction
     const tangentBase = atBezierStart ? bz.p0 : bz.p3;
     const tangentControl = atBezierStart ? bz.p1 : bz.p2;
-    return this.constrain({ type: 'bezierTangentArc', tangentBase, tangentControl, arc: this.resolveArcId(arc), atArcStart } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'bezierTangentArc', tangentBase, tangentControl, arc: this.resolveArcId(arc), atArcStart } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   // ─── Smooth blend (high-level curve connection) ──────────────────────────
@@ -919,20 +974,24 @@ export class ConstrainedSketchBuilder {
    *
    * Returns the BezierId of the bridge curve.
    */
-  smoothBlend(arc1: any, arc2: any, options?: {
-    /** 0–1, controls which arc dominates. 0.5 = symmetric. Default 0.5. */
-    weight?: number;
-    /** Which end of arc1 to blend from. Default 'end'. */
-    arc1End?: 'start' | 'end';
-    /** Which end of arc2 to blend to. Default 'start'. */
-    arc2End?: 'start' | 'end';
-  }): BezierId {
+  smoothBlend(
+    arc1: any,
+    arc2: any,
+    options?: {
+      /** 0–1, controls which arc dominates. 0.5 = symmetric. Default 0.5. */
+      weight?: number;
+      /** Which end of arc1 to blend from. Default 'end'. */
+      arc1End?: 'start' | 'end';
+      /** Which end of arc2 to blend to. Default 'start'. */
+      arc2End?: 'start' | 'end';
+    },
+  ): BezierId {
     const arc1Id = this.resolveArcId(arc1);
     const arc2Id = this.resolveArcId(arc2);
     const { weight = 0.5, arc1End = 'end', arc2End = 'start' } = options ?? {};
 
-    const a1 = this.arcs.find(a => a.id === arc1Id)!;
-    const a2 = this.arcs.find(a => a.id === arc2Id)!;
+    const a1 = this.arcs.find((a) => a.id === arc1Id)!;
+    const a2 = this.arcs.find((a) => a.id === arc2Id)!;
 
     // Get the junction points
     const p0Id = arc1End === 'start' ? a1.start : a1.end;
@@ -953,12 +1012,22 @@ export class ConstrainedSketchBuilder {
 
     // Forward tangent of each arc at its junction point
     let tf1x: number, tf1y: number;
-    if (a1.clockwise) { tf1x = r1y; tf1y = -r1x; }
-    else              { tf1x = -r1y; tf1y = r1x; }
+    if (a1.clockwise) {
+      tf1x = r1y;
+      tf1y = -r1x;
+    } else {
+      tf1x = -r1y;
+      tf1y = r1x;
+    }
 
     let tf2x: number, tf2y: number;
-    if (a2.clockwise) { tf2x = r2y; tf2y = -r2x; }
-    else              { tf2x = -r2y; tf2y = r2x; }
+    if (a2.clockwise) {
+      tf2x = r2y;
+      tf2y = -r2x;
+    } else {
+      tf2x = -r2y;
+      tf2y = r2x;
+    }
 
     // Bezier departure direction at P0:
     //   If P0 is arc1's END → depart in same direction as arc's travel: +t_fwd
@@ -972,14 +1041,16 @@ export class ConstrainedSketchBuilder {
     //   If P3 is arc2's START → arrive in arc's forward direction: P3-P2 ∝ t_fwd, so P2 = P3 - t_fwd*h
     //   If P3 is arc2's END → arrive in reversed arc direction: P3-P2 ∝ -t_fwd, so P2 = P3 + t_fwd*h
     const sign2 = arc2End === 'start' ? -1 : 1;
-    let t2x = tf2x * sign2;  // direction to offset P2 from P3
+    let t2x = tf2x * sign2; // direction to offset P2 from P3
     let t2y = tf2y * sign2;
 
     // Normalize tangent directions
     const len1 = Math.hypot(t1x, t1y) || 1;
     const len2 = Math.hypot(t2x, t2y) || 1;
-    t1x /= len1; t1y /= len1;
-    t2x /= len2; t2y /= len2;
+    t1x /= len1;
+    t1y /= len1;
+    t2x /= len2;
+    t2y /= len2;
 
     // Compute handle lengths based on distance and weight.
     const dx = pt3.x - pt0.x;
@@ -1038,18 +1109,24 @@ export class ConstrainedSketchBuilder {
 
   /** Constrain two shapes to share the same centroid. */
   shapeEqualCentroid(a: any, b: any): this {
-    return this.constrain({ type: 'shapeEqualCentroid', a: this.resolveShapeId(a), b: this.resolveShapeId(b) } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'shapeEqualCentroid', a: this.resolveShapeId(a), b: this.resolveShapeId(b) } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /** Constrain the unsigned angle between two lines (accepts both orientations). */
   angleBetween(a: any, b: any, value: number): this {
     this.requireFinite(value, 'angleBetween');
-    return this.constrain({ type: 'angleBetween', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'angleBetween', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<
+      SketchConstraint,
+      'id'
+    >);
   }
 
   /** Enforce counter-clockwise winding on a polygon defined by its vertices. */
   ccw(...points: any[]): this {
-    return this.constrain({ type: 'ccw', points: points.map(p => this.resolvePointId(p)) } as Omit<SketchConstraint, 'id'>);
+    return this.constrain({ type: 'ccw', points: points.map((p) => this.resolvePointId(p)) } as Omit<SketchConstraint, 'id'>);
   }
 
   // ─── Loop helpers ──────────────────────────────────────────────────────────
@@ -1059,7 +1136,7 @@ export class ConstrainedSketchBuilder {
    */
   addLoop(points: any[]): this {
     if (points.length < 3) throw new Error('addLoop(): needs at least 3 points');
-    this.loops.push({ type: 'poly', points: points.map(p => this.resolvePointId(p)) });
+    this.loops.push({ type: 'poly', points: points.map((p) => this.resolvePointId(p)) });
     return this;
   }
 
@@ -1069,7 +1146,7 @@ export class ConstrainedSketchBuilder {
    * or { kind: 'bezier', bezier: BezierId }.
    */
   addProfileLoop(segments: Array<{ kind: 'line'; line: any } | { kind: 'arc'; arc: any } | { kind: 'bezier'; bezier: any }>): this {
-    const resolved = segments.map(seg => {
+    const resolved = segments.map((seg) => {
       if (seg.kind === 'line') return { kind: 'line' as const, line: this.resolveLineId(seg.line) };
       if (seg.kind === 'arc') return { kind: 'arc' as const, arc: this.resolveArcId(seg.arc) };
       return { kind: 'bezier' as const, bezier: this.resolveBezierId(seg.bezier) };
@@ -1144,7 +1221,10 @@ export class ConstrainedSketchBuilder {
     for (const p of this.points) {
       if (this.groupOwnedPointIds.has(p.id)) continue;
       const dp = defPointMap.get(p.id);
-      if (dp) { p.x = dp.x; p.y = dp.y; }
+      if (dp) {
+        p.x = dp.x;
+        p.y = dp.y;
+      }
     }
     for (let i = 0; i < this.circles.length; i++) {
       this.circles[i].radius = def.circles[i].radius;
@@ -1159,7 +1239,9 @@ export class ConstrainedSketchBuilder {
     for (const g of this._groups) {
       const dg = defGroupMap.get(g.id);
       if (dg) {
-        g.x = dg.x; g.y = dg.y; g.theta = dg.theta;
+        g.x = dg.x;
+        g.y = dg.y;
+        g.theta = dg.theta;
         const cosT = Math.cos(g.theta);
         const sinT = Math.sin(g.theta);
         for (const lp of g.points) {
@@ -1171,82 +1253,6 @@ export class ConstrainedSketchBuilder {
         }
       }
     }
-  }
-
-  /**
-   * Find all point IDs that should remain free (not frozen) when incrementally
-   * solving for a newly added constraint.  Returns the set of points that are
-   * directly or one-hop-transitively connected to the new constraint's entities.
-   */
-  private findAffectedPoints(constraint: SketchConstraint): Set<string> {
-    // Extract entity IDs from the new constraint.
-    const newEntityIds = new Set<string>();
-    for (const [key, val] of Object.entries(constraint)) {
-      if (key === 'id' || key === 'type') continue;
-      if (typeof val === 'string') newEntityIds.add(val);
-      else if (Array.isArray(val)) {
-        for (const v of val) { if (typeof v === 'string') newEntityIds.add(v); }
-      }
-    }
-    // Expand line/circle/arc/shape IDs to their constituent point IDs.
-    const expandToPoints = (entityIds: Set<string>): void => {
-      for (const l of this.lines) {
-        if (entityIds.has(l.id)) { entityIds.add(l.a); entityIds.add(l.b); }
-      }
-      for (const c of this.circles) {
-        if (entityIds.has(c.id)) entityIds.add(c.center);
-      }
-      for (const a of this.arcs) {
-        if (entityIds.has(a.id)) { entityIds.add(a.center); entityIds.add(a.start); entityIds.add(a.end); }
-      }
-      for (const b of this.beziers) {
-        if (entityIds.has(b.id)) { entityIds.add(b.p0); entityIds.add(b.p1); entityIds.add(b.p2); entityIds.add(b.p3); }
-      }
-      for (const s of this.shapes ?? []) {
-        if (entityIds.has(s.id)) {
-          for (const lineId of s.lines) {
-            entityIds.add(lineId);
-            const line = this.lines.find(l => l.id === lineId);
-            if (line) { entityIds.add(line.a); entityIds.add(line.b); }
-          }
-        }
-      }
-    };
-    expandToPoints(newEntityIds);
-
-    // Find all constraints that share entities with the new constraint.
-    const affectedEntities = new Set(newEntityIds);
-    for (const c of this.constraints) {
-      if (c.id === constraint.id) continue;
-      let shares = false;
-      for (const [key, val] of Object.entries(c)) {
-        if (key === 'id' || key === 'type') continue;
-        if (typeof val === 'string' && newEntityIds.has(val)) { shares = true; break; }
-        if (Array.isArray(val)) {
-          for (const v of val) { if (typeof v === 'string' && newEntityIds.has(v)) { shares = true; break; } }
-          if (shares) break;
-        }
-      }
-      if (shares) {
-        // Add all entities from this neighbor constraint.
-        for (const [key, val] of Object.entries(c)) {
-          if (key === 'id' || key === 'type') continue;
-          if (typeof val === 'string') affectedEntities.add(val);
-          else if (Array.isArray(val)) {
-            for (const v of val) { if (typeof v === 'string') affectedEntities.add(v); }
-          }
-        }
-      }
-    }
-    expandToPoints(affectedEntities);
-
-    // Return only point IDs.
-    const pointIds = new Set(this.points.map(p => p.id));
-    const result = new Set<string>();
-    for (const id of affectedEntities) {
-      if (pointIds.has(id)) result.add(id);
-    }
-    return result;
   }
 
   private getPoint(id: PointId | null): SketchPoint | null {
@@ -1295,9 +1301,12 @@ export class ConstrainedSketchBuilder {
   }
 
   /** Import a Rectangle2D as 4 points + 4 lines, returning side LineIds keyed by name */
-  importRectangle(r: {
-    vertices: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
-  }, fixed = false): { bottom: LineId; right: LineId; top: LineId; left: LineId; points: [PointId, PointId, PointId, PointId] } {
+  importRectangle(
+    r: {
+      vertices: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
+    },
+    fixed = false,
+  ): { bottom: LineId; right: LineId; top: LineId; left: LineId; points: [PointId, PointId, PointId, PointId] } {
     const [bl, br, tr, tl] = r.vertices.map((v) => this.importPoint(v, fixed)) as [PointId, PointId, PointId, PointId];
     return {
       bottom: this.line(bl, br),
@@ -1354,9 +1363,7 @@ export class ConstrainedSketchBuilder {
    * Import ALL non-construction entities from a solved `ConstraintSketch` as
    * fixed reference geometry.
    */
-  referenceAllFrom(
-    source: ConstraintSketch,
-  ): { points: Map<string, PointId>; lines: Map<string, LineId> } {
+  referenceAllFrom(source: ConstraintSketch): { points: Map<string, PointId>; lines: Map<string, LineId> } {
     const pointMap = new Map<string, PointId>();
     const lineMap = new Map<string, LineId>();
 
@@ -1383,9 +1390,12 @@ export class ConstrainedSketchBuilder {
    * Used by concept factories to auto-offset initial geometry.
    */
   _pointBounds(): { minX: number; maxX: number; minY: number; maxY: number } | null {
-    const pts = this.points.filter(p => !p.id.startsWith('ref-'));
+    const pts = this.points.filter((p) => !p.id.startsWith('ref-'));
     if (pts.length === 0) return null;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity;
     for (const p of pts) {
       if (p.x < minX) minX = p.x;
       if (p.x > maxX) maxX = p.x;

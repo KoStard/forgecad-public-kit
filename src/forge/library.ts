@@ -5,23 +5,15 @@
  * Each part is a function that returns a Shape, taking parameters.
  */
 
-import { box, cylinder, sphere, union, difference, intersection, Shape, buildShapeFromCompilePlan } from './kernel';
-import { ShapeGroup } from './group';
-import { Sketch, setSketchCompileProfilePlan } from './sketch/core';
 import { profilePlanFromCrossSection } from './compilePlan';
-import { TrackedShape } from './sketch/topology';
-import { rect, roundedRect, circle2d, polygon } from './sketch/primitives';
-import { union2d, difference2d } from './sketch/booleans';
-import { sketchTranslate, sketchRotate } from './sketch/transforms';
-import { sketchExtrude } from './sketch/extrude';
 import {
+  computeExplodeMotion,
+  createResolvedExplodeConfig,
   type ExplodeAxis,
   type ExplodeBounds,
   type ExplodeConfigOptions,
-  type ExplodeDirective,
   type ExplodeDirection,
-  computeExplodeMotion,
-  createResolvedExplodeConfig,
+  type ExplodeDirective,
   explodeAdd,
   explodeBoundsCenter,
   explodeLeafFanStage,
@@ -31,6 +23,14 @@ import {
   resolveExplodeDirective,
   resolveExplodeLocalFanDirection,
 } from './explodeCore';
+import { ShapeGroup } from './group';
+import { box, buildShapeFromCompilePlan, cylinder, Shape, union } from './kernel';
+import { difference2d, union2d } from './sketch/booleans';
+import { Sketch, setSketchCompileProfilePlan } from './sketch/core';
+import { sketchExtrude } from './sketch/extrude';
+import { circle2d, polygon, rect, roundedRect } from './sketch/primitives';
+import { TrackedShape } from './sketch/topology';
+import { sketchRotate, sketchTranslate } from './sketch/transforms';
 
 /** M-series bolt hole (through-hole) */
 export function boltHole(diameter: number, depth: number): Shape {
@@ -86,8 +86,7 @@ export function fastenerHole(opts: FastenerHoleOptions): Shape {
   if (opts.counterbore) {
     const boreDepth = Math.max(0.01, opts.counterbore.depth);
     const boreDia = Math.max(holeDia, opts.counterbore.diameter ?? sizeData.head);
-    const bore = cylinder(boreDepth, boreDia / 2, undefined, segs, true)
-      .translate(0, 0, depth / 2 - boreDepth / 2);
+    const bore = cylinder(boreDepth, boreDia / 2, undefined, segs, true).translate(0, 0, depth / 2 - boreDepth / 2);
     hole = union(hole, bore);
   }
 
@@ -96,8 +95,7 @@ export function fastenerHole(opts: FastenerHoleOptions): Shape {
     const angleDeg = opts.countersink.angleDeg ?? 90;
     const angleRad = (angleDeg * Math.PI) / 180;
     const sinkDepth = ((sinkDia - holeDia) * 0.5) / Math.tan(angleRad * 0.5);
-    const sink = cylinder(Math.max(0.01, sinkDepth), sinkDia / 2, holeDia / 2, segs, true)
-      .translate(0, 0, depth / 2 - sinkDepth / 2);
+    const sink = cylinder(Math.max(0.01, sinkDepth), sinkDia / 2, holeDia / 2, segs, true).translate(0, 0, depth / 2 - sinkDepth / 2);
     hole = union(hole, sink);
   }
 
@@ -109,68 +107,39 @@ export function fastenerHole(opts: FastenerHoleOptions): Shape {
 }
 
 /** Counterbore hole — through-hole with a wider recess at the top */
-export function counterbore(
-  holeDia: number,
-  boreDia: number,
-  boreDepth: number,
-  totalDepth: number,
-): Shape {
+export function counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: number): Shape {
   const through = cylinder(totalDepth, holeDia / 2, undefined, 32, true);
-  const bore = cylinder(boreDepth, boreDia / 2, undefined, 32)
-    .translate(0, 0, totalDepth / 2 - boreDepth);
+  const bore = cylinder(boreDepth, boreDia / 2, undefined, 32).translate(0, 0, totalDepth / 2 - boreDepth);
   return union(through, bore);
 }
 
 /** Rectangular tube / hollow box */
-export function tube(
-  outerX: number,
-  outerY: number,
-  outerZ: number,
-  wall: number,
-): Shape {
+export function tube(outerX: number, outerY: number, outerZ: number, wall: number): Shape {
   const outer = box(outerX, outerY, outerZ);
-  const inner = box(outerX - wall * 2, outerY - wall * 2, outerZ + 1)
-    .translate(wall, wall, -0.5);
+  const inner = box(outerX - wall * 2, outerY - wall * 2, outerZ + 1).translate(wall, wall, -0.5);
   return outer.subtract(inner);
 }
 
 /** Pipe — hollow cylinder */
-export function pipe(
-  height: number,
-  outerRadius: number,
-  wall: number,
-  segments = 32,
-): Shape {
+export function pipe(height: number, outerRadius: number, wall: number, segments = 32): Shape {
   const outer = cylinder(height, outerRadius, undefined, segments);
-  const inner = cylinder(height + 1, outerRadius - wall, undefined, segments)
-    .translate(0, 0, -0.5);
+  const inner = cylinder(height + 1, outerRadius - wall, undefined, segments).translate(0, 0, -0.5);
   return outer.subtract(inner);
 }
 
 /** Hex nut profile (2D extruded) */
-export function hexNut(
-  acrossFlats: number,
-  height: number,
-  holeDia: number,
-): Shape {
+export function hexNut(acrossFlats: number, height: number, holeDia: number): Shape {
   // Hexagon as intersection of 3 rotated boxes
-  const r = acrossFlats / 2;
+  const _r = acrossFlats / 2;
   const w = acrossFlats * 1.2; // oversized box
   const slab = box(w, acrossFlats, height, true);
-  const hex = slab
-    .intersect(slab.rotate(0, 0, 60))
-    .intersect(slab.rotate(0, 0, 120));
+  const hex = slab.intersect(slab.rotate(0, 0, 60)).intersect(slab.rotate(0, 0, 120));
   const hole = cylinder(height + 1, holeDia / 2, undefined, 32, true);
   return hex.subtract(hole);
 }
 
 /** Rounded box — box with spheres at corners (approximate fillet) */
-export function roundedBox(
-  x: number,
-  y: number,
-  z: number,
-  radius: number,
-): Shape {
+export function roundedBox(x: number, y: number, z: number, radius: number): Shape {
   // Intersect 3 axis-aligned rounded slabs
   const sx = box(x - radius * 2, y, z, true);
   const sy = box(x, y - radius * 2, z, true);
@@ -179,20 +148,13 @@ export function roundedBox(
 }
 
 /** Mounting bracket — L-shaped with optional holes */
-export function bracket(
-  width: number,
-  height: number,
-  depth: number,
-  thick: number,
-  holeDia = 0,
-): Shape {
+export function bracket(width: number, height: number, depth: number, thick: number, holeDia = 0): Shape {
   const base = box(width, depth, thick);
   const wall = box(width, thick, height).translate(0, 0, thick);
   let shape = union(base, wall);
 
   if (holeDia > 0) {
-    const baseHole = cylinder(thick + 1, holeDia / 2, undefined, 24)
-      .translate(width / 2, depth / 2, 0);
+    const baseHole = cylinder(thick + 1, holeDia / 2, undefined, 24).translate(width / 2, depth / 2, 0);
     const wallHole = cylinder(thick + 1, holeDia / 2, undefined, 24)
       .rotate(90, 0, 0)
       .translate(width / 2, 0, thick + height / 2);
@@ -203,21 +165,11 @@ export function bracket(
 }
 
 /** Grid pattern of holes */
-export function holePattern(
-  rows: number,
-  cols: number,
-  spacingX: number,
-  spacingY: number,
-  holeDia: number,
-  depth: number,
-): Shape {
+export function holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape {
   const holes: Shape[] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      holes.push(
-        cylinder(depth, holeDia / 2, undefined, 24)
-          .translate(c * spacingX, r * spacingY, 0),
-      );
+      holes.push(cylinder(depth, holeDia / 2, undefined, 24).translate(c * spacingX, r * spacingY, 0));
     }
   }
   return union(...holes);
@@ -332,17 +284,9 @@ function buildSingleSideSlotCutter(
   slotDepth: number,
   slotNeckDepth: number,
 ): Sketch {
-  const neck = sketchTranslate(
-    rect(slotWidth, slotNeckDepth, true),
-    0,
-    size / 2 - slotNeckDepth / 2,
-  );
+  const neck = sketchTranslate(rect(slotWidth, slotNeckDepth, true), 0, size / 2 - slotNeckDepth / 2);
   const pocketDepth = slotDepth - slotNeckDepth;
-  const pocket = sketchTranslate(
-    rect(slotInnerWidth, pocketDepth, true),
-    0,
-    size / 2 - slotNeckDepth - pocketDepth / 2,
-  );
+  const pocket = sketchTranslate(rect(slotInnerWidth, pocketDepth, true), 0, size / 2 - slotNeckDepth - pocketDepth / 2);
   return union2d(neck, pocket);
 }
 
@@ -371,13 +315,9 @@ export function tSlotProfile(options: TSlotProfileOptions = {}): Sketch {
   const innerSize = size - wall * 2;
   const innerCornerRadius = Math.max(0, Math.min(outerCornerRadius - wall, innerSize / 2 - 1e-6));
 
-  const outer = outerCornerRadius > 0
-    ? roundedRect(size, size, outerCornerRadius, true)
-    : rect(size, size, true);
+  const outer = outerCornerRadius > 0 ? roundedRect(size, size, outerCornerRadius, true) : rect(size, size, true);
 
-  const inner = innerCornerRadius > 0
-    ? roundedRect(innerSize, innerSize, innerCornerRadius, true)
-    : rect(innerSize, innerSize, true);
+  const inner = innerCornerRadius > 0 ? roundedRect(innerSize, innerSize, innerCornerRadius, true) : rect(innerSize, innerSize, true);
 
   const shell = difference2d(outer, inner);
   const webX = rect(innerSize, web, true);
@@ -385,12 +325,7 @@ export function tSlotProfile(options: TSlotProfileOptions = {}): Sketch {
   const boss = centerBossDia > 0 ? circle2d(centerBossDia / 2, segments) : null;
 
   const sideSlot = buildSingleSideSlotCutter(size, slotWidth, slotInnerWidth, slotDepth, slotNeckDepth);
-  const slots = union2d(
-    sideSlot,
-    sketchRotate(sideSlot, 90),
-    sketchRotate(sideSlot, 180),
-    sketchRotate(sideSlot, 270),
-  );
+  const slots = union2d(sideSlot, sketchRotate(sideSlot, 90), sketchRotate(sideSlot, 180), sketchRotate(sideSlot, 270));
 
   let profile = union2d(shell, webX, webY);
   if (boss) profile = union2d(profile, boss);
@@ -462,9 +397,7 @@ const DEFAULT_2020_B_SLOT6_PROFILE: Required<Profile2020BSlot6ProfileOptions> = 
   segments: 40,
 };
 
-function normalized2020BSlot6ProfileOptions(
-  options?: Profile2020BSlot6ProfileOptions,
-): Required<Profile2020BSlot6ProfileOptions> {
+function normalized2020BSlot6ProfileOptions(options?: Profile2020BSlot6ProfileOptions): Required<Profile2020BSlot6ProfileOptions> {
   const opts: Required<Profile2020BSlot6ProfileOptions> = {
     ...DEFAULT_2020_B_SLOT6_PROFILE,
     ...(options ?? {}),
@@ -512,29 +445,14 @@ function normalized2020BSlot6ProfileOptions(
  *
  * Returns a drawing-ready Sketch centered at origin.
  */
-export function profile2020BSlot6Profile(
-  options: Profile2020BSlot6ProfileOptions = {},
-): Sketch {
+export function profile2020BSlot6Profile(options: Profile2020BSlot6ProfileOptions = {}): Sketch {
   const opts = normalized2020BSlot6ProfileOptions(options);
   const size = 20;
 
-  const outer = opts.outerCornerRadius > 0
-    ? roundedRect(size, size, opts.outerCornerRadius, true)
-    : rect(size, size, true);
+  const outer = opts.outerCornerRadius > 0 ? roundedRect(size, size, opts.outerCornerRadius, true) : rect(size, size, true);
 
-  const sideSlot = buildSingleSideSlotCutter(
-    size,
-    opts.slotWidth,
-    opts.slotInnerWidth,
-    opts.slotDepth,
-    opts.slotNeckDepth,
-  );
-  const slots = union2d(
-    sideSlot,
-    sketchRotate(sideSlot, 90),
-    sketchRotate(sideSlot, 180),
-    sketchRotate(sideSlot, 270),
-  );
+  const sideSlot = buildSingleSideSlotCutter(size, opts.slotWidth, opts.slotInnerWidth, opts.slotDepth, opts.slotNeckDepth);
+  const slots = union2d(sideSlot, sketchRotate(sideSlot, 90), sketchRotate(sideSlot, 180), sketchRotate(sideSlot, 270));
 
   let profile = difference2d(outer, slots);
 
@@ -542,10 +460,7 @@ export function profile2020BSlot6Profile(
   const centerBoss = opts.centerBossDia > 0 ? circle2d(opts.centerBossDia / 2, opts.segments) : null;
   const webLen = size * 1.15;
   const xWeb = rect(webLen, opts.diagonalWebWidth, true);
-  const webs = union2d(
-    sketchRotate(xWeb, 45),
-    sketchRotate(xWeb, -45),
-  );
+  const webs = union2d(sketchRotate(xWeb, 45), sketchRotate(xWeb, -45));
 
   profile = union2d(profile, webs);
   if (centerBoss) {
@@ -573,7 +488,7 @@ export function profile2020BSlot6(length: number, options: Profile2020BSlot6Opti
   return sketchExtrude(profile, length, { center }).toShape();
 }
 
-export type { ExplodeAxis, ExplodeDirective, ExplodeDirection };
+export type { ExplodeAxis, ExplodeDirection, ExplodeDirective };
 
 export interface ExplodeNamedItem {
   name: string;
@@ -592,19 +507,14 @@ export interface ExplodeOptions extends ExplodeConfigOptions {}
  * Deterministic exploded-view transform for arrays / named assemblies / ShapeGroup trees.
  * Returns the same structure type as input, with translated shapes/sketches.
  */
-export function explode<T extends ExplodeItem[] | ShapeGroup>(
-  items: T,
-  options: ExplodeOptions = {},
-): T {
+export function explode<T extends ExplodeItem[] | ShapeGroup>(items: T, options: ExplodeOptions = {}): T {
   const config = createResolvedExplodeConfig(options);
   const boundsCache = new WeakMap<object, ExplodeBounds | null>();
   const rootBounds = computeExplodeBounds(items, boundsCache);
   const rootCenter = explodeBoundsCenter(rootBounds) ?? [0, 0, 0];
 
-  const centerForNode = (
-    node: unknown,
-    fallback: [number, number, number],
-  ): [number, number, number] => explodeBoundsCenter(computeExplodeBounds(node, boundsCache)) ?? fallback;
+  const centerForNode = (node: unknown, fallback: [number, number, number]): [number, number, number] =>
+    explodeBoundsCenter(computeExplodeBounds(node, boundsCache)) ?? fallback;
 
   const nodeMotion = (
     node: unknown,
@@ -651,10 +561,7 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     return nodeMotion(node, path, depth, originCenter, inheritedDirection, name, local);
   };
 
-  const explodeLeaf = (
-    leaf: Shape | Sketch | TrackedShape,
-    offset: [number, number, number],
-  ): Shape | Sketch | TrackedShape => {
+  const explodeLeaf = (leaf: Shape | Sketch | TrackedShape, offset: [number, number, number]): Shape | Sketch | TrackedShape => {
     if (leaf instanceof TrackedShape) return leaf.translate(offset[0], offset[1], offset[2]);
     if (leaf instanceof Shape) return leaf.translate(offset[0], offset[1], offset[2]);
     return leaf.translate(offset[0], offset[1]);
@@ -676,11 +583,14 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     const groupCenter = centerForNode(grp, parentCenter);
     const motion = nodeMotion(grp, path, depth, parentCenter, parentDirection);
     const total = explodeAdd(inherited, motion.offset);
-    return new ShapeGroup(grp.children.map((child, i) => {
-      const p = childPath(path, i, grp.childName(i));
-      if (child instanceof ShapeGroup) return explodeGroup(child, p, depth + 1, total, groupCenter, motion.branchDirection);
-      return explodeLeaf(child, explodeAdd(total, leafMotion(child, p, depth + 1, groupCenter, motion.branchDirection).offset));
-    }), grp.childNames);
+    return new ShapeGroup(
+      grp.children.map((child, i) => {
+        const p = childPath(path, i, grp.childName(i));
+        if (child instanceof ShapeGroup) return explodeGroup(child, p, depth + 1, total, groupCenter, motion.branchDirection);
+        return explodeLeaf(child, explodeAdd(total, leafMotion(child, p, depth + 1, groupCenter, motion.branchDirection).offset));
+      }),
+      grp.childNames,
+    );
   };
 
   const explodeItemNode = (
@@ -705,17 +615,11 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
     if (item.shape instanceof ShapeGroup) {
       out.shape = explodeGroup(item.shape, `${path}/shape`, depth + 1, total, itemCenter, motion.branchDirection);
     } else if (item.shape instanceof TrackedShape || item.shape instanceof Shape) {
-      out.shape = explodeLeaf(
-        item.shape,
-        total,
-      ) as Shape | TrackedShape;
+      out.shape = explodeLeaf(item.shape, total) as Shape | TrackedShape;
     }
 
     if (item.sketch instanceof Sketch) {
-      out.sketch = explodeLeaf(
-        item.sketch,
-        total,
-      ) as Sketch;
+      out.sketch = explodeLeaf(item.sketch, total) as Sketch;
     }
 
     if (Array.isArray(item.group)) {
@@ -729,11 +633,14 @@ export function explode<T extends ExplodeItem[] | ShapeGroup>(
   };
 
   if (items instanceof ShapeGroup) {
-    return new ShapeGroup(items.children.map((child, i) => {
-      const p = childPath('root', i, items.childName(i));
-      if (child instanceof ShapeGroup) return explodeGroup(child, p, 1, [0, 0, 0], rootCenter, undefined);
-      return explodeLeaf(child, nodeMotion(child, p, 1, rootCenter, undefined).offset);
-    }), items.childNames) as T;
+    return new ShapeGroup(
+      items.children.map((child, i) => {
+        const p = childPath('root', i, items.childName(i));
+        if (child instanceof ShapeGroup) return explodeGroup(child, p, 1, [0, 0, 0], rootCenter, undefined);
+        return explodeLeaf(child, nodeMotion(child, p, 1, rootCenter, undefined).offset);
+      }),
+      items.childNames,
+    ) as T;
   }
 
   return items.map((item, i) => {
@@ -746,10 +653,7 @@ function isExplodeNamedItem(value: unknown): value is ExplodeNamedItem {
   return !!value && typeof value === 'object' && typeof (value as { name?: unknown }).name === 'string';
 }
 
-function computeExplodeBounds(
-  node: unknown,
-  cache: WeakMap<object, ExplodeBounds | null>,
-): ExplodeBounds | null {
+function computeExplodeBounds(node: unknown, cache: WeakMap<object, ExplodeBounds | null>): ExplodeBounds | null {
   if (!node || typeof node !== 'object') return null;
   if (cache.has(node)) return cache.get(node) ?? null;
 
@@ -814,18 +718,20 @@ export function pipeRoute(
 
   // Precompute directions and bend info for each interior point
   type BendInfo = {
-    axis: [number, number, number];   // rotation axis (cross of incoming/outgoing)
+    axis: [number, number, number]; // rotation axis (cross of incoming/outgoing)
     center: [number, number, number]; // bend arc center
-    angle: number;                    // bend angle in radians
-    trimLen: number;                  // how much to shorten adjacent straights
+    angle: number; // bend angle in radians
+    trimLen: number; // how much to shorten adjacent straights
     startPt: [number, number, number]; // where straight ends / bend starts
-    endPt: [number, number, number];   // where bend ends / next straight starts
+    endPt: [number, number, number]; // where bend ends / next straight starts
   };
 
   const bends: (BendInfo | null)[] = new Array(points.length).fill(null);
 
   for (let i = 1; i < points.length - 1; i++) {
-    const prev = points[i - 1], cur = points[i], next = points[i + 1];
+    const prev = points[i - 1],
+      cur = points[i],
+      next = points[i + 1];
     // Incoming direction (toward cur)
     const dIn = normalize(sub(cur, prev));
     // Outgoing direction (away from cur)
@@ -898,8 +804,8 @@ export function pipeRoute(
       circlePts.push([cx, cy]);
     }
 
-    const angleDeg = info.angle * 180 / Math.PI;
-    const bendSegs = Math.max(4, Math.ceil(segs * angleDeg / 360));
+    const angleDeg = (info.angle * 180) / Math.PI;
+    const bendSegs = Math.max(4, Math.ceil((segs * angleDeg) / 360));
 
     const outerPlan: import('./compilePlan').ShapeCompilePlan = {
       kind: 'revolve',
@@ -952,10 +858,22 @@ export function pipeRoute(
     // col3 = center      (translation)
     const c = info.center;
     bendShape = bendShape.transform([
-      radialDir[0], radialDir[1], radialDir[2], 0,
-      tangentDir[0], tangentDir[1], tangentDir[2], 0,
-      info.axis[0], info.axis[1], info.axis[2], 0,
-      c[0], c[1], c[2], 1,
+      radialDir[0],
+      radialDir[1],
+      radialDir[2],
+      0,
+      tangentDir[0],
+      tangentDir[1],
+      tangentDir[2],
+      0,
+      info.axis[0],
+      info.axis[1],
+      info.axis[2],
+      0,
+      c[0],
+      c[1],
+      c[2],
+      1,
     ] as any);
 
     return bendShape;
@@ -1059,12 +977,12 @@ export function elbow(
     const nFrom = normalize(fromDir);
     const nTo = normalize(toDir);
     const d = clampDot(dot(nFrom, nTo));
-    angleDeg = Math.acos(d) * 180 / Math.PI;
+    angleDeg = (Math.acos(d) * 180) / Math.PI;
   }
 
   if (angleDeg < 0.01) throw new Error('elbow: angle too small');
 
-  const angleRad = angleDeg * Math.PI / 180;
+  const _angleRad = (angleDeg * Math.PI) / 180;
 
   // Build torus cross-section: circle at distance bendRadius from Z axis
   const circlePts: [number, number][] = [];
@@ -1073,7 +991,7 @@ export function elbow(
     circlePts.push([bendRadius + pipeRadius * Math.cos(a), pipeRadius * Math.sin(a)]);
   }
 
-  const bendSegs = Math.max(4, Math.ceil(segs * angleDeg / 360));
+  const bendSegs = Math.max(4, Math.ceil((segs * angleDeg) / 360));
 
   const outerPlan: import('./compilePlan').ShapeCompilePlan = {
     kind: 'revolve',
@@ -1117,10 +1035,22 @@ export function elbow(
     const perpDir = cross(axis, nFrom) as [number, number, number];
 
     bendShape = bendShape.transform([
-      perpDir[0], perpDir[1], perpDir[2], 0,
-      nFrom[0], nFrom[1], nFrom[2], 0,
-      axis[0], axis[1], axis[2], 0,
-      0, 0, 0, 1,
+      perpDir[0],
+      perpDir[1],
+      perpDir[2],
+      0,
+      nFrom[0],
+      nFrom[1],
+      nFrom[2],
+      0,
+      axis[0],
+      axis[1],
+      axis[2],
+      0,
+      0,
+      0,
+      0,
+      1,
     ] as any);
   }
 
@@ -1190,12 +1120,7 @@ function addArcPoints(
   }
 }
 
-function flankAngleAtRadius(
-  radius: number,
-  baseRadius: number,
-  halfThicknessAtPitch: number,
-  pressureAngleRad: number,
-): number {
+function flankAngleAtRadius(radius: number, baseRadius: number, halfThicknessAtPitch: number, pressureAngleRad: number): number {
   const alphaAtRadius = Math.acos(clamp01(baseRadius / Math.max(radius, baseRadius)));
   return halfThicknessAtPitch + involuteFn(pressureAngleRad) - involuteFn(alphaAtRadius);
 }
@@ -1288,7 +1213,7 @@ function normalizeSpurGearOptions(options: SpurGearOptions): NormalizedSpurGearO
     module,
     teeth: options.teeth,
     pressureAngleDeg,
-    pressureAngleRad: pressureAngleDeg * Math.PI / 180,
+    pressureAngleRad: (pressureAngleDeg * Math.PI) / 180,
     faceWidth: options.faceWidth,
     backlash,
     clearance,
@@ -1489,10 +1414,7 @@ export function sideGear(options: SideGearOptions): Shape {
   const segments = Math.max(48, normalized.teeth * normalized.segmentsPerTooth);
   const rootDisk = cylinder(normalized.faceWidth, meta.rootRadius, undefined, segments, normalized.center);
   const profile = buildSpurGearProfile(spurMeta, normalized.segmentsPerTooth);
-  const toothBandRaw = difference2d(
-    profile,
-    circle2d(meta.rootRadius, Math.max(48, normalized.teeth * 2)),
-  );
+  const toothBandRaw = difference2d(profile, circle2d(meta.rootRadius, Math.max(48, normalized.teeth * 2)));
   // Use backend-level simplify for polygon cleanup (not a public Sketch API).
   const simplifiedCross = toothBandRaw.cross.simplify(1e-6);
   const toothBandProfile = setSketchCompileProfilePlan(
@@ -1500,20 +1422,17 @@ export function sideGear(options: SideGearOptions): Shape {
     profilePlanFromCrossSection(simplifiedCross),
   );
 
-  const teethBand = sketchExtrude(toothBandProfile, normalized.toothHeight, { center: false })
-    .toShape()
-    .translate(0, 0, zBands.toothMinZ);
+  const teethBand = sketchExtrude(toothBandProfile, normalized.toothHeight, { center: false }).toShape().translate(0, 0, zBands.toothMinZ);
 
   let shape = union(rootDisk, teethBand);
   if (normalized.boreDiameter > 0) {
     const zMin = Math.min(zBands.bodyMinZ, zBands.toothMinZ);
     const zMax = Math.max(zBands.bodyMaxZ, zBands.toothMaxZ);
-    const bore = cylinder(
-      (zMax - zMin) + 2,
-      normalized.boreDiameter * 0.5,
-      undefined,
-      Math.max(48, normalized.teeth * 2),
-    ).translate(0, 0, zMin - 1);
+    const bore = cylinder(zMax - zMin + 2, normalized.boreDiameter * 0.5, undefined, Math.max(48, normalized.teeth * 2)).translate(
+      0,
+      0,
+      zMin - 1,
+    );
     shape = shape.subtract(bore);
   }
 
@@ -1590,9 +1509,7 @@ function normalizeRingGearOptions(options: RingGearOptions): NormalizedRingGearO
   const rimWidth = options.rimWidth ?? module * 2;
   if (!isFinitePositive(rimWidth)) throw new Error('ringGear: "rimWidth" must be > 0');
 
-  const outerRadius = options.outerDiameter != null
-    ? options.outerDiameter * 0.5
-    : rootRadius + rimWidth;
+  const outerRadius = options.outerDiameter != null ? options.outerDiameter * 0.5 : rootRadius + rimWidth;
   if (!(outerRadius > rootRadius + EPSILON)) {
     throw new Error('ringGear: outer diameter/rim width leaves no ring body');
   }
@@ -1601,7 +1518,7 @@ function normalizeRingGearOptions(options: RingGearOptions): NormalizedRingGearO
     module,
     teeth: options.teeth,
     pressureAngleDeg,
-    pressureAngleRad: pressureAngleDeg * Math.PI / 180,
+    pressureAngleRad: (pressureAngleDeg * Math.PI) / 180,
     faceWidth: options.faceWidth,
     backlash,
     addendum,
@@ -1713,7 +1630,7 @@ export function rackGear(options: RackGearOptions): Shape {
   if (!isFinitePositive(pressureAngleDeg) || pressureAngleDeg >= 60) {
     throw new Error('rackGear: "pressureAngleDeg" must be in (0, 60)');
   }
-  const pressureAngleRad = pressureAngleDeg * Math.PI / 180;
+  const pressureAngleRad = (pressureAngleDeg * Math.PI) / 180;
 
   const module = options.module;
   const pitch = Math.PI * module;
@@ -1819,14 +1736,14 @@ function normalizeShaftAngle(label: string, value: number): number {
 }
 
 function computeBevelPitchAngleDeg(teeth: number, mateTeeth: number, shaftAngleDeg: number): number {
-  const shaftAngleRad = shaftAngleDeg * Math.PI / 180;
+  const shaftAngleRad = (shaftAngleDeg * Math.PI) / 180;
   const numerator = teeth * Math.sin(shaftAngleRad);
   const denominator = mateTeeth + teeth * Math.cos(shaftAngleRad);
   const angle = Math.atan2(numerator, denominator);
   if (!(angle > EPSILON && angle < shaftAngleRad - EPSILON)) {
     throw new Error('bevelGear: could not derive a valid pitch angle from teeth/shaft angle');
   }
-  return angle * 180 / Math.PI;
+  return (angle * 180) / Math.PI;
 }
 
 function normalizeBevelGearOptions(options: BevelGearOptions): NormalizedBevelGearOptions {
@@ -1861,7 +1778,7 @@ function normalizeBevelGearOptions(options: BevelGearOptions): NormalizedBevelGe
   if (!isFinitePositive(pitchAngleDeg) || pitchAngleDeg >= 88) {
     throw new Error('bevelGear: "pitchAngleDeg" must be in (0, 88)');
   }
-  const pitchAngleRad = pitchAngleDeg * Math.PI / 180;
+  const pitchAngleRad = (pitchAngleDeg * Math.PI) / 180;
   const pitchRadius = spur.module * spur.teeth * 0.5;
   const coneDistance = pitchRadius / Math.max(EPSILON, Math.sin(pitchAngleRad));
   if (!isFinitePositive(coneDistance)) {
@@ -1960,10 +1877,7 @@ export interface GearPairResult {
   status: 'ok' | 'warn' | 'error';
 }
 
-function resolveGearPairMember(
-  value: Shape | GearPairSpec,
-  label: 'pinion' | 'gear',
-): { shape: Shape; meta: GearMeta } {
+function resolveGearPairMember(value: Shape | GearPairSpec, label: 'pinion' | 'gear'): { shape: Shape; meta: GearMeta } {
   if (value instanceof Shape) {
     const meta = readGearMeta(value);
     if (!meta || meta.kind !== 'spur') {
@@ -2023,7 +1937,7 @@ export function gearPair(options: GearPairOptions): GearPairResult {
 
   const module = pinion.meta.module;
   const alpha = pinion.meta.pressureAngleRad;
-  const nominalCenterDistance = (pinion.meta.pitchRadius + gear.meta.pitchRadius);
+  const nominalCenterDistance = pinion.meta.pitchRadius + gear.meta.pitchRadius;
   const requestedBacklash = options.backlash ?? Math.max(pinion.meta.backlash, gear.meta.backlash, 0);
   const autoCenterDistance = nominalCenterDistance + requestedBacklash / (2 * Math.max(EPSILON, Math.tan(alpha)));
   const centerDistance = options.centerDistance ?? autoCenterDistance;
@@ -2061,9 +1975,10 @@ export function gearPair(options: GearPairOptions): GearPairResult {
   const cosWorking = clamp01(baseSum / Math.max(centerDistance, EPSILON));
   const alphaWorking = Math.acos(cosWorking);
   const basePitch = Math.PI * module * Math.cos(alpha);
-  const pathLength = Math.sqrt(Math.max(0, pinion.meta.outerRadius ** 2 - pinion.meta.baseRadius ** 2))
-    + Math.sqrt(Math.max(0, gear.meta.outerRadius ** 2 - gear.meta.baseRadius ** 2))
-    - centerDistance * Math.sin(alphaWorking);
+  const pathLength =
+    Math.sqrt(Math.max(0, pinion.meta.outerRadius ** 2 - pinion.meta.baseRadius ** 2)) +
+    Math.sqrt(Math.max(0, gear.meta.outerRadius ** 2 - gear.meta.baseRadius ** 2)) -
+    centerDistance * Math.sin(alphaWorking);
   const contactRatio = pathLength / Math.max(EPSILON, basePitch);
 
   if (contactRatio < 1) {
@@ -2097,10 +2012,8 @@ export function gearPair(options: GearPairOptions): GearPairResult {
 
   const place = options.place ?? true;
   const pinionShape = place ? pinion.shape : pinion.shape.clone();
-  const phaseDeg = options.phaseDeg ?? (180 / gear.meta.teeth);
-  const gearShape = place
-    ? gear.shape.rotate(0, 0, phaseDeg).translate(centerDistance, 0, 0)
-    : gear.shape;
+  const phaseDeg = options.phaseDeg ?? 180 / gear.meta.teeth;
+  const gearShape = place ? gear.shape.rotate(0, 0, phaseDeg).translate(centerDistance, 0, 0) : gear.shape;
   const status = pairStatusFromDiagnostics(diagnostics);
 
   return {
@@ -2110,7 +2023,7 @@ export function gearPair(options: GearPairOptions): GearPairResult {
     centerDistanceNominal: nominalCenterDistance,
     backlash: impliedBacklash,
     pressureAngleDeg,
-    workingPressureAngleDeg: alphaWorking * 180 / Math.PI,
+    workingPressureAngleDeg: (alphaWorking * 180) / Math.PI,
     contactRatio,
     jointRatio: -(pinion.meta.teeth / gear.meta.teeth),
     speedReduction: gear.meta.teeth / pinion.meta.teeth,
@@ -2254,29 +2167,31 @@ function resolveBevelPairMember(
 
 export function bevelGearPair(options: BevelGearPairOptions): BevelGearPairResult {
   const shaftAngleDeg = normalizeShaftAngle('bevelGearPair', options.shaftAngleDeg ?? 90);
-  const pinionTeeth = options.pinion instanceof Shape
-    ? (() => {
-      const meta = readGearMeta(options.pinion);
-      if (!meta || meta.kind !== 'bevel') {
-        throw new Error('bevelGearPair: pinion shape must come from bevelGear(...)');
-      }
-      return meta.teeth;
-    })()
-    : options.pinion.teeth;
-  const gearTeeth = options.gear instanceof Shape
-    ? (() => {
-      const meta = readGearMeta(options.gear);
-      if (!meta || meta.kind !== 'bevel') {
-        throw new Error('bevelGearPair: gear shape must come from bevelGear(...)');
-      }
-      return meta.teeth;
-    })()
-    : options.gear.teeth;
+  const pinionTeeth =
+    options.pinion instanceof Shape
+      ? (() => {
+          const meta = readGearMeta(options.pinion);
+          if (!meta || meta.kind !== 'bevel') {
+            throw new Error('bevelGearPair: pinion shape must come from bevelGear(...)');
+          }
+          return meta.teeth;
+        })()
+      : options.pinion.teeth;
+  const gearTeeth =
+    options.gear instanceof Shape
+      ? (() => {
+          const meta = readGearMeta(options.gear);
+          if (!meta || meta.kind !== 'bevel') {
+            throw new Error('bevelGearPair: gear shape must come from bevelGear(...)');
+          }
+          return meta.teeth;
+        })()
+      : options.gear.teeth;
 
   const pinionPitchAngleDeg = computeBevelPitchAngleDeg(pinionTeeth, gearTeeth, shaftAngleDeg);
   const gearPitchAngleDeg = shaftAngleDeg - pinionPitchAngleDeg;
-  const pinionPitchAngleRad = pinionPitchAngleDeg * Math.PI / 180;
-  const gearPitchAngleRad = gearPitchAngleDeg * Math.PI / 180;
+  const pinionPitchAngleRad = (pinionPitchAngleDeg * Math.PI) / 180;
+  const gearPitchAngleRad = (gearPitchAngleDeg * Math.PI) / 180;
 
   const pinion = resolveBevelPairMember(options.pinion, 'pinion', gearTeeth, shaftAngleDeg);
   const gear = resolveBevelPairMember(options.gear, 'gear', pinionTeeth, shaftAngleDeg);
@@ -2315,10 +2230,8 @@ export function bevelGearPair(options: BevelGearPairOptions): BevelGearPairResul
     });
   }
 
-  const coneDistancePinion = pinion.meta.coneDistance
-    ?? (pinion.meta.pitchRadius / Math.max(EPSILON, Math.sin(pinionPitchAngleRad)));
-  const coneDistanceGear = gear.meta.coneDistance
-    ?? (gear.meta.pitchRadius / Math.max(EPSILON, Math.sin(gearPitchAngleRad)));
+  const coneDistancePinion = pinion.meta.coneDistance ?? pinion.meta.pitchRadius / Math.max(EPSILON, Math.sin(pinionPitchAngleRad));
+  const coneDistanceGear = gear.meta.coneDistance ?? gear.meta.pitchRadius / Math.max(EPSILON, Math.sin(gearPitchAngleRad));
   const coneDistance = (coneDistancePinion + coneDistanceGear) * 0.5;
   if (Math.abs(coneDistancePinion - coneDistanceGear) > pinion.meta.module * 0.5) {
     diagnostics.push({
@@ -2338,21 +2251,15 @@ export function bevelGearPair(options: BevelGearPairOptions): BevelGearPairResul
     });
   }
 
-  const shaftAngleRad = shaftAngleDeg * Math.PI / 180;
+  const shaftAngleRad = (shaftAngleDeg * Math.PI) / 180;
   const pinionAxis: [number, number, number] = [0, 0, 1];
   const gearAxis: [number, number, number] = [Math.sin(shaftAngleRad), 0, Math.cos(shaftAngleRad)];
   const pinionCenter: [number, number, number] = [0, 0, -pinionToApex];
-  const gearCenter: [number, number, number] = [
-    -gearAxis[0] * gearToApex,
-    0,
-    -gearAxis[2] * gearToApex,
-  ];
+  const gearCenter: [number, number, number] = [-gearAxis[0] * gearToApex, 0, -gearAxis[2] * gearToApex];
 
   const place = options.place ?? true;
-  const phaseDeg = options.phaseDeg ?? (180 / gear.meta.teeth);
-  const pinionShape = place
-    ? pinion.shape.translate(pinionCenter[0], pinionCenter[1], pinionCenter[2])
-    : pinion.shape.clone();
+  const phaseDeg = options.phaseDeg ?? 180 / gear.meta.teeth;
+  const pinionShape = place ? pinion.shape.translate(pinionCenter[0], pinionCenter[1], pinionCenter[2]) : pinion.shape.clone();
   const gearShape = place
     ? gear.shape.rotate(0, 0, phaseDeg).rotate(0, shaftAngleDeg, 0).translate(gearCenter[0], gearCenter[1], gearCenter[2])
     : gear.shape.clone();
@@ -2478,7 +2385,7 @@ export function sideGearPair(options: SideGearPairOptions): SideGearPairResult {
   const module = side.meta.module;
   const nominalCenterDistance = side.meta.pitchRadius + vertical.meta.pitchRadius;
   const requestedBacklash = options.backlash ?? Math.max(side.meta.backlash, vertical.meta.backlash, 0);
-  const centerDistance = options.centerDistance ?? (nominalCenterDistance + requestedBacklash * 0.5);
+  const centerDistance = options.centerDistance ?? nominalCenterDistance + requestedBacklash * 0.5;
   if (!Number.isFinite(centerDistance) || centerDistance <= 0) {
     throw new Error('sideGearPair: centerDistance must be > 0');
   }
@@ -2539,8 +2446,11 @@ export function sideGearPair(options: SideGearPairOptions): SideGearPairResult {
   if (!Number.isFinite(meshPlaneZ)) {
     throw new Error('sideGearPair: meshPlaneZ must be finite');
   }
-  if (side.meta.toothMinZ != null && side.meta.toothMaxZ != null
-    && (meshPlaneZ < side.meta.toothMinZ - 1e-6 || meshPlaneZ > side.meta.toothMaxZ + 1e-6)) {
+  if (
+    side.meta.toothMinZ != null &&
+    side.meta.toothMaxZ != null &&
+    (meshPlaneZ < side.meta.toothMinZ - 1e-6 || meshPlaneZ > side.meta.toothMaxZ + 1e-6)
+  ) {
     diagnostics.push({
       level: 'error',
       code: 'sidegear.mesh_plane_out_of_band',
@@ -2550,7 +2460,7 @@ export function sideGearPair(options: SideGearPairOptions): SideGearPairResult {
 
   const place = options.place ?? true;
   const sideShape = place ? side.shape : side.shape.clone();
-  const phaseDeg = options.phaseDeg ?? (180 / vertical.meta.teeth);
+  const phaseDeg = options.phaseDeg ?? 180 / vertical.meta.teeth;
   const verticalShape = place
     ? vertical.shape.rotate(0, 0, phaseDeg).rotate(-90, 0, 0).translate(centerDistance, 0, meshPlaneZ)
     : vertical.shape;
@@ -2649,20 +2559,15 @@ export const partLibrary = {
 
 /**
  * External thread via twisted extrusion — no SDF grid artifacts.
- * 
+ *
  * The idea: build a cross-section that's a circle at the root diameter
  * with one trapezoidal bump out to the crest diameter. Then twist-extrude
  * it so the bump traces a helix. Manifold's extrude+twist produces clean
  * structured geometry — quads split into triangles that follow the thread.
- * 
+ *
  * Returns a threaded cylinder along +Z from z=0 to z=length.
  */
-export function thread(
-  diameter: number,
-  pitch: number,
-  length: number,
-  options?: { depth?: number; segments?: number },
-): Shape {
+export function thread(diameter: number, pitch: number, length: number, options?: { depth?: number; segments?: number }): Shape {
   const r = diameter / 2;
   const depth = options?.depth ?? pitch * 0.35;
   const segs = options?.segments ?? 36;
@@ -2674,8 +2579,8 @@ export function thread(
   // The tooth angular width at the root radius.
   // Standard metric: tooth occupies ~50% of pitch circumferentially.
   // One pitch spans (pitch / rRoot) radians at the root circle.
-  const toothHalfWidth = (pitch * 0.5) / (2 * rRoot);  // half-width in radians
-  const flankWidth = toothHalfWidth * 0.4;  // transition zone
+  const toothHalfWidth = (pitch * 0.5) / (2 * rRoot); // half-width in radians
+  const flankWidth = toothHalfWidth * 0.4; // transition zone
 
   const pts: [number, number][] = [];
   for (let i = 0; i < segs; i++) {
@@ -2737,23 +2642,18 @@ export function bolt(
 
   // Hex head
   const slab = box(headAF * 1.2, headAF, headH, true).translate(0, 0, headH / 2);
-  const hexHead = slab
-    .intersect(slab.rotate(0, 0, 60))
-    .intersect(slab.rotate(0, 0, 120));
+  const hexHead = slab.intersect(slab.rotate(0, 0, 60)).intersect(slab.rotate(0, 0, 120));
 
   // Smooth shaft (unthreaded portion)
   const unthreadedLen = length - threadLen;
   const parts: Shape[] = [hexHead];
 
   if (unthreadedLen > 0.1) {
-    parts.push(
-      cylinder(unthreadedLen, r, undefined, segs).translate(0, 0, -unthreadedLen),
-    );
+    parts.push(cylinder(unthreadedLen, r, undefined, segs).translate(0, 0, -unthreadedLen));
   }
 
   // Threaded portion
-  const threaded = thread(diameter, pitch, threadLen, { segments: segs })
-    .translate(0, 0, -length);
+  const threaded = thread(diameter, pitch, threadLen, { segments: segs }).translate(0, 0, -length);
   parts.push(threaded);
 
   // TODO: Tip chamfer (cone at the end)
@@ -2774,16 +2674,14 @@ export function nut(
   },
 ): Shape {
   const r = diameter / 2;
-  const pitch = options?.pitch ?? diameter * 0.15;
+  const _pitch = options?.pitch ?? diameter * 0.15;
   const nutH = options?.height ?? diameter * 0.8;
   const nutAF = options?.acrossFlats ?? diameter * 1.6;
-  const segs = options?.segments ?? 36;
+  const _segs = options?.segments ?? 36;
 
   // Hex body
   const slab = box(nutAF * 1.2, nutAF, nutH, true);
-  let hexBody = slab
-    .intersect(slab.rotate(0, 0, 60))
-    .intersect(slab.rotate(0, 0, 120));
+  let hexBody = slab.intersect(slab.rotate(0, 0, 60)).intersect(slab.rotate(0, 0, 120));
 
   // Threaded bore (internal thread = slightly larger bore with thread ridges)
   // For simplicity, use a clearance bore — internal threads are hard to see anyway
@@ -2801,14 +2699,14 @@ type WasherStandard = 'din-125-a';
 
 /** DIN 125-A flat washer dimensions (inner diameter, outer diameter, thickness) in mm */
 const WASHER_TABLE: Record<MetricSize, { id: number; od: number; t: number }> = {
-  M2:    { id: 2.2,  od: 5.0,  t: 0.3 },
-  'M2.5': { id: 2.7, od: 6.0,  t: 0.5 },
-  M3:    { id: 3.2,  od: 7.0,  t: 0.5 },
-  M4:    { id: 4.3,  od: 9.0,  t: 0.8 },
-  M5:    { id: 5.3,  od: 10.0, t: 1.0 },
-  M6:    { id: 6.4,  od: 12.0, t: 1.6 },
-  M8:    { id: 8.4,  od: 17.0, t: 1.6 },
-  M10:   { id: 10.5, od: 21.0, t: 2.0 },
+  M2: { id: 2.2, od: 5.0, t: 0.3 },
+  'M2.5': { id: 2.7, od: 6.0, t: 0.5 },
+  M3: { id: 3.2, od: 7.0, t: 0.5 },
+  M4: { id: 4.3, od: 9.0, t: 0.8 },
+  M5: { id: 5.3, od: 10.0, t: 1.0 },
+  M6: { id: 6.4, od: 12.0, t: 1.6 },
+  M8: { id: 8.4, od: 17.0, t: 1.6 },
+  M10: { id: 10.5, od: 21.0, t: 2.0 },
 };
 
 /**
@@ -2816,15 +2714,12 @@ const WASHER_TABLE: Record<MetricSize, { id: number; od: number; t: number }> = 
  * Returns a flat ring centered at the origin, thickness along Z.
  * Use `size` to select a standard metric thread size.
  */
-export function washer(
-  size: MetricSize,
-  options?: { standard?: WasherStandard; segments?: number },
-): Shape {
+export function washer(size: MetricSize, options?: { standard?: WasherStandard; segments?: number }): Shape {
   const dims = WASHER_TABLE[size];
   if (!dims) throw new Error(`washer: unsupported size "${size}"`);
   const segs = options?.segments ?? 48;
   const outer = cylinder(dims.t, dims.od / 2, undefined, segs, true);
-  const bore  = cylinder(dims.t + 1, dims.id / 2, undefined, segs, true);
+  const bore = cylinder(dims.t + 1, dims.id / 2, undefined, segs, true);
   return outer.subtract(bore);
 }
 
@@ -2898,11 +2793,7 @@ export interface FastenerSetResult {
  *   { name: 'Bolt', shape: boltPos, color: '#aaaaaa' },
  * ];
  */
-export function fastenerSet(
-  size: MetricSize,
-  boltLength: number,
-  options?: FastenerSetOptions,
-): FastenerSetResult {
+export function fastenerSet(size: MetricSize, boltLength: number, options?: FastenerSetOptions): FastenerSetResult {
   const sizeData = METRIC_HOLE_TABLE[size];
   if (!sizeData) throw new Error(`fastenerSet: unsupported size "${size}"`);
   if (!Number.isFinite(boltLength) || boltLength <= 0) {
@@ -2912,25 +2803,25 @@ export function fastenerSet(
   const fit = options?.fit ?? 'normal';
   const segs = options?.segments ?? 36;
   const includeHeadWasher = options?.washerUnderHead ?? true;
-  const includeNutWasher  = options?.washerUnderNut  ?? true;
+  const includeNutWasher = options?.washerUnderNut ?? true;
 
   const nomDia = parseFloat(size.replace('M', ''));
   const washerDims = WASHER_TABLE[size];
   const nutHeight = nomDia * 0.8;
-  const nutAF     = nomDia * 1.6;
+  const nutAF = nomDia * 1.6;
 
   const boltShape = bolt(nomDia, boltLength, { segments: segs });
-  const nutShape  = nut(nomDia, { height: nutHeight, acrossFlats: nutAF, segments: segs });
+  const nutShape = nut(nomDia, { height: nutHeight, acrossFlats: nutAF, segments: segs });
 
   const headWasher = includeHeadWasher ? washer(size, { segments: segs }) : null;
-  const nutWasherShape  = includeNutWasher  ? washer(size, { segments: segs }) : null;
+  const nutWasherShape = includeNutWasher ? washer(size, { segments: segs }) : null;
 
   const clearanceDia = sizeData[fit];
-  const tapDia       = sizeData.tap;
-  const depth        = boltLength + 1;  // slightly deeper than bolt for clean cutter
+  const tapDia = sizeData.tap;
+  const depth = boltLength + 1; // slightly deeper than bolt for clean cutter
 
   const clearanceHole = cylinder(depth, clearanceDia / 2, undefined, segs, true);
-  const tappedHole    = cylinder(depth, tapDia / 2,       undefined, segs, true);
+  const tappedHole = cylinder(depth, tapDia / 2, undefined, segs, true);
 
   const dims: FastenerSetDimensions = {
     size,
@@ -2940,16 +2831,16 @@ export function fastenerSet(
     tapDia,
     nutAcrossFlats: nutAF,
     nutHeight,
-    washerOuterDia:   washerDims.od,
-    washerInnerDia:   washerDims.id,
-    washerThickness:  washerDims.t,
+    washerOuterDia: washerDims.od,
+    washerInnerDia: washerDims.id,
+    washerThickness: washerDims.t,
   };
 
   return {
     bolt: boltShape,
     nut: nutShape,
     washerUnderHead: headWasher,
-    washerUnderNut:  nutWasherShape,
+    washerUnderNut: nutWasherShape,
     clearanceHole,
     tappedHole,
     dims,

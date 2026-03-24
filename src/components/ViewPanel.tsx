@@ -1,14 +1,14 @@
-import { useForgeStore } from '../store/forgeStore';
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactElement, type ReactNode } from 'react';
-import type { SceneObject } from '@forge/index';
 import type { CutPlaneDef } from '@forge/cutPlane';
+import type { SceneObject } from '@forge/index';
 import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
 import { resolveJointViewValues } from '@forge/jointsView';
+import { formatArea } from '@forge/units';
+import { type CSSProperties, type MouseEvent, type ReactElement, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { animationSpeedToSlider, formatAnimationSpeed, sliderToAnimationSpeed } from '../animationSpeed';
 import { getCameraForwardVector, type ViewportCameraState } from '../capture/cameraState';
 import { formatRenderSceneCliSpec, type ViewportRenderSceneState } from '../capture/renderSceneState';
+import { useForgeStore } from '../store/forgeStore';
 import { ConstructionTreePanel } from './ConstructionTreePanel';
-import { formatArea } from '@forge/units';
 
 function CollapsibleSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
   const [open, setOpen] = useState(true);
@@ -68,13 +68,11 @@ const resolveJointRange = (type: 'revolute' | 'prismatic', min?: number, max?: n
   max: max ?? (type === 'prismatic' ? 100 : 360),
 });
 
-const formatVector = (value: [number, number, number]): string => (
-  value.map((entry) => entry.toFixed(3)).join(', ')
-);
+const formatVector = (value: [number, number, number]): string => value.map((entry) => entry.toFixed(3)).join(', ');
 
 const DEFAULT_OBJECT_SETTINGS = { visible: true, opacity: 1, color: '#5b9bd5' } as const;
 
-const shellQuoteArg = (value: string): string => `'${value.replace(/'/g, `'\"'\"'`)}'`;
+const shellQuoteArg = (value: string): string => `'${value.replace(/'/g, `'"'"'`)}'`;
 
 const buildViewportRenderSceneState = (
   camera: ViewportCameraState,
@@ -97,9 +95,7 @@ const buildViewportRenderSceneState = (
     }
   });
 
-  return Object.keys(objectOverrides).length > 0
-    ? { camera, objects: objectOverrides }
-    : { camera };
+  return Object.keys(objectOverrides).length > 0 ? { camera, objects: objectOverrides } : { camera };
 };
 
 type ObjectVisibilityState = 'none' | 'mixed' | 'all';
@@ -132,11 +128,8 @@ interface MutableObjectTreeGroupNode {
   groups: Map<string, MutableObjectTreeGroupNode>;
 }
 
-const cleanTreeSegments = (segments: string[] | undefined): string[] => (
-  (segments ?? [])
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0)
-);
+const cleanTreeSegments = (segments: string[] | undefined): string[] =>
+  (segments ?? []).map((segment) => segment.trim()).filter((segment) => segment.length > 0);
 
 const getObjectTreePath = (object: SceneObject): string[] => {
   const explicitTreePath = cleanTreeSegments(object.treePath);
@@ -168,9 +161,7 @@ const createMutableObjectGroup = (label: string, path: string[]): MutableObjectT
 });
 
 const finalizeObjectGroup = (node: MutableObjectTreeGroupNode): ObjectTreeGroupNode => {
-  const children = node.children.map((child) => (
-    child.kind === 'object' ? child : finalizeObjectGroup(child)
-  ));
+  const children = node.children.map((child) => (child.kind === 'object' ? child : finalizeObjectGroup(child)));
   return {
     kind: 'group',
     key: node.key,
@@ -209,9 +200,7 @@ const buildObjectTree = (objects: SceneObject[]): ObjectTreeNode[] => {
     });
   });
 
-  return root.children.map((child) => (
-    child.kind === 'object' ? child : finalizeObjectGroup(child)
-  ));
+  return root.children.map((child) => (child.kind === 'object' ? child : finalizeObjectGroup(child)));
 };
 
 function VisibilityCheckbox({
@@ -300,7 +289,7 @@ export function ViewPanel() {
   const toggleJointAnimationPlayback = useForgeStore((s) => s.toggleJointAnimationPlayback);
   const hoveredJointName = useForgeStore((s) => s.hoveredJointName);
   const setHoveredJointName = useForgeStore((s) => s.setHoveredJointName);
-  const updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
+  const _updateSketchConstraint = useForgeStore((s) => s.updateSketchConstraint);
   const selectedSurfaceIndex = useForgeStore((s) => s.selectedSurfaceIndex);
   const setSelectedSurfaceIndex = useForgeStore((s) => s.setSelectedSurfaceIndex);
   const hoveredSurfaceIndex = useForgeStore((s) => s.hoveredSurfaceIndex);
@@ -340,21 +329,16 @@ export function ViewPanel() {
     () => resolveJointViewValues(joints, jointCouplings, animatedJointValues),
     [animatedJointValues, jointCouplings, joints],
   );
-  const coupledJointNames = useMemo(
-    () => new Set(jointCouplings.map((coupling) => coupling.joint)),
-    [jointCouplings],
-  );
+  const coupledJointNames = useMemo(() => new Set(jointCouplings.map((coupling) => coupling.joint)), [jointCouplings]);
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
   const [sceneCopyStatus, setSceneCopyStatus] = useState<string | null>(null);
   const [constraintsSectionOpen, setConstraintsSectionOpen] = useState(true);
   const sceneCopyTimeoutRef = useRef<number | null>(null);
-  const cameraForward = useMemo(
-    () => (viewportCameraState ? getCameraForwardVector(viewportCameraState) : null),
-    [viewportCameraState],
-  );
-  const displayedAnimationProgress = activeAnimationClip?.loop && activeAnimationClip.continuous
-    ? jointAnimationProgress - Math.floor(jointAnimationProgress)
-    : Math.max(0, Math.min(1, jointAnimationProgress));
+  const cameraForward = useMemo(() => (viewportCameraState ? getCameraForwardVector(viewportCameraState) : null), [viewportCameraState]);
+  const displayedAnimationProgress =
+    activeAnimationClip?.loop && activeAnimationClip.continuous
+      ? jointAnimationProgress - Math.floor(jointAnimationProgress)
+      : Math.max(0, Math.min(1, jointAnimationProgress));
 
   useEffect(() => {
     if (!hoveredJointName) return;
@@ -367,23 +351,21 @@ export function ViewPanel() {
     () => (viewportCameraState ? buildViewportRenderSceneState(viewportCameraState, objects, objectSettings) : null),
     [objectSettings, objects, viewportCameraState],
   );
-  const sceneObjectOverrideCount = useMemo(
-    () => Object.keys(cliSceneState?.objects ?? {}).length,
-    [cliSceneState],
-  );
+  const sceneObjectOverrideCount = useMemo(() => Object.keys(cliSceneState?.objects ?? {}).length, [cliSceneState]);
   const objectTree = useMemo(() => buildObjectTree(objects), [objects]);
   const selectedObject = objects.find((obj) => obj.id === selectedObjectId) ?? null;
   const objectItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const constraintMeta = selectedObject?.sketchMeta ?? null;
-  const constraintStatusColor = constraintMeta?.status === 'over'
-    ? 'var(--fc-sketchOverConstrained)'
-    : constraintMeta?.status === 'over-redundant'
-      ? 'var(--fc-sketchRedundant)'
-      : constraintMeta?.status === 'fully'
-        ? 'var(--fc-sketchFullyConstrained)'
-        : constraintMeta?.status === 'under'
-          ? 'var(--fc-sketchUnderConstrained)'
-          : 'var(--fc-textDim)';
+  const constraintStatusColor =
+    constraintMeta?.status === 'over'
+      ? 'var(--fc-sketchOverConstrained)'
+      : constraintMeta?.status === 'over-redundant'
+        ? 'var(--fc-sketchRedundant)'
+        : constraintMeta?.status === 'fully'
+          ? 'var(--fc-sketchFullyConstrained)'
+          : constraintMeta?.status === 'under'
+            ? 'var(--fc-sketchUnderConstrained)'
+            : 'var(--fc-textDim)';
 
   useEffect(() => {
     if (!objectPickSyncEnabled || !selectedObjectId) return;
@@ -437,8 +419,7 @@ export function ViewPanel() {
   const renderObjectTreeNode = (node: ObjectTreeNode): ReactElement => {
     if (node.kind === 'group') {
       const visibilityState = getObjectVisibilityState(node.objectIds);
-      const isDimmedByFocus = focusedObjectIdSet.size > 0
-        && !node.objectIds.some((id) => focusedObjectIdSet.has(id));
+      const isDimmedByFocus = focusedObjectIdSet.size > 0 && !node.objectIds.some((id) => focusedObjectIdSet.has(id));
       return (
         <div key={node.key} style={{ marginBottom: 8, opacity: isDimmedByFocus ? 0.65 : 1 }}>
           <div
@@ -488,7 +469,9 @@ export function ViewPanel() {
     return (
       <div
         key={node.key}
-        ref={(element) => { objectItemRefs.current[obj.id] = element; }}
+        ref={(element) => {
+          objectItemRefs.current[obj.id] = element;
+        }}
         tabIndex={-1}
         onClick={() => selectObject(obj.id)}
         onDoubleClick={(event) => {
@@ -570,25 +553,39 @@ export function ViewPanel() {
       <div style={{ ...sectionStyle, borderTop: 'none' }}>
         <div style={labelStyle}>Backend</div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button className={btn(activeBackend === 'manifold')} onClick={() => setActiveBackend('manifold')}>Manifold (fast)</button>
-          <button className={btn(activeBackend === 'occt')} onClick={() => setActiveBackend('occt')}>OCCT (exact)</button>
+          <button className={btn(activeBackend === 'manifold')} onClick={() => setActiveBackend('manifold')}>
+            Manifold (fast)
+          </button>
+          <button className={btn(activeBackend === 'occt')} onClick={() => setActiveBackend('occt')}>
+            OCCT (exact)
+          </button>
         </div>
       </div>
 
       <div style={sectionStyle}>
         <div style={labelStyle}>Render Mode</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <button className={btn(renderMode === 'solid')} onClick={() => setRenderMode('solid')}>Solid</button>
-          <button className={btn(renderMode === 'wireframe')} onClick={() => setRenderMode('wireframe')}>Wireframe</button>
-          <button className={btn(renderMode === 'overlay')} onClick={() => setRenderMode('overlay')}>Overlay</button>
+          <button className={btn(renderMode === 'solid')} onClick={() => setRenderMode('solid')}>
+            Solid
+          </button>
+          <button className={btn(renderMode === 'wireframe')} onClick={() => setRenderMode('wireframe')}>
+            Wireframe
+          </button>
+          <button className={btn(renderMode === 'overlay')} onClick={() => setRenderMode('overlay')}>
+            Overlay
+          </button>
         </div>
       </div>
 
       <div style={sectionStyle}>
         <div style={labelStyle}>Projection</div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button className={btn(projectionMode === 'perspective')} onClick={() => setProjectionMode('perspective')}>Perspective</button>
-          <button className={btn(projectionMode === 'orthographic')} onClick={() => setProjectionMode('orthographic')}>Orthographic</button>
+          <button className={btn(projectionMode === 'perspective')} onClick={() => setProjectionMode('perspective')}>
+            Perspective
+          </button>
+          <button className={btn(projectionMode === 'orthographic')} onClick={() => setProjectionMode('orthographic')}>
+            Orthographic
+          </button>
         </div>
       </div>
 
@@ -606,8 +603,12 @@ export function ViewPanel() {
       <div style={sectionStyle}>
         <div style={labelStyle}>Views</div>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <button className={btn()} onClick={() => requestViewCommand({ type: 'snap', view: 'iso' })}>⌂ Home</button>
-          <button className={btn()} onClick={() => requestViewCommand({ type: 'fit' })}>Fit</button>
+          <button className={btn()} onClick={() => requestViewCommand({ type: 'snap', view: 'iso' })}>
+            ⌂ Home
+          </button>
+          <button className={btn()} onClick={() => requestViewCommand({ type: 'fit' })}>
+            Fit
+          </button>
           <button
             className={btn()}
             onClick={() => requestViewCommand({ type: 'zoom', targetId: selectedObjectId })}
@@ -654,22 +655,21 @@ export function ViewPanel() {
             <button
               className={btn()}
               style={{ width: '100%', marginTop: 8 }}
-              onClick={() => { void copySceneCliArg(); }}
+              onClick={() => {
+                void copySceneCliArg();
+              }}
             >
               Copy CLI `--scene`
             </button>
             <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
-              {sceneCopyStatus ?? (
-                sceneObjectOverrideCount > 0
+              {sceneCopyStatus ??
+                (sceneObjectOverrideCount > 0
                   ? `Includes camera + ${sceneObjectOverrideCount} object override${sceneObjectOverrideCount === 1 ? '' : 's'}.`
-                  : 'Includes the live viewport camera only.'
-              )}
+                  : 'Includes the live viewport camera only.')}
             </div>
           </>
         ) : (
-          <div style={{ fontSize: 11, color: 'var(--fc-textDim)' }}>
-            Move the viewport once to populate the CLI camera export.
-          </div>
+          <div style={{ fontSize: 11, color: 'var(--fc-textDim)' }}>Move the viewport once to populate the CLI camera export.</div>
         )}
       </div>
 
@@ -711,7 +711,9 @@ export function ViewPanel() {
             >
               <option value="">Manual</option>
               {animationClips.map((clip) => (
-                <option key={clip.name} value={clip.name}>{clip.name}</option>
+                <option key={clip.name} value={clip.name}>
+                  {clip.name}
+                </option>
               ))}
             </select>
             <button
@@ -784,7 +786,9 @@ export function ViewPanel() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
                   <span style={{ color: 'var(--fc-text)' }}>{joint.name}</span>
                   <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
-                    {Number(rawValue.toFixed(2))}{joint.unit ? ` ${joint.unit}` : ''}{isCoupled ? ' (linked)' : ''}
+                    {Number(rawValue.toFixed(2))}
+                    {joint.unit ? ` ${joint.unit}` : ''}
+                    {isCoupled ? ' (linked)' : ''}
                   </span>
                 </div>
                 <input
@@ -806,9 +810,7 @@ export function ViewPanel() {
             );
           })}
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
-            {activeAnimationClip
-              ? 'Animation clip currently drives joint values.'
-              : 'Viewport-only motion. Geometry does not recompute.'}
+            {activeAnimationClip ? 'Animation clip currently drives joint values.' : 'Viewport-only motion. Geometry does not recompute.'}
           </div>
         </div>
       )}
@@ -829,9 +831,7 @@ export function ViewPanel() {
           clearFocusedObject();
         }}
       >
-        {objects.length === 0 && (
-          <div style={{ fontSize: 12, color: 'var(--fc-textDim)', padding: '6px 0' }}>No objects loaded</div>
-        )}
+        {objects.length === 0 && <div style={{ fontSize: 12, color: 'var(--fc-textDim)', padding: '6px 0' }}>No objects loaded</div>}
         {objectTree.map(renderObjectTreeNode)}
       </div>
 
@@ -841,7 +841,10 @@ export function ViewPanel() {
           <div style={labelStyle}>Sketch Geometry</div>
           {/* Edges */}
           {(constraintMeta.edges.lines.length > 0 || constraintMeta.edges.circles.length > 0 || constraintMeta.edges.arcs.length > 0) && (
-            <CollapsibleSection title="Edges" count={constraintMeta.edges.lines.length + constraintMeta.edges.circles.length + constraintMeta.edges.arcs.length}>
+            <CollapsibleSection
+              title="Edges"
+              count={constraintMeta.edges.lines.length + constraintMeta.edges.circles.length + constraintMeta.edges.arcs.length}
+            >
               {constraintMeta.edges.lines.map((line) => {
                 const isSelected = selectedSketchEntityId === line.id;
                 const len = Math.hypot(line.b[0] - line.a[0], line.b[1] - line.a[1]);
@@ -861,7 +864,15 @@ export function ViewPanel() {
                       color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
                     }}
                   >
-                    <span>{line.name ? <>{line.name} <span style={{ color: 'var(--fc-textDim)', fontSize: 9, opacity: 0.6 }}>{line.id}</span></> : line.id}</span>
+                    <span>
+                      {line.name ? (
+                        <>
+                          {line.name} <span style={{ color: 'var(--fc-textDim)', fontSize: 9, opacity: 0.6 }}>{line.id}</span>
+                        </>
+                      ) : (
+                        line.id
+                      )}
+                    </span>
                     <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>{len.toFixed(1)}mm</span>
                   </div>
                 );
@@ -884,7 +895,15 @@ export function ViewPanel() {
                       color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
                     }}
                   >
-                    <span>{c.name ? <>{c.name} <span style={{ color: 'var(--fc-textDim)', fontSize: 9, opacity: 0.6 }}>{c.id}</span></> : c.id}</span>
+                    <span>
+                      {c.name ? (
+                        <>
+                          {c.name} <span style={{ color: 'var(--fc-textDim)', fontSize: 9, opacity: 0.6 }}>{c.id}</span>
+                        </>
+                      ) : (
+                        c.id
+                      )}
+                    </span>
                     <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>r={c.radius.toFixed(1)}mm</span>
                   </div>
                 );
@@ -907,7 +926,15 @@ export function ViewPanel() {
                       color: isSelected ? '#4aa3ff' : 'var(--fc-text)',
                     }}
                   >
-                    <span>{a.name ? <>{a.name} <span style={{ color: 'var(--fc-textDim)', fontSize: 9, opacity: 0.6 }}>{a.id}</span></> : a.id}</span>
+                    <span>
+                      {a.name ? (
+                        <>
+                          {a.name} <span style={{ color: 'var(--fc-textDim)', fontSize: 9, opacity: 0.6 }}>{a.id}</span>
+                        </>
+                      ) : (
+                        a.id
+                      )}
+                    </span>
                     <span style={{ color: 'var(--fc-textDim)', fontSize: 10 }}>r={a.radius.toFixed(1)}mm</span>
                   </div>
                 );
@@ -937,7 +964,9 @@ export function ViewPanel() {
                   >
                     <span>{pt.id}</span>
                     {isSelected && (
-                      <span style={{ color: 'var(--fc-textDim)', fontSize: 10, paddingLeft: 8 }}>({pt.pos[0].toFixed(1)}, {pt.pos[1].toFixed(1)})</span>
+                      <span style={{ color: 'var(--fc-textDim)', fontSize: 10, paddingLeft: 8 }}>
+                        ({pt.pos[0].toFixed(1)}, {pt.pos[1].toFixed(1)})
+                      </span>
                     )}
                   </div>
                 );
@@ -946,7 +975,14 @@ export function ViewPanel() {
           )}
           {/* Construction */}
           {(constraintMeta.construction.lines.length > 0 || constraintMeta.construction.circles.length > 0) && (
-            <CollapsibleSection title="Construction" count={constraintMeta.construction.lines.length + constraintMeta.construction.circles.length + constraintMeta.construction.arcs.length}>
+            <CollapsibleSection
+              title="Construction"
+              count={
+                constraintMeta.construction.lines.length +
+                constraintMeta.construction.circles.length +
+                constraintMeta.construction.arcs.length
+              }
+            >
               {constraintMeta.construction.lines.map((line) => (
                 <div key={line.id} style={{ fontSize: 11, padding: '2px 6px', color: '#888', fontStyle: 'italic' }}>
                   {line.id}
@@ -966,9 +1002,19 @@ export function ViewPanel() {
         <div style={sectionStyle}>
           <div
             onClick={() => setConstraintsSectionOpen((v) => !v)}
-            style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}
+            style={{
+              ...labelStyle,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
           >
-            <span><span style={{ fontSize: 8, marginRight: 4 }}>{constraintsSectionOpen ? '\u25BE' : '\u25B8'}</span>Constraints ({constraintMeta.constraints.length})</span>
+            <span>
+              <span style={{ fontSize: 8, marginRight: 4 }}>{constraintsSectionOpen ? '\u25BE' : '\u25B8'}</span>Constraints (
+              {constraintMeta.constraints.length})
+            </span>
             <span style={{ fontSize: 11, color: constraintStatusColor }}>
               {constraintMeta.status}
               {constraintMeta.dof !== 0 && (
@@ -978,74 +1024,110 @@ export function ViewPanel() {
               )}
             </span>
           </div>
-          {constraintsSectionOpen && (<>
-          {constraintMeta.timedOut && (
-            <div style={{
-              fontSize: 11,
-              color: '#f59e0b',
-              background: 'rgba(245, 158, 11, 0.1)',
-              border: '1px solid rgba(245, 158, 11, 0.3)',
-              borderRadius: 4,
-              padding: '4px 8px',
-              marginBottom: 6,
-            }}>
-              Solver timed out — result may be approximate. Try simplifying constraints or using groupRect() for rigid rectangles.
-            </div>
-          )}
-          {constraintMeta.constraints.length === 0 && (
-            <div style={{ fontSize: 12, color: 'var(--fc-textDim)', padding: '6px 0' }}>No constraints in this sketch</div>
-          )}
-          {constraintMeta.constraints.map((constraint) => (
-            <div
-              key={constraint.id}
-              onClick={() => setSelectedConstraintId(constraint.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '6px 8px',
-                border: selectedConstraintId === constraint.id ? '1px solid #ffcc00' : '1px solid var(--fc-borderLight)',
-                borderRadius: 6,
-                marginBottom: 6,
-                background: selectedConstraintId === constraint.id
-                  ? 'rgba(255,204,0,0.15)'
-                  : constraint.isConflicting ? 'var(--fc-errorBg)' : constraint.isRedundant ? `color-mix(in srgb, var(--fc-sketchRedundant) 12%, transparent)` : 'var(--fc-bgOverlay)',
-                cursor: 'pointer',
-              }}
-            >
-              <span style={{ fontSize: 11, color: constraint.isConflicting ? 'var(--fc-sketchConflicting)' : constraint.isRedundant ? 'var(--fc-sketchRedundant)' : 'var(--fc-text)', width: 48 }}>
-                {constraint.label}
-              </span>
-              {constraint.isDimension && constraint.value !== undefined ? (
-                <span style={{ fontSize: 12, color: 'var(--fc-text)' }}>{constraint.value.toFixed(2)} {lengthUnit}</span>
-              ) : (
-                <span style={{ fontSize: 12, color: 'var(--fc-textDim)' }}>{constraint.type}</span>
+          {constraintsSectionOpen && (
+            <>
+              {constraintMeta.timedOut && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: '#f59e0b',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: 4,
+                    padding: '4px 8px',
+                    marginBottom: 6,
+                  }}
+                >
+                  Solver timed out — result may be approximate. Try simplifying constraints or using groupRect() for rigid rectangles.
+                </div>
               )}
-              <span style={{ fontSize: 9, color: 'var(--fc-textDim)', marginLeft: 'auto', opacity: 0.6 }}>
-                {constraint.entityIds.join(', ')}
-              </span>
-            </div>
-          ))}
-          {constraintMeta.rejected.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, color: 'var(--fc-error)', marginBottom: 4 }}>Rejected constraints</div>
-              {constraintMeta.rejected.map((constraint) => (
-                <div key={constraint.id} style={{ fontSize: 11, color: 'var(--fc-error)' }} title={constraint.rejectionReason}>
-                  {constraint.label}{constraint.rejectionReason ? ` — ${constraint.rejectionReason}` : ''}
+              {constraintMeta.constraints.length === 0 && (
+                <div style={{ fontSize: 12, color: 'var(--fc-textDim)', padding: '6px 0' }}>No constraints in this sketch</div>
+              )}
+              {constraintMeta.constraints.map((constraint) => (
+                <div
+                  key={constraint.id}
+                  onClick={() => setSelectedConstraintId(constraint.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 8px',
+                    border: selectedConstraintId === constraint.id ? '1px solid #ffcc00' : '1px solid var(--fc-borderLight)',
+                    borderRadius: 6,
+                    marginBottom: 6,
+                    background:
+                      selectedConstraintId === constraint.id
+                        ? 'rgba(255,204,0,0.15)'
+                        : constraint.isConflicting
+                          ? 'var(--fc-errorBg)'
+                          : constraint.isRedundant
+                            ? `color-mix(in srgb, var(--fc-sketchRedundant) 12%, transparent)`
+                            : 'var(--fc-bgOverlay)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: constraint.isConflicting
+                        ? 'var(--fc-sketchConflicting)'
+                        : constraint.isRedundant
+                          ? 'var(--fc-sketchRedundant)'
+                          : 'var(--fc-text)',
+                      width: 48,
+                    }}
+                  >
+                    {constraint.label}
+                  </span>
+                  {constraint.isDimension && constraint.value !== undefined ? (
+                    <span style={{ fontSize: 12, color: 'var(--fc-text)' }}>
+                      {constraint.value.toFixed(2)} {lengthUnit}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 12, color: 'var(--fc-textDim)' }}>{constraint.type}</span>
+                  )}
+                  <span style={{ fontSize: 9, color: 'var(--fc-textDim)', marginLeft: 'auto', opacity: 0.6 }}>
+                    {constraint.entityIds.join(', ')}
+                  </span>
                 </div>
               ))}
-            </div>
+              {constraintMeta.rejected.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, color: 'var(--fc-error)', marginBottom: 4 }}>Rejected constraints</div>
+                  {constraintMeta.rejected.map((constraint) => (
+                    <div key={constraint.id} style={{ fontSize: 11, color: 'var(--fc-error)' }} title={constraint.rejectionReason}>
+                      {constraint.label}
+                      {constraint.rejectionReason ? ` — ${constraint.rejectionReason}` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
-          </>)}
           {constraintMeta.surfaces && constraintMeta.surfaces.length > 0 && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: 'var(--fc-textDim)',
+                  marginBottom: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
                 <span>Surfaces ({constraintMeta.surfaces.length})</span>
                 <span
-                  onClick={(e) => { e.stopPropagation(); useForgeStore.getState().toggleSurfaces(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    useForgeStore.getState().toggleSurfaces();
+                  }}
                   style={{ cursor: 'pointer', fontSize: 13, opacity: surfacesVisible ? 1 : 0.4, userSelect: 'none' }}
                   title={surfacesVisible ? 'Hide surfaces' : 'Show surfaces'}
-                >{surfacesVisible ? '\u25C9' : '\u25CE'}</span>
+                >
+                  {surfacesVisible ? '\u25C9' : '\u25CE'}
+                </span>
               </div>
               {constraintMeta.surfaces.map((s) => {
                 const palette = ['#4488cc', '#44cc88', '#cc8844', '#cc44aa', '#88cc44', '#44aacc', '#aa44cc', '#cccc44'];
@@ -1074,14 +1156,34 @@ export function ViewPanel() {
                     }}
                   >
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0, opacity: isSelected ? 1 : 0.7 }} />
-                      <span style={{ fontWeight: isSelected ? 600 : 400 }}>S{s.index} — {formatArea(s.area, lengthUnit, 1)}</span>
+                      <span
+                        style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0, opacity: isSelected ? 1 : 0.7 }}
+                      />
+                      <span style={{ fontWeight: isSelected ? 600 : 400 }}>
+                        S{s.index} — {formatArea(s.area, lengthUnit, 1)}
+                      </span>
                     </div>
                     {isSelected && (
-                      <div style={{ fontSize: 10, color: 'var(--fc-textDim)', paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <span>Centroid: ({s.centroid[0].toFixed(2)}, {s.centroid[1].toFixed(2)})</span>
-                        <span>Bounds: [{s.bounds.min[0].toFixed(1)}, {s.bounds.min[1].toFixed(1)}] → [{s.bounds.max[0].toFixed(1)}, {s.bounds.max[1].toFixed(1)}]</span>
-                        <span>Seed: ({s.seed[0].toFixed(2)}, {s.seed[1].toFixed(2)})</span>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: 'var(--fc-textDim)',
+                          paddingLeft: 16,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 1,
+                        }}
+                      >
+                        <span>
+                          Centroid: ({s.centroid[0].toFixed(2)}, {s.centroid[1].toFixed(2)})
+                        </span>
+                        <span>
+                          Bounds: [{s.bounds.min[0].toFixed(1)}, {s.bounds.min[1].toFixed(1)}] → [{s.bounds.max[0].toFixed(1)},{' '}
+                          {s.bounds.max[1].toFixed(1)}]
+                        </span>
+                        <span>
+                          Seed: ({s.seed[0].toFixed(2)}, {s.seed[1].toFixed(2)})
+                        </span>
                       </div>
                     )}
                   </div>
@@ -1090,93 +1192,73 @@ export function ViewPanel() {
             </div>
           )}
           {/* Selected entity info — show constraints referencing this entity */}
-          {selectedSketchEntityId && constraintMeta && (() => {
-            const relatedConstraints = constraintMeta.constraints.filter(
-              (c) => c.entityIds.includes(selectedSketchEntityId)
-            );
-            if (relatedConstraints.length === 0) return null;
-            return (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 4 }}>
-                  Constraints on {selectedSketchEntityId} ({relatedConstraints.length})
-                </div>
-                {relatedConstraints.map((c) => (
-                  <div
-                    key={c.id}
-                    onClick={() => { setSelectedConstraintId(c.id); }}
-                    style={{
-                      fontSize: 11,
-                      padding: '3px 6px',
-                      marginBottom: 2,
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                      color: c.isConflicting ? 'var(--fc-error)' : c.isRedundant ? '#faad14' : 'var(--fc-text)',
-                      background: selectedConstraintId === c.id ? 'rgba(255,204,0,0.15)' : 'transparent',
-                      border: selectedConstraintId === c.id ? '1px solid #ffcc00' : '1px solid transparent',
-                    }}
-                  >
-                    {c.label} {c.isDimension && c.value !== undefined ? `= ${c.value}` : c.type}
+          {selectedSketchEntityId &&
+            constraintMeta &&
+            (() => {
+              const relatedConstraints = constraintMeta.constraints.filter((c) => c.entityIds.includes(selectedSketchEntityId));
+              if (relatedConstraints.length === 0) return null;
+              return (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 4 }}>
+                    Constraints on {selectedSketchEntityId} ({relatedConstraints.length})
                   </div>
-                ))}
-              </div>
-            );
-          })()}
+                  {relatedConstraints.map((c) => (
+                    <div
+                      key={c.id}
+                      onClick={() => {
+                        setSelectedConstraintId(c.id);
+                      }}
+                      style={{
+                        fontSize: 11,
+                        padding: '3px 6px',
+                        marginBottom: 2,
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        color: c.isConflicting ? 'var(--fc-error)' : c.isRedundant ? '#faad14' : 'var(--fc-text)',
+                        background: selectedConstraintId === c.id ? 'rgba(255,204,0,0.15)' : 'transparent',
+                        border: selectedConstraintId === c.id ? '1px solid #ffcc00' : '1px solid transparent',
+                      }}
+                    >
+                      {c.label} {c.isDimension && c.value !== undefined ? `= ${c.value}` : c.type}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
         </div>
       )}
 
-      {selectedObject?.shape && (
-        <ConstructionTreePanel key={selectedObject.id} objectId={selectedObject.id} shape={selectedObject.shape} />
-      )}
+      {selectedObject?.shape && <ConstructionTreePanel key={selectedObject.id} objectId={selectedObject.id} shape={selectedObject.shape} />}
 
       <div style={sectionStyle}>
         <div style={labelStyle}>Display</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
-            <input
-              type="checkbox"
-              checked={gridEnabled}
-              onChange={(e) => setGridEnabled(e.target.checked)}
-            />
+            <input type="checkbox" checked={gridEnabled} onChange={(e) => setGridEnabled(e.target.checked)} />
             Show grid
           </label>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
-            <input
-              type="checkbox"
-              checked={dimensionsVisible}
-              onChange={toggleDimensions}
-            />
+            <input type="checkbox" checked={dimensionsVisible} onChange={toggleDimensions} />
             Show dimensions
           </label>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
-            <input
-              type="checkbox"
-              checked={showPerformanceInfo}
-              onChange={(e) => setShowPerformanceInfo(e.target.checked)}
-            />
+            <input type="checkbox" checked={showPerformanceInfo} onChange={(e) => setShowPerformanceInfo(e.target.checked)} />
             Show performance info
           </label>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
-            <input
-              type="checkbox"
-              checked={disableRunCache}
-              onChange={(e) => setDisableRunCache(e.target.checked)}
-            />
+            <input type="checkbox" checked={disableRunCache} onChange={(e) => setDisableRunCache(e.target.checked)} />
             Disable run cache
           </label>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
-            <input
-              type="checkbox"
-              checked={objectPickSyncEnabled}
-              onChange={(e) => setObjectPickSyncEnabled(e.target.checked)}
-            />
+            <input type="checkbox" checked={objectPickSyncEnabled} onChange={(e) => setObjectPickSyncEnabled(e.target.checked)} />
             Scene pick sync + labels
           </label>
         </div>
@@ -1214,11 +1296,7 @@ export function ViewPanel() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
-              <input
-                type="checkbox"
-                checked={sectionPlaneGuidesEnabled}
-                onChange={(e) => setSectionPlaneGuidesEnabled(e.target.checked)}
-              />
+              <input type="checkbox" checked={sectionPlaneGuidesEnabled} onChange={(e) => setSectionPlaneGuidesEnabled(e.target.checked)} />
               Show guides
             </label>
           </div>

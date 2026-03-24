@@ -40,20 +40,10 @@ export interface ProfileBackend {
   subtract(other: ProfileBackend): ProfileBackend;
 
   // ── 3D Conversions ──────────────────────────────────────────────
-  extrude(
-    height: number,
-    divisions: number,
-    twist: number,
-    scaleTop?: [number, number],
-    center?: boolean,
-  ): ShapeBackend;
+  extrude(height: number, divisions: number, twist: number, scaleTop?: [number, number], center?: boolean): ShapeBackend;
   revolve(segments: number, degrees: number): ShapeBackend;
 }
 
 export function isProfileBackend(value: unknown): value is ProfileBackend {
-  return Boolean(
-    value
-    && typeof value === 'object'
-    && (value as Record<PropertyKey, unknown>)[PROFILE_BACKEND_MARKER] === true,
-  );
+  return Boolean(value && typeof value === 'object' && (value as Record<PropertyKey, unknown>)[PROFILE_BACKEND_MARKER] === true);
 }

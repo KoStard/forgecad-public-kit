@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import type { SheetStockDef } from '../forge/sheetStock';
+import { useMemo, useState } from 'react';
 import { generateCuttingLayoutPdf } from '../forge/cuttingLayout';
+import type { SheetStockDef } from '../forge/sheetStock';
 
 function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -62,12 +62,9 @@ export function CuttingLayoutPanel({ fileStem, entries }: CuttingLayoutPanelProp
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginBottom: 6 }}>
-        Sheet Cutting Layout
-      </div>
+      <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginBottom: 6 }}>Sheet Cutting Layout</div>
       <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 10 }}>
-        {stats.totalPieces} piece{stats.totalPieces !== 1 ? 's' : ''} &middot;{' '}
-        {stats.totalAreaM2.toFixed(3)} m&sup2; total area
+        {stats.totalPieces} piece{stats.totalPieces !== 1 ? 's' : ''} &middot; {stats.totalAreaM2.toFixed(3)} m&sup2; total area
         {stats.materialCount > 1 ? ` \u00b7 ${stats.materialCount} materials` : ''}
       </div>
 

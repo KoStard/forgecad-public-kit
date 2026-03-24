@@ -6,7 +6,7 @@
  */
 import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
-import { midpoint, reflectPointAcrossLine } from '../helpers';
+import { midpoint } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -36,7 +36,8 @@ registerConstraint<'symmetric', ConstraintTypeMap['symmetric']>({
   },
 
   displayAnnotations(c, { points }) {
-    const a = points.get(c.a), b = points.get(c.b);
+    const a = points.get(c.a),
+      b = points.get(c.b);
     const annotations: AnnotationElement[] = [];
     if (a) annotations.push({ kind: 'symbol', position: [a.x, a.y], symbol: 'symmetric' });
     if (b) annotations.push({ kind: 'symbol', position: [b.x, b.y], symbol: 'symmetric' });

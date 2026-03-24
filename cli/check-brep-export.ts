@@ -9,9 +9,9 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { init, runScript } from '../src/forge/headless';
 import { buildBrepExportManifest } from '../src/forge/brepExport';
 import type { CadQueryProfilePlan, CadQueryShapePlan, CadQueryShapeTransformStep } from '../src/forge/cadqueryPlan';
+import { init, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
 import { COMPILER_REGRESSION_CORPUS, getCompilerRegressionCorpusPart } from './compiler-regression-corpus';
 import { CHAMFER_EDGE_WORKFLOW_CODE, FILLET_EDGE_WORKFLOW_CODE } from './edge-finish-fixtures';
@@ -67,12 +67,7 @@ function loadProjectScript(scriptPath: string): LoadedProjectScript {
   };
 }
 
-function runExactManifestForFiles(
-  code: string,
-  fileName: string,
-  allFiles: Record<string, string>,
-  expectedObjectCount = 1,
-) {
+function runExactManifestForFiles(code: string, fileName: string, allFiles: Record<string, string>, expectedObjectCount = 1) {
   const result = runScript(code, fileName, allFiles);
   assert.equal(result.error, null, `runScript failed: ${result.error ?? 'unknown error'}`);
   const manifest = buildBrepExportManifest(result.objects);
@@ -91,11 +86,7 @@ function runExactManifestForFiles(
     manifest,
     plans: manifest.objects.map((object, index) => {
       assert.equal(object.kind, 'exact', `Expected export object ${index} to be exact, got ${object.kind}`);
-      assert.equal(
-        object.target,
-        'cadquery-occt',
-        `Expected export object ${index} to use the CadQuery/OCCT lowerer`,
-      );
+      assert.equal(object.target, 'cadquery-occt', `Expected export object ${index} to use the CadQuery/OCCT lowerer`);
       return object.plan;
     }),
   };
@@ -183,12 +174,7 @@ function collectShapes(plan: CadQueryShapePlan): CadQueryShapePlan[] {
   }
 }
 
-function exportExactManifestForFiles(
-  code: string,
-  fileName: string,
-  allFiles: Record<string, string>,
-  expectedObjectCount = 1,
-): void {
+function exportExactManifestForFiles(code: string, fileName: string, allFiles: Record<string, string>, expectedObjectCount = 1): void {
   const { manifest } = runExactManifestForFiles(code, fileName, allFiles, expectedObjectCount);
 
   const tempDir = mkdtempSync(join(tmpdir(), 'forgecad-brep-'));
@@ -349,9 +335,7 @@ return [{ name: 'Polygon Panel', shape: panel }];
   assert.equal(plan.profile.profiles.length, 2);
   assert.equal(plan.profile.profiles[0].kind, 'polygon');
   assert.equal(plan.profile.profiles[1].kind, 'polygon');
-  assert.deepEqual(plan.profile.profiles[1].transforms, [
-    { kind: 'translate', x: 2, y: -1 },
-  ]);
+  assert.deepEqual(plan.profile.profiles[1].transforms, [{ kind: 'translate', x: 2, y: -1 }]);
 }
 
 function checkRoundOffsetProfilePlan(): void {
@@ -423,9 +407,7 @@ return [{ name: 'Collar', shape: collar }];
 
   assert.equal(plan.kind, 'extrude', `Expected extrude plan, got ${plan.kind}`);
   assert.equal(plan.profile.kind, 'polygon', `Expected polygon profile, got ${plan.profile.kind}`);
-  assert.deepEqual(plan.profile.transforms, [
-    { kind: 'mirror', normalX: 1, normalY: 0 },
-  ]);
+  assert.deepEqual(plan.profile.transforms, [{ kind: 'mirror', normalX: 1, normalY: 0 }]);
 }
 
 function checkRigidMatrixTransformPlan(): void {
@@ -447,10 +429,10 @@ return [{ name: 'Moved', shape: moved }];
   assert(Array.isArray(m) && m.length === 16, 'workplanePlacement matrix should be a 16-element array');
   // Verify the matrix encodes the expected rotation (90° around Z) + translation
   // Rotation 90° around Z: col0=[0,1,0], col1=[-1,0,0], col2=[0,0,1]
-  assert.equal(Math.round(m[0]), 0, 'r00 should be ~0');   // cos(90)
-  assert.equal(Math.round(m[1]), 1, 'r10 should be ~1');   // sin(90)
+  assert.equal(Math.round(m[0]), 0, 'r00 should be ~0'); // cos(90)
+  assert.equal(Math.round(m[1]), 1, 'r10 should be ~1'); // sin(90)
   assert.equal(Math.round(m[4]), -1, 'r01 should be ~-1'); // -sin(90)
-  assert.equal(Math.round(m[5]), 0, 'r11 should be ~0');   // cos(90)
+  assert.equal(Math.round(m[5]), 0, 'r11 should be ~0'); // cos(90)
   assert.equal(Math.round(m[10]), 1, 'r22 should be ~1');
   // Translation is embedded after rotation: T·R applied to a point
   // The matrix stores column-major, so m[12..14] are the translation
@@ -596,15 +578,22 @@ function checkFilletEdgeWorkflowPlan(): void {
   const nodes = collectShapes(plan);
   const fillets = nodes.filter((node) => node.kind === 'fillet');
   assert.equal(fillets.length, 2, `Expected fillet workflow exact lowering to contain two fillet nodes, got ${fillets.length}`);
-  assert.deepEqual(fillets.map((node) => node.radius).sort((a, b) => a - b), [4, 6]);
   assert.deepEqual(
-    fillets.map((node) => node.quadrant.join(',')).sort(),
-    ['-1,-1', '1,-1'],
+    fillets.map((node) => node.radius).sort((a, b) => a - b),
+    [4, 6],
   );
-  assert(fillets.every((node) => !!node.resolvedEdge), 'Expected both fillet nodes to include resolved edge selectors');
+  assert.deepEqual(fillets.map((node) => node.quadrant.join(',')).sort(), ['-1,-1', '1,-1']);
+  assert(
+    fillets.every((node) => !!node.resolvedEdge),
+    'Expected both fillet nodes to include resolved edge selectors',
+  );
 
   const transforms = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
-  assert.equal(transforms.length, 3, `Expected three workplane placements after the fillet workflow (boss + pocket + hole), got ${transforms.length}`);
+  assert.equal(
+    transforms.length,
+    3,
+    `Expected three workplane placements after the fillet workflow (boss + pocket + hole), got ${transforms.length}`,
+  );
   assert(
     transforms.every((step) => step.placement.workplane.source.owner),
     'Expected downstream fillet workflow placements to retain query-backed owners',
@@ -622,12 +611,15 @@ function checkChamferEdgeWorkflowPlan(): void {
   const nodes = collectShapes(plan);
   const chamfers = nodes.filter((node) => node.kind === 'chamfer');
   assert.equal(chamfers.length, 2, `Expected chamfer workflow exact lowering to contain two chamfer nodes, got ${chamfers.length}`);
-  assert.deepEqual(chamfers.map((node) => node.size).sort((a, b) => a - b), [3, 4]);
   assert.deepEqual(
-    chamfers.map((node) => node.quadrant.join(',')).sort(),
-    ['-1,-1', '1,1'],
+    chamfers.map((node) => node.size).sort((a, b) => a - b),
+    [3, 4],
   );
-  assert(chamfers.every((node) => !!node.resolvedEdge), 'Expected both chamfer nodes to include resolved edge selectors');
+  assert.deepEqual(chamfers.map((node) => node.quadrant.join(',')).sort(), ['-1,-1', '1,1']);
+  assert(
+    chamfers.every((node) => !!node.resolvedEdge),
+    'Expected both chamfer nodes to include resolved edge selectors',
+  );
 
   const placements = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
   assert.equal(placements.length, 2, `Expected two workplane placements after the chamfer workflow (rib + hole), got ${placements.length}`);
@@ -672,18 +664,10 @@ function checkCorpusMotorMountPlatePlan(): void {
     transforms.some((step) => step.kind === 'mirror'),
     `Expected ${part.name} exact lowering to preserve mirrored ear transforms`,
   );
-  const zRotations = transforms.filter(
-    (step) => step.kind === 'rotate' && step.xDeg === 0 && step.yDeg === 0 && step.zDeg !== 0,
-  );
-  assert(
-    zRotations.length >= 3,
-    `Expected ${part.name} exact lowering to preserve the non-trivial bolt-circle rotations`,
-  );
+  const zRotations = transforms.filter((step) => step.kind === 'rotate' && step.xDeg === 0 && step.yDeg === 0 && step.zDeg !== 0);
+  assert(zRotations.length >= 3, `Expected ${part.name} exact lowering to preserve the non-trivial bolt-circle rotations`);
   const cylinders = collectShapes(plan).filter((shape) => shape.kind === 'cylinder');
-  assert(
-    cylinders.length >= 5,
-    `Expected ${part.name} exact lowering to contain the center bore plus patterned cylindrical hole cutters`,
-  );
+  assert(cylinders.length >= 5, `Expected ${part.name} exact lowering to contain the center bore plus patterned cylindrical hole cutters`);
 }
 
 function checkRepeatedFeatureOwnershipPlan(): void {
@@ -759,23 +743,16 @@ function checkCorpusSensorBracketPlan(): void {
     `Expected ${part.name} exact lowering to preserve mirrored rib transforms`,
   );
   const placements = transforms.filter((step) => step.kind === 'workplanePlacement');
-  assert(
-    placements.length >= 3,
-    `Expected ${part.name} exact lowering to preserve several semantic workplane placements`,
-  );
+  assert(placements.length >= 3, `Expected ${part.name} exact lowering to preserve several semantic workplane placements`);
   assert(
     placements.some(
-      (step) =>
-        step.placement.workplane.source.kind === 'canonical-face' &&
-        step.placement.workplane.source.face === 'front',
+      (step) => step.placement.workplane.source.kind === 'canonical-face' && step.placement.workplane.source.face === 'front',
     ),
     `Expected ${part.name} exact lowering to preserve front-face feature provenance`,
   );
   assert(
     placements.some(
-      (step) =>
-        step.placement.workplane.source.kind === 'canonical-face' &&
-        step.placement.workplane.source.face === 'right',
+      (step) => step.placement.workplane.source.kind === 'canonical-face' && step.placement.workplane.source.face === 'right',
     ),
     `Expected ${part.name} exact lowering to preserve right-face feature provenance`,
   );
@@ -830,10 +807,7 @@ function checkCorpusEdgeFinishedMountPlan(): void {
   assert(chamfer.resolvedEdge, `Expected ${part.name} exact lowering to carry a resolved chamfer edge selector`);
 
   const placements = collectShapeTransforms(plan).filter((step) => step.kind === 'workplanePlacement');
-  assert(
-    placements.length >= 4,
-    `Expected ${part.name} exact lowering to preserve downstream feature placements after edge finishing`,
-  );
+  assert(placements.length >= 4, `Expected ${part.name} exact lowering to preserve downstream feature placements after edge finishing`);
   assert(
     collectShapeTransforms(plan).some((step) => step.kind === 'mirror'),
     `Expected ${part.name} exact lowering to preserve the mirrored additive feature transforms`,
@@ -848,8 +822,16 @@ function checkCorpusProjectionRelayCoverPlan(): void {
   const profiles = collectProfiles(plan);
   const lipProfile = profiles.find((profile) => profile.kind === 'offset' && profile.delta === 2);
   assert(lipProfile && lipProfile.kind === 'offset', `Expected ${part.name} exact lowering to keep the projected lip offset profile`);
-  assert.equal(lipProfile.base.kind, 'boolean', `Expected ${part.name} projected lip base to stay a boolean profile, got ${lipProfile.base.kind}`);
-  assert.equal(lipProfile.base.op, 'union', `Expected ${part.name} projected lip to replay the union silhouette, got ${lipProfile.base.op}`);
+  assert.equal(
+    lipProfile.base.kind,
+    'boolean',
+    `Expected ${part.name} projected lip base to stay a boolean profile, got ${lipProfile.base.kind}`,
+  );
+  assert.equal(
+    lipProfile.base.op,
+    'union',
+    `Expected ${part.name} projected lip to replay the union silhouette, got ${lipProfile.base.op}`,
+  );
 }
 
 function checkCorpusServicePanelCoverPlan(): void {
@@ -871,8 +853,16 @@ function checkCorpusServicePanelCoverPlan(): void {
   const profiles = collectProfiles(plan);
   const lipProfile = profiles.find((profile) => profile.kind === 'offset' && profile.delta === 1.8);
   assert(lipProfile && lipProfile.kind === 'offset', `Expected ${part.name} exact lowering to keep the projected gasket offset profile`);
-  assert.equal(lipProfile.base.kind, 'boolean', `Expected ${part.name} projected gasket base to stay a boolean profile, got ${lipProfile.base.kind}`);
-  assert.equal(lipProfile.base.op, 'union', `Expected ${part.name} projected gasket to replay the union silhouette, got ${lipProfile.base.op}`);
+  assert.equal(
+    lipProfile.base.kind,
+    'boolean',
+    `Expected ${part.name} projected gasket base to stay a boolean profile, got ${lipProfile.base.kind}`,
+  );
+  assert.equal(
+    lipProfile.base.op,
+    'union',
+    `Expected ${part.name} projected gasket to replay the union silhouette, got ${lipProfile.base.op}`,
+  );
   assert(
     profiles.some((profile) => profile.kind === 'roundedRect' && profile.width === 30 && profile.height === 14),
     `Expected ${part.name} exact lowering to retain the service-pocket sketch profile`,
@@ -901,7 +891,11 @@ function checkCorpusFoldedServicePanelCoverPlan(): void {
   assert(flatPlan, `Expected ${part.name} corpus scene to include the flat object`);
 
   assert.equal(foldedPlan!.kind, 'boolean', `Expected folded ${part.name} plan to remain a boolean tree, got ${foldedPlan!.kind}`);
-  assert.equal(flatPlan!.kind, 'transform', `Expected flat ${part.name} scene object to preserve its presentation translate, got ${flatPlan!.kind}`);
+  assert.equal(
+    flatPlan!.kind,
+    'transform',
+    `Expected flat ${part.name} scene object to preserve its presentation translate, got ${flatPlan!.kind}`,
+  );
   assert(
     collectShapes(flatPlan!).some((shape) => shape.kind === 'boolean'),
     `Expected flat ${part.name} exact lowering to retain a boolean tree under the scene-object transform`,
@@ -965,9 +959,7 @@ function checkCorpusTrimmedAccessCoverPlan(): void {
     `Expected ${part.name} exact lowering to retain the pre-trim service-pocket profile`,
   );
   assert(
-    collectShapeTransforms(plan).some(
-      (step) => step.kind === 'translate' && step.x === 0 && step.y === 28 && step.z === 8,
-    ),
+    collectShapeTransforms(plan).some((step) => step.kind === 'translate' && step.x === 0 && step.y === 28 && step.z === 8),
     `Expected ${part.name} exact lowering to retain the later latch placement after the trim`,
   );
 }
@@ -1033,8 +1025,16 @@ return [{ name: 'Hole Shadow Lip', shape: lip }];
 
   const offset = collectProfiles(plan).find((profile) => profile.kind === 'offset' && profile.delta === 1.5);
   assert(offset && offset.kind === 'offset', 'Expected projected through-hole replay to preserve the downstream offset profile');
-  assert.equal(offset.base.kind, 'boolean', `Expected through-hole projection replay to reduce to a boolean profile, got ${offset.base.kind}`);
-  assert.equal(offset.base.op, 'difference', `Expected through-hole projection replay to subtract the hole silhouette, got ${offset.base.op}`);
+  assert.equal(
+    offset.base.kind,
+    'boolean',
+    `Expected through-hole projection replay to reduce to a boolean profile, got ${offset.base.kind}`,
+  );
+  assert.equal(
+    offset.base.op,
+    'difference',
+    `Expected through-hole projection replay to subtract the hole silhouette, got ${offset.base.op}`,
+  );
   assert(
     offset.base.profiles.some((profile) => profile.kind === 'circle' && profile.radius === 4),
     'Expected through-hole projection replay to keep the hole circle inside the boolean profile chain',
@@ -1108,8 +1108,14 @@ return [
   const manifest = buildBrepExportManifest(result.objects);
   assert.equal(manifest.unsupported.length, 0, 'Split branches should stay exact-exportable');
   assert.equal(manifest.objects.length, 2, `Expected both split branches to export, got ${manifest.objects.length}`);
-  assert(manifest.objects.every((item) => item.kind === 'exact'), 'Expected split branches to stay on the exact export route');
-  assert(manifest.objects.every((item) => item.kind !== 'exact' || item.target === 'cadquery-occt'), 'Expected split branches to use the CadQuery/OCCT lowerer');
+  assert(
+    manifest.objects.every((item) => item.kind === 'exact'),
+    'Expected split branches to stay on the exact export route',
+  );
+  assert(
+    manifest.objects.every((item) => item.kind !== 'exact' || item.target === 'cadquery-occt'),
+    'Expected split branches to use the CadQuery/OCCT lowerer',
+  );
 }
 
 function checkPlaneTrimAndSplitStayExactExportable(): void {
@@ -1131,12 +1137,19 @@ return [
   const manifest = buildBrepExportManifest(result.objects);
   assert.equal(manifest.unsupported.length, 0, 'Plane trims and plane splits should stay exact-exportable');
   assert.equal(manifest.objects.length, 3, `Expected trim plus split branches to export, got ${manifest.objects.length}`);
-  assert(manifest.objects.every((item) => item.kind === 'exact'), 'Expected plane trim and split branches to stay on the exact export route');
-  assert(manifest.objects.every((item) => item.kind !== 'exact' || item.target === 'cadquery-occt'), 'Expected plane trim and split branches to use the CadQuery/OCCT lowerer');
+  assert(
+    manifest.objects.every((item) => item.kind === 'exact'),
+    'Expected plane trim and split branches to stay on the exact export route',
+  );
+  assert(
+    manifest.objects.every((item) => item.kind !== 'exact' || item.target === 'cadquery-occt'),
+    'Expected plane trim and split branches to use the CadQuery/OCCT lowerer',
+  );
 }
 
 function checkLoftAndSweepExportEndToEnd(): void {
-  exportExactManifest(`
+  exportExactManifest(
+    `
 const lofted = loft(
   [
     roundedRect(22, 14, 2.5, true),
@@ -1159,10 +1172,12 @@ return [
   { name: 'Lofted', shape: lofted },
   { name: 'Swept', shape: swept.translate(0, 24, 0) },
 ];
-`, 2);
+`,
+    2,
+  );
 }
 
-function checkChessSetFacetedFallbackManifest(): void {
+function _checkChessSetFacetedFallbackManifest(): void {
   const scriptPath = resolve('examples/chess-set.forge.js');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
   const result = runScript(allFiles[fileName], fileName, allFiles);

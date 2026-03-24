@@ -9,152 +9,116 @@
 
 import * as ts from 'typescript';
 import './holeCut';
+import { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly';
+import { type BomDef, bom, getCollectedBom, resetBom } from './bom';
+import type { ShapeCompilePlan } from './compilePlan';
+import { appendShapeCompileTransform, createOwnedShapeCompilePlan, resetShapeQueryOwnerIds } from './compilePlan';
+import { type CutPlaneDef, cutPlane, getCollectedCutPlanes, resetCutPlanes } from './cutPlane';
+import { coalesceEdges, selectEdge, selectEdges } from './edgeQuery';
+import { chamferEdgeSegment, filletEdgeSegment } from './edgeSegmentFeatures';
+import { type ExplodeViewOptions, explodeView, getCollectedExplodeView, resetExplodeView } from './explodeView';
+import { chamfer, draft, fillet, offsetSolid } from './fillet';
+import type { ToolpathData } from './gcode';
+import { GCodeBuilder, gcode } from './gcode';
+import { group, ShapeGroup } from './group';
+import { joint } from './joint';
+import { type CollectedJointsView, getCollectedJointsView, jointsView, resetJointsView } from './jointsView';
 import {
-  Shape,
   box,
+  buildShapeFromCompilePlan,
   cylinder,
+  difference,
+  type GeometryInfo,
+  getShapeDimensions,
+  intersection,
+  Shape,
+  type ShapeDimension,
+  setShapeDimensions,
   sphere,
   torus,
   union,
-  difference,
-  intersection,
-  setShapeDimensions,
-  getShapeDimensions,
-  type ShapeDimension,
-  type GeometryInfo,
-  buildShapeFromCompilePlan,
 } from './kernel';
-import type { Anchor3D } from './kernel';
-import { resetShapeQueryOwnerIds, createOwnedShapeCompilePlan, appendShapeCompileTransform } from './compilePlan';
-import type { ShapeCompilePlan } from './compilePlan';
-import { intersectWithPlane, projectToPlane } from './section';
-import { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';
-import { filletEdgeSegment, chamferEdgeSegment } from './edgeSegmentFeatures';
-import { fillet, chamfer, draft, offsetSolid } from './fillet';
-import {
-  Sketch,
-  rect,
-  circle2d,
-  roundedRect,
-  polygon,
-  ngon,
-  ellipse,
-  slot,
-  star,
-  union2d,
-  difference2d,
-  intersection2d,
-  path,
-  stroke,
-  constrainedSketch,
-  ConstraintSketch,
-  type SketchConstraintMeta,
-  Point2D,
-  Line2D,
-  Circle2D,
-  Rectangle2D,
-  TrackedShape,
-  buildRectExtrusionTopology,
-  buildCircleExtrusionTopology,
-  point,
-  line,
-  circle,
-  rectangle,
-  Constraint,
-  degrees,
-  radians,
-  linearPattern,
-  circularPattern,
-  linearPattern2d,
-  circularPattern2d,
-  mirrorCopy,
-  filletCorners,
-  filletEdge,
-  chamferEdge,
-  arcBridgeBetweenRects,
-  Curve3D,
-  spline2d,
-  spline3d,
-  loft,
-  sweep,
-  sketchFromSvg,
-  text2d,
-  textWidth,
-  loadFont,
-  dim,
-  dimLine,
-  resetDimensions,
-  getCollectedDimensions,
-  takeCollectedDimensions,
-  sketchToSvg,
-  sketchToDxf,
-  highlight,
-  resetHighlights,
-  getCollectedHighlights,
-  getCollectedDebugHighlights3D,
-  getPendingShapeHighlights,
-  resetPendingShapeHighlights,
-  type DimensionDef,
-  type HighlightDef,
-  type DebugHighlight3D,
-  type SvgImportOptions,
-  type TextOptions,
-} from './sketch';
-import { param, boolParam, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, type ParamDef } from './params';
-import { joint } from './joint';
-import { Assembly, ImportedAssembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
-import { Transform, composeChain } from './transform';
 import { partLibrary } from './library';
 import { detectMeshFormat } from './meshParsers';
-import { ShapeGroup, group } from './group';
-import { cutPlane, resetCutPlanes, getCollectedCutPlanes, type CutPlaneDef } from './cutPlane';
-import { bom, resetBom, getCollectedBom, type BomDef } from './bom';
-import { sheetStock, resetSheetStock, getCollectedSheetStock, type SheetStockDef } from './sheetStock';
+import { boolParam, getCollectedParams, type ParamDef, param, resetParams, runWithParamScope } from './params';
+import { type ForgeQualityPreset, resolveForgeQualityPreset, runWithForgeQuality } from './quality';
+import { type CollectedRobotExport, getCollectedRobotExport, resetRobotExport, robotExport } from './robotExport';
+import { getCollectedScene, resetScene, type SceneConfig, scene } from './scene';
+import { intersectWithPlane, projectToPlane } from './section';
+import { SheetMetalPart, sheetMetal } from './sheetMetal';
+import { getCollectedSheetStock, resetSheetStock, type SheetStockDef, sheetStock } from './sheetStock';
 import {
-  robotExport,
-  resetRobotExport,
-  getCollectedRobotExport,
-  type CollectedRobotExport,
-} from './robotExport';
-import {
-  verify,
-  resetVerifications,
-  getCollectedVerifications,
-  type VerificationResult,
-} from './verification';
-import {
-  explodeView,
-  resetExplodeView,
-  getCollectedExplodeView,
-  type ExplodeViewOptions,
-} from './explodeView';
-import {
-  jointsView,
-  resetJointsView,
-  getCollectedJointsView,
-  type CollectedJointsView,
-} from './jointsView';
-import {
-  viewConfig,
-  resetViewConfig,
-  getCollectedViewConfig,
-  type ViewConfig,
-} from './viewConfig';
-import {
-  scene,
-  resetScene,
-  getCollectedScene,
-  type SceneConfig,
-} from './scene';
+  arcBridgeBetweenRects,
+  buildCircleExtrusionTopology,
+  buildRectExtrusionTopology,
+  Circle2D,
+  Constraint,
+  ConstraintSketch,
+  Curve3D,
+  chamferEdge,
+  circle,
+  circle2d,
+  circularPattern,
+  circularPattern2d,
+  constrainedSketch,
+  type DebugHighlight3D,
+  type DimensionDef,
+  degrees,
+  difference2d,
+  dim,
+  dimLine,
+  ellipse,
+  filletCorners,
+  filletEdge,
+  getCollectedDebugHighlights3D,
+  getCollectedDimensions,
+  getCollectedHighlights,
+  getPendingShapeHighlights,
+  type HighlightDef,
+  highlight,
+  intersection2d,
+  Line2D,
+  line,
+  linearPattern,
+  linearPattern2d,
+  loadFont,
+  loft,
+  mirrorCopy,
+  ngon,
+  Point2D,
+  path,
+  point,
+  polygon,
+  Rectangle2D,
+  radians,
+  rect,
+  rectangle,
+  resetDimensions,
+  resetHighlights,
+  resetPendingShapeHighlights,
+  roundedRect,
+  Sketch,
+  type SketchConstraintMeta,
+  type SvgImportOptions,
+  sketchFromSvg,
+  sketchToDxf,
+  sketchToSvg,
+  slot,
+  spline2d,
+  spline3d,
+  star,
+  stroke,
+  sweep,
+  TrackedShape,
+  takeCollectedDimensions,
+  text2d,
+  textWidth,
+  union2d,
+} from './sketch';
 import type { SolverWasmRunDebugSnapshot } from './sketch/constraints/solver-wasm';
-import {
-  resolveForgeQualityPreset,
-  runWithForgeQuality,
-  type ForgeQualityPreset,
-} from './quality';
-import { sheetMetal, SheetMetalPart } from './sheetMetal';
-import { GCodeBuilder, gcode } from './gcode';
-import type { ToolpathData } from './gcode';
+import { composeChain, Transform } from './transform';
+import { getCollectedVerifications, resetVerifications, type VerificationResult, verify } from './verification';
+import { getCollectedViewConfig, resetViewConfig, type ViewConfig, viewConfig } from './viewConfig';
 
 export interface SceneObject {
   id: string;
@@ -244,11 +208,7 @@ const LOG_MAX_DEPTH = 4;
 const LOG_MAX_ARRAY_ITEMS = 24;
 const LOG_MAX_OBJECT_KEYS = 32;
 const LOG_NUMBER_PRECISION = 4;
-const FORGE_RUNTIME_MODULE_SPECIFIERS = new Set([
-  'forgecad',
-  '@forge/runtime',
-  '@forgecad/runtime',
-]);
+const FORGE_RUNTIME_MODULE_SPECIFIERS = new Set(['forgecad', '@forge/runtime', '@forgecad/runtime']);
 
 interface SourceMapSegment {
   generatedColumn: number;
@@ -284,15 +244,9 @@ function roundLogNumber(value: number): number {
 
 function toRoundedNumberArray(value: unknown): number[] {
   if (Array.isArray(value)) {
-    return value
-      .filter((entry): entry is number => typeof entry === 'number' && Number.isFinite(entry))
-      .map(roundLogNumber);
+    return value.filter((entry): entry is number => typeof entry === 'number' && Number.isFinite(entry)).map(roundLogNumber);
   }
-  if (
-    ArrayBuffer.isView(value) &&
-    'length' in value &&
-    typeof (value as { length: unknown }).length === 'number'
-  ) {
+  if (ArrayBuffer.isView(value) && 'length' in value && typeof (value as { length: unknown }).length === 'number') {
     return Array.from(value as unknown as ArrayLike<number>)
       .filter((entry) => Number.isFinite(entry))
       .map(roundLogNumber);
@@ -317,10 +271,26 @@ function summarizeShapeForLog(shape: Shape): Record<string, unknown> {
     summary.bboxError = formatLogError(error);
   }
 
-  try { summary.volume = roundLogNumber(shape.volume()); } catch (error) { summary.volumeError = formatLogError(error); }
-  try { summary.surfaceArea = roundLogNumber(shape.surfaceArea()); } catch (error) { summary.surfaceAreaError = formatLogError(error); }
-  try { summary.triangles = shape.numTri(); } catch (error) { summary.triangleError = formatLogError(error); }
-  try { summary.isEmpty = shape.isEmpty(); } catch (error) { summary.isEmptyError = formatLogError(error); }
+  try {
+    summary.volume = roundLogNumber(shape.volume());
+  } catch (error) {
+    summary.volumeError = formatLogError(error);
+  }
+  try {
+    summary.surfaceArea = roundLogNumber(shape.surfaceArea());
+  } catch (error) {
+    summary.surfaceAreaError = formatLogError(error);
+  }
+  try {
+    summary.triangles = shape.numTri();
+  } catch (error) {
+    summary.triangleError = formatLogError(error);
+  }
+  try {
+    summary.isEmpty = shape.isEmpty();
+  } catch (error) {
+    summary.isEmptyError = formatLogError(error);
+  }
   return summary;
 }
 
@@ -476,13 +446,15 @@ function formatLogArg(value: unknown): string {
 }
 
 function makeSandboxConsole(): Record<string, (...args: unknown[]) => void> {
-  const capture = (level: LogEntry['level']) => (...args: unknown[]) => {
-    _collectedLogs.push({
-      level,
-      args: args.map(formatLogArg),
-      timestamp: Date.now(),
-    });
-  };
+  const capture =
+    (level: LogEntry['level']) =>
+    (...args: unknown[]) => {
+      _collectedLogs.push({
+        level,
+        args: args.map(formatLogArg),
+        timestamp: Date.now(),
+      });
+    };
   return { log: capture('log'), warn: capture('warn'), error: capture('error'), info: capture('info') };
 }
 
@@ -522,11 +494,7 @@ const SVG_IMPORT_OPTION_KEYS = new Set([
   'invertY',
 ]);
 
-function parseSvgImportArgs(
-  importKind: 'importSketch' | 'importSvgSketch',
-  fileName: string,
-  args: unknown,
-): SvgImportOptions {
+function parseSvgImportArgs(importKind: 'importSketch' | 'importSvgSketch', fileName: string, args: unknown): SvgImportOptions {
   if (args == null) return {};
   if (typeof args !== 'object' || Array.isArray(args)) {
     throw new Error(`${importKind}("${fileName}") options must be an object`);
@@ -536,26 +504,21 @@ function parseSvgImportArgs(
   for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
     if (!SVG_IMPORT_OPTION_KEYS.has(key)) {
       throw new Error(
-        `${importKind}("${fileName}") unknown SVG option "${key}". ` +
-        `Allowed keys: ${Array.from(SVG_IMPORT_OPTION_KEYS).join(', ')}`,
+        `${importKind}("${fileName}") unknown SVG option "${key}". ` + `Allowed keys: ${Array.from(SVG_IMPORT_OPTION_KEYS).join(', ')}`,
       );
     }
 
     switch (key) {
       case 'include': {
         if (typeof value !== 'string' || !['auto', 'fill', 'stroke', 'fill-and-stroke'].includes(value)) {
-          throw new Error(
-            `${importKind}("${fileName}") option "include" must be one of: auto, fill, stroke, fill-and-stroke`,
-          );
+          throw new Error(`${importKind}("${fileName}") option "include" must be one of: auto, fill, stroke, fill-and-stroke`);
         }
         out.include = value as SvgImportOptions['include'];
         break;
       }
       case 'regionSelection': {
         if (typeof value !== 'string' || !['all', 'largest'].includes(value)) {
-          throw new Error(
-            `${importKind}("${fileName}") option "regionSelection" must be one of: all, largest`,
-          );
+          throw new Error(`${importKind}("${fileName}") option "regionSelection" must be one of: all, largest`);
         }
         out.regionSelection = value as SvgImportOptions['regionSelection'];
         break;
@@ -658,12 +621,7 @@ function dirnamePath(path: string): string {
 }
 
 function isRelativeImportSpecifier(specifier: string): boolean {
-  return (
-    specifier === '.' ||
-    specifier === '..' ||
-    specifier.startsWith('./') ||
-    specifier.startsWith('../')
-  );
+  return specifier === '.' || specifier === '..' || specifier.startsWith('./') || specifier.startsWith('../');
 }
 
 function normalizeLookupPath(path: string): string {
@@ -705,9 +663,8 @@ function resolveImportSource(
   const resolvedPath = resolveImportPath(fromFile, requestedName);
   const lookupKey = options.fileIndex.get(resolvedPath);
   if (!lookupKey) {
-    const suffix = resolvedPath && resolvedPath !== requestedName
-      ? ` (resolved to "${resolvedPath}" from "${fromFile}")`
-      : ` (from "${fromFile}")`;
+    const suffix =
+      resolvedPath && resolvedPath !== requestedName ? ` (resolved to "${resolvedPath}" from "${fromFile}")` : ` (from "${fromFile}")`;
     throw new Error(`File not found: "${requestedName}"${suffix}`);
   }
   const source = allFiles[lookupKey];
@@ -748,7 +705,11 @@ function isSvgImportPath(path: string): boolean {
 
 function stableSerializeOverrides(overrides?: Record<string, number>): string {
   if (!overrides) return '';
-  return JSON.stringify(Object.keys(overrides).sort().map((key) => [key, overrides[key]]));
+  return JSON.stringify(
+    Object.keys(overrides)
+      .sort()
+      .map((key) => [key, overrides[key]]),
+  );
 }
 
 function makeModuleCacheKey(fileName: string, scope: ImportScope): string {
@@ -756,9 +717,7 @@ function makeModuleCacheKey(fileName: string, scope: ImportScope): string {
 }
 
 const BASE64_VLQ_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-const BASE64_VLQ_LOOKUP = Object.fromEntries(
-  BASE64_VLQ_CHARS.split('').map((char, index) => [char, index]),
-) as Record<string, number>;
+const BASE64_VLQ_LOOKUP = Object.fromEntries(BASE64_VLQ_CHARS.split('').map((char, index) => [char, index])) as Record<string, number>;
 
 function decodeBase64Vlq(segment: string): number[] {
   const values: number[] = [];
@@ -780,7 +739,7 @@ function decodeBase64Vlq(segment: string): number[] {
       shift += 5;
     } while (continuation && index < segment.length);
 
-    const signed = (value & 1) === 1 ? -(value >> 1) : (value >> 1);
+    const signed = (value & 1) === 1 ? -(value >> 1) : value >> 1;
     values.push(signed);
   }
 
@@ -927,22 +886,22 @@ function resolveErrorLocation(
 
 function isRenderableEntryResult(value: unknown): boolean {
   return (
-    value instanceof Shape
-    || value instanceof Sketch
-    || value instanceof TrackedShape
-    || value instanceof ShapeGroup
-    || value instanceof GCodeBuilder
-    || Array.isArray(value)
+    value instanceof Shape ||
+    value instanceof Sketch ||
+    value instanceof TrackedShape ||
+    value instanceof ShapeGroup ||
+    value instanceof GCodeBuilder ||
+    Array.isArray(value)
   );
 }
 
 function resolveExportedEntryResult(exportsValue: unknown): unknown {
   if (isRenderableEntryResult(exportsValue)) return exportsValue;
   if (
-    exportsValue
-    && typeof exportsValue === 'object'
-    && 'default' in (exportsValue as Record<string, unknown>)
-    && isRenderableEntryResult((exportsValue as Record<string, unknown>).default)
+    exportsValue &&
+    typeof exportsValue === 'object' &&
+    'default' in (exportsValue as Record<string, unknown>) &&
+    isRenderableEntryResult((exportsValue as Record<string, unknown>).default)
   ) {
     return (exportsValue as Record<string, unknown>).default;
   }
@@ -1081,7 +1040,7 @@ function executeFile(
       if (!options.readBinaryFile) {
         throw new Error(
           `importMesh("${name}"): binary file reading is not available in this environment. ` +
-          'Provide a readBinaryFile callback in RunScriptOptions.',
+            'Provide a readBinaryFile callback in RunScriptOptions.',
         );
       }
       const fileData = options.readBinaryFile(resolvedPath);
@@ -1102,11 +1061,10 @@ function executeFile(
         plan = appendShapeCompileTransform(plan, { kind: 'scale', x: s, y: s, z: s })!;
       }
 
-      return buildShapeFromCompilePlan(
-        createOwnedShapeCompilePlan(plan, 'importedMesh')!,
-        undefined,
-        { fidelity: 'sampled', sources: ['imported'] },
-      );
+      return buildShapeFromCompilePlan(createOwnedShapeCompilePlan(plan, 'importedMesh')!, undefined, {
+        fidelity: 'sampled',
+        sources: ['imported'],
+      });
     };
 
     // importPart("name", { ...paramOverrides }) — executes another file, expects a Shape result
@@ -1125,7 +1083,11 @@ function executeFile(
       }
       const importedDims = takeCollectedDimensions(dimStart);
       if (result instanceof Shape) {
-        logImportTrace(fileName, scope, options, 'importPart', resolvedPath, 'success', { requested: name, got: 'Shape', importedDims: importedDims.length });
+        logImportTrace(fileName, scope, options, 'importPart', resolvedPath, 'success', {
+          requested: name,
+          got: 'Shape',
+          importedDims: importedDims.length,
+        });
         return setShapeDimensions(result, importedDims as ShapeDimension[]);
       }
       if (result instanceof TrackedShape) {
@@ -1161,7 +1123,9 @@ function executeFile(
       }
       const got = describeScriptResultType(result);
       logImportTrace(fileName, scope, options, 'importGroup', resolvedPath, 'error', { requested: name, got });
-      throw new Error(`"${resolvedPath}" did not return a ShapeGroup (got ${got}). Use group(...) as the return value, or use importPart() for single-shape files.`);
+      throw new Error(
+        `"${resolvedPath}" did not return a ShapeGroup (got ${got}). Use group(...) as the return value, or use importPart() for single-shape files.`,
+      );
     };
 
     // importAssembly("name", { ...paramOverrides }) — executes another file, expects an Assembly result
@@ -1174,7 +1138,10 @@ function executeFile(
       try {
         result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
       } catch (error) {
-        logImportTrace(fileName, scope, options, 'importAssembly', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
+        logImportTrace(fileName, scope, options, 'importAssembly', resolvedPath, 'error', {
+          requested: name,
+          error: formatLogError(error),
+        });
         throw error;
       }
       if (result instanceof Assembly) {
@@ -1183,12 +1150,13 @@ function executeFile(
       }
       const got = describeScriptResultType(result);
       logImportTrace(fileName, scope, options, 'importAssembly', resolvedPath, 'error', { requested: name, got });
-      throw new Error(`"${resolvedPath}" did not return an Assembly (got ${got}). Return the assembly() instance directly (before calling .solve()).`);
+      throw new Error(
+        `"${resolvedPath}" did not return an Assembly (got ${got}). Return the assembly() instance directly (before calling .solve()).`,
+      );
     };
 
     // Wrappers that auto-unwrap TrackedShape for boolean ops
-    const unwrap = (s: Shape | TrackedShape): Shape =>
-      s instanceof TrackedShape ? s.toShape() : s;
+    const unwrap = (s: Shape | TrackedShape): Shape => (s instanceof TrackedShape ? s.toShape() : s);
     const wrappedUnion = (...shapes: (Shape | TrackedShape)[]) => union(...shapes.map(unwrap));
     const wrappedDifference = (...shapes: (Shape | TrackedShape)[]) => difference(...shapes.map(unwrap));
     const wrappedIntersection = (...shapes: (Shape | TrackedShape)[]) => intersection(...shapes.map(unwrap));
@@ -1203,9 +1171,7 @@ function executeFile(
       return new TrackedShape(shape, topo, 0, true);
     };
 
-    const trackedCylinder = (
-      height: number, radius: number, radiusTop?: number, segments?: number, center = false,
-    ): TrackedShape => {
+    const trackedCylinder = (height: number, radius: number, radiusTop?: number, segments?: number, center = false): TrackedShape => {
       const shape = cylinder(height, radius, radiusTop, segments, center);
       const c = { center: new Point2D(0, 0), radius, radiusTop };
       const topo = buildCircleExtrusionTopology(c, height, center);
@@ -1323,7 +1289,10 @@ function executeFile(
       const normalizedRequested = requestedName.trim();
 
       if (FORGE_RUNTIME_MODULE_SPECIFIERS.has(normalizedRequested)) {
-        logImportTrace(fileName, scope, options, 'require', normalizedRequested, 'start', { requested: normalizedRequested, virtual: true });
+        logImportTrace(fileName, scope, options, 'require', normalizedRequested, 'start', {
+          requested: normalizedRequested,
+          virtual: true,
+        });
         const runtimeModule = createForgeRuntimeModule(runtimeBindings);
         logImportTrace(fileName, scope, options, 'require', normalizedRequested, 'success', {
           requested: normalizedRequested,
@@ -1337,13 +1306,13 @@ function executeFile(
       if (isSvgImportPath(resolvedPath)) {
         throw new Error(
           `JS import "${normalizedRequested}" resolved to "${resolvedPath}", which is an SVG asset. ` +
-          'Use importSketch() or importSvgSketch() instead.',
+            'Use importSketch() or importSvgSketch() instead.',
         );
       }
       if (resolvedPath.endsWith('.forge-notebook.json')) {
         throw new Error(
           `JS import "${normalizedRequested}" resolved to "${resolvedPath}", which is a notebook file. ` +
-          'Export the notebook to .forge.js first.',
+            'Export the notebook to .forge.js first.',
         );
       }
 
@@ -1363,16 +1332,7 @@ function executeFile(
       const nextModuleEntry: ModuleCacheEntry = { exports: {}, loaded: false };
       options.moduleCache.set(cacheKey, nextModuleEntry);
       try {
-        const moduleExports = executeFile(
-          src,
-          lookupKey,
-          allFiles,
-          visited,
-          scope,
-          options,
-          'module',
-          nextModuleEntry,
-        );
+        const moduleExports = executeFile(src, lookupKey, allFiles, visited, scope, options, 'module', nextModuleEntry);
         nextModuleEntry.exports = moduleExports;
         nextModuleEntry.loaded = true;
         logImportTrace(fileName, scope, options, 'require', resolvedPath, 'success', {
@@ -1408,21 +1368,16 @@ function executeFile(
       exports: executionMode === 'module' && moduleCacheEntry ? moduleCacheEntry.exports : {},
     };
     const initialExportsRef = moduleValue.exports;
-    const returnValue = runWithParamScope(scope, () => fn(
-      moduleValue.exports,
-      moduleValue,
-      requireModule,
-      fileName,
-      dirnamePath(fileName),
-      ...bindingValues,
-    ));
+    const returnValue = runWithParamScope(scope, () =>
+      fn(moduleValue.exports, moduleValue, requireModule, fileName, dirnamePath(fileName), ...bindingValues),
+    );
 
     if (executionMode === 'module') {
       if (returnValue !== undefined) {
         if (hasExplicitModuleExports(moduleValue.exports, initialExportsRef)) {
           throw new Error(
             `"${fileName}" mixed top-level return with exports while being imported as a JS module. ` +
-            'Use either return or export/module.exports, not both.',
+              'Use either return or export/module.exports, not both.',
           );
         }
         if (moduleCacheEntry) {
@@ -1482,288 +1437,266 @@ export function runScript(
     return runWithForgeQuality(quality, () => {
       const result = executeFile(code, fileName, allFiles, new Set(), {}, execOptions);
 
-    const objects: SceneObject[] = [];
-    const shapeDimensions: DimensionDef[] = [];
-    const pushShape = (
-      shape: Shape,
-      name: string,
-      groupName?: string,
-      color?: string,
-      geometryInfo?: GeometryInfo,
-      treePath?: string[],
-    ) => {
-      const objectId = `obj-${objects.length + 1}`;
-      objects.push({
-        id: objectId,
-        name,
-        shape,
-        sketch: null,
-        color: color || shape.colorHex,
-        materialProps: shape.materialProps,
-        geometryInfo: geometryInfo ?? shape.geometryInfo(),
-        groupName,
-        treePath: treePath && treePath.length > 0 ? [...treePath] : [name],
-      });
-
-      const dims = getShapeDimensions(shape) as unknown as DimensionDef[];
-      dims.forEach((dim) => {
-        if (dim.currentComponent) {
-          const ownerNames = new Set<string>(dim.components ?? []);
-          ownerNames.add(name);
-          shapeDimensions.push({
-            ...dim,
-            components: Array.from(ownerNames),
-            currentComponent: undefined,
-          });
-          return;
-        }
-        shapeDimensions.push(dim);
-      });
-      if (shape.isEmpty()) {
-        _collectedLogs.push({
-          level: 'warn',
-          args: [`Object "${name}" is empty. This usually means full clipping, full subtraction, or invalid geometry.`],
-          timestamp: Date.now(),
+      const objects: SceneObject[] = [];
+      const shapeDimensions: DimensionDef[] = [];
+      const pushShape = (
+        shape: Shape,
+        name: string,
+        groupName?: string,
+        color?: string,
+        geometryInfo?: GeometryInfo,
+        treePath?: string[],
+      ) => {
+        const objectId = `obj-${objects.length + 1}`;
+        objects.push({
+          id: objectId,
+          name,
+          shape,
+          sketch: null,
+          color: color || shape.colorHex,
+          materialProps: shape.materialProps,
+          geometryInfo: geometryInfo ?? shape.geometryInfo(),
+          groupName,
+          treePath: treePath && treePath.length > 0 ? [...treePath] : [name],
         });
-      }
-    };
-    const pushSketch = (sketch: Sketch, name: string, groupName?: string, treePath?: string[]) => {
-      const meta = sketch instanceof ConstraintSketch ? sketch.constraintMeta : undefined;
-      objects.push({
-        id: `obj-${objects.length + 1}`,
-        name,
-        shape: null,
-        sketch,
-        geometryInfo: null,
-        sketchMeta: meta,
-        color: sketch.colorHex,
-        groupName,
-        treePath: treePath && treePath.length > 0 ? [...treePath] : [name],
-      });
-    };
 
-    const isNamedObject = (item: unknown): item is { name: string; shape?: Shape; sketch?: Sketch; color?: string; group?: unknown[] } => {
-      return !!item && typeof item === 'object' && 'name' in item;
-    };
-
-    const shapeGroupChildSegment = (grp: ShapeGroup, index: number, root = false): string => {
-      const childName = grp.childName(index);
-      if (childName) return childName;
-      return root ? `Object ${index + 1}` : `${index + 1}`;
-    };
-
-    const groupChildLabel = (grp: ShapeGroup, parentLabel: string, index: number): string => {
-      return `${parentLabel}.${shapeGroupChildSegment(grp, index)}`;
-    };
-
-    const rootGroupChildLabel = (grp: ShapeGroup, index: number): string => {
-      return shapeGroupChildSegment(grp, index, true);
-    };
-
-    const flattenGroupChild = (
-      child: Shape | Sketch | TrackedShape | ShapeGroup,
-      label: string,
-      groupName?: string,
-      treePath?: string[],
-    ) => {
-      const resolvedTreePath = treePath && treePath.length > 0 ? treePath : [label];
-      if (child instanceof ShapeGroup) {
-        child.children.forEach((nested, i) => {
-          flattenGroupChild(
-            nested,
-            groupChildLabel(child, label, i),
-            groupName,
-            [...resolvedTreePath, shapeGroupChildSegment(child, i)],
-          );
-        });
-        return;
-      }
-      if (child instanceof TrackedShape) {
-        pushShape(child.toShape(), label, groupName, undefined, child.geometryInfo(), resolvedTreePath);
-      } else if (child instanceof Shape) {
-        pushShape(child, label, groupName, undefined, undefined, resolvedTreePath);
-      } else if (child instanceof Sketch) {
-        pushSketch(child, label, groupName, resolvedTreePath);
-      }
-    };
-
-    /** Process a named object item (from array return format), optionally within a parent group */
-    const processNamedItem = (
-      item: any,
-      fallbackLabel: string,
-      fallbackSegment: string,
-      parentGroup?: string,
-      parentTreePath: string[] = [],
-    ) => {
-      const name = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : fallbackLabel;
-      const localSegment = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : fallbackSegment;
-      const treePath = [...parentTreePath, localSegment];
-      const grp = parentGroup;
-
-      // Handle { name, group: ShapeGroup } — pre-built group passed directly
-      if (item.group instanceof ShapeGroup) {
-        item.group.children.forEach((child: any, i: number) => {
-          flattenGroupChild(
-            child,
-            groupChildLabel(item.group, name, i),
-            name,
-            [...treePath, shapeGroupChildSegment(item.group, i)],
-          );
-        });
-        return;
-      }
-
-      // Handle { name, group: [...] } — nested assembly group
-      if (Array.isArray(item.group)) {
-        item.group.forEach((child: any, i: number) => {
-          const childLabel = `${name}.${i + 1}`;
-          const childTreePath = [...treePath, `${i + 1}`];
-          if (child instanceof ShapeGroup) {
-            child.children.forEach((nested: any, nestedIndex: number) => {
-              flattenGroupChild(
-                nested,
-                groupChildLabel(child, name, nestedIndex),
-                name,
-                [...treePath, shapeGroupChildSegment(child, nestedIndex)],
-              );
+        const dims = getShapeDimensions(shape) as unknown as DimensionDef[];
+        dims.forEach((dim) => {
+          if (dim.currentComponent) {
+            const ownerNames = new Set<string>(dim.components ?? []);
+            ownerNames.add(name);
+            shapeDimensions.push({
+              ...dim,
+              components: Array.from(ownerNames),
+              currentComponent: undefined,
             });
-          } else if (child instanceof TrackedShape) {
-            pushShape(child.toShape(), childLabel, name, undefined, child.geometryInfo(), childTreePath);
-          } else if (child instanceof Shape) {
-            pushShape(child, childLabel, name, undefined, undefined, childTreePath);
-          } else if (child instanceof Sketch) {
-            pushSketch(child, childLabel, name, childTreePath);
-          } else if (isNamedObject(child)) {
-            processNamedItem(child, childLabel, `${i + 1}`, name, treePath);
+            return;
           }
+          shapeDimensions.push(dim);
         });
-        return;
-      }
-
-      if (item.shape instanceof ShapeGroup) {
-        item.shape.children.forEach((child: any, i: number) => (
-          flattenGroupChild(
-            child,
-            groupChildLabel(item.shape, name, i),
-            name,
-            [...treePath, shapeGroupChildSegment(item.shape, i)],
-          )
-        ));
-        return;
-      }
-      if (item.shape instanceof TrackedShape) {
-        pushShape(item.shape.toShape(), name, grp, item.color, item.shape.geometryInfo(), treePath);
-        return;
-      }
-      if (item.shape instanceof Shape) {
-        pushShape(item.shape, name, grp, item.color, undefined, treePath);
-        return;
-      }
-      if (item.sketch instanceof Sketch) {
-        const meta = item.sketch instanceof ConstraintSketch ? item.sketch.constraintMeta : undefined;
+        if (shape.isEmpty()) {
+          _collectedLogs.push({
+            level: 'warn',
+            args: [`Object "${name}" is empty. This usually means full clipping, full subtraction, or invalid geometry.`],
+            timestamp: Date.now(),
+          });
+        }
+      };
+      const pushSketch = (sketch: Sketch, name: string, groupName?: string, treePath?: string[]) => {
+        const meta = sketch instanceof ConstraintSketch ? sketch.constraintMeta : undefined;
         objects.push({
           id: `obj-${objects.length + 1}`,
           name,
           shape: null,
-          sketch: item.sketch,
+          sketch,
           geometryInfo: null,
           sketchMeta: meta,
-          color: item.color || item.sketch.colorHex,
-          groupName: grp,
-          treePath,
+          color: sketch.colorHex,
+          groupName,
+          treePath: treePath && treePath.length > 0 ? [...treePath] : [name],
         });
-        return;
-      }
-    };
+      };
 
-    if (result instanceof ShapeGroup) {
-      result.children.forEach((child, i) => {
-        const label = rootGroupChildLabel(result, i);
-        flattenGroupChild(child, label, undefined, [label]);
-      });
-    } else if (Array.isArray(result)) {
-      result.forEach((item, index) => {
-        const label = `Object ${index + 1}`;
-        if (item instanceof ShapeGroup) {
-          item.children.forEach((child, i) => {
-            flattenGroupChild(
-              child,
-              groupChildLabel(item, label, i),
-              undefined,
-              [label, shapeGroupChildSegment(item, i)],
-            );
+      const isNamedObject = (
+        item: unknown,
+      ): item is { name: string; shape?: Shape; sketch?: Sketch; color?: string; group?: unknown[] } => {
+        return !!item && typeof item === 'object' && 'name' in item;
+      };
+
+      const shapeGroupChildSegment = (grp: ShapeGroup, index: number, root = false): string => {
+        const childName = grp.childName(index);
+        if (childName) return childName;
+        return root ? `Object ${index + 1}` : `${index + 1}`;
+      };
+
+      const groupChildLabel = (grp: ShapeGroup, parentLabel: string, index: number): string => {
+        return `${parentLabel}.${shapeGroupChildSegment(grp, index)}`;
+      };
+
+      const rootGroupChildLabel = (grp: ShapeGroup, index: number): string => {
+        return shapeGroupChildSegment(grp, index, true);
+      };
+
+      const flattenGroupChild = (
+        child: Shape | Sketch | TrackedShape | ShapeGroup,
+        label: string,
+        groupName?: string,
+        treePath?: string[],
+      ) => {
+        const resolvedTreePath = treePath && treePath.length > 0 ? treePath : [label];
+        if (child instanceof ShapeGroup) {
+          child.children.forEach((nested, i) => {
+            flattenGroupChild(nested, groupChildLabel(child, label, i), groupName, [...resolvedTreePath, shapeGroupChildSegment(child, i)]);
           });
           return;
         }
-        if (item instanceof TrackedShape) {
-          pushShape(item.toShape(), label, undefined, undefined, item.geometryInfo(), [label]);
-          return;
+        if (child instanceof TrackedShape) {
+          pushShape(child.toShape(), label, groupName, undefined, child.geometryInfo(), resolvedTreePath);
+        } else if (child instanceof Shape) {
+          pushShape(child, label, groupName, undefined, undefined, resolvedTreePath);
+        } else if (child instanceof Sketch) {
+          pushSketch(child, label, groupName, resolvedTreePath);
         }
-        if (item instanceof Shape) {
-          pushShape(item, label, undefined, undefined, undefined, [label]);
-          return;
-        }
-        if (item instanceof Sketch) {
-          pushSketch(item, label, undefined, [label]);
-          return;
-        }
-        if (isNamedObject(item)) {
-          processNamedItem(item, label, label);
-          return;
-        }
-        throw new Error('Array results must contain Shape/Sketch items');
-      });
-    } else if (result instanceof TrackedShape) {
-      pushShape(result.toShape(), fileName, undefined, undefined, result.geometryInfo(), [fileName]);
-    } else if (result instanceof Shape) {
-      pushShape(result, fileName, undefined, undefined, undefined, [fileName]);
-    } else if (result instanceof Sketch) {
-      pushSketch(result, fileName, undefined, [fileName]);
-    } else if (result instanceof GCodeBuilder) {
-      objects.push({
-        id: `obj-${objects.length + 1}`,
-        name: fileName,
-        shape: null,
-        sketch: null,
-        toolpath: result.build(),
-        geometryInfo: null,
-        treePath: [fileName],
-      });
-    }
+      };
 
-    // Inject collected highlights into sketch objects' meta for rendering.
-    const highlights = getCollectedHighlights();
-    if (highlights.length > 0) {
-      for (const obj of objects) {
-        if (obj.sketchMeta) {
-          obj.sketchMeta = { ...obj.sketchMeta, highlights };
-        }
-      }
-    }
+      /** Process a named object item (from array return format), optionally within a parent group */
+      const processNamedItem = (
+        item: any,
+        fallbackLabel: string,
+        fallbackSegment: string,
+        parentGroup?: string,
+        parentTreePath: string[] = [],
+      ) => {
+        const name = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : fallbackLabel;
+        const localSegment = typeof item.name === 'string' && item.name.trim().length > 0 ? item.name : fallbackSegment;
+        const treePath = [...parentTreePath, localSegment];
+        const grp = parentGroup;
 
-    // Resolve pending shape highlights → match shapes to scene object indices.
-    const pendingShapeHls = getPendingShapeHighlights();
-    for (const pending of pendingShapeHls) {
-      const rawShape = pending.shape;
-      // Extract the underlying Shape for TrackedShape
-      const targetShape = (rawShape as any).shape?.getMesh
-        ? (rawShape as any).shape
-        : rawShape;
-      const idx = objects.findIndex((o) => o.shape === targetShape);
-      if (idx >= 0) {
-        getCollectedDebugHighlights3D().push({
-          kind: 'shape',
-          shapeIndex: idx,
-          color: pending.color,
-          label: pending.label,
-          pulse: pending.pulse,
+        // Handle { name, group: ShapeGroup } — pre-built group passed directly
+        if (item.group instanceof ShapeGroup) {
+          item.group.children.forEach((child: any, i: number) => {
+            flattenGroupChild(child, groupChildLabel(item.group, name, i), name, [...treePath, shapeGroupChildSegment(item.group, i)]);
+          });
+          return;
+        }
+
+        // Handle { name, group: [...] } — nested assembly group
+        if (Array.isArray(item.group)) {
+          item.group.forEach((child: any, i: number) => {
+            const childLabel = `${name}.${i + 1}`;
+            const childTreePath = [...treePath, `${i + 1}`];
+            if (child instanceof ShapeGroup) {
+              child.children.forEach((nested: any, nestedIndex: number) => {
+                flattenGroupChild(nested, groupChildLabel(child, name, nestedIndex), name, [
+                  ...treePath,
+                  shapeGroupChildSegment(child, nestedIndex),
+                ]);
+              });
+            } else if (child instanceof TrackedShape) {
+              pushShape(child.toShape(), childLabel, name, undefined, child.geometryInfo(), childTreePath);
+            } else if (child instanceof Shape) {
+              pushShape(child, childLabel, name, undefined, undefined, childTreePath);
+            } else if (child instanceof Sketch) {
+              pushSketch(child, childLabel, name, childTreePath);
+            } else if (isNamedObject(child)) {
+              processNamedItem(child, childLabel, `${i + 1}`, name, treePath);
+            }
+          });
+          return;
+        }
+
+        if (item.shape instanceof ShapeGroup) {
+          item.shape.children.forEach((child: any, i: number) =>
+            flattenGroupChild(child, groupChildLabel(item.shape, name, i), name, [...treePath, shapeGroupChildSegment(item.shape, i)]),
+          );
+          return;
+        }
+        if (item.shape instanceof TrackedShape) {
+          pushShape(item.shape.toShape(), name, grp, item.color, item.shape.geometryInfo(), treePath);
+          return;
+        }
+        if (item.shape instanceof Shape) {
+          pushShape(item.shape, name, grp, item.color, undefined, treePath);
+          return;
+        }
+        if (item.sketch instanceof Sketch) {
+          const meta = item.sketch instanceof ConstraintSketch ? item.sketch.constraintMeta : undefined;
+          objects.push({
+            id: `obj-${objects.length + 1}`,
+            name,
+            shape: null,
+            sketch: item.sketch,
+            geometryInfo: null,
+            sketchMeta: meta,
+            color: item.color || item.sketch.colorHex,
+            groupName: grp,
+            treePath,
+          });
+          return;
+        }
+      };
+
+      if (result instanceof ShapeGroup) {
+        result.children.forEach((child, i) => {
+          const label = rootGroupChildLabel(result, i);
+          flattenGroupChild(child, label, undefined, [label]);
+        });
+      } else if (Array.isArray(result)) {
+        result.forEach((item, index) => {
+          const label = `Object ${index + 1}`;
+          if (item instanceof ShapeGroup) {
+            item.children.forEach((child, i) => {
+              flattenGroupChild(child, groupChildLabel(item, label, i), undefined, [label, shapeGroupChildSegment(item, i)]);
+            });
+            return;
+          }
+          if (item instanceof TrackedShape) {
+            pushShape(item.toShape(), label, undefined, undefined, item.geometryInfo(), [label]);
+            return;
+          }
+          if (item instanceof Shape) {
+            pushShape(item, label, undefined, undefined, undefined, [label]);
+            return;
+          }
+          if (item instanceof Sketch) {
+            pushSketch(item, label, undefined, [label]);
+            return;
+          }
+          if (isNamedObject(item)) {
+            processNamedItem(item, label, label);
+            return;
+          }
+          throw new Error('Array results must contain Shape/Sketch items');
+        });
+      } else if (result instanceof TrackedShape) {
+        pushShape(result.toShape(), fileName, undefined, undefined, result.geometryInfo(), [fileName]);
+      } else if (result instanceof Shape) {
+        pushShape(result, fileName, undefined, undefined, undefined, [fileName]);
+      } else if (result instanceof Sketch) {
+        pushSketch(result, fileName, undefined, [fileName]);
+      } else if (result instanceof GCodeBuilder) {
+        objects.push({
+          id: `obj-${objects.length + 1}`,
+          name: fileName,
+          shape: null,
+          sketch: null,
+          toolpath: result.build(),
+          geometryInfo: null,
+          treePath: [fileName],
         });
       }
-    }
-    resetPendingShapeHighlights();
 
-    const shape = objects.length === 1 ? objects[0].shape : null;
-    const sketch = objects.length === 1 ? objects[0].sketch : null;
+      // Inject collected highlights into sketch objects' meta for rendering.
+      const highlights = getCollectedHighlights();
+      if (highlights.length > 0) {
+        for (const obj of objects) {
+          if (obj.sketchMeta) {
+            obj.sketchMeta = { ...obj.sketchMeta, highlights };
+          }
+        }
+      }
+
+      // Resolve pending shape highlights → match shapes to scene object indices.
+      const pendingShapeHls = getPendingShapeHighlights();
+      for (const pending of pendingShapeHls) {
+        const rawShape = pending.shape;
+        // Extract the underlying Shape for TrackedShape
+        const targetShape = (rawShape as any).shape?.getMesh ? (rawShape as any).shape : rawShape;
+        const idx = objects.findIndex((o) => o.shape === targetShape);
+        if (idx >= 0) {
+          getCollectedDebugHighlights3D().push({
+            kind: 'shape',
+            shapeIndex: idx,
+            color: pending.color,
+            label: pending.label,
+            pulse: pending.pulse,
+          });
+        }
+      }
+      resetPendingShapeHighlights();
+
+      const shape = objects.length === 1 ? objects[0].shape : null;
+      const sketch = objects.length === 1 ? objects[0].sketch : null;
 
       return {
         shape,
@@ -1794,9 +1727,8 @@ export function runScript(
     let lineInfo = '';
     const location = resolveErrorLocation(stack, execOptions.compiledFiles);
     if (location) {
-      lineInfo = location.fileName === fileName
-        ? ` (line ${location.line})`
-        : ` (${location.fileName}:${location.line}:${location.column})`;
+      lineInfo =
+        location.fileName === fileName ? ` (line ${location.line})` : ` (${location.fileName}:${location.line}:${location.column})`;
     }
     _collectedLogs.push({ level: 'error', args: [`${msg}${lineInfo}`, ...(stack ? [stack] : [])], timestamp: Date.now() });
     return {

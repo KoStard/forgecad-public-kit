@@ -1,6 +1,6 @@
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
-import type { Mat4 } from '../../transform';
 import type { ResolvedEdgeFeatureSelection } from '../../edgeFeatureModel';
+import type { Mat4 } from '../../transform';
 
 /**
  * Minimum extrusion overshoot past each end of the edge.
@@ -27,10 +27,22 @@ function edgeFrameMatrix(selection: ResolvedEdgeFeatureSelection, originOffset =
   ];
 
   return [
-    selection.basisX[0], selection.basisX[1], selection.basisX[2], 0,
-    selection.basisY[0], selection.basisY[1], selection.basisY[2], 0,
-    selection.axis[0], selection.axis[1], selection.axis[2], 0,
-    origin[0], origin[1], origin[2], 1,
+    selection.basisX[0],
+    selection.basisX[1],
+    selection.basisX[2],
+    0,
+    selection.basisY[0],
+    selection.basisY[1],
+    selection.basisY[2],
+    0,
+    selection.axis[0],
+    selection.axis[1],
+    selection.axis[2],
+    0,
+    origin[0],
+    origin[1],
+    origin[2],
+    1,
   ];
 }
 
@@ -61,9 +73,9 @@ function buildFilletCrossSection(
   const { surfaceDirA, surfaceDirB, dihedralAngleDeg } = selection;
   if (!surfaceDirA || !surfaceDirB || dihedralAngleDeg == null) return null;
 
-  const alpha = dihedralAngleDeg * Math.PI / 180; // opening angle in radians
+  const alpha = (dihedralAngleDeg * Math.PI) / 180; // opening angle in radians
   // Clamp to avoid degenerate geometry at extreme angles
-  if (alpha < 5 * Math.PI / 180 || alpha > 175 * Math.PI / 180) return null;
+  if (alpha < (5 * Math.PI) / 180 || alpha > (175 * Math.PI) / 180) return null;
 
   const halfAlpha = alpha / 2;
   const tangentDist = radius / Math.tan(halfAlpha);
@@ -102,16 +114,25 @@ function buildFilletCrossSection(
   // Ensure counter-clockwise winding.
   // Check signed area of (origin, tangentA, center, tangentB).
   // Using shoelace: sum of cross products of consecutive edge vectors.
-  const crossWinding = ((tAx - ox) * (cyExt - oy) - (tAy - oy) * (cxExt - ox))
-    + ((cxExt - ox) * (tBy - oy) - (cyExt - oy) * (tBx - ox));
-  const kiteVerts: [number, number][] = crossWinding >= 0
-    ? [[ox, oy], [tAx, tAy], [cxExt, cyExt], [tBx, tBy]]
-    : [[ox, oy], [tBx, tBy], [cxExt, cyExt], [tAx, tAy]];
+  const crossWinding = (tAx - ox) * (cyExt - oy) - (tAy - oy) * (cxExt - ox) + ((cxExt - ox) * (tBy - oy) - (cyExt - oy) * (tBx - ox));
+  const kiteVerts: [number, number][] =
+    crossWinding >= 0
+      ? [
+          [ox, oy],
+          [tAx, tAy],
+          [cxExt, cyExt],
+          [tBx, tBy],
+        ]
+      : [
+          [ox, oy],
+          [tBx, tBy],
+          [cxExt, cyExt],
+          [tAx, tAy],
+        ];
 
   const wedge = new wasm.CrossSection([kiteVerts]);
 
-  const cylinder = wasm.CrossSection.circle(radius, Math.max(3, segments))
-    .translate(cx, cy);
+  const cylinder = wasm.CrossSection.circle(radius, Math.max(3, segments)).translate(cx, cy);
 
   return { wedge, cylinder };
 }
@@ -128,11 +149,13 @@ function buildChamferCrossSection(
   const { surfaceDirA, surfaceDirB } = selection;
   if (!surfaceDirA || !surfaceDirB) return null;
 
-  return new wasm.CrossSection([[
-    [0, 0],
-    [surfaceDirA[0] * size, surfaceDirA[1] * size],
-    [surfaceDirB[0] * size, surfaceDirB[1] * size],
-  ]]);
+  return new wasm.CrossSection([
+    [
+      [0, 0],
+      [surfaceDirA[0] * size, surfaceDirA[1] * size],
+      [surfaceDirB[0] * size, surfaceDirB[1] * size],
+    ],
+  ]);
 }
 
 // --- Legacy 90°-only construction (for tracked-edge path) ---
@@ -144,10 +167,8 @@ function legacyFilletCrossSection(
   wasm: ManifoldToplevel,
 ): { wedge: import('manifold-3d').CrossSection; cylinder: import('manifold-3d').CrossSection } {
   const [qx, qy] = selection.quadrant;
-  const wedge = wasm.CrossSection.square([radius, radius], false)
-    .translate(qx > 0 ? 0 : -radius, qy > 0 ? 0 : -radius);
-  const cylinder = wasm.CrossSection.circle(radius, Math.max(3, segments))
-    .translate(qx * radius, qy * radius);
+  const wedge = wasm.CrossSection.square([radius, radius], false).translate(qx > 0 ? 0 : -radius, qy > 0 ? 0 : -radius);
+  const cylinder = wasm.CrossSection.circle(radius, Math.max(3, segments)).translate(qx * radius, qy * radius);
   return { wedge, cylinder };
 }
 
@@ -157,11 +178,13 @@ function legacyChamferCrossSection(
   wasm: ManifoldToplevel,
 ): import('manifold-3d').CrossSection {
   const [qx, qy] = selection.quadrant;
-  return new wasm.CrossSection([[
-    [0, 0],
-    [qx * size, 0],
-    [0, qy * size],
-  ]]);
+  return new wasm.CrossSection([
+    [
+      [0, 0],
+      [qx * size, 0],
+      [0, qy * size],
+    ],
+  ]);
 }
 
 // --- Public API ---
@@ -184,16 +207,11 @@ export function applyFilletSelectionToManifold(
 
   // Use angle-aware construction when surface direction data is available,
   // fall back to legacy 90°-only square for tracked-edge path.
-  const cs = buildFilletCrossSection(selection, radius, segments, wasm)
-    ?? legacyFilletCrossSection(selection, radius, segments, wasm);
+  const cs = buildFilletCrossSection(selection, radius, segments, wasm) ?? legacyFilletCrossSection(selection, radius, segments, wasm);
 
-  const corner = cs.wedge
-    .extrude(span, 0, 0, undefined, false)
-    .transform(frame);
+  const corner = cs.wedge.extrude(span, 0, 0, undefined, false).transform(frame);
 
-  const cyl = cs.cylinder
-    .extrude(span, 0, 0, undefined, false)
-    .transform(frame);
+  const cyl = cs.cylinder.extrude(span, 0, 0, undefined, false).transform(frame);
 
   const crescent = wasm.Manifold.difference([corner, cyl]);
   return wasm.Manifold.difference([base, crescent]);
@@ -217,16 +235,11 @@ export function applyConcaveFilletSelectionToManifold(
   const span = height + pad * 2;
   const frame = edgeFrameMatrix(selection, -pad);
 
-  const cs = buildFilletCrossSection(selection, radius, segments, wasm)
-    ?? legacyFilletCrossSection(selection, radius, segments, wasm);
+  const cs = buildFilletCrossSection(selection, radius, segments, wasm) ?? legacyFilletCrossSection(selection, radius, segments, wasm);
 
-  const corner = cs.wedge
-    .extrude(span, 0, 0, undefined, false)
-    .transform(frame);
+  const corner = cs.wedge.extrude(span, 0, 0, undefined, false).transform(frame);
 
-  const cyl = cs.cylinder
-    .extrude(span, 0, 0, undefined, false)
-    .transform(frame);
+  const cyl = cs.cylinder.extrude(span, 0, 0, undefined, false).transform(frame);
 
   const crescent = wasm.Manifold.difference([corner, cyl]);
   return wasm.Manifold.union([base, crescent]);
@@ -245,12 +258,9 @@ export function applyChamferSelectionToManifold(
   const span = height + pad * 2;
   const frame = edgeFrameMatrix(selection, -pad);
 
-  const triangle = buildChamferCrossSection(selection, size, wasm)
-    ?? legacyChamferCrossSection(selection, size, wasm);
+  const triangle = buildChamferCrossSection(selection, size, wasm) ?? legacyChamferCrossSection(selection, size, wasm);
 
-  const chamfer = triangle
-    .extrude(span, 0, 0, undefined, false)
-    .transform(frame);
+  const chamfer = triangle.extrude(span, 0, 0, undefined, false).transform(frame);
 
   return wasm.Manifold.difference([base, chamfer]);
 }
@@ -268,12 +278,9 @@ export function applyConcaveChamferSelectionToManifold(
   const span = height + pad * 2;
   const frame = edgeFrameMatrix(selection, -pad);
 
-  const triangle = buildChamferCrossSection(selection, size, wasm)
-    ?? legacyChamferCrossSection(selection, size, wasm);
+  const triangle = buildChamferCrossSection(selection, size, wasm) ?? legacyChamferCrossSection(selection, size, wasm);
 
-  const chamfer = triangle
-    .extrude(span, 0, 0, undefined, false)
-    .transform(frame);
+  const chamfer = triangle.extrude(span, 0, 0, undefined, false).transform(frame);
 
   return wasm.Manifold.union([base, chamfer]);
 }

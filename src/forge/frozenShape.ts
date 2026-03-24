@@ -12,12 +12,18 @@
  * is a zero-cost BufferGeometry assembly with no CPU work.
  */
 
-import { Shape } from './kernel';
-import { SHAPE_BACKEND_MARKER, type ShapeBackend, type ShapeRuntimeBounds, type ShapeRuntimeMesh, type ShapeRuntimeCrossSection } from './shapeBackend';
-import { reconstructBackendFromMesh } from './backends/manifold';
-import type { FaceRef } from './sketch/topology';
-import type { FaceTransformationHistory } from './faceHistory';
 import type { SerializedShapeData } from '../workers/evalWorkerProtocol';
+import { reconstructBackendFromMesh } from './backends/manifold';
+import type { FaceTransformationHistory } from './faceHistory';
+import { Shape } from './kernel';
+import {
+  SHAPE_BACKEND_MARKER,
+  type ShapeBackend,
+  type ShapeRuntimeBounds,
+  type ShapeRuntimeCrossSection,
+  type ShapeRuntimeMesh,
+} from './shapeBackend';
+import type { FaceRef } from './sketch/topology';
 
 export interface PrecomputedGeometry {
   positions: Float32Array;
@@ -102,19 +108,45 @@ class FrozenShapeBackend implements ShapeBackend {
 
   // --- Delegated to lazy reconstructed backend ---
 
-  clone(): ShapeBackend { return this.getReconstructedBackend().clone(); }
-  translate(x: number, y: number, z: number): ShapeBackend { return this.getReconstructedBackend().translate(x, y, z); }
-  rotate(x: number, y: number, z: number): ShapeBackend { return this.getReconstructedBackend().rotate(x, y, z); }
-  transform(m: Parameters<ShapeBackend['transform']>[0]): ShapeBackend { return this.getReconstructedBackend().transform(m); }
-  scale(v: number | [number, number, number]): ShapeBackend { return this.getReconstructedBackend().scale(v); }
-  mirror(normal: [number, number, number]): ShapeBackend { return this.getReconstructedBackend().mirror(normal); }
-  split(other: ShapeBackend): [ShapeBackend, ShapeBackend] { return this.getReconstructedBackend().split(other); }
-  splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend] { return this.getReconstructedBackend().splitByPlane(normal, originOffset); }
-  trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend { return this.getReconstructedBackend().trimByPlane(normal, originOffset); }
-  volume(): number { return this.getReconstructedBackend().volume(); }
-  surfaceArea(): number { return this.getReconstructedBackend().surfaceArea(); }
-  slice(offset: number): ShapeRuntimeCrossSection { return this.getReconstructedBackend().slice(offset); }
-  project(): ShapeRuntimeCrossSection { return this.getReconstructedBackend().project(); }
+  clone(): ShapeBackend {
+    return this.getReconstructedBackend().clone();
+  }
+  translate(x: number, y: number, z: number): ShapeBackend {
+    return this.getReconstructedBackend().translate(x, y, z);
+  }
+  rotate(x: number, y: number, z: number): ShapeBackend {
+    return this.getReconstructedBackend().rotate(x, y, z);
+  }
+  transform(m: Parameters<ShapeBackend['transform']>[0]): ShapeBackend {
+    return this.getReconstructedBackend().transform(m);
+  }
+  scale(v: number | [number, number, number]): ShapeBackend {
+    return this.getReconstructedBackend().scale(v);
+  }
+  mirror(normal: [number, number, number]): ShapeBackend {
+    return this.getReconstructedBackend().mirror(normal);
+  }
+  split(other: ShapeBackend): [ShapeBackend, ShapeBackend] {
+    return this.getReconstructedBackend().split(other);
+  }
+  splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend] {
+    return this.getReconstructedBackend().splitByPlane(normal, originOffset);
+  }
+  trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend {
+    return this.getReconstructedBackend().trimByPlane(normal, originOffset);
+  }
+  volume(): number {
+    return this.getReconstructedBackend().volume();
+  }
+  surfaceArea(): number {
+    return this.getReconstructedBackend().surfaceArea();
+  }
+  slice(offset: number): ShapeRuntimeCrossSection {
+    return this.getReconstructedBackend().slice(offset);
+  }
+  project(): ShapeRuntimeCrossSection {
+    return this.getReconstructedBackend().project();
+  }
 }
 
 export class FrozenShape extends Shape {

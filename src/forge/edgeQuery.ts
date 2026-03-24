@@ -6,16 +6,19 @@
  */
 
 import { Shape } from './kernel';
-import { extractEdgeSegments, type EdgeSegment, type MeshData } from './meshEdgeExtraction';
+import { type EdgeSegment, extractEdgeSegments, type MeshData } from './meshEdgeExtraction';
 import { TrackedShape } from './sketch/topology';
 import type { Vec3 } from './transform';
 
 export type { EdgeSegment } from './meshEdgeExtraction';
 
 export interface BoundingRegion {
-  xMin?: number; xMax?: number;
-  yMin?: number; yMax?: number;
-  zMin?: number; zMax?: number;
+  xMin?: number;
+  xMax?: number;
+  yMin?: number;
+  yMax?: number;
+  zMin?: number;
+  zMax?: number;
 }
 
 export interface EdgeQuery {
@@ -55,7 +58,9 @@ function unwrapShape(value: Shape | TrackedShape): Shape {
 }
 
 function distSq(a: Vec3, b: Vec3): number {
-  const dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+  const dx = a[0] - b[0],
+    dy = a[1] - b[1],
+    dz = a[2] - b[2];
   return dx * dx + dy * dy + dz * dz;
 }
 
@@ -88,55 +93,55 @@ function getMeshFromShape(shape: Shape): MeshData {
 function applyFilters(edges: EdgeSegment[], query: EdgeQuery): EdgeSegment[] {
   const tol = query.tolerance ?? DEFAULT_TOLERANCE;
   const angleTol = query.angleTolerance ?? DEFAULT_ANGLE_TOLERANCE;
-  const cosAngleTol = Math.cos(angleTol * Math.PI / 180);
+  const cosAngleTol = Math.cos((angleTol * Math.PI) / 180);
 
   let result = edges;
 
   if (query.convex === true) {
-    result = result.filter(e => e.convex);
+    result = result.filter((e) => e.convex);
   }
   if (query.concave === true) {
-    result = result.filter(e => !e.convex);
+    result = result.filter((e) => !e.convex);
   }
 
   if (query.minAngle != null) {
     const min = query.minAngle;
-    result = result.filter(e => e.dihedralAngle >= min);
+    result = result.filter((e) => e.dihedralAngle >= min);
   }
   if (query.maxAngle != null) {
     const max = query.maxAngle;
-    result = result.filter(e => e.dihedralAngle <= max);
+    result = result.filter((e) => e.dihedralAngle <= max);
   }
 
   if (query.minLength != null) {
     const min = query.minLength;
-    result = result.filter(e => e.length >= min);
+    result = result.filter((e) => e.length >= min);
   }
   if (query.maxLength != null) {
     const max = query.maxLength;
-    result = result.filter(e => e.length <= max);
+    result = result.filter((e) => e.length <= max);
   }
 
   if (query.parallel) {
     const dir = normalize(query.parallel);
-    result = result.filter(e => absDot(e.direction, dir) >= cosAngleTol);
+    result = result.filter((e) => absDot(e.direction, dir) >= cosAngleTol);
   }
 
   if (query.perpendicular) {
     const dir = normalize(query.perpendicular);
     // Perpendicular means dot ≈ 0, so absDot should be ≤ sin(angleTol)
-    const sinAngleTol = Math.sin(angleTol * Math.PI / 180);
-    result = result.filter(e => absDot(e.direction, dir) <= sinAngleTol);
+    const sinAngleTol = Math.sin((angleTol * Math.PI) / 180);
+    result = result.filter((e) => absDot(e.direction, dir) <= sinAngleTol);
   }
 
   if (query.atZ != null) {
     const z = query.atZ;
-    result = result.filter(e => Math.abs(e.midpoint[2] - z) <= tol);
+    result = result.filter((e) => Math.abs(e.midpoint[2] - z) <= tol);
   }
 
   if (query.within) {
     const b = query.within;
-    result = result.filter(e => {
+    result = result.filter((e) => {
       const [mx, my, mz] = e.midpoint;
       if (b.xMin != null && mx < b.xMin) return false;
       if (b.xMax != null && mx > b.xMax) return false;
@@ -219,9 +224,7 @@ export function coalesceEdges(segments: EdgeSegment[], tolerance = 0.01): EdgeSe
       const dz = segments[j].midpoint[2] - segments[i].midpoint[2];
       const dLen = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (dLen > 1e-12) {
-        const perpDist = Math.sqrt(
-          dLen * dLen - (dx * dir[0] + dy * dir[1] + dz * dir[2]) ** 2,
-        );
+        const perpDist = Math.sqrt(dLen * dLen - (dx * dir[0] + dy * dir[1] + dz * dir[2]) ** 2);
         if (perpDist > tolerance) continue;
       }
 
@@ -266,30 +269,48 @@ function minEndpointGap(a: EdgeSegment, b: EdgeSegment): number {
 function mergeCollinearGroup(group: EdgeSegment[], index: number): EdgeSegment {
   // Project all endpoints onto the shared direction axis and find the extremes
   const dir = group[0].direction;
-  let minProj = Infinity, maxProj = -Infinity;
-  let minPt: Vec3 = group[0].start, maxPt: Vec3 = group[0].end;
+  let minProj = Infinity,
+    maxProj = -Infinity;
+  let minPt: Vec3 = group[0].start,
+    maxPt: Vec3 = group[0].end;
 
   for (const seg of group) {
     for (const pt of [seg.start, seg.end]) {
       const proj = pt[0] * dir[0] + pt[1] * dir[1] + pt[2] * dir[2];
-      if (proj < minProj) { minProj = proj; minPt = pt; }
-      if (proj > maxProj) { maxProj = proj; maxPt = pt; }
+      if (proj < minProj) {
+        minProj = proj;
+        minPt = pt;
+      }
+      if (proj > maxProj) {
+        maxProj = proj;
+        maxPt = pt;
+      }
     }
   }
 
-  const dx = maxPt[0] - minPt[0], dy = maxPt[1] - minPt[1], dz = maxPt[2] - minPt[2];
+  const dx = maxPt[0] - minPt[0],
+    dy = maxPt[1] - minPt[1],
+    dz = maxPt[2] - minPt[2];
   const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
   const invLen = length > 1e-12 ? 1 / length : 0;
 
   // Average the dihedral angles and normals from the group
   let avgAngle = 0;
-  let avgNAx = 0, avgNAy = 0, avgNAz = 0;
-  let avgNBx = 0, avgNBy = 0, avgNBz = 0;
+  let avgNAx = 0,
+    avgNAy = 0,
+    avgNAz = 0;
+  let avgNBx = 0,
+    avgNBy = 0,
+    avgNBz = 0;
   let convexCount = 0;
   for (const seg of group) {
     avgAngle += seg.dihedralAngle;
-    avgNAx += seg.normalA[0]; avgNAy += seg.normalA[1]; avgNAz += seg.normalA[2];
-    avgNBx += seg.normalB[0]; avgNBy += seg.normalB[1]; avgNBz += seg.normalB[2];
+    avgNAx += seg.normalA[0];
+    avgNAy += seg.normalA[1];
+    avgNAz += seg.normalA[2];
+    avgNBx += seg.normalB[0];
+    avgNBy += seg.normalB[1];
+    avgNBz += seg.normalB[2];
     if (seg.convex) convexCount++;
   }
   const n = group.length;

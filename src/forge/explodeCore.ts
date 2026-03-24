@@ -81,11 +81,7 @@ export function mergeExplodeDirectives(...directives: (ExplodeDirective | undefi
 }
 
 export function hasExplodeOverride(directive: ExplodeDirective | undefined): boolean {
-  return !!directive && (
-    directive.stage !== undefined
-    || directive.direction !== undefined
-    || directive.axisLock !== undefined
-  );
+  return !!directive && (directive.stage !== undefined || directive.direction !== undefined || directive.axisLock !== undefined);
 }
 
 export function resolveExplodeDirective(
@@ -117,24 +113,10 @@ export function computeExplodeMotion({
   const merged = resolveExplodeDirective(pathKeys, name, local, config);
   const stage = merged.stage ?? config.stageForDepth(depth);
   const effectiveDirection = merged.direction ?? config.defaultMode;
-  const resolvedDirection = resolveExplodeDirection(
-    effectiveDirection,
-    center,
-    originCenter,
-    seed,
-  );
+  const resolvedDirection = resolveExplodeDirection(effectiveDirection, center, originCenter, seed);
   const explicitDirectionProvided = merged.direction !== undefined;
-  const branchSource = applyExplodeTreeBias(
-    resolvedDirection,
-    effectiveDirection,
-    inheritedDirection,
-    seed,
-  );
-  const branchDirection = applyExplodeAxisLock(
-    branchSource,
-    merged.axisLock ?? config.defaultAxisLock,
-    `${seed}|branch`,
-  );
+  const branchSource = applyExplodeTreeBias(resolvedDirection, effectiveDirection, inheritedDirection, seed);
+  const branchDirection = applyExplodeAxisLock(branchSource, merged.axisLock ?? config.defaultAxisLock, `${seed}|branch`);
   const nestedDirection = resolveNestedExplodeDirection(
     resolvedDirection,
     effectiveDirection,
@@ -144,11 +126,7 @@ export function computeExplodeMotion({
     explicitDirectionProvided,
     seed,
   );
-  const locked = applyExplodeAxisLock(
-    nestedDirection ?? branchDirection,
-    merged.axisLock ?? config.defaultAxisLock,
-    seed,
-  );
+  const locked = applyExplodeAxisLock(nestedDirection ?? branchDirection, merged.axisLock ?? config.defaultAxisLock, seed);
   return {
     direction: locked,
     branchDirection,
@@ -168,39 +146,21 @@ export function explodeMergeBounds(a: ExplodeBounds | null, b: ExplodeBounds | n
   if (!a) return b ? { min: [...b.min], max: [...b.max] } : null;
   if (!b) return { min: [...a.min], max: [...a.max] };
   return {
-    min: [
-      Math.min(a.min[0], b.min[0]),
-      Math.min(a.min[1], b.min[1]),
-      Math.min(a.min[2], b.min[2]),
-    ],
-    max: [
-      Math.max(a.max[0], b.max[0]),
-      Math.max(a.max[1], b.max[1]),
-      Math.max(a.max[2], b.max[2]),
-    ],
+    min: [Math.min(a.min[0], b.min[0]), Math.min(a.min[1], b.min[1]), Math.min(a.min[2], b.min[2])],
+    max: [Math.max(a.max[0], b.max[0]), Math.max(a.max[1], b.max[1]), Math.max(a.max[2], b.max[2])],
   };
 }
 
 export function explodeBoundsCenter(bounds: ExplodeBounds | null): [number, number, number] | null {
   if (!bounds) return null;
-  return [
-    (bounds.min[0] + bounds.max[0]) / 2,
-    (bounds.min[1] + bounds.max[1]) / 2,
-    (bounds.min[2] + bounds.max[2]) / 2,
-  ];
+  return [(bounds.min[0] + bounds.max[0]) / 2, (bounds.min[1] + bounds.max[1]) / 2, (bounds.min[2] + bounds.max[2]) / 2];
 }
 
-export function explodeAdd(
-  a: [number, number, number],
-  b: [number, number, number],
-): [number, number, number] {
+export function explodeAdd(a: [number, number, number], b: [number, number, number]): [number, number, number] {
   return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 }
 
-export function explodeMul(
-  v: [number, number, number],
-  k: number,
-): [number, number, number] {
+export function explodeMul(v: [number, number, number], k: number): [number, number, number] {
   return [v[0] * k, v[1] * k, v[2] * k];
 }
 
@@ -208,26 +168,16 @@ export function explodeLength(v: [number, number, number]): number {
   return Math.hypot(v[0], v[1], v[2]);
 }
 
-export function explodeDot(
-  a: [number, number, number],
-  b: [number, number, number],
-): number {
+export function explodeDot(a: [number, number, number], b: [number, number, number]): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-export function explodeNormalize(
-  v: [number, number, number],
-  fallback: [number, number, number],
-): [number, number, number] {
+export function explodeNormalize(v: [number, number, number], fallback: [number, number, number]): [number, number, number] {
   const len = explodeLength(v);
   if (len > 1e-8) return [v[0] / len, v[1] / len, v[2] / len];
   const fallbackLength = explodeLength(fallback);
   if (fallbackLength > 1e-8) {
-    return [
-      fallback[0] / fallbackLength,
-      fallback[1] / fallbackLength,
-      fallback[2] / fallbackLength,
-    ];
+    return [fallback[0] / fallbackLength, fallback[1] / fallbackLength, fallback[2] / fallbackLength];
   }
   return [1, 0, 0];
 }
@@ -259,11 +209,7 @@ export function resolveExplodeDirection(
   }
   if (mode === 'radial') {
     return explodeNormalize(
-      [
-        center[0] - originCenter[0],
-        center[1] - originCenter[1],
-        center[2] - originCenter[2],
-      ],
+      [center[0] - originCenter[0], center[1] - originCenter[1], center[2] - originCenter[2]],
       explodeFallbackVector(`${seed}|radial`),
     );
   }
@@ -272,16 +218,9 @@ export function resolveExplodeDirection(
   return [0, 0, 1];
 }
 
-function explodeProjectPerpendicular(
-  vec: [number, number, number],
-  axis: [number, number, number],
-): [number, number, number] {
+function explodeProjectPerpendicular(vec: [number, number, number], axis: [number, number, number]): [number, number, number] {
   const dot = explodeDot(vec, axis);
-  return [
-    vec[0] - axis[0] * dot,
-    vec[1] - axis[1] * dot,
-    vec[2] - axis[2] * dot,
-  ];
+  return [vec[0] - axis[0] * dot, vec[1] - axis[1] * dot, vec[2] - axis[2] * dot];
 }
 
 export function applyExplodeTreeBias(
@@ -292,15 +231,9 @@ export function applyExplodeTreeBias(
 ): [number, number, number] {
   if (!inheritedDirection || mode !== 'radial') return direction;
 
-  const branch = explodeNormalize(
-    inheritedDirection,
-    explodeFallbackVector(`${seed}|branch`),
-  );
+  const branch = explodeNormalize(inheritedDirection, explodeFallbackVector(`${seed}|branch`));
   const fanSource = explodeFallbackVector(`${seed}|fan`);
-  const sideways = explodeNormalize(
-    explodeProjectPerpendicular(fanSource, branch),
-    fanSource,
-  );
+  const sideways = explodeNormalize(explodeProjectPerpendicular(fanSource, branch), fanSource);
 
   return explodeNormalize(
     [
@@ -323,15 +256,8 @@ function resolveNestedExplodeDirection(
 ): [number, number, number] | null {
   if (!inheritedDirection || explicitDirectionProvided || mode === 'radial') return null;
 
-  const branch = explodeNormalize(
-    inheritedDirection,
-    explodeFallbackVector(`${seed}|nested-branch`),
-  );
-  const local = [
-    center[0] - originCenter[0],
-    center[1] - originCenter[1],
-    center[2] - originCenter[2],
-  ] as [number, number, number];
+  const branch = explodeNormalize(inheritedDirection, explodeFallbackVector(`${seed}|nested-branch`));
+  const local = [center[0] - originCenter[0], center[1] - originCenter[1], center[2] - originCenter[2]] as [number, number, number];
   const fan = explodeNormalize(
     explodeProjectPerpendicular(local, branch),
     explodeProjectPerpendicular(explodeFallbackVector(`${seed}|nested-fan`), branch),
@@ -347,31 +273,20 @@ export function resolveExplodeLocalFanDirection(
   branchDirection: [number, number, number] | undefined,
   seed: string,
 ): [number, number, number] {
-  const local = [
-    center[0] - originCenter[0],
-    center[1] - originCenter[1],
-    center[2] - originCenter[2],
-  ] as [number, number, number];
+  const local = [center[0] - originCenter[0], center[1] - originCenter[1], center[2] - originCenter[2]] as [number, number, number];
 
   if (!branchDirection) {
     return explodeNormalize(local, explodeFallbackVector(`${seed}|leaf-fan`));
   }
 
-  const branch = explodeNormalize(
-    branchDirection,
-    explodeFallbackVector(`${seed}|leaf-branch`),
-  );
+  const branch = explodeNormalize(branchDirection, explodeFallbackVector(`${seed}|leaf-branch`));
   return explodeNormalize(
     explodeProjectPerpendicular(local, branch),
     explodeProjectPerpendicular(explodeFallbackVector(`${seed}|leaf-fan`), branch),
   );
 }
 
-export function applyExplodeAxisLock(
-  vec: [number, number, number],
-  axis: ExplodeAxis | undefined,
-  seed: string,
-): [number, number, number] {
+export function applyExplodeAxisLock(vec: [number, number, number], axis: ExplodeAxis | undefined, seed: string): [number, number, number] {
   if (!axis) return vec;
   const index = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
   const fallback = explodeFallbackVector(`${seed}|axis`);

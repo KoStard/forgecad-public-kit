@@ -27,39 +27,23 @@ interface PreparedSketchSvgEntry {
 
 function combineBounds(left: SketchBounds, right: SketchBounds): SketchBounds {
   return {
-    min: [
-      Math.min(left.min[0], right.min[0]),
-      Math.min(left.min[1], right.min[1]),
-    ],
-    max: [
-      Math.max(left.max[0], right.max[0]),
-      Math.max(left.max[1], right.max[1]),
-    ],
+    min: [Math.min(left.min[0], right.min[0]), Math.min(left.min[1], right.min[1])],
+    max: [Math.max(left.max[0], right.max[0]), Math.max(left.max[1], right.max[1])],
   };
 }
 
 function escapeAttribute(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
+  return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
 function polygonPath(poly: number[][]): string {
-  return `${poly
-    .map((point, index) => `${index === 0 ? 'M' : 'L'}${point[0].toFixed(3)},${(-point[1]).toFixed(3)}`)
-    .join(' ')} Z`;
+  return `${poly.map((point, index) => `${index === 0 ? 'M' : 'L'}${point[0].toFixed(3)},${(-point[1]).toFixed(3)}`).join(' ')} Z`;
 }
 
 function prepareEntry(entry: SketchSvgEntry): PreparedSketchSvgEntry {
   const polygons = entry.sketch.toPolygons();
   if (polygons.length === 0) {
-    throw new Error(
-      entry.name
-        ? `Sketch "${entry.name}" exported no polygons.`
-        : 'Sketch export produced no polygons.',
-    );
+    throw new Error(entry.name ? `Sketch "${entry.name}" exported no polygons.` : 'Sketch export produced no polygons.');
   }
 
   const bounds = entry.sketch.bounds();
@@ -90,14 +74,18 @@ export function buildSketchSvgDocument(entries: readonly SketchSvgEntry[]): Sket
   const height = maxY - minY;
 
   let pathCount = 0;
-  const body = prepared.map((entry) => {
-    const label = entry.name ? ` data-name="${escapeAttribute(entry.name)}"` : '';
-    const paths = entry.polygons.map((poly) => {
-      pathCount += 1;
-      return `    <path d="${polygonPath(poly)}" fill="#4488cc" stroke="#224466" stroke-width="0.3"/>`;
-    }).join('\n');
-    return `  <g${label}>\n${paths}\n  </g>`;
-  }).join('\n');
+  const body = prepared
+    .map((entry) => {
+      const label = entry.name ? ` data-name="${escapeAttribute(entry.name)}"` : '';
+      const paths = entry.polygons
+        .map((poly) => {
+          pathCount += 1;
+          return `    <path d="${polygonPath(poly)}" fill="#4488cc" stroke="#224466" stroke-width="0.3"/>`;
+        })
+        .join('\n');
+      return `  <g${label}>\n${paths}\n  </g>`;
+    })
+    .join('\n');
 
   return {
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX.toFixed(1)} ${(-maxY).toFixed(1)} ${width.toFixed(1)} ${height.toFixed(1)}" width="${Math.max(width * 4, 400)}" height="${Math.max(height * 4, 400)}">
@@ -113,7 +101,7 @@ ${body}
 
 // ─── Constraint wireframe SVG renderer ─────────────────────────────────────────
 
-import type { SketchConstraintMeta, ConstraintDisplay, AnnotationElement, ConstraintSymbol } from '../src/forge/sketch/constraints/types';
+import type { AnnotationElement, ConstraintDisplay, ConstraintSymbol, SketchConstraintMeta } from '../src/forge/sketch/constraints/types';
 
 export interface ConstraintSvgOptions {
   /** Show constraint labels. Default true. */
@@ -152,10 +140,7 @@ function tessellateArc(
   for (let k = 1; k <= segments; k++) {
     const t = (k / segments) * sweep;
     const angle = startAngle + direction * t;
-    points.push([
-      center[0] + radius * Math.cos(angle),
-      center[1] + radius * Math.sin(angle),
-    ]);
+    points.push([center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)]);
   }
   return points;
 }
@@ -228,10 +213,14 @@ function constraintColor(c: ConstraintDisplay): string {
 
 function statusColor(status: SketchConstraintMeta['status']): string {
   switch (status) {
-    case 'fully': return '#4ade80';
-    case 'under': return '#60a5fa';
-    case 'over': return '#ff6b6b';
-    case 'over-redundant': return '#faad14';
+    case 'fully':
+      return '#4ade80';
+    case 'under':
+      return '#60a5fa';
+    case 'over':
+      return '#ff6b6b';
+    case 'over-redundant':
+      return '#faad14';
   }
 }
 
@@ -242,7 +231,7 @@ function statusColor(status: SketchConstraintMeta['status']): string {
 function renderSymbol(pos: [number, number], symbol: ConstraintSymbol, color: string, rotation?: number): string[] {
   const x = pos[0].toFixed(3);
   const y = (-pos[1]).toFixed(3);
-  const rot = rotation !== undefined ? ` transform="rotate(${(-rotation * 180 / Math.PI).toFixed(1)} ${x} ${y})"` : '';
+  const rot = rotation !== undefined ? ` transform="rotate(${((-rotation * 180) / Math.PI).toFixed(1)} ${x} ${y})"` : '';
   const S = 1.2; // half-size of symbol
 
   switch (symbol) {
@@ -254,7 +243,7 @@ function renderSymbol(pos: [number, number], symbol: ConstraintSymbol, color: st
         `<line x1="${(pos[0] + S * 0.1).toFixed(3)}" y1="${(-pos[1] - S * 0.5).toFixed(3)}" x2="${(pos[0] + S * 0.7).toFixed(3)}" y2="${(-pos[1]).toFixed(3)}" stroke="${color}" stroke-width="0.3"${rot}/>`,
         `<line x1="${(pos[0] + S * 0.7).toFixed(3)}" y1="${(-pos[1]).toFixed(3)}" x2="${(pos[0] + S * 0.1).toFixed(3)}" y2="${(-pos[1] + S * 0.5).toFixed(3)}" stroke="${color}" stroke-width="0.3"${rot}/>`,
       ];
-      return lines.map(l => `    ${l}`);
+      return lines.map((l) => `    ${l}`);
     }
     case 'equal': {
       // Two horizontal tick marks =
@@ -270,9 +259,13 @@ function renderSymbol(pos: [number, number], symbol: ConstraintSymbol, color: st
       ];
     }
     case 'horizontal':
-      return [`    <text x="${x}" y="${y}" fill="${color}" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">H</text>`];
+      return [
+        `    <text x="${x}" y="${y}" fill="${color}" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">H</text>`,
+      ];
     case 'vertical':
-      return [`    <text x="${x}" y="${y}" fill="${color}" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">V</text>`];
+      return [
+        `    <text x="${x}" y="${y}" fill="${color}" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">V</text>`,
+      ];
     case 'fixed': {
       // Ground hatching: horizontal line + diagonal hash marks below
       return [
@@ -286,7 +279,7 @@ function renderSymbol(pos: [number, number], symbol: ConstraintSymbol, color: st
     case 'midpoint': {
       // Small diamond
       return [
-        `    <polygon points="${x},${(-(pos[1]) - S * 0.5).toFixed(3)} ${(pos[0] + S * 0.4).toFixed(3)},${y} ${x},${(-(pos[1]) + S * 0.5).toFixed(3)} ${(pos[0] - S * 0.4).toFixed(3)},${y}" fill="${color}" opacity="0.7"/>`,
+        `    <polygon points="${x},${(-pos[1] - S * 0.5).toFixed(3)} ${(pos[0] + S * 0.4).toFixed(3)},${y} ${x},${(-pos[1] + S * 0.5).toFixed(3)} ${(pos[0] - S * 0.4).toFixed(3)},${y}" fill="${color}" opacity="0.7"/>`,
       ];
     }
     case 'coincident': {
@@ -298,12 +291,12 @@ function renderSymbol(pos: [number, number], symbol: ConstraintSymbol, color: st
     }
     case 'collinear': {
       // Small filled dot
-      return [
-        `    <circle cx="${x}" cy="${y}" r="${(S * 0.3).toFixed(2)}" fill="${color}" opacity="0.8"/>`,
-      ];
+      return [`    <circle cx="${x}" cy="${y}" r="${(S * 0.3).toFixed(2)}" fill="${color}" opacity="0.8"/>`];
     }
     case 'tangent':
-      return [`    <text x="${x}" y="${y}" fill="${color}" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">T</text>`];
+      return [
+        `    <text x="${x}" y="${y}" fill="${color}" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">T</text>`,
+      ];
     case 'concentric': {
       // Two concentric circles
       return [
@@ -378,19 +371,31 @@ function renderDimension(ann: Extract<AnnotationElement, { kind: 'dimension' }>,
 
   // Extension lines (thin)
   if (Math.abs(o) > 0.5) {
-    parts.push(`    <line x1="${e1a[0].toFixed(3)}" y1="${(-e1a[1]).toFixed(3)}" x2="${e1b[0].toFixed(3)}" y2="${(-e1b[1]).toFixed(3)}" stroke="${color}" stroke-width="0.15" opacity="0.6"/>`);
-    parts.push(`    <line x1="${e2a[0].toFixed(3)}" y1="${(-e2a[1]).toFixed(3)}" x2="${e2b[0].toFixed(3)}" y2="${(-e2b[1]).toFixed(3)}" stroke="${color}" stroke-width="0.15" opacity="0.6"/>`);
+    parts.push(
+      `    <line x1="${e1a[0].toFixed(3)}" y1="${(-e1a[1]).toFixed(3)}" x2="${e1b[0].toFixed(3)}" y2="${(-e1b[1]).toFixed(3)}" stroke="${color}" stroke-width="0.15" opacity="0.6"/>`,
+    );
+    parts.push(
+      `    <line x1="${e2a[0].toFixed(3)}" y1="${(-e2a[1]).toFixed(3)}" x2="${e2b[0].toFixed(3)}" y2="${(-e2b[1]).toFixed(3)}" stroke="${color}" stroke-width="0.15" opacity="0.6"/>`,
+    );
   }
 
   // Dimension line
-  parts.push(`    <line x1="${p1[0].toFixed(3)}" y1="${(-p1[1]).toFixed(3)}" x2="${p2[0].toFixed(3)}" y2="${(-p2[1]).toFixed(3)}" stroke="${color}" stroke-width="0.2"/>`);
+  parts.push(
+    `    <line x1="${p1[0].toFixed(3)}" y1="${(-p1[1]).toFixed(3)}" x2="${p2[0].toFixed(3)}" y2="${(-p2[1]).toFixed(3)}" stroke="${color}" stroke-width="0.2"/>`,
+  );
 
   // Arrowheads
-  parts.push(`    <polygon points="${a1tip[0].toFixed(3)},${(-a1tip[1]).toFixed(3)} ${a1l[0].toFixed(3)},${(-a1l[1]).toFixed(3)} ${a1r[0].toFixed(3)},${(-a1r[1]).toFixed(3)}" fill="${color}"/>`);
-  parts.push(`    <polygon points="${a2tip[0].toFixed(3)},${(-a2tip[1]).toFixed(3)} ${a2l[0].toFixed(3)},${(-a2l[1]).toFixed(3)} ${a2r[0].toFixed(3)},${(-a2r[1]).toFixed(3)}" fill="${color}"/>`);
+  parts.push(
+    `    <polygon points="${a1tip[0].toFixed(3)},${(-a1tip[1]).toFixed(3)} ${a1l[0].toFixed(3)},${(-a1l[1]).toFixed(3)} ${a1r[0].toFixed(3)},${(-a1r[1]).toFixed(3)}" fill="${color}"/>`,
+  );
+  parts.push(
+    `    <polygon points="${a2tip[0].toFixed(3)},${(-a2tip[1]).toFixed(3)} ${a2l[0].toFixed(3)},${(-a2l[1]).toFixed(3)} ${a2r[0].toFixed(3)},${(-a2r[1]).toFixed(3)}" fill="${color}"/>`,
+  );
 
   // Value text
-  parts.push(`    <text x="${mid[0].toFixed(3)}" y="${(-mid[1] - 0.8).toFixed(3)}" fill="${color}" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">${escapeAttribute(value)}</text>`);
+  parts.push(
+    `    <text x="${mid[0].toFixed(3)}" y="${(-mid[1] - 0.8).toFixed(3)}" fill="${color}" font-size="1.8" font-family="sans-serif" text-anchor="middle" font-weight="bold">${escapeAttribute(value)}</text>`,
+  );
 
   return parts;
 }
@@ -434,7 +439,9 @@ function renderAnnotation(ann: AnnotationElement, color: string): string[] {
     case 'angle-arc':
       return renderAngleArc(ann, color);
     case 'text':
-      return [`    <text x="${ann.position[0].toFixed(3)}" y="${(-ann.position[1]).toFixed(3)}" fill="${color}" font-size="2" font-family="sans-serif" text-anchor="middle">${escapeAttribute(ann.text)}</text>`];
+      return [
+        `    <text x="${ann.position[0].toFixed(3)}" y="${(-ann.position[1]).toFixed(3)}" fill="${color}" font-size="2" font-family="sans-serif" text-anchor="middle">${escapeAttribute(ann.text)}</text>`,
+      ];
   }
 }
 
@@ -462,7 +469,9 @@ export function buildConstraintSvgDocument(meta: SketchConstraintMeta, options?:
   const parts: string[] = [];
 
   // Background
-  parts.push(`  <rect x="${minX.toFixed(1)}" y="${(-maxY).toFixed(1)}" width="${width.toFixed(1)}" height="${height.toFixed(1)}" fill="#1a1a2e"/>`);
+  parts.push(
+    `  <rect x="${minX.toFixed(1)}" y="${(-maxY).toFixed(1)}" width="${width.toFixed(1)}" height="${height.toFixed(1)}" fill="#1a1a2e"/>`,
+  );
 
   // ─── Surface region fills ───
   if (meta.surfaces && meta.surfaces.length > 0) {
@@ -470,9 +479,7 @@ export function buildConstraintSvgDocument(meta: SketchConstraintMeta, options?:
     parts.push('  <g data-layer="surfaces" opacity="0.25">');
     for (const s of meta.surfaces) {
       const color = palette[s.index % palette.length];
-      const d = s.polygon
-        .map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(3)},${(-p[1]).toFixed(3)}`)
-        .join(' ') + 'Z';
+      const d = s.polygon.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(3)},${(-p[1]).toFixed(3)}`).join(' ') + 'Z';
       parts.push(`    <path d="${d}" fill="${color}" stroke="none"/>`);
     }
     parts.push('  </g>');
@@ -482,7 +489,9 @@ export function buildConstraintSvgDocument(meta: SketchConstraintMeta, options?:
       const color = palette[s.index % palette.length];
       const x = s.centroid[0].toFixed(3);
       const y = (-s.centroid[1]).toFixed(3);
-      parts.push(`    <text x="${x}" y="${y}" fill="${color}" font-size="3" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold" opacity="0.6">[${s.index}]</text>`);
+      parts.push(
+        `    <text x="${x}" y="${y}" fill="${color}" font-size="3" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold" opacity="0.6">[${s.index}]</text>`,
+      );
     }
     parts.push('  </g>');
   }
@@ -490,16 +499,18 @@ export function buildConstraintSvgDocument(meta: SketchConstraintMeta, options?:
   // ─── Edge geometry ───
   parts.push('  <g data-layer="edges">');
   for (const line of meta.edges.lines) {
-    parts.push(`    <line x1="${line.a[0].toFixed(3)}" y1="${(-line.a[1]).toFixed(3)}" x2="${line.b[0].toFixed(3)}" y2="${(-line.b[1]).toFixed(3)}" stroke="#e8e8e8" stroke-width="0.4"/>`);
+    parts.push(
+      `    <line x1="${line.a[0].toFixed(3)}" y1="${(-line.a[1]).toFixed(3)}" x2="${line.b[0].toFixed(3)}" y2="${(-line.b[1]).toFixed(3)}" stroke="#e8e8e8" stroke-width="0.4"/>`,
+    );
   }
   for (const circle of meta.edges.circles) {
-    parts.push(`    <circle cx="${circle.center[0].toFixed(3)}" cy="${(-circle.center[1]).toFixed(3)}" r="${circle.radius.toFixed(3)}" stroke="#e8e8e8" stroke-width="0.4" fill="none"/>`);
+    parts.push(
+      `    <circle cx="${circle.center[0].toFixed(3)}" cy="${(-circle.center[1]).toFixed(3)}" r="${circle.radius.toFixed(3)}" stroke="#e8e8e8" stroke-width="0.4" fill="none"/>`,
+    );
   }
   for (const arc of meta.edges.arcs) {
     const pts = tessellateArc(arc.center, arc.start, arc.end, arc.radius, arc.clockwise, 32);
-    const d = pts
-      .map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(3)},${(-p[1]).toFixed(3)}`)
-      .join(' ');
+    const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(3)},${(-p[1]).toFixed(3)}`).join(' ');
     parts.push(`    <path d="${d}" stroke="#e8e8e8" stroke-width="0.4" fill="none"/>`);
   }
   if (opts.showPoints) {
@@ -513,16 +524,18 @@ export function buildConstraintSvgDocument(meta: SketchConstraintMeta, options?:
   if (opts.showConstruction) {
     parts.push('  <g data-layer="construction">');
     for (const line of meta.construction.lines) {
-      parts.push(`    <line x1="${line.a[0].toFixed(3)}" y1="${(-line.a[1]).toFixed(3)}" x2="${line.b[0].toFixed(3)}" y2="${(-line.b[1]).toFixed(3)}" stroke="#666666" stroke-width="0.3" stroke-dasharray="1,1"/>`);
+      parts.push(
+        `    <line x1="${line.a[0].toFixed(3)}" y1="${(-line.a[1]).toFixed(3)}" x2="${line.b[0].toFixed(3)}" y2="${(-line.b[1]).toFixed(3)}" stroke="#666666" stroke-width="0.3" stroke-dasharray="1,1"/>`,
+      );
     }
     for (const circle of meta.construction.circles) {
-      parts.push(`    <circle cx="${circle.center[0].toFixed(3)}" cy="${(-circle.center[1]).toFixed(3)}" r="${circle.radius.toFixed(3)}" stroke="#666666" stroke-width="0.3" stroke-dasharray="1,1" fill="none"/>`);
+      parts.push(
+        `    <circle cx="${circle.center[0].toFixed(3)}" cy="${(-circle.center[1]).toFixed(3)}" r="${circle.radius.toFixed(3)}" stroke="#666666" stroke-width="0.3" stroke-dasharray="1,1" fill="none"/>`,
+      );
     }
     for (const arc of meta.construction.arcs) {
       const pts = tessellateArc(arc.center, arc.start, arc.end, arc.radius, arc.clockwise, 32);
-      const d = pts
-        .map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(3)},${(-p[1]).toFixed(3)}`)
-        .join(' ');
+      const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(3)},${(-p[1]).toFixed(3)}`).join(' ');
       parts.push(`    <path d="${d}" stroke="#666666" stroke-width="0.3" stroke-dasharray="1,1" fill="none"/>`);
     }
     parts.push('  </g>');
@@ -547,8 +560,12 @@ export function buildConstraintSvgDocument(meta: SketchConstraintMeta, options?:
     const bx = minX + 1;
     const by = -maxY + 1;
     parts.push('  <g data-layer="status">');
-    parts.push(`    <rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${(statusText.length * 1.3).toFixed(1)}" height="3" rx="0.5" fill="${badgeColor}" opacity="0.85"/>`);
-    parts.push(`    <text x="${(bx + 0.8).toFixed(1)}" y="${(by + 2.1).toFixed(1)}" fill="#000000" font-size="1.8" font-family="sans-serif" font-weight="bold">${escapeAttribute(statusText)}</text>`);
+    parts.push(
+      `    <rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${(statusText.length * 1.3).toFixed(1)}" height="3" rx="0.5" fill="${badgeColor}" opacity="0.85"/>`,
+    );
+    parts.push(
+      `    <text x="${(bx + 0.8).toFixed(1)}" y="${(by + 2.1).toFixed(1)}" fill="#000000" font-size="1.8" font-family="sans-serif" font-weight="bold">${escapeAttribute(statusText)}</text>`,
+    );
     parts.push('  </g>');
   }
 
@@ -561,7 +578,9 @@ export function buildConstraintSvgDocument(meta: SketchConstraintMeta, options?:
       const r = meta.rejected[i];
       const reason = r.rejectionReason ? ` \u2014 ${r.rejectionReason}` : '';
       const text = `REJECTED: ${r.label} ${r.type}${reason}`;
-      parts.push(`    <text x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" fill="#ff6b6b" font-size="1.5" font-family="sans-serif">${escapeAttribute(text)}</text>`);
+      parts.push(
+        `    <text x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" fill="#ff6b6b" font-size="1.5" font-family="sans-serif">${escapeAttribute(text)}</text>`,
+      );
       ry -= 2;
     }
     parts.push('  </g>');

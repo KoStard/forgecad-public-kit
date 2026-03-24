@@ -12,16 +12,12 @@
  * - Both convex and concave edges
  */
 
-import {
-  Shape,
-  getShapeCompilePlan,
-  buildShapeFromCompilePlan,
-} from './kernel';
+import type { ShapeCompilePlan } from './compilePlan';
+import { type EdgeQuery, selectEdges } from './edgeQuery';
+import { buildShapeFromCompilePlan, getShapeCompilePlan, Shape } from './kernel';
+import type { EdgeSegment } from './meshEdgeExtraction';
 import type { EdgeFeatureTarget } from './shapeBackend';
 import { TrackedShape } from './sketch/topology';
-import { selectEdges, type EdgeQuery } from './edgeQuery';
-import type { EdgeSegment } from './meshEdgeExtraction';
-import type { ShapeCompilePlan } from './compilePlan';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -71,7 +67,7 @@ function isEdgeSegment(value: unknown): value is EdgeSegment {
 
 /** Convert EdgeSegments to backend-agnostic EdgeFeatureTargets for the compile plan. */
 function edgesToTargets(edges: EdgeSegment[]): EdgeFeatureTarget[] {
-  return edges.map(e => ({
+  return edges.map((e) => ({
     midpoint: [e.midpoint[0], e.midpoint[1], e.midpoint[2]] as [number, number, number],
     start: [e.start[0], e.start[1], e.start[2]] as [number, number, number],
     end: [e.end[0], e.end[1], e.end[2]] as [number, number, number],
@@ -108,12 +104,7 @@ function edgesToTargets(edges: EdgeSegment[]): EdgeFeatureTarget[] {
  * const edges = selectEdges(myShape, { parallel: [0, 0, 1] })
  * fillet(myShape, 3, edges)
  */
-export function fillet(
-  shape: ShapeArg,
-  radius: number,
-  edges?: EdgeSelector,
-  segments = 16,
-): Shape {
+export function fillet(shape: ShapeArg, radius: number, edges?: EdgeSelector, segments = 16): Shape {
   if (!Number.isFinite(radius) || !(radius > 0)) {
     throw new Error('fillet() requires a positive finite radius.');
   }
@@ -155,11 +146,7 @@ export function fillet(
  * // Chamfer vertical edges only
  * chamfer(myShape, 2, { parallel: [0, 0, 1] })
  */
-export function chamfer(
-  shape: ShapeArg,
-  size: number,
-  edges?: EdgeSelector,
-): Shape {
+export function chamfer(shape: ShapeArg, size: number, edges?: EdgeSelector): Shape {
   if (!Number.isFinite(size) || !(size > 0)) {
     throw new Error('chamfer() requires a positive finite size.');
   }
@@ -256,10 +243,7 @@ export function draft(
  * // Shrink a shape inward by 0.5mm
  * offsetSolid(myShape, -0.5)
  */
-export function offsetSolid(
-  shape: ShapeArg,
-  thickness: number,
-): Shape {
+export function offsetSolid(shape: ShapeArg, thickness: number): Shape {
   if (!Number.isFinite(thickness) || thickness === 0) {
     throw new Error('offsetSolid() requires a non-zero finite thickness.');
   }

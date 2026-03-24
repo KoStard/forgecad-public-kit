@@ -4,7 +4,7 @@
  * Rust owns solving; this file only declares the public payload shape, equation count,
  * and UI/display metadata used by the builder and viewer.
  */
-import type { CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
+import type { CircleId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
 import { midpoint } from '../helpers';
 
@@ -45,6 +45,6 @@ registerConstraint<'concentric', ConstraintTypeMap['concentric']>({
     const p1 = points.get(c1.center);
     const p2 = points.get(c2.center);
     if (!p1 || !p2) return [];
-    return [{ kind: 'symbol', position: [(p1.x+p2.x)/2, (p1.y+p2.y)/2] as [number, number], symbol: 'concentric' as const }];
+    return [{ kind: 'symbol', position: [(p1.x + p2.x) / 2, (p1.y + p2.y) / 2] as [number, number], symbol: 'concentric' as const }];
   },
 });

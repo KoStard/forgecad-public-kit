@@ -6,16 +6,16 @@
  * producing data compatible with Manifold's getMesh() format.
  */
 
-import type { Mat4 } from '../../transform';
-import { Transform } from '../../transform';
 import {
+  type EdgeFeatureTarget,
   SHAPE_BACKEND_MARKER,
   type ShapeBackend,
   type ShapeRuntimeBounds,
-  type ShapeRuntimeMesh,
   type ShapeRuntimeCrossSection,
-  type EdgeFeatureTarget,
+  type ShapeRuntimeMesh,
 } from '../../shapeBackend';
+import type { Mat4 } from '../../transform';
+import { Transform } from '../../transform';
 import { getOCCT, type OCCTModule } from './init';
 
 /** Default tessellation linear deflection. Lower = finer mesh. */
@@ -41,11 +41,7 @@ function extractMeshFromShape(
   const allPositions: number[] = [];
   const allIndices: number[] = [];
 
-  const expl = new oc.TopExp_Explorer_2(
-    shape,
-    oc.TopAbs_ShapeEnum.TopAbs_FACE,
-    oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  );
+  const expl = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
 
   while (expl.More()) {
     const face = oc.TopoDS.Face_1(expl.Current());
@@ -163,11 +159,7 @@ function applyTransform(oc: OCCTModule, shape: any, m: Mat4): any {
   const trsf = new oc.gp_Trsf_1();
   // Mat4 is column-major [m00, m10, m20, m30, m01, m11, m21, m31, ...]
   // gp_Trsf.SetValues takes row-major 3x4
-  trsf.SetValues(
-    m[0], m[4], m[8], m[12],
-    m[1], m[5], m[9], m[13],
-    m[2], m[6], m[10], m[14],
-  );
+  trsf.SetValues(m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14]);
   const transformed = new oc.BRepBuilderAPI_Transform_2(shape, trsf, true);
   return transformed.Shape();
 }
@@ -179,11 +171,7 @@ function findEdgeByMidpoint(oc: OCCTModule, shape: any, midpoint: [number, numbe
   let bestEdge: any = null;
   let bestDist = Infinity;
 
-  const edgeExpl = new oc.TopExp_Explorer_2(
-    shape,
-    oc.TopAbs_ShapeEnum.TopAbs_EDGE,
-    oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  );
+  const edgeExpl = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
   while (edgeExpl.More()) {
     const edge = oc.TopoDS.Edge_1(edgeExpl.Current());
     const first = { current: 0 };
@@ -229,10 +217,7 @@ export class OCCTShapeBackend implements ShapeBackend {
   }
 
   rotate(x: number, y: number, z: number): ShapeBackend {
-    return this.transform(Transform.rotationAxis([1, 0, 0], x)
-      .rotateAxis([0, 1, 0], y)
-      .rotateAxis([0, 0, 1], z)
-      .toArray());
+    return this.transform(Transform.rotationAxis([1, 0, 0], x).rotateAxis([0, 1, 0], y).rotateAxis([0, 0, 1], z).toArray());
   }
 
   transform(m: Mat4): ShapeBackend {
@@ -259,10 +244,7 @@ export class OCCTShapeBackend implements ShapeBackend {
 
   mirror(normal: [number, number, number]): ShapeBackend {
     const oc = getOCCT();
-    const ax2 = new oc.gp_Ax2_3(
-      new oc.gp_Pnt_3(0, 0, 0),
-      new oc.gp_Dir_4(normal[0], normal[1], normal[2]),
-    );
+    const ax2 = new oc.gp_Ax2_3(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(normal[0], normal[1], normal[2]));
     const trsf = new oc.gp_Trsf_1();
     trsf.SetMirror_3(ax2);
     const transformed = new oc.BRepBuilderAPI_Transform_2(this._shape, trsf, true);
@@ -274,54 +256,32 @@ export class OCCTShapeBackend implements ShapeBackend {
     const otherShape = requireOCCTShape(other, 'split()');
 
     // Inside = intersection, Outside = difference
-    const inside = new oc.BRepAlgoAPI_Common_3(
-      this._shape, otherShape, new oc.Message_ProgressRange_1(),
-    );
+    const inside = new oc.BRepAlgoAPI_Common_3(this._shape, otherShape, new oc.Message_ProgressRange_1());
     inside.Build(new oc.Message_ProgressRange_1());
 
-    const outside = new oc.BRepAlgoAPI_Cut_3(
-      this._shape, otherShape, new oc.Message_ProgressRange_1(),
-    );
+    const outside = new oc.BRepAlgoAPI_Cut_3(this._shape, otherShape, new oc.Message_ProgressRange_1());
     outside.Build(new oc.Message_ProgressRange_1());
 
-    return [
-      new OCCTShapeBackend(inside.Shape()),
-      new OCCTShapeBackend(outside.Shape()),
-    ];
+    return [new OCCTShapeBackend(inside.Shape()), new OCCTShapeBackend(outside.Shape())];
   }
 
   splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend] {
     const oc = getOCCT();
     // Create a large half-space box to cut with
     const dir = new oc.gp_Dir_4(normal[0], normal[1], normal[2]);
-    const pln = new oc.gp_Pln_3(new oc.gp_Pnt_3(
-      normal[0] * originOffset,
-      normal[1] * originOffset,
-      normal[2] * originOffset,
-    ), dir);
+    const pln = new oc.gp_Pln_3(new oc.gp_Pnt_3(normal[0] * originOffset, normal[1] * originOffset, normal[2] * originOffset), dir);
     const halfSpace = new oc.BRepPrimAPI_MakeHalfSpace_1(
       new oc.BRepBuilderAPI_MakeFace_9(pln, -1e6, 1e6, -1e6, 1e6).Face(),
-      new oc.gp_Pnt_3(
-        normal[0] * (originOffset + 1),
-        normal[1] * (originOffset + 1),
-        normal[2] * (originOffset + 1),
-      ),
+      new oc.gp_Pnt_3(normal[0] * (originOffset + 1), normal[1] * (originOffset + 1), normal[2] * (originOffset + 1)),
     );
 
-    const inside = new oc.BRepAlgoAPI_Common_3(
-      this._shape, halfSpace.Solid(), new oc.Message_ProgressRange_1(),
-    );
+    const inside = new oc.BRepAlgoAPI_Common_3(this._shape, halfSpace.Solid(), new oc.Message_ProgressRange_1());
     inside.Build(new oc.Message_ProgressRange_1());
 
-    const outside = new oc.BRepAlgoAPI_Cut_3(
-      this._shape, halfSpace.Solid(), new oc.Message_ProgressRange_1(),
-    );
+    const outside = new oc.BRepAlgoAPI_Cut_3(this._shape, halfSpace.Solid(), new oc.Message_ProgressRange_1());
     outside.Build(new oc.Message_ProgressRange_1());
 
-    return [
-      new OCCTShapeBackend(inside.Shape()),
-      new OCCTShapeBackend(outside.Shape()),
-    ];
+    return [new OCCTShapeBackend(inside.Shape()), new OCCTShapeBackend(outside.Shape())];
   }
 
   trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend {
@@ -348,7 +308,7 @@ export class OCCTShapeBackend implements ShapeBackend {
   }
 
   isEmpty(): boolean {
-    const oc = getOCCT();
+    const _oc = getOCCT();
     return this._shape.IsNull() || this._shape.NbChildren() === 0;
   }
 
@@ -375,17 +335,11 @@ export class OCCTShapeBackend implements ShapeBackend {
     const matchedEdge = findEdgeByMidpoint(oc, this._shape, edge.midpoint);
     if (!matchedEdge) throw new Error('OCCT filletEdgeByMidpoint: could not find matching edge');
 
-    const mkFillet = new oc.BRepFilletAPI_MakeFillet(
-      this._shape,
-      oc.ChFi3d_FilletShape.ChFi3d_Rational,
-    );
+    const mkFillet = new oc.BRepFilletAPI_MakeFillet(this._shape, oc.ChFi3d_FilletShape.ChFi3d_Rational);
     mkFillet.Add_2(radius, matchedEdge);
     mkFillet.Build(new oc.Message_ProgressRange_1());
     if (!mkFillet.IsDone()) {
-      throw new Error(
-        `OCCT fillet operation failed (radius=${radius}, ` +
-        `midpoint=[${edge.midpoint.map(v => v.toFixed(3))}])`,
-      );
+      throw new Error(`OCCT fillet operation failed (radius=${radius}, ` + `midpoint=[${edge.midpoint.map((v) => v.toFixed(3))}])`);
     }
     return new OCCTShapeBackend(mkFillet.Shape());
   }
@@ -401,7 +355,6 @@ export class OCCTShapeBackend implements ShapeBackend {
     if (!mkChamfer.IsDone()) throw new Error('OCCT chamfer operation failed');
     return new OCCTShapeBackend(mkChamfer.Shape());
   }
-
 }
 
 export function wrapOCCTShapeBackend(shape: any): ShapeBackend {

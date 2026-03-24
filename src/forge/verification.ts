@@ -79,9 +79,10 @@ function captureSourceLine(): number | undefined {
     // Walk the stack from the top; the first frame that references a
     // `.forge.js` user file is the caller (`.sketch.js` kept for legacy compat).
     for (const line of lines) {
-      const match = line.match(/\(([^)]+\.(?:forge|sketch)\.js):(\d+):\d+\)/u)
-        ?? line.match(/at ([^:]+\.(?:forge|sketch)\.js):(\d+):\d+/u)
-        ?? line.match(/<anonymous>:(\d+):\d+/u);
+      const match =
+        line.match(/\(([^)]+\.(?:forge|sketch)\.js):(\d+):\d+\)/u) ??
+        line.match(/at ([^:]+\.(?:forge|sketch)\.js):(\d+):\d+/u) ??
+        line.match(/<anonymous>:(\d+):\d+/u);
 
       if (!match) continue;
 
@@ -125,7 +126,8 @@ interface ShapeLike {
  */
 function computeMinGap(a: ShapeLike, b: ShapeLike, searchLength: number): number {
   const { getShapeRuntimeBackend } = require('./kernel') as typeof import('./kernel');
-  const { isManifoldCapableBackend, requireManifoldShapeBackend } = require('./backends/manifold/shapeBackend') as typeof import('./backends/manifold/shapeBackend');
+  const { isManifoldCapableBackend, requireManifoldShapeBackend } =
+    require('./backends/manifold/shapeBackend') as typeof import('./backends/manifold/shapeBackend');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const backendA = getShapeRuntimeBackend(a as any);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -152,11 +154,7 @@ function vec3Len(v: [number, number, number]): number {
 }
 
 function bboxCenter(bbox: { min: number[]; max: number[] }): [number, number, number] {
-  return [
-    (bbox.min[0] + bbox.max[0]) / 2,
-    (bbox.min[1] + bbox.max[1]) / 2,
-    (bbox.min[2] + bbox.max[2]) / 2,
-  ];
+  return [(bbox.min[0] + bbox.max[0]) / 2, (bbox.min[1] + bbox.max[1]) / 2, (bbox.min[2] + bbox.max[2]) / 2];
 }
 
 function dist3(a: [number, number, number], b: [number, number, number]): number {
@@ -242,9 +240,7 @@ export const verify = {
       id: nextId(),
       label,
       status: passed ? 'pass' : 'fail',
-      message: passed
-        ? `${roundNum(actual)} > ${roundNum(min)}`
-        : (message ?? `Expected > ${roundNum(min)}, got ${roundNum(actual)}`),
+      message: passed ? `${roundNum(actual)} > ${roundNum(min)}` : (message ?? `Expected > ${roundNum(min)}, got ${roundNum(actual)}`),
       line: passed ? undefined : line,
       expected: `> ${roundNum(min)}`,
       actual: roundNum(actual),
@@ -259,9 +255,7 @@ export const verify = {
       id: nextId(),
       label,
       status: passed ? 'pass' : 'fail',
-      message: passed
-        ? `${roundNum(actual)} < ${roundNum(max)}`
-        : (message ?? `Expected < ${roundNum(max)}, got ${roundNum(actual)}`),
+      message: passed ? `${roundNum(actual)} < ${roundNum(max)}` : (message ?? `Expected < ${roundNum(max)}, got ${roundNum(actual)}`),
       line: passed ? undefined : line,
       expected: `< ${roundNum(max)}`,
       actual: roundNum(actual),
@@ -325,9 +319,7 @@ export const verify = {
         id: nextId(),
         label,
         status: passed ? 'pass' : 'fail',
-        message: passed
-          ? `No collision (min gap ${roundNum(gap, 3)} mm)`
-          : `Shapes are colliding (min gap ${roundNum(gap, 3)} mm ≤ 0)`,
+        message: passed ? `No collision (min gap ${roundNum(gap, 3)} mm)` : `Shapes are colliding (min gap ${roundNum(gap, 3)} mm ≤ 0)`,
         line: passed ? undefined : line,
         expected: '> 0 mm',
         actual: `${roundNum(gap, 3)} mm`,
@@ -450,9 +442,13 @@ export const verify = {
       const angleDeg = (Math.acos(Math.min(1, cosAngle)) * 180) / Math.PI;
       if (angleDeg > toleranceDeg) {
         push({
-          id: nextId(), label, status: 'fail',
+          id: nextId(),
+          label,
+          status: 'fail',
           message: `Not coplanar: normals are ${roundNum(angleDeg, 2)}° apart`,
-          line, expected: `angle ≤ ${toleranceDeg}°`, actual: `${roundNum(angleDeg, 2)}°`,
+          line,
+          expected: `angle ≤ ${toleranceDeg}°`,
+          actual: `${roundNum(angleDeg, 2)}°`,
         });
         return;
       }
@@ -531,9 +527,7 @@ export const verify = {
         id: nextId(),
         label,
         status: passed ? 'pass' : 'fail',
-        message: passed
-          ? `Same direction (angle ${roundNum(angleDeg, 2)}°)`
-          : `Not same direction: ${roundNum(angleDeg, 2)}° apart`,
+        message: passed ? `Same direction (angle ${roundNum(angleDeg, 2)}°)` : `Not same direction: ${roundNum(angleDeg, 2)}° apart`,
         line: passed ? undefined : line,
         expected: `≤ ${roundNum(toleranceDeg, 1)}°`,
         actual: `${roundNum(angleDeg, 2)}°`,
@@ -643,20 +637,11 @@ export const verify = {
    * @param expectedSize  [sizeX, sizeY, sizeZ] in mm
    * @param tolerance  Per-axis tolerance in mm (default 0.1)
    */
-  boundingBoxSize(
-    label: string,
-    shape: ShapeLike,
-    expectedSize: [number, number, number],
-    tolerance = 0.1,
-  ): void {
+  boundingBoxSize(label: string, shape: ShapeLike, expectedSize: [number, number, number], tolerance = 0.1): void {
     const line = captureSourceLine();
     try {
       const bb = shape.boundingBox();
-      const actual: [number, number, number] = [
-        bb.max[0] - bb.min[0],
-        bb.max[1] - bb.min[1],
-        bb.max[2] - bb.min[2],
-      ];
+      const actual: [number, number, number] = [bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]];
       const diffs = actual.map((v, i) => Math.abs(v - expectedSize[i]));
       const passed = diffs.every((d) => d <= Math.abs(tolerance));
       const fmtActual = `(${actual.map((v) => roundNum(v, 2)).join(', ')}) mm`;
@@ -665,9 +650,7 @@ export const verify = {
         id: nextId(),
         label,
         status: passed ? 'pass' : 'fail',
-        message: passed
-          ? `Bounding box size ${fmtActual} ≈ expected`
-          : `Bounding box size ${fmtActual} ≠ expected ${fmtExpected}`,
+        message: passed ? `Bounding box size ${fmtActual} ≈ expected` : `Bounding box size ${fmtActual} ≠ expected ${fmtExpected}`,
         line: passed ? undefined : line,
         expected: fmtExpected,
         actual: fmtActual,

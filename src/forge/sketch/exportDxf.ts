@@ -1,6 +1,6 @@
-import type { Sketch } from './core';
 import { isConstraintSketch } from './constraints/sketch';
 import type { SketchConstraintMeta } from './constraints/types';
+import type { Sketch } from './core';
 
 export interface SketchDxfOptions {
   /** DXF layer name. Default: "0" */
@@ -43,11 +43,16 @@ function buildPolygonDxf(loops: number[][][], layer: string, colorIndex: number)
   for (const loop of loops) {
     if (loop.length < 2) continue;
     entities.push([
-      '0', 'LWPOLYLINE',
-      '8', layer,
-      '62', String(colorIndex),
-      '90', String(loop.length),
-      '70', '1', // closed
+      '0',
+      'LWPOLYLINE',
+      '8',
+      layer,
+      '62',
+      String(colorIndex),
+      '90',
+      String(loop.length),
+      '70',
+      '1', // closed
       ...loop.flatMap(([x, y]) => ['10', fmtDxf(x), '20', fmtDxf(y)]),
     ]);
   }
@@ -63,42 +68,63 @@ function buildEdgeDxf(meta: SketchConstraintMeta, layer: string, colorIndex: num
 
   for (const l of edges.lines) {
     entities.push([
-      '0', 'LINE',
-      '8', layer,
-      '62', String(colorIndex),
-      '10', fmtDxf(l.a[0]),
-      '20', fmtDxf(l.a[1]),
-      '11', fmtDxf(l.b[0]),
-      '21', fmtDxf(l.b[1]),
+      '0',
+      'LINE',
+      '8',
+      layer,
+      '62',
+      String(colorIndex),
+      '10',
+      fmtDxf(l.a[0]),
+      '20',
+      fmtDxf(l.a[1]),
+      '11',
+      fmtDxf(l.b[0]),
+      '21',
+      fmtDxf(l.b[1]),
     ]);
   }
 
   for (const c of edges.circles) {
     entities.push([
-      '0', 'CIRCLE',
-      '8', layer,
-      '62', String(colorIndex),
-      '10', fmtDxf(c.center[0]),
-      '20', fmtDxf(c.center[1]),
-      '40', fmtDxf(c.radius),
+      '0',
+      'CIRCLE',
+      '8',
+      layer,
+      '62',
+      String(colorIndex),
+      '10',
+      fmtDxf(c.center[0]),
+      '20',
+      fmtDxf(c.center[1]),
+      '40',
+      fmtDxf(c.radius),
     ]);
   }
 
   for (const a of edges.arcs) {
-    const startAngle = Math.atan2(a.start[1] - a.center[1], a.start[0] - a.center[0]) * 180 / Math.PI;
-    const endAngle = Math.atan2(a.end[1] - a.center[1], a.end[0] - a.center[0]) * 180 / Math.PI;
+    const startAngle = (Math.atan2(a.start[1] - a.center[1], a.start[0] - a.center[0]) * 180) / Math.PI;
+    const endAngle = (Math.atan2(a.end[1] - a.center[1], a.end[0] - a.center[0]) * 180) / Math.PI;
 
     // DXF ARC goes counter-clockwise from start to end angle.
     // If the arc is clockwise, swap start/end.
     entities.push([
-      '0', 'ARC',
-      '8', layer,
-      '62', String(colorIndex),
-      '10', fmtDxf(a.center[0]),
-      '20', fmtDxf(a.center[1]),
-      '40', fmtDxf(a.radius),
-      '50', fmtDxf(a.clockwise ? endAngle : startAngle),
-      '51', fmtDxf(a.clockwise ? startAngle : endAngle),
+      '0',
+      'ARC',
+      '8',
+      layer,
+      '62',
+      String(colorIndex),
+      '10',
+      fmtDxf(a.center[0]),
+      '20',
+      fmtDxf(a.center[1]),
+      '40',
+      fmtDxf(a.radius),
+      '50',
+      fmtDxf(a.clockwise ? endAngle : startAngle),
+      '51',
+      fmtDxf(a.clockwise ? startAngle : endAngle),
     ]);
   }
 
@@ -109,12 +135,20 @@ function buildEdgeDxf(meta: SketchConstraintMeta, layer: string, colorIndex: num
 
 function buildDxf(entities: string[][]): string {
   const sections: string[] = [
-    '0', 'SECTION',
-    '2', 'HEADER',
-    '9', '$ACADVER', '1', 'AC1009',
-    '0', 'ENDSEC',
-    '0', 'SECTION',
-    '2', 'ENTITIES',
+    '0',
+    'SECTION',
+    '2',
+    'HEADER',
+    '9',
+    '$ACADVER',
+    '1',
+    'AC1009',
+    '0',
+    'ENDSEC',
+    '0',
+    'SECTION',
+    '2',
+    'ENTITIES',
   ];
 
   for (const entity of entities) {

@@ -3,16 +3,10 @@ import { createOwnedShapeCompilePlan } from './compilePlan';
 
 export type PatternOwnershipKind = 'linear' | 'circular';
 
-export function wrapRepeatedShapeCompilePlan(
-  plan: ShapeCompilePlan,
-  operation: string,
-): ShapeCompilePlan {
+export function wrapRepeatedShapeCompilePlan(plan: ShapeCompilePlan, operation: string): ShapeCompilePlan {
   return createOwnedShapeCompilePlan(plan, operation);
 }
 
-export function buildPatternOwnershipOperation(
-  kind: PatternOwnershipKind,
-  index: number,
-): string {
+export function buildPatternOwnershipOperation(kind: PatternOwnershipKind, index: number): string {
   return `pattern:${kind}:${index}`;
 }

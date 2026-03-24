@@ -58,8 +58,7 @@ export const COMPILER_REGRESSION_CORPUS: CompilerRegressionCorpusPart[] = [
   {
     id: 'corpus-fastener-plate-variants',
     name: 'Fastener Plate Variants',
-    description:
-      'A service plate keeps compiler-owned counterbores, countersinks, and up-to-face pockets aligned across both lowerers.',
+    description: 'A service plate keeps compiler-owned counterbores, countersinks, and up-to-face pockets aligned across both lowerers.',
     guards: [
       'counterbore and countersink holes stay compiler-owned instead of falling back to manual cutter booleans',
       'upToFace hole/cut extents remain exact-exportable through the shared semantic feature family',

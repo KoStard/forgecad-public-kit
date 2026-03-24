@@ -1,28 +1,28 @@
-import { create } from 'zustand';
+import projectFiles from 'virtual:forge-project';
 import {
+  type ForgeQualityPreset,
+  isConstraintSketch,
+  type LogEntry,
   type ParamDef,
   type RunResult,
-  type SceneObject,
-  type LogEntry,
-  type ForgeQualityPreset,
   resolveForgeQualityPreset,
-  isConstraintSketch,
+  type SceneObject,
   updateConstraintValue,
 } from '@forge/index';
-import type { ShapeCompilePlan } from '../forge/compilePlan';
 import { setParamOverrides } from '@forge/params';
-import projectFiles from 'virtual:forge-project';
-import { fileSystem } from '../fs';
-import { isNotebookFile, serializeNotebook, createNotebook } from '../notebook/model';
-import { evalWorkerClient } from '../workers/evalWorkerClient';
-import { deserializeRunResult } from '../forge/deserializeRunResult';
-import type { SerializedRunResult, SerializedSceneObject, SerializedShapeData } from '../workers/evalWorkerProtocol';
-import { publishSolverWasmRunDebug } from '../forge/sketch/constraints/solver-wasm';
-import { type ThemeName, applyTheme } from '../theme';
 import type { LengthUnit } from '@forge/units';
+import { create } from 'zustand';
 import { clampAnimationSpeed } from '../animationSpeed';
 import type { ViewportCameraState } from '../capture/cameraState';
-import { decodeSharedHash, decodeSharedBundle, getGistId } from '../share';
+import type { ShapeCompilePlan } from '../forge/compilePlan';
+import { deserializeRunResult } from '../forge/deserializeRunResult';
+import { publishSolverWasmRunDebug } from '../forge/sketch/constraints/solver-wasm';
+import { fileSystem } from '../fs';
+import { createNotebook, isNotebookFile, serializeNotebook } from '../notebook/model';
+import { decodeSharedBundle, decodeSharedHash } from '../share';
+import { applyTheme, type ThemeName } from '../theme';
+import { evalWorkerClient } from '../workers/evalWorkerClient';
+import type { SerializedRunResult, SerializedShapeData } from '../workers/evalWorkerProtocol';
 
 // ---------------------------------------------------------------------------
 // Run result LRU cache — avoids re-evaluating a file you just switched away from.
@@ -128,7 +128,11 @@ function persistCache(): void {
     const json = JSON.stringify({ v: CACHE_VERSION, entries });
     if (json.length > MAX_PERSIST_BYTES) {
       // Too large — clear any stale persisted data and bail
-      try { sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch { /* ignore */ }
+      try {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
       return;
     }
     sessionStorage.setItem(SESSION_STORAGE_KEY, json);
@@ -158,7 +162,11 @@ function rehydrateCache(): void {
     }
   } catch {
     // Corrupt or incompatible data — start fresh
-    try { sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch { /* ignore */ }
+    try {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -183,7 +191,8 @@ function lookupCache(
     entry.quality !== quality ||
     JSON.stringify(entry.paramOverrides) !== JSON.stringify(paramOverrides) ||
     JSON.stringify(entry.files) !== JSON.stringify(files)
-  ) return null;
+  )
+    return null;
   return entry.result;
 }
 
@@ -212,9 +221,7 @@ const EMPTY_FILE: Record<string, string> = {
   'untitled.forge.js': '// New part\n\nreturn box(50, 30, 10);\n',
 };
 
-const INITIAL_FILES = projectFiles && Object.keys(projectFiles).length > 0
-  ? projectFiles as Record<string, string>
-  : EMPTY_FILE;
+const INITIAL_FILES = projectFiles && Object.keys(projectFiles).length > 0 ? (projectFiles as Record<string, string>) : EMPTY_FILE;
 
 const collectInitialFolders = (files: Record<string, string>): string[] => {
   const folders = new Set<string>();
@@ -231,16 +238,10 @@ const collectInitialFolders = (files: Record<string, string>): string[] => {
 };
 
 const INITIAL_FOLDERS = collectInitialFolders(INITIAL_FILES);
-const isModelFile = (name: string): boolean => (
-  name.endsWith('.forge.js')
-  || name.endsWith('.sketch.js') // legacy compat
-);
+const isModelFile = (name: string): boolean => name.endsWith('.forge.js') || name.endsWith('.sketch.js'); // legacy compat
 const isRunnableFile = isModelFile;
-const findPreferredEntryFile = (names: string[]): string | null => (
-  names.find((n) => isModelFile(n))
-  || names.find((n) => isNotebookFile(n))
-  || null
-);
+const findPreferredEntryFile = (names: string[]): string | null =>
+  names.find((n) => isModelFile(n)) || names.find((n) => isNotebookFile(n)) || null;
 
 const getActiveFileFromHash = (): string | null => {
   const hash = window.location.hash.slice(1); // Remove the #
@@ -263,7 +264,7 @@ if (sharedBundle) {
 }
 
 /** Exported so applyServerSnapshot can inject the shared model into the file set. */
-export { sharedModel, sharedBundle };
+export { sharedBundle, sharedModel };
 
 const LAST_ACTIVE_FILE_KEY = 'fc-last-active-file';
 
@@ -281,29 +282,28 @@ const initialActive = (() => {
       window.history.replaceState(null, '', `#${last}`);
       return last;
     }
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
   const names = Object.keys(INITIAL_FILES);
-  const fallback = findPreferredEntryFile(names)
-    || names.find((n) => n.endsWith('.js'))
-    || names.find((n) => isNotebookFile(n))
-    || names[0];
+  const fallback =
+    findPreferredEntryFile(names) || names.find((n) => n.endsWith('.js')) || names.find((n) => isNotebookFile(n)) || names[0];
   if (fallback) window.history.replaceState(null, '', `#${fallback}`);
   return fallback;
 })();
 
-const INITIAL_SAVED = projectFiles && Object.keys(projectFiles).length > 0
-  ? projectFiles as Record<string, string>
-  : EMPTY_FILE;
+const INITIAL_SAVED = projectFiles && Object.keys(projectFiles).length > 0 ? (projectFiles as Record<string, string>) : EMPTY_FILE;
 
 export interface ProjectFile {
   name: string;
   code: string;
 }
 
-const normalizePath = (value: string): string => value
-  .replace(/\\/g, '/')
-  .replace(/\/+/g, '/')
-  .replace(/^\/+|\/+$/g, '');
+const normalizePath = (value: string): string =>
+  value
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/')
+    .replace(/^\/+|\/+$/g, '');
 
 const getParentPath = (value: string): string => {
   const normalized = normalizePath(value);
@@ -334,9 +334,9 @@ const resolvePreviewFile = (activeFile: string, files: Record<string, string>): 
     const bestIsNotebook = isNotebookFile(best);
     const candidateIsNotebook = isNotebookFile(candidate);
     if (
-      depth > bestDepth
-      || (depth === bestDepth && bestIsNotebook && !candidateIsNotebook)
-      || (depth === bestDepth && bestIsNotebook === candidateIsNotebook && candidate < best)
+      depth > bestDepth ||
+      (depth === bestDepth && bestIsNotebook && !candidateIsNotebook) ||
+      (depth === bestDepth && bestIsNotebook === candidateIsNotebook && candidate < best)
     ) {
       best = candidate;
       bestDepth = depth;
@@ -628,10 +628,7 @@ interface ViewPreferencesState {
 const DEFAULT_OBJECT_COLOR = '#5b9bd5';
 const VIEW_PREFERENCES_KEY = 'fc-view-preferences-v1';
 
-const getObjectSettingsForPreviewFile = (
-  objectSettingsByFile: ObjectSettingsByFile,
-  previewFile: string | null,
-): ObjectSettingsMap => {
+const getObjectSettingsForPreviewFile = (objectSettingsByFile: ObjectSettingsByFile, previewFile: string | null): ObjectSettingsMap => {
   if (!previewFile) return {};
   return objectSettingsByFile[previewFile] ?? {};
 };
@@ -651,11 +648,7 @@ const setObjectSettingsForPreviewFile = (
   return { ...objectSettingsByFile, [previewFile]: objectSettings };
 };
 
-const remapObjectSettingsByFile = (
-  objectSettingsByFile: ObjectSettingsByFile,
-  from: string,
-  to: string,
-): ObjectSettingsByFile => {
+const remapObjectSettingsByFile = (objectSettingsByFile: ObjectSettingsByFile, from: string, to: string): ObjectSettingsByFile => {
   let changed = false;
   const next: ObjectSettingsByFile = {};
   Object.entries(objectSettingsByFile).forEach(([file, settings]) => {
@@ -666,10 +659,7 @@ const remapObjectSettingsByFile = (
   return changed ? next : objectSettingsByFile;
 };
 
-const removeObjectSettingsForFile = (
-  objectSettingsByFile: ObjectSettingsByFile,
-  file: string,
-): ObjectSettingsByFile => {
+const removeObjectSettingsForFile = (objectSettingsByFile: ObjectSettingsByFile, file: string): ObjectSettingsByFile => {
   if (!(file in objectSettingsByFile)) return objectSettingsByFile;
   const next = { ...objectSettingsByFile };
   delete next[file];
@@ -694,17 +684,12 @@ const syncObjectSettings = (
       nextSettings[obj.id].color = obj.color || DEFAULT_OBJECT_COLOR;
     }
   });
-  const nextSelected = objects.length === 0
-    ? null
-    : (selectedObjectId && ids.has(selectedObjectId) ? selectedObjectId : objects[0].id);
+  const nextSelected = objects.length === 0 ? null : selectedObjectId && ids.has(selectedObjectId) ? selectedObjectId : objects[0].id;
   const nextFocused = focusedObjectIds.filter((id) => ids.has(id));
   return { settings: nextSettings, selectedObjectId: nextSelected, focusedObjectIds: nextFocused };
 };
 
-const syncCutPlaneEnabled = (
-  cutPlanes: { name: string }[],
-  prevEnabled: Record<string, boolean>,
-): Record<string, boolean> => {
+const syncCutPlaneEnabled = (cutPlanes: { name: string }[], prevEnabled: Record<string, boolean>): Record<string, boolean> => {
   const next: Record<string, boolean> = {};
   cutPlanes.forEach((cp) => {
     next[cp.name] = prevEnabled[cp.name] ?? false;
@@ -712,11 +697,7 @@ const syncCutPlaneEnabled = (
   return next;
 };
 
-const clampJointValue = (
-  value: number,
-  min?: number,
-  max?: number,
-): number => {
+const clampJointValue = (value: number, min?: number, max?: number): number => {
   let next = Number.isFinite(value) ? value : 0;
   if (min !== undefined) next = Math.max(min, next);
   if (max !== undefined) next = Math.min(max, next);
@@ -728,19 +709,13 @@ const clampAnimationProgress = (value: number): number => {
   return Math.max(0, Math.min(1, value));
 };
 
-const sanitizeAnimationProgress = (
-  value: number,
-  clip?: { loop: boolean; continuous?: boolean } | null,
-): number => {
+const sanitizeAnimationProgress = (value: number, clip?: { loop: boolean; continuous?: boolean } | null): number => {
   if (!Number.isFinite(value)) return 0;
   if (clip?.loop && clip.continuous) return Math.max(0, value);
   return clampAnimationProgress(value);
 };
 
-const syncJointValues = (
-  result: RunResult,
-  prev: Record<string, number>,
-): Record<string, number> => {
+const syncJointValues = (result: RunResult, prev: Record<string, number>): Record<string, number> => {
   const joints = result.jointsView?.enabled === false ? [] : (result.jointsView?.joints ?? []);
   const next: Record<string, number> = {};
   joints.forEach((joint) => {
@@ -750,10 +725,7 @@ const syncJointValues = (
   return next;
 };
 
-const syncHoveredJointName = (
-  result: RunResult,
-  hoveredJointName: string | null,
-): string | null => {
+const syncHoveredJointName = (result: RunResult, hoveredJointName: string | null): string | null => {
   if (!hoveredJointName) return null;
   const joints = result.jointsView?.enabled === false ? [] : (result.jointsView?.joints ?? []);
   return joints.some((joint) => joint.name === hoveredJointName) ? hoveredJointName : null;
@@ -783,7 +755,7 @@ const syncJointAnimationState = (
     if (preferred && clipNames.has(preferred)) clip = preferred;
   }
 
-  const activeClip = clip ? clips.find((entry) => entry.name === clip) ?? null : null;
+  const activeClip = clip ? (clips.find((entry) => entry.name === clip) ?? null) : null;
   const progress = previousStillValid ? sanitizeAnimationProgress(prevProgress, activeClip) : 0;
   const playing = clip ? prevPlaying : false;
   return { clip, progress, playing };
@@ -816,7 +788,6 @@ function createErrorRunResult(message: string, quality: ForgeQualityPreset): Run
   } satisfies RunResult;
 }
 
-
 function buildRunState(
   previewFile: string | null,
   runResult: RunResult,
@@ -839,11 +810,7 @@ function buildRunState(
     state.selectedObjectId,
     state.focusedObjectIds,
   );
-  const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
-    state.objectSettingsByFile,
-    previewFile,
-    synced.settings,
-  );
+  const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(state.objectSettingsByFile, previewFile, synced.settings);
   const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, state.cutPlaneEnabled);
   const nextJointValues = syncJointValues(runResult, state.jointValues);
   const nextAnimationState = syncJointAnimationState(
@@ -923,7 +890,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     // Update URL hash when active file changes
     if (name) {
       window.history.replaceState(null, '', `#${name}`);
-      try { localStorage.setItem(LAST_ACTIVE_FILE_KEY, name); } catch { /* */ }
+      try {
+        localStorage.setItem(LAST_ACTIVE_FILE_KEY, name);
+      } catch {
+        /* */
+      }
     }
     // Save current file's param overrides before switching
     const { activeFile: prevFile, paramOverrides, paramOverridesByFile } = get();
@@ -936,7 +907,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       }
     }
     // Restore target file's saved overrides (empty if none)
-    const restored = (name && nextByFile[name]) ? nextByFile[name] : {};
+    const restored = name && nextByFile[name] ? nextByFile[name] : {};
     set({
       activeFile: name,
       meshPreviewFile: null, // Clear mesh preview when switching files
@@ -963,11 +934,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const template = isNotebookFile(normalized)
       ? serializeNotebook(createNotebook())
       : normalized.endsWith('.svg')
-      ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <path d="M 10 10 L 90 10 L 90 90 L 10 90 Z" fill="none" stroke="#000" stroke-width="4" />
 </svg>
 `
-      : normalized.endsWith('.forge.js')
+        : normalized.endsWith('.forge.js')
           ? '// 3D Part\n\nreturn box(50, 30, 10);\n'
           : '// Shared JS utilities for ForgeCAD.\n\nexport function exampleValue() {\n  return 42;\n}\n';
     const newFolders = Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort();
@@ -1047,7 +1018,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       objectSettingsByFile: nextObjectSettingsByFile,
       folders: Array.from(new Set([...get().folders, ...collectParentPaths(normalized)])).sort(),
     });
-    fileSystem.delete(oldName)
+    fileSystem
+      .delete(oldName)
       .then(() => fileSystem.save(normalized, code))
       .catch((e) => console.error('Rename persist failed:', e));
   },
@@ -1094,15 +1066,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       }
     });
 
-    const updatedFolders = Array.from(new Set(
-      folders
-        .map((folder) => movePath(folder, normalizedOld, normalizedNew))
-        .concat(collectParentPaths(normalizedNew)),
-    )).sort();
+    const updatedFolders = Array.from(
+      new Set(folders.map((folder) => movePath(folder, normalizedOld, normalizedNew)).concat(collectParentPaths(normalizedNew))),
+    ).sort();
 
-    const nextActive = activeFile && activeFile.startsWith(`${normalizedOld}/`)
-      ? movePath(activeFile, normalizedOld, normalizedNew)
-      : activeFile;
+    const nextActive = activeFile?.startsWith(`${normalizedOld}/`) ? movePath(activeFile, normalizedOld, normalizedNew) : activeFile;
     const nextObjectSettingsByFile = remapObjectSettingsByFile(objectSettingsByFile, normalizedOld, normalizedNew);
     writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
 
@@ -1156,9 +1124,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const remainingFolders = folders.filter((f) => f !== normalized && !f.startsWith(prefix));
 
     // Pick a new active file if the current one was deleted
-    const newActive = activeFile && (activeFile.startsWith(prefix))
-      ? Object.keys(remainingFiles)[0]
-      : activeFile;
+    const newActive = activeFile?.startsWith(prefix) ? Object.keys(remainingFiles)[0] : activeFile;
 
     let nextObjectSettingsByFile = objectSettingsByFile;
     for (const f of deletedFiles) {
@@ -1241,13 +1207,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 
   execute: async () => {
-    const {
-      files,
-      activeFile,
-      meshPreviewFile,
-      runQuality,
-      paramOverrides,
-    } = get();
+    const { files, activeFile, meshPreviewFile, runQuality, paramOverrides } = get();
 
     // Mesh preview mode: render a temporary importMesh() script
     let previewFile: string | null;
@@ -1321,9 +1281,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const overrides = { ...get().paramOverrides, [name]: value };
     const { activeFile: curFile, paramOverridesByFile } = get();
     const previewKey = curFile ? resolvePreviewFile(curFile, get().files) : null;
-    const nextByFile = previewKey
-      ? { ...paramOverridesByFile, [previewKey]: overrides }
-      : paramOverridesByFile;
+    const nextByFile = previewKey ? { ...paramOverridesByFile, [previewKey]: overrides } : paramOverridesByFile;
     set({ paramOverrides: overrides, paramOverridesByFile: nextByFile });
     get().execute();
   },
@@ -1338,58 +1296,63 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     get().execute();
   },
 
-  setJointValue: (name, value) => set((state) => {
-    const joints = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.joints ?? []);
-    const couplings = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.couplings ?? []);
-    const coupled = new Set(couplings.map((coupling) => coupling.joint));
-    if (coupled.has(name)) return {};
-    const joint = joints.find((entry) => entry.name === name);
-    if (!joint) return {};
-    const clamped = clampJointValue(value, joint.min, joint.max);
-    return {
-      jointValues: { ...state.jointValues, [name]: clamped },
-      jointAnimationPlaying: false,
-    };
-  }),
-
-  setJointAnimationClip: (name) => set((state) => {
-    const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
-    if (!name) {
+  setJointValue: (name, value) =>
+    set((state) => {
+      const joints = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.joints ?? []);
+      const couplings = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.couplings ?? []);
+      const coupled = new Set(couplings.map((coupling) => coupling.joint));
+      if (coupled.has(name)) return {};
+      const joint = joints.find((entry) => entry.name === name);
+      if (!joint) return {};
+      const clamped = clampJointValue(value, joint.min, joint.max);
       return {
-        jointAnimationClip: null,
+        jointValues: { ...state.jointValues, [name]: clamped },
         jointAnimationPlaying: false,
       };
-    }
-    if (!clips.some((clip) => clip.name === name)) return {};
-    return {
-      jointAnimationClip: name,
-      jointAnimationProgress: 0,
-      jointAnimationPlaying: false,
-    };
-  }),
+    }),
 
-  setJointAnimationProgress: (value) => set({
-    jointAnimationProgress: sanitizeAnimationProgress(
-      value,
-      get().result?.jointsView?.animations.find((clip) => clip.name === get().jointAnimationClip) ?? null,
-    ),
-  }),
+  setJointAnimationClip: (name) =>
+    set((state) => {
+      const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
+      if (!name) {
+        return {
+          jointAnimationClip: null,
+          jointAnimationPlaying: false,
+        };
+      }
+      if (!clips.some((clip) => clip.name === name)) return {};
+      return {
+        jointAnimationClip: name,
+        jointAnimationProgress: 0,
+        jointAnimationPlaying: false,
+      };
+    }),
 
-  setJointAnimationPlaying: (playing) => set((state) => {
-    if (!playing) return { jointAnimationPlaying: false };
-    const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
-    if (clips.length === 0) return { jointAnimationPlaying: false };
-    const clipName = state.jointAnimationClip
-      && clips.some((clip) => clip.name === state.jointAnimationClip)
-      ? state.jointAnimationClip
-      : (state.lastValidResult?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.lastValidResult?.jointsView?.defaultAnimation)
-        ? state.lastValidResult?.jointsView?.defaultAnimation
-        : clips[0].name);
-    return {
-      jointAnimationClip: clipName,
-      jointAnimationPlaying: true,
-    };
-  }),
+  setJointAnimationProgress: (value) =>
+    set({
+      jointAnimationProgress: sanitizeAnimationProgress(
+        value,
+        get().result?.jointsView?.animations.find((clip) => clip.name === get().jointAnimationClip) ?? null,
+      ),
+    }),
+
+  setJointAnimationPlaying: (playing) =>
+    set((state) => {
+      if (!playing) return { jointAnimationPlaying: false };
+      const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
+      if (clips.length === 0) return { jointAnimationPlaying: false };
+      const clipName =
+        state.jointAnimationClip && clips.some((clip) => clip.name === state.jointAnimationClip)
+          ? state.jointAnimationClip
+          : state.lastValidResult?.jointsView?.defaultAnimation &&
+              clips.some((clip) => clip.name === state.lastValidResult?.jointsView?.defaultAnimation)
+            ? state.lastValidResult?.jointsView?.defaultAnimation
+            : clips[0].name;
+      return {
+        jointAnimationClip: clipName,
+        jointAnimationPlaying: true,
+      };
+    }),
 
   setJointAnimationSpeed: (value) => {
     const safeSpeed = clampAnimationSpeed(value);
@@ -1397,21 +1360,23 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set({ jointAnimationSpeed: safeSpeed });
   },
 
-  toggleJointAnimationPlayback: () => set((state) => {
-    if (state.jointAnimationPlaying) return { jointAnimationPlaying: false };
-    const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
-    if (clips.length === 0) return {};
-    const clipName = state.jointAnimationClip
-      && clips.some((clip) => clip.name === state.jointAnimationClip)
-      ? state.jointAnimationClip
-      : (state.lastValidResult?.jointsView?.defaultAnimation && clips.some((clip) => clip.name === state.lastValidResult?.jointsView?.defaultAnimation)
-        ? state.lastValidResult?.jointsView?.defaultAnimation
-        : clips[0].name);
-    return {
-      jointAnimationClip: clipName,
-      jointAnimationPlaying: true,
-    };
-  }),
+  toggleJointAnimationPlayback: () =>
+    set((state) => {
+      if (state.jointAnimationPlaying) return { jointAnimationPlaying: false };
+      const clips = state.lastValidResult?.jointsView?.enabled === false ? [] : (state.lastValidResult?.jointsView?.animations ?? []);
+      if (clips.length === 0) return {};
+      const clipName =
+        state.jointAnimationClip && clips.some((clip) => clip.name === state.jointAnimationClip)
+          ? state.jointAnimationClip
+          : state.lastValidResult?.jointsView?.defaultAnimation &&
+              clips.some((clip) => clip.name === state.lastValidResult?.jointsView?.defaultAnimation)
+            ? state.lastValidResult?.jointsView?.defaultAnimation
+            : clips[0].name;
+      return {
+        jointAnimationClip: clipName,
+        jointAnimationPlaying: true,
+      };
+    }),
 
   lengthUnit: (initialViewPreferences.lengthUnit as LengthUnit) ?? 'mm',
   setLengthUnit: (unit) => {
@@ -1447,149 +1412,122 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   previewFile: initialPreviewFile,
   objectSettingsByFile: initialObjectSettingsByFile,
   objectSettings: getObjectSettingsForPreviewFile(initialObjectSettingsByFile, initialPreviewFile),
-  setObjectVisibility: (id, visible) => set((s) => {
-    const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
-    const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, visible } };
-    const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
-      s.objectSettingsByFile,
-      s.previewFile,
-      nextObjectSettings,
-    );
-    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
-    return {
-      objectSettings: nextObjectSettings,
-      objectSettingsByFile: nextObjectSettingsByFile,
-    };
-  }),
-  showAllObjects: () => set((state) => {
-    const objectMetaById = new Map((state.lastValidResult?.objects ?? []).map((obj) => [obj.id, obj]));
-    const ids = new Set([
-      ...Object.keys(state.objectSettings),
-      ...objectMetaById.keys(),
-    ]);
+  setObjectVisibility: (id, visible) =>
+    set((s) => {
+      const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
+      const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, visible } };
+      const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(s.objectSettingsByFile, s.previewFile, nextObjectSettings);
+      writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+      return {
+        objectSettings: nextObjectSettings,
+        objectSettingsByFile: nextObjectSettingsByFile,
+      };
+    }),
+  showAllObjects: () =>
+    set((state) => {
+      const objectMetaById = new Map((state.lastValidResult?.objects ?? []).map((obj) => [obj.id, obj]));
+      const ids = new Set([...Object.keys(state.objectSettings), ...objectMetaById.keys()]);
 
-    if (ids.size === 0) return state;
+      if (ids.size === 0) return state;
 
-    let changed = false;
-    const nextObjectSettings = { ...state.objectSettings };
-    ids.forEach((id) => {
-      const objectMeta = objectMetaById.get(id);
-      const fallbackColor = objectMeta?.color || DEFAULT_OBJECT_COLOR;
-      const current = nextObjectSettings[id] ?? { visible: true, opacity: 1, color: fallbackColor };
-      if (!current.visible) changed = true;
-      nextObjectSettings[id] = { ...current, visible: true };
-    });
+      let changed = false;
+      const nextObjectSettings = { ...state.objectSettings };
+      ids.forEach((id) => {
+        const objectMeta = objectMetaById.get(id);
+        const fallbackColor = objectMeta?.color || DEFAULT_OBJECT_COLOR;
+        const current = nextObjectSettings[id] ?? { visible: true, opacity: 1, color: fallbackColor };
+        if (!current.visible) changed = true;
+        nextObjectSettings[id] = { ...current, visible: true };
+      });
 
-    if (!changed) return state;
-    const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
-      state.objectSettingsByFile,
-      state.previewFile,
-      nextObjectSettings,
-    );
-    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
-    return {
-      objectSettings: nextObjectSettings,
-      objectSettingsByFile: nextObjectSettingsByFile,
-    };
-  }),
-  setObjectsVisibility: (ids, visible) => set((s) => {
-    if (ids.length === 0) return {} as Partial<ForgeStore>;
+      if (!changed) return state;
+      const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(state.objectSettingsByFile, state.previewFile, nextObjectSettings);
+      writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+      return {
+        objectSettings: nextObjectSettings,
+        objectSettingsByFile: nextObjectSettingsByFile,
+      };
+    }),
+  setObjectsVisibility: (ids, visible) =>
+    set((s) => {
+      if (ids.length === 0) return {} as Partial<ForgeStore>;
 
-    let changed = false;
-    const nextObjectSettings = { ...s.objectSettings };
-    ids.forEach((id) => {
-      const current = nextObjectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
-      if (current.visible === visible) return;
-      nextObjectSettings[id] = { ...current, visible };
-      changed = true;
-    });
+      let changed = false;
+      const nextObjectSettings = { ...s.objectSettings };
+      ids.forEach((id) => {
+        const current = nextObjectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
+        if (current.visible === visible) return;
+        nextObjectSettings[id] = { ...current, visible };
+        changed = true;
+      });
 
-    if (!changed) return {} as Partial<ForgeStore>;
-    const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
-      s.objectSettingsByFile,
-      s.previewFile,
-      nextObjectSettings,
-    );
-    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
-    return {
-      objectSettings: nextObjectSettings,
-      objectSettingsByFile: nextObjectSettingsByFile,
-    };
-  }),
-  setObjectOpacity: (id, opacity) => set((s) => {
-    const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
-    const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, opacity } };
-    const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
-      s.objectSettingsByFile,
-      s.previewFile,
-      nextObjectSettings,
-    );
-    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
-    return {
-      objectSettings: nextObjectSettings,
-      objectSettingsByFile: nextObjectSettingsByFile,
-    };
-  }),
-  setObjectColor: (id, color) => set((s) => {
-    const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
-    const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, color } };
-    const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(
-      s.objectSettingsByFile,
-      s.previewFile,
-      nextObjectSettings,
-    );
-    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
-    return {
-      objectSettings: nextObjectSettings,
-      objectSettingsByFile: nextObjectSettingsByFile,
-    };
-  }),
+      if (!changed) return {} as Partial<ForgeStore>;
+      const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(s.objectSettingsByFile, s.previewFile, nextObjectSettings);
+      writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+      return {
+        objectSettings: nextObjectSettings,
+        objectSettingsByFile: nextObjectSettingsByFile,
+      };
+    }),
+  setObjectOpacity: (id, opacity) =>
+    set((s) => {
+      const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
+      const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, opacity } };
+      const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(s.objectSettingsByFile, s.previewFile, nextObjectSettings);
+      writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+      return {
+        objectSettings: nextObjectSettings,
+        objectSettingsByFile: nextObjectSettingsByFile,
+      };
+    }),
+  setObjectColor: (id, color) =>
+    set((s) => {
+      const current = s.objectSettings[id] ?? { visible: true, opacity: 1, color: DEFAULT_OBJECT_COLOR };
+      const nextObjectSettings = { ...s.objectSettings, [id]: { ...current, color } };
+      const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(s.objectSettingsByFile, s.previewFile, nextObjectSettings);
+      writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
+      return {
+        objectSettings: nextObjectSettings,
+        objectSettingsByFile: nextObjectSettingsByFile,
+      };
+    }),
   selectedObjectId: null,
   selectObject: (id) => set({ selectedObjectId: id, constructionGhost: null, selectedConstraintId: null }),
   constructionGhost: null,
   setConstructionGhost: (ghost) => set({ constructionGhost: ghost }),
   focusedObjectIds: [],
-  focusObject: (id, options) => set((state) => {
-    if (!id) return { focusedObjectIds: [] };
-    if (!options?.additive) {
-      return { focusedObjectIds: [id], selectedObjectId: id };
-    }
-    if (state.focusedObjectIds.includes(id)) {
-      const nextFocusedObjectIds = state.focusedObjectIds.filter((focusedId) => focusedId !== id);
-      return {
-        focusedObjectIds: nextFocusedObjectIds,
-        selectedObjectId: nextFocusedObjectIds.length > 0
-          ? nextFocusedObjectIds[nextFocusedObjectIds.length - 1]
-          : state.selectedObjectId,
-      };
-    }
-    return { focusedObjectIds: [...state.focusedObjectIds, id], selectedObjectId: id };
-  }),
+  focusObject: (id, options) =>
+    set((state) => {
+      if (!id) return { focusedObjectIds: [] };
+      if (!options?.additive) {
+        return { focusedObjectIds: [id], selectedObjectId: id };
+      }
+      if (state.focusedObjectIds.includes(id)) {
+        const nextFocusedObjectIds = state.focusedObjectIds.filter((focusedId) => focusedId !== id);
+        return {
+          focusedObjectIds: nextFocusedObjectIds,
+          selectedObjectId:
+            nextFocusedObjectIds.length > 0 ? nextFocusedObjectIds[nextFocusedObjectIds.length - 1] : state.selectedObjectId,
+        };
+      }
+      return { focusedObjectIds: [...state.focusedObjectIds, id], selectedObjectId: id };
+    }),
   clearFocusedObject: () => set({ focusedObjectIds: [] }),
   hoveredObjectId: null,
-  setHoveredObjectId: (id) => set((state) => (
-    state.hoveredObjectId === id ? state : { hoveredObjectId: id }
-  )),
+  setHoveredObjectId: (id) => set((state) => (state.hoveredObjectId === id ? state : { hoveredObjectId: id })),
   selectedConstraintId: null,
-  setSelectedConstraintId: (id) => set((state) => (
-    state.selectedConstraintId === id ? { selectedConstraintId: null } : { selectedConstraintId: id }
-  )),
+  setSelectedConstraintId: (id) =>
+    set((state) => (state.selectedConstraintId === id ? { selectedConstraintId: null } : { selectedConstraintId: id })),
   hoveredSurfaceIndex: null,
-  setHoveredSurfaceIndex: (index) => set((state) => (
-    state.hoveredSurfaceIndex === index ? state : { hoveredSurfaceIndex: index }
-  )),
+  setHoveredSurfaceIndex: (index) => set((state) => (state.hoveredSurfaceIndex === index ? state : { hoveredSurfaceIndex: index })),
   selectedSurfaceIndex: null,
-  setSelectedSurfaceIndex: (index) => set((state) => (
-    state.selectedSurfaceIndex === index ? { selectedSurfaceIndex: null } : { selectedSurfaceIndex: index }
-  )),
+  setSelectedSurfaceIndex: (index) =>
+    set((state) => (state.selectedSurfaceIndex === index ? { selectedSurfaceIndex: null } : { selectedSurfaceIndex: index })),
   selectedSketchEntityId: null,
-  setSelectedSketchEntityId: (id) => set((state) => (
-    state.selectedSketchEntityId === id ? { selectedSketchEntityId: null } : { selectedSketchEntityId: id }
-  )),
+  setSelectedSketchEntityId: (id) =>
+    set((state) => (state.selectedSketchEntityId === id ? { selectedSketchEntityId: null } : { selectedSketchEntityId: id })),
   hoveredJointName: null,
-  setHoveredJointName: (name) => set((state) => (
-    state.hoveredJointName === name ? state : { hoveredJointName: name }
-  )),
+  setHoveredJointName: (name) => set((state) => (state.hoveredJointName === name ? state : { hoveredJointName: name })),
   objectPickSyncEnabled: initialViewPreferences.objectPickSyncEnabled ?? true,
   setObjectPickSyncEnabled: (enabled) => {
     writeViewPreferences({ objectPickSyncEnabled: enabled });
@@ -1634,11 +1572,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const next = measurements.map((m, i) => (i === measurements.length - 1 ? { ...m, points: [...m.points, pt] } : m));
     set({ measurements: next });
   },
-  updateMeasurePoint: (id, index, pt) => set((s) => ({
-    measurements: s.measurements.map((m) => (
-      m.id === id ? { ...m, points: m.points.map((p, i) => (i === index ? pt : p)) } : m
-    )),
-  })),
+  updateMeasurePoint: (id, index, pt) =>
+    set((s) => ({
+      measurements: s.measurements.map((m) => (m.id === id ? { ...m, points: m.points.map((p, i) => (i === index ? pt : p)) } : m)),
+    })),
   removeMeasurement: (id) => set((s) => ({ measurements: s.measurements.filter((m) => m.id !== id) })),
   clearMeasure: () => set({ measurements: [] }),
   measureSnapPx: initialViewPreferences.measureSnapPx ?? 12,
@@ -1648,18 +1585,20 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 
   dimensionsVisible: initialViewPreferences.dimensionsVisible ?? true,
-  toggleDimensions: () => set((s) => {
-    const nextDimensionsVisible = !s.dimensionsVisible;
-    writeViewPreferences({ dimensionsVisible: nextDimensionsVisible });
-    return { dimensionsVisible: nextDimensionsVisible };
-  }),
+  toggleDimensions: () =>
+    set((s) => {
+      const nextDimensionsVisible = !s.dimensionsVisible;
+      writeViewPreferences({ dimensionsVisible: nextDimensionsVisible });
+      return { dimensionsVisible: nextDimensionsVisible };
+    }),
 
   surfacesVisible: initialViewPreferences.surfacesVisible ?? true,
-  toggleSurfaces: () => set((s) => {
-    const nextSurfacesVisible = !s.surfacesVisible;
-    writeViewPreferences({ surfacesVisible: nextSurfacesVisible });
-    return { surfacesVisible: nextSurfacesVisible };
-  }),
+  toggleSurfaces: () =>
+    set((s) => {
+      const nextSurfacesVisible = !s.surfacesVisible;
+      writeViewPreferences({ surfacesVisible: nextSurfacesVisible });
+      return { surfacesVisible: nextSurfacesVisible };
+    }),
 
   explodeAmount: initialViewPreferences.explodeAmount ?? 0,
   setExplodeAmount: (amount) => {
@@ -1669,11 +1608,12 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 
   cutPlaneEnabled: initialViewPreferences.cutPlaneEnabled ?? {},
-  setCutPlaneEnabled: (name, enabled) => set((s) => {
-    const nextCutPlaneEnabled = { ...s.cutPlaneEnabled, [name]: enabled };
-    writeViewPreferences({ cutPlaneEnabled: nextCutPlaneEnabled });
-    return { cutPlaneEnabled: nextCutPlaneEnabled };
-  }),
+  setCutPlaneEnabled: (name, enabled) =>
+    set((s) => {
+      const nextCutPlaneEnabled = { ...s.cutPlaneEnabled, [name]: enabled };
+      writeViewPreferences({ cutPlaneEnabled: nextCutPlaneEnabled });
+      return { cutPlaneEnabled: nextCutPlaneEnabled };
+    }),
   sectionPlaneGuidesEnabled: initialViewPreferences.sectionPlaneGuidesEnabled ?? true,
   sectionPlaneFillEnabled: initialViewPreferences.sectionPlaneFillEnabled ?? true,
   sectionPlaneFillOpacity: initialViewPreferences.sectionPlaneFillOpacity ?? 0.2,
@@ -1757,7 +1697,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         // Actually saveAs usually implies the current editor content is now associated with this new file.
         // But activeFile name in the store might remain the same unless we update it?
         // The current implementation of saveAs DOES NOT update activeFile name or file handle in a persistent way
-        // EXCEPT it sets fileHandle. 
+        // EXCEPT it sets fileHandle.
         // Wait, if I saveAs "foo.js" and activeFile was "untitled.js", does the editor rename it?
         // In the previous code:
         // set({ fileHandle: handle, dirty: false });
@@ -1766,15 +1706,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         // However, for the purpose of THIS task, I should just mark the CURRENT buffer as saved.
         // If the user saves as a DIFFERENT name, usually the editor switches to that file.
         // I will assume for now we just verify the content is clean.
-        set((s) => ({ 
-          fileHandle: handle, 
+        set((s) => ({
+          fileHandle: handle,
           dirty: false,
-          savedFiles: { ...s.savedFiles, [activeFile]: code } // This assumes we are satisfied with current content being "saved"
+          savedFiles: { ...s.savedFiles, [activeFile]: code }, // This assumes we are satisfied with current content being "saved"
         }));
       } else {
-        const mime = isNotebookFile(activeFile)
-          ? 'application/json'
-          : (activeFile.endsWith('.svg') ? 'image/svg+xml' : 'text/javascript');
+        const mime = isNotebookFile(activeFile) ? 'application/json' : activeFile.endsWith('.svg') ? 'image/svg+xml' : 'text/javascript';
         const blob = new Blob([code], { type: mime });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1782,9 +1720,9 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
         a.download = activeFile;
         a.click();
         URL.revokeObjectURL(url);
-        set((s) => ({ 
+        set((s) => ({
           dirty: false,
-          savedFiles: { ...s.savedFiles, [activeFile]: code }
+          savedFiles: { ...s.savedFiles, [activeFile]: code },
         }));
       }
     } catch (e: any) {
@@ -1819,17 +1757,19 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   setKernelReady: (v) => set({ kernelReady: v }),
 
   fileExplorerOpen: initialViewPreferences.fileExplorerOpen ?? true,
-  toggleFileExplorer: () => set((s) => {
-    const nextFileExplorerOpen = !s.fileExplorerOpen;
-    writeViewPreferences({ fileExplorerOpen: nextFileExplorerOpen });
-    return { fileExplorerOpen: nextFileExplorerOpen };
-  }),
+  toggleFileExplorer: () =>
+    set((s) => {
+      const nextFileExplorerOpen = !s.fileExplorerOpen;
+      writeViewPreferences({ fileExplorerOpen: nextFileExplorerOpen });
+      return { fileExplorerOpen: nextFileExplorerOpen };
+    }),
   viewPanelOpen: initialViewPreferences.viewPanelOpen ?? true,
-  toggleViewPanel: () => set((s) => {
-    const nextViewPanelOpen = !s.viewPanelOpen;
-    writeViewPreferences({ viewPanelOpen: nextViewPanelOpen });
-    return { viewPanelOpen: nextViewPanelOpen };
-  }),
+  toggleViewPanel: () =>
+    set((s) => {
+      const nextViewPanelOpen = !s.viewPanelOpen;
+      writeViewPreferences({ viewPanelOpen: nextViewPanelOpen });
+      return { viewPanelOpen: nextViewPanelOpen };
+    }),
 
   updateSketchConstraint: (objectId, constraintId, value) => {
     const current = get().lastValidResult;
@@ -1904,13 +1844,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       ? sharedBundle.entry
       : sharedModel
         ? sharedModel.filename
-        : (hashFile && !isMeshHash && nextFiles[hashFile] !== undefined)
-        ? hashFile
-        : (activeFile && nextFiles[activeFile]
-          ? activeFile
-          : (findPreferredEntryFile(availableFiles)
-            || availableFiles.find((n) => n.endsWith('.js'))
-            || availableFiles[0]));
+        : hashFile && !isMeshHash && nextFiles[hashFile] !== undefined
+          ? hashFile
+          : activeFile && nextFiles[activeFile]
+            ? activeFile
+            : findPreferredEntryFile(availableFiles) || availableFiles.find((n) => n.endsWith('.js')) || availableFiles[0];
 
     const nextDirty = Object.keys(nextFiles).some((p) => nextSaved[p] !== nextFiles[p]);
     const nextObjectSettingsByFile = Object.fromEntries(
@@ -1972,9 +1910,10 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const newFolders = new Set<string>();
     Object.keys(nextFiles).forEach((p) => collectParentPaths(p).forEach((f) => newFolders.add(f)));
     const availableFiles = Object.keys(nextFiles);
-    const newActiveFile = activeFile === filename
-      ? (findPreferredEntryFile(availableFiles) || availableFiles.find((n) => n.endsWith('.js')) || availableFiles[0])
-      : activeFile;
+    const newActiveFile =
+      activeFile === filename
+        ? findPreferredEntryFile(availableFiles) || availableFiles.find((n) => n.endsWith('.js')) || availableFiles[0]
+        : activeFile;
     const nextObjectSettingsByFile = Object.fromEntries(
       Object.entries(objectSettingsByFile).filter(([f]) => f in nextFiles),
     ) as ObjectSettingsByFile;

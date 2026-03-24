@@ -1,9 +1,6 @@
 export type EditorSurface = 'monaco' | 'notebook';
 
-type ShortcutEvent = Pick<
-  KeyboardEvent,
-  'altKey' | 'code' | 'ctrlKey' | 'defaultPrevented' | 'isComposing' | 'key' | 'metaKey'
->;
+type ShortcutEvent = Pick<KeyboardEvent, 'altKey' | 'code' | 'ctrlKey' | 'defaultPrevented' | 'isComposing' | 'key' | 'metaKey'>;
 
 const SHARED_BLOCKED_SHORTCUTS = new Set([
   '0',
@@ -28,13 +25,7 @@ const SHARED_BLOCKED_SHORTCUTS = new Set([
   'w',
 ]);
 
-const MONACO_BLOCKED_SHORTCUTS = new Set([
-  'f',
-  'g',
-  'h',
-  'y',
-  'z',
-]);
+const MONACO_BLOCKED_SHORTCUTS = new Set(['f', 'g', 'h', 'y', 'z']);
 
 export function getShortcutKey(event: Pick<KeyboardEvent, 'code' | 'key'>): string {
   if (event.code.startsWith('Digit') && event.code.length === 6) {

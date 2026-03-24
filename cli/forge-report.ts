@@ -8,9 +8,10 @@
  */
 
 import { readFile, writeFile } from 'fs/promises';
-import { resolve, basename } from 'path';
-import { init, runScript, generateReportPdf } from '../src/forge/headless';
+import { basename, resolve } from 'path';
+import { generateReportPdf, init, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
+
 function argValue(argv: string[], name: string): string | undefined {
   const idx = argv.indexOf(name);
   if (idx === -1) return undefined;
@@ -27,9 +28,7 @@ export async function runReportCli(argv: string[] = process.argv.slice(2)): Prom
   if (!scriptPath) usage();
 
   const defaultOut = scriptPath.replace(/\.(forge\.)?js$/, '.report.pdf');
-  const outputPath = argv[1] && !argv[1].startsWith('--')
-    ? argv[1]
-    : defaultOut;
+  const outputPath = argv[1] && !argv[1].startsWith('--') ? argv[1] : defaultOut;
   const toleranceArg = argValue(argv, '--dim-angle-tol');
   const dimAngleToleranceDeg = toleranceArg != null ? Number(toleranceArg) : undefined;
 

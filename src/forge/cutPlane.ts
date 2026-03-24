@@ -29,11 +29,9 @@ export function getCollectedCutPlanes(): CutPlaneDef[] {
 function normalizeExcludedObjectNames(input: CutPlaneExcludeInput | undefined): string[] | undefined {
   if (input === undefined) return undefined;
   const values = Array.isArray(input) ? input : [input];
-  const cleaned = Array.from(new Set(
-    values
-      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-      .filter((entry) => entry.length > 0),
-  ));
+  const cleaned = Array.from(
+    new Set(values.map((entry) => (typeof entry === 'string' ? entry.trim() : '')).filter((entry) => entry.length > 0)),
+  );
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
@@ -55,7 +53,7 @@ export function cutPlane(
   maybeOptions: CutPlaneOptions = {},
 ): void {
   const usingOffsetArg = typeof offsetOrOptions === 'number';
-  const rawOffset = usingOffsetArg ? offsetOrOptions : offsetOrOptions.offset ?? 0;
+  const rawOffset = usingOffsetArg ? offsetOrOptions : (offsetOrOptions.offset ?? 0);
   const offset = Number.isFinite(rawOffset) ? rawOffset : 0;
   const options = usingOffsetArg ? maybeOptions : offsetOrOptions;
   const excludeObjectNames = normalizeExcludedObjectNames(options.exclude);

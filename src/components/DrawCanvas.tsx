@@ -3,11 +3,12 @@
  * Provides a hit plane for capturing draw-mode clicks and renders
  * preview geometry (rubber-band lines, snap indicators, etc.).
  */
-import { useMemo, useState } from 'react';
-import { useFrame, type ThreeEvent } from '@react-three/fiber';
+
 import { Html } from '@react-three/drei';
-import { useDrawStore, findNearestEntity } from '../draw/drawStore';
+import { type ThreeEvent, useFrame } from '@react-three/fiber';
+import { useMemo, useState } from 'react';
 import * as THREE from 'three';
+import { findNearestEntity, useDrawStore } from '../draw/drawStore';
 
 /**
  * Hook that returns a world-space pixel size — the number of world units
@@ -52,10 +53,7 @@ function SnapCrosshair({ x, y, snapped, wp }: { x: number; y: number; snapped: b
 /** Rubber-band line from first click to current mouse position. */
 function RubberBandLine({ from, to }: { from: { x: number; y: number }; to: { x: number; y: number } }) {
   const lineObj = useMemo(() => {
-    const pts = [
-      new THREE.Vector3(from.x, from.y, 0.6),
-      new THREE.Vector3(to.x, to.y, 0.6),
-    ];
+    const pts = [new THREE.Vector3(from.x, from.y, 0.6), new THREE.Vector3(to.x, to.y, 0.6)];
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const mat = new THREE.LineBasicMaterial({ color: '#60a5fa', transparent: true, opacity: 0.7 });
     return new THREE.Line(geo, mat);
@@ -93,11 +91,7 @@ function RubberBandCircle({ center, radius }: { center: { x: number; y: number }
     const pts: THREE.Vector3[] = [];
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2;
-      pts.push(new THREE.Vector3(
-        center.x + Math.cos(angle) * radius,
-        center.y + Math.sin(angle) * radius,
-        0.6,
-      ));
+      pts.push(new THREE.Vector3(center.x + Math.cos(angle) * radius, center.y + Math.sin(angle) * radius, 0.6));
     }
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const mat = new THREE.LineBasicMaterial({ color: '#60a5fa', transparent: true, opacity: 0.7 });
@@ -132,7 +126,10 @@ function CoordLabel({ x, y, wp }: { x: number; y: number; wp: number }) {
 
 /** Axis alignment guides — lines from aligned point to cursor. */
 function AlignmentGuides({
-  x, y, points, snapResult,
+  x,
+  y,
+  points,
+  snapResult,
 }: {
   x: number;
   y: number;
@@ -201,11 +198,7 @@ function HoverPointHighlight({ x, y, wp }: { x: number; y: number; wp: number })
     const segments = 24;
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2;
-      pts.push(new THREE.Vector3(
-        x + Math.cos(angle) * radius,
-        y + Math.sin(angle) * radius,
-        0.65,
-      ));
+      pts.push(new THREE.Vector3(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius, 0.65));
     }
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const mat = new THREE.LineBasicMaterial({ color: '#f59e0b', linewidth: 2, transparent: true, opacity: 0.9 });
@@ -226,10 +219,7 @@ function HoverLineHighlight({ varName }: { varName: string }) {
     const p1 = storePoints.find((p) => p.varName === ln.startVar);
     const p2 = storePoints.find((p) => p.varName === ln.endVar);
     if (!p1 || !p2) return null;
-    const pts = [
-      new THREE.Vector3(p1.x, p1.y, 0.65),
-      new THREE.Vector3(p2.x, p2.y, 0.65),
-    ];
+    const pts = [new THREE.Vector3(p1.x, p1.y, 0.65), new THREE.Vector3(p2.x, p2.y, 0.65)];
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const mat = new THREE.LineBasicMaterial({ color: '#f59e0b', linewidth: 2, transparent: true, opacity: 0.9 });
     return new THREE.Line(geo, mat);
@@ -253,11 +243,7 @@ function HoverCircleHighlight({ varName }: { varName: string }) {
     const pts: THREE.Vector3[] = [];
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2;
-      pts.push(new THREE.Vector3(
-        center.x + Math.cos(angle) * c.radius,
-        center.y + Math.sin(angle) * c.radius,
-        0.65,
-      ));
+      pts.push(new THREE.Vector3(center.x + Math.cos(angle) * c.radius, center.y + Math.sin(angle) * c.radius, 0.65));
     }
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const mat = new THREE.LineBasicMaterial({ color: '#f59e0b', linewidth: 2, transparent: true, opacity: 0.9 });
@@ -279,10 +265,7 @@ function ConstructionLineOverlay({ varName }: { varName: string }) {
     const p1 = storePoints.find((p) => p.varName === ln.startVar);
     const p2 = storePoints.find((p) => p.varName === ln.endVar);
     if (!p1 || !p2) return null;
-    const pts = [
-      new THREE.Vector3(p1.x, p1.y, 0.62),
-      new THREE.Vector3(p2.x, p2.y, 0.62),
-    ];
+    const pts = [new THREE.Vector3(p1.x, p1.y, 0.62), new THREE.Vector3(p2.x, p2.y, 0.62)];
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     geo.computeBoundingSphere();
     const mat = new THREE.LineDashedMaterial({
@@ -315,11 +298,7 @@ function ConstructionCircleOverlay({ varName }: { varName: string }) {
     const pts: THREE.Vector3[] = [];
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2;
-      pts.push(new THREE.Vector3(
-        center.x + Math.cos(angle) * c.radius,
-        center.y + Math.sin(angle) * c.radius,
-        0.62,
-      ));
+      pts.push(new THREE.Vector3(center.x + Math.cos(angle) * c.radius, center.y + Math.sin(angle) * c.radius, 0.62));
     }
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     geo.computeBoundingSphere();
@@ -362,12 +341,8 @@ export function DrawCanvas() {
   const isSnappedToPoint = !!snapResult?.snappedToVar;
 
   // Determine which construction entity varNames correspond to lines vs circles
-  const constructionLineVarNames = storeLines
-    .filter((l) => constructionEntities.has(l.varName))
-    .map((l) => l.varName);
-  const constructionCircleVarNames = storeCircles
-    .filter((c) => constructionEntities.has(c.varName))
-    .map((c) => c.varName);
+  const constructionLineVarNames = storeLines.filter((l) => constructionEntities.has(l.varName)).map((l) => l.varName);
+  const constructionCircleVarNames = storeCircles.filter((c) => constructionEntities.has(c.varName)).map((c) => c.varName);
 
   return (
     <>
@@ -391,7 +366,10 @@ export function DrawCanvas() {
           e.stopPropagation();
           useDrawStore.getState().handleDoubleClick(e.point.x, e.point.y);
         }}
-        onPointerLeave={() => { setPreviewPoint(null); setHoveredEntity(null); }}
+        onPointerLeave={() => {
+          setPreviewPoint(null);
+          setHoveredEntity(null);
+        }}
         onContextMenu={(e: ThreeEvent<MouseEvent>) => {
           e.stopPropagation();
           useDrawStore.getState().cancelPending();
@@ -402,19 +380,13 @@ export function DrawCanvas() {
       </mesh>
 
       {/* Snap crosshair */}
-      {previewPoint && (
-        <SnapCrosshair x={previewPoint.x} y={previewPoint.y} snapped={isSnappedToPoint} wp={wp} />
-      )}
+      {previewPoint && <SnapCrosshair x={previewPoint.x} y={previewPoint.y} snapped={isSnappedToPoint} wp={wp} />}
 
       {/* Coordinate label */}
-      {previewPoint && (
-        <CoordLabel x={previewPoint.x} y={previewPoint.y} wp={wp} />
-      )}
+      {previewPoint && <CoordLabel x={previewPoint.x} y={previewPoint.y} wp={wp} />}
 
       {/* Alignment guides */}
-      {previewPoint && (
-        <AlignmentGuides x={previewPoint.x} y={previewPoint.y} points={points} snapResult={snapResult} />
-      )}
+      {previewPoint && <AlignmentGuides x={previewPoint.x} y={previewPoint.y} points={points} snapResult={snapResult} />}
 
       {/* Rubber-band preview for line tool */}
       {(tool === 'line' || tool === 'polyline') && pendingClicks.length >= 1 && previewPoint && (
@@ -422,9 +394,7 @@ export function DrawCanvas() {
       )}
 
       {/* Rubber-band preview for rectangle tool */}
-      {tool === 'rectangle' && pendingClicks.length === 1 && previewPoint && (
-        <RubberBandRect from={pendingClicks[0]} to={previewPoint} />
-      )}
+      {tool === 'rectangle' && pendingClicks.length === 1 && previewPoint && <RubberBandRect from={pendingClicks[0]} to={previewPoint} />}
 
       {/* Rubber-band preview for circle tool */}
       {tool === 'circle' && pendingClicks.length === 1 && previewPoint && (
@@ -435,16 +405,19 @@ export function DrawCanvas() {
       )}
 
       {/* Rubber-band preview for arc tool (3-point) */}
-      {tool === 'arc' && pendingClicks.length >= 1 && previewPoint && (
-        pendingClicks.length === 1
-          ? <RubberBandLine from={pendingClicks[0]} to={previewPoint} />
-          : <RubberBandArc p1={pendingClicks[0]} p2={pendingClicks[1]} p3={previewPoint} />
-      )}
+      {tool === 'arc' &&
+        pendingClicks.length >= 1 &&
+        previewPoint &&
+        (pendingClicks.length === 1 ? (
+          <RubberBandLine from={pendingClicks[0]} to={previewPoint} />
+        ) : (
+          <RubberBandArc p1={pendingClicks[0]} p2={pendingClicks[1]} p3={previewPoint} />
+        ))}
 
       {/* Polyline segments already committed in this chain */}
-      {tool === 'polyline' && pendingClicks.length >= 2 && pendingClicks.slice(0, -1).map((pt, i) => (
-        <RubberBandLine key={`poly-${i}`} from={pt} to={pendingClicks[i + 1]} />
-      ))}
+      {tool === 'polyline' &&
+        pendingClicks.length >= 2 &&
+        pendingClicks.slice(0, -1).map((pt, i) => <RubberBandLine key={`poly-${i}`} from={pt} to={pendingClicks[i + 1]} />)}
 
       {/* Point markers for pending clicks — zoom-independent */}
       {pendingClicks.map((pt, i) => (
@@ -452,22 +425,16 @@ export function DrawCanvas() {
       ))}
 
       {/* Highlight selected entities for constraint tools */}
-      {selectedEntities.map((ent, i) => (
-        ent.type === 'point'
-          ? <PointMarker key={`sel-${i}`} x={ent.x!} y={ent.y!} wp={wp} color="#f59e0b" />
-          : null
-      ))}
+      {selectedEntities.map((ent, i) =>
+        ent.type === 'point' ? <PointMarker key={`sel-${i}`} x={ent.x!} y={ent.y!} wp={wp} color="#f59e0b" /> : null,
+      )}
 
       {/* Hovered entity highlight */}
       {hoveredEntity && hoveredEntity.type === 'point' && hoveredEntity.x != null && hoveredEntity.y != null && (
         <HoverPointHighlight x={hoveredEntity.x} y={hoveredEntity.y} wp={wp} />
       )}
-      {hoveredEntity && hoveredEntity.type === 'line' && (
-        <HoverLineHighlight varName={hoveredEntity.varName} />
-      )}
-      {hoveredEntity && hoveredEntity.type === 'circle' && (
-        <HoverCircleHighlight varName={hoveredEntity.varName} />
-      )}
+      {hoveredEntity && hoveredEntity.type === 'line' && <HoverLineHighlight varName={hoveredEntity.varName} />}
+      {hoveredEntity && hoveredEntity.type === 'circle' && <HoverCircleHighlight varName={hoveredEntity.varName} />}
 
       {/* Construction entity overlays — dashed lines for construction geometry */}
       {constructionLineVarNames.map((varName) => (
@@ -481,22 +448,19 @@ export function DrawCanvas() {
 }
 
 /** Preview arc through 3 points. */
-function RubberBandArc({ p1, p2, p3 }: {
-  p1: { x: number; y: number };
-  p2: { x: number; y: number };
-  p3: { x: number; y: number };
-}) {
+function RubberBandArc({ p1, p2, p3 }: { p1: { x: number; y: number }; p2: { x: number; y: number }; p3: { x: number; y: number } }) {
   const lineObj = useMemo(() => {
     // Compute circumscribed circle through 3 points
-    const ax = p1.x, ay = p1.y, bx = p2.x, by = p2.y, cx = p3.x, cy = p3.y;
+    const ax = p1.x,
+      ay = p1.y,
+      bx = p2.x,
+      by = p2.y,
+      cx = p3.x,
+      cy = p3.y;
     const D = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
     if (Math.abs(D) < 1e-10) {
       // Points are collinear — draw straight lines
-      const pts = [
-        new THREE.Vector3(ax, ay, 0.6),
-        new THREE.Vector3(bx, by, 0.6),
-        new THREE.Vector3(cx, cy, 0.6),
-      ];
+      const pts = [new THREE.Vector3(ax, ay, 0.6), new THREE.Vector3(bx, by, 0.6), new THREE.Vector3(cx, cy, 0.6)];
       const geo = new THREE.BufferGeometry().setFromPoints(pts);
       const mat = new THREE.LineBasicMaterial({ color: '#60a5fa', transparent: true, opacity: 0.7 });
       return new THREE.Line(geo, mat);
@@ -507,7 +471,7 @@ function RubberBandArc({ p1, p2, p3 }: {
 
     // Compute angles
     let a1 = Math.atan2(ay - uy, ax - ux);
-    const a2 = Math.atan2(by - uy, bx - ux);
+    const _a2 = Math.atan2(by - uy, bx - ux);
     let a3 = Math.atan2(cy - uy, cx - ux);
 
     // Determine arc direction
@@ -518,7 +482,7 @@ function RubberBandArc({ p1, p2, p3 }: {
     a1 = normalize(a1);
     a3 = normalize(a3);
 
-    let startAngle = a1;
+    const startAngle = a1;
     let endAngle = a3;
     if (ccw) {
       if (endAngle <= startAngle) endAngle += Math.PI * 2;
@@ -542,21 +506,13 @@ function RubberBandArc({ p1, p2, p3 }: {
 }
 
 /** Preview ellipse outline. */
-function RubberBandEllipse({ center, rx, ry }: {
-  center: { x: number; y: number };
-  rx: number;
-  ry: number;
-}) {
+function _RubberBandEllipse({ center, rx, ry }: { center: { x: number; y: number }; rx: number; ry: number }) {
   const lineObj = useMemo(() => {
     const segments = 64;
     const pts: THREE.Vector3[] = [];
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2;
-      pts.push(new THREE.Vector3(
-        center.x + Math.cos(angle) * rx,
-        center.y + Math.sin(angle) * ry,
-        0.6,
-      ));
+      pts.push(new THREE.Vector3(center.x + Math.cos(angle) * rx, center.y + Math.sin(angle) * ry, 0.6));
     }
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const mat = new THREE.LineBasicMaterial({ color: '#60a5fa', transparent: true, opacity: 0.7 });
@@ -567,7 +523,11 @@ function RubberBandEllipse({ center, rx, ry }: {
 }
 
 /** Preview slot (stadium) outline. */
-function RubberBandSlot({ c1, c2, widthPt }: {
+function _RubberBandSlot({
+  c1,
+  c2,
+  widthPt,
+}: {
   c1: { x: number; y: number };
   c2: { x: number; y: number };
   widthPt: { x: number; y: number };

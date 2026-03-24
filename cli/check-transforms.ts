@@ -6,18 +6,13 @@
 
 import assert from 'node:assert/strict';
 import { assembly } from '../src/forge/assembly';
-import { box, initKernel } from '../src/forge/kernel';
 import { group } from '../src/forge/group';
-import { bevelGear } from '../src/forge/library';
 import { resolveJointAnimation } from '../src/forge/jointAnimation';
+import { type JointViewAnimationDef, type JointViewCouplingDef, type JointViewDef, resolveJointViewValues } from '../src/forge/jointsView';
+import { box, initKernel } from '../src/forge/kernel';
+import { bevelGear } from '../src/forge/library';
 import { runScript } from '../src/forge/runner';
 import { Transform } from '../src/forge/transform';
-import {
-  resolveJointViewValues,
-  type JointViewAnimationDef,
-  type JointViewCouplingDef,
-  type JointViewDef,
-} from '../src/forge/jointsView';
 
 const EPS = 1e-6;
 
@@ -27,10 +22,7 @@ function approx(a: number, b: number, eps = EPS): boolean {
 
 function assertVec(actual: [number, number, number], expected: [number, number, number], label: string) {
   for (let i = 0; i < 3; i++) {
-    assert(
-      approx(actual[i], expected[i]),
-      `${label}[${i}] expected ${expected[i]}, got ${actual[i]}`,
-    );
+    assert(approx(actual[i], expected[i]), `${label}[${i}] expected ${expected[i]}, got ${actual[i]}`);
   }
 }
 
@@ -38,11 +30,7 @@ function rotateZ(point: [number, number, number], deg: number): [number, number,
   const r = (deg * Math.PI) / 180;
   const c = Math.cos(r);
   const s = Math.sin(r);
-  return [
-    point[0] * c - point[1] * s,
-    point[0] * s + point[1] * c,
-    point[2],
-  ];
+  return [point[0] * c - point[1] * s, point[0] * s + point[1] * c, point[2]];
 }
 
 function testTransformMulOrder() {
@@ -107,11 +95,7 @@ function testAssemblyChainAgainstAnalytic() {
   const w = solved.getTransform('WristRoll').point([0, 0, 0]);
 
   const r = (deg: number) => (deg * Math.PI) / 180;
-  const pitchVec = (len: number, deg: number): [number, number, number] => [
-    len * Math.cos(r(deg)),
-    0,
-    len * Math.sin(r(deg)),
-  ];
+  const pitchVec = (len: number, deg: number): [number, number, number] => [len * Math.cos(r(deg)), 0, len * Math.sin(r(deg))];
   const add = (a: [number, number, number], b: [number, number, number]): [number, number, number] => [
     a[0] + b[0],
     a[1] + b[1],
@@ -133,15 +117,9 @@ function testAssemblyChainAgainstAnalytic() {
 
 function testShapeGroupRotateAroundSugar() {
   const hingeY = 18;
-  const lid = group(
-    box(60, 40, 4, true).translate(0, 0, 2),
-    box(18, 8, 2, true).translate(0, 10, 5),
-  );
+  const lid = group(box(60, 40, 4, true).translate(0, 0, 2), box(18, 8, 2, true).translate(0, 10, 5));
 
-  const aroundSugar = lid
-    .translate(0, 0, 1.5)
-    .rotateAround([1, 0, 0], 35, [0, hingeY, 0])
-    .boundingBox();
+  const aroundSugar = lid.translate(0, 0, 1.5).rotateAround([1, 0, 0], 35, [0, hingeY, 0]).boundingBox();
 
   const aroundTransform = lid
     .translate(0, 0, 1.5)
@@ -153,10 +131,7 @@ function testShapeGroupRotateAroundSugar() {
 }
 
 function testShapeGroupPointAlongSugar() {
-  const g = group(
-    box(30, 12, 8, true).translate(0, 0, 2),
-    box(10, 6, 4, true).translate(0, 10, 6),
-  );
+  const g = group(box(30, 12, 8, true).translate(0, 0, 2), box(10, 6, 4, true).translate(0, 10, 6));
 
   const bySugar = g.pointAlong([1, 0, 0]).boundingBox();
   const byTransform = g.transform(Transform.rotationAxis([0, 1, 0], 90)).boundingBox();
@@ -173,18 +148,10 @@ function testShapeRotateAroundTo() {
   const expectedXY = 80 / Math.sqrt(2);
 
   const planeAligned = arm.rotateAroundTo([0, 0, 1], [0, 0, 0], 'tip', [30, 30, 24]);
-  assertVec(
-    planeAligned.referencePoint('tip'),
-    [expectedXY, expectedXY, 0],
-    'shape.rotateAroundTo plane tip',
-  );
+  assertVec(planeAligned.referencePoint('tip'), [expectedXY, expectedXY, 0], 'shape.rotateAroundTo plane tip');
 
   const lineAligned = arm.rotateAroundTo([0, 0, 1], [0, 0, 0], 'tip', [30, 30, 0], { mode: 'line' });
-  assertVec(
-    lineAligned.referencePoint('tip'),
-    [expectedXY, expectedXY, 0],
-    'shape.rotateAroundTo line tip',
-  );
+  assertVec(lineAligned.referencePoint('tip'), [expectedXY, expectedXY, 0], 'shape.rotateAroundTo line tip');
 
   assert.throws(
     () => arm.rotateAroundTo([0, 0, 1], [0, 0, 0], 'tip', [30, 30, 10], { mode: 'line' }),
@@ -193,15 +160,10 @@ function testShapeRotateAroundTo() {
 }
 
 function testShapeGroupRotateAroundToSugar() {
-  const g = group(
-    box(30, 12, 8, true).translate(20, 0, 2),
-    box(10, 6, 4, true).translate(40, 0, 6),
-  );
+  const g = group(box(30, 12, 8, true).translate(20, 0, 2), box(10, 6, 4, true).translate(40, 0, 6));
 
   const bySugar = g.rotateAroundTo([0, 0, 1], [0, 0, 0], [40, 0, 6], [30, 30, 20]).boundingBox();
-  const byTransform = g.transform(
-    Transform.rotateAroundTo([0, 0, 1], [0, 0, 0], [40, 0, 6], [30, 30, 20]),
-  ).boundingBox();
+  const byTransform = g.transform(Transform.rotateAroundTo([0, 0, 1], [0, 0, 0], [40, 0, 6], [30, 30, 20])).boundingBox();
 
   assertVec(bySugar.min, byTransform.min, 'group.rotateAroundTo min');
   assertVec(bySugar.max, byTransform.max, 'group.rotateAroundTo max');
@@ -234,12 +196,7 @@ function testAssemblyNamedGroupLabels() {
   assert.equal(result.error, null, `Expected named group script to run, got ${result.error}`);
   assert.deepEqual(
     result.objects.map((obj) => obj.name),
-    [
-      'Base Assembly.Body',
-      'Base Assembly.Lid',
-      'Base Assembly.Hardware.Left Screw',
-      'Base Assembly.Hardware.Right Screw',
-    ],
+    ['Base Assembly.Body', 'Base Assembly.Lid', 'Base Assembly.Hardware.Left Screw', 'Base Assembly.Hardware.Right Screw'],
   );
   assert(
     result.objects.every((obj) => obj.groupName === 'Base Assembly'),
@@ -257,7 +214,13 @@ function testAssemblyJointCouplings() {
     .addRevolute('B', 'A', 'B', { axis: [0, 0, 1], min: -30, max: 30 })
     .addRevolute('C', 'B', 'C', { axis: [0, 0, 1] })
     .addJointCoupling('B', { terms: [{ joint: 'A', ratio: 2 }], offset: 10 })
-    .addJointCoupling('C', { terms: [{ joint: 'A', ratio: -1 }, { joint: 'B', ratio: 0.5 }], offset: 5 });
+    .addJointCoupling('C', {
+      terms: [
+        { joint: 'A', ratio: -1 },
+        { joint: 'B', ratio: 0.5 },
+      ],
+      offset: 5,
+    });
 
   const solved = mech.solve({ A: 20, B: 999 });
   const state = solved.getJointState();
@@ -418,9 +381,17 @@ function testRuntimeJointCouplingResolution() {
   assert(approx(values.Motor, -260), `Expected Motor=-260 (unclamped), got ${values.Motor}`);
 
   // Explicit clamp: true still respects min/max
-  const clamped = resolveJointViewValues(joints, couplings, {
-    Steer: 30, Drive: 70, 'Top Gear': 999, Motor: 999,
-  }, { clamp: true });
+  const clamped = resolveJointViewValues(
+    joints,
+    couplings,
+    {
+      Steer: 30,
+      Drive: 70,
+      'Top Gear': 999,
+      Motor: 999,
+    },
+    { clamp: true },
+  );
   assert(approx(clamped.Motor, -200), `Expected Motor=-200 after clamp, got ${clamped.Motor}`);
 }
 
@@ -483,10 +454,7 @@ function testBevelGearTopSectionCircularity() {
 
   assert(spanX > EPS && spanY > EPS, `Expected non-degenerate top slice, got spanX=${spanX}, spanY=${spanY}`);
   const aspect = spanY / spanX;
-  assert(
-    aspect > 0.85 && aspect < 1.15,
-    `Expected near-circular top slice, got spanX=${spanX}, spanY=${spanY}, aspect=${aspect}`,
-  );
+  assert(aspect > 0.85 && aspect < 1.15, `Expected near-circular top slice, got spanX=${spanX}, spanY=${spanY}, aspect=${aspect}`);
 }
 
 export async function runCheckTransformsCli(): Promise<void> {

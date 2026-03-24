@@ -7,7 +7,7 @@
  * Removes 6 DOF (all translational + rotational).
  */
 
-import type { Constraint3DDef, Constraint3D, Solver3DContext } from '../types';
+import type { Constraint3D, Constraint3DDef, Solver3DContext } from '../types';
 
 export const fixedDef: Constraint3DDef<'fixed'> = {
   type: 'fixed',

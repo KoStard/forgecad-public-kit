@@ -1,17 +1,6 @@
-import type {
-  CutTaperCompilePlan,
-  FeatureCutExtent,
-  HoleCompilePlan,
-  ProfileCompilePlan,
-  ShapeCompilePlan,
-} from './compilePlan';
+import type { CutTaperCompilePlan, FeatureCutExtent, HoleCompilePlan, ProfileCompilePlan, ShapeCompilePlan } from './compilePlan';
 import { assertExhaustive, featureCutExtentForwardSide, featureCutExtentReverseSide, findShapePrimaryQueryOwner } from './compilePlan';
-import {
-  cloneTopologyRewritePropagation,
-  type EdgeQueryRef,
-  type ShapeQueryOwner,
-  type TopologyRewritePropagation,
-} from './queryModel';
+import { cloneTopologyRewritePropagation, type EdgeQueryRef, type ShapeQueryOwner, type TopologyRewritePropagation } from './queryModel';
 import {
   createCreatedEdgeQueryRef,
   createCreatedFaceQueryRef,
@@ -23,17 +12,17 @@ import {
   createTopologyRewritePropagationDiagnostic,
   pushTopologyRewriteDescendantContract,
 } from './queryPropagationCore';
-import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import {
   blockedShapeFacesForFeature,
   type FeatureBlockedFaceReason,
   preservedShapeFaceQueries,
-  supportedCutCreatedFaceNames,
   supportedCutCreatedEdgeNames,
-  supportedHoleCreatedFaceNames,
+  supportedCutCreatedFaceNames,
   supportedHoleCreatedEdgeNames,
+  supportedHoleCreatedFaceNames,
   supportedShellCreatedFaceNames,
 } from './shapeFaces';
+import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 
 export { buildBooleanTopologyRewritePropagation } from './booleanQueryPropagation';
 
@@ -46,11 +35,16 @@ const VERTICAL_EDGE_NAMES = ['vert-bl', 'vert-br', 'vert-tr', 'vert-tl'] as cons
 /** The two side-face names that share a given vertical edge corner. */
 function verticalEdgeAdjacentFaceNames(edgeName: string): readonly string[] {
   switch (edgeName) {
-    case 'vert-bl': return ['side-bottom', 'side-left'];
-    case 'vert-br': return ['side-bottom', 'side-right'];
-    case 'vert-tr': return ['side-right', 'side-top'];
-    case 'vert-tl': return ['side-top', 'side-left'];
-    default: return [];
+    case 'vert-bl':
+      return ['side-bottom', 'side-left'];
+    case 'vert-br':
+      return ['side-bottom', 'side-right'];
+    case 'vert-tr':
+      return ['side-right', 'side-top'];
+    case 'vert-tl':
+      return ['side-top', 'side-left'];
+    default:
+      return [];
   }
 }
 
@@ -94,9 +88,12 @@ function rootPlanPropagation(plan: ShapeCompilePlan): TopologyRewritePropagation
 /** Walk propagated-edge chains to find the original tracked-edge name. */
 function deepestTrackedEdgeName(ref: EdgeQueryRef): string | null {
   switch (ref.kind) {
-    case 'tracked-edge': return ref.edgeName;
-    case 'propagated-edge': return deepestTrackedEdgeName(ref.source);
-    default: return null;
+    case 'tracked-edge':
+      return ref.edgeName;
+    case 'propagated-edge':
+      return deepestTrackedEdgeName(ref.source);
+    default:
+      return null;
   }
 }
 
@@ -111,9 +108,7 @@ function deepestTrackedEdgeName(ref: EdgeQueryRef): string | null {
  * rewrite's `preservedEdges` instead, filtering to the four canonical
  * vertical-edge lineages only.
  */
-function collectVerticalEdgeSeeds(
-  base: ShapeCompilePlan,
-): Array<{ edgeName: string; query: EdgeQueryRef }> {
+function collectVerticalEdgeSeeds(base: ShapeCompilePlan): Array<{ edgeName: string; query: EdgeQueryRef }> {
   const propagation = rootPlanPropagation(base);
 
   if (!propagation) {
@@ -180,14 +175,7 @@ function buildHoleCutEdgePropagation(
   }
 }
 
-type TopologyRewriteNodeKind =
-  | 'shell'
-  | 'hole'
-  | 'cut'
-  | 'boolean'
-  | 'trimByPlane'
-  | 'fillet'
-  | 'chamfer';
+type TopologyRewriteNodeKind = 'shell' | 'hole' | 'cut' | 'boolean' | 'trimByPlane' | 'fillet' | 'chamfer';
 
 type TopologyRewriteShapeCompilePlan = Extract<ShapeCompilePlan, { kind: TopologyRewriteNodeKind }>;
 
@@ -383,8 +371,7 @@ export function buildHoleTopologyRewritePropagation(
   extent: FeatureCutExtent,
 ): TopologyRewritePropagation {
   const propagation = createTopologyRewritePropagation('hole', owner);
-  const blocked = new Map(blockedShapeFacesForFeature(base, placement.workplane.source, extent)
-    .map((entry) => [entry.name, entry.reason]));
+  const blocked = new Map(blockedShapeFacesForFeature(base, placement.workplane.source, extent).map((entry) => [entry.name, entry.reason]));
   for (const entry of preservedShapeFaceQueries(base)) {
     const blockedReason = blocked.get(entry.name);
     if (blockedReason) {
@@ -480,8 +467,7 @@ export function buildCutTopologyRewritePropagation(
   taper?: CutTaperCompilePlan,
 ): TopologyRewritePropagation {
   const propagation = createTopologyRewritePropagation('cut', owner);
-  const blocked = new Map(blockedShapeFacesForFeature(base, placement.workplane.source, extent)
-    .map((entry) => [entry.name, entry.reason]));
+  const blocked = new Map(blockedShapeFacesForFeature(base, placement.workplane.source, extent).map((entry) => [entry.name, entry.reason]));
   for (const entry of preservedShapeFaceQueries(base)) {
     const blockedReason = blocked.get(entry.name);
     if (blockedReason) {
@@ -519,9 +505,10 @@ export function buildCutTopologyRewritePropagation(
     const query = createCreatedFaceQueryRef(owner, 'cut', name);
     propagation.createdFaces.push({
       query,
-      note: name === 'floor'
-        ? 'Blind cutouts create a defended planar floor face.'
-        : 'This cut-created wall face is part of the defended named-face subset.',
+      note:
+        name === 'floor'
+          ? 'Blind cutouts create a defended planar floor face.'
+          : 'This cut-created wall face is part of the defended named-face subset.',
     });
     pushTopologyRewriteDescendantContract(
       propagation,
@@ -568,10 +555,7 @@ export function buildCutTopologyRewritePropagation(
   return propagation;
 }
 
-export function buildTrimByPlaneTopologyRewritePropagation(
-  owner: ShapeQueryOwner,
-  base: ShapeCompilePlan,
-): TopologyRewritePropagation {
+export function buildTrimByPlaneTopologyRewritePropagation(owner: ShapeQueryOwner, base: ShapeCompilePlan): TopologyRewritePropagation {
   const propagation = createTopologyRewritePropagation('trimByPlane', owner);
   for (const entry of preservedShapeFaceQueries(base)) {
     const query = createPropagatedFaceQueryRef(entry.query, owner, 'split');
@@ -675,13 +659,15 @@ export function buildEdgeFeatureTopologyRewritePropagation(
 }
 
 function isTopologyRewriteShapeCompilePlan(plan: ShapeCompilePlan): plan is TopologyRewriteShapeCompilePlan {
-  return plan.kind === 'shell'
-    || plan.kind === 'hole'
-    || plan.kind === 'cut'
-    || plan.kind === 'boolean'
-    || plan.kind === 'trimByPlane'
-    || plan.kind === 'fillet'
-    || plan.kind === 'chamfer';
+  return (
+    plan.kind === 'shell' ||
+    plan.kind === 'hole' ||
+    plan.kind === 'cut' ||
+    plan.kind === 'boolean' ||
+    plan.kind === 'trimByPlane' ||
+    plan.kind === 'fillet' ||
+    plan.kind === 'chamfer'
+  );
 }
 
 function cloneNodeWithPropagation(
@@ -694,10 +680,7 @@ function cloneNodeWithPropagation(
   };
 }
 
-export function attachTopologyRewritePropagation<T extends ShapeCompilePlan | null>(
-  plan: T,
-  propagation: TopologyRewritePropagation,
-): T {
+export function attachTopologyRewritePropagation<T extends ShapeCompilePlan | null>(plan: T, propagation: TopologyRewritePropagation): T {
   if (!plan) return plan;
   if (!isTopologyRewriteShapeCompilePlan(plan)) {
     throw new Error(`Cannot attach topology-rewrite propagation to non-rewrite plan kind "${plan.kind}".`);
@@ -709,9 +692,7 @@ function nodePropagation(plan: TopologyRewriteShapeCompilePlan): TopologyRewrite
   return cloneTopologyRewritePropagation(plan.queryPropagation) ?? null;
 }
 
-export function findShapeTopologyRewritePropagation(
-  plan: ShapeCompilePlan | null,
-): TopologyRewritePropagation | null {
+export function findShapeTopologyRewritePropagation(plan: ShapeCompilePlan | null): TopologyRewritePropagation | null {
   if (!plan) return null;
 
   switch (plan.kind) {
@@ -746,9 +727,7 @@ export function findShapeTopologyRewritePropagation(
   }
 }
 
-export function collectShapeTopologyRewritePropagations(
-  plan: ShapeCompilePlan | null,
-): TopologyRewritePropagation[] {
+export function collectShapeTopologyRewritePropagations(plan: ShapeCompilePlan | null): TopologyRewritePropagation[] {
   const out: TopologyRewritePropagation[] = [];
   const seen = new Set<string>();
 

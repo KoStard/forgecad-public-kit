@@ -4,9 +4,9 @@
  * Output: cli/snapshots/constraint-svgs/symbols/<name>.svg
  */
 
-import { writeFileSync, mkdirSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { AnnotationElement, ConstraintSymbol } from '../src/forge/sketch/constraints/types';
+import type { ConstraintSymbol } from '../src/forge/sketch/constraints/types';
 
 // Import rendering functions from sketch-svg (we'll call them via the full document builder)
 // Instead, we'll generate minimal sketches that exercise each annotation type.
@@ -20,7 +20,7 @@ mkdirSync(outDir, { recursive: true });
 
 const BG = '#1a1a2e';
 const COLOR = '#4ade80';
-const WARN_COLOR = '#faad14';
+const _WARN_COLOR = '#faad14';
 
 function svgDoc(viewBox: string, width: number, height: number, content: string, title: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
@@ -35,7 +35,7 @@ ${content}
 function renderSymbol(pos: [number, number], symbol: ConstraintSymbol, color: string, rotation?: number): string[] {
   const x = pos[0].toFixed(3);
   const y = (-pos[1]).toFixed(3);
-  const rot = rotation !== undefined ? ` transform="rotate(${(-rotation * 180 / Math.PI).toFixed(1)} ${x} ${y})"` : '';
+  const rot = rotation !== undefined ? ` transform="rotate(${((-rotation * 180) / Math.PI).toFixed(1)} ${x} ${y})"` : '';
   const S = 1.2;
 
   switch (symbol) {
@@ -59,9 +59,13 @@ function renderSymbol(pos: [number, number], symbol: ConstraintSymbol, color: st
       ];
     }
     case 'horizontal':
-      return [`  <text x="${x}" y="${y}" fill="${color}" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">H</text>`];
+      return [
+        `  <text x="${x}" y="${y}" fill="${color}" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">H</text>`,
+      ];
     case 'vertical':
-      return [`  <text x="${x}" y="${y}" fill="${color}" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">V</text>`];
+      return [
+        `  <text x="${x}" y="${y}" fill="${color}" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">V</text>`,
+      ];
     case 'fixed': {
       return [
         `  <line x1="${(pos[0] - S).toFixed(3)}" y1="${(-pos[1] + S * 0.3).toFixed(3)}" x2="${(pos[0] + S).toFixed(3)}" y2="${(-pos[1] + S * 0.3).toFixed(3)}" stroke="${color}" stroke-width="0.3"/>`,
@@ -73,7 +77,7 @@ function renderSymbol(pos: [number, number], symbol: ConstraintSymbol, color: st
     }
     case 'midpoint': {
       return [
-        `  <polygon points="${x},${(-(pos[1]) - S * 0.5).toFixed(3)} ${(pos[0] + S * 0.4).toFixed(3)},${y} ${x},${(-(pos[1]) + S * 0.5).toFixed(3)} ${(pos[0] - S * 0.4).toFixed(3)},${y}" fill="${color}" opacity="0.7"/>`,
+        `  <polygon points="${x},${(-pos[1] - S * 0.5).toFixed(3)} ${(pos[0] + S * 0.4).toFixed(3)},${y} ${x},${(-pos[1] + S * 0.5).toFixed(3)} ${(pos[0] - S * 0.4).toFixed(3)},${y}" fill="${color}" opacity="0.7"/>`,
       ];
     }
     case 'coincident': {
@@ -83,12 +87,12 @@ function renderSymbol(pos: [number, number], symbol: ConstraintSymbol, color: st
       ];
     }
     case 'collinear': {
-      return [
-        `  <circle cx="${x}" cy="${y}" r="${(S * 0.3).toFixed(2)}" fill="${color}" opacity="0.8"/>`,
-      ];
+      return [`  <circle cx="${x}" cy="${y}" r="${(S * 0.3).toFixed(2)}" fill="${color}" opacity="0.8"/>`];
     }
     case 'tangent':
-      return [`  <text x="${x}" y="${y}" fill="${color}" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">T</text>`];
+      return [
+        `  <text x="${x}" y="${y}" fill="${color}" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">T</text>`,
+      ];
     case 'concentric': {
       return [
         `  <circle cx="${x}" cy="${y}" r="${(S * 0.3).toFixed(2)}" fill="none" stroke="${color}" stroke-width="0.25"/>`,
@@ -113,7 +117,7 @@ function renderSymbol(pos: [number, number], symbol: ConstraintSymbol, color: st
   }
 }
 
-function escapeAttr(s: string): string {
+function _escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
@@ -159,15 +163,18 @@ for (const sym of symbols) {
 
   // Dimension annotation
   const offset = 3;
-  const dx = to[0] - from[0], dy = to[1] - from[1];
+  const dx = to[0] - from[0],
+    dy = to[1] - from[1];
   const len = Math.hypot(dx, dy);
-  const nx = -dy / len, ny = dx / len;
+  const nx = -dy / len,
+    ny = dx / len;
   const p1: [number, number] = [from[0] + nx * offset, from[1] + ny * offset];
   const p2: [number, number] = [to[0] + nx * offset, to[1] + ny * offset];
   const extLen = offset + 0.5;
   const arrowLen = Math.min(1.0, len * 0.15);
   const arrowW = arrowLen * 0.35;
-  const udx = dx / len, udy = dy / len;
+  const _udx = dx / len,
+    _udy = dy / len;
 
   const dimLines = [
     // Extension lines
@@ -191,7 +198,7 @@ for (const sym of symbols) {
 {
   // Two lines from origin at 0° and 45°
   const r = 6;
-  const angle = 45 * Math.PI / 180;
+  const angle = (45 * Math.PI) / 180;
   const line1 = `  <line x1="0" y1="0" x2="${r}" y2="0" stroke="#555" stroke-width="0.3"/>`;
   const line2 = `  <line x1="0" y1="0" x2="${(r * Math.cos(angle)).toFixed(3)}" y2="${(-r * Math.sin(angle)).toFixed(3)}" stroke="#555" stroke-width="0.3"/>`;
   const dot = `  <circle cx="0" cy="0" r="0.4" fill="#555"/>`;

@@ -1,9 +1,4 @@
-import {
-  exactRoute,
-  facetedRoute,
-  partExample,
-  type ExampleManifestEntry,
-} from './types';
+import { type ExampleManifestEntry, exactRoute, facetedRoute, partExample } from './types';
 
 const DEFAULT_EXACT_NOTE = 'This product demo now stays inside the defended exact-route subset.';
 
@@ -125,9 +120,7 @@ export const PRODUCT_DEMO_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
     }
     return partExample('product-demos', entry.path, exactRoute(entry.note), undefined, entry.primaryShapes);
   }),
-  ...PRODUCT_DEMO_FACETED_PARTS.map((entry) =>
-    partExample('product-demos', entry.path, facetedRoute(entry.blocker, entry.note)),
-  ),
+  ...PRODUCT_DEMO_FACETED_PARTS.map((entry) => partExample('product-demos', entry.path, facetedRoute(entry.blocker, entry.note))),
   ...PRODUCT_DEMO_RECOVERED_FACETED_PARTS.map((entry) =>
     partExample('product-demos', entry.path, facetedRoute(entry.blocker, entry.note), undefined, entry.primaryShapes),
   ),

@@ -8,8 +8,8 @@
  *   [2,3]: ((o2 - o1) × a1) components — origins on same line
  */
 
-import type { Constraint3DDef, Constraint3D, Solver3DContext } from '../types';
 import { cross3, sub3 } from '../rodrigues';
+import type { Constraint3D, Constraint3DDef, Solver3DContext } from '../types';
 
 export const concentricDef: Constraint3DDef<'concentric'> = {
   type: 'concentric',

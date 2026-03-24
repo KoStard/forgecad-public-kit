@@ -9,22 +9,21 @@
  * followed by a summary page.
  */
 
-import type { SheetStockDef } from './sheetStock';
 import {
-  PdfBuilder,
-  formatNumber,
+  type ColorRgb,
+  commandLine,
+  commandRect,
   commandSetFill,
   commandSetStroke,
   commandText,
-  commandLine,
-  commandRect,
-  estimateTextWidth,
-  truncateToWidth,
-  PAGE_WIDTH,
+  formatNumber,
   PAGE_HEIGHT,
   PAGE_MARGIN,
-  type ColorRgb,
+  PAGE_WIDTH,
+  PdfBuilder,
+  truncateToWidth,
 } from './pdfUtils';
+import type { SheetStockDef } from './sheetStock';
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -92,18 +91,18 @@ const PIECE_FILL_COLORS: ColorRgb[] = [
   [0.93, 0.87, 0.96], // light violet
   [0.98, 0.88, 0.88], // light red
   [0.85, 0.96, 0.94], // light teal
-  [0.96, 0.90, 0.82], // light orange
-  [0.90, 0.90, 0.96], // light indigo
+  [0.96, 0.9, 0.82], // light orange
+  [0.9, 0.9, 0.96], // light indigo
 ];
 
 const PIECE_STROKE_COLORS: ColorRgb[] = [
-  [0.30, 0.55, 0.78],
-  [0.30, 0.65, 0.35],
-  [0.78, 0.60, 0.25],
+  [0.3, 0.55, 0.78],
+  [0.3, 0.65, 0.35],
+  [0.78, 0.6, 0.25],
   [0.58, 0.38, 0.72],
   [0.78, 0.35, 0.35],
   [0.25, 0.65, 0.58],
-  [0.72, 0.50, 0.25],
+  [0.72, 0.5, 0.25],
   [0.45, 0.45, 0.72],
 ];
 
@@ -144,14 +143,9 @@ function groupByMaterial(pieces: ExpandedPiece[]): Map<string, ExpandedPiece[]> 
  * Guillotine bin packing for a single material group.
  * Sorts by area descending, uses best-short-side-fit heuristic.
  */
-function packMaterialGroup(
-  pieces: ExpandedPiece[],
-  sheetW: number,
-  sheetH: number,
-  material: string,
-): PackedSheet[] {
+function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: number, material: string): PackedSheet[] {
   // Sort largest-area-first
-  const sorted = [...pieces].sort((a, b) => (b.width * b.height) - (a.width * a.height));
+  const sorted = [...pieces].sort((a, b) => b.width * b.height - a.width * a.height);
 
   const sheets: PackedSheet[] = [];
   const sheetFreeRects: FreeRect[][] = [];
@@ -266,11 +260,7 @@ function packMaterialGroup(
   return sheets;
 }
 
-export function computeCuttingLayout(
-  entries: SheetStockDef[],
-  sheetWidth: number,
-  sheetHeight: number,
-): CuttingLayoutResult {
+export function computeCuttingLayout(entries: SheetStockDef[], sheetWidth: number, sheetHeight: number): CuttingLayoutResult {
   const expanded = expandPieces(entries);
   const groups = groupByMaterial(expanded);
 
@@ -281,7 +271,9 @@ export function computeCuttingLayout(
   }
 
   // Re-index sheets
-  allSheets.forEach((s, i) => { s.sheetIndex = i; });
+  allSheets.forEach((s, i) => {
+    s.sheetIndex = i;
+  });
 
   const totalUsedArea = allSheets.reduce((sum, s) => sum + s.usedArea, 0);
   const totalSheetArea = allSheets.length * sheetWidth * sheetHeight;
@@ -305,17 +297,14 @@ const DRAW_AREA_LEFT = PAGE_MARGIN;
 const DRAW_AREA_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
 const DRAW_AREA_HEIGHT = DRAW_AREA_TOP - DRAW_AREA_BOTTOM;
 
-function renderSheetPage(
-  sheet: PackedSheet,
-  totalSheets: number,
-  layout: CuttingLayoutResult,
-): string {
+function renderSheetPage(sheet: PackedSheet, totalSheets: number, _layout: CuttingLayoutResult): string {
   const cmd: string[] = [];
 
   // Header
-  const wastePercent = sheet.sheetWidth * sheet.sheetHeight > 0
-    ? ((sheet.sheetWidth * sheet.sheetHeight - sheet.usedArea) / (sheet.sheetWidth * sheet.sheetHeight)) * 100
-    : 0;
+  const wastePercent =
+    sheet.sheetWidth * sheet.sheetHeight > 0
+      ? ((sheet.sheetWidth * sheet.sheetHeight - sheet.usedArea) / (sheet.sheetWidth * sheet.sheetHeight)) * 100
+      : 0;
   const title = `CUTTING LAYOUT — ${sheet.material.toUpperCase()}`;
   const subtitle = `Sheet ${sheet.sheetIndex + 1} of ${totalSheets} | ${sheet.sheetWidth} x ${sheet.sheetHeight} mm | ${sheet.pieces.length} pieces | ${formatNumber(wastePercent)}% waste`;
 
@@ -387,11 +376,7 @@ function renderSheetPage(
   return cmd.join('');
 }
 
-function renderSummaryPage(
-  layout: CuttingLayoutResult,
-  sheetWidth: number,
-  sheetHeight: number,
-): string {
+function renderSummaryPage(layout: CuttingLayoutResult, sheetWidth: number, sheetHeight: number): string {
   const cmd: string[] = [];
 
   // Header
@@ -431,7 +416,10 @@ function renderSummaryPage(
   const byMaterial = new Map<string, PackedSheet[]>();
   for (const s of layout.sheets) {
     let arr = byMaterial.get(s.material);
-    if (!arr) { arr = []; byMaterial.set(s.material, arr); }
+    if (!arr) {
+      arr = [];
+      byMaterial.set(s.material, arr);
+    }
     arr.push(s);
   }
 
@@ -510,21 +498,19 @@ function renderSummaryPage(
   cmd.push(commandLine([tableX, tableY + 6], [tableX + tableW, tableY + 6]));
   cmd.push(commandSetFill([0.12, 0.12, 0.14]));
   const totalAreaM2 = layout.totalUsedArea / 1_000_000;
-  cmd.push(commandText(
-    `Total: ${formatNumber(totalAreaM2)} m\u00b2 material on ${layout.totalSheets} sheet${layout.totalSheets > 1 ? 's' : ''} (${formatNumber(layout.wastePercent)}% waste)`,
-    tableX + 4,
-    tableY - 6,
-    10,
-  ));
+  cmd.push(
+    commandText(
+      `Total: ${formatNumber(totalAreaM2)} m\u00b2 material on ${layout.totalSheets} sheet${layout.totalSheets > 1 ? 's' : ''} (${formatNumber(layout.wastePercent)}% waste)`,
+      tableX + 4,
+      tableY - 6,
+      10,
+    ),
+  );
 
   return cmd.join('');
 }
 
-export function generateCuttingLayoutPdf(
-  entries: SheetStockDef[],
-  sheetWidth: number,
-  sheetHeight: number,
-): CuttingLayoutPdfResult {
+export function generateCuttingLayoutPdf(entries: SheetStockDef[], sheetWidth: number, sheetHeight: number): CuttingLayoutPdfResult {
   if (entries.length === 0) {
     throw new Error('No sheet stock entries to lay out.');
   }

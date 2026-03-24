@@ -15,11 +15,8 @@ const roundNumber = (value: number, digits: number): number => {
   return Math.round(value * scale) / scale;
 };
 
-const isFiniteTuple3 = (value: unknown): value is [number, number, number] => (
-  Array.isArray(value)
-  && value.length === 3
-  && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
-);
+const isFiniteTuple3 = (value: unknown): value is [number, number, number] =>
+  Array.isArray(value) && value.length === 3 && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry));
 
 export function parseViewportCameraState(value: unknown): ViewportCameraState | null {
   if (!value || typeof value !== 'object') return null;
@@ -127,9 +124,7 @@ export function parseCameraCliSpec(input: string): ViewportCameraState {
 }
 
 export function formatCameraCliSpec(state: ViewportCameraState, digits = 3): string {
-  const formatVector = (value: [number, number, number]): string => (
-    value.map((entry) => roundNumber(entry, digits)).join(',')
-  );
+  const formatVector = (value: [number, number, number]): string => value.map((entry) => roundNumber(entry, digits)).join(',');
 
   const parts = [
     `proj=${state.projectionMode}`,
@@ -150,9 +145,5 @@ export function getCameraForwardVector(state: ViewportCameraState, digits = 3): 
   const dy = state.target[1] - state.position[1];
   const dz = state.target[2] - state.position[2];
   const length = Math.hypot(dx, dy, dz) || 1;
-  return [
-    roundNumber(dx / length, digits),
-    roundNumber(dy / length, digits),
-    roundNumber(dz / length, digits),
-  ];
+  return [roundNumber(dx / length, digits), roundNumber(dy / length, digits), roundNumber(dz / length, digits)];
 }

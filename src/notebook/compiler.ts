@@ -1,5 +1,5 @@
 import * as ts from 'typescript';
-import { cellSourceToString, resolveNotebookPreviewCellId, type ForgeNotebook } from './model';
+import { cellSourceToString, type ForgeNotebook, resolveNotebookPreviewCellId } from './model';
 
 const NOTEBOOK_STATE = '__forgeNotebookState';
 
@@ -35,19 +35,14 @@ function compileNotebookCellSource(source: string, cellId: string): string {
   }
 
   if (ts.isReturnStatement(last)) {
-    const expression = last.expression
-      ? source.slice(last.expression.getStart(sourceFile), last.expression.getEnd())
-      : 'undefined';
+    const expression = last.expression ? source.slice(last.expression.getStart(sourceFile), last.expression.getEnd()) : 'undefined';
     return `${before}${leading}${NOTEBOOK_STATE}.lastValue = (${expression});\n`;
   }
 
   return `${source}${source.endsWith('\n') ? '' : '\n'}${NOTEBOOK_STATE}.lastValue = undefined;\n`;
 }
 
-export function compileNotebookProgram(
-  notebook: ForgeNotebook,
-  options: CompileNotebookOptions = {},
-): CompiledNotebookProgram {
+export function compileNotebookProgram(notebook: ForgeNotebook, options: CompileNotebookOptions = {}): CompiledNotebookProgram {
   const targetCellId = resolveNotebookPreviewCellId(notebook, options.targetCellId);
   const targetIndex = targetCellId ? notebook.cells.findIndex((cell) => cell.id === targetCellId) : -1;
   const executedCells = targetIndex >= 0 ? notebook.cells.slice(0, targetIndex + 1) : [];
@@ -70,7 +65,7 @@ export function compileNotebookProgram(
     '};',
     'const __forgeNotebookIsNamedObject = (value) => {',
     "  if (!value || typeof value !== 'object') return false;",
-    '  if (!(\'name\' in value)) return false;',
+    "  if (!('name' in value)) return false;",
     "  return ('shape' in value) || ('sketch' in value) || ('group' in value);",
     '};',
     'const __forgeNotebookIsRenderableArray = (value) => (',
@@ -100,9 +95,7 @@ export function compileNotebookProgram(
   });
 
   chunks.push(
-    options.mode === 'cell'
-      ? `return ${NOTEBOOK_STATE}.lastValue;`
-      : `return ${NOTEBOOK_STATE}.display ?? ${NOTEBOOK_STATE}.lastValue;`,
+    options.mode === 'cell' ? `return ${NOTEBOOK_STATE}.lastValue;` : `return ${NOTEBOOK_STATE}.display ?? ${NOTEBOOK_STATE}.lastValue;`,
   );
 
   return {

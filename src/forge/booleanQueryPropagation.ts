@@ -6,10 +6,10 @@ import {
   cloneTopologyRewritePropagation,
   describeEdgeQueryRef,
   describeFaceQueryRef,
-  edgeQueryRefsEqual,
-  faceQueryRefsEqual,
   type EdgeQueryRef,
+  edgeQueryRefsEqual,
   type FaceQueryRef,
+  faceQueryRefsEqual,
   type ShapeQueryOwner,
   type SketchFace3D,
   type TopologyRewritePropagation,
@@ -202,57 +202,37 @@ function groupEdgeSeeds(seeds: EdgePropagationSeed[]): EdgeSeedGroup[] {
   return groups;
 }
 
-function collectOperandFaceGroups(
-  plans: Array<ShapeCompilePlan | null>,
-  includeAllOperands: boolean,
-): FaceSeedGroup[] {
+function collectOperandFaceGroups(plans: Array<ShapeCompilePlan | null>, includeAllOperands: boolean): FaceSeedGroup[] {
   const selected = includeAllOperands ? plans : plans.slice(0, 1);
   return groupFaceSeeds(selected.flatMap((plan) => collectFaceSeeds(plan)));
 }
 
-function collectOperandEdgeGroups(
-  plans: Array<ShapeCompilePlan | null>,
-  includeAllOperands: boolean,
-): EdgeSeedGroup[] {
+function collectOperandEdgeGroups(plans: Array<ShapeCompilePlan | null>, includeAllOperands: boolean): EdgeSeedGroup[] {
   const selected = includeAllOperands ? plans : plans.slice(0, 1);
   return groupEdgeSeeds(selected.flatMap((plan) => collectEdgeSeeds(plan)));
 }
 
-function addFaceUnsupportedDiagnostic(
-  propagation: TopologyRewritePropagation,
-  op: 'union' | 'difference' | 'intersection',
-): void {
-  const message = op === 'union'
-    ? 'Boolean union preserved owner lineage, but none of its operands exposed defended face queries in the supported subset.'
-    : op === 'difference'
-      ? 'Boolean difference can only propagate explicit base-operand face queries, and none were available in the supported subset.'
-      : 'Boolean intersection needs explicit operand face queries to defend any surviving descendants, and none were available in the supported subset.';
+function addFaceUnsupportedDiagnostic(propagation: TopologyRewritePropagation, op: 'union' | 'difference' | 'intersection'): void {
+  const message =
+    op === 'union'
+      ? 'Boolean union preserved owner lineage, but none of its operands exposed defended face queries in the supported subset.'
+      : op === 'difference'
+        ? 'Boolean difference can only propagate explicit base-operand face queries, and none were available in the supported subset.'
+        : 'Boolean intersection needs explicit operand face queries to defend any surviving descendants, and none were available in the supported subset.';
   propagation.diagnostics.push(
-    createTopologyRewritePropagationDiagnostic(
-      `boolean-${op}-face-propagation-unsupported`,
-      'unsupported',
-      'face',
-      message,
-    ),
+    createTopologyRewritePropagationDiagnostic(`boolean-${op}-face-propagation-unsupported`, 'unsupported', 'face', message),
   );
 }
 
-function addEdgeUnsupportedDiagnostic(
-  propagation: TopologyRewritePropagation,
-  op: 'union' | 'difference' | 'intersection',
-): void {
-  const message = op === 'union'
-    ? 'Boolean union preserved owner lineage, but none of its operands exposed defended edge queries in the supported subset.'
-    : op === 'difference'
-      ? 'Boolean difference can only propagate explicit base-operand edge queries, and none were available in the supported subset.'
-      : 'Boolean intersection needs explicit operand edge queries to defend any surviving descendants, and none were available in the supported subset.';
+function addEdgeUnsupportedDiagnostic(propagation: TopologyRewritePropagation, op: 'union' | 'difference' | 'intersection'): void {
+  const message =
+    op === 'union'
+      ? 'Boolean union preserved owner lineage, but none of its operands exposed defended edge queries in the supported subset.'
+      : op === 'difference'
+        ? 'Boolean difference can only propagate explicit base-operand edge queries, and none were available in the supported subset.'
+        : 'Boolean intersection needs explicit operand edge queries to defend any surviving descendants, and none were available in the supported subset.';
   propagation.diagnostics.push(
-    createTopologyRewritePropagationDiagnostic(
-      `boolean-${op}-edge-propagation-unsupported`,
-      'unsupported',
-      'edge',
-      message,
-    ),
+    createTopologyRewritePropagationDiagnostic(`boolean-${op}-edge-propagation-unsupported`, 'unsupported', 'edge', message),
   );
 }
 
@@ -284,11 +264,7 @@ function buildUnionFacePropagation(
       continue;
     }
 
-    const query = createPropagatedFaceQueryRef(
-      group.source,
-      owner,
-      group.count > 1 ? 'merged' : 'preserved',
-    );
+    const query = createPropagatedFaceQueryRef(group.source, owner, group.count > 1 ? 'merged' : 'preserved');
     propagation.preservedFaces.push({
       query,
       status: 'ambiguous',
@@ -304,9 +280,7 @@ function buildUnionFacePropagation(
     }
     propagation.diagnostics.push(
       createTopologyRewritePropagationDiagnostic(
-        group.count > 1
-          ? 'boolean-union-face-merged-ambiguous'
-          : 'boolean-union-face-inherited-ambiguity',
+        group.count > 1 ? 'boolean-union-face-merged-ambiguous' : 'boolean-union-face-inherited-ambiguity',
         'ambiguous',
         'face',
         group.count > 1
@@ -347,20 +321,14 @@ function buildUnionEdgePropagation(
       continue;
     }
 
-    const query = createPropagatedEdgeQueryRef(
-      group.source,
-      owner,
-      group.count > 1 ? 'merged' : 'preserved',
-    );
+    const query = createPropagatedEdgeQueryRef(group.source, owner, group.count > 1 ? 'merged' : 'preserved');
     propagation.preservedEdges.push({
       query,
       status: 'ambiguous',
     });
     propagation.diagnostics.push(
       createTopologyRewritePropagationDiagnostic(
-        group.count > 1
-          ? 'boolean-union-edge-merged-ambiguous'
-          : 'boolean-union-edge-inherited-ambiguity',
+        group.count > 1 ? 'boolean-union-edge-merged-ambiguous' : 'boolean-union-edge-inherited-ambiguity',
         'ambiguous',
         'edge',
         group.count > 1

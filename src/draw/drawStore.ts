@@ -7,36 +7,45 @@
  * code, and updates the file.
  */
 import { create } from 'zustand';
+import { useForgeStore } from '../store/forgeStore';
 import {
-  type DrawSessionState,
+  arcStatement,
+  circleStatement,
+  constraintStatement,
   type DrawnPoint,
   generateSketchCode,
-  pointStatement,
   lineStatement,
-  circleStatement,
-  arcStatement,
-  constraintStatement,
+  pointStatement,
   roundCoord,
 } from './codegen';
-import { useForgeStore } from '../store/forgeStore';
 
 // ─── Tool types ──────────────────────────────────────────────────────────────
 
 /** Drawing tools create geometry. */
-export type DrawingTool =
-  | 'point' | 'line' | 'polyline' | 'rectangle' | 'circle'
-  | 'arc' | 'polygon' | 'ellipse' | 'slot';
+export type DrawingTool = 'point' | 'line' | 'polyline' | 'rectangle' | 'circle' | 'arc' | 'polygon' | 'ellipse' | 'slot';
 
 /** Edit tools modify existing geometry. */
 export type EditTool = 'trim' | 'mirror' | 'offset';
 
 /** Constraint tools apply constraints to selected entities. */
 export type ConstraintTool =
-  | 'c:horizontal' | 'c:vertical' | 'c:length' | 'c:distance'
-  | 'c:angle' | 'c:radius' | 'c:parallel' | 'c:perpendicular'
-  | 'c:coincident' | 'c:tangent' | 'c:equal' | 'c:fixed'
-  | 'c:midpoint' | 'c:symmetric' | 'c:concentric'
-  | 'c:pointOnLine' | 'c:pointOnCircle';
+  | 'c:horizontal'
+  | 'c:vertical'
+  | 'c:length'
+  | 'c:distance'
+  | 'c:angle'
+  | 'c:radius'
+  | 'c:parallel'
+  | 'c:perpendicular'
+  | 'c:coincident'
+  | 'c:tangent'
+  | 'c:equal'
+  | 'c:fixed'
+  | 'c:midpoint'
+  | 'c:symmetric'
+  | 'c:concentric'
+  | 'c:pointOnLine'
+  | 'c:pointOnCircle';
 
 /** Special mode for selection without a specific tool. */
 export type SelectTool = 'select';
@@ -183,10 +192,7 @@ const AXIS_SNAP_THRESHOLD = 1.5; // world units for axis alignment
 const ANGLE_SNAP_THRESHOLD_DEG = 3; // degrees for near-H/V detection
 
 /** Resolve line endpoint coordinates from points array. */
-function resolveLineEndpoints(
-  line: DrawnLine,
-  points: DrawnPoint[],
-): { x1: number; y1: number; x2: number; y2: number } | null {
+function resolveLineEndpoints(line: DrawnLine, points: DrawnPoint[]): { x1: number; y1: number; x2: number; y2: number } | null {
   const p1 = points.find((p) => p.varName === line.startVar);
   const p2 = points.find((p) => p.varName === line.endVar);
   if (!p1 || !p2) return null;
@@ -195,8 +201,14 @@ function resolveLineEndpoints(
 
 /** Compute intersection of two line segments. Returns null if parallel or outside both segments. */
 function lineLineIntersection(
-  x1: number, y1: number, x2: number, y2: number,
-  x3: number, y3: number, x4: number, y4: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+  x4: number,
+  y4: number,
 ): { x: number; y: number } | null {
   const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
   if (Math.abs(denom) < 1e-10) return null; // parallel or coincident
@@ -209,8 +221,12 @@ function lineLineIntersection(
 
 /** Project a point onto a line segment. Returns the foot and parameter t (0..1 = on segment). */
 function projectPointOntoSegment(
-  px: number, py: number,
-  x1: number, y1: number, x2: number, y2: number,
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
 ): { x: number; y: number; t: number } {
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -257,7 +273,14 @@ function findSnapTarget(
     }
   }
   if (bestMidpoint) {
-    return { x: roundCoord(bestMidpoint.x), y: roundCoord(bestMidpoint.y), snappedToVar: null, xAligned: true, yAligned: true, snapType: 'midpoint' };
+    return {
+      x: roundCoord(bestMidpoint.x),
+      y: roundCoord(bestMidpoint.y),
+      snappedToVar: null,
+      xAligned: true,
+      yAligned: true,
+      snapType: 'midpoint',
+    };
   }
 
   // 3. Intersection snap — check all pairs of lines (O(n^2), fine for <100 lines)
@@ -279,7 +302,14 @@ function findSnapTarget(
     }
   }
   if (bestIsect) {
-    return { x: roundCoord(bestIsect.x), y: roundCoord(bestIsect.y), snappedToVar: null, xAligned: true, yAligned: true, snapType: 'intersection' };
+    return {
+      x: roundCoord(bestIsect.x),
+      y: roundCoord(bestIsect.y),
+      snappedToVar: null,
+      xAligned: true,
+      yAligned: true,
+      snapType: 'intersection',
+    };
   }
 
   // 4. Perpendicular snap — only when we have a pending first click (drawing a line)
@@ -299,7 +329,14 @@ function findSnapTarget(
       }
     }
     if (bestPerp) {
-      return { x: roundCoord(bestPerp.x), y: roundCoord(bestPerp.y), snappedToVar: null, xAligned: true, yAligned: true, snapType: 'perpendicular' };
+      return {
+        x: roundCoord(bestPerp.x),
+        y: roundCoord(bestPerp.y),
+        snappedToVar: null,
+        xAligned: true,
+        yAligned: true,
+        snapType: 'perpendicular',
+      };
     }
   }
 
@@ -324,30 +361,24 @@ function findSnapTarget(
   const gridThreshold = gridSnap * 0.3;
   if (!xAligned) {
     const nearestGridX = Math.round(snapX / gridSnap) * gridSnap;
-    snapX = Math.abs(snapX - nearestGridX) < gridThreshold
-      ? nearestGridX
-      : Math.round(snapX * 10) / 10;
+    snapX = Math.abs(snapX - nearestGridX) < gridThreshold ? nearestGridX : Math.round(snapX * 10) / 10;
   }
   if (!yAligned) {
     const nearestGridY = Math.round(snapY / gridSnap) * gridSnap;
-    snapY = Math.abs(snapY - nearestGridY) < gridThreshold
-      ? nearestGridY
-      : Math.round(snapY * 10) / 10;
+    snapY = Math.abs(snapY - nearestGridY) < gridThreshold ? nearestGridY : Math.round(snapY * 10) / 10;
   }
 
-  const snapType: SnapType = (xAligned || yAligned) ? 'none' : 'grid';
+  const snapType: SnapType = xAligned || yAligned ? 'none' : 'grid';
   return { x: roundCoord(snapX), y: roundCoord(snapY), snappedToVar: null, xAligned, yAligned, snapType };
 }
 
 /** Check if a line is nearly horizontal or vertical. */
-function detectLineConstraint(
-  x1: number, y1: number, x2: number, y2: number,
-): 'horizontal' | 'vertical' | null {
+function detectLineConstraint(x1: number, y1: number, x2: number, y2: number): 'horizontal' | 'vertical' | null {
   const dx = Math.abs(x2 - x1);
   const dy = Math.abs(y2 - y1);
   const len = Math.hypot(dx, dy);
   if (len < 0.1) return null;
-  const angleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+  const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
   if (angleDeg < ANGLE_SNAP_THRESHOLD_DEG) return 'horizontal';
   if (angleDeg > 90 - ANGLE_SNAP_THRESHOLD_DEG) return 'vertical';
   return null;
@@ -604,13 +635,24 @@ export const useDrawStore = create<DrawState>((set, get) => ({
     const arcRegex = /^const (a\d+) = sk\.arc\((p\d+), (p\d+), (p\d+)\);$/;
     for (const stmt of newStatements) {
       let m = stmt.match(pointRegex);
-      if (m) { newPoints.push({ varName: m[1], x: parseFloat(m[2]), y: parseFloat(m[3]) }); continue; }
+      if (m) {
+        newPoints.push({ varName: m[1], x: parseFloat(m[2]), y: parseFloat(m[3]) });
+        continue;
+      }
       m = stmt.match(lineRegex);
-      if (m) { newLines.push({ varName: m[1], startVar: m[2], endVar: m[3] }); continue; }
+      if (m) {
+        newLines.push({ varName: m[1], startVar: m[2], endVar: m[3] });
+        continue;
+      }
       m = stmt.match(circleRegex);
-      if (m) { newCircles.push({ varName: m[1], centerVar: m[2], radius: parseFloat(m[3]) }); continue; }
+      if (m) {
+        newCircles.push({ varName: m[1], centerVar: m[2], radius: parseFloat(m[3]) });
+        continue;
+      }
       m = stmt.match(arcRegex);
-      if (m) { newArcs.push({ varName: m[1], p1Var: m[2], p2Var: m[3], p3Var: m[4] }); continue; }
+      if (m) {
+        newArcs.push({ varName: m[1], p1Var: m[2], p2Var: m[3], p3Var: m[4] });
+      }
     }
 
     set({ statements: newStatements, points: newPoints, lines: newLines, circles: newCircles, arcs: newArcs });
@@ -915,7 +957,12 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         const nextLIdx = state.nextLineIdx;
 
         const vars = [0, 1, 2, 3].map(() => `p${nextPIdx++}`);
-        const corners: [number, number][] = [[x1, y1], [x2, y1], [x2, y2], [x1, y2]];
+        const corners: [number, number][] = [
+          [x1, y1],
+          [x2, y1],
+          [x2, y2],
+          [x1, y2],
+        ];
         corners.forEach((c, i) => {
           newStatements.push(pointStatement(vars[i], c[0], c[1]));
           newPoints.push({ varName: vars[i], x: c[0], y: c[1] });
@@ -1109,7 +1156,7 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         // Mid-arc points on the ellipse (at 45, 135, 225, 315 degrees)
         const midPts: { vn: string; px: number; py: number }[] = [];
         for (let q = 0; q < 4; q++) {
-          const angle = (Math.PI / 4) + (q * Math.PI / 2);
+          const angle = Math.PI / 4 + (q * Math.PI) / 2;
           const mx = roundCoord(centerE.x + rx * Math.cos(angle));
           const my = roundCoord(centerE.y + ry * Math.sin(angle));
           const vn = `p${ePIdx++}`;
@@ -1329,22 +1376,34 @@ export const useDrawStore = create<DrawState>((set, get) => ({
 
         if (offEntity.type === 'line') {
           const srcLine = state.lines.find((l) => l.varName === offEntity.varName);
-          if (!srcLine) { set({ pendingClicks: [] }); return; }
+          if (!srcLine) {
+            set({ pendingClicks: [] });
+            return;
+          }
           const osp1 = state.points.find((p) => p.varName === srcLine.startVar);
           const osp2 = state.points.find((p) => p.varName === srcLine.endVar);
-          if (!osp1 || !osp2) { set({ pendingClicks: [] }); return; }
+          if (!osp1 || !osp2) {
+            set({ pendingClicks: [] });
+            return;
+          }
 
           const oldx = osp2.x - osp1.x;
           const oldy = osp2.y - osp1.y;
           const ollen = Math.hypot(oldx, oldy);
-          if (ollen < 0.1) { set({ pendingClicks: [] }); return; }
+          if (ollen < 0.1) {
+            set({ pendingClicks: [] });
+            return;
+          }
 
           const ocross = oldx * (distClick.y - osp1.y) - oldy * (distClick.x - osp1.x);
           const osign = ocross >= 0 ? 1 : -1;
-          const onx = -oldy / ollen * osign;
-          const ony = oldx / ollen * osign;
+          const onx = (-oldy / ollen) * osign;
+          const ony = (oldx / ollen) * osign;
           const offsetDist = roundCoord(Math.abs(ocross) / ollen);
-          if (offsetDist < 0.1) { set({ pendingClicks: [] }); return; }
+          if (offsetDist < 0.1) {
+            set({ pendingClicks: [] });
+            return;
+          }
 
           const op1Var = `p${oPIdx++}`;
           const op2Var = `p${oPIdx++}`;
@@ -1373,9 +1432,15 @@ export const useDrawStore = create<DrawState>((set, get) => ({
           });
         } else if (offEntity.type === 'circle') {
           const srcCircle = state.circles.find((c) => c.varName === offEntity.varName);
-          if (!srcCircle) { set({ pendingClicks: [] }); return; }
+          if (!srcCircle) {
+            set({ pendingClicks: [] });
+            return;
+          }
           const centerPt = state.points.find((p) => p.varName === srcCircle.centerVar);
-          if (!centerPt) { set({ pendingClicks: [] }); return; }
+          if (!centerPt) {
+            set({ pendingClicks: [] });
+            return;
+          }
 
           const distFromCenter = Math.hypot(distClick.x - centerPt.x, distClick.y - centerPt.y);
           const newRadius = roundCoord(Math.max(0.5, distFromCenter));
@@ -1481,13 +1546,24 @@ export const useDrawStore = create<DrawState>((set, get) => ({
     const arcRegex = /^const (a\d+) = sk\.arc\((p\d+), (p\d+), (p\d+)\);$/;
     for (const stmt of newStatements) {
       let m = stmt.match(pointRegex);
-      if (m) { newPoints.push({ varName: m[1], x: parseFloat(m[2]), y: parseFloat(m[3]) }); continue; }
+      if (m) {
+        newPoints.push({ varName: m[1], x: parseFloat(m[2]), y: parseFloat(m[3]) });
+        continue;
+      }
       m = stmt.match(lineRegex);
-      if (m) { newLines.push({ varName: m[1], startVar: m[2], endVar: m[3] }); continue; }
+      if (m) {
+        newLines.push({ varName: m[1], startVar: m[2], endVar: m[3] });
+        continue;
+      }
       m = stmt.match(circleRegex);
-      if (m) { newCircles.push({ varName: m[1], centerVar: m[2], radius: parseFloat(m[3]) }); continue; }
+      if (m) {
+        newCircles.push({ varName: m[1], centerVar: m[2], radius: parseFloat(m[3]) });
+        continue;
+      }
       m = stmt.match(arcRegex);
-      if (m) { newArcs.push({ varName: m[1], p1Var: m[2], p2Var: m[3], p3Var: m[4] }); continue; }
+      if (m) {
+        newArcs.push({ varName: m[1], p1Var: m[2], p2Var: m[3], p3Var: m[4] });
+      }
     }
 
     set({ statements: newStatements, points: newPoints, lines: newLines, circles: newCircles, arcs: newArcs });

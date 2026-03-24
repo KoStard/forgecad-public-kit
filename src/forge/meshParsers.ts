@@ -73,7 +73,7 @@ function parseStlBinary(data: ArrayBuffer): { positions: Float32Array; numTriang
   if (Math.abs(data.byteLength - expectedSize) > 10) {
     throw new Error(
       `Binary STL corrupt: header says ${numTriangles} triangles (expecting ${expectedSize} bytes) but file is ${data.byteLength} bytes. ` +
-      `The file data may not be a valid STL — check that the mesh file was loaded correctly.`,
+        `The file data may not be a valid STL — check that the mesh file was loaded correctly.`,
     );
   }
   const positions = new Float32Array(numTriangles * 9); // 3 verts × 3 coords
@@ -95,7 +95,8 @@ function parseStlBinary(data: ArrayBuffer): { positions: Float32Array; numTriang
 }
 
 function parseStlAscii(text: string): { positions: Float32Array; numTriangles: number } {
-  const vertexPattern = /vertex\s+([\-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][\-+]?\d+)?)\s+([\-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][\-+]?\d+)?)\s+([\-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][\-+]?\d+)?)/gi;
+  const vertexPattern =
+    /vertex\s+([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s+([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s+([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)/gi;
   const coords: number[] = [];
   let match;
   while ((match = vertexPattern.exec(text)) !== null) {
@@ -142,11 +143,7 @@ export function parseStl(data: ArrayBuffer): ParsedMesh {
  * Since we fully deduplicate, mergeFromVert/mergeToVert are empty —
  * all shared-vertex information is already encoded in the triVerts indices.
  */
-function weldVertices(
-  positions: Float32Array,
-  numTriangles: number,
-  epsilon = 1e-5,
-): ParsedMesh {
+function weldVertices(positions: Float32Array, numTriangles: number, epsilon = 1e-5): ParsedMesh {
   const totalVerts = numTriangles * 3;
 
   // Spatial hash for deduplication

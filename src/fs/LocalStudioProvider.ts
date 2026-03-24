@@ -74,7 +74,7 @@ export class LocalStudioProvider implements FileSystemProvider {
   async projectPath(): Promise<string | null> {
     try {
       const response = await fetch('/api/project-path');
-      const data = await response.json() as { projectDir: string | null };
+      const data = (await response.json()) as { projectDir: string | null };
       return data.projectDir ?? null;
     } catch {
       return null;

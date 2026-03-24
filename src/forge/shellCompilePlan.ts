@@ -10,9 +10,7 @@ import {
 
 export type ShellOpenFace = string;
 
-export type ShellCompilePlanLoweringResult =
-  | { ok: true; plan: ShapeCompilePlan }
-  | { ok: false; reason: string };
+export type ShellCompilePlanLoweringResult = { ok: true; plan: ShapeCompilePlan } | { ok: false; reason: string };
 
 // Canonical face name aliases. Users may write 'front', 'back', 'left', 'right' in openFaces;
 // the compiler normalises these to the internal face-table names before storing in the plan.
@@ -52,12 +50,8 @@ function buildAxisShellSpan(
   openMin: boolean,
   openMax: boolean,
 ): { size: number; translate: number } | null {
-  const start = center
-    ? -total / 2 + (openMin ? 0 : thickness)
-    : (openMin ? 0 : thickness);
-  const end = center
-    ? total / 2 - (openMax ? 0 : thickness)
-    : total - (openMax ? 0 : thickness);
+  const start = center ? -total / 2 + (openMin ? 0 : thickness) : openMin ? 0 : thickness;
+  const end = center ? total / 2 - (openMax ? 0 : thickness) : total - (openMax ? 0 : thickness);
   const size = end - start;
   if (!(size > 0)) return null;
   return { size, translate: center ? (start + end) / 2 : start };
@@ -83,12 +77,9 @@ function lowerBoxShellToConcretePlan(
 ): ShellCompilePlanLoweringResult {
   // openFaces uses internal face-table names after normalisation.
   // Box faces: top, bottom, side-left (−X), side-right (+X), side-bottom (−Y/front), side-top (+Y/back).
-  const xSpan = buildAxisShellSpan(plan.x, plan.center, thickness,
-    openFaces.includes('side-left'), openFaces.includes('side-right'));
-  const ySpan = buildAxisShellSpan(plan.y, plan.center, thickness,
-    openFaces.includes('side-bottom'), openFaces.includes('side-top'));
-  const zSpan = buildAxisShellSpan(plan.z, plan.center, thickness,
-    openFaces.includes('bottom'), openFaces.includes('top'));
+  const xSpan = buildAxisShellSpan(plan.x, plan.center, thickness, openFaces.includes('side-left'), openFaces.includes('side-right'));
+  const ySpan = buildAxisShellSpan(plan.y, plan.center, thickness, openFaces.includes('side-bottom'), openFaces.includes('side-top'));
+  const zSpan = buildAxisShellSpan(plan.z, plan.center, thickness, openFaces.includes('bottom'), openFaces.includes('top'));
 
   if (!xSpan || !ySpan || !zSpan) {
     return { ok: false, reason: 'Shape.shell() thickness is too large for this box base and opening configuration.' };
@@ -122,19 +113,21 @@ function lowerCylinderShellToConcretePlan(
     return { ok: false, reason: 'Shape.shell() thickness is too large for this cylinder or cone base.' };
   }
 
-  const zSpan = buildAxisShellSpan(plan.height, plan.center, thickness,
-    openFaces.includes('bottom'), openFaces.includes('top'));
+  const zSpan = buildAxisShellSpan(plan.height, plan.center, thickness, openFaces.includes('bottom'), openFaces.includes('top'));
   if (!zSpan) {
     return { ok: false, reason: 'Shape.shell() thickness is too large for this cylinder height and opening configuration.' };
   }
 
-  const inner = translateShapePlanZ({
-    kind: 'cylinder',
-    height: zSpan.size,
-    radius: innerRadius,
-    radiusTop: innerRadiusTop,
-    center: plan.center,
-  }, zSpan.translate);
+  const inner = translateShapePlanZ(
+    {
+      kind: 'cylinder',
+      height: zSpan.size,
+      radius: innerRadius,
+      radiusTop: innerRadiusTop,
+      center: plan.center,
+    },
+    zSpan.translate,
+  );
   return { ok: true, plan: buildBooleanShapeCompilePlan('difference', [plan, inner])! };
 }
 
@@ -163,18 +156,20 @@ function lowerExtrudeShellToConcretePlan(
     return { ok: false, reason: 'Shape.shell() could not offset the source profile for this extrude base.' };
   }
 
-  const zSpan = buildAxisShellSpan(plan.height, plan.center, thickness,
-    openFaces.includes('bottom'), openFaces.includes('top'));
+  const zSpan = buildAxisShellSpan(plan.height, plan.center, thickness, openFaces.includes('bottom'), openFaces.includes('top'));
   if (!zSpan) {
     return { ok: false, reason: 'Shape.shell() thickness is too large for this extrude height and opening configuration.' };
   }
 
-  const inner = translateShapePlanZ({
-    kind: 'extrude',
-    profile: innerProfile,
-    height: zSpan.size,
-    center: plan.center,
-  }, zSpan.translate);
+  const inner = translateShapePlanZ(
+    {
+      kind: 'extrude',
+      profile: innerProfile,
+      height: zSpan.size,
+      center: plan.center,
+    },
+    zSpan.translate,
+  );
   return { ok: true, plan: buildBooleanShapeCompilePlan('difference', [plan, inner])! };
 }
 
@@ -229,7 +224,8 @@ function lowerBaseShellPlanToConcretePlan(
     case 'offsetSolid':
       return {
         ok: false,
-        reason: 'Shape.shell() does not support edge-finished bodies (fillet/chamfer/draft/offsetSolid). Apply shell before edge finishing.',
+        reason:
+          'Shape.shell() does not support edge-finished bodies (fillet/chamfer/draft/offsetSolid). Apply shell before edge finishing.',
       };
     case 'sphere':
     case 'torus':

@@ -1,8 +1,7 @@
 import { appendShapeCompileTransform, createOwnedShapeCompilePlan } from '../compilePlan';
-import { Sketch, getSketchCompileProfilePlan, getSketchPlacement3D, getSketchPlacementModel } from './core';
-import { Shape, buildShapeFromCompilePlan } from '../kernel';
-import { TrackedShape, transformTopology, type Topology, type FaceName, type FaceRef, type EdgeName, type EdgeRef } from './topology';
-
+import { buildShapeFromCompilePlan, Shape } from '../kernel';
+import { getSketchCompileProfilePlan, getSketchPlacement3D, getSketchPlacementModel, Sketch } from './core';
+import { type EdgeName, type EdgeRef, type FaceName, type FaceRef, type Topology, TrackedShape, transformTopology } from './topology';
 
 function buildGenericExtrusionTopology(sketch: Sketch, height: number, center: boolean): Topology {
   const faces = new Map<FaceName, FaceRef>();
@@ -39,15 +38,17 @@ function buildGenericExtrusionTopology(sketch: Sketch, height: number, center: b
   return { faces, edges };
 }
 
-export function sketchExtrude(sketch: Sketch, height: number, opts?: {
-  twist?: number;
-  divisions?: number;
-  scaleTop?: number | [number, number];
-  center?: boolean;
-}): TrackedShape {
-  const scaleTop = typeof opts?.scaleTop === 'number'
-    ? [opts.scaleTop, opts.scaleTop] as [number, number]
-    : opts?.scaleTop;
+export function sketchExtrude(
+  sketch: Sketch,
+  height: number,
+  opts?: {
+    twist?: number;
+    divisions?: number;
+    scaleTop?: number | [number, number];
+    center?: boolean;
+  },
+): TrackedShape {
+  const scaleTop = typeof opts?.scaleTop === 'number' ? ([opts.scaleTop, opts.scaleTop] as [number, number]) : opts?.scaleTop;
   const basePlan = {
     kind: 'extrude' as const,
     profile: getSketchCompileProfilePlan(sketch),
@@ -59,13 +60,14 @@ export function sketchExtrude(sketch: Sketch, height: number, opts?: {
   };
   const placement = getSketchPlacement3D(sketch);
   const placementModel = getSketchPlacementModel(sketch);
-  const plan = placement && placementModel
-    ? appendShapeCompileTransform(basePlan, {
-        kind: 'workplanePlacement',
-        matrix: placement,
-        placement: placementModel,
-      })
-    : basePlan;
+  const plan =
+    placement && placementModel
+      ? appendShapeCompileTransform(basePlan, {
+          kind: 'workplanePlacement',
+          matrix: placement,
+          placement: placementModel,
+        })
+      : basePlan;
   const ownedPlan = createOwnedShapeCompilePlan(plan, 'extrude');
   const shape = buildShapeFromCompilePlan(ownedPlan, sketch.colorHex, {
     fidelity: 'kernel-native',
@@ -87,13 +89,14 @@ export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number):
   };
   const placement = getSketchPlacement3D(sketch);
   const placementModel = getSketchPlacementModel(sketch);
-  const plan = placement && placementModel
-    ? appendShapeCompileTransform(basePlan, {
-        kind: 'workplanePlacement',
-        matrix: placement,
-        placement: placementModel,
-      })
-    : basePlan;
+  const plan =
+    placement && placementModel
+      ? appendShapeCompileTransform(basePlan, {
+          kind: 'workplanePlacement',
+          matrix: placement,
+          placement: placementModel,
+        })
+      : basePlan;
   const ownedPlan = createOwnedShapeCompilePlan(plan, 'revolve');
   const revolved = buildShapeFromCompilePlan(ownedPlan, sketch.colorHex, {
     fidelity: 'kernel-native',
@@ -103,11 +106,18 @@ export function sketchRevolve(sketch: Sketch, degrees = 360, segments?: number):
   return revolved.transform(placement);
 }
 
-Sketch.prototype.extrude = function (height: number, opts?: {
-  twist?: number;
-  divisions?: number;
-  scaleTop?: number | [number, number];
-  center?: boolean;
-}) { return sketchExtrude(this, height, opts); };
+Sketch.prototype.extrude = function (
+  height: number,
+  opts?: {
+    twist?: number;
+    divisions?: number;
+    scaleTop?: number | [number, number];
+    center?: boolean;
+  },
+) {
+  return sketchExtrude(this, height, opts);
+};
 
-Sketch.prototype.revolve = function (degrees = 360, segments?: number) { return sketchRevolve(this, degrees, segments); };
+Sketch.prototype.revolve = function (degrees = 360, segments?: number) {
+  return sketchRevolve(this, degrees, segments);
+};

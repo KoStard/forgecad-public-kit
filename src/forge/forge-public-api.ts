@@ -17,147 +17,141 @@
 
 // ─── Re-exports: classes whose types come entirely from source ────────────────
 
-export { Shape } from './kernel';
-export type { GeometryInfo, GeometryBackend, GeometryRepresentation, GeometryFidelity, GeometryTopology, GeometrySource } from './kernel';
-
-export {
-  Sketch,
-  TrackedShape,
-  Point2D,
-  Line2D,
-  Circle2D,
-  Rectangle2D,
-  Constraint,
-  rect,
-  circle2d,
-  roundedRect,
-  polygon,
-  ngon,
-  ellipse,
-  slot,
-  star,
-  union2d,
-  difference2d,
-  intersection2d,
-  path,
-  stroke,
-  constrainedSketch,
-  ConstraintSketch,
-  point,
-  line,
-  circle,
-  rectangle,
-  degrees,
-  radians,
-  linearPattern,
-  circularPattern,
-  linearPattern2d,
-  circularPattern2d,
-  mirrorCopy,
-  filletCorners,
-  filletEdge,
-  chamferEdge,
-  arcBridgeBetweenRects,
-  Curve3D,
-  spline2d,
-  spline3d,
-  loft,
-  sweep,
-  text2d,
-  textWidth,
-  loadFont,
-  dim,
-  dimLine,
-  addRect,
-  addPolygon,
-  addRegularPolygon,
-  sketchToSvg,
-  sketchToDxf,
-} from './sketch';
-
-export type {
-  Anchor,
-  SvgImportOptions,
-  SketchSvgOptions,
-  SketchDxfOptions,
-  RectOptions,
-  RectVertexName,
-  RectSideName,
-  ConstrainedRect,
-  PolygonOptions,
-  ConstrainedPolygon,
-  RegularPolygonOptions,
-  ConstrainedRegularPolygon,
-} from './sketch';
-
-// ConstrainedSketchBuilder is the main win: all constraint methods are inlined
-// automatically from the source class — addLoop, fix, horizontal, etc.
-export { ConstrainedSketchBuilder } from './sketch/constraints';
-export type { PointId, LineId, CircleId, LineDistanceConstraint } from './sketch/constraints';
-
-export { param, boolParam } from './params';
-export { Transform, composeChain } from './transform';
-export { Assembly, SolvedAssembly, ImportedAssembly, assembly, bomToCsv } from './assembly';
 export type {
   AssemblyPart,
-  JointType as AssemblyJointType,
+  BomRow,
+  GearCouplingOptions,
+  GearRatioLike,
+  JointCouplingOptions as AssemblyJointCouplingOptions,
+  JointCouplingTerm,
+  JointOptions as AssemblyJointOptions,
   JointState as AssemblyJointState,
+  JointType as AssemblyJointType,
   PartMetadata as AssemblyPartMetadata,
   PartOptions as AssemblyPartOptions,
-  JointOptions as AssemblyJointOptions,
-  JointCouplingTerm,
-  JointCouplingOptions as AssemblyJointCouplingOptions,
-  GearRatioLike,
-  GearCouplingOptions,
-  BomRow,
 } from './assembly';
-export { joint } from './joint';
-export { ShapeGroup, group } from './group';
-export { cutPlane } from './cutPlane';
+export { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly';
 export { bom } from './bom';
-export { robotExport } from './robotExport';
-export { verify } from './verification';
+export { cutPlane } from './cutPlane';
+export type { BoundingRegion, EdgeQuery, EdgeSegment } from './edgeQuery';
+export { coalesceEdges, selectEdge, selectEdges } from './edgeQuery';
+export { chamferEdgeSegment, filletEdgeSegment } from './edgeSegmentFeatures';
 export { explodeView } from './explodeView';
-export { jointsView } from './jointsView';
-export { viewConfig } from './viewConfig';
-export { scene } from './scene';
-export type {
-  SceneOptions,
-  SceneCameraConfig,
-  SceneLightConfig,
-  SceneLightType,
-  SceneEnvironmentConfig,
-  SceneBackgroundGradient,
-  SceneFogConfig,
-  SceneBloomConfig,
-  SceneVignetteConfig,
-  SceneGrainConfig,
-  ScenePostProcessingConfig,
-  SceneGroundConfig,
-} from './scene';
-export { sheetMetal, SheetMetalPart } from './sheetMetal';
-export { intersectWithPlane, projectToPlane } from './section';
-export { selectEdge, selectEdges, coalesceEdges } from './edgeQuery';
-export type { EdgeSegment, EdgeQuery, BoundingRegion } from './edgeQuery';
-export { filletEdgeSegment, chamferEdgeSegment } from './edgeSegmentFeatures';
-export { fillet, chamfer, draft, offsetSolid } from './fillet';
 export type { EdgeSelector } from './fillet';
-
-export type { HighlightOptions } from './sketch/highlights';
-
+export { chamfer, draft, fillet, offsetSolid } from './fillet';
+export { group, ShapeGroup } from './group';
+export { joint } from './joint';
+export { jointsView } from './jointsView';
+export type { GeometryBackend, GeometryFidelity, GeometryInfo, GeometryRepresentation, GeometrySource, GeometryTopology } from './kernel';
+export { Shape } from './kernel';
 // `lib` — re-export the partLibrary object as `lib` so its full inferred type
 // (all the gear/pipe/extrusion helpers) is always in sync with library.ts.
 export { partLibrary as lib } from './library';
+export { boolParam, param } from './params';
+export { robotExport } from './robotExport';
+export type {
+  SceneBackgroundGradient,
+  SceneBloomConfig,
+  SceneCameraConfig,
+  SceneEnvironmentConfig,
+  SceneFogConfig,
+  SceneGrainConfig,
+  SceneGroundConfig,
+  SceneLightConfig,
+  SceneLightType,
+  SceneOptions,
+  ScenePostProcessingConfig,
+  SceneVignetteConfig,
+} from './scene';
+export { scene } from './scene';
+export { intersectWithPlane, projectToPlane } from './section';
+export { SheetMetalPart, sheetMetal } from './sheetMetal';
+export type {
+  Anchor,
+  ConstrainedPolygon,
+  ConstrainedRect,
+  ConstrainedRegularPolygon,
+  PolygonOptions,
+  RectOptions,
+  RectSideName,
+  RectVertexName,
+  RegularPolygonOptions,
+  SketchDxfOptions,
+  SketchSvgOptions,
+  SvgImportOptions,
+} from './sketch';
+export {
+  addPolygon,
+  addRect,
+  addRegularPolygon,
+  arcBridgeBetweenRects,
+  Circle2D,
+  Constraint,
+  ConstraintSketch,
+  Curve3D,
+  chamferEdge,
+  circle,
+  circle2d,
+  circularPattern,
+  circularPattern2d,
+  constrainedSketch,
+  degrees,
+  difference2d,
+  dim,
+  dimLine,
+  ellipse,
+  filletCorners,
+  filletEdge,
+  intersection2d,
+  Line2D,
+  line,
+  linearPattern,
+  linearPattern2d,
+  loadFont,
+  loft,
+  mirrorCopy,
+  ngon,
+  Point2D,
+  path,
+  point,
+  polygon,
+  Rectangle2D,
+  radians,
+  rect,
+  rectangle,
+  roundedRect,
+  Sketch,
+  sketchToDxf,
+  sketchToSvg,
+  slot,
+  spline2d,
+  spline3d,
+  star,
+  stroke,
+  sweep,
+  TrackedShape,
+  text2d,
+  textWidth,
+  union2d,
+} from './sketch';
+export type { CircleId, LineDistanceConstraint, LineId, PointId } from './sketch/constraints';
+// ConstrainedSketchBuilder is the main win: all constraint methods are inlined
+// automatically from the source class — addLoop, fix, horizontal, etc.
+export { ConstrainedSketchBuilder } from './sketch/constraints';
+export type { HighlightOptions } from './sketch/highlights';
+export { composeChain, Transform } from './transform';
+export { verify } from './verification';
+export { viewConfig } from './viewConfig';
 
 // ─── Wrapper functions: differ from their kernel/sketch source signatures ─────
 //
 // The runner wraps these to accept/return TrackedShape.  We declare them here
 // with the PUBLIC signatures users actually see.
 
-import type { Shape as _Shape } from './kernel';
-import type { TrackedShape, Sketch as _Sketch, SvgImportOptions as _SvgImportOptions } from './sketch';
-import type { ShapeGroup as _ShapeGroup } from './group';
 import type { ImportedAssembly as _ImportedAssembly } from './assembly';
+import type { ShapeGroup as _ShapeGroup } from './group';
+import type { Shape as _Shape } from './kernel';
+import type { Sketch as _Sketch, SvgImportOptions as _SvgImportOptions, TrackedShape } from './sketch';
 
 type _ShapeOperand = _Shape | TrackedShape;
 
@@ -178,7 +172,7 @@ export declare function importSvgSketch(fileName: string, options?: _SvgImportOp
 export declare function importMesh(fileName: string, options?: { scale?: number; center?: boolean }): _Shape;
 
 import type { HighlightOptions as _HighlightOptions } from './sketch/highlights';
-import type { FaceRef as _FaceRef, EdgeRef as _EdgeRef } from './sketch/topology';
+import type { EdgeRef as _EdgeRef, FaceRef as _FaceRef } from './sketch/topology';
 
 /**
  * Highlight any geometry for visual debugging in the viewport.
@@ -197,7 +191,10 @@ export declare function highlight(entityId: string, opts?: _HighlightOptions): v
 export declare function highlight(point: [number, number, number], opts?: _HighlightOptions): void;
 export declare function highlight(edge: [[number, number, number], [number, number, number]], opts?: _HighlightOptions): void;
 export declare function highlight(plane: { normal: [number, number, number]; offset: number }, opts?: _HighlightOptions): void;
-export declare function highlight(plane: { normal: [number, number, number]; point: [number, number, number] }, opts?: _HighlightOptions): void;
+export declare function highlight(
+  plane: { normal: [number, number, number]; point: [number, number, number] },
+  opts?: _HighlightOptions,
+): void;
 export declare function highlight(shape: _Shape | TrackedShape, opts?: _HighlightOptions): void;
 export declare function highlight(face: _FaceRef, opts?: _HighlightOptions): void;
 export declare function highlight(edge: _EdgeRef, opts?: _HighlightOptions): void;

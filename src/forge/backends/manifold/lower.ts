@@ -6,35 +6,28 @@ import {
   type ShapeCompilePlan,
   type ShapeCompileTransformStep,
 } from '../../compilePlan';
-import {
-  lowerCutShapeCompilePlanToConcretePlan,
-  lowerHoleShapeCompilePlanToConcretePlan,
-} from '../../holeCutCompilePlan';
-import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
-import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
-import type { ShapeBackend } from '../../shapeBackend';
-import { wrapManifoldShapeBackend } from './shapeBackend';
-import { buildLoftLevelSetInput, buildSweepLevelSetInput } from '../../sketch/loftSweepLowering';
-import { loftStitched } from './loftStitched';
-import { Transform } from '../../transform';
-import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
 import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolution';
+import { lowerCutShapeCompilePlanToConcretePlan, lowerHoleShapeCompilePlanToConcretePlan } from '../../holeCutCompilePlan';
+import { type EdgeSegment, extractEdgeSegments } from '../../meshEdgeExtraction';
+import type { MeshFormat } from '../../meshParsers';
+import { parseMeshFile } from '../../meshParsers';
+import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
+import type { EdgeFeatureTarget, ShapeBackend } from '../../shapeBackend';
+import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
+import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
+import { buildLoftLevelSetInput, buildSweepLevelSetInput } from '../../sketch/loftSweepLowering';
+import type { Vec3 } from '../../transform';
+import { Transform } from '../../transform';
 import {
   applyChamferSelectionToManifold,
   applyConcaveChamferSelectionToManifold,
-  applyFilletSelectionToManifold,
   applyConcaveFilletSelectionToManifold,
+  applyFilletSelectionToManifold,
 } from './edgeFeatureRuntime';
-import { parseMeshFile } from '../../meshParsers';
-import type { MeshFormat } from '../../meshParsers';
-import { extractEdgeSegments, type EdgeSegment } from '../../meshEdgeExtraction';
-import type { EdgeFeatureTarget } from '../../shapeBackend';
-import type { Vec3 } from '../../transform';
+import { loftStitched } from './loftStitched';
+import { wrapManifoldShapeBackend } from './shapeBackend';
 
-function applyProfileCompileTransform(
-  crossSection: CrossSection,
-  step: ProfileCompileTransformStep,
-): CrossSection {
+function applyProfileCompileTransform(crossSection: CrossSection, step: ProfileCompileTransformStep): CrossSection {
   switch (step.kind) {
     case 'translate':
       return crossSection.translate(step.x, step.y);
@@ -47,10 +40,7 @@ function applyProfileCompileTransform(
   }
 }
 
-function applyProfileCompileTransforms(
-  crossSection: CrossSection,
-  transforms: ProfileCompileTransformStep[],
-): CrossSection {
+function applyProfileCompileTransforms(crossSection: CrossSection, transforms: ProfileCompileTransformStep[]): CrossSection {
   let out = crossSection;
   for (const step of transforms) {
     out = applyProfileCompileTransform(out, step);
@@ -81,16 +71,10 @@ function lowerProfileBooleanCompilePlan(plan: Extract<ProfileCompilePlan, { kind
   return applyProfileCompileTransforms(combined, plan.transforms);
 }
 
-export function lowerProfileCompilePlanToCrossSection(
-  plan: ProfileCompilePlan,
-  wasm: ManifoldToplevel,
-): CrossSection {
+export function lowerProfileCompilePlanToCrossSection(plan: ProfileCompilePlan, wasm: ManifoldToplevel): CrossSection {
   switch (plan.kind) {
     case 'rect':
-      return applyProfileCompileTransforms(
-        wasm.CrossSection.square([plan.width, plan.height], plan.center),
-        plan.transforms,
-      );
+      return applyProfileCompileTransforms(wasm.CrossSection.square([plan.width, plan.height], plan.center), plan.transforms);
     case 'roundedRect': {
       const radius = Math.min(plan.radius, plan.width / 2, plan.height / 2);
       const crossSection = wasm.CrossSection.square([plan.width - 2 * radius, plan.height - 2 * radius], true)
@@ -130,11 +114,7 @@ function applyShapeCompileTransform(manifold: Manifold, step: ShapeCompileTransf
       return manifold.scale([step.x, step.y, step.z] as [number, number, number]);
     case 'rotateAround':
       return manifold.transform(
-        Transform.rotationAxis(
-          [step.axisX, step.axisY, step.axisZ],
-          step.degrees,
-          [step.pivotX, step.pivotY, step.pivotZ],
-        ).toArray(),
+        Transform.rotationAxis([step.axisX, step.axisY, step.axisZ], step.degrees, [step.pivotX, step.pivotY, step.pivotZ]).toArray(),
       );
     case 'mirror':
       return manifold.mirror([step.normalX, step.normalY, step.normalZ]);
@@ -170,21 +150,14 @@ function lowerShapeBooleanCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'b
   }
 }
 
-function lowerShapeTrimByPlaneCompilePlan(
-  plan: Extract<ShapeCompilePlan, { kind: 'trimByPlane' }>,
-  wasm: ManifoldToplevel,
-): Manifold {
-  return lowerShapeCompilePlanToManifold(plan.base, wasm).trimByPlane(
-    [plan.normalX, plan.normalY, plan.normalZ],
-    plan.originOffset,
-  );
+function lowerShapeTrimByPlaneCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'trimByPlane' }>, wasm: ManifoldToplevel): Manifold {
+  return lowerShapeCompilePlanToManifold(plan.base, wasm).trimByPlane([plan.normalX, plan.normalY, plan.normalZ], plan.originOffset);
 }
 
-function lowerShapeLoftCompilePlan(
-  plan: Extract<ShapeCompilePlan, { kind: 'loft' }>,
-  wasm: ManifoldToplevel,
-): Manifold {
-  const inputPolygons = plan.profiles.map((profile) => lowerProfileCompilePlanToCrossSection(profile, wasm).toPolygons() as [number, number][][]);
+function lowerShapeLoftCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'loft' }>, wasm: ManifoldToplevel): Manifold {
+  const inputPolygons = plan.profiles.map(
+    (profile) => lowerProfileCompilePlanToCrossSection(profile, wasm).toPolygons() as [number, number][][],
+  );
 
   // Try stitched path first if compatible (one loop per profile, same loop type)
   const canStitch = inputPolygons.length >= 2 && inputPolygons.every((p) => p.length === 1);
@@ -193,18 +166,11 @@ function lowerShapeLoftCompilePlan(
     if (stitched) return stitched;
   }
 
-  const input = buildLoftLevelSetInput(
-    inputPolygons,
-    plan.heights,
-    { edgeLength: plan.edgeLength, boundsPadding: plan.boundsPadding },
-  );
+  const input = buildLoftLevelSetInput(inputPolygons, plan.heights, { edgeLength: plan.edgeLength, boundsPadding: plan.boundsPadding });
   return wasm.Manifold.levelSet(input.sdf as any, input.bounds, input.edgeLength, 0);
 }
 
-function lowerShapeSweepCompilePlan(
-  plan: Extract<ShapeCompilePlan, { kind: 'sweep' }>,
-  wasm: ManifoldToplevel,
-): Manifold {
+function lowerShapeSweepCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'sweep' }>, wasm: ManifoldToplevel): Manifold {
   const input = buildSweepLevelSetInput(
     lowerProfileCompilePlanToCrossSection(plan.profile, wasm).toPolygons() as [number, number][][],
     plan.path.points.map(([x, y, z]) => [x, y, z]),
@@ -217,16 +183,10 @@ function lowerShapeSweepCompilePlan(
   return wasm.Manifold.levelSet(input.sdf as any, input.bounds, input.edgeLength, 0);
 }
 
-function lowerShapeFilletCompilePlan(
-  plan: Extract<ShapeCompilePlan, { kind: 'fillet' }>,
-  wasm: ManifoldToplevel,
-): Manifold {
+function lowerShapeFilletCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'fillet' }>, wasm: ManifoldToplevel): Manifold {
   const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
   if (!selection.ok) throw new Error(selection.issue.reason);
-  if (
-    selection.selection.quadrant[0] !== plan.quadrant[0]
-    || selection.selection.quadrant[1] !== plan.quadrant[1]
-  ) {
+  if (selection.selection.quadrant[0] !== plan.quadrant[0] || selection.selection.quadrant[1] !== plan.quadrant[1]) {
     throw new Error(
       `filletEdge() currently supports ${selection.selection.edgeName} only with quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
     );
@@ -240,26 +200,15 @@ function lowerShapeFilletCompilePlan(
   );
 }
 
-function lowerShapeChamferCompilePlan(
-  plan: Extract<ShapeCompilePlan, { kind: 'chamfer' }>,
-  wasm: ManifoldToplevel,
-): Manifold {
+function lowerShapeChamferCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'chamfer' }>, wasm: ManifoldToplevel): Manifold {
   const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
   if (!selection.ok) throw new Error(selection.issue.reason);
-  if (
-    selection.selection.quadrant[0] !== plan.quadrant[0]
-    || selection.selection.quadrant[1] !== plan.quadrant[1]
-  ) {
+  if (selection.selection.quadrant[0] !== plan.quadrant[0] || selection.selection.quadrant[1] !== plan.quadrant[1]) {
     throw new Error(
       `chamferEdge() currently supports ${selection.selection.edgeName} only with quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
     );
   }
-  return applyChamferSelectionToManifold(
-    lowerShapeCompilePlanToManifold(plan.base, wasm),
-    selection.selection,
-    plan.size,
-    wasm,
-  );
+  return applyChamferSelectionToManifold(lowerShapeCompilePlanToManifold(plan.base, wasm), selection.selection, plan.size, wasm);
 }
 
 function edgeSegmentToSelection(segment: EdgeSegment): import('../../edgeFeatureModel').ResolvedEdgeFeatureSelection {
@@ -278,13 +227,11 @@ function edgeSegmentToSelection(segment: EdgeSegment): import('../../edgeFeature
     bLen = Math.sqrt(bx * bx + by * by + bz * bz);
   }
   if (bLen < 1e-10) throw new Error('Cannot compute fillet basis: edge normals are degenerate.');
-  bx /= bLen; by /= bLen; bz /= bLen;
+  bx /= bLen;
+  by /= bLen;
+  bz /= bLen;
   const basisX: Vec3 = [bx, by, bz];
-  const basisY: Vec3 = [
-    axis[1] * bz - axis[2] * by,
-    axis[2] * bx - axis[0] * bz,
-    axis[0] * by - axis[1] * bx,
-  ];
+  const basisY: Vec3 = [axis[1] * bz - axis[2] * by, axis[2] * bx - axis[0] * bz, axis[0] * by - axis[1] * bx];
 
   const nAx = normalA[0] * basisX[0] + normalA[1] * basisX[1] + normalA[2] * basisX[2];
   const nAy = normalA[0] * basisY[0] + normalA[1] * basisY[1] + normalA[2] * basisY[2];
@@ -295,8 +242,10 @@ function edgeSegmentToSelection(segment: EdgeSegment): import('../../edgeFeature
   const avgY = nAy + nBy;
 
   function pickSurfaceDir(nx: number, ny: number): [number, number] {
-    const perpAx = -ny, perpAy = nx;
-    const perpBx = ny, perpBy = -nx;
+    const perpAx = -ny,
+      perpAy = nx;
+    const perpBx = ny,
+      perpBy = -nx;
     const dotA2 = perpAx * avgX + perpAy * avgY;
     const dotB2 = perpBx * avgX + perpBy * avgY;
     if (convex) {
@@ -312,21 +261,14 @@ function edgeSegmentToSelection(segment: EdgeSegment): import('../../edgeFeature
   const projX = avgX;
   const projY = avgY;
   const sign = convex ? -1 : 1;
-  const quadrant: [number, number] = [
-    projX >= 0 ? sign : -sign,
-    projY >= 0 ? sign : -sign,
-  ];
+  const quadrant: [number, number] = [projX >= 0 ? sign : -sign, projY >= 0 ? sign : -sign];
 
   return {
     kind: 'line-segment',
     edgeName: `mesh-edge-${segment.index}`,
     start: [start[0], start[1], start[2]],
     end: [end[0], end[1], end[2]],
-    midpoint: [
-      (start[0] + end[0]) * 0.5,
-      (start[1] + end[1]) * 0.5,
-      (start[2] + end[2]) * 0.5,
-    ],
+    midpoint: [(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5, (start[2] + end[2]) * 0.5],
     axis: [axis[0], axis[1], axis[2]],
     basisX,
     basisY,
@@ -338,10 +280,7 @@ function edgeSegmentToSelection(segment: EdgeSegment): import('../../edgeFeature
   };
 }
 
-function matchEdgeSegmentByMidpoint(
-  segments: EdgeSegment[],
-  target: EdgeFeatureTarget,
-): EdgeSegment | null {
+function matchEdgeSegmentByMidpoint(segments: EdgeSegment[], target: EdgeFeatureTarget): EdgeSegment | null {
   let best: EdgeSegment | null = null;
   let bestDist = Infinity;
   for (const seg of segments) {
@@ -357,10 +296,7 @@ function matchEdgeSegmentByMidpoint(
   return best;
 }
 
-function lowerFilletEdgesCompilePlan(
-  plan: Extract<ShapeCompilePlan, { kind: 'filletEdges' }>,
-  wasm: ManifoldToplevel,
-): Manifold {
+function lowerFilletEdgesCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'filletEdges' }>, wasm: ManifoldToplevel): Manifold {
   let manifold = lowerShapeCompilePlanToManifold(plan.base, wasm);
   const mesh = manifold.getMesh();
   const segments = extractEdgeSegments({
@@ -381,9 +317,7 @@ function lowerFilletEdgesCompilePlan(
   for (const seg of matched) {
     try {
       const selection = edgeSegmentToSelection(seg);
-      const apply = seg.convex
-        ? applyFilletSelectionToManifold
-        : applyConcaveFilletSelectionToManifold;
+      const apply = seg.convex ? applyFilletSelectionToManifold : applyConcaveFilletSelectionToManifold;
       manifold = apply(manifold, selection, plan.radius, plan.segments, wasm);
     } catch {
       // Edge may have been consumed by a previous fillet — skip silently
@@ -392,10 +326,7 @@ function lowerFilletEdgesCompilePlan(
   return manifold;
 }
 
-function lowerChamferEdgesCompilePlan(
-  plan: Extract<ShapeCompilePlan, { kind: 'chamferEdges' }>,
-  wasm: ManifoldToplevel,
-): Manifold {
+function lowerChamferEdgesCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'chamferEdges' }>, wasm: ManifoldToplevel): Manifold {
   let manifold = lowerShapeCompilePlanToManifold(plan.base, wasm);
   const mesh = manifold.getMesh();
   const segments = extractEdgeSegments({
@@ -415,9 +346,7 @@ function lowerChamferEdgesCompilePlan(
   for (const seg of matched) {
     try {
       const selection = edgeSegmentToSelection(seg);
-      const apply = seg.convex
-        ? applyChamferSelectionToManifold
-        : applyConcaveChamferSelectionToManifold;
+      const apply = seg.convex ? applyChamferSelectionToManifold : applyConcaveChamferSelectionToManifold;
       manifold = apply(manifold, selection, plan.size, wasm);
     } catch {
       // Edge may have been consumed by a previous chamfer — skip silently
@@ -426,10 +355,7 @@ function lowerChamferEdgesCompilePlan(
   return manifold;
 }
 
-export function lowerShapeCompilePlanToManifold(
-  plan: ShapeCompilePlan,
-  wasm: ManifoldToplevel,
-): Manifold {
+export function lowerShapeCompilePlanToManifold(plan: ShapeCompilePlan, wasm: ManifoldToplevel): Manifold {
   switch (plan.kind) {
     case 'box':
       return wasm.Manifold.cube([plan.x, plan.y, plan.z], plan.center);
@@ -489,9 +415,9 @@ export function lowerShapeCompilePlanToManifold(
     case 'chamferEdges':
       return lowerChamferEdgesCompilePlan(plan, wasm);
     case 'draft':
-      throw new Error('Draft angle requires the OCCT backend. Add setActiveBackend(\'occt\') at the top of your script.');
+      throw new Error("Draft angle requires the OCCT backend. Add setActiveBackend('occt') at the top of your script.");
     case 'offsetSolid':
-      throw new Error('Offset solid requires the OCCT backend. Add setActiveBackend(\'occt\') at the top of your script.');
+      throw new Error("Offset solid requires the OCCT backend. Add setActiveBackend('occt') at the top of your script.");
     case 'trimByPlane':
       return lowerShapeTrimByPlaneCompilePlan(plan, wasm);
     case 'importedMesh':
@@ -501,12 +427,7 @@ export function lowerShapeCompilePlanToManifold(
   }
 }
 
-function lowerImportedMeshToManifold(
-  fileData: ArrayBuffer,
-  format: MeshFormat,
-  filePath: string,
-  wasm: ManifoldToplevel,
-): Manifold {
+function lowerImportedMeshToManifold(fileData: ArrayBuffer, format: MeshFormat, filePath: string, wasm: ManifoldToplevel): Manifold {
   const parsed = parseMeshFile(fileData, format);
   if (parsed.triVerts.length === 0) {
     throw new Error(`importMesh("${filePath}"): file contains no triangles`);
@@ -523,14 +444,11 @@ function lowerImportedMeshToManifold(
   } catch (e) {
     throw new Error(
       `importMesh("${filePath}"): Manifold rejected the mesh — it may be non-manifold (non-watertight, self-intersecting, or degenerate). ` +
-      `Original error: ${e instanceof Error ? e.message : String(e)}`,
+        `Original error: ${e instanceof Error ? e.message : String(e)}`,
     );
   }
 }
 
-export function lowerShapeCompilePlanToShapeBackend(
-  plan: ShapeCompilePlan,
-  wasm: ManifoldToplevel,
-): ShapeBackend {
+export function lowerShapeCompilePlanToShapeBackend(plan: ShapeCompilePlan, wasm: ManifoldToplevel): ShapeBackend {
   return wrapManifoldShapeBackend(lowerShapeCompilePlanToManifold(plan, wasm));
 }

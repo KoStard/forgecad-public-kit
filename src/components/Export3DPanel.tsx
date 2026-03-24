@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 import {
-  exportMeshFromStore,
+  type ExactExportFormat,
+  type ExportQualityChoice,
   exportExactFromStore,
+  exportMeshFromStore,
   exportOrbitGifFromStore,
   exportReportFromStore,
   type MeshExportFormat,
-  type ExactExportFormat,
-  type ExportQualityChoice,
 } from './exportActions';
 
 function waitForNextPaint(): Promise<void> {
@@ -21,7 +21,11 @@ type ExportFormat = MeshExportFormat | ExactExportFormat;
 const FORMAT_META: Record<ExportFormat, { label: string; desc: string; accent?: string }> = {
   '3mf': { label: '3MF (recommended)', desc: 'Preserves manifold topology and object structure.' },
   obj: { label: 'OBJ (universal)', desc: 'Wavefront OBJ — widely supported by 3D tools, renderers, and game engines.' },
-  stl: { label: 'STL (legacy)', desc: 'Triangle-only export, may not preserve manifold topology on re-import.', accent: 'var(--fc-warning)' },
+  stl: {
+    label: 'STL (legacy)',
+    desc: 'Triangle-only export, may not preserve manifold topology on re-import.',
+    accent: 'var(--fc-warning)',
+  },
   step: { label: 'STEP (exact)', desc: 'Industry-standard exact geometry exchange format (OCCT).' },
   brep: { label: 'BREP (exact)', desc: 'Native OpenCascade boundary representation format.' },
 };
@@ -166,16 +170,18 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
       </div>
 
       {format === 'stl' && (
-        <div style={{
-          marginTop: 8,
-          border: '1px solid var(--fc-warning)',
-          background: 'color-mix(in srgb, var(--fc-warning) 12%, transparent)',
-          color: 'var(--fc-text)',
-          borderRadius: 6,
-          padding: '8px 10px',
-          fontSize: 11,
-          lineHeight: 1.4,
-        }}>
+        <div
+          style={{
+            marginTop: 8,
+            border: '1px solid var(--fc-warning)',
+            background: 'color-mix(in srgb, var(--fc-warning) 12%, transparent)',
+            color: 'var(--fc-text)',
+            borderRadius: 6,
+            padding: '8px 10px',
+            fontSize: 11,
+            lineHeight: 1.4,
+          }}
+        >
           STL is lossy for solid models. Use 3MF for reliable manifold round-trips.
         </div>
       )}
@@ -199,9 +205,7 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
             disabled={isExact}
           >
             <div style={{ fontSize: 13, fontWeight: 600 }}>Default (current scene)</div>
-            <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>
-              Uses the geometry already loaded in the viewport.
-            </div>
+            <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginTop: 2 }}>Uses the geometry already loaded in the viewport.</div>
           </button>
           <button
             onClick={() => !isExact && setExportQuality('live')}
@@ -225,16 +229,18 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
           </button>
         </div>
         {!isExact && exportQuality !== 'default' && (
-          <div style={{
-            marginTop: 8,
-            border: '1px solid var(--fc-border)',
-            background: 'var(--fc-bgOverlay)',
-            color: 'var(--fc-textDim)',
-            borderRadius: 6,
-            padding: '8px 10px',
-            fontSize: 11,
-            lineHeight: 1.4,
-          }}>
+          <div
+            style={{
+              marginTop: 8,
+              border: '1px solid var(--fc-border)',
+              background: 'var(--fc-bgOverlay)',
+              color: 'var(--fc-textDim)',
+              borderRadius: 6,
+              padding: '8px 10px',
+              fontSize: 11,
+              lineHeight: 1.4,
+            }}
+          >
             This export will regenerate geometry with the selected quality profile.
           </div>
         )}
@@ -259,9 +265,7 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
               fontSize: 12,
             }}
           />
-          <span style={{ fontSize: 12, color: 'var(--fc-textDim)', width: 44, textAlign: 'left' }}>
-            .{format}
-          </span>
+          <span style={{ fontSize: 12, color: 'var(--fc-textDim)', width: 44, textAlign: 'left' }}>.{format}</span>
         </div>
       </label>
 
@@ -302,9 +306,7 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
       {/* Animation GIF */}
       <div style={sectionBorder}>
         <div style={{ fontSize: 12, color: 'var(--fc-textDim)', marginBottom: 6 }}>Animation</div>
-        <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 7 }}>
-          Renders a full 360 orbit in solid, then wireframe.
-        </div>
+        <div style={{ fontSize: 11, color: 'var(--fc-textDim)', marginBottom: 7 }}>Renders a full 360 orbit in solid, then wireframe.</div>
         <button onClick={exportGif} disabled={gifBusy} style={actionBtn(gifBusy)}>
           {gifBusy ? 'Rendering Orbit GIF...' : 'Export Orbit GIF'}
         </button>
@@ -319,7 +321,14 @@ export function Export3DPanel({ fileStem: initialStem, defaultStem, shapeCount, 
               <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
                 <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
                 <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2">
-                  <animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="0.75s" repeatCount="indefinite" />
+                  <animateTransform
+                    attributeName="transform"
+                    type="rotate"
+                    from="0 8 8"
+                    to="360 8 8"
+                    dur="0.75s"
+                    repeatCount="indefinite"
+                  />
                 </path>
               </svg>
               <span>Generating Report...</span>

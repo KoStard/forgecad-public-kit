@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, extname, resolve } from 'path';
-import { init, runScript, getCollectedRobotExport } from '../src/forge/headless';
+import { getCollectedRobotExport, init, runScript } from '../src/forge/headless';
 import { buildSdfRobotPackage } from '../src/forge/sdfExport';
 import { collectProjectFiles } from './collect-files';
 

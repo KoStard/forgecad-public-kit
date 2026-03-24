@@ -2,15 +2,16 @@
  * Passive 3D viewport for mobile — orbit, zoom, pan only.
  * No face selection, measurements, context menus, GIF export, or performance overlay.
  */
-import { useMemo, useRef } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment, Lightformer, PerspectiveCamera } from '@react-three/drei';
-import { useForgeStore } from '../store/forgeStore';
+
 import type { SceneObject } from '@forge/index';
 import { shapeToGeometry } from '@forge/meshToGeometry';
 import { getSketchWorldMatrix } from '@forge/sketch/placement3d';
-import { TOUCH_GESTURES_3D, MOUSE_BUTTONS_3D } from '../capture/controlsConfig';
+import { Environment, Grid, Lightformer, OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { Canvas } from '@react-three/fiber';
+import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { MOUSE_BUTTONS_3D, TOUCH_GESTURES_3D } from '../capture/controlsConfig';
+import { useForgeStore } from '../store/forgeStore';
 
 function MobileForgeObject({ obj, matrix }: { obj: SceneObject; matrix: THREE.Matrix4 }) {
   const geometry = useMemo(() => {
@@ -25,12 +26,7 @@ function MobileForgeObject({ obj, matrix }: { obj: SceneObject; matrix: THREE.Ma
   return (
     <group matrixAutoUpdate={false} matrix={matrix}>
       <mesh geometry={geometry.solid}>
-        <meshStandardMaterial
-          color={color}
-          roughness={0.45}
-          metalness={0.05}
-          side={THREE.DoubleSide}
-        />
+        <meshStandardMaterial color={color} roughness={0.45} metalness={0.05} side={THREE.DoubleSide} />
       </mesh>
       {geometry.edges && (
         <lineSegments geometry={geometry.edges}>
@@ -61,9 +57,7 @@ export function MobileViewport() {
   const objectMatrices = useMemo(() => {
     const out: Record<string, THREE.Matrix4> = {};
     objects.forEach((obj) => {
-      out[obj.id] = obj.sketch
-        ? new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch))
-        : new THREE.Matrix4();
+      out[obj.id] = obj.sketch ? new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch)) : new THREE.Matrix4();
     });
     return out;
   }, [objects]);

@@ -1,21 +1,21 @@
 import { assertExhaustive, type ShapeCompilePlan, type ShapeCompileTransformStep } from './compilePlan';
 import type { ShapeEdgeDescendantResolution } from './descendantResolution';
+import type { EdgeFeatureResolvedSelector, ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
 import {
   cloneEdgeQueryRef,
   cloneShapeQueryOwner,
-  edgeQueryRefsEqual,
-  shapeQueryOwnersEqual,
   type EdgeQueryRef,
+  edgeQueryRefsEqual,
   type PropagatedEdgeQueryRef,
   type ShapeQueryOwner,
+  shapeQueryOwnersEqual,
   type TopologyRewriteEdgeDescendantContract,
 } from './queryModel';
 import { Transform, type Vec3 } from './transform';
-import type { EdgeFeatureResolvedSelector, ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
 
 const EPS = 1e-8;
 const SUPPORTED_VERTICAL_EDGE_NAMES = ['vert-bl', 'vert-br', 'vert-tr', 'vert-tl'] as const;
-type SupportedVerticalEdgeName = typeof SUPPORTED_VERTICAL_EDGE_NAMES[number];
+type SupportedVerticalEdgeName = (typeof SUPPORTED_VERTICAL_EDGE_NAMES)[number];
 
 type EdgeFeatureIssueCode =
   | 'missing-edge-query'
@@ -46,14 +46,9 @@ type EdgeFeatureResolutionResult =
   | { ok: true; selection: ResolvedEdgeFeatureSelection; query: EdgeQueryRef }
   | { ok: false; issue: EdgeFeatureResolutionIssue };
 
-type EdgeFeatureSelectionResult =
-  | { ok: true; selection: ResolvedEdgeFeatureSelection }
-  | { ok: false; issue: EdgeFeatureResolutionIssue };
+type EdgeFeatureSelectionResult = { ok: true; selection: ResolvedEdgeFeatureSelection } | { ok: false; issue: EdgeFeatureResolutionIssue };
 
-type TopologyRewritePlan = Extract<
-  ShapeCompilePlan,
-  { kind: 'shell' | 'hole' | 'cut' | 'boolean' | 'trimByPlane' | 'fillet' | 'chamfer' }
->;
+type TopologyRewritePlan = Extract<ShapeCompilePlan, { kind: 'shell' | 'hole' | 'cut' | 'boolean' | 'trimByPlane' | 'fillet' | 'chamfer' }>;
 
 type OwnerSearchStep =
   | {
@@ -71,11 +66,7 @@ interface OwnerSearchMatch {
 }
 
 function midpoint(start: Vec3, end: Vec3): Vec3 {
-  return [
-    (start[0] + end[0]) * 0.5,
-    (start[1] + end[1]) * 0.5,
-    (start[2] + end[2]) * 0.5,
-  ];
+  return [(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5, (start[2] + end[2]) * 0.5];
 }
 
 function normalize(v: Vec3): Vec3 {
@@ -92,10 +83,7 @@ function edgeIssue(code: EdgeFeatureIssueCode, reason: string): EdgeFeatureResol
   return { ok: false, issue: { code, reason } };
 }
 
-function edgeSuccess(
-  selection: ResolvedEdgeFeatureSelection,
-  query: EdgeQueryRef,
-): EdgeFeatureResolutionResult {
+function edgeSuccess(selection: ResolvedEdgeFeatureSelection, query: EdgeQueryRef): EdgeFeatureResolutionResult {
   return {
     ok: true,
     selection,
@@ -145,21 +133,16 @@ function defaultUnsupportedReasonForRewrite(plan: TopologyRewritePlan): string {
   }
 }
 
-function findEdgePropagationDiagnosticMessage(
-  plan: TopologyRewritePlan,
-  source: EdgeQueryRef,
-  query?: EdgeQueryRef,
-): string | null {
+function findEdgePropagationDiagnosticMessage(plan: TopologyRewritePlan, source: EdgeQueryRef, query?: EdgeQueryRef): string | null {
   const diagnostics = plan.queryPropagation?.diagnostics.filter((entry) => entry.queryKind === 'edge') ?? [];
-  const exact = diagnostics.find((entry) =>
-    edgeQueryRefsEqual(entry.source as EdgeQueryRef | undefined, source)
-    && (query == null || edgeQueryRefsEqual(entry.query as EdgeQueryRef | undefined, query))
+  const exact = diagnostics.find(
+    (entry) =>
+      edgeQueryRefsEqual(entry.source as EdgeQueryRef | undefined, source) &&
+      (query == null || edgeQueryRefsEqual(entry.query as EdgeQueryRef | undefined, query)),
   );
   if (exact?.message) return exact.message;
 
-  const bySource = diagnostics.find((entry) =>
-    edgeQueryRefsEqual(entry.source as EdgeQueryRef | undefined, source)
-  );
+  const bySource = diagnostics.find((entry) => edgeQueryRefsEqual(entry.source as EdgeQueryRef | undefined, source));
   if (bySource?.message) return bySource.message;
 
   const generic = diagnostics.find((entry) => entry.source == null && entry.query == null);
@@ -171,8 +154,8 @@ function findEdgeDescendantContract(
   query: EdgeQueryRef | undefined,
 ): TopologyRewriteEdgeDescendantContract | undefined {
   if (!query) return undefined;
-  return plan.queryPropagation?.descendants.find((entry): entry is TopologyRewriteEdgeDescendantContract =>
-    entry.queryKind === 'edge' && edgeQueryRefsEqual(entry.query, query),
+  return plan.queryPropagation?.descendants.find(
+    (entry): entry is TopologyRewriteEdgeDescendantContract => entry.queryKind === 'edge' && edgeQueryRefsEqual(entry.query, query),
   );
 }
 
@@ -181,16 +164,9 @@ function rigidTransformForEdgeStep(step: ShapeCompileTransformStep): Transform |
     case 'translate':
       return Transform.translation(step.x, step.y, step.z);
     case 'rotate':
-      return Transform.identity()
-        .rotateAxis([1, 0, 0], step.xDeg)
-        .rotateAxis([0, 1, 0], step.yDeg)
-        .rotateAxis([0, 0, 1], step.zDeg);
+      return Transform.identity().rotateAxis([1, 0, 0], step.xDeg).rotateAxis([0, 1, 0], step.yDeg).rotateAxis([0, 0, 1], step.zDeg);
     case 'rotateAround':
-      return Transform.rotationAxis(
-        [step.axisX, step.axisY, step.axisZ],
-        step.degrees,
-        [step.pivotX, step.pivotY, step.pivotZ],
-      );
+      return Transform.rotationAxis([step.axisX, step.axisY, step.axisZ], step.degrees, [step.pivotX, step.pivotY, step.pivotZ]);
     case 'mirror': {
       const [nx0, ny0, nz0] = [step.normalX, step.normalY, step.normalZ];
       const len = Math.hypot(nx0, ny0, nz0);
@@ -199,10 +175,22 @@ function rigidTransformForEdgeStep(step: ShapeCompileTransformStep): Transform |
       const ny = ny0 / len;
       const nz = nz0 / len;
       return Transform.from([
-        1 - 2 * nx * nx, -2 * ny * nx, -2 * nz * nx, 0,
-        -2 * nx * ny, 1 - 2 * ny * ny, -2 * nz * ny, 0,
-        -2 * nx * nz, -2 * ny * nz, 1 - 2 * nz * nz, 0,
-        0, 0, 0, 1,
+        1 - 2 * nx * nx,
+        -2 * ny * nx,
+        -2 * nz * nx,
+        0,
+        -2 * nx * ny,
+        1 - 2 * ny * ny,
+        -2 * nz * ny,
+        0,
+        -2 * nx * nz,
+        -2 * ny * nz,
+        1 - 2 * nz * nz,
+        0,
+        0,
+        0,
+        0,
+        1,
       ]);
     }
     case 'workplanePlacement':
@@ -321,20 +309,14 @@ function applyTransformStepsToCandidate(
   return edgeSuccess(applySelectionTransform(candidate.selection, accumulated.transform), candidate.query);
 }
 
-function resolveEdgeQueryAtOwnerBase(
-  ownerBase: ShapeCompilePlan,
-  ref: EdgeQueryRef,
-): EdgeFeatureResolutionResult {
+function resolveEdgeQueryAtOwnerBase(ownerBase: ShapeCompilePlan, ref: EdgeQueryRef): EdgeFeatureResolutionResult {
   switch (ref.kind) {
     case 'tracked-edge':
       return resolveTrackedEdgeQueryAtOwnerBase(ownerBase, ref);
     case 'propagated-edge':
       return resolvePropagatedEdgeQueryAtOwnerBase(ownerBase, ref);
     case 'created-edge':
-      return edgeIssue(
-        'unsupported-edge-query-kind',
-        'Edge finishing does not yet support created-edge queries from topology rewrites.',
-      );
+      return edgeIssue('unsupported-edge-query-kind', 'Edge finishing does not yet support created-edge queries from topology rewrites.');
     case 'edge-ref':
       return edgeIssue(
         'unsupported-edge-query-kind',
@@ -352,10 +334,7 @@ function resolveTrackedEdgeQueryAtOwnerBase(
   return edgeSuccess(selection.selection, ref);
 }
 
-function resolveSourceQueryBeforeRewrite(
-  plan: TopologyRewritePlan,
-  source: EdgeQueryRef,
-): EdgeFeatureResolutionResult {
+function resolveSourceQueryBeforeRewrite(plan: TopologyRewritePlan, source: EdgeQueryRef): EdgeFeatureResolutionResult {
   switch (plan.kind) {
     case 'fillet':
     case 'chamfer':
@@ -376,7 +355,7 @@ function resolveSourceQueryBeforeRewrite(
       if (deferred) return edgeIssue(deferred.code, deferred.reason);
       return edgeIssue(
         'edge-query-propagation-mismatch',
-        'The selected propagated edge query does not match the target shape\'s recorded rewrite propagation contract.',
+        "The selected propagated edge query does not match the target shape's recorded rewrite propagation contract.",
       );
     }
     default:
@@ -384,49 +363,40 @@ function resolveSourceQueryBeforeRewrite(
   }
 }
 
-function propagateCandidateAcrossRewrite(
-  plan: TopologyRewritePlan,
-  candidate: ResolvedEdgeFeatureCandidate,
-): EdgeFeatureResolutionResult {
-  const preservedEntry = plan.queryPropagation?.preservedEdges.find((entry) =>
-    edgeQueryRefsEqual(entry.query.source, candidate.query)
-  );
+function propagateCandidateAcrossRewrite(plan: TopologyRewritePlan, candidate: ResolvedEdgeFeatureCandidate): EdgeFeatureResolutionResult {
+  const preservedEntry = plan.queryPropagation?.preservedEdges.find((entry) => edgeQueryRefsEqual(entry.query.source, candidate.query));
   if (!preservedEntry) {
     return edgeIssue(
       'edge-query-unsupported-after-rewrite',
-      findEdgePropagationDiagnosticMessage(plan, candidate.query)
-        ?? defaultUnsupportedReasonForRewrite(plan),
+      findEdgePropagationDiagnosticMessage(plan, candidate.query) ?? defaultUnsupportedReasonForRewrite(plan),
     );
   }
   if (preservedEntry.status !== 'supported' || preservedEntry.query.outcome !== 'preserved') {
     return edgeIssue(
       'edge-query-ambiguous-after-rewrite',
-      findEdgePropagationDiagnosticMessage(plan, candidate.query, preservedEntry.query)
-        ?? preservedEntry.note
-        ?? `The selected edge query is recorded as ${preservedEntry.status} after ${rewriteOperationLabel(plan)} and does not resolve to one defended edge target.`,
+      findEdgePropagationDiagnosticMessage(plan, candidate.query, preservedEntry.query) ??
+        preservedEntry.note ??
+        `The selected edge query is recorded as ${preservedEntry.status} after ${rewriteOperationLabel(plan)} and does not resolve to one defended edge target.`,
     );
   }
   return edgeSuccess(candidate.selection, preservedEntry.query);
 }
 
-function resolvePropagatedEdgeQueryAtOwnerBase(
-  ownerBase: ShapeCompilePlan,
-  ref: PropagatedEdgeQueryRef,
-): EdgeFeatureResolutionResult {
+function resolvePropagatedEdgeQueryAtOwnerBase(ownerBase: ShapeCompilePlan, ref: PropagatedEdgeQueryRef): EdgeFeatureResolutionResult {
   if (
-    ownerBase.kind === 'box'
-    || ownerBase.kind === 'cylinder'
-    || ownerBase.kind === 'sphere'
-    || ownerBase.kind === 'extrude'
-    || ownerBase.kind === 'sheetMetal'
-    || ownerBase.kind === 'revolve'
-    || ownerBase.kind === 'loft'
-    || ownerBase.kind === 'sweep'
-    || ownerBase.kind === 'transform'
-    || ownerBase.kind === 'queryOwner'
-    || ownerBase.kind === 'filletEdges'
-    || ownerBase.kind === 'chamferEdges'
-    || ownerBase.kind === 'importedMesh'
+    ownerBase.kind === 'box' ||
+    ownerBase.kind === 'cylinder' ||
+    ownerBase.kind === 'sphere' ||
+    ownerBase.kind === 'extrude' ||
+    ownerBase.kind === 'sheetMetal' ||
+    ownerBase.kind === 'revolve' ||
+    ownerBase.kind === 'loft' ||
+    ownerBase.kind === 'sweep' ||
+    ownerBase.kind === 'transform' ||
+    ownerBase.kind === 'queryOwner' ||
+    ownerBase.kind === 'filletEdges' ||
+    ownerBase.kind === 'chamferEdges' ||
+    ownerBase.kind === 'importedMesh'
   ) {
     return edgeIssue(
       'edge-query-propagation-mismatch',
@@ -438,7 +408,7 @@ function resolvePropagatedEdgeQueryAtOwnerBase(
   if (!propagation || propagation.rewriteId !== ref.rewriteId) {
     return edgeIssue(
       'edge-query-propagation-mismatch',
-      'The selected propagated edge query does not match the target shape\'s recorded rewrite propagation contract.',
+      "The selected propagated edge query does not match the target shape's recorded rewrite propagation contract.",
     );
   }
 
@@ -461,22 +431,20 @@ function resolvePropagatedEdgeQueryAtOwnerBase(
   if (!edgeQueryRefsEqual(propagated.query, ref)) {
     return edgeIssue(
       'edge-query-propagation-mismatch',
-      'The selected propagated edge query does not match the target shape\'s recorded rewrite propagation contract.',
+      "The selected propagated edge query does not match the target shape's recorded rewrite propagation contract.",
     );
   }
   return propagated;
 }
 
-function applyOwnerSearchSteps(
-  selection: ResolvedEdgeFeatureCandidate,
-  steps: OwnerSearchStep[],
-): EdgeFeatureResolutionResult {
+function applyOwnerSearchSteps(selection: ResolvedEdgeFeatureCandidate, steps: OwnerSearchStep[]): EdgeFeatureResolutionResult {
   let current: EdgeFeatureResolutionResult = edgeSuccess(selection.selection, selection.query);
   for (const step of steps) {
     if (!current.ok) return current;
-    current = step.kind === 'transform'
-      ? applyTransformStepsToCandidate({ selection: current.selection, query: current.query }, step.steps)
-      : propagateCandidateAcrossRewrite(step.plan, { selection: current.selection, query: current.query });
+    current =
+      step.kind === 'transform'
+        ? applyTransformStepsToCandidate({ selection: current.selection, query: current.query }, step.steps)
+        : propagateCandidateAcrossRewrite(step.plan, { selection: current.selection, query: current.query });
   }
   return current;
 }
@@ -500,10 +468,7 @@ function deepestTrackedVerticalEdgeSource(
   }
 }
 
-function boxEdgeSelection(
-  plan: Extract<ShapeCompilePlan, { kind: 'box' }>,
-  edgeName: string,
-): EdgeFeatureSelectionResult {
+function boxEdgeSelection(plan: Extract<ShapeCompilePlan, { kind: 'box' }>, edgeName: string): EdgeFeatureSelectionResult {
   const x0 = plan.center ? -plan.x / 2 : 0;
   const y0 = plan.center ? -plan.y / 2 : 0;
   const z0 = plan.center ? -plan.z / 2 : 0;
@@ -567,23 +532,19 @@ function isRectangleProfile(points: [number, number][]): boolean {
   const cross02 = vectors[0][0] * vectors[2][1] - vectors[0][1] * vectors[2][0];
   const cross13 = vectors[1][0] * vectors[3][1] - vectors[1][1] * vectors[3][0];
 
-  return Math.abs(dot01) <= 1e-6 * Math.max(1, lengths[0] * lengths[1])
-    && Math.abs(dot12) <= 1e-6 * Math.max(1, lengths[1] * lengths[2])
-    && Math.abs(dot23) <= 1e-6 * Math.max(1, lengths[2] * lengths[3])
-    && Math.abs(dot30) <= 1e-6 * Math.max(1, lengths[3] * lengths[0])
-    && Math.abs(cross02) <= 1e-6 * Math.max(1, lengths[0] * lengths[2])
-    && Math.abs(cross13) <= 1e-6 * Math.max(1, lengths[1] * lengths[3]);
+  return (
+    Math.abs(dot01) <= 1e-6 * Math.max(1, lengths[0] * lengths[1]) &&
+    Math.abs(dot12) <= 1e-6 * Math.max(1, lengths[1] * lengths[2]) &&
+    Math.abs(dot23) <= 1e-6 * Math.max(1, lengths[2] * lengths[3]) &&
+    Math.abs(dot30) <= 1e-6 * Math.max(1, lengths[3] * lengths[0]) &&
+    Math.abs(cross02) <= 1e-6 * Math.max(1, lengths[0] * lengths[2]) &&
+    Math.abs(cross13) <= 1e-6 * Math.max(1, lengths[1] * lengths[3])
+  );
 }
 
-function extrudeEdgeSelection(
-  plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>,
-  edgeName: string,
-): EdgeFeatureSelectionResult {
+function extrudeEdgeSelection(plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>, edgeName: string): EdgeFeatureSelectionResult {
   if (plan.scaleTop) {
-    return edgeIssue(
-      'unsupported-edge-base',
-      'Edge finishing v1 does not support tapered extrudes (`scaleTop`) yet.',
-    );
+    return edgeIssue('unsupported-edge-base', 'Edge finishing v1 does not support tapered extrudes (`scaleTop`) yet.');
   }
   if (plan.center) {
     return edgeIssue(
@@ -620,16 +581,11 @@ function extrudeEdgeSelection(
   }
 
   const points = plan.profile.points;
-  const [bl, br, tr, tl] = points;
+  const [bl, br, _tr, tl] = points;
   const u = normalize([br[0] - bl[0], br[1] - bl[1], 0]);
   const v = normalize([tl[0] - bl[0], tl[1] - bl[1], 0]);
   const vertex = points[index];
-  const quadrant = (
-    index === 0 ? [1, -1]
-      : index === 1 ? [-1, -1]
-        : index === 2 ? [-1, 1]
-          : [1, 1]
-  ) as [number, number];
+  const quadrant = (index === 0 ? [1, -1] : index === 1 ? [-1, -1] : index === 2 ? [-1, 1] : [1, 1]) as [number, number];
 
   return {
     ok: true,
@@ -647,10 +603,7 @@ function extrudeEdgeSelection(
   };
 }
 
-function applySelectionTransform(
-  selection: ResolvedEdgeFeatureSelection,
-  transform: Transform,
-): ResolvedEdgeFeatureSelection {
+function applySelectionTransform(selection: ResolvedEdgeFeatureSelection, transform: Transform): ResolvedEdgeFeatureSelection {
   const start = transform.point(selection.start);
   const end = transform.point(selection.end);
   const basisX = normalize(transform.vector(selection.basisX));
@@ -670,10 +623,7 @@ function applySelectionTransform(
   };
 }
 
-function resolveSelectionFromOwnerBase(
-  plan: ShapeCompilePlan,
-  edgeName: string,
-): EdgeFeatureSelectionResult {
+function resolveSelectionFromOwnerBase(plan: ShapeCompilePlan, edgeName: string): EdgeFeatureSelectionResult {
   switch (plan.kind) {
     case 'transform': {
       const base = resolveSelectionFromOwnerBase(plan.base, edgeName);
@@ -730,15 +680,11 @@ export function resolveSupportedEdgeFeatureSelection(
   if (descendant.kind === 'edge-chain') {
     return edgeIssue(
       'edge-query-ambiguous-after-rewrite',
-      descendant.note
-        ?? 'The selected edge resolves to a defended descendant chain, not one single edge target.',
+      descendant.note ?? 'The selected edge resolves to a defended descendant chain, not one single edge target.',
     );
   }
   if (descendant.query == null && ref == null) {
-    return edgeIssue(
-      'missing-edge-query',
-      descendant.reason,
-    );
+    return edgeIssue('missing-edge-query', descendant.reason);
   }
   if (descendant.query == null && ref?.selector && ref.selector !== 'edge') {
     return edgeIssue('unsupported-edge-selector', descendant.reason);
@@ -752,24 +698,21 @@ export function resolveSupportedEdgeFeatureSelection(
   return edgeIssue('edge-query-unsupported-after-rewrite', descendant.reason);
 }
 
-function resolveEdgeChainAtOwnerBase(
-  ownerBase: ShapeCompilePlan,
-  ref: PropagatedEdgeQueryRef,
-): ShapeEdgeDescendantResolution {
+function resolveEdgeChainAtOwnerBase(ownerBase: ShapeCompilePlan, ref: PropagatedEdgeQueryRef): ShapeEdgeDescendantResolution {
   if (
-    ownerBase.kind === 'box'
-    || ownerBase.kind === 'cylinder'
-    || ownerBase.kind === 'sphere'
-    || ownerBase.kind === 'extrude'
-    || ownerBase.kind === 'sheetMetal'
-    || ownerBase.kind === 'revolve'
-    || ownerBase.kind === 'loft'
-    || ownerBase.kind === 'sweep'
-    || ownerBase.kind === 'transform'
-    || ownerBase.kind === 'queryOwner'
-    || ownerBase.kind === 'filletEdges'
-    || ownerBase.kind === 'chamferEdges'
-    || ownerBase.kind === 'importedMesh'
+    ownerBase.kind === 'box' ||
+    ownerBase.kind === 'cylinder' ||
+    ownerBase.kind === 'sphere' ||
+    ownerBase.kind === 'extrude' ||
+    ownerBase.kind === 'sheetMetal' ||
+    ownerBase.kind === 'revolve' ||
+    ownerBase.kind === 'loft' ||
+    ownerBase.kind === 'sweep' ||
+    ownerBase.kind === 'transform' ||
+    ownerBase.kind === 'queryOwner' ||
+    ownerBase.kind === 'filletEdges' ||
+    ownerBase.kind === 'chamferEdges' ||
+    ownerBase.kind === 'importedMesh'
   ) {
     return {
       kind: 'unsupported',
@@ -811,19 +754,19 @@ function resolveCreatedEdgeChainAtOwnerBase(
   ref: Extract<EdgeQueryRef, { kind: 'created-edge' }>,
 ): ShapeEdgeDescendantResolution {
   if (
-    ownerBase.kind === 'box'
-    || ownerBase.kind === 'cylinder'
-    || ownerBase.kind === 'sphere'
-    || ownerBase.kind === 'extrude'
-    || ownerBase.kind === 'sheetMetal'
-    || ownerBase.kind === 'revolve'
-    || ownerBase.kind === 'loft'
-    || ownerBase.kind === 'sweep'
-    || ownerBase.kind === 'transform'
-    || ownerBase.kind === 'queryOwner'
-    || ownerBase.kind === 'filletEdges'
-    || ownerBase.kind === 'chamferEdges'
-    || ownerBase.kind === 'importedMesh'
+    ownerBase.kind === 'box' ||
+    ownerBase.kind === 'cylinder' ||
+    ownerBase.kind === 'sphere' ||
+    ownerBase.kind === 'extrude' ||
+    ownerBase.kind === 'sheetMetal' ||
+    ownerBase.kind === 'revolve' ||
+    ownerBase.kind === 'loft' ||
+    ownerBase.kind === 'sweep' ||
+    ownerBase.kind === 'transform' ||
+    ownerBase.kind === 'queryOwner' ||
+    ownerBase.kind === 'filletEdges' ||
+    ownerBase.kind === 'chamferEdges' ||
+    ownerBase.kind === 'importedMesh'
   ) {
     return {
       kind: 'unsupported',
@@ -849,10 +792,7 @@ function resolveCreatedEdgeChainAtOwnerBase(
   };
 }
 
-export function resolveShapeEdgeDescendant(
-  plan: ShapeCompilePlan | null,
-  ref: EdgeQueryRef | undefined,
-): ShapeEdgeDescendantResolution {
+export function resolveShapeEdgeDescendant(plan: ShapeCompilePlan | null, ref: EdgeQueryRef | undefined): ShapeEdgeDescendantResolution {
   if (!ref) {
     return {
       kind: 'unsupported',
@@ -870,7 +810,8 @@ export function resolveShapeEdgeDescendant(
     return {
       kind: 'unsupported',
       query: cloneEdgeQueryRef(ref),
-      reason: 'Edge finishing v1 supports compiler-owned tracked-edge, propagated-edge, and inspectable created-edge queries only, not direct edge refs.',
+      reason:
+        'Edge finishing v1 supports compiler-owned tracked-edge, propagated-edge, and inspectable created-edge queries only, not direct edge refs.',
     };
   }
   if (!ref.owner) {
@@ -886,8 +827,7 @@ export function resolveShapeEdgeDescendant(
     return {
       kind: 'unsupported',
       query: cloneEdgeQueryRef(ref),
-      reason: found.issue?.reason
-        ?? 'The selected tracked edge is not owned by this target shape or any preserved query ancestor.',
+      reason: found.issue?.reason ?? 'The selected tracked edge is not owned by this target shape or any preserved query ancestor.',
     };
   }
 
@@ -934,10 +874,7 @@ export function resolveShapeEdgeDescendant(
           if (!transformed.selection) {
             continue;
           }
-          const applied = applyTransformStepsToCandidate(
-            { selection: transformed.selection, query: transformed.query },
-            step.steps,
-          );
+          const applied = applyTransformStepsToCandidate({ selection: transformed.selection, query: transformed.query }, step.steps);
           if (!applied.ok) {
             return {
               kind: 'unsupported',
@@ -994,9 +931,7 @@ export function collectSupportedEdgeFinishPreservedSources(
   return out;
 }
 
-export function selectionToResolvedSelector(
-  selection: ResolvedEdgeFeatureSelection,
-): EdgeFeatureResolvedSelector {
+export function selectionToResolvedSelector(selection: ResolvedEdgeFeatureSelection): EdgeFeatureResolvedSelector {
   return {
     kind: 'line-segment',
     edgeName: selection.edgeName,

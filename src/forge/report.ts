@@ -1,27 +1,25 @@
+import type { BomDef } from './bom';
 import type { Shape } from './kernel';
 import { shapeToGeometry } from './meshToGeometry';
-import type { RunResult, SceneObject } from './runner';
-import type { DimensionDef } from './sketch/dimensions';
-import type { BomDef } from './bom';
-import { mapDimensionsToOwnerIds } from './reportDimensionOwnership';
-import { formatLength, type LengthUnit } from './units';
 import {
-  PdfBuilder,
-  byteLength,
-  formatNumber,
-  escapePdfText,
+  type ColorRgb,
+  commandLine,
   commandSetFill,
   commandSetStroke,
   commandText,
-  commandLine,
   estimateTextWidth,
-  truncateToWidth,
-  PAGE_WIDTH,
+  formatNumber,
   PAGE_HEIGHT,
   PAGE_MARGIN,
-  type ColorRgb,
+  PAGE_WIDTH,
+  PdfBuilder,
+  truncateToWidth,
   type Vec2,
 } from './pdfUtils';
+import { mapDimensionsToOwnerIds } from './reportDimensionOwnership';
+import type { RunResult, SceneObject } from './runner';
+import type { DimensionDef } from './sketch/dimensions';
+import { formatLength, type LengthUnit } from './units';
 
 export type ReportViewId = 'front' | 'right' | 'top' | 'iso';
 
@@ -187,7 +185,7 @@ function sub3(a: Vec3, b: Vec3): Vec3 {
   return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 }
 
-function add3(a: Vec3, b: Vec3): Vec3 {
+function _add3(a: Vec3, b: Vec3): Vec3 {
   return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 }
 
@@ -200,11 +198,7 @@ function dot3(a: Vec3, b: Vec3): number {
 }
 
 function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function distance3(a: Vec3, b: Vec3): number {
@@ -212,11 +206,7 @@ function distance3(a: Vec3, b: Vec3): number {
 }
 
 function bboxCenter(b: Bounds3): Vec3 {
-  return [
-    (b.min[0] + b.max[0]) * 0.5,
-    (b.min[1] + b.max[1]) * 0.5,
-    (b.min[2] + b.max[2]) * 0.5,
-  ];
+  return [(b.min[0] + b.max[0]) * 0.5, (b.min[1] + b.max[1]) * 0.5, (b.min[2] + b.max[2]) * 0.5];
 }
 
 function mergeBounds3(bounds: Bounds3[]): Bounds3 | null {
@@ -240,8 +230,14 @@ function bboxCorners(bounds: Bounds3): Vec3[] {
   const [x0, y0, z0] = bounds.min;
   const [x1, y1, z1] = bounds.max;
   return [
-    [x0, y0, z0], [x1, y0, z0], [x0, y1, z0], [x1, y1, z0],
-    [x0, y0, z1], [x1, y0, z1], [x0, y1, z1], [x1, y1, z1],
+    [x0, y0, z0],
+    [x1, y0, z0],
+    [x0, y1, z0],
+    [x1, y1, z0],
+    [x0, y0, z1],
+    [x1, y0, z1],
+    [x0, y1, z1],
+    [x1, y1, z1],
   ];
 }
 
@@ -300,15 +296,7 @@ function splitBomRowsIntoPages(rows: BomReportRow[]): BomReportRow[][] {
 
   const maxRowsByGeometry = Math.max(
     1,
-    Math.floor(
-      (
-        PAGE_HEIGHT
-        - PAGE_MARGIN * 2
-        - HEADER_HEIGHT
-        - BOM_TABLE_BOTTOM_PAD * 2
-        - BOM_TABLE_HEADER_HEIGHT
-      ) / BOM_TABLE_ROW_HEIGHT,
-    ),
+    Math.floor((PAGE_HEIGHT - PAGE_MARGIN * 2 - HEADER_HEIGHT - BOM_TABLE_BOTTOM_PAD * 2 - BOM_TABLE_HEADER_HEIGHT) / BOM_TABLE_ROW_HEIGHT),
   );
   const perPage = Math.max(1, Math.min(BOM_MAX_ROWS_PER_PAGE, maxRowsByGeometry));
   const out: BomReportRow[][] = [];
@@ -356,17 +344,18 @@ function projectPoint(point: Vec3, center: Vec3, frame: ViewFrame): ViewProjecti
   };
 }
 
-function pointInBounds(point: Vec3, bounds: Bounds3, tolerance: number): boolean {
-  return point[0] >= bounds.min[0] - tolerance && point[0] <= bounds.max[0] + tolerance
-    && point[1] >= bounds.min[1] - tolerance && point[1] <= bounds.max[1] + tolerance
-    && point[2] >= bounds.min[2] - tolerance && point[2] <= bounds.max[2] + tolerance;
+function _pointInBounds(point: Vec3, bounds: Bounds3, tolerance: number): boolean {
+  return (
+    point[0] >= bounds.min[0] - tolerance &&
+    point[0] <= bounds.max[0] + tolerance &&
+    point[1] >= bounds.min[1] - tolerance &&
+    point[1] <= bounds.max[1] + tolerance &&
+    point[2] >= bounds.min[2] - tolerance &&
+    point[2] <= bounds.max[2] + tolerance
+  );
 }
 
-function isDimensionVisibleInView(
-  dim: DimensionDef,
-  frame: ViewFrame,
-  toleranceDeg: number,
-): boolean {
+function isDimensionVisibleInView(dim: DimensionDef, frame: ViewFrame, toleranceDeg: number): boolean {
   const dir = sub3(dim.to, dim.from);
   const len = Math.hypot(dir[0], dir[1], dir[2]);
   if (len < 1e-9) return false;
@@ -374,8 +363,8 @@ function isDimensionVisibleInView(
   const d = [dir[0] / len, dir[1] / len, dir[2] / len] as Vec3;
   const alignRight = clamp(Math.abs(dot3(d, frame.right)), 0, 1);
   const alignUp = clamp(Math.abs(dot3(d, frame.up)), 0, 1);
-  const angleRight = Math.acos(alignRight) * 180 / Math.PI;
-  const angleUp = Math.acos(alignUp) * 180 / Math.PI;
+  const angleRight = (Math.acos(alignRight) * 180) / Math.PI;
+  const angleUp = (Math.acos(alignUp) * 180) / Math.PI;
   const minAngle = Math.min(angleRight, angleUp);
   return minAngle <= toleranceDeg;
 }
@@ -397,21 +386,9 @@ function collectShapeTriangles(shape: Shape): ReportTriangle[] {
     const i1 = mesh.triVerts[t * 3 + 1];
     const i2 = mesh.triVerts[t * 3 + 2];
 
-    const a: Vec3 = [
-      mesh.vertProperties[i0 * numProp],
-      mesh.vertProperties[i0 * numProp + 1],
-      mesh.vertProperties[i0 * numProp + 2],
-    ];
-    const b: Vec3 = [
-      mesh.vertProperties[i1 * numProp],
-      mesh.vertProperties[i1 * numProp + 1],
-      mesh.vertProperties[i1 * numProp + 2],
-    ];
-    const c: Vec3 = [
-      mesh.vertProperties[i2 * numProp],
-      mesh.vertProperties[i2 * numProp + 1],
-      mesh.vertProperties[i2 * numProp + 2],
-    ];
+    const a: Vec3 = [mesh.vertProperties[i0 * numProp], mesh.vertProperties[i0 * numProp + 1], mesh.vertProperties[i0 * numProp + 2]];
+    const b: Vec3 = [mesh.vertProperties[i1 * numProp], mesh.vertProperties[i1 * numProp + 1], mesh.vertProperties[i1 * numProp + 2]];
+    const c: Vec3 = [mesh.vertProperties[i2 * numProp], mesh.vertProperties[i2 * numProp + 1], mesh.vertProperties[i2 * numProp + 2]];
 
     const n = norm(cross3(sub3(b, a), sub3(c, a)));
     tris.push({ a, b, c, normal: n });
@@ -439,10 +416,7 @@ function collectShapeEdges(shape: Shape): ReportEdge[] {
   return edges;
 }
 
-function collectReportObjects(
-  objects: SceneObject[],
-  visuals: Record<string, ReportObjectVisual> | undefined,
-): ReportObject[] {
+function collectReportObjects(objects: SceneObject[], visuals: Record<string, ReportObjectVisual> | undefined): ReportObject[] {
   const out: ReportObject[] = [];
 
   for (const obj of objects) {
@@ -461,11 +435,7 @@ function collectReportObjects(
     const edges = collectShapeEdges(obj.shape);
     const opacity = clamp(visual?.opacity ?? 1, 0.08, 1);
     const baseColor = hexToRgb01(visual?.color || obj.color || DEFAULT_COLOR_HEX);
-    const color: ColorRgb = [
-      1 - (1 - baseColor[0]) * opacity,
-      1 - (1 - baseColor[1]) * opacity,
-      1 - (1 - baseColor[2]) * opacity,
-    ];
+    const color: ColorRgb = [1 - (1 - baseColor[0]) * opacity, 1 - (1 - baseColor[1]) * opacity, 1 - (1 - baseColor[2]) * opacity];
 
     out.push({
       id: obj.id,
@@ -482,17 +452,11 @@ function collectReportObjects(
   return out;
 }
 
-function mapDimensionsToOwners(
-  dimensions: DimensionDef[],
-  objects: ReportObject[],
-): Map<string, string[]> {
+function mapDimensionsToOwners(dimensions: DimensionDef[], objects: ReportObject[]): Map<string, string[]> {
   return mapDimensionsToOwnerIds(dimensions, objects);
 }
 
-function buildDimensionOwnership(
-  dimensions: DimensionDef[],
-  objects: ReportObject[],
-): DimensionOwnership {
+function buildDimensionOwnership(dimensions: DimensionDef[], objects: ReportObject[]): DimensionOwnership {
   const byId = mapDimensionsToOwners(dimensions, objects);
   const combined: DimensionDef[] = [];
   const byComponent = new Map<string, DimensionDef[]>();
@@ -532,12 +496,7 @@ function summarizeMetricSeries(values: number[]): string {
     max = Math.max(max, value);
   });
 
-  return [
-    signatureNumber(sum),
-    signatureNumber(sumSquares),
-    signatureNumber(min),
-    signatureNumber(max),
-  ].join(':');
+  return [signatureNumber(sum), signatureNumber(sumSquares), signatureNumber(min), signatureNumber(max)].join(':');
 }
 
 function triangleArea(triangle: ReportTriangle): number {
@@ -566,10 +525,7 @@ function makeComponentPageSignature(object: ReportObject): string {
   ].join('|');
 }
 
-function collectComponentPageGroups(
-  objects: ReportObject[],
-  ownership: DimensionOwnership,
-): ComponentPageGroup[] {
+function collectComponentPageGroups(objects: ReportObject[], ownership: DimensionOwnership): ComponentPageGroup[] {
   const grouped = new Map<string, ReportObject[]>();
 
   objects.forEach((object) => {
@@ -602,12 +558,7 @@ function collectComponentPageGroups(
   });
 }
 
-function projectedBounds(
-  center: Vec3,
-  frame: ViewFrame,
-  objects: ReportObject[],
-  dimensions: DimensionDef[],
-): Bounds2 {
+function projectedBounds(center: Vec3, frame: ViewFrame, objects: ReportObject[], dimensions: DimensionDef[]): Bounds2 {
   const bounds: Bounds2 = {
     minX: Infinity,
     minY: Infinity,
@@ -707,7 +658,11 @@ function projectVectorToView(v: Vec3, frame: ViewFrame): Vec2 {
 }
 
 function pickDimensionOffsetBasis(dirModel: Vec3, frame: ViewFrame): DimensionOffsetBasis {
-  const worldAxes: Vec3[] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  const worldAxes: Vec3[] = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+  ];
   const candidates: DimensionOffsetBasis[] = [];
 
   const pushCandidate = (candidate: Vec3) => {
@@ -736,10 +691,7 @@ function pickDimensionOffsetBasis(dirModel: Vec3, frame: ViewFrame): DimensionOf
     return { dir3: [0, 0, 1], proj: [0, 1], projDir: [0, 1], projLen: 1 };
   }
 
-  candidates.sort((a, b) => (
-    (b.projLen + Math.abs(b.projDir[1]) * 0.18)
-    - (a.projLen + Math.abs(a.projDir[1]) * 0.18)
-  ));
+  candidates.sort((a, b) => b.projLen + Math.abs(b.projDir[1]) * 0.18 - (a.projLen + Math.abs(a.projDir[1]) * 0.18));
   return candidates[0];
 }
 
@@ -766,7 +718,7 @@ function buildGridCells(viewCount: number): CellRect[] {
   return out;
 }
 
-function makeMapperForRect(bounds: Bounds2, rect: CellRect, padding = CELL_PADDING): { map: (p: Vec2) => Vec2; scale: number } {
+function _makeMapperForRect(bounds: Bounds2, rect: CellRect, padding = CELL_PADDING): { map: (p: Vec2) => Vec2; scale: number } {
   const spanX = Math.max(1e-6, bounds.maxX - bounds.minX);
   const spanY = Math.max(1e-6, bounds.maxY - bounds.minY);
   const scale = Math.min((rect.w - padding * 2) / spanX, (rect.h - padding * 2) / spanY);
@@ -780,12 +732,7 @@ function makeMapperForRect(bounds: Bounds2, rect: CellRect, padding = CELL_PADDI
   };
 }
 
-
-function collectProjectedEdges(
-  frame: ViewFrame,
-  center: Vec3,
-  objects: ReportObject[],
-): ProjectedEdge[] {
+function collectProjectedEdges(frame: ViewFrame, center: Vec3, objects: ReportObject[]): ProjectedEdge[] {
   const out: ProjectedEdge[] = [];
   objects.forEach((obj) => {
     obj.edges.forEach((edge) => {
@@ -804,11 +751,7 @@ function collectProjectedEdges(
   return out;
 }
 
-function projectedObjectBounds(
-  object: ReportObject,
-  center: Vec3,
-  frame: ViewFrame,
-): Bounds2 {
+function projectedObjectBounds(object: ReportObject, center: Vec3, frame: ViewFrame): Bounds2 {
   const bounds: Bounds2 = {
     minX: Infinity,
     minY: Infinity,
@@ -830,10 +773,7 @@ function projectedObjectBounds(
 
 type LabelBox = { minX: number; minY: number; maxX: number; maxY: number };
 
-function mapBoundsToLabelBox(
-  bounds: Bounds2,
-  mapPoint: (p: Vec2) => Vec2,
-): LabelBox {
+function mapBoundsToLabelBox(bounds: Bounds2, mapPoint: (p: Vec2) => Vec2): LabelBox {
   const p0 = mapPoint([bounds.minX, bounds.minY]);
   const p1 = mapPoint([bounds.maxX, bounds.maxY]);
   return {
@@ -933,7 +873,7 @@ function overlapArea(a: LabelBox, b: LabelBox): number {
   return x * y;
 }
 
-function boxDistance(a: LabelBox, b: LabelBox): number {
+function _boxDistance(a: LabelBox, b: LabelBox): number {
   const dx = Math.max(0, a.minX - b.maxX, b.minX - a.maxX);
   const dy = Math.max(0, a.minY - b.maxY, b.minY - a.maxY);
   return Math.hypot(dx, dy);
@@ -955,17 +895,11 @@ function clampLabelCenter(center: Vec2, textHalfW: number, textHalfH: number, ce
   const minY = cell.y + inset + textHalfH;
   const maxY = cell.y + cell.h - inset - textHalfH;
   if (minX > maxX || minY > maxY) return [cell.x + cell.w * 0.5, cell.y + cell.h * 0.5];
-  return [
-    clamp(center[0], minX, maxX),
-    clamp(center[1], minY, maxY),
-  ];
+  return [clamp(center[0], minX, maxX), clamp(center[1], minY, maxY)];
 }
 
 function closestPointOnBox(box: LabelBox, point: Vec2): Vec2 {
-  return [
-    clamp(point[0], box.minX, box.maxX),
-    clamp(point[1], box.minY, box.maxY),
-  ];
+  return [clamp(point[0], box.minX, box.maxX), clamp(point[1], box.minY, box.maxY)];
 }
 
 function pointInBox(point: Vec2, box: LabelBox): boolean {
@@ -977,10 +911,12 @@ function orientation2(a: Vec2, b: Vec2, c: Vec2): number {
 }
 
 function onSegment2(a: Vec2, b: Vec2, p: Vec2): boolean {
-  return p[0] >= Math.min(a[0], b[0]) - 1e-6
-    && p[0] <= Math.max(a[0], b[0]) + 1e-6
-    && p[1] >= Math.min(a[1], b[1]) - 1e-6
-    && p[1] <= Math.max(a[1], b[1]) + 1e-6;
+  return (
+    p[0] >= Math.min(a[0], b[0]) - 1e-6 &&
+    p[0] <= Math.max(a[0], b[0]) + 1e-6 &&
+    p[1] >= Math.min(a[1], b[1]) - 1e-6 &&
+    p[1] <= Math.max(a[1], b[1]) + 1e-6
+  );
 }
 
 function segmentsIntersect2(a1: Vec2, a2: Vec2, b1: Vec2, b2: Vec2): boolean {
@@ -989,7 +925,7 @@ function segmentsIntersect2(a1: Vec2, a2: Vec2, b1: Vec2, b2: Vec2): boolean {
   const o3 = orientation2(b1, b2, a1);
   const o4 = orientation2(b1, b2, a2);
 
-  if ((o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0)) return true;
+  if (o1 > 0 !== o2 > 0 && o3 > 0 !== o4 > 0) return true;
   if (Math.abs(o1) <= 1e-6 && onSegment2(a1, a2, b1)) return true;
   if (Math.abs(o2) <= 1e-6 && onSegment2(a1, a2, b2)) return true;
   if (Math.abs(o3) <= 1e-6 && onSegment2(b1, b2, a1)) return true;
@@ -1144,9 +1080,7 @@ function assignCrowdedDimensionColors(
     }
   }
 
-  const crowdedIdxs = entries
-    .map((_, idx) => idx)
-    .filter((idx) => (neighbors.get(idx)?.size ?? 0) > 0);
+  const crowdedIdxs = entries.map((_, idx) => idx).filter((idx) => (neighbors.get(idx)?.size ?? 0) > 0);
   if (crowdedIdxs.length < 4) return out;
 
   const inCrowd = new Set(crowdedIdxs);
@@ -1239,7 +1173,7 @@ function assignAutoOffsetLanes(
   const overlapPadPx = frame.id === 'iso' ? 8 : 10;
   const alignThreshold = frame.id === 'iso' ? 0.98 : 0.985;
   const normalBandPx = laneStepPx * 1.35;
-  const angleBucketRad = frame.id === 'iso' ? (Math.PI / 42) : (Math.PI / 54);
+  const angleBucketRad = frame.id === 'iso' ? Math.PI / 42 : Math.PI / 54;
   const containTolPx = frame.id === 'iso' ? 4 : 5;
 
   const entries: AutoLaneEntry[] = [];
@@ -1388,9 +1322,7 @@ function assignAutoOffsetLanes(
   });
 
   if (out.size === 0 && entries.length > 2) {
-    const order = entries
-      .map((entry, idx) => ({ entry, idx }))
-      .sort((lhs, rhs) => lhs.entry.lenPx - rhs.entry.lenPx || lhs.idx - rhs.idx);
+    const order = entries.map((entry, idx) => ({ entry, idx })).sort((lhs, rhs) => lhs.entry.lenPx - rhs.entry.lenPx || lhs.idx - rhs.idx);
     order.forEach(({ entry, idx }) => {
       const extraPx = autoLaneOffsetPx(idx, frame.id === 'iso');
       if (extraPx <= 0) return;
@@ -1401,12 +1333,7 @@ function assignAutoOffsetLanes(
   return out;
 }
 
-function candidateOrderFromCenter(
-  center: number,
-  min: number,
-  max: number,
-  step: number,
-): number[] {
+function candidateOrderFromCenter(center: number, min: number, max: number, step: number): number[] {
   const out: number[] = [];
   const clampedCenter = clamp(center, min, max);
   out.push(clampedCenter);
@@ -1519,12 +1446,8 @@ function chooseLegendPlacement(
       maxX: c.x + width,
       maxY: c.y + height,
     };
-    const labelPenalty = renderedLabelBoxes.reduce((sum, b) => (
-      sum + overlapArea(expandBox(box, 2.2), expandBox(b, 2.2)) * 700
-    ), 0);
-    const avoidPenalty = avoidBoxes.reduce((sum, b) => (
-      sum + overlapArea(box, b) * 120
-    ), 0);
+    const labelPenalty = renderedLabelBoxes.reduce((sum, b) => sum + overlapArea(expandBox(box, 2.2), expandBox(b, 2.2)) * 700, 0);
+    const avoidPenalty = avoidBoxes.reduce((sum, b) => sum + overlapArea(box, b) * 120, 0);
     const segPenalty = blockedSegments.reduce((sum, seg) => {
       const d = segmentToBoxDistance(seg, box);
       if (d <= 0.1) return sum + 80;
@@ -1625,9 +1548,10 @@ function layoutDimensionLabels(
       if (hasHardLabelConflict(plan.ownLineSegments, box, placed, blockedSegments, avoidBoxes)) return;
       const leaderEnd = closestPointOnBox(box, plan.anchor);
       const leaderLen = Math.hypot(leaderEnd[0] - plan.anchor[0], leaderEnd[1] - plan.anchor[1]);
-      const leaderPenalty = blockedSegments.reduce((sum, seg) => (
-        plan.ownLineSegments.includes(seg) ? sum : (segmentsIntersect2(plan.anchor, leaderEnd, seg.a, seg.b) ? sum + 5 : sum)
-      ), 0);
+      const leaderPenalty = blockedSegments.reduce(
+        (sum, seg) => (plan.ownLineSegments.includes(seg) ? sum : segmentsIntersect2(plan.anchor, leaderEnd, seg.a, seg.b) ? sum + 5 : sum),
+        0,
+      );
       const score = leaderLen * 0.35 + leaderPenalty * 6 + ci * 0.1;
       if (score < bestScore) {
         bestScore = score;
@@ -1650,11 +1574,10 @@ function layoutDimensionLabels(
   const shouldIndex = denseMode || placed.some((p) => p.fallback);
 
   if (shouldIndex) {
-    const indexed = [...placed].sort((lhs, rhs) => (
-      rhs.plan.anchor[1] - lhs.plan.anchor[1]
-      || lhs.plan.anchor[0] - rhs.plan.anchor[0]
-      || lhs.plan.dimId.localeCompare(rhs.plan.dimId)
-    ));
+    const indexed = [...placed].sort(
+      (lhs, rhs) =>
+        rhs.plan.anchor[1] - lhs.plan.anchor[1] || lhs.plan.anchor[0] - rhs.plan.anchor[0] || lhs.plan.dimId.localeCompare(rhs.plan.dimId),
+    );
     let counter = 1;
     indexed.forEach((p) => {
       if (!denseMode && !p.fallback) return;
@@ -1698,8 +1621,8 @@ function drawDimension(
   const modelDir: Vec3 = [modelDirRaw[0] / modelLen, modelDirRaw[1] / modelLen, modelDirRaw[2] / modelLen];
   const offsetBasis = pickDimensionOffsetBasis(modelDir, frame);
 
-  const ux = dx / len;
-  const uy = dy / len;
+  const _ux = dx / len;
+  const _uy = dy / len;
   const isIsoView = frame.id === 'iso';
 
   const requestedOffset = Number.isFinite(dim.offset) ? dim.offset : 0;
@@ -1708,26 +1631,18 @@ function drawDimension(
   const minReadableOffset = MIN_DIM_OFFSET_PX / projectedModelScale;
   const autoLaneOffsetModel = Math.max(0, autoLaneNudgeModel / Math.max(1e-6, offsetBasis.projLen));
   const baseOffsetAbs = Math.max(Math.abs(requestedOffset), minReadableOffset) + autoLaneOffsetModel;
-  const boundsForPlacement = placementBounds
-    ? expandBounds2(placementBounds, DIM_CLEARANCE_PX / Math.max(1e-6, mapScale))
-    : null;
+  const boundsForPlacement = placementBounds ? expandBounds2(placementBounds, DIM_CLEARANCE_PX / Math.max(1e-6, mapScale)) : null;
   const placementSpan = boundsForPlacement
     ? Math.max(1e-6, Math.max(boundsForPlacement.maxX - boundsForPlacement.minX, boundsForPlacement.maxY - boundsForPlacement.minY))
     : 1;
   const midProjected: Vec2 = [(fromProjected[0] + toProjected[0]) * 0.5, (fromProjected[1] + toProjected[1]) * 0.5];
-  const centerPref = (
-    (midProjected[0] - placementCenter[0]) * offsetBasis.projDir[0]
-    + (midProjected[1] - placementCenter[1]) * offsetBasis.projDir[1]
-  );
+  const centerPref =
+    (midProjected[0] - placementCenter[0]) * offsetBasis.projDir[0] + (midProjected[1] - placementCenter[1]) * offsetBasis.projDir[1];
   const centerSign = Math.abs(centerPref) > 1e-6 ? (centerPref >= 0 ? 1 : -1) : 0;
-  const candidateSides = Array.from(new Set([
-    centerSign || requestedSign,
-    requestedSign,
-    -(centerSign || requestedSign),
-  ]));
+  const candidateSides = Array.from(new Set([centerSign || requestedSign, requestedSign, -(centerSign || requestedSign)]));
   const stepOffset = Math.max(
     minReadableOffset * (isIsoView ? 0.55 : 0.8),
-    placementSpan * (isIsoView ? 0.008 : 0.015) / Math.max(1e-6, offsetBasis.projLen),
+    (placementSpan * (isIsoView ? 0.008 : 0.015)) / Math.max(1e-6, offsetBasis.projLen),
   );
   const maxBoostSteps = isIsoView ? 5 : 12;
   const maxOffsetAbs = baseOffsetAbs + (isIsoView ? 14 : 28) / projectedModelScale;
@@ -1737,20 +1652,14 @@ function drawDimension(
     let offsetAbs = baseOffsetAbs;
     let intersects = false;
     for (let i = 0; i < maxBoostSteps; i += 1) {
-      const shift: Vec2 = [
-        offsetBasis.proj[0] * side * offsetAbs,
-        offsetBasis.proj[1] * side * offsetAbs,
-      ];
+      const shift: Vec2 = [offsetBasis.proj[0] * side * offsetAbs, offsetBasis.proj[1] * side * offsetAbs];
       const a1: Vec2 = [from[0] + shift[0], from[1] + shift[1]];
       const b1: Vec2 = [to[0] + shift[0], to[1] + shift[1]];
-      const shiftedMid: Vec2 = [
-        midProjected[0] + shift[0],
-        midProjected[1] + shift[1],
-      ];
+      const shiftedMid: Vec2 = [midProjected[0] + shift[0], midProjected[1] + shift[1]];
       intersects = boundsForPlacement
-        ? (fullSegmentClear
+        ? fullSegmentClear
           ? segmentIntersectsBounds2(a1, b1, boundsForPlacement)
-          : pointInBounds2(shiftedMid, boundsForPlacement))
+          : pointInBounds2(shiftedMid, boundsForPlacement)
         : false;
       if (!intersects) break;
       const nextOffset = Math.min(maxOffsetAbs, offsetAbs + stepOffset);
@@ -1758,19 +1667,10 @@ function drawDimension(
       offsetAbs = nextOffset;
     }
 
-    const shift: Vec2 = [
-      offsetBasis.proj[0] * side * offsetAbs,
-      offsetBasis.proj[1] * side * offsetAbs,
-    ];
-    const shiftedMid: Vec2 = [
-      midProjected[0] + shift[0],
-      midProjected[1] + shift[1],
-    ];
+    const shift: Vec2 = [offsetBasis.proj[0] * side * offsetAbs, offsetBasis.proj[1] * side * offsetAbs];
+    const shiftedMid: Vec2 = [midProjected[0] + shift[0], midProjected[1] + shift[1]];
     const outwardDir: Vec2 = [offsetBasis.projDir[0] * side, offsetBasis.projDir[1] * side];
-    const outwardScore = (
-      (shiftedMid[0] - placementCenter[0]) * outwardDir[0]
-      + (shiftedMid[1] - placementCenter[1]) * outwardDir[1]
-    );
+    const outwardScore = (shiftedMid[0] - placementCenter[0]) * outwardDir[0] + (shiftedMid[1] - placementCenter[1]) * outwardDir[1];
     return { side, offsetAbs, intersects, outwardScore };
   };
 
@@ -1799,7 +1699,7 @@ function drawDimension(
   const pa1 = mapPoint(a1);
   const pb1 = mapPoint(b1);
 
-  const arrowSize = clamp((len * mapScale) * 0.045, 3, 7.5);
+  const arrowSize = clamp(len * mapScale * 0.045, 3, 7.5);
   const extGap = clamp(Math.abs(offset) * projectedModelScale * 0.1, 0.8, 2.5);
   const dmm = distance3(dim.from, dim.to);
   const baseLabel = dim.label ? `${dim.label}: ${formatLength(dmm, _reportLengthUnit, 1)}` : formatLength(dmm, _reportLengthUnit, 1);
@@ -1809,8 +1709,14 @@ function drawDimension(
   cmd.push(commandSetFill(color));
   cmd.push('0.8 w\n');
 
-  const extAFrom: Vec2 = [pa0[0] + (pa1[0] - pa0[0]) * (extGap / Math.max(1e-6, Math.hypot(pa1[0] - pa0[0], pa1[1] - pa0[1]))), pa0[1] + (pa1[1] - pa0[1]) * (extGap / Math.max(1e-6, Math.hypot(pa1[0] - pa0[0], pa1[1] - pa0[1])))];
-  const extBFrom: Vec2 = [pb0[0] + (pb1[0] - pb0[0]) * (extGap / Math.max(1e-6, Math.hypot(pb1[0] - pb0[0], pb1[1] - pb0[1]))), pb0[1] + (pb1[1] - pb0[1]) * (extGap / Math.max(1e-6, Math.hypot(pb1[0] - pb0[0], pb1[1] - pb0[1])))];
+  const extAFrom: Vec2 = [
+    pa0[0] + (pa1[0] - pa0[0]) * (extGap / Math.max(1e-6, Math.hypot(pa1[0] - pa0[0], pa1[1] - pa0[1]))),
+    pa0[1] + (pa1[1] - pa0[1]) * (extGap / Math.max(1e-6, Math.hypot(pa1[0] - pa0[0], pa1[1] - pa0[1]))),
+  ];
+  const extBFrom: Vec2 = [
+    pb0[0] + (pb1[0] - pb0[0]) * (extGap / Math.max(1e-6, Math.hypot(pb1[0] - pb0[0], pb1[1] - pb0[1]))),
+    pb0[1] + (pb1[1] - pb0[1]) * (extGap / Math.max(1e-6, Math.hypot(pb1[0] - pb0[0], pb1[1] - pb0[1]))),
+  ];
   const lineSegments: Segment2[] = [
     { a: extAFrom, b: pa1 },
     { a: extBFrom, b: pb1 },
@@ -1857,9 +1763,7 @@ function drawDimension(
   const textHalfH = Math.max(3.5, fontSize * 0.62);
   const base = 6;
   const lineLenPx = Math.hypot(pb1[0] - pa1[0], pb1[1] - pa1[1]);
-  const tangentMax = isIsoView
-    ? clamp(lineLenPx * 0.2, 16, 38)
-    : clamp(lineLenPx * 0.32, 20, 72);
+  const tangentMax = isIsoView ? clamp(lineLenPx * 0.2, 16, 38) : clamp(lineLenPx * 0.32, 20, 72);
   const tangentMid = Math.max(isIsoView ? 12 : 16, tangentMax * 0.55);
   const normalSteps = isIsoView ? [0, 5, 10, 16, 22] : [0, 6, 12, 18, 26, 34];
   const tangentSteps = isIsoView
@@ -1870,10 +1774,7 @@ function drawDimension(
   [1, -1].forEach((side) => {
     normalSteps.forEach((n) => {
       tangentSteps.forEach((t) => {
-        candidates.push([
-          mid[0] + pxS * side * (base + n) + uxS * t,
-          mid[1] + pyS * side * (base + n) + uyS * t,
-        ]);
+        candidates.push([mid[0] + pxS * side * (base + n) + uxS * t, mid[1] + pyS * side * (base + n) + uyS * t]);
       });
     });
   });
@@ -1973,9 +1874,7 @@ function renderViewCell(
     projectedEdges.map((edge) => ({ a: mapper.map(edge.modelA), b: mapper.map(edge.modelB) })),
     MAX_LABEL_GEOMETRY_SEGMENTS,
   );
-  const geometryAvoidBoxes = objects.map((obj) => (
-    mapBoundsToLabelBox(projectedObjectBounds(obj, center, frame), mapper.map)
-  ));
+  const geometryAvoidBoxes = objects.map((obj) => mapBoundsToLabelBox(projectedObjectBounds(obj, center, frame), mapper.map));
 
   cmd.push(commandSetStroke([0.1, 0.1, 0.12]));
   cmd.push('0.45 w\n');
@@ -1990,9 +1889,7 @@ function renderViewCell(
   viewDims.forEach((dim) => {
     const pFrom = projectPoint(dim.from, center, frame);
     const pTo = projectPoint(dim.to, center, frame);
-    const dimColor = hasExplicitDimensionColor(dim)
-      ? hexToRgb01(dim.color)
-      : (crowdedColorOverrides.get(dim.id) || hexToRgb01('#2b2b2b'));
+    const dimColor = hasExplicitDimensionColor(dim) ? hexToRgb01(dim.color) : crowdedColorOverrides.get(dim.id) || hexToRgb01('#2b2b2b');
     const result = drawDimension(
       dim,
       frame,
@@ -2037,20 +1934,17 @@ function renderViewCell(
     cmd.push(commandText(text, textX, pos[1] - 3, plan.fontSize));
   });
 
-  const legendPlacement = chooseLegendPlacement(
-    labelLayout.legend,
-    cell,
-    renderedLabelBoxes,
-    blockedLabelSegments,
-    geometryAvoidBoxes,
-  );
+  const legendPlacement = chooseLegendPlacement(labelLayout.legend, cell, renderedLabelBoxes, blockedLabelSegments, geometryAvoidBoxes);
   if (legendPlacement) {
-    const rows = legendPlacement.hiddenCount > 0
-      ? [...legendPlacement.rows, { index: 0, text: `+${legendPlacement.hiddenCount} more`, color: [0.45, 0.45, 0.48] as ColorRgb }]
-      : legendPlacement.rows;
+    const rows =
+      legendPlacement.hiddenCount > 0
+        ? [...legendPlacement.rows, { index: 0, text: `+${legendPlacement.hiddenCount} more`, color: [0.45, 0.45, 0.48] as ColorRgb }]
+        : legendPlacement.rows;
     cmd.push(commandSetStroke([0.42, 0.42, 0.46]));
     cmd.push('0.35 w\n');
-    cmd.push(`${formatNumber(legendPlacement.x)} ${formatNumber(legendPlacement.y)} ${formatNumber(legendPlacement.w)} ${formatNumber(legendPlacement.h)} re S\n`);
+    cmd.push(
+      `${formatNumber(legendPlacement.x)} ${formatNumber(legendPlacement.y)} ${formatNumber(legendPlacement.w)} ${formatNumber(legendPlacement.h)} re S\n`,
+    );
 
     rows.forEach((row, i) => {
       const y = legendPlacement.y + legendPlacement.h - 3 - (i + 1) * legendPlacement.lineHeight;
@@ -2140,11 +2034,7 @@ function renderBomPage(page: BomPageSpec): string {
   return cmd.join('');
 }
 
-function buildPageContent(
-  page: PageSpec,
-  views: ViewFrame[],
-  dimDirectionToleranceDeg: number,
-): string {
+function buildPageContent(page: PageSpec, views: ViewFrame[], dimDirectionToleranceDeg: number): string {
   const cmd: string[] = [];
 
   cmd.push(commandSetFill([0.12, 0.12, 0.14]));
@@ -2158,7 +2048,7 @@ function buildPageContent(
   }
 
   const merged = mergeBounds3(page.objects.map((o) => o.bbox));
-  const center = merged ? bboxCenter(merged) : [0, 0, 0] as Vec3;
+  const center = merged ? bboxCenter(merged) : ([0, 0, 0] as Vec3);
 
   const cells = buildGridCells(views.length);
   views.forEach((view, i) => {
@@ -2198,7 +2088,7 @@ function buildPages(
   views: ViewFrame[],
   title: string,
   includeDisassembled: boolean,
-  dimDirectionToleranceDeg: number,
+  _dimDirectionToleranceDeg: number,
 ): PageSpec[] {
   const pages: PageSpec[] = [];
   const basePages: StandardPageSpec[] = [];
@@ -2235,10 +2125,9 @@ function buildPages(
   if (includeDisassembled) {
     componentGroups.forEach((group) => {
       const obj = group.representative;
-      const subtitleParts = [
-        obj.groupName ? `Group ${obj.groupName}` : '',
-        `${group.dimensions.length} component dimensions`,
-      ].filter(Boolean);
+      const subtitleParts = [obj.groupName ? `Group ${obj.groupName}` : '', `${group.dimensions.length} component dimensions`].filter(
+        Boolean,
+      );
       if (group.instanceCount > 1) {
         subtitleParts.push(`${group.instanceCount} identical instances merged`);
       }
@@ -2263,14 +2152,10 @@ function buildPages(
   return pages;
 }
 
-export function generateReportPdf(
-  result: RunResult,
-  options: ReportOptions = {},
-): ReportGenerationResult {
+export function generateReportPdf(result: RunResult, options: ReportOptions = {}): ReportGenerationResult {
   _reportLengthUnit = options.lengthUnit ?? 'mm';
 
-  const views = (options.views && options.views.length > 0 ? options.views : DEFAULT_VIEWS)
-    .map(makeViewFrame);
+  const views = (options.views && options.views.length > 0 ? options.views : DEFAULT_VIEWS).map(makeViewFrame);
 
   const reportObjects = collectReportObjects(result.objects, options.objectVisuals);
   if (reportObjects.length === 0) {
@@ -2283,15 +2168,7 @@ export function generateReportPdf(
   const includeDisassembled = options.includeDisassembled !== false;
   const dimDirectionToleranceDeg = normalizeToleranceDeg(options.dimensionDirectionToleranceDeg);
 
-  const pages = buildPages(
-    reportObjects,
-    dimensions,
-    bomEntries,
-    views,
-    title,
-    includeDisassembled,
-    dimDirectionToleranceDeg,
-  );
+  const pages = buildPages(reportObjects, dimensions, bomEntries, views, title, includeDisassembled, dimDirectionToleranceDeg);
 
   const pdf = new PdfBuilder();
 
@@ -2305,7 +2182,9 @@ export function generateReportPdf(
   pages.forEach((page) => {
     const content = buildPageContent(page, views, dimDirectionToleranceDeg);
     const contentId = pdf.addStreamObject('', content);
-    const pageId = pdf.addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources ${resourcesId} 0 R /Contents ${contentId} 0 R >>`);
+    const pageId = pdf.addObject(
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources ${resourcesId} 0 R /Contents ${contentId} 0 R >>`,
+    );
     pageIds.push(pageId);
   });
 

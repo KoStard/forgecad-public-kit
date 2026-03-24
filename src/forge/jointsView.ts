@@ -93,15 +93,10 @@ export interface CollectedJointsView {
 
 let _collected: CollectedJointsView | null = null;
 
-const isFiniteNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value);
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
 const isVec3 = (value: unknown): value is [number, number, number] =>
-  Array.isArray(value)
-  && value.length === 3
-  && isFiniteNumber(value[0])
-  && isFiniteNumber(value[1])
-  && isFiniteNumber(value[2]);
+  Array.isArray(value) && value.length === 3 && isFiniteNumber(value[0]) && isFiniteNumber(value[1]) && isFiniteNumber(value[2]);
 
 const normalizeAxis = (axis: [number, number, number]): JointViewAxis => {
   const len = Math.hypot(axis[0], axis[1], axis[2]);
@@ -212,31 +207,33 @@ const normalizeAnimation = (animation: JointViewAnimationInput): JointViewAnimat
     throw new Error(`jointsView animation "${name}" keyframes must be a non-empty array`);
   }
 
-  const keyframes = animation.keyframes.map((keyframe, index): JointViewAnimationKeyframeDef => {
-    if (!keyframe || typeof keyframe !== 'object') {
-      throw new Error(`jointsView animation "${name}" keyframes[${index}] must be an object`);
-    }
-    if (!isFiniteNumber(keyframe.at)) {
-      throw new Error(`jointsView animation "${name}" keyframes[${index}].at must be a finite number`);
-    }
-    if (keyframe.at < 0 || keyframe.at > 1) {
-      throw new Error(`jointsView animation "${name}" keyframes[${index}].at must be within [0, 1]`);
-    }
-    if (!keyframe.values || typeof keyframe.values !== 'object') {
-      throw new Error(`jointsView animation "${name}" keyframes[${index}].values must be an object map`);
-    }
-    const values: Record<string, number> = {};
-    Object.entries(keyframe.values).forEach(([jointName, value]) => {
-      if (!isFiniteNumber(value)) {
-        throw new Error(`jointsView animation "${name}" keyframes[${index}].values["${jointName}"] must be finite`);
+  const keyframes = animation.keyframes
+    .map((keyframe, index): JointViewAnimationKeyframeDef => {
+      if (!keyframe || typeof keyframe !== 'object') {
+        throw new Error(`jointsView animation "${name}" keyframes[${index}] must be an object`);
       }
-      values[jointName] = value;
-    });
-    if (Object.keys(values).length === 0) {
-      throw new Error(`jointsView animation "${name}" keyframes[${index}] must animate at least one joint`);
-    }
-    return { at: keyframe.at, values };
-  }).sort((a, b) => a.at - b.at);
+      if (!isFiniteNumber(keyframe.at)) {
+        throw new Error(`jointsView animation "${name}" keyframes[${index}].at must be a finite number`);
+      }
+      if (keyframe.at < 0 || keyframe.at > 1) {
+        throw new Error(`jointsView animation "${name}" keyframes[${index}].at must be within [0, 1]`);
+      }
+      if (!keyframe.values || typeof keyframe.values !== 'object') {
+        throw new Error(`jointsView animation "${name}" keyframes[${index}].values must be an object map`);
+      }
+      const values: Record<string, number> = {};
+      Object.entries(keyframe.values).forEach(([jointName, value]) => {
+        if (!isFiniteNumber(value)) {
+          throw new Error(`jointsView animation "${name}" keyframes[${index}].values["${jointName}"] must be finite`);
+        }
+        values[jointName] = value;
+      });
+      if (Object.keys(values).length === 0) {
+        throw new Error(`jointsView animation "${name}" keyframes[${index}] must animate at least one joint`);
+      }
+      return { at: keyframe.at, values };
+    })
+    .sort((a, b) => a.at - b.at);
 
   return {
     name,
@@ -351,10 +348,7 @@ const validateCouplings = (joints: JointViewDef[], couplings: JointViewCouplingD
   couplingByJoint.forEach((_, jointName) => walk(jointName));
 };
 
-const validateAnimationsAgainstCouplings = (
-  animations: JointViewAnimationDef[],
-  couplings: JointViewCouplingDef[],
-): void => {
+const validateAnimationsAgainstCouplings = (animations: JointViewAnimationDef[], couplings: JointViewCouplingDef[]): void => {
   const coupledJointNames = new Set(couplings.map((coupling) => coupling.joint));
   if (coupledJointNames.size === 0) return;
 
@@ -362,9 +356,7 @@ const validateAnimationsAgainstCouplings = (
     animation.keyframes.forEach((keyframe, index) => {
       Object.keys(keyframe.values).forEach((jointName) => {
         if (coupledJointNames.has(jointName)) {
-          throw new Error(
-            `jointsView animation "${animation.name}" keyframes[${index}] cannot set coupled joint "${jointName}"`,
-          );
+          throw new Error(`jointsView animation "${animation.name}" keyframes[${index}] cannot set coupled joint "${jointName}"`);
         }
       });
     });
@@ -418,7 +410,7 @@ export function resolveJointViewValues(
       });
     }
 
-    const resolved = shouldClamp ? clampJointValue(joint, raw) : (Number.isFinite(raw) ? raw : joint.defaultValue);
+    const resolved = shouldClamp ? clampJointValue(joint, raw) : Number.isFinite(raw) ? raw : joint.defaultValue;
     cache.set(jointName, resolved);
     resolving.delete(jointName);
     return resolved;
@@ -429,7 +421,7 @@ export function resolveJointViewValues(
     out[joint.name] = resolveValue(joint.name);
   });
   return out;
-};
+}
 
 const cloneCollected = (value: CollectedJointsView): CollectedJointsView => ({
   enabled: value.enabled,
@@ -456,9 +448,7 @@ export function jointsView(options: JointsViewOptions = {}): void {
     throw new Error('jointsView(options) expects an options object');
   }
 
-  const next: CollectedJointsView = _collected
-    ? cloneCollected(_collected)
-    : { joints: [], couplings: [], animations: [] };
+  const next: CollectedJointsView = _collected ? cloneCollected(_collected) : { joints: [], couplings: [], animations: [] };
 
   if (options.enabled !== undefined) {
     if (typeof options.enabled !== 'boolean') {

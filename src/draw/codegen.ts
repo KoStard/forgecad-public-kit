@@ -85,6 +85,6 @@ const CONSTRAINT_API_MAP: Record<string, string> = {
  */
 export function constraintStatement(type: string, ...args: (string | number)[]): string {
   const apiName = CONSTRAINT_API_MAP[type] ?? type;
-  const fmtArgs = args.map((a) => typeof a === 'number' ? fmt(a) : a).join(', ');
+  const fmtArgs = args.map((a) => (typeof a === 'number' ? fmt(a) : a)).join(', ');
   return `sk.${apiName}(${fmtArgs});`;
 }

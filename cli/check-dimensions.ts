@@ -1,23 +1,14 @@
 #!/usr/bin/env node
+import { runScript } from '../src/forge/headless';
 /**
  * Dimension propagation invariants.
  *
  * Ensures shape-bound dimensions survive through all key Shape APIs
  * and import/runtime paths.
  */
-import {
-  initKernel,
-  Shape,
-  box,
-  union,
-  difference,
-  intersection,
-  getShapeDimensions,
-  setShapeDimensions,
-} from '../src/forge/kernel';
-import { Transform } from '../src/forge/transform';
-import { runScript } from '../src/forge/headless';
+import { box, difference, getShapeDimensions, initKernel, intersection, Shape, setShapeDimensions, union } from '../src/forge/kernel';
 import { mapDimensionsToOwnerIds } from '../src/forge/reportDimensionOwnership';
+import { Transform } from '../src/forge/transform';
 
 type Dim = {
   id: string;
@@ -48,13 +39,15 @@ function expectVec(actual: [number, number, number], expected: [number, number, 
 
 function seedShape(name: string): Shape {
   const shape = box(20, 10, 6, true);
-  const dims: Dim[] = [{
-    id: `${name}-seed`,
-    from: [1, 2, 3],
-    to: [7, 2, 3],
-    offset: 11,
-    label: `${name}-dim`,
-  }];
+  const dims: Dim[] = [
+    {
+      id: `${name}-seed`,
+      from: [1, 2, 3],
+      to: [7, 2, 3],
+      offset: 11,
+      label: `${name}-dim`,
+    },
+  ];
   return setShapeDimensions(shape, dims);
 }
 

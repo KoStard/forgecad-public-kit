@@ -100,11 +100,7 @@ const validateColor = (value: unknown, label: string): string => {
   return trimmed;
 };
 
-const validateFinite = (
-  value: unknown,
-  label: string,
-  opts: { min?: number; max?: number; integer?: boolean } = {},
-): number => {
+const validateFinite = (value: unknown, label: string, opts: { min?: number; max?: number; integer?: boolean } = {}): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error(`${label} must be a finite number`);
   }
@@ -153,39 +149,68 @@ const patchJointOverlay = (
   if (patch.arcColor !== undefined) next.arcColor = validateColor(patch.arcColor, `${label}.arcColor`);
   if (patch.zeroColor !== undefined) next.zeroColor = validateColor(patch.zeroColor, `${label}.zeroColor`);
 
-  if (patch.arcVisualLimitDeg !== undefined) next.arcVisualLimitDeg = validateFinite(patch.arcVisualLimitDeg, `${label}.arcVisualLimitDeg`, { min: 0, max: 3600 });
-  if (patch.axisLengthScale !== undefined) next.axisLengthScale = validateFinite(patch.axisLengthScale, `${label}.axisLengthScale`, { min: 0 });
+  if (patch.arcVisualLimitDeg !== undefined)
+    next.arcVisualLimitDeg = validateFinite(patch.arcVisualLimitDeg, `${label}.arcVisualLimitDeg`, { min: 0, max: 3600 });
+  if (patch.axisLengthScale !== undefined)
+    next.axisLengthScale = validateFinite(patch.axisLengthScale, `${label}.axisLengthScale`, { min: 0 });
   if (patch.axisLengthMin !== undefined) next.axisLengthMin = validateFinite(patch.axisLengthMin, `${label}.axisLengthMin`, { min: 0 });
-  if (patch.axisLineRadiusScale !== undefined) next.axisLineRadiusScale = validateFinite(patch.axisLineRadiusScale, `${label}.axisLineRadiusScale`, { min: 0 });
-  if (patch.axisLineRadiusMin !== undefined) next.axisLineRadiusMin = validateFinite(patch.axisLineRadiusMin, `${label}.axisLineRadiusMin`, { min: 0 });
-  if (patch.axisLineRadiusMax !== undefined) next.axisLineRadiusMax = validateFinite(patch.axisLineRadiusMax, `${label}.axisLineRadiusMax`, { min: 0 });
-  if (patch.spokeLineRadiusScale !== undefined) next.spokeLineRadiusScale = validateFinite(patch.spokeLineRadiusScale, `${label}.spokeLineRadiusScale`, { min: 0 });
-  if (patch.spokeLineRadiusMin !== undefined) next.spokeLineRadiusMin = validateFinite(patch.spokeLineRadiusMin, `${label}.spokeLineRadiusMin`, { min: 0 });
-  if (patch.spokeLineRadiusMax !== undefined) next.spokeLineRadiusMax = validateFinite(patch.spokeLineRadiusMax, `${label}.spokeLineRadiusMax`, { min: 0 });
-  if (patch.arcLineRadiusScale !== undefined) next.arcLineRadiusScale = validateFinite(patch.arcLineRadiusScale, `${label}.arcLineRadiusScale`, { min: 0 });
-  if (patch.arcLineRadiusMin !== undefined) next.arcLineRadiusMin = validateFinite(patch.arcLineRadiusMin, `${label}.arcLineRadiusMin`, { min: 0 });
-  if (patch.arcLineRadiusMax !== undefined) next.arcLineRadiusMax = validateFinite(patch.arcLineRadiusMax, `${label}.arcLineRadiusMax`, { min: 0 });
-  if (patch.axisDotRadiusScale !== undefined) next.axisDotRadiusScale = validateFinite(patch.axisDotRadiusScale, `${label}.axisDotRadiusScale`, { min: 0 });
-  if (patch.axisDotRadiusMin !== undefined) next.axisDotRadiusMin = validateFinite(patch.axisDotRadiusMin, `${label}.axisDotRadiusMin`, { min: 0 });
-  if (patch.axisArrowRadiusScale !== undefined) next.axisArrowRadiusScale = validateFinite(patch.axisArrowRadiusScale, `${label}.axisArrowRadiusScale`, { min: 0 });
-  if (patch.axisArrowRadiusMin !== undefined) next.axisArrowRadiusMin = validateFinite(patch.axisArrowRadiusMin, `${label}.axisArrowRadiusMin`, { min: 0 });
-  if (patch.axisArrowLengthScale !== undefined) next.axisArrowLengthScale = validateFinite(patch.axisArrowLengthScale, `${label}.axisArrowLengthScale`, { min: 0 });
-  if (patch.axisArrowLengthMin !== undefined) next.axisArrowLengthMin = validateFinite(patch.axisArrowLengthMin, `${label}.axisArrowLengthMin`, { min: 0 });
-  if (patch.axisArrowOffsetFactor !== undefined) next.axisArrowOffsetFactor = validateFinite(patch.axisArrowOffsetFactor, `${label}.axisArrowOffsetFactor`, { min: 0 });
+  if (patch.axisLineRadiusScale !== undefined)
+    next.axisLineRadiusScale = validateFinite(patch.axisLineRadiusScale, `${label}.axisLineRadiusScale`, { min: 0 });
+  if (patch.axisLineRadiusMin !== undefined)
+    next.axisLineRadiusMin = validateFinite(patch.axisLineRadiusMin, `${label}.axisLineRadiusMin`, { min: 0 });
+  if (patch.axisLineRadiusMax !== undefined)
+    next.axisLineRadiusMax = validateFinite(patch.axisLineRadiusMax, `${label}.axisLineRadiusMax`, { min: 0 });
+  if (patch.spokeLineRadiusScale !== undefined)
+    next.spokeLineRadiusScale = validateFinite(patch.spokeLineRadiusScale, `${label}.spokeLineRadiusScale`, { min: 0 });
+  if (patch.spokeLineRadiusMin !== undefined)
+    next.spokeLineRadiusMin = validateFinite(patch.spokeLineRadiusMin, `${label}.spokeLineRadiusMin`, { min: 0 });
+  if (patch.spokeLineRadiusMax !== undefined)
+    next.spokeLineRadiusMax = validateFinite(patch.spokeLineRadiusMax, `${label}.spokeLineRadiusMax`, { min: 0 });
+  if (patch.arcLineRadiusScale !== undefined)
+    next.arcLineRadiusScale = validateFinite(patch.arcLineRadiusScale, `${label}.arcLineRadiusScale`, { min: 0 });
+  if (patch.arcLineRadiusMin !== undefined)
+    next.arcLineRadiusMin = validateFinite(patch.arcLineRadiusMin, `${label}.arcLineRadiusMin`, { min: 0 });
+  if (patch.arcLineRadiusMax !== undefined)
+    next.arcLineRadiusMax = validateFinite(patch.arcLineRadiusMax, `${label}.arcLineRadiusMax`, { min: 0 });
+  if (patch.axisDotRadiusScale !== undefined)
+    next.axisDotRadiusScale = validateFinite(patch.axisDotRadiusScale, `${label}.axisDotRadiusScale`, { min: 0 });
+  if (patch.axisDotRadiusMin !== undefined)
+    next.axisDotRadiusMin = validateFinite(patch.axisDotRadiusMin, `${label}.axisDotRadiusMin`, { min: 0 });
+  if (patch.axisArrowRadiusScale !== undefined)
+    next.axisArrowRadiusScale = validateFinite(patch.axisArrowRadiusScale, `${label}.axisArrowRadiusScale`, { min: 0 });
+  if (patch.axisArrowRadiusMin !== undefined)
+    next.axisArrowRadiusMin = validateFinite(patch.axisArrowRadiusMin, `${label}.axisArrowRadiusMin`, { min: 0 });
+  if (patch.axisArrowLengthScale !== undefined)
+    next.axisArrowLengthScale = validateFinite(patch.axisArrowLengthScale, `${label}.axisArrowLengthScale`, { min: 0 });
+  if (patch.axisArrowLengthMin !== undefined)
+    next.axisArrowLengthMin = validateFinite(patch.axisArrowLengthMin, `${label}.axisArrowLengthMin`, { min: 0 });
+  if (patch.axisArrowOffsetFactor !== undefined)
+    next.axisArrowOffsetFactor = validateFinite(patch.axisArrowOffsetFactor, `${label}.axisArrowOffsetFactor`, { min: 0 });
   if (patch.arcRadiusScale !== undefined) next.arcRadiusScale = validateFinite(patch.arcRadiusScale, `${label}.arcRadiusScale`, { min: 0 });
   if (patch.arcRadiusMin !== undefined) next.arcRadiusMin = validateFinite(patch.arcRadiusMin, `${label}.arcRadiusMin`, { min: 0 });
-  if (patch.arcDotRadiusScale !== undefined) next.arcDotRadiusScale = validateFinite(patch.arcDotRadiusScale, `${label}.arcDotRadiusScale`, { min: 0 });
-  if (patch.arcDotRadiusMin !== undefined) next.arcDotRadiusMin = validateFinite(patch.arcDotRadiusMin, `${label}.arcDotRadiusMin`, { min: 0 });
-  if (patch.arcArrowRadiusScale !== undefined) next.arcArrowRadiusScale = validateFinite(patch.arcArrowRadiusScale, `${label}.arcArrowRadiusScale`, { min: 0 });
-  if (patch.arcArrowRadiusMin !== undefined) next.arcArrowRadiusMin = validateFinite(patch.arcArrowRadiusMin, `${label}.arcArrowRadiusMin`, { min: 0 });
-  if (patch.arcArrowLengthScale !== undefined) next.arcArrowLengthScale = validateFinite(patch.arcArrowLengthScale, `${label}.arcArrowLengthScale`, { min: 0 });
-  if (patch.arcArrowLengthMin !== undefined) next.arcArrowLengthMin = validateFinite(patch.arcArrowLengthMin, `${label}.arcArrowLengthMin`, { min: 0 });
-  if (patch.arcArrowOffsetFactor !== undefined) next.arcArrowOffsetFactor = validateFinite(patch.arcArrowOffsetFactor, `${label}.arcArrowOffsetFactor`, { min: 0 });
+  if (patch.arcDotRadiusScale !== undefined)
+    next.arcDotRadiusScale = validateFinite(patch.arcDotRadiusScale, `${label}.arcDotRadiusScale`, { min: 0 });
+  if (patch.arcDotRadiusMin !== undefined)
+    next.arcDotRadiusMin = validateFinite(patch.arcDotRadiusMin, `${label}.arcDotRadiusMin`, { min: 0 });
+  if (patch.arcArrowRadiusScale !== undefined)
+    next.arcArrowRadiusScale = validateFinite(patch.arcArrowRadiusScale, `${label}.arcArrowRadiusScale`, { min: 0 });
+  if (patch.arcArrowRadiusMin !== undefined)
+    next.arcArrowRadiusMin = validateFinite(patch.arcArrowRadiusMin, `${label}.arcArrowRadiusMin`, { min: 0 });
+  if (patch.arcArrowLengthScale !== undefined)
+    next.arcArrowLengthScale = validateFinite(patch.arcArrowLengthScale, `${label}.arcArrowLengthScale`, { min: 0 });
+  if (patch.arcArrowLengthMin !== undefined)
+    next.arcArrowLengthMin = validateFinite(patch.arcArrowLengthMin, `${label}.arcArrowLengthMin`, { min: 0 });
+  if (patch.arcArrowOffsetFactor !== undefined)
+    next.arcArrowOffsetFactor = validateFinite(patch.arcArrowOffsetFactor, `${label}.arcArrowOffsetFactor`, { min: 0 });
   if (patch.arcStepDeg !== undefined) next.arcStepDeg = validateFinite(patch.arcStepDeg, `${label}.arcStepDeg`, { min: 0.05 });
-  if (patch.arcMinSteps !== undefined) next.arcMinSteps = validateFinite(patch.arcMinSteps, `${label}.arcMinSteps`, { min: 1, integer: true });
-  if (patch.arcTubeSegmentsMin !== undefined) next.arcTubeSegmentsMin = validateFinite(patch.arcTubeSegmentsMin, `${label}.arcTubeSegmentsMin`, { min: 3, integer: true });
-  if (patch.arcTubeSegmentsFactor !== undefined) next.arcTubeSegmentsFactor = validateFinite(patch.arcTubeSegmentsFactor, `${label}.arcTubeSegmentsFactor`, { min: 0.1 });
-  if (patch.arcTubeRadialSegments !== undefined) next.arcTubeRadialSegments = validateFinite(patch.arcTubeRadialSegments, `${label}.arcTubeRadialSegments`, { min: 3, integer: true });
+  if (patch.arcMinSteps !== undefined)
+    next.arcMinSteps = validateFinite(patch.arcMinSteps, `${label}.arcMinSteps`, { min: 1, integer: true });
+  if (patch.arcTubeSegmentsMin !== undefined)
+    next.arcTubeSegmentsMin = validateFinite(patch.arcTubeSegmentsMin, `${label}.arcTubeSegmentsMin`, { min: 3, integer: true });
+  if (patch.arcTubeSegmentsFactor !== undefined)
+    next.arcTubeSegmentsFactor = validateFinite(patch.arcTubeSegmentsFactor, `${label}.arcTubeSegmentsFactor`, { min: 0.1 });
+  if (patch.arcTubeRadialSegments !== undefined)
+    next.arcTubeRadialSegments = validateFinite(patch.arcTubeRadialSegments, `${label}.arcTubeRadialSegments`, { min: 3, integer: true });
 
   validateRadiusRange(next, label);
   return next;
@@ -255,9 +280,7 @@ export function viewConfig(options: ViewConfigOptions = {}): void {
     throw new Error('viewConfig(options) expects an options object');
   }
 
-  const next: ViewConfig = _collected
-    ? cloneViewConfig(_collected)
-    : cloneViewConfig(DEFAULT_VIEW_CONFIG);
+  const next: ViewConfig = _collected ? cloneViewConfig(_collected) : cloneViewConfig(DEFAULT_VIEW_CONFIG);
 
   if (options.jointOverlay !== undefined) {
     if (!options.jointOverlay || typeof options.jointOverlay !== 'object') {

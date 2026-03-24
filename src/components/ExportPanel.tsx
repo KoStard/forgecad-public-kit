@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useForgeStore } from '../store/forgeStore';
-import { deriveExportStem } from './exportActions';
+import { CuttingLayoutPanel } from './CuttingLayoutPanel';
 import { Export3DPanel } from './Export3DPanel';
 import { ExportSketchPanel } from './ExportSketchPanel';
-import { CuttingLayoutPanel } from './CuttingLayoutPanel';
+import { deriveExportStem } from './exportActions';
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
@@ -22,10 +22,7 @@ export function ExportPanel() {
   const hasSheetStock = sheetStockEntries.length > 0;
   const defaultMeshStem = useMemo(() => deriveExportStem(activeFile), [activeFile]);
 
-  const totalTriangles = useMemo(
-    () => shapeObjects.reduce((sum, obj) => sum + (obj.shape?.numTri() ?? 0), 0),
-    [shapeObjects],
-  );
+  const totalTriangles = useMemo(() => shapeObjects.reduce((sum, obj) => sum + (obj.shape?.numTri() ?? 0), 0), [shapeObjects]);
 
   const hasAnything = hasShapes || hasSketches || hasSheetStock;
 
@@ -140,7 +137,11 @@ export function ExportPanel() {
 
             {/* Sheet Cutting Layout */}
             {hasSheetStock && (
-              <div style={(hasShapes || hasSketches) ? { borderTop: '1px solid var(--fc-borderLight)', marginTop: 12, paddingTop: 12 } : undefined}>
+              <div
+                style={
+                  hasShapes || hasSketches ? { borderTop: '1px solid var(--fc-borderLight)', marginTop: 12, paddingTop: 12 } : undefined
+                }
+              >
                 <CuttingLayoutPanel fileStem={defaultMeshStem} entries={sheetStockEntries} />
               </div>
             )}

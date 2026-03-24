@@ -11,14 +11,15 @@ export interface DimensionOwnerObject {
   };
 }
 
-function pointInBounds(
-  point: Vec3,
-  bounds: DimensionOwnerObject['bbox'],
-  tolerance: number,
-): boolean {
-  return point[0] >= bounds.min[0] - tolerance && point[0] <= bounds.max[0] + tolerance
-    && point[1] >= bounds.min[1] - tolerance && point[1] <= bounds.max[1] + tolerance
-    && point[2] >= bounds.min[2] - tolerance && point[2] <= bounds.max[2] + tolerance;
+function pointInBounds(point: Vec3, bounds: DimensionOwnerObject['bbox'], tolerance: number): boolean {
+  return (
+    point[0] >= bounds.min[0] - tolerance &&
+    point[0] <= bounds.max[0] + tolerance &&
+    point[1] >= bounds.min[1] - tolerance &&
+    point[1] <= bounds.max[1] + tolerance &&
+    point[2] >= bounds.min[2] - tolerance &&
+    point[2] <= bounds.max[2] + tolerance
+  );
 }
 
 function pushLookup(map: Map<string, string[]>, key: string, id: string): void {
@@ -46,10 +47,7 @@ function buildNameLookup(objects: DimensionOwnerObject[]): {
   return { byExact, bySuffix };
 }
 
-function resolveExplicitOwnerIds(
-  names: string[],
-  lookup: ReturnType<typeof buildNameLookup>,
-): string[] {
+function resolveExplicitOwnerIds(names: string[], lookup: ReturnType<typeof buildNameLookup>): string[] {
   const ids = new Set<string>();
 
   names.forEach((name) => {
@@ -74,10 +72,7 @@ function resolveExplicitOwnerIds(
   return Array.from(ids);
 }
 
-export function mapDimensionsToOwnerIds(
-  dimensions: DimensionDef[],
-  objects: DimensionOwnerObject[],
-): Map<string, string[]> {
+export function mapDimensionsToOwnerIds(dimensions: DimensionDef[], objects: DimensionOwnerObject[]): Map<string, string[]> {
   const lookup = buildNameLookup(objects);
   const out = new Map<string, string[]>();
 

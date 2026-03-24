@@ -6,7 +6,7 @@
  */
 import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
-import { midpoint, midpointPerp, distance, lineDirection } from '../helpers';
+import { midpointPerp } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -30,7 +30,8 @@ registerConstraint<'equal', ConstraintTypeMap['equal']>({
   displayPosition(c, { lines, points }) {
     const lineA = lines.get(c.a);
     if (lineA) {
-      const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+      const a1 = points.get(lineA.a);
+      const a2 = points.get(lineA.b);
       if (a1 && a2) return midpointPerp(a1, a2, 3);
     }
     return [0, 0];

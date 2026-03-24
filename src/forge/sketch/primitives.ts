@@ -2,9 +2,7 @@ import { buildSketchFromCompileProfilePlan, Sketch } from './core';
 import type { Point2D } from './entities';
 
 function normalizePolygonPoints(points: ([number, number] | Point2D)[]): [number, number][] {
-  const pts: [number, number][] = points.map((p) =>
-    Array.isArray(p) ? [p[0], p[1]] : [p.x, p.y]
-  );
+  const pts: [number, number][] = points.map((p) => (Array.isArray(p) ? [p[0], p[1]] : [p.x, p.y]));
 
   // Manifold expects CCW loops, so flip CW input before building the cross-section.
   let signedArea = 0;

@@ -1,4 +1,3 @@
-import { buildBinaryStl } from './exportMesh';
 import type {
   AssemblyDefinition,
   AssemblyJointCouplingDef,
@@ -8,12 +7,13 @@ import type {
   JointType,
   PartMetadata,
 } from './assembly';
-import type { CollectedRobotExport, RobotWorldOptions } from './robotExport';
-import { Shape, union } from './kernel';
+import { buildBinaryStl } from './exportMesh';
 import { ShapeGroup } from './group';
-import { TrackedShape } from './sketch/topology';
-import { Transform, composeChain, type Vec3 } from './transform';
+import { Shape, union } from './kernel';
 import { computeMeshInertia } from './meshInertia';
+import type { CollectedRobotExport, RobotWorldOptions } from './robotExport';
+import { TrackedShape } from './sketch/topology';
+import { composeChain, Transform, type Vec3 } from './transform';
 
 const DEFAULT_DENSITY_KG_M3 = 1000;
 const STL_SCALE_METERS = 0.001;
@@ -75,12 +75,7 @@ interface PoseParts {
 }
 
 function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
 function sanitizeToken(value: string, fallback: string): string {
@@ -110,7 +105,7 @@ function mmToM(valueMm: number): number {
 }
 
 function degToRad(valueDeg: number): number {
-  return valueDeg * Math.PI / 180;
+  return (valueDeg * Math.PI) / 180;
 }
 
 function formatNumber(value: number, digits = 6): string {
@@ -120,10 +115,7 @@ function formatNumber(value: number, digits = 6): string {
 }
 
 function formatPose(parts: PoseParts): string {
-  return [
-    ...parts.xyzM.map((value) => formatNumber(value, 6)),
-    ...parts.rpyRad.map((value) => formatNumber(value, 6)),
-  ].join(' ');
+  return [...parts.xyzM.map((value) => formatNumber(value, 6)), ...parts.rpyRad.map((value) => formatNumber(value, 6))].join(' ');
 }
 
 function axisToText(axis: Vec3): string {
@@ -133,8 +125,8 @@ function axisToText(axis: Vec3): string {
 function transformToPose(transform: Transform): PoseParts {
   const m = transform.toArray();
   const r00 = m[0];
-  const r01 = m[4];
-  const r02 = m[8];
+  const _r01 = m[4];
+  const _r02 = m[8];
   const r10 = m[1];
   const r11 = m[5];
   const r12 = m[9];
@@ -203,11 +195,7 @@ function linkGeometry(part: AssemblyPartDef): LinkGeometry {
 function motionTransform(joint: AssemblyJointDef, value: number): Transform {
   if (joint.type === 'fixed') return Transform.identity();
   if (joint.type === 'revolute') return Transform.identity().rotateAxis(joint.axis, value);
-  return Transform.identity().translate(
-    joint.axis[0] * value,
-    joint.axis[1] * value,
-    joint.axis[2] * value,
-  );
+  return Transform.identity().translate(joint.axis[0] * value, joint.axis[1] * value, joint.axis[2] * value);
 }
 
 function clampJointValue(joint: AssemblyJointDef, value: number): { value: number; clamped: boolean } {
@@ -244,10 +232,7 @@ function resolveJointValues(
   return out;
 }
 
-function computeLinkFrameWorlds(
-  assembly: AssemblyDefinition,
-  jointValues: Record<string, number>,
-): Map<string, Transform> {
+function computeLinkFrameWorlds(assembly: AssemblyDefinition, jointValues: Record<string, number>): Map<string, Transform> {
   const jointsByParent = new Map<string, AssemblyJointDef[]>();
   const incoming = new Set<string>();
   assembly.joints.forEach((joint) => {
@@ -262,11 +247,7 @@ function computeLinkFrameWorlds(
   const visit = (partName: string, world: Transform) => {
     worlds.set(partName, world);
     (jointsByParent.get(partName) ?? []).forEach((joint) => {
-      const childWorld = composeChain(
-        motionTransform(joint, jointValues[joint.name] ?? joint.defaultValue),
-        joint.frame,
-        world,
-      );
+      const childWorld = composeChain(motionTransform(joint, jointValues[joint.name] ?? joint.defaultValue), joint.frame, world);
       visit(joint.child, childWorld);
     });
   };
@@ -304,9 +285,7 @@ function estimateLinkMassKg(
   const explicitMass = combineMetadataNumber(metadata, linkOverrideMassKg, 'massKg');
   if (explicitMass !== undefined) return Math.max(MIN_LINK_MASS_KG, explicitMass);
 
-  const densityKgM3 =
-    combineMetadataNumber(metadata, linkOverrideDensityKgM3, 'densityKgM3')
-    ?? DEFAULT_DENSITY_KG_M3;
+  const densityKgM3 = combineMetadataNumber(metadata, linkOverrideDensityKgM3, 'densityKgM3') ?? DEFAULT_DENSITY_KG_M3;
   const volumeM3 = geometry.volumeMm3 * 1e-9;
   return Math.max(MIN_LINK_MASS_KG, densityKgM3 * volumeM3);
 }
@@ -321,9 +300,9 @@ function inertiaFromBounds(geometry: LinkGeometry, massKg: number): { pose: Pose
 
   return {
     pose: { xyzM: [cx, cy, cz], rpyRad: [0, 0, 0] },
-    ixx: massKg * (dy * dy + dz * dz) / 12,
-    iyy: massKg * (dx * dx + dz * dz) / 12,
-    izz: massKg * (dx * dx + dy * dy) / 12,
+    ixx: (massKg * (dy * dy + dz * dz)) / 12,
+    iyy: (massKg * (dx * dx + dz * dz)) / 12,
+    izz: (massKg * (dx * dx + dy * dy)) / 12,
   };
 }
 
@@ -383,14 +362,18 @@ function keyboardPluginXml(cmdVelTopic: string, linearStep: number, angularStep:
     { key: 32, twist: 'linear: {x: 0.0}, angular: {z: 0.0}' },
   ];
 
-  return bindings.map((binding) => `  <plugin filename="gz-sim-triggered-publisher-system" name="gz::sim::systems::TriggeredPublisher">
+  return bindings
+    .map(
+      (binding) => `  <plugin filename="gz-sim-triggered-publisher-system" name="gz::sim::systems::TriggeredPublisher">
     <input type="gz.msgs.Int32" topic="/keyboard/keypress">
       <match field="data">${binding.key}</match>
     </input>
     <output type="gz.msgs.Twist" topic="${escapeXml(cmdVelTopic)}">
       ${binding.twist}
     </output>
-  </plugin>`).join('\n');
+  </plugin>`,
+    )
+    .join('\n');
 }
 
 function keyboardGuiPluginXml(): string {
@@ -536,12 +519,7 @@ function demoWorldGuiXml(keyboardEnabled: boolean): string {
 `;
 }
 
-function demoWorldXml(
-  worldName: string,
-  modelName: string,
-  cmdVelTopic: string | undefined,
-  world: RobotWorldOptions | null,
-): string {
+function demoWorldXml(worldName: string, modelName: string, cmdVelTopic: string | undefined, world: RobotWorldOptions | null): string {
   const spawnPose = world?.spawnPose ?? [0, 0, 120, 0, 0, 0];
   const spawnPoseText = [
     formatNumber(mmToM(spawnPose[0]), 6),
@@ -556,9 +534,7 @@ function demoWorldXml(
   const linearStep = world?.keyboardTeleop?.linearStep ?? 0.9;
   const angularStep = world?.keyboardTeleop?.angularStep ?? 1.2;
   const worldGui = demoWorldGuiXml(keyboardEnabled && !!cmdVelTopic);
-  const keyboardPlugins = keyboardEnabled && cmdVelTopic
-    ? `${keyboardPluginXml(cmdVelTopic, linearStep, angularStep)}\n`
-    : '';
+  const keyboardPlugins = keyboardEnabled && cmdVelTopic ? `${keyboardPluginXml(cmdVelTopic, linearStep, angularStep)}\n` : '';
 
   return `<sdf version="1.10">
   <world name="${escapeXml(worldName)}">
@@ -706,41 +682,44 @@ function modelXml(
     couplingByJoint.set(coupling.joint, coupling);
   }
 
-  const linksXml = spec.assembly.parts.map((part) => {
-    const sdfLinkName = linkNameMap.get(part.name)!;
-    const geometry = geometries.get(part.name)!;
-    const worldPose = transformToPose(linkWorlds.get(part.name) ?? Transform.identity());
-    const linkOptions = spec.links[part.name];
-    const massKg = estimateLinkMassKg(geometry, linkOptions?.massKg, linkOptions?.densityKgM3);
-    // Compute inertia from mesh (divergence theorem), falling back to bounding-box approximation
-    let inertia: { pose: PoseParts; ixx: number; iyy: number; izz: number; ixy: number; ixz: number; iyz: number };
-    const combinedMesh = geometry.shapes.length === 1
-      ? geometry.shapes[0].getMesh()
-      : union(...geometry.shapes).getMesh();
-    if (combinedMesh.numTri > 0) {
-      const mi = computeMeshInertia(combinedMesh, massKg);
-      inertia = {
-        pose: { xyzM: [mmToM(mi.centerOfMass[0]), mmToM(mi.centerOfMass[1]), mmToM(mi.centerOfMass[2])], rpyRad: [0, 0, 0] },
-        ixx: mi.ixx, iyy: mi.iyy, izz: mi.izz,
-        ixy: mi.ixy, ixz: mi.ixz, iyz: mi.iyz,
-      };
-    } else {
-      const bb = inertiaFromBounds(geometry, massKg);
-      inertia = { ...bb, ixy: 0, ixz: 0, iyz: 0 };
-    }
+  const linksXml = spec.assembly.parts
+    .map((part) => {
+      const sdfLinkName = linkNameMap.get(part.name)!;
+      const geometry = geometries.get(part.name)!;
+      const worldPose = transformToPose(linkWorlds.get(part.name) ?? Transform.identity());
+      const linkOptions = spec.links[part.name];
+      const massKg = estimateLinkMassKg(geometry, linkOptions?.massKg, linkOptions?.densityKgM3);
+      // Compute inertia from mesh (divergence theorem), falling back to bounding-box approximation
+      let inertia: { pose: PoseParts; ixx: number; iyy: number; izz: number; ixy: number; ixz: number; iyz: number };
+      const combinedMesh = geometry.shapes.length === 1 ? geometry.shapes[0].getMesh() : union(...geometry.shapes).getMesh();
+      if (combinedMesh.numTri > 0) {
+        const mi = computeMeshInertia(combinedMesh, massKg);
+        inertia = {
+          pose: { xyzM: [mmToM(mi.centerOfMass[0]), mmToM(mi.centerOfMass[1]), mmToM(mi.centerOfMass[2])], rpyRad: [0, 0, 0] },
+          ixx: mi.ixx,
+          iyy: mi.iyy,
+          izz: mi.izz,
+          ixy: mi.ixy,
+          ixz: mi.ixz,
+          iyz: mi.iyz,
+        };
+      } else {
+        const bb = inertiaFromBounds(geometry, massKg);
+        inertia = { ...bb, ixy: 0, ixz: 0, iyz: 0 };
+      }
 
-    const collisionMode = resolveCollisionMode(part.metadata, linkOptions?.collision);
-    const meshPath = `model://${modelName}/meshes/${sdfLinkName}.stl`;
-    const color = sRgbFloat(geometry.shapes[0]?.colorHex);
-    const materialXml = color
-      ? `
+      const collisionMode = resolveCollisionMode(part.metadata, linkOptions?.collision);
+      const meshPath = `model://${modelName}/meshes/${sdfLinkName}.stl`;
+      const color = sRgbFloat(geometry.shapes[0]?.colorHex);
+      const materialXml = color
+        ? `
         <material>
           <ambient>${formatNumber(color[0], 3)} ${formatNumber(color[1], 3)} ${formatNumber(color[2], 3)} 1</ambient>
           <diffuse>${formatNumber(color[0], 3)} ${formatNumber(color[1], 3)} ${formatNumber(color[2], 3)} 1</diffuse>
         </material>`
-      : '';
+        : '';
 
-    return `    <link name="${escapeXml(sdfLinkName)}">
+      return `    <link name="${escapeXml(sdfLinkName)}">
       <pose relative_to="__model__">${formatPose(worldPose)}</pose>
       <inertial>
         <pose>${formatPose(inertia.pose)}</pose>
@@ -803,59 +782,97 @@ function modelXml(
         return '';
       })()}
     </link>`;
-  }).join('\n');
+    })
+    .join('\n');
 
-  const jointsXml = spec.assembly.joints.map((joint) => {
-    const sourceOverrides = spec.joints[joint.name];
-    const sdfJointName = jointNameMap.get(`${joint.name}_joint`)!;
-    const sdfParent = linkNameMap.get(joint.parent) ?? 'world';
-    const sdfChild = linkNameMap.get(joint.child)!;
-    const limitLower = jointTypeLimitUnits(joint, joint.min);
-    const limitUpper = jointTypeLimitUnits(joint, joint.max);
-    const velocity = jointVelocityUnits(joint, sourceOverrides?.velocity ?? joint.velocity);
-    const effort = sourceOverrides?.effort ?? joint.effort;
-    const damping = sourceOverrides?.damping ?? joint.damping;
-    const friction = sourceOverrides?.friction ?? joint.friction;
-    const jointPose = transformToPose(joint.frame);
+  const jointsXml = spec.assembly.joints
+    .map((joint) => {
+      const sourceOverrides = spec.joints[joint.name];
+      const sdfJointName = jointNameMap.get(`${joint.name}_joint`)!;
+      const sdfParent = linkNameMap.get(joint.parent) ?? 'world';
+      const sdfChild = linkNameMap.get(joint.child)!;
+      const limitLower = jointTypeLimitUnits(joint, joint.min);
+      const limitUpper = jointTypeLimitUnits(joint, joint.max);
+      const velocity = jointVelocityUnits(joint, sourceOverrides?.velocity ?? joint.velocity);
+      const effort = sourceOverrides?.effort ?? joint.effort;
+      const damping = sourceOverrides?.damping ?? joint.damping;
+      const friction = sourceOverrides?.friction ?? joint.friction;
+      const jointPose = transformToPose(joint.frame);
 
-    // Build <mimic> element if this joint is driven by a coupling
-    let mimicXml = '';
-    const coupling = couplingByJoint.get(joint.name);
-    if (coupling && coupling.terms.length > 0) {
-      const primary = coupling.terms.reduce((a, b) =>
-        Math.abs(a.ratio) >= Math.abs(b.ratio) ? a : b);
-      const leaderSdfName = jointNameMap.get(`${primary.joint}_joint`)!;
-      mimicXml = `
+      // Build <mimic> element if this joint is driven by a coupling
+      let mimicXml = '';
+      const coupling = couplingByJoint.get(joint.name);
+      if (coupling && coupling.terms.length > 0) {
+        const primary = coupling.terms.reduce((a, b) => (Math.abs(a.ratio) >= Math.abs(b.ratio) ? a : b));
+        const leaderSdfName = jointNameMap.get(`${primary.joint}_joint`)!;
+        mimicXml = `
         <mimic joint="${escapeXml(leaderSdfName)}">
           <multiplier>${formatNumber(primary.ratio, 6)}</multiplier>
           <offset>${formatNumber(coupling.offset, 6)}</offset>
         </mimic>`;
-      if (coupling.terms.length > 1) {
-        warnings.push(
-          `Joint "${joint.name}" coupling has ${coupling.terms.length} terms but SDF mimic only supports 1. Using primary term (ratio=${primary.ratio} from "${primary.joint}").`,
-        );
+        if (coupling.terms.length > 1) {
+          warnings.push(
+            `Joint "${joint.name}" coupling has ${coupling.terms.length} terms but SDF mimic only supports 1. Using primary term (ratio=${primary.ratio} from "${primary.joint}").`,
+          );
+        }
       }
-    }
 
-    return `    <joint name="${escapeXml(sdfJointName)}" type="${joint.type}">
+      return `    <joint name="${escapeXml(sdfJointName)}" type="${joint.type}">
       <parent>${escapeXml(sdfParent)}</parent>
       <child>${escapeXml(sdfChild)}</child>
-      <pose relative_to="${escapeXml(sdfParent)}">${formatPose(jointPose)}</pose>${joint.type !== 'fixed' ? `
+      <pose relative_to="${escapeXml(sdfParent)}">${formatPose(jointPose)}</pose>${
+        joint.type !== 'fixed'
+          ? `
       <axis>
-        <xyz>${axisToText(joint.axis)}</xyz>${mimicXml}${limitLower !== null || limitUpper !== null || effort !== undefined || velocity !== null ? `
-        <limit>${limitLower !== null ? `
-          <lower>${limitLower}</lower>` : ''}${limitUpper !== null ? `
-          <upper>${limitUpper}</upper>` : ''}${effort !== undefined ? `
-          <effort>${formatNumber(effort, 6)}</effort>` : ''}${velocity !== null ? `
-          <velocity>${velocity}</velocity>` : ''}
-        </limit>` : ''}${damping !== undefined || friction !== undefined ? `
-        <dynamics>${damping !== undefined ? `
-          <damping>${formatNumber(damping, 6)}</damping>` : ''}${friction !== undefined ? `
-          <friction>${formatNumber(friction, 6)}</friction>` : ''}
-        </dynamics>` : ''}
-      </axis>` : ''}
+        <xyz>${axisToText(joint.axis)}</xyz>${mimicXml}${
+          limitLower !== null || limitUpper !== null || effort !== undefined || velocity !== null
+            ? `
+        <limit>${
+          limitLower !== null
+            ? `
+          <lower>${limitLower}</lower>`
+            : ''
+        }${
+          limitUpper !== null
+            ? `
+          <upper>${limitUpper}</upper>`
+            : ''
+        }${
+          effort !== undefined
+            ? `
+          <effort>${formatNumber(effort, 6)}</effort>`
+            : ''
+        }${
+          velocity !== null
+            ? `
+          <velocity>${velocity}</velocity>`
+            : ''
+        }
+        </limit>`
+            : ''
+        }${
+          damping !== undefined || friction !== undefined
+            ? `
+        <dynamics>${
+          damping !== undefined
+            ? `
+          <damping>${formatNumber(damping, 6)}</damping>`
+            : ''
+        }${
+          friction !== undefined
+            ? `
+          <friction>${formatNumber(friction, 6)}</friction>`
+            : ''
+        }
+        </dynamics>`
+            : ''
+        }
+      </axis>`
+          : ''
+      }
     </joint>`;
-  }).join('\n');
+    })
+    .join('\n');
 
   const plugins: string[] = [];
   if (spec.plugins.diffDrive) {
@@ -864,24 +881,64 @@ function modelXml(
       ${spec.plugins.diffDrive.rightJoints.map((jointName) => `<right_joint>${escapeXml(jointNameMap.get(`${jointName}_joint`)!)}</right_joint>`).join('\n      ')}
       <wheel_separation>${formatNumber(mmToM(spec.plugins.diffDrive.wheelSeparationMm), 6)}</wheel_separation>
       <wheel_radius>${formatNumber(mmToM(spec.plugins.diffDrive.wheelRadiusMm), 6)}</wheel_radius>
-      <topic>${escapeXml(cmdVelTopic)}</topic>${spec.plugins.diffDrive.odomTopic ? `
-      <odom_topic>${escapeXml(spec.plugins.diffDrive.odomTopic)}</odom_topic>` : ''}${spec.plugins.diffDrive.tfTopic ? `
-      <tf_topic>${escapeXml(spec.plugins.diffDrive.tfTopic)}</tf_topic>` : ''}${spec.plugins.diffDrive.frameId ? `
-      <frame_id>${escapeXml(spec.plugins.diffDrive.frameId)}</frame_id>` : ''}${spec.plugins.diffDrive.odomFrameId ? `
-      <odom_frame>${escapeXml(spec.plugins.diffDrive.odomFrameId)}</odom_frame>` : ''}${spec.plugins.diffDrive.maxLinearVelocity !== undefined ? `
-      <max_linear_velocity>${formatNumber(spec.plugins.diffDrive.maxLinearVelocity, 6)}</max_linear_velocity>` : ''}${spec.plugins.diffDrive.maxAngularVelocity !== undefined ? `
-      <max_angular_velocity>${formatNumber(spec.plugins.diffDrive.maxAngularVelocity, 6)}</max_angular_velocity>` : ''}${spec.plugins.diffDrive.linearAcceleration !== undefined ? `
-      <linear_acceleration>${formatNumber(spec.plugins.diffDrive.linearAcceleration, 6)}</linear_acceleration>` : ''}${spec.plugins.diffDrive.angularAcceleration !== undefined ? `
-      <angular_acceleration>${formatNumber(spec.plugins.diffDrive.angularAcceleration, 6)}</angular_acceleration>` : ''}
+      <topic>${escapeXml(cmdVelTopic)}</topic>${
+        spec.plugins.diffDrive.odomTopic
+          ? `
+      <odom_topic>${escapeXml(spec.plugins.diffDrive.odomTopic)}</odom_topic>`
+          : ''
+      }${
+        spec.plugins.diffDrive.tfTopic
+          ? `
+      <tf_topic>${escapeXml(spec.plugins.diffDrive.tfTopic)}</tf_topic>`
+          : ''
+      }${
+        spec.plugins.diffDrive.frameId
+          ? `
+      <frame_id>${escapeXml(spec.plugins.diffDrive.frameId)}</frame_id>`
+          : ''
+      }${
+        spec.plugins.diffDrive.odomFrameId
+          ? `
+      <odom_frame>${escapeXml(spec.plugins.diffDrive.odomFrameId)}</odom_frame>`
+          : ''
+      }${
+        spec.plugins.diffDrive.maxLinearVelocity !== undefined
+          ? `
+      <max_linear_velocity>${formatNumber(spec.plugins.diffDrive.maxLinearVelocity, 6)}</max_linear_velocity>`
+          : ''
+      }${
+        spec.plugins.diffDrive.maxAngularVelocity !== undefined
+          ? `
+      <max_angular_velocity>${formatNumber(spec.plugins.diffDrive.maxAngularVelocity, 6)}</max_angular_velocity>`
+          : ''
+      }${
+        spec.plugins.diffDrive.linearAcceleration !== undefined
+          ? `
+      <linear_acceleration>${formatNumber(spec.plugins.diffDrive.linearAcceleration, 6)}</linear_acceleration>`
+          : ''
+      }${
+        spec.plugins.diffDrive.angularAcceleration !== undefined
+          ? `
+      <angular_acceleration>${formatNumber(spec.plugins.diffDrive.angularAcceleration, 6)}</angular_acceleration>`
+          : ''
+      }
     </plugin>`);
   }
 
   const jointState = spec.plugins.jointStatePublisher;
   if (jointState?.enabled !== false) {
     plugins.push(`    <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
-      <topic>${escapeXml(jointState?.topic || jointStateTopic)}</topic>${(jointState?.joints ?? []).map((jointName) => `
-      <joint_name>${escapeXml(jointNameMap.get(`${jointName}_joint`)!)}</joint_name>`).join('')}${jointState?.updateRate !== undefined ? `
-      <update_rate>${formatNumber(jointState.updateRate, 6)}</update_rate>` : ''}
+      <topic>${escapeXml(jointState?.topic || jointStateTopic)}</topic>${(jointState?.joints ?? [])
+        .map(
+          (jointName) => `
+      <joint_name>${escapeXml(jointNameMap.get(`${jointName}_joint`)!)}</joint_name>`,
+        )
+        .join('')}${
+        jointState?.updateRate !== undefined
+          ? `
+      <update_rate>${formatNumber(jointState.updateRate, 6)}</update_rate>`
+          : ''
+      }
     </plugin>`);
   }
 
@@ -908,7 +965,7 @@ ${plugins.join('\n')}
   return {
     xml,
     cmdVelTopic: spec.plugins.diffDrive ? cmdVelTopic : undefined,
-    jointStateTopic: jointState?.enabled === false ? undefined : (jointState?.topic || jointStateTopic),
+    jointStateTopic: jointState?.enabled === false ? undefined : jointState?.topic || jointStateTopic,
   };
 }
 
@@ -920,8 +977,14 @@ export function buildSdfRobotPackage(spec: CollectedRobotExport): SdfPackageOutp
   const warnings: string[] = [];
   const modelName = sanitizeToken(spec.modelName, 'forgecad_robot');
   const modelFolder = `models/${modelName}`;
-  const linkNameMap = uniqueNameMap(spec.assembly.parts.map((part) => part.name), 'link');
-  const jointNameMap = uniqueNameMap(spec.assembly.joints.map((joint) => `${joint.name}_joint`), 'joint');
+  const linkNameMap = uniqueNameMap(
+    spec.assembly.parts.map((part) => part.name),
+    'link',
+  );
+  const jointNameMap = uniqueNameMap(
+    spec.assembly.joints.map((joint) => `${joint.name}_joint`),
+    'joint',
+  );
   const jointValues = resolveJointValues(spec.assembly, spec.state, warnings);
   const linkWorlds = computeLinkFrameWorlds(spec.assembly, jointValues);
   const geometries = new Map<string, LinkGeometry>();
@@ -945,18 +1008,21 @@ export function buildSdfRobotPackage(spec: CollectedRobotExport): SdfPackageOutp
     const meshPath = `${modelFolder}/meshes/${sdfLinkName}.stl`;
     files.push({
       path: meshPath,
-      bytes: new Uint8Array(buildBinaryStl([{ name: part.name, shape: geometry.shapes[0] }, ...geometry.shapes.slice(1).map((shape, index) => ({
-        name: `${part.name}.${index + 2}`,
-        shape,
-      }))])),
+      bytes: new Uint8Array(
+        buildBinaryStl([
+          { name: part.name, shape: geometry.shapes[0] },
+          ...geometry.shapes.slice(1).map((shape, index) => ({
+            name: `${part.name}.${index + 2}`,
+            shape,
+          })),
+        ]),
+      ),
     });
 
     const collisionMode = resolveCollisionMode(part.metadata, linkOptions?.collision);
     if (collisionMode === 'convex') {
       const collisionMeshPath = `${modelFolder}/meshes/${sdfLinkName}_collision.stl`;
-      const collisionShape = geometry.shapes.length === 1
-        ? geometry.shapes[0]
-        : union(...geometry.shapes);
+      const collisionShape = geometry.shapes.length === 1 ? geometry.shapes[0] : union(...geometry.shapes);
       files.push({
         path: collisionMeshPath,
         bytes: new Uint8Array(buildBinaryStl([{ name: `${part.name}_collision`, shape: collisionShape }])),

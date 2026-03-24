@@ -6,26 +6,24 @@
  */
 import assert from 'node:assert/strict';
 import {
-  init,
   box,
+  chamferEdge,
+  circle2d,
+  constrainedSketch,
   cylinder,
-  union,
   difference,
+  difference2d,
+  filletEdge,
+  init,
   intersection,
+  intersection2d,
   rect,
   rectangle,
   roundedRect,
-  circle2d,
-  sheetMetal,
-  union2d,
-  difference2d,
-  filletEdge,
-  chamferEdge,
-  intersection2d,
   runScript,
-  constrainedSketch,
-  sketchRegions,
-  sketchRegion,
+  sheetMetal,
+  union,
+  union2d,
 } from '../src/forge/headless';
 
 const EPS = 1e-6;
@@ -125,33 +123,20 @@ function checkSketchBooleanForms(): void {
   expectClose(intersectVariadic.area(), intersectFn.area(), 'Sketch.intersect variadic');
   expectClose(intersectArray.area(), intersectFn.area(), 'Sketch.intersect array');
   expectClose(intersectFnArray.area(), intersectFn.area(), 'intersection2d array');
-
 }
 
 function checkBooleanErrors(): void {
   const base = box(20, 20, 10);
   const plate = rect(20, 20);
 
-  assert.throws(
-    () => base.subtract(),
-    /Shape\.subtract\(\) requires at least 1 shape/,
-  );
-  assert.throws(
-    () => difference(base),
-    /difference\(\) requires at least 2 shapes/,
-  );
+  assert.throws(() => base.subtract(), /Shape\.subtract\(\) requires at least 1 shape/);
+  assert.throws(() => difference(base), /difference\(\) requires at least 2 shapes/);
   assert.throws(
     () => base.add(undefined as unknown as ReturnType<typeof box>),
     /Shape\.add\(\) argument 1: expected a Shape or TrackedShape-compatible value, got undefined/,
   );
-  assert.throws(
-    () => plate.subtract(),
-    /Sketch\.subtract\(\) requires at least 1 sketch/,
-  );
-  assert.throws(
-    () => difference2d(plate),
-    /difference2d\(\) requires at least 2 sketch/,
-  );
+  assert.throws(() => plate.subtract(), /Sketch\.subtract\(\) requires at least 1 sketch/);
+  assert.throws(() => difference2d(plate), /difference2d\(\) requires at least 2 sketch/);
   assert.throws(
     () => union2d([plate, undefined as unknown as ReturnType<typeof rect>]),
     /union2d\(\) argument 2: expected a Sketch, got undefined/,
@@ -161,9 +146,7 @@ function checkBooleanErrors(): void {
 function checkEdgeFinishSubsetErrors(): void {
   const base = rectangle(-24, -16, 48, 32).extrude(18);
   const once = filletEdge(base.toShape(), base.edge('vert-br'), 4, [-1, -1]);
-  const boss = roundedRect(10, 6, 1.5, true)
-    .onFace(base, 'top', { u: -10, v: 4, protrude: 0.25, selfAnchor: 'center' })
-    .extrude(5);
+  const boss = roundedRect(10, 6, 1.5, true).onFace(base, 'top', { u: -10, v: 4, protrude: 0.25, selfAnchor: 'center' }).extrude(5);
   const widened = once.add(boss);
   assert.doesNotThrow(
     () => filletEdge(once, base.edge('vert-bl'), 4, [1, -1]),
@@ -194,12 +177,7 @@ function checkEdgeFinishSubsetErrors(): void {
     /merged rewritten descendants|merged into rewritten descendants|untouched sibling vertical edges|descendant chain/,
   );
   assert.throws(
-    () => filletEdge(
-      widened.subtract(box(8, 8, 20, true).translate(-24, -16, 9)),
-      base.edge('vert-bl'),
-      4,
-      [1, -1],
-    ),
+    () => filletEdge(widened.subtract(box(8, 8, 20, true).translate(-24, -16, 9)), base.edge('vert-bl'), 4, [1, -1]),
     /split or erase|clipped descendant subset|stable edge target/,
   );
 }
@@ -278,19 +256,12 @@ return difference([base, hole1, hole2]);
   assert.equal(ok.error, null, `Expected sandbox boolean script to pass, got ${ok.error}`);
   assert(ok.shape != null, 'Sandbox boolean script should return a shape');
 
-  const expected = difference(
-    box(40, 40, 10),
-    cylinder(12, 4).translate(10, 10, -1),
-    cylinder(12, 4).translate(30, 10, -1),
-  );
+  const expected = difference(box(40, 40, 10), cylinder(12, 4).translate(10, 10, -1), cylinder(12, 4).translate(30, 10, -1));
   expectClose(ok.shape!.volume(), expected.volume(), 'runScript difference array');
 
   const badScript = 'return box(10, 10, 10).subtract();';
   const bad = runScript(badScript, 'bad.forge.js', { 'bad.forge.js': badScript });
-  assert.match(
-    bad.error ?? '',
-    /Shape\.subtract\(\) requires at least 1 shape/,
-  );
+  assert.match(bad.error ?? '', /Shape\.subtract\(\) requires at least 1 shape/);
 }
 
 // ─── Step 1: sketch.regions() / sketch.region() ─────────────────────────────
@@ -334,18 +305,10 @@ function checkSketchRegions(): void {
   assert(extruded != null, 'extrude on region should produce a shape');
 
   // region() with seed in hole → throws
-  assert.throws(
-    () => donut.region([0, 0]),
-    /seed point .* is not inside any/,
-    'seed inside the hole should throw',
-  );
+  assert.throws(() => donut.region([0, 0]), /seed point .* is not inside any/, 'seed inside the hole should throw');
 
   // region() on empty sketch → throws
-  assert.throws(
-    () => rect(0, 0).region([0, 0]),
-    /no filled area/,
-    'region on empty sketch should throw',
-  );
+  assert.throws(() => rect(0, 0).region([0, 0]), /no filled area/, 'region on empty sketch should throw');
 
   // regions() regions are sorted largest-first
   const big = rect(100, 100);
@@ -361,9 +324,14 @@ function checkSketchRegions(): void {
 function checkArrangementDetection(): void {
   // Simple case: a rectangle drawn as 4 lines (no explicit loop)
   const b1 = constrainedSketch();
-  const p00 = b1.point(0, 0); const p10 = b1.point(100, 0);
-  const p11 = b1.point(100, 60); const p01 = b1.point(0, 60);
-  b1.line(p00, p10); b1.line(p10, p11); b1.line(p11, p01); b1.line(p01, p00);
+  const p00 = b1.point(0, 0);
+  const p10 = b1.point(100, 0);
+  const p11 = b1.point(100, 60);
+  const p01 = b1.point(0, 60);
+  b1.line(p00, p10);
+  b1.line(p10, p11);
+  b1.line(p11, p01);
+  b1.line(p01, p00);
   const sk1 = b1.solve();
   const regions1 = sk1.detectArrangement();
   assert.equal(regions1.length, 1, 'simple closed rectangle should yield 1 region');
@@ -371,11 +339,17 @@ function checkArrangementDetection(): void {
 
   // Divided rectangle: 2 cells separated by a vertical line through the middle
   const b2 = constrainedSketch();
-  const q00 = b2.point(0, 0);  const q10 = b2.point(100, 0);
-  const q11 = b2.point(100, 60); const q01 = b2.point(0, 60);
-  const qm0 = b2.point(50, 0);  const qm1 = b2.point(50, 60);
-  b2.line(q00, qm0); b2.line(qm0, q10); // bottom in 2 segments
-  b2.line(q10, q11); b2.line(q11, q01); b2.line(q01, q00);
+  const q00 = b2.point(0, 0);
+  const q10 = b2.point(100, 0);
+  const q11 = b2.point(100, 60);
+  const q01 = b2.point(0, 60);
+  const qm0 = b2.point(50, 0);
+  const qm1 = b2.point(50, 60);
+  b2.line(q00, qm0);
+  b2.line(qm0, q10); // bottom in 2 segments
+  b2.line(q10, q11);
+  b2.line(q11, q01);
+  b2.line(q01, q00);
   b2.line(qm0, qm1); // divider
   const sk2 = b2.solve();
   const regions2 = sk2.detectArrangement();
@@ -395,10 +369,14 @@ function checkArrangementDetection(): void {
   // (or more complex depending on arrangement, but at least > 1 face)
   const b3 = constrainedSketch();
   // Enclosed diamond: 4 segments forming a diamond
-  const dTop = b3.point(50, 80);  const dBot = b3.point(50, 0);
-  const dLeft = b3.point(0, 40);  const dRight = b3.point(100, 40);
-  b3.line(dTop, dRight); b3.line(dRight, dBot);
-  b3.line(dBot, dLeft);  b3.line(dLeft, dTop);
+  const dTop = b3.point(50, 80);
+  const dBot = b3.point(50, 0);
+  const dLeft = b3.point(0, 40);
+  const dRight = b3.point(100, 40);
+  b3.line(dTop, dRight);
+  b3.line(dRight, dBot);
+  b3.line(dBot, dLeft);
+  b3.line(dLeft, dTop);
   const sk3 = b3.solve();
   const regions3 = sk3.detectArrangement();
   assert.equal(regions3.length, 1, 'diamond should yield 1 region');
@@ -406,9 +384,14 @@ function checkArrangementDetection(): void {
 
   // Construction lines are excluded from arrangement detection
   const b4 = constrainedSketch();
-  const r0 = b4.point(0, 0); const r1 = b4.point(50, 0);
-  const r2 = b4.point(50, 50); const r3 = b4.point(0, 50);
-  b4.line(r0, r1); b4.line(r1, r2); b4.line(r2, r3); b4.line(r3, r0);
+  const r0 = b4.point(0, 0);
+  const r1 = b4.point(50, 0);
+  const r2 = b4.point(50, 50);
+  const r3 = b4.point(0, 50);
+  b4.line(r0, r1);
+  b4.line(r1, r2);
+  b4.line(r2, r3);
+  b4.line(r3, r0);
   // Add a construction diagonal — should NOT create extra arrangement regions
   b4.line(r0, r2, true /* construction */);
   const sk4 = b4.solve();
@@ -416,11 +399,7 @@ function checkArrangementDetection(): void {
   assert.equal(regions4.length, 1, 'construction lines should not create extra regions');
 
   // detectArrangementRegion throws when seed is outside all regions
-  assert.throws(
-    () => sk1.detectArrangementRegion([200, 200]),
-    /seed point .* is not inside any/,
-    'out-of-bounds seed should throw',
-  );
+  assert.throws(() => sk1.detectArrangementRegion([200, 200]), /seed point .* is not inside any/, 'out-of-bounds seed should throw');
 
   // Smoke test: extrude a detected arrangement region
   const extruded = regions1[0].extrude(5);
@@ -450,7 +429,8 @@ function checkCrossSketchReferences(): void {
   const b2 = constrainedSketch();
   const refLine = b2.referenceLine(0, 0, 100, 0); // horizontal baseline
   // Draw a line parallel to the reference baseline
-  const pl1 = b2.point(10, 30); const pl2 = b2.point(90, 30);
+  const pl1 = b2.point(10, 30);
+  const pl2 = b2.point(90, 30);
   const mainLine = b2.line(pl1, pl2);
   b2.parallel(mainLine, refLine);
   b2.fix(pl1, 10, 30);
@@ -462,9 +442,12 @@ function checkCrossSketchReferences(): void {
 
   // referenceFrom: import a solved sketch's entities into a new builder
   const builderA = constrainedSketch();
-  const a1 = builderA.point(0, 0); const a2 = builderA.point(100, 0);
+  const a1 = builderA.point(0, 0);
+  const a2 = builderA.point(100, 0);
   const aLine = builderA.line(a1, a2);
-  builderA.fix(a1, 0, 0); builderA.horizontal(aLine); builderA.length(aLine, 100);
+  builderA.fix(a1, 0, 0);
+  builderA.horizontal(aLine);
+  builderA.length(aLine, 100);
   const sketchA = builderA.solve();
 
   const builderB = constrainedSketch();
@@ -475,7 +458,8 @@ function checkCrossSketchReferences(): void {
   const bp2 = builderB.point(100, 50);
   const bLine = builderB.line(bp1, bp2);
   builderB.parallel(bLine, refImported as string);
-  builderB.fix(bp1, 0, 50); builderB.length(bLine, 100);
+  builderB.fix(bp1, 0, 50);
+  builderB.length(bLine, 100);
   builderB.addLoop([bp1, bp2, builderB.point(100, 80), builderB.point(0, 80)]);
   const sketchB = builderB.solve();
   assert.equal(sketchB.constraintMeta.rejected.length, 0, 'cross-sketch parallel should resolve');

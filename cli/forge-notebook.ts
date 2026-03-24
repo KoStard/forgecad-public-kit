@@ -1,30 +1,30 @@
 #!/usr/bin/env node
+import { stdin as input } from 'node:process';
+import { type ChildProcess } from 'child_process';
 import { readFileSync, writeFileSync } from 'fs';
-import { spawn, type ChildProcess } from 'child_process';
 import { createServer } from 'net';
 import { resolve } from 'path';
-import { stdin as input } from 'node:process';
-import { findProjectRoot } from './collect-files';
 import { exportNotebookToForgeScript, notebookDefaultScriptPath } from '../src/notebook/export';
 import { parseNotebook } from '../src/notebook/model';
 import { renderNotebookForTerminal } from '../src/notebook/terminal';
+import { findProjectRoot } from './collect-files';
 import { packageRootFrom, spawnPackageVite } from './package-runtime';
 
 type NotebookOutput =
   | {
-    output_type: 'stream';
-    name: 'stdout' | 'stderr';
-    text: string[];
-  }
+      output_type: 'stream';
+      name: 'stdout' | 'stderr';
+      text: string[];
+    }
   | {
-    output_type: 'display_data';
-    data: { 'text/plain': string[] };
-  }
+      output_type: 'display_data';
+      data: { 'text/plain': string[] };
+    }
   | {
-    output_type: 'error';
-    evalue: string;
-    traceback: string[];
-  };
+      output_type: 'error';
+      evalue: string;
+      traceback: string[];
+    };
 
 interface NotebookResponse {
   cellId: string | null;
@@ -131,13 +131,9 @@ function parseCli(argv: string[]): ParsedCli {
     command = 'run';
   }
 
-  const positionalAfterTarget = argv[targetIndex + 1] && !argv[targetIndex + 1].startsWith('--')
-    ? argv[targetIndex + 1]
-    : undefined;
+  const positionalAfterTarget = argv[targetIndex + 1] && !argv[targetIndex + 1].startsWith('--') ? argv[targetIndex + 1] : undefined;
 
-  const cellId = command === 'run'
-    ? positionalAfterTarget
-    : undefined;
+  const cellId = command === 'run' ? positionalAfterTarget : undefined;
 
   return {
     command,
@@ -344,10 +340,12 @@ function viewNotebook(cli: ParsedCli): void {
   const notebookPath = resolve(cli.target);
   const notebookText = readFileSync(notebookPath, 'utf-8');
   const notebook = parseNotebook(notebookText);
-  process.stdout.write(renderNotebookForTerminal(notebook, {
-    filename: notebookPath,
-    cellSpecifier: cli.cellSpecifier,
-  }));
+  process.stdout.write(
+    renderNotebookForTerminal(notebook, {
+      filename: notebookPath,
+      cellSpecifier: cli.cellSpecifier,
+    }),
+  );
 }
 
 export async function runNotebookCli(argv: string[] = process.argv.slice(2)): Promise<void> {

@@ -47,7 +47,7 @@ export async function buildStepBlob(objects: StepExportObject[]): Promise<Blob> 
     if (!topoShape) {
       throw new Error(
         `STEP export: object "${objects[0].name}" does not have an OCCT TopoDS_Shape. ` +
-        'Only OCCT-backed shapes can be exported to STEP.',
+          'Only OCCT-backed shapes can be exported to STEP.',
       );
     }
     exportShape = topoShape;
@@ -61,8 +61,7 @@ export async function buildStepBlob(objects: StepExportObject[]): Promise<Blob> 
       const topoShape = obj.shape?.shape;
       if (!topoShape) {
         throw new Error(
-          `STEP export: object "${obj.name}" does not have an OCCT TopoDS_Shape. ` +
-          'Only OCCT-backed shapes can be exported to STEP.',
+          `STEP export: object "${obj.name}" does not have an OCCT TopoDS_Shape. ` + 'Only OCCT-backed shapes can be exported to STEP.',
         );
       }
       builder.Add(compound, topoShape);
@@ -81,10 +80,7 @@ export async function buildStepBlob(objects: StepExportObject[]): Promise<Blob> 
   );
 
   if (transferStatus !== oc.IFSelect_ReturnStatus.IFSelect_RetDone) {
-    throw new Error(
-      `STEP export: Transfer failed with status ${transferStatus}. ` +
-      'The shape may be invalid or empty.',
-    );
+    throw new Error(`STEP export: Transfer failed with status ${transferStatus}. ` + 'The shape may be invalid or empty.');
   }
 
   // Write to a virtual filesystem path
@@ -92,10 +88,7 @@ export async function buildStepBlob(objects: StepExportObject[]): Promise<Blob> 
   const writeStatus = writer.Write(virtualPath);
 
   if (writeStatus !== oc.IFSelect_ReturnStatus.IFSelect_RetDone) {
-    throw new Error(
-      `STEP export: Write failed with status ${writeStatus}. ` +
-      'The STEP writer could not serialize the model.',
-    );
+    throw new Error(`STEP export: Write failed with status ${writeStatus}. ` + 'The STEP writer could not serialize the model.');
   }
 
   // Read the file back from Emscripten's virtual FS
@@ -104,8 +97,7 @@ export async function buildStepBlob(objects: StepExportObject[]): Promise<Blob> 
     data = oc.FS.readFile(virtualPath);
   } catch (e) {
     throw new Error(
-      'STEP export: Failed to read exported file from virtual filesystem. ' +
-      `${e instanceof Error ? e.message : String(e)}`,
+      'STEP export: Failed to read exported file from virtual filesystem. ' + `${e instanceof Error ? e.message : String(e)}`,
     );
   }
 

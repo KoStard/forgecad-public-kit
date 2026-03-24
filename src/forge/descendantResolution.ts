@@ -90,6 +90,4 @@ export interface UnsupportedVertexDescendantResolution {
   note?: string;
 }
 
-export type ShapeVertexDescendantResolution =
-  | VertexSetDescendantResolution
-  | UnsupportedVertexDescendantResolution;
+export type ShapeVertexDescendantResolution = VertexSetDescendantResolution | UnsupportedVertexDescendantResolution;

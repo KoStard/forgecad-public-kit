@@ -1,27 +1,24 @@
 import {
+  type CreatedEdgeQueryRef,
+  type CreatedFaceQueryRef,
   cloneEdgeQueryRef,
   cloneFaceQueryRef,
   cloneShapeQueryOwner,
-  type CreatedEdgeQueryRef,
-  type CreatedFaceQueryRef,
   type EdgeQueryRef,
   type FaceQueryRef,
   type PropagatedEdgeQueryRef,
   type PropagatedFaceQueryRef,
   type ShapeQueryOwner,
-  type TopologyRewritePropagation,
-  type TopologyRewritePropagationDiagnostic,
   type TopologyRewriteDescendantContract,
   type TopologyRewriteEdgeDescendantContract,
   type TopologyRewriteFaceDescendantContract,
+  type TopologyRewritePropagation,
+  type TopologyRewritePropagationDiagnostic,
   type TopologyRewriteQueryKind,
   type TopologyRewriteQueryOutcome,
 } from './queryModel';
 
-export function createTopologyRewritePropagation(
-  operation: string,
-  owner: ShapeQueryOwner,
-): TopologyRewritePropagation {
+export function createTopologyRewritePropagation(operation: string, owner: ShapeQueryOwner): TopologyRewritePropagation {
   return {
     rewriteId: owner.id,
     operation,
@@ -48,12 +45,10 @@ export function createTopologyRewritePropagationDiagnostic(
     category,
     queryKind,
     message,
-    source: queryKind === 'face'
-      ? cloneFaceQueryRef(source as FaceQueryRef | undefined)
-      : cloneEdgeQueryRef(source as EdgeQueryRef | undefined),
-    query: queryKind === 'face'
-      ? cloneFaceQueryRef(query as FaceQueryRef | undefined)
-      : cloneEdgeQueryRef(query as EdgeQueryRef | undefined),
+    source:
+      queryKind === 'face' ? cloneFaceQueryRef(source as FaceQueryRef | undefined) : cloneEdgeQueryRef(source as EdgeQueryRef | undefined),
+    query:
+      queryKind === 'face' ? cloneFaceQueryRef(query as FaceQueryRef | undefined) : cloneEdgeQueryRef(query as EdgeQueryRef | undefined),
   };
 }
 
@@ -71,11 +66,7 @@ export function createPropagatedFaceQueryRef(
   };
 }
 
-export function createCreatedFaceQueryRef(
-  owner: ShapeQueryOwner,
-  operation: string,
-  slot: string,
-): CreatedFaceQueryRef {
+export function createCreatedFaceQueryRef(owner: ShapeQueryOwner, operation: string, slot: string): CreatedFaceQueryRef {
   return {
     kind: 'created-face',
     rewriteId: owner.id,

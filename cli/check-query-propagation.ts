@@ -10,19 +10,15 @@ import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 import { init } from '../src/forge/headless';
 import {
-  describeTopologyRewriteDescendantContract,
   describeEdgeQueryRef,
   describeFaceQueryRef,
+  describeTopologyRewriteDescendantContract,
   type EdgeQueryRef,
   type FaceQueryRef,
   type ShapeQueryOwner,
   type TopologyRewritePropagation,
 } from '../src/forge/queryModel';
-import type {
-  CompilerInspectionInput,
-  CompilerRouteInspection,
-  CompilerShapeInspection,
-} from './compiler-inspection';
+import type { CompilerInspectionInput, CompilerRouteInspection, CompilerShapeInspection } from './compiler-inspection';
 import { inspectCompilerScene, loadCompilerInspectionInput } from './compiler-inspection';
 import { getCompilerRegressionCorpusPart } from './compiler-regression-corpus';
 import { CHAMFER_EDGE_WORKFLOW_CODE, FILLET_EDGE_WORKFLOW_CODE } from './edge-finish-fixtures';
@@ -195,10 +191,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         exactRouteKind: 'exact',
         facetedRouteKind: 'exact',
         operations: ['trimByPlane'],
-        requiredDiagnosticCodes: [
-          'trim-by-plane-preserved-face-propagation-ambiguous',
-          'trim-by-plane-edge-propagation-ambiguous',
-        ],
+        requiredDiagnosticCodes: ['trim-by-plane-preserved-face-propagation-ambiguous', 'trim-by-plane-edge-propagation-ambiguous'],
         requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
       },
       {
@@ -206,10 +199,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         exactRouteKind: 'exact',
         facetedRouteKind: 'exact',
         operations: ['trimByPlane'],
-        requiredDiagnosticCodes: [
-          'trim-by-plane-preserved-face-propagation-ambiguous',
-          'trim-by-plane-edge-propagation-ambiguous',
-        ],
+        requiredDiagnosticCodes: ['trim-by-plane-preserved-face-propagation-ambiguous', 'trim-by-plane-edge-propagation-ambiguous'],
         requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
       },
       {
@@ -217,10 +207,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         exactRouteKind: 'exact',
         facetedRouteKind: 'exact',
         operations: ['trimByPlane'],
-        requiredDiagnosticCodes: [
-          'trim-by-plane-preserved-face-propagation-ambiguous',
-          'trim-by-plane-edge-propagation-ambiguous',
-        ],
+        requiredDiagnosticCodes: ['trim-by-plane-preserved-face-propagation-ambiguous', 'trim-by-plane-edge-propagation-ambiguous'],
         requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
       },
     ],
@@ -235,10 +222,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         exactRouteKind: 'exact',
         facetedRouteKind: 'exact',
         operations: ['cut', 'cut', 'hole', 'hole'],
-        requiredDiagnosticCodes: [
-          'cut-source-face-split-ambiguous',
-          'hole-source-face-split-ambiguous',
-        ],
+        requiredDiagnosticCodes: ['cut-source-face-split-ambiguous', 'hole-source-face-split-ambiguous'],
         requiredPreservedFaceQueries: [
           'propagated-face(split <- tracked-face(side-bottom)',
           'propagated-face(split <- tracked-face(side-top)',
@@ -275,10 +259,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'hole-source-face-split-ambiguous',
           'hole-up-to-face-target-split-ambiguous',
         ],
-        requiredCreatedFaceQueries: [
-          'created-face(hole:cap)',
-          'created-face(cut:wall-right)',
-        ],
+        requiredCreatedFaceQueries: ['created-face(hole:cap)', 'created-face(cut:wall-right)'],
         requiredCreatedEdgeQueries: [
           'created-edge(hole:reverse-end-rim#edge)',
           'created-edge(hole:forward-end-rim#edge)',
@@ -346,14 +327,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         name: 'Enclosure Shell Cuts',
         exactRouteKind: 'exact',
         facetedRouteKind: 'exact',
-        operations: [
-          'boolean:difference',
-          'boolean:difference',
-          'boolean:union',
-          'shell',
-          'boolean:union',
-          'boolean:union',
-        ],
+        operations: ['boolean:difference', 'boolean:difference', 'boolean:union', 'shell', 'boolean:union', 'boolean:union'],
         requiredDiagnosticCodes: [
           'boolean-difference-face-split-ambiguous',
 
@@ -411,13 +385,8 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'created-face(hole:counterbore-wall)',
           'created-face(hole:countersink-wall)',
         ],
-        requiredCreatedEdgeQueries: [
-          'created-edge(hole:head-transition-rim#edge)',
-          'created-edge(cut:forward-end-rim#edge)',
-        ],
-        requiredPreservedFaceQueries: [
-          'propagated-face(preserved <- created-face(hole:counterbore-floor)',
-        ],
+        requiredCreatedEdgeQueries: ['created-edge(hole:head-transition-rim#edge)', 'created-edge(cut:forward-end-rim#edge)'],
+        requiredPreservedFaceQueries: ['propagated-face(preserved <- created-face(hole:counterbore-floor)'],
       },
     ],
   ),
@@ -443,10 +412,7 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
           'created-face(cut:wall-right)',
           'created-face(cut:floor)',
         ],
-        requiredCreatedEdgeQueries: [
-          'created-edge(hole:head-transition-rim#edge)',
-          'created-edge(cut:forward-end-rim#edge)',
-        ],
+        requiredCreatedEdgeQueries: ['created-edge(hole:head-transition-rim#edge)', 'created-edge(cut:forward-end-rim#edge)'],
         requiredPreservedFaceQueries: [
           'propagated-face(preserved <- created-face(hole:counterbore-floor)',
           'propagated-face(preserved <- created-face(hole:countersink-wall)',
@@ -464,13 +430,8 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         exactRouteKind: 'exact',
         facetedRouteKind: 'exact',
         operations: ['cut', 'cut', 'cut', 'cut', 'cut', 'cut'],
-        requiredDiagnosticCodes: [
-          'cut-source-face-split-ambiguous',
-        ],
-        requiredCreatedFaceQueries: [
-          'created-face(cut:wall-right)',
-          'created-face(cut:wall)',
-        ],
+        requiredDiagnosticCodes: ['cut-source-face-split-ambiguous'],
+        requiredCreatedFaceQueries: ['created-face(cut:wall-right)', 'created-face(cut:wall)'],
         requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim#edge)'],
         requiredPreservedFaceQueries: [
           'propagated-face(split <- tracked-face(panel)',
@@ -482,13 +443,8 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
         exactRouteKind: 'exact',
         facetedRouteKind: 'exact',
         operations: ['cut', 'cut', 'cut', 'cut', 'cut', 'cut'],
-        requiredDiagnosticCodes: [
-          'cut-source-face-split-ambiguous',
-        ],
-        requiredCreatedFaceQueries: [
-          'created-face(cut:wall-right)',
-          'created-face(cut:wall)',
-        ],
+        requiredDiagnosticCodes: ['cut-source-face-split-ambiguous'],
+        requiredCreatedFaceQueries: ['created-face(cut:wall-right)', 'created-face(cut:wall)'],
         requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim#edge)'],
         requiredPreservedFaceQueries: [
           'propagated-face(split <- tracked-face(panel)',
@@ -568,14 +524,9 @@ function describeOwner(owner: ShapeQueryOwner | undefined): string | undefined {
   return `${owner.operation}:${owner.id}`;
 }
 
-function describeQuery(
-  queryKind: 'face' | 'edge',
-  query: FaceQueryRef | EdgeQueryRef | undefined,
-): string | undefined {
+function describeQuery(queryKind: 'face' | 'edge', query: FaceQueryRef | EdgeQueryRef | undefined): string | undefined {
   if (!query) return undefined;
-  return queryKind === 'face'
-    ? describeFaceQueryRef(query as FaceQueryRef)
-    : describeEdgeQueryRef(query as EdgeQueryRef);
+  return queryKind === 'face' ? describeFaceQueryRef(query as FaceQueryRef) : describeEdgeQueryRef(query as EdgeQueryRef);
 }
 
 function summarizeRoute(route: CompilerRouteInspection): QueryPropagationRouteSnapshot {
@@ -632,9 +583,7 @@ function summarizeShapeObject(object: CompilerShapeInspection): QueryPropagation
 }
 
 function generateSnapshots(caseId?: string): QueryPropagationCaseSnapshot[] {
-  const selected = caseId
-    ? QUERY_PROPAGATION_CASES.filter((entry) => entry.id === caseId)
-    : QUERY_PROPAGATION_CASES;
+  const selected = caseId ? QUERY_PROPAGATION_CASES.filter((entry) => entry.id === caseId) : QUERY_PROPAGATION_CASES;
   if (selected.length === 0) {
     throw new Error(`Unknown query-propagation snapshot case: ${caseId}`);
   }
@@ -701,20 +650,11 @@ function assertExpectedCoverage(snapshots: QueryPropagationCaseSnapshot[]): void
         expected.facetedRouteKind,
         `${snapshot.id}/${expected.name}: expected allow-faceted route ${expected.facetedRouteKind}, got ${object!.facetedRoute.kind}`,
       );
-      assert.deepEqual(
-        object!.propagationOps,
-        expected.operations,
-        `${snapshot.id}/${expected.name}: propagation ordering changed`,
-      );
+      assert.deepEqual(object!.propagationOps, expected.operations, `${snapshot.id}/${expected.name}: propagation ordering changed`);
 
-      const diagnosticCodes = object!.propagations.flatMap((propagation) =>
-        propagation.diagnostics.map((diagnostic) => diagnostic.code),
-      );
+      const diagnosticCodes = object!.propagations.flatMap((propagation) => propagation.diagnostics.map((diagnostic) => diagnostic.code));
       for (const code of expected.requiredDiagnosticCodes) {
-        assert(
-          diagnosticCodes.includes(code),
-          `${snapshot.id}/${expected.name}: missing propagation diagnostic ${code}`,
-        );
+        assert(diagnosticCodes.includes(code), `${snapshot.id}/${expected.name}: missing propagation diagnostic ${code}`);
       }
 
       for (const code of expected.requiredRouteDiagnosticCodes ?? []) {
@@ -779,9 +719,7 @@ export async function runCheckQueryPropagationCli(argv: string[] = process.argv.
   }
 
   const stored = readStoredSnapshots();
-  const expected = caseId
-    ? stored.filter((entry) => entry.id === caseId)
-    : stored;
+  const expected = caseId ? stored.filter((entry) => entry.id === caseId) : stored;
 
   assert.deepEqual(
     generated,

@@ -2,16 +2,9 @@
  * Draw mode toolbar — floating tool palette, constraint palette, and status bar.
  * Provides tool selection, constraint application, and keyboard shortcut handling.
  */
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  useDrawStore,
-  type DrawTool,
-  type ConstraintTool,
-  isConstraintTool,
-  isDrawingTool,
-  isEditTool,
-} from '../draw/drawStore';
+import { type ConstraintTool, type DrawTool, isConstraintTool, isDrawingTool, isEditTool, useDrawStore } from '../draw/drawStore';
 
 // ─── Tool definitions ────────────────────────────────────────────────────────
 
@@ -42,28 +35,104 @@ const drawTools: ToolDef[] = [
 ];
 
 const constraintTools: ToolDef[] = [
-  { id: 'c:horizontal', label: 'Horizontal', icon: '━', shortcut: 'H', tip: 'Make line horizontal', section: 'constraint', requires: ['line'] },
+  {
+    id: 'c:horizontal',
+    label: 'Horizontal',
+    icon: '━',
+    shortcut: 'H',
+    tip: 'Make line horizontal',
+    section: 'constraint',
+    requires: ['line'],
+  },
   { id: 'c:vertical', label: 'Vertical', icon: '┃', tip: 'Make line vertical', section: 'constraint', requires: ['line'] },
-  { id: 'c:length', label: 'Length', icon: '↔', shortcut: 'D', tip: 'Set line length', section: 'constraint', requires: ['line'], needsValue: true },
-  { id: 'c:distance', label: 'Distance', icon: '⟷', tip: 'Set distance between points', section: 'constraint', requires: ['point', 'point'], needsValue: true },
-  { id: 'c:angle', label: 'Angle', icon: '∠', tip: 'Set angle between lines', section: 'constraint', requires: ['line', 'line'], needsValue: true },
+  {
+    id: 'c:length',
+    label: 'Length',
+    icon: '↔',
+    shortcut: 'D',
+    tip: 'Set line length',
+    section: 'constraint',
+    requires: ['line'],
+    needsValue: true,
+  },
+  {
+    id: 'c:distance',
+    label: 'Distance',
+    icon: '⟷',
+    tip: 'Set distance between points',
+    section: 'constraint',
+    requires: ['point', 'point'],
+    needsValue: true,
+  },
+  {
+    id: 'c:angle',
+    label: 'Angle',
+    icon: '∠',
+    tip: 'Set angle between lines',
+    section: 'constraint',
+    requires: ['line', 'line'],
+    needsValue: true,
+  },
   { id: 'c:radius', label: 'Radius', icon: 'R', tip: 'Set circle radius', section: 'constraint', requires: ['circle'], needsValue: true },
   { id: 'c:parallel', label: 'Parallel', icon: '∥', tip: 'Make lines parallel', section: 'constraint', requires: ['line', 'line'] },
   { id: 'c:perpendicular', label: 'Perp', icon: '⊥', tip: 'Make lines perpendicular', section: 'constraint', requires: ['line', 'line'] },
-  { id: 'c:coincident', label: 'Coincident', icon: '⊙', tip: 'Make points coincident', section: 'constraint', requires: ['point', 'point'] },
+  {
+    id: 'c:coincident',
+    label: 'Coincident',
+    icon: '⊙',
+    tip: 'Make points coincident',
+    section: 'constraint',
+    requires: ['point', 'point'],
+  },
   { id: 'c:tangent', label: 'Tangent', icon: '⊸', tip: 'Make line tangent to circle', section: 'constraint', requires: ['line', 'circle'] },
   { id: 'c:equal', label: 'Equal', icon: '=', tip: 'Make entities equal', section: 'constraint', requires: ['line', 'line'] },
   { id: 'c:fixed', label: 'Fix', icon: '📌', tip: 'Fix point position', section: 'constraint', requires: ['point'] },
   { id: 'c:midpoint', label: 'Midpoint', icon: '⊥·', tip: 'Point at midpoint of line', section: 'constraint', requires: ['point', 'line'] },
-  { id: 'c:symmetric', label: 'Symmetric', icon: '⇄', tip: 'Make points symmetric about line', section: 'constraint', requires: ['point', 'point'] },
-  { id: 'c:concentric', label: 'Concentric', icon: '◎', tip: 'Make circles concentric', section: 'constraint', requires: ['circle', 'circle'] },
-  { id: 'c:pointOnLine', label: 'On Line', icon: '⊶', shortcut: 'O', tip: 'Constrain point onto a line', section: 'constraint', requires: ['point', 'line'] },
-  { id: 'c:pointOnCircle', label: 'On Circle', icon: '⊕', tip: 'Constrain point onto a circle', section: 'constraint', requires: ['point', 'circle'] },
+  {
+    id: 'c:symmetric',
+    label: 'Symmetric',
+    icon: '⇄',
+    tip: 'Make points symmetric about line',
+    section: 'constraint',
+    requires: ['point', 'point'],
+  },
+  {
+    id: 'c:concentric',
+    label: 'Concentric',
+    icon: '◎',
+    tip: 'Make circles concentric',
+    section: 'constraint',
+    requires: ['circle', 'circle'],
+  },
+  {
+    id: 'c:pointOnLine',
+    label: 'On Line',
+    icon: '⊶',
+    shortcut: 'O',
+    tip: 'Constrain point onto a line',
+    section: 'constraint',
+    requires: ['point', 'line'],
+  },
+  {
+    id: 'c:pointOnCircle',
+    label: 'On Circle',
+    icon: '⊕',
+    tip: 'Constrain point onto a circle',
+    section: 'constraint',
+    requires: ['point', 'circle'],
+  },
 ];
 
 const editTools: ToolDef[] = [
   { id: 'trim', label: 'Trim', icon: '✂', shortcut: 'T', tip: 'Click entity to remove it', section: 'edit' },
-  { id: 'mirror', label: 'Mirror', icon: '⧓', shortcut: 'I', tip: 'Select mirror line, then click to place mirrored points', section: 'edit' },
+  {
+    id: 'mirror',
+    label: 'Mirror',
+    icon: '⧓',
+    shortcut: 'I',
+    tip: 'Select mirror line, then click to place mirrored points',
+    section: 'edit',
+  },
   { id: 'offset', label: 'Offset', icon: '⧈', shortcut: 'F', tip: 'Click entity, then click to set offset distance', section: 'edit' },
 ];
 
@@ -71,11 +140,7 @@ const allTools = [...drawTools, ...editTools, ...constraintTools];
 
 // ─── Dimension Input Popup ───────────────────────────────────────────────────
 
-function DimensionInputPopup({ label, onSubmit, onCancel }: {
-  label: string;
-  onSubmit: (value: number) => void;
-  onCancel: () => void;
-}) {
+function DimensionInputPopup({ label, onSubmit, onCancel }: { label: string; onSubmit: (value: number) => void; onCancel: () => void }) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -109,9 +174,7 @@ function DimensionInputPopup({ label, onSubmit, onCancel }: {
         minWidth: 200,
       }}
     >
-      <label style={{ fontSize: 12, color: 'var(--fc-textMuted)', fontWeight: 600 }}>
-        {label}
-      </label>
+      <label style={{ fontSize: 12, color: 'var(--fc-textMuted)', fontWeight: 600 }}>{label}</label>
       <input
         ref={inputRef}
         type="number"
@@ -193,9 +256,7 @@ function ExitConfirmDialog() {
         minWidth: 280,
       }}
     >
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fc-text)' }}>
-        Leave Draw Mode?
-      </div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fc-text)' }}>Leave Draw Mode?</div>
       <div style={{ fontSize: 12, color: 'var(--fc-textMuted)' }}>
         Your sketch has been saved to the file. You can re-enter draw mode to continue editing.
       </div>
@@ -260,14 +321,16 @@ function TooltipPortal({ def, rect }: { def: ToolDef; rect: DOMRect }) {
       <div style={{ fontWeight: 600, marginBottom: 2 }}>
         {def.label}
         {def.shortcut && (
-          <kbd style={{
-            marginLeft: 6,
-            fontSize: 10,
-            background: 'rgba(255,255,255,0.1)',
-            padding: '1px 5px',
-            borderRadius: 3,
-            fontFamily: 'inherit',
-          }}>
+          <kbd
+            style={{
+              marginLeft: 6,
+              fontSize: 10,
+              background: 'rgba(255,255,255,0.1)',
+              padding: '1px 5px',
+              borderRadius: 3,
+              fontFamily: 'inherit',
+            }}
+          >
             {def.shortcut}
           </kbd>
         )}
@@ -300,7 +363,9 @@ function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; o
   }, []);
 
   useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, []);
 
   return (
@@ -327,14 +392,16 @@ function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; o
     >
       {def.icon}
       {def.shortcut && (
-        <span style={{
-          position: 'absolute',
-          bottom: 1,
-          right: 2,
-          fontSize: 8,
-          opacity: 0.4,
-          fontFamily: 'sans-serif',
-        }}>
+        <span
+          style={{
+            position: 'absolute',
+            bottom: 1,
+            right: 2,
+            fontSize: 8,
+            opacity: 0.4,
+            fontFamily: 'sans-serif',
+          }}
+        >
           {def.shortcut}
         </span>
       )}
@@ -347,15 +414,17 @@ function ToolButton({ def, active, onClick }: { def: ToolDef; active: boolean; o
 
 function SectionLabel({ text }: { text: string }) {
   return (
-    <div style={{
-      fontSize: 8,
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      color: 'var(--fc-textMuted)',
-      textAlign: 'center',
-      padding: '2px 0',
-      opacity: 0.6,
-    }}>
+    <div
+      style={{
+        fontSize: 8,
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+        color: 'var(--fc-textMuted)',
+        textAlign: 'center',
+        padding: '2px 0',
+        opacity: 0.6,
+      }}
+    >
       {text}
     </div>
   );
@@ -385,73 +454,141 @@ export function DrawToolbar() {
   // Dimension input popup state
   const [dimInput, setDimInput] = useState<{ tool: ConstraintTool; label: string } | null>(null);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!active) return;
-    const tag = (e.target as HTMLElement)?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-    if ((e.target as HTMLElement)?.closest('[data-fc-editor-surface]')) return;
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!active) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if ((e.target as HTMLElement)?.closest('[data-fc-editor-surface]')) return;
 
-    // Undo: Cmd/Ctrl+Z — handle before the modifier guard
-    if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z')) {
-      undo();
-      e.preventDefault();
-      return;
-    }
+      // Undo: Cmd/Ctrl+Z — handle before the modifier guard
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z')) {
+        undo();
+        e.preventDefault();
+        return;
+      }
 
-    // Don't intercept single-key shortcuts when Cmd/Ctrl/Alt is held
-    // so system shortcuts (Cmd+L, Cmd+R, Cmd+C, etc.) still work
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Don't intercept single-key shortcuts when Cmd/Ctrl/Alt is held
+      // so system shortcuts (Cmd+L, Cmd+R, Cmd+C, etc.) still work
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-    switch (e.key) {
-      case 'Escape':
-        if (dimInput) {
-          setDimInput(null);
-        } else if (pendingClicks.length > 0) {
+      switch (e.key) {
+        case 'Escape':
+          if (dimInput) {
+            setDimInput(null);
+          } else if (pendingClicks.length > 0) {
+            if (tool === 'polyline' && pendingClicks.length >= 2) {
+              useDrawStore.getState().handleDoubleClick(0, 0);
+            } else {
+              cancelPending();
+            }
+          } else if (isDrawingTool(tool) || isEditTool(tool) || isConstraintTool(tool)) {
+            setTool('select');
+          } else {
+            requestExit();
+          }
+          e.preventDefault();
+          break;
+        // Drawing tools (single key, no modifiers)
+        case 'v':
+        case 'V':
+          setTool('select');
+          e.preventDefault();
+          break;
+        case 'p':
+        case 'P':
+          setTool('point');
+          e.preventDefault();
+          break;
+        case 'l':
+        case 'L':
+          setTool('line');
+          e.preventDefault();
+          break;
+        case 'w':
+        case 'W':
+          setTool('polyline');
+          e.preventDefault();
+          break;
+        case 'r':
+        case 'R':
+          setTool('rectangle');
+          e.preventDefault();
+          break;
+        case 'c':
+        case 'C':
+          setTool('circle');
+          e.preventDefault();
+          break;
+        case 'a':
+        case 'A':
+          setTool('arc');
+          e.preventDefault();
+          break;
+        case 'g':
+        case 'G':
+          setTool('polygon');
+          e.preventDefault();
+          break;
+        case 'e':
+        case 'E':
+          setTool('ellipse');
+          e.preventDefault();
+          break;
+        case 's':
+        case 'S':
+          setTool('slot');
+          e.preventDefault();
+          break;
+        // Edit tool shortcuts
+        case 't':
+        case 'T':
+          setTool('trim');
+          e.preventDefault();
+          break;
+        case 'i':
+        case 'I':
+          setTool('mirror');
+          e.preventDefault();
+          break;
+        case 'f':
+        case 'F':
+          setTool('offset');
+          e.preventDefault();
+          break;
+        // Constraint shortcuts
+        case 'h':
+        case 'H':
+          setTool('c:horizontal');
+          e.preventDefault();
+          break;
+        case 'd':
+        case 'D':
+          setTool('c:length');
+          e.preventDefault();
+          break;
+        case 'o':
+        case 'O':
+          setTool('c:pointOnLine');
+          e.preventDefault();
+          break;
+        // Enter to finish polyline
+        case 'Enter':
           if (tool === 'polyline' && pendingClicks.length >= 2) {
             useDrawStore.getState().handleDoubleClick(0, 0);
-          } else {
-            cancelPending();
+            e.preventDefault();
           }
-        } else if (isDrawingTool(tool) || isEditTool(tool) || isConstraintTool(tool)) {
-          setTool('select');
-        } else {
-          requestExit();
-        }
-        e.preventDefault();
-        break;
-      // Drawing tools (single key, no modifiers)
-      case 'v': case 'V': setTool('select'); e.preventDefault(); break;
-      case 'p': case 'P': setTool('point'); e.preventDefault(); break;
-      case 'l': case 'L': setTool('line'); e.preventDefault(); break;
-      case 'w': case 'W': setTool('polyline'); e.preventDefault(); break;
-      case 'r': case 'R': setTool('rectangle'); e.preventDefault(); break;
-      case 'c': case 'C': setTool('circle'); e.preventDefault(); break;
-      case 'a': case 'A': setTool('arc'); e.preventDefault(); break;
-      case 'g': case 'G': setTool('polygon'); e.preventDefault(); break;
-      case 'e': case 'E': setTool('ellipse'); e.preventDefault(); break;
-      case 's': case 'S': setTool('slot'); e.preventDefault(); break;
-      // Edit tool shortcuts
-      case 't': case 'T': setTool('trim'); e.preventDefault(); break;
-      case 'i': case 'I': setTool('mirror'); e.preventDefault(); break;
-      case 'f': case 'F': setTool('offset'); e.preventDefault(); break;
-      // Constraint shortcuts
-      case 'h': case 'H': setTool('c:horizontal'); e.preventDefault(); break;
-      case 'd': case 'D': setTool('c:length'); e.preventDefault(); break;
-      case 'o': case 'O': setTool('c:pointOnLine'); e.preventDefault(); break;
-      // Enter to finish polyline
-      case 'Enter':
-        if (tool === 'polyline' && pendingClicks.length >= 2) {
-          useDrawStore.getState().handleDoubleClick(0, 0);
+          break;
+        // Construction mode toggle
+        case 'x':
+        case 'X':
+          toggleConstructionMode();
           e.preventDefault();
-        }
-        break;
-      // Construction mode toggle
-      case 'x': case 'X':
-        toggleConstructionMode();
-        e.preventDefault();
-        break;
-    }
-  }, [active, pendingClicks, tool, cancelPending, requestExit, setTool, undo, dimInput, toggleConstructionMode]);
+          break;
+      }
+    },
+    [active, pendingClicks, tool, cancelPending, requestExit, setTool, undo, dimInput, toggleConstructionMode],
+  );
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -554,7 +691,14 @@ export function DrawToolbar() {
 
         {/* Construction mode toggle */}
         <ToolButton
-          def={{ id: 'select' as DrawTool, label: 'Construction', icon: '┈┈', shortcut: 'X', tip: 'Toggle construction mode — dashed lines', section: 'draw' }}
+          def={{
+            id: 'select' as DrawTool,
+            label: 'Construction',
+            icon: '┈┈',
+            shortcut: 'X',
+            tip: 'Toggle construction mode — dashed lines',
+            section: 'draw',
+          }}
           active={constructionMode}
           onClick={toggleConstructionMode}
         />
@@ -591,12 +735,14 @@ export function DrawToolbar() {
       >
         <span>Draw Mode</span>
         {constructionMode && (
-          <span style={{
-            background: '#7c3aed',
-            padding: '1px 6px',
-            borderRadius: 3,
-            fontSize: 10,
-          }}>
+          <span
+            style={{
+              background: '#7c3aed',
+              padding: '1px 6px',
+              borderRadius: 3,
+              fontSize: 10,
+            }}
+          >
             Construction
           </span>
         )}

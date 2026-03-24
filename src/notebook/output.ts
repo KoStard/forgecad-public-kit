@@ -1,6 +1,6 @@
 import type { RunResult, SceneObject } from '../forge/index';
+import { formatArea, formatVolume, type LengthUnit } from '../forge/units';
 import type { ForgeNotebookOutput, NotebookExecutionSummary } from './model';
-import { formatVolume, formatArea, type LengthUnit } from '../forge/units';
 
 function formatVec(values: number[]): string {
   return `[${values.map((value) => value.toFixed(1)).join(', ')}]`;
@@ -20,16 +20,10 @@ function summarizeObject(object: SceneObject, unit: LengthUnit = 'mm'): string {
 
 function summarizeRunResult(result: RunResult): string[] {
   if (result.objects.length === 0) {
-    return [
-      '(no renderable output)',
-      `Time: ${result.timeMs.toFixed(0)}ms`,
-    ];
+    return ['(no renderable output)', `Time: ${result.timeMs.toFixed(0)}ms`];
   }
 
-  const lines = [
-    `Objects: ${result.objects.length}`,
-    ...result.objects.map((object) => `  ${summarizeObject(object)}`),
-  ];
+  const lines = [`Objects: ${result.objects.length}`, ...result.objects.map((object) => `  ${summarizeObject(object)}`)];
 
   if (result.params.length > 0) {
     lines.push(`Params: ${result.params.map((param) => param.name).join(', ')}`);

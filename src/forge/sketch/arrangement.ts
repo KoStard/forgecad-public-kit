@@ -24,11 +24,11 @@
  * `circle()` calls. Construction lines are always excluded.
  */
 
-import { Sketch } from './core';
-import { polygon } from './primitives';
+import { computeFacesFromSegments, pointInPolygon } from './arrangement-core';
 import type { ConstraintDefinition } from './constraints';
 import { ConstraintSketch } from './constraints';
-import { computeFacesFromSegments, pointInPolygon } from './arrangement-core';
+import { Sketch } from './core';
+import { polygon } from './primitives';
 
 type Vec2 = [number, number];
 
@@ -77,9 +77,7 @@ function arrangementFacesFromDef(def: ConstraintDefinition): Vec2[][] {
  * const [left, right] = sketch.detectArrangement();
  * left.extrude(10);
  */
-(ConstraintSketch.prototype as any).detectArrangement = function (
-  this: ConstraintSketch,
-): Sketch[] {
+(ConstraintSketch.prototype as any).detectArrangement = function (this: ConstraintSketch): Sketch[] {
   const faces = arrangementFacesFromDef(this.definition);
   const sketches = faces.map((pts) => polygon(pts));
   sketches.sort((a, b) => b.area() - a.area());
@@ -99,15 +97,11 @@ function arrangementFacesFromDef(def: ConstraintDefinition): Vec2[][] {
  * const leftHalf = sketch.detectArrangementRegion([25, 30]);
  * leftHalf.extrude(10);
  */
-(ConstraintSketch.prototype as any).detectArrangementRegion = function (
-  this: ConstraintSketch,
-  seed: [number, number],
-): Sketch {
+(ConstraintSketch.prototype as any).detectArrangementRegion = function (this: ConstraintSketch, seed: [number, number]): Sketch {
   const faces = arrangementFacesFromDef(this.definition);
   if (faces.length === 0) {
     throw new Error(
-      'detectArrangementRegion(): no bounded regions found. '
-      + 'Ensure the sketch has non-construction lines that form closed loops.',
+      'detectArrangementRegion(): no bounded regions found. ' + 'Ensure the sketch has non-construction lines that form closed loops.',
     );
   }
   for (const pts of faces) {
@@ -116,8 +110,8 @@ function arrangementFacesFromDef(def: ConstraintDefinition): Vec2[][] {
     }
   }
   throw new Error(
-    `detectArrangementRegion(): seed point [${seed[0]}, ${seed[1]}] is not inside any of the `
-    + `${faces.length} detected region(s). The seed must lie strictly inside an enclosed area.`,
+    `detectArrangementRegion(): seed point [${seed[0]}, ${seed[1]}] is not inside any of the ` +
+      `${faces.length} detected region(s). The seed must lie strictly inside an enclosed area.`,
   );
 };
 

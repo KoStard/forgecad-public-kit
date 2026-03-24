@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
+import type { ShapeCompilePlan, ShapeCompileTransformStep } from '@forge/compilePlan';
 import type { Shape } from '@forge/index';
 import { getShapeCompilePlan } from '@forge/kernel';
-import type { ShapeCompilePlan, ShapeCompileTransformStep } from '@forge/compilePlan';
+import { type CSSProperties, type KeyboardEvent, type MouseEvent, useEffect, useMemo, useState } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 
 const fmt = (n: number): string => {
@@ -11,57 +11,81 @@ const fmt = (n: number): string => {
 
 const planLabel = (plan: ShapeCompilePlan): string => {
   switch (plan.kind) {
-    case 'box': return `Box ${fmt(plan.x)} × ${fmt(plan.y)} × ${fmt(plan.z)}`;
+    case 'box':
+      return `Box ${fmt(plan.x)} × ${fmt(plan.y)} × ${fmt(plan.z)}`;
     case 'cylinder': {
-      const rLabel = plan.radiusTop !== undefined && plan.radiusTop !== plan.radius
-        ? `r=${fmt(plan.radius)}→${fmt(plan.radiusTop)}`
-        : `r=${fmt(plan.radius)}`;
+      const rLabel =
+        plan.radiusTop !== undefined && plan.radiusTop !== plan.radius
+          ? `r=${fmt(plan.radius)}→${fmt(plan.radiusTop)}`
+          : `r=${fmt(plan.radius)}`;
       return `Cylinder ${rLabel} h=${fmt(plan.height)}`;
     }
-    case 'sphere': return `Sphere r=${fmt(plan.radius)}`;
-    case 'torus': return `Torus R=${fmt(plan.majorRadius)} r=${fmt(plan.minorRadius)}`;
-    case 'extrude': return `Extrude h=${fmt(plan.height)}`;
-    case 'revolve': return `Revolve ${fmt(plan.degrees)}°`;
-    case 'loft': return `Loft (${plan.profiles.length} profiles)`;
-    case 'sweep': return 'Sweep';
+    case 'sphere':
+      return `Sphere r=${fmt(plan.radius)}`;
+    case 'torus':
+      return `Torus R=${fmt(plan.majorRadius)} r=${fmt(plan.minorRadius)}`;
+    case 'extrude':
+      return `Extrude h=${fmt(plan.height)}`;
+    case 'revolve':
+      return `Revolve ${fmt(plan.degrees)}°`;
+    case 'loft':
+      return `Loft (${plan.profiles.length} profiles)`;
+    case 'sweep':
+      return 'Sweep';
     case 'boolean':
-      return plan.op === 'union' ? 'Union'
-        : plan.op === 'difference' ? 'Difference'
-        : 'Intersection';
+      return plan.op === 'union' ? 'Union' : plan.op === 'difference' ? 'Difference' : 'Intersection';
     case 'transform': {
       const kinds = [...new Set(plan.steps.map((s) => s.kind))];
       return kinds.length > 0 ? `Transform (${kinds.join(', ')})` : 'Transform';
     }
-    case 'fillet': return `Fillet r=${fmt(plan.radius)}`;
-    case 'chamfer': return `Chamfer ${fmt(plan.size)}`;
-    case 'shell': return `Shell t=${fmt(plan.thickness)}`;
-    case 'hole': return 'Hole';
-    case 'cut': return 'Cut';
-    case 'trimByPlane': return 'Trim by Plane';
-    case 'sheetMetal': return 'Sheet Metal';
-    case 'queryOwner': return planLabel(plan.base);
-    default: return (plan as { kind: string }).kind;
+    case 'fillet':
+      return `Fillet r=${fmt(plan.radius)}`;
+    case 'chamfer':
+      return `Chamfer ${fmt(plan.size)}`;
+    case 'shell':
+      return `Shell t=${fmt(plan.thickness)}`;
+    case 'hole':
+      return 'Hole';
+    case 'cut':
+      return 'Cut';
+    case 'trimByPlane':
+      return 'Trim by Plane';
+    case 'sheetMetal':
+      return 'Sheet Metal';
+    case 'queryOwner':
+      return planLabel(plan.base);
+    default:
+      return (plan as { kind: string }).kind;
   }
 };
 
 const planChildren = (plan: ShapeCompilePlan): ShapeCompilePlan[] => {
   switch (plan.kind) {
-    case 'boolean': return plan.shapes;
-    case 'transform': return [plan.base];
-    case 'queryOwner': return planChildren(plan.base);
-    case 'shell': return [plan.base];
-    case 'hole': return [plan.base];
-    case 'cut': return [plan.base];
-    case 'fillet': return [plan.base];
-    case 'chamfer': return [plan.base];
-    case 'trimByPlane': return [plan.base];
-    default: return [];
+    case 'boolean':
+      return plan.shapes;
+    case 'transform':
+      return [plan.base];
+    case 'queryOwner':
+      return planChildren(plan.base);
+    case 'shell':
+      return [plan.base];
+    case 'hole':
+      return [plan.base];
+    case 'cut':
+      return [plan.base];
+    case 'fillet':
+      return [plan.base];
+    case 'chamfer':
+      return [plan.base];
+    case 'trimByPlane':
+      return [plan.base];
+    default:
+      return [];
   }
 };
 
 // Resolve through transparent queryOwner wrappers
-const resolvePlan = (plan: ShapeCompilePlan): ShapeCompilePlan =>
-  plan.kind === 'queryOwner' ? resolvePlan(plan.base) : plan;
+const resolvePlan = (plan: ShapeCompilePlan): ShapeCompilePlan => (plan.kind === 'queryOwner' ? resolvePlan(plan.base) : plan);
 
 // Build the ghost plan for a given path, wrapping with any ancestor transforms so the
 // sub-shape appears at its final (post-transform) world position within the object.
@@ -79,10 +103,7 @@ const getPlanForGhost = (rootPlan: ShapeCompilePlan, path: string): ShapeCompile
   }
 
   // Wrap innermost-last: reduceRight means outermost ancestor wraps outermost
-  return transformSteps.reduceRight(
-    (plan, steps): ShapeCompilePlan => ({ kind: 'transform', base: plan, steps }),
-    current,
-  );
+  return transformSteps.reduceRight((plan, steps): ShapeCompilePlan => ({ kind: 'transform', base: plan, steps }), current);
 };
 
 // Collect paths that should be auto-expanded: root and any direct boolean children
@@ -102,11 +123,7 @@ const collectAutoExpanded = (plan: ShapeCompilePlan, path: string, depth: number
 // Flatten visible nodes in DFS order for keyboard navigation
 type FlatNode = { path: string; plan: ShapeCompilePlan };
 
-const flattenVisible = (
-  plan: ShapeCompilePlan,
-  path: string,
-  expandedSet: Set<string>,
-): FlatNode[] => {
+const flattenVisible = (plan: ShapeCompilePlan, path: string, expandedSet: Set<string>): FlatNode[] => {
   if (plan.kind === 'queryOwner') return flattenVisible(plan.base, path, expandedSet);
   const result: FlatNode[] = [{ path, plan }];
   if (expandedSet.has(path)) {
@@ -195,25 +212,34 @@ function ConstructionNode({
         onMouseLeave={() => setHovered(false)}
       >
         <span
-          style={{ width: 16, fontSize: 10, color: 'var(--fc-textDim)', flexShrink: 0, textAlign: 'center', cursor: hasChildren ? 'pointer' : 'default' }}
+          style={{
+            width: 16,
+            fontSize: 10,
+            color: 'var(--fc-textDim)',
+            flexShrink: 0,
+            textAlign: 'center',
+            cursor: hasChildren ? 'pointer' : 'default',
+          }}
           onClick={handleArrowClick}
         >
           {hasChildren ? (isExpanded ? '▾' : '▸') : '·'}
         </span>
         <span>{label}</span>
       </div>
-      {hasChildren && isExpanded && children.map((child, i) => (
-        <ConstructionNode
-          key={i}
-          plan={child}
-          depth={depth + 1}
-          path={`${path}/${i}`}
-          expandedSet={expandedSet}
-          selectedPath={selectedPath}
-          onToggle={onToggle}
-          onSelect={onSelect}
-        />
-      ))}
+      {hasChildren &&
+        isExpanded &&
+        children.map((child, i) => (
+          <ConstructionNode
+            key={i}
+            plan={child}
+            depth={depth + 1}
+            path={`${path}/${i}`}
+            expandedSet={expandedSet}
+            selectedPath={selectedPath}
+            onToggle={onToggle}
+            onSelect={onSelect}
+          />
+        ))}
     </div>
   );
 }
@@ -223,10 +249,7 @@ export function ConstructionTreePanel({ shape, objectId }: { shape: Shape; objec
   const setConstructionGhost = useForgeStore((s) => s.setConstructionGhost);
   const constructionGhost = useForgeStore((s) => s.constructionGhost);
 
-  const initialExpanded = useMemo(
-    () => plan ? collectAutoExpanded(plan, 'root', 0) : new Set<string>(),
-    [plan],
-  );
+  const initialExpanded = useMemo(() => (plan ? collectAutoExpanded(plan, 'root', 0) : new Set<string>()), [plan]);
 
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(initialExpanded);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -317,20 +340,23 @@ export function ConstructionTreePanel({ shape, objectId }: { shape: Shape; objec
         applyGhost(null);
         break;
       }
-      default: break;
+      default:
+        break;
     }
   };
 
   return (
     <div style={{ borderTop: '1px solid var(--fc-borderLight)', padding: '10px 12px' }}>
-      <div style={{
-        fontSize: 12,
-        fontWeight: 600,
-        color: 'var(--fc-textDim)',
-        marginBottom: 6,
-        textTransform: 'uppercase',
-        letterSpacing: 0.6,
-      }}>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: 'var(--fc-textDim)',
+          marginBottom: 6,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
+        }}
+      >
         Construction
       </div>
       <div

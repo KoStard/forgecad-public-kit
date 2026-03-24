@@ -12,30 +12,22 @@
  */
 
 import type { Vec3 } from '../transform';
-import type {
-  RigidBody,
-  Constraint3D,
-  Constraint3DDef,
-  Solver3DContext,
-  Solve3DOptions,
-  Solve3DResult,
-  Solve3DStatus,
-} from './types';
-import { transformPoint, transformDir, normalize3 } from './rodrigues';
+import { normalize3, transformDir, transformPoint } from './rodrigues';
+import type { Constraint3D, Constraint3DDef, RigidBody, Solve3DOptions, Solve3DResult, Solve3DStatus, Solver3DContext } from './types';
 
 // ─── Constraint registry ────────────────────────────────────────────────────
 
-import { flushDef } from './defs/flush';
 import { alignDef } from './defs/align';
-import { parallelDef } from './defs/parallel';
+import { angleDef } from './defs/angle';
+import { axisParallelDef } from './defs/axisParallel';
 import { concentricDef } from './defs/concentric';
 import { faceDistanceDef } from './defs/faceDistance';
-import { pointCoincidentDef } from './defs/pointCoincident';
-import { pointOnFaceDef } from './defs/pointOnFace';
-import { pointOnAxisDef } from './defs/pointOnAxis';
-import { angleDef } from './defs/angle';
 import { fixedDef } from './defs/fixed';
-import { axisParallelDef } from './defs/axisParallel';
+import { flushDef } from './defs/flush';
+import { parallelDef } from './defs/parallel';
+import { pointCoincidentDef } from './defs/pointCoincident';
+import { pointOnAxisDef } from './defs/pointOnAxis';
+import { pointOnFaceDef } from './defs/pointOnFace';
 
 const constraintDefs = new Map<string, Constraint3DDef>([
   ['flush', flushDef],
@@ -73,7 +65,9 @@ function buildVariables(bodies: Map<string, RigidBody>): Variable[] {
         bodyId: id,
         component: c,
         get: () => arr[idx],
-        set: (v: number) => { arr[idx] = v; },
+        set: (v: number) => {
+          arr[idx] = v;
+        },
         scale: isRotation ? 1.0 : computePositionScale(body),
       });
     }
@@ -138,10 +132,7 @@ function createContext(bodies: Map<string, RigidBody>): Solver3DContext {
 
 // ─── Residual evaluation ────────────────────────────────────────────────────
 
-function evaluateResiduals(
-  constraints: Constraint3D[],
-  ctx: Solver3DContext,
-): { residuals: number[]; maxAbs: number } {
+function evaluateResiduals(constraints: Constraint3D[], ctx: Solver3DContext): { residuals: number[]; maxAbs: number } {
   const residuals: number[] = [];
   let maxAbs = 0;
   for (const c of constraints) {
@@ -200,12 +191,7 @@ function computeJacobian(
 
 // ─── Cholesky solve for (J^T J + λI) dx = -J^T r ───────────────────────────
 
-function solveNormalEquations(
-  J: number[][],
-  r: number[],
-  lambda: number,
-  nVars: number,
-): number[] | null {
+function solveNormalEquations(J: number[][], r: number[], lambda: number, nVars: number): number[] | null {
   const nRes = r.length;
 
   // Build J^T J + λI
@@ -276,7 +262,7 @@ function limitStep(dx: number[], variables: Variable[], maxScaledStep: number): 
 
   if (scaledNorm > maxScaledStep) {
     const factor = maxScaledStep / scaledNorm;
-    return dx.map(d => d * factor);
+    return dx.map((d) => d * factor);
   }
   return dx;
 }
@@ -284,7 +270,7 @@ function limitStep(dx: number[], variables: Variable[], maxScaledStep: number): 
 // ─── State capture/restore ──────────────────────────────────────────────────
 
 function captureState(variables: Variable[]): number[] {
-  return variables.map(v => v.get());
+  return variables.map((v) => v.get());
 }
 
 function applyState(variables: Variable[], state: number[]): void {
@@ -297,12 +283,7 @@ function applyState(variables: Variable[], state: number[]): void {
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-function seedRestart(
-  variables: Variable[],
-  initialState: number[],
-  attempt: number,
-  scale: number,
-): void {
+function seedRestart(variables: Variable[], initialState: number[], attempt: number, scale: number): void {
   if (attempt === 0) {
     applyState(variables, initialState);
     return;
@@ -313,18 +294,14 @@ function seedRestart(
 
   for (let i = 0; i < variables.length; i++) {
     const phase = angle + i * GOLDEN_ANGLE;
-    const perturbation = radius * Math.sin(phase) / Math.max(1, variables[i].scale);
+    const perturbation = (radius * Math.sin(phase)) / Math.max(1, variables[i].scale);
     variables[i].set(initialState[i] + perturbation);
   }
 }
 
 // ─── Main solver ────────────────────────────────────────────────────────────
 
-export function solve3D(
-  bodies: Map<string, RigidBody>,
-  constraints: Constraint3D[],
-  options: Solve3DOptions = {},
-): Solve3DResult {
+export function solve3D(bodies: Map<string, RigidBody>, constraints: Constraint3D[], options: Solve3DOptions = {}): Solve3DResult {
   const maxIterations = options.iterations ?? 100;
   const tolerance = options.tolerance ?? 1e-4;
   const restarts = options.restarts ?? 4;

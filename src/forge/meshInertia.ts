@@ -6,8 +6,12 @@ export interface MeshInertiaResult {
   /** Volume in mm³ */
   volumeMm3: number;
   /** Inertia tensor components in kg·m² (already scaled for mass) */
-  ixx: number; iyy: number; izz: number;
-  ixy: number; ixz: number; iyz: number;
+  ixx: number;
+  iyy: number;
+  izz: number;
+  ixy: number;
+  ixz: number;
+  iyz: number;
 }
 
 /**
@@ -17,32 +21,45 @@ export interface MeshInertiaResult {
  * All mesh coordinates are in mm. The returned inertia components are in kg·m²,
  * already scaled for the given mass. The inertia is about the center of mass.
  */
-export function computeMeshInertia(
-  mesh: ShapeRuntimeMesh,
-  massKg: number,
-): MeshInertiaResult {
+export function computeMeshInertia(mesh: ShapeRuntimeMesh, massKg: number): MeshInertiaResult {
   const { numProp, numTri, triVerts, vertProperties } = mesh;
 
   // Accumulators for volume integrals (in mm units)
   let vol = 0;
   // First moments (for center of mass)
-  let sx = 0, sy = 0, sz = 0;
+  let sx = 0,
+    sy = 0,
+    sz = 0;
   // Second moments (for inertia tensor about origin)
-  let sxx = 0, syy = 0, szz = 0;
-  let sxy = 0, sxz = 0, syz = 0;
+  let sxx = 0,
+    syy = 0,
+    szz = 0;
+  let sxy = 0,
+    sxz = 0,
+    syz = 0;
 
   for (let t = 0; t < numTri; t++) {
     const i0 = triVerts[t * 3] * numProp;
     const i1 = triVerts[t * 3 + 1] * numProp;
     const i2 = triVerts[t * 3 + 2] * numProp;
 
-    const ax = vertProperties[i0], ay = vertProperties[i0 + 1], az = vertProperties[i0 + 2];
-    const bx = vertProperties[i1], by = vertProperties[i1 + 1], bz = vertProperties[i1 + 2];
-    const cx = vertProperties[i2], cy = vertProperties[i2 + 1], cz = vertProperties[i2 + 2];
+    const ax = vertProperties[i0],
+      ay = vertProperties[i0 + 1],
+      az = vertProperties[i0 + 2];
+    const bx = vertProperties[i1],
+      by = vertProperties[i1 + 1],
+      bz = vertProperties[i1 + 2];
+    const cx = vertProperties[i2],
+      cy = vertProperties[i2 + 1],
+      cz = vertProperties[i2 + 2];
 
     // Edge vectors
-    const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
-    const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
+    const e1x = bx - ax,
+      e1y = by - ay,
+      e1z = bz - az;
+    const e2x = cx - ax,
+      e2y = cy - ay,
+      e2z = cz - az;
 
     // Cross product d = e1 × e2
     const dx = e1y * e2z - e1z * e2y;
@@ -58,24 +75,21 @@ export function computeMeshInertia(
     // determinant which is a · ((b-a)×(c-a)) = a·d, same as 6 * vol contribution)
     const det = ax * dx + ay * dy + az * dz;
 
-    sx += det * (ax + bx + cx) / 24;
-    sy += det * (ay + by + cy) / 24;
-    sz += det * (az + bz + cz) / 24;
+    sx += (det * (ax + bx + cx)) / 24;
+    sy += (det * (ay + by + cy)) / 24;
+    sz += (det * (az + bz + cz)) / 24;
 
     // Second moments: for tetrahedron (0,a,b,c):
     // integral of x² dV = det/60 * (a_x² + b_x² + c_x² + a_x*b_x + a_x*c_x + b_x*c_x)
     // integral of xy dV = det/120 * (2*a_x*a_y + 2*b_x*b_y + 2*c_x*c_y
     //                                + a_x*b_y + a_y*b_x + a_x*c_y + a_y*c_x + b_x*c_y + b_y*c_x)
-    sxx += det * (ax * ax + bx * bx + cx * cx + ax * bx + ax * cx + bx * cx) / 60;
-    syy += det * (ay * ay + by * by + cy * cy + ay * by + ay * cy + by * cy) / 60;
-    szz += det * (az * az + bz * bz + cz * cz + az * bz + az * cz + bz * cz) / 60;
+    sxx += (det * (ax * ax + bx * bx + cx * cx + ax * bx + ax * cx + bx * cx)) / 60;
+    syy += (det * (ay * ay + by * by + cy * cy + ay * by + ay * cy + by * cy)) / 60;
+    szz += (det * (az * az + bz * bz + cz * cz + az * bz + az * cz + bz * cz)) / 60;
 
-    sxy += det * (2 * ax * ay + 2 * bx * by + 2 * cx * cy
-      + ax * by + ay * bx + ax * cy + ay * cx + bx * cy + by * cx) / 120;
-    sxz += det * (2 * ax * az + 2 * bx * bz + 2 * cx * cz
-      + ax * bz + az * bx + ax * cz + az * cx + bx * cz + bz * cx) / 120;
-    syz += det * (2 * ay * az + 2 * by * bz + 2 * cy * cz
-      + ay * bz + az * by + ay * cz + az * cy + by * cz + bz * cy) / 120;
+    sxy += (det * (2 * ax * ay + 2 * bx * by + 2 * cx * cy + ax * by + ay * bx + ax * cy + ay * cx + bx * cy + by * cx)) / 120;
+    sxz += (det * (2 * ax * az + 2 * bx * bz + 2 * cx * cz + ax * bz + az * bx + ax * cz + az * cx + bx * cz + bz * cx)) / 120;
+    syz += (det * (2 * ay * az + 2 * by * bz + 2 * cy * cz + ay * bz + az * by + ay * cz + az * cy + by * cz + bz * cy)) / 120;
   }
 
   const absVol = Math.abs(vol);
@@ -84,8 +98,12 @@ export function computeMeshInertia(
     return {
       centerOfMass: [0, 0, 0],
       volumeMm3: 0,
-      ixx: 0, iyy: 0, izz: 0,
-      ixy: 0, ixz: 0, iyz: 0,
+      ixx: 0,
+      iyy: 0,
+      izz: 0,
+      ixy: 0,
+      ixz: 0,
+      iyz: 0,
     };
   }
 
@@ -97,7 +115,7 @@ export function computeMeshInertia(
   // Inertia tensor about origin (in mm^5 density units):
   // I_xx = integral of (y² + z²) dV = syy + szz
   // etc. Then scale by density = mass / volume.
-  const density = massKg / absVol; // kg / mm³
+  const _density = massKg / absVol; // kg / mm³
 
   // Raw moments about origin (mm^5)
   const Ixx_o = syy + szz;

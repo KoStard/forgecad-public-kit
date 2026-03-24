@@ -5,8 +5,8 @@
  * points while the repo transitions internal callsites and tooling.
  */
 export {
-  lowerProfileCompilePlanToCadQueryResult as lowerProfileCompilePlanToBrepResult,
-  lowerShapeCompilePlanToCadQueryResult as lowerShapeCompilePlanToBrepResult,
   lowerProfileCompilePlanToCadQueryPlan as lowerProfileCompilePlanToBrepPlan,
+  lowerProfileCompilePlanToCadQueryResult as lowerProfileCompilePlanToBrepResult,
   lowerShapeCompilePlanToCadQueryPlan as lowerShapeCompilePlanToBrepPlan,
+  lowerShapeCompilePlanToCadQueryResult as lowerShapeCompilePlanToBrepResult,
 } from './compilePlanCadQuery';

@@ -15,19 +15,19 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { initKernel } from '../src/forge/kernel';
-import { initSolverWasm } from '../src/forge/sketch/constraints/solver-wasm';
-import { resolvePackagePath } from './package-runtime';
-import { constrainedSketch, ConstrainedSketchBuilder } from '../src/forge/sketch/constraints/builder';
-import { isConstraintSketch, ConstraintSketch, solveConstraintDefinition, updateConstraintValue } from '../src/forge/sketch/constraints/sketch';
-import type { ConstraintDefinition, SketchPoint } from '../src/forge/sketch/constraints/types';
-import { addRect, addPolygon, addRegularPolygon } from '../src/forge/sketch/constraints/concepts';
-import { buildEdgeSvg } from '../src/forge/sketch/exportSvg';
+import { ConstrainedSketchBuilder, constrainedSketch } from '../src/forge/sketch/constraints/builder';
+import { addPolygon, addRect, addRegularPolygon } from '../src/forge/sketch/constraints/concepts';
 import { getLastSolveTrail } from '../src/forge/sketch/constraints/registry';
-import { computeLabelMetrics, formatMetrics } from './label-metrics';
 import { analyzeRigidity } from '../src/forge/sketch/constraints/rigidity';
+import { ConstraintSketch, solveConstraintDefinition, updateConstraintValue } from '../src/forge/sketch/constraints/sketch';
+import { initSolverWasm } from '../src/forge/sketch/constraints/solver-wasm';
+import type { ConstraintDefinition, SketchPoint } from '../src/forge/sketch/constraints/types';
+import { buildEdgeSvg } from '../src/forge/sketch/exportSvg';
+import { computeLabelMetrics, formatMetrics } from './label-metrics';
+import { resolvePackagePath } from './package-runtime';
 import '../src/forge/sketch/constraints/defs';
 
 const EPS = 1e-2; // solver tolerance for position checks (1/100th of a unit)
@@ -100,13 +100,12 @@ function printTopResiduals(sketch: ConstraintSketch, limit = 12) {
 
 function assertConverged(sketch: ConstraintSketch, label: string) {
   if (_verbose && sketch.constraintMeta.maxError >= 1e-2) {
-    console.log(`      ${label}: status=${sketch.constraintMeta.status} maxErr=${sketch.constraintMeta.maxError.toFixed(4)} dof=${sketch.constraintMeta.dof}`);
+    console.log(
+      `      ${label}: status=${sketch.constraintMeta.status} maxErr=${sketch.constraintMeta.maxError.toFixed(4)} dof=${sketch.constraintMeta.dof}`,
+    );
     printTopResiduals(sketch);
   }
-  assert(
-    sketch.constraintMeta.maxError < 1e-2,
-    `${label}: solver did not converge, maxError=${sketch.constraintMeta.maxError.toFixed(6)}`,
-  );
+  assert(sketch.constraintMeta.maxError < 1e-2, `${label}: solver did not converge, maxError=${sketch.constraintMeta.maxError.toFixed(6)}`);
 }
 
 function assertNoRejections(sketch: ConstraintSketch, label: string) {
@@ -287,11 +286,7 @@ function testEqual() {
   s.equal(la, lb);
   const result = s.solve();
   assertConverged(result, 'equal');
-  assertApprox(
-    lineLength(result.definition, lb),
-    lineLength(result.definition, la),
-    'equal lengths',
-  );
+  assertApprox(lineLength(result.definition, lb), lineLength(result.definition, la), 'equal lengths');
 }
 
 function testHDistance() {
@@ -479,10 +474,7 @@ function testFullyConstrainedRectangle() {
   assertPointAt(result.definition, p2, 6, 0, 'rect p2');
   assertPointAt(result.definition, p3, 6, 4, 'rect p3');
   assertPointAt(result.definition, p4, 0, 4, 'rect p4');
-  assert(
-    result.constraintMeta.dof === 0,
-    `Expected DOF=0, got ${result.constraintMeta.dof}`,
-  );
+  assert(result.constraintMeta.dof === 0, `Expected DOF=0, got ${result.constraintMeta.dof}`);
 }
 
 function testIsoscelesTriangleWithAngle() {
@@ -615,10 +607,7 @@ function loadSnapshots(): Record<string, ConstraintSnapshot> {
 
 function saveSnapshots(data: Record<string, ConstraintSnapshot>) {
   if (!existsSync(SNAPSHOT_DIR)) mkdirSync(SNAPSHOT_DIR, { recursive: true });
-  writeFileSync(
-    join(SNAPSHOT_DIR, 'constraint-snapshots.json'),
-    JSON.stringify(data, null, 2) + '\n',
-  );
+  writeFileSync(join(SNAPSHOT_DIR, 'constraint-snapshots.json'), JSON.stringify(data, null, 2) + '\n');
 }
 
 function compareSnapshot(name: string, current: ConstraintSnapshot, saved: ConstraintSnapshot) {
@@ -629,10 +618,7 @@ function compareSnapshot(name: string, current: ConstraintSnapshot, saved: Const
     saved.rejectedCount,
     `${name}: rejectedCount changed (${saved.rejectedCount} → ${current.rejectedCount})`,
   );
-  assert(
-    current.maxError <= saved.maxError + 1e-3,
-    `${name}: maxError regressed (${saved.maxError} → ${current.maxError})`,
-  );
+  assert(current.maxError <= saved.maxError + 1e-3, `${name}: maxError regressed (${saved.maxError} → ${current.maxError})`);
   // Compare point positions
   for (let i = 0; i < current.points.length && i < saved.points.length; i++) {
     const cp = current.points[i];
@@ -752,7 +738,12 @@ function runSnapshotTests(update: boolean): number {
       // Label quality metrics
       if (_verbose) {
         const metrics = computeLabelMetrics(result.constraintMeta);
-        console.log(`  ✓ ${tc.name}\n${formatMetrics(metrics).split('\n').map(l => '      ' + l).join('\n')}`);
+        console.log(
+          `  ✓ ${tc.name}\n${formatMetrics(metrics)
+            .split('\n')
+            .map((l) => '      ' + l)
+            .join('\n')}`,
+        );
       } else {
         console.log(`  ✓ ${tc.name}`);
       }
@@ -1022,7 +1013,7 @@ function testConnectedSubsystems() {
   const tl1 = sk.line(p2, apex);
   const tl2 = sk.line(apex, p3);
   sk.equal(tl1, tl2);
-  sk.midpoint(apex, right);  // Actually: apex is at midpoint of right side (no — midpoint constrains apex ON right)
+  sk.midpoint(apex, right); // Actually: apex is at midpoint of right side (no — midpoint constrains apex ON right)
 
   // Point on the top side
   const mid = sk.point(5, 6);
@@ -1067,7 +1058,7 @@ function testCameraHolderPattern() {
   const cam1 = sk.line(cp1, cp4);
   const cam2 = sk.line(cp4, cp3);
   const cam3 = sk.line(cp3, cp2);
-  const cam4 = sk.line(cp2, cp1);
+  const _cam4 = sk.line(cp2, cp1);
   sk.perpendicular(leftWall, cam1);
   sk.perpendicular(leftWall, cam3);
   sk.length(cam2, 10);
@@ -1109,8 +1100,8 @@ function testOpeningPattern() {
   sk.parallel(oright, oleft);
   sk.perpendicular(obot, oright);
   sk.length(obot, 4);
-  sk.lineDistance(obot, baseLine, 0);  // bottom aligned with baseLine
-  sk.lineDistance(otop, topLine, 0);   // top aligned with topLine
+  sk.lineDistance(obot, baseLine, 0); // bottom aligned with baseLine
+  sk.lineDistance(otop, topLine, 0); // top aligned with topLine
 
   const attachMid = sk.point(10, 0);
   sk.midpoint(attachMid, obot);
@@ -1324,35 +1315,38 @@ function testFullSpectrogram() {
   // Label quality metrics
   if (_verbose) {
     const metrics = computeLabelMetrics(meta);
-    console.log(formatMetrics(metrics).split('\n').map(l => '      ' + l).join('\n'));
+    console.log(
+      formatMetrics(metrics)
+        .split('\n')
+        .map((l) => '      ' + l)
+        .join('\n'),
+    );
   }
 }
-
 
 // ─── Diagnostic inspect ──────────────────────────────────────────────────────
 
 function printConstraintSummary(meta: import('../src/forge/sketch/constraints/types').SketchConstraintMeta) {
   // Status line
-  const statusLabel = meta.status === 'over-redundant'
-    ? 'OVER-REDUNDANT' : meta.status.toUpperCase();
-  const statusColor = meta.status === 'fully' ? '\x1b[32m'       // green
-    : meta.status === 'over' ? '\x1b[31m'                         // red
-    : meta.status === 'over-redundant' ? '\x1b[33m'               // yellow
-    : '\x1b[34m';                                                  // blue
+  const statusLabel = meta.status === 'over-redundant' ? 'OVER-REDUNDANT' : meta.status.toUpperCase();
+  const statusColor =
+    meta.status === 'fully'
+      ? '\x1b[32m' // green
+      : meta.status === 'over'
+        ? '\x1b[31m' // red
+        : meta.status === 'over-redundant'
+          ? '\x1b[33m' // yellow
+          : '\x1b[34m'; // blue
   console.log(`  ${statusColor}${statusLabel}\x1b[0m  DOF=${meta.dof}  maxErr=${meta.maxError.toFixed(6)}`);
 
   // Constraint table
   console.log(`  constraints (${meta.constraints.length}):`);
   for (const c of meta.constraints) {
-    const icon = c.isConflicting ? '\x1b[31m✗\x1b[0m'
-      : c.isRedundant ? '\x1b[33m~\x1b[0m'
-      : '\x1b[32m✓\x1b[0m';
+    const icon = c.isConflicting ? '\x1b[31m✗\x1b[0m' : c.isRedundant ? '\x1b[33m~\x1b[0m' : '\x1b[32m✓\x1b[0m';
     const valueStr = c.value !== undefined ? `=${c.value}` : '';
     const entities = c.entityIds.join(', ');
     const errStr = c.residual > 1e-6 ? `  err=${c.residual.toFixed(4)}` : '';
-    const tag = c.isConflicting ? ' \x1b[31mCONFLICT\x1b[0m'
-      : c.isRedundant ? ' \x1b[33mREDUNDANT\x1b[0m'
-      : '';
+    const tag = c.isConflicting ? ' \x1b[31mCONFLICT\x1b[0m' : c.isRedundant ? ' \x1b[33mREDUNDANT\x1b[0m' : '';
     console.log(`    ${icon} ${c.label}${valueStr}  (${entities})${errStr}${tag}`);
   }
 
@@ -1364,7 +1358,7 @@ function printConstraintSummary(meta: import('../src/forge/sketch/constraints/ty
   }
 }
 
-function printDiagnostic(sketch: ConstraintSketch) {
+function _printDiagnostic(sketch: ConstraintSketch) {
   console.log(sketch.inspect());
   printConstraintSummary(sketch.constraintMeta);
 }
@@ -1382,10 +1376,10 @@ function testAddRectStructure() {
   assertNoRejections(result, 'addRect structure');
 
   const def = result.definition;
-  assertPointAt(def, rect.bottomLeft,  5,  3, 'bl');
+  assertPointAt(def, rect.bottomLeft, 5, 3, 'bl');
   assertPointAt(def, rect.bottomRight, 25, 3, 'br');
-  assertPointAt(def, rect.topRight,    25, 13, 'tr');
-  assertPointAt(def, rect.topLeft,     5,  13, 'tl');
+  assertPointAt(def, rect.topRight, 25, 13, 'tr');
+  assertPointAt(def, rect.topLeft, 5, 13, 'tl');
 
   // Bottom and top must be horizontal
   assertApprox(lineAngleDeg(def, rect.bottom), 0, 'bottom horizontal');
@@ -1413,16 +1407,16 @@ function testAddRectNamedAccess() {
   // vertex() and side() helpers must return matching IDs
   const sk = constrainedSketch();
   const rect = addRect(sk, { x: 0, y: 0, width: 10, height: 5 });
-  assert.equal(rect.vertex('bottomLeft'),  rect.bottomLeft);
+  assert.equal(rect.vertex('bottomLeft'), rect.bottomLeft);
   assert.equal(rect.vertex('bottomRight'), rect.bottomRight);
-  assert.equal(rect.vertex('topRight'),    rect.topRight);
-  assert.equal(rect.vertex('topLeft'),     rect.topLeft);
+  assert.equal(rect.vertex('topRight'), rect.topRight);
+  assert.equal(rect.vertex('topLeft'), rect.topLeft);
   assert.equal(rect.side('bottom'), rect.bottom);
-  assert.equal(rect.side('right'),  rect.right);
-  assert.equal(rect.side('top'),    rect.top);
-  assert.equal(rect.side('left'),   rect.left);
-  assert.equal(rect.vertices[0],    rect.bottomLeft);
-  assert.equal(rect.sides[0],       rect.bottom);
+  assert.equal(rect.side('right'), rect.right);
+  assert.equal(rect.side('top'), rect.top);
+  assert.equal(rect.side('left'), rect.left);
+  assert.equal(rect.vertices[0], rect.bottomLeft);
+  assert.equal(rect.sides[0], rect.bottom);
 }
 
 function testAddRectResizable() {
@@ -1435,11 +1429,11 @@ function testAddRectResizable() {
   const result = sk.solve();
   assertConverged(result, 'addRect resizable');
   const def = result.definition;
-  assertPointAt(def, rect.bottomLeft,  0,  0,  'bl after resize');
-  assertPointAt(def, rect.bottomRight, 30, 0,  'br after resize');
-  assertPointAt(def, rect.topRight,    30, 15, 'tr after resize');
-  assertPointAt(def, rect.topLeft,     0,  15, 'tl after resize');
-  assertPointAt(def, rect.center,      15, 7.5, 'center after resize');
+  assertPointAt(def, rect.bottomLeft, 0, 0, 'bl after resize');
+  assertPointAt(def, rect.bottomRight, 30, 0, 'br after resize');
+  assertPointAt(def, rect.topRight, 30, 15, 'tr after resize');
+  assertPointAt(def, rect.topLeft, 0, 15, 'tl after resize');
+  assertPointAt(def, rect.center, 15, 7.5, 'center after resize');
 }
 
 function testAddRectBuilderMethod() {
@@ -1450,7 +1444,7 @@ function testAddRectBuilderMethod() {
   const result = sk.solve();
   assertConverged(result, 'sk.rect() method');
   const def = result.definition;
-  assertPointAt(def, rect.bottomLeft,  0, 0, 'bl');
+  assertPointAt(def, rect.bottomLeft, 0, 0, 'bl');
   assertPointAt(def, rect.bottomRight, 10, 0, 'br');
 }
 
@@ -1458,16 +1452,22 @@ function testAddPolygonCCW() {
   // Triangle given in CW order must be flipped to CCW by the ccw constraint
   const sk = constrainedSketch();
   // CW order: going clockwise from origin
-  const tri = addPolygon(sk, { points: [[0, 0], [0, 10], [10, 0]] });
+  const tri = addPolygon(sk, {
+    points: [
+      [0, 0],
+      [0, 10],
+      [10, 0],
+    ],
+  });
   sk.fix(tri.vertex(0), 0, 0);
   const result = sk.solve();
   assertConverged(result, 'addPolygon CCW');
   const def = result.definition;
   // After CCW enforcement, signed area must be positive
   const pts = [
-    def.points.find(p => p.id === tri.vertex(0))!,
-    def.points.find(p => p.id === tri.vertex(1))!,
-    def.points.find(p => p.id === tri.vertex(2))!,
+    def.points.find((p) => p.id === tri.vertex(0))!,
+    def.points.find((p) => p.id === tri.vertex(1))!,
+    def.points.find((p) => p.id === tri.vertex(2))!,
   ];
   let area = 0;
   for (let i = 0; i < 3; i++) {
@@ -1480,15 +1480,20 @@ function testAddPolygonCCW() {
 function testAddPolygonSideIndices() {
   // side(i) must connect vertex(i) to vertex((i+1) % n)
   const sk = constrainedSketch();
-  const poly = addPolygon(sk, { points: [[0, 0], [10, 0], [5, 8]] });
+  const poly = addPolygon(sk, {
+    points: [
+      [0, 0],
+      [10, 0],
+      [5, 8],
+    ],
+  });
   for (let i = 0; i < 3; i++) {
     const j = (i + 1) % 3;
     const sideId = poly.side(i);
     const line = sk['lines' as any].find((l: any) => l.id === sideId);
     assert(
-      (line.a === poly.vertex(i) && line.b === poly.vertex(j)) ||
-      (line.b === poly.vertex(i) && line.a === poly.vertex(j)),
-      `side(${i}) must connect vertex(${i}) and vertex(${j})`
+      (line.a === poly.vertex(i) && line.b === poly.vertex(j)) || (line.b === poly.vertex(i) && line.a === poly.vertex(j)),
+      `side(${i}) must connect vertex(${i}) and vertex(${j})`,
     );
   }
 }
@@ -1623,14 +1628,8 @@ function testWrapperRectCaseLayout() {
   const def = result.definition;
   const wrapperWidth = lineLength(def, wrapper.top);
   const wrapperHeight = lineLength(def, wrapper.left);
-  assert(
-    Math.abs(wrapperWidth - 610) < 1,
-    `wrapperCaseLayout: expected wrapper width ~610, got ${wrapperWidth.toFixed(1)}`,
-  );
-  assert(
-    Math.abs(wrapperHeight - 1250) < 5,
-    `wrapperCaseLayout: expected wrapper height ~1250, got ${wrapperHeight.toFixed(1)}`,
-  );
+  assert(Math.abs(wrapperWidth - 610) < 1, `wrapperCaseLayout: expected wrapper width ~610, got ${wrapperWidth.toFixed(1)}`);
+  assert(Math.abs(wrapperHeight - 1250) < 5, `wrapperCaseLayout: expected wrapper height ~1250, got ${wrapperHeight.toFixed(1)}`);
 }
 
 /**
@@ -1936,9 +1935,7 @@ function testWarmStartConvergence() {
   assertConverged(result, 'warm-start-base');
 
   // Find the length constraint on bottom
-  const bottomLenConstraint = result.constraintMeta.constraints.find(
-    c => c.type === 'length' && c.entityIds.includes(rect.bottom)
-  );
+  const bottomLenConstraint = result.constraintMeta.constraints.find((c) => c.type === 'length' && c.entityIds.includes(rect.bottom));
   assert(bottomLenConstraint, 'should find bottom length constraint');
 
   // Update: small change, warm-start should handle it
@@ -1967,9 +1964,9 @@ function testSkipRedundancyCheckCorrectness() {
 
 /** Helper: extract line endpoint coordinates from a definition. */
 function getLineEndpoints(def: ConstraintDefinition, lineId: string) {
-  const line = def.lines.find(l => l.id === lineId)!;
-  const pa = def.points.find(p => p.id === line.a)!;
-  const pb = def.points.find(p => p.id === line.b)!;
+  const line = def.lines.find((l) => l.id === lineId)!;
+  const pa = def.points.find((p) => p.id === line.a)!;
+  const pb = def.points.find((p) => p.id === line.b)!;
   return { ax: pa.x, ay: pa.y, bx: pb.x, by: pb.y };
 }
 

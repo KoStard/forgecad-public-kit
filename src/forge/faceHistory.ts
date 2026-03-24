@@ -5,8 +5,8 @@
  */
 
 import { assertExhaustive, type ProfileCompilePlan, type ShapeCompilePlan, type ShapeCompileTransformStep } from './compilePlan';
-import type { FaceRef } from './sketch/topology';
 import type { FaceQueryRef, ShapeQueryOwner } from './queryModel';
+import type { FaceRef } from './sketch/topology';
 
 export interface TransformationStep {
   kind: string;
@@ -160,14 +160,22 @@ function findOriginOperation(plan: ShapeCompilePlan | null): { operation: string
 
 function summarizeProfile(profile: ProfileCompilePlan): string {
   switch (profile.kind) {
-    case 'rect': return `${profile.width}×${profile.height} rect`;
-    case 'roundedRect': return `${profile.width}×${profile.height} rounded rect`;
-    case 'circle': return `r=${profile.radius} circle`;
-    case 'polygon': return `polygon (${profile.points.length} pts)`;
-    case 'boolean': return `${profile.op} profile`;
-    case 'offset': return 'offset profile';
-    case 'project': return 'projected profile';
-    default: assertExhaustive(profile);
+    case 'rect':
+      return `${profile.width}×${profile.height} rect`;
+    case 'roundedRect':
+      return `${profile.width}×${profile.height} rounded rect`;
+    case 'circle':
+      return `r=${profile.radius} circle`;
+    case 'polygon':
+      return `polygon (${profile.points.length} pts)`;
+    case 'boolean':
+      return `${profile.op} profile`;
+    case 'offset':
+      return 'offset profile';
+    case 'project':
+      return 'projected profile';
+    default:
+      assertExhaustive(profile);
   }
 }
 
@@ -184,12 +192,17 @@ function collectTimelineEntries(plan: ShapeCompilePlan, entries: TimelineEntry[]
       for (const step of plan.steps) {
         const d = describeTransformStep(step);
         const label =
-          step.kind === 'translate' ? 'Move' :
-          step.kind === 'rotate' ? 'Rotate' :
-          step.kind === 'rotateAround' ? 'Rotate Around' :
-          step.kind === 'scale' ? 'Scale' :
-          step.kind === 'mirror' ? 'Mirror' :
-          'Place on Workplane';
+          step.kind === 'translate'
+            ? 'Move'
+            : step.kind === 'rotate'
+              ? 'Rotate'
+              : step.kind === 'rotateAround'
+                ? 'Rotate Around'
+                : step.kind === 'scale'
+                  ? 'Scale'
+                  : step.kind === 'mirror'
+                    ? 'Mirror'
+                    : 'Place on Workplane';
         entries.push({ kind: step.kind, label, summary: d.description, category: 'transform' });
       }
       return;
@@ -241,7 +254,12 @@ function collectTimelineEntries(plan: ShapeCompilePlan, entries: TimelineEntry[]
 
     case 'trimByPlane':
       collectTimelineEntries(plan.base, entries);
-      entries.push({ kind: 'trimByPlane', label: 'Trim by Plane', summary: `normal [${plan.normalX}, ${plan.normalY}, ${plan.normalZ}]`, category: 'modifier' });
+      entries.push({
+        kind: 'trimByPlane',
+        label: 'Trim by Plane',
+        summary: `normal [${plan.normalX}, ${plan.normalY}, ${plan.normalZ}]`,
+        category: 'modifier',
+      });
       return;
 
     case 'boolean':
@@ -256,7 +274,12 @@ function collectTimelineEntries(plan: ShapeCompilePlan, entries: TimelineEntry[]
       return;
 
     case 'extrude':
-      entries.push({ kind: 'extrude', label: 'Extrude', summary: `${summarizeProfile(plan.profile)}, h = ${plan.height}`, category: 'sketch' });
+      entries.push({
+        kind: 'extrude',
+        label: 'Extrude',
+        summary: `${summarizeProfile(plan.profile)}, h = ${plan.height}`,
+        category: 'sketch',
+      });
       return;
 
     case 'revolve':
@@ -279,9 +302,10 @@ function collectTimelineEntries(plan: ShapeCompilePlan, entries: TimelineEntry[]
       entries.push({
         kind: 'cylinder',
         label: 'Cylinder',
-        summary: plan.radiusTop !== undefined && plan.radiusTop !== plan.radius
-          ? `r = ${plan.radius}→${plan.radiusTop}, h = ${plan.height}`
-          : `r = ${plan.radius}, h = ${plan.height}`,
+        summary:
+          plan.radiusTop !== undefined && plan.radiusTop !== plan.radius
+            ? `r = ${plan.radius}→${plan.radiusTop}, h = ${plan.height}`
+            : `r = ${plan.radius}, h = ${plan.height}`,
         category: 'primitive',
       });
       return;
@@ -313,10 +337,7 @@ export function buildOperationTimeline(plan: ShapeCompilePlan | null): TimelineE
   return entries;
 }
 
-export function traceFaceTransformationHistory(
-  plan: ShapeCompilePlan | null,
-  face: FaceRef,
-): FaceTransformationHistory {
+export function traceFaceTransformationHistory(plan: ShapeCompilePlan | null, face: FaceRef): FaceTransformationHistory {
   const transformations = tracePlanTransformations(plan);
   const origin = findOriginOperation(plan);
   const timeline = buildOperationTimeline(plan);

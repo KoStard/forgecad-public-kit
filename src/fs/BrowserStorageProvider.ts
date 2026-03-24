@@ -1,5 +1,5 @@
-import type { FileChangeEvent, FileSystemCapabilities, FileSystemProvider } from './FileSystemProvider';
 import { EXAMPLE_FILES } from './exampleFiles';
+import type { FileChangeEvent, FileSystemCapabilities, FileSystemProvider } from './FileSystemProvider';
 
 const STORAGE_KEY = 'forgecad-browser-project';
 
@@ -22,7 +22,9 @@ export class BrowserStorageProvider implements FileSystemProvider {
     this._files = { ...files };
     // Defer to next tick so React has finished its first render
     setTimeout(() => onChange({ type: 'init', files }), 0);
-    return () => { /* no cleanup needed */ };
+    return () => {
+      /* no cleanup needed */
+    };
   }
 
   async save(filename: string, content: string): Promise<void> {
@@ -58,12 +60,7 @@ export class BrowserStorageProvider implements FileSystemProvider {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as unknown;
-        if (
-          parsed !== null &&
-          typeof parsed === 'object' &&
-          !Array.isArray(parsed) &&
-          Object.keys(parsed).length > 0
-        ) {
+        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length > 0) {
           const stored = parsed as Record<string, string>;
           return this._reconcileWithExamples(stored);
         }

@@ -7,11 +7,11 @@
  * Runs on the main thread.
  */
 
-import type { RunResult, SceneObject } from './runner';
-import { FrozenShape } from './frozenShape';
-import { FrozenSketch, FrozenConstraintSketch } from './frozenSketch';
-import { setShapeCompilePlan } from './kernel';
 import type { SerializedRunResult, SerializedSceneObject } from '../workers/evalWorkerProtocol';
+import { FrozenShape } from './frozenShape';
+import { FrozenConstraintSketch, FrozenSketch } from './frozenSketch';
+import { setShapeCompilePlan } from './kernel';
+import type { RunResult, SceneObject } from './runner';
 
 function deserializeSceneObject(s: SerializedSceneObject): SceneObject {
   let shape = null;

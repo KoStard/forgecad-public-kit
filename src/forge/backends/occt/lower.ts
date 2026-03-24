@@ -13,21 +13,16 @@ import {
   type ShapeCompilePlan,
   type ShapeCompileTransformStep,
 } from '../../compilePlan';
-import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
-import {
-  lowerCutShapeCompilePlanToConcretePlan,
-  lowerHoleShapeCompilePlanToConcretePlan,
-} from '../../holeCutCompilePlan';
-import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
 import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolution';
-import { getOCCT, type OCCTModule } from './init';
-import { wrapOCCTShapeBackend } from './shapeBackend';
-import type { ShapeBackend } from '../../shapeBackend';
+import { lowerCutShapeCompilePlanToConcretePlan, lowerHoleShapeCompilePlanToConcretePlan } from '../../holeCutCompilePlan';
 import type { ProfileBackend } from '../../profileBackend';
-import { wrapOCCTProfileBackend } from './profileBackend';
+import type { ShapeBackend } from '../../shapeBackend';
+import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
+import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
 import { Transform } from '../../transform';
-import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
-
+import { getOCCT, type OCCTModule } from './init';
+import { wrapOCCTProfileBackend } from './profileBackend';
+import { wrapOCCTShapeBackend } from './shapeBackend';
 
 // ─── Profile → OCCT Wire/Face ──────────────────────────────────────
 
@@ -43,10 +38,7 @@ function buildWireFromPoints(oc: OCCTModule, points: [number, number][]): any {
     const [x2, y2] = points[(i + 1) % points.length];
     // Skip degenerate (zero-length) edges from duplicate consecutive vertices
     if (Math.abs(x1 - x2) < 1e-10 && Math.abs(y1 - y2) < 1e-10) continue;
-    const edge = new oc.BRepBuilderAPI_MakeEdge_3(
-      new oc.gp_Pnt_3(x1, y1, 0),
-      new oc.gp_Pnt_3(x2, y2, 0),
-    ).Edge();
+    const edge = new oc.BRepBuilderAPI_MakeEdge_3(new oc.gp_Pnt_3(x1, y1, 0), new oc.gp_Pnt_3(x2, y2, 0)).Edge();
     edges.push(edge);
   }
 
@@ -119,7 +111,7 @@ function shapeToFace(oc: OCCTModule, shape: any): any {
  * This function strips all internal edges by reconstructing the face
  * from only its outer wire and inner wires (holes).
  */
-function cleanProfileFace(oc: OCCTModule, shape: any): any {
+function _cleanProfileFace(oc: OCCTModule, shape: any): any {
   const face = shapeToFace(oc, shape);
   const faceCast = oc.TopoDS.Face_1(face);
   const outerWire = oc.BRepTools.OuterWire(faceCast);
@@ -207,8 +199,10 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
       if (r < 1e-10) {
         // No rounding — plain rect
         const pts: [number, number][] = [
-          [cx - hw, cy - hh], [cx + hw, cy - hh],
-          [cx + hw, cy + hh], [cx - hw, cy + hh],
+          [cx - hw, cy - hh],
+          [cx + hw, cy - hh],
+          [cx + hw, cy + hh],
+          [cx - hw, cy + hh],
         ];
         face = buildFaceFromWire(oc, buildWireFromPoints(oc, pts));
       } else {
@@ -218,10 +212,10 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
 
         // Corner arc centers and their start angle (radians, CCW from +X)
         const arcs: { acx: number; acy: number; startRad: number }[] = [
-          { acx: cx + hw - r, acy: cy - hh + r, startRad: -Math.PI / 2 },  // bottom-right
-          { acx: cx + hw - r, acy: cy + hh - r, startRad: 0 },              // top-right
-          { acx: cx - hw + r, acy: cy + hh - r, startRad: Math.PI / 2 },    // top-left
-          { acx: cx - hw + r, acy: cy - hh + r, startRad: Math.PI },         // bottom-left
+          { acx: cx + hw - r, acy: cy - hh + r, startRad: -Math.PI / 2 }, // bottom-right
+          { acx: cx + hw - r, acy: cy + hh - r, startRad: 0 }, // top-right
+          { acx: cx - hw + r, acy: cy + hh - r, startRad: Math.PI / 2 }, // top-left
+          { acx: cx - hw + r, acy: cy - hh + r, startRad: Math.PI }, // bottom-left
         ];
 
         // Each segment: line from prev arc end → this arc start, then 90° arc.
@@ -238,23 +232,13 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
 
           // Line segment (skip if degenerate)
           if (Math.abs(lx1 - lx2) > 1e-10 || Math.abs(ly1 - ly2) > 1e-10) {
-            mkWire.Add_1(new oc.BRepBuilderAPI_MakeEdge_3(
-              new oc.gp_Pnt_3(lx1, ly1, 0),
-              new oc.gp_Pnt_3(lx2, ly2, 0),
-            ).Edge());
+            mkWire.Add_1(new oc.BRepBuilderAPI_MakeEdge_3(new oc.gp_Pnt_3(lx1, ly1, 0), new oc.gp_Pnt_3(lx2, ly2, 0)).Edge());
           }
 
           // 90° arc
-          const axis = new oc.gp_Ax2_3(
-            new oc.gp_Pnt_3(arc.acx, arc.acy, 0),
-            new oc.gp_Dir_4(0, 0, 1),
-          );
+          const axis = new oc.gp_Ax2_3(new oc.gp_Pnt_3(arc.acx, arc.acy, 0), new oc.gp_Dir_4(0, 0, 1));
           const circ = new oc.gp_Circ_2(axis, r);
-          const arcEdge = new oc.BRepBuilderAPI_MakeEdge_9(
-            circ,
-            arc.startRad,
-            arc.startRad + Math.PI / 2,
-          ).Edge();
+          const arcEdge = new oc.BRepBuilderAPI_MakeEdge_9(circ, arc.startRad, arc.startRad + Math.PI / 2).Edge();
           mkWire.Add_1(arcEdge);
         }
 
@@ -264,10 +248,7 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
     }
 
     case 'circle': {
-      const axis = new oc.gp_Ax2_3(
-        new oc.gp_Pnt_3(0, 0, 0),
-        new oc.gp_Dir_4(0, 0, 1),
-      );
+      const axis = new oc.gp_Ax2_3(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(0, 0, 1));
       const circle = new oc.gp_Circ_2(axis, plan.radius);
       const edge = new oc.BRepBuilderAPI_MakeEdge_8(circle).Edge();
       const wire = new oc.BRepBuilderAPI_MakeWire_2(edge).Wire();
@@ -351,10 +332,7 @@ function applyProfileTransforms(oc: OCCTModule, shape: any, transforms: ProfileC
         trsf.SetTranslation_1(new oc.gp_Vec_4(step.x, step.y, 0));
         break;
       case 'rotate':
-        trsf.SetRotation_1(
-          new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(0, 0, 1)),
-          step.degrees * Math.PI / 180,
-        );
+        trsf.SetRotation_1(new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(0, 0, 1)), (step.degrees * Math.PI) / 180);
         break;
       case 'scale': {
         // Non-uniform 2D scale via GTrsf
@@ -367,10 +345,7 @@ function applyProfileTransforms(oc: OCCTModule, shape: any, transforms: ProfileC
         continue;
       }
       case 'mirror':
-        trsf.SetMirror_3(new oc.gp_Ax2_3(
-          new oc.gp_Pnt_3(0, 0, 0),
-          new oc.gp_Dir_4(step.normalX, step.normalY, 0),
-        ));
+        trsf.SetMirror_3(new oc.gp_Ax2_3(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(step.normalX, step.normalY, 0)));
         break;
     }
     const transformed = new oc.BRepBuilderAPI_Transform_2(result, trsf, true);
@@ -389,15 +364,8 @@ function applyShapeTransform(oc: OCCTModule, shape: any, step: ShapeCompileTrans
       break;
     case 'rotate': {
       // Euler angles — apply Z, Y, X in sequence
-      const mat = Transform.rotationAxis([1, 0, 0], step.xDeg)
-        .rotateAxis([0, 1, 0], step.yDeg)
-        .rotateAxis([0, 0, 1], step.zDeg)
-        .toArray();
-      trsf.SetValues(
-        mat[0], mat[4], mat[8], mat[12],
-        mat[1], mat[5], mat[9], mat[13],
-        mat[2], mat[6], mat[10], mat[14],
-      );
+      const mat = Transform.rotationAxis([1, 0, 0], step.xDeg).rotateAxis([0, 1, 0], step.yDeg).rotateAxis([0, 0, 1], step.zDeg).toArray();
+      trsf.SetValues(mat[0], mat[4], mat[8], mat[12], mat[1], mat[5], mat[9], mat[13], mat[2], mat[6], mat[10], mat[14]);
       break;
     }
     case 'scale': {
@@ -414,31 +382,20 @@ function applyShapeTransform(oc: OCCTModule, shape: any, step: ShapeCompileTrans
       return transformed.Shape();
     }
     case 'rotateAround': {
-      const mat = Transform.rotationAxis(
-        [step.axisX, step.axisY, step.axisZ],
-        step.degrees,
-        [step.pivotX, step.pivotY, step.pivotZ],
-      ).toArray();
-      trsf.SetValues(
-        mat[0], mat[4], mat[8], mat[12],
-        mat[1], mat[5], mat[9], mat[13],
-        mat[2], mat[6], mat[10], mat[14],
-      );
+      const mat = Transform.rotationAxis([step.axisX, step.axisY, step.axisZ], step.degrees, [
+        step.pivotX,
+        step.pivotY,
+        step.pivotZ,
+      ]).toArray();
+      trsf.SetValues(mat[0], mat[4], mat[8], mat[12], mat[1], mat[5], mat[9], mat[13], mat[2], mat[6], mat[10], mat[14]);
       break;
     }
     case 'mirror':
-      trsf.SetMirror_3(new oc.gp_Ax2_3(
-        new oc.gp_Pnt_3(0, 0, 0),
-        new oc.gp_Dir_4(step.normalX, step.normalY, step.normalZ),
-      ));
+      trsf.SetMirror_3(new oc.gp_Ax2_3(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(step.normalX, step.normalY, step.normalZ)));
       break;
     case 'workplanePlacement': {
       const m = step.matrix;
-      trsf.SetValues(
-        m[0], m[4], m[8], m[12],
-        m[1], m[5], m[9], m[13],
-        m[2], m[6], m[10], m[14],
-      );
+      trsf.SetValues(m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14]);
       break;
     }
   }
@@ -468,9 +425,11 @@ function lowerBooleanPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind
 function occtNativeBoolean(oc: OCCTModule, boolOp: string, shapes: any[]): any {
   if (shapes.length === 2) {
     const op =
-      boolOp === 'union' ? new oc.BRepAlgoAPI_Fuse_3(shapes[0], shapes[1], new oc.Message_ProgressRange_1()) :
-      boolOp === 'difference' ? new oc.BRepAlgoAPI_Cut_3(shapes[0], shapes[1], new oc.Message_ProgressRange_1()) :
-      new oc.BRepAlgoAPI_Common_3(shapes[0], shapes[1], new oc.Message_ProgressRange_1());
+      boolOp === 'union'
+        ? new oc.BRepAlgoAPI_Fuse_3(shapes[0], shapes[1], new oc.Message_ProgressRange_1())
+        : boolOp === 'difference'
+          ? new oc.BRepAlgoAPI_Cut_3(shapes[0], shapes[1], new oc.Message_ProgressRange_1())
+          : new oc.BRepAlgoAPI_Common_3(shapes[0], shapes[1], new oc.Message_ProgressRange_1());
     op.Build(new oc.Message_ProgressRange_1());
     return op.Shape();
   }
@@ -494,9 +453,7 @@ function occtNativeBoolean(oc: OCCTModule, boolOp: string, shapes: any[]): any {
   const tools = new oc.TopTools_ListOfShape_1();
   for (let i = 1; i < shapes.length; i++) tools.Append_1(shapes[i]);
 
-  const op =
-    boolOp === 'union' ? new oc.BRepAlgoAPI_Fuse_1() :
-    new oc.BRepAlgoAPI_Cut_1();
+  const op = boolOp === 'union' ? new oc.BRepAlgoAPI_Fuse_1() : new oc.BRepAlgoAPI_Cut_1();
   op.SetArguments(args);
   op.SetTools(tools);
   op.Build(new oc.Message_ProgressRange_1());
@@ -508,10 +465,7 @@ function lowerFilletPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind:
 
   const selection = resolveSupportedEdgeFeatureSelection(plan.base, plan.edge);
   if (!selection.ok) throw new Error(selection.issue.reason);
-  if (
-    selection.selection.quadrant[0] !== plan.quadrant[0]
-    || selection.selection.quadrant[1] !== plan.quadrant[1]
-  ) {
+  if (selection.selection.quadrant[0] !== plan.quadrant[0] || selection.selection.quadrant[1] !== plan.quadrant[1]) {
     throw new Error(
       `filletEdge() currently supports ${selection.selection.edgeName} only with quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
     );
@@ -519,10 +473,7 @@ function lowerFilletPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind:
 
   // Find the matching edge in the OCCT shape
   // Use the edge selection data to identify which edge to fillet
-  const mkFillet = new oc.BRepFilletAPI_MakeFillet(
-    base,
-    oc.ChFi3d_FilletShape.ChFi3d_Rational,
-  );
+  const mkFillet = new oc.BRepFilletAPI_MakeFillet(base, oc.ChFi3d_FilletShape.ChFi3d_Rational);
 
   // Find the edge closest to the selection's start/end points
   const sel = selection.selection;
@@ -533,11 +484,7 @@ function lowerFilletPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind:
   let bestEdge: any = null;
   let bestDist = Infinity;
 
-  const edgeExpl = new oc.TopExp_Explorer_2(
-    base,
-    oc.TopAbs_ShapeEnum.TopAbs_EDGE,
-    oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  );
+  const edgeExpl = new oc.TopExp_Explorer_2(base, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
   while (edgeExpl.More()) {
     const edge = oc.TopoDS.Edge_1(edgeExpl.Current());
     // Get edge midpoint via BRep_Tool
@@ -587,11 +534,7 @@ function lowerChamferPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind
   let bestEdge: any = null;
   let bestDist = Infinity;
 
-  const edgeExpl = new oc.TopExp_Explorer_2(
-    base,
-    oc.TopAbs_ShapeEnum.TopAbs_EDGE,
-    oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  );
+  const edgeExpl = new oc.TopExp_Explorer_2(base, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
   while (edgeExpl.More()) {
     const edge = oc.TopoDS.Edge_1(edgeExpl.Current());
     const first = { current: 0 };
@@ -627,11 +570,7 @@ function lowerChamferPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind
 function findOCCTEdgeByMidpoint(oc: OCCTModule, shape: any, midpoint: [number, number, number]): any {
   let bestEdge: any = null;
   let bestDist = Infinity;
-  const edgeExpl = new oc.TopExp_Explorer_2(
-    shape,
-    oc.TopAbs_ShapeEnum.TopAbs_EDGE,
-    oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  );
+  const edgeExpl = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
   while (edgeExpl.More()) {
     const edge = oc.TopoDS.Edge_1(edgeExpl.Current());
     const first = { current: 0 };
@@ -656,10 +595,7 @@ function findOCCTEdgeByMidpoint(oc: OCCTModule, shape: any, midpoint: [number, n
 
 function lowerFilletEdgesPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'filletEdges' }>): any {
   const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
-  const mkFillet = new oc.BRepFilletAPI_MakeFillet(
-    base,
-    oc.ChFi3d_FilletShape.ChFi3d_Rational,
-  );
+  const mkFillet = new oc.BRepFilletAPI_MakeFillet(base, oc.ChFi3d_FilletShape.ChFi3d_Rational);
   let addedCount = 0;
   for (const target of plan.edgeTargets) {
     const matchedEdge = findOCCTEdgeByMidpoint(oc, base, target.midpoint);
@@ -673,9 +609,7 @@ function lowerFilletEdgesPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { 
   }
   mkFillet.Build(new oc.Message_ProgressRange_1());
   if (!mkFillet.IsDone()) {
-    throw new Error(
-      `filletEdges(): OCCT fillet operation failed (radius=${plan.radius}, ${addedCount} edges).`,
-    );
+    throw new Error(`filletEdges(): OCCT fillet operation failed (radius=${plan.radius}, ${addedCount} edges).`);
   }
   return mkFillet.Shape();
 }
@@ -696,9 +630,7 @@ function lowerChamferEdgesPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, {
   }
   mkChamfer.Build(new oc.Message_ProgressRange_1());
   if (!mkChamfer.IsDone()) {
-    throw new Error(
-      `chamferEdges(): OCCT chamfer operation failed (size=${plan.size}, ${addedCount} edges).`,
-    );
+    throw new Error(`chamferEdges(): OCCT chamfer operation failed (size=${plan.size}, ${addedCount} edges).`);
   }
   return mkChamfer.Shape();
 }
@@ -717,11 +649,10 @@ function lowerDraftPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 
   );
 
   // Check if BRepOffsetAPI_DraftAngle is available in the bindings
-  if (typeof (oc as any).BRepOffsetAPI_DraftAngle_2 !== 'function' &&
-      typeof (oc as any).BRepOffsetAPI_DraftAngle_1 !== 'function') {
+  if (typeof (oc as any).BRepOffsetAPI_DraftAngle_2 !== 'function' && typeof (oc as any).BRepOffsetAPI_DraftAngle_1 !== 'function') {
     throw new Error(
       'draft() is not available — the OCCT WASM build does not include BRepOffsetAPI_DraftAngle. ' +
-      'This operation requires a full OCCT build with the BRepOffsetAPI module.',
+        'This operation requires a full OCCT build with the BRepOffsetAPI module.',
     );
   }
 
@@ -735,11 +666,7 @@ function lowerDraftPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 
   }
 
   // Add draft to all faces
-  const explorer = new oc.TopExp_Explorer_2(
-    base,
-    oc.TopAbs_ShapeEnum.TopAbs_FACE,
-    oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  );
+  const explorer = new oc.TopExp_Explorer_2(base, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
   let addedCount = 0;
   while (explorer.More()) {
     const face = oc.TopoDS.Face_1(explorer.Current());
@@ -757,9 +684,7 @@ function lowerDraftPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 
 
   draftMaker.Build(new oc.Message_ProgressRange_1());
   if (!draftMaker.IsDone()) {
-    throw new Error(
-      `draft(): OCCT draft operation failed (angle=${plan.angleDeg}°, ${addedCount} faces).`,
-    );
+    throw new Error(`draft(): OCCT draft operation failed (angle=${plan.angleDeg}°, ${addedCount} faces).`);
   }
   return draftMaker.Shape();
 }
@@ -768,11 +693,13 @@ function lowerOffsetSolidPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { 
   const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
   try {
     // Check if BRepOffsetAPI_MakeOffsetShape is available
-    if (typeof (oc as any).BRepOffsetAPI_MakeOffsetShape !== 'function' &&
-        typeof (oc as any).BRepOffsetAPI_MakeOffsetShape_1 !== 'function') {
+    if (
+      typeof (oc as any).BRepOffsetAPI_MakeOffsetShape !== 'function' &&
+      typeof (oc as any).BRepOffsetAPI_MakeOffsetShape_1 !== 'function'
+    ) {
       throw new Error(
         'offsetSolid() is not available — the OCCT WASM build does not include BRepOffsetAPI_MakeOffsetShape. ' +
-        'This operation requires a full OCCT build with the BRepOffsetAPI module.',
+          'This operation requires a full OCCT build with the BRepOffsetAPI module.',
       );
     }
 
@@ -801,9 +728,7 @@ function lowerOffsetSolidPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { 
     return offsetMaker.Shape();
   } catch (e) {
     if (e instanceof Error && e.message.startsWith('offsetSolid()')) throw e;
-    throw new Error(
-      `offsetSolid() failed: ${e instanceof Error ? e.message : e}. Try a smaller thickness value.`,
-    );
+    throw new Error(`offsetSolid() failed: ${e instanceof Error ? e.message : e}. Try a smaller thickness value.`);
   }
 }
 
@@ -813,10 +738,7 @@ function lowerOffsetSolidPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { 
  * Throws for operations that require Manifold (levelSet, etc.)
  * — the caller should catch and fall back to the Manifold lowerer.
  */
-export function lowerShapeCompilePlanToOCCT(
-  plan: ShapeCompilePlan,
-  oc?: OCCTModule,
-): any {
+export function lowerShapeCompilePlanToOCCT(plan: ShapeCompilePlan, oc?: OCCTModule): any {
   // Return cached OCCT shape if this plan node was already lowered.
   // The cache is set on plan objects by this function and preserved
   // across clones by cloneShapeCompilePlan(). This avoids re-lowering
@@ -829,13 +751,10 @@ export function lowerShapeCompilePlanToOCCT(
   return shape;
 }
 
-function _lowerShapeCompilePlanToOCCTInner(
-  plan: ShapeCompilePlan,
-  oc?: OCCTModule,
-): any {
+function _lowerShapeCompilePlanToOCCTInner(plan: ShapeCompilePlan, oc?: OCCTModule): any {
   if (!oc) oc = getOCCT();
 
-  let result: any;
+  let _result: any;
   switch (plan.kind) {
     case 'box':
       if (plan.center) {
@@ -904,19 +823,13 @@ function _lowerShapeCompilePlanToOCCTInner(
       // revolving around Z. The OCCT face lives in XY (z=0), so rotate it
       // 90° around X to move it into the XZ plane before revolving around Z.
       const rot = new oc.gp_Trsf_1();
-      rot.SetRotation_1(
-        new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(1, 0, 0)),
-        Math.PI / 2,
-      );
+      rot.SetRotation_1(new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(1, 0, 0)), Math.PI / 2);
       const rotated = new oc.BRepBuilderAPI_Transform_2(face, rot, true);
       const rotatedFace = rotated.Shape();
 
-      const axis = new oc.gp_Ax1_2(
-        new oc.gp_Pnt_3(0, 0, 0),
-        new oc.gp_Dir_4(0, 0, 1),
-      );
+      const axis = new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(0, 0, 1));
       const degrees = plan.degrees ?? 360;
-      const radians = degrees * Math.PI / 180;
+      const radians = (degrees * Math.PI) / 180;
       const revol = new oc.BRepPrimAPI_MakeRevol_1(rotatedFace, axis, radians, true);
       revol.Build(new oc.Message_ProgressRange_1());
       if (!revol.IsDone()) {
@@ -957,24 +870,14 @@ function _lowerShapeCompilePlanToOCCTInner(
     case 'trimByPlane': {
       const base = lowerShapeCompilePlanToOCCT(plan.base, oc);
       const normal = [plan.normalX, plan.normalY, plan.normalZ] as [number, number, number];
-      const pnt = new oc.gp_Pnt_3(
-        normal[0] * plan.originOffset,
-        normal[1] * plan.originOffset,
-        normal[2] * plan.originOffset,
-      );
+      const pnt = new oc.gp_Pnt_3(normal[0] * plan.originOffset, normal[1] * plan.originOffset, normal[2] * plan.originOffset);
       const pln = new oc.gp_Pln_3(pnt, new oc.gp_Dir_4(normal[0], normal[1], normal[2]));
       const halfSpaceFace = new oc.BRepBuilderAPI_MakeFace_9(pln, -1e6, 1e6, -1e6, 1e6).Face();
       const halfSpace = new oc.BRepPrimAPI_MakeHalfSpace_1(
         halfSpaceFace,
-        new oc.gp_Pnt_3(
-          normal[0] * (plan.originOffset - 1),
-          normal[1] * (plan.originOffset - 1),
-          normal[2] * (plan.originOffset - 1),
-        ),
+        new oc.gp_Pnt_3(normal[0] * (plan.originOffset - 1), normal[1] * (plan.originOffset - 1), normal[2] * (plan.originOffset - 1)),
       );
-      const cut = new oc.BRepAlgoAPI_Cut_3(
-        base, halfSpace.Solid(), new oc.Message_ProgressRange_1(),
-      );
+      const cut = new oc.BRepAlgoAPI_Cut_3(base, halfSpace.Solid(), new oc.Message_ProgressRange_1());
       cut.Build(new oc.Message_ProgressRange_1());
       return cut.Shape();
     }
@@ -1007,7 +910,7 @@ function _lowerShapeCompilePlanToOCCTInner(
     case 'importedMesh':
       throw new Error(
         `importMesh("${plan.filePath}") is not supported with the OCCT backend. ` +
-        'Switch to the Manifold backend or use the default backend.',
+          'Switch to the Manifold backend or use the default backend.',
       );
     case 'hull':
       throw new OCCTUnsupportedError('hull');
@@ -1070,12 +973,11 @@ function buildSpineWire(oc: OCCTModule, points: [number, number, number][]): any
   for (let i = 0; i < points.length - 1; i++) {
     const [x1, y1, z1] = points[i];
     const [x2, y2, z2] = points[i + 1];
-    const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+    const dx = x2 - x1,
+      dy = y2 - y1,
+      dz = z2 - z1;
     if (dx * dx + dy * dy + dz * dz < 1e-20) continue;
-    const edge = new oc.BRepBuilderAPI_MakeEdge_3(
-      new oc.gp_Pnt_3(x1, y1, z1),
-      new oc.gp_Pnt_3(x2, y2, z2),
-    ).Edge();
+    const edge = new oc.BRepBuilderAPI_MakeEdge_3(new oc.gp_Pnt_3(x1, y1, z1), new oc.gp_Pnt_3(x2, y2, z2)).Edge();
     mkWire.Add_1(edge);
   }
   return mkWire.Wire();
@@ -1095,14 +997,20 @@ function lowerSweepPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 
   // first segment. The profile is built on the XY plane (normal = Z).
   const [sx, sy, sz] = pathPoints[0];
   const [nx, ny, nz] = pathPoints[1];
-  const tx = nx - sx, ty = ny - sy, tz = nz - sz;
+  const tx = nx - sx,
+    ty = ny - sy,
+    tz = nz - sz;
   const tLen = Math.sqrt(tx * tx + ty * ty + tz * tz);
 
   let orientedProfile: any;
   if (tLen > 1e-10) {
-    const tangentX = tx / tLen, tangentY = ty / tLen, tangentZ = tz / tLen;
+    const tangentX = tx / tLen,
+      tangentY = ty / tLen,
+      tangentZ = tz / tLen;
     // Cross product: Z × tangent = rotation axis
-    const crossX = -tangentY, crossY = tangentX, crossZ = 0;
+    const crossX = -tangentY,
+      crossY = tangentX,
+      crossZ = 0;
     const crossLen = Math.sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
 
     const trsf = new oc.gp_Trsf_1();
@@ -1110,17 +1018,11 @@ function lowerSweepPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 
       const dot = tangentZ;
       const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
       trsf.SetRotation_1(
-        new oc.gp_Ax1_2(
-          new oc.gp_Pnt_3(0, 0, 0),
-          new oc.gp_Dir_4(crossX / crossLen, crossY / crossLen, crossZ / crossLen),
-        ),
+        new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(crossX / crossLen, crossY / crossLen, crossZ / crossLen)),
         angle,
       );
     } else if (tangentZ < 0) {
-      trsf.SetRotation_1(
-        new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(1, 0, 0)),
-        Math.PI,
-      );
+      trsf.SetRotation_1(new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(1, 0, 0)), Math.PI);
     }
 
     const rotated = new oc.BRepBuilderAPI_Transform_2(profileFace, trsf, true);
@@ -1144,11 +1046,7 @@ function lowerSweepPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 
 
 // ─── Extrude with twist via ThruSections ──────────────────────────────
 
-function lowerExtrudeWithTwist(
-  oc: OCCTModule,
-  plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>,
-  bottomFace: any,
-): any {
+function lowerExtrudeWithTwist(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>, bottomFace: any): any {
   const height = plan.height;
   const totalTwistDeg = plan.twist ?? 0;
   const nSections = Math.max(2, (plan.twistSegments ?? 12) + 1);
@@ -1161,11 +1059,8 @@ function lowerExtrudeWithTwist(
     const angleDeg = totalTwistDeg * t;
 
     const trsf = new oc.gp_Trsf_1();
-    const angleRad = angleDeg * Math.PI / 180;
-    trsf.SetRotation_1(
-      new oc.gp_Ax1_2(new oc.gp_Pnt_1(), new oc.gp_Dir_4(0, 0, 1)),
-      angleRad,
-    );
+    const angleRad = (angleDeg * Math.PI) / 180;
+    trsf.SetRotation_1(new oc.gp_Ax1_2(new oc.gp_Pnt_1(), new oc.gp_Dir_4(0, 0, 1)), angleRad);
     const trsf2 = new oc.gp_Trsf_1();
     trsf2.SetTranslation_1(new oc.gp_Vec_4(0, 0, z));
     trsf.Multiply(trsf2);
@@ -1191,10 +1086,7 @@ function lowerExtrudeWithTwist(
  * Extrude with non-uniform top scaling: 2-section loft from bottom wire
  * (original profile) to top wire (scaled profile at z=height).
  */
-function lowerExtrudeWithScaleTop(
-  oc: OCCTModule,
-  plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>,
-): any {
+function lowerExtrudeWithScaleTop(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>): any {
   const bottomFace = lowerProfileToFace(oc, plan.profile);
   const bottomWire = extractOuterWire(oc, bottomFace);
 
@@ -1246,9 +1138,7 @@ export class OCCTUnsupportedError extends Error {
 /**
  * Lower a ShapeCompilePlan to an OCCTShapeBackend.
  */
-export function lowerShapeCompilePlanToOCCTBackend(
-  plan: ShapeCompilePlan,
-): ShapeBackend {
+export function lowerShapeCompilePlanToOCCTBackend(plan: ShapeCompilePlan): ShapeBackend {
   const oc = getOCCT();
   const shape = lowerShapeCompilePlanToOCCT(plan, oc);
   return wrapOCCTShapeBackend(shape);
@@ -1257,9 +1147,7 @@ export function lowerShapeCompilePlanToOCCTBackend(
 /**
  * Lower a ProfileCompilePlan to a ProfileBackend (OCCT TopoDS_Face).
  */
-export function lowerProfileCompilePlanToOCCTProfileBackend(
-  plan: ProfileCompilePlan,
-): ProfileBackend {
+export function lowerProfileCompilePlanToOCCTProfileBackend(plan: ProfileCompilePlan): ProfileBackend {
   const oc = getOCCT();
   return wrapOCCTProfileBackend(lowerProfileToFace(oc, plan));
 }

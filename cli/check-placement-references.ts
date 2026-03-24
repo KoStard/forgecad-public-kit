@@ -6,6 +6,7 @@
  */
 import '../src/forge/holeCut';
 import { resolveShapeEdgeDescendant, resolveSupportedEdgeFeatureSelection } from '../src/forge/edgeFeatureResolution';
+import { runScript } from '../src/forge/headless';
 import {
   box,
   getShapeCompilePlan,
@@ -18,9 +19,8 @@ import {
   sphere,
   union,
 } from '../src/forge/kernel';
-import { runScript } from '../src/forge/headless';
 import { describeFaceQueryRef } from '../src/forge/queryModel';
-import { chamferEdge, circle2d, filletEdge, linearPattern, rect, roundedRect, rectangle, transformTopology } from '../src/forge/sketch';
+import { chamferEdge, circle2d, filletEdge, linearPattern, rect, rectangle, roundedRect, transformTopology } from '../src/forge/sketch';
 import { getSketchPlacement3D, getSketchPlacementModel, getSketchWorkplane } from '../src/forge/sketch/core';
 import { Transform } from '../src/forge/transform';
 
@@ -59,11 +59,7 @@ function expectThrows(fn: () => void, pattern: RegExp, label: string): void {
 }
 
 function midpoint(start: [number, number, number], end: [number, number, number]): [number, number, number] {
-  return [
-    (start[0] + end[0]) / 2,
-    (start[1] + end[1]) / 2,
-    (start[2] + end[2]) / 2,
-  ];
+  return [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2];
 }
 
 function checkTransformAndPlacementHelpers(): void {
@@ -230,10 +226,7 @@ function checkDirectFaceRefWorkplaneRecording(): void {
 
 function checkBooleanFacePlacementResolution(): void {
   const plate = roundedRect(40, 24, 3, true).extrude(10).toShape();
-  const cover = union(
-    plate,
-    sphere(4).translate(0, 0, 11),
-  );
+  const cover = union(plate, sphere(4).translate(0, 0, 11));
 
   const topFace = cover.face('top');
   expect(topFace.query?.kind === 'propagated-face', 'supported boolean-preserved top faces should resolve to propagated-face queries');
@@ -250,7 +243,10 @@ function checkBooleanFacePlacementResolution(): void {
   });
   const placement = getSketchPlacementModel(sketch);
   expect(placement != null, 'compile-covered boolean results should resolve named preserved faces for Sketch.onFace()');
-  expect(placement!.workplane.source.kind === 'propagated-face', 'Sketch.onFace(booleanResult, "top") should preserve propagated face provenance');
+  expect(
+    placement!.workplane.source.kind === 'propagated-face',
+    'Sketch.onFace(booleanResult, "top") should preserve propagated face provenance',
+  );
   expectVec(placement!.workplane.origin, topFace.center, 'boolean.onFace.origin');
   expectVec(placement!.workplane.normal, topFace.normal, 'boolean.onFace.normal');
 }
@@ -281,13 +277,12 @@ function checkTrackedEdgeQueryPropagation(): void {
   expectVec(shifted.referencePoint('edges.top-bottom.start'), shiftedEdge.start, 'translatedEdge.start');
   expectVec(shifted.referencePoint('edges.top-bottom.end'), shiftedEdge.end, 'translatedEdge.end');
 
-  const placedSketch = rect(6, 4)
-    .onFace(box(16, 10, 8, true), 'front', {
-      u: 2,
-      v: -1,
-      protrude: 0.5,
-      selfAnchor: 'center',
-    });
+  const placedSketch = rect(6, 4).onFace(box(16, 10, 8, true), 'front', {
+    u: 2,
+    v: -1,
+    protrude: 0.5,
+    selfAnchor: 'center',
+  });
   const placement = getSketchPlacement3D(placedSketch);
   expect(placement != null, 'tracked-edge workplane transform check should have a placement matrix');
   const transformedTopology = transformTopology(target.topology, placement!);
@@ -296,11 +291,7 @@ function checkTrackedEdgeQueryPropagation(): void {
   expect(transformedStoredQuery!.kind === 'tracked-edge', 'workplane-placed edge queries should remain tracked-edge');
   expect(transformedStoredQuery!.edgeName === 'top-bottom', 'workplane-placed edge queries should preserve the edge name');
   expect(transformedStoredQuery!.selector === 'edge', 'workplane-placed edge queries should preserve the selector');
-  expectVec(
-    transformedTopology.edges.get('top-bottom')!.start,
-    Transform.from(placement!).point(topEdge.start),
-    'workplaneEdge.start',
-  );
+  expectVec(transformedTopology.edges.get('top-bottom')!.start, Transform.from(placement!).point(topEdge.start), 'workplaneEdge.start');
 }
 
 function checkShapeWorkplanePlacementPropagation(): void {
@@ -319,7 +310,10 @@ function checkShapeWorkplanePlacementPropagation(): void {
   expect(extrudePlacement != null, 'extrude() should preserve semantic workplane placement on the shape compile plan');
   expect(extrudePlacement!.placement.workplane.source.kind === 'tracked-face', 'extrude() should preserve tracked-face placement source');
   expect(extrudePlacement!.placement.workplane.source.faceName === 'top', 'extrude() should preserve tracked face name');
-  expect(extrudePlacement!.placement.workplane.source.owner?.id === targetOwner!.id, 'extrude() should preserve parent-body query ownership');
+  expect(
+    extrudePlacement!.placement.workplane.source.owner?.id === targetOwner!.id,
+    'extrude() should preserve parent-body query ownership',
+  );
   expectVec(extrudePlacement!.placement.workplane.origin, target.face('top').center, 'extrude.workplane.origin');
   expectMatrix(extrudePlacement!.matrix, getSketchPlacement3D(extrudeSketch)!, 'extrude.workplane.matrix');
 
@@ -346,7 +340,10 @@ function checkShapeWorkplanePlacementPropagation(): void {
   const revolved = revolveSketch.revolve(180);
   const revolvePlacement = getShapeWorkplanePlacement(revolved);
   expect(revolvePlacement != null, 'revolve() should preserve semantic workplane placement on the shape compile plan');
-  expect(revolvePlacement!.placement.workplane.source.kind === 'canonical-face', 'revolve() should preserve canonical-face placement source');
+  expect(
+    revolvePlacement!.placement.workplane.source.kind === 'canonical-face',
+    'revolve() should preserve canonical-face placement source',
+  );
   expect(revolvePlacement!.placement.workplane.source.face === 'front', 'revolve() should preserve canonical face name');
   expectMatrix(revolvePlacement!.matrix, getSketchPlacement3D(revolveSketch)!, 'revolve.workplane.matrix');
 
@@ -376,16 +373,12 @@ function checkShapeQueryOwnerPropagation(): void {
   expect(cupOwner != null, 'shell result should expose a primary query owner');
   expect(cupOwner!.operation === 'shell', `expected shell owner operation "shell", got ${cupOwner!.operation}`);
 
-  const vent = roundedRect(10, 6, 1.5, true)
-    .onFace(base, 'front', { u: 0, v: 2, protrude: 0.25, selfAnchor: 'center' })
-    .extrude(4);
+  const vent = roundedRect(10, 6, 1.5, true).onFace(base, 'front', { u: 0, v: 2, protrude: 0.25, selfAnchor: 'center' }).extrude(4);
   const ventPlacement = getShapeWorkplanePlacement(vent.toShape());
   expect(ventPlacement != null, 'downstream cut feature should preserve workplane placement');
   expect(ventPlacement!.placement.workplane.source.owner?.id === baseOwner!.id, 'downstream cut should preserve the base owner query');
 
-  const foot = roundedRect(8, 8, 1.5, true)
-    .onFace(base, 'bottom', { u: 10, v: 6, protrude: 0, selfAnchor: 'center' })
-    .extrude(4);
+  const foot = roundedRect(8, 8, 1.5, true).onFace(base, 'bottom', { u: 10, v: 6, protrude: 0, selfAnchor: 'center' }).extrude(4);
   const footOwner = getShapePrimaryQueryOwner(foot.toShape());
   expect(footOwner != null, 'downstream support feature should expose a primary query owner');
 
@@ -411,9 +404,15 @@ function checkHoleCutFeaturePlacement(): void {
   expect(drilledOwner != null, 'blind-hole result should expose a primary owner');
   const holePlacement = getShapeWorkplanePlacement(drilled);
   expect(holePlacement != null, 'Shape.hole() should preserve its semantic workplane placement on the result');
-  expect(holePlacement!.placement.workplane.source.kind === 'tracked-face', 'Shape.hole() should prefer tracked planar faces when available');
+  expect(
+    holePlacement!.placement.workplane.source.kind === 'tracked-face',
+    'Shape.hole() should prefer tracked planar faces when available',
+  );
   expect(holePlacement!.placement.workplane.source.faceName === 'top', 'Shape.hole() should preserve the selected tracked face name');
-  expect(holePlacement!.placement.workplane.source.owner?.id === baseOwner!.id, 'Shape.hole() should keep the parent body owner on the face query');
+  expect(
+    holePlacement!.placement.workplane.source.owner?.id === baseOwner!.id,
+    'Shape.hole() should keep the parent body owner on the face query',
+  );
   expect(holePlacement!.placement.u === 8, 'Shape.hole() should preserve the feature u offset');
   expect(holePlacement!.placement.v === -4, 'Shape.hole() should preserve the feature v offset');
   expect(drilled.faceNames().includes('floor'), 'blind-hole results should expose a defended floor face name');
@@ -432,10 +431,7 @@ function checkHoleCutFeaturePlacement(): void {
   }
   expect(drilledTop.descendant?.semantic === 'region', 'hole host-face descendants should expose region semantics');
 
-  const topBadge = rect(4, 3)
-    .onFace(drilled, 'top', { u: -12, v: 6, protrude: 0.05, selfAnchor: 'center' })
-    .extrude(0.8)
-    .toShape();
+  const topBadge = rect(4, 3).onFace(drilled, 'top', { u: -12, v: 6, protrude: 0.05, selfAnchor: 'center' }).extrude(0.8).toShape();
   const topBadgePlacement = getShapeWorkplanePlacement(topBadge);
   expect(topBadgePlacement != null, 'downstream features should place on defended hole host-face regions');
   expect(
@@ -443,31 +439,39 @@ function checkHoleCutFeaturePlacement(): void {
     'hole host-face region placement should preserve a propagated-face query source',
   );
 
-  const floorBadge = rect(4, 3)
-    .onFace(drilled, 'floor', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
-    .extrude(1)
-    .toShape();
+  const floorBadge = rect(4, 3).onFace(drilled, 'floor', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' }).extrude(1).toShape();
   const floorPlacement = getShapeWorkplanePlacement(floorBadge);
   expect(floorPlacement != null, 'downstream features should preserve workplane placement from blind-hole floor faces');
-  expect(floorPlacement!.placement.workplane.source.kind === 'created-face', 'blind-hole floor placement should preserve a created-face query source');
+  expect(
+    floorPlacement!.placement.workplane.source.kind === 'created-face',
+    'blind-hole floor placement should preserve a created-face query source',
+  );
   if (floorPlacement!.placement.workplane.source.kind === 'created-face') {
-    expect(floorPlacement!.placement.workplane.source.slot === 'floor', `expected blind-hole floor placement slot "floor", got ${floorPlacement!.placement.workplane.source.slot}`);
+    expect(
+      floorPlacement!.placement.workplane.source.slot === 'floor',
+      `expected blind-hole floor placement slot "floor", got ${floorPlacement!.placement.workplane.source.slot}`,
+    );
     expect(
       floorPlacement!.placement.workplane.source.owner?.id === drilledOwner!.id,
       'blind-hole floor placement should target the hole owner lineage',
     );
   }
 
-  const pocket = roundedRect(12, 8, 2, true)
-    .onFace(base, 'front', { u: 0, v: 3, selfAnchor: 'center' });
+  const pocket = roundedRect(12, 8, 2, true).onFace(base, 'front', { u: 0, v: 3, selfAnchor: 'center' });
   const cut = drilled.cutout(pocket, { depth: 5 });
   const cutOwner = getShapePrimaryQueryOwner(cut);
   expect(cutOwner != null, 'cut results should expose a primary owner');
   const cutPlacement = getShapeWorkplanePlacement(cut);
   expect(cutPlacement != null, 'Shape.cutout() should preserve its semantic workplane placement on the result');
-  expect(cutPlacement!.placement.workplane.source.kind === 'canonical-face', 'Shape.cutout() should preserve canonical face queries when the source sketch used them');
+  expect(
+    cutPlacement!.placement.workplane.source.kind === 'canonical-face',
+    'Shape.cutout() should preserve canonical face queries when the source sketch used them',
+  );
   expect(cutPlacement!.placement.workplane.source.face === 'front', 'Shape.cutout() should preserve the selected canonical face');
-  expect(cutPlacement!.placement.workplane.source.owner?.id === baseOwner!.id, 'Shape.cutout() should retain the originating body owner lineage');
+  expect(
+    cutPlacement!.placement.workplane.source.owner?.id === baseOwner!.id,
+    'Shape.cutout() should retain the originating body owner lineage',
+  );
   expect(cutPlacement!.placement.selfAnchor === 'center', 'Shape.cutout() should preserve the source sketch anchor');
   expect(cut.faceNames().includes('floor'), 'blind cutouts should expose a defended floor face name');
   expect(cut.faceNames().includes('wall-right'), 'rounded-rect cutouts should expose named wall faces');
@@ -478,13 +482,13 @@ function checkHoleCutFeaturePlacement(): void {
     expect(cutWall.query.owner?.id === cutOwner!.id, 'cut wall queries should target the cut owner');
   }
 
-  const cutBadge = rect(3, 2)
-    .onFace(cut, 'wall-right', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
-    .extrude(0.8)
-    .toShape();
+  const cutBadge = rect(3, 2).onFace(cut, 'wall-right', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' }).extrude(0.8).toShape();
   const cutWallPlacement = getShapeWorkplanePlacement(cutBadge);
   expect(cutWallPlacement != null, 'downstream features should preserve workplane placement from cut-created wall faces');
-  expect(cutWallPlacement!.placement.workplane.source.kind === 'created-face', 'cut-created wall placement should preserve a created-face query source');
+  expect(
+    cutWallPlacement!.placement.workplane.source.kind === 'created-face',
+    'cut-created wall placement should preserve a created-face query source',
+  );
   if (cutWallPlacement!.placement.workplane.source.kind === 'created-face') {
     expect(
       cutWallPlacement!.placement.workplane.source.slot === 'wall-right',
@@ -520,13 +524,13 @@ function checkRicherHoleCutVariants(): void {
       counterboreFloor.query.slot === 'counterbore-floor',
       `expected counterbore floor slot "counterbore-floor", got ${counterboreFloor.query.slot}`,
     );
-    expect(
-      counterboreFloor.query.owner?.id === counterboredOwner!.id,
-      'counterbore floor queries should target the counterbore owner',
-    );
+    expect(counterboreFloor.query.owner?.id === counterboredOwner!.id, 'counterbore floor queries should target the counterbore owner');
   }
   const counterboreBottom = counterbored.face('bottom');
-  expect(counterboreBottom.query?.kind === 'propagated-face', 'counterbore upToFace termination descendants should stay queryable as propagated regions');
+  expect(
+    counterboreBottom.query?.kind === 'propagated-face',
+    'counterbore upToFace termination descendants should stay queryable as propagated regions',
+  );
   expect(counterboreBottom.descendant?.semantic === 'region', 'counterbore upToFace termination should expose region semantics');
 
   const counterboreBadge = rect(3, 2)
@@ -578,8 +582,7 @@ function checkRicherHoleCutVariants(): void {
     'countersink.nonPlanarPlacement',
   );
 
-  const pocket = roundedRect(18, 10, 2, true)
-    .onFace(base, 'top', { u: 0, v: -6, selfAnchor: 'center' });
+  const pocket = roundedRect(18, 10, 2, true).onFace(base, 'top', { u: 0, v: -6, selfAnchor: 'center' });
   const cut = base.cutout(pocket, { upToFace: exitFace });
   const cutPropagation = getShapeTopologyRewritePropagation(cut);
   expect(cutPropagation != null, 'up-to-face cuts should expose a topology-rewrite propagation contract');
@@ -593,8 +596,7 @@ function checkRicherHoleCutVariants(): void {
   expect(cutBottom.descendant?.semantic === 'region', 'cut upToFace termination should expose region semantics');
 
   const pocketBase = roundedRect(68, 44, 4, true).extrude(20);
-  const accessPocket = roundedRect(20, 12, 2, true)
-    .onFace(pocketBase, 'top', { u: 0, v: 0, selfAnchor: 'center' });
+  const accessPocket = roundedRect(20, 12, 2, true).onFace(pocketBase, 'top', { u: 0, v: 0, selfAnchor: 'center' });
   const recessed = pocketBase.cutout(accessPocket, { depth: 10 });
   const internalFloor = recessed.face('floor');
   const threadedTwoSidedHole = recessed.hole(internalFloor, {
@@ -628,14 +630,19 @@ function checkRicherHoleCutVariants(): void {
   const threadedHolePlan = getShapeCompilePlan(threadedTwoSidedHole);
   expect(threadedHolePlan?.kind === 'queryOwner', 'two-sided threaded holes should keep a wrapped query-owner compile plan');
   if (threadedHolePlan?.kind === 'queryOwner' && threadedHolePlan.base.kind === 'hole') {
-    expect(threadedHolePlan.base.extent.kind === 'two-sided', 'threaded two-sided holes should preserve the structured extent in the compile plan');
-    expect(threadedHolePlan.base.hole.thread?.designation === 'M5x0.8', 'threaded holes should preserve thread designation metadata in the compile plan');
+    expect(
+      threadedHolePlan.base.extent.kind === 'two-sided',
+      'threaded two-sided holes should preserve the structured extent in the compile plan',
+    );
+    expect(
+      threadedHolePlan.base.hole.thread?.designation === 'M5x0.8',
+      'threaded holes should preserve thread designation metadata in the compile plan',
+    );
     expect(threadedHolePlan.base.hole.thread?.class === '6H', 'threaded holes should preserve thread class metadata in the compile plan');
   }
 
   const taperedPocketBase = roundedRect(60, 38, 4, true).extrude(18);
-  const taperedPocket = roundedRect(16, 10, 2, true)
-    .onFace(taperedPocketBase, 'front', { u: 0, v: 3, selfAnchor: 'center' });
+  const taperedPocket = roundedRect(16, 10, 2, true).onFace(taperedPocketBase, 'front', { u: 0, v: 3, selfAnchor: 'center' });
   const taperedCut = taperedPocketBase.cutout(taperedPocket, { depth: 7, taperScale: 0.72 });
   expect(taperedCut.faceNames().includes('wall-right'), 'tapered cutouts should keep defended wall faces in the rect subset');
   const taperedCutPlan = getShapeCompilePlan(taperedCut);
@@ -673,9 +680,7 @@ function checkEdgeFinishOwnerPropagation(): void {
   expect(ownerIds.has(baseOwner!.id), 'fillet result should retain the source body owner lineage');
   expect(ownerIds.has(filletOwner!.id), 'fillet result should include its own feature owner lineage');
 
-  const boss = roundedRect(12, 8, 1.5, true)
-    .onFace(base, 'top', { u: -12, v: 6, protrude: 0.25, selfAnchor: 'center' })
-    .extrude(5);
+  const boss = roundedRect(12, 8, 1.5, true).onFace(base, 'top', { u: -12, v: 6, protrude: 0.25, selfAnchor: 'center' }).extrude(5);
   const widened = filleted.add(boss);
   const widenedUnionOwner = getShapePrimaryQueryOwner(widened);
   expect(widenedUnionOwner != null, 'union after a supported fillet should expose a primary query owner');
@@ -699,7 +704,10 @@ function checkEdgeFinishOwnerPropagation(): void {
   expect(doubledPropagation != null, 'second fillet after a supported union should expose propagation metadata');
   const mergedEdge = doubledPropagation!.preservedEdges.find((entry) => entry.status === 'ambiguous');
   expect(mergedEdge != null, 'second fillet after a supported union should keep the selected edge ambiguity explicit');
-  expect(mergedEdge!.query.source.kind === 'propagated-edge', 'second fillet should record the selected edge against the propagated union query');
+  expect(
+    mergedEdge!.query.source.kind === 'propagated-edge',
+    'second fillet should record the selected edge against the propagated union query',
+  );
   if (mergedEdge!.query.source.kind === 'propagated-edge') {
     expect(
       mergedEdge!.query.source.owner?.id === widenedUnionOwner!.id,
@@ -719,9 +727,7 @@ function checkEdgeFinishOwnerPropagation(): void {
 function checkRepeatedFeatureOwnershipPropagation(): void {
   const base = roundedRect(72, 44, 4, true).extrude(12);
 
-  const boss = roundedRect(16, 12, 2, true)
-    .onFace(base, 'top', { u: -18, v: 10, protrude: 0.5, selfAnchor: 'center' })
-    .extrude(8);
+  const boss = roundedRect(16, 12, 2, true).onFace(base, 'top', { u: -18, v: 10, protrude: 0.5, selfAnchor: 'center' }).extrude(8);
   const bossOwner = getShapePrimaryQueryOwner(boss.toShape());
   expect(bossOwner != null, 'seed downstream feature should expose a primary query owner');
 
@@ -731,9 +737,7 @@ function checkRepeatedFeatureOwnershipPropagation(): void {
   expect(mirroredOwner!.operation === 'mirror', `expected mirrored feature owner operation "mirror", got ${mirroredOwner!.operation}`);
   expect(mirroredOwner!.id !== bossOwner!.id, 'mirrored downstream feature should get its own repeated-result owner');
 
-  const mirroredHole = circle2d(2.4)
-    .onFace(mirroredBoss, 'top', { u: 0, v: 0, protrude: 0.25, selfAnchor: 'center' })
-    .extrude(10);
+  const mirroredHole = circle2d(2.4).onFace(mirroredBoss, 'top', { u: 0, v: 0, protrude: 0.25, selfAnchor: 'center' }).extrude(10);
   const mirroredHolePlacement = getShapeWorkplanePlacement(mirroredHole.toShape());
   expect(mirroredHolePlacement != null, 'downstream feature on mirrored result should preserve workplane placement');
   expect(
@@ -741,9 +745,7 @@ function checkRepeatedFeatureOwnershipPropagation(): void {
     'downstream feature on mirrored result should target the mirrored owner lineage',
   );
 
-  const slotSeed = roundedRect(12, 4, 1.5, true)
-    .onFace(base, 'top', { u: -22, v: -12, protrude: 0.5, selfAnchor: 'center' })
-    .extrude(6);
+  const slotSeed = roundedRect(12, 4, 1.5, true).onFace(base, 'top', { u: -22, v: -12, protrude: 0.5, selfAnchor: 'center' }).extrude(6);
   const slotOwner = getShapePrimaryQueryOwner(slotSeed.toShape());
   expect(slotOwner != null, 'pattern seed feature should expose a primary query owner');
 
@@ -756,14 +758,15 @@ function checkRepeatedFeatureOwnershipPropagation(): void {
     patternedOwners.some((owner) => owner.operation === 'pattern:linear:0'),
     'linear-pattern ownership should keep the seed instance visible as pattern:linear:0',
   );
-  expect(slotOwners.some((owner) => owner.id === slotOwner!.id), 'patterned result should retain the seed feature lineage');
+  expect(
+    slotOwners.some((owner) => owner.id === slotOwner!.id),
+    'patterned result should retain the seed feature lineage',
+  );
 }
 
 function checkRepeatedBooleanTargetFaceQuerySupport(): void {
   const base = roundedRect(64, 42, 4, true).extrude(12);
-  const boss = roundedRect(14, 10, 2, true)
-    .onFace(base, 'top', { u: 16, v: 10, protrude: 0.5, selfAnchor: 'center' })
-    .extrude(6);
+  const boss = roundedRect(14, 10, 2, true).onFace(base, 'top', { u: 16, v: 10, protrude: 0.5, selfAnchor: 'center' }).extrude(6);
   const mirroredBoss = boss.toShape().mirror([1, 0, 0]);
   const mirroredOwner = getShapePrimaryQueryOwner(mirroredBoss);
   expect(mirroredOwner != null, 'mirrored descendant should expose a repeated-result owner');
@@ -777,7 +780,10 @@ function checkRepeatedBooleanTargetFaceQuerySupport(): void {
   });
   const placement = getShapeWorkplanePlacement(drilled);
   expect(placement != null, 'boolean targets should accept defended face queries from repeated descendants');
-  expect(placement!.placement.workplane.source.kind === 'face-ref', 'direct repeated-descendant face targets should preserve a face-ref workplane source');
+  expect(
+    placement!.placement.workplane.source.kind === 'face-ref',
+    'direct repeated-descendant face targets should preserve a face-ref workplane source',
+  );
   expect(
     placement!.placement.workplane.source.owner?.id === mirroredOwner!.id,
     'boolean-target downstream features should keep the repeated descendant owner lineage on direct face refs',
@@ -789,16 +795,12 @@ function checkBooleanAndRepeatedQueryPropagation(): void {
   const seedOwner = getShapePrimaryQueryOwner(seed);
   expect(seedOwner != null, 'duplicate-union seed should expose a primary owner');
 
-  const duplicated = union(
-    seed,
-    seed.clone().translate(28, 0, 0),
-  );
+  const duplicated = union(seed, seed.clone().translate(28, 0, 0));
   const duplicatePropagation = getShapeTopologyRewritePropagation(duplicated);
   expect(duplicatePropagation != null, 'boolean union should expose propagation metadata for duplicated-owner operands');
-  const duplicateTop = duplicatePropagation!.preservedFaces.find((entry) =>
-    entry.query.source.kind === 'canonical-face'
-      && entry.query.source.face === 'top'
-      && entry.query.source.owner?.id === seedOwner!.id,
+  const duplicateTop = duplicatePropagation!.preservedFaces.find(
+    (entry) =>
+      entry.query.source.kind === 'canonical-face' && entry.query.source.face === 'top' && entry.query.source.owner?.id === seedOwner!.id,
   );
   expect(duplicateTop != null, 'duplicated-owner union should keep an explicit top-face propagation entry');
   expect(duplicateTop!.status === 'ambiguous', 'duplicated-owner union top-face propagation should be ambiguous');
@@ -809,30 +811,32 @@ function checkBooleanAndRepeatedQueryPropagation(): void {
   );
 
   const plate = roundedRect(84, 48, 4, true).extrude(12);
-  const bossSeed = roundedRect(12, 10, 1.5, true)
-    .onFace(plate, 'top', { u: -24, v: 0, protrude: 0.5, selfAnchor: 'center' })
-    .extrude(8);
+  const bossSeed = roundedRect(12, 10, 1.5, true).onFace(plate, 'top', { u: -24, v: 0, protrude: 0.5, selfAnchor: 'center' }).extrude(8);
   const bosses = linearPattern(bossSeed, 3, 24, 0, 0);
   const bossPropagation = getShapeTopologyRewritePropagation(bosses);
   expect(bossPropagation != null, 'pattern unions should expose boolean propagation metadata');
   expect(bossPropagation!.operation === 'boolean:union', `expected pattern union propagation operation, got ${bossPropagation!.operation}`);
   const bossesTop = bosses.face('top');
   expect(bossesTop.descendant?.semantic === 'set', 'coplanar boolean top descendants should expose face-set semantics');
-  expect(bossesTop.descendant?.memberCount === 3, `expected 3 coplanar top descendants in the set, got ${bossesTop.descendant?.memberCount ?? 0}`);
+  expect(
+    bossesTop.descendant?.memberCount === 3,
+    `expected 3 coplanar top descendants in the set, got ${bossesTop.descendant?.memberCount ?? 0}`,
+  );
   expect(bossesTop.descendant?.coplanar === true, 'coplanar boolean face sets should stay workplane-usable');
-  const bossesCap = rect(4, 3)
-    .onFace(bosses, 'top', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' })
-    .extrude(0.8)
-    .toShape();
+  const bossesCap = rect(4, 3).onFace(bosses, 'top', { u: 0, v: 0, protrude: 0.05, selfAnchor: 'center' }).extrude(0.8).toShape();
   const bossesCapPlacement = getShapeWorkplanePlacement(bossesCap);
   expect(bossesCapPlacement != null, 'coplanar boolean face sets should drive downstream onFace placement');
-  expect(bossesCapPlacement!.placement.workplane.source.kind === 'face-ref', 'coplanar boolean face-set placement should preserve a face-ref source');
-  const bossTopFaces = bossPropagation!.preservedFaces.filter((entry) =>
-    entry.status === 'supported'
-      && entry.query.outcome === 'preserved'
-      && entry.query.source.kind === 'canonical-face'
-      && entry.query.source.face === 'top'
-      && entry.query.source.owner?.operation.startsWith('pattern:linear:'),
+  expect(
+    bossesCapPlacement!.placement.workplane.source.kind === 'face-ref',
+    'coplanar boolean face-set placement should preserve a face-ref source',
+  );
+  const bossTopFaces = bossPropagation!.preservedFaces.filter(
+    (entry) =>
+      entry.status === 'supported' &&
+      entry.query.outcome === 'preserved' &&
+      entry.query.source.kind === 'canonical-face' &&
+      entry.query.source.face === 'top' &&
+      entry.query.source.owner?.operation.startsWith('pattern:linear:'),
   );
   expect(bossTopFaces.length === 3, `expected 3 supported patterned top-face entries, got ${bossTopFaces.length}`);
   expect(
@@ -841,15 +845,14 @@ function checkBooleanAndRepeatedQueryPropagation(): void {
   );
 
   const bossPlate = union(plate, bosses);
-  const trimmedBossPlate = bossPlate.subtract(
-    box(18, 10, 24, true).translate(0, 0, 8),
-  );
+  const trimmedBossPlate = bossPlate.subtract(box(18, 10, 24, true).translate(0, 0, 8));
   const trimmedPropagation = getShapeTopologyRewritePropagation(trimmedBossPlate);
   expect(trimmedPropagation != null, 'later boolean differences should keep repeated-result propagation metadata visible');
-  const trimmedPatternFaces = trimmedPropagation!.preservedFaces.filter((entry) =>
-    entry.status === 'ambiguous'
-      && entry.query.outcome === 'split'
-      && describeFaceQueryRef(entry.query.source).includes('pattern:linear:'),
+  const trimmedPatternFaces = trimmedPropagation!.preservedFaces.filter(
+    (entry) =>
+      entry.status === 'ambiguous' &&
+      entry.query.outcome === 'split' &&
+      describeFaceQueryRef(entry.query.source).includes('pattern:linear:'),
   );
   expect(
     trimmedPatternFaces.length >= 3,
@@ -864,9 +867,7 @@ function checkBooleanAndRepeatedQueryPropagation(): void {
 function checkBooleanTargetAmbiguityDiagnostics(): void {
   const base = roundedRect(52, 34, 4, true).extrude(14);
   const topFace = base.face('top');
-  const carved = base.toShape().subtract(
-    box(20, 12, 24, true).translate(0, 0, 6),
-  );
+  const carved = base.toShape().subtract(box(20, 12, 24, true).translate(0, 0, 6));
 
   const carvedTop = carved.face('top');
   expect(carvedTop.descendant?.semantic === 'region', 'boolean-difference top descendants should expose region semantics');
@@ -885,7 +886,10 @@ function checkTopologyRewritePropagationInspection(): void {
   expect(shellPropagation != null, 'shell results should expose a topology-rewrite propagation contract');
   expect(shellPropagation!.operation === 'shell', `expected shell propagation operation, got ${shellPropagation!.operation}`);
   expect(shellPropagation!.preservedFaces.length === 6, `expected 6 preserved shell faces, got ${shellPropagation!.preservedFaces.length}`);
-  expect(shellPropagation!.createdFaces.length === 5, `expected 5 created shell faces for an open-top rounded shell, got ${shellPropagation!.createdFaces.length}`);
+  expect(
+    shellPropagation!.createdFaces.length === 5,
+    `expected 5 created shell faces for an open-top rounded shell, got ${shellPropagation!.createdFaces.length}`,
+  );
   expect(
     shellPropagation!.createdFaces.some((entry) => entry.query.slot === 'inner-side-right'),
     'shell propagation should expose the defended inner wall created-face slots',
@@ -897,8 +901,9 @@ function checkTopologyRewritePropagationInspection(): void {
   // Shell edge propagation now resolves defended edges on rounded shells,
   // so the ambiguity diagnostic is no longer expected for this geometry.
   expect(
-    shellPropagation!.createdEdges.length > 0 || shellPropagation!.preservedEdges.length > 0
-      || shellPropagation!.diagnostics.some((d) => d.code === 'shell-edge-propagation-ambiguous'),
+    shellPropagation!.createdEdges.length > 0 ||
+      shellPropagation!.preservedEdges.length > 0 ||
+      shellPropagation!.diagnostics.some((d) => d.code === 'shell-edge-propagation-ambiguous'),
     'shell propagation should either resolve edges or emit an explicit ambiguity diagnostic',
   );
 
@@ -916,7 +921,10 @@ function checkTopologyRewritePropagationInspection(): void {
     .toShape();
   const shellFeaturePlacement = getShapeWorkplanePlacement(shellFeature);
   expect(shellFeaturePlacement != null, 'downstream features should preserve workplane placement from shell-created wall faces');
-  expect(shellFeaturePlacement!.placement.workplane.source.kind === 'created-face', 'shell-created wall placement should preserve a created-face query source');
+  expect(
+    shellFeaturePlacement!.placement.workplane.source.kind === 'created-face',
+    'shell-created wall placement should preserve a created-face query source',
+  );
   if (shellFeaturePlacement!.placement.workplane.source.kind === 'created-face') {
     expect(
       shellFeaturePlacement!.placement.workplane.source.slot === 'inner-side-right',
@@ -930,11 +938,13 @@ function checkTopologyRewritePropagationInspection(): void {
   const holePropagation = getShapeTopologyRewritePropagation(drilled);
   expect(holePropagation != null, 'hole results should expose a topology-rewrite propagation contract');
   expect(holePropagation!.operation === 'hole', `expected hole propagation operation, got ${holePropagation!.operation}`);
-  expect(holePropagation!.preservedFaces.length === 6, `expected 6 preserved-face entries for hole propagation, got ${holePropagation!.preservedFaces.length}`);
-  const splitFace = holePropagation!.preservedFaces.find((entry) =>
-    entry.query.kind === 'propagated-face'
-      && entry.query.source.kind === 'tracked-face'
-      && entry.query.source.faceName === 'top',
+  expect(
+    holePropagation!.preservedFaces.length === 6,
+    `expected 6 preserved-face entries for hole propagation, got ${holePropagation!.preservedFaces.length}`,
+  );
+  const splitFace = holePropagation!.preservedFaces.find(
+    (entry) =>
+      entry.query.kind === 'propagated-face' && entry.query.source.kind === 'tracked-face' && entry.query.source.faceName === 'top',
   );
   expect(splitFace != null, 'hole propagation should expose an explicit ambiguous entry for the rewritten host face');
   expect(splitFace!.status === 'ambiguous', 'hole source-face propagation should still mark the host face ambiguous');
@@ -945,8 +955,14 @@ function checkTopologyRewritePropagationInspection(): void {
   if (splitFace!.query.source.kind === 'tracked-face') {
     expect(splitFace!.query.source.faceName === 'top', `expected top source face, got ${splitFace!.query.source.faceName}`);
   }
-  expect(holePropagation!.createdFaces.length === 2, `expected 2 created faces for a blind hole, got ${holePropagation!.createdFaces.length}`);
-  expect(holePropagation!.createdEdges.length === 2, `expected 2 created edge chains for a blind hole, got ${holePropagation!.createdEdges.length}`);
+  expect(
+    holePropagation!.createdFaces.length === 2,
+    `expected 2 created faces for a blind hole, got ${holePropagation!.createdFaces.length}`,
+  );
+  expect(
+    holePropagation!.createdEdges.length === 2,
+    `expected 2 created edge chains for a blind hole, got ${holePropagation!.createdEdges.length}`,
+  );
   expect(
     holePropagation!.createdFaces.some((entry) => entry.query.slot === 'floor'),
     'hole propagation should expose the blind-hole floor created-face slot',
@@ -966,7 +982,10 @@ function checkTopologyRewritePropagationInspection(): void {
   const trimPropagation = getShapeTopologyRewritePropagation(trimmed);
   expect(trimPropagation != null, 'trimByPlane results should expose a topology-rewrite propagation contract');
   expect(trimPropagation!.operation === 'trimByPlane', `expected trimByPlane propagation operation, got ${trimPropagation!.operation}`);
-  expect(trimPropagation!.createdFaces.length === 1, `expected one created face query for trimByPlane, got ${trimPropagation!.createdFaces.length}`);
+  expect(
+    trimPropagation!.createdFaces.length === 1,
+    `expected one created face query for trimByPlane, got ${trimPropagation!.createdFaces.length}`,
+  );
   const planeCap = trimPropagation!.createdFaces[0].query;
   expect(planeCap.kind === 'created-face', 'trimByPlane should expose a created-face query for the plane cap');
   expect(planeCap.operation === 'trimByPlane', `expected trimByPlane created-face operation, got ${planeCap.operation}`);
@@ -991,7 +1010,10 @@ function checkTopologyRewritePropagationInspection(): void {
   const filletPropagation = getShapeTopologyRewritePropagation(filleted);
   expect(filletPropagation != null, 'fillet results should expose a topology-rewrite propagation contract');
   expect(filletPropagation!.operation === 'fillet', `expected fillet propagation operation, got ${filletPropagation!.operation}`);
-  expect(filletPropagation!.preservedEdges.length === 4, `expected four preserved-edge records for fillet propagation, got ${filletPropagation!.preservedEdges.length}`);
+  expect(
+    filletPropagation!.preservedEdges.length === 4,
+    `expected four preserved-edge records for fillet propagation, got ${filletPropagation!.preservedEdges.length}`,
+  );
   const supportedEdges = filletPropagation!.preservedEdges.filter((entry) => entry.status === 'supported');
   expect(supportedEdges.length === 3, `expected three supported preserved sibling edges, got ${supportedEdges.length}`);
   const mergedEdge = filletPropagation!.preservedEdges.find((entry) => entry.status === 'ambiguous');
@@ -1005,55 +1027,70 @@ function checkTopologyRewritePropagationInspection(): void {
     'fillet propagation should expose an explicit merged-edge ambiguity diagnostic',
   );
 
-  const supportedSibling = supportedEdges.find((entry) =>
-    entry.query.kind === 'propagated-edge'
-    && entry.query.source.kind === 'tracked-edge'
-    && entry.query.source.edgeName === 'vert-bl',
+  const supportedSibling = supportedEdges.find(
+    (entry) =>
+      entry.query.kind === 'propagated-edge' && entry.query.source.kind === 'tracked-edge' && entry.query.source.edgeName === 'vert-bl',
   );
   expect(supportedSibling != null, 'fillet propagation should expose a supported propagated-edge query for an untouched sibling edge');
   const resolvedSibling = resolveSupportedEdgeFeatureSelection(getShapeCompilePlan(filleted), supportedSibling!.query);
-  expect(resolvedSibling.ok, `supported propagated-edge queries should resolve after fillet rewrites: ${resolvedSibling.ok ? '' : resolvedSibling.issue.reason}`);
+  expect(
+    resolvedSibling.ok,
+    `supported propagated-edge queries should resolve after fillet rewrites: ${resolvedSibling.ok ? '' : resolvedSibling.issue.reason}`,
+  );
   if (resolvedSibling.ok) {
-    expect(resolvedSibling.selection.edgeName === 'vert-bl', `expected supported sibling propagated-edge to resolve vert-bl, got ${resolvedSibling.selection.edgeName}`);
+    expect(
+      resolvedSibling.selection.edgeName === 'vert-bl',
+      `expected supported sibling propagated-edge to resolve vert-bl, got ${resolvedSibling.selection.edgeName}`,
+    );
   }
 
   const resolvedMerged = resolveSupportedEdgeFeatureSelection(getShapeCompilePlan(filleted), mergedEdge!.query);
   expect(!resolvedMerged.ok, 'merged propagated-edge queries should stay explicitly unsupported');
   if (!resolvedMerged.ok) {
     expect(
-      /blended descendant set|merged rewritten descendants|merged into rewritten descendants|untouched sibling vertical edges|descendant chain/.test(resolvedMerged.issue.reason),
+      /blended descendant set|merged rewritten descendants|merged into rewritten descendants|untouched sibling vertical edges|descendant chain/.test(
+        resolvedMerged.issue.reason,
+      ),
       `expected merged-edge diagnostic to stay explicit, got "${resolvedMerged.issue.reason}"`,
     );
   }
   const resolvedMergedChain = resolveShapeEdgeDescendant(getShapeCompilePlan(filleted), mergedEdge!.query);
   expect(resolvedMergedChain.kind === 'edge-chain', 'merged propagated-edge descendants should resolve as a defended edge chain');
 
-  const boss = roundedRect(10, 6, 1.5, true)
-    .onFace(prism, 'top', { u: -8, v: 4, protrude: 0.25, selfAnchor: 'center' })
-    .extrude(4);
+  const boss = roundedRect(10, 6, 1.5, true).onFace(prism, 'top', { u: -8, v: 4, protrude: 0.25, selfAnchor: 'center' }).extrude(4);
   const widened = filleted.add(boss);
   const widenedOwner = getShapePrimaryQueryOwner(widened);
   expect(widenedOwner != null, 'union after a supported fillet should expose a primary owner');
   expect(widenedOwner!.operation === 'boolean:union', `expected boolean-union propagation owner, got ${widenedOwner!.operation}`);
   const widenedPropagation = getShapeTopologyRewritePropagation(widened);
   expect(widenedPropagation != null, 'union after a supported fillet should expose propagation metadata');
-  expect(widenedPropagation!.operation === 'boolean:union', `expected widened propagation operation "boolean:union", got ${widenedPropagation!.operation}`);
-  const widenedSibling = widenedPropagation!.preservedEdges.find((entry) =>
-    entry.status === 'supported'
-      && entry.query.kind === 'propagated-edge'
-      && entry.query.source.kind === 'propagated-edge'
-      && entry.query.source.source.kind === 'tracked-edge'
-      && entry.query.source.source.edgeName === 'vert-bl',
+  expect(
+    widenedPropagation!.operation === 'boolean:union',
+    `expected widened propagation operation "boolean:union", got ${widenedPropagation!.operation}`,
+  );
+  const widenedSibling = widenedPropagation!.preservedEdges.find(
+    (entry) =>
+      entry.status === 'supported' &&
+      entry.query.kind === 'propagated-edge' &&
+      entry.query.source.kind === 'propagated-edge' &&
+      entry.query.source.source.kind === 'tracked-edge' &&
+      entry.query.source.source.edgeName === 'vert-bl',
   );
   expect(widenedSibling != null, 'union after a supported fillet should keep a supported propagated-edge entry for untouched siblings');
   const resolvedWidenedSibling = resolveSupportedEdgeFeatureSelection(getShapeCompilePlan(widened), widenedSibling!.query);
-  expect(resolvedWidenedSibling.ok, `supported union propagated-edge queries should resolve for later finishing: ${resolvedWidenedSibling.ok ? '' : resolvedWidenedSibling.issue.reason}`);
+  expect(
+    resolvedWidenedSibling.ok,
+    `supported union propagated-edge queries should resolve for later finishing: ${resolvedWidenedSibling.ok ? '' : resolvedWidenedSibling.issue.reason}`,
+  );
   const widenedFinished = chamferEdge(widened, prism.edge('vert-bl'), 2.5, [1, -1]);
   const widenedFinishedPropagation = getShapeTopologyRewritePropagation(widenedFinished);
   expect(widenedFinishedPropagation != null, 'chamfer after a supported union should expose propagation metadata');
   const widenedMerged = widenedFinishedPropagation!.preservedEdges.find((entry) => entry.status === 'ambiguous');
   expect(widenedMerged != null, 'chamfer after a supported union should keep the selected propagated edge ambiguity explicit');
-  expect(widenedMerged!.query.source.kind === 'propagated-edge', 'chamfer after a supported union should record the selected propagated union edge');
+  expect(
+    widenedMerged!.query.source.kind === 'propagated-edge',
+    'chamfer after a supported union should record the selected propagated union edge',
+  );
   if (widenedMerged!.query.source.kind === 'propagated-edge') {
     expect(
       widenedMerged!.query.source.owner?.id === widenedOwner!.id,

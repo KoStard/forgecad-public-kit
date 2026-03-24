@@ -16,14 +16,9 @@ import {
   featureCutExtentForwardSide,
 } from './compilePlan';
 import { cloneFaceQueryRef } from './queryModel';
-import {
-  cloneShapeWorkplanePlacement,
-  type ShapeWorkplanePlacement,
-} from './sketch/workplaneModel';
+import { cloneShapeWorkplanePlacement, type ShapeWorkplanePlacement } from './sketch/workplaneModel';
 
-export type HoleCutCompilePlanLoweringResult =
-  | { ok: true; plan: ShapeCompilePlan }
-  | { ok: false; reason: string };
+export type HoleCutCompilePlanLoweringResult = { ok: true; plan: ShapeCompilePlan } | { ok: false; reason: string };
 
 function cloneFeatureCutExtentSide(extent: FeatureCutExtentSideCompilePlan): FeatureCutExtentSideCompilePlan {
   switch (extent.kind) {
@@ -61,10 +56,7 @@ function featureCutClearance(depth: number): number {
   return Math.max(0.01, Math.min(0.25, depth * 0.01));
 }
 
-function translateCutterPlan(
-  cutter: ShapeCompilePlan,
-  z: number,
-): ShapeCompilePlan | null {
+function translateCutterPlan(cutter: ShapeCompilePlan, z: number): ShapeCompilePlan | null {
   return appendShapeCompileTransform(cutter, {
     kind: 'translate',
     x: 0,
@@ -73,10 +65,7 @@ function translateCutterPlan(
   });
 }
 
-function placeCutterPlan(
-  cutter: ShapeCompilePlan,
-  placement: ShapeWorkplanePlacement,
-): HoleCutCompilePlanLoweringResult {
+function placeCutterPlan(cutter: ShapeCompilePlan, placement: ShapeWorkplanePlacement): HoleCutCompilePlanLoweringResult {
   const placed = appendShapeCompileTransform(cutter, {
     kind: 'workplanePlacement',
     matrix: placement.matrix,
@@ -112,7 +101,7 @@ function buildPlacedCutCutterPlan(
           radius: cutter.radius,
           center: false,
         };
-      case 'extrude':
+      case 'extrude': {
         if (taper && (!isFinitePositive(taper.scale[0]) || !isFinitePositive(taper.scale[1]))) {
           return null;
         }
@@ -131,8 +120,9 @@ function buildPlacedCutCutterPlan(
           profile: taperedProfile,
           height,
           center: false,
-          scaleTop: taper ? [1 / taper.scale[0], 1 / taper.scale[1]] as [number, number] : undefined,
+          scaleTop: taper ? ([1 / taper.scale[0], 1 / taper.scale[1]] as [number, number]) : undefined,
         };
+      }
       default:
         return null;
     }
@@ -166,12 +156,15 @@ function buildHoleCutterPlan(
 
   const clearance = featureCutClearance(totalDepth);
   const shapes: ShapeCompilePlan[] = [];
-  const shaft = translateCutterPlan({
-    kind: 'cylinder',
-    height: totalDepth + clearance * 2,
-    radius: hole.radius,
-    center: false,
-  }, -(forward.depth + clearance + placement.placement.protrude));
+  const shaft = translateCutterPlan(
+    {
+      kind: 'cylinder',
+      height: totalDepth + clearance * 2,
+      radius: hole.radius,
+      center: false,
+    },
+    -(forward.depth + clearance + placement.placement.protrude),
+  );
   if (!shaft) {
     return { ok: false, reason: 'Hole/cut features could not translate the cutter into the selected workplane.' };
   }
@@ -181,12 +174,15 @@ function buildHoleCutterPlan(
     if (!isFinitePositive(hole.counterbore.radius) || !isFinitePositive(hole.counterbore.depth)) {
       return { ok: false, reason: 'Shape.hole() counterbores require positive finite diameter and depth.' };
     }
-    const counterbore = translateCutterPlan({
-      kind: 'cylinder',
-      height: hole.counterbore.depth + clearance,
-      radius: hole.counterbore.radius,
-      center: false,
-    }, -(hole.counterbore.depth + placement.placement.protrude));
+    const counterbore = translateCutterPlan(
+      {
+        kind: 'cylinder',
+        height: hole.counterbore.depth + clearance,
+        radius: hole.counterbore.radius,
+        center: false,
+      },
+      -(hole.counterbore.depth + placement.placement.protrude),
+    );
     if (!counterbore) {
       return { ok: false, reason: 'Hole/cut features could not translate the cutter into the selected workplane.' };
     }
@@ -197,22 +193,28 @@ function buildHoleCutterPlan(
     if (!isFinitePositive(hole.countersink.radius) || !isFinitePositive(hole.countersink.depth)) {
       return { ok: false, reason: 'Shape.hole() countersinks require positive finite diameter and depth.' };
     }
-    const frustum = translateCutterPlan({
-      kind: 'cylinder',
-      height: hole.countersink.depth,
-      radius: hole.radius,
-      radiusTop: hole.countersink.radius,
-      center: false,
-    }, -(hole.countersink.depth + placement.placement.protrude));
+    const frustum = translateCutterPlan(
+      {
+        kind: 'cylinder',
+        height: hole.countersink.depth,
+        radius: hole.radius,
+        radiusTop: hole.countersink.radius,
+        center: false,
+      },
+      -(hole.countersink.depth + placement.placement.protrude),
+    );
     if (!frustum) {
       return { ok: false, reason: 'Hole/cut features could not translate the cutter into the selected workplane.' };
     }
-    const cap = translateCutterPlan({
-      kind: 'cylinder',
-      height: clearance,
-      radius: hole.countersink.radius,
-      center: false,
-    }, -placement.placement.protrude);
+    const cap = translateCutterPlan(
+      {
+        kind: 'cylinder',
+        height: clearance,
+        radius: hole.countersink.radius,
+        center: false,
+      },
+      -placement.placement.protrude,
+    );
     if (!cap) {
       return { ok: false, reason: 'Hole/cut features could not translate the cutter into the selected workplane.' };
     }
@@ -287,28 +289,25 @@ export function lowerHoleShapeCompilePlanToConcretePlan(
   if (!cutter.ok) return cutter;
   return {
     ok: true,
-    plan: buildBooleanShapeCompilePlan('difference', [
-      plan.base,
-      cutter.plan,
-    ])!,
+    plan: buildBooleanShapeCompilePlan('difference', [plan.base, cutter.plan])!,
   };
 }
 
-export function lowerCutShapeCompilePlanToConcretePlan(
-  plan: Extract<ShapeCompilePlan, { kind: 'cut' }>,
-): HoleCutCompilePlanLoweringResult {
-  const cutter = buildPlacedCutCutterPlan({
-    kind: 'extrude',
-    profile: plan.profile,
-    height: featureCutExtentDepth(plan.extent),
-    center: false,
-  }, plan.placement, plan.extent, plan.taper);
+export function lowerCutShapeCompilePlanToConcretePlan(plan: Extract<ShapeCompilePlan, { kind: 'cut' }>): HoleCutCompilePlanLoweringResult {
+  const cutter = buildPlacedCutCutterPlan(
+    {
+      kind: 'extrude',
+      profile: plan.profile,
+      height: featureCutExtentDepth(plan.extent),
+      center: false,
+    },
+    plan.placement,
+    plan.extent,
+    plan.taper,
+  );
   if (!cutter.ok) return cutter;
   return {
     ok: true,
-    plan: buildBooleanShapeCompilePlan('difference', [
-      plan.base,
-      cutter.plan,
-    ])!,
+    plan: buildBooleanShapeCompilePlan('difference', [plan.base, cutter.plan])!,
   };
 }

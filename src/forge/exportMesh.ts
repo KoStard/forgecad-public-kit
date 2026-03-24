@@ -65,10 +65,7 @@ function rgbToHex(r: number, g: number, b: number): string {
  * Build a 3MF archive directly from mesh data, with no Manifold dependency.
  * Each object becomes a separate <object> in the model, with optional per-object color.
  */
-function buildPure3mfBuffer(
-  objects: MeshExportObject[],
-  options: ThreeMfExportOptions = {},
-): Uint8Array {
+function buildPure3mfBuffer(objects: MeshExportObject[], options: ThreeMfExportOptions = {}): Uint8Array {
   const title = escapeXml(options.title ?? 'ForgeCAD model');
   const application = escapeXml(options.application ?? 'ForgeCAD');
   const description = escapeXml(options.description ?? title);
@@ -101,9 +98,9 @@ function buildPure3mfBuffer(
   xmlParts.push('<?xml version="1.0" encoding="UTF-8"?>');
   xmlParts.push(
     '<model unit="millimeter" xml:lang="en-US"' +
-    ' xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"' +
-    (hasColors ? ' xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02"' : '') +
-    '>',
+      ' xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"' +
+      (hasColors ? ' xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02"' : '') +
+      '>',
   );
 
   // Metadata
@@ -289,20 +286,14 @@ export function buildBinaryStl(objects: MeshExportObject[]): ArrayBuffer {
  * Build a 3MF archive as a Uint8Array (works in Node and browser).
  * Pure implementation — no Manifold dependency.
  */
-export async function build3mfBuffer(
-  objects: MeshExportObject[],
-  options: ThreeMfExportOptions = {},
-): Promise<Uint8Array> {
+export async function build3mfBuffer(objects: MeshExportObject[], options: ThreeMfExportOptions = {}): Promise<Uint8Array> {
   if (objects.length === 0) {
     throw new Error('No shapes available for 3MF export.');
   }
   return buildPure3mfBuffer(objects, options);
 }
 
-export async function build3mfBlob(
-  objects: MeshExportObject[],
-  options: ThreeMfExportOptions = {},
-): Promise<Blob> {
+export async function build3mfBlob(objects: MeshExportObject[], options: ThreeMfExportOptions = {}): Promise<Blob> {
   const buffer = await build3mfBuffer(objects, options);
   return new Blob([buffer.buffer as ArrayBuffer], {
     type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
