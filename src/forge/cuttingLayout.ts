@@ -3,10 +3,10 @@
  *
  * Packs rectangular pieces onto stock sheets using a greedy guillotine
  * algorithm (largest-area-first, best-short-side-fit heuristic).
- * Pieces may be rotated 90 degrees.
+ * Pieces may be rotated 90 degrees. Supports cutting clearance (kerf).
  *
- * Produces a PDF with one page per sheet showing the cutting pattern,
- * followed by a summary page.
+ * Produces a PDF with one page per sheet showing the cutting pattern
+ * with ruler marks and piece legend, followed by a summary page.
  */
 
 import {
@@ -16,6 +16,7 @@ import {
   commandSetFill,
   commandSetStroke,
   commandText,
+  estimateTextWidth,
   formatNumber,
   PAGE_HEIGHT,
   PAGE_MARGIN,
@@ -74,6 +75,7 @@ export interface CuttingLayoutResult {
   totalUsedArea: number;
   totalSheetArea: number;
   wastePercent: number;
+  kerf: number;
 }
 
 export interface CuttingLayoutPdfResult {
@@ -142,8 +144,10 @@ function groupByMaterial(pieces: ExpandedPiece[]): Map<string, ExpandedPiece[]> 
 /**
  * Guillotine bin packing for a single material group.
  * Sorts by area descending, uses best-short-side-fit heuristic.
+ * Each piece slot is inflated by `kerf` on right and bottom to account
+ * for saw blade material removal.
  */
-function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: number, material: string): PackedSheet[] {
+function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: number, material: string, kerf: number): PackedSheet[] {
   // Sort largest-area-first
   const sorted = [...pieces].sort((a, b) => b.width * b.height - a.width * a.height);
 
@@ -165,6 +169,9 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
   }
 
   for (const piece of sorted) {
+    // Effective dimensions include kerf clearance
+    const effW = piece.width + kerf;
+    const effH = piece.height + kerf;
     let bestScore = Infinity;
     let bestSheetIdx = -1;
     let bestRectIdx = -1;
@@ -177,8 +184,8 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
         const rect = freeRects[ri];
 
         // Try original orientation
-        if (piece.width <= rect.w && piece.height <= rect.h) {
-          const shortSide = Math.min(rect.w - piece.width, rect.h - piece.height);
+        if (effW <= rect.w && effH <= rect.h) {
+          const shortSide = Math.min(rect.w - effW, rect.h - effH);
           if (shortSide < bestScore) {
             bestScore = shortSide;
             bestSheetIdx = si;
@@ -188,8 +195,8 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
         }
 
         // Try rotated 90°
-        if (piece.height <= rect.w && piece.width <= rect.h) {
-          const shortSide = Math.min(rect.w - piece.height, rect.h - piece.width);
+        if (effH <= rect.w && effW <= rect.h) {
+          const shortSide = Math.min(rect.w - effH, rect.h - effW);
           if (shortSide < bestScore) {
             bestScore = shortSide;
             bestSheetIdx = si;
@@ -207,8 +214,8 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
       bestRotated = false;
 
       // Check if it fits at all (try rotated too)
-      if (piece.width > sheetW || piece.height > sheetH) {
-        if (piece.height <= sheetW && piece.width <= sheetH) {
+      if (effW > sheetW || effH > sheetH) {
+        if (effH <= sheetW && effW <= sheetH) {
           bestRotated = true;
         }
         // If still doesn't fit, place it anyway — the PDF will show it overflowing
@@ -219,6 +226,9 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
     const rect = freeRects[bestRectIdx];
     const pw = bestRotated ? piece.height : piece.width;
     const ph = bestRotated ? piece.width : piece.height;
+    // Slot includes kerf clearance on right and bottom
+    const slotW = pw + kerf;
+    const slotH = ph + kerf;
 
     // Place piece
     sheets[bestSheetIdx].pieces.push({
@@ -235,11 +245,11 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
     sheets[bestSheetIdx].usedArea += pw * ph;
 
     // Guillotine split: choose axis that maximizes larger remainder area
-    const rightFullH: FreeRect = { x: rect.x + pw, y: rect.y, w: rect.w - pw, h: rect.h };
-    const topPartW: FreeRect = { x: rect.x, y: rect.y + ph, w: pw, h: rect.h - ph };
+    const rightFullH: FreeRect = { x: rect.x + slotW, y: rect.y, w: rect.w - slotW, h: rect.h };
+    const topPartW: FreeRect = { x: rect.x, y: rect.y + slotH, w: slotW, h: rect.h - slotH };
 
-    const rightPartH: FreeRect = { x: rect.x + pw, y: rect.y, w: rect.w - pw, h: ph };
-    const topFullW: FreeRect = { x: rect.x, y: rect.y + ph, w: rect.w, h: rect.h - ph };
+    const rightPartH: FreeRect = { x: rect.x + slotW, y: rect.y, w: rect.w - slotW, h: slotH };
+    const topFullW: FreeRect = { x: rect.x, y: rect.y + slotH, w: rect.w, h: rect.h - slotH };
 
     // Remove used rect
     freeRects.splice(bestRectIdx, 1);
@@ -260,13 +270,13 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
   return sheets;
 }
 
-export function computeCuttingLayout(entries: SheetStockDef[], sheetWidth: number, sheetHeight: number): CuttingLayoutResult {
+export function computeCuttingLayout(entries: SheetStockDef[], sheetWidth: number, sheetHeight: number, kerf: number = 0): CuttingLayoutResult {
   const expanded = expandPieces(entries);
   const groups = groupByMaterial(expanded);
 
   const allSheets: PackedSheet[] = [];
   for (const [material, pieces] of groups) {
-    const sheets = packMaterialGroup(pieces, sheetWidth, sheetHeight, material);
+    const sheets = packMaterialGroup(pieces, sheetWidth, sheetHeight, material, kerf);
     allSheets.push(...sheets);
   }
 
@@ -285,6 +295,7 @@ export function computeCuttingLayout(entries: SheetStockDef[], sheetWidth: numbe
     totalUsedArea,
     totalSheetArea,
     wastePercent: totalSheetArea > 0 ? ((totalSheetArea - totalUsedArea) / totalSheetArea) * 100 : 0,
+    kerf,
   };
 }
 
@@ -297,81 +308,280 @@ const DRAW_AREA_LEFT = PAGE_MARGIN;
 const DRAW_AREA_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
 const DRAW_AREA_HEIGHT = DRAW_AREA_TOP - DRAW_AREA_BOTTOM;
 
-function renderSheetPage(sheet: PackedSheet, totalSheets: number, _layout: CuttingLayoutResult): string {
-  const cmd: string[] = [];
+// Space reserved for ruler marks outside the sheet rectangle
+const RULER_BOTTOM = 24;
+const RULER_LEFT = 34;
 
-  // Header
-  const wastePercent =
-    sheet.sheetWidth * sheet.sheetHeight > 0
-      ? ((sheet.sheetWidth * sheet.sheetHeight - sheet.usedArea) / (sheet.sheetWidth * sheet.sheetHeight)) * 100
-      : 0;
+// Rendered-size thresholds (PDF points) below which a piece is "small"
+const SMALL_W_THRESH = 30;
+const SMALL_H_THRESH = 18;
+
+function renderSheetPage(sheet: PackedSheet, totalSheets: number, layout: CuttingLayoutResult): string {
+  const cmd: string[] = [];
+  const kerf = layout.kerf;
+
+  // ── Header ──
+  const sheetArea = sheet.sheetWidth * sheet.sheetHeight;
+  const wastePercent = sheetArea > 0 ? ((sheetArea - sheet.usedArea) / sheetArea) * 100 : 0;
   const title = `CUTTING LAYOUT — ${sheet.material.toUpperCase()}`;
-  const subtitle = `Sheet ${sheet.sheetIndex + 1} of ${totalSheets} | ${sheet.sheetWidth} x ${sheet.sheetHeight} mm | ${sheet.pieces.length} pieces | ${formatNumber(wastePercent)}% waste`;
+  let subtitle = `Sheet ${sheet.sheetIndex + 1} of ${totalSheets} | ${sheet.sheetWidth} x ${sheet.sheetHeight} mm | ${sheet.pieces.length} pieces | ${formatNumber(wastePercent)}% waste`;
+  if (kerf > 0) subtitle += ` | Kerf: ${formatNumber(kerf)} mm`;
 
   cmd.push(commandSetFill([0.12, 0.12, 0.14]));
   cmd.push(commandText(title, PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN + 2, 15));
   cmd.push(commandSetFill([0.4, 0.4, 0.44]));
   cmd.push(commandText(subtitle, PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN - 14, 9));
 
-  // Compute scale to fit sheet in draw area
-  const scaleX = DRAW_AREA_WIDTH / sheet.sheetWidth;
-  const scaleY = DRAW_AREA_HEIGHT / sheet.sheetHeight;
+  // ── Identify small pieces (need numbered-legend treatment) ──
+  // Use a preliminary scale (before reserving legend space) to classify sizes
+  const prelAvailW = DRAW_AREA_WIDTH - RULER_LEFT;
+  const prelAvailH = DRAW_AREA_HEIGHT - RULER_BOTTOM;
+  const prelScale = Math.min(prelAvailW / sheet.sheetWidth, prelAvailH / sheet.sheetHeight);
+
+  interface SmallEntry { num: number; piece: PackedPiece }
+  const smallPieces: SmallEntry[] = [];
+  const pieceNum: (number | null)[] = [];
+  let numCounter = 0;
+
+  for (let i = 0; i < sheet.pieces.length; i++) {
+    const p = sheet.pieces[i];
+    if (p.width * prelScale < SMALL_W_THRESH || p.height * prelScale < SMALL_H_THRESH) {
+      numCounter++;
+      pieceNum.push(numCounter);
+      smallPieces.push({ num: numCounter, piece: p });
+    } else {
+      pieceNum.push(null);
+    }
+  }
+
+  // Reserve space for legend at the bottom
+  const LEGEND_ROW_H = 10;
+  const LEGEND_COLS = 2;
+  const legendRows = Math.ceil(smallPieces.length / LEGEND_COLS);
+  const legendH = smallPieces.length > 0 ? 14 + legendRows * LEGEND_ROW_H + 4 : 0;
+
+  // ── Final scale and positioning ──
+  const finalAvailH = DRAW_AREA_HEIGHT - RULER_BOTTOM - legendH;
+  const scaleX = prelAvailW / sheet.sheetWidth;
+  const scaleY = finalAvailH / sheet.sheetHeight;
   const scale = Math.min(scaleX, scaleY);
 
   const drawW = sheet.sheetWidth * scale;
   const drawH = sheet.sheetHeight * scale;
-  // Center the sheet drawing in the draw area
-  const offsetX = DRAW_AREA_LEFT + (DRAW_AREA_WIDTH - drawW) / 2;
-  const offsetY = DRAW_AREA_BOTTOM + (DRAW_AREA_HEIGHT - drawH) / 2;
 
-  // Sheet outline
+  // Sheet left-edge leaves room for y-ruler; center horizontally in remaining space
+  const sheetLeft = DRAW_AREA_LEFT + RULER_LEFT + (prelAvailW - drawW) / 2;
+  const sheetBottom = DRAW_AREA_BOTTOM + legendH + RULER_BOTTOM + (finalAvailH - drawH) / 2;
+
+  // ── Collect cut positions for ruler marks ──
+  const xPositions = new Set<number>();
+  const yPositions = new Set<number>();
+  for (const p of sheet.pieces) {
+    if (p.x > 0.5) xPositions.add(p.x);
+    const pr = p.x + p.width;
+    if (pr < sheet.sheetWidth - 0.5) xPositions.add(pr);
+    if (p.y > 0.5) yPositions.add(p.y);
+    const pb = p.y + p.height;
+    if (pb < sheet.sheetHeight - 0.5) yPositions.add(pb);
+  }
+  const sortedX = [...xPositions].sort((a, b) => a - b);
+  const sortedY = [...yPositions].sort((a, b) => a - b);
+
+  // ── Cut reference lines (drawn behind pieces) ──
+  if (sortedX.length > 0 || sortedY.length > 0) {
+    cmd.push(commandSetStroke([0.78, 0.78, 0.82]));
+    cmd.push('[2 2] 0 d\n'); // dashed
+    cmd.push('0.3 w\n');
+    for (const xMm of sortedX) {
+      const xPdf = sheetLeft + xMm * scale;
+      cmd.push(commandLine([xPdf, sheetBottom], [xPdf, sheetBottom + drawH]));
+    }
+    for (const yMm of sortedY) {
+      const yPdf = sheetBottom + drawH - yMm * scale;
+      cmd.push(commandLine([sheetLeft, yPdf], [sheetLeft + drawW, yPdf]));
+    }
+    cmd.push('[] 0 d\n'); // reset dash
+  }
+
+  // ── Sheet outline ──
   cmd.push(commandSetStroke([0.4, 0.4, 0.44]));
   cmd.push('1.5 w\n');
-  cmd.push(`${commandRect(offsetX, offsetY, drawW, drawH)} S\n`);
+  cmd.push(`${commandRect(sheetLeft, sheetBottom, drawW, drawH)} S\n`);
 
-  // Draw pieces
+  // ── Draw pieces ──
   sheet.pieces.forEach((piece, i) => {
-    const px = offsetX + piece.x * scale;
-    // PDF y-axis is bottom-up, but our packing is top-down from y=0
-    // So we flip: PDF_y = offsetY + drawH - (piece.y + piece.height) * scale
-    const py = offsetY + drawH - (piece.y + piece.height) * scale;
+    const px = sheetLeft + piece.x * scale;
+    // PDF y-axis is bottom-up, packing is top-down from y=0
+    const py = sheetBottom + drawH - (piece.y + piece.height) * scale;
     const pw = piece.width * scale;
     const ph = piece.height * scale;
 
     const fillColor = PIECE_FILL_COLORS[i % PIECE_FILL_COLORS.length];
     const strokeColor = PIECE_STROKE_COLORS[i % PIECE_STROKE_COLORS.length];
 
-    // Fill
+    // Fill + stroke
     cmd.push(commandSetFill(fillColor));
     cmd.push(`${commandRect(px, py, pw, ph)} f\n`);
-    // Stroke
     cmd.push(commandSetStroke(strokeColor));
     cmd.push('0.8 w\n');
     cmd.push(`${commandRect(px, py, pw, ph)} S\n`);
 
-    // Label: piece name + dimensions
-    const dimLabel = piece.rotated
-      ? `${formatNumber(piece.origWidth)} x ${formatNumber(piece.origHeight)} (R)`
-      : `${formatNumber(piece.origWidth)} x ${formatNumber(piece.origHeight)}`;
-
-    const labelFontSize = Math.max(5, Math.min(9, pw * 0.08, ph * 0.15));
-    const dimFontSize = Math.max(4, Math.min(7, labelFontSize * 0.8));
-
-    // Only draw label if piece rect is large enough
-    if (pw > 18 && ph > 12) {
-      const maxLabelW = pw - 4;
-      const nameText = truncateToWidth(piece.description, maxLabelW, labelFontSize);
-
+    const num = pieceNum[i];
+    if (num !== null) {
+      // Small piece — show number only, details go in legend
+      const fontSize = Math.max(5, Math.min(8, pw * 0.4, ph * 0.5));
+      const numStr = String(num);
+      const numW = estimateTextWidth(numStr, fontSize);
       cmd.push(commandSetFill([0.1, 0.1, 0.12]));
-      cmd.push(commandText(nameText, px + 3, py + ph - labelFontSize - 2, labelFontSize));
+      cmd.push(commandText(numStr, px + (pw - numW) / 2, py + (ph - fontSize) / 2, fontSize));
+    } else {
+      // Large piece — show name + dimensions inline
+      const dimLabel = piece.rotated
+        ? `${formatNumber(piece.origWidth)} x ${formatNumber(piece.origHeight)} (R)`
+        : `${formatNumber(piece.origWidth)} x ${formatNumber(piece.origHeight)}`;
 
-      // Dimensions below name
-      if (ph > 22) {
-        cmd.push(commandSetFill([0.35, 0.35, 0.4]));
-        cmd.push(commandText(dimLabel, px + 3, py + ph - labelFontSize - dimFontSize - 5, dimFontSize));
+      const labelFontSize = Math.max(5, Math.min(9, pw * 0.08, ph * 0.15));
+      const dimFontSize = Math.max(4, Math.min(7, labelFontSize * 0.8));
+
+      if (pw > 18 && ph > 12) {
+        const maxLabelW = pw - 4;
+        const nameText = truncateToWidth(piece.description, maxLabelW, labelFontSize);
+
+        cmd.push(commandSetFill([0.1, 0.1, 0.12]));
+        cmd.push(commandText(nameText, px + 3, py + ph - labelFontSize - 2, labelFontSize));
+
+        if (ph > 22) {
+          cmd.push(commandSetFill([0.35, 0.35, 0.4]));
+          cmd.push(commandText(dimLabel, px + 3, py + ph - labelFontSize - dimFontSize - 5, dimFontSize));
+        }
       }
     }
   });
+
+  // ── Ruler marks ──
+  // Greedy label placement: each label is pushed to the nearest non-overlapping
+  // slot so closely-spaced marks (e.g. kerf pairs) never overlap.
+  const rulerFontSize = 6;
+  const tickLen = 6;
+  const labelH = rulerFontSize + 1; // vertical space each label occupies
+
+  cmd.push(commandSetStroke([0.45, 0.45, 0.5]));
+  cmd.push('0.5 w\n');
+
+  // X-axis along bottom edge — labels stack downward when crowded
+  {
+    // Each placed label occupies [centerX - halfW, centerX + halfW] horizontally.
+    // When two labels would overlap horizontally, push the later one to a lower row.
+    const ROW_STEP = labelH + 1;
+    const MAX_ROWS = 3;
+    // Track the rightmost x extent placed at each row
+    const rowRightEdge: number[] = new Array(MAX_ROWS).fill(-Infinity);
+
+    for (let i = 0; i < sortedX.length; i++) {
+      const xMm = sortedX[i];
+      const xPdf = sheetLeft + xMm * scale;
+
+      cmd.push(commandLine([xPdf, sheetBottom], [xPdf, sheetBottom - tickLen]));
+
+      const label = formatNumber(xMm);
+      const labelW = estimateTextWidth(label, rulerFontSize);
+      const leftEdge = xPdf - labelW / 2;
+      const rightEdge = xPdf + labelW / 2 + 3; // 3pt gap between labels
+
+      // Find the first row where this label fits without overlap
+      let row = 0;
+      for (let r = 0; r < MAX_ROWS; r++) {
+        if (leftEdge >= rowRightEdge[r]) { row = r; break; }
+        row = r + 1;
+      }
+      if (row >= MAX_ROWS) row = MAX_ROWS - 1; // clamp
+
+      rowRightEdge[row] = rightEdge;
+      const labelY = sheetBottom - tickLen - 2 - row * ROW_STEP;
+
+      // Leader line from tick to staggered label
+      if (row > 0) {
+        cmd.push(commandSetStroke([0.7, 0.7, 0.74]));
+        cmd.push('0.3 w\n');
+        cmd.push(commandLine([xPdf, sheetBottom - tickLen], [xPdf, labelY + labelH]));
+        cmd.push(commandSetStroke([0.45, 0.45, 0.5]));
+        cmd.push('0.5 w\n');
+      }
+
+      cmd.push(commandSetFill([0.3, 0.3, 0.35]));
+      cmd.push(commandText(label, xPdf - labelW / 2, labelY, rulerFontSize));
+    }
+  }
+
+  // Y-axis along left edge — labels push further left when crowded
+  {
+    const COL_STEP = 18; // horizontal offset per stagger column
+    const MAX_COLS = 2;
+    const rowBottomEdge: number[] = new Array(MAX_COLS).fill(Infinity);
+
+    for (let i = 0; i < sortedY.length; i++) {
+      const yMm = sortedY[i];
+      const yPdf = sheetBottom + drawH - yMm * scale;
+
+      cmd.push(commandSetStroke([0.45, 0.45, 0.5]));
+      cmd.push('0.5 w\n');
+      cmd.push(commandLine([sheetLeft, yPdf], [sheetLeft - tickLen, yPdf]));
+
+      const label = formatNumber(yMm);
+      const labelW = estimateTextWidth(label, rulerFontSize);
+      const topEdge = yPdf + labelH / 2 + 1;
+      const bottomEdge = yPdf - labelH / 2 - 1;
+
+      // Find first column where this label doesn't overlap vertically
+      let col = 0;
+      for (let c = 0; c < MAX_COLS; c++) {
+        if (topEdge <= rowBottomEdge[c]) { col = c; break; }
+        col = c + 1;
+      }
+      if (col >= MAX_COLS) col = MAX_COLS - 1;
+
+      rowBottomEdge[col] = bottomEdge;
+      const labelX = sheetLeft - tickLen - 2 - labelW - col * COL_STEP;
+
+      // Leader line
+      if (col > 0) {
+        cmd.push(commandSetStroke([0.7, 0.7, 0.74]));
+        cmd.push('0.3 w\n');
+        cmd.push(commandLine([sheetLeft - tickLen, yPdf], [labelX + labelW + 1, yPdf]));
+        cmd.push(commandSetStroke([0.45, 0.45, 0.5]));
+        cmd.push('0.5 w\n');
+      }
+
+      cmd.push(commandSetFill([0.3, 0.3, 0.35]));
+      cmd.push(commandText(label, labelX, yPdf - rulerFontSize * 0.35, rulerFontSize));
+    }
+  }
+
+  // ── Legend for numbered small pieces ──
+  if (smallPieces.length > 0) {
+    const legendTop = DRAW_AREA_BOTTOM + legendH - 4;
+    cmd.push(commandSetFill([0.3, 0.3, 0.35]));
+    cmd.push(commandText('Legend:', PAGE_MARGIN, legendTop, 8));
+
+    const colWidth = (PAGE_WIDTH - PAGE_MARGIN * 2) / LEGEND_COLS;
+    for (let i = 0; i < smallPieces.length; i++) {
+      const { num, piece } = smallPieces[i];
+      const col = i % LEGEND_COLS;
+      const row = Math.floor(i / LEGEND_COLS);
+      const lx = PAGE_MARGIN + col * colWidth;
+      const ly = legendTop - 12 - row * LEGEND_ROW_H;
+
+      if (ly < PAGE_MARGIN) break; // off page
+
+      const dimStr = piece.rotated
+        ? `${formatNumber(piece.origWidth)} x ${formatNumber(piece.origHeight)} (R)`
+        : `${formatNumber(piece.origWidth)} x ${formatNumber(piece.origHeight)}`;
+      const legendText = `${num}: ${piece.description} (${dimStr})`;
+
+      cmd.push(commandSetFill([0.2, 0.2, 0.24]));
+      cmd.push(commandText(truncateToWidth(legendText, colWidth - 10, 7), lx, ly, 7));
+    }
+  }
 
   return cmd.join('');
 }
@@ -383,7 +593,9 @@ function renderSummaryPage(layout: CuttingLayoutResult, sheetWidth: number, shee
   cmd.push(commandSetFill([0.12, 0.12, 0.14]));
   cmd.push(commandText('CUTTING LAYOUT SUMMARY', PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN + 2, 15));
   cmd.push(commandSetFill([0.4, 0.4, 0.44]));
-  const summarySubtitle = `${layout.totalPieces} pieces on ${layout.totalSheets} sheet${layout.totalSheets > 1 ? 's' : ''} | Stock size: ${sheetWidth} x ${sheetHeight} mm | ${formatNumber(layout.wastePercent)}% waste`;
+  const sheetAreaM2 = formatNumber((sheetWidth * sheetHeight) / 1_000_000);
+  let summarySubtitle = `${layout.totalPieces} pieces on ${layout.totalSheets} sheet${layout.totalSheets > 1 ? 's' : ''} | Stock: ${sheetWidth} x ${sheetHeight} mm (${sheetAreaM2} m\\262/sheet) | ${formatNumber(layout.wastePercent)}% waste`;
+  if (layout.kerf > 0) summarySubtitle += ` | Kerf: ${formatNumber(layout.kerf)} mm`;
   cmd.push(commandText(summarySubtitle, PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN - 14, 9));
 
   // Sheet summary table
@@ -498,9 +710,10 @@ function renderSummaryPage(layout: CuttingLayoutResult, sheetWidth: number, shee
   cmd.push(commandLine([tableX, tableY + 6], [tableX + tableW, tableY + 6]));
   cmd.push(commandSetFill([0.12, 0.12, 0.14]));
   const totalAreaM2 = layout.totalUsedArea / 1_000_000;
+  const totalStockM2 = layout.totalSheetArea / 1_000_000;
   cmd.push(
     commandText(
-      `Total: ${formatNumber(totalAreaM2)} m\u00b2 material on ${layout.totalSheets} sheet${layout.totalSheets > 1 ? 's' : ''} (${formatNumber(layout.wastePercent)}% waste)`,
+      `Total: ${formatNumber(totalAreaM2)} m\\262 material on ${layout.totalSheets} sheet${layout.totalSheets > 1 ? 's' : ''} (${formatNumber(totalStockM2)} m\\262 stock, ${formatNumber(layout.wastePercent)}% waste)`,
       tableX + 4,
       tableY - 6,
       10,
@@ -510,7 +723,7 @@ function renderSummaryPage(layout: CuttingLayoutResult, sheetWidth: number, shee
   return cmd.join('');
 }
 
-export function generateCuttingLayoutPdf(entries: SheetStockDef[], sheetWidth: number, sheetHeight: number): CuttingLayoutPdfResult {
+export function generateCuttingLayoutPdf(entries: SheetStockDef[], sheetWidth: number, sheetHeight: number, kerf: number = 0): CuttingLayoutPdfResult {
   if (entries.length === 0) {
     throw new Error('No sheet stock entries to lay out.');
   }
@@ -520,8 +733,11 @@ export function generateCuttingLayoutPdf(entries: SheetStockDef[], sheetWidth: n
   if (!Number.isFinite(sheetHeight) || sheetHeight <= 0) {
     throw new Error('Stock sheet height must be a finite number > 0');
   }
+  if (!Number.isFinite(kerf) || kerf < 0) {
+    throw new Error('Kerf must be a finite number >= 0');
+  }
 
-  const layout = computeCuttingLayout(entries, sheetWidth, sheetHeight);
+  const layout = computeCuttingLayout(entries, sheetWidth, sheetHeight, kerf);
   const pdf = new PdfBuilder();
 
   const fontId = pdf.addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');

@@ -76,11 +76,12 @@ Bend operations, flat pattern unfolding, K-factor configuration.
 
 - `docs/permanent/API/sheet-metal/sheet-metal.md`
 
-### 6. Output and Export (for STL/3MF/STEP, BOM, dimensions)
+### 6. Output and Export (for STL/3MF/G-code/STEP, BOM, dimensions)
 
-Mesh export, exact geometry export, bill of materials, dimension annotations.
+Mesh export, direct G-code toolpaths, exact geometry export, bill of materials, dimension annotations.
 
 - `docs/permanent/API/output/export.md`
+- `docs/permanent/API/output/gcode.md`
 - `docs/permanent/API/output/brep-export.md`
 - `docs/permanent/API/output/bom.md`
 - `docs/permanent/API/output/dimensions.md`

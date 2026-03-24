@@ -247,7 +247,9 @@ This is a **toolpath scripting API**, not a slicer. You define print movements d
 - `examples/gcode/math-surface.forge.js` — Non-planar bowl with wave rim
 - `examples/gcode/lissajous-vase.forge.js` — Lissajous curve vase with morphing profile
 
-See [`docs/permanent/API/output/export.md`](API/output/export.md) for the full `GCodeBuilder` API reference.
+Preview these scripts in ForgeCAD's interactive viewport. The current `forgecad render` CLI expects shape outputs and does not render `GCodeBuilder` scenes yet.
+
+See [`docs/permanent/API/output/gcode.md`](API/output/gcode.md) for the dedicated G-code mode guide and full `GCodeBuilder` API reference.
 
 ### SDF Robot Export (Gazebo package)
 

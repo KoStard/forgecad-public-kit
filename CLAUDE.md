@@ -79,3 +79,7 @@ Rules:
 If you hit a moment you don't know how to proceed, take the scientist hat of experiments, only reality can give us the data, so we should run experiments, analyse, capture, iterate. If unsure about the science, take the first principles book approach.
 
 Our design goal should be to prevent parameter hacking. It should work automatically and smoothly without microoptimizing magic numbers.
+
+### Omotenashi
+
+Always do house keeping. Finding small cleanup places, do it.
