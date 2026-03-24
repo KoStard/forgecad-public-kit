@@ -16,7 +16,7 @@ import {
   type TopologyRewritePropagationDiagnostic,
   type TopologyRewriteQueryKind,
   type TopologyRewriteQueryOutcome,
-} from './queryModel';
+} from '../queryModel';
 
 export function createTopologyRewritePropagation(operation: string, owner: ShapeQueryOwner): TopologyRewritePropagation {
   return {

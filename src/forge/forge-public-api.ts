@@ -33,8 +33,8 @@ export type {
 export { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly/assembly';
 export { bom } from './bom';
 export { cutPlane } from './cutPlane';
-export type { BoundingRegion, EdgeQuery, EdgeSegment } from './edgeQuery';
-export { coalesceEdges, selectEdge, selectEdges } from './edgeQuery';
+export type { BoundingRegion, EdgeQuery, EdgeSegment } from './query/edgeQuery';
+export { coalesceEdges, selectEdge, selectEdges } from './query/edgeQuery';
 export { chamferEdgeSegment, filletEdgeSegment } from './edge-features/edgeSegmentFeatures';
 export { explodeView } from './assembly/explodeView';
 export type { EdgeSelector } from './fillet';

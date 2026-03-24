@@ -5,12 +5,12 @@
  * Returns EdgeSegment objects that can be passed to filletEdgeSegment / chamferEdgeSegment.
  */
 
-import { Shape } from './kernel';
-import { type EdgeSegment, extractEdgeSegments, type MeshData } from './mesh/meshEdgeExtraction';
-import { TrackedShape } from './sketch/topology';
-import type { Vec3 } from './transform';
+import { Shape } from '../kernel';
+import { type EdgeSegment, extractEdgeSegments, type MeshData } from '../mesh/meshEdgeExtraction';
+import { TrackedShape } from '../sketch/topology';
+import type { Vec3 } from '../transform';
 
-export type { EdgeSegment } from './mesh/meshEdgeExtraction';
+export type { EdgeSegment } from '../mesh/meshEdgeExtraction';
 
 export interface BoundingRegion {
   xMin?: number;

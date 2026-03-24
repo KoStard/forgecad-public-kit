@@ -47,7 +47,7 @@ import {
   buildTrimByPlaneTopologyRewritePropagation,
   collectShapeTopologyRewritePropagations,
   findShapeTopologyRewritePropagation,
-} from './queryPropagation';
+} from './query/queryPropagation';
 import { wrapRepeatedShapeCompilePlan } from './repetitionOwnership';
 import { isShapeBackend, type ShapeBackend } from './shapeBackend';
 import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './shapeFaces';

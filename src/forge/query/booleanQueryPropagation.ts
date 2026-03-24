@@ -1,4 +1,4 @@
-import { assertExhaustive, findShapePrimaryQueryOwner, type ShapeCompilePlan } from './compilePlan';
+import { assertExhaustive, findShapePrimaryQueryOwner, type ShapeCompilePlan } from '../compilePlan';
 import {
   cloneEdgeQueryRef,
   cloneFaceQueryRef,
@@ -13,7 +13,7 @@ import {
   type ShapeQueryOwner,
   type SketchFace3D,
   type TopologyRewritePropagation,
-} from './queryModel';
+} from '../queryModel';
 import {
   createEdgeDescendantContract,
   createFaceDescendantContract,

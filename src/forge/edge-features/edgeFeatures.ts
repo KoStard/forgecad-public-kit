@@ -19,7 +19,7 @@ import {
   setShapePlacementReferences,
 } from '../kernel';
 import { type ShapeQueryOwner, shapeQueryOwnersEqual } from '../queryModel';
-import { attachTopologyRewritePropagation, buildEdgeFeatureTopologyRewritePropagation } from '../queryPropagation';
+import { attachTopologyRewritePropagation, buildEdgeFeatureTopologyRewritePropagation } from '../query/queryPropagation';
 import { type EdgeRef, TrackedShape } from '../sketch/topology';
 
 type ShapeArg = Shape | TrackedShape;

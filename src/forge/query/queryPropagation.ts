@@ -1,6 +1,6 @@
-import type { CutTaperCompilePlan, FeatureCutExtent, HoleCompilePlan, ProfileCompilePlan, ShapeCompilePlan } from './compilePlan';
-import { assertExhaustive, featureCutExtentForwardSide, featureCutExtentReverseSide, findShapePrimaryQueryOwner } from './compilePlan';
-import { cloneTopologyRewritePropagation, type EdgeQueryRef, type ShapeQueryOwner, type TopologyRewritePropagation } from './queryModel';
+import type { CutTaperCompilePlan, FeatureCutExtent, HoleCompilePlan, ProfileCompilePlan, ShapeCompilePlan } from '../compilePlan';
+import { assertExhaustive, featureCutExtentForwardSide, featureCutExtentReverseSide, findShapePrimaryQueryOwner } from '../compilePlan';
+import { cloneTopologyRewritePropagation, type EdgeQueryRef, type ShapeQueryOwner, type TopologyRewritePropagation } from '../queryModel';
 import {
   createCreatedEdgeQueryRef,
   createCreatedFaceQueryRef,
@@ -21,8 +21,8 @@ import {
   supportedHoleCreatedEdgeNames,
   supportedHoleCreatedFaceNames,
   supportedShellCreatedFaceNames,
-} from './shapeFaces';
-import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
+} from '../shapeFaces';
+import type { ShapeWorkplanePlacement } from '../sketch/workplaneModel';
 
 export { buildBooleanTopologyRewritePropagation } from './booleanQueryPropagation';
 

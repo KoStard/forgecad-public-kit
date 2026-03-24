@@ -10,7 +10,7 @@ import {
 } from './compilerDiagnostics';
 import { type GeometryInfo, getShapeCompilePlan, type Shape } from './kernel';
 import type { TopologyRewritePropagation } from './queryModel';
-import { collectShapeTopologyRewritePropagations } from './queryPropagation';
+import { collectShapeTopologyRewritePropagations } from './query/queryPropagation';
 
 export interface CompilerTargetReport<T> {
   target: CompilerTarget;

@@ -26,7 +26,7 @@ import {
   attachTopologyRewritePropagation,
   buildCutTopologyRewritePropagation,
   buildHoleTopologyRewritePropagation,
-} from './queryPropagation';
+} from './query/queryPropagation';
 import { validateShapeFaceQuery } from './shapeFaces';
 import { getSketchCompileProfilePlan, getSketchPlacement3D, getSketchPlacementModel, Sketch } from './sketch/core';
 import { type FaceRef, TrackedShape } from './sketch/topology';

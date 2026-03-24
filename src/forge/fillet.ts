@@ -13,7 +13,7 @@
  */
 
 import type { ShapeCompilePlan } from './compilePlan';
-import { type EdgeQuery, selectEdges } from './edgeQuery';
+import { type EdgeQuery, selectEdges } from './query/edgeQuery';
 import { buildShapeFromCompilePlan, getShapeCompilePlan, Shape } from './kernel';
 import type { EdgeSegment } from './mesh/meshEdgeExtraction';
 import type { EdgeFeatureTarget } from './shapeBackend';
