@@ -5,7 +5,7 @@
  * Ensures named points/edges/surfaces/objects survive transforms and importPart().
  */
 import '../src/forge/holeCut';
-import { resolveShapeEdgeDescendant, resolveSupportedEdgeFeatureSelection } from '../src/forge/edgeFeatureResolution';
+import { resolveShapeEdgeDescendant, resolveSupportedEdgeFeatureSelection } from '../src/forge/edge-features/edgeFeatureResolution';
 import { runScript } from '../src/forge/headless';
 import {
   box,
