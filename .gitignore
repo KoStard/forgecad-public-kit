@@ -2,6 +2,7 @@ node_modules
 dist
 dist-cli
 dist-skill
+docs-web
 .DS_Store
 .aider*
 
