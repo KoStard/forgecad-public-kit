@@ -58,6 +58,12 @@ import {
   readViewPreferences,
   writeViewPreferences,
 } from './executionHelpers';
+import {
+  computeServerSnapshot,
+  postApplyServerSnapshot,
+  computeServerFileChange,
+  computeServerFileDelete,
+} from './serverSync';
 
 // ---------------------------------------------------------------------------
 // Re-export sharedBundle/sharedModel for consumers that need them
@@ -1234,153 +1240,40 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   },
 
   applyServerSnapshot: (serverFiles: Record<string, string>, serverFolders?: string[]) => {
-    const { files, savedFiles, activeFile, objectSettingsByFile } = get();
-
-    const dirtyFiles = new Set<string>();
-    Object.keys(files).forEach((p) => {
-      if (!(p in savedFiles) || savedFiles[p] !== files[p]) dirtyFiles.add(p);
-    });
-
-    const nextFiles: Record<string, string> = {};
-    const nextSaved: Record<string, string> = {};
-    const newFolders = new Set<string>();
-    // Include empty folders reported by the server
-    if (serverFolders) serverFolders.forEach((f) => newFolders.add(f));
-
-    Object.keys(serverFiles).forEach((p) => {
-      if (dirtyFiles.has(p)) {
-        nextFiles[p] = files[p];
-        if (p in savedFiles) nextSaved[p] = savedFiles[p];
-      } else {
-        nextFiles[p] = serverFiles[p];
-        nextSaved[p] = serverFiles[p];
-      }
-      collectParentPaths(p).forEach((folder) => newFolders.add(folder));
-    });
-
-    // Keep locally modified files that no longer exist on disk
-    Object.keys(files).forEach((p) => {
-      if (p in nextFiles || !dirtyFiles.has(p)) return;
-      nextFiles[p] = files[p];
-      if (p in savedFiles) nextSaved[p] = savedFiles[p];
-      collectParentPaths(p).forEach((folder) => newFolders.add(folder));
-    });
-
-    // Inject shared model from URL (if any) so it survives server snapshots
-    if (sharedModel) {
-      nextFiles[sharedModel.filename] = sharedModel.code;
-      nextSaved[sharedModel.filename] = sharedModel.code;
-      collectParentPaths(sharedModel.filename).forEach((folder) => newFolders.add(folder));
-    }
-
-    // Inject shared bundle files from URL (if any) so they survive server snapshots
-    if (sharedBundle) {
-      for (const [name, code] of Object.entries(sharedBundle.files)) {
-        nextFiles[name] = code;
-        nextSaved[name] = code;
-        collectParentPaths(name).forEach((folder) => newFolders.add(folder));
-      }
-    }
-
-    const hashFile = getActiveFileFromHash();
-    const availableFiles = Object.keys(nextFiles);
-
-    // Check if the hash points to a mesh file — if so, set up mesh preview
-    const MESH_EXTS = ['.stl', '.obj', '.3mf'];
-    const isMeshHash = hashFile && MESH_EXTS.some((ext) => hashFile.toLowerCase().endsWith(ext));
-    const meshPreview = isMeshHash && nextFiles[hashFile] !== undefined ? hashFile : null;
-
-    // For mesh preview, pick a script file as the active file (not the mesh itself)
-    const newActiveFile = sharedBundle
-      ? sharedBundle.entry
-      : sharedModel
-        ? sharedModel.filename
-        : hashFile && !isMeshHash && nextFiles[hashFile] !== undefined
-          ? hashFile
-          : activeFile && nextFiles[activeFile]
-            ? activeFile
-            : findPreferredEntryFile(availableFiles) || availableFiles.find((n) => n.endsWith('.js')) || availableFiles[0];
-
-    const nextDirty = Object.keys(nextFiles).some((p) => nextSaved[p] !== nextFiles[p]);
-    const nextObjectSettingsByFile = Object.fromEntries(
-      Object.entries(objectSettingsByFile).filter(([f]) => f in nextFiles),
-    ) as ObjectSettingsByFile;
-    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
-
-    set({
-      files: nextFiles,
-      savedFiles: nextSaved,
-      folders: Array.from(newFolders).sort(),
-      activeFile: newActiveFile,
-      meshPreviewFile: meshPreview,
-      dirty: nextDirty,
-      objectSettingsByFile: nextObjectSettingsByFile,
-    });
-
-    if (meshPreview) {
-      setTimeout(() => get().execute(), 0);
-    } else if (newActiveFile && newActiveFile !== activeFile) {
-      set({ paramOverrides: {}, lastValidResult: null });
-      setParamOverrides({});
-      window.history.replaceState(null, '', `#${newActiveFile}`);
-      setTimeout(() => get().execute(), 0);
-    } else {
-      const previewFile = resolvePreviewFile(newActiveFile, nextFiles);
-      if (previewFile && nextFiles[previewFile] !== files[previewFile]) {
-        setTimeout(() => get().execute(), 0);
-      }
-    }
+    const state = get();
+    const prevFiles = state.files;
+    const prevActiveFile = state.activeFile;
+    const nextState = computeServerSnapshot(state, serverFiles, serverFolders, sharedModel, sharedBundle);
+    set(nextState as any);
+    postApplyServerSnapshot(
+      prevActiveFile,
+      nextState,
+      nextState.files as Record<string, string>,
+      prevFiles,
+      () => get().execute(),
+      (partial) => set(partial as any),
+    );
   },
 
   applyServerFileChange: (filename: string, content: string) => {
-    const { files, savedFiles, activeFile } = get();
-    const isDirty = filename in files && savedFiles[filename] !== files[filename];
-    if (isDirty) return;
-    if (files[filename] === content) return;
-    const folders = new Set(get().folders);
-    collectParentPaths(filename).forEach((f) => folders.add(f));
-    const nextFiles = { ...files, [filename]: content };
-    set({
-      files: nextFiles,
-      savedFiles: { ...savedFiles, [filename]: content },
-      folders: Array.from(folders).sort(),
-    });
-    const previewFile = resolvePreviewFile(activeFile, nextFiles);
+    const state = get();
+    const nextState = computeServerFileChange(state, filename, content);
+    if (!nextState) return;
+    set(nextState as any);
+    const previewFile = resolvePreviewFile(state.activeFile, nextState.files as Record<string, string>);
     if (previewFile === filename) setTimeout(() => get().execute(), 0);
   },
 
   applyServerFileDelete: (filename: string) => {
-    const { files, savedFiles, activeFile, objectSettingsByFile } = get();
-    const isDirty = filename in files && savedFiles[filename] !== files[filename];
-    if (isDirty) return;
-    if (!(filename in files)) return;
-    const nextFiles = { ...files };
-    const nextSaved = { ...savedFiles };
-    delete nextFiles[filename];
-    delete nextSaved[filename];
-    const newFolders = new Set<string>();
-    Object.keys(nextFiles).forEach((p) => collectParentPaths(p).forEach((f) => newFolders.add(f)));
-    const availableFiles = Object.keys(nextFiles);
-    const newActiveFile =
-      activeFile === filename
-        ? findPreferredEntryFile(availableFiles) || availableFiles.find((n) => n.endsWith('.js')) || availableFiles[0]
-        : activeFile;
-    const nextObjectSettingsByFile = Object.fromEntries(
-      Object.entries(objectSettingsByFile).filter(([f]) => f in nextFiles),
-    ) as ObjectSettingsByFile;
-    writeViewPreferences({ objectSettingsByFile: nextObjectSettingsByFile });
-    set({
-      files: nextFiles,
-      savedFiles: nextSaved,
-      folders: Array.from(newFolders).sort(),
-      activeFile: newActiveFile,
-      dirty: Object.keys(nextFiles).some((p) => nextSaved[p] !== nextFiles[p]),
-      objectSettingsByFile: nextObjectSettingsByFile,
-    });
-    if (newActiveFile && newActiveFile !== activeFile) {
-      set({ paramOverrides: {}, lastValidResult: null });
+    const state = get();
+    const prevActiveFile = state.activeFile;
+    const nextState = computeServerFileDelete(state, filename);
+    if (!nextState) return;
+    set(nextState as any);
+    if (nextState.activeFile && nextState.activeFile !== prevActiveFile) {
+      set({ paramOverrides: {}, lastValidResult: null } as any);
       setParamOverrides({});
-      window.history.replaceState(null, '', `#${newActiveFile}`);
+      window.history.replaceState(null, '', `#${nextState.activeFile}`);
       setTimeout(() => get().execute(), 0);
     }
   },
