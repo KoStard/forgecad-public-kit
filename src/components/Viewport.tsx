@@ -1,17 +1,10 @@
-import type { CutPlaneDef } from '@forge/cutPlane';
-import type { ExplodeViewOptions, JointViewDef, SceneObject } from '@forge/index';
-import { DEFAULT_VIEW_CONFIG } from '@forge/index';
-import { findJointAnimationClip, resolveJointAnimation } from '@forge/assembly/jointAnimation';
-import { resolveJointViewValues } from '@forge/assembly/jointsView';
-import type { SceneConfig } from '@forge/scene';
-import { getSketchWorldMatrix } from '@forge/sketch/placement3d';
 import { formatCoord, formatLength } from '@forge/units';
 import { Grid, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
-import type { ThreeEvent } from '@react-three/fiber';
 import { Canvas } from '@react-three/fiber';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import { LocalStudioEnvironment } from './viewport/LocalStudioEnvironment';
 import {
   MOUSE_BUTTONS_3D,
   MOUSE_BUTTONS_DRAW,
@@ -19,395 +12,105 @@ import {
   TOUCH_GESTURES_3D,
   TOUCH_GESTURES_SKETCH,
 } from '../capture/controlsConfig';
-import { useDrawStore } from '../draw/drawStore';
-import { getShortcutKey, hasPrimaryModifier } from '../editorShortcuts';
-import { useFeatureFlag } from '../featureFlags';
-import { useForgeStore } from '../store/forgeStore';
 import { themes } from '../theme';
-import { evalWorkerClient } from '../workers/evalWorkerClient';
-import type { EvalWorkerFaceInfoResult } from '../workers/evalWorkerProtocol';
+import { useForgeStore } from '../store/forgeStore';
 import { DrawCanvas } from './DrawCanvas';
 import { DrawToolbar } from './DrawToolbar';
 import { SceneConfigurator } from './SceneConfigurator';
 import { ClippingManager } from './viewport/ClippingManager';
 import { ConstructionGhostOverlay } from './viewport/ConstructionGhostOverlay';
 import { ControlsInteractionBridge, OrbitGifExporterBridge } from './viewport/ControlsBridge';
-import { resolveHoverObjectName } from './viewport/cameraPersistence';
 import { DebugHighlightsOverlay } from './viewport/DebugHighlights';
 import { DimensionAnnotation } from './viewport/DimensionAnnotation';
 import { EvaluationIndicator } from './viewport/EvaluationIndicator';
-import { buildExplodeTree, computeExplodeTreeOffsets } from './viewport/explodeTree';
 import { ForgeObject } from './viewport/ForgeObject';
-import { expandBoundsByTransformedAabb, isTextEntryTarget } from './viewport/geometryUtils';
 import { HoveredJointOverlay } from './viewport/HoveredJointOverlay';
-import { computeJointNodeMatrices } from './viewport/jointUtils';
 import { LabeledAxes } from './viewport/LabeledAxes';
-import { LocalStudioEnvironment } from './viewport/LocalStudioEnvironment';
 import { MeasureInfoPanel, MeasureTool } from './viewport/MeasureTool';
 import { PerformanceInfoPanel, PerformanceInfoSampler } from './viewport/PerformanceInfo';
 import { SectionPlaneGuides } from './viewport/SectionPlane';
 import { SketchObject } from './viewport/SketchObject';
-import { isObjectExcludedFromCutPlane, toClippingPlane } from './viewport/sectionUtils';
 import { ToolpathObject } from './viewport/ToolpathObject';
-import type { SketchHoveredEntity } from './viewport/types';
-// Extracted viewport modules
 import {
   FOCUS_MODE_DIM_OPACITY,
-  type HoveredJointOverlayState,
-  IDENTITY_MATRIX,
-  OBJECT_CONTEXT_MENU_HEIGHT,
   OBJECT_CONTEXT_MENU_MARGIN,
   OBJECT_CONTEXT_MENU_WIDTH,
-  type ObjectContextMenuState,
-  type SketchEntityInfoPanel,
-  type ViewportPerformanceInfo,
-  ZERO_OFFSET,
 } from './viewport/types';
 import { ViewController, ViewManager, ViewPersistence } from './viewport/ViewController';
+import { useViewportState } from './viewport/useViewportState';
+import { useViewportHandlers } from './viewport/useViewportHandlers';
 
 export function Viewport() {
-  const measureMode = useForgeStore((s) => s.measureMode);
-  const isEvaluating = useForgeStore((s) => s.isEvaluating);
-  const evaluationPhase = useForgeStore((s) => s.evaluationPhase);
-  const result = useForgeStore((s) => s.lastValidResult);
-  const previewFile = useForgeStore((s) => s.previewFile);
-  const files = useForgeStore((s) => s.files);
-  const renderMode = useForgeStore((s) => s.renderMode);
-  const projectionMode = useForgeStore((s) => s.projectionMode);
-  const gridEnabled = useForgeStore((s) => s.gridEnabled);
-  const gridSize = useForgeStore((s) => s.gridSize);
-  const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
-  const objectSettings = useForgeStore((s) => s.objectSettings);
-  const setObjectVisibility = useForgeStore((s) => s.setObjectVisibility);
-  const hoveredObjectId = useForgeStore((s) => s.hoveredObjectId);
-  const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
-  const selectObject = useForgeStore((s) => s.selectObject);
-  const focusedObjectIds = useForgeStore((s) => s.focusedObjectIds);
-  const focusObject = useForgeStore((s) => s.focusObject);
-  const clearFocusedObject = useForgeStore((s) => s.clearFocusedObject);
-  const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
-  const explodeAmount = useForgeStore((s) => s.explodeAmount);
-  const viewCommand = useForgeStore((s) => s.viewCommand);
-  const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
-  const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
-  const jointValues = useForgeStore((s) => s.jointValues);
-  const jointAnimationClip = useForgeStore((s) => s.jointAnimationClip);
-  const jointAnimationProgress = useForgeStore((s) => s.jointAnimationProgress);
-  const jointAnimationPlaying = useForgeStore((s) => s.jointAnimationPlaying);
-  const jointAnimationSpeed = useForgeStore((s) => s.jointAnimationSpeed);
-  const hoveredJointName = useForgeStore((s) => s.hoveredJointName);
-  const setJointAnimationProgress = useForgeStore((s) => s.setJointAnimationProgress);
-  const setJointAnimationPlaying = useForgeStore((s) => s.setJointAnimationPlaying);
-  const lengthUnit = useForgeStore((s) => s.lengthUnit);
-  const constructionGhost = useForgeStore((s) => s.constructionGhost);
-  const objects = result?.objects ?? [];
-  const dimensions = result?.dimensions ?? [];
-  const debugHighlights3D = result?.debugHighlights3D ?? [];
-  const shapeHighlightByIndex = useMemo(() => {
-    const map = new Map<number, { color: string; pulse?: boolean }>();
-    for (const hl of debugHighlights3D) {
-      if (hl.kind === 'shape') {
-        map.set(hl.shapeIndex, { color: hl.color ?? '#ff00ff', pulse: hl.pulse });
-      }
-    }
-    return map;
-  }, [debugHighlights3D]);
-  const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
-  const _surfacesVisible = useForgeStore((s) => s.surfacesVisible);
-  const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
-  const sectionPlaneGuidesEnabled = useForgeStore((s) => s.sectionPlaneGuidesEnabled);
-  const sectionPlaneFillEnabled = useForgeStore((s) => s.sectionPlaneFillEnabled);
-  const sectionPlaneFillOpacity = useForgeStore((s) => s.sectionPlaneFillOpacity);
-  const sectionPlaneBorderEnabled = useForgeStore((s) => s.sectionPlaneBorderEnabled);
-  const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
-  const drawFlagEnabled = useFeatureFlag('drawMode');
-  const drawModeActive = useDrawStore((s) => s.active) && drawFlagEnabled;
-  const [toolpathProgress, setToolpathProgress] = useState(1); // 0..1 — fraction of segments to show
-  const prevResultRef = useRef(result);
-  if (prevResultRef.current !== result) {
-    prevResultRef.current = result;
-    // Reset to full when the script re-evaluates
-    if (toolpathProgress !== 1) setToolpathProgress(1);
-  }
-  const [performanceInfo, setPerformanceInfo] = useState<ViewportPerformanceInfo | null>(null);
-  const reactRenderCountRef = useRef(0);
-  reactRenderCountRef.current += 1;
-  const cutPlaneDefs: CutPlaneDef[] = result?.cutPlanes ?? [];
-  const explodeConfig: ExplodeViewOptions | null = result?.explodeView ?? null;
-  const jointsConfig = result?.jointsView ?? null;
-  const jointOverlayConfig = result?.viewConfig?.jointOverlay ?? DEFAULT_VIEW_CONFIG.jointOverlay;
-  const sceneConfig: SceneConfig | null = result?.sceneConfig ?? null;
-  const [defaultLightsOverridden, setDefaultLightsOverridden] = useState(false);
-  const [defaultEnvironmentOverridden, setDefaultEnvironmentOverridden] = useState(false);
-  const handleDefaultLightsOverridden = useCallback((v: boolean) => setDefaultLightsOverridden(v), []);
-  const handleDefaultEnvironmentOverridden = useCallback((v: boolean) => setDefaultEnvironmentOverridden(v), []);
-  const joints = useMemo(() => (jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? [])), [jointsConfig]);
-  const jointCouplings = useMemo(() => (jointsConfig?.enabled === false ? [] : (jointsConfig?.couplings ?? [])), [jointsConfig]);
-  const jointAnimations = useMemo(() => (jointsConfig?.enabled === false ? [] : (jointsConfig?.animations ?? [])), [jointsConfig]);
-  const activeJointAnimation = useMemo(
-    () => findJointAnimationClip(jointAnimations, jointAnimationClip),
-    [jointAnimationClip, jointAnimations],
-  );
-  const animatedJointValues = useMemo(
-    () => resolveJointAnimation(activeJointAnimation, jointAnimationProgress, jointValues),
-    [activeJointAnimation, jointAnimationProgress, jointValues],
-  );
-  const effectiveJointValues = useMemo(
-    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues, { clamp: false }),
-    [animatedJointValues, jointCouplings, joints],
-  );
+  const state = useViewportState();
 
-  const activeCutPlaneDefs = useMemo(() => {
-    return cutPlaneDefs
-      .filter((cp) => cutPlaneEnabled[cp.name])
-      .filter((cp) => new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).lengthSq() > 1e-8);
-  }, [cutPlaneDefs, cutPlaneEnabled]);
-
-  const { objectCutPlanesById, objectClippingPlanesById, hasAnyObjectCutPlanes } = useMemo(() => {
-    const cutPlanesById: Record<string, CutPlaneDef[]> = {};
-    const clippingPlanesById: Record<string, THREE.Plane[]> = {};
-    let hasAnyCutPlanes = false;
-
-    objects.forEach((obj) => {
-      const applicable = activeCutPlaneDefs.filter((cp) => !isObjectExcludedFromCutPlane(obj, cp));
-      cutPlanesById[obj.id] = applicable;
-      clippingPlanesById[obj.id] = applicable.map(toClippingPlane);
-      if (applicable.length > 0) hasAnyCutPlanes = true;
-    });
-
-    return {
-      objectCutPlanesById: cutPlanesById,
-      objectClippingPlanesById: clippingPlanesById,
-      hasAnyObjectCutPlanes: hasAnyCutPlanes,
-    };
-  }, [activeCutPlaneDefs, objects]);
-
-  const explodeOffsets = useMemo(() => {
-    if (explodeAmount <= 1e-8) return {} as Record<string, [number, number, number]>;
-    if (explodeConfig?.enabled === false) return {} as Record<string, [number, number, number]>;
-    if (objects.length === 0) return {} as Record<string, [number, number, number]>;
-    return computeExplodeTreeOffsets(buildExplodeTree(objects), explodeAmount, explodeConfig);
-  }, [explodeAmount, explodeConfig, objects]);
-
-  const jointNodeMatrices = useMemo(() => computeJointNodeMatrices(joints, effectiveJointValues), [effectiveJointValues, joints]);
-
-  const jointMatrices = useMemo(() => {
-    const out: Record<string, THREE.Matrix4> = {};
-    objects.forEach((obj) => {
-      out[obj.id] = new THREE.Matrix4();
-    });
-
-    if (joints.length === 0 || objects.length === 0) return out;
-
-    const jointByChild = new Map<string, JointViewDef>();
-    joints.forEach((joint) => {
-      jointByChild.set(joint.child, joint);
-    });
-
-    objects.forEach((obj) => {
-      let nodeName: string | null = null;
-      if (jointByChild.has(obj.name)) {
-        nodeName = obj.name;
-      } else if (obj.groupName && jointByChild.has(obj.groupName)) {
-        // ShapeGroup returns are flattened as "Group.Lid" or the fallback "Group.1".
-        // Resolve joints against the parent group name when exact object name is absent.
-        nodeName = obj.groupName;
-      }
-      if (!nodeName) return;
-      out[obj.id] = jointNodeMatrices.get(nodeName)?.clone() ?? new THREE.Matrix4();
-    });
-
-    return out;
-  }, [jointNodeMatrices, joints, objects]);
-
-  const objectMatrices = useMemo(() => {
-    const out: Record<string, THREE.Matrix4> = {};
-    objects.forEach((obj) => {
-      const baseMatrix = obj.sketch ? new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch)) : new THREE.Matrix4();
-      const jointMatrix = jointMatrices[obj.id] ?? new THREE.Matrix4();
-      const offset = explodeOffsets[obj.id] ?? ZERO_OFFSET;
-      const explodeMatrix = new THREE.Matrix4().makeTranslation(offset[0], offset[1], offset[2]);
-      out[obj.id] = explodeMatrix.multiply(jointMatrix).multiply(baseMatrix);
-    });
-    return out;
-  }, [explodeOffsets, jointMatrices, objects]);
-
-  const constructionGhostMatrix = useMemo(
-    () => (constructionGhost ? (objectMatrices[constructionGhost.objectId] ?? new THREE.Matrix4()) : new THREE.Matrix4()),
-    [constructionGhost, objectMatrices],
-  );
-
-  useEffect(() => {
-    if (!jointAnimationPlaying || !activeJointAnimation) return;
-
-    let raf = 0;
-    let lastTs = performance.now();
-    let cancelled = false;
-
-    const tick = (now: number) => {
-      if (cancelled) return;
-      const dtSec = Math.max(0, (now - lastTs) / 1000);
-      lastTs = now;
-
-      const step = (dtSec * jointAnimationSpeed) / Math.max(1e-6, activeJointAnimation.duration);
-      let next = useForgeStore.getState().jointAnimationProgress + step;
-      if (next >= 1) {
-        if (!activeJointAnimation.loop) {
-          next = 1;
-          setJointAnimationPlaying(false);
-        } else if (!activeJointAnimation.continuous) {
-          next = next % 1;
-        }
-      }
-      setJointAnimationProgress(next);
-
-      if (useForgeStore.getState().jointAnimationPlaying) {
-        raf = requestAnimationFrame(tick);
-      }
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-    };
-  }, [activeJointAnimation, jointAnimationPlaying, jointAnimationSpeed, setJointAnimationPlaying, setJointAnimationProgress]);
-
-  const sectionGuideBoundsKey = sectionPlaneGuidesEnabled && activeCutPlaneDefs.length > 0 ? objectMatrices : null;
-
-  const sectionGuideSize = useMemo(() => {
-    if (!sectionPlaneGuidesEnabled || activeCutPlaneDefs.length === 0) {
-      return Math.max(60, gridSize * 8);
-    }
-
-    const bounds = new THREE.Box3();
-    let hasBounds = false;
-
-    objects.forEach((obj) => {
-      const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
-      if (obj.shape) {
-        try {
-          const bb = obj.shape.boundingBox();
-          expandBoundsByTransformedAabb(bounds, bb.min, bb.max, matrix);
-          hasBounds = true;
-        } catch {
-          // Ignore bad shape bounds from partial execution failures.
-        }
-        return;
-      }
-      if (obj.sketch) {
-        try {
-          const bb = obj.sketch.bounds();
-          expandBoundsByTransformedAabb(bounds, [bb.min[0], bb.min[1], 0], [bb.max[0], bb.max[1], 0], matrix);
-          hasBounds = true;
-        } catch {
-          // Ignore bad sketch bounds from partial execution failures.
-        }
-        return;
-      }
-      if (obj.toolpath) {
-        const tb = obj.toolpath.bounds;
-        expandBoundsByTransformedAabb(bounds, tb.min, tb.max, matrix);
-        hasBounds = true;
-      }
-    });
-
-    if (!hasBounds) return Math.max(60, gridSize * 8);
-
-    const size = new THREE.Vector3();
-    bounds.getSize(size);
-    const diagonal = Math.max(1, size.length());
-    return Math.max(60, diagonal * 1.35, gridSize * 6);
-  }, [activeCutPlaneDefs.length, gridSize, objects, sectionGuideBoundsKey, sectionPlaneGuidesEnabled]);
-
-  const jointOverlayBaseSize = useMemo(() => {
-    const bounds = new THREE.Box3();
-    let hasBounds = false;
-
-    objects.forEach((obj) => {
-      if (obj.shape) {
-        try {
-          const bb = obj.shape.boundingBox();
-          expandBoundsByTransformedAabb(bounds, bb.min, bb.max, IDENTITY_MATRIX);
-          hasBounds = true;
-        } catch {
-          // Ignore bad shape bounds from partial execution failures.
-        }
-        return;
-      }
-      if (obj.sketch) {
-        try {
-          const bb = obj.sketch.bounds();
-          expandBoundsByTransformedAabb(
-            bounds,
-            [bb.min[0], bb.min[1], 0],
-            [bb.max[0], bb.max[1], 0],
-            new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch)),
-          );
-          hasBounds = true;
-        } catch {
-          // Ignore bad sketch bounds from partial execution failures.
-        }
-        return;
-      }
-      if (obj.toolpath) {
-        const tb = obj.toolpath.bounds;
-        expandBoundsByTransformedAabb(bounds, tb.min, tb.max, IDENTITY_MATRIX);
-        hasBounds = true;
-      }
-    });
-
-    if (!hasBounds) return Math.max(60, gridSize * 8);
-
-    const size = new THREE.Vector3();
-    bounds.getSize(size);
-    const diagonal = Math.max(1, size.length());
-    return Math.max(60, diagonal * 1.35, gridSize * 6);
-  }, [gridSize, objects]);
-
-  const hoveredJointOverlay = useMemo((): HoveredJointOverlayState | null => {
-    if (!jointOverlayConfig.enabled) return null;
-    if (!hoveredJointName) return null;
-    const joint = joints.find((entry) => entry.name === hoveredJointName);
-    if (!joint) return null;
-
-    const parentMatrix = joint.parent ? (jointNodeMatrices.get(joint.parent)?.clone() ?? new THREE.Matrix4()) : new THREE.Matrix4();
-    const axisLocal = new THREE.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]).normalize();
-    const axisWorld = axisLocal.clone().transformDirection(parentMatrix);
-    if (axisWorld.lengthSq() <= 1e-8) axisWorld.copy(axisLocal);
-    axisWorld.normalize();
-
-    const pivotWorld = new THREE.Vector3(joint.pivot[0], joint.pivot[1], joint.pivot[2]).applyMatrix4(parentMatrix);
-    const childObject = objects.find((obj) => obj.name === joint.child || obj.groupName === joint.child);
-    if (childObject) {
-      const offset = explodeOffsets[childObject.id] ?? ZERO_OFFSET;
-      pivotWorld.add(new THREE.Vector3(offset[0], offset[1], offset[2]));
-    }
-
-    const rawOverlay = effectiveJointValues[joint.name] ?? joint.defaultValue;
-    const value = Number.isFinite(rawOverlay) ? rawOverlay : joint.defaultValue;
-    const axisLength = Math.max(jointOverlayConfig.axisLengthMin, jointOverlayBaseSize * jointOverlayConfig.axisLengthScale);
-    return {
-      joint,
-      value,
-      pivotWorld,
-      axisWorld,
-      axisLength,
-    };
-  }, [
-    effectiveJointValues,
-    explodeOffsets,
-    hoveredJointName,
-    jointNodeMatrices,
-    jointOverlayConfig,
-    jointOverlayBaseSize,
-    joints,
+  const {
+    measureMode,
+    isEvaluating,
+    evaluationPhase,
+    renderMode,
+    projectionMode,
+    gridEnabled,
+    gridSize,
+    showPerformanceInfo,
+    objectSettings,
+    setObjectVisibility,
+    hoveredObjectId,
+    setHoveredObjectId,
+    selectObject,
+    focusedObjectIds,
+    focusObject,
+    clearFocusedObject,
+    objectPickSyncEnabled,
+    viewCommand,
+    requestViewCommand,
+    clearViewCommand,
+    lengthUnit,
+    constructionGhost,
     objects,
-  ]);
+    dimensions,
+    debugHighlights3D,
+    dimensionsVisible,
+    sectionPlaneGuidesEnabled,
+    sectionPlaneFillEnabled,
+    sectionPlaneFillOpacity,
+    sectionPlaneBorderEnabled,
+    sectionPlaneAxisEnabled,
+    drawFlagEnabled,
+    drawModeActive,
+    shapeHighlightByIndex,
+    activeCutPlaneDefs,
+    objectCutPlanesById,
+    objectClippingPlanesById,
+    hasAnyObjectCutPlanes,
+    objectMatrices,
+    constructionGhostMatrix,
+    joints,
+    activeJointAnimation,
+    effectiveJointValues,
+    sectionGuideSize,
+    hoveredJointOverlay,
+    jointOverlayConfig,
+    isSketchOnly,
+    sceneConfig,
+    focusedObjectIdSet,
+    visibleSceneObjectCount,
+    visibleModelTriangles,
+    toolpathProgress,
+    setToolpathProgress,
+    performanceInfo,
+    setPerformanceInfo,
+    reactRenderCountRef,
+    defaultLightsOverridden,
+    defaultEnvironmentOverridden,
+    handleDefaultLightsOverridden,
+    handleDefaultEnvironmentOverridden,
+    themeName,
+    previewFile,
+    knownFileNames,
+  } = state;
 
-  const hasShape = objects.some((obj) => obj.shape);
-  const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
-  const knownFileNames = useMemo(() => new Set(Object.keys(files)), [files]);
+  const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
+  const [isViewportInteracting, setIsViewportInteracting] = useState(false);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const initialFitRequestedRef = useRef(false);
   const prevPreviewFileRef = useRef<string | null | undefined>(undefined);
@@ -415,360 +118,62 @@ export function Viewport() {
   const hoverTooltipRef = useRef<HTMLDivElement | null>(null);
   const hoverTooltipIdRef = useRef<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
-  const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
-  const [isViewportInteracting, setIsViewportInteracting] = useState(false);
-  const [objectContextMenu, setObjectContextMenu] = useState<ObjectContextMenuState | null>(null);
-  const [faceInfoPanel, setFaceInfoPanel] = useState<{
-    objectId: string;
-    faceName: string | null;
-    hitNormal: [number, number, number] | null;
-    x: number;
-    y: number;
-  } | null>(null);
-  const [faceInfoData, setFaceInfoData] = useState<EvalWorkerFaceInfoResult | null>(null);
-  const [faceInfoLoading, setFaceInfoLoading] = useState(false);
-  const [sketchEntityInfo, setSketchEntityInfo] = useState<SketchEntityInfoPanel | null>(null);
-  const themeName = useForgeStore((s) => s.theme);
+
   const t = themes[themeName];
-  const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
   const canvasDpr: number | [number, number] = isViewportInteracting ? 1 : [1, 2];
-  const { visibleSceneObjectCount, visibleModelTriangles } = useMemo(() => {
-    let nextVisibleSceneObjectCount = 0;
-    let nextVisibleModelTriangles = 0;
 
-    objects.forEach((obj) => {
-      if (objectSettings[obj.id]?.visible === false) return;
-      nextVisibleSceneObjectCount += 1;
-      if (!obj.shape) return;
-      try {
-        nextVisibleModelTriangles += obj.shape.numTri();
-      } catch {
-        // Ignore broken triangle counts from partial/invalid geometry.
-      }
-    });
+  const handlers = useViewportHandlers({
+    containerRef,
+    hoverTooltipRef,
+    hoverTooltipIdRef,
+    contextMenuRef,
+    measureMode,
+    isViewportInteracting,
+    objectPickSyncEnabled,
+    hoveredObjectId,
+    knownFileNames,
+    objects,
+    selectObject,
+    focusObject,
+    clearFocusedObject,
+    setHoveredObjectId,
+    setObjectVisibility,
+    requestViewCommand,
+    viewPersistenceResolved,
+    viewCommand,
+    previewFile,
+    initialFitRequestedRef,
+    prevPreviewFileRef,
+    setPerformanceInfo,
+  });
 
-    return {
-      visibleSceneObjectCount: nextVisibleSceneObjectCount,
-      visibleModelTriangles: nextVisibleModelTriangles,
-    };
-  }, [objectSettings, objects]);
+  const {
+    objectContextMenu,
+    closeObjectContextMenu,
+    faceInfoPanel,
+    setFaceInfoPanel,
+    faceInfoData,
+    faceInfoLoading,
+    sketchEntityInfo,
+    setSketchEntityInfo,
+    hideHoverTooltip,
+    updateHoverLabel,
+    clearHoverLabel,
+    handleObjectClick,
+    handleObjectDoubleClick,
+    handleObjectContextMenu,
+    handleHideObject,
+    handleGetFaceInfo,
+    handleSketchEntityClick,
+    handleViewportPointerMissed,
+    handlePerformanceInfoChange,
+    handleViewPersistenceResolved: handleViewPersistenceResolvedFromHandlers,
+  } = handlers;
 
-  const closeObjectContextMenu = useCallback(() => {
-    setObjectContextMenu(null);
-  }, []);
-
-  const hideHoverTooltip = useCallback((id?: string | null) => {
-    if (id !== undefined && hoverTooltipIdRef.current !== id) return;
-    hoverTooltipIdRef.current = null;
-    const tooltip = hoverTooltipRef.current;
-    if (!tooltip) return;
-    tooltip.style.visibility = 'hidden';
-    tooltip.style.opacity = '0';
-  }, []);
-
-  const showHoverTooltip = useCallback((label: { id: string; name: string; x: number; y: number }) => {
-    hoverTooltipIdRef.current = label.id;
-    const tooltip = hoverTooltipRef.current;
-    if (!tooltip) return;
-    if (tooltip.textContent !== label.name) tooltip.textContent = label.name;
-    tooltip.style.left = `${label.x}px`;
-    tooltip.style.top = `${label.y}px`;
-    tooltip.style.visibility = 'visible';
-    tooltip.style.opacity = '1';
-  }, []);
-
-  const handleViewPersistenceResolved = useCallback((restored: boolean) => {
-    if (restored) {
-      initialFitRequestedRef.current = true;
-    }
+  const handleViewPersistenceResolved = (restored: boolean) => {
+    handleViewPersistenceResolvedFromHandlers(restored);
     setViewPersistenceResolved(true);
-  }, []);
-
-  useEffect(() => {
-    if (!viewPersistenceResolved) return;
-    if (initialFitRequestedRef.current) return;
-    if (viewCommand) return;
-    if (objects.length === 0) return;
-    initialFitRequestedRef.current = true;
-    requestViewCommand({ type: 'fit' });
-  }, [objects.length, requestViewCommand, viewCommand, viewPersistenceResolved]);
-
-  // Auto-fit whenever a different model finishes loading
-  useEffect(() => {
-    const prev = prevPreviewFileRef.current;
-    prevPreviewFileRef.current = previewFile;
-    if (prev === undefined) return; // skip initial mount — handled by the effect above
-    if (prev === previewFile) return;
-    if (objects.length === 0) return;
-    requestViewCommand({ type: 'fit' });
-  }, [previewFile, objects.length, requestViewCommand]);
-
-  useEffect(() => {
-    if (objectPickSyncEnabled) return;
-    hideHoverTooltip();
-    setHoveredObjectId(null);
-  }, [hideHoverTooltip, objectPickSyncEnabled, setHoveredObjectId]);
-
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (objectContextMenu) {
-        closeObjectContextMenu();
-        return;
-      }
-      // Escape in measure mode: clear selections first, then deactivate
-      const store = useForgeStore.getState();
-      if (store.measureMode) {
-        if (store.measureSelections.length > 0) {
-          store.clearMeasureSelections();
-        } else {
-          store.toggleMeasure();
-        }
-        return;
-      }
-      if (store.constructionGhost !== null) {
-        store.setConstructionGhost(null);
-        return;
-      }
-      if (store.focusedObjectIds.length === 0) return;
-      clearFocusedObject();
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [clearFocusedObject, closeObjectContextMenu, objectContextMenu]);
-
-  useEffect(() => {
-    const handleViewShortcut = (event: KeyboardEvent) => {
-      if (event.isComposing || event.repeat) return;
-      if (event.altKey || !event.shiftKey || !hasPrimaryModifier(event)) return;
-      if (isTextEntryTarget(event.target)) return;
-
-      const key = getShortcutKey(event);
-      if (key === 'f') {
-        event.preventDefault();
-        requestViewCommand({ type: 'fit' });
-        return;
-      }
-      if (key === 'h') {
-        event.preventDefault();
-        requestViewCommand({ type: 'snap', view: 'iso' });
-      }
-    };
-
-    window.addEventListener('keydown', handleViewShortcut, true);
-    return () => window.removeEventListener('keydown', handleViewShortcut, true);
-  }, [requestViewCommand]);
-
-  useEffect(() => {
-    if (!objectContextMenu) return;
-
-    const handleWindowPointerDown = (event: PointerEvent) => {
-      const menu = contextMenuRef.current;
-      if (menu && event.target instanceof Node && menu.contains(event.target)) return;
-      closeObjectContextMenu();
-    };
-    const handleWindowResize = () => closeObjectContextMenu();
-
-    window.addEventListener('pointerdown', handleWindowPointerDown);
-    window.addEventListener('resize', handleWindowResize);
-    return () => {
-      window.removeEventListener('pointerdown', handleWindowPointerDown);
-      window.removeEventListener('resize', handleWindowResize);
-    };
-  }, [closeObjectContextMenu, objectContextMenu]);
-
-  useEffect(() => {
-    if (!objectContextMenu) return;
-    if (measureMode || isViewportInteracting) {
-      closeObjectContextMenu();
-      return;
-    }
-    if (!objects.some((obj) => obj.id === objectContextMenu.objectId)) {
-      closeObjectContextMenu();
-    }
-  }, [closeObjectContextMenu, isViewportInteracting, measureMode, objectContextMenu, objects]);
-
-  const updateHoverLabel = useCallback(
-    (obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
-      if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
-      event.stopPropagation();
-      setHoveredObjectId(obj.id);
-      const hoverName = resolveHoverObjectName(obj.name, knownFileNames);
-      if (!hoverName) {
-        // Pass no ID so the guard in hideHoverTooltip doesn't block clearing a stale tooltip
-        // that belongs to a different (now-occluded) object.
-        hideHoverTooltip();
-        return;
-      }
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      showHoverTooltip({
-        id: obj.id,
-        name: hoverName,
-        x: event.clientX - rect.left + 10,
-        y: event.clientY - rect.top + 12,
-      });
-    },
-    [hideHoverTooltip, isViewportInteracting, knownFileNames, measureMode, objectPickSyncEnabled, setHoveredObjectId, showHoverTooltip],
-  );
-
-  const clearHoverLabel = useCallback(
-    (obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
-      if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
-      event.stopPropagation();
-      if (hoveredObjectId === obj.id) setHoveredObjectId(null);
-      hideHoverTooltip(obj.id);
-    },
-    [hideHoverTooltip, hoveredObjectId, isViewportInteracting, measureMode, objectPickSyncEnabled, setHoveredObjectId],
-  );
-
-  const handleObjectClick = useCallback(
-    (obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
-      if (!objectPickSyncEnabled || measureMode || isViewportInteracting) return;
-      event.stopPropagation();
-      selectObject(obj.id);
-    },
-    [isViewportInteracting, measureMode, objectPickSyncEnabled, selectObject],
-  );
-
-  const handleObjectDoubleClick = useCallback(
-    (obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
-      if (measureMode || isViewportInteracting) return;
-      event.stopPropagation();
-      const additive = event.shiftKey || event.metaKey || event.ctrlKey;
-      focusObject(obj.id, { additive });
-    },
-    [focusObject, isViewportInteracting, measureMode],
-  );
-
-  const handleObjectContextMenu = useCallback(
-    (obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
-      if (measureMode || isViewportInteracting) return;
-      event.stopPropagation();
-      event.nativeEvent.preventDefault();
-      selectObject(obj.id);
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const x = Math.min(
-        Math.max(event.clientX - rect.left, OBJECT_CONTEXT_MENU_MARGIN),
-        Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.width - OBJECT_CONTEXT_MENU_WIDTH - OBJECT_CONTEXT_MENU_MARGIN),
-      );
-      const y = Math.min(
-        Math.max(event.clientY - rect.top, OBJECT_CONTEXT_MENU_MARGIN),
-        Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.height - OBJECT_CONTEXT_MENU_HEIGHT - OBJECT_CONTEXT_MENU_MARGIN),
-      );
-      // Capture the face normal in world space for face identification
-      let hitNormal: [number, number, number] | undefined;
-      if (event.face) {
-        const n = event.face.normal.clone().transformDirection(event.object.matrixWorld);
-        hitNormal = [n.x, n.y, n.z];
-      }
-      setObjectContextMenu({ objectId: obj.id, x, y, hitNormal });
-    },
-    [isViewportInteracting, measureMode, selectObject],
-  );
-
-  const handleHideObject = useCallback(() => {
-    if (!objectContextMenu) return;
-    setObjectVisibility(objectContextMenu.objectId, false);
-    closeObjectContextMenu();
-  }, [closeObjectContextMenu, objectContextMenu, setObjectVisibility]);
-
-  // Fetch face info asynchronously when the panel opens or switches object.
-  useEffect(() => {
-    if (!faceInfoPanel) {
-      setFaceInfoData(null);
-      return;
-    }
-    let cancelled = false;
-    setFaceInfoLoading(true);
-    evalWorkerClient
-      .fetchFaceInfo(faceInfoPanel.objectId)
-      .then((data) => {
-        if (cancelled) return;
-        setFaceInfoData(data);
-        setFaceInfoLoading(false);
-        // If we don't have a faceName yet, pick the best one now that we have the data.
-        if (!faceInfoPanel.faceName) {
-          let bestName: string | null = data.faceNames[0] ?? null;
-          if (faceInfoPanel.hitNormal && data.faceNames.length > 0) {
-            let bestDot = -Infinity;
-            for (const name of data.faceNames) {
-              try {
-                const n = data.faces[name]?.normal;
-                if (!n) continue;
-                const dot = n[0] * faceInfoPanel.hitNormal[0] + n[1] * faceInfoPanel.hitNormal[1] + n[2] * faceInfoPanel.hitNormal[2];
-                if (dot > bestDot) {
-                  bestDot = dot;
-                  bestName = name;
-                }
-              } catch {
-                /* skip */
-              }
-            }
-          }
-          if (bestName) setFaceInfoPanel((prev) => (prev ? { ...prev, faceName: bestName } : prev));
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setFaceInfoLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [faceInfoPanel?.objectId]);
-
-  const handleGetFaceInfo = useCallback(() => {
-    if (!objectContextMenu) return;
-    const obj = objects.find((o) => o.id === objectContextMenu.objectId);
-    if (!obj?.shape) {
-      closeObjectContextMenu();
-      return;
-    }
-    setFaceInfoData(null);
-    setFaceInfoPanel({
-      objectId: objectContextMenu.objectId,
-      faceName: null,
-      hitNormal: objectContextMenu.hitNormal ?? null,
-      x: objectContextMenu.x,
-      y: objectContextMenu.y,
-    });
-    closeObjectContextMenu();
-  }, [closeObjectContextMenu, objectContextMenu, objects]);
-
-  const handleSketchEntityClick = useCallback((entity: SketchHoveredEntity, clientX: number, clientY: number) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const panelWidth = 248;
-    const panelHeight = 160;
-    const x = Math.min(
-      Math.max(clientX - rect.left, OBJECT_CONTEXT_MENU_MARGIN),
-      Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.width - panelWidth - OBJECT_CONTEXT_MENU_MARGIN),
-    );
-    const y = Math.min(
-      Math.max(clientY - rect.top, OBJECT_CONTEXT_MENU_MARGIN),
-      Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.height - panelHeight - OBJECT_CONTEXT_MENU_MARGIN),
-    );
-    setSketchEntityInfo({ entity, x, y });
-  }, []);
-
-  const handleViewportPointerMissed = useCallback(
-    (event: MouseEvent) => {
-      if (measureMode) return;
-      if (useForgeStore.getState().constructionGhost !== null) {
-        useForgeStore.getState().setConstructionGhost(null);
-        return;
-      }
-      if (event.detail !== 2) return;
-      clearFocusedObject();
-    },
-    [clearFocusedObject, measureMode],
-  );
-
-  const handlePerformanceInfoChange = useCallback((stats: ViewportPerformanceInfo | null) => {
-    setPerformanceInfo(stats);
-  }, []);
+  };
 
   return (
     <div
@@ -884,7 +289,7 @@ export function Viewport() {
                   if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
                   const rect = containerRef.current?.getBoundingClientRect();
                   if (!rect) return;
-                  showHoverTooltip({
+                  handlers.showHoverTooltip({
                     id: `${obj.id}:${pointId}`,
                     name: pointId,
                     x: event.clientX - rect.left + 10,
@@ -1419,3 +824,4 @@ export function Viewport() {
     </div>
   );
 }
+
