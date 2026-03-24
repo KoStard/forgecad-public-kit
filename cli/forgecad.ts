@@ -28,6 +28,7 @@ import { runCaptureCli } from './forge-capture';
 import { runNotebookCli } from './forge-notebook';
 import { runReportCli } from './forge-report';
 import { runRenderCli } from './forge-render.mjs';
+import { runRenderHqCli } from './forge-render-hq';
 import { runSdfCli } from './forge-sdf';
 import { runUrdfCli } from './forge-urdf';
 import { runDevCli } from './forge-dev';
@@ -424,6 +425,43 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: runRenderCli,
+  },
+  {
+    group: 'Modeling',
+    path: ['render-hq'],
+    summary: 'High-quality render via Blender Cycles — path-traced, HDRI, material presets.',
+    usage: ['forgecad render-hq <script.forge.js|notebook.forge-notebook.json> [output.png] [options]'],
+    examples: [
+      'forgecad render-hq examples/cup.forge.js',
+      'forgecad render-hq examples/cup.forge.js hero.png --preset dramatic --samples 1024',
+      'forgecad render-hq examples/cup.forge.js --preset clay --size 2048',
+      'forgecad render-hq examples/cup.forge.js --transparent --preset glass',
+    ],
+    completion: {
+      options: [
+        { name: '--preset', description: 'Material/lighting preset', argument: 'required', valueLabel: '<name>', values: ['studio', 'outdoor', 'dramatic', 'clay', 'wireframe', 'glass', 'metallic', 'toon', 'xray', 'normals', 'silhouette'] },
+        { name: '--size', description: 'Square output size in pixels', argument: 'required', valueLabel: '<px>' },
+        { name: '--width', description: 'Output width in pixels', argument: 'required', valueLabel: '<px>' },
+        { name: '--height', description: 'Output height in pixels', argument: 'required', valueLabel: '<px>' },
+        { name: '--samples', description: 'Render samples (more = higher quality, slower)', argument: 'required', valueLabel: '<n>' },
+        { name: '--engine', description: 'Render engine', argument: 'required', valueLabel: '<cycles|eevee>', values: ['cycles', 'eevee'] },
+        { name: '--transparent', description: 'Transparent background (RGBA)' },
+        { name: '--no-denoise', description: 'Disable denoising' },
+        { name: '--hdri', description: 'Custom HDRI environment map path', argument: 'required', valueLabel: '<path.hdr>' },
+        { name: '--video', description: 'Render orbit turntable video (MP4)' },
+        { name: '--frames', description: 'Video frames per revolution', argument: 'required', valueLabel: '<n>' },
+        { name: '--fps', description: 'Video frame rate', argument: 'required', valueLabel: '<n>' },
+        { name: '--pitch', description: 'Camera pitch angle in degrees', argument: 'required', valueLabel: '<deg>' },
+        { name: '--quality', description: 'Mesh tessellation quality', argument: 'required', valueLabel: '<default|live|high>', values: ['default', 'live', 'high'] },
+        { name: '--backend', description: 'Geometry backend', argument: 'required', valueLabel: '<manifold|occt>', values: ['manifold', 'occt'] },
+        { name: '--output', description: 'Output file path', argument: 'required', valueLabel: '<path>' },
+      ],
+      positionals: [
+        { description: 'Forge script or notebook', valueKind: 'renderable' },
+        { description: 'output PNG path', valueKind: 'png' },
+      ],
+    },
+    run: (args) => runRenderHqCli(args),
   },
   {
     group: 'Modeling',
