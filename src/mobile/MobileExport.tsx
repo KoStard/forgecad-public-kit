@@ -45,26 +45,15 @@ export function MobileExport({ onClose }: Props) {
           </button>
         </div>
         {FORMATS.map(({ format, label, desc }) => (
-          <button
-            key={format}
-            className="fc-mobile-export-item"
-            onClick={() => handleExport(format)}
-            disabled={exporting !== null}
-          >
-            <span style={{ fontSize: 18 }}>
-              {exporting === format ? '\u23F3' : '\u{1F4E6}'}
-            </span>
+          <button key={format} className="fc-mobile-export-item" onClick={() => handleExport(format)} disabled={exporting !== null}>
+            <span style={{ fontSize: 18 }}>{exporting === format ? '\u23F3' : '\u{1F4E6}'}</span>
             <div>
               <div style={{ fontWeight: 600 }}>{label}</div>
               <div style={{ fontSize: 12, color: 'var(--fc-textMuted)' }}>{desc}</div>
             </div>
           </button>
         ))}
-        {error && (
-          <div style={{ padding: '8px 16px', color: 'var(--fc-error)', fontSize: 12 }}>
-            {error}
-          </div>
-        )}
+        {error && <div style={{ padding: '8px 16px', color: 'var(--fc-error)', fontSize: 12 }}>{error}</div>}
       </div>
     </div>
   );

@@ -33,9 +33,9 @@ const strokedCenterline = union2d(
   rect(bodyWidth, bodyHeight),
   stroke(roofRidge, radius * 2, 'Round'),
 ).color('#2a9d8f');
-const hulledCircles = union2d(
+const mergedCircles = union2d(
   rect(bodyWidth, bodyHeight),
-  hull2d(
+  union2d(
     circle2d(radius).translate(shoulderInset, bodyHeight + shoulderRise),
     circle2d(radius).translate(bodyWidth / 2, bodyHeight + peakRise),
     circle2d(radius).translate(bodyWidth - shoulderInset, bodyHeight + shoulderRise),
@@ -51,6 +51,6 @@ return [
   { name: "Raw polygon", sketch: rawProfile },
   { name: "offset(-r).offset(+r)", sketch: roundedAllCorners.translate(gap, 0) },
   { name: "stroke(..., 'Round')", sketch: strokedCenterline.translate(gap * 2, 0) },
-  { name: "hull2d() of circles", sketch: hulledCircles.translate(gap * 3, 0) },
+  { name: "union2d() of circles", sketch: mergedCircles.translate(gap * 3, 0) },
   { name: "filletCorners()", sketch: selectiveFillet.translate(gap * 4, 0) },
 ];

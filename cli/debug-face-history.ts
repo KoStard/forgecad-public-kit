@@ -8,9 +8,9 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { init, runScript } from '../src/forge/headless';
-import { collectProjectFiles } from './collect-files';
-import type { SceneObject } from '../src/forge/runner';
 import type { Shape } from '../src/forge/kernel';
+import type { SceneObject } from '../src/forge/runner';
+import { collectProjectFiles } from './collect-files';
 
 export async function runDebugFaceHistoryCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   if (argv.length < 1) {
@@ -54,7 +54,7 @@ export async function runDebugFaceHistoryCli(argv: string[] = process.argv.slice
     console.log(`Available faces: ${faceNames.join(', ')}`);
 
     // If a specific face was requested, only show that one
-    const facesToShow = targetFaceName ? faceNames.filter(n => n === targetFaceName) : faceNames;
+    const facesToShow = targetFaceName ? faceNames.filter((n) => n === targetFaceName) : faceNames;
 
     if (targetFaceName && facesToShow.length === 0) {
       console.log(`  Face "${targetFaceName}" not found on this object`);
@@ -91,4 +91,3 @@ export async function runDebugFaceHistoryCli(argv: string[] = process.argv.slice
 
   console.log('\n');
 }
-

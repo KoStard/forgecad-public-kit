@@ -16,9 +16,9 @@
  *   box(60, 30, 10).cut(label.onFace(/* top face * /), { depth: 0.5 });
  */
 
-import { Sketch } from './core';
-import { loadFont, fontText2d } from './fontText';
 import type opentype from 'opentype.js';
+import { Sketch } from './core';
+import { fontText2d, loadFont } from './fontText';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -95,12 +95,7 @@ export interface TextOptions {
  * text2d('V 2.0', { size: 6, align: 'center', baseline: 'center' })
  */
 export function text2d(content: string, options: TextOptions = {}): Sketch {
-  const {
-    size = 10,
-    letterSpacing = 0,
-    align = 'left',
-    baseline = 'baseline',
-  } = options;
+  const { size = 10, letterSpacing = 0, align = 'left', baseline = 'baseline' } = options;
 
   if (typeof content !== 'string') {
     throw new TypeError('text2d: content must be a string');
@@ -114,9 +109,7 @@ export function text2d(content: string, options: TextOptions = {}): Sketch {
 
   // Resolve font: use provided font, or default to bundled Inter
   const fontSource = options.font ?? 'sans-serif';
-  const font = typeof fontSource === 'string'
-    ? loadFont(fontSource)
-    : fontSource;
+  const font = typeof fontSource === 'string' ? loadFont(fontSource) : fontSource;
 
   return fontText2d(font, content, {
     size,
@@ -132,11 +125,9 @@ export function textWidth(content: string, options: Pick<TextOptions, 'size' | '
   const { size = 10, letterSpacing = 0 } = options;
 
   const fontSource = options.font ?? 'sans-serif';
-  const font = typeof fontSource === 'string'
-    ? loadFont(fontSource)
-    : fontSource;
+  const font = typeof fontSource === 'string' ? loadFont(fontSource) : fontSource;
 
-  const unitsPerEm = font.unitsPerEm;
+  const _unitsPerEm = font.unitsPerEm;
   const capHeight = (font.tables as any).os2?.sCapHeight || font.ascender;
   const scale = size / capHeight;
 

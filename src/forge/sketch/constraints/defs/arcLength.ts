@@ -35,11 +35,8 @@ registerConstraint<'arcLength', ConstraintTypeMap['arcLength']>({
     const start = points.get(arc.start);
     if (!center || !start) return [0, 0];
     const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
-    const midAngle = startAngle + (arc.clockwise ? -1 : 1) * Math.PI / 4;
-    return [
-      center.x + (arc.radius + 8) * Math.cos(midAngle),
-      center.y + (arc.radius + 8) * Math.sin(midAngle),
-    ];
+    const midAngle = startAngle + ((arc.clockwise ? -1 : 1) * Math.PI) / 4;
+    return [center.x + (arc.radius + 8) * Math.cos(midAngle), center.y + (arc.radius + 8) * Math.sin(midAngle)];
   },
 
   displayAnnotations(c, { arcs, points }): AnnotationElement[] {
@@ -49,11 +46,8 @@ registerConstraint<'arcLength', ConstraintTypeMap['arcLength']>({
     const start = points.get(arc.start);
     if (!center || !start) return [];
     const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
-    const midAngle = startAngle + (arc.clockwise ? -1 : 1) * Math.PI / 4;
-    const pos: [number, number] = [
-      center.x + (arc.radius + 8) * Math.cos(midAngle),
-      center.y + (arc.radius + 8) * Math.sin(midAngle),
-    ];
+    const midAngle = startAngle + ((arc.clockwise ? -1 : 1) * Math.PI) / 4;
+    const pos: [number, number] = [center.x + (arc.radius + 8) * Math.cos(midAngle), center.y + (arc.radius + 8) * Math.sin(midAngle)];
     return [{ kind: 'text', position: pos, text: `⌒${c.value}` }];
   },
 });

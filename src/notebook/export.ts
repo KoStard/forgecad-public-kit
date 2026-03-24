@@ -8,10 +8,7 @@ export function notebookDefaultScriptPath(notebookPath: string): string {
   return `${notebookPath}.forge.js`;
 }
 
-export function exportNotebookToForgeScript(
-  notebookText: string,
-  notebookPath: string,
-): string {
+export function exportNotebookToForgeScript(notebookText: string, notebookPath: string): string {
   const notebook = parseNotebook(notebookText);
   const compiled = compileNotebookProgram(notebook, { mode: 'display' });
   const sourceName = notebookPath.replace(/\\/g, '/').split('/').pop() ?? notebookPath;

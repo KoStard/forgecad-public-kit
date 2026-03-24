@@ -6,7 +6,7 @@
  */
 import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
 import { registerConstraint } from '../registry';
-import { midpoint, midpointPerp, distance, lineDirection } from '../helpers';
+import { midpointPerp } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -40,7 +40,8 @@ registerConstraint<'length', ConstraintTypeMap['length']>({
   displayAnnotations(c, { lines, points }): AnnotationElement[] {
     const line = lines.get(c.line);
     if (!line) return [];
-    const a = points.get(line.a), b = points.get(line.b);
+    const a = points.get(line.a),
+      b = points.get(line.b);
     if (!a || !b) return [];
     return [{ kind: 'dimension', from: [a.x, a.y], to: [b.x, b.y], offset: 3, value: String(c.value) }];
   },

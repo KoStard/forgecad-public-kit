@@ -1,7 +1,7 @@
 // Edge Query API Demo — selecting and filleting edges on arbitrary shapes
 //
 // Demonstrates selectEdge(), selectEdges(), and filletEdgeSegment()
-// on shapes built from booleans and hulls (not just box().edge('vert-bl')).
+// on shapes built from booleans (not just box().edge('vert-bl')).
 
 // --- Simple: fillet a boolean result ---
 const base = box(40, 30, 20);

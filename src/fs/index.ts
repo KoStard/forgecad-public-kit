@@ -1,8 +1,8 @@
+import { BrowserStorageProvider } from './BrowserStorageProvider';
 import type { FileSystemProvider } from './FileSystemProvider';
 import { LocalStudioProvider } from './LocalStudioProvider';
-import { BrowserStorageProvider } from './BrowserStorageProvider';
 
-export type { FileSystemProvider, FileSystemCapabilities, FileChangeEvent } from './FileSystemProvider';
+export type { FileChangeEvent, FileSystemCapabilities, FileSystemProvider } from './FileSystemProvider';
 
 /**
  * The active file system provider for this build.
@@ -12,7 +12,4 @@ export type { FileSystemProvider, FileSystemCapabilities, FileChangeEvent } from
  *
  * __FORGE_MODE__ is injected at build time by vite.config.ts.
  */
-export const fileSystem: FileSystemProvider =
-  __FORGE_MODE__ === 'web'
-    ? new BrowserStorageProvider()
-    : new LocalStudioProvider();
+export const fileSystem: FileSystemProvider = __FORGE_MODE__ === 'web' ? new BrowserStorageProvider() : new LocalStudioProvider();

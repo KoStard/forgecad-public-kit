@@ -5,11 +5,7 @@
  * all 2D operations to OCCT's BRep API.
  */
 
-import {
-  PROFILE_BACKEND_MARKER,
-  type ProfileBackend,
-  type ProfileBounds,
-} from '../../profileBackend';
+import { PROFILE_BACKEND_MARKER, type ProfileBackend, type ProfileBounds } from '../../profileBackend';
 import type { ShapeBackend } from '../../shapeBackend';
 import { getOCCT, type OCCTModule } from './init';
 import { wrapOCCTShapeBackend } from './shapeBackend';
@@ -54,21 +50,13 @@ function extractPolygonsFromFace(oc: OCCTModule, face: any): number[][][] {
   new oc.BRepMesh_IncrementalMesh_2(face, 0.01, false, 0.1, false);
 
   const loops: number[][][] = [];
-  const wireExpl = new oc.TopExp_Explorer_2(
-    face,
-    oc.TopAbs_ShapeEnum.TopAbs_WIRE,
-    oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  );
+  const wireExpl = new oc.TopExp_Explorer_2(face, oc.TopAbs_ShapeEnum.TopAbs_WIRE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
 
   while (wireExpl.More()) {
     const wire = oc.TopoDS.Wire_1(wireExpl.Current());
     const points: number[][] = [];
 
-    const edgeExpl = new oc.TopExp_Explorer_2(
-      wire,
-      oc.TopAbs_ShapeEnum.TopAbs_EDGE,
-      oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-    );
+    const edgeExpl = new oc.TopExp_Explorer_2(wire, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
 
     while (edgeExpl.More()) {
       const edge = oc.TopoDS.Edge_1(edgeExpl.Current());
@@ -96,9 +84,7 @@ function extractPolygonsFromFace(oc: OCCTModule, face: any): number[][][] {
           // Check edge orientation: if reversed, swap parameter direction
           const isReversed = edge.Orientation_1() === oc.TopAbs_Orientation.TopAbs_REVERSED;
           for (let i = 0; i < steps; i++) {
-            const t = isReversed
-              ? t1 - (i / steps) * (t1 - t0)
-              : t0 + (i / steps) * (t1 - t0);
+            const t = isReversed ? t1 - (i / steps) * (t1 - t0) : t0 + (i / steps) * (t1 - t0);
             const pt = curveObj.Value(t);
             points.push([pt.X(), pt.Y()]);
           }
@@ -185,11 +171,7 @@ export class OCCTProfileBackend implements ProfileBackend {
       const oc = getOCCT();
       if (this.face.IsNull()) return true;
       // Check if face has any wires
-      const wireExpl = new oc.TopExp_Explorer_2(
-        this.face,
-        oc.TopAbs_ShapeEnum.TopAbs_WIRE,
-        oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-      );
+      const wireExpl = new oc.TopExp_Explorer_2(this.face, oc.TopAbs_ShapeEnum.TopAbs_WIRE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
       return !wireExpl.More();
     } catch {
       return true;
@@ -217,10 +199,7 @@ export class OCCTProfileBackend implements ProfileBackend {
   rotate(degrees: number): ProfileBackend {
     const oc = getOCCT();
     const trsf = new oc.gp_Trsf_1();
-    trsf.SetRotation_1(
-      new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(0, 0, 1)),
-      degrees * Math.PI / 180,
-    );
+    trsf.SetRotation_1(new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(0, 0, 1)), (degrees * Math.PI) / 180);
     return new OCCTProfileBackend(applyTrsf(oc, this.face, trsf));
   }
 
@@ -247,32 +226,21 @@ export class OCCTProfileBackend implements ProfileBackend {
   mirror(ax: [number, number]): ProfileBackend {
     const oc = getOCCT();
     const trsf = new oc.gp_Trsf_1();
-    trsf.SetMirror_3(new oc.gp_Ax2_3(
-      new oc.gp_Pnt_3(0, 0, 0),
-      new oc.gp_Dir_4(ax[0], ax[1], 0),
-    ));
+    trsf.SetMirror_3(new oc.gp_Ax2_3(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(ax[0], ax[1], 0)));
     return new OCCTProfileBackend(applyTrsf(oc, this.face, trsf));
   }
 
   // ── 2D Operations ──────────────────────────────────────────────
 
-  offset(delta: number, join: 'Square' | 'Round' | 'Miter'): ProfileBackend {
+  offset(delta: number, _join: 'Square' | 'Round' | 'Miter'): ProfileBackend {
     const oc = getOCCT();
     // OCCT offset only supports Arc join; map all join types to it
-    const offsetMaker = new oc.BRepOffsetAPI_MakeOffset_2(
-      this.face,
-      oc.GeomAbs_JoinType.GeomAbs_Arc,
-      false,
-    );
+    const offsetMaker = new oc.BRepOffsetAPI_MakeOffset_2(this.face, oc.GeomAbs_JoinType.GeomAbs_Arc, false);
     offsetMaker.Perform(delta, 0);
     if (offsetMaker.IsDone()) {
       return new OCCTProfileBackend(shapeToFace(oc, offsetMaker.Shape()));
     }
     return this; // Fallback: return unchanged
-  }
-
-  hull(): ProfileBackend {
-    throw new Error('OCCTProfileBackend.hull() is not supported — use Manifold backend for hull operations');
   }
 
   simplify(_epsilon: number): ProfileBackend {
@@ -294,11 +262,7 @@ export class OCCTProfileBackend implements ProfileBackend {
     const mkFace = new oc.BRepBuilderAPI_MakeFace_15(outerWire, true);
 
     // Re-add existing holes
-    const wireExpl = new oc.TopExp_Explorer_2(
-      this.face,
-      oc.TopAbs_ShapeEnum.TopAbs_WIRE,
-      oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-    );
+    const wireExpl = new oc.TopExp_Explorer_2(this.face, oc.TopAbs_ShapeEnum.TopAbs_WIRE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
     while (wireExpl.More()) {
       const wire = oc.TopoDS.Wire_1(wireExpl.Current());
       if (!wire.IsSame(outerWire)) mkFace.Add(wire);
@@ -314,13 +278,7 @@ export class OCCTProfileBackend implements ProfileBackend {
 
   // ── 3D Conversions ─────────────────────────────────────────────
 
-  extrude(
-    height: number,
-    _divisions: number,
-    _twist: number,
-    _scaleTop?: [number, number],
-    center?: boolean,
-  ): ShapeBackend {
+  extrude(height: number, _divisions: number, _twist: number, _scaleTop?: [number, number], center?: boolean): ShapeBackend {
     const oc = getOCCT();
     const vec = new oc.gp_Vec_4(0, 0, height);
     const prism = new oc.BRepPrimAPI_MakePrism_1(this.face, vec, false, true);
@@ -336,22 +294,16 @@ export class OCCTProfileBackend implements ProfileBackend {
     return wrapOCCTShapeBackend(result);
   }
 
-  revolve(segments: number, degrees: number): ShapeBackend {
+  revolve(_segments: number, degrees: number): ShapeBackend {
     const oc = getOCCT();
 
     // Rotate face from XY to XZ plane (Manifold convention: 2D-X → radial, 2D-Y → Z)
     const rot = new oc.gp_Trsf_1();
-    rot.SetRotation_1(
-      new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(1, 0, 0)),
-      Math.PI / 2,
-    );
+    rot.SetRotation_1(new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(1, 0, 0)), Math.PI / 2);
     const rotatedFace = applyTrsf(oc, this.face, rot);
 
-    const axis = new oc.gp_Ax1_2(
-      new oc.gp_Pnt_3(0, 0, 0),
-      new oc.gp_Dir_4(0, 0, 1),
-    );
-    const radians = degrees * Math.PI / 180;
+    const axis = new oc.gp_Ax1_2(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Dir_4(0, 0, 1));
+    const radians = (degrees * Math.PI) / 180;
     const revol = new oc.BRepPrimAPI_MakeRevol_1(rotatedFace, axis, radians, true);
     revol.Build(new oc.Message_ProgressRange_1());
     if (!revol.IsDone()) {

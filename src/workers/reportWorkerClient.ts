@@ -1,6 +1,6 @@
 import type { ForgeQualityPreset, ReportGenerationResult, ReportObjectVisual } from '@forge/index';
-import type { ReportWorkerRequest, ReportWorkerResponse } from './reportWorkerProtocol';
 import type { LengthUnit } from '@forge/units';
+import type { ReportWorkerRequest, ReportWorkerResponse } from './reportWorkerProtocol';
 
 interface GenerateReportInWorkerOptions {
   files: Record<string, string>;

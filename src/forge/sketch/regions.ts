@@ -9,8 +9,8 @@
  * internally by the SVG import pipeline.
  */
 
-import { Sketch, copySketchPlacement3D } from './core';
 import { difference2d } from './booleans';
+import { copySketchPlacement3D, Sketch } from './core';
 import { polygon } from './primitives';
 
 type Vec2 = [number, number];
@@ -74,8 +74,7 @@ function pointInPolygon(point: Vec2, poly: Vec2[]): boolean {
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i];
     const [xj, yj] = poly[j];
-    if (((yi > py) !== (yj > py))
-        && (px < ((xj - xi) * (py - yi)) / ((yj - yi) || 1e-20) + xi)) {
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi || 1e-20) + xi) {
       inside = !inside;
     }
   }
@@ -119,9 +118,7 @@ function extractRegionCandidates(sketch: Sketch): RegionCandidate[] {
     // All contours wound CW — treat largest as outer
     const fallbackPts = loops[0].points;
     const fb = polygon(fallbackPts);
-    return fb.isEmpty()
-      ? []
-      : [{ sketch: fb, area: fb.area(), outerPoints: fallbackPts, holePoints: [] }];
+    return fb.isEmpty() ? [] : [{ sketch: fb, area: fb.area(), outerPoints: fallbackPts, holePoints: [] }];
   }
 
   // Nest holes into their smallest containing outer boundary
@@ -130,9 +127,7 @@ function extractRegionCandidates(sketch: Sketch): RegionCandidate[] {
     holes: [] as LoopInfo[],
   }));
   for (const hole of holes) {
-    const containers = regions
-      .filter((r) => pointInPolygon(hole.sample, r.outer.points))
-      .sort((a, b) => a.outer.absArea - b.outer.absArea);
+    const containers = regions.filter((r) => pointInPolygon(hole.sample, r.outer.points)).sort((a, b) => a.outer.absArea - b.outer.absArea);
     if (containers.length > 0) {
       containers[0].holes.push(hole);
     }
@@ -237,9 +232,9 @@ export function sketchRegion(sketch: Sketch, seed: [number, number]): Sketch {
   }
 
   throw new Error(
-    `sketch.region(): seed point [${seed[0]}, ${seed[1]}] is not inside any of the `
-    + `${candidates.length} filled region(s). The seed must lie strictly inside the filled area `
-    + '(not on a boundary edge or inside a hole).',
+    `sketch.region(): seed point [${seed[0]}, ${seed[1]}] is not inside any of the ` +
+      `${candidates.length} filled region(s). The seed must lie strictly inside the filled area ` +
+      '(not on a boundary edge or inside a hole).',
   );
 }
 

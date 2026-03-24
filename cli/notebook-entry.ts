@@ -39,10 +39,7 @@ export function materializeNotebookPreviewScript(inputPath: string): Materialize
   const notebookText = readFileSync(originalPath, 'utf-8');
   const scriptText = exportNotebookToForgeScript(notebookText, originalPath);
   const notebookBase = basename(originalPath, NOTEBOOK_FILE_EXTENSION);
-  const tempPath = join(
-    dirname(originalPath),
-    `.${notebookBase}.forge-cli-preview-${process.pid}-${Date.now()}.forge.js`,
-  );
+  const tempPath = join(dirname(originalPath), `.${notebookBase}.forge-cli-preview-${process.pid}-${Date.now()}.forge.js`);
   writeFileSync(tempPath, scriptText, 'utf-8');
 
   let cleaned = false;

@@ -156,7 +156,7 @@
   color: var(--fc-text);
   border: none;
   padding: 12px;
-  font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
   font-size: 13px;
   line-height: 1.5;
   resize: none;
@@ -316,7 +316,7 @@
   top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--fc-bgOverlay, rgba(0,0,0,0.7));
+  background: var(--fc-bgOverlay, rgba(0, 0, 0, 0.7));
   color: var(--fc-text);
   padding: 4px 12px;
   border-radius: 12px;
@@ -333,7 +333,7 @@
   background: var(--fc-errorBg);
   color: var(--fc-error);
   font-size: 12px;
-  font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-word;
@@ -355,7 +355,9 @@
 /* ─── Spinner ─── */
 
 @keyframes fc-mobile-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .fc-mobile-spinner {

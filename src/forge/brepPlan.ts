@@ -6,19 +6,19 @@
  * the CadQuery/OCCT naming.
  */
 export type {
-  CadQueryProfileTransformStep as BrepProfileTransformStep,
   CadQueryProfilePlan as BrepProfilePlan,
-  CadQueryShapeTransformStep as BrepShapeTransformStep,
+  CadQueryProfileTransformStep as BrepProfileTransformStep,
   CadQueryShapePlan as BrepShapePlan,
+  CadQueryShapeTransformStep as BrepShapeTransformStep,
 } from './cadqueryPlan';
 
 export {
-  cloneCadQueryProfilePlan as cloneBrepProfilePlan,
-  cloneCadQueryShapePlan as cloneBrepShapePlan,
   appendCadQueryProfileTransform as appendBrepProfileTransform,
   appendCadQueryShapeTransform as appendBrepShapeTransform,
   appendCadQueryShapeTransforms as appendBrepShapeTransforms,
   buildCadQueryBooleanPlan as buildBrepBooleanPlan,
   buildCadQueryBooleanProfilePlan as buildBrepBooleanProfilePlan,
   buildCadQueryOffsetProfilePlan as buildBrepOffsetProfilePlan,
+  cloneCadQueryProfilePlan as cloneBrepProfilePlan,
+  cloneCadQueryShapePlan as cloneBrepShapePlan,
 } from './cadqueryPlan';

@@ -12,17 +12,25 @@ ForgeCAD has two overlapping interfaces for build and dev tasks. Use the right o
 | **Humans developing ForgeCAD** | `npm run dev` (live reload), `npm run build` (prod), `forgecad check suite` | — |
 | **CI / pre-publish** | `npm run build && npm run test` | forgecad CLI (not installed in CI) |
 
-**Important**: Always use `node dist-cli/forgecad.js` (local build) instead of the global `forgecad` command. The global binary may be an older installed version that doesn't reflect local source changes. After editing TS source, run `npm run build:cli` to rebuild, then use `node dist-cli/forgecad.js` to run.
+**Important**: Always use `node dist-cli/forgecad.js` (local build) instead of the global `forgecad` command. The global binary may be an older installed version that doesn't reflect local source changes.
+
+### Rebuilding after source changes
+
+| Command | What it does |
+|---------|-------------|
+| `npm run refresh` | Rebuild **all** derived artifacts (CLI, types, docs, skill) in correct order with parallelism. Run this after editing TS source. |
+| `npm run refresh -- --no-cli` | Same but skip CLI rebuild (faster, use when only API/docs changed) |
+| `forgecad dev` / `npm run dev` | Vite dev server — auto-rebuilds types, docs, and skill on file changes. No manual refresh needed during active dev. |
+
+After `npm run refresh`, use `node dist-cli/forgecad.js` to run CLI commands. Do not use the global `forgecad` binary — it won't reflect local changes.
 
 ### Dev server commands
 
 | Command | When to use |
 |---------|------------|
-| `forgecad dev [path]` | Active development — Vite dev server, live reload, no build needed |
+| `forgecad dev [path]` | Active development — Vite dev server, live reload, auto-refreshes types/docs/skill |
 | `forgecad studio [path]` | Production server — requires `dist/` to be built (`npm run build`) |
 | `npm run dev` | Same as `forgecad dev` for humans; conventional JS-project entry point |
-
-After editing TS source files, rebuild the CLI with `npm run build:cli`, then use `node dist-cli/forgecad.js` to run commands. Do not use the global `forgecad` binary — it won't reflect local changes.
 
 ## React Performance: Stable References in Render Bodies
 
@@ -65,7 +73,21 @@ pointOnLine(point: any, line: any): this {
 }
 ```
 
+## Compile Plans Are Non-Optional
+
+**Every `Sketch` must have a real `ProfileCompilePlan`. Every `Shape` must have a real `ShapeCompilePlan`.** There are no nulls, no "opaque" markers, no fallback paths. If a compile plan is missing, that's a bug to fix at the source — never work around it downstream.
+
+Rules:
+1. **Never use `new Sketch(cross)` in isolation.** The constructor snapshots the cross-section as a polygon plan, but prefer the sketch-level API (`circle2d`, `polygon`, `rect`, `.add()`, `.subtract()`) which builds proper parametric plans.
+2. **Never bypass the sketch API with raw `.cross` operations** (e.g. `sketch.cross.subtract(other.cross)`). This drops the compile plan. Use `.subtract()`, `difference2d()`, etc.
+3. **When a downstream transform crashes because a plan is missing, trace back to where the plan was lost and fix the construction** — don't add null-checks or fallbacks in the transform methods.
+4. **If an operation produces a `CrossSection` without a plan** (e.g. section cuts, backend-level simplify), snapshot the result via `profilePlanFromCrossSection(cross)` which captures the polygon loops as a real plan.
+
 ## Approach
 If you hit a moment you don't know how to proceed, take the scientist hat of experiments, only reality can give us the data, so we should run experiments, analyse, capture, iterate. If unsure about the science, take the first principles book approach.
 
 Our design goal should be to prevent parameter hacking. It should work automatically and smoothly without microoptimizing magic numbers.
+
+### Omotenashi
+
+Always do house keeping. Finding small cleanup places, do it.

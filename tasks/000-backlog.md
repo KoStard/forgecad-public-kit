@@ -1,1 +1,0 @@
-When showing a sketch, show all lines, not just the shape.

@@ -1,23 +1,8 @@
-import {
-  cloneFaceQueryRef,
-  cloneShapeQueryOwner,
-  type ShapeQueryOwner,
-} from '../queryModel';
-import {
-  Shape,
-  getShapeCompilePlan,
-  getShapePrimaryQueryOwner,
-  resolveAnchor3D,
-} from '../kernel';
-import { Transform, type Mat4, type Vec3 } from '../transform';
-import {
-  Sketch,
-  type Anchor,
-  type SketchFace3D,
-  type SketchPlacementModel,
-  type SketchWorkplane,
-} from './core';
-import { TrackedShape, type FaceRef } from './topology';
+import { getShapeCompilePlan, getShapePrimaryQueryOwner, resolveAnchor3D, Shape } from '../kernel';
+import { cloneFaceQueryRef, cloneShapeQueryOwner, type ShapeQueryOwner } from '../queryModel';
+import { type Mat4, Transform, type Vec3 } from '../transform';
+import { type Anchor, Sketch, type SketchFace3D, type SketchPlacementModel, type SketchWorkplane } from './core';
+import { type FaceRef, TrackedShape } from './topology';
 
 export type ShapeAnchorTarget = Shape | TrackedShape | { _bbox(): { min: number[]; max: number[] } };
 export type SketchFaceTarget = SketchFace3D | string | FaceRef;
@@ -31,15 +16,24 @@ function getSketchAnchorPoint(sketch: Sketch, anchor: Anchor): [number, number] 
   const cy = (minY + maxY) / 2;
 
   switch (anchor) {
-    case 'center': return [cx, cy];
-    case 'top-left': return [minX, maxY];
-    case 'top-right': return [maxX, maxY];
-    case 'bottom-left': return [minX, minY];
-    case 'bottom-right': return [maxX, minY];
-    case 'top': return [cx, maxY];
-    case 'bottom': return [cx, minY];
-    case 'left': return [minX, cy];
-    case 'right': return [maxX, cy];
+    case 'center':
+      return [cx, cy];
+    case 'top-left':
+      return [minX, maxY];
+    case 'top-right':
+      return [maxX, maxY];
+    case 'bottom-left':
+      return [minX, minY];
+    case 'bottom-right':
+      return [maxX, minY];
+    case 'top':
+      return [cx, maxY];
+    case 'bottom':
+      return [cx, minY];
+    case 'left':
+      return [minX, cy];
+    case 'right':
+      return [maxX, cy];
   }
 }
 
@@ -63,20 +57,13 @@ function resolveTargetQueryOwner(target: ShapeAnchorTarget): ShapeQueryOwner | u
 }
 
 function isCanonicalFace(face: string): face is SketchFace3D {
-  return face === 'front'
-    || face === 'back'
-    || face === 'left'
-    || face === 'right'
-    || face === 'top'
-    || face === 'bottom';
+  return face === 'front' || face === 'back' || face === 'left' || face === 'right' || face === 'top' || face === 'bottom';
 }
 
 function isFaceRef(value: unknown): value is FaceRef {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<FaceRef>;
-  return typeof candidate.name === 'string'
-    && Array.isArray(candidate.normal)
-    && Array.isArray(candidate.center);
+  return typeof candidate.name === 'string' && Array.isArray(candidate.normal) && Array.isArray(candidate.center);
 }
 
 function buildCanonicalFaceBasis(face: SketchFace3D): { u: Vec3; v: Vec3; normal: Vec3 } {
@@ -91,7 +78,6 @@ function buildCanonicalFaceBasis(face: SketchFace3D): { u: Vec3; v: Vec3; normal
       return { u: [0, 1, 0], v: [0, 0, 1], normal: [1, 0, 0] };
     case 'bottom':
       return { u: [1, 0, 0], v: [0, -1, 0], normal: [0, 0, -1] };
-    case 'top':
     default:
       return { u: [1, 0, 0], v: [0, 1, 0], normal: [0, 0, 1] };
   }
@@ -140,14 +126,13 @@ function availablePlanarFaceNames(parent: TrackedShape): string[] {
 
 function isGenericMissingFaceError(error: unknown, face: string): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return message === `Face "${face}" is not available. Supported faces: none`
-    || message.startsWith(`Face "${face}" is not available. Supported faces: `);
+  return (
+    message === `Face "${face}" is not available. Supported faces: none` ||
+    message.startsWith(`Face "${face}" is not available. Supported faces: `)
+  );
 }
 
-export function resolveSketchWorkplane(
-  parentOrFace: ShapeAnchorTarget | FaceRef,
-  face?: SketchFaceTarget,
-): SketchWorkplane {
+export function resolveSketchWorkplane(parentOrFace: ShapeAnchorTarget | FaceRef, face?: SketchFaceTarget): SketchWorkplane {
   if (isFaceRef(parentOrFace)) {
     return resolvePlanarFaceWorkplane(parentOrFace);
   }
@@ -206,19 +191,40 @@ export function resolveSketchWorkplane(
 
 function placementMatrix(basisU: Vec3, basisV: Vec3, normal: Vec3, origin: Vec3): Mat4 {
   return [
-    basisU[0], basisU[1], basisU[2], 0,
-    basisV[0], basisV[1], basisV[2], 0,
-    normal[0], normal[1], normal[2], 0,
-    origin[0], origin[1], origin[2], 1,
+    basisU[0],
+    basisU[1],
+    basisU[2],
+    0,
+    basisV[0],
+    basisV[1],
+    basisV[2],
+    0,
+    normal[0],
+    normal[1],
+    normal[2],
+    0,
+    origin[0],
+    origin[1],
+    origin[2],
+    1,
   ];
 }
 
 export function buildSketchPlacementMatrix(sketch: Sketch, model: SketchPlacementModel): Mat4 {
   const [anchorX, anchorY] = getSketchAnchorPoint(sketch, model.selfAnchor);
   const origin: Vec3 = [
-    model.workplane.origin[0] + model.workplane.u[0] * model.u + model.workplane.v[0] * model.v + model.workplane.normal[0] * model.protrude,
-    model.workplane.origin[1] + model.workplane.u[1] * model.u + model.workplane.v[1] * model.v + model.workplane.normal[1] * model.protrude,
-    model.workplane.origin[2] + model.workplane.u[2] * model.u + model.workplane.v[2] * model.v + model.workplane.normal[2] * model.protrude,
+    model.workplane.origin[0] +
+      model.workplane.u[0] * model.u +
+      model.workplane.v[0] * model.v +
+      model.workplane.normal[0] * model.protrude,
+    model.workplane.origin[1] +
+      model.workplane.u[1] * model.u +
+      model.workplane.v[1] * model.v +
+      model.workplane.normal[1] * model.protrude,
+    model.workplane.origin[2] +
+      model.workplane.u[2] * model.u +
+      model.workplane.v[2] * model.v +
+      model.workplane.normal[2] * model.protrude,
   ];
 
   const basePlacement = placementMatrix(model.workplane.u, model.workplane.v, model.workplane.normal, origin);

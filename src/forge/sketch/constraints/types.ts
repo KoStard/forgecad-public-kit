@@ -107,10 +107,7 @@ export interface SketchBezier {
 }
 
 /** A segment in a mixed line/arc/bezier profile loop. */
-export type ProfileSegment =
-  | { kind: 'line'; line: LineId }
-  | { kind: 'arc'; arc: ArcId }
-  | { kind: 'bezier'; bezier: BezierId };
+export type ProfileSegment = { kind: 'line'; line: LineId } | { kind: 'arc'; arc: ArcId } | { kind: 'bezier'; bezier: BezierId };
 
 export type SketchLoop =
   | { type: 'poly'; points: PointId[] }
@@ -127,27 +124,25 @@ export type AnnotationElement =
   /** Dimension line with extension lines (length, distance). */
   | { kind: 'dimension'; from: [number, number]; to: [number, number]; offset: number; value: string }
   /** Angle arc between two directions (angle, absoluteAngle). */
-  | { kind: 'angle-arc'; center: [number, number]; startAngle: number; endAngle: number;
-      radius: number; value: string }
+  | { kind: 'angle-arc'; center: [number, number]; startAngle: number; endAngle: number; radius: number; value: string }
   /** Fallback text label for constraints not yet migrated to annotations. */
   | { kind: 'text'; position: [number, number]; text: string };
 
 /** Named symbols rendered as SVG paths, not Unicode glyphs. */
 export type ConstraintSymbol =
-  | 'parallel'       // >> tick marks
-  | 'equal'          // = double line
-  | 'perpendicular'  // right-angle box
-  | 'horizontal'     // H
-  | 'vertical'       // V
-  | 'fixed'          // ground/anchor hatching
-  | 'midpoint'       // diamond
-  | 'coincident'     // target dot
-  | 'collinear'      // dot on line
-  | 'tangent'        // T
-  | 'concentric'     // concentric circles
-  | 'ccw'            // curved arrow
-  | 'symmetric'      // mirror axis mark
-  ;
+  | 'parallel' // >> tick marks
+  | 'equal' // = double line
+  | 'perpendicular' // right-angle box
+  | 'horizontal' // H
+  | 'vertical' // V
+  | 'fixed' // ground/anchor hatching
+  | 'midpoint' // diamond
+  | 'coincident' // target dot
+  | 'collinear' // dot on line
+  | 'tangent' // T
+  | 'concentric' // concentric circles
+  | 'ccw' // curved arrow
+  | 'symmetric'; // mirror axis mark
 
 // ─── Constraint display ───────────────────────────────────────────────────────
 
@@ -208,7 +203,15 @@ export interface SketchConstraintMeta {
   edges: {
     lines: { id: string; name?: string; a: [number, number]; b: [number, number] }[];
     circles: { id: string; name?: string; center: [number, number]; radius: number }[];
-    arcs: { id: string; name?: string; center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
+    arcs: {
+      id: string;
+      name?: string;
+      center: [number, number];
+      start: [number, number];
+      end: [number, number];
+      radius: number;
+      clockwise: boolean;
+    }[];
     beziers: { id: string; name?: string; points: [number, number][] }[];
     points: { id: string; pos: [number, number] }[];
   };
@@ -283,8 +286,80 @@ export interface SolverMetadata {
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ConstraintTypeMap {}
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface ConstraintBuilderMethods {}
+export interface ConstraintBuilderMethods {
+  // ─── Path construction ───────────────────────────────────────────────────────
+  moveTo(x: number, y: number): this;
+  lineTo(x: number, y: number): this;
+  lineH(dx: number): this;
+  lineV(dy: number): this;
+  lineAngled(length: number, degrees: number): this;
+  arcTo(x: number, y: number, radius: number, clockwise?: boolean): this;
+  arcByCenter(centerId: PointId, startId: PointId, endId: PointId, clockwise?: boolean, name?: string): ArcId;
+  bezier(p0: any, p1: any, p2: any, p3: any, name?: string): BezierId;
+  bezierTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): this;
+  blendTo(x: number, y: number, weight?: number): this;
+  close(): this;
+  addLoopCircle(center: PointId, radius: number, segments?: number): this;
+  addLoop(points: any[]): this;
+  addProfileLoop(segments: Array<{ kind: 'line'; line: any } | { kind: 'arc'; arc: any } | { kind: 'bezier'; bezier: any }>): this;
+
+  // ─── Geometric constraints ───────────────────────────────────────────────────
+  horizontal(line: any): this;
+  vertical(line: any): this;
+  parallel(a: any, b: any): this;
+  sameDirection(a: any, b: any): this;
+  oppositeDirection(a: any, b: any): this;
+  blockRotation(points: any[], axis?: 'x' | 'y'): this;
+  perpendicular(a: any, b: any): this;
+  tangent(a: any, b: any): this;
+  equal(a: any, b: any): this;
+  coincident(a: any, b: any): this;
+  concentric(a: any, b: any): this;
+  collinear(point: any, line: any): this;
+  symmetric(a: any, b: any, axis: any): this;
+  fix(point: any, x?: number, y?: number): this;
+  midpoint(point: any, line: any): this;
+  pointOnCircle(point: any, circle: any): this;
+  pointOnLine(point: any, line: any): this;
+
+  // ─── Dimensional & tangency constraints ─────────────────────────────────────
+  distance(a: any, b: any, value: number): this;
+  length(line: any, value: number): this;
+  angle(a: any, b: any, value: number): this;
+  radius(circle: any, value: number): this;
+  diameter(circle: any, value: number): this;
+  hDistance(a: any, b: any, value: number): this;
+  vDistance(a: any, b: any, value: number): this;
+  pointLineDistance(point: any, line: any, value: number): this;
+  lineDistance(a: any, b: any, value: number): this;
+  absoluteAngle(line: any, value: number): this;
+  equalRadius(a: any, b: any): this;
+  arcLength(arc: any, value: number): this;
+  lineTangentArc(line: any, arc: any, atStart: boolean): this;
+  arcTangentArc(arcA: any, arcB: any, aAtStart?: boolean, bAtStart?: boolean): this;
+  bezierTangentArc(bezier: any, arc: any, atBezierStart: boolean, atArcStart: boolean): this;
+  smoothBlend(arc1: any, arc2: any, options?: { weight?: number; arc1End?: 'start' | 'end'; arc2End?: 'start' | 'end' }): BezierId;
+  shapeWidth(shape: any, value: number): this;
+  shapeHeight(shape: any, value: number): this;
+  shapeCentroidX(shape: any, value: number): this;
+  shapeCentroidY(shape: any, value: number): this;
+  shapeArea(shape: any, value: number): this;
+  shapeEqualCentroid(a: any, b: any): this;
+  angleBetween(a: any, b: any, value: number): this;
+  ccw(...points: any[]): this;
+
+  // ─── Import & reference geometry ────────────────────────────────────────────
+  importPoint(pt: { x: number; y: number }, fixed?: boolean): PointId;
+  importLine(l: { start: { x: number; y: number }; end: { x: number; y: number } }, fixed?: boolean): LineId;
+  importRectangle(
+    r: { vertices: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }, { x: number; y: number }] },
+    fixed?: boolean,
+  ): { bottom: LineId; right: LineId; top: LineId; left: LineId; points: [PointId, PointId, PointId, PointId] };
+  referencePoint(x: number, y: number): PointId;
+  referenceLine(x1: number, y1: number, x2: number, y2: number): LineId;
+  referenceFrom(source: any, entityId: string): PointId | LineId | null;
+  referenceAllFrom(source: any): { points: Map<string, PointId>; lines: Map<string, LineId> };
+}
 
 // Derived union types — automatically include every registered constraint:
 export type SketchConstraint = {

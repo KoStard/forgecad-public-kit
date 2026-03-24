@@ -57,10 +57,7 @@ export interface ConstrainedPolygon {
  * sk.length(tri.side(0), 100);
  * ```
  */
-export function addPolygon(
-  sk: ConstrainedSketchBuilder,
-  options: PolygonOptions,
-): ConstrainedPolygon {
+export function addPolygon(sk: ConstrainedSketchBuilder, options: PolygonOptions): ConstrainedPolygon {
   const { points, addLoop: registerLoop = true, blockRotation = false } = options;
   if (points.length < 3) throw new Error('addPolygon: requires at least 3 points');
 

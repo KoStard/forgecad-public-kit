@@ -73,11 +73,7 @@ return [
 ];
 `,
   };
-  const returnArrayResult = runScript(
-    returnArrayModuleFiles['main.forge.js'],
-    'main.forge.js',
-    returnArrayModuleFiles,
-  );
+  const returnArrayResult = runScript(returnArrayModuleFiles['main.forge.js'], 'main.forge.js', returnArrayModuleFiles);
   expect(!returnArrayResult.error, `array-return module import failed: ${returnArrayResult.error}`);
   expect(returnArrayResult.objects.length === 2, `expected 2 imported objects, got ${returnArrayResult.objects.length}`);
 
@@ -91,11 +87,7 @@ export const answer = 42;
 return answer;
 `,
   };
-  const mixedModuleResult = runScript(
-    mixedModuleFiles['main.forge.js'],
-    'main.forge.js',
-    mixedModuleFiles,
-  );
+  const mixedModuleResult = runScript(mixedModuleFiles['main.forge.js'], 'main.forge.js', mixedModuleFiles);
   expect(
     Boolean(mixedModuleResult.error) && mixedModuleResult.error!.includes('mixed top-level return with exports'),
     `expected mixed return/export failure, got: ${mixedModuleResult.error ?? 'success'}`,

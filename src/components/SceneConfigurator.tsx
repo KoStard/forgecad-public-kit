@@ -5,13 +5,13 @@
  * fog, environment, and post-processing based on the script's scene() calls.
  */
 
-import { useEffect, useMemo, useRef } from 'react';
-import { useThree, useFrame } from '@react-three/fiber';
+import type { SceneConfig, SceneFogConfig, SceneLightConfig } from '@forge/scene';
 import { Environment } from '@react-three/drei';
-import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
+import { useThree } from '@react-three/fiber';
+import { Bloom, EffectComposer, Noise, Vignette } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import type { SceneConfig, SceneLightConfig, SceneFogConfig } from '@forge/scene';
 
 // ---------------------------------------------------------------------------
 // Background
@@ -94,13 +94,7 @@ function createLight(def: SceneLightConfig): THREE.Light {
     }
 
     case 'spot': {
-      const light = new THREE.SpotLight(
-        color, intensity,
-        def.distance ?? 0,
-        def.angle ?? Math.PI / 6,
-        def.penumbra ?? 0,
-        def.decay ?? 2,
-      );
+      const light = new THREE.SpotLight(color, intensity, def.distance ?? 0, def.angle ?? Math.PI / 6, def.penumbra ?? 0, def.decay ?? 2);
       if (def.position) light.position.set(...def.position);
       if (def.target) light.target.position.set(...def.target);
       if (def.castShadow) light.castShadow = true;
@@ -254,23 +248,11 @@ function SceneEffects({ config }: { config: SceneConfig }) {
   }
   if (vignette) {
     effects.push(
-      <Vignette
-        key="vignette"
-        darkness={vignette.darkness ?? 0.5}
-        offset={vignette.offset ?? 0.5}
-        blendFunction={BlendFunction.NORMAL}
-      />,
+      <Vignette key="vignette" darkness={vignette.darkness ?? 0.5} offset={vignette.offset ?? 0.5} blendFunction={BlendFunction.NORMAL} />,
     );
   }
   if (grain) {
-    effects.push(
-      <Noise
-        key="grain"
-        premultiply
-        blendFunction={BlendFunction.ADD}
-        opacity={grain.intensity ?? 0.15}
-      />,
-    );
+    effects.push(<Noise key="grain" premultiply blendFunction={BlendFunction.ADD} opacity={grain.intensity ?? 0.15} />);
   }
 
   return <EffectComposer>{effects}</EffectComposer>;
@@ -282,9 +264,7 @@ function ScenePostProcessing({ config }: { config: SceneConfig }) {
 
   return (
     <>
-      {pp.toneMappingExposure !== undefined && (
-        <SceneExposure exposure={pp.toneMappingExposure} />
-      )}
+      {pp.toneMappingExposure !== undefined && <SceneExposure exposure={pp.toneMappingExposure} />}
       <SceneEffects config={config} />
     </>
   );
@@ -298,13 +278,7 @@ function SceneEnvironment({ config }: { config: SceneConfig }) {
   const env = config.environment;
   if (!env || env.preset === 'none') return null;
 
-  return (
-    <Environment
-      preset={env.preset ?? 'studio'}
-      environmentIntensity={env.intensity ?? 1}
-      background={env.background ?? false}
-    />
-  );
+  return <Environment preset={env.preset ?? 'studio'} environmentIntensity={env.intensity ?? 1} background={env.background ?? false} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,17 +290,9 @@ function SceneGround({ config }: { config: SceneConfig }) {
   if (!ground || ground.visible === false) return null;
 
   return (
-    <mesh
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, 0, ground.height ?? 0]}
-      receiveShadow={ground.receiveShadow ?? false}
-    >
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, ground.height ?? 0]} receiveShadow={ground.receiveShadow ?? false}>
       <planeGeometry args={[10000, 10000]} />
-      <meshStandardMaterial
-        color={ground.color ?? '#1a1a1a'}
-        roughness={1}
-        metalness={0}
-      />
+      <meshStandardMaterial color={ground.color ?? '#1a1a1a'} roughness={1} metalness={0} />
     </mesh>
   );
 }

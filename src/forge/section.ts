@@ -1,17 +1,16 @@
-import { Shape } from './kernel';
-import { Sketch } from './sketch';
-import { buildProjectionProfileCompilePlan } from './projectionCompile';
-import { planeFrameToWorldToPlaneMatrix, resolvePlaneFrame, type PlaneSpec } from './planeFrame';
-import { setSketchCompileProfilePlan } from './sketch/core';
 import { profilePlanFromCrossSection } from './compilePlan';
+import { Shape } from './kernel';
+import { type PlaneSpec, planeFrameToWorldToPlaneMatrix, resolvePlaneFrame } from './planeFrame';
+import { buildProjectionProfileCompilePlan } from './projectionCompile';
+import { Sketch } from './sketch';
+import { setSketchCompileProfilePlan } from './sketch/core';
 
 export type { PlaneSpec } from './planeFrame';
 
 function toPlaneSpace(shape: Shape, plane: PlaneSpec) {
   const frame = resolvePlaneFrame(plane);
   const rotation = planeFrameToWorldToPlaneMatrix(frame);
-  return shape
-    .transform(rotation);
+  return shape.transform(rotation);
 }
 
 export function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch {

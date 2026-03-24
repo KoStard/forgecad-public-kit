@@ -1,11 +1,11 @@
 import { readdirSync, statSync } from 'fs';
 import { basename, join, relative, resolve } from 'path';
+import { packageRootFrom } from '../package-runtime';
 import { API_AND_CORPUS_EXAMPLE_MANIFEST } from './api-and-corpus';
 import { EXPERIMENTAL_EXAMPLE_MANIFEST } from './experimental';
 import { NON_PART_EXAMPLE_MANIFEST } from './non-part';
 import { PRODUCT_DEMO_EXAMPLE_MANIFEST } from './product-demos';
 import type { ExampleManifestEntry, ExampleManifestFamily } from './types';
-import { packageRootFrom } from '../package-runtime';
 
 const EXAMPLE_ARTIFACT_EXTENSIONS = ['.forge.js', '.forge-notebook.json'] as const;
 

@@ -1,9 +1,9 @@
 import {
   cellSourceToString,
-  resolveNotebookPreviewCellId,
   type ForgeNotebook,
   type ForgeNotebookCell,
   type ForgeNotebookOutput,
+  resolveNotebookPreviewCellId,
 } from './model';
 
 export interface RenderNotebookForTerminalOptions {
@@ -30,49 +30,30 @@ function flattenTextChunks(chunks: string[]): string[] {
 }
 
 function renderIndentedLines(lines: string[]): string[] {
-  return lines.length > 0
-    ? lines.map((line) => `  ${line}`)
-    : ['  (empty)'];
+  return lines.length > 0 ? lines.map((line) => `  ${line}`) : ['  (empty)'];
 }
 
 function renderSourceBlock(cell: ForgeNotebookCell): string[] {
   const lines = splitTextLines(cellSourceToString(cell.source));
   if (lines.length === 0) return ['Source:', '  (empty)'];
   const width = String(lines.length).length;
-  return [
-    'Source:',
-    ...lines.map((line, index) => `  ${String(index + 1).padStart(width)} | ${line}`),
-  ];
+  return ['Source:', ...lines.map((line, index) => `  ${String(index + 1).padStart(width)} | ${line}`)];
 }
 
 function renderOutputBlock(output: ForgeNotebookOutput, index: number): string[] {
   if (output.output_type === 'stream') {
-    return [
-      `Output ${index + 1} [${output.name}]:`,
-      ...renderIndentedLines(flattenTextChunks(output.text)),
-    ];
+    return [`Output ${index + 1} [${output.name}]:`, ...renderIndentedLines(flattenTextChunks(output.text))];
   }
 
   if (output.output_type === 'display_data') {
-    return [
-      `Output ${index + 1} [display]:`,
-      ...renderIndentedLines(flattenTextChunks(output.data['text/plain'])),
-    ];
+    return [`Output ${index + 1} [display]:`, ...renderIndentedLines(flattenTextChunks(output.data['text/plain']))];
   }
 
-  const errorLines = output.traceback.length > 0
-    ? flattenTextChunks(output.traceback)
-    : [output.evalue];
-  return [
-    `Output ${index + 1} [error]:`,
-    ...renderIndentedLines(errorLines),
-  ];
+  const errorLines = output.traceback.length > 0 ? flattenTextChunks(output.traceback) : [output.evalue];
+  return [`Output ${index + 1} [error]:`, ...renderIndentedLines(errorLines)];
 }
 
-function resolveSelectedCells(
-  notebook: ForgeNotebook,
-  cellSpecifier?: string | null,
-): SelectedNotebookCell[] {
+function resolveSelectedCells(notebook: ForgeNotebook, cellSpecifier?: string | null): SelectedNotebookCell[] {
   if (!cellSpecifier) {
     return notebook.cells.map((cell, index) => ({ cell, index }));
   }
@@ -102,10 +83,7 @@ function resolveSelectedCells(
   return [{ cell: notebook.cells[index], index }];
 }
 
-function renderCell(
-  notebook: ForgeNotebook,
-  selected: SelectedNotebookCell,
-): string {
+function renderCell(notebook: ForgeNotebook, selected: SelectedNotebookCell): string {
   const previewCellId = resolveNotebookPreviewCellId(notebook);
   const tags = [
     selected.cell.id === previewCellId ? 'preview' : null,
@@ -129,10 +107,7 @@ function renderCell(
   return sections.join('\n');
 }
 
-export function renderNotebookForTerminal(
-  notebook: ForgeNotebook,
-  options: RenderNotebookForTerminalOptions = {},
-): string {
+export function renderNotebookForTerminal(notebook: ForgeNotebook, options: RenderNotebookForTerminalOptions = {}): string {
   const selectedCells = resolveSelectedCells(notebook, options.cellSpecifier);
   const previewCellId = resolveNotebookPreviewCellId(notebook);
   const previewIndex = notebook.cells.findIndex((cell) => cell.id === previewCellId);
@@ -150,11 +125,9 @@ export function renderNotebookForTerminal(
   return [
     ...header,
     '',
-    ...selectedCells.map((selected, index) => (
-      index === 0
-        ? renderCell(notebook, selected)
-        : ['-'.repeat(72), renderCell(notebook, selected)].join('\n')
-    )),
+    ...selectedCells.map((selected, index) =>
+      index === 0 ? renderCell(notebook, selected) : ['-'.repeat(72), renderCell(notebook, selected)].join('\n'),
+    ),
     '',
   ].join('\n');
 }

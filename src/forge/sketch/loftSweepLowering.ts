@@ -35,11 +35,7 @@ function vec3Dot(a: Vec3, b: Vec3): number {
 }
 
 function vec3Cross(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function vec3Len(v: Vec3): number {
@@ -68,8 +64,7 @@ function pointInLoop(point: Vec2, loop: Loop2D): boolean {
   for (let index = 0, prev = loop.length - 1; index < loop.length; prev = index, index += 1) {
     const [xi, yi] = loop[index];
     const [xj, yj] = loop[prev];
-    const intersects = ((yi > py) !== (yj > py))
-      && (px < ((xj - xi) * (py - yi)) / (yj - yi + 1e-20) + xi);
+    const intersects = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi + 1e-20) + xi;
     if (intersects) inside = !inside;
   }
   return inside;
@@ -113,9 +108,7 @@ function compilePolygonsSdf(polygons: Vec2[][]): (x: number, y: number) => numbe
     let field = -Infinity;
     for (const loop of loops) {
       const loopField = loopSignedDistance(point, loop.pts);
-      field = loop.area >= 0
-        ? Math.max(field, loopField)
-        : Math.min(field, -loopField);
+      field = loop.area >= 0 ? Math.max(field, loopField) : Math.min(field, -loopField);
     }
     return field;
   };

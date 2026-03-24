@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 
 export function ParamPanel() {
@@ -8,24 +8,29 @@ export function ParamPanel() {
   const resetParams = useForgeStore((s) => s.resetParamOverrides);
   const [collapsed, setCollapsed] = useState(false);
 
-  const hasOverrides = useMemo(
-    () => params.some((p) => p.value !== p.defaultValue),
-    [params],
-  );
+  const hasOverrides = useMemo(() => params.some((p) => p.value !== p.defaultValue), [params]);
 
   if (params.length === 0) return null;
 
   return (
-    <div style={{ maxHeight: '50%', display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--fc-border)', background: 'var(--fc-bg)' }}>
-      <div
-        onClick={() => setCollapsed(!collapsed)}
-        className="fc-panel-header"
-      >
+    <div
+      style={{
+        maxHeight: '50%',
+        display: 'flex',
+        flexDirection: 'column',
+        borderTop: '1px solid var(--fc-border)',
+        background: 'var(--fc-bg)',
+      }}
+    >
+      <div onClick={() => setCollapsed(!collapsed)} className="fc-panel-header">
         <span>Parameters ({params.length})</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {hasOverrides && (
             <button
-              onClick={(e) => { e.stopPropagation(); resetParams(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                resetParams();
+              }}
               title="Reset all parameters to defaults"
               style={{
                 background: 'none',
@@ -72,7 +77,8 @@ export function ParamPanel() {
                         {p.name}
                       </span>
                       <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
-                        {displayValue}{p.unit ? ` ${p.unit}` : ''}
+                        {displayValue}
+                        {p.unit ? ` ${p.unit}` : ''}
                       </span>
                     </div>
                     <input

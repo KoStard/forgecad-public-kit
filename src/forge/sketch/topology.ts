@@ -8,25 +8,20 @@
  * Arbitrary boolean results lose topology (mesh kernel limitation).
  */
 
+import type { FaceDescendantMetadata } from '../face-tracking/descendantResolution';
+import type { PortInput } from '../port';
 import {
-  Shape,
-  getShapePrimaryQueryOwner,
-  resolveAnchor3D,
-  setShapePlacementReferences,
-  type ShapeOperandInput,
   type GeometryInfo,
+  getShapePrimaryQueryOwner,
   type PlacementReferenceInput,
+  resolveAnchor3D,
+  Shape,
+  type ShapeOperandInput,
+  setShapePlacementReferences,
 } from '../kernel';
-import { Transform, normalizeAxis, type Mat4, type RotateAroundToOptions } from '../transform';
+import { cloneEdgeQueryRef, cloneFaceQueryRef, cloneShapeQueryOwner, type EdgeQueryRef, type FaceQueryRef } from '../queryModel';
+import { type Mat4, normalizeAxis, type RotateAroundToOptions, Transform } from '../transform';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
-import {
-  cloneEdgeQueryRef,
-  cloneFaceQueryRef,
-  cloneShapeQueryOwner,
-  type EdgeQueryRef,
-  type FaceQueryRef,
-} from '../queryModel';
-import type { FaceDescendantMetadata } from '../descendantResolution';
 
 export type FaceName = string;
 export type EdgeName = string;
@@ -64,11 +59,7 @@ export interface Topology {
   edges: Map<EdgeName, EdgeRef>;
 }
 
-function createTrackedEdgeRef(
-  name: EdgeName,
-  start: [number, number, number],
-  end: [number, number, number],
-): EdgeRef {
+function createTrackedEdgeRef(name: EdgeName, start: [number, number, number], end: [number, number, number]): EdgeRef {
   return {
     name,
     start,
@@ -150,12 +141,7 @@ export class TrackedShape {
 
   /** Return a new TrackedShape wrapper with copied topology metadata. */
   clone(): TrackedShape {
-    return new TrackedShape(
-      this.shape.clone(),
-      cloneTopology(this.topology),
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.clone(), cloneTopology(this.topology), this.baseHeight, this.extrudeUp);
   }
 
   /** Alias for clone() */
@@ -175,12 +161,22 @@ export class TrackedShape {
 
   /** Attach named placement references that survive normal transforms and imports. */
   withReferences(refs: PlacementReferenceInput): TrackedShape {
+    return new TrackedShape(this.shape.withReferences(refs), cloneTopology(this.topology), this.baseHeight, this.extrudeUp);
+  }
+
+  /** Attach named assembly ports (origin + axis + up) that survive transforms and imports. */
+  withPorts(ports: Record<string, PortInput>): TrackedShape {
     return new TrackedShape(
-      this.shape.withReferences(refs),
+      this.shape.withPorts(ports),
       cloneTopology(this.topology),
       this.baseHeight,
       this.extrudeUp,
     );
+  }
+
+  /** List named port identifiers carried by this shape. */
+  portNames(): string[] {
+    return this.shape.portNames();
   }
 
   /** List named placement references carried by this tracked shape. */
@@ -194,17 +190,8 @@ export class TrackedShape {
   }
 
   /** Translate the tracked shape so the given reference lands on the target coordinate. */
-  placeReference(
-    ref: string,
-    target: [number, number, number],
-    offset?: [number, number, number],
-  ): TrackedShape {
-    return new TrackedShape(
-      this.shape.placeReference(ref, target, offset),
-      cloneTopology(this.topology),
-      this.baseHeight,
-      this.extrudeUp,
-    );
+  placeReference(ref: string, target: [number, number, number], offset?: [number, number, number]): TrackedShape {
+    return new TrackedShape(this.shape.placeReference(ref, target, offset), cloneTopology(this.topology), this.baseHeight, this.extrudeUp);
   }
 
   // Delegate Shape methods, preserving topology with offset transforms
@@ -239,15 +226,25 @@ export class TrackedShape {
     const dy = edge.end[1] - oy;
     const dz = edge.end[2] - oz;
     const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-    const ax = dx / len, ay = dy / len, az = dz / len;
+    const ax = dx / len,
+      ay = dy / len,
+      az = dz / len;
 
     // Rodrigues' rotation: build 4x3 affine matrix for rotation around arbitrary axis through origin
-    const rad = angleDeg * Math.PI / 180;
-    const c = Math.cos(rad), s = Math.sin(rad), t = 1 - c;
+    const rad = (angleDeg * Math.PI) / 180;
+    const c = Math.cos(rad),
+      s = Math.sin(rad),
+      t = 1 - c;
     // Rotation matrix R
-    const r00 = t * ax * ax + c,      r01 = t * ax * ay - s * az, r02 = t * ax * az + s * ay;
-    const r10 = t * ax * ay + s * az,  r11 = t * ay * ay + c,     r12 = t * ay * az - s * ax;
-    const r20 = t * ax * az - s * ay,  r21 = t * ay * az + s * ax, r22 = t * az * az + c;
+    const r00 = t * ax * ax + c,
+      r01 = t * ax * ay - s * az,
+      r02 = t * ax * az + s * ay;
+    const r10 = t * ax * ay + s * az,
+      r11 = t * ay * ay + c,
+      r12 = t * ay * az - s * ax;
+    const r20 = t * ax * az - s * ay,
+      r21 = t * ay * az + s * ax,
+      r22 = t * az * az + c;
 
     // Full transform: translate(-origin) → rotate → translate(+origin)
     // Combined into a single 4x3 matrix [R | R*(-o) + o]
@@ -256,12 +253,24 @@ export class TrackedShape {
     const tz = -r20 * ox - r21 * oy - r22 * oz + oz;
 
     // Manifold transform() takes 4x4 column-major
-    const m: [number,number,number,number,number,number,number,number,number,number,number,number,number,number,number,number] = [
-      r00, r10, r20, 0,
-      r01, r11, r21, 0,
-      r02, r12, r22, 0,
-      tx,  ty,  tz,  1,
-    ];
+    const m: [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ] = [r00, r10, r20, 0, r01, r11, r21, 0, r02, r12, r22, 0, tx, ty, tz, 1];
     const final = this.shape.transform(m);
 
     // Topology is invalidated after rotation
@@ -270,40 +279,21 @@ export class TrackedShape {
 
   /** Rotate using Euler angles (degrees), topology is cleared */
   rotate(x: number, y: number, z: number): TrackedShape {
-    return new TrackedShape(
-      this.shape.rotate(x, y, z),
-      { faces: new Map(), edges: new Map() },
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.rotate(x, y, z), { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
   /** Apply a 4x4 transform matrix or Transform object. Topology is cleared. */
   transform(m: Mat4 | Transform): TrackedShape {
-    return new TrackedShape(
-      this.shape.transform(m),
-      { faces: new Map(), edges: new Map() },
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.transform(m), { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
   /** Reorient so primary axis (Z) points along direction. Topology is cleared. */
   pointAlong(direction: [number, number, number]): TrackedShape {
-    return new TrackedShape(
-      this.shape.pointAlong(direction),
-      { faces: new Map(), edges: new Map() },
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.pointAlong(direction), { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
   /** Rotate around an arbitrary axis through a pivot point. Topology is cleared. */
-  rotateAround(
-    axis: [number, number, number],
-    angleDeg: number,
-    pivot: [number, number, number] = [0, 0, 0],
-  ): TrackedShape {
+  rotateAround(axis: [number, number, number], angleDeg: number, pivot: [number, number, number] = [0, 0, 0]): TrackedShape {
     return new TrackedShape(
       this.shape.rotateAround(axis, angleDeg, pivot),
       { faces: new Map(), edges: new Map() },
@@ -330,22 +320,12 @@ export class TrackedShape {
 
   /** Scale the shape. Topology is cleared for non-uniform scale. */
   scale(v: number | [number, number, number]): TrackedShape {
-    return new TrackedShape(
-      this.shape.scale(v),
-      { faces: new Map(), edges: new Map() },
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.scale(v), { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
   /** Mirror across a plane. Topology is cleared. */
   mirror(normal: [number, number, number]): TrackedShape {
-    return new TrackedShape(
-      this.shape.mirror(normal),
-      { faces: new Map(), edges: new Map() },
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.mirror(normal), { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
   /** Set the display color. Returns a new TrackedShape. */
@@ -378,12 +358,18 @@ export class TrackedShape {
       const bb = (target as any)._bbox();
       tp = resolveAnchor3D(bb.min, bb.max, targetAnchor as any);
     } else {
-      const targetShape = target instanceof TrackedShape ? target : target as Shape;
+      const targetShape = target instanceof TrackedShape ? target : (target as Shape);
       tp = targetShape.referencePoint(targetAnchor);
     }
     const sp = this.referencePoint(selfAnchor);
-    let dx = tp[0] - sp[0], dy = tp[1] - sp[1], dz = tp[2] - sp[2];
-    if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }
+    let dx = tp[0] - sp[0],
+      dy = tp[1] - sp[1],
+      dz = tp[2] - sp[2];
+    if (offset) {
+      dx += offset[0];
+      dy += offset[1];
+      dz += offset[2];
+    }
     return this.translate(dx, dy, dz);
   }
 
@@ -396,13 +382,18 @@ export class TrackedShape {
     face: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom',
     opts: { u?: number; v?: number; protrude?: number } = {},
   ): TrackedShape {
-    const u = opts.u ?? 0, v = opts.v ?? 0, p = opts.protrude ?? 0;
+    const u = opts.u ?? 0,
+      v = opts.v ?? 0,
+      p = opts.protrude ?? 0;
     type F = typeof face;
     const opp: Record<F, F> = { front: 'back', back: 'front', left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
     const uvMap: Record<F, (u: number, v: number, p: number) => [number, number, number]> = {
-      front: (u, v, p) => [u, -p, v], back: (u, v, p) => [u, p, v],
-      left: (u, v, p) => [-p, u, v], right: (u, v, p) => [p, u, v],
-      top: (u, v, p) => [u, v, p], bottom: (u, v, p) => [u, v, -p],
+      front: (u, v, p) => [u, -p, v],
+      back: (u, v, p) => [u, p, v],
+      left: (u, v, p) => [-p, u, v],
+      right: (u, v, p) => [p, u, v],
+      top: (u, v, p) => [u, v, p],
+      bottom: (u, v, p) => [u, v, -p],
     };
     return this.attachTo(parent, face, opp[face], uvMap[face](u, v, p));
   }
@@ -433,10 +424,7 @@ export class TrackedShape {
   }
 
   /** Shelling returns a plain Shape because tracked topology is not preserved. */
-  shell(
-    thickness: number,
-    opts: { openFaces?: Array<'top' | 'bottom'> } = {},
-  ): Shape {
+  shell(thickness: number, opts: { openFaces?: Array<'top' | 'bottom'> } = {}): Shape {
     return this.shape.shell(thickness, opts);
   }
 
@@ -549,12 +537,7 @@ function topologyToPlacementReferences(topo: Topology): PlacementReferenceInput 
  * Edges: bottom-front, bottom-back, bottom-left, bottom-right, top-front, top-back, top-left, top-right,
  *        vertical-front-left, vertical-front-right, vertical-back-left, vertical-back-right
  */
-export function buildRectExtrusionTopology(
-  rect: Rectangle2D,
-  height: number,
-  up = true,
-  zBase = 0,
-): Topology {
+export function buildRectExtrusionTopology(rect: Rectangle2D, height: number, up = true, zBase = 0): Topology {
   const faces = new Map<FaceName, FaceRef>();
   const edges = new Map<EdgeName, EdgeRef>();
 
@@ -642,7 +625,8 @@ export function buildCircleExtrusionTopology(
 ): Topology {
   const faces = new Map<FaceName, FaceRef>();
   const edges = new Map<EdgeName, EdgeRef>();
-  const cx = circ.center.x, cy = circ.center.y;
+  const cx = circ.center.x,
+    cy = circ.center.y;
   const z0 = center ? -height / 2 : 0;
   const z1 = center ? height / 2 : height;
   const zBot = Math.min(z0, z1);

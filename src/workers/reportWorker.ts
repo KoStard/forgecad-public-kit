@@ -29,16 +29,7 @@ worker.onmessage = async (event) => {
   try {
     await ensureKernelReady();
 
-    const {
-      files,
-      activeFile,
-      paramOverrides,
-      quality,
-      title,
-      objectVisuals,
-      includeDisassembled,
-      lengthUnit,
-    } = data.payload;
+    const { files, activeFile, paramOverrides, quality, title, objectVisuals, includeDisassembled, lengthUnit } = data.payload;
     const code = files[activeFile];
     if (!code) {
       throw new Error(`Active file "${activeFile}" is missing from project files.`);
@@ -58,16 +49,19 @@ worker.onmessage = async (event) => {
     });
 
     const pdf = toPdfArrayBuffer(report.pdf);
-    worker.postMessage({
-      type: 'generate-report-success',
-      payload: {
-        pdf,
-        pageCount: report.pageCount,
-        componentCount: report.componentCount,
-        viewCount: report.viewCount,
-        bomItemCount: report.bomItemCount,
+    worker.postMessage(
+      {
+        type: 'generate-report-success',
+        payload: {
+          pdf,
+          pageCount: report.pageCount,
+          componentCount: report.componentCount,
+          viewCount: report.viewCount,
+          bomItemCount: report.bomItemCount,
+        },
       },
-    }, [pdf]);
+      [pdf],
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     worker.postMessage({

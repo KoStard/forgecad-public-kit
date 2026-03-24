@@ -6,18 +6,21 @@
  * raw coordinate-based primitives and the constraint system.
  */
 
-import { Sketch, setSketchCompileProfilePlan } from './core';
-import { polygon } from './primitives';
-import { sketchExtrude } from './extrude';
-import { ConstrainedSketchBuilder, type PointId, type LineId } from './constraints';
-import { TrackedShape, buildRectExtrusionTopology, buildCircleExtrusionTopology } from './topology';
-import { createCircleProfile } from '../profileOps';
 import type { ProfileCompilePlan } from '../compilePlan';
+import { createCircleProfile } from '../profileOps';
+import { ConstrainedSketchBuilder, type LineId, type PointId } from './constraints';
+import { Sketch, setSketchCompileProfilePlan } from './core';
+import { sketchExtrude } from './extrude';
+import { polygon } from './primitives';
+import { buildCircleExtrusionTopology, buildRectExtrusionTopology, TrackedShape } from './topology';
 
 // ─── Point ───────────────────────────────────────────────────────
 
 export class Point2D {
-  constructor(public readonly x: number, public readonly y: number) {}
+  constructor(
+    public readonly x: number,
+    public readonly y: number,
+  ) {}
 
   distanceTo(other: Point2D): number {
     const dx = other.x - this.x;
@@ -72,10 +75,7 @@ export class Line2D {
     const [dx, dy] = this.direction;
     const nx = -dy * distance;
     const ny = dx * distance;
-    return new Line2D(
-      this.start.translate(nx, ny),
-      this.end.translate(nx, ny),
-    );
+    return new Line2D(this.start.translate(nx, ny), this.end.translate(nx, ny));
   }
 
   /**
@@ -83,10 +83,14 @@ export class Line2D {
    * Returns null if lines are parallel.
    */
   intersect(other: Line2D): Point2D | null {
-    const x1 = this.start.x, y1 = this.start.y;
-    const x2 = this.end.x, y2 = this.end.y;
-    const x3 = other.start.x, y3 = other.start.y;
-    const x4 = other.end.x, y4 = other.end.y;
+    const x1 = this.start.x,
+      y1 = this.start.y;
+    const x2 = this.end.x,
+      y2 = this.end.y;
+    const x3 = other.start.x,
+      y3 = other.start.y;
+    const x4 = other.end.x,
+      y4 = other.end.y;
     const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
     if (Math.abs(denom) < 1e-12) return null; // parallel
     const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
@@ -98,10 +102,14 @@ export class Line2D {
    * Returns null if segments don't cross.
    */
   intersectSegment(other: Line2D): Point2D | null {
-    const x1 = this.start.x, y1 = this.start.y;
-    const x2 = this.end.x, y2 = this.end.y;
-    const x3 = other.start.x, y3 = other.start.y;
-    const x4 = other.end.x, y4 = other.end.y;
+    const x1 = this.start.x,
+      y1 = this.start.y;
+    const x2 = this.end.x,
+      y2 = this.end.y;
+    const x3 = other.start.x,
+      y3 = other.start.y;
+    const x4 = other.end.x,
+      y4 = other.end.y;
     const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
     if (Math.abs(denom) < 1e-12) return null;
     const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
@@ -116,18 +124,12 @@ export class Line2D {
 
   static fromPointAndAngle(origin: Point2D, angleDeg: number, length: number): Line2D {
     const rad = angleDeg * (Math.PI / 180);
-    return new Line2D(origin, new Point2D(
-      origin.x + Math.cos(rad) * length,
-      origin.y + Math.sin(rad) * length,
-    ));
+    return new Line2D(origin, new Point2D(origin.x + Math.cos(rad) * length, origin.y + Math.sin(rad) * length));
   }
 
   static fromPointAndDirection(origin: Point2D, dir: [number, number], length: number): Line2D {
     const len = Math.sqrt(dir[0] * dir[0] + dir[1] * dir[1]) || 1;
-    return new Line2D(origin, new Point2D(
-      origin.x + (dir[0] / len) * length,
-      origin.y + (dir[1] / len) * length,
-    ));
+    return new Line2D(origin, new Point2D(origin.x + (dir[0] / len) * length, origin.y + (dir[1] / len) * length));
   }
 }
 
@@ -143,17 +145,20 @@ export class Circle2D {
     public readonly radius: number,
   ) {}
 
-  get diameter(): number { return this.radius * 2; }
-  get circumference(): number { return 2 * Math.PI * this.radius; }
-  get area(): number { return Math.PI * this.radius * this.radius; }
+  get diameter(): number {
+    return this.radius * 2;
+  }
+  get circumference(): number {
+    return 2 * Math.PI * this.radius;
+  }
+  get area(): number {
+    return Math.PI * this.radius * this.radius;
+  }
 
   /** Point on the circle at given angle (degrees, 0=right, CCW) */
   pointAtAngle(angleDeg: number): Point2D {
-    const rad = angleDeg * Math.PI / 180;
-    return new Point2D(
-      this.center.x + Math.cos(rad) * this.radius,
-      this.center.y + Math.sin(rad) * this.radius,
-    );
+    const rad = (angleDeg * Math.PI) / 180;
+    return new Point2D(this.center.x + Math.cos(rad) * this.radius, this.center.y + Math.sin(rad) * this.radius);
   }
 
   translate(dx: number, dy: number): Circle2D {
@@ -161,8 +166,7 @@ export class Circle2D {
   }
 
   toSketch(segments?: number): Sketch {
-    const cross = createCircleProfile(this.radius, segments ?? 0)
-      .translate(this.center.x, this.center.y);
+    const cross = createCircleProfile(this.radius, segments ?? 0).translate(this.center.x, this.center.y);
     const plan: ProfileCompilePlan = {
       kind: 'circle',
       radius: this.radius,
@@ -226,10 +230,14 @@ export class Rectangle2D {
   side(name: RectSide): Line2D {
     const [bl, br, tr, tl] = this.vertices;
     switch (name) {
-      case 'bottom': return new Line2D(bl, br);
-      case 'right': return new Line2D(br, tr);
-      case 'top': return new Line2D(tr, tl);
-      case 'left': return new Line2D(tl, bl);
+      case 'bottom':
+        return new Line2D(bl, br);
+      case 'right':
+        return new Line2D(br, tr);
+      case 'top':
+        return new Line2D(tr, tl);
+      case 'left':
+        return new Line2D(tl, bl);
     }
   }
 
@@ -242,10 +250,14 @@ export class Rectangle2D {
   vertex(name: RectVertex): Point2D {
     const [bl, br, tr, tl] = this.vertices;
     switch (name) {
-      case 'bottom-left': return bl;
-      case 'bottom-right': return br;
-      case 'top-right': return tr;
-      case 'top-left': return tl;
+      case 'bottom-left':
+        return bl;
+      case 'bottom-right':
+        return br;
+      case 'top-right':
+        return tr;
+      case 'top-left':
+        return tl;
     }
   }
 
@@ -256,23 +268,16 @@ export class Rectangle2D {
   }
 
   toSketch(): Sketch {
-    return polygon(this.vertices.map(v => v.toTuple()));
+    return polygon(this.vertices.map((v) => v.toTuple()));
   }
 
   translate(dx: number, dy: number): Rectangle2D {
-    return new Rectangle2D(
-      this.vertices.map(v => v.translate(dx, dy)) as [Point2D, Point2D, Point2D, Point2D],
-    );
+    return new Rectangle2D(this.vertices.map((v) => v.translate(dx, dy)) as [Point2D, Point2D, Point2D, Point2D]);
   }
 
   /** Create from origin corner + width/height (axis-aligned) */
   static fromDimensions(x: number, y: number, width: number, height: number): Rectangle2D {
-    return new Rectangle2D([
-      new Point2D(x, y),
-      new Point2D(x + width, y),
-      new Point2D(x + width, y + height),
-      new Point2D(x, y + height),
-    ]);
+    return new Rectangle2D([new Point2D(x, y), new Point2D(x + width, y), new Point2D(x + width, y + height), new Point2D(x, y + height)]);
   }
 
   /** Create centered at a point */
@@ -293,12 +298,7 @@ export class Rectangle2D {
     const maxX = Math.max(p1.x, p2.x);
     const minY = Math.min(p1.y, p2.y);
     const maxY = Math.max(p1.y, p2.y);
-    return new Rectangle2D([
-      new Point2D(minX, minY),
-      new Point2D(maxX, minY),
-      new Point2D(maxX, maxY),
-      new Point2D(minX, maxY),
-    ]);
+    return new Rectangle2D([new Point2D(minX, minY), new Point2D(maxX, minY), new Point2D(maxX, maxY), new Point2D(minX, maxY)]);
   }
 
   /** Create from three points (free angle). p1-p2 defines one side, p3 gives the height direction. */
@@ -312,12 +312,7 @@ export class Rectangle2D {
     const nx = -uy;
     const ny = ux;
     const proj = (p3.x - p1.x) * nx + (p3.y - p1.y) * ny;
-    return new Rectangle2D([
-      p1,
-      p2,
-      new Point2D(p2.x + nx * proj, p2.y + ny * proj),
-      new Point2D(p1.x + nx * proj, p1.y + ny * proj),
-    ]);
+    return new Rectangle2D([p1, p2, new Point2D(p2.x + nx * proj, p2.y + ny * proj), new Point2D(p1.x + nx * proj, p1.y + ny * proj)]);
   }
 
   /** Extrude this rectangle into a 3D TrackedShape with named faces and edges */

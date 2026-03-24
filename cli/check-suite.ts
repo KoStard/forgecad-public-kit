@@ -5,18 +5,19 @@
  * This is the closest thing ForgeCAD currently has to a traditional unit-test
  * entrypoint: a single assertion-based runner over the curated CLI checks.
  */
+import { execSync } from 'child_process';
 import { runCheckApiContractsCli } from './check-api-contracts';
-import { runCheckTextCli } from './check-text';
 import { runCheckBrepExportCli } from './check-brep-export';
 import { runCheckCompilerCli } from './check-compiler';
+import { runCheckConstraintsCli } from './check-constraints';
 import { runCheckDimensionsCli } from './check-dimensions';
 import { runCheckExamplesCli } from './check-examples';
 import { runCheckJsModulesCli } from './check-js-modules';
+import { runCheckOcctLowerCli } from './check-occt-lower';
 import { runCheckPlacementReferencesCli } from './check-placement-references';
 import { runCheckQueryPropagationCli } from './check-query-propagation';
-import { runCheckConstraintsCli } from './check-constraints';
+import { runCheckTextCli } from './check-text';
 import { runCheckTransformsCli } from './check-transforms';
-import { runCheckOcctLowerCli } from './check-occt-lower';
 
 /* ── Animated progress ─────────────────────────────────────────────── */
 
@@ -43,18 +44,25 @@ interface Stage {
 }
 
 const STAGES: Stage[] = [
-  { label: 'Constraints',           insight: 'solver convergence & snapshot fidelity',      run: () => runCheckConstraintsCli([]) },
-  { label: 'Transforms',            insight: 'matrix composition & assembly trees',          run: () => runCheckTransformsCli() },
-  { label: 'Dimensions',            insight: 'parametric dimension propagation',             run: () => runCheckDimensionsCli() },
-  { label: 'Placement refs',        insight: 'reference stability across edits',             run: () => runCheckPlacementReferencesCli() },
-  { label: 'JS modules',            insight: 'import graph & bundle hygiene',                run: () => runCheckJsModulesCli() },
-  { label: 'BREP export',           insight: 'solid topology & face-history integrity',      run: () => runCheckBrepExportCli() },
-  { label: 'Compiler',              insight: 'AST snapshots & code-gen correctness',         run: () => runCheckCompilerCli([]) },
-  { label: 'Query propagation',     insight: 'reactive data-flow graph consistency',         run: () => runCheckQueryPropagationCli([]) },
-  { label: 'Examples',              insight: 'example gallery architecture gate',            run: () => runCheckExamplesCli([]) },
-  { label: 'API contracts',         insight: 'public script API surface stability',          run: () => runCheckApiContractsCli() },
-  { label: 'Text',                  insight: 'text2d rendering contracts',                   run: () => runCheckTextCli() },
-  { label: 'OCCT lowerer',          insight: 'compile-plan → OCCT geometry invariants',       run: () => runCheckOcctLowerCli() },
+  { label: 'Constraints', insight: 'solver convergence & snapshot fidelity', run: () => runCheckConstraintsCli([]) },
+  { label: 'Transforms', insight: 'matrix composition & assembly trees', run: () => runCheckTransformsCli() },
+  { label: 'Dimensions', insight: 'parametric dimension propagation', run: () => runCheckDimensionsCli() },
+  { label: 'Placement refs', insight: 'reference stability across edits', run: () => runCheckPlacementReferencesCli() },
+  { label: 'JS modules', insight: 'import graph & bundle hygiene', run: () => runCheckJsModulesCli() },
+  { label: 'BREP export', insight: 'solid topology & face-history integrity', run: () => runCheckBrepExportCli() },
+  { label: 'Compiler', insight: 'AST snapshots & code-gen correctness', run: () => runCheckCompilerCli([]) },
+  { label: 'Query propagation', insight: 'reactive data-flow graph consistency', run: () => runCheckQueryPropagationCli([]) },
+  { label: 'Examples', insight: 'example gallery architecture gate', run: () => runCheckExamplesCli([]) },
+  { label: 'API contracts', insight: 'public script API surface stability', run: () => runCheckApiContractsCli() },
+  { label: 'Text', insight: 'text2d rendering contracts', run: () => runCheckTextCli() },
+  { label: 'OCCT lowerer', insight: 'compile-plan → OCCT geometry invariants', run: () => runCheckOcctLowerCli() },
+  {
+    label: 'Lint & format',
+    insight: 'Biome lint + formatting consistency',
+    run: async () => {
+      execSync('npx biome check .', { stdio: 'pipe' });
+    },
+  },
 ];
 
 function progressBar(done: number, total: number, width: number): string {
@@ -69,7 +77,7 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-type StageResult = { label: string; durationMs: number; ok: boolean };
+type StageResult = { label: string; durationMs: number; ok: boolean; error?: string };
 
 /**
  * Render a live spinner line showing current stage progress.
@@ -110,17 +118,15 @@ function startSpinner(stage: Stage, index: number, total: number): () => void {
 }
 
 function printStageResult(result: StageResult, index: number, total: number) {
-  const icon = result.ok
-    ? `${ANSI.green}✓${ANSI.reset}`
-    : `${ANSI.red}✗${ANSI.reset}`;
+  const icon = result.ok ? `${ANSI.green}✓${ANSI.reset}` : `${ANSI.red}✗${ANSI.reset}`;
   const dur = `${ANSI.dim}${formatDuration(result.durationMs)}${ANSI.reset}`;
   const counter = `${ANSI.dim}[${index + 1}/${total}]${ANSI.reset}`;
   console.log(`  ${icon} ${counter} ${result.label} ${dur}`);
 }
 
 function printSummary(results: StageResult[], totalMs: number) {
-  const passed = results.filter(r => r.ok).length;
-  const failed = results.filter(r => !r.ok).length;
+  const passed = results.filter((r) => r.ok).length;
+  const failed = results.filter((r) => !r.ok).length;
   const slowest = results.reduce((a, b) => (a.durationMs > b.durationMs ? a : b));
 
   console.log('');
@@ -128,9 +134,13 @@ function printSummary(results: StageResult[], totalMs: number) {
   console.log('');
 
   if (failed === 0) {
-    console.log(`  ${ANSI.green}${ANSI.bold}✓ Invariant suite passed${ANSI.reset} ${ANSI.dim}— ${passed} checks in ${formatDuration(totalMs)}${ANSI.reset}`);
+    console.log(
+      `  ${ANSI.green}${ANSI.bold}✓ Invariant suite passed${ANSI.reset} ${ANSI.dim}— ${passed} checks in ${formatDuration(totalMs)}${ANSI.reset}`,
+    );
   } else {
-    console.log(`  ${ANSI.red}${ANSI.bold}✗ Suite failed${ANSI.reset} ${ANSI.dim}— ${passed} passed, ${failed} failed in ${formatDuration(totalMs)}${ANSI.reset}`);
+    console.log(
+      `  ${ANSI.red}${ANSI.bold}✗ Suite failed${ANSI.reset} ${ANSI.dim}— ${passed} passed, ${failed} failed in ${formatDuration(totalMs)}${ANSI.reset}`,
+    );
   }
   console.log(`  ${ANSI.dim}slowest: ${slowest.label} (${formatDuration(slowest.durationMs)})${ANSI.reset}`);
   console.log('');
@@ -154,21 +164,20 @@ export async function runCheckSuiteCli(): Promise<void> {
     const stopSpinner = startSpinner(stage, i, STAGES.length);
     const t0 = Date.now();
     let ok = true;
+    let error: string | undefined;
     try {
       await stage.run();
     } catch (err) {
       ok = false;
-      stopSpinner();
-      printStageResult({ label: stage.label, durationMs: Date.now() - t0, ok }, i, STAGES.length);
-      console.error(`    ${ANSI.red}${(err as Error).message}${ANSI.reset}`);
-      // Continue running remaining stages so we see the full picture
-      results.push({ label: stage.label, durationMs: Date.now() - t0, ok });
-      continue;
+      error = (err as Error).message;
     }
     stopSpinner();
-    const result: StageResult = { label: stage.label, durationMs: Date.now() - t0, ok };
+    const result: StageResult = { label: stage.label, durationMs: Date.now() - t0, ok, error };
     results.push(result);
     printStageResult(result, i, STAGES.length);
+    if (!ok && error) {
+      console.error(`    ${ANSI.red}${error}${ANSI.reset}`);
+    }
   }
 
   const totalMs = Date.now() - suiteStart;
@@ -176,7 +185,7 @@ export async function runCheckSuiteCli(): Promise<void> {
 
   if (isTTY) process.stdout.write(ANSI.showCursor);
 
-  const failed = results.filter(r => !r.ok);
+  const failed = results.filter((r) => !r.ok);
   if (failed.length > 0) {
     process.exit(1);
   }

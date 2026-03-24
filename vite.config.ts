@@ -589,6 +589,20 @@ function forgeTypesPlugin() {
           console.log('✓ forge-api.d.ts regenerated');
         } catch (e: any) {
           console.error('✗ gen:types failed:', e.stderr?.toString() ?? e.message);
+          return;
+        }
+        // Chain: docs and skill depend on the freshly generated .d.ts
+        try {
+          execSync('node scripts/gen-api-docs.mjs', { cwd: __dirname, stdio: 'pipe' });
+          console.log('✓ api-reference.md regenerated');
+        } catch (e: any) {
+          console.error('✗ gen:docs failed:', e.stderr?.toString() ?? e.message);
+        }
+        try {
+          execSync('node scripts/build-forgecad-skill.mjs', { cwd: __dirname, stdio: 'pipe' });
+          console.log('✓ SKILL.md rebuilt');
+        } catch (e: any) {
+          console.error('✗ build:skill failed:', e.stderr?.toString() ?? e.message);
         }
       };
 

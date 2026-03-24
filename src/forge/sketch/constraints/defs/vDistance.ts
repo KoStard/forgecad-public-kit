@@ -35,7 +35,8 @@ registerConstraint<'vDistance', ConstraintTypeMap['vDistance']>({
   },
 
   displayAnnotations(c, { points }): AnnotationElement[] {
-    const a = points.get(c.a), b = points.get(c.b);
+    const a = points.get(c.a),
+      b = points.get(c.b);
     if (!a || !b) return [];
     return [{ kind: 'dimension', from: [a.x, a.y], to: [a.x, b.y], offset: 3, value: String(c.value) }];
   },

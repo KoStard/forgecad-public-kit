@@ -11,7 +11,7 @@ This directory contains **hand-written API guides** for model authors. For a com
 | `assembly/` | Model authors (mechanisms) | Assembly graph, joints, couplings, kinematics |
 | `sheet-metal/` | Model authors (folded parts) | Sheet metal, flanges, flat patterns |
 | `runtime/` | Model authors (viewport) | Cut planes, exploded views, joint controls |
-| `output/` | Model authors (export/reports) | BOM, dimensions, STEP/BREP export |
+| `output/` | Model authors (export/reports) | BOM, dimensions, G-code toolpaths, mesh export, STEP/BREP export |
 | `toolbox/` | Model authors (library) | Fasteners, hardware helpers |
 
 ## Read Plan

@@ -32,7 +32,7 @@ const baseDeck = box(chassisLength, chassisWidth, chassisHeight, true)
 const roofPod = box(roofLength, roofWidth, roofHeight, true)
   .translate(20, 0, bodyZ + 40);
 
-const bumper = hull3d(
+const bumper = union(
   box(54, bumperWidth, bumperDepth, true).translate(chassisLength * 0.5 - 18, 0, wheelRadius + 6),
   box(bumperLength, bumperWidth - 42, bumperDepth * 0.7, true).translate(chassisLength * 0.5 + 46, 0, wheelRadius - 10),
 ).color('#c8742b');

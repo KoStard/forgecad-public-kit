@@ -295,10 +295,7 @@ function collectChildSuggestions(node: CommandTreeNode, prefix: string): Complet
   return items;
 }
 
-function lookupOption(
-  options: CompletionOptionDefinition[] | undefined,
-  token: string,
-): CompletionOptionDefinition | null {
+function lookupOption(options: CompletionOptionDefinition[] | undefined, token: string): CompletionOptionDefinition | null {
   return options?.find((option) => option.name === token) || null;
 }
 
@@ -561,10 +558,7 @@ export function runCompletionCli(argv: string[] = process.argv.slice(2)): void {
   console.log(renderCompletionScript(shell));
 }
 
-export function runHiddenCompletionCli(
-  argv: string[],
-  commands: CompletionAwareCommandDefinition[],
-): void {
+export function runHiddenCompletionCli(argv: string[], commands: CompletionAwareCommandDefinition[]): void {
   const shell = parseShell(argv[0]);
   void shell;
 

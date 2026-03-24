@@ -1,22 +1,15 @@
-import type { ProfileBackend } from '../profileBackend';
-import { Shape } from '../kernel';
 import type { ProfileCompilePlan } from '../compilePlan';
 import { cloneProfileCompilePlan, profilePlanFromCrossSection } from '../compilePlan';
-import type { Mat4 } from '../transform';
-import type { FaceRef } from './topology';
+import { Shape } from '../kernel';
+import type { ProfileBackend } from '../profileBackend';
 import { lowerProfileCompilePlan } from '../profileOps';
 import { faceQueryRefsEqual } from '../queryModel';
-import {
-  cloneSketchPlacementModel,
-  type Anchor,
-  type SketchFace3D,
-  type SketchPlacementModel,
-  type SketchWorkplane,
-} from './workplaneModel';
+import type { Mat4 } from '../transform';
+import type { FaceRef } from './topology';
+import { type Anchor, cloneSketchPlacementModel, type SketchPlacementModel, type SketchWorkplane } from './workplaneModel';
 
 type SketchPlacement3D = Mat4;
 export type SketchOperandInput = Sketch | readonly Sketch[];
-
 
 const _sketchCompileProfilePlans = new WeakMap<Sketch, ProfileCompilePlan>();
 const _sketchPlacement3D = new WeakMap<Sketch, SketchPlacement3D | null>();
@@ -28,7 +21,7 @@ function setSketchCompileProfilePlanInternal(sketch: Sketch, plan: ProfileCompil
 }
 
 function cloneSketchPlacement3D(placement: SketchPlacement3D | null): SketchPlacement3D | null {
-  return placement ? [...placement] as SketchPlacement3D : null;
+  return placement ? ([...placement] as SketchPlacement3D) : null;
 }
 
 function setSketchPlacement3DInternal(sketch: Sketch, placement: SketchPlacement3D | null): Sketch {
@@ -44,7 +37,10 @@ function setSketchPlacementModelInternal(sketch: Sketch, model: SketchPlacementM
 export class Sketch {
   public colorHex: string | undefined;
 
-  constructor(public readonly cross: ProfileBackend, color?: string) {
+  constructor(
+    public readonly cross: ProfileBackend,
+    color?: string,
+  ) {
     this.colorHex = color;
     setSketchCompileProfilePlanInternal(this, profilePlanFromCrossSection(cross));
     setSketchPlacement3DInternal(this, null);
@@ -78,43 +74,94 @@ export class Sketch {
     return this.clone();
   }
 
-  area(): number { return this.cross.area(); }
-  bounds() { return this.cross.bounds(); }
-  isEmpty(): boolean { return this.cross.isEmpty(); }
-  numVert(): number { return this.cross.numVert(); }
-  toPolygons() { return this.cross.toPolygons(); }
+  area(): number {
+    return this.cross.area();
+  }
+  bounds() {
+    return this.cross.bounds();
+  }
+  isEmpty(): boolean {
+    return this.cross.isEmpty();
+  }
+  numVert(): number {
+    return this.cross.numVert();
+  }
+  toPolygons() {
+    return this.cross.toPolygons();
+  }
 
   // Method declarations (implementations added by feature modules)
-  translate(x: number, y?: number): Sketch { throw new Error('Not implemented'); }
-  rotate(degrees: number): Sketch { throw new Error('Not implemented'); }
-  rotateAround(degrees: number, pivot: [number, number]): Sketch { throw new Error('Not implemented'); }
-  scale(v: number | [number, number]): Sketch { throw new Error('Not implemented'); }
-  mirror(ax: [number, number]): Sketch { throw new Error('Not implemented'); }
-  add(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
-  subtract(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
-  intersect(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
-  offset(delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch { throw new Error('Not implemented'); }
-  hull(): Sketch { throw new Error('Not implemented'); }
+  translate(_x: number, _y?: number): Sketch {
+    throw new Error('Not implemented');
+  }
+  rotate(_degrees: number): Sketch {
+    throw new Error('Not implemented');
+  }
+  rotateAround(_degrees: number, _pivot: [number, number]): Sketch {
+    throw new Error('Not implemented');
+  }
+  scale(_v: number | [number, number]): Sketch {
+    throw new Error('Not implemented');
+  }
+  mirror(_ax: [number, number]): Sketch {
+    throw new Error('Not implemented');
+  }
+  add(..._others: SketchOperandInput[]): Sketch {
+    throw new Error('Not implemented');
+  }
+  subtract(..._others: SketchOperandInput[]): Sketch {
+    throw new Error('Not implemented');
+  }
+  intersect(..._others: SketchOperandInput[]): Sketch {
+    throw new Error('Not implemented');
+  }
+  offset(_delta: number, _join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
+    throw new Error('Not implemented');
+  }
   /**
    * Decompose this sketch into its distinct filled regions. See `sketchRegions()`.
    * Regions are returned largest-first by area.
    */
-  regions(): Sketch[] { throw new Error('Not implemented'); }
+  regions(): Sketch[] {
+    throw new Error('Not implemented');
+  }
 
   /**
    * Select the single filled region that contains the given 2D seed point.
    * Throws if the seed is outside all regions. See `sketchRegion()`.
    */
-  region(seed: [number, number]): Sketch { throw new Error('Not implemented'); }
+  region(_seed: [number, number]): Sketch {
+    throw new Error('Not implemented');
+  }
 
-  extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean; }): Shape | any { throw new Error('Not implemented'); }
-  revolve(degrees?: number, segments?: number): Shape { throw new Error('Not implemented'); }
-  attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: [number, number]): Sketch { throw new Error('Not implemented'); }
+  extrude(
+    _height: number,
+    _opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean },
+  ): Shape | any {
+    throw new Error('Not implemented');
+  }
+  revolve(_degrees?: number, _segments?: number): Shape {
+    throw new Error('Not implemented');
+  }
+  attachTo(_target: Sketch, _targetAnchor: Anchor, _selfAnchor?: Anchor, _offset?: [number, number]): Sketch {
+    throw new Error('Not implemented');
+  }
   onFace(
-    parentOrFace: Shape | { toShape(): Shape } | { _bbox(): { min: number[]; max: number[] } } | FaceRef,
-    faceOrOpts?: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | string | FaceRef | { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor },
-    opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor },
-  ): Sketch { throw new Error('Not implemented'); }
+    _parentOrFace: Shape | { toShape(): Shape } | { _bbox(): { min: number[]; max: number[] } } | FaceRef,
+    _faceOrOpts?:
+      | 'front'
+      | 'back'
+      | 'left'
+      | 'right'
+      | 'top'
+      | 'bottom'
+      | string
+      | FaceRef
+      | { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor },
+    _opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor },
+  ): Sketch {
+    throw new Error('Not implemented');
+  }
 }
 
 export type {
@@ -140,10 +187,7 @@ export function setSketchCompileProfilePlan(sketch: Sketch, plan: ProfileCompile
 }
 
 export function buildSketchFromCompileProfilePlan(plan: ProfileCompilePlan, color?: string): Sketch {
-  return setSketchCompileProfilePlan(
-    new Sketch(lowerProfileCompilePlan(plan), color),
-    plan,
-  );
+  return setSketchCompileProfilePlan(new Sketch(lowerProfileCompilePlan(plan), color), plan);
 }
 
 export const getSketchBrepProfilePlan = getSketchCompileProfilePlan;
@@ -204,11 +248,13 @@ function workplanesNearlyEqual(a: SketchWorkplane | null, b: SketchWorkplane | n
 
 function placementModelsNearlyEqual(a: SketchPlacementModel | null, b: SketchPlacementModel | null, eps = 1e-8): boolean {
   if (a == null || b == null) return a == null && b == null;
-  return workplanesNearlyEqual(a.workplane, b.workplane, eps)
-    && Math.abs(a.u - b.u) <= eps
-    && Math.abs(a.v - b.v) <= eps
-    && Math.abs(a.protrude - b.protrude) <= eps
-    && a.selfAnchor === b.selfAnchor;
+  return (
+    workplanesNearlyEqual(a.workplane, b.workplane, eps) &&
+    Math.abs(a.u - b.u) <= eps &&
+    Math.abs(a.v - b.v) <= eps &&
+    Math.abs(a.protrude - b.protrude) <= eps &&
+    a.selfAnchor === b.selfAnchor
+  );
 }
 
 export function mergeSketchPlacement3D(sketches: Sketch[]): SketchPlacement3D | null {

@@ -1,17 +1,17 @@
 export type {
-  ProfileCompileTransformStep as CadQueryProfileTransformStep,
   ProfileCompilePlan as CadQueryProfilePlan,
-  ShapeCompileTransformStep as CadQueryShapeTransformStep,
+  ProfileCompileTransformStep as CadQueryProfileTransformStep,
   ShapeCompilePlan as CadQueryShapePlan,
+  ShapeCompileTransformStep as CadQueryShapeTransformStep,
 } from './compilePlan';
 
 export {
-  cloneProfileCompilePlan as cloneCadQueryProfilePlan,
-  cloneShapeCompilePlan as cloneCadQueryShapePlan,
   appendProfileCompileTransform as appendCadQueryProfileTransform,
   appendShapeCompileTransform as appendCadQueryShapeTransform,
   appendShapeCompileTransforms as appendCadQueryShapeTransforms,
-  buildBooleanShapeCompilePlan as buildCadQueryBooleanPlan,
   buildBooleanProfileCompilePlan as buildCadQueryBooleanProfilePlan,
+  buildBooleanShapeCompilePlan as buildCadQueryBooleanPlan,
   buildOffsetProfileCompilePlan as buildCadQueryOffsetProfilePlan,
+  cloneProfileCompilePlan as cloneCadQueryProfilePlan,
+  cloneShapeCompilePlan as cloneCadQueryShapePlan,
 } from './compilePlan';

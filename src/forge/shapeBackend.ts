@@ -44,7 +44,6 @@ export interface EdgeFeatureTarget {
   convex: boolean;
 }
 
-
 export interface ShapeBackend {
   readonly [SHAPE_BACKEND_MARKER]: true;
 
@@ -57,7 +56,6 @@ export interface ShapeBackend {
   split(other: ShapeBackend): [ShapeBackend, ShapeBackend];
   splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend];
   trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend;
-  hull(): ShapeBackend;
   boundingBox(): ShapeRuntimeBounds;
   volume(): number;
   surfaceArea(): number;

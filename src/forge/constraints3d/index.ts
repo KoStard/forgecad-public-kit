@@ -8,19 +8,19 @@
  * - constrain3d() is the standalone quick-positioning entry point
  */
 
+export { bodyFromRefs, bodyFromTrackedShape, constrain3d, MateBuilder } from './builder';
+export { add3, cross3, dot3, len3, normalize3, rodrigues, scale3, sub3, transformDir, transformPoint } from './rodrigues';
 export { solve3D } from './solver';
-export { bodyFromTrackedShape, bodyFromRefs, MateBuilder, constrain3d } from './builder';
 export type {
-  RigidBody,
-  Constraint3D,
-  Constraint3DType,
-  Constraint3DDef,
   AxisRef3D,
-  PointRef3D,
   BodyFeatureRef,
-  Solver3DContext,
+  Constraint3D,
+  Constraint3DDef,
+  Constraint3DType,
+  PointRef3D,
+  RigidBody,
   Solve3DOptions,
   Solve3DResult,
   Solve3DStatus,
+  Solver3DContext,
 } from './types';
-export { rodrigues, transformPoint, transformDir, dot3, cross3, sub3, add3, scale3, len3, normalize3 } from './rodrigues';

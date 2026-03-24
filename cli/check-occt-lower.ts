@@ -8,10 +8,10 @@
  * If a test fails, the code has a bug.
  */
 import assert from 'node:assert/strict';
-import { init, runScript } from '../src/forge/headless';
 import { lowerShapeCompilePlanToOCCT, lowerShapeCompilePlanToOCCTBackend, OCCTUnsupportedError } from '../src/forge/backends/occt';
 import { wrapOCCTShapeBackend } from '../src/forge/backends/occt/shapeBackend';
 import type { ProfileCompilePlan, ShapeCompilePlan } from '../src/forge/compilePlan';
+import { init, runScript } from '../src/forge/headless';
 import type { ShapeBackend } from '../src/forge/shapeBackend';
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
@@ -22,9 +22,7 @@ function approx(a: number, b: number, eps = 1e-2): boolean {
 
 function expectClose(actual: number, expected: number, label: string, eps = 1e-2): void {
   if (!approx(actual, expected, eps)) {
-    throw new Error(
-      `${label}: expected ${expected}, got ${actual} (delta ${Math.abs(actual - expected)}, eps ${eps})`,
-    );
+    throw new Error(`${label}: expected ${expected}, got ${actual} (delta ${Math.abs(actual - expected)}, eps ${eps})`);
   }
 }
 
@@ -126,7 +124,16 @@ function testCircle(): void {
 
 function testPolygonTriangle(): void {
   // Right triangle: base=10, height=6 => area = 0.5 * 10 * 6 = 30
-  const b = lower(extrudePlan(polygonProfile([[0, 0], [10, 0], [0, 6]]), 1));
+  const b = lower(
+    extrudePlan(
+      polygonProfile([
+        [0, 0],
+        [10, 0],
+        [0, 6],
+      ]),
+      1,
+    ),
+  );
   expectClose(b.volume(), 30, 'polygon triangle volume');
   expectBBox(b, [0, 0, 0], [10, 6, 1], 'polygon triangle');
 }
@@ -134,7 +141,18 @@ function testPolygonTriangle(): void {
 function testPolygonDegenerateEdges(): void {
   // Pentagon with two duplicate consecutive vertices — degenerate edges should be skipped
   // Effective triangle: (0,0), (10,0), (0,6). Area = 30
-  const b = lower(extrudePlan(polygonProfile([[0, 0], [10, 0], [10, 0], [0, 6], [0, 6]]), 1));
+  const b = lower(
+    extrudePlan(
+      polygonProfile([
+        [0, 0],
+        [10, 0],
+        [10, 0],
+        [0, 6],
+        [0, 6],
+      ]),
+      1,
+    ),
+  );
   expectClose(b.volume(), 30, 'polygon degenerate edges volume');
 }
 
@@ -143,10 +161,7 @@ function testProfileBooleanUnion(): void {
   const profile: ProfileCompilePlan = {
     kind: 'boolean',
     op: 'union',
-    profiles: [
-      rectProfile(5, 5),
-      { kind: 'rect', width: 5, height: 5, center: false, transforms: [{ kind: 'translate', x: 10, y: 0 }] },
-    ],
+    profiles: [rectProfile(5, 5), { kind: 'rect', width: 5, height: 5, center: false, transforms: [{ kind: 'translate', x: 10, y: 0 }] }],
     transforms: [],
   };
   const b = lower(extrudePlan(profile, 1));
@@ -159,10 +174,7 @@ function testProfileBooleanDifference(): void {
   const profile: ProfileCompilePlan = {
     kind: 'boolean',
     op: 'difference',
-    profiles: [
-      rectProfile(10, 10),
-      { kind: 'rect', width: 2, height: 2, center: false, transforms: [{ kind: 'translate', x: 4, y: 4 }] },
-    ],
+    profiles: [rectProfile(10, 10), { kind: 'rect', width: 2, height: 2, center: false, transforms: [{ kind: 'translate', x: 4, y: 4 }] }],
     transforms: [],
   };
   const b = lower(extrudePlan(profile, 1));
@@ -271,19 +283,6 @@ function testProfileScale(): void {
   const b = lower(extrudePlan(profile, 1));
   expectClose(b.volume(), 200, 'profile scale volume');
   expectBBox(b, [0, 0, 0], [20, 10, 1], 'profile scale');
-}
-
-function testProfileHullThrows(): void {
-  const profile: ProfileCompilePlan = {
-    kind: 'hull',
-    profiles: [rectProfile(5, 5)],
-    transforms: [],
-  };
-  assert.throws(
-    () => lower(extrudePlan(profile, 1)),
-    (err: any) => err instanceof OCCTUnsupportedError,
-    'profile hull should throw OCCTUnsupportedError',
-  );
 }
 
 function testProfileProjectThrows(): void {
@@ -445,7 +444,13 @@ function testSweepStraight(): void {
   const plan: ShapeCompilePlan = {
     kind: 'sweep',
     profile: rectProfile(4, 4, true),
-    path: { kind: 'polyline', points: [[0, 0, 0], [0, 0, 20]] },
+    path: {
+      kind: 'polyline',
+      points: [
+        [0, 0, 0],
+        [0, 0, 20],
+      ],
+    },
     edgeLength: 1,
     boundsPadding: 1,
     up: [0, 1, 0],
@@ -460,7 +465,14 @@ function testSweepLShaped(): void {
   const plan: ShapeCompilePlan = {
     kind: 'sweep',
     profile: rectProfile(2, 2, true),
-    path: { kind: 'polyline', points: [[0, 0, 0], [10, 0, 0], [10, 10, 0]] },
+    path: {
+      kind: 'polyline',
+      points: [
+        [0, 0, 0],
+        [10, 0, 0],
+        [10, 10, 0],
+      ],
+    },
     edgeLength: 1,
     boundsPadding: 1,
     up: [0, 0, 1],
@@ -476,10 +488,7 @@ function testBooleanUnionNonOverlapping(): void {
   const plan: ShapeCompilePlan = {
     kind: 'boolean',
     op: 'union',
-    shapes: [
-      boxPlan(5, 5, 5),
-      { kind: 'transform', base: boxPlan(5, 5, 5), steps: [{ kind: 'translate', x: 10, y: 0, z: 0 }] },
-    ],
+    shapes: [boxPlan(5, 5, 5), { kind: 'transform', base: boxPlan(5, 5, 5), steps: [{ kind: 'translate', x: 10, y: 0, z: 0 }] }],
   };
   const b = lower(plan);
   expectClose(b.volume(), 250, 'boolean union non-overlapping volume');
@@ -492,10 +501,7 @@ function testBooleanUnionOverlapping(): void {
   const plan: ShapeCompilePlan = {
     kind: 'boolean',
     op: 'union',
-    shapes: [
-      boxPlan(10, 10, 10),
-      { kind: 'transform', base: boxPlan(10, 10, 10), steps: [{ kind: 'translate', x: 5, y: 0, z: 0 }] },
-    ],
+    shapes: [boxPlan(10, 10, 10), { kind: 'transform', base: boxPlan(10, 10, 10), steps: [{ kind: 'translate', x: 5, y: 0, z: 0 }] }],
   };
   const b = lower(plan);
   expectClose(b.volume(), 1500, 'boolean union overlapping volume');
@@ -507,10 +513,7 @@ function testBooleanDifference(): void {
   const plan: ShapeCompilePlan = {
     kind: 'boolean',
     op: 'difference',
-    shapes: [
-      boxPlan(10, 10, 10),
-      { kind: 'transform', base: boxPlan(4, 4, 4), steps: [{ kind: 'translate', x: 3, y: 3, z: 3 }] },
-    ],
+    shapes: [boxPlan(10, 10, 10), { kind: 'transform', base: boxPlan(4, 4, 4), steps: [{ kind: 'translate', x: 3, y: 3, z: 3 }] }],
   };
   const b = lower(plan);
   expectClose(b.volume(), 936, 'boolean difference volume');
@@ -521,10 +524,7 @@ function testBooleanIntersection(): void {
   const plan: ShapeCompilePlan = {
     kind: 'boolean',
     op: 'intersection',
-    shapes: [
-      boxPlan(10, 10, 10),
-      { kind: 'transform', base: boxPlan(10, 10, 10), steps: [{ kind: 'translate', x: 5, y: 5, z: 0 }] },
-    ],
+    shapes: [boxPlan(10, 10, 10), { kind: 'transform', base: boxPlan(10, 10, 10), steps: [{ kind: 'translate', x: 5, y: 5, z: 0 }] }],
   };
   const b = lower(plan);
   expectClose(b.volume(), 250, 'boolean intersection volume');
@@ -692,12 +692,7 @@ function testTransformChained(): void {
 
 function testTransformWorkplanePlacement(): void {
   // Identity matrix — shape should be unchanged
-  const identity: number[] = [
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1,
-  ];
+  const identity: number[] = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
   const plan: ShapeCompilePlan = {
     kind: 'transform',
     base: boxPlan(10, 20, 30),
@@ -710,12 +705,7 @@ function testTransformWorkplanePlacement(): void {
 
 function testTransformWorkplanePlacementTranslate(): void {
   // Translation matrix: move by (5, 10, 15)
-  const mat: number[] = [
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    5, 10, 15, 1,
-  ];
+  const mat: number[] = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 10, 15, 1];
   const plan: ShapeCompilePlan = {
     kind: 'transform',
     base: boxPlan(10, 20, 30),
@@ -801,31 +791,6 @@ function testTrimByPlaneOutside(): void {
 }
 
 /* ── Group 8: Errors ─────────────────────────────────────────────────── */
-
-function testHullThrowsOCCTUnsupported(): void {
-  const plan: ShapeCompilePlan = {
-    kind: 'hull',
-    shapes: [],
-    points: [[0, 0, 0]],
-    queryPropagation: undefined,
-  };
-  assert.throws(
-    () => lowerShapeCompilePlanToOCCT(plan),
-    (err: any) => err instanceof OCCTUnsupportedError,
-    'hull should throw OCCTUnsupportedError',
-  );
-}
-
-function testOpaqueThrows(): void {
-  const plan: ShapeCompilePlan = {
-    kind: 'opaque',
-    backend: { volume: () => 0 } as any,
-  };
-  assert.throws(
-    () => lowerShapeCompilePlanToOCCT(plan),
-    'opaque should throw',
-  );
-}
 
 function testEmptyBooleanThrows(): void {
   const plan: ShapeCompilePlan = {
@@ -949,7 +914,6 @@ export async function runCheckOcctLowerCli(): Promise<void> {
   testProfileMirror();
   testProfileScale();
   testPolygonDegenerateEdges();
-  testProfileHullThrows();
   testProfileProjectThrows();
 
   // Group 2: Primitives
@@ -1003,8 +967,6 @@ export async function runCheckOcctLowerCli(): Promise<void> {
   testTrimByPlaneOutside();
 
   // Group 8: Errors
-  testHullThrowsOCCTUnsupported();
-  testOpaqueThrows();
   testEmptyBooleanThrows();
   testLoftTooFewProfilesThrows();
   testSweepTooFewPointsThrows();

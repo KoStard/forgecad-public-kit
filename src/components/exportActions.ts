@@ -1,13 +1,13 @@
-import { build3mfBlob, buildBinaryStl, buildObjBlob, type MeshExportObject } from '@forge/exportMesh';
-import { runScript, type ForgeQualityPreset, type RunResult } from '@forge/index';
-import { sketchToSvg } from '@forge/sketch/exportSvg';
+import { build3mfBlob, buildBinaryStl, buildObjBlob, type MeshExportObject } from '@forge/export/exportMesh';
+import { type ForgeQualityPreset, type RunResult, runScript } from '@forge/index';
+import { setParamOverrides } from '@forge/params';
 import { sketchToDxf } from '@forge/sketch/exportDxf';
 import { generateSketchPdf } from '@forge/sketch/exportSketchPdf';
-import { setParamOverrides } from '@forge/params';
-import { useForgeStore, type ObjectSettings } from '../store/forgeStore';
-import { generateReportInWorker } from '../workers/reportWorkerClient';
-import { evalWorkerClient } from '../workers/evalWorkerClient';
+import { sketchToSvg } from '@forge/sketch/exportSvg';
 import { isNotebookFile } from '../notebook/model';
+import { type ObjectSettings, useForgeStore } from '../store/forgeStore';
+import { evalWorkerClient } from '../workers/evalWorkerClient';
+import { generateReportInWorker } from '../workers/reportWorkerClient';
 
 export type MeshExportFormat = '3mf' | 'stl' | 'obj';
 export type ExactExportFormat = 'step' | 'brep';
@@ -75,9 +75,7 @@ function normalizeExportQuality(quality?: ExportQualityChoice): ExportQualityCho
   return 'default';
 }
 
-function shouldRegenerateForQuality(
-  quality: ExportQualityChoice,
-): quality is Exclude<ForgeQualityPreset, 'default'> {
+function shouldRegenerateForQuality(quality: ExportQualityChoice): quality is Exclude<ForgeQualityPreset, 'default'> {
   return quality === 'live' || quality === 'high';
 }
 
@@ -105,10 +103,7 @@ function resolveRunResultForExport(qualityChoice: ExportQualityChoice): RunResul
   return rerunActiveScriptForQuality(qualityChoice);
 }
 
-function toMeshExportObjects(
-  runResult: RunResult,
-  objectSettings: Record<string, ObjectSettings>,
-): MeshExportObject[] {
+function toMeshExportObjects(runResult: RunResult, objectSettings: Record<string, ObjectSettings>): MeshExportObject[] {
   const shapeObjects = runResult.objects.filter((obj) => obj.shape);
   return shapeObjects.map((obj) => ({
     name: obj.name,
@@ -157,10 +152,7 @@ export async function exportMeshFromStore(
   triggerDownload(stlBlob, `${stem}.stl`);
 }
 
-export async function exportExactFromStore(
-  format: ExactExportFormat,
-  preferredStem?: string,
-): Promise<void> {
+export async function exportExactFromStore(format: ExactExportFormat, preferredStem?: string): Promise<void> {
   const { result, activeFile, files, paramOverrides, runQuality } = useForgeStore.getState();
   requireSuccessfulRunResult(result);
 
@@ -187,12 +179,9 @@ export async function exportExactFromStore(
   }
 }
 
-export async function exportReportFromStore(
-  preferredStem?: string,
-  options: ExportQualityOptions = {},
-): Promise<void> {
+export async function exportReportFromStore(preferredStem?: string, options: ExportQualityOptions = {}): Promise<void> {
   const { result, files, activeFile, paramOverrides, objectSettings } = useForgeStore.getState();
-  const hasShapes = (result?.objects?.some((obj) => Boolean(obj.shape)) ?? false);
+  const hasShapes = result?.objects?.some((obj) => Boolean(obj.shape)) ?? false;
   if (!hasShapes) {
     throw new Error('No 3D objects available for report export.');
   }
@@ -215,10 +204,7 @@ export async function exportReportFromStore(
   triggerDownload(blob, `${title}.report.pdf`);
 }
 
-export async function exportOrbitGifFromStore(
-  preferredStem?: string,
-  options?: OrbitGifExportOptions,
-): Promise<void> {
+export async function exportOrbitGifFromStore(preferredStem?: string, options?: OrbitGifExportOptions): Promise<void> {
   if (!orbitGifExporter) {
     throw new Error('Viewport is not ready for GIF export. Try again in a moment.');
   }
@@ -234,19 +220,16 @@ export async function exportOrbitGifFromStore(
   const stem = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
   const exporterOptions = shouldRegenerateForQuality(quality)
     ? {
-      ...(options ?? {}),
-      runResult,
-      objectSettings,
-    }
+        ...(options ?? {}),
+        runResult,
+        objectSettings,
+      }
     : options;
   const blob = await orbitGifExporter(exporterOptions);
   triggerDownload(blob, `${stem}.orbit.gif`);
 }
 
-export function exportSketchFromStore(
-  format: SketchExportFormat,
-  preferredStem?: string,
-): void {
+export function exportSketchFromStore(format: SketchExportFormat, preferredStem?: string): void {
   const { result, activeFile } = useForgeStore.getState();
   const current = requireSuccessfulRunResult(result);
   const sketchObjects = current.objects.filter((obj) => obj.sketch);

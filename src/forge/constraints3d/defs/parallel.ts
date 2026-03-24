@@ -7,8 +7,8 @@
  * We pick the two largest components for numerical stability.
  */
 
-import type { Constraint3DDef, Constraint3D, Solver3DContext } from '../types';
 import { cross3 } from '../rodrigues';
+import type { Constraint3D, Constraint3DDef, Solver3DContext } from '../types';
 
 export const parallelDef: Constraint3DDef<'parallel'> = {
   type: 'parallel',

@@ -1,7 +1,8 @@
-import { filletEdge, chamferEdge } from '../edgeFeatures';
+import { chamferEdge, filletEdge } from '../edge-features/edgeFeatures';
 import type { Sketch } from './core';
-import { polygon } from './primitives';
 import type { Point2D } from './entities';
+import { polygon } from './primitives';
+
 const EPSILON = 1e-8;
 
 export interface FilletCornerSpec {
@@ -62,11 +63,7 @@ function pointsNearlyEqual(a: [number, number], b: [number, number], epsilon = 1
   return Math.abs(a[0] - b[0]) <= epsilon && Math.abs(a[1] - b[1]) <= epsilon;
 }
 
-function buildCornerGeometry(
-  points: [number, number][],
-  spec: FilletCornerSpec,
-  winding: number,
-): FilletCornerGeometry {
+function buildCornerGeometry(points: [number, number][], spec: FilletCornerSpec, winding: number): FilletCornerGeometry {
   const count = points.length;
   if (!Number.isInteger(spec.index) || spec.index < 0 || spec.index >= count) {
     throw new Error(`filletCorners corner index ${spec.index} is out of range for ${count} points`);
@@ -101,29 +98,18 @@ function buildCornerGeometry(
   const tangentDistance = spec.radius / Math.tan(interiorAngle / 2);
   if (tangentDistance >= inLength - EPSILON || tangentDistance >= outLength - EPSILON) {
     const maxRadius = Math.min(inLength, outLength) * Math.tan(interiorAngle / 2);
-    throw new Error(
-      `filletCorners radius ${spec.radius} is too large for corner ${spec.index}; max is ${maxRadius.toFixed(3)}`,
-    );
+    throw new Error(`filletCorners radius ${spec.radius} is too large for corner ${spec.index}; max is ${maxRadius.toFixed(3)}`);
   }
 
-  const start: [number, number] = [
-    current[0] - inDirX * tangentDistance,
-    current[1] - inDirY * tangentDistance,
-  ];
-  const end: [number, number] = [
-    current[0] + outDirX * tangentDistance,
-    current[1] + outDirY * tangentDistance,
-  ];
+  const start: [number, number] = [current[0] - inDirX * tangentDistance, current[1] - inDirY * tangentDistance];
+  const end: [number, number] = [current[0] + outDirX * tangentDistance, current[1] + outDirY * tangentDistance];
 
   // For convex corners the bisector (toPrev+toNext) points inward; for concave it
   // naturally points outward into the concavity — both are the correct direction
   // for the arc center.
   const [bisectorX, bisectorY] = normalize(toPrev[0] + toNext[0], toPrev[1] + toNext[1]);
   const centerDistance = spec.radius / Math.sin(interiorAngle / 2);
-  const center: [number, number] = [
-    current[0] + bisectorX * centerDistance,
-    current[1] + bisectorY * centerDistance,
-  ];
+  const center: [number, number] = [current[0] + bisectorX * centerDistance, current[1] + bisectorY * centerDistance];
 
   // Convex: arc sweeps in winding direction. Concave: arc sweeps opposite.
   const sweep = isConcave ? -winding * interiorAngle : winding * interiorAngle;
@@ -166,9 +152,7 @@ export function filletCorners(points: PointInput[], corners: FilletCornerSpec[])
     const exitDistance = geometryByIndex.get(i)?.tangentDistance ?? 0;
     const entryDistance = geometryByIndex.get(nextIndex)?.tangentDistance ?? 0;
     if (exitDistance + entryDistance >= edgeLength - EPSILON) {
-      throw new Error(
-        `filletCorners adjacent fillets overlap on edge ${i} -> ${nextIndex}; reduce one of the radii`,
-      );
+      throw new Error(`filletCorners adjacent fillets overlap on edge ${i} -> ${nextIndex}; reduce one of the radii`);
     }
   }
 
@@ -189,10 +173,7 @@ export function filletCorners(points: PointInput[], corners: FilletCornerSpec[])
     pushPoint(corner.start);
     for (let step = 1; step < corner.segments; step += 1) {
       const angle = corner.startAngle + (corner.sweep * step) / corner.segments;
-      pushPoint([
-        corner.center[0] + Math.cos(angle) * corner.radius,
-        corner.center[1] + Math.sin(angle) * corner.radius,
-      ]);
+      pushPoint([corner.center[0] + Math.cos(angle) * corner.radius, corner.center[1] + Math.sin(angle) * corner.radius]);
     }
     pushPoint(corner.end);
   }
@@ -204,4 +185,4 @@ export function filletCorners(points: PointInput[], corners: FilletCornerSpec[])
   return polygon(rounded);
 }
 
-export { filletEdge, chamferEdge };
+export { chamferEdge, filletEdge };

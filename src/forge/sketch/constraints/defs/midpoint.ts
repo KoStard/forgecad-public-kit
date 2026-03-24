@@ -4,7 +4,7 @@
  * Rust owns solving; this file only declares the public payload shape, equation count,
  * and UI/display metadata used by the builder and viewer.
  */
-import type { PointId, LineId, ConstraintTypeMap, AnnotationElement } from '../types';
+import type { PointId, LineId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
 import { midpointPerp } from '../helpers';
 
@@ -39,7 +39,8 @@ registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
   displayAnnotations(c, { lines, points }) {
     const line = lines.get(c.line);
     if (!line) return [];
-    const a = points.get(line.a), b = points.get(line.b);
+    const a = points.get(line.a),
+      b = points.get(line.b);
     if (!a || !b) return [];
     return [{ kind: 'symbol', position: midpointPerp(a, b, 3), symbol: 'midpoint' as const }];
   },

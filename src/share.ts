@@ -1,7 +1,4 @@
-import {
-  compressToEncodedURIComponent,
-  decompressFromEncodedURIComponent,
-} from 'lz-string';
+import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 
 const SHARED_PREFIX = 'code/';
 const BUNDLE_PREFIX = 'bundle/';
@@ -144,9 +141,8 @@ export async function fetchGistModel(gistId: string): Promise<SharedModel> {
 
   // Prefer .forge.js, then .sketch.js (legacy), then first file
   const entries = Object.values(files);
-  const forgeFile = entries.find((f) => f.filename.endsWith('.forge.js'))
-    || entries.find((f) => f.filename.endsWith('.sketch.js'))
-    || entries[0];
+  const forgeFile =
+    entries.find((f) => f.filename.endsWith('.forge.js')) || entries.find((f) => f.filename.endsWith('.sketch.js')) || entries[0];
 
   if (!forgeFile) throw new Error('Gist contains no files');
   return { filename: forgeFile.filename, code: forgeFile.content };

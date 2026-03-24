@@ -10,27 +10,19 @@ import type {
   ConstraintDisplay,
   ConstraintType,
   DisplayContext,
-  PointId,
   SketchConstraint,
   SolveOptions,
   SolveTrailStep,
   SolverMetadata,
 } from './types';
-import {
-  getLastSolverWasmExchange,
-  getSolverWasmStats,
-  resetSolverWasmStats,
-  solveConstraintsWasm,
-} from './solver-wasm';
+import { getLastSolverWasmExchange, getSolverWasmStats, resetSolverWasmStats, solveConstraintsWasm } from './solver-wasm';
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const registry = new Map<string, ConstraintDef<string, any>>();
 
-export function registerConstraint<TType extends string, TData extends object>(
-  def: ConstraintDef<TType, TData>,
-): void {
+export function registerConstraint<TType extends string, TData extends object>(def: ConstraintDef<TType, TData>): void {
   registry.set(def.type, def as unknown as ConstraintDef<string, object>);
 }
 
@@ -58,11 +50,9 @@ export function getPendingBuilderMethods(): Map<string, (...args: any[]) => any>
 
 // ─── Registry-derived helpers ──────────────────────────────────────────────────
 
-export const buildLabel = (type: ConstraintType | string): string =>
-  registry.get(type)?.label ?? 'C';
+export const buildLabel = (type: ConstraintType | string): string => registry.get(type)?.label ?? 'C';
 
-export const isDimensionConstraint = (type: ConstraintType | string): boolean =>
-  registry.get(type)?.isDimension ?? false;
+export const isDimensionConstraint = (type: ConstraintType | string): boolean => registry.get(type)?.isDimension ?? false;
 
 export const getConstraintValue = (constraint: SketchConstraint): number | undefined => {
   const def = registry.get(constraint.type);
@@ -125,7 +115,7 @@ export const solveConstraints = (
     solve: _st1 - _st0,
     total: _st1 - _st0,
     constraints: def.constraints.length,
-    freePoints: def.points.filter(p => !p.fixed).length,
+    freePoints: def.points.filter((p) => !p.fixed).length,
     serialize: exchange?.timings.serialize ?? 0,
     stringify: exchange?.timings.stringify ?? 0,
     wasm: exchange?.timings.wasm ?? 0,
@@ -159,9 +149,7 @@ export const buildConstraintDisplays = (
 
   const displays = def.constraints.map((constraint) => {
     const constraintDef = registry.get(constraint.type);
-    const position: [number, number] = constraintDef
-      ? constraintDef.displayPosition(constraint as never, ctx)
-      : [0, 0];
+    const position: [number, number] = constraintDef ? constraintDef.displayPosition(constraint as never, ctx) : [0, 0];
 
     // Extract entity IDs from constraint fields.
     const entityIds: string[] = [];
@@ -169,7 +157,9 @@ export const buildConstraintDisplays = (
       if (key === 'id' || key === 'type') continue;
       if (typeof val === 'string') entityIds.push(val);
       else if (Array.isArray(val)) {
-        for (const v of val) { if (typeof v === 'string') entityIds.push(v); }
+        for (const v of val) {
+          if (typeof v === 'string') entityIds.push(v);
+        }
       }
     }
 
@@ -216,9 +206,7 @@ export const buildConstraintDisplays = (
 
   // Compute text bounding box dimensions for each label.
   // Dimension constraints render as "symbol + value" (e.g., "⟨22"), others just the symbol.
-  const labelTexts = displays.map(
-    (d) => d.isDimension && d.value !== undefined ? `${d.label}${d.value}` : d.label,
-  );
+  const labelTexts = displays.map((d) => (d.isDimension && d.value !== undefined ? `${d.label}${d.value}` : d.label));
   const halfWidths = labelTexts.map((t) => (t.length * CHAR_WIDTH) / 2 + LABEL_PAD);
   const halfHeight = TEXT_HEIGHT / 2 + LABEL_PAD;
 
@@ -236,7 +224,10 @@ export const buildConstraintDisplays = (
     const pts: [number, number][] = [];
     for (const eid of d.entityIds) {
       const pt = ctx.points.get(eid);
-      if (pt) { pts.push([pt.x, pt.y]); continue; }
+      if (pt) {
+        pts.push([pt.x, pt.y]);
+        continue;
+      }
       const ln = ctx.lines.get(eid);
       if (ln) {
         const a = ctx.points.get(ln.a);
@@ -251,10 +242,7 @@ export const buildConstraintDisplays = (
       }
     }
     if (pts.length === 0) return null;
-    return [
-      pts.reduce((s, p) => s + p[0], 0) / pts.length,
-      pts.reduce((s, p) => s + p[1], 0) / pts.length,
-    ] as [number, number];
+    return [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length] as [number, number];
   });
 
   // Seed force layout from the annotation's own natural position, not displayPosition().
@@ -267,10 +255,13 @@ export const buildConstraintDisplays = (
       }
       if (ann.kind === 'dimension') {
         // Midpoint of the offset dimension line = where the label naturally appears.
-        const [ax, ay] = ann.from, [bx, by] = ann.to;
-        const dx = bx - ax, dy = by - ay;
+        const [ax, ay] = ann.from,
+          [bx, by] = ann.to;
+        const dx = bx - ax,
+          dy = by - ay;
         const len = Math.hypot(dx, dy) || 1;
-        const nx = -dy / len * ann.offset, ny = dx / len * ann.offset;
+        const nx = (-dy / len) * ann.offset,
+          ny = (dx / len) * ann.offset;
         return [(ax + bx) / 2 + nx, (ay + by) / 2 + ny];
       }
     }
@@ -282,11 +273,11 @@ export const buildConstraintDisplays = (
   // Force simulation parameters.
   const MAX_ITERS = 80;
   const DAMPING = 0.4;
-  const LABEL_REPULSION = 2.0;   // strength of label-label repulsion
-  const EDGE_REPULSION = 1.0;    // strength of edge repulsion
-  const EDGE_INFLUENCE = 4.0;    // max distance at which edges repel
-  const TETHER_STRENGTH = 0.12;  // spring pull back toward entity (stronger — symbols are small)
-  const MAX_TETHER_DIST = 12;    // tighter leash — compact symbols stay near entities
+  const LABEL_REPULSION = 2.0; // strength of label-label repulsion
+  const EDGE_REPULSION = 1.0; // strength of edge repulsion
+  const EDGE_INFLUENCE = 4.0; // max distance at which edges repel
+  const TETHER_STRENGTH = 0.12; // spring pull back toward entity (stronger — symbols are small)
+  const MAX_TETHER_DIST = 12; // tighter leash — compact symbols stay near entities
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     let maxForce = 0;
@@ -295,8 +286,8 @@ export const buildConstraintDisplays = (
     // 1. Label-label repulsion (bbox-aware).
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
-        const overlapX = (halfWidths[i] + halfWidths[j]) - Math.abs(pos[j][0] - pos[i][0]);
-        const overlapY = (halfHeight + halfHeight) - Math.abs(pos[j][1] - pos[i][1]);
+        const overlapX = halfWidths[i] + halfWidths[j] - Math.abs(pos[j][0] - pos[i][0]);
+        const overlapY = halfHeight + halfHeight - Math.abs(pos[j][1] - pos[i][1]);
         if (overlapX > 0 && overlapY > 0) {
           // Labels overlap — push apart along the axis of least overlap.
           let dx = pos[j][0] - pos[i][0];
@@ -305,13 +296,17 @@ export const buildConstraintDisplays = (
           if (d < 0.01) {
             // Exact overlap — use index-based angle to break symmetry.
             const a = (i * Math.PI * 2) / Math.max(n, 2);
-            dx = Math.cos(a); dy = Math.sin(a);
+            dx = Math.cos(a);
+            dy = Math.sin(a);
           } else {
-            dx /= d; dy /= d;
+            dx /= d;
+            dy /= d;
           }
           const push = Math.min(overlapX, overlapY) * LABEL_REPULSION;
-          forces[i][0] -= dx * push; forces[i][1] -= dy * push;
-          forces[j][0] += dx * push; forces[j][1] += dy * push;
+          forces[i][0] -= dx * push;
+          forces[i][1] -= dy * push;
+          forces[j][0] += dx * push;
+          forces[j][1] += dy * push;
         }
       }
     }
@@ -339,7 +334,8 @@ export const buildConstraintDisplays = (
         const effectiveInfluence = EDGE_INFLUENCE + Math.max(hw, hh) * 0.5;
         if (d < effectiveInfluence && d > 0.01) {
           const strength = EDGE_REPULSION * (1 - d / effectiveInfluence);
-          dx /= d; dy /= d;
+          dx /= d;
+          dy /= d;
           forces[i][0] += dx * strength;
           forces[i][1] += dy * strength;
         }
@@ -389,20 +385,23 @@ export const buildConstraintDisplays = (
     const dx = pos[i][0] - origPos[i][0];
     const dy = pos[i][1] - origPos[i][1];
     // Shift annotation positions by the same delta the force layout applied.
-    const annotations = (dx === 0 && dy === 0) ? d.annotations : d.annotations.map((ann) => {
-      if (ann.kind === 'symbol' || ann.kind === 'text') {
-        return { ...ann, position: [ann.position[0] + dx, ann.position[1] + dy] as [number, number] };
-      }
-      if (ann.kind === 'dimension') {
-        // Don't shift from/to — they are entity endpoints that must stay anchored to geometry.
-        return ann;
-      }
-      if (ann.kind === 'angle-arc') {
-        // Don't shift center — it is the vertex of the angle and must stay on the entity.
-        return ann;
-      }
-      return ann;
-    });
+    const annotations =
+      dx === 0 && dy === 0
+        ? d.annotations
+        : d.annotations.map((ann) => {
+            if (ann.kind === 'symbol' || ann.kind === 'text') {
+              return { ...ann, position: [ann.position[0] + dx, ann.position[1] + dy] as [number, number] };
+            }
+            if (ann.kind === 'dimension') {
+              // Don't shift from/to — they are entity endpoints that must stay anchored to geometry.
+              return ann;
+            }
+            if (ann.kind === 'angle-arc') {
+              // Don't shift center — it is the vertex of the angle and must stay on the entity.
+              return ann;
+            }
+            return ann;
+          });
     return { ...d, position: pos[i], annotations };
   });
 };

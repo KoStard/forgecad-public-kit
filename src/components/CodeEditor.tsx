@@ -1,8 +1,8 @@
-import { useRef, useCallback, useEffect } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
-import { useForgeStore } from '../store/forgeStore';
+import { useCallback, useEffect, useRef } from 'react';
 import FORGE_TYPES from '../forge/forge-api.d.ts?raw';
+import { useForgeStore } from '../store/forgeStore';
 
 export function CodeEditor() {
   const files = useForgeStore((s) => s.files);
@@ -192,11 +192,15 @@ export function CodeEditor() {
           key={activeFile}
           defaultLanguage="javascript"
           theme={
-            theme === 'gruvbox' ? 'forge-gruvbox'
-            : theme === 'tokyo-night' ? 'forge-tokyo-night'
-            : theme === 'kanagawa-lotus' ? 'forge-kanagawa-lotus'
-            : theme === 'light' ? 'light'
-            : 'vs-dark'
+            theme === 'gruvbox'
+              ? 'forge-gruvbox'
+              : theme === 'tokyo-night'
+                ? 'forge-tokyo-night'
+                : theme === 'kanagawa-lotus'
+                  ? 'forge-kanagawa-lotus'
+                  : theme === 'light'
+                    ? 'light'
+                    : 'vs-dark'
           }
           value={code}
           onChange={handleChange}
@@ -213,30 +217,47 @@ export function CodeEditor() {
         />
       </div>
       {result?.error && (
-        <div style={{ padding: '8px 12px', background: 'var(--fc-errorBg)', color: 'var(--fc-error)', fontSize: 13, fontFamily: 'monospace', maxHeight: 80, overflow: 'auto' }}>
+        <div
+          style={{
+            padding: '8px 12px',
+            background: 'var(--fc-errorBg)',
+            color: 'var(--fc-error)',
+            fontSize: 13,
+            fontFamily: 'monospace',
+            maxHeight: 80,
+            overflow: 'auto',
+          }}
+        >
           {result.error}
         </div>
       )}
-      {result && !result.error && !isEvaluating && (() => {
-        const failCount = result.verifications?.filter((v) => v.status === 'fail').length ?? 0;
-        return (
-          <div style={{
-            padding: '4px 12px',
-            background: failCount > 0 ? 'var(--fc-warningBg, rgba(230,168,23,0.12))' : 'var(--fc-successBg)',
-            color: failCount > 0 ? 'var(--fc-warning, #e6a817)' : 'var(--fc-success)',
-            fontSize: 12,
-            fontFamily: 'monospace',
-            display: 'flex',
-            gap: 10,
-            alignItems: 'center',
-          }}>
-            <span>✓ {result.timeMs.toFixed(1)}ms</span>
-            {failCount > 0 && (
-              <span>⚠ {failCount} check{failCount !== 1 ? 's' : ''} failed</span>
-            )}
-          </div>
-        );
-      })()}
+      {result &&
+        !result.error &&
+        !isEvaluating &&
+        (() => {
+          const failCount = result.verifications?.filter((v) => v.status === 'fail').length ?? 0;
+          return (
+            <div
+              style={{
+                padding: '4px 12px',
+                background: failCount > 0 ? 'var(--fc-warningBg, rgba(230,168,23,0.12))' : 'var(--fc-successBg)',
+                color: failCount > 0 ? 'var(--fc-warning, #e6a817)' : 'var(--fc-success)',
+                fontSize: 12,
+                fontFamily: 'monospace',
+                display: 'flex',
+                gap: 10,
+                alignItems: 'center',
+              }}
+            >
+              <span>✓ {result.timeMs.toFixed(1)}ms</span>
+              {failCount > 0 && (
+                <span>
+                  ⚠ {failCount} check{failCount !== 1 ? 's' : ''} failed
+                </span>
+              )}
+            </div>
+          );
+        })()}
     </div>
   );
 }

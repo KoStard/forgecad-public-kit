@@ -7,33 +7,29 @@
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { parseCameraCliSpec, type ViewportCameraState } from '../src/capture/cameraState';
+import { mergeViewportRenderSceneStates, parseRenderSceneCliSpec, type ViewportRenderSceneState } from '../src/capture/renderSceneState';
 import {
-  init,
-  runScript,
-  shapeToGeometry,
   CAD_MATERIAL_PROPS,
-  EDGE_MATERIAL_PROPS,
-  findJointAnimationClip,
-  resolveJointAnimation,
-  resolveJointViewValues,
   type CutPlaneDef,
+  EDGE_MATERIAL_PROPS,
   type ForgeQualityPreset,
+  findJointAnimationClip,
+  init,
   type JointViewAnimationDef,
   type JointViewCouplingDef,
   type JointViewDef,
   type RunResult,
-  type SceneObject,
-  type SceneConfig,
+  resolveJointAnimation,
+  resolveJointViewValues,
+  runScript,
   type SceneCaptureConfig,
+  type SceneConfig,
   type SceneLightConfig,
+  type SceneObject,
   type ShapeMaterialProps,
+  shapeToGeometry,
 } from '../src/forge/headless';
-import { parseCameraCliSpec, type ViewportCameraState } from '../src/capture/cameraState';
-import {
-  mergeViewportRenderSceneStates,
-  parseRenderSceneCliSpec,
-  type ViewportRenderSceneState,
-} from '../src/capture/renderSceneState';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const exportCanvas = document.createElement('canvas');
@@ -172,10 +168,7 @@ function normalizeVector(dir: [number, number, number]): [number, number, number
   return [dir[0] / len, dir[1] / len, dir[2] / len];
 }
 
-function renderFromDirection(
-  session: CaptureSession,
-  dir: [number, number, number],
-): string {
+function renderFromDirection(session: CaptureSession, dir: [number, number, number]): string {
   const d = normalizeVector(dir);
   session.camera.position.set(
     session.center.x + d[0] * session.distance,
@@ -208,7 +201,8 @@ function createSceneLight(def: SceneLightConfig): THREE.Light {
   const color = def.color ? new THREE.Color(def.color) : new THREE.Color(0xffffff);
   const intensity = def.intensity ?? 1;
   switch (def.type) {
-    case 'ambient': return new THREE.AmbientLight(color, intensity);
+    case 'ambient':
+      return new THREE.AmbientLight(color, intensity);
     case 'directional': {
       const l = new THREE.DirectionalLight(color, intensity);
       if (def.position) l.position.set(...def.position);
@@ -231,7 +225,8 @@ function createSceneLight(def: SceneLightConfig): THREE.Light {
       const ground = def.groundColor ? new THREE.Color(def.groundColor) : new THREE.Color(0x444444);
       return new THREE.HemisphereLight(sky, ground, intensity);
     }
-    default: return new THREE.AmbientLight(color, intensity);
+    default:
+      return new THREE.AmbientLight(color, intensity);
   }
 }
 
@@ -295,21 +290,14 @@ function parseColor(input: string | undefined, fallback: number): THREE.Color {
   }
 }
 
-function buildRevoluteMatrix(
-  axisWorld: THREE.Vector3,
-  pivotWorld: THREE.Vector3,
-  angleDeg: number,
-): THREE.Matrix4 {
+function buildRevoluteMatrix(axisWorld: THREE.Vector3, pivotWorld: THREE.Vector3, angleDeg: number): THREE.Matrix4 {
   const rotation = new THREE.Matrix4().makeRotationAxis(axisWorld, THREE.MathUtils.degToRad(angleDeg));
   const toPivot = new THREE.Matrix4().makeTranslation(pivotWorld.x, pivotWorld.y, pivotWorld.z);
   const fromPivot = new THREE.Matrix4().makeTranslation(-pivotWorld.x, -pivotWorld.y, -pivotWorld.z);
   return toPivot.multiply(rotation).multiply(fromPivot);
 }
 
-function computeJointNodeMatrices(
-  joints: JointViewDef[],
-  jointValues: Record<string, number>,
-): Map<string, THREE.Matrix4> {
+function computeJointNodeMatrices(joints: JointViewDef[], jointValues: Record<string, number>): Map<string, THREE.Matrix4> {
   const byChild = new Map<string, JointViewDef>();
   joints.forEach((joint) => {
     byChild.set(joint.child, joint);
@@ -386,10 +374,7 @@ function setSessionMode(session: CaptureSession, mode: OrbitMode): void {
   });
 }
 
-function applyCameraPose(
-  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera,
-  state: ViewportCameraState,
-): void {
+function applyCameraPose(camera: THREE.PerspectiveCamera | THREE.OrthographicCamera, state: ViewportCameraState): void {
   camera.position.set(state.position[0], state.position[1], state.position[2]);
   camera.up.set(state.up[0], state.up[1], state.up[2]);
   if (camera.isOrthographicCamera) {
@@ -399,25 +384,13 @@ function applyCameraPose(
   camera.updateProjectionMatrix();
 }
 
-function applyOrbitPose(
-  session: CaptureSession,
-  turn: number,
-  pitchDeg?: number,
-): void {
+function applyOrbitPose(session: CaptureSession, turn: number, pitchDeg?: number): void {
   const normalizedTurn = ((turn % 1) + 1) % 1;
-  const clampedPitch = THREE.MathUtils.clamp(
-    pitchDeg ?? session.orbitBasePitchDeg,
-    -80,
-    80,
-  );
+  const clampedPitch = THREE.MathUtils.clamp(pitchDeg ?? session.orbitBasePitchDeg, -80, 80);
   const yaw = (session.orbitBaseTurn + normalizedTurn) * Math.PI * 2;
   const pitch = THREE.MathUtils.degToRad(clampedPitch);
   const cosPitch = Math.cos(pitch);
-  const dir: [number, number, number] = [
-    Math.sin(yaw) * cosPitch,
-    -Math.cos(yaw) * cosPitch,
-    Math.sin(pitch),
-  ];
+  const dir: [number, number, number] = [Math.sin(yaw) * cosPitch, -Math.cos(yaw) * cosPitch, Math.sin(pitch)];
   const d = normalizeVector(dir);
 
   session.camera.position.set(
@@ -425,11 +398,7 @@ function applyOrbitPose(
     session.orbitTarget.y + d[1] * session.orbitRadius,
     session.orbitTarget.z + d[2] * session.orbitRadius,
   );
-  session.camera.up.set(
-    session.fixedCameraState.up[0],
-    session.fixedCameraState.up[1],
-    session.fixedCameraState.up[2],
-  );
+  session.camera.up.set(session.fixedCameraState.up[0], session.fixedCameraState.up[1], session.fixedCameraState.up[2]);
   session.camera.lookAt(session.orbitTarget);
   session.camera.updateProjectionMatrix();
 }
@@ -457,10 +426,7 @@ function resolveSelectedAnimation(
   return null;
 }
 
-function createDefaultCameraState(
-  center: THREE.Vector3,
-  distance: number,
-): ViewportCameraState {
+function createDefaultCameraState(center: THREE.Vector3, distance: number): ViewportCameraState {
   return {
     projectionMode: 'perspective',
     position: [
@@ -476,7 +442,7 @@ function createDefaultCameraState(
 function buildCameraRig(
   center: THREE.Vector3,
   distance: number,
-  maxDim: number,
+  _maxDim: number,
   spec?: ViewportCameraState | null,
 ): {
   camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
@@ -495,17 +461,14 @@ function buildCameraRig(
   const ORTHO_BASE_SIZE = 960;
   const orthoSpan = ORTHO_BASE_SIZE;
 
-  const camera = fixedCameraState.projectionMode === 'orthographic'
-    ? new THREE.OrthographicCamera(-orthoSpan * 0.5, orthoSpan * 0.5, orthoSpan * 0.5, -orthoSpan * 0.5, -nearFar, nearFar)
-    : new THREE.PerspectiveCamera(45, 1, 0.1, Math.max(10, distance * 10));
+  const camera =
+    fixedCameraState.projectionMode === 'orthographic'
+      ? new THREE.OrthographicCamera(-orthoSpan * 0.5, orthoSpan * 0.5, orthoSpan * 0.5, -orthoSpan * 0.5, -nearFar, nearFar)
+      : new THREE.PerspectiveCamera(45, 1, 0.1, Math.max(10, distance * 10));
   camera.aspect = 1;
   applyCameraPose(camera, fixedCameraState);
 
-  const orbitTarget = new THREE.Vector3(
-    fixedCameraState.target[0],
-    fixedCameraState.target[1],
-    fixedCameraState.target[2],
-  );
+  const orbitTarget = new THREE.Vector3(fixedCameraState.target[0], fixedCameraState.target[1], fixedCameraState.target[2]);
   const offset = new THREE.Vector3(
     fixedCameraState.position[0] - fixedCameraState.target[0],
     fixedCameraState.position[1] - fixedCameraState.target[1],
@@ -513,7 +476,7 @@ function buildCameraRig(
   );
   const orbitRadius = offset.length() > 1e-3 ? offset.length() : distance;
   const orbitBasePitchDeg = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(offset.z / orbitRadius, -1, 1)));
-  const orbitBaseTurn = ((Math.atan2(offset.x, -offset.y) / (Math.PI * 2)) % 1 + 1) % 1;
+  const orbitBaseTurn = (((Math.atan2(offset.x, -offset.y) / (Math.PI * 2)) % 1) + 1) % 1;
 
   return {
     camera,
@@ -549,10 +512,7 @@ function resolveRequestedSceneState(opts?: OrbitInitOptions): ViewportRenderScen
   return sceneState;
 }
 
-function resolveRenderableJointNodeName(
-  obj: SceneObject,
-  joints: JointViewDef[],
-): string | null {
+function resolveRenderableJointNodeName(obj: SceneObject, joints: JointViewDef[]): string | null {
   const jointByChild = new Map<string, JointViewDef>();
   joints.forEach((joint) => {
     jointByChild.set(joint.child, joint);
@@ -563,20 +523,9 @@ function resolveRenderableJointNodeName(
   return null;
 }
 
-function applyObjectTransforms(
-  session: CaptureSession,
-  animationProgress?: number,
-): void {
-  const animatedValues = resolveJointAnimation(
-    session.selectedAnimation,
-    animationProgress ?? 0,
-    session.baseJointValues,
-  );
-  const effectiveJointValues = resolveJointViewValues(
-    session.joints,
-    session.jointCouplings,
-    animatedValues,
-  );
+function applyObjectTransforms(session: CaptureSession, animationProgress?: number): void {
+  const animatedValues = resolveJointAnimation(session.selectedAnimation, animationProgress ?? 0, session.baseJointValues);
+  const effectiveJointValues = resolveJointViewValues(session.joints, session.jointCouplings, animatedValues);
   const jointMatrices = computeJointNodeMatrices(session.joints, effectiveJointValues);
 
   session.renderables.forEach((renderable) => {
@@ -628,10 +577,7 @@ function destroyCaptureSession(): void {
   captureSession = null;
 }
 
-function createSession(
-  code: string,
-  opts?: OrbitInitOptions,
-): { ok: true; session: CaptureSession } | { ok: false; error: string } {
+function createSession(code: string, opts?: OrbitInitOptions): { ok: true; session: CaptureSession } | { ok: false; error: string } {
   const size = opts?.size ?? 1024;
   const pixelRatio = opts?.pixelRatio ?? 1;
   const r = getRenderer(size, pixelRatio);
@@ -643,12 +589,7 @@ function createSession(
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 
-  const result: RunResult = runScript(
-    code,
-    opts?.fileName || 'main.forge.js',
-    opts?.allFiles || {},
-    { quality: opts?.quality ?? 'high' },
-  );
+  const result: RunResult = runScript(code, opts?.fileName || 'main.forge.js', opts?.allFiles || {}, { quality: opts?.quality ?? 'high' });
 
   if (result.error) {
     return { ok: false, error: String(result.error) };
@@ -660,20 +601,21 @@ function createSession(
       shape: obj.shape || (obj.sketch ? obj.sketch.extrude(1) : null),
       color: requestedSceneState?.objects?.[obj.id]?.color ?? obj.color,
       materialProps: obj.materialProps as ShapeMaterialProps | undefined,
-      opacity: THREE.MathUtils.clamp(
-        requestedSceneState?.objects?.[obj.id]?.opacity ?? obj.materialProps?.opacity ?? 1,
-        0, 1,
-      ),
+      opacity: THREE.MathUtils.clamp(requestedSceneState?.objects?.[obj.id]?.opacity ?? obj.materialProps?.opacity ?? 1, 0, 1),
       visible: requestedSceneState?.objects?.[obj.id]?.visible !== false,
     }))
-    .filter((entry): entry is {
-      source: SceneObject;
-      shape: NonNullable<typeof entry.shape>;
-      color?: string;
-      materialProps?: ShapeMaterialProps;
-      opacity: number;
-      visible: boolean;
-    } => entry.shape != null);
+    .filter(
+      (
+        entry,
+      ): entry is {
+        source: SceneObject;
+        shape: NonNullable<typeof entry.shape>;
+        color?: string;
+        materialProps?: ShapeMaterialProps;
+        opacity: number;
+        visible: boolean;
+      } => entry.shape != null,
+    );
 
   if (objs.length === 0) {
     return { ok: false, error: 'No shape returned' };
@@ -700,10 +642,7 @@ function createSession(
     max: [shapeBB.max[0], shapeBB.max[1], shapeBB.max[2]] as [number, number, number],
   };
 
-  const bb = new THREE.Box3(
-    new THREE.Vector3(...bbox.min),
-    new THREE.Vector3(...bbox.max),
-  );
+  const bb = new THREE.Box3(new THREE.Vector3(...bbox.min), new THREE.Vector3(...bbox.max));
   const center = new THREE.Vector3();
   bb.getCenter(center);
   const bsize = new THREE.Vector3();
@@ -711,7 +650,7 @@ function createSession(
   const maxDim = Math.max(1, bsize.x, bsize.y, bsize.z);
 
   const fov = 45;
-  const distance = maxDim / (2 * Math.tan((fov * Math.PI) / 360)) * 1.6;
+  const distance = (maxDim / (2 * Math.tan((fov * Math.PI) / 360))) * 1.6;
   const joints = result.jointsView?.enabled === false ? [] : (result.jointsView?.joints ?? []);
   const jointCouplings = result.jointsView?.enabled === false ? [] : (result.jointsView?.couplings ?? []);
   const animationClips = result.jointsView?.enabled === false ? [] : (result.jointsView?.animations ?? []);
@@ -719,20 +658,13 @@ function createSession(
   let selectedAnimation: JointViewAnimationDef | null;
 
   try {
-    selectedAnimation = resolveSelectedAnimation(
-      animationClips,
-      opts?.capture ?? 'orbit',
-      defaultAnimation,
-      opts?.animationName,
-    );
+    selectedAnimation = resolveSelectedAnimation(animationClips, opts?.capture ?? 'orbit', defaultAnimation, opts?.animationName);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 
   const enabledCutPlanes = new Set(opts?.enabledCutPlanes ?? []);
-  const availableCutPlanes = result.cutPlanes.filter((cp) => (
-    new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).lengthSq() > 1e-8
-  ));
+  const availableCutPlanes = result.cutPlanes.filter((cp) => new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).lengthSq() > 1e-8);
 
   if (enabledCutPlanes.size > 0) {
     const availableNames = new Set(availableCutPlanes.map((cp) => cp.name));
@@ -861,7 +793,7 @@ async function setup() {
   (window as any).__forgeReady = true;
 }
 
-(window as any).__forgeRender = function (
+(window as any).__forgeRender = (
   code: string,
   opts?: {
     angles?: string[];
@@ -876,7 +808,7 @@ async function setup() {
     sceneState?: ViewportRenderSceneState | null;
     sceneSpec?: string | null;
   },
-) {
+) => {
   const angles = opts?.angles || ['front', 'side', 'top', 'iso'];
   const built = createSession(code, {
     size: opts?.size || 1024,
@@ -914,7 +846,7 @@ async function setup() {
   };
 };
 
-(window as any).__forgeCaptureInit = function (code: string, opts?: OrbitInitOptions) {
+(window as any).__forgeCaptureInit = (code: string, opts?: OrbitInitOptions) => {
   destroyCaptureSession();
   const built = createSession(code, opts);
   if (!built.ok) {
@@ -938,7 +870,7 @@ async function setup() {
   };
 };
 
-(window as any).__forgeCaptureFrame = function (opts?: OrbitFrameOptions) {
+(window as any).__forgeCaptureFrame = (opts?: OrbitFrameOptions) => {
   if (!captureSession) {
     return { ok: false, error: 'No active capture session. Call __forgeCaptureInit first.' };
   }
@@ -950,20 +882,14 @@ async function setup() {
   }
 };
 
-(window as any).__forgeCaptureDispose = function () {
+(window as any).__forgeCaptureDispose = () => {
   destroyCaptureSession();
   return { ok: true };
 };
 
 // Backwards-compatible aliases for older GIF-only callers.
-(window as any).__forgeOrbitInit = (code: string, opts?: OrbitInitOptions) => (
-  (window as any).__forgeCaptureInit(code, opts)
-);
-(window as any).__forgeOrbitFrame = (opts?: OrbitFrameOptions) => (
-  (window as any).__forgeCaptureFrame(opts)
-);
-(window as any).__forgeOrbitDispose = () => (
-  (window as any).__forgeCaptureDispose()
-);
+(window as any).__forgeOrbitInit = (code: string, opts?: OrbitInitOptions) => (window as any).__forgeCaptureInit(code, opts);
+(window as any).__forgeOrbitFrame = (opts?: OrbitFrameOptions) => (window as any).__forgeCaptureFrame(opts);
+(window as any).__forgeOrbitDispose = () => (window as any).__forgeCaptureDispose();
 
 setup();

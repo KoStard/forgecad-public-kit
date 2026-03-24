@@ -6,10 +6,10 @@
  * compares geometric outputs (volume, surface area, bounding box),
  * and writes a structured report.
  */
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
-import { resolve, relative, join, basename, dirname } from 'path';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
+import { basename, join, relative, resolve } from 'path';
 import { init, runScript } from '../src/forge/headless';
-import { setActiveBackend, type ActiveBackend } from '../src/forge/kernel';
+import { type ActiveBackend, setActiveBackend } from '../src/forge/kernel';
 import { collectProjectFiles } from './collect-files';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
@@ -48,14 +48,20 @@ function collectForgeFiles(dir: string): string[] {
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry);
       let stat;
-      try { stat = statSync(full); } catch { continue; }
+      try {
+        stat = statSync(full);
+      } catch {
+        continue;
+      }
       if (stat.isDirectory() && !entry.startsWith('.') && entry !== 'node_modules' && entry !== 'dist') {
         results.push(...collectForgeFiles(full));
       } else if (stat.isFile() && entry.endsWith('.forge.js')) {
         results.push(full);
       }
     }
-  } catch { /* directory doesn't exist */ }
+  } catch {
+    /* directory doesn't exist */
+  }
   return results;
 }
 
@@ -108,11 +114,11 @@ function compareMetrics(m: ShapeMetrics, o: ShapeMetrics): { score: number; issu
     const span = Math.max(Math.abs(m.bboxMax[i] - m.bboxMin[i]), Math.abs(o.bboxMax[i] - o.bboxMin[i]), 1);
     if (minDiff / span > 0.01) {
       issues.push(`bbox.min.${axis}: manifold=${m.bboxMin[i].toFixed(2)} occt=${o.bboxMin[i].toFixed(2)} (delta ${minDiff.toFixed(2)})`);
-      penalty += Math.min(minDiff / span * 30, 10);
+      penalty += Math.min((minDiff / span) * 30, 10);
     }
     if (maxDiff / span > 0.01) {
       issues.push(`bbox.max.${axis}: manifold=${m.bboxMax[i].toFixed(2)} occt=${o.bboxMax[i].toFixed(2)} (delta ${maxDiff.toFixed(2)})`);
-      penalty += Math.min(maxDiff / span * 30, 10);
+      penalty += Math.min((maxDiff / span) * 30, 10);
     }
   }
 
@@ -161,12 +167,9 @@ export async function runCheckBackendParityCli(args: string[] = []): Promise<voi
   let files: string[] = [];
   if (args.length > 0) {
     // Run specific files
-    files = args.map(f => resolve(f));
+    files = args.map((f) => resolve(f));
   } else {
-    files = [
-      ...collectForgeFiles(EXAMPLE_DIR),
-      ...collectForgeFiles(PERSONAL_DIR),
-    ];
+    files = [...collectForgeFiles(EXAMPLE_DIR), ...collectForgeFiles(PERSONAL_DIR)];
   }
 
   console.log(`\nBackend parity check: ${files.length} files\n`);
@@ -291,10 +294,7 @@ export async function runCheckBackendParityCli(args: string[] = []): Promise<voi
   console.log(`\n  Report written to: ${reportPath}\n`);
 }
 
-function generateReport(
-  results: FileResult[],
-  summary: { passed: number; failed: number; errored: number; total: number },
-): string {
+function generateReport(results: FileResult[], summary: { passed: number; failed: number; errored: number; total: number }): string {
   const lines: string[] = [];
   lines.push('# Backend Parity Report: Manifold vs OCCT');
   lines.push('');
@@ -306,7 +306,7 @@ function generateReport(
   lines.push('');
 
   // OCCT-only errors (most actionable)
-  const occtErrors = results.filter(r => r.score === -3);
+  const occtErrors = results.filter((r) => r.score === -3);
   if (occtErrors.length > 0) {
     lines.push('## OCCT-Only Errors');
     lines.push('');
@@ -322,7 +322,7 @@ function generateReport(
   }
 
   // Manifold-only errors
-  const manifoldErrors = results.filter(r => r.score === -2);
+  const manifoldErrors = results.filter((r) => r.score === -2);
   if (manifoldErrors.length > 0) {
     lines.push('## Manifold-Only Errors');
     lines.push('');
@@ -336,7 +336,7 @@ function generateReport(
   }
 
   // Both errors
-  const bothErrors = results.filter(r => r.score === -1);
+  const bothErrors = results.filter((r) => r.score === -1);
   if (bothErrors.length > 0) {
     lines.push('## Both Backends Error');
     lines.push('');
@@ -351,7 +351,7 @@ function generateReport(
   }
 
   // Geometry mismatches (sorted worst-first)
-  const mismatches = results.filter(r => r.score >= 0 && r.score < 95);
+  const mismatches = results.filter((r) => r.score >= 0 && r.score < 95);
   if (mismatches.length > 0) {
     lines.push('## Geometry Mismatches');
     lines.push('');
@@ -368,7 +368,7 @@ function generateReport(
   }
 
   // Passing files
-  const passing = results.filter(r => r.score >= 95);
+  const passing = results.filter((r) => r.score >= 95);
   if (passing.length > 0) {
     lines.push('## Passing Files (≥95% parity)');
     lines.push('');

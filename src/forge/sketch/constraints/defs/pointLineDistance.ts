@@ -37,9 +37,11 @@ registerConstraint<'pointLineDistance', ConstraintTypeMap['pointLineDistance']>(
     const pt = points.get(c.point);
     const line = lines.get(c.line);
     if (!pt || !line) return [];
-    const a = points.get(line.a), b = points.get(line.b);
+    const a = points.get(line.a),
+      b = points.get(line.b);
     if (!a || !b) return [];
-    const dx = b.x - a.x, dy = b.y - a.y;
+    const dx = b.x - a.x,
+      dy = b.y - a.y;
     const len2 = dx * dx + dy * dy;
     const t = len2 > 1e-9 ? ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2 : 0;
     const proj: [number, number] = [a.x + t * dx, a.y + t * dy];

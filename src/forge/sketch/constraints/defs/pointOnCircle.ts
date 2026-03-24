@@ -4,7 +4,7 @@
  * Rust owns solving; this file only declares the public payload shape, equation count,
  * and UI/display metadata used by the builder and viewer.
  */
-import type { PointId, CircleId, ConstraintTypeMap, AnnotationElement } from '../types';
+import type { PointId, CircleId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
 
 declare module '../types' {

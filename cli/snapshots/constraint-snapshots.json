@@ -46,7 +46,7 @@
       }
     ],
     "status": "fully",
-    "maxError": 0.00022,
+    "maxError": 0.000004,
     "dof": 0,
     "rejectedCount": 0
   },

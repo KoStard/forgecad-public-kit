@@ -9,10 +9,10 @@
  */
 
 import opentype from 'opentype.js';
+import { INTER_REGULAR_WOFF_BASE64 } from '../fonts/inter-regular-data';
+import { difference2d, union2d } from './booleans';
 import { Sketch } from './core';
 import { polygon } from './primitives';
-import { union2d, difference2d } from './booleans';
-import { INTER_REGULAR_WOFF_BASE64 } from '../fonts/inter-regular-data';
 
 type Vec2 = [number, number];
 
@@ -41,7 +41,7 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
  */
 const BUILTIN_FONTS: Record<string, () => opentype.Font> = {
   'sans-serif': () => opentype.parse(base64ToArrayBuffer(INTER_REGULAR_WOFF_BASE64)),
-  'inter': () => opentype.parse(base64ToArrayBuffer(INTER_REGULAR_WOFF_BASE64)),
+  inter: () => opentype.parse(base64ToArrayBuffer(INTER_REGULAR_WOFF_BASE64)),
 };
 
 /**
@@ -106,14 +106,8 @@ function sampleCubic(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, tolerance: number):
   for (let i = 1; i <= segments; i++) {
     const t = i / segments;
     const u = 1 - t;
-    const x = u * u * u * p0[0]
-      + 3 * u * u * t * p1[0]
-      + 3 * u * t * t * p2[0]
-      + t * t * t * p3[0];
-    const y = u * u * u * p0[1]
-      + 3 * u * u * t * p1[1]
-      + 3 * u * t * t * p2[1]
-      + t * t * t * p3[1];
+    const x = u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0];
+    const y = u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1];
     out.push([x, y]);
   }
   return out;
@@ -135,14 +129,13 @@ function signedArea(points: Vec2[]): number {
   return area * 0.5;
 }
 
-function pointInPolygon(point: Vec2, poly: Vec2[]): boolean {
+function _pointInPolygon(point: Vec2, poly: Vec2[]): boolean {
   const [px, py] = point;
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i];
     const [xj, yj] = poly[j];
-    const intersects = ((yi > py) !== (yj > py))
-      && (px < ((xj - xi) * (py - yi)) / ((yj - yi) || 1e-20) + xi);
+    const intersects = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi || 1e-20) + xi;
     if (intersects) inside = !inside;
   }
   return inside;
@@ -234,8 +227,12 @@ interface LoopInfo {
 function loopInfo(points: Vec2[]): LoopInfo {
   const area = signedArea(points);
   // Use a point near the centroid for containment tests
-  let sx = 0, sy = 0;
-  for (const [x, y] of points) { sx += x; sy += y; }
+  let sx = 0,
+    sy = 0;
+  for (const [x, y] of points) {
+    sx += x;
+    sy += y;
+  }
   const sample: Vec2 = [sx / points.length, sy / points.length];
   return { points, area, absArea: Math.abs(area), sample };
 }
@@ -245,9 +242,7 @@ function loopInfo(points: Vec2[]): LoopInfo {
  * (standard for TrueType/OpenType fonts).
  */
 function loopsToSketch(loops: Vec2[][]): Sketch | null {
-  const infos = loops
-    .filter(l => l.length >= 3 && Math.abs(signedArea(l)) > EPS)
-    .map(loopInfo);
+  const infos = loops.filter((l) => l.length >= 3 && Math.abs(signedArea(l)) > EPS).map(loopInfo);
 
   if (infos.length === 0) return null;
 
@@ -302,17 +297,8 @@ export interface FontTextOptions {
  * This produces professional typography with proper curves, kerning,
  * and full character set support.
  */
-export function fontText2d(
-  font: opentype.Font,
-  content: string,
-  options: FontTextOptions = {},
-): Sketch {
-  const {
-    size = 10,
-    letterSpacing = 0,
-    align = 'left',
-    baseline = 'baseline',
-  } = options;
+export function fontText2d(font: opentype.Font, content: string, options: FontTextOptions = {}): Sketch {
+  const { size = 10, letterSpacing = 0, align = 'left', baseline = 'baseline' } = options;
 
   if (content.length === 0) {
     throw new Error('fontText2d: content must not be empty');
@@ -329,7 +315,7 @@ export function fontText2d(
   const scale = size / capHeight;
 
   // Flattening tolerance in font units
-  const toleranceModelUnits = options.flattenTolerance ?? (size * 0.005);
+  const toleranceModelUnits = options.flattenTolerance ?? size * 0.005;
   const tolerance = toleranceModelUnits / scale;
 
   const glyphs = font.stringToGlyphs(content);

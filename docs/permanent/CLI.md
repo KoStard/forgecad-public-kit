@@ -207,7 +207,7 @@ This exporter is `uv`-first. `cli/forge-brep-export.py` carries inline dependenc
 
 By default this exporter is exact-subset only. It does **not** silently convert arbitrary triangle meshes back into fake BREP. Instead, Forge lowers compile-covered geometry into the `cadquery-occt` compiler target and exports that exact subset through CadQuery/OpenCascade.
 
-If you pass `--allow-faceted`, unsupported closed mesh solids are exported as explicit faceted OCCT solids. This keeps hull-heavy designs exportable to STEP/BREP, but that fallback is tessellation-driven rather than exact replay.
+If you pass `--allow-faceted`, unsupported closed mesh solids are exported as explicit faceted OCCT solids. This keeps mesh-heavy designs exportable to STEP/BREP, but that fallback is tessellation-driven rather than exact replay.
 
 The maintained feature matrix lives in [`docs/permanent/API/output/brep-export.md`](API/output/brep-export.md).
 
@@ -247,7 +247,9 @@ This is a **toolpath scripting API**, not a slicer. You define print movements d
 - `examples/gcode/math-surface.forge.js` — Non-planar bowl with wave rim
 - `examples/gcode/lissajous-vase.forge.js` — Lissajous curve vase with morphing profile
 
-See [`docs/permanent/API/output/export.md`](API/output/export.md) for the full `GCodeBuilder` API reference.
+Preview these scripts in ForgeCAD's interactive viewport. The current `forgecad render` CLI expects shape outputs and does not render `GCodeBuilder` scenes yet.
+
+See [`docs/permanent/API/output/gcode.md`](API/output/gcode.md) for the dedicated G-code mode guide and full `GCodeBuilder` API reference.
 
 ### SDF Robot Export (Gazebo package)
 
@@ -503,7 +505,6 @@ This check also fails if:
 
 ```bash
 forgecad check query-propagation
-forgecad check query-propagation --case hull-runtime-boundary
 forgecad check query-propagation --update
 ```
 
@@ -613,7 +614,7 @@ forgecad check dimensions
 Runs shape-level invariants for dimension metadata propagation across:
 - transform APIs (`translate`, `rotate`, `transform`, `scale`, `mirror`, `rotateAround`)
 - copy/style APIs (`clone`, `color`, `setColor`, `smooth/refine/simplify`)
-- boolean APIs (`add/subtract/intersect`, plus `union/difference/intersection/hull3d`)
+- boolean APIs (`add/subtract/intersect`, plus `union/difference/intersection`)
 - import runtime path (`importPart(...).color(...).translate(...)`)
 
 ### Dimension Debugger

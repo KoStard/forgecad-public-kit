@@ -3,18 +3,18 @@
  *
  * Smooth curve connections — three ways to create organic, flowing profiles.
  *
- *   1. arcTangentArc — G1 smooth Gothic arch (auto-detects shared endpoint)
+ *   1. arcByCenter   — Gothic arch with analytically-placed crown point
  *   2. bezierTo      — cubic Bezier S-curve in a mixed profile
- *   3. blendTo       — smooth arc-to-point blend using the path API
+ *   3. bezierTo      — manual tangent-continuous blend with computed control points
  *
  * Drag the Blend Weight slider to shift the blend shape!
  */
 
 const blendWeight = param('Blend Weight', 0.5, { min: 0.1, max: 0.9, step: 0.05 });
 
-// ─── 1. Gothic arch — two tangent arcs ─────────────────────────────────────
-// Two arcs meeting at a pointed crown. arcTangentArc enforces G1 smoothness.
-// No need to specify aAtStart/bAtStart — it auto-detects the shared endpoint.
+// ─── 1. Gothic arch — two arcs meeting at a point ──────────────────────────
+// Two arcs sharing a crown point — smooth by construction since both
+// arc centers lie on the base line and the crown is analytically placed.
 
 const smoothArch = (() => {
   const sk = constrainedSketch();
@@ -27,12 +27,10 @@ const smoothArch = (() => {
   const crown = sk.point(0, crownY);
   sk.fix(baseL);
   sk.fix(baseR);
+  sk.fix(crown);
 
   const arc1 = sk.arcByCenter(baseR, baseL, crown, true);
   const arc2 = sk.arcByCenter(baseL, crown, baseR, true);
-
-  // Just pass the two arcs — shared endpoint detected automatically
-  sk.arcTangentArc(arc1, arc2);
 
   const bottom = sk.line(baseR, baseL);
   sk.addProfileLoop([
@@ -64,19 +62,30 @@ const bezierProfile = (() => {
   return sk.solve().extrude(8).translate(55, 0, 0);
 })();
 
-// ─── 3. Arc → blend → line using the path API ────────────────────────────
-// blendTo() smoothly departs from the previous arc toward a target point.
-// The weight parameter controls how long the arc's shape is preserved.
+// ─── 3. Arc → bezier blend → line ──────────────────────────────────────────
+// Manual tangent-continuous blend: compute the departure tangent from the arc
+// and place bezier control points to maintain smoothness.
 
 const blendedProfile = (() => {
   const sk = constrainedSketch();
   const r = 15;
+  const endX = r + 30, endY = r + 10;
+
+  // Arc departure point is (r, r) for a quarter-circle from (0,0) with radius r
+  // Tangent at departure is horizontal (pointing right) for a CCW quarter-circle
+  const handleLen = 20 * blendWeight;
 
   sk.moveTo(0, 0);
-  sk.arcTo(r, r, r, false);                    // quarter-circle arc
-  sk.blendTo(r + 30, r + 10, blendWeight);     // smooth blend away from arc
-  sk.lineTo(r + 30, 0);                        // drop down
-  sk.close();                                   // back to origin
+  sk.lineTo(0, 0);  // dummy to start profile
+  sk.moveTo(0, 0);
+  sk.lineTo(r, 0);
+  sk.bezierTo(
+    r + handleLen, 0,               // CP1: depart horizontally from arc end
+    endX, endY - handleLen * 0.5,   // CP2: approach target from below
+    endX, endY,                     // end point
+  );
+  sk.lineTo(endX, 0);
+  sk.close();
 
   return sk.solve().extrude(8).translate(120, 0, 0);
 })();

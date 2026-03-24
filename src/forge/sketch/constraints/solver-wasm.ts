@@ -262,9 +262,7 @@ type SolverWasmDebugHandle = {
 };
 
 function nowMs(): number {
-  return typeof performance !== 'undefined' && typeof performance.now === 'function'
-    ? performance.now()
-    : Date.now();
+  return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
 }
 
 function readInitialConsoleDebug(): boolean {
@@ -349,12 +347,16 @@ function formatMs(ms: number): string {
 function formatSolverWasmExchange(record: SolverWasmExchangeRecord): string {
   const request = JSON.parse(record.requestJson);
   const response = JSON.parse(record.responseJson);
-  return JSON.stringify({
-    kind: record.kind,
-    constraint_id: record.constraintId,
-    request,
-    response,
-  }, null, 2);
+  return JSON.stringify(
+    {
+      kind: record.kind,
+      constraint_id: record.constraintId,
+      request,
+      response,
+    },
+    null,
+    2,
+  );
 }
 
 function findLastExchange(kind?: SolverWasmExchangeKind): SolverWasmExchangeRecord | null {
@@ -367,10 +369,10 @@ function findLastExchange(kind?: SolverWasmExchangeKind): SolverWasmExchangeReco
 
 async function copyText(text: string): Promise<void> {
   if (
-    typeof navigator !== 'undefined'
-    && 'clipboard' in navigator
-    && navigator.clipboard
-    && typeof navigator.clipboard.writeText === 'function'
+    typeof navigator !== 'undefined' &&
+    'clipboard' in navigator &&
+    navigator.clipboard &&
+    typeof navigator.clipboard.writeText === 'function'
   ) {
     await navigator.clipboard.writeText(text);
   }
@@ -399,12 +401,12 @@ function recordExchange(record: SolverWasmExchangeRecord): void {
     const status = record.status ? ` status=${record.status}` : '';
     const maxError = typeof record.maxError === 'number' ? ` maxErr=${record.maxError.toExponential(2)}` : '';
     console.log(
-      `[solver-wasm] #${record.id} ${record.source} ${record.kind}${constraint}`
-      + ` total=${formatMs(record.timings.total)} wasm=${formatMs(record.timings.wasm)}`
-      + ` serialize=${formatMs(record.timings.serialize)} stringify=${formatMs(record.timings.stringify)}`
-      + ` parse=${formatMs(record.timings.parse)} apply=${formatMs(record.timings.apply)}`
-      + ` req=${record.requestBytes}B res=${record.responseBytes}B`
-      + ` constraints=${record.constraints}${status}${maxError}${err}`,
+      `[solver-wasm] #${record.id} ${record.source} ${record.kind}${constraint}` +
+        ` total=${formatMs(record.timings.total)} wasm=${formatMs(record.timings.wasm)}` +
+        ` serialize=${formatMs(record.timings.serialize)} stringify=${formatMs(record.timings.stringify)}` +
+        ` parse=${formatMs(record.timings.parse)} apply=${formatMs(record.timings.apply)}` +
+        ` req=${record.requestBytes}B res=${record.responseBytes}B` +
+        ` constraints=${record.constraints}${status}${maxError}${err}`,
     );
   }
 }
@@ -432,12 +434,10 @@ export function getSolverWasmStats(): SolverWasmStats {
   return {
     consoleDebug: _consoleDebug,
     totals: cloneAccumulator(_totals),
-    byKind: Object.fromEntries(
-      [..._byKind.entries()].map(([kind, acc]) => [kind, cloneAccumulator(acc)]),
-    ) as Partial<Record<SolverWasmExchangeKind, SolverWasmTimingAccumulator>>,
-    bySource: Object.fromEntries(
-      [..._bySource.entries()].map(([source, acc]) => [source, cloneAccumulator(acc)]),
-    ),
+    byKind: Object.fromEntries([..._byKind.entries()].map(([kind, acc]) => [kind, cloneAccumulator(acc)])) as Partial<
+      Record<SolverWasmExchangeKind, SolverWasmTimingAccumulator>
+    >,
+    bySource: Object.fromEntries([..._bySource.entries()].map(([source, acc]) => [source, cloneAccumulator(acc)])),
     history: _exchangeHistory.map((record) => ({
       id: record.id,
       kind: record.kind,
@@ -486,10 +486,10 @@ export function publishSolverWasmRunDebug(snapshot: SolverWasmRunDebugSnapshot |
   const totals = snapshot.stats.totals;
   const lastSolve = snapshot.lastSolveExchange;
   const header =
-    `[forgecad solver] ${totals.calls} Rust calls`
-    + ` | boundary=${formatMs(totals.total)}`
-    + ` | rust/wasm=${formatMs(totals.wasm)}`
-    + (lastSolve ? ` | last solve rust/wasm=${formatMs(lastSolve.timings.wasm)}` : '');
+    `[forgecad solver] ${totals.calls} Rust calls` +
+    ` | boundary=${formatMs(totals.total)}` +
+    ` | rust/wasm=${formatMs(totals.wasm)}` +
+    (lastSolve ? ` | last solve rust/wasm=${formatMs(lastSolve.timings.wasm)}` : '');
 
   if (typeof console.groupCollapsed === 'function') {
     console.groupCollapsed(header);
@@ -562,18 +562,20 @@ function installDebugHandle(): void {
     printRecent: (limit = 20) => {
       const history = getSolverWasmExchangeHistory(limit);
       if (typeof console.table === 'function') {
-        console.table(history.map((entry) => ({
-          id: entry.id,
-          kind: entry.kind,
-          source: entry.source,
-          constraintId: entry.constraintId ?? '',
-          totalMs: Number(entry.timings.total.toFixed(3)),
-          wasmMs: Number(entry.timings.wasm.toFixed(3)),
-          constraints: entry.constraints,
-          maxError: entry.maxError == null ? '' : Number(entry.maxError.toPrecision(4)),
-          status: entry.status ?? '',
-          error: entry.error ?? '',
-        })));
+        console.table(
+          history.map((entry) => ({
+            id: entry.id,
+            kind: entry.kind,
+            source: entry.source,
+            constraintId: entry.constraintId ?? '',
+            totalMs: Number(entry.timings.total.toFixed(3)),
+            wasmMs: Number(entry.timings.wasm.toFixed(3)),
+            constraints: entry.constraints,
+            maxError: entry.maxError == null ? '' : Number(entry.maxError.toPrecision(4)),
+            status: entry.status ?? '',
+            error: entry.error ?? '',
+          })),
+        );
       } else {
         console.log(history);
       }
@@ -618,7 +620,10 @@ export async function initSolverWasm(): Promise<void> {
         let wasmPath = '';
         for (let i = 0; i < 10; i++) {
           const candidate = resolve(dir, 'solver', 'pkg', 'solver_bg.wasm');
-          if (existsSync(candidate)) { wasmPath = candidate; break; }
+          if (existsSync(candidate)) {
+            wasmPath = candidate;
+            break;
+          }
           const parent = dirname(dir);
           if (parent === dir) break;
           dir = parent;
@@ -631,7 +636,7 @@ export async function initSolverWasm(): Promise<void> {
       }
 
       _wasm_solve = solverModule.solve as WasmSolveFn;
-      _wasm_get_profile = (solverModule as any).get_last_profile as WasmProfileFn | undefined ?? null;
+      _wasm_get_profile = ((solverModule as any).get_last_profile as WasmProfileFn | undefined) ?? null;
 
       // Session API — available if WASM was built with session support.
       const sm = solverModule as any;
@@ -653,9 +658,9 @@ export async function initSolverWasm(): Promise<void> {
     } catch (err) {
       throw new Error(
         `[solver-wasm] Failed to load WASM solver.\n` +
-        `  Build it with: npm run build:solver\n` +
-        `  (or run "npm run dev" which auto-builds)\n` +
-        `  Original error: ${err instanceof Error ? err.message : err}`,
+          `  Build it with: npm run build:solver\n` +
+          `  (or run "npm run dev" which auto-builds)\n` +
+          `  Original error: ${err instanceof Error ? err.message : err}`,
       );
     }
   })();
@@ -781,15 +786,22 @@ function applyResult(def: ConstraintDefinition, result: WasmSolveResult): void {
 
   for (const { id, x, y } of result.points) {
     const p = pointMap.get(id);
-    if (p && !p.fixed) { p.x = x; p.y = y; }
+    if (p && !p.fixed) {
+      p.x = x;
+      p.y = y;
+    }
   }
   for (const { id, radius } of result.circles) {
     const c = circleMap.get(id);
-    if (c && !c.fixedRadius) { c.radius = radius; }
+    if (c && !c.fixedRadius) {
+      c.radius = radius;
+    }
   }
   for (const { id, radius } of result.arcs) {
     const a = arcMap.get(id);
-    if (a) { a.radius = radius; }
+    if (a) {
+      a.radius = radius;
+    }
   }
   // Apply group frame updates and recompute world positions of group-owned points.
   if (result.groups && def.groups) {
@@ -816,21 +828,23 @@ function applyResult(def: ConstraintDefinition, result: WasmSolveResult): void {
 }
 
 function toSolverMetadata(result: WasmSolveResult): SolverMetadata | null {
-  return result.metadata ? {
-    status: result.metadata.status,
-    dof: result.metadata.dof,
-    constraintResiduals: result.metadata.constraint_residuals.map((entry) => ({
-      id: entry.id,
-      residual: entry.residual,
-    })),
-    redundantConstraintIds: result.metadata.redundant_constraint_ids,
-    conflictingConstraintIds: result.metadata.conflicting_constraint_ids,
-    solveTrail: result.metadata.solve_trail?.map((s: { phase: string; error: number }) => ({
-      phase: s.phase,
-      error: s.error,
-    })),
-    timedOut: result.metadata.timed_out || false,
-  } : null;
+  return result.metadata
+    ? {
+        status: result.metadata.status,
+        dof: result.metadata.dof,
+        constraintResiduals: result.metadata.constraint_residuals.map((entry) => ({
+          id: entry.id,
+          residual: entry.residual,
+        })),
+        redundantConstraintIds: result.metadata.redundant_constraint_ids,
+        conflictingConstraintIds: result.metadata.conflicting_constraint_ids,
+        solveTrail: result.metadata.solve_trail?.map((s: { phase: string; error: number }) => ({
+          phase: s.phase,
+          error: s.error,
+        })),
+        timedOut: result.metadata.timed_out || false,
+      }
+    : null;
 }
 
 function runWasmCall<TResult>(
@@ -1010,7 +1024,7 @@ export function solveConstraintsWasm(
       if (metadata?.timedOut) {
         console.warn(
           `[solver] Solver timed out (maxError=${result.max_error.toFixed(4)}, source=${source}). ` +
-          `Result may be approximate. Consider simplifying constraints.`,
+            `Result may be approximate. Consider simplifying constraints.`,
         );
       }
       return { maxError: result.max_error, metadata };
@@ -1023,6 +1037,7 @@ export function getLastRustProfile(): Record<string, number> | null {
   if (!_wasm_get_profile) return null;
   try {
     return JSON.parse(_wasm_get_profile());
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
-

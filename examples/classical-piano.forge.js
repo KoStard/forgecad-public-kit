@@ -124,7 +124,7 @@ const rad = lidOpen * Math.PI / 180;
 const propTopY = hingeY + dy * Math.cos(rad);
 const propTopZ = hingeZ - dy * Math.sin(rad) - lidThickness;
 
-const propStick = hull3d(
+const propStick = union(
   sphere(propRadius).translate(propBaseX, propBaseY, propBaseZ),
   sphere(propRadius).translate(propBaseX, propTopY, propTopZ),
 ).color('#8B7355');

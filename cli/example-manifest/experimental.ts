@@ -1,4 +1,4 @@
-import { experimentalExample, type ExampleManifestEntry } from './types';
+import { type ExampleManifestEntry, experimentalExample } from './types';
 
 export const EXPERIMENTAL_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
   experimentalExample(
@@ -9,6 +9,11 @@ export const EXPERIMENTAL_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
   experimentalExample(
     'examples/test-colors.forge.js',
     'This file is a color-behavior probe rather than a maintained architecture-phase example, so it stays behind the temporary experimental fence.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
+  experimentalExample(
+    'examples/api/_test-curves-render.forge.js',
+    'Test/debug file for curve rendering features (arcTo, bezierTo, blendTo). Not a maintained example.',
     'tasks/280-example-gap-recovery-and-legacy-fence.md',
   ),
   experimentalExample(
@@ -79,10 +84,19 @@ export const EXPERIMENTAL_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
   ...Array.from({ length: 13 }, (_, i) => {
     const num = String(i + 1).padStart(2, '0');
     const names = [
-      'fully-constrained-rect', 'underconstrained-triangle', 'redundant-constraints',
-      'conflicting-constraints', 'parallel-with-linedistance', 'complex-spectrogram',
-      'perpendicular-chain', 'symmetric-bracket', 'stress-spiral', 'stress-honeycomb',
-      'surface-grid', 'surface-nested', 'surface-complex',
+      'fully-constrained-rect',
+      'underconstrained-triangle',
+      'redundant-constraints',
+      'conflicting-constraints',
+      'parallel-with-linedistance',
+      'complex-spectrogram',
+      'perpendicular-chain',
+      'symmetric-bracket',
+      'stress-spiral',
+      'stress-honeycomb',
+      'surface-grid',
+      'surface-nested',
+      'surface-complex',
     ];
     return experimentalExample(
       `examples/constraints/${num}-${names[i]}.forge.js`,

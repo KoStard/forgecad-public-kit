@@ -15,9 +15,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "trimByPlane"
-        ],
+        "propagationOps": ["trimByPlane"],
         "propagations": [
           {
             "rewriteId": "shape-query-trimbyplane-2",
@@ -99,9 +97,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "trimByPlane"
-        ],
+        "propagationOps": ["trimByPlane"],
         "propagations": [
           {
             "rewriteId": "shape-query-splitbyplane-positive-3",
@@ -183,9 +179,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "trimByPlane"
-        ],
+        "propagationOps": ["trimByPlane"],
         "propagations": [
           {
             "rewriteId": "shape-query-splitbyplane-opposite-4",
@@ -273,12 +267,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "cut",
-          "cut",
-          "hole",
-          "hole"
-        ],
+        "propagationOps": ["cut", "cut", "hole", "hole"],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-5",
@@ -711,11 +700,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "cut",
-          "hole",
-          "cut"
-        ],
+        "propagationOps": ["cut", "hole", "cut"],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-4",
@@ -1161,14 +1146,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "boolean:difference",
-          "cut",
-          "hole",
-          "fillet",
-          "boolean:union",
-          "fillet"
-        ],
+        "propagationOps": ["boolean:difference", "cut", "hole", "fillet", "boolean:union", "fillet"],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-difference-9",
@@ -1636,12 +1614,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "hole",
-          "chamfer",
-          "boolean:union",
-          "chamfer"
-        ],
+        "propagationOps": ["hole", "chamfer", "boolean:union", "chamfer"],
         "propagations": [
           {
             "rewriteId": "shape-query-hole-6",
@@ -1868,102 +1841,6 @@
     ]
   },
   {
-    "id": "hull-runtime-boundary",
-    "description": "Hull stays an explicit unsupported propagation boundary instead of pretending to preserve durable post-rewrite queries.",
-    "objects": [
-      {
-        "name": "Rib",
-        "exactRoute": {
-          "kind": "unsupported",
-          "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet.",
-          "diagnosticCodes": [
-            "cadquery-occt-unsupported-shape-hull"
-          ]
-        },
-        "facetedRoute": {
-          "kind": "faceted",
-          "target": "faceted-mesh",
-          "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet.",
-          "diagnosticCodes": [
-            "cadquery-occt-unsupported-shape-hull"
-          ]
-        },
-        "propagationOps": [
-          "hull"
-        ],
-        "propagations": [
-          {
-            "rewriteId": "shape-query-hull-3",
-            "operation": "hull",
-            "owner": "hull:shape-query-hull-3",
-            "preservedFaces": [],
-            "preservedEdges": [],
-            "createdFaces": [],
-            "createdEdges": [],
-            "diagnostics": [
-              {
-                "code": "hull-face-propagation-unsupported",
-                "category": "unsupported",
-                "queryKind": "face"
-              },
-              {
-                "code": "hull-edge-propagation-unsupported",
-                "category": "unsupported",
-                "queryKind": "edge"
-              }
-            ],
-            "descendants": []
-          }
-        ]
-      },
-      {
-        "name": "Convex Post",
-        "exactRoute": {
-          "kind": "unsupported",
-          "reason": "CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet.",
-          "diagnosticCodes": [
-            "cadquery-occt-unsupported-shape-hull"
-          ]
-        },
-        "facetedRoute": {
-          "kind": "faceted",
-          "target": "faceted-mesh",
-          "reason": "Using faceted mesh fallback because exact BREP lowering failed: CadQuery/OCCT lowering does not support Forge shape-hull intent at $.base yet.",
-          "diagnosticCodes": [
-            "cadquery-occt-unsupported-shape-hull"
-          ]
-        },
-        "propagationOps": [
-          "hull"
-        ],
-        "propagations": [
-          {
-            "rewriteId": "shape-query-hull-5",
-            "operation": "hull",
-            "owner": "hull:shape-query-hull-5",
-            "preservedFaces": [],
-            "preservedEdges": [],
-            "createdFaces": [],
-            "createdEdges": [],
-            "diagnostics": [
-              {
-                "code": "hull-face-propagation-unsupported",
-                "category": "unsupported",
-                "queryKind": "face"
-              },
-              {
-                "code": "hull-edge-propagation-unsupported",
-                "category": "unsupported",
-                "queryKind": "edge"
-              }
-            ],
-            "descendants": []
-          }
-        ]
-      }
-    ]
-  },
-  {
     "id": "corpus-enclosure-shell-cuts",
     "description": "The enclosure corpus keeps defended shell ownership plus later boolean rewrite boundaries reviewable inside a normal product-style part.",
     "objects": [
@@ -1979,14 +1856,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "boolean:difference",
-          "boolean:difference",
-          "boolean:union",
-          "shell",
-          "boolean:union",
-          "boolean:union"
-        ],
+        "propagationOps": ["boolean:difference", "boolean:difference", "boolean:union", "shell", "boolean:union", "boolean:union"],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-difference-12",
@@ -3242,15 +3112,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "boolean:difference",
-          "cut",
-          "hole",
-          "chamfer",
-          "boolean:union",
-          "fillet",
-          "boolean:union"
-        ],
+        "propagationOps": ["boolean:difference", "cut", "hole", "chamfer", "boolean:union", "fillet", "boolean:union"],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-difference-11",
@@ -3827,13 +3689,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "cut",
-          "hole",
-          "hole",
-          "hole",
-          "hole"
-        ],
+        "propagationOps": ["cut", "hole", "hole", "hole", "hole"],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-6",
@@ -4530,16 +4386,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "boolean:union",
-          "cut",
-          "hole",
-          "hole",
-          "hole",
-          "hole",
-          "boolean:union",
-          "boolean:union"
-        ],
+        "propagationOps": ["boolean:union", "cut", "hole", "hole", "hole", "hole", "boolean:union", "boolean:union"],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-union-14",
@@ -5485,14 +5332,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "cut",
-          "cut",
-          "cut",
-          "cut",
-          "cut",
-          "cut"
-        ],
+        "propagationOps": ["cut", "cut", "cut", "cut", "cut", "cut"],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-7",
@@ -6378,14 +6218,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "cut",
-          "cut",
-          "cut",
-          "cut",
-          "cut",
-          "cut"
-        ],
+        "propagationOps": ["cut", "cut", "cut", "cut", "cut", "cut"],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-14",
@@ -7277,13 +7110,7 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": [
-          "boolean:union",
-          "trimByPlane",
-          "cut",
-          "hole",
-          "boolean:union"
-        ],
+        "propagationOps": ["boolean:union", "trimByPlane", "cut", "hole", "boolean:union"],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-union-8",

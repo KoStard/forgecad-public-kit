@@ -65,9 +65,26 @@ export function circleStatement(varName: string, centerVar: string, radius: numb
 }
 
 /**
+ * Generate an arc statement using arcByCenter(center, start, end).
+ * Note: the builder API is `arcByCenter`, not `arc`.
+ */
+export function arcStatement(varName: string, centerVar: string, startVar: string, endVar: string): string {
+  return `const ${varName} = sk.arcByCenter(${centerVar}, ${startVar}, ${endVar});`;
+}
+
+/**
+ * Map draw-mode constraint names to actual ConstrainedSketchBuilder method names.
+ * Most match 1:1, but some differ (e.g., 'fixed' → 'fix').
+ */
+const CONSTRAINT_API_MAP: Record<string, string> = {
+  fixed: 'fix',
+};
+
+/**
  * Generate a constraint statement (no const, just the call).
  */
 export function constraintStatement(type: string, ...args: (string | number)[]): string {
-  const fmtArgs = args.map((a) => typeof a === 'number' ? fmt(a) : a).join(', ');
-  return `sk.${type}(${fmtArgs});`;
+  const apiName = CONSTRAINT_API_MAP[type] ?? type;
+  const fmtArgs = args.map((a) => (typeof a === 'number' ? fmt(a) : a)).join(', ');
+  return `sk.${apiName}(${fmtArgs});`;
 }

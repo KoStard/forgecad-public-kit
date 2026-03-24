@@ -27,19 +27,23 @@ registerConstraint<'angle', ConstraintTypeMap['angle']>({
   displayPosition(c, { lines, points }) {
     const lineA = lines.get(c.a);
     if (lineA) {
-      const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+      const a1 = points.get(lineA.a);
+      const a2 = points.get(lineA.b);
       if (a1 && a2) return midpointPerp(a1, a2, 3);
     }
     return [0, 0];
   },
 
   displayAnnotations(c, { lines, points }): AnnotationElement[] {
-    const lineA = lines.get(c.a), lineB = lines.get(c.b);
+    const lineA = lines.get(c.a),
+      lineB = lines.get(c.b);
     if (!lineA || !lineB) return [];
-    const a1 = points.get(lineA.a), a2 = points.get(lineA.b);
-    const b1 = points.get(lineB.a), b2 = points.get(lineB.b);
+    const a1 = points.get(lineA.a),
+      a2 = points.get(lineA.b);
+    const b1 = points.get(lineB.a),
+      b2 = points.get(lineB.b);
     if (!a1 || !a2 || !b1 || !b2) return [];
-    const shared = [lineA.a, lineA.b].find(p => p === lineB.a || p === lineB.b);
+    const shared = [lineA.a, lineA.b].find((p) => p === lineB.a || p === lineB.b);
     let center: [number, number];
     if (shared) {
       const pt = points.get(shared)!;

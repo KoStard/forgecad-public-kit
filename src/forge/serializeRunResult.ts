@@ -6,18 +6,13 @@
  * Runs inside the eval worker.
  */
 
-import type { RunResult, SceneObject } from './runner';
-import { getSketchPlacement3D } from './sketch/core';
-import { isConstraintSketch, ConstraintSketch } from './sketch/constraints';
-import { computeGeometryArrays } from './geometryArrays';
+import type { SerializedRunResult, SerializedSceneObject, SerializedShapeData, SerializedSketchData } from '../workers/evalWorkerProtocol';
+import { computeGeometryArrays } from './mesh/geometryArrays';
 import { getShapeCompilePlan } from './kernel';
+import type { RunResult, SceneObject } from './runner';
+import { isConstraintSketch } from './sketch/constraints';
 import type { SolverWasmRunDebugSnapshot } from './sketch/constraints/solver-wasm';
-import type {
-  SerializedRunResult,
-  SerializedSceneObject,
-  SerializedShapeData,
-  SerializedSketchData,
-} from '../workers/evalWorkerProtocol';
+import { getSketchPlacement3D } from './sketch/core';
 
 interface ShapeTimings {
   getMeshMs: number;
@@ -62,15 +57,18 @@ function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShap
     const numTriangles = shape.numTri();
 
     const tGeom = performance.now();
-    const { positions: geometryPositions, normals: geometryNormals, edgePositions: geometryEdgePositions } =
-      computeGeometryArrays({
-        numProp: rawMesh.numProp,
-        numTri: numTriangles,
-        triVerts: meshTriVerts,
-        vertProperties: meshVertProperties,
-        mergeFromVert: meshMergeFromVert.length > 0 ? meshMergeFromVert : undefined,
-        mergeToVert: meshMergeToVert.length > 0 ? meshMergeToVert : undefined,
-      });
+    const {
+      positions: geometryPositions,
+      normals: geometryNormals,
+      edgePositions: geometryEdgePositions,
+    } = computeGeometryArrays({
+      numProp: rawMesh.numProp,
+      numTri: numTriangles,
+      triVerts: meshTriVerts,
+      vertProperties: meshVertProperties,
+      mergeFromVert: meshMergeFromVert.length > 0 ? meshMergeFromVert : undefined,
+      mergeToVert: meshMergeToVert.length > 0 ? meshMergeToVert : undefined,
+    });
     timings.geomArraysMs += performance.now() - tGeom;
 
     return {
@@ -177,11 +175,11 @@ export function serializeRunResult(
 
   console.log(
     `[serialize] ${result.objects.length} obj` +
-    ` | getMesh=${timings.getMeshMs.toFixed(0)}ms` +
-    ` copy=${timings.copyMs.toFixed(0)}ms` +
-    ` bb=${timings.bbMs.toFixed(0)}ms` +
-    ` geomArrays=${timings.geomArraysMs.toFixed(0)}ms` +
-    ` sketch=${timings.sketchMs.toFixed(0)}ms`,
+      ` | getMesh=${timings.getMeshMs.toFixed(0)}ms` +
+      ` copy=${timings.copyMs.toFixed(0)}ms` +
+      ` bb=${timings.bbMs.toFixed(0)}ms` +
+      ` geomArrays=${timings.geomArraysMs.toFixed(0)}ms` +
+      ` sketch=${timings.sketchMs.toFixed(0)}ms`,
   );
 
   // Spread all plain-data fields from RunResult, then override the WASM-backed

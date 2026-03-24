@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 // ---------------------------------------------------------------------------
 // Toast store — lightweight pub/sub, no Zustand dependency
@@ -17,7 +17,9 @@ let nextId = 0;
 let toasts: Toast[] = [];
 const listeners = new Set<() => void>();
 
-function notify() { listeners.forEach((l) => l()); }
+function notify() {
+  listeners.forEach((l) => l());
+}
 
 export function showToast(message: string, variant: ToastVariant = 'info', durationMs = 3000) {
   const toast: Toast = { id: nextId++, message, variant, durationMs };
@@ -32,9 +34,13 @@ export function showToast(message: string, variant: ToastVariant = 'info', durat
 
 function subscribe(cb: () => void) {
   listeners.add(cb);
-  return () => { listeners.delete(cb); };
+  return () => {
+    listeners.delete(cb);
+  };
 }
-function getSnapshot() { return toasts; }
+function getSnapshot() {
+  return toasts;
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -42,8 +48,8 @@ function getSnapshot() { return toasts; }
 
 const VARIANT_COLORS: Record<ToastVariant, { bg: string; border: string; icon: string }> = {
   success: { bg: 'var(--fc-successBg)', border: 'var(--fc-success)', icon: '✓' },
-  error:   { bg: 'var(--fc-errorBg)',   border: 'var(--fc-error)',   icon: '✕' },
-  info:    { bg: 'var(--fc-bgSurface)',  border: 'var(--fc-accent)',  icon: 'ℹ' },
+  error: { bg: 'var(--fc-errorBg)', border: 'var(--fc-error)', icon: '✕' },
+  info: { bg: 'var(--fc-bgSurface)', border: 'var(--fc-accent)', icon: 'ℹ' },
 };
 
 function ToastItem({ toast }: { toast: Toast }) {
@@ -73,19 +79,21 @@ function ToastItem({ toast }: { toast: Toast }) {
         maxWidth: 320,
       }}
     >
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 18,
-        height: 18,
-        borderRadius: '50%',
-        background: colors.border,
-        color: '#fff',
-        fontSize: 10,
-        fontWeight: 700,
-        flexShrink: 0,
-      }}>
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 18,
+          height: 18,
+          borderRadius: '50%',
+          background: colors.border,
+          color: '#fff',
+          fontSize: 10,
+          fontWeight: 700,
+          flexShrink: 0,
+        }}
+      >
         {colors.icon}
       </span>
       <span>{toast.message}</span>
@@ -99,17 +107,21 @@ export function ToastContainer() {
   if (items.length === 0) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 52,
-      right: 16,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 8,
-      zIndex: 9999,
-      pointerEvents: 'none',
-    }}>
-      {items.map((t) => <ToastItem key={t.id} toast={t} />)}
+    <div
+      style={{
+        position: 'fixed',
+        top: 52,
+        right: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        zIndex: 9999,
+        pointerEvents: 'none',
+      }}
+    >
+      {items.map((t) => (
+        <ToastItem key={t.id} toast={t} />
+      ))}
     </div>
   );
 }

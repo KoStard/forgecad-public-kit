@@ -5,11 +5,11 @@
  * so that importSketch/importPart paths match between frontend and CLI.
  */
 
-import { readFileSync, readdirSync, statSync } from 'fs';
-import { resolve, relative, join, dirname } from 'path';
+import { readdirSync, readFileSync, statSync } from 'fs';
+import { dirname, join, relative, resolve } from 'path';
 
 const FORGE_EXTS = ['.forge.js', '.js', '.svg', '.forge-notebook.json'];
-const isForgeFile = (f: string) => FORGE_EXTS.some(ext => f.endsWith(ext));
+const isForgeFile = (f: string) => FORGE_EXTS.some((ext) => f.endsWith(ext));
 
 /**
  * Recursively collect all forge/sketch files under a directory.
@@ -56,10 +56,12 @@ export function findProjectRoot(scriptPath: string): string {
     try {
       // Check if candidate directly contains forge files (not in deep subdirs)
       const entries = readdirSync(candidate);
-      const hasDirectForgeFiles = entries.some(e => {
+      const hasDirectForgeFiles = entries.some((e) => {
         try {
           return statSync(join(candidate, e)).isFile() && isForgeFile(e);
-        } catch { return false; }
+        } catch {
+          return false;
+        }
       });
       if (hasDirectForgeFiles) {
         root = candidate;

@@ -30,10 +30,7 @@ export interface ForgeNotebookErrorOutput {
   traceback: string[];
 }
 
-export type ForgeNotebookOutput =
-  | ForgeNotebookStreamOutput
-  | ForgeNotebookDisplayOutput
-  | ForgeNotebookErrorOutput;
+export type ForgeNotebookOutput = ForgeNotebookStreamOutput | ForgeNotebookDisplayOutput | ForgeNotebookErrorOutput;
 
 export interface ForgeNotebookCell {
   cell_type: 'code';
@@ -142,21 +139,27 @@ function normalizeOutputs(value: unknown): ForgeNotebookOutput[] {
     }
     if (output.output_type === 'display_data') {
       const data = (output as Partial<ForgeNotebookDisplayOutput>).data;
-      const text = data && typeof data === 'object' && 'text/plain' in data
-        ? (Array.isArray(data['text/plain']) ? data['text/plain'].map(String) : [])
-        : [];
-      const summary = data && typeof data === 'object' && 'application/vnd.forgecad.summary+json' in data
-        ? data['application/vnd.forgecad.summary+json'] as NotebookExecutionSummary
-        : undefined;
+      const text =
+        data && typeof data === 'object' && 'text/plain' in data
+          ? Array.isArray(data['text/plain'])
+            ? data['text/plain'].map(String)
+            : []
+          : [];
+      const summary =
+        data && typeof data === 'object' && 'application/vnd.forgecad.summary+json' in data
+          ? (data['application/vnd.forgecad.summary+json'] as NotebookExecutionSummary)
+          : undefined;
       acc.push({
         output_type: 'display_data',
         data: {
           'text/plain': text,
           ...(summary ? { 'application/vnd.forgecad.summary+json': summary } : {}),
         },
-        metadata: (output as Partial<ForgeNotebookDisplayOutput>).metadata && typeof (output as Partial<ForgeNotebookDisplayOutput>).metadata === 'object'
-          ? { ...(output as Partial<ForgeNotebookDisplayOutput>).metadata }
-          : {},
+        metadata:
+          (output as Partial<ForgeNotebookDisplayOutput>).metadata &&
+          typeof (output as Partial<ForgeNotebookDisplayOutput>).metadata === 'object'
+            ? { ...(output as Partial<ForgeNotebookDisplayOutput>).metadata }
+            : {},
       });
       return acc;
     }
@@ -174,7 +177,7 @@ function normalizeOutputs(value: unknown): ForgeNotebookOutput[] {
 }
 
 function normalizeCell(value: unknown): ForgeNotebookCell {
-  const raw = value && typeof value === 'object' ? value as Partial<ForgeNotebookCell> : {};
+  const raw = value && typeof value === 'object' ? (value as Partial<ForgeNotebookCell>) : {};
   return {
     cell_type: 'code',
     execution_count: typeof raw.execution_count === 'number' ? raw.execution_count : null,
@@ -187,16 +190,15 @@ function normalizeCell(value: unknown): ForgeNotebookCell {
 
 export function parseNotebook(text: string): ForgeNotebook {
   const parsed = JSON.parse(text) as Partial<ForgeNotebook>;
-  const rawMetadata = parsed.metadata && typeof parsed.metadata === 'object'
-    ? parsed.metadata
-    : {};
+  const rawMetadata = parsed.metadata && typeof parsed.metadata === 'object' ? parsed.metadata : {};
   const cells = Array.isArray(parsed.cells) ? parsed.cells.map(normalizeCell) : [];
   const firstCell = cells[0] ?? createNotebookCell();
   const normalizedCells = cells.length > 0 ? cells : [firstCell];
-  const previewCellId = typeof parsed.metadata?.forgecad?.previewCellId === 'string'
-    && normalizedCells.some((cell) => cell.id === parsed.metadata?.forgecad?.previewCellId)
-    ? parsed.metadata?.forgecad?.previewCellId
-    : (normalizedCells[normalizedCells.length - 1]?.id ?? null);
+  const previewCellId =
+    typeof parsed.metadata?.forgecad?.previewCellId === 'string' &&
+    normalizedCells.some((cell) => cell.id === parsed.metadata?.forgecad?.previewCellId)
+      ? parsed.metadata?.forgecad?.previewCellId
+      : (normalizedCells[normalizedCells.length - 1]?.id ?? null);
 
   return {
     cells: normalizedCells,
@@ -227,10 +229,7 @@ export function serializeNotebook(notebook: ForgeNotebook): string {
   return `${JSON.stringify(notebook, null, 2)}\n`;
 }
 
-export function resolveNotebookPreviewCellId(
-  notebook: ForgeNotebook,
-  preferredCellId?: string | null,
-): string | null {
+export function resolveNotebookPreviewCellId(notebook: ForgeNotebook, preferredCellId?: string | null): string | null {
   if (preferredCellId && notebook.cells.some((cell) => cell.id === preferredCellId)) {
     return preferredCellId;
   }
@@ -241,21 +240,17 @@ export function resolveNotebookPreviewCellId(
   return notebook.cells[notebook.cells.length - 1]?.id ?? null;
 }
 
-export function upsertNotebookCellSource(
-  notebook: ForgeNotebook,
-  cellId: string,
-  source: string,
-): ForgeNotebook {
+export function upsertNotebookCellSource(notebook: ForgeNotebook, cellId: string, source: string): ForgeNotebook {
   return {
     ...notebook,
-    cells: notebook.cells.map((cell) => (
+    cells: notebook.cells.map((cell) =>
       cell.id === cellId
         ? {
-          ...cell,
-          source: stringToCellSource(source),
-        }
-        : cell
-    )),
+            ...cell,
+            source: stringToCellSource(source),
+          }
+        : cell,
+    ),
   };
 }
 
@@ -265,9 +260,7 @@ export function appendNotebookCell(
   afterCellId?: string | null,
 ): { notebook: ForgeNotebook; cell: ForgeNotebookCell } {
   const cell = createNotebookCell(source);
-  const insertAt = afterCellId
-    ? notebook.cells.findIndex((entry) => entry.id === afterCellId) + 1
-    : notebook.cells.length;
+  const insertAt = afterCellId ? notebook.cells.findIndex((entry) => entry.id === afterCellId) + 1 : notebook.cells.length;
   const nextCells = [...notebook.cells];
   const safeIndex = insertAt > 0 ? insertAt : nextCells.length;
   nextCells.splice(safeIndex, 0, cell);
@@ -307,22 +300,18 @@ export function deleteNotebookCell(notebook: ForgeNotebook, cellId: string): For
   };
 }
 
-export function updateNotebookCellExecution(
-  notebook: ForgeNotebook,
-  cellId: string,
-  outputs: ForgeNotebookOutput[],
-): ForgeNotebook {
+export function updateNotebookCellExecution(notebook: ForgeNotebook, cellId: string, outputs: ForgeNotebookOutput[]): ForgeNotebook {
   return {
     ...notebook,
-    cells: notebook.cells.map((cell) => (
+    cells: notebook.cells.map((cell) =>
       cell.id === cellId
         ? {
-          ...cell,
-          execution_count: (cell.execution_count ?? 0) + 1,
-          outputs,
-        }
-        : cell
-    )),
+            ...cell,
+            execution_count: (cell.execution_count ?? 0) + 1,
+            outputs,
+          }
+        : cell,
+    ),
     metadata: {
       ...notebook.metadata,
       forgecad: {

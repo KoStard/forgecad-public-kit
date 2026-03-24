@@ -1,16 +1,12 @@
-import type {
-  ForgeQualityPreset,
-  LogEntry,
-  VerificationResult,
-} from '@forge/index';
-import type { RunResult } from '../forge/runner';
-import type { FaceRef } from '../forge/sketch/topology';
-import type { FaceTransformationHistory } from '../forge/faceHistory';
-import type { GeometryInfo } from '../forge/kernel';
+import type { ForgeQualityPreset, LogEntry } from '@forge/index';
 import type { ShapeCompilePlan } from '../forge/compilePlan';
-import type { SketchConstraintMeta, ConstraintDefinition } from '../forge/sketch/constraints';
+import type { FaceTransformationHistory } from '../forge/face-tracking/faceHistory';
+import type { ToolpathData } from '../forge/export/gcode';
+import type { GeometryInfo } from '../forge/kernel';
+import type { RunResult } from '../forge/runner';
+import type { ConstraintDefinition, SketchConstraintMeta } from '../forge/sketch/constraints';
 import type { SolverWasmRunDebugSnapshot } from '../forge/sketch/constraints/solver-wasm';
-import type { ToolpathData } from '../forge/gcode';
+import type { FaceRef } from '../forge/sketch/topology';
 
 /** Wire format for a serialized Shape — all WASM data extracted into transferable TypedArrays. */
 export interface SerializedShapeData {
@@ -70,11 +66,10 @@ export interface SerializedSceneObject {
  * All other fields pass through unchanged — adding a new plain-data
  * field to RunResult automatically includes it here.
  */
-export type SerializedRunResult =
-  Omit<RunResult, 'shape' | 'sketch' | 'objects'> & {
-    objects: SerializedSceneObject[];
-    solverDebug?: SolverWasmRunDebugSnapshot | null;
-  };
+export type SerializedRunResult = Omit<RunResult, 'shape' | 'sketch' | 'objects'> & {
+  objects: SerializedSceneObject[];
+  solverDebug?: SolverWasmRunDebugSnapshot | null;
+};
 
 // ---- Message types ----
 
@@ -177,4 +172,11 @@ export interface EvalWorkerExportExactError {
 }
 
 export type EvalWorkerRequest = EvalWorkerRunRequest | EvalWorkerFaceInfoRequest | EvalWorkerExportExactRequest;
-export type EvalWorkerResponse = EvalWorkerRunSuccess | EvalWorkerRunError | EvalWorkerProgressMessage | EvalWorkerFaceInfoSuccess | EvalWorkerFaceInfoError | EvalWorkerExportExactSuccess | EvalWorkerExportExactError;
+export type EvalWorkerResponse =
+  | EvalWorkerRunSuccess
+  | EvalWorkerRunError
+  | EvalWorkerProgressMessage
+  | EvalWorkerFaceInfoSuccess
+  | EvalWorkerFaceInfoError
+  | EvalWorkerExportExactSuccess
+  | EvalWorkerExportExactError;

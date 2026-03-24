@@ -5,8 +5,8 @@
  * Removes 3 DOF.
  */
 
-import type { Constraint3DDef, Constraint3D, Solver3DContext } from '../types';
 import { dot3, sub3 } from '../rodrigues';
+import type { Constraint3D, Constraint3DDef, Solver3DContext } from '../types';
 
 export const alignDef: Constraint3DDef<'align'> = {
   type: 'align',

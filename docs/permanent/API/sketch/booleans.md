@@ -73,21 +73,6 @@ const overlap = intersection2d(
 
 `intersection2d([a, b, c])` is also supported.
 
-### `hull2d(...sketches)`
-Creates the convex hull of multiple sketches.
-
-```javascript
-const hull = hull2d(
-  circle2d(10),
-  circle2d(10).translate(50, 0),
-  circle2d(10).translate(25, 40)
-);
-```
-
-`hull2d([a, b, c])` is also supported when your sketches are already in an array.
-
-`hull2d()` is best for intentionally blended convex silhouettes. If you need true corner fillets while keeping some neighboring corners sharp, use `filletCorners(...)` instead.
-
 ## Performance Note
 
 The multi-argument functions (`union2d`, `difference2d`, `intersection2d`) use Manifold's batch operations internally, which are faster than chaining `.add()` / `.subtract()` calls one by one. Prefer them when combining many sketches.

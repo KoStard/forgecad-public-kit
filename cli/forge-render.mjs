@@ -17,17 +17,13 @@
  * Requires: puppeteer-core + Chrome/Chromium installed on the system.
  */
 
-import puppeteer from 'puppeteer-core';
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { resolve, basename, dirname, join, extname } from 'path';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
-import { execSync } from 'child_process';
+import { readFile, writeFile } from 'fs/promises';
 import { createServer } from 'net';
+import { basename, dirname, extname, join, resolve } from 'path';
+import puppeteer from 'puppeteer-core';
+import { materializeNotebookPreviewScript, replaceRenderableInputExtension } from './notebook-entry';
 import { packageRootFrom, spawnPackageVite } from './package-runtime';
-import {
-  materializeNotebookPreviewScript,
-  replaceRenderableInputExtension,
-} from './notebook-entry';
 
 // --- Config ---
 
@@ -38,11 +34,14 @@ const CHROME_PATHS = [
 ];
 const DEFAULT_PORT = parseInt(process.env.FORGE_PORT || '5173', 10);
 const DEFAULT_SIZE = parseInt(process.env.FORGE_SIZE || '1024', 10);
-const DEFAULT_ANGLES = (process.env.FORGE_ANGLES || 'front,side,top,iso').split(',').map(s => s.trim()).filter(Boolean);
+const DEFAULT_ANGLES = (process.env.FORGE_ANGLES || 'front,side,top,iso')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 function resolveChromePath(explicitPath) {
   if (explicitPath && existsSync(explicitPath)) return explicitPath;
-  return CHROME_PATHS.find(p => existsSync(p)) || null;
+  return CHROME_PATHS.find((p) => existsSync(p)) || null;
 }
 
 function usage() {
@@ -95,7 +94,10 @@ function parseCli(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--angles') {
-      angles = readValue(argv, i, arg).split(',').map(s => s.trim()).filter(Boolean);
+      angles = readValue(argv, i, arg)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       i += 1;
       continue;
     }
@@ -172,7 +174,7 @@ function parseCli(argv) {
 // (mirrors collect-files.ts logic for plain Node)
 
 const FORGE_EXTS = ['.forge.js', '.js', '.svg'];
-const isForgeFile = (f) => FORGE_EXTS.some(ext => f.endsWith(ext));
+const isForgeFile = (f) => FORGE_EXTS.some((ext) => f.endsWith(ext));
 
 function collectRec(dir, root) {
   const result = {};
@@ -198,13 +200,20 @@ function findProjectRoot(sp) {
     if (candidate === root) break;
     try {
       const entries = readdirSync(candidate);
-      const hasDirectForge = entries.some(e => {
-        try { return statSync(join(candidate, e)).isFile() && isForgeFile(e); }
-        catch { return false; }
+      const hasDirectForge = entries.some((e) => {
+        try {
+          return statSync(join(candidate, e)).isFile() && isForgeFile(e);
+        } catch {
+          return false;
+        }
       });
-      if (hasDirectForge) { root = candidate; candidate = dirname(candidate); }
-      else break;
-    } catch { break; }
+      if (hasDirectForge) {
+        root = candidate;
+        candidate = dirname(candidate);
+      } else break;
+    } catch {
+      break;
+    }
   }
   return root;
 }
@@ -214,8 +223,11 @@ function findProjectRoot(sp) {
 async function isPortOpen(port) {
   return new Promise((resolve) => {
     const server = createServer();
-    server.once('error', () => resolve(false));  // port in use = server running
-    server.once('listening', () => { server.close(); resolve(true); }); // port free = no server
+    server.once('error', () => resolve(false)); // port in use = server running
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    }); // port free = no server
     server.listen(port, '127.0.0.1');
   });
 }
@@ -242,7 +254,10 @@ async function ensureDevServer(port) {
         resolve();
       }
     });
-    viteProcess.on('error', (e) => { clearTimeout(timeout); reject(e); });
+    viteProcess.on('error', (e) => {
+      clearTimeout(timeout);
+      reject(e);
+    });
   });
 }
 
@@ -295,23 +310,29 @@ export async function runRenderCli(argv = process.argv.slice(2)) {
       await page.goto(url, { waitUntil: 'networkidle0', timeout: 15000 });
       await page.waitForFunction('window.__forgeReady === true', { timeout: 10000 });
 
-      const result = await page.evaluate((scriptCode, files, scriptName, renderOptions) => {
-        return window.__forgeRender(scriptCode, {
-          angles: renderOptions.angles,
-          size: renderOptions.size,
-          allFiles: files,
-          fileName: scriptName,
-          cameraSpec: renderOptions.cameraSpec,
-          sceneSpec: renderOptions.sceneSpec,
-          background: renderOptions.background,
-        });
-      }, code, allFiles, scriptFileName, {
-        angles: options.angles,
-        size: options.size,
-        cameraSpec: options.cameraSpec || null,
-        sceneSpec: options.sceneSpec || null,
-        background: options.background || null,
-      });
+      const result = await page.evaluate(
+        (scriptCode, files, scriptName, renderOptions) => {
+          return window.__forgeRender(scriptCode, {
+            angles: renderOptions.angles,
+            size: renderOptions.size,
+            allFiles: files,
+            fileName: scriptName,
+            cameraSpec: renderOptions.cameraSpec,
+            sceneSpec: renderOptions.sceneSpec,
+            background: renderOptions.background,
+          });
+        },
+        code,
+        allFiles,
+        scriptFileName,
+        {
+          angles: options.angles,
+          size: options.size,
+          cameraSpec: options.cameraSpec || null,
+          sceneSpec: options.sceneSpec || null,
+          background: options.background || null,
+        },
+      );
 
       if (!result.ok) {
         console.error('Script error:', result.error);
@@ -324,20 +345,14 @@ export async function runRenderCli(argv = process.argv.slice(2)) {
 
       const savedFiles = [];
       for (const [angle, png] of Object.entries(result.renders)) {
-        const filename = renderAngles.length === 1
-          ? outputBase
-          : `${base}_${angle}${ext}`;
+        const filename = renderAngles.length === 1 ? outputBase : `${base}_${angle}${ext}`;
         const b64 = png.replace(/^data:image\/png;base64,/, '');
         await writeFile(resolve(filename), Buffer.from(b64, 'base64'));
         savedFiles.push(basename(filename));
       }
 
       const bb = result.bbox;
-      const sz = [
-        (bb.max[0] - bb.min[0]).toFixed(1),
-        (bb.max[1] - bb.min[1]).toFixed(1),
-        (bb.max[2] - bb.min[2]).toFixed(1),
-      ];
+      const sz = [(bb.max[0] - bb.min[0]).toFixed(1), (bb.max[1] - bb.min[1]).toFixed(1), (bb.max[2] - bb.min[2]).toFixed(1)];
 
       console.log(`\n✓ ForgeCAD Render Complete`);
       console.log(`  Script: ${basename(scriptPath)}`);
@@ -345,7 +360,7 @@ export async function runRenderCli(argv = process.argv.slice(2)) {
       console.log(`  Size:   ${sz[0]} × ${sz[1]} × ${sz[2]} mm`);
       console.log(`  Volume: ${result.volume.toFixed(1)} mm³`);
       if (bb.min[0] != null) {
-        console.log(`  Bounds: [${bb.min.map(v => v.toFixed(1))}] → [${bb.max.map(v => v.toFixed(1))}]`);
+        console.log(`  Bounds: [${bb.min.map((v) => v.toFixed(1))}] → [${bb.max.map((v) => v.toFixed(1))}]`);
       }
 
       if (result.params.length > 0) {

@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
 import { initKernel } from '@forge/kernel';
 import { initSolverWasm } from '@forge/sketch/constraints/solver-wasm';
+import { useEffect, useState } from 'react';
+import { buildShareUrl, fetchGistModel, getGistId } from '../share';
 import { useForgeStore } from '../store/forgeStore';
 import { Viewport } from './Viewport';
-import { getGistId, fetchGistModel, buildShareUrl } from '../share';
 
 /**
  * Minimal embed view — just the 3D viewport with a small watermark link.
@@ -69,10 +69,17 @@ export function EmbedViewer() {
 
   if (gistError) {
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: '100vh', color: '#e74c3c', background: '#1e1e1e', fontFamily: 'system-ui',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          color: '#e74c3c',
+          background: '#1e1e1e',
+          fontFamily: 'system-ui',
+        }}
+      >
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 16, marginBottom: 8 }}>Failed to load model</div>
           <div style={{ fontSize: 13, color: '#999' }}>{gistError}</div>
@@ -83,10 +90,16 @@ export function EmbedViewer() {
 
   if (!kernelReady || gistLoading) {
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: '100vh', color: 'var(--fc-textDim)', background: 'var(--fc-bg, #1e1e1e)',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          color: 'var(--fc-textDim)',
+          background: 'var(--fc-bg, #1e1e1e)',
+        }}
+      >
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 18, marginBottom: 8 }}>ForgeCAD</div>
           <div style={{ fontSize: 13 }}>{gistLoading ? 'Loading model...' : 'Loading geometry kernel...'}</div>

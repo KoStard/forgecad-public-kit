@@ -1,9 +1,4 @@
-import {
-  exactRoute,
-  facetedRoute,
-  partExample,
-  type ExampleManifestEntry,
-} from './types';
+import { type ExampleManifestEntry, exactRoute, facetedRoute, partExample } from './types';
 
 const API_EXACT_PART_PATHS = [
   'examples/api/attachTo-basics.forge.js',
@@ -34,6 +29,7 @@ const API_EXACT_PART_PATHS = [
   'examples/api/text2d-basics.forge.js',
   'examples/api/text2d-font.forge.js',
   'examples/api/extrude-options.forge.js',
+  'examples/api/smooth-curve-connections.forge.js',
   'examples/api/verification-demo.forge.js',
 ] as const;
 
@@ -45,7 +41,8 @@ const API_FACETED_PARTS = [
   },
   {
     path: 'examples/api/profile-2020-b-slot6.forge.js',
-    blocker: 'The direct 3D profile helper still lowers through segmented profile geometry, so the extrusion must stay on the faceted route for now.',
+    blocker:
+      'The direct 3D profile helper still lowers through segmented profile geometry, so the extrusion must stay on the faceted route for now.',
     note: 'The sketch half of the example remains exact-capable; the 3D helper is the intentional blocker.',
   },
 ] as const;
@@ -53,7 +50,8 @@ const API_FACETED_PARTS = [
 const API_RECOVERED_FACETED_PARTS = [
   {
     path: 'examples/api/gears-tier1.forge.js',
-    blocker: 'The spur and ring gear helpers still lower through segmented circle profile geometry outside the exact CadQuery/OCCT subset, so those gears intentionally stay on the faceted route.',
+    blocker:
+      'The spur and ring gear helpers still lower through segmented circle profile geometry outside the exact CadQuery/OCCT subset, so those gears intentionally stay on the faceted route.',
     note: 'The rack gear already stays exact; this contract scopes the route claim to the three gear solids that still require faceted fallback.',
     primaryShapes: ['Spur Pinion', 'Spur Gear', 'Ring Gear'],
   },
@@ -90,18 +88,14 @@ export const API_AND_CORPUS_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
     exactRoute('This is the public exact-exportable demo and should stay inside the exact route.'),
   ),
   ...COMPILER_CORPUS_PATHS.map((path) =>
-    partExample(
-      'compiler-corpus',
-      path,
-      exactRoute('The compiler corpus is the defended ordinary-part exact subset and must stay exact.'),
-    ),
+    partExample('compiler-corpus', path, exactRoute('The compiler corpus is the defended ordinary-part exact subset and must stay exact.')),
   ),
   partExample(
     'compiler-corpus',
     'examples/compiler-corpus/edge-query-demo.forge.js',
     facetedRoute(
-      'The chamfered-union and pipe shapes use hull/runtime geometry outside the exact subset.',
-      'Most shapes stay exact; this contract scopes the faceted claim to the hull-dependent solids.',
+      'The chamfered-union and pipe shapes use runtime geometry outside the exact subset.',
+      'Most shapes stay exact; this contract scopes the faceted claim to the runtime-dependent solids.',
     ),
     undefined,
     ['Chamfered Union', 'Pipe (16 edges)'],

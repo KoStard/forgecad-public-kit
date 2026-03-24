@@ -98,7 +98,7 @@ const QUALITY_PROFILES: Record<ForgeQualityPreset, ForgeQualityProfile> = {
 export const FORGE_QUALITY_PRESETS: ForgeQualityPreset[] = ['live', 'default', 'high'];
 export const FORGE_QUALITY_PROFILES: Readonly<Record<ForgeQualityPreset, ForgeQualityProfile>> = QUALITY_PROFILES;
 
-let _qualityStack: ForgeQualityPreset[] = ['default'];
+const _qualityStack: ForgeQualityPreset[] = ['default'];
 
 export function resolveForgeQualityPreset(preset?: ForgeQualityPreset | null): ForgeQualityPreset {
   if (preset === 'live' || preset === 'default' || preset === 'high') return preset;

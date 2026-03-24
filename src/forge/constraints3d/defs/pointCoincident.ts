@@ -6,7 +6,7 @@
  * Residuals: [p2.x - p1.x, p2.y - p1.y, p2.z - p1.z]
  */
 
-import type { Constraint3DDef, Constraint3D, Solver3DContext } from '../types';
+import type { Constraint3D, Constraint3DDef, Solver3DContext } from '../types';
 
 export const pointCoincidentDef: Constraint3DDef<'pointCoincident'> = {
   type: 'pointCoincident',

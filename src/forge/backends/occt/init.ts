@@ -64,10 +64,9 @@ function idbPut(db: IDBDatabase, key: string, value: { version: string; module: 
  * `wasmUrl` is captured from opencascade.js's locateFile before Emscripten
  * calls instantiateWasm.
  */
-function buildCachedInstantiateWasm(captured: { wasmUrl: string }): (
-  imports: WebAssembly.Imports,
-  successCallback: (instance: WebAssembly.Instance) => void,
-) => Record<string, never> {
+function buildCachedInstantiateWasm(captured: {
+  wasmUrl: string;
+}): (imports: WebAssembly.Imports, successCallback: (instance: WebAssembly.Instance) => void) => Record<string, never> {
   return (imports, successCallback) => {
     (async () => {
       try {
@@ -113,9 +112,7 @@ export async function initOCCT(): Promise<OCCTModule> {
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
-    const isNode = typeof process !== 'undefined'
-      && typeof process.versions !== 'undefined'
-      && typeof process.versions.node === 'string';
+    const isNode = typeof process !== 'undefined' && typeof process.versions !== 'undefined' && typeof process.versions.node === 'string';
 
     if (isNode) {
       // Node.js — no IDB caching, use the Node entry point directly.

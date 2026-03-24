@@ -20,8 +20,7 @@ export function pointInPolygon(point: Vec2, poly: Vec2[]): boolean {
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i];
     const [xj, yj] = poly[j];
-    if (((yi > py) !== (yj > py))
-        && (px < ((xj - xi) * (py - yi)) / ((yj - yi) || 1e-20) + xi)) {
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi || 1e-20) + xi) {
       inside = !inside;
     }
   }
@@ -30,7 +29,10 @@ export function pointInPolygon(point: Vec2, poly: Vec2[]): boolean {
 
 // ─── Segment-segment intersection ───────────────────────────────────────────
 
-interface Seg { a: Vec2; b: Vec2 }
+interface Seg {
+  a: Vec2;
+  b: Vec2;
+}
 
 function segSegT(p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2): number | null {
   const dx1 = p2[0] - p1[0];
@@ -43,8 +45,7 @@ function segSegT(p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2): number | null {
   const dy3 = p3[1] - p1[1];
   const t = (dx3 * dy2 - dy3 * dx2) / denom;
   const s = (dx3 * dy1 - dy3 * dx1) / denom;
-  if (t > INTERSECT_EPS && t < 1 - INTERSECT_EPS
-      && s > INTERSECT_EPS && s < 1 - INTERSECT_EPS) {
+  if (t > INTERSECT_EPS && t < 1 - INTERSECT_EPS && s > INTERSECT_EPS && s < 1 - INTERSECT_EPS) {
     return t;
   }
   return null;
@@ -111,8 +112,7 @@ function buildPlaneGraph(segs: Seg[]): PlaneGraph {
 
   const nodeIndex = (p: Vec2): number => {
     for (let i = 0; i < nodes.length; i += 1) {
-      if (Math.abs(nodes[i][0] - p[0]) < SNAP_EPS
-          && Math.abs(nodes[i][1] - p[1]) < SNAP_EPS) {
+      if (Math.abs(nodes[i][0] - p[0]) < SNAP_EPS && Math.abs(nodes[i][1] - p[1]) < SNAP_EPS) {
         return i;
       }
     }
@@ -153,7 +153,7 @@ function traverseFaces(graph: PlaneGraph): Vec2[][] {
     const ei = he >> 1;
     const [a, b] = edges[ei];
     const from = (he & 1) === 0 ? a : b;
-    const to   = (he & 1) === 0 ? b : a;
+    const to = (he & 1) === 0 ? b : a;
     return Math.atan2(nodes[to][1] - nodes[from][1], nodes[to][0] - nodes[from][0]);
   };
   for (const out of outgoing) {
@@ -188,12 +188,21 @@ function traverseFaces(graph: PlaneGraph): Vec2[][] {
     let guard = totalHE + 4;
 
     do {
-      if (visited[he]) { nodeIds.length = 0; break; }
+      if (visited[he]) {
+        nodeIds.length = 0;
+        break;
+      }
       visited[he] = 1;
       nodeIds.push(heFrom(he));
       he = nextHE(he);
-      if (he === -1) { nodeIds.length = 0; break; }
-      if (--guard < 0) { nodeIds.length = 0; break; }
+      if (he === -1) {
+        nodeIds.length = 0;
+        break;
+      }
+      if (--guard < 0) {
+        nodeIds.length = 0;
+        break;
+      }
     } while (he !== startHE);
 
     if (nodeIds.length < 3) continue;
@@ -214,7 +223,10 @@ function traverseFaces(graph: PlaneGraph): Vec2[][] {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-export interface ArrangementSegment { a: Vec2; b: Vec2 }
+export interface ArrangementSegment {
+  a: Vec2;
+  b: Vec2;
+}
 
 /**
  * Compute all bounded planar faces from a set of 2D line segments.

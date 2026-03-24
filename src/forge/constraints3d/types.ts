@@ -6,8 +6,8 @@
  * definitions, and solve results.
  */
 
-import type { Vec3 } from '../transform';
 import type { FaceRef } from '../sketch/topology';
+import type { Vec3 } from '../transform';
 
 // ─── Rigid body (solver-internal state) ─────────────────────────────────────
 

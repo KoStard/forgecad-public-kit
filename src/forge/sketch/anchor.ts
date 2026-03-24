@@ -1,4 +1,4 @@
-import { Sketch, type Anchor } from './core';
+import { type Anchor, Sketch } from './core';
 
 function getAnchorPoint(sketch: Sketch, anchor: Anchor): [number, number] {
   const b = sketch.bounds();
@@ -8,27 +8,45 @@ function getAnchorPoint(sketch: Sketch, anchor: Anchor): [number, number] {
   const cy = (minY + maxY) / 2;
 
   switch (anchor) {
-    case 'center': return [cx, cy];
-    case 'top-left': return [minX, maxY];
-    case 'top-right': return [maxX, maxY];
-    case 'bottom-left': return [minX, minY];
-    case 'bottom-right': return [maxX, minY];
-    case 'top': return [cx, maxY];
-    case 'bottom': return [cx, minY];
-    case 'left': return [minX, cy];
-    case 'right': return [maxX, cy];
+    case 'center':
+      return [cx, cy];
+    case 'top-left':
+      return [minX, maxY];
+    case 'top-right':
+      return [maxX, maxY];
+    case 'bottom-left':
+      return [minX, minY];
+    case 'bottom-right':
+      return [maxX, minY];
+    case 'top':
+      return [cx, maxY];
+    case 'bottom':
+      return [cx, minY];
+    case 'left':
+      return [minX, cy];
+    case 'right':
+      return [maxX, cy];
   }
 }
 
-export function sketchAttachTo(sketch: Sketch, target: Sketch, targetAnchor: Anchor, selfAnchor: Anchor = 'center', offset?: [number, number]): Sketch {
+export function sketchAttachTo(
+  sketch: Sketch,
+  target: Sketch,
+  targetAnchor: Anchor,
+  selfAnchor: Anchor = 'center',
+  offset?: [number, number],
+): Sketch {
   const targetPt = getAnchorPoint(target, targetAnchor);
   const selfPt = getAnchorPoint(sketch, selfAnchor);
   let dx = targetPt[0] - selfPt[0];
   let dy = targetPt[1] - selfPt[1];
-  if (offset) { dx += offset[0]; dy += offset[1]; }
+  if (offset) {
+    dx += offset[0];
+    dy += offset[1];
+  }
   return sketch.translate(dx, dy);
 }
 
-Sketch.prototype.attachTo = function(target: Sketch, targetAnchor: Anchor, selfAnchor: Anchor = 'center', offset?: [number, number]) {
+Sketch.prototype.attachTo = function (target: Sketch, targetAnchor: Anchor, selfAnchor: Anchor = 'center', offset?: [number, number]) {
   return sketchAttachTo(this, target, targetAnchor, selfAnchor, offset);
 };

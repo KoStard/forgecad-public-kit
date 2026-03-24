@@ -16,9 +16,8 @@ const roundNumber = (value: number, digits: number): number => {
   return Math.round(value * scale) / scale;
 };
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> => (
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-);
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 function parseViewportRenderObjectState(value: unknown): ViewportRenderObjectState | null {
   if (!isPlainObject(value)) return null;
@@ -100,10 +99,7 @@ export function mergeViewportRenderSceneStates(
 ): ViewportRenderSceneState | null {
   if (!base && !override) return null;
 
-  const objectIds = new Set([
-    ...Object.keys(base?.objects ?? {}),
-    ...Object.keys(override?.objects ?? {}),
-  ]);
+  const objectIds = new Set([...Object.keys(base?.objects ?? {}), ...Object.keys(override?.objects ?? {})]);
   const objects: Record<string, ViewportRenderObjectState> = {};
 
   objectIds.forEach((id) => {
@@ -147,15 +143,17 @@ export function formatRenderSceneCliSpec(state: ViewportRenderSceneState, digits
 
   if (parsed.objects) {
     const formattedObjects: Record<string, ViewportRenderObjectState> = {};
-    Object.keys(parsed.objects).sort().forEach((id) => {
-      const objectState = parsed.objects?.[id];
-      if (!objectState) return;
-      formattedObjects[id] = {
-        ...(objectState.visible !== undefined ? { visible: objectState.visible } : {}),
-        ...(objectState.opacity !== undefined ? { opacity: roundNumber(objectState.opacity, digits) } : {}),
-        ...(objectState.color !== undefined ? { color: objectState.color } : {}),
-      };
-    });
+    Object.keys(parsed.objects)
+      .sort()
+      .forEach((id) => {
+        const objectState = parsed.objects?.[id];
+        if (!objectState) return;
+        formattedObjects[id] = {
+          ...(objectState.visible !== undefined ? { visible: objectState.visible } : {}),
+          ...(objectState.opacity !== undefined ? { opacity: roundNumber(objectState.opacity, digits) } : {}),
+          ...(objectState.color !== undefined ? { color: objectState.color } : {}),
+        };
+      });
     if (Object.keys(formattedObjects).length > 0) {
       formatted.objects = formattedObjects;
     }

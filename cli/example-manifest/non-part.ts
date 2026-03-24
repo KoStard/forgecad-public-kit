@@ -1,10 +1,10 @@
 import {
   assemblyExample,
+  type ExampleManifestEntry,
+  type NonPartValidationExpectations,
   notebookExample,
   runtimeSceneExample,
   sketchExample,
-  type ExampleManifestEntry,
-  type NonPartValidationExpectations,
 } from './types';
 
 type NonPartEntry = {
@@ -97,6 +97,10 @@ const RUNTIME_SCENE_ENTRIES: readonly NonPartEntry[] = [
     expect: { minJoints: 4, minAnimations: 1 },
   },
   {
+    path: 'examples/api/highlight-debug.forge.js',
+    note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
+  },
+  {
     path: 'examples/api/geometry-info.forge.js',
     note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
   },
@@ -114,6 +118,18 @@ const RUNTIME_SCENE_ENTRIES: readonly NonPartEntry[] = [
     path: 'examples/cut-plane-demo.forge.js',
     note: 'This example is judged by runtime scene behavior rather than by exact part-lowering parity.',
     expect: { minCutPlanes: 2 },
+  },
+  {
+    path: 'examples/fillet-curved-edges.forge.js',
+    note: 'Fillet showcase — mixed exact/faceted objects, no export parity assertion.',
+  },
+  {
+    path: 'examples/fillet-enclosure.forge.js',
+    note: 'Fillet showcase — mixed exact/faceted objects, no export parity assertion.',
+  },
+  {
+    path: 'examples/fillet-showcase.forge.js',
+    note: 'Fillet showcase — mixed exact/faceted objects, no export parity assertion.',
   },
   {
     path: 'examples/door-with-hinges.forge.js',

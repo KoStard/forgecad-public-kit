@@ -1,22 +1,11 @@
 #!/usr/bin/env node
 
 import { spawn } from 'child_process';
-import { resolve, dirname } from 'path';
+import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import {
-  materializeNotebookPreviewScript,
-  replaceRenderableInputExtension,
-} from './notebook-entry';
+import { materializeNotebookPreviewScript, replaceRenderableInputExtension } from './notebook-entry';
 
-const VALUE_FLAGS = new Set([
-  '--angles',
-  '--size',
-  '--port',
-  '--camera',
-  '--scene',
-  '--background',
-  '--chrome-path',
-]);
+const VALUE_FLAGS = new Set(['--angles', '--size', '--port', '--camera', '--scene', '--background', '--chrome-path']);
 
 interface ParsedRenderArgs {
   scriptArgIndex: number;
