@@ -38,6 +38,9 @@ export const getActiveFileFromHash = (): string | null => {
   return hash || null;
 };
 
+/** Captured once at module load — before any replaceState can overwrite it. */
+export const STARTUP_HASH_FILE = getActiveFileFromHash();
+
 /** If the URL contains a shared model (`#code/...`), decode it once at startup. */
 export const sharedModel = decodeSharedHash(window.location.hash);
 if (sharedModel) {

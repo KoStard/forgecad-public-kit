@@ -12,17 +12,25 @@ ForgeCAD has two overlapping interfaces for build and dev tasks. Use the right o
 | **Humans developing ForgeCAD** | `npm run dev` (live reload), `npm run build` (prod), `forgecad check suite` | — |
 | **CI / pre-publish** | `npm run build && npm run test` | forgecad CLI (not installed in CI) |
 
-**Important**: Always use `node dist-cli/forgecad.js` (local build) instead of the global `forgecad` command. The global binary may be an older installed version that doesn't reflect local source changes. After editing TS source, run `npm run build:cli` to rebuild, then use `node dist-cli/forgecad.js` to run.
+**Important**: Always use `node dist-cli/forgecad.js` (local build) instead of the global `forgecad` command. The global binary may be an older installed version that doesn't reflect local source changes.
+
+### Rebuilding after source changes
+
+| Command | What it does |
+|---------|-------------|
+| `npm run refresh` | Rebuild **all** derived artifacts (CLI, types, docs, skill) in correct order with parallelism. Run this after editing TS source. |
+| `npm run refresh -- --no-cli` | Same but skip CLI rebuild (faster, use when only API/docs changed) |
+| `forgecad dev` / `npm run dev` | Vite dev server — auto-rebuilds types, docs, and skill on file changes. No manual refresh needed during active dev. |
+
+After `npm run refresh`, use `node dist-cli/forgecad.js` to run CLI commands. Do not use the global `forgecad` binary — it won't reflect local changes.
 
 ### Dev server commands
 
 | Command | When to use |
 |---------|------------|
-| `forgecad dev [path]` | Active development — Vite dev server, live reload, no build needed |
+| `forgecad dev [path]` | Active development — Vite dev server, live reload, auto-refreshes types/docs/skill |
 | `forgecad studio [path]` | Production server — requires `dist/` to be built (`npm run build`) |
 | `npm run dev` | Same as `forgecad dev` for humans; conventional JS-project entry point |
-
-After editing TS source files, rebuild the CLI with `npm run build:cli`, then use `node dist-cli/forgecad.js` to run commands. Do not use the global `forgecad` binary — it won't reflect local changes.
 
 ## React Performance: Stable References in Render Bodies
 

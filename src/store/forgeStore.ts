@@ -29,7 +29,7 @@ import {
   isModelFile,
   isRunnableFile,
   findPreferredEntryFile,
-  getActiveFileFromHash,
+  STARTUP_HASH_FILE,
   sharedModel,
   sharedBundle,
   LAST_ACTIVE_FILE_KEY,
@@ -72,15 +72,17 @@ export { sharedBundle, sharedModel };
 const initialActive = (() => {
   if (sharedBundle) return sharedBundle.entry;
   if (sharedModel) return sharedModel.filename;
-  const hashFile = getActiveFileFromHash();
+  const hashFile = STARTUP_HASH_FILE;
   if (hashFile && hashFile in INITIAL_FILES) {
     return hashFile;
   }
-  // Restore last opened file from localStorage
+  // Restore last opened file from localStorage.
+  // Do NOT replaceState here — the URL hash represents user intent and must be
+  // preserved for computeServerSnapshot to read when the SSE init arrives
+  // (in production builds INITIAL_FILES is empty until the server snapshot).
   try {
     const last = localStorage.getItem(LAST_ACTIVE_FILE_KEY);
     if (last && INITIAL_FILES[last]) {
-      window.history.replaceState(null, '', `#${last}`);
       return last;
     }
   } catch {
@@ -89,7 +91,6 @@ const initialActive = (() => {
   const names = Object.keys(INITIAL_FILES);
   const fallback =
     findPreferredEntryFile(names) || names.find((n) => n.endsWith('.js')) || names.find((n) => isNotebookFile(n)) || names[0];
-  if (fallback) window.history.replaceState(null, '', `#${fallback}`);
   return fallback;
 })();
 
@@ -1274,6 +1275,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       set({ paramOverrides: {}, lastValidResult: null } as any);
       setParamOverrides({});
       window.history.replaceState(null, '', `#${nextState.activeFile}`);
+      try { localStorage.setItem(LAST_ACTIVE_FILE_KEY, nextState.activeFile); } catch { /* */ }
       setTimeout(() => get().execute(), 0);
     }
   },

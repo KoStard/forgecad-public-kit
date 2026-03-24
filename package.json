@@ -52,7 +52,8 @@
     "meta:status": "bash scripts/local-meta.sh status",
     "meta:path": "bash scripts/local-meta.sh path",
     "gen:types": "node scripts/gen-forge-types.mjs",
-    "gen:docs": "node scripts/gen-api-docs.mjs"
+    "gen:docs": "node scripts/gen-api-docs.mjs",
+    "refresh": "node scripts/refresh.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

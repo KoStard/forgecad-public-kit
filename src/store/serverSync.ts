@@ -9,7 +9,8 @@
 import { setParamOverrides } from '@forge/params';
 import {
   findPreferredEntryFile,
-  getActiveFileFromHash,
+  STARTUP_HASH_FILE,
+  LAST_ACTIVE_FILE_KEY,
   collectParentPaths,
   resolvePreviewFile,
 } from './fileHelpers';
@@ -94,7 +95,7 @@ export function computeServerSnapshot(
     }
   }
 
-  const hashFile = getActiveFileFromHash();
+  const hashFile = STARTUP_HASH_FILE;
   const availableFiles = Object.keys(nextFiles);
 
   const isMeshHash = hashFile && MESH_EXTS.some((ext) => hashFile.toLowerCase().endsWith(ext));
@@ -145,6 +146,7 @@ export function postApplyServerSnapshot(
     setSlice({ paramOverrides: {}, lastValidResult: null });
     setParamOverrides({});
     window.history.replaceState(null, '', `#${newActiveFile}`);
+    try { localStorage.setItem(LAST_ACTIVE_FILE_KEY, newActiveFile); } catch { /* */ }
     setTimeout(execute, 0);
   } else {
     const previewFile = newActiveFile ? resolvePreviewFile(newActiveFile, files) : null;
