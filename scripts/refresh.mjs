@@ -5,7 +5,7 @@
  * Dependency graph:
  *   build:cli            (independent)
  *   build:solver --if-missing  (independent, skips if already built)
- *   gen:types → gen:docs → build:skill:forgecad  (sequential chain)
+ *   gen:types → gen:docs → build:skill:forgecad → build:docs  (sequential chain)
  *
  * Independent branches run in parallel. Exits non-zero if any step fails.
  *
@@ -63,6 +63,7 @@ async function main() {
       if (!run('gen:types', 'node scripts/gen-forge-types.mjs')) return false;
       if (!run('gen:docs', 'node scripts/gen-api-docs.mjs')) return false;
       if (!run('build:skill', 'node scripts/build-forgecad-skill.mjs')) return false;
+      if (!run('build:docs', 'node scripts/build-docs-site.mjs')) return false;
       return true;
     })()
   );
