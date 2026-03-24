@@ -1,8 +1,8 @@
 import type { CutPlaneDef } from '@forge/cutPlane';
 import type { ExplodeViewOptions, JointViewDef, SceneObject } from '@forge/index';
 import { DEFAULT_VIEW_CONFIG } from '@forge/index';
-import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
-import { resolveJointViewValues } from '@forge/jointsView';
+import { findJointAnimationClip, resolveJointAnimation } from '@forge/assembly/jointAnimation';
+import { resolveJointViewValues } from '@forge/assembly/jointsView';
 import type { SceneConfig } from '@forge/scene';
 import { getSketchWorldMatrix } from '@forge/sketch/placement3d';
 import { formatCoord, formatLength } from '@forge/units';

@@ -22,7 +22,7 @@ import {
   hasExplodeOverride,
   resolveExplodeDirective,
   resolveExplodeLocalFanDirection,
-} from './explodeCore';
+} from './assembly/explodeCore';
 import { ShapeGroup } from './group';
 import { box, buildShapeFromCompilePlan, cylinder, Shape, union } from './kernel';
 import { difference2d, union2d } from './sketch/booleans';

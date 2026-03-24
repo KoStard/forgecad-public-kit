@@ -1,13 +1,13 @@
-import { isManifoldCapableBackend, requireManifoldShapeBackend } from './backends/manifold/shapeBackend';
-import { bodyFromTrackedShape, MateBuilder } from './constraints3d/builder';
-import type { Mat3 } from './constraints3d/rodrigues';
-import { normalize3, rodrigues, sub3 } from './constraints3d/rodrigues';
-import { createContext, solve3D } from './constraints3d/solver';
-import type { Constraint3D, RigidBody, Solve3DResult, Solver3DContext } from './constraints3d/types';
+import { isManifoldCapableBackend, requireManifoldShapeBackend } from '../backends/manifold/shapeBackend';
+import { bodyFromTrackedShape, MateBuilder } from '../constraints3d/builder';
+import type { Mat3 } from '../constraints3d/rodrigues';
+import { normalize3, rodrigues, sub3 } from '../constraints3d/rodrigues';
+import { createContext, solve3D } from '../constraints3d/solver';
+import type { Constraint3D, RigidBody, Solve3DResult, Solver3DContext } from '../constraints3d/types';
 import type { ExplodeViewDirective } from './explodeView';
 import { explodeView } from './explodeView';
-import { group, ShapeGroup } from './group';
-import { getShapeRuntimeBackend, Shape, union } from './kernel';
+import { group, ShapeGroup } from '../group';
+import { getShapeRuntimeBackend, Shape, union } from '../kernel';
 import {
   applyPlacementReferenceInput,
   clonePlacementReferences,
@@ -18,9 +18,9 @@ import {
   type PlacementReferences,
   placementReferenceNames,
   resolvePlacementReferencePoint,
-} from './placement';
-import { TrackedShape } from './sketch/topology';
-import { composeChain, type Mat4, normalizeAxis, Transform, type TransformInput, type Vec3 } from './transform';
+} from '../placement';
+import { TrackedShape } from '../sketch/topology';
+import { composeChain, type Mat4, normalizeAxis, Transform, type TransformInput, type Vec3 } from '../transform';
 
 export type AssemblyPart = Shape | TrackedShape | ShapeGroup;
 export type JointType = 'fixed' | 'revolute' | 'prismatic';

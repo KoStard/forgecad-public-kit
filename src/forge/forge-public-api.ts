@@ -29,19 +29,19 @@ export type {
   JointType as AssemblyJointType,
   PartMetadata as AssemblyPartMetadata,
   PartOptions as AssemblyPartOptions,
-} from './assembly';
-export { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly';
+} from './assembly/assembly';
+export { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly/assembly';
 export { bom } from './bom';
 export { cutPlane } from './cutPlane';
 export type { BoundingRegion, EdgeQuery, EdgeSegment } from './edgeQuery';
 export { coalesceEdges, selectEdge, selectEdges } from './edgeQuery';
 export { chamferEdgeSegment, filletEdgeSegment } from './edgeSegmentFeatures';
-export { explodeView } from './explodeView';
+export { explodeView } from './assembly/explodeView';
 export type { EdgeSelector } from './fillet';
 export { chamfer, draft, fillet, offsetSolid } from './fillet';
 export { group, ShapeGroup } from './group';
-export { joint } from './joint';
-export { jointsView } from './jointsView';
+export { joint } from './assembly/joint';
+export { jointsView } from './assembly/jointsView';
 export type { GeometryBackend, GeometryFidelity, GeometryInfo, GeometryRepresentation, GeometrySource, GeometryTopology } from './kernel';
 export { Shape } from './kernel';
 // `lib` — re-export the partLibrary object as `lib` so its full inferred type
@@ -148,7 +148,7 @@ export { viewConfig } from './scene/viewConfig';
 // The runner wraps these to accept/return TrackedShape.  We declare them here
 // with the PUBLIC signatures users actually see.
 
-import type { ImportedAssembly as _ImportedAssembly } from './assembly';
+import type { ImportedAssembly as _ImportedAssembly } from './assembly/assembly';
 import type { ShapeGroup as _ShapeGroup } from './group';
 import type { Shape as _Shape } from './kernel';
 import type { Sketch as _Sketch, SvgImportOptions as _SvgImportOptions, TrackedShape } from './sketch';

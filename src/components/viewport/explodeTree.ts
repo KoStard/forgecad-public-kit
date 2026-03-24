@@ -10,7 +10,7 @@ import {
   hasExplodeOverride,
   resolveExplodeDirective,
   resolveExplodeLocalFanDirection,
-} from '@forge/explodeCore';
+} from '@forge/assembly/explodeCore';
 import type { ExplodeViewOptions, SceneObject } from '@forge/index';
 import { getSketchWorldMatrix } from '@forge/sketch/placement3d';
 import * as THREE from 'three';

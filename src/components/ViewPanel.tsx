@@ -1,7 +1,7 @@
 import type { CutPlaneDef } from '@forge/cutPlane';
 import type { SceneObject } from '@forge/index';
-import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
-import { resolveJointViewValues } from '@forge/jointsView';
+import { findJointAnimationClip, resolveJointAnimation } from '@forge/assembly/jointAnimation';
+import { resolveJointViewValues } from '@forge/assembly/jointsView';
 import { formatArea } from '@forge/units';
 import { type CSSProperties, type MouseEvent, type ReactElement, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { animationSpeedToSlider, formatAnimationSpeed, sliderToAnimationSpeed } from '../animationSpeed';

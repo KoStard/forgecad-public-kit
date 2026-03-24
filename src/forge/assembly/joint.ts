@@ -5,8 +5,8 @@
  * A joint wraps the common pattern of "rotate this part around an axis at a pivot".
  */
 
-import { Shape } from './kernel';
-import { param } from './params';
+import { Shape } from '../kernel';
+import { param } from '../params';
 
 export interface RevoluteJointOpts {
   axis?: [number, number, number];

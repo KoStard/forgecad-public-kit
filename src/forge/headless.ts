@@ -37,14 +37,14 @@ export type {
   MergeIntoOptions,
   PartMetadata,
   PartOptions,
-} from './assembly';
-export { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly';
+} from './assembly/assembly';
+export { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly/assembly';
 export type { BomDef, BomOpts } from './bom';
 export { bom, getCollectedBom, resetBom } from './bom';
 export type { CutPlaneDef, CutPlaneExcludeInput, CutPlaneOptions } from './cutPlane';
 export { cutPlane, getCollectedCutPlanes, resetCutPlanes } from './cutPlane';
-export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './explodeView';
-export { explodeView, getCollectedExplodeView, resetExplodeView } from './explodeView';
+export type { ExplodeViewDirection, ExplodeViewDirective, ExplodeViewOptions } from './assembly/explodeView';
+export { explodeView, getCollectedExplodeView, resetExplodeView } from './assembly/explodeView';
 export type { MeshExportObject, ThreeMfExportOptions } from './exportMesh';
 export { build3mfBuffer, buildBinaryStl } from './exportMesh';
 export type { PreheatOptions, PrinterProfile, ToolpathData, ToolpathSegment } from './gcode';
@@ -52,9 +52,9 @@ export { GCodeBuilder, gcode } from './gcode';
 export type { GroupChild, GroupInput, NamedGroupChild } from './group';
 export { group, ShapeGroup } from './group';
 export * from './holeCut';
-export type { RevoluteJointOpts } from './joint';
-export { joint } from './joint';
-export { clampAnimationProgress, findJointAnimationClip, resolveJointAnimation } from './jointAnimation';
+export type { RevoluteJointOpts } from './assembly/joint';
+export { joint } from './assembly/joint';
+export { clampAnimationProgress, findJointAnimationClip, resolveJointAnimation } from './assembly/jointAnimation';
 export type {
   CollectedJointsView,
   JointsViewOptions,
@@ -69,8 +69,8 @@ export type {
   JointViewDef,
   JointViewInput,
   JointViewType,
-} from './jointsView';
-export { getCollectedJointsView, jointsView, resetJointsView, resolveJointViewValues } from './jointsView';
+} from './assembly/jointsView';
+export { getCollectedJointsView, jointsView, resetJointsView, resolveJointViewValues } from './assembly/jointsView';
 export type {
   Anchor3D,
   FaceTransformationHistory,

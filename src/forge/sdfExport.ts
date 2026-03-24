@@ -6,7 +6,7 @@ import type {
   AssemblyPartDef,
   JointType,
   PartMetadata,
-} from './assembly';
+} from './assembly/assembly';
 import { buildBinaryStl } from './exportMesh';
 import { ShapeGroup } from './group';
 import { Shape, union } from './kernel';

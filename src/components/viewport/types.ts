@@ -1,4 +1,4 @@
-import type { ExplodeBounds } from '@forge/explodeCore';
+import type { ExplodeBounds } from '@forge/assembly/explodeCore';
 import type { JointViewDef } from '@forge/index';
 import * as THREE from 'three';
 

@@ -9,20 +9,20 @@
 
 import * as ts from 'typescript';
 import './holeCut';
-import { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly';
+import { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly/assembly';
 import { type BomDef, bom, getCollectedBom, resetBom } from './bom';
 import type { ShapeCompilePlan } from './compilePlan';
 import { appendShapeCompileTransform, createOwnedShapeCompilePlan, resetShapeQueryOwnerIds } from './compilePlan';
 import { type CutPlaneDef, cutPlane, getCollectedCutPlanes, resetCutPlanes } from './cutPlane';
 import { coalesceEdges, selectEdge, selectEdges } from './edgeQuery';
 import { chamferEdgeSegment, filletEdgeSegment } from './edgeSegmentFeatures';
-import { type ExplodeViewOptions, explodeView, getCollectedExplodeView, resetExplodeView } from './explodeView';
+import { type ExplodeViewOptions, explodeView, getCollectedExplodeView, resetExplodeView } from './assembly/explodeView';
 import { chamfer, draft, fillet, offsetSolid } from './fillet';
 import type { ToolpathData } from './gcode';
 import { GCodeBuilder, gcode } from './gcode';
 import { group, ShapeGroup } from './group';
-import { joint } from './joint';
-import { type CollectedJointsView, getCollectedJointsView, jointsView, resetJointsView } from './jointsView';
+import { joint } from './assembly/joint';
+import { type CollectedJointsView, getCollectedJointsView, jointsView, resetJointsView } from './assembly/jointsView';
 import {
   box,
   buildShapeFromCompilePlan,
