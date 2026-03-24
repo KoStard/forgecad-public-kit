@@ -554,22 +554,38 @@ CLAUDE.md updated with:
 
 ## Progress Tracker
 
-| # | Change | Status |
-|---|--------|--------|
-| — | Baseline audit + dependency analysis | ✅ Complete |
-| W1.A | Export module (`forge/export/`) | 🔲 |
-| W1.B | Mesh module (`forge/mesh/`) | 🔲 |
-| W1.C | Assembly module (`forge/assembly/`) | 🔲 |
-| W1.D | Scene module (`forge/scene/`) | 🔲 |
-| W2.A | Edge features module (`forge/edge-features/`) | 🔲 |
-| W2.B | Query module (`forge/query/`) | 🔲 |
-| W3.A | Split `library.ts` → `forge/lib/` | 🔲 |
-| W3.B | Split `report.ts` → `forge/report/` | 🔲 |
-| W3.C | Split `forgeStore.ts` → `src/store/` | 🔲 |
-| W3.D | Split `builder.ts` → mixins | 🔲 |
-| W4.A | Split Viewport.tsx + ViewPanel.tsx | 🔲 |
-| W4.B | Long method decomposition | 🔲 |
-| W4.C | Lint rules + enforcement | 🔲 |
+| # | Change | Commit | Status |
+|---|--------|--------|--------|
+| — | Baseline audit + dependency analysis | — | ✅ |
+| W1.D | Scene module (`forge/scene/`) | `98649de` | ✅ |
+| W1.B | Mesh module (`forge/mesh/`) | `ab9ec3c` | ✅ |
+| W1.C | Assembly module (`forge/assembly/`) | `588ae3a` | ✅ |
+| W1.A | Export module (`forge/export/`) | `47bfa59` | ✅ |
+| W2.A | Edge features module (`forge/edge-features/`) | `87b52ee` | ✅ |
+| W2.B | Query module (`forge/query/`) | `54de2f4` | ✅ |
+| W3.A | Split `library.ts` → `forge/lib/` | `c94a025` | ✅ |
+| W3.B | Split `report.ts` → `forge/report/` | `21a67e2` | ✅ |
+| W3.C | Split `forgeStore.ts` → action helpers | `7366ec8` | ✅ |
+| W3.D | Split `builder.ts` → method modules | `401b6d6` | ✅ |
+| W4.A | Split `gears.ts` → `forge/lib/gears/` | `ffe764f` | ✅ |
+| W4.B | Split `runner.ts` → `forge/runner/` | `4e7a3b0` | ✅ |
+| W4.C | Move face-tracking cluster | `964194a` | ✅ |
+| W4.D | Extract more forgeStore helpers | `0709296` | ✅ |
+| W5.A | Lint rules + enforcement | — | 🔲 |
+| W5.B | Split Viewport.tsx + ViewPanel.tsx | — | 🔲 |
+
+## Final Metrics (after 14 commits)
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Files in `src/forge/` root | 82 | 44 |
+| Domain subfolders | 3 | **14** |
+| `library.ts` | 2,848 lines | 11 lines (barrel) |
+| `report.ts` | 2,206 lines | 6 lines (barrel) |
+| `builder.ts` | 1,529 lines | 749 lines |
+| `forgeStore.ts` | 1,973 lines | 1,317 lines |
+| `gears.ts` | 1,514 lines | split into 8 files |
+| New tsc errors introduced | — | **0** |
 
 ---
 

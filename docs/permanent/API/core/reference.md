@@ -741,17 +741,6 @@ const sideVent = box(2, 30, 40, true).color('#666')
 
 ## Advanced 3D Operations
 
-### `hull3d(...args)`
-Convex hull of multiple shapes and/or points.
-
-```javascript
-const hull = hull3d(
-  sphere(10),
-  sphere(10).translate(50, 0, 0),
-  [25, 0, 30],  // bare point
-);
-```
-
 ### `levelSet(sdf, bounds, edgeLength, level?)`
 Create a shape from a signed distance function (SDF). Positive = inside.
 
@@ -804,7 +793,7 @@ Not supported yet:
 - tapered extrudes (`scaleTop`)
 - scale transforms before shelling
 - already-shelled results
-- general boolean, `revolve()`, `loft()`, `sweep()`, `sphere()`, hull, and plane-trim bases
+- general boolean, `revolve()`, `loft()`, `sweep()`, `sphere()`, and plane-trim bases
 
 Forge keeps `shell` as semantic compiler intent, then lowers it into backend-supported boolean/extrude/cylinder plans for both Manifold and CadQuery/OCCT.
 
@@ -1029,8 +1018,8 @@ Use these canonical files:
 - [sketch-primitives.md](sketch-primitives.md) - `rect`, `circle2d`, `roundedRect`, `polygon`, `ngon`, `ellipse`, `slot`, `star`
 - [sketch-path.md](sketch-path.md) - `path()` builder and `stroke(...)`
 - [sketch-transforms.md](sketch-transforms.md) - translate/rotate/scale/mirror for sketches
-- [sketch-booleans.md](sketch-booleans.md) - `union2d`/`difference2d`/`intersection2d`/`hull2d` and method forms
-- [sketch-operations.md](sketch-operations.md) - `offset`, `filletCorners`, `simplify`, `warp`, hull
+- [sketch-booleans.md](sketch-booleans.md) - `union2d`/`difference2d`/`intersection2d` and method forms
+- [sketch-operations.md](sketch-operations.md) - `offset`, `filletCorners`, `simplify`, `warp`
 - [sketch-on-face.md](sketch-on-face.md) - sketch placement on planar faces
 - [sketch-extrude.md](sketch-extrude.md) - `extrude` and `revolve`
 - [sketch-anchor.md](sketch-anchor.md) - 2D anchor-based positioning
