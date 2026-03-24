@@ -257,6 +257,6 @@ export function offsetSolid(shape: ShapeArg, thickness: number): Shape {
   };
 
   return buildShapeFromCompilePlan(plan, target.colorHex, {
-    sources: ['offsetSolid'],
+    sources: ['offset-solid'],
   });
 }

@@ -322,7 +322,7 @@ export function loft(profiles: Sketch[], heights: number[], options: LoftOptions
   const ownedPlan = createOwnedShapeCompilePlan(plan, 'loft')!;
   const isOCCT = getActiveBackend() === 'occt';
   return buildShapeFromCompilePlan(ownedPlan, pairs[0]?.profile.colorHex, {
-    fidelity: isOCCT ? 'exact' : 'sampled',
+    fidelity: isOCCT ? 'kernel-native' : 'sampled',
     sources: isOCCT ? ['loft'] : ['loft', 'level-set'],
   });
 }
@@ -387,7 +387,7 @@ export function sweep(profile: Sketch, path: Curve3D | Vec3[], options: SweepOpt
   const ownedPlan = createOwnedShapeCompilePlan(plan, 'sweep')!;
   const isOCCTSweep = getActiveBackend() === 'occt';
   return buildShapeFromCompilePlan(ownedPlan, profile.colorHex, {
-    fidelity: isOCCTSweep ? 'exact' : 'sampled',
+    fidelity: isOCCTSweep ? 'kernel-native' : 'sampled',
     sources: isOCCTSweep ? ['sweep'] : ['sweep', 'level-set'],
   });
 }

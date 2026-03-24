@@ -396,7 +396,10 @@ function resolvePropagatedEdgeQueryAtOwnerBase(ownerBase: ShapeCompilePlan, ref:
     ownerBase.kind === 'queryOwner' ||
     ownerBase.kind === 'filletEdges' ||
     ownerBase.kind === 'chamferEdges' ||
-    ownerBase.kind === 'importedMesh'
+    ownerBase.kind === 'importedMesh' ||
+    ownerBase.kind === 'torus' ||
+    ownerBase.kind === 'draft' ||
+    ownerBase.kind === 'offsetSolid'
   ) {
     return edgeIssue(
       'edge-query-propagation-mismatch',
@@ -712,7 +715,10 @@ function resolveEdgeChainAtOwnerBase(ownerBase: ShapeCompilePlan, ref: Propagate
     ownerBase.kind === 'queryOwner' ||
     ownerBase.kind === 'filletEdges' ||
     ownerBase.kind === 'chamferEdges' ||
-    ownerBase.kind === 'importedMesh'
+    ownerBase.kind === 'importedMesh' ||
+    ownerBase.kind === 'torus' ||
+    ownerBase.kind === 'draft' ||
+    ownerBase.kind === 'offsetSolid'
   ) {
     return {
       kind: 'unsupported',
@@ -766,7 +772,10 @@ function resolveCreatedEdgeChainAtOwnerBase(
     ownerBase.kind === 'queryOwner' ||
     ownerBase.kind === 'filletEdges' ||
     ownerBase.kind === 'chamferEdges' ||
-    ownerBase.kind === 'importedMesh'
+    ownerBase.kind === 'importedMesh' ||
+    ownerBase.kind === 'torus' ||
+    ownerBase.kind === 'draft' ||
+    ownerBase.kind === 'offsetSolid'
   ) {
     return {
       kind: 'unsupported',

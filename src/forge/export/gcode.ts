@@ -22,8 +22,6 @@ export interface PrinterProfile {
   nozzle?: number;
   /** Filament diameter in mm. Default: 1.75 */
   filament?: number;
-  /** Filament type string for slicer metadata. Default: 'PLA' */
-  filamentType?: string;
   /** Layer height in mm. Default: 0.2 */
   layerHeight?: number;
   /** Default print speed in mm/min. Default: 1800 (30 mm/s) */
@@ -98,7 +96,6 @@ const DEFAULT_PROFILE: ResolvedProfile = {
   retractionDistance: 1.0,
   retractionSpeed: 2700,
   printer: 'generic',
-  filamentType: 'PLA',
   filamentColor: '#FFFFFF',
 };
 

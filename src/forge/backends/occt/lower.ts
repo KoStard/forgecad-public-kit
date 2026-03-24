@@ -912,8 +912,6 @@ function _lowerShapeCompilePlanToOCCTInner(plan: ShapeCompilePlan, oc?: OCCTModu
         `importMesh("${plan.filePath}") is not supported with the OCCT backend. ` +
           'Switch to the Manifold backend or use the default backend.',
       );
-    case 'hull':
-      throw new OCCTUnsupportedError('hull');
   }
 }
 
