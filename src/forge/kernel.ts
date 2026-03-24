@@ -54,6 +54,8 @@ import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from '.
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { type Mat4, type RotateAroundToOptions, solveRotateAroundAngle, Transform, type Vec3 } from './transform';
+import type { PortInput, PortMap } from './port';
+import { normalizePortMapInput, clonePortMap, hasAnyPorts, mergePortMaps, transformPortMap } from './port';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -115,6 +117,8 @@ export type GeometrySource =
   | 'loft'
   | 'sweep'
   | 'deform'
+  | 'draft'
+  | 'offset-solid'
   | 'imported'
   | 'unknown';
 
@@ -158,6 +162,7 @@ const _shapeDimensions = new WeakMap<Shape, ShapeDimension[]>();
 const _shapeGeometryInfo = new WeakMap<Shape, GeometryInfo>();
 const _shapeCompilePlans = new WeakMap<Shape, ShapeCompilePlan>();
 const _shapePlacementRefs = new WeakMap<Shape, PlacementReferences>();
+const _shapePorts = new WeakMap<Shape, PortMap>();
 const _shapeRuntimeBackends = new WeakMap<Shape, ShapeBackend>();
 let _shapeDimensionCounter = 0;
 
@@ -225,6 +230,19 @@ function setShapePlacementRefsInternal(shape: Shape, refs: PlacementReferences):
     _shapePlacementRefs.delete(shape);
   }
   return shape;
+}
+
+function setShapePortsInternal(shape: Shape, ports: PortMap): Shape {
+  if (hasAnyPorts(ports)) {
+    _shapePorts.set(shape, clonePortMap(ports));
+  } else {
+    _shapePorts.delete(shape);
+  }
+  return shape;
+}
+
+function getShapePortsInternal(shape: Shape): PortMap {
+  return clonePortMap(_shapePorts.get(shape) ?? {});
 }
 
 function getShapeGeometryInfoInternal(shape: Shape): GeometryInfo {
@@ -483,6 +501,7 @@ function withCopiedDimensions(source: Shape, out: Shape): Shape {
   setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(source), true));
   setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(source));
   setShapePlacementRefsInternal(out, getShapePlacementRefsInternal(source));
+  setShapePortsInternal(out, getShapePortsInternal(source));
   if (source.materialProps) out.materialProps = { ...source.materialProps };
   return setShapeCompilePlanInternal(out, getShapeCompilePlanInternal(source));
 }
@@ -496,6 +515,7 @@ function withTransformedDimensions(source: Shape, out: Shape, m: Mat4): Shape {
   }
   setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(source));
   setShapePlacementRefsInternal(out, transformPlacementReferences(getShapePlacementRefsInternal(source), m));
+  setShapePortsInternal(out, transformPortMap(getShapePortsInternal(source), m));
   if (source.materialProps) out.materialProps = { ...source.materialProps };
   return setShapeCompilePlanInternal(out, getShapeCompilePlanInternal(source));
 }
@@ -506,6 +526,7 @@ function withMergedDimensions(sources: Shape[], out: Shape): Shape {
   const baseInfo = sources.length > 0 ? getShapeGeometryInfoInternal(sources[0]) : DEFAULT_GEOMETRY_INFO;
   setShapeGeometryInfoInternal(out, baseInfo);
   setShapePlacementRefsInternal(out, mergePlacementReferences(...sources.map((shape) => getShapePlacementRefsInternal(shape))));
+  setShapePortsInternal(out, mergePortMaps(...sources.map((shape) => getShapePortsInternal(shape))));
   if (sources.length > 0) {
     setShapeCompilePlanInternal(out, getShapeCompilePlanInternal(sources[0]));
     if (sources[0].materialProps) out.materialProps = { ...sources[0].materialProps };
@@ -517,6 +538,7 @@ function withBaseDimensions(base: Shape, out: Shape): Shape {
   setShapeDimensionsInternal(out, cloneDimensions(getShapeDimensionsInternal(base), true));
   setShapeGeometryInfoInternal(out, getShapeGeometryInfoInternal(base));
   setShapePlacementRefsInternal(out, getShapePlacementRefsInternal(base));
+  setShapePortsInternal(out, getShapePortsInternal(base));
   return setShapeCompilePlanInternal(out, getShapeCompilePlanInternal(base));
 }
 
@@ -553,6 +575,10 @@ export function setShapePlacementReferences(shape: Shape, refs: PlacementReferen
 
 export function getShapePlacementReferences(shape: Shape): PlacementReferences {
   return getShapePlacementRefsInternal(shape);
+}
+
+export function getShapePorts(shape: Shape): PortMap {
+  return getShapePortsInternal(shape);
 }
 
 export function getShapeRuntimeBackend(shape: Shape): ShapeBackend {
@@ -721,6 +747,20 @@ export class Shape {
   /** List named placement references carried by this shape. */
   referenceNames(kind?: PlacementReferenceKind): string[] {
     return placementReferenceNames(getShapePlacementRefsInternal(this), kind);
+  }
+
+  /** Attach named assembly ports (origin + axis + up) that survive transforms and imports. */
+  withPorts(ports: Record<string, PortInput>): Shape {
+    const out = this.clone();
+    const existing = getShapePortsInternal(this);
+    const incoming = normalizePortMapInput(ports);
+    setShapePortsInternal(out, mergePortMaps(existing, incoming));
+    return out;
+  }
+
+  /** List named port identifiers carried by this shape. */
+  portNames(): string[] {
+    return Object.keys(getShapePortsInternal(this)).sort();
   }
 
   /** Resolve a named placement reference or built-in anchor to a 3D point. */

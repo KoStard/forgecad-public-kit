@@ -29,6 +29,91 @@ const solved = mech.solve();
 return solved.toScene();
 ```
 
+## Port-based assembly (recommended for mechanisms)
+
+Instead of manually computing `frame` and `axis`, declare **ports** on parts and let `connect()` align them automatically.
+
+### Declaring ports
+
+A port is an oriented attachment frame: origin + axis + up vector, in part-local coordinates.
+
+```javascript
+const base = box(80, 80, 20, true).withPorts({
+  top: port.revolute({
+    origin: [0, 0, 10],
+    axis: [0, 0, 1],      // joint rotation axis
+    up: [0, 1, 0],         // zero-angle reference (optional, auto-computed if omitted)
+  }),
+});
+
+const arm = box(120, 20, 20).translate(60, 0, 0).withPorts({
+  shoulder: port.revolute({ origin: [0, 0, 0], axis: [0, 0, 1] }),
+  elbow: port.revolute({ origin: [120, 0, 0], axis: [0, 0, 1] }),
+});
+```
+
+Port factories: `port.revolute(...)`, `port.prismatic(...)`, `port.fixed(...)`, or generic `port(...)`.
+
+Ports survive transforms — if you `translate()` or `rotate()` a shape, its ports move with it.
+
+### Connecting parts
+
+```javascript
+const mech = assembly("Arm")
+  .addPart("Base", base)
+  .addPart("Link", arm)
+  .connect("Base.top", "Link.shoulder", {
+    as: "J1",              // joint name (auto-generated if omitted)
+    min: -90, max: 90,     // optional limits
+    default: 0,            // optional default angle
+  });
+
+const solved = mech.solve({ J1: 45 });
+return solved.toScene();
+```
+
+`connect()` computes the joint `frame` and `axis` from port alignment, then delegates to `addJoint()` internally. The kinematic solver is unchanged.
+
+**ConnectOptions:** `as`, `type` (override port kind), `min`, `max`, `default`, `unit`, `flip` (oppose axes), `effort`, `velocity`, `damping`, `friction`.
+
+### Derived jointsView
+
+Instead of manually restating the kinematic chain for `jointsView()`, derive it from the assembly graph:
+
+```javascript
+mech.toJointsView({
+  defaults: { J1: 30 },
+  animations: [
+    {
+      name: "Swing",
+      duration: 2,
+      loop: true,
+      keyframes: [
+        { at: 0, values: { J1: -45 } },
+        { at: 0.5, values: { J1: 45 } },
+        { at: 1, values: { J1: -45 } },
+      ],
+    },
+  ],
+});
+```
+
+`toJointsView()` solves the assembly at rest, computes world-space pivots and axes, and calls the existing `jointsView()` function. No manual pivot coordinates needed.
+
+### Port API on shapes
+
+- `shape.withPorts({ name: port.revolute({...}) })` — attach ports (returns new shape)
+- `shape.portNames()` — list port names
+- Works on `Shape`, `TrackedShape`, and `ShapeGroup`
+
+### Port API on assemblies
+
+- `assembly.withPorts("PartName", { name: port.revolute({...}) })` — add ports to an existing part
+- `assembly.getPorts("PartName")` — get ports on a part
+- `assembly.getPort("Part.port")` — resolve a "Part.port" reference
+- Ports from imported parts are captured automatically in `addPart()`
+- Ports are forwarded through `mergeInto()` with the prefix
+
 ## Ergonomic helpers
 - `addFrame(name, { transform? })` adds a virtual reference frame (no geometry)
 - `addRevolute(name, parent, child, opts)` shorthand for `addJoint(..., "revolute", ...)`

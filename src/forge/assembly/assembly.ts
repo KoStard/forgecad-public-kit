@@ -6,8 +6,17 @@ import { createContext, solve3D } from '../constraints3d/solver';
 import type { Constraint3D, RigidBody, Solve3DResult, Solver3DContext } from '../constraints3d/types';
 import type { ExplodeViewDirective } from './explodeView';
 import { explodeView } from './explodeView';
-import { group, ShapeGroup } from '../group';
-import { getShapeRuntimeBackend, Shape, union } from '../kernel';
+import { group, ShapeGroup, getShapeGroupPorts } from '../group';
+import { getShapeRuntimeBackend, getShapePorts, Shape, union } from '../kernel';
+import type { PortInput, PortMap, PortDef } from '../port';
+import { normalizePortMapInput, clonePortMap, mergePortMaps, computeConnectFrame } from '../port';
+import {
+  jointsView as jointsViewFn,
+  type JointViewInput,
+  type JointViewType,
+  type JointViewAnimationInput,
+  type JointViewCouplingInput,
+} from './jointsView';
 import {
   applyPlacementReferenceInput,
   clonePlacementReferences,
@@ -549,12 +558,37 @@ export class SolvedAssembly {
   }
 }
 
+export interface ConnectOptions {
+  as?: string;
+  type?: JointType;
+  min?: number;
+  max?: number;
+  default?: number;
+  unit?: string;
+  flip?: boolean;
+  effort?: number;
+  velocity?: number;
+  damping?: number;
+  friction?: number;
+}
+
+export interface ToJointsViewOptions {
+  defaults?: Record<string, number>;
+  overrides?: Record<string, Partial<JointViewInput>>;
+  animations?: JointViewAnimationInput[];
+  couplings?: JointViewCouplingInput[];
+  defaultAnimation?: string;
+  enabled?: boolean;
+}
+
 export class Assembly {
   private readonly parts = new Map<string, PartRecord>();
   private readonly joints = new Map<string, JointRecord>();
   private readonly jointCouplings = new Map<string, JointCouplingRecord>();
   private readonly _mateFns: Array<(m: MateBuilder) => void> = [];
   private _refs: PlacementReferences = createPlacementReferences();
+  private readonly _portsByPart = new Map<string, PortMap>();
+  private _connectCounter = 0;
 
   constructor(public readonly name = 'Assembly') {}
 
@@ -585,6 +619,74 @@ export class Assembly {
     return clonePlacementReferences(this._refs);
   }
 
+  /**
+   * Attach named ports to a specific part or the assembly root.
+   * Ports declared this way are in the part's local coordinate system.
+   */
+  withPorts(partName: string, ports: Record<string, PortInput>): Assembly;
+  withPorts(ports: Record<string, PortInput>): Assembly;
+  withPorts(partNameOrPorts: string | Record<string, PortInput>, maybePorts?: Record<string, PortInput>): Assembly {
+    if (typeof partNameOrPorts === 'string') {
+      const partName = partNameOrPorts;
+      const ports = maybePorts!;
+      if (!this.parts.has(partName)) throw new Error(`Unknown part "${partName}" — add it with addPart() first`);
+      const existing = this._portsByPart.get(partName) ?? {};
+      this._portsByPart.set(partName, mergePortMaps(existing, normalizePortMapInput(ports)));
+      return this;
+    }
+    // Assembly-level ports (for the assembly itself when used as a sub-assembly)
+    const ports = partNameOrPorts;
+    const normalized = normalizePortMapInput(ports);
+    // Store under a special key — the assembly name
+    const existing = this._portsByPart.get('__assembly__') ?? {};
+    this._portsByPart.set('__assembly__', mergePortMaps(existing, normalized));
+    return this;
+  }
+
+  /** Get ports declared on a part (in part-local space). */
+  getPorts(partName: string): PortMap {
+    return clonePortMap(this._portsByPart.get(partName) ?? {});
+  }
+
+  /** @internal — set already-normalized ports directly (used by mergeInto). */
+  _setPortsDirect(partName: string, ports: PortMap): void {
+    const existing = this._portsByPart.get(partName) ?? {};
+    this._portsByPart.set(partName, mergePortMaps(existing, ports));
+  }
+
+  /** @internal — get all port maps, keyed by part name. */
+  getAllPorts(): Map<string, PortMap> {
+    const out = new Map<string, PortMap>();
+    for (const [key, ports] of this._portsByPart) {
+      out.set(key, clonePortMap(ports));
+    }
+    return out;
+  }
+
+  /**
+   * Parse a "PartName.portName" reference and return the resolved port.
+   * Throws descriptive errors if the part or port doesn't exist.
+   */
+  getPort(ref: string): { partName: string; portName: string; port: PortDef } {
+    const dotIdx = ref.indexOf('.');
+    if (dotIdx < 0) throw new Error(`Port reference "${ref}" must use "PartName.portName" format`);
+    const partName = ref.slice(0, dotIdx);
+    const portName = ref.slice(dotIdx + 1);
+    if (!partName || !portName) throw new Error(`Port reference "${ref}" must use "PartName.portName" format`);
+    if (!this.parts.has(partName)) {
+      throw new Error(`Port reference "${ref}": no part named "${partName}". Available: ${[...this.parts.keys()].join(', ')}`);
+    }
+    const ports = this._portsByPart.get(partName);
+    if (!ports || !(portName in ports)) {
+      const available = ports ? Object.keys(ports) : [];
+      throw new Error(
+        `Port reference "${ref}": no port "${portName}" on part "${partName}".` +
+        (available.length > 0 ? ` Available: ${available.join(', ')}` : ' No ports declared on this part.'),
+      );
+    }
+    return { partName, portName, port: { ...ports[portName], origin: [...ports[portName].origin] as Vec3, axis: [...ports[portName].axis] as Vec3, up: [...ports[portName].up] as Vec3 } };
+  }
+
   /** Add a virtual reference frame (no geometry) to the assembly graph. */
   addFrame(name: string, options: PartOptions = {}): Assembly {
     return this.addPart(name, group(), options);
@@ -598,6 +700,18 @@ export class Assembly {
       base: options.transform ? Transform.from(options.transform) : Transform.identity(),
       metadata: options.metadata ? { ...options.metadata } : undefined,
     });
+    // Capture ports from the incoming part
+    let ports: PortMap = {};
+    if (part instanceof Shape) {
+      ports = getShapePorts(part);
+    } else if (part instanceof ShapeGroup) {
+      ports = getShapeGroupPorts(part);
+    } else if (part instanceof TrackedShape) {
+      ports = getShapePorts(part.toShape());
+    }
+    if (Object.keys(ports).length > 0) {
+      this._portsByPart.set(name, clonePortMap(ports));
+    }
     return this;
   }
 
@@ -646,6 +760,66 @@ export class Assembly {
 
   addFixed(name: string, parent: string, child: string, options: JointOptions = {}): Assembly {
     return this.addJoint(name, 'fixed', parent, child, options);
+  }
+
+  /**
+   * Connect two parts by aligning their declared ports.
+   *
+   * `parentPortRef` and `childPortRef` use "PartName.portName" format.
+   * The system computes the joint frame and axis automatically from port alignment.
+   *
+   * ```javascript
+   * const mech = assembly("Arm")
+   *   .addPart("Base", base)
+   *   .addPart("Link", link)
+   *   .connect("Base.top", "Link.bottom", { as: "J1", type: "revolute" });
+   * ```
+   */
+  connect(parentPortRef: string, childPortRef: string, options: ConnectOptions = {}): Assembly {
+    const parent = this.getPort(parentPortRef);
+    const child = this.getPort(childPortRef);
+
+    if (parent.partName === child.partName) {
+      throw new Error(`connect(): both ports refer to the same part "${parent.partName}"`);
+    }
+
+    // Determine joint type
+    const jointType: JointType = options.type
+      ?? child.port.kind
+      ?? parent.port.kind
+      ?? 'revolute';
+
+    // Determine joint name
+    const jointName = options.as ?? `${parent.partName}_${child.partName}_${this._connectCounter++}`;
+
+    // Get child part's base transform
+    const childRecord = this.parts.get(child.partName)!;
+    const childBase = childRecord.base;
+
+    // Compute frame and axis from port alignment
+    const { frame, axis } = computeConnectFrame(
+      childBase,
+      child.port,
+      parent.port,
+      options.flip ?? false,
+    );
+
+    // Determine limits (options override port hints)
+    const min = options.min ?? child.port.min ?? parent.port.min;
+    const max = options.max ?? child.port.max ?? parent.port.max;
+
+    return this.addJoint(jointName, jointType, parent.partName, child.partName, {
+      frame,
+      axis,
+      min,
+      max,
+      default: options.default,
+      unit: options.unit,
+      effort: options.effort,
+      velocity: options.velocity,
+      damping: options.damping,
+      friction: options.friction,
+    });
   }
 
   addJointCoupling(jointName: string, options: JointCouplingOptions): Assembly {
@@ -970,6 +1144,73 @@ export class Assembly {
     return frames;
   }
 
+  /**
+   * Derive `jointsView()` configuration from this assembly's joint graph and call it.
+   *
+   * Computes world-space pivots and axes from the solved rest pose, so you don't
+   * have to manually restate joint kinematics for the viewport runtime.
+   */
+  toJointsView(options: ToJointsViewOptions = {}): void {
+    // Solve at rest to get world transforms for all parts
+    const restState: JointState = {};
+    const solved = this.solve(restState);
+    const def = this.describe();
+
+    const joints: JointViewInput[] = [];
+    for (const j of def.joints) {
+      if (j.type === 'fixed') continue;
+
+      const parentWorld = solved.getTransform(j.parent);
+
+      // Pivot: the joint frame origin mapped to world space
+      const pivot = parentWorld.point(j.frame.point([0, 0, 0]));
+
+      // Axis: the joint axis mapped through the frame then to world space
+      // motionTransform uses axis in intermediate space; frame maps that to parent-local;
+      // parentWorld maps parent-local to world.
+      const axisWorld = parentWorld.vector(j.frame.vector(j.axis));
+      const axisLen = Math.hypot(axisWorld[0], axisWorld[1], axisWorld[2]);
+      const normalizedAxis: Vec3 = axisLen > 1e-10
+        ? [axisWorld[0] / axisLen, axisWorld[1] / axisLen, axisWorld[2] / axisLen]
+        : j.axis;
+
+      const entry: JointViewInput = {
+        name: j.name,
+        child: j.child,
+        parent: j.parent,
+        type: j.type as JointViewType,
+        axis: normalizedAxis as [number, number, number],
+        pivot: pivot as [number, number, number],
+        min: j.min,
+        max: j.max,
+        default: options.defaults?.[j.name] ?? j.defaultValue,
+        unit: j.unit,
+      };
+
+      // Apply per-joint overrides
+      if (options.overrides?.[j.name]) {
+        Object.assign(entry, options.overrides[j.name]);
+      }
+
+      joints.push(entry);
+    }
+
+    // Derive couplings from assembly couplings
+    const couplings: JointViewCouplingInput[] = options.couplings ?? def.jointCouplings.map((c) => ({
+      joint: c.joint,
+      terms: c.terms.map((t) => ({ joint: t.joint, ratio: t.ratio })),
+      offset: c.offset,
+    }));
+
+    jointsViewFn({
+      enabled: options.enabled ?? true,
+      joints,
+      couplings: couplings.length > 0 ? couplings : undefined,
+      animations: options.animations,
+      defaultAnimation: options.defaultAnimation,
+    });
+  }
+
   describe(): AssemblyDefinition {
     return {
       name: this.name,
@@ -1193,6 +1434,16 @@ export class ImportedAssembly {
         terms: c.terms.map((t) => ({ joint: `${pfx}${t.joint}`, ratio: t.ratio })),
         offset: c.offset,
       });
+    }
+
+    // Forward ports from the sub-assembly parts to the parent with prefix.
+    const allPorts = this._assembly.getAllPorts();
+    for (const [partName, ports] of allPorts) {
+      if (partName === '__assembly__') continue;
+      const prefixedName = `${pfx}${partName}`;
+      if (Object.keys(ports).length > 0) {
+        parent._setPortsDirect(prefixedName, ports);
+      }
     }
 
     // Wire the mount joint: parent part → sub-assembly root.

@@ -9,6 +9,7 @@
 
 import './holeCut';
 import { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly/assembly';
+import { port } from './port';
 import { type BomDef, bom, getCollectedBom, resetBom } from './bom';
 import type { ShapeCompilePlan } from './compilePlan';
 import { appendShapeCompileTransform, createOwnedShapeCompilePlan, resetShapeQueryOwnerIds } from './compilePlan';
@@ -561,6 +562,7 @@ function executeFile(
       composeChain,
       assembly,
       Assembly,
+      port,
       SolvedAssembly,
       bomToCsv,
       intersectWithPlane,

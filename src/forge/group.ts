@@ -18,6 +18,8 @@ import {
   resolvePlacementReferencePoint,
   transformPlacementReferences,
 } from './placement';
+import type { PortInput, PortMap } from './port';
+import { normalizePortMapInput, clonePortMap, hasAnyPorts, mergePortMaps, transformPortMap } from './port';
 import { Sketch } from './sketch/core';
 import { TrackedShape } from './sketch/topology';
 import { type Mat4, type RotateAroundToOptions, Transform } from './transform';
@@ -36,6 +38,7 @@ export type GroupInput = GroupChild | NamedGroupChild;
 // --- Placement reference storage ---
 
 const _groupPlacementRefs = new WeakMap<ShapeGroup, PlacementReferences>();
+const _groupPorts = new WeakMap<ShapeGroup, PortMap>();
 
 function getGroupRefs(g: ShapeGroup): PlacementReferences {
   return _groupPlacementRefs.get(g) ?? createPlacementReferences();
@@ -60,6 +63,37 @@ function transformGroupRefs(source: ShapeGroup, dest: ShapeGroup, matrix: Mat4):
     setGroupRefs(dest, transformPlacementReferences(refs, matrix));
   }
   return dest;
+}
+
+// --- Port storage ---
+
+function getGroupPorts(g: ShapeGroup): PortMap {
+  return _groupPorts.get(g) ?? {};
+}
+
+function setGroupPorts(g: ShapeGroup, ports: PortMap): ShapeGroup {
+  if (hasAnyPorts(ports)) {
+    _groupPorts.set(g, clonePortMap(ports));
+  } else {
+    _groupPorts.delete(g);
+  }
+  return g;
+}
+
+function copyGroupPorts(source: ShapeGroup, dest: ShapeGroup): ShapeGroup {
+  return setGroupPorts(dest, getGroupPorts(source));
+}
+
+function transformGroupPortsHelper(source: ShapeGroup, dest: ShapeGroup, matrix: Mat4): ShapeGroup {
+  const ports = getGroupPorts(source);
+  if (hasAnyPorts(ports)) {
+    setGroupPorts(dest, transformPortMap(ports, matrix));
+  }
+  return dest;
+}
+
+export function getShapeGroupPorts(g: ShapeGroup): PortMap {
+  return clonePortMap(getGroupPorts(g));
 }
 
 // --- Transform helpers ---
@@ -181,12 +215,14 @@ export class ShapeGroup {
   /** Apply fn to all children, producing a new ShapeGroup that also copies placement refs. */
   private mapChildren(fn: (child: GroupChild) => GroupChild): ShapeGroup {
     const next = new ShapeGroup(this.children.map(fn), this.childNames);
+    copyGroupPorts(this, next);
     return copyGroupRefs(this, next);
   }
 
   /** Apply fn to all children and also transform placement refs by the given matrix. */
   private mapChildrenTransform(fn: (child: GroupChild) => GroupChild, matrix: Mat4): ShapeGroup {
     const next = new ShapeGroup(this.children.map(fn), this.childNames);
+    transformGroupPortsHelper(this, next, matrix);
     return transformGroupRefs(this, next, matrix);
   }
 
@@ -406,6 +442,7 @@ export class ShapeGroup {
       }),
       this.childNames,
     );
+    transformGroupPortsHelper(this, next, matrix);
     return transformGroupRefs(this, next, matrix);
   }
 
@@ -462,6 +499,20 @@ export class ShapeGroup {
   /** List named placement references carried by this group. */
   referenceNames(kind?: PlacementReferenceKind): string[] {
     return placementReferenceNames(getGroupRefs(this), kind);
+  }
+
+  /** Attach named assembly ports (origin + axis + up) that survive transforms. */
+  withPorts(ports: Record<string, PortInput>): ShapeGroup {
+    const next = new ShapeGroup(this.children, this.childNames);
+    copyGroupRefs(this, next);
+    const existing = getGroupPorts(this);
+    const incoming = normalizePortMapInput(ports);
+    return setGroupPorts(next, mergePortMaps(existing, incoming));
+  }
+
+  /** List named port identifiers carried by this group. */
+  portNames(): string[] {
+    return Object.keys(getGroupPorts(this)).sort();
   }
 
   /**

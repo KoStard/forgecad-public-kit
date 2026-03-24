@@ -9,6 +9,7 @@
  */
 
 import type { FaceDescendantMetadata } from '../face-tracking/descendantResolution';
+import type { PortInput } from '../port';
 import {
   type GeometryInfo,
   getShapePrimaryQueryOwner,
@@ -161,6 +162,21 @@ export class TrackedShape {
   /** Attach named placement references that survive normal transforms and imports. */
   withReferences(refs: PlacementReferenceInput): TrackedShape {
     return new TrackedShape(this.shape.withReferences(refs), cloneTopology(this.topology), this.baseHeight, this.extrudeUp);
+  }
+
+  /** Attach named assembly ports (origin + axis + up) that survive transforms and imports. */
+  withPorts(ports: Record<string, PortInput>): TrackedShape {
+    return new TrackedShape(
+      this.shape.withPorts(ports),
+      cloneTopology(this.topology),
+      this.baseHeight,
+      this.extrudeUp,
+    );
+  }
+
+  /** List named port identifiers carried by this shape. */
+  portNames(): string[] {
+    return this.shape.portNames();
   }
 
   /** List named placement references carried by this tracked shape. */

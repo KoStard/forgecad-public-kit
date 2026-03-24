@@ -19,6 +19,8 @@ export {
   type JointSweepFrame,
   type MateMetadata,
   type MergeIntoOptions,
+  type ConnectOptions,
+  type ToJointsViewOptions,
   bomToCsv,
   SolvedAssembly,
   Assembly,
