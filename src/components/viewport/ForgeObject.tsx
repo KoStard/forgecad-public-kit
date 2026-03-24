@@ -1,7 +1,7 @@
 import type { CutPlaneDef } from '@forge/cutPlane';
 import type { SceneObject } from '@forge/index';
 import { intersectWithPlane } from '@forge/index';
-import { shapeToGeometry } from '@forge/meshToGeometry';
+import { shapeToGeometry } from '@forge/mesh/meshToGeometry';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';

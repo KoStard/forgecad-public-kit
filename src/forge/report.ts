@@ -1,6 +1,6 @@
 import type { BomDef } from './bom';
 import type { Shape } from './kernel';
-import { shapeToGeometry } from './meshToGeometry';
+import { shapeToGeometry } from './mesh/meshToGeometry';
 import {
   type ColorRgb,
   commandLine,

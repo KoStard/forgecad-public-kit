@@ -1,5 +1,5 @@
 import { buildShapeFromCompilePlan } from '@forge/kernel';
-import { shapeToGeometry } from '@forge/meshToGeometry';
+import { shapeToGeometry } from '@forge/mesh/meshToGeometry';
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useForgeStore } from '../../store/forgeStore';

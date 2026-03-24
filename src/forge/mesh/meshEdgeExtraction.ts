@@ -6,7 +6,7 @@
  * but returns rich EdgeSegment objects instead of flat Float32Arrays.
  */
 
-import type { Vec3 } from './transform';
+import type { Vec3 } from '../transform';
 
 export interface EdgeSegment {
   /** Stable index within the extraction (deterministic for a given mesh). */

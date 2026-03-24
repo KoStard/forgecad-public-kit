@@ -8,9 +8,9 @@ import {
 } from '../../compilePlan';
 import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolution';
 import { lowerCutShapeCompilePlanToConcretePlan, lowerHoleShapeCompilePlanToConcretePlan } from '../../holeCutCompilePlan';
-import { type EdgeSegment, extractEdgeSegments } from '../../meshEdgeExtraction';
-import type { MeshFormat } from '../../meshParsers';
-import { parseMeshFile } from '../../meshParsers';
+import { type EdgeSegment, extractEdgeSegments } from '../../mesh/meshEdgeExtraction';
+import type { MeshFormat } from '../../mesh/meshParsers';
+import { parseMeshFile } from '../../mesh/meshParsers';
 import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
 import type { EdgeFeatureTarget, ShapeBackend } from '../../shapeBackend';
 import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';

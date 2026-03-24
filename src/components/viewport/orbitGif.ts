@@ -1,5 +1,5 @@
 import type { RunResult } from '@forge/index';
-import { shapeToGeometry } from '@forge/meshToGeometry';
+import { shapeToGeometry } from '@forge/mesh/meshToGeometry';
 import * as THREE from 'three';
 import type { ObjectSettings } from '../../store/forgeStore';
 import type { OrbitGifMode } from '../exportActions';

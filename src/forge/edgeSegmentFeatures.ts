@@ -28,7 +28,7 @@ import {
   setShapeGeometryInfo,
   setShapePlacementReferences,
 } from './kernel';
-import type { EdgeSegment } from './meshEdgeExtraction';
+import type { EdgeSegment } from './mesh/meshEdgeExtraction';
 import type { ShapeBackend } from './shapeBackend';
 import { TrackedShape } from './sketch/topology';
 import type { Vec3 } from './transform';

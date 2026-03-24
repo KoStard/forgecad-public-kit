@@ -13,8 +13,8 @@
  */
 
 import * as THREE from 'three';
-import { FrozenShape } from './frozenShape';
-import type { Shape } from './kernel';
+import { FrozenShape } from '../frozenShape';
+import type { Shape } from '../kernel';
 
 export interface ForgeGeometry {
   solid: THREE.BufferGeometry;

@@ -39,7 +39,7 @@ import {
   union,
 } from './kernel';
 import { partLibrary } from './library';
-import { detectMeshFormat } from './meshParsers';
+import { detectMeshFormat } from './mesh/meshParsers';
 import { boolParam, getCollectedParams, type ParamDef, param, resetParams, runWithParamScope } from './params';
 import { type ForgeQualityPreset, resolveForgeQualityPreset, runWithForgeQuality } from './quality';
 import { type CollectedRobotExport, getCollectedRobotExport, resetRobotExport, robotExport } from './robotExport';

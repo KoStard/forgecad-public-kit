@@ -4,7 +4,7 @@
  */
 
 import type { SceneObject } from '@forge/index';
-import { shapeToGeometry } from '@forge/meshToGeometry';
+import { shapeToGeometry } from '@forge/mesh/meshToGeometry';
 import { getSketchWorldMatrix } from '@forge/sketch/placement3d';
 import { Environment, Grid, Lightformer, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';

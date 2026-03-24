@@ -15,7 +15,7 @@
 import type { ShapeCompilePlan } from './compilePlan';
 import { type EdgeQuery, selectEdges } from './edgeQuery';
 import { buildShapeFromCompilePlan, getShapeCompilePlan, Shape } from './kernel';
-import type { EdgeSegment } from './meshEdgeExtraction';
+import type { EdgeSegment } from './mesh/meshEdgeExtraction';
 import type { EdgeFeatureTarget } from './shapeBackend';
 import { TrackedShape } from './sketch/topology';
 

@@ -103,8 +103,8 @@ export {
   union,
 } from './kernel';
 export { partLibrary } from './library';
-export type { ForgeGeometry } from './meshToGeometry';
-export { shapeToGeometry } from './meshToGeometry';
+export type { ForgeGeometry } from './mesh/meshToGeometry';
+export { shapeToGeometry } from './mesh/meshToGeometry';
 export type { ParamDef } from './params';
 export { boolParam, getCollectedParams, param, resetParams, setParamOverrides } from './params';
 export type { ForgeQualityPreset, ForgeQualityProfile } from './quality';

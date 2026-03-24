@@ -7,7 +7,7 @@
  */
 
 import type { SerializedRunResult, SerializedSceneObject, SerializedShapeData, SerializedSketchData } from '../workers/evalWorkerProtocol';
-import { computeGeometryArrays } from './geometryArrays';
+import { computeGeometryArrays } from './mesh/geometryArrays';
 import { getShapeCompilePlan } from './kernel';
 import type { RunResult, SceneObject } from './runner';
 import { isConstraintSketch } from './sketch/constraints';

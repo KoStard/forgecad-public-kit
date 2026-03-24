@@ -10,7 +10,7 @@ import type {
 import { buildBinaryStl } from './exportMesh';
 import { ShapeGroup } from './group';
 import { Shape, union } from './kernel';
-import { computeMeshInertia } from './meshInertia';
+import { computeMeshInertia } from './mesh/meshInertia';
 import type { CollectedRobotExport } from './robotExport';
 import { TrackedShape } from './sketch/topology';
 import { composeChain, Transform } from './transform';

@@ -1,4 +1,4 @@
-import type { ShapeRuntimeMesh } from './shapeBackend';
+import type { ShapeRuntimeMesh } from '../shapeBackend';
 
 export interface MeshInertiaResult {
   /** Center of mass in mm coordinates */

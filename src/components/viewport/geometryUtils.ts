@@ -1,5 +1,5 @@
 import type { SceneObject } from '@forge/index';
-import { shapeToGeometry } from '@forge/meshToGeometry';
+import { shapeToGeometry } from '@forge/mesh/meshToGeometry';
 import * as THREE from 'three';
 import { NON_TEXT_INPUT_TYPES } from './types';
 
