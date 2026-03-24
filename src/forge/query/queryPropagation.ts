@@ -21,7 +21,7 @@ import {
   supportedHoleCreatedEdgeNames,
   supportedHoleCreatedFaceNames,
   supportedShellCreatedFaceNames,
-} from '../shapeFaces';
+} from '../face-tracking/shapeFaces';
 import type { ShapeWorkplanePlacement } from '../sketch/workplaneModel';
 
 export { buildBooleanTopologyRewritePropagation } from './booleanQueryPropagation';

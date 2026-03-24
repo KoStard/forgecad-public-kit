@@ -4,9 +4,9 @@
  * Exposes the transformation chain that led to each surface.
  */
 
-import { assertExhaustive, type ProfileCompilePlan, type ShapeCompilePlan, type ShapeCompileTransformStep } from './compilePlan';
-import type { FaceQueryRef, ShapeQueryOwner } from './queryModel';
-import type { FaceRef } from './sketch/topology';
+import { assertExhaustive, type ProfileCompilePlan, type ShapeCompilePlan, type ShapeCompileTransformStep } from '../compilePlan';
+import type { FaceQueryRef, ShapeQueryOwner } from '../queryModel';
+import type { FaceRef } from '../sketch/topology';
 
 export interface TransformationStep {
   kind: string;

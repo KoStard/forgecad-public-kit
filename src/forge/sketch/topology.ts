@@ -8,7 +8,7 @@
  * Arbitrary boolean results lose topology (mesh kernel limitation).
  */
 
-import type { FaceDescendantMetadata } from '../descendantResolution';
+import type { FaceDescendantMetadata } from '../face-tracking/descendantResolution';
 import {
   type GeometryInfo,
   getShapePrimaryQueryOwner,

@@ -1,6 +1,6 @@
 import type { ForgeQualityPreset, LogEntry } from '@forge/index';
 import type { ShapeCompilePlan } from '../forge/compilePlan';
-import type { FaceTransformationHistory } from '../forge/faceHistory';
+import type { FaceTransformationHistory } from '../forge/face-tracking/faceHistory';
 import type { ToolpathData } from '../forge/export/gcode';
 import type { GeometryInfo } from '../forge/kernel';
 import type { RunResult } from '../forge/runner';

@@ -14,7 +14,7 @@
 
 import type { SerializedShapeData } from '../workers/evalWorkerProtocol';
 import { reconstructBackendFromMesh } from './backends/manifold';
-import type { FaceTransformationHistory } from './faceHistory';
+import type { FaceTransformationHistory } from './face-tracking/faceHistory';
 import { Shape } from './kernel';
 import {
   SHAPE_BACKEND_MARKER,

@@ -10,7 +10,7 @@ import {
   type ProfileCompileTransformStep,
   type ShapeCompilePlan,
   type ShapeCompileTransformStep,
-} from './compilePlan';
+} from '../compilePlan';
 import type { FaceDescendantMetadata, FaceDescendantSemantic } from './descendantResolution';
 import {
   cloneFaceQueryRef,
@@ -20,11 +20,11 @@ import {
   type ShapeQueryOwner,
   shapeQueryOwnersEqual,
   type TopologyRewriteFaceDescendantContract,
-} from './queryModel';
-import { describeSheetMetalFaces } from './sheetMetalModel';
-import type { FaceRef } from './sketch/topology';
-import type { SketchPlacementModel } from './sketch/workplaneModel';
-import { type Mat4, normalizeAxis, Transform, type Vec3 } from './transform';
+} from '../queryModel';
+import { describeSheetMetalFaces } from '../sheetMetalModel';
+import type { FaceRef } from '../sketch/topology';
+import type { SketchPlacementModel } from '../sketch/workplaneModel';
+import { type Mat4, normalizeAxis, Transform, type Vec3 } from '../transform';
 
 type Vec2 = [number, number];
 

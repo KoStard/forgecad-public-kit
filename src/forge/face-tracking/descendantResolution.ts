@@ -1,6 +1,6 @@
-import type { ResolvedEdgeFeatureSelection } from './edge-features/edgeFeatureModel';
-import type { EdgeQueryRef, FaceQueryRef } from './queryModel';
-import type { FaceRef } from './sketch/topology';
+import type { ResolvedEdgeFeatureSelection } from '../edge-features/edgeFeatureModel';
+import type { EdgeQueryRef, FaceQueryRef } from '../queryModel';
+import type { FaceRef } from '../sketch/topology';
 
 export type FaceDescendantSemantic = 'face' | 'region' | 'set';
 

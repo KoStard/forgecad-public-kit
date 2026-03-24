@@ -4,7 +4,7 @@
  */
 
 import { getShapeCompilePlan, Shape, setShapeCompilePlan, union } from '../kernel';
-import { buildPatternOwnershipOperation, wrapRepeatedShapeCompilePlan } from '../repetitionOwnership';
+import { buildPatternOwnershipOperation, wrapRepeatedShapeCompilePlan } from '../face-tracking/repetitionOwnership';
 import { union2d } from './booleans';
 import { Sketch } from './core';
 import { TrackedShape } from './topology';

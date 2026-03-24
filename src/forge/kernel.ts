@@ -24,7 +24,7 @@ import {
   findShapeWorkplanePlacement,
   wrapShapeCompilePlanWithQueryOwner,
 } from './compilePlan';
-import { type FaceTransformationHistory, traceFaceTransformationHistory } from './faceHistory';
+import { type FaceTransformationHistory, traceFaceTransformationHistory } from './face-tracking/faceHistory';
 import {
   applyPlacementReferenceInput,
   clonePlacementReferences,
@@ -48,16 +48,16 @@ import {
   collectShapeTopologyRewritePropagations,
   findShapeTopologyRewritePropagation,
 } from './query/queryPropagation';
-import { wrapRepeatedShapeCompilePlan } from './repetitionOwnership';
+import { wrapRepeatedShapeCompilePlan } from './face-tracking/repetitionOwnership';
 import { isShapeBackend, type ShapeBackend } from './shapeBackend';
-import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './shapeFaces';
+import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './face-tracking/shapeFaces';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { type Mat4, type RotateAroundToOptions, solveRotateAroundAngle, Transform, type Vec3 } from './transform';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
-export type { FaceTransformationHistory, TransformationStep } from './faceHistory';
+export type { FaceTransformationHistory, TransformationStep } from './face-tracking/faceHistory';
 export type {
   PlacementReferenceInput,
   PlacementReferenceKind,

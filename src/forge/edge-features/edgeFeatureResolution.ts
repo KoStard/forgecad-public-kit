@@ -1,5 +1,5 @@
 import { assertExhaustive, type ShapeCompilePlan, type ShapeCompileTransformStep } from '../compilePlan';
-import type { ShapeEdgeDescendantResolution } from '../descendantResolution';
+import type { ShapeEdgeDescendantResolution } from '../face-tracking/descendantResolution';
 import type { EdgeFeatureResolvedSelector, ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
 import {
   cloneEdgeQueryRef,

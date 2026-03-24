@@ -1,5 +1,5 @@
-import type { ShapeCompilePlan } from './compilePlan';
-import { createOwnedShapeCompilePlan } from './compilePlan';
+import type { ShapeCompilePlan } from '../compilePlan';
+import { createOwnedShapeCompilePlan } from '../compilePlan';
 
 export type PatternOwnershipKind = 'linear' | 'circular';
 
