@@ -141,7 +141,7 @@ export { ConstrainedSketchBuilder } from './sketch/constraints';
 export type { HighlightOptions } from './sketch/highlights';
 export { composeChain, Transform } from './transform';
 export { verify } from './verification';
-export { viewConfig } from './viewConfig';
+export { viewConfig } from './scene/viewConfig';
 
 // ─── Wrapper functions: differ from their kernel/sketch source signatures ─────
 //

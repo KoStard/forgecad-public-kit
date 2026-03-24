@@ -53,12 +53,12 @@ const blue = box(20, 20, 20).translate(30, 0, 0).color('#0066ff');
 
 // Return as named objects to preserve individual colors and materials
 return [
-  { "label": red },    // Each gets its own color, toggle, and controls
-  { "label": blue }
+  { name: "Red Box", shape: red, color: '#ff0000' },
+  { name: "Blue Box", shape: blue, color: '#0066ff' },
 ];
 ```
 
-Each object in the returned array stays independently colorable and selectable, which is the main alternative to booleaning everything into one solid.
+Each object in the returned array must have a `name` property (string) and a `shape` or `sketch` property. The optional `color` property sets the display color. This keeps each object independently colorable and selectable, which is the main alternative to booleaning everything into one solid.
 
 ### Coordinate System
 ForgeCAD uses **Z-up** right-handed coordinates:

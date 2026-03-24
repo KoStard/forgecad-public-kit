@@ -151,7 +151,7 @@ export type {
   SceneVignetteConfig,
 } from './scene';
 export { getCollectedScene, resetScene, scene } from './scene';
-export { buildScene, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from './sceneBuilder';
+export { buildScene, CAD_MATERIAL_PROPS, EDGE_MATERIAL_PROPS } from './scene/sceneBuilder';
 export type { PlaneSpec } from './section';
 export { intersectWithPlane, projectToPlane } from './section';
 export * from './sheetMetal';
@@ -166,14 +166,14 @@ export type {
   JointOverlayViewConfigOptions,
   ViewConfig,
   ViewConfigOptions,
-} from './viewConfig';
+} from './scene/viewConfig';
 export {
   DEFAULT_JOINT_OVERLAY_VIEW_CONFIG,
   DEFAULT_VIEW_CONFIG,
   getCollectedViewConfig,
   resetViewConfig,
   viewConfig,
-} from './viewConfig';
+} from './scene/viewConfig';
 
 /**
  * Initialize the geometry kernel. Must be called once before using any forge API.

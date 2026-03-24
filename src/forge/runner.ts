@@ -118,7 +118,7 @@ import {
 import type { SolverWasmRunDebugSnapshot } from './sketch/constraints/solver-wasm';
 import { composeChain, Transform } from './transform';
 import { getCollectedVerifications, resetVerifications, type VerificationResult, verify } from './verification';
-import { getCollectedViewConfig, resetViewConfig, type ViewConfig, viewConfig } from './viewConfig';
+import { getCollectedViewConfig, resetViewConfig, type ViewConfig, viewConfig } from './scene/viewConfig';
 
 export interface SceneObject {
   id: string;

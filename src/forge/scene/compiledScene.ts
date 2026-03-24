@@ -1,8 +1,8 @@
-import type { CadQueryShapePlan } from './cadqueryPlan';
-import type { CompilerDiagnostic } from './compilerDiagnostics';
-import { buildShapeCompilerReport, type ShapeCompilerReport, summarizeCompilerDiagnostics } from './compilerReport';
-import type { GeometryInfo, Shape } from './kernel';
-import type { SceneObject } from './runner';
+import type { CadQueryShapePlan } from '../cadqueryPlan';
+import type { CompilerDiagnostic } from '../compilerDiagnostics';
+import { buildShapeCompilerReport, type ShapeCompilerReport, summarizeCompilerDiagnostics } from '../compilerReport';
+import type { GeometryInfo, Shape } from '../kernel';
+import type { SceneObject } from '../runner';
 
 export type CompiledSceneTargetRoute =
   | {

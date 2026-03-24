@@ -6,7 +6,7 @@
  */
 
 import * as THREE from 'three';
-import type { ForgeGeometry } from './meshToGeometry';
+import type { ForgeGeometry } from '../meshToGeometry';
 import type { SceneConfig, SceneLightConfig } from './scene';
 
 export const CAD_MATERIAL_PROPS = {
