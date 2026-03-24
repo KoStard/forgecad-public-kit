@@ -1,4 +1,4 @@
-import type { Vec3 } from './transform';
+import type { Vec3 } from '../transform';
 
 export type EdgeFinishQuadrant = [number, number];
 

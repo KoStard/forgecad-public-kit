@@ -13,7 +13,7 @@ import {
   type ShapeCompilePlan,
   type ShapeCompileTransformStep,
 } from '../../compilePlan';
-import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolution';
+import { resolveSupportedEdgeFeatureSelection } from '../../edge-features/edgeFeatureResolution';
 import { lowerCutShapeCompilePlanToConcretePlan, lowerHoleShapeCompilePlanToConcretePlan } from '../../holeCutCompilePlan';
 import type { ProfileBackend } from '../../profileBackend';
 import type { ShapeBackend } from '../../shapeBackend';

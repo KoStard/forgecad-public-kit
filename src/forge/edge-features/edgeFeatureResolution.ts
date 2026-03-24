@@ -1,5 +1,5 @@
-import { assertExhaustive, type ShapeCompilePlan, type ShapeCompileTransformStep } from './compilePlan';
-import type { ShapeEdgeDescendantResolution } from './descendantResolution';
+import { assertExhaustive, type ShapeCompilePlan, type ShapeCompileTransformStep } from '../compilePlan';
+import type { ShapeEdgeDescendantResolution } from '../descendantResolution';
 import type { EdgeFeatureResolvedSelector, ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
 import {
   cloneEdgeQueryRef,
@@ -10,8 +10,8 @@ import {
   type ShapeQueryOwner,
   shapeQueryOwnersEqual,
   type TopologyRewriteEdgeDescendantContract,
-} from './queryModel';
-import { Transform, type Vec3 } from './transform';
+} from '../queryModel';
+import { Transform, type Vec3 } from '../transform';
 
 const EPS = 1e-8;
 const SUPPORTED_VERTICAL_EDGE_NAMES = ['vert-bl', 'vert-br', 'vert-tr', 'vert-tl'] as const;

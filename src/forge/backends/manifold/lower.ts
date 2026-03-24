@@ -6,7 +6,7 @@ import {
   type ShapeCompilePlan,
   type ShapeCompileTransformStep,
 } from '../../compilePlan';
-import { resolveSupportedEdgeFeatureSelection } from '../../edgeFeatureResolution';
+import { resolveSupportedEdgeFeatureSelection } from '../../edge-features/edgeFeatureResolution';
 import { lowerCutShapeCompilePlanToConcretePlan, lowerHoleShapeCompilePlanToConcretePlan } from '../../holeCutCompilePlan';
 import { type EdgeSegment, extractEdgeSegments } from '../../mesh/meshEdgeExtraction';
 import type { MeshFormat } from '../../mesh/meshParsers';
@@ -211,7 +211,7 @@ function lowerShapeChamferCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'c
   return applyChamferSelectionToManifold(lowerShapeCompilePlanToManifold(plan.base, wasm), selection.selection, plan.size, wasm);
 }
 
-function edgeSegmentToSelection(segment: EdgeSegment): import('../../edgeFeatureModel').ResolvedEdgeFeatureSelection {
+function edgeSegmentToSelection(segment: EdgeSegment): import('../../edge-features/edgeFeatureModel').ResolvedEdgeFeatureSelection {
   const { start, end, direction: axis, normalA, normalB, convex } = segment;
 
   const dotA = normalA[0] * axis[0] + normalA[1] * axis[1] + normalA[2] * axis[2];

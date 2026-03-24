@@ -35,7 +35,7 @@ export { bom } from './bom';
 export { cutPlane } from './cutPlane';
 export type { BoundingRegion, EdgeQuery, EdgeSegment } from './edgeQuery';
 export { coalesceEdges, selectEdge, selectEdges } from './edgeQuery';
-export { chamferEdgeSegment, filletEdgeSegment } from './edgeSegmentFeatures';
+export { chamferEdgeSegment, filletEdgeSegment } from './edge-features/edgeSegmentFeatures';
 export { explodeView } from './assembly/explodeView';
 export type { EdgeSelector } from './fillet';
 export { chamfer, draft, fillet, offsetSolid } from './fillet';

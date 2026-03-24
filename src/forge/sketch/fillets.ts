@@ -1,4 +1,4 @@
-import { chamferEdge, filletEdge } from '../edgeFeatures';
+import { chamferEdge, filletEdge } from '../edge-features/edgeFeatures';
 import type { Sketch } from './core';
 import type { Point2D } from './entities';
 import { polygon } from './primitives';

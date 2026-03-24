@@ -15,7 +15,7 @@ import type { ShapeCompilePlan } from './compilePlan';
 import { appendShapeCompileTransform, createOwnedShapeCompilePlan, resetShapeQueryOwnerIds } from './compilePlan';
 import { type CutPlaneDef, cutPlane, getCollectedCutPlanes, resetCutPlanes } from './cutPlane';
 import { coalesceEdges, selectEdge, selectEdges } from './edgeQuery';
-import { chamferEdgeSegment, filletEdgeSegment } from './edgeSegmentFeatures';
+import { chamferEdgeSegment, filletEdgeSegment } from './edge-features/edgeSegmentFeatures';
 import { type ExplodeViewOptions, explodeView, getCollectedExplodeView, resetExplodeView } from './assembly/explodeView';
 import { chamfer, draft, fillet, offsetSolid } from './fillet';
 import type { ToolpathData } from './export/gcode';

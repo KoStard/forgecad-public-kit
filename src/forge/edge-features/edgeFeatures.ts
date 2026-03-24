@@ -4,7 +4,7 @@ import {
   createShapeQueryOwner,
   type ShapeCompilePlan,
   wrapShapeCompilePlanWithQueryOwner,
-} from './compilePlan';
+} from '../compilePlan';
 import { collectSupportedEdgeFinishPreservedSources, resolveSupportedEdgeFeatureSelection } from './edgeFeatureResolution';
 import {
   buildShapeFromCompilePlan,
@@ -17,10 +17,10 @@ import {
   setShapeDimensions,
   setShapeGeometryInfo,
   setShapePlacementReferences,
-} from './kernel';
-import { type ShapeQueryOwner, shapeQueryOwnersEqual } from './queryModel';
-import { attachTopologyRewritePropagation, buildEdgeFeatureTopologyRewritePropagation } from './queryPropagation';
-import { type EdgeRef, TrackedShape } from './sketch/topology';
+} from '../kernel';
+import { type ShapeQueryOwner, shapeQueryOwnersEqual } from '../queryModel';
+import { attachTopologyRewritePropagation, buildEdgeFeatureTopologyRewritePropagation } from '../queryPropagation';
+import { type EdgeRef, TrackedShape } from '../sketch/topology';
 
 type ShapeArg = Shape | TrackedShape;
 

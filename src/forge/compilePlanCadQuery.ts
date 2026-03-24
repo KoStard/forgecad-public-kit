@@ -1,7 +1,7 @@
 import { appendCadQueryProfileTransform, type CadQueryProfilePlan, type CadQueryShapePlan } from './cadqueryPlan';
 import { assertExhaustive, type ProfileCompilePlan, type ShapeCompilePlan } from './compilePlan';
 import { type CompileLoweringResult, compilerDiagnostic, compilerFailure, compilerSuccess } from './compilerDiagnostics';
-import { resolveSupportedEdgeFeatureSelection, selectionToResolvedSelector } from './edgeFeatureResolution';
+import { resolveSupportedEdgeFeatureSelection, selectionToResolvedSelector } from './edge-features/edgeFeatureResolution';
 import { lowerCutShapeCompilePlanToConcretePlan, lowerHoleShapeCompilePlanToConcretePlan } from './holeCutCompilePlan';
 import { lowerSheetMetalBasePlan } from './sheetMetalModel';
 import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';

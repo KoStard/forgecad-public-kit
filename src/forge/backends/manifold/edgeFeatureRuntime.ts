@@ -1,5 +1,5 @@
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
-import type { ResolvedEdgeFeatureSelection } from '../../edgeFeatureModel';
+import type { ResolvedEdgeFeatureSelection } from '../../edge-features/edgeFeatureModel';
 import type { Mat4 } from '../../transform';
 
 /**

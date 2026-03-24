@@ -6,14 +6,14 @@
  * topology system and works directly with mesh-extracted EdgeSegments.
  */
 
-import { requireManifoldShapeBackend, wrapManifoldShapeBackend } from './backends/manifold';
+import { requireManifoldShapeBackend, wrapManifoldShapeBackend } from '../backends/manifold';
 import {
   applyChamferSelectionToManifold,
   applyConcaveChamferSelectionToManifold,
   applyConcaveFilletSelectionToManifold,
   applyFilletSelectionToManifold,
-} from './backends/manifold/edgeFeatureRuntime';
-import { isOCCTShapeBackend } from './backends/occt/shapeBackend';
+} from '../backends/manifold/edgeFeatureRuntime';
+import { isOCCTShapeBackend } from '../backends/occt/shapeBackend';
 import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
 import {
   getShapeCompilePlan,
@@ -27,11 +27,11 @@ import {
   setShapeDimensions,
   setShapeGeometryInfo,
   setShapePlacementReferences,
-} from './kernel';
-import type { EdgeSegment } from './mesh/meshEdgeExtraction';
-import type { ShapeBackend } from './shapeBackend';
-import { TrackedShape } from './sketch/topology';
-import type { Vec3 } from './transform';
+} from '../kernel';
+import type { EdgeSegment } from '../mesh/meshEdgeExtraction';
+import type { ShapeBackend } from '../shapeBackend';
+import { TrackedShape } from '../sketch/topology';
+import type { Vec3 } from '../transform';
 
 type ShapeArg = Shape | TrackedShape;
 

@@ -1,4 +1,4 @@
-import { cloneEdgeFeatureResolvedSelector, cloneEdgeFinishQuadrant, type EdgeFeatureResolvedSelector } from './edgeFeatureModel';
+import { cloneEdgeFeatureResolvedSelector, cloneEdgeFinishQuadrant, type EdgeFeatureResolvedSelector } from './edge-features/edgeFeatureModel';
 import type { PlaneFrame } from './planeFrame';
 import type { ProfileBackend } from './profileBackend';
 import {

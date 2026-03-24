@@ -1,4 +1,4 @@
-import type { ResolvedEdgeFeatureSelection } from './edgeFeatureModel';
+import type { ResolvedEdgeFeatureSelection } from './edge-features/edgeFeatureModel';
 import type { EdgeQueryRef, FaceQueryRef } from './queryModel';
 import type { FaceRef } from './sketch/topology';
 
