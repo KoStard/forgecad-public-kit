@@ -19,254 +19,49 @@ import { deserializeRunResult } from '../forge/deserializeRunResult';
 import { publishSolverWasmRunDebug } from '../forge/sketch/constraints/solver-wasm';
 import { fileSystem } from '../fs';
 import { createNotebook, isNotebookFile, serializeNotebook } from '../notebook/model';
-import { decodeSharedBundle, decodeSharedHash } from '../share';
 import { applyTheme, type ThemeName } from '../theme';
 import { evalWorkerClient } from '../workers/evalWorkerClient';
-import type { SerializedRunResult, SerializedShapeData } from '../workers/evalWorkerProtocol';
+import { lookupCache, storeCache } from './runResultCache';
+import {
+  INITIAL_FILES,
+  INITIAL_FOLDERS,
+  EMPTY_FILE,
+  isModelFile,
+  isRunnableFile,
+  findPreferredEntryFile,
+  getActiveFileFromHash,
+  sharedModel,
+  sharedBundle,
+  LAST_ACTIVE_FILE_KEY,
+  normalizePath,
+  getParentPath,
+  resolvePreviewFile,
+  collectParentPaths,
+  movePath,
+} from './fileHelpers';
+import {
+  type ObjectSettings,
+  type ObjectSettingsMap,
+  type ObjectSettingsByFile,
+  DEFAULT_OBJECT_COLOR,
+  getObjectSettingsForPreviewFile,
+  setObjectSettingsForPreviewFile,
+  remapObjectSettingsByFile,
+  removeObjectSettingsForFile,
+} from './objectSettings';
+import {
+  type ViewPreferencesState,
+  clampJointValue,
+  sanitizeAnimationProgress,
+  createErrorRunResult,
+  buildRunState,
+  readViewPreferences,
+  writeViewPreferences,
+} from './executionHelpers';
 
 // ---------------------------------------------------------------------------
-// Run result LRU cache — avoids re-evaluating a file you just switched away from.
-// Persisted to sessionStorage so it survives page refreshes within the same tab.
-// ---------------------------------------------------------------------------
-const RUN_RESULT_CACHE_MAX = 8;
-const SESSION_STORAGE_KEY = 'forgecad-run-cache';
-const CACHE_VERSION = 1;
-/** Don't persist if serialized cache exceeds this size (sessionStorage limit ~5 MB). */
-const MAX_PERSIST_BYTES = 4 * 1024 * 1024;
-
-interface CacheEntry {
-  code: string;
-  files: Record<string, string>;
-  paramOverrides: Record<string, number>;
-  quality: string;
-  backend: string;
-  result: RunResult;
-  /** Kept around so we can persist to sessionStorage without re-serializing shapes. */
-  serialized: SerializedRunResult;
-}
-
-/** JSON-safe representation of a CacheEntry (TypedArrays → plain number[]). */
-interface PersistedCacheEntry {
-  code: string;
-  files: Record<string, string>;
-  paramOverrides: Record<string, number>;
-  quality: string;
-  backend: string;
-  serialized: unknown; // SerializedRunResult with TypedArrays replaced by number[]
-}
-
-/** Module-level LRU map: filePath → entry. JS Map preserves insertion order. */
-const runResultCache = new Map<string, CacheEntry>();
-
-// -- TypedArray ↔ plain array helpers for JSON serialization -----------------
-
-function typedArrayToArray(ta: Uint32Array | Float32Array): number[] {
-  return Array.from(ta);
-}
-
-function shapeDataToJson(sd: SerializedShapeData): Record<string, unknown> {
-  return {
-    ...sd,
-    meshTriVerts: typedArrayToArray(sd.meshTriVerts),
-    meshVertProperties: typedArrayToArray(sd.meshVertProperties),
-    meshMergeFromVert: typedArrayToArray(sd.meshMergeFromVert),
-    meshMergeToVert: typedArrayToArray(sd.meshMergeToVert),
-    geometryPositions: typedArrayToArray(sd.geometryPositions),
-    geometryNormals: typedArrayToArray(sd.geometryNormals),
-    geometryEdgePositions: typedArrayToArray(sd.geometryEdgePositions),
-  };
-}
-
-function jsonToShapeData(raw: Record<string, any>): SerializedShapeData {
-  return {
-    ...raw,
-    meshTriVerts: new Uint32Array(raw.meshTriVerts),
-    meshVertProperties: new Float32Array(raw.meshVertProperties),
-    meshMergeFromVert: new Uint32Array(raw.meshMergeFromVert),
-    meshMergeToVert: new Uint32Array(raw.meshMergeToVert),
-    geometryPositions: new Float32Array(raw.geometryPositions),
-    geometryNormals: new Float32Array(raw.geometryNormals),
-    geometryEdgePositions: new Float32Array(raw.geometryEdgePositions),
-  } as SerializedShapeData;
-}
-
-function serializedResultToJson(sr: SerializedRunResult): unknown {
-  return {
-    ...sr,
-    objects: sr.objects.map((obj) => ({
-      ...obj,
-      shapeData: obj.shapeData ? shapeDataToJson(obj.shapeData) : null,
-    })),
-  };
-}
-
-function jsonToSerializedResult(raw: any): SerializedRunResult {
-  return {
-    ...raw,
-    objects: (raw.objects as any[]).map((obj: any) => ({
-      ...obj,
-      shapeData: obj.shapeData ? jsonToShapeData(obj.shapeData) : null,
-    })),
-  } as SerializedRunResult;
-}
-
-// -- sessionStorage persistence ----------------------------------------------
-
-function persistCache(): void {
-  try {
-    const entries: Record<string, PersistedCacheEntry> = {};
-    for (const [key, entry] of runResultCache) {
-      entries[key] = {
-        code: entry.code,
-        files: entry.files,
-        paramOverrides: entry.paramOverrides,
-        quality: entry.quality,
-        backend: entry.backend,
-        serialized: serializedResultToJson(entry.serialized),
-      };
-    }
-    const json = JSON.stringify({ v: CACHE_VERSION, entries });
-    if (json.length > MAX_PERSIST_BYTES) {
-      // Too large — clear any stale persisted data and bail
-      try {
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
-    sessionStorage.setItem(SESSION_STORAGE_KEY, json);
-  } catch {
-    // sessionStorage may be unavailable (private browsing) or full — ignore
-  }
-}
-
-function rehydrateCache(): void {
-  try {
-    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.v !== CACHE_VERSION || !parsed.entries) return;
-    for (const [key, pe] of Object.entries<any>(parsed.entries)) {
-      const serialized = jsonToSerializedResult(pe.serialized);
-      const result = deserializeRunResult(serialized);
-      runResultCache.set(key, {
-        code: pe.code,
-        files: pe.files,
-        paramOverrides: pe.paramOverrides,
-        quality: pe.quality,
-        backend: pe.backend,
-        result,
-        serialized,
-      });
-    }
-  } catch {
-    // Corrupt or incompatible data — start fresh
-    try {
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-// Rehydrate on module load
-rehydrateCache();
-
-// -- Cache lookup / store ----------------------------------------------------
-
-function lookupCache(
-  filePath: string,
-  code: string,
-  files: Record<string, string>,
-  paramOverrides: Record<string, number>,
-  quality: string,
-  backend: string,
-): RunResult | null {
-  const key = `${filePath}::${backend}`;
-  const entry = runResultCache.get(key);
-  if (!entry) return null;
-  if (
-    entry.code !== code ||
-    entry.quality !== quality ||
-    JSON.stringify(entry.paramOverrides) !== JSON.stringify(paramOverrides) ||
-    JSON.stringify(entry.files) !== JSON.stringify(files)
-  )
-    return null;
-  return entry.result;
-}
-
-function storeCache(
-  filePath: string,
-  code: string,
-  files: Record<string, string>,
-  paramOverrides: Record<string, number>,
-  quality: string,
-  backend: string,
-  result: RunResult,
-  serialized: SerializedRunResult,
-): void {
-  const key = `${filePath}::${backend}`;
-  runResultCache.delete(key); // re-insert to mark as recently used
-  runResultCache.set(key, { code, files, paramOverrides, quality, backend, result, serialized });
-  if (runResultCache.size > RUN_RESULT_CACHE_MAX) {
-    runResultCache.delete(runResultCache.keys().next().value!);
-  }
-  persistCache();
-}
-
-// ---------------------------------------------------------------------------
-
-const EMPTY_FILE: Record<string, string> = {
-  'untitled.forge.js': '// New part\n\nreturn box(50, 30, 10);\n',
-};
-
-const INITIAL_FILES = projectFiles && Object.keys(projectFiles).length > 0 ? (projectFiles as Record<string, string>) : EMPTY_FILE;
-
-const collectInitialFolders = (files: Record<string, string>): string[] => {
-  const folders = new Set<string>();
-  Object.keys(files).forEach((name) => {
-    const parts = name.replace(/\\/g, '/').split('/');
-    if (parts.length <= 1) return;
-    let current = '';
-    for (let i = 0; i < parts.length - 1; i += 1) {
-      current = current ? `${current}/${parts[i]}` : parts[i];
-      folders.add(current);
-    }
-  });
-  return Array.from(folders).sort();
-};
-
-const INITIAL_FOLDERS = collectInitialFolders(INITIAL_FILES);
-const isModelFile = (name: string): boolean => name.endsWith('.forge.js') || name.endsWith('.sketch.js'); // legacy compat
-const isRunnableFile = isModelFile;
-const findPreferredEntryFile = (names: string[]): string | null =>
-  names.find((n) => isModelFile(n)) || names.find((n) => isNotebookFile(n)) || null;
-
-const getActiveFileFromHash = (): string | null => {
-  const hash = window.location.hash.slice(1); // Remove the #
-  if (hash.startsWith('code/') || hash.startsWith('bundle/')) return null; // handled by shared model / bundle logic
-  return hash || null;
-};
-
-/** If the URL contains a shared model (`#code/...`), decode it once at startup. */
-const sharedModel = decodeSharedHash(window.location.hash);
-if (sharedModel) {
-  INITIAL_FILES[sharedModel.filename] = sharedModel.code;
-}
-
-/** If the URL contains a multi-file bundle (`#bundle/...`), decode and inject all files. */
-const sharedBundle = decodeSharedBundle(window.location.hash);
-if (sharedBundle) {
-  for (const [name, code] of Object.entries(sharedBundle.files)) {
-    INITIAL_FILES[name] = code;
-  }
-}
-
-/** Exported so applyServerSnapshot can inject the shared model into the file set. */
+// Re-export sharedBundle/sharedModel for consumers that need them
 export { sharedBundle, sharedModel };
-
-const LAST_ACTIVE_FILE_KEY = 'fc-last-active-file';
 
 const initialActive = (() => {
   if (sharedBundle) return sharedBundle.entry;
@@ -299,82 +94,10 @@ export interface ProjectFile {
   code: string;
 }
 
-const normalizePath = (value: string): string =>
-  value
-    .replace(/\\/g, '/')
-    .replace(/\/+/g, '/')
-    .replace(/^\/+|\/+$/g, '');
-
-const getParentPath = (value: string): string => {
-  const normalized = normalizePath(value);
-  const idx = normalized.lastIndexOf('/');
-  return idx === -1 ? '' : normalized.slice(0, idx);
-};
-
-const sharedPathDepth = (a: string, b: string): number => {
-  const aParts = normalizePath(a).split('/').filter(Boolean);
-  const bParts = normalizePath(b).split('/').filter(Boolean);
-  const length = Math.min(aParts.length, bParts.length);
-  let depth = 0;
-  while (depth < length && aParts[depth] === bParts[depth]) depth += 1;
-  return depth;
-};
-
-const resolvePreviewFile = (activeFile: string, files: Record<string, string>): string | null => {
-  if (isRunnableFile(activeFile) || isNotebookFile(activeFile)) return activeFile;
-
-  const candidates = Object.keys(files).filter((name) => isRunnableFile(name) || isNotebookFile(name));
-  if (candidates.length === 0) return null;
-
-  const activeDir = getParentPath(activeFile);
-  let best = candidates[0];
-  let bestDepth = -1;
-  for (const candidate of candidates) {
-    const depth = sharedPathDepth(activeDir, getParentPath(candidate));
-    const bestIsNotebook = isNotebookFile(best);
-    const candidateIsNotebook = isNotebookFile(candidate);
-    if (
-      depth > bestDepth ||
-      (depth === bestDepth && bestIsNotebook && !candidateIsNotebook) ||
-      (depth === bestDepth && bestIsNotebook === candidateIsNotebook && candidate < best)
-    ) {
-      best = candidate;
-      bestDepth = depth;
-    }
-  }
-  return best;
-};
-
-const collectParentPaths = (value: string): string[] => {
-  const normalized = normalizePath(value);
-  const parts = normalized.split('/');
-  if (parts.length <= 1) return [];
-  const parents: string[] = [];
-  let current = '';
-  for (let i = 0; i < parts.length - 1; i += 1) {
-    current = current ? `${current}/${parts[i]}` : parts[i];
-    parents.push(current);
-  }
-  return parents;
-};
-
-const movePath = (value: string, from: string, to: string): string => {
-  if (value === from) return to;
-  if (value.startsWith(`${from}/`)) return `${to}${value.slice(from.length)}`;
-  return value;
-};
-
 export type RenderMode = 'solid' | 'wireframe' | 'overlay';
 export type ProjectionMode = 'perspective' | 'orthographic';
 
-export interface ObjectSettings {
-  visible: boolean;
-  opacity: number;
-  color: string;
-}
-
-type ObjectSettingsMap = Record<string, ObjectSettings>;
-type ObjectSettingsByFile = Record<string, ObjectSettingsMap>;
+export type { ObjectSettings } from './objectSettings';
 
 export interface ViewCommand {
   id: number;
@@ -595,278 +318,6 @@ interface ForgeStore {
   disableRunCache: boolean;
   setDisableRunCache: (disabled: boolean) => void;
 }
-
-interface ViewPreferencesState {
-  runQuality: ForgeQualityPreset;
-  renderMode: RenderMode;
-  projectionMode: ProjectionMode;
-  gridEnabled: boolean;
-  gridSize: number;
-  showPerformanceInfo: boolean;
-  objectSettingsByFile: ObjectSettingsByFile;
-  objectPickSyncEnabled: boolean;
-  measureSnapPx: number;
-  dimensionsVisible: boolean;
-  surfacesVisible: boolean;
-  explodeAmount: number;
-  jointAnimationSpeed: number;
-  cutPlaneEnabled: Record<string, boolean>;
-  sectionPlaneGuidesEnabled: boolean;
-  sectionPlaneFillEnabled: boolean;
-  sectionPlaneFillOpacity: number;
-  sectionPlaneBorderEnabled: boolean;
-  sectionPlaneAxisEnabled: boolean;
-  fileExplorerOpen: boolean;
-  viewPanelOpen: boolean;
-  lengthUnit: LengthUnit;
-  /** Disable the run-result cache so every execution round-trips to the worker. */
-  disableRunCache: boolean;
-  /** Active geometry backend for evaluation. */
-  activeBackend: 'occt' | 'manifold';
-}
-
-const DEFAULT_OBJECT_COLOR = '#5b9bd5';
-const VIEW_PREFERENCES_KEY = 'fc-view-preferences-v1';
-
-const getObjectSettingsForPreviewFile = (objectSettingsByFile: ObjectSettingsByFile, previewFile: string | null): ObjectSettingsMap => {
-  if (!previewFile) return {};
-  return objectSettingsByFile[previewFile] ?? {};
-};
-
-const setObjectSettingsForPreviewFile = (
-  objectSettingsByFile: ObjectSettingsByFile,
-  previewFile: string | null,
-  objectSettings: ObjectSettingsMap,
-): ObjectSettingsByFile => {
-  if (!previewFile) return objectSettingsByFile;
-  if (Object.keys(objectSettings).length === 0) {
-    if (!(previewFile in objectSettingsByFile)) return objectSettingsByFile;
-    const next = { ...objectSettingsByFile };
-    delete next[previewFile];
-    return next;
-  }
-  return { ...objectSettingsByFile, [previewFile]: objectSettings };
-};
-
-const remapObjectSettingsByFile = (objectSettingsByFile: ObjectSettingsByFile, from: string, to: string): ObjectSettingsByFile => {
-  let changed = false;
-  const next: ObjectSettingsByFile = {};
-  Object.entries(objectSettingsByFile).forEach(([file, settings]) => {
-    const mapped = movePath(file, from, to);
-    if (mapped !== file) changed = true;
-    next[mapped] = settings;
-  });
-  return changed ? next : objectSettingsByFile;
-};
-
-const removeObjectSettingsForFile = (objectSettingsByFile: ObjectSettingsByFile, file: string): ObjectSettingsByFile => {
-  if (!(file in objectSettingsByFile)) return objectSettingsByFile;
-  const next = { ...objectSettingsByFile };
-  delete next[file];
-  return next;
-};
-
-const syncObjectSettings = (
-  objects: SceneObject[],
-  prevSettings: Record<string, ObjectSettings>,
-  selectedObjectId: string | null,
-  focusedObjectIds: string[],
-): { settings: Record<string, ObjectSettings>; selectedObjectId: string | null; focusedObjectIds: string[] } => {
-  const nextSettings: Record<string, ObjectSettings> = { ...prevSettings };
-  const ids = new Set(objects.map((obj) => obj.id));
-  Object.keys(nextSettings).forEach((id) => {
-    if (!ids.has(id)) delete nextSettings[id];
-  });
-  objects.forEach((obj) => {
-    if (!nextSettings[obj.id]) {
-      nextSettings[obj.id] = { visible: true, opacity: 1, color: obj.color || DEFAULT_OBJECT_COLOR };
-    } else {
-      nextSettings[obj.id].color = obj.color || DEFAULT_OBJECT_COLOR;
-    }
-  });
-  const nextSelected = objects.length === 0 ? null : selectedObjectId && ids.has(selectedObjectId) ? selectedObjectId : objects[0].id;
-  const nextFocused = focusedObjectIds.filter((id) => ids.has(id));
-  return { settings: nextSettings, selectedObjectId: nextSelected, focusedObjectIds: nextFocused };
-};
-
-const syncCutPlaneEnabled = (cutPlanes: { name: string }[], prevEnabled: Record<string, boolean>): Record<string, boolean> => {
-  const next: Record<string, boolean> = {};
-  cutPlanes.forEach((cp) => {
-    next[cp.name] = prevEnabled[cp.name] ?? false;
-  });
-  return next;
-};
-
-const clampJointValue = (value: number, min?: number, max?: number): number => {
-  let next = Number.isFinite(value) ? value : 0;
-  if (min !== undefined) next = Math.max(min, next);
-  if (max !== undefined) next = Math.min(max, next);
-  return next;
-};
-
-const clampAnimationProgress = (value: number): number => {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(1, value));
-};
-
-const sanitizeAnimationProgress = (value: number, clip?: { loop: boolean; continuous?: boolean } | null): number => {
-  if (!Number.isFinite(value)) return 0;
-  if (clip?.loop && clip.continuous) return Math.max(0, value);
-  return clampAnimationProgress(value);
-};
-
-const syncJointValues = (result: RunResult, prev: Record<string, number>): Record<string, number> => {
-  const joints = result.jointsView?.enabled === false ? [] : (result.jointsView?.joints ?? []);
-  const next: Record<string, number> = {};
-  joints.forEach((joint) => {
-    const raw = prev[joint.name] ?? joint.defaultValue;
-    next[joint.name] = clampJointValue(raw, joint.min, joint.max);
-  });
-  return next;
-};
-
-const syncHoveredJointName = (result: RunResult, hoveredJointName: string | null): string | null => {
-  if (!hoveredJointName) return null;
-  const joints = result.jointsView?.enabled === false ? [] : (result.jointsView?.joints ?? []);
-  return joints.some((joint) => joint.name === hoveredJointName) ? hoveredJointName : null;
-};
-
-interface JointAnimationState {
-  clip: string | null;
-  progress: number;
-  playing: boolean;
-}
-
-const syncJointAnimationState = (
-  result: RunResult,
-  prevClip: string | null,
-  prevProgress: number,
-  prevPlaying: boolean,
-): JointAnimationState => {
-  const clips = result.jointsView?.enabled === false ? [] : (result.jointsView?.animations ?? []);
-  if (clips.length === 0) return { clip: null, progress: 0, playing: false };
-
-  const clipNames = new Set(clips.map((clip) => clip.name));
-  const previousStillValid = !!prevClip && clipNames.has(prevClip);
-  let clip = previousStillValid ? prevClip : null;
-
-  if (!clip) {
-    const preferred = result.jointsView?.defaultAnimation;
-    if (preferred && clipNames.has(preferred)) clip = preferred;
-  }
-
-  const activeClip = clip ? (clips.find((entry) => entry.name === clip) ?? null) : null;
-  const progress = previousStillValid ? sanitizeAnimationProgress(prevProgress, activeClip) : 0;
-  const playing = clip ? prevPlaying : false;
-  return { clip, progress, playing };
-};
-
-function createErrorRunResult(message: string, quality: ForgeQualityPreset): RunResult {
-  // `satisfies RunResult` ensures a compile error if RunResult gains a new
-  // required field — prevents the silent-null bug that hit sceneConfig.
-  return {
-    shape: null,
-    sketch: null,
-    objects: [],
-    params: [],
-    dimensions: [],
-    highlights: [],
-    debugHighlights3D: [],
-    bom: [],
-    sheetStock: [],
-    cutPlanes: [],
-    explodeView: null,
-    jointsView: null,
-    viewConfig: null,
-    sceneConfig: null,
-    robotExport: null,
-    quality,
-    error: message,
-    timeMs: 0,
-    logs: [{ level: 'error', args: [message], timestamp: Date.now() }],
-    verifications: [],
-  } satisfies RunResult;
-}
-
-function buildRunState(
-  previewFile: string | null,
-  runResult: RunResult,
-  state: Pick<
-    ForgeStore,
-    | 'objectSettingsByFile'
-    | 'selectedObjectId'
-    | 'focusedObjectIds'
-    | 'cutPlaneEnabled'
-    | 'jointValues'
-    | 'jointAnimationClip'
-    | 'jointAnimationProgress'
-    | 'jointAnimationPlaying'
-    | 'hoveredJointName'
-  >,
-) {
-  const synced = syncObjectSettings(
-    runResult.objects,
-    getObjectSettingsForPreviewFile(state.objectSettingsByFile, previewFile),
-    state.selectedObjectId,
-    state.focusedObjectIds,
-  );
-  const nextObjectSettingsByFile = setObjectSettingsForPreviewFile(state.objectSettingsByFile, previewFile, synced.settings);
-  const nextCutPlaneEnabled = syncCutPlaneEnabled(runResult.cutPlanes, state.cutPlaneEnabled);
-  const nextJointValues = syncJointValues(runResult, state.jointValues);
-  const nextAnimationState = syncJointAnimationState(
-    runResult,
-    state.jointAnimationClip,
-    state.jointAnimationProgress,
-    state.jointAnimationPlaying,
-  );
-
-  return {
-    nextState: {
-      result: runResult,
-      consoleLogs: runResult.logs,
-      params: runResult.params,
-      jointValues: nextJointValues,
-      jointAnimationClip: nextAnimationState.clip,
-      jointAnimationProgress: nextAnimationState.progress,
-      jointAnimationPlaying: nextAnimationState.playing,
-      hoveredJointName: syncHoveredJointName(runResult, state.hoveredJointName),
-      previewFile,
-      objectSettings: synced.settings,
-      objectSettingsByFile: nextObjectSettingsByFile,
-      selectedObjectId: synced.selectedObjectId,
-      focusedObjectIds: synced.focusedObjectIds,
-      cutPlaneEnabled: nextCutPlaneEnabled,
-    },
-    nextCutPlaneEnabled,
-    nextObjectSettingsByFile,
-  };
-}
-
-const readViewPreferences = (): Partial<ViewPreferencesState> => {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem(VIEW_PREFERENCES_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return {};
-    return parsed as Partial<ViewPreferencesState>;
-  } catch {
-    return {};
-  }
-};
-
-const writeViewPreferences = (patch: Partial<ViewPreferencesState>): void => {
-  if (typeof window === 'undefined') return;
-  try {
-    const next = { ...readViewPreferences(), ...patch };
-    if ('objectSettingsByFile' in patch) {
-      delete (next as { objectSettings?: unknown }).objectSettings;
-    }
-    localStorage.setItem(VIEW_PREFERENCES_KEY, JSON.stringify(next));
-  } catch {
-    // Ignore storage failures (private mode, quota, etc.)
-  }
-};
 
 const initialViewPreferences = readViewPreferences();
 const initialPreviewFile = resolvePreviewFile(initialActive, INITIAL_FILES);
