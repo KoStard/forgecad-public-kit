@@ -5,6 +5,11 @@
  */
 // Load all constraint definitions (side effects: populates the registry)
 import './defs/index';
+// Load builder method groups (side effects: augment ConstrainedSketchBuilder prototype)
+import './builder-path';
+import './builder-geometric';
+import './builder-dimensional';
+import './builder-reference';
 
 import type { SketchConstraint } from './types';
 
