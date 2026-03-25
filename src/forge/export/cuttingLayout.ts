@@ -79,7 +79,7 @@ export interface CuttingLayoutResult {
 }
 
 export interface CuttingLayoutPdfResult {
-  pdf: Uint8Array;
+  pdf: Uint8Array<ArrayBuffer>;
   pageCount: number;
   layout: CuttingLayoutResult;
 }

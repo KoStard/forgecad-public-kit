@@ -25,7 +25,7 @@ export interface ReportOptions {
 }
 
 export interface ReportGenerationResult {
-  pdf: Uint8Array;
+  pdf: Uint8Array<ArrayBuffer>;
   pageCount: number;
   componentCount: number;
   viewCount: number;

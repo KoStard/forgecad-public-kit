@@ -77,7 +77,7 @@ export class PdfBuilder {
     return this.addObject(`<< ${dictBody} /Length ${length} >>\nstream\n${data}endstream`);
   }
 
-  build(rootId: number): Uint8Array {
+  build(rootId: number): Uint8Array<ArrayBuffer> {
     const parts: string[] = [];
     const offsets: number[] = [0];
     let cursor = 0;
@@ -104,6 +104,6 @@ export class PdfBuilder {
     push(`trailer\n<< /Size ${this.objects.length + 1} /Root ${rootId} 0 R >>\n`);
     push(`startxref\n${xrefPos}\n%%EOF\n`);
 
-    return encoder.encode(parts.join(''));
+    return encoder.encode(parts.join('')) as Uint8Array<ArrayBuffer>;
   }
 }
