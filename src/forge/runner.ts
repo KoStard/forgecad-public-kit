@@ -98,7 +98,7 @@ import {
   type SvgImportOptions,
   type TextOptions,
 } from './sketch';
-import { param, boolParam, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, type ParamDef } from './params';
+import { param, boolParam, resetParams, getCollectedParams, runWithParamScope, setParamOverrides, createTrackedScope, validateConsumedOverrides, type ParamDef } from './params';
 import { joint } from './joint';
 import { Assembly, ImportedAssembly, SolvedAssembly, assembly, bomToCsv } from './assembly';
 import { Transform, composeChain } from './transform';
@@ -1019,7 +1019,7 @@ function executeFile(
       }
 
       const localOverrides = parseImportParamArgs('importSketch', name, paramOverrides);
-      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
       logImportTrace(fileName, scope, options, 'importSketch', resolvedPath, 'start', { requested: name, overrides: localOverrides });
       let result: ReturnType<typeof executeFile>;
       try {
@@ -1028,6 +1028,7 @@ function executeFile(
         logImportTrace(fileName, scope, options, 'importSketch', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
         throw error;
       }
+      validateConsumedOverrides(childScope, 'importSketch', resolvedPath);
       if (result instanceof Sketch) {
         logImportTrace(fileName, scope, options, 'importSketch', resolvedPath, 'success', { requested: name, got: 'Sketch' });
         return result;
@@ -1109,7 +1110,7 @@ function executeFile(
     const importPart = (name: string, paramOverrides?: Record<string, number>): Shape => {
       const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
       const localOverrides = parseImportParamArgs('importPart', name, paramOverrides);
-      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
       const dimStart = getCollectedDimensions().length;
       logImportTrace(fileName, scope, options, 'importPart', resolvedPath, 'start', { requested: name, overrides: localOverrides });
       let result: ReturnType<typeof executeFile>;
@@ -1119,6 +1120,7 @@ function executeFile(
         logImportTrace(fileName, scope, options, 'importPart', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
         throw error;
       }
+      validateConsumedOverrides(childScope, 'importPart', resolvedPath);
       const importedDims = takeCollectedDimensions(dimStart);
       if (result instanceof Shape) {
         logImportTrace(fileName, scope, options, 'importPart', resolvedPath, 'success', { requested: name, got: 'Shape', importedDims: importedDims.length });
@@ -1142,7 +1144,7 @@ function executeFile(
     const importGroup = (name: string, paramOverrides?: Record<string, number>): ShapeGroup => {
       const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
       const localOverrides = parseImportParamArgs('importGroup', name, paramOverrides);
-      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
       logImportTrace(fileName, scope, options, 'importGroup', resolvedPath, 'start', { requested: name, overrides: localOverrides });
       let result: ReturnType<typeof executeFile>;
       try {
@@ -1151,6 +1153,7 @@ function executeFile(
         logImportTrace(fileName, scope, options, 'importGroup', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
         throw error;
       }
+      validateConsumedOverrides(childScope, 'importGroup', resolvedPath);
       if (result instanceof ShapeGroup) {
         logImportTrace(fileName, scope, options, 'importGroup', resolvedPath, 'success', { requested: name, got: 'ShapeGroup' });
         return result;
@@ -1164,7 +1167,7 @@ function executeFile(
     const importAssembly = (name: string, paramOverrides?: Record<string, number>): ImportedAssembly => {
       const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
       const localOverrides = parseImportParamArgs('importAssembly', name, paramOverrides);
-      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
       logImportTrace(fileName, scope, options, 'importAssembly', resolvedPath, 'start', { requested: name, overrides: localOverrides });
       let result: ReturnType<typeof executeFile>;
       try {
@@ -1173,6 +1176,7 @@ function executeFile(
         logImportTrace(fileName, scope, options, 'importAssembly', resolvedPath, 'error', { requested: name, error: formatLogError(error) });
         throw error;
       }
+      validateConsumedOverrides(childScope, 'importAssembly', resolvedPath);
       if (result instanceof Assembly) {
         logImportTrace(fileName, scope, options, 'importAssembly', resolvedPath, 'success', { requested: name, got: 'Assembly' });
         return new ImportedAssembly(result, result.getReferences());
