@@ -741,30 +741,6 @@ const sideVent = box(2, 30, 40, true).color('#666')
 
 ## Advanced 3D Operations
 
-### `levelSet(sdf, bounds, edgeLength, level?)`
-Create a shape from a signed distance function (SDF). Positive = inside.
-
-```javascript
-const gyroid = levelSet(
-  ([x, y, z]) => Math.sin(x) * Math.cos(y) + Math.sin(y) * Math.cos(z) + Math.sin(z) * Math.cos(x),
-  { min: [-10, -10, -10], max: [10, 10, 10] },
-  0.5,  // edge length (resolution)
-);
-```
-
-### Smoothing
-
-```javascript
-// Mark edges for smoothing, then subdivide
-const smooth = box(50, 50, 50, true)
-  .smoothOut(60)     // edges sharper than 60° get smoothed
-  .refine(4);        // subdivide 4 times
-
-// Or refine by edge length / tolerance
-shape.refineToLength(2);      // max edge length 2mm
-shape.refineToTolerance(0.1); // max deviation 0.1mm from smooth surface
-```
-
 ### Cutting
 
 ```javascript
