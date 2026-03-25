@@ -25,8 +25,57 @@ const mech = assembly("Arm")
     frame: Transform.identity().translate(0, 0, 20),
   });
 
-const solved = mech.solve();
-return solved.toScene();
+return mech; // auto-solved at defaults, renders all parts
+```
+
+Returning `mech` (unsolved Assembly) auto-solves at default joint values and renders all parts.  You can also return a `SolvedAssembly` for a specific pose:
+
+```javascript
+return mech.solve({ shoulder: 60 });
+```
+
+## Return types and imports — how they fit together
+
+| Return value | Standalone | `importPart` | `importGroup` | `importAssembly` |
+|---|---|---|---|---|
+| `Shape` | yes | yes | — | — |
+| `Sketch` | yes | — | — | — |
+| `ShapeGroup` | yes | — | yes | — |
+| `Assembly` (unsolved) | **yes** | — | — | yes |
+| `SolvedAssembly` | **yes** | — | — | — |
+
+**`Assembly` is the dual-use type**: a file that returns an unsolved `Assembly` works both as a standalone renderable script *and* as an import target for `importAssembly()`.
+
+Pattern for dual-use assembly files:
+
+```javascript
+// handle.forge.js — works standalone AND importable via importAssembly()
+const mech = assembly("Handle")
+  .addPart("Base", baseBracket)
+  .addPart("Arm", arm)
+  .addRevolute("Fold", "Base", "Arm", { axis: [0, 1, 0], min: 0, max: 90 });
+
+// Animation setup — runs when standalone, ignored on import
+mech.toJointsView({
+  animations: [{ name: "Fold", duration: 2, loop: true,
+    keyframes: [{ at: 0, values: { Fold: 0 } }, { at: 0.5, values: { Fold: 90 } }, { at: 1, values: { Fold: 0 } }],
+  }],
+});
+
+return mech; // works standalone (auto-solved + animated) AND with importAssembly()
+```
+
+```javascript
+// case.forge.js — imports the handle as a positioned assembly
+const handle = importAssembly("./handle.forge.js");
+
+// Convenience transforms: solve at defaults, return ShapeGroup
+const handleGroup = handle.rotate(0, 0, -90).translate(0, -20, 50);
+
+return [
+  { name: "Case", shape: caseBody },
+  { name: "Handle", shape: handleGroup },
+];
 ```
 
 ## Ergonomic helpers
@@ -112,6 +161,27 @@ Forge chain form:
 
 This keeps kinematic chains declarative and avoids repeated manual pivot math.
 
+## SolvedAssembly
+
+`mech.solve(state?)` returns a `SolvedAssembly` with these methods:
+
+| Method | Returns | Use for |
+|--------|---------|---------|
+| `toGroup()` | `ShapeGroup` | Primary way to get positioned parts as a group — for `show()`, embedding, transforms |
+| `getPart(name)` | `AssemblyPart` | Extract a single part at its solved position |
+| `getTransform(name)` | `Transform` | Raw world transform for a part |
+| `bom()` / `bomCsv()` | `BomRow[]` / `string` | Bill of materials |
+| `collisionReport()` | `CollisionFinding[]` | Interference detection |
+| `minClearance(a, b)` | `number` | Minimum gap between two parts |
+| `toSceneObjects()` | `Array<{name, shape?, group?}>` | Advanced: raw scene-graph array for custom rendering |
+
+**`toGroup()`** is the preferred way to convert a solved assembly to a positionable group:
+
+```javascript
+const solved = mech.solve({ shoulder: 45 });
+show(solved.toGroup()); // in notebooks
+```
+
 ## Validation helpers
 - `solved.collisionReport()` returns overlapping part pairs and volume
 - `solved.minClearance("PartA", "PartB", 10)` computes minimum gap
@@ -126,49 +196,55 @@ console.log("Collisions", solved.collisionReport());
 const sweep = mech.sweepJoint("elbow", -10, 135, 12, { shoulder: 35 });
 console.log("Sweep collisions", sweep.filter((step) => step.collisions.length > 0).length);
 
-show(solved.toScene());
+show(solved);
 ```
 
 That keeps mechanism setup in earlier cells and collision/sweep investigation in the current preview cell.
 
-## Importing assemblies from other files
+## ImportedAssembly
 
-Use `importAssembly(fileName, paramOverrides?)` to import an assembly defined in another file. The source file must `return` the `Assembly` instance directly (not `.solve()`).
+`importAssembly()` returns an `ImportedAssembly` with these capabilities:
 
-```javascript
-// arm.forge.js — source file
-const mech = assembly("Arm")
-  .addPart("Base", box(80, 80, 20, true))
-  .addPart("Link", box(140, 24, 24).translate(0, -12, -12))
-  .addRevolute("shoulder", "Base", "Link", {
-    axis: [0, 1, 0],
-    min: -30,
-    max: 120,
-    default: 25,
-    frame: Transform.identity().translate(0, 0, 20),
-  });
-
-return mech; // return Assembly, not mech.solve()
-```
+### Kinematic access
 
 ```javascript
-// scene.forge.js — consumer
 const arm = importAssembly("arm.forge.js");
 
-// Access named parts by name (positioned at default or given joint state)
-const base = arm.part("Base");
-const link = arm.part("Link", { shoulder: 60 });
-
-// Convert to a ShapeGroup — children named after assembly part names
-const g = arm.toGroup({ shoulder: 45 });
-const baseChild = g.child("Base");
-
 // Full kinematic access
-arm.assembly.sweepJoint("shoulder", -30, 120, 24);
 const solved = arm.solve({ shoulder: 45 });
 console.log(solved.bom());
+arm.assembly.sweepJoint("shoulder", -30, 120, 24);
+```
 
-return arm.toGroup({ shoulder: 45 });
+### Extracting parts
+
+```javascript
+const base = arm.part("Base");                   // at default state
+const link = arm.part("Link", { shoulder: 60 }); // at specific state
+```
+
+### Converting to group
+
+```javascript
+const g = arm.toGroup({ shoulder: 45 }); // ShapeGroup with named children
+const baseChild = g.child("Base");
+```
+
+### Convenience transforms
+
+`ImportedAssembly` has `.rotate()`, `.translate()`, `.scale()`, `.mirror()`, `.color()`, and `.child()` that auto-solve at defaults and return a `ShapeGroup`:
+
+```javascript
+const handle = importAssembly("./handle.forge.js");
+const positioned = handle.rotate(0, 0, -90).translate(0, -20, 50);
+// positioned is a ShapeGroup — use directly in named arrays or group()
+```
+
+### Placement references
+
+```javascript
+const arm = importAssembly("arm.forge.js");
+const placed = arm.placeReference("mountHole", [100, 0, 50]);
 ```
 
 ## Merging sub-assemblies into a parent
@@ -201,11 +277,10 @@ importAssembly("arm.forge.js")
   });
 
 // Drive sub-assembly joints from the parent using prefixed names
-const solved = robot.solve({
+return robot.solve({
   "Left Arm.shoulder": 45,
   "Right Arm.shoulder": -20,
 });
-return solved.toScene();
 ```
 
 **`mergeInto(parent, options)` options:**
@@ -228,7 +303,6 @@ return solved.toScene();
 - **Animating assemblies with `jointsView`**: If you use [`jointsView()`](../runtime/viewport.md) to animate an assembly, solve the assembly at rest pose (all animated joints = 0) and let `jointsView` control posing via `default` values and animation keyframes. Solving at non-zero angles and then animating will double-rotate parts. See the [viewport docs](../runtime/viewport.md#using-jointsview-with-assemblies) for the full pattern.
 - If parts vanish in the viewport, check whether a cut plane is active before debugging kinematics. The viewer-side APIs live in [../runtime/viewport.md](../runtime/viewport.md).
 - If a returned object is empty, Forge logs a warning in script output.
-- `importAssembly()` requires the source file to return the `Assembly` object before calling `.solve()`. If you call `.solve()` in the source file and return a `SolvedAssembly`, use `importGroup()` instead (convert with `.toScene()` → group).
 
 ## Metadata
 - `addPart(..., { metadata })` attaches per-part metadata to an assembly part.

@@ -910,6 +910,8 @@ Mark an entity for visual highlighting in the viewport (debugging aid).
 - `lineAngled()` — lineAngled(length: number, degrees: number): this
 - `arcTo()` — Draw a circular arc from the current cursor position to (x, y) with the given radius. If `clockwise` is true the arc sweeps clockwise; otherwise counter-clockwise. The arc center is computed automatically.
 - `arcByCenter()` — Create an arc from an explicit center point. `start` and `end` are existing PointIds that must lie on the arc's circle. Returns the ArcId. Does NOT advance the cursor.
+- `bezier()` — Create a cubic Bezier curve from four control points. Returns the BezierId. Does NOT advance the cursor.
+- `bezierTo()` — Draw a Bezier curve from the current cursor to (x3, y3) with control points (x1, y1) and (x2, y2).
 - `close()` — close(): this
 - `addLoopCircle()` — addLoopCircle(center: PointId, radius: number, segments?: number): this
 - `shape()` — Register a named shape (closed polygon) from an ordered list of line IDs. Returns the ShapeId for use in shape constraints (shapeWidth, shapeCentroidX, etc.).
@@ -941,6 +943,10 @@ Mark an entity for visual highlighting in the viewport (debugging aid).
 - `equalRadius()` — Constrain two circles to have equal radii.
 - `arcLength()` — Constrain the arc length of an arc (radius × sweep angle).
 - `lineTangentArc()` — Constrain a line to be tangent to an arc at the arc's start (`atStart=true`) or end point. Combine with `coincident` to enforce the shared endpoint.
+- `arcTangentArc()` — Constrain two arcs to be tangent (G1 smooth) at a shared junction point.
+- `bezierTangentArc()` — Constrain a Bezier curve to be tangent to an arc.
+- `smoothBlend()` — Create a smooth Bezier bridge between two arcs with controllable weight. Returns the BezierId of the bridge curve.
+- `blendTo()` — Draw a smooth Bezier curve from the current cursor to (x, y), tangent to the previous arc. Control points are computed automatically.
 - `shapeWidth()` — Constrain the bounding-box width of a shape.
 - `shapeHeight()` — Constrain the bounding-box height of a shape.
 - `shapeCentroidX()` — Constrain the X coordinate of a shape's centroid.
@@ -1080,6 +1086,7 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `scale()` — Scale the shape. Topology is cleared for non-uniform scale.
 - `mirror()` — Mirror across a plane. Topology is cleared.
 - `color()` — Set the display color. Returns a new TrackedShape.
+- `material()` — Set material properties (metalness, roughness, emissive, etc.). Returns a new TrackedShape.
 - `toShape()` — Access the underlying Shape for boolean ops etc
 - `attachTo()` — Position this tracked shape relative to another using named 3D anchor points
 - `onFace()` — Place this shape on a face of a parent shape. See Shape.onFace() for full documentation.
@@ -1126,12 +1133,17 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 
 ### `Shape`
 
-Thin immutable wrapper around a runtime geometry backend payload.
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `materialProps` | `ShapeMaterialProps | undefined` | — |
 
 **Methods:**
 
 - `setColor()` — Set the color of this shape (hex string, e.g. "#ff0000")
 - `color()` — Alias for setColor
+- `material()` — Set material properties for this shape's visual appearance. Returns a new Shape with the specified material properties merged. ```js box(50, 50, 50).material({ metalness: 0.9, roughness: 0.1 }); sphere(30).material({ emissive: '#ff6b35', emissiveIntensity: 2 }); cylinder(40, 20).material({ opacity: 0.3 }); ```
 - `clone()` — Return a new Shape wrapper for explicit duplication in scripts.
 - `duplicate()` — Alias for clone()
 - `geometryInfo()` — Inspect which backend/representation produced this solid.
@@ -1228,6 +1240,8 @@ Thin immutable wrapper around a runtime geometry backend payload.
 - `getJointState()` — getJointState(): JointState
 - `getTransform()` — getTransform(partName: string): Transform
 - `getPart()` — getPart(partName: string): AssemblyPart
+- `toGroup()` — Convert all solved parts to a ShapeGroup with named children. Each part becomes a child, positioned at its solved transform. This is the primary way to get a group for rendering, `show()`, or embedding.
+- `toSceneObjects()` — Return an array of named scene objects for the viewport renderer. Prefer `toGroup()` for most uses; this method exists for advanced scene-graph control.
 - `toScene()` — toScene(): Array<{ name: string; shape?: Shape; group?: Array<{ name: string; sh
 - `bom()` — bom(): BomRow[]
 - `bomCsv()` — bomCsv(): string
@@ -1271,6 +1285,12 @@ Wraps an imported Assembly, giving access to named parts and group conversion wi
 - `withReferences()` — Attach named placement reference points to this assembly. Points are simple 3D coordinates (relative to the assembly's own origin). Returns a new ImportedAssembly — does not mutate.
 - `referenceNames()` — List all attached placement reference names.
 - `placeReference()` — Translate the assembly so the named reference point lands on `target`. Returns a new ImportedAssembly — does not mutate. All point refs are translated by the same delta.
+- `translate()` — Solve at defaults and return a translated ShapeGroup.
+- `rotate()` — Solve at defaults and return a rotated ShapeGroup (Euler XYZ degrees).
+- `scale()` — Solve at defaults and return a scaled ShapeGroup.
+- `mirror()` — Solve at defaults and return a mirrored ShapeGroup.
+- `color()` — Solve at defaults and return a colored ShapeGroup.
+- `child()` — Solve at defaults, get a named child part from the resulting group.
 - `mergeInto()` — Flatten this sub-assembly's parts and joints into `parent`, then wire a mount joint connecting `mountParent` (a part already in `parent`) to the sub-assembly root. All part names and joint names from the sub-assembly are prefixed with `"${options.prefix}."` to avoid collisions. After the merge you can drive sub-assembly joints from the parent: `parent.solve({ "Left Arm.shoulder": 45 })`. Throws if the sub-assembly has multiple root parts (connect them with addFixed first). Returns `parent` for chaining.
 
 ### `SheetMetalPart`

@@ -258,7 +258,7 @@ jointsView({
   joints: [{ name: "shoulder", child: "Upper Arm", ... }],
   animations: [{ ... keyframes with shoulder values ... }],
 });
-return solved.toScene(); // double-rotated mess
+return solved; // double-rotated mess
 
 // GOOD — assembly at rest, jointsView controls all posing
 const solved = mech.solve({ shoulder: 0, elbow: 0 });
@@ -269,7 +269,7 @@ jointsView({
   ],
   animations: [{ ... }],
 });
-return solved.toScene(); // jointsView handles static pose via defaults AND animation
+return solved; // jointsView handles static pose via defaults AND animation
 ```
 
 **Pivot coordinates** are the world-space position of each joint origin at rest pose. For an assembly with `addRevolute("shoulder", "Base", "Link", { frame: Transform.identity().translate(0, 0, 20) })` where "Base" is at the world origin, the pivot is `[0, 0, 20]`.

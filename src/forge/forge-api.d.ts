@@ -2905,6 +2905,26 @@ declare class SolvedAssembly {
 	getJointState(): JointState;
 	getTransform(partName: string): Transform;
 	getPart(partName: string): AssemblyPart;
+	/**
+	 * Convert all solved parts to a ShapeGroup with named children.
+	 * Each part becomes a child, positioned at its solved transform.
+	 * This is the primary way to get a group for rendering, `show()`, or embedding.
+	 */
+	toGroup(): ShapeGroup;
+	/**
+	 * Return an array of named scene objects for the viewport renderer.
+	 * Prefer `toGroup()` for most uses; this method exists for advanced scene-graph control.
+	 */
+	toSceneObjects(): Array<{
+		name: string;
+		shape?: Shape;
+		group?: Array<{
+			name: string;
+			shape: Shape;
+		}>;
+		metadata?: PartMetadata;
+	}>;
+	/** @deprecated Use `toSceneObjects()` or `toGroup()` instead. */
 	toScene(): Array<{
 		name: string;
 		shape?: Shape;
@@ -3020,6 +3040,18 @@ declare class ImportedAssembly {
 		number,
 		number
 	]): ImportedAssembly;
+	/** Solve at defaults and return a translated ShapeGroup. */
+	translate(x: number, y: number, z: number): ShapeGroup;
+	/** Solve at defaults and return a rotated ShapeGroup (Euler XYZ degrees). */
+	rotate(x: number, y: number, z: number): ShapeGroup;
+	/** Solve at defaults and return a scaled ShapeGroup. */
+	scale(v: number | [number, number, number]): ShapeGroup;
+	/** Solve at defaults and return a mirrored ShapeGroup. */
+	mirror(normal: [number, number, number]): ShapeGroup;
+	/** Solve at defaults and return a colored ShapeGroup. */
+	color(hex: string): ShapeGroup;
+	/** Solve at defaults, get a named child part from the resulting group. */
+	child(name: string): GroupChild;
 	/**
 	 * Flatten this sub-assembly's parts and joints into `parent`, then wire a
 	 * mount joint connecting `mountParent` (a part already in `parent`) to the

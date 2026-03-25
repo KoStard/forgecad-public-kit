@@ -385,8 +385,7 @@ const mech = assembly("Two-Link Arm")
     frame: Transform.identity().translate(120, 0, 0),
   });
 
-const solved = mech.solve();
-return solved.toScene();
+return mech; // auto-solved at defaults
 ```
 
 Linked joint example:
@@ -450,7 +449,8 @@ Key methods:
 - `sweepJoint(jointName, from, to, steps, baseState?, collisionOptions?)`
 
 Solved assembly helpers:
-- `solved.toScene()` for rendering
+- `solved.toGroup()` returns a `ShapeGroup` with named children — primary way to get positioned parts
+- `solved.toSceneObjects()` returns raw scene-graph array (advanced)
 - `solved.collisionReport()` for interference checks
 - `solved.minClearance(partA, partB, searchLength?)`
 - `solved.bom()` / `solved.bomCsv()`
