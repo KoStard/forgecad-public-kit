@@ -198,72 +198,28 @@ function shapeToFace(oc: OCCTModule, shape: any): any {
 }
 
 /**
- * Rebuild a face from its outer wire and inner wires only.
+ * Merge coplanar face fragments from a boolean result into a single face.
  *
- * OCCT coplanar face booleans (fuse, cut) can leave internal edges
- * where the operand boundaries overlapped. When extruded, these
- * internal edges become parasitic surfaces that make the solid
- * non-manifold and break downstream 3D booleans.
- *
- * This function strips all internal edges by reconstructing the face
- * from only its outer wire and inner wires (holes).
+ * Profile boolean operations (fuse, cut, common) produce compounds of
+ * face fragments. These compounds work fine as inputs to further booleans
+ * and extrude/revolve, but some operations (offset, polygon extraction)
+ * need a single coherent face. This function uses ShapeUpgrade_UnifySameDomain
+ * to merge the fragments.
  */
-function _cleanProfileFace(oc: OCCTModule, shape: any): any {
-  const face = shapeToFace(oc, shape);
-  const faceCast = oc.TopoDS.Face_1(face);
-  const outerWire = oc.BRepTools.OuterWire(faceCast);
-  const mkFace = new oc.BRepBuilderAPI_MakeFace_15(outerWire, true);
-
-  // Re-add inner wires (holes), skip the outer wire
-  const wireExpl = new oc.TopExp_Explorer_2(face, oc.TopAbs_ShapeEnum.TopAbs_WIRE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
-  while (wireExpl.More()) {
-    const wire = oc.TopoDS.Wire_1(wireExpl.Current());
-    if (!wire.IsSame(outerWire)) {
-      mkFace.Add(wire);
-    }
-    wireExpl.Next();
-  }
-  return mkFace.Face();
+function unifyProfileShape(oc: OCCTModule, shape: any): any {
+  // Already a single face — nothing to unify
+  if (shape.ShapeType() === oc.TopAbs_ShapeEnum.TopAbs_FACE) return shape;
+  const unify = new oc.ShapeUpgrade_UnifySameDomain_2(shape, true, true, false);
+  unify.Build();
+  return shapeToFace(oc, unify.Shape());
 }
 
 /**
- * Subtract a cutting face from a base face on the same plane.
+ * Lower a ProfileCompilePlan to an OCCT shape on the XY plane (z=0).
  *
- * All 2D profile booleans operate on coplanar faces (both on Z=0).
- * OCCT's BRepAlgoAPI_Cut can fail silently or produce incorrect geometry
- * for coplanar face subtraction. Instead, use wire insertion — the
- * idiomatic OCCT way to create holes in planar faces: extract the
- * cutting face's outer wire, reverse it, and add it as an inner wire.
- */
-function profileDifference(oc: OCCTModule, base: any, cutter: any): any {
-  const baseFace = shapeToFace(oc, base);
-  const cutterFace = shapeToFace(oc, cutter);
-
-  // Cast to TopoDS_Face for BRepTools.OuterWire (requires exact type, not TopoDS_Shape)
-  const baseFaceCast = oc.TopoDS.Face_1(baseFace);
-  const outerWire = oc.BRepTools.OuterWire(baseFaceCast);
-  const mkFace = new oc.BRepBuilderAPI_MakeFace_15(outerWire, true);
-
-  // Re-add existing inner wires (holes from previous operations)
-  const wireExpl = new oc.TopExp_Explorer_2(baseFace, oc.TopAbs_ShapeEnum.TopAbs_WIRE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
-  while (wireExpl.More()) {
-    const wire = oc.TopoDS.Wire_1(wireExpl.Current());
-    if (!wire.IsSame(outerWire)) {
-      mkFace.Add(wire);
-    }
-    wireExpl.Next();
-  }
-
-  // Add the cutter's outer wire as a hole (reversed orientation)
-  const cutterFaceCast = oc.TopoDS.Face_1(cutterFace);
-  const cutterOuterWire = oc.BRepTools.OuterWire(cutterFaceCast);
-  mkFace.Add(oc.TopoDS.Wire_1(cutterOuterWire.Reversed()));
-  return mkFace.Face();
-}
-
-/**
- * Build an OCCT TopoDS_Face from a ProfileCompilePlan.
- * Returns the face in the XY plane (z=0).
+ * May return a single TopoDS_Face or a compound of faces (for boolean
+ * operations that produce disconnected regions). Consumers that need
+ * a single face should call unifyProfileShape() on the result.
  */
 function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
   let face: any;
@@ -360,42 +316,56 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
     }
 
     case 'boolean': {
-      const faces = plan.profiles.map((p) => lowerProfileToFace(oc, p));
-      if (faces.length === 0) throw new Error('Cannot lower empty profile boolean');
-      if (faces.length === 1) {
-        face = faces[0];
+      const shapes = plan.profiles.map((p) => lowerProfileToFace(oc, p));
+      if (shapes.length === 0) throw new Error('Cannot lower empty profile boolean');
+      if (shapes.length === 1) {
+        face = shapes[0];
         break;
       }
-      let result = faces[0];
-      for (let i = 1; i < faces.length; i++) {
-        if (plan.op === 'difference') {
-          // Coplanar face subtraction via BRepAlgoAPI_Cut can fail silently
-          // in OCCT when both faces lie on the same plane. Use wire insertion
-          // as the primary strategy: extract the cutting face's outer wire
-          // and add it as an inner wire (hole) to the base face.
-          // Falls back to boolean cut for partial-overlap cases.
-          result = profileDifference(oc, result, faces[i]);
-        } else {
-          let op: any;
-          switch (plan.op) {
-            case 'union':
-              op = new oc.BRepAlgoAPI_Fuse_3(result, faces[i], new oc.Message_ProgressRange_1());
-              break;
-            case 'intersection':
-              op = new oc.BRepAlgoAPI_Common_3(result, faces[i], new oc.Message_ProgressRange_1());
-              break;
-          }
-          op.Build(new oc.Message_ProgressRange_1());
-          result = shapeToFace(oc, op.Shape());
-        }
+
+      // Use list-based boolean API for all operations.
+      // Pairwise chaining via shapeToFace creates faces with internal partition
+      // edges that corrupt subsequent boolean operations (double-counted overlap).
+      const args = new oc.TopTools_ListOfShape_1();
+      args.Append_1(shapes[0]);
+      const tools = new oc.TopTools_ListOfShape_1();
+      for (let i = 1; i < shapes.length; i++) tools.Append_1(shapes[i]);
+
+      let op: any;
+      switch (plan.op) {
+        case 'union':
+          op = new oc.BRepAlgoAPI_Fuse_1();
+          break;
+        case 'difference':
+          op = new oc.BRepAlgoAPI_Cut_1();
+          break;
+        case 'intersection':
+          op = new oc.BRepAlgoAPI_Common_1();
+          break;
       }
-      // Boolean on 2D profiles can return a compound; ensure it's a face.
-      face = shapeToFace(oc, result);
+      op.SetArguments(args);
+      op.SetTools(tools);
+      op.Build(new oc.Message_ProgressRange_1());
+      let result = op.Shape();
+
+      // Merge coplanar face fragments. The boolean produces a compound
+      // of face fragments; UnifySameDomain merges adjacent coplanar faces
+      // while preserving disconnected regions as separate faces.
+      const unify = new oc.ShapeUpgrade_UnifySameDomain_2(result, true, true, false);
+      unify.Build();
+
+      // Return the shape directly — may be a single face or a compound
+      // of faces (disconnected regions). Do NOT force into a single face
+      // via shapeToFace — that would merge wires from disconnected faces
+      // into a broken topology.
+      face = unify.Shape();
       break;
     }
 
     case 'offset': {
-      const baseFace = lowerProfileToFace(oc, plan.base);
+      const baseShape = lowerProfileToFace(oc, plan.base);
+      // Offset requires a single face, not a compound of fragments
+      const baseFace = unifyProfileShape(oc, baseShape);
       const offsetMaker = new oc.BRepOffsetAPI_MakeOffset_2(baseFace, oc.GeomAbs_JoinType.GeomAbs_Arc, false);
       offsetMaker.Perform(plan.delta, 0);
       if (offsetMaker.IsDone()) {
@@ -888,7 +858,7 @@ function _lowerShapeCompilePlanToOCCTInner(plan: ShapeCompilePlan, oc?: OCCTModu
       return new oc.BRepPrimAPI_MakeTorus_1(plan.majorRadius, plan.minorRadius).Shape();
 
     case 'extrude': {
-      const face = lowerProfileToFace(oc, plan.profile);
+      const rawFace = lowerProfileToFace(oc, plan.profile);
       const height = plan.height;
 
       if (plan.scaleTop && (plan.scaleTop[0] !== 1 || plan.scaleTop[1] !== 1)) {
@@ -896,11 +866,13 @@ function _lowerShapeCompilePlanToOCCTInner(plan: ShapeCompilePlan, oc?: OCCTModu
       }
 
       if (plan.twist && Math.abs(plan.twist) > 1e-6) {
-        return lowerExtrudeWithTwist(oc, plan, face);
+        // Twist needs a single face for extractOuterWire
+        return lowerExtrudeWithTwist(oc, plan, unifyProfileShape(oc, rawFace));
       }
 
+      // Simple extrude works with compounds (face fragments from booleans)
       const vec = new oc.gp_Vec_4(0, 0, height);
-      const prism = new oc.BRepPrimAPI_MakePrism_1(face, vec, false, true);
+      const prism = new oc.BRepPrimAPI_MakePrism_1(rawFace, vec, false, true);
       prism.Build(new oc.Message_ProgressRange_1());
       let result = prism.Shape();
 
@@ -1033,7 +1005,8 @@ function lowerLoftPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: '
   const ts = new oc.BRepOffsetAPI_ThruSections(true, false, 1e-6);
 
   for (let i = 0; i < plan.profiles.length; i++) {
-    const face = lowerProfileToFace(oc, plan.profiles[i]);
+    const rawFace = lowerProfileToFace(oc, plan.profiles[i]);
+    const face = unifyProfileShape(oc, rawFace);
     let wire = extractOuterWire(oc, face);
     // Convert high-edge-count polygon wires to B-spline wires.
     // ThruSections with 120+ line-segment edges per profile hangs;
@@ -1090,7 +1063,7 @@ function lowerSweepPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 
   if (pathPoints.length < 2) throw new Error('Sweep path needs at least 2 points');
 
   const spineWire = buildSpineWire(oc, pathPoints);
-  const profileFace = lowerProfileToFace(oc, plan.profile);
+  const profileFace = unifyProfileShape(oc, lowerProfileToFace(oc, plan.profile));
 
   // Orient the profile at the start of the path, perpendicular to the
   // first segment. The profile is built on the XY plane (normal = Z).
@@ -1186,7 +1159,7 @@ function lowerExtrudeWithTwist(oc: OCCTModule, plan: Extract<ShapeCompilePlan, {
  * (original profile) to top wire (scaled profile at z=height).
  */
 function lowerExtrudeWithScaleTop(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>): any {
-  const bottomFace = lowerProfileToFace(oc, plan.profile);
+  const bottomFace = unifyProfileShape(oc, lowerProfileToFace(oc, plan.profile));
   const bottomWire = toBSplineWireIfNeeded(oc, extractOuterWire(oc, bottomFace));
 
   const scaleX = plan.scaleTop![0];
@@ -1248,5 +1221,6 @@ export function lowerShapeCompilePlanToOCCTBackend(plan: ShapeCompilePlan): Shap
  */
 export function lowerProfileCompilePlanToOCCTProfileBackend(plan: ProfileCompilePlan): ProfileBackend {
   const oc = getOCCT();
-  return wrapOCCTProfileBackend(lowerProfileToFace(oc, plan));
+  // ProfileBackend needs a single face for area/bounds/polygon queries
+  return wrapOCCTProfileBackend(unifyProfileShape(oc, lowerProfileToFace(oc, plan)));
 }
