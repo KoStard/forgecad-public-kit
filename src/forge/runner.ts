@@ -22,7 +22,7 @@ import type { ToolpathData } from './export/gcode';
 import { GCodeBuilder, gcode } from './export/gcode';
 import { group, ShapeGroup } from './group';
 import { joint } from './assembly/joint';
-import { type CollectedJointsView, getCollectedJointsView, jointsView, resetJointsView } from './assembly/jointsView';
+import { type CollectedJointsView, getCollectedJointsView, jointsView, resetJointsView, restoreJointsView, saveJointsView } from './assembly/jointsView';
 import {
   box,
   buildShapeFromCompilePlan,
@@ -383,6 +383,7 @@ function executeFile(
         overrides: localOverrides,
       });
       let result: ReturnType<typeof executeFile>;
+      const savedJointsView = saveJointsView();
       try {
         result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
       } catch (error) {
@@ -391,6 +392,8 @@ function executeFile(
           error: formatLogError(error),
         });
         throw error;
+      } finally {
+        restoreJointsView(savedJointsView);
       }
       validateConsumedOverrides(childScope, 'importPart', resolvedPath);
       const importedDims = takeCollectedDimensions(dimStart);
@@ -426,6 +429,7 @@ function executeFile(
         overrides: localOverrides,
       });
       let result: ReturnType<typeof executeFile>;
+      const savedJointsView = saveJointsView();
       try {
         result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
       } catch (error) {
@@ -434,6 +438,8 @@ function executeFile(
           error: formatLogError(error),
         });
         throw error;
+      } finally {
+        restoreJointsView(savedJointsView);
       }
       validateConsumedOverrides(childScope, 'importGroup', resolvedPath);
       if (result instanceof ShapeGroup) {
@@ -460,6 +466,7 @@ function executeFile(
         overrides: localOverrides,
       });
       let result: ReturnType<typeof executeFile>;
+      const savedJointsView = saveJointsView();
       try {
         result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
       } catch (error) {
@@ -468,6 +475,8 @@ function executeFile(
           error: formatLogError(error),
         });
         throw error;
+      } finally {
+        restoreJointsView(savedJointsView);
       }
       validateConsumedOverrides(childScope, 'importAssembly', resolvedPath);
       if (result instanceof Assembly) {

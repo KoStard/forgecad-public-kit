@@ -439,6 +439,16 @@ export function getCollectedJointsView(): CollectedJointsView | null {
   return _collected ? cloneCollected(_collected) : null;
 }
 
+/** Save the current jointsView state (for restoring after child file execution). */
+export function saveJointsView(): CollectedJointsView | null {
+  return _collected ? cloneCollected(_collected) : null;
+}
+
+/** Restore a previously saved jointsView state. */
+export function restoreJointsView(state: CollectedJointsView | null): void {
+  _collected = state;
+}
+
 /**
  * Configure runtime joint controls that animate object transforms in the viewport
  * without re-running the script.
