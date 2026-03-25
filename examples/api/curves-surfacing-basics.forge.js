@@ -63,8 +63,6 @@ const inner = loft(
 );
 
 let bottle = body.subtract(inner);
-// Mild smoothing to reduce voxel-like artifacts on curved sections.
-bottle = bottle.smoothOut(70, 0.25).refine(2);
 
 // Curved spout/tube detail using sweep.
 const spoutPath = spline3d(

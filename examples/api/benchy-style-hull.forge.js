@@ -43,7 +43,6 @@ let hull = loft(
   [z0, z1, z2, z3, z4],
   { edgeLength: 0.95 },
 );
-hull = hull.smoothOut(72, 0.28).refine(2);
 
 // Orient hull so length goes along X, beam along Y, height along Z.
 hull = hull
