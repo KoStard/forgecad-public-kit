@@ -613,7 +613,7 @@ forgecad check dimensions
 
 Runs shape-level invariants for dimension metadata propagation across:
 - transform APIs (`translate`, `rotate`, `transform`, `scale`, `mirror`, `rotateAround`)
-- copy/style APIs (`clone`, `color`, `setColor`, `smooth/refine/simplify`)
+- copy/style APIs (`clone`, `color`, `setColor`)
 - boolean APIs (`add/subtract/intersect`, plus `union/difference/intersection`)
 - import runtime path (`importPart(...).color(...).translate(...)`)
 

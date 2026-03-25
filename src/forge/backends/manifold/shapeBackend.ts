@@ -51,22 +51,6 @@ export class ManifoldShapeBackend implements ManifoldCapableBackend {
     return new ManifoldShapeBackend(this.manifold.mirror(normal));
   }
 
-  smoothOut(minSharpAngle: number, minSmoothness: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.smoothOut(minSharpAngle, minSmoothness));
-  }
-
-  refine(steps: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.refine(steps));
-  }
-
-  refineToLength(length: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.refineToLength(length));
-  }
-
-  refineToTolerance(tolerance: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.refineToTolerance(tolerance));
-  }
-
   warp(fn: (vert: [number, number, number]) => void): ShapeBackend {
     return new ManifoldShapeBackend(this.manifold.warp(fn as any));
   }

@@ -26,7 +26,6 @@ The kernel is not the product. The modeling layer on top is.
 - **Parameters** — `param()` creates live UI sliders, code re-executes on change
 - **Multi-file** — `importSketch()`, `importPart()` with circular import detection, folder support
 - **Code-as-format** — plain JS/TS files, version-controllable, LLM-writable
-- **3D smoothing** — `smoothOut()` + `refine()` / `refineToLength()` / `refineToTolerance()` for edge rounding
 - **3D advanced ops** — `levelSet()` (SDF-based shapes), `warp()`, `split()`, `splitByPlane()`, `trimByPlane()`
 - **Sketch on face** — `sketch.onFace(body, face, ...)` places a 2D sketch on canonical or tracked planar faces and extrudes from that face normal
 - **Part library** — bolt holes, counterbores, tubes, pipes, hex nuts, rounded boxes, brackets, hole patterns, threaded bolts/nuts (real helical threads via SDF levelSet)

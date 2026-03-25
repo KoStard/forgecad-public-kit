@@ -17,18 +17,8 @@ export const EXPERIMENTAL_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
     'tasks/280-example-gap-recovery-and-legacy-fence.md',
   ),
   experimentalExample(
-    'examples/api/benchy-style-hull.forge.js',
-    'Uses smoothOut/refine which were removed from the Shape API. Needs rewrite to use supported surfacing methods.',
-    'tasks/280-example-gap-recovery-and-legacy-fence.md',
-  ),
-  experimentalExample(
     'examples/api/curves-surfacing-basics.forge.js',
     'Uses loft/sweep geometry outside the current API surface. Needs rewrite to use supported methods.',
-    'tasks/280-example-gap-recovery-and-legacy-fence.md',
-  ),
-  experimentalExample(
-    'examples/iphone.forge.js',
-    'Uses smoothOut/refine which were removed from the Shape API. Needs rewrite to use supported methods.',
     'tasks/280-example-gap-recovery-and-legacy-fence.md',
   ),
   experimentalExample(

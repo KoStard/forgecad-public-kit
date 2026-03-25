@@ -33,6 +33,7 @@ import { runMeshExportCli } from './forge-mesh';
 import { runNotebookCli } from './forge-notebook';
 import { runRenderCli } from './forge-render.mjs';
 import { runRenderHqCli } from './forge-render-hq';
+import { runCuttingLayoutCli } from './forge-cutting-layout';
 import { runReportCli } from './forge-report';
 import { runSdfCli } from './forge-sdf';
 import { runSketchPdfCli } from './forge-sketch-pdf';
@@ -716,6 +717,31 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: runReportCli,
+  },
+  {
+    group: 'Export',
+    path: ['export', 'cutting-layout'],
+    summary: 'Compute sheet cutting layout with sequenced cuts, export PDF and print cut list.',
+    usage: [
+      'forgecad export cutting-layout <script.forge.js> [output.pdf]',
+      '  [--sheet-width <mm>] [--sheet-height <mm>] [--kerf <mm>]',
+    ],
+    examples: [
+      'forgecad export cutting-layout examples/my-cabinet.forge.js',
+      'forgecad export cutting-layout examples/my-cabinet.forge.js --sheet-width 2440 --sheet-height 1220 --kerf 3',
+    ],
+    completion: {
+      options: [
+        { name: '--sheet-width', description: 'Stock sheet width in mm', argument: 'required', valueLabel: '<mm>' },
+        { name: '--sheet-height', description: 'Stock sheet height in mm', argument: 'required', valueLabel: '<mm>' },
+        { name: '--kerf', description: 'Cutting clearance (saw blade width) in mm', argument: 'required', valueLabel: '<mm>' },
+      ],
+      positionals: [
+        { description: 'Forge script', valueKind: 'forge-script' },
+        { description: 'output PDF path', valueKind: 'pdf' },
+      ],
+    },
+    run: runCuttingLayoutCli,
   },
   {
     group: 'Checks',

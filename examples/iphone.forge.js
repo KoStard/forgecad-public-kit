@@ -14,11 +14,6 @@ const edgeR = param("Edge Radius", 1.5, { min: 0, max: 3, step: 0.1, unit: "mm" 
 const bodyProfile = roundedRect(w, h, cornerR, true);
 let body = bodyProfile.extrude(d, { center: true });
 
-if (edgeR > 0) {
-  const smoothness = Math.min(edgeR / 3, 1);
-  body = body.toShape().smoothOut(80, smoothness).refine(3);
-}
-
 // === Screen cutout (top +Z face = phone screen side) ===
 const screenInset = param("Screen Inset", 2, { min: 1, max: 5, unit: "mm" });
 const screenDepth = 0.4;
@@ -50,10 +45,6 @@ let camIsland = roundedRect(camSize, camSize, camR, true)
   .translate(camX, camY)
   .extrude(camBump)
   .translate(0, 0, -d / 2 - camBump);
-
-if (edgeR > 0) {
-  camIsland = camIsland.toShape().smoothOut(80, 0.4).refine(2);
-}
 
 // Camera lenses — 3 in L-pattern, positioned via entity geometry
 const lensR = param("Lens Radius", 6, { min: 3, max: 10, unit: "mm" });
