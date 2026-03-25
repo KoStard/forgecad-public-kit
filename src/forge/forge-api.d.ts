@@ -3352,6 +3352,7 @@ interface JointViewInput {
 	max?: number;
 	default?: number;
 	unit?: string;
+	hidden?: boolean;
 }
 interface JointViewAnimationKeyframeInput {
 	at: number;

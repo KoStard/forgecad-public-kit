@@ -12,6 +12,7 @@ export interface JointViewInput {
   max?: number;
   default?: number;
   unit?: string;
+  hidden?: boolean;
 }
 
 export interface JointViewAnimationKeyframeInput {
@@ -49,6 +50,7 @@ export interface JointViewDef {
   max?: number;
   defaultValue: number;
   unit?: string;
+  hidden?: boolean;
 }
 
 export interface JointViewAnimationKeyframeDef {
@@ -182,6 +184,7 @@ const normalizeJoint = (joint: JointViewInput): JointViewDef => {
     max,
     defaultValue,
     unit,
+    hidden: joint.hidden === true ? true : undefined,
   };
 };
 

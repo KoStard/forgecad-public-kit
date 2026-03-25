@@ -1208,6 +1208,7 @@ export class Assembly {
       if (j.type === 'fixed') {
         // Fixed joints become zero-range revolute joints in jointsView so
         // attached parts follow their parent during viewport animation.
+        // Hidden from the joints panel since they have no user-meaningful control.
         const parentAxis = parentWorld.vector([0, 0, 1]);
         const parentAxisLen = Math.hypot(parentAxis[0], parentAxis[1], parentAxis[2]);
         joints.push({
@@ -1222,6 +1223,7 @@ export class Assembly {
           min: 0,
           max: 0,
           default: 0,
+          hidden: true,
         });
         continue;
       }

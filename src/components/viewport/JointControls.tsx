@@ -134,10 +134,10 @@ export function JointControls({
         </div>
       )}
 
-      {joints.length > 0 && (
+      {joints.some((j) => !j.hidden) && (
         <div style={sectionStyle}>
           <div style={labelStyle}>Joints</div>
-          {joints.map((joint) => {
+          {joints.filter((j) => !j.hidden).map((joint) => {
             const { min, max } = resolveJointRange(joint.type, joint.min, joint.max);
             const rawValue = displayedRawJointValues[joint.name] ?? joint.defaultValue;
             const clampedValue = displayedJointValues[joint.name] ?? joint.defaultValue;
