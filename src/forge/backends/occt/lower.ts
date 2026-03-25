@@ -513,8 +513,8 @@ function occtNativeBoolean(oc: OCCTModule, boolOp: string, shapes: any[]): any {
     return result;
   }
 
-  // Union and difference: N-shape API is correct.
-  // Union: A ∪ (B ∪ C) = A ∪ B ∪ C. Difference: A - (B ∪ C) = A - B - C.
+  // Union and difference: N-shape API.
+  // A ∪ B ∪ C via single call. A - (B ∪ C) = A - B - C.
   const args = new oc.TopTools_ListOfShape_1();
   args.Append_1(shapes[0]);
   const tools = new oc.TopTools_ListOfShape_1();
