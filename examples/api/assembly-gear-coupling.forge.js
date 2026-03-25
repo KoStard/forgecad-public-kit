@@ -29,4 +29,4 @@ const mech = assembly("Gear Coupling Demo")
   .addGearCoupling("Driven", "Pinion", { pair });
 
 const solved = mech.solve({ Pinion: pinionDeg });
-return solved.toScene();
+return solved;

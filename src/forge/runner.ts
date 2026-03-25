@@ -928,6 +928,8 @@ function isRenderableEntryResult(value: unknown): boolean {
     || value instanceof TrackedShape
     || value instanceof ShapeGroup
     || value instanceof GCodeBuilder
+    || value instanceof Assembly
+    || value instanceof SolvedAssembly
     || Array.isArray(value)
   );
 }
@@ -1666,7 +1668,18 @@ export function runScript(
       }
     };
 
-    if (result instanceof ShapeGroup) {
+    // Assembly / SolvedAssembly: auto-solve and flatten into named scene objects.
+    // Uses toSceneObjects() to preserve group names (groupName on SceneObject).
+    const assemblySceneItems =
+      result instanceof Assembly ? result.solve().toSceneObjects()
+      : result instanceof SolvedAssembly ? result.toSceneObjects()
+      : null;
+    if (assemblySceneItems) {
+      assemblySceneItems.forEach((item, index) => {
+        const label = `Object ${index + 1}`;
+        processNamedItem(item, label, label);
+      });
+    } else if (result instanceof ShapeGroup) {
       result.children.forEach((child, i) => {
         const label = rootGroupChildLabel(result, i);
         flattenGroupChild(child, label, undefined, [label]);

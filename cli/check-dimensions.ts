@@ -153,7 +153,7 @@ function checkGroupedExplicitOwnership(): void {
 const panel = group({ name: "Panel", shape: box(40, 20, 5) });
 dim([0, 0, 0], [40, 0, 0], { component: "Panel" });
 const asm = assembly("Case").addPart("Base Assembly", panel);
-return asm.solve().toScene();
+return asm.solve();
 `,
   };
 
@@ -184,7 +184,7 @@ dim([0, 0, 0], [40, 0, 0], { component: "Panel" });
 const asm = assembly("Case")
   .addPart("Base Assembly", panel())
   .addPart("Lid Assembly", panel().translate(0, 40, 0));
-return asm.solve().toScene();
+return asm.solve();
 `,
   };
 

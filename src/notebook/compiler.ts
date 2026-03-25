@@ -88,6 +88,8 @@ export function compileNotebookProgram(
     '  || value instanceof Sketch',
     '  || value instanceof TrackedShape',
     '  || value instanceof ShapeGroup',
+    '  || value instanceof Assembly',
+    '  || value instanceof SolvedAssembly',
     '  || __forgeNotebookIsRenderableArray(value)',
     ');',
   ];

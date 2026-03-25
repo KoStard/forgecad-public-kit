@@ -1,4 +1,5 @@
 import { Shape, union, getShapeRuntimeBackend } from './kernel';
+import type { Sketch } from './sketch/core';
 import { isManifoldCapableBackend, requireManifoldShapeBackend } from './backends/manifold/shapeBackend';
 import { ShapeGroup, group } from './group';
 import { TrackedShape } from './sketch/topology';
@@ -430,7 +431,28 @@ export class SolvedAssembly {
     return applyTransformToPart(rec.part, this.getTransform(partName));
   }
 
-  toScene(): Array<{
+  /**
+   * Convert all solved parts to a ShapeGroup with named children.
+   * Each part becomes a child, positioned at its solved transform.
+   * This is the primary way to get a group for rendering, `show()`, or embedding.
+   */
+  toGroup(): ShapeGroup {
+    const children: AssemblyPart[] = [];
+    const childNames: string[] = [];
+    for (const [name] of this.parts) {
+      children.push(this.getPart(name));
+      childNames.push(name);
+    }
+    return new ShapeGroup(children, childNames);
+  }
+
+  /**
+   * Return an array of named scene objects for the viewport renderer.
+   * Each part becomes `{ name, shape }` or `{ name, group: [...] }` if the part
+   * is a ShapeGroup.  Prefer `toGroup()` for most uses; this method exists for
+   * advanced scene-graph control.
+   */
+  toSceneObjects(): Array<{
     name: string;
     shape?: Shape;
     group?: Array<{ name: string; shape: Shape }>;
@@ -478,6 +500,16 @@ export class SolvedAssembly {
       }
     }
     return out;
+  }
+
+  /** @deprecated Use `toSceneObjects()` or `toGroup()` instead. */
+  toScene(): Array<{
+    name: string;
+    shape?: Shape;
+    group?: Array<{ name: string; shape: Shape }>;
+    metadata?: PartMetadata;
+  }> {
+    return this.toSceneObjects();
   }
 
   bom(): BomRow[] {
@@ -1138,6 +1170,41 @@ export class ImportedAssembly {
       this._offset[2] + dz,
     ];
     return new ImportedAssembly(this._assembly, newRefs, newOffset);
+  }
+
+  // ── Convenience transforms ─────────────────────────────────────────
+  // These solve the assembly at default joint values, convert to a
+  // ShapeGroup, and apply the transform.  The result is a ShapeGroup
+  // (not an ImportedAssembly) because transforms lose kinematic identity.
+
+  /** Solve at defaults and return a translated ShapeGroup. */
+  translate(x: number, y: number, z: number): ShapeGroup {
+    return this.toGroup().translate(x, y, z);
+  }
+
+  /** Solve at defaults and return a rotated ShapeGroup (Euler XYZ degrees). */
+  rotate(x: number, y: number, z: number): ShapeGroup {
+    return this.toGroup().rotate(x, y, z);
+  }
+
+  /** Solve at defaults and return a scaled ShapeGroup. */
+  scale(v: number | [number, number, number]): ShapeGroup {
+    return this.toGroup().scale(v);
+  }
+
+  /** Solve at defaults and return a mirrored ShapeGroup. */
+  mirror(normal: [number, number, number]): ShapeGroup {
+    return this.toGroup().mirror(normal);
+  }
+
+  /** Solve at defaults and return a colored ShapeGroup. */
+  color(hex: string): ShapeGroup {
+    return this.toGroup().color(hex);
+  }
+
+  /** Solve at defaults, get a named child part from the resulting group. */
+  child(name: string): Shape | Sketch | TrackedShape | ShapeGroup {
+    return this.toGroup().child(name);
   }
 
   /**
