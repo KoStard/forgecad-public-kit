@@ -16,7 +16,10 @@ export interface JointViewInput {
 }
 
 export interface JointViewAnimationKeyframeInput {
-  at: number;
+  /** Timeline position [0, 1]. If omitted from ALL keyframes, positions are auto-computed from tick weights. */
+  at?: number;
+  /** Relative weight of the segment from this keyframe to the next (default 1). Only used in tick-based mode (when `at` is omitted). Last keyframe's ticks value is ignored. */
+  ticks?: number;
   values: Record<string, number>;
 }
 
@@ -210,17 +213,78 @@ const normalizeAnimation = (animation: JointViewAnimationInput): JointViewAnimat
     throw new Error(`jointsView animation "${name}" keyframes must be a non-empty array`);
   }
 
+  // Detect tick-based vs explicit-at mode
+  const hasExplicitAt = animation.keyframes.some((kf) => kf && typeof kf === 'object' && kf.at !== undefined);
+  const hasImplicitAt = animation.keyframes.some((kf) => kf && typeof kf === 'object' && kf.at === undefined);
+  if (hasExplicitAt && hasImplicitAt) {
+    throw new Error(
+      `jointsView animation "${name}" keyframes must either all have "at" or all omit it (tick-based); mixing is not allowed`,
+    );
+  }
+  const tickBased = !hasExplicitAt;
+
+  // Pre-validate ticks weights and compute cumulative positions for tick-based mode
+  let tickPositions: number[] | null = null;
+  if (tickBased && animation.keyframes.length > 1) {
+    // Collect weights: each keyframe's `ticks` is the relative duration of the segment
+    // from this keyframe to the next. Last keyframe's ticks is ignored.
+    const weights: number[] = [];
+    for (let i = 0; i < animation.keyframes.length - 1; i++) {
+      const kf = animation.keyframes[i];
+      if (kf && typeof kf === 'object' && kf.ticks !== undefined) {
+        if (!isFiniteNumber(kf.ticks) || kf.ticks <= 0) {
+          throw new Error(`jointsView animation "${name}" keyframes[${i}].ticks must be a positive number`);
+        }
+        weights.push(kf.ticks);
+      } else {
+        weights.push(1);
+      }
+    }
+    // Validate last keyframe's ticks if present (we ignore it but still reject bad values)
+    const lastKf = animation.keyframes[animation.keyframes.length - 1];
+    if (lastKf && typeof lastKf === 'object' && lastKf.ticks !== undefined) {
+      if (!isFiniteNumber(lastKf.ticks) || lastKf.ticks <= 0) {
+        throw new Error(
+          `jointsView animation "${name}" keyframes[${animation.keyframes.length - 1}].ticks must be a positive number`,
+        );
+      }
+    }
+
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    tickPositions = [0];
+    let cumulative = 0;
+    for (const w of weights) {
+      cumulative += w;
+      tickPositions.push(cumulative / totalWeight);
+    }
+  }
+
   const keyframes = animation.keyframes
     .map((keyframe, index): JointViewAnimationKeyframeDef => {
       if (!keyframe || typeof keyframe !== 'object') {
         throw new Error(`jointsView animation "${name}" keyframes[${index}] must be an object`);
       }
-      if (!isFiniteNumber(keyframe.at)) {
-        throw new Error(`jointsView animation "${name}" keyframes[${index}].at must be a finite number`);
+
+      let at: number;
+      if (tickBased) {
+        if (animation.keyframes.length === 1) {
+          at = 0;
+        } else {
+          at = tickPositions![index];
+        }
+      } else {
+        if (keyframe.ticks !== undefined) {
+          throw new Error(`jointsView animation "${name}" keyframes[${index}].ticks cannot be used with explicit "at" values`);
+        }
+        if (!isFiniteNumber(keyframe.at)) {
+          throw new Error(`jointsView animation "${name}" keyframes[${index}].at must be a finite number`);
+        }
+        if (keyframe.at! < 0 || keyframe.at! > 1) {
+          throw new Error(`jointsView animation "${name}" keyframes[${index}].at must be within [0, 1]`);
+        }
+        at = keyframe.at!;
       }
-      if (keyframe.at < 0 || keyframe.at > 1) {
-        throw new Error(`jointsView animation "${name}" keyframes[${index}].at must be within [0, 1]`);
-      }
+
       if (!keyframe.values || typeof keyframe.values !== 'object') {
         throw new Error(`jointsView animation "${name}" keyframes[${index}].values must be an object map`);
       }
@@ -234,7 +298,7 @@ const normalizeAnimation = (animation: JointViewAnimationInput): JointViewAnimat
       if (Object.keys(values).length === 0) {
         throw new Error(`jointsView animation "${name}" keyframes[${index}] must animate at least one joint`);
       }
-      return { at: keyframe.at, values };
+      return { at, values };
     })
     .sort((a, b) => a.at - b.at);
 

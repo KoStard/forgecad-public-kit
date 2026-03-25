@@ -58,7 +58,7 @@ const mech = assembly("Handle")
 // Animation setup — runs when standalone, ignored on import
 mech.toJointsView({
   animations: [{ name: "Fold", duration: 2, loop: true,
-    keyframes: [{ at: 0, values: { Fold: 0 } }, { at: 0.5, values: { Fold: 90 } }, { at: 1, values: { Fold: 0 } }],
+    keyframes: [{ values: { Fold: 0 } }, { values: { Fold: 90 } }, { values: { Fold: 0 } }],
   }],
 });
 
@@ -180,9 +180,9 @@ mech.toJointsView({
       duration: 2,
       loop: true,
       keyframes: [
-        { at: 0, values: { J1: -45 } },
-        { at: 0.5, values: { J1: 45 } },
-        { at: 1, values: { J1: -45 } },
+        { values: { J1: -45 } },
+        { values: { J1: 45 } },
+        { values: { J1: -45 } },
       ],
     },
   ],

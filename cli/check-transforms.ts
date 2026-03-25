@@ -8,7 +8,15 @@ import assert from 'node:assert/strict';
 import { assembly } from '../src/forge/assembly';
 import { group } from '../src/forge/group';
 import { resolveJointAnimation } from '../src/forge/assembly/jointAnimation';
-import { type JointViewAnimationDef, type JointViewCouplingDef, type JointViewDef, resolveJointViewValues } from '../src/forge/assembly/jointsView';
+import {
+  type JointViewAnimationDef,
+  type JointViewCouplingDef,
+  type JointViewDef,
+  getCollectedJointsView,
+  jointsView,
+  resetJointsView,
+  resolveJointViewValues,
+} from '../src/forge/assembly/jointsView';
 import { box, initKernel } from '../src/forge/kernel';
 import { bevelGear } from '../src/forge/library';
 import { runScript } from '../src/forge/runner';
@@ -439,6 +447,127 @@ function testContinuousRuntimeJointAnimation() {
   assert(approx(unclamped['Input Drive'], 1800), `Expected unclamped drive=1800, got ${unclamped['Input Drive']}`);
 }
 
+function testTickBasedKeyframes() {
+  // Tick-based: omit `at`, positions auto-computed as evenly spaced
+  resetJointsView();
+  jointsView({
+    joints: [
+      { name: 'J1', child: 'A', type: 'revolute', axis: [0, 0, 1], pivot: [0, 0, 0], min: -180, max: 180 },
+    ],
+    animations: [
+      {
+        name: 'Tick Test',
+        duration: 2,
+        loop: true,
+        keyframes: [
+          { values: { J1: 0 } },
+          { values: { J1: 45 } },
+          { values: { J1: 90 } },
+          { values: { J1: 45 } },
+          { values: { J1: 0 } },
+        ],
+      },
+    ],
+  });
+
+  const collected = getCollectedJointsView();
+  assert(collected !== null, 'Expected collected jointsView');
+  const kfs = collected!.animations[0].keyframes;
+  assert(kfs.length === 5, `Expected 5 keyframes, got ${kfs.length}`);
+
+  // 5 keyframes → at: 0, 0.25, 0.5, 0.75, 1.0
+  assert(approx(kfs[0].at, 0), `Expected kf[0].at=0, got ${kfs[0].at}`);
+  assert(approx(kfs[1].at, 0.25), `Expected kf[1].at=0.25, got ${kfs[1].at}`);
+  assert(approx(kfs[2].at, 0.5), `Expected kf[2].at=0.5, got ${kfs[2].at}`);
+  assert(approx(kfs[3].at, 0.75), `Expected kf[3].at=0.75, got ${kfs[3].at}`);
+  assert(approx(kfs[4].at, 1.0), `Expected kf[4].at=1.0, got ${kfs[4].at}`);
+
+  // Verify interpolation matches equivalent explicit-at animation
+  const tickClip = collected!.animations[0];
+  const explicitClip: JointViewAnimationDef = {
+    name: 'Explicit',
+    duration: 2,
+    loop: true,
+    continuous: false,
+    keyframes: [
+      { at: 0, values: { J1: 0 } },
+      { at: 0.25, values: { J1: 45 } },
+      { at: 0.5, values: { J1: 90 } },
+      { at: 0.75, values: { J1: 45 } },
+      { at: 1.0, values: { J1: 0 } },
+    ],
+  };
+
+  for (const t of [0, 0.1, 0.25, 0.4, 0.5, 0.75, 0.9, 1.0]) {
+    const tickResult = resolveJointAnimation(tickClip, t);
+    const explicitResult = resolveJointAnimation(explicitClip, t);
+    assert(
+      approx(tickResult.J1, explicitResult.J1),
+      `At t=${t}: tick=${tickResult.J1} vs explicit=${explicitResult.J1}`,
+    );
+  }
+
+  // Verify single-keyframe tick → at=0
+  resetJointsView();
+  jointsView({
+    joints: [{ name: 'J1', child: 'A', type: 'revolute', axis: [0, 0, 1], pivot: [0, 0, 0] }],
+    animations: [{ name: 'Single', keyframes: [{ values: { J1: 42 } }] }],
+  });
+  const single = getCollectedJointsView()!.animations[0].keyframes;
+  assert(single.length === 1 && approx(single[0].at, 0), `Single tick keyframe should be at=0`);
+
+  // Verify weighted ticks: [3, 1, 2] → positions [0, 3/6=0.5, 4/6=0.667, 1.0]
+  resetJointsView();
+  jointsView({
+    joints: [{ name: 'J1', child: 'A', type: 'revolute', axis: [0, 0, 1], pivot: [0, 0, 0] }],
+    animations: [
+      {
+        name: 'Weighted',
+        keyframes: [
+          { ticks: 3, values: { J1: 0 } },
+          { ticks: 1, values: { J1: 90 } },
+          { ticks: 2, values: { J1: 180 } },
+          { values: { J1: 0 } }, // last keyframe's ticks is ignored
+        ],
+      },
+    ],
+  });
+  const wkfs = getCollectedJointsView()!.animations[0].keyframes;
+  assert(wkfs.length === 4, `Expected 4 weighted keyframes, got ${wkfs.length}`);
+  assert(approx(wkfs[0].at, 0), `Weighted kf[0].at should be 0, got ${wkfs[0].at}`);
+  assert(approx(wkfs[1].at, 3 / 6), `Weighted kf[1].at should be 0.5, got ${wkfs[1].at}`);
+  assert(approx(wkfs[2].at, 4 / 6), `Weighted kf[2].at should be ~0.667, got ${wkfs[2].at}`);
+  assert(approx(wkfs[3].at, 1.0), `Weighted kf[3].at should be 1.0, got ${wkfs[3].at}`);
+
+  // Verify ticks with explicit at throws
+  resetJointsView();
+  let threwTicksAt = false;
+  try {
+    jointsView({
+      joints: [{ name: 'J1', child: 'A', type: 'revolute', axis: [0, 0, 1], pivot: [0, 0, 0] }],
+      animations: [{ name: 'Bad', keyframes: [{ at: 0, ticks: 2, values: { J1: 0 } }, { at: 1, values: { J1: 1 } }] }],
+    });
+  } catch {
+    threwTicksAt = true;
+  }
+  assert(threwTicksAt, 'Expected error when using ticks with explicit at');
+
+  // Verify mixing at and no-at throws
+  resetJointsView();
+  let threw = false;
+  try {
+    jointsView({
+      joints: [{ name: 'J1', child: 'A', type: 'revolute', axis: [0, 0, 1], pivot: [0, 0, 0] }],
+      animations: [{ name: 'Mixed', keyframes: [{ at: 0, values: { J1: 0 } }, { values: { J1: 1 } }] }],
+    });
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'Expected error when mixing explicit at with tick-based keyframes');
+
+  resetJointsView();
+}
+
 function testBevelGearTopSectionCircularity() {
   const gear = bevelGear({
     module: 2,
@@ -470,6 +599,7 @@ export async function runCheckTransformsCli(): Promise<void> {
   testAssemblyGearCouplings();
   testRuntimeJointCouplingResolution();
   testContinuousRuntimeJointAnimation();
+  testTickBasedKeyframes();
   testBevelGearTopSectionCircularity();
   console.log('✓ Transform and assembly invariants passed');
 }
