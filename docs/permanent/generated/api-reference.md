@@ -8,43 +8,46 @@
 ## Table of Contents
 
 **Functions:**
-- [3D Primitives](#3d-primitives) — `box`, `cylinder`, `sphere`, `levelSet`
+- [3D Primitives](#3d-primitives) — `box`, `cylinder`, `sphere`
 - [Boolean Operations](#boolean-operations) — `union`, `difference`, `intersection`
-- [2D Sketch Primitives](#2d-sketch-primitives) — `rect`, `circle2d`, `roundedRect`, `polygon`, `ngon`, `ellipse`, `slot`, `star`, `path`, `stroke`
+- [2D Sketch Primitives](#2d-sketch-primitives) — `path`, `stroke`, `rect`, `circle2d`, `roundedRect`, `polygon`, `ngon`, `ellipse`, `slot`, `star`
 - [2D Sketch Booleans](#2d-sketch-booleans) — `union2d`, `difference2d`, `intersection2d`
 - [2D Text](#2d-text) — `text2d`, `textWidth`
 - [Constrained Sketches](#constrained-sketches) — `constrainedSketch`, `addRect`, `addPolygon`, `addRegularPolygon`
 - [2D Geometry Helpers](#2d-geometry-helpers) — `point`, `line`, `circle`, `rectangle`, `degrees`, `radians`
 - [Curves & Surfacing](#curves-surfacing) — `spline2d`, `spline3d`, `loft`, `sweep`
-- [Patterns & Topology](#patterns-topology) — `linearPattern`, `circularPattern`, `mirrorCopy`, `filletEdge`, `chamferEdge`, `filletCorners`, `arcBridgeBetweenRects`
+- [Patterns & Topology](#patterns-topology) — `arcBridgeBetweenRects`, `filletEdge`, `chamferEdge`, `filletCorners`, `linearPattern`, `circularPattern`, `mirrorCopy`, `selectEdges`, `selectEdge`, `coalesceEdges`, `filletEdgeSegment`, `chamferEdgeSegment`
 - [Imports & Composition](#imports-composition) — `importSketch`, `importPart`, `importGroup`, `importAssembly`, `importSvgSketch`
 - [Parameters](#parameters) — `param`, `boolParam`
 - [Grouping](#grouping) — `group`
 - [Assembly & Joints](#assembly-joints) — `bomToCsv`, `assembly`, `joint`
 - [Sheet Metal](#sheet-metal) — `sheetMetal`
 - [Section & Projection](#section-projection) — `intersectWithPlane`, `projectToPlane`
-- [Viewport & Runtime](#viewport-runtime) — `cutPlane`, `cutPlane`, `explodeView`, `jointsView`, `viewConfig`, `scene`
+- [Viewport & Runtime](#viewport-runtime) — `jointsView`, `cutPlane`, `cutPlane`, `explodeView`, `scene`, `viewConfig`
 - [Annotations & Output](#annotations-output) — `dim`, `dimLine`, `bom`, `robotExport`
+- [Sketch Export](#sketch-export) — `sketchToDxf`, `sketchToSvg`
 - [Fasteners & Hardware](#fasteners-hardware) — `boltHole`, `fastenerHole`, `counterbore`, `hexNut`, `holePattern`, `thread`, `bolt`, `nut`, `washer`, `fastenerSet`
 - [Structural Profiles](#structural-profiles) — `tSlotProfile`, `tSlotExtrusion`, `profile2020BSlot6Profile`, `profile2020BSlot6`
 - [Pipes & Routing](#pipes-routing) — `tube`, `pipe`, `pipeRoute`, `elbow`
 - [Gears](#gears) — `spurGear`, `sideGear`, `faceGear`, `ringGear`, `rackGear`, `bevelGear`, `gearPair`, `bevelGearPair`, `sideGearPair`, `faceGearPair`
 - [Utility Shapes](#utility-shapes) — `roundedBox`, `bracket`, `explode`
-- [Other](#other) — `composeChain`, `linearPattern2d`, `circularPattern2d`, `draft`, `offsetSolid`, `highlight`, `torus`
+- [Other](#other) — `composeChain`, `portFactory`, `loadFont`, `linearPattern2d`, `circularPattern2d`, `fillet`, `chamfer`, `draft`, `offsetSolid`, `torus`, `importMesh`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`
 
 **Classes:**
 - [`Transform`](#transform)
+- [`ConstrainedSketchBuilder`](#constrainedsketchbuilder)
 - [`Sketch`](#sketch)
 - [`ConstraintSketch`](#constraintsketch)
-- [`ConstrainedSketchBuilder`](#constrainedsketchbuilder)
+- [`SketchGroupBuilder`](#sketchgroupbuilder)
 - [`Point2D`](#point2d)
 - [`Line2D`](#line2d)
 - [`Circle2D`](#circle2d)
 - [`Rectangle2D`](#rectangle2d)
 - [`TrackedShape`](#trackedshape)
-- [`PathBuilder`](#pathbuilder)
 - [`Curve3D`](#curve3d)
+- [`PathBuilder`](#pathbuilder)
 - [`Shape`](#shape)
+- [`MateBuilder`](#matebuilder)
 - [`ShapeGroup`](#shapegroup)
 - [`SolvedAssembly`](#solvedassembly)
 - [`Assembly`](#assembly)
@@ -52,11 +55,11 @@
 - [`SheetMetalPart`](#sheetmetalpart)
 
 **Constants:**
+- [`ANCHOR3D_NAMES`](#anchor3d_names)
 - [`Constraint`](#constraint)
 - [`SHEET_METAL_EDGES`](#sheet_metal_edges)
-- [`ANCHOR3D_NAMES`](#anchor3d_names)
-- [`verify`](#verify)
 - [`partLibrary`](#partlibrary)
+- [`verify`](#verify)
 
 ---
 
@@ -82,12 +85,6 @@ cylinder(height: number, radius: number, radiusTop?: number, segments?: number, 
 
 ```ts
 sphere(radius: number, segments?: number): Shape
-```
-
-#### `levelSet()`
-
-```ts
-levelSet( sdf: (p: [number, number, number]) => number, bounds: { min: [number, number, number]; max: [number, number, number]; }, edgeLength: number, level?: number, ): Shape
 ```
 
 ### Boolean Operations
@@ -116,6 +113,18 @@ intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape
 
 Create 2D profiles for extrusion and other operations.
 
+#### `path()`
+
+```ts
+path(): PathBuilder
+```
+
+#### `stroke()`
+
+```ts
+stroke(points: [ number, number ][], width: number, join?: "Round" | "Square"): Sketch
+```
+
 #### `rect()`
 
 ```ts
@@ -137,7 +146,7 @@ roundedRect(width: number, height: number, radius: number, center?: boolean): Sk
 #### `polygon()`
 
 ```ts
-polygon(points: ([number, number] | Point2D)[]): Sketch
+polygon(points: ([ number, number ] | Point2D)[]): Sketch
 ```
 
 #### `ngon()`
@@ -162,18 +171,6 @@ slot(length: number, width: number): Sketch
 
 ```ts
 star(points: number, outerR: number, innerR: number): Sketch
-```
-
-#### `path()`
-
-```ts
-path(): PathBuilder
-```
-
-#### `stroke()`
-
-```ts
-stroke(points: [number, number][], width: number, join?: 'Round' | 'Square'): Sketch
 ```
 
 ### 2D Sketch Booleans
@@ -208,12 +205,12 @@ Create text geometry from strings using the built-in geometric font.
 text2d(content: string, options?: TextOptions): Sketch
 ```
 
-Build a 2-D filled Sketch from a text string. The Sketch origin is at the left end of the text baseline by default (see `align` and `baseline` options to adjust placement).  All characters are drawn using the built-in "Forge Mono" geometric font — a clean, angular, monoline typeface designed to extrude and engrave crisply. // Extruded nameplate text2d('FORGE CAD', { size: 8 }).extrude(1.2) // Centered label on the XY plane text2d('V 2.0', { size: 6, align: 'center', baseline: 'center' })
+Build a 2-D filled Sketch from a text string. The Sketch origin is at the left end of the text baseline by default (see `align` and `baseline` options to adjust placement). Text is rendered using the bundled Inter font by default, or any TTF/OTF/WOFF font you provide. // Extruded nameplate text2d('FORGE CAD', { size: 8 }).extrude(1.2) // Centered label on the XY plane text2d('V 2.0', { size: 6, align: 'center', baseline: 'center' })
 
 #### `textWidth()`
 
 ```ts
-textWidth(content: string, options?: Pick<TextOptions, 'size' | 'letterSpacing'>): number
+textWidth(content: string, options?: Pick<TextOptions, "size" | "letterSpacing" | "font">): number
 ```
 
 Returns the rendered width of a string in model units (same options as text2d).
@@ -234,7 +231,7 @@ constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder
 addRect(sk: ConstrainedSketchBuilder, options?: RectOptions): ConstrainedRect
 ```
 
-Add an axis-aligned rectangle concept to the builder. Creates 4 vertices (CCW: bl→br→tr→tl), 4 sides, applies 4 structural constraints (`horizontal`/`vertical` on each side), registers a loop and a shape, and returns a `ConstrainedRect` handle. ```ts const sk = constrainedSketch(); const rect = addRect(sk, { x: 0, y: 0, width: 100, height: 50 }); sk.fix(rect.bottomLeft, 0, 0); sk.length(rect.bottom, 120); ```
+Add an axis-aligned rectangle concept to the builder. Creates 4 vertices (CCW: bl→br→tr→tl), 4 sides, applies 4 structural constraints (`horizontal`/`vertical` on each side), enforces CCW winding, registers a loop and a shape, and returns a `ConstrainedRect` handle. ```ts const sk = constrainedSketch(); const rect = addRect(sk, { x: 0, y: 0, width: 100, height: 50 }); sk.fix(rect.bottomLeft, 0, 0); sk.length(rect.bottom, 120); ```
 
 #### `addPolygon()`
 
@@ -336,40 +333,24 @@ Sweep a 2D profile along a 3D path. Path can be: - `Curve3D` from spline3d(...) 
 
 Repeat, mirror, fillet, and chamfer geometry.
 
-#### `linearPattern()`
+#### `arcBridgeBetweenRects()`
 
 ```ts
-linearPattern(shape: ShapeArg, count: number, dx: number, dy: number, dz?: number): Shape
+arcBridgeBetweenRects(rectA: RectAreaArg, rectB: RectAreaArg, segments?: number): Shape
 ```
 
-Repeat a shape along a direction vector
-
-#### `circularPattern()`
-
-```ts
-circularPattern(shape: ShapeArg, count: number, centerX?: number, centerY?: number): Shape
-```
-
-Repeat a shape around the Z axis
-
-#### `mirrorCopy()`
-
-```ts
-mirrorCopy(shape: ShapeArg, normal: [number, number, number]): Shape
-```
-
-Mirror a shape and union with original
+Build an arc bridge between two rectangular areas.
 
 #### `filletEdge()`
 
 ```ts
-filletEdge(shape: ShapeArg$1, edge: EdgeRef, radius: number, quadrant?: [number, number], segments?: number): Shape
+filletEdge(shape: ShapeArg, edge: EdgeRef, radius: number, quadrant?: [ number, number ], segments?: number): Shape
 ```
 
 #### `chamferEdge()`
 
 ```ts
-chamferEdge(shape: ShapeArg$1, edge: EdgeRef, size: number, quadrant?: [number, number]): Shape
+chamferEdge(shape: ShapeArg, edge: EdgeRef, size: number, quadrant?: [ number, number ]): Shape
 ```
 
 #### `filletCorners()`
@@ -378,13 +359,69 @@ chamferEdge(shape: ShapeArg$1, edge: EdgeRef, size: number, quadrant?: [number, 
 filletCorners(points: PointInput[], corners: FilletCornerSpec[]): Sketch
 ```
 
-#### `arcBridgeBetweenRects()`
+#### `linearPattern()`
 
 ```ts
-arcBridgeBetweenRects(rectA: RectAreaArg, rectB: RectAreaArg, segments?: number): Shape
+linearPattern(shape: ShapeArg$1, count: number, dx: number, dy: number, dz?: number): Shape
 ```
 
-Build an arc bridge between two rectangular areas.
+Repeat a shape along a direction vector
+
+#### `circularPattern()`
+
+```ts
+circularPattern(shape: ShapeArg$1, count: number, centerX?: number, centerY?: number): Shape
+```
+
+Repeat a shape around the Z axis
+
+#### `mirrorCopy()`
+
+```ts
+mirrorCopy(shape: ShapeArg$1, normal: [ number, number, number ]): Shape
+```
+
+Mirror a shape and union with original
+
+#### `selectEdges()`
+
+```ts
+selectEdges(shape: Shape | TrackedShape, query?: EdgeQuery): EdgeSegment[]
+```
+
+Select all edges from a shape that match the given query. Extracts sharp edges from the mesh (dihedral angle > 1°), applies filters, and returns the matching EdgeSegment array.
+
+#### `selectEdge()`
+
+```ts
+selectEdge(shape: Shape | TrackedShape, query?: EdgeQuery): EdgeSegment
+```
+
+Select the single best-matching edge from a shape. When `near` is specified, returns the closest matching edge. Otherwise returns the first matching edge (by mesh order). Throws if no edges match.
+
+#### `coalesceEdges()`
+
+```ts
+coalesceEdges(segments: EdgeSegment[], tolerance?: number): EdgeSegment[]
+```
+
+Coalesce collinear edge segments into longer logical edges. Multiple short mesh segments along the same line (e.g. from tessellation) are merged into a single EdgeSegment spanning the full extent. The `tolerance` controls how far endpoints can deviate from collinearity.
+
+#### `filletEdgeSegment()`
+
+```ts
+filletEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, radius: number, segments?: number): Shape
+```
+
+Apply a fillet (rounded edge) to a mesh-selected edge. Works on any straight edge of any shape — not limited to tracked box edges. The edge must have been obtained from selectEdge() / selectEdges().
+
+#### `chamferEdgeSegment()`
+
+```ts
+chamferEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, size: number): Shape
+```
+
+Apply a chamfer (beveled edge) to a mesh-selected edge. Works on any straight edge of any shape — not limited to tracked box edges.
 
 ### Imports & Composition
 
@@ -427,7 +464,7 @@ Declare user-adjustable parameters with UI controls.
 #### `param()`
 
 ```ts
-param( name: string, defaultValue: number, opts?: { min?: number; max?: number; step?: number; unit?: string; integer?: boolean; reverse?: boolean; }, ): number
+param(name: string, defaultValue: number, opts?: { min?: number; max?: number; step?: number; unit?: string; integer?: boolean; reverse?: boolean; }): number
 ```
 
 Declare a parameter. Returns the current value (default or overridden). Each call registers the param for UI generation.
@@ -469,7 +506,7 @@ assembly(name?: string): Assembly
 #### `joint()`
 
 ```ts
-joint(name: string, shape: Shape, pivot: [number, number, number], opts?: RevoluteJointOpts): Shape
+joint(name: string, shape: Shape, pivot: [ number, number, number ], opts?: RevoluteJointOpts): Shape
 ```
 
 Create a revolute (hinge) joint. Auto-creates a param slider and rotates the shape.
@@ -504,10 +541,18 @@ projectToPlane(shape: Shape, plane: PlaneSpec): Sketch
 
 Configure viewport behavior: cut planes, exploded views, joint controls.
 
+#### `jointsView()`
+
+```ts
+jointsView(options?: JointsViewOptions): void
+```
+
+Configure runtime joint controls that animate object transforms in the viewport without re-running the script.
+
 #### `cutPlane()`
 
 ```ts
-cutPlane(name: string, normal: [number, number, number], offset?: number, options?: CutPlaneOptions): void
+cutPlane(name: string, normal: [ number, number, number ], offset?: number, options?: CutPlaneOptions): void
 ```
 
 Define a named section/cut plane. Appears as a toggle in the View Panel. When enabled, geometry on the positive side of the plane is clipped away.
@@ -515,7 +560,7 @@ Define a named section/cut plane. Appears as a toggle in the View Panel. When en
 #### `cutPlane()`
 
 ```ts
-cutPlane(name: string, normal: [number, number, number], options?: CutPlaneOptions): void
+cutPlane(name: string, normal: [ number, number, number ], options?: CutPlaneOptions): void
 ```
 
 #### `explodeView()`
@@ -526,13 +571,13 @@ explodeView(options?: ExplodeViewOptions): void
 
 Configure viewport exploded-view behavior for the current script execution. Multiple calls merge; later values override earlier ones.
 
-#### `jointsView()`
+#### `scene()`
 
 ```ts
-jointsView(options?: JointsViewOptions): void
+scene(options: SceneOptions): void
 ```
 
-Configure runtime joint controls that animate object transforms in the viewport without re-running the script.
+Configure the scene environment for the current script execution. Controls camera, lighting, background, fog, and post-processing. Multiple calls merge; later values override earlier ones. ```js scene({ background: '#0a0a0a', camera: { position: [200, 100, 150], target: [0, 0, 30], fov: 60 }, lights: [ { type: 'ambient', color: '#1a1a2e', intensity: 0.2 }, { type: 'point', position: [0, 0, 100], color: '#ff6b35', intensity: 2 }, ], fog: { color: '#0a0a0a', near: 100, far: 500 }, postProcessing: { bloom: { intensity: 1.5, threshold: 0.8, radius: 0.4 }, }, }); ```
 
 #### `viewConfig()`
 
@@ -541,14 +586,6 @@ viewConfig(options?: ViewConfigOptions): void
 ```
 
 Configure runtime viewport visuals for the current script execution. Multiple calls merge; later values override earlier ones.
-
-#### `scene()`
-
-```ts
-scene(options: SceneOptions): void
-```
-
-Configure the scene environment for the current script execution. Controls camera, lighting, background, fog, and post-processing. Multiple calls merge; later values override earlier ones.
 
 ### Annotations & Output
 
@@ -583,6 +620,26 @@ Add a bill-of-materials entry.
 ```ts
 robotExport(options: RobotExportOptions): CollectedRobotExport
 ```
+
+### Sketch Export
+
+Export 2D sketches to SVG or DXF format strings.
+
+#### `sketchToDxf()`
+
+```ts
+sketchToDxf(sketch: Sketch, options?: SketchDxfOptions): string
+```
+
+Export a 2D sketch as a DXF string (R12/AC1009 — maximally compatible). For regular sketches, each polygon loop becomes a closed LWPOLYLINE. For constraint sketches, exports LINE, CIRCLE, and ARC entities from the constraint edge geometry.
+
+#### `sketchToSvg()`
+
+```ts
+sketchToSvg(sketch: Sketch, options?: SketchSvgOptions): string
+```
+
+Export a 2D sketch as an SVG string. For regular sketches, exports filled polygon regions. For constraint sketches, exports line/arc/circle edge geometry. The SVG uses the sketch's native coordinate system (Y-up) with a transform that flips Y so the output renders correctly in SVG's Y-down space. Coordinates are in sketch units (typically mm).
 
 ### Fasteners & Hardware
 
@@ -621,25 +678,25 @@ holePattern(rows: number, cols: number, spacingX: number, spacingY: number, hole
 #### `thread()`
 
 ```ts
-thread( diameter: number, pitch: number, length: number, options?: { depth?: number; segments?: number; }, ): Shape
+thread(diameter: number, pitch: number, length: number, options?: { depth?: number; segments?: number; }): Shape
 ```
 
 #### `bolt()`
 
 ```ts
-bolt( diameter: number, length: number, options?: { ... }, ): Shape
+bolt(diameter: number, length: number, options?: { ... }): Shape
 ```
 
 #### `nut()`
 
 ```ts
-nut( diameter: number, options?: { pitch?: number; height?: number; acrossFlats?: number; segments?: number; }, ): Shape
+nut(diameter: number, options?: { pitch?: number; height?: number; acrossFlats?: number; segments?: number; }): Shape
 ```
 
 #### `washer()`
 
 ```ts
-washer( size: MetricSize, options?: { standard?: WasherStandard; segments?: number; }, ): Shape
+washer(size: MetricSize, options?: { standard?: WasherStandard; segments?: number; }): Shape
 ```
 
 #### `fastenerSet()`
@@ -695,13 +752,13 @@ pipe(height: number, outerRadius: number, wall: number, segments?: number): Shap
 #### `pipeRoute()`
 
 ```ts
-pipeRoute( points: [number, number, number][], radius: number, options?: { bendRadius?: number; wall?: number; segments?: number; }, ): Shape
+pipeRoute(points: [ number, number, number ][], radius: number, options?: { bendRadius?: number; wall?: number; segments?: number; }): Shape
 ```
 
 #### `elbow()`
 
 ```ts
-elbow( pipeRadius: number, bendRadius: number, angle?: | number | { ... }, options?: { ... }, ): Shape
+elbow(pipeRadius: number, bendRadius: number, angle?: number | { ... }, options?: { ... }): Shape
 ```
 
 ### Gears
@@ -800,6 +857,20 @@ composeChain(...steps: TransformInput[]): Transform
 
 Compose transforms in chain order. Equivalent to Transform.identity().mul(a).mul(b).mul(c)...
 
+#### `portFactory()`
+
+```ts
+portFactory(input: PortInput): PortDef
+```
+
+#### `loadFont()`
+
+```ts
+loadFont(source: string | ArrayBuffer, cacheKey?: string): opentype$1.Font
+```
+
+Load and cache a font. - A built-in font name: `'sans-serif'` or `'inter'` (works everywhere) - A file path to a TTF/OTF/WOFF file (CLI/Node only) - An ArrayBuffer of font data (works everywhere)
+
 #### `linearPattern2d()`
 
 ```ts
@@ -816,30 +887,100 @@ circularPattern2d(sketch: Sketch, count: number, centerX?: number, centerY?: num
 
 Repeat a sketch in a circular pattern around a center point
 
+#### `fillet()`
+
+```ts
+fillet(shape: ShapeArg$3, radius: number, edges?: EdgeSelector, segments?: number): Shape
+```
+
+Apply fillets (rounded edges) to one or more edges of a shape. Works on both straight and curved edges. Supports OCCT and Manifold backends. When using OCCT, all edges are filleted in a single kernel operation for best quality. When using Manifold, edges are filleted sequentially. - EdgeSegment: a single edge from selectEdge() - EdgeSegment[]: multiple edges from selectEdges() - EdgeQuery: inline query (same options as selectEdges) - undefined: all sharp edges on the shape // Fillet all edges fillet(myShape, 2) // Fillet edges at the top fillet(myShape, 1.5, { atZ: 20, convex: true }) // Fillet specific edges const edges = selectEdges(myShape, { parallel: [0, 0, 1] }) fillet(myShape, 3, edges)
+
+#### `chamfer()`
+
+```ts
+chamfer(shape: ShapeArg$3, size: number, edges?: EdgeSelector): Shape
+```
+
+Apply chamfers (beveled edges) to one or more edges of a shape. Works on both straight and curved edges. Supports OCCT and Manifold backends. // Chamfer all edges chamfer(myShape, 1) // Chamfer vertical edges only chamfer(myShape, 2, { parallel: [0, 0, 1] })
+
 #### `draft()`
 
 ```ts
-draft( shape: Shape | TrackedShape, angleDeg: number, pullDirection?: [number, number, number], neutralPlaneOffset?: number, ): Shape
+draft(shape: ShapeArg$3, angleDeg: number, pullDirection?: [ number, number, number ], neutralPlaneOffset?: number): Shape
 ```
+
+Apply a draft angle (taper) to all faces of a solid for mold extraction. Draft angle is a manufacturing feature that adds taper to the vertical faces of a solid so that it can be extracted from a mold. The neutral plane is where the draft angle is zero — faces above and below are tapered symmetrically. Requires the OCCT backend. Throws on Manifold. // Add 3° draft to a box for injection molding draft(myBox, 3) // Draft with custom pull direction and neutral plane draft(myShape, 2, [0, 0, 1], 10)
 
 #### `offsetSolid()`
 
 ```ts
-offsetSolid(shape: Shape | TrackedShape, thickness: number): Shape
+offsetSolid(shape: ShapeArg$3, thickness: number): Shape
 ```
 
-#### `highlight()`
-
-```ts
-highlight(entityId: string, opts?: { color?: string; label?: string; pulse?: boolean }): void
-```
-
-Mark an entity for visual highlighting in the viewport (debugging aid).
+Uniformly offset all surfaces of a solid inward or outward by a thickness value. Unlike shell(), which hollows a solid, offsetSolid() produces a new solid whose surfaces are all shifted by the given thickness. Positive = outward, negative = inward. Requires the OCCT backend. Throws on Manifold. // Grow a box outward by 1mm on all sides offsetSolid(myBox, 1) // Shrink a shape inward by 0.5mm offsetSolid(myShape, -0.5)
 
 #### `torus()`
 
 ```ts
 torus(majorRadius: number, minorRadius: number, segments?: number): Shape
+```
+
+#### `importMesh()`
+
+```ts
+importMesh(fileName: string, options?: { scale?: number; center?: boolean; }): Shape
+```
+
+Import an external mesh file (STL, OBJ, 3MF) as a Shape.
+
+#### `highlight()`
+
+```ts
+highlight(entityId: string, opts?: HighlightOptions): void
+```
+
+Highlight any geometry for visual debugging in the viewport. Supported inputs: - `string` — sketch entity ID (e.g. `'L0'`, `'P0'`, `'C0'`) - `[x, y, z]` — 3D point - `[[x1,y1,z1], [x2,y2,z2]]` — edge (line segment) - `{ normal: [x,y,z], offset: number }` — plane by normal + distance from origin - `{ normal: [x,y,z], point: [x,y,z] }` — plane by normal + point on plane - `Shape` or `TrackedShape` — highlight entire 3D shape - `FaceRef` (from `shape.face('top')`) — highlight as plane at face center - `EdgeRef` (from `shape.edge('left')`) — highlight as edge segment
+
+#### `highlight()`
+
+```ts
+highlight(point: [ number, number, number ], opts?: HighlightOptions): void
+```
+
+#### `highlight()`
+
+```ts
+highlight(edge: [ [ number, number, number ], [ number, number, number ] ], opts?: HighlightOptions): void
+```
+
+#### `highlight()`
+
+```ts
+highlight(plane: { normal: [ number, number, number ]; offset: number; }, opts?: HighlightOptions): void
+```
+
+#### `highlight()`
+
+```ts
+highlight(plane: { normal: [ number, number, number ]; point: [ number, number, number ]; }, opts?: HighlightOptions): void
+```
+
+#### `highlight()`
+
+```ts
+highlight(shape: Shape | TrackedShape, opts?: HighlightOptions): void
+```
+
+#### `highlight()`
+
+```ts
+highlight(face: FaceRef, opts?: HighlightOptions): void
+```
+
+#### `highlight()`
+
+```ts
+highlight(edge: EdgeRef, opts?: HighlightOptions): void
 ```
 
 ---
@@ -864,6 +1005,88 @@ torus(majorRadius: number, minorRadius: number, segments?: number): Shape
 - `vector()` — vector(v: Vec3): Vec3
 - `toArray()` — toArray(): Mat4
 
+### `ConstrainedSketchBuilder`
+
+**Methods:**
+
+- `moveTo()` — moveTo(x: number, y: number): this
+- `lineTo()` — lineTo(x: number, y: number): this
+- `lineH()` — lineH(dx: number): this
+- `lineV()` — lineV(dy: number): this
+- `lineAngled()` — lineAngled(length: number, degrees: number): this
+- `arcTo()` — arcTo(x: number, y: number, radius: number, clockwise?: boolean): this
+- `arcByCenter()` — arcByCenter(centerId: PointId, startId: PointId, endId: PointId, clockwise?: boo
+- `bezier()` — bezier(p0: any, p1: any, p2: any, p3: any, name?: string): BezierId
+- `bezierTo()` — bezierTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number)
+- `blendTo()` — blendTo(x: number, y: number, weight?: number): this
+- `close()` — close(): this
+- `addLoopCircle()` — addLoopCircle(center: PointId, radius: number, segments?: number): this
+- `addLoop()` — addLoop(points: any[]): this
+- `addProfileLoop()` — addProfileLoop(segments: Array<{ kind: "line"; line: any; } | { kind: "arc"; arc
+- `horizontal()` — horizontal(line: any): this
+- `vertical()` — vertical(line: any): this
+- `parallel()` — parallel(a: any, b: any): this
+- `sameDirection()` — sameDirection(a: any, b: any): this
+- `oppositeDirection()` — oppositeDirection(a: any, b: any): this
+- `blockRotation()` — blockRotation(points: any[], axis?: "x" | "y"): this
+- `perpendicular()` — perpendicular(a: any, b: any): this
+- `tangent()` — tangent(a: any, b: any): this
+- `equal()` — equal(a: any, b: any): this
+- `coincident()` — coincident(a: any, b: any): this
+- `concentric()` — concentric(a: any, b: any): this
+- `collinear()` — collinear(point: any, line: any): this
+- `symmetric()` — symmetric(a: any, b: any, axis: any): this
+- `fix()` — fix(point: any, x?: number, y?: number): this
+- `midpoint()` — midpoint(point: any, line: any): this
+- `pointOnCircle()` — pointOnCircle(point: any, circle: any): this
+- `pointOnLine()` — pointOnLine(point: any, line: any): this
+- `distance()` — distance(a: any, b: any, value: number): this
+- `length()` — length(line: any, value: number): this
+- `angle()` — angle(a: any, b: any, value: number): this
+- `radius()` — radius(circle: any, value: number): this
+- `diameter()` — diameter(circle: any, value: number): this
+- `hDistance()` — hDistance(a: any, b: any, value: number): this
+- `vDistance()` — vDistance(a: any, b: any, value: number): this
+- `pointLineDistance()` — pointLineDistance(point: any, line: any, value: number): this
+- `lineDistance()` — lineDistance(a: any, b: any, value: number): this
+- `absoluteAngle()` — absoluteAngle(line: any, value: number): this
+- `equalRadius()` — equalRadius(a: any, b: any): this
+- `arcLength()` — arcLength(arc: any, value: number): this
+- `lineTangentArc()` — lineTangentArc(line: any, arc: any, atStart: boolean): this
+- `arcTangentArc()` — arcTangentArc(arcA: any, arcB: any, aAtStart?: boolean, bAtStart?: boolean): thi
+- `bezierTangentArc()` — bezierTangentArc(bezier: any, arc: any, atBezierStart: boolean, atArcStart: bool
+- `smoothBlend()` — smoothBlend(arc1: any, arc2: any, options?: { weight?: number; arc1End?: "start"
+- `shapeWidth()` — shapeWidth(shape: any, value: number): this
+- `shapeHeight()` — shapeHeight(shape: any, value: number): this
+- `shapeCentroidX()` — shapeCentroidX(shape: any, value: number): this
+- `shapeCentroidY()` — shapeCentroidY(shape: any, value: number): this
+- `shapeArea()` — shapeArea(shape: any, value: number): this
+- `shapeEqualCentroid()` — shapeEqualCentroid(a: any, b: any): this
+- `angleBetween()` — angleBetween(a: any, b: any, value: number): this
+- `ccw()` — ccw(...points: any[]): this
+- `importPoint()` — importPoint(pt: { x: number; y: number; }, fixed?: boolean): PointId
+- `importLine()` — importLine(l: { start: { x: number; y: number; }; end: { x: number; y: number; }
+- `importRectangle()` — importRectangle(r: { vertices: [ { x: number; y: number; }, { x: number; y: numb
+- `referencePoint()` — referencePoint(x: number, y: number): PointId
+- `referenceLine()` — referenceLine(x1: number, y1: number, x2: number, y2: number): LineId
+- `referenceFrom()` — referenceFrom(source: ConstraintSketch, entityId: string): PointId | LineId | nu
+- `referenceAllFrom()` — referenceAllFrom(source: ConstraintSketch): { points: Map<string, PointId>; line
+- `point()` — point(x?: number, y?: number, fixed?: boolean): PointId
+- `pointAt()` — pointAt(index: number): PointId
+- `line()` — line(a: PointId, b: PointId, construction?: boolean, name?: string): LineId
+- `lineAt()` — lineAt(index: number): LineId
+- `circle()` — circle(center: PointId, radius: number, construction?: boolean, segments?: numbe
+- `circleAt()` — circleAt(index: number): CircleId
+- `shape()` — Register a named shape (closed polygon) from an ordered list of line IDs. Returns the ShapeId for use in shape constraints (shapeWidth, shapeCentroidX, etc.).
+- `group()` — Create a rigid-body group with a local coordinate frame. Points/lines added to the group move together as a unit — the solver sees 3 DOF (x, y, θ) instead of 2N per point. ```ts const g = sk.group({ x: 50, y: 30 }); const p0 = g.point(0, 0);    // local origin → world (50, 30) const p1 = g.point(100, 0);  // local (100,0) → world (150, 30) const l = g.line(p0, p1); g.fixRotation(); // p0, p1 work in constraints like any other PointId: sk.coincident(p0, someExternalPoint); ```
+- `constrain()` — constrain(constraint: Omit<SketchConstraint, "id">): this
+- `solve()` — solve(options?: SolveOptions): ConstraintSketch
+- `solveConstraintsOnly()` — Run the solver without building a full `ConstraintSketch`. Useful for lightweight constraint validation or progress monitoring. Returns the final maxError, the number of rejected constraints, and the solved `ConstraintDefinition` with updated point positions.
+- `rect()` — Add an axis-aligned rectangle concept. Returns a `ConstrainedRect` handle with named vertices, sides, and center.
+- `addPolygon()` — Add a general polygon concept (CCW winding enforced). Returns a `ConstrainedPolygon` handle.
+- `regularPolygon()` — Add a regular n-gon concept (equal sides, CCW winding). Returns a `ConstrainedRegularPolygon` handle with a center point.
+- `groupRect()` — Add a rigid rectangle as a group concept. Returns a `ConstrainedGroupRect` handle with named vertices and sides. The rectangle is fixed in shape — only position (and optionally rotation) varies.
+
 ### `Sketch`
 
 **Properties:**
@@ -878,25 +1101,25 @@ torus(majorRadius: number, minorRadius: number, segments?: number): Shape
 - `clone()` — Return a new Sketch wrapper for explicit duplication in scripts.
 - `duplicate()` — Alias for clone()
 - `area()` — area(): number
-- `bounds()` — bounds(): unknown
+- `bounds()` — bounds(): ProfileBounds
 - `isEmpty()` — isEmpty(): boolean
 - `numVert()` — numVert(): number
-- `toPolygons()` — toPolygons(): unknown[]
-- `translate()` — translate(x: number, y?: number): Sketch
-- `rotate()` — rotate(degrees: number): Sketch
-- `rotateAround()` — rotateAround(degrees: number, pivot: [number, number]): Sketch
-- `scale()` — scale(v: number | [number, number]): Sketch
-- `mirror()` — mirror(ax: [number, number]): Sketch
-- `add()` — add(...others: SketchOperandInput[]): Sketch
-- `subtract()` — subtract(...others: SketchOperandInput[]): Sketch
-- `intersect()` — intersect(...others: SketchOperandInput[]): Sketch
-- `offset()` — offset(delta: number, join?: 'Square' | 'Round' | 'Miter'): Sketch
+- `toPolygons()` — toPolygons(): number[][][]
+- `translate()` — translate(_x: number, _y?: number): Sketch
+- `rotate()` — rotate(_degrees: number): Sketch
+- `rotateAround()` — rotateAround(_degrees: number, _pivot: [ number, number ]): Sketch
+- `scale()` — scale(_v: number | [ number, number ]): Sketch
+- `mirror()` — mirror(_ax: [ number, number ]): Sketch
+- `add()` — add(..._others: SketchOperandInput[]): Sketch
+- `subtract()` — subtract(..._others: SketchOperandInput[]): Sketch
+- `intersect()` — intersect(..._others: SketchOperandInput[]): Sketch
+- `offset()` — offset(_delta: number, _join?: "Square" | "Round" | "Miter"): Sketch
 - `regions()` — Decompose this sketch into its distinct filled regions. See `sketchRegions()`. Regions are returned largest-first by area.
 - `region()` — Select the single filled region that contains the given 2D seed point. Throws if the seed is outside all regions. See `sketchRegion()`.
-- `extrude()` — extrude( height: number, opts?: { twist?: number; divisions?: number; scaleTop?:
-- `revolve()` — revolve(degrees?: number, segments?: number): Shape
-- `attachTo()` — attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: [nu
-- `onFace()` — onFace( parentOrFace: | Shape | { toShape(): Shape; } | { _bbox(): { min: number
+- `extrude()` — extrude(_height: number, _opts?: { twist?: number; divisions?: number; scaleTop?
+- `revolve()` — revolve(_degrees?: number, _segments?: number): Shape
+- `attachTo()` — attachTo(_target: Sketch, _targetAnchor: Anchor, _selfAnchor?: Anchor, _offset?:
+- `onFace()` — onFace(_parentOrFace: Shape | { toShape(): Shape; } | { _bbox(): { min: number[]
 
 ### `ConstraintSketch`
 
@@ -914,81 +1137,15 @@ torus(majorRadius: number, minorRadius: number, segments?: number): Shape
 - `withUpdatedConstraint()` — withUpdatedConstraint(constraintId: string, value: number): ConstraintSketch
 - `inspect()` — Return a human-readable diagnostic string of the solved state.
 
-### `ConstrainedSketchBuilder`
+### `SketchGroupBuilder`
 
 **Methods:**
 
-- `point()` — point(x: number, y: number, fixed?: boolean): PointId
-- `pointAt()` — pointAt(index: number): PointId
-- `line()` — line(a: PointId, b: PointId, construction?: boolean): LineId
-- `lineAt()` — lineAt(index: number): LineId
-- `circle()` — circle(center: PointId, radius: number, construction?: boolean, segments?: numbe
-- `circleAt()` — circleAt(index: number): CircleId
-- `moveTo()` — moveTo(x: number, y: number): this
-- `lineTo()` — lineTo(x: number, y: number): this
-- `lineH()` — lineH(dx: number): this
-- `lineV()` — lineV(dy: number): this
-- `lineAngled()` — lineAngled(length: number, degrees: number): this
-- `arcTo()` — Draw a circular arc from the current cursor position to (x, y) with the given radius. If `clockwise` is true the arc sweeps clockwise; otherwise counter-clockwise. The arc center is computed automatically.
-- `arcByCenter()` — Create an arc from an explicit center point. `start` and `end` are existing PointIds that must lie on the arc's circle. Returns the ArcId. Does NOT advance the cursor.
-- `bezier()` — Create a cubic Bezier curve from four control points. Returns the BezierId. Does NOT advance the cursor.
-- `bezierTo()` — Draw a Bezier curve from the current cursor to (x3, y3) with control points (x1, y1) and (x2, y2).
-- `close()` — close(): this
-- `addLoopCircle()` — addLoopCircle(center: PointId, radius: number, segments?: number): this
-- `shape()` — Register a named shape (closed polygon) from an ordered list of line IDs. Returns the ShapeId for use in shape constraints (shapeWidth, shapeCentroidX, etc.).
-- `constrain()` — constrain(constraint: Omit<SketchConstraint, 'id'>): this
-- `horizontal()` — Constrain a line to be horizontal.
-- `vertical()` — Constrain a line to be vertical.
-- `parallel()` — Constrain two lines to be parallel.
-- `perpendicular()` — Constrain two lines to be perpendicular.
-- `tangent()` — Tangent constraint. - `tangent(line, circle)` — line is tangent to a circle. - `tangent(circleA, circleB)` — two circles are externally tangent.
-- `equal()` — Constrain two lines to have equal length.
-- `coincident()` — Constrain two points to be at the same location.
-- `concentric()` — Constrain two circles to share the same center.
-- `collinear()` — Constrain a point to lie on an infinite line (collinear).
-- `symmetric()` — Constrain two points to be symmetric about an axis line.
-- `fix()` — Fix a point at a specific location (or at its current position if x/y are omitted).
-- `midpoint()` — Constrain a point to lie at the midpoint of a line.
-- `pointOnCircle()` — Constrain a point to lie on the perimeter of a circle.
-- `pointOnLine()` — Constrain a point to lie on a bounded line segment (not its infinite extension).
-- `distance()` — Constrain the distance between two points.
-- `length()` — Constrain the length of a line.
-- `angle()` — Constrain the angle from line `a` to line `b` (degrees).
-- `radius()` — Constrain the radius of a circle.
-- `diameter()` — Constrain the diameter of a circle.
-- `hDistance()` — Constrain the horizontal distance between two points (b.x − a.x = value).
-- `vDistance()` — Constrain the vertical distance between two points (b.y − a.y = value).
-- `pointLineDistance()` — Constrain the signed perpendicular distance from a point to a line. Positive `value` places the point to the **left** of the line (a→b direction). Zero is equivalent to `collinear`.
-- `lineDistance()` — Constrain the perpendicular (offset) distance between two lines. Also implicitly enforces parallelism. Positive `value` places line `b` on the **left** side of line `a` (according to `a`'s direction vector). Negative places it on the right.
-- `absoluteAngle()` — Constrain the absolute angle of a line from the positive X-axis (degrees).
-- `equalRadius()` — Constrain two circles to have equal radii.
-- `arcLength()` — Constrain the arc length of an arc (radius × sweep angle).
-- `lineTangentArc()` — Constrain a line to be tangent to an arc at the arc's start (`atStart=true`) or end point. Combine with `coincident` to enforce the shared endpoint.
-- `arcTangentArc()` — Constrain two arcs to be tangent (G1 smooth) at a shared junction point.
-- `bezierTangentArc()` — Constrain a Bezier curve to be tangent to an arc.
-- `smoothBlend()` — Create a smooth Bezier bridge between two arcs with controllable weight. Returns the BezierId of the bridge curve.
-- `blendTo()` — Draw a smooth Bezier curve from the current cursor to (x, y), tangent to the previous arc. Control points are computed automatically.
-- `shapeWidth()` — Constrain the bounding-box width of a shape.
-- `shapeHeight()` — Constrain the bounding-box height of a shape.
-- `shapeCentroidX()` — Constrain the X coordinate of a shape's centroid.
-- `shapeCentroidY()` — Constrain the Y coordinate of a shape's centroid.
-- `shapeArea()` — Constrain the area of a shape.
-- `shapeEqualCentroid()` — Constrain two shapes to share the same centroid.
-- `angleBetween()` — Constrain the unsigned angle between two lines (accepts both orientations).
-- `ccw()` — Enforce counter-clockwise winding on a polygon defined by its vertices.
-- `addLoop()` — Register a closed polygon loop from an explicit ordered list of point IDs.
-- `solve()` — solve(options?: SolveOptions): ConstraintSketch
-- `solveConstraintsOnly()` — Run the solver without building a full `ConstraintSketch`. Useful for lightweight constraint validation or progress monitoring. Returns the final maxError, the number of rejected constraints, and the solved `ConstraintDefinition` with updated point positions.
-- `importPoint()` — Import a Point2D, returning its PointId
-- `importLine()` — Import a Line2D (two points + line), returning its LineId
-- `importRectangle()` — Import a Rectangle2D as 4 points + 4 lines, returning side LineIds keyed by name
-- `referencePoint()` — Add a fixed reference point at (x, y).
-- `referenceLine()` — Add a fixed reference line from (x1, y1) to (x2, y2).
-- `referenceFrom()` — Import a single named entity (point or line) from a solved `ConstraintSketch` as fixed reference geometry in this builder.
-- `referenceAllFrom()` — Import ALL non-construction entities from a solved `ConstraintSketch` as fixed reference geometry.
-- `rect()` — Add an axis-aligned rectangle concept. Returns a `ConstrainedRect` handle with named vertices, sides, and center.
-- `addPolygon()` — Add a general polygon concept (CCW winding enforced). Returns a `ConstrainedPolygon` handle.
-- `regularPolygon()` — Add a regular n-gon concept (equal sides, CCW winding). Returns a `ConstrainedRegularPolygon` handle with a center point.
+- `point()` — Add a point in local coordinates. Returns its globally-addressable PointId.
+- `line()` — Connect two group points with a line. Both must be PointIds from this group.
+- `fixRotation()` — Freeze rotation (θ). Group can still translate — 2 DOF remain.
+- `fix()` — Freeze all 3 DOF — group is completely fixed.
+- `done()` — Finalize and register the group with the builder. Returns a handle for referencing group points/lines in constraints.
 
 ### `Point2D`
 
@@ -1004,7 +1161,7 @@ torus(majorRadius: number, minorRadius: number, segments?: number): Shape
 - `distanceTo()` — distanceTo(other: Point2D): number
 - `midpointTo()` — midpointTo(other: Point2D): Point2D
 - `translate()` — translate(dx: number, dy: number): Point2D
-- `toTuple()` — toTuple(): [number, number]
+- `toTuple()` — toTuple(): [ number, number ]
 
 ### `Line2D`
 
@@ -1020,13 +1177,13 @@ torus(majorRadius: number, minorRadius: number, segments?: number): Shape
 - `get length()` — get length(): number
 - `get midpoint()` — get midpoint(): Point2D
 - `get angle()` — get angle(): number
-- `get direction()` — get direction(): [number, number]
+- `get direction()` — get direction(): [ number, number ]
 - `parallel()` — Create a line parallel to this one, offset by distance. positive = left of direction
 - `intersect()` — Intersection point of two lines (treating them as infinite lines). Returns null if lines are parallel.
 - `intersectSegment()` — Intersection point within both line segments only. Returns null if segments don't cross.
 - `static fromCoordinates()` — static fromCoordinates(x1: number, y1: number, x2: number, y2: number): Line2D
 - `static fromPointAndAngle()` — static fromPointAndAngle(origin: Point2D, angleDeg: number, length: number): Lin
-- `static fromPointAndDirection()` — static fromPointAndDirection(origin: Point2D, dir: [number, number], length: num
+- `static fromPointAndDirection()` — static fromPointAndDirection(origin: Point2D, dir: [ number, number ], length: n
 
 ### `Circle2D`
 
@@ -1052,12 +1209,6 @@ torus(majorRadius: number, minorRadius: number, segments?: number): Shape
 ### `Rectangle2D`
 
 A rectangle with named sides and vertices. Sides are named based on the rectangle's local orientation at construction time. Vertices go: bottom-left, bottom-right, top-right, top-left (CCW from bottom-left).
-
-**Properties:**
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `vertices` | `[Point2D, Point2D, Point2D, Point2D]` | Vertices in order: bottom-left, bottom-right, top-right, top-left |
 
 **Methods:**
 
@@ -1097,6 +1248,8 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `duplicate()` — Alias for clone()
 - `geometryInfo()` — Inspect backend/representation info, including tracked-topology status.
 - `withReferences()` — Attach named placement references that survive normal transforms and imports.
+- `withPorts()` — Attach named assembly ports (origin + axis + up) that survive transforms and imports.
+- `portNames()` — List named port identifiers carried by this shape.
 - `referenceNames()` — List named placement references carried by this tracked shape.
 - `referencePoint()` — Resolve a named placement reference or built-in anchor to a 3D point.
 - `placeReference()` — Translate the tracked shape so the given reference lands on the target coordinate.
@@ -1123,22 +1276,10 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `splitByPlane()` — Split by infinite plane. Returns [positive-side, negative-side] as plain Shapes.
 - `trimByPlane()` — Keep the positive side of the plane and discard the opposite side. Returns plain Shape.
 - `shell()` — Shelling returns a plain Shape because tracked topology is not preserved.
-- `boundingBox()` — boundingBox(): unknown
+- `boundingBox()` — boundingBox(): ShapeRuntimeBounds
 - `get volume()` — get volume(): number
 - `hole()` — hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape
 - `cutout()` — cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape
-
-### `PathBuilder`
-
-**Methods:**
-
-- `moveTo()` — moveTo(x: number, y: number): this
-- `lineTo()` — lineTo(x: number, y: number): this
-- `lineH()` — lineH(dx: number): this
-- `lineV()` — lineV(dy: number): this
-- `lineAngled()` — lineAngled(length: number, degrees: number): this
-- `close()` — close(): Sketch
-- `stroke()` — stroke(width: number, join?: 'Round' | 'Square'): Sketch
 
 ### `Curve3D`
 
@@ -1158,7 +1299,21 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `tangentAt()` — tangentAt(t: number): Vec3$2
 - `length()` — length(samples?: number): number
 
+### `PathBuilder`
+
+**Methods:**
+
+- `moveTo()` — moveTo(x: number, y: number): this
+- `lineTo()` — lineTo(x: number, y: number): this
+- `lineH()` — lineH(dx: number): this
+- `lineV()` — lineV(dy: number): this
+- `lineAngled()` — lineAngled(length: number, degrees: number): this
+- `close()` — close(): Sketch
+- `stroke()` — stroke(width: number, join?: "Round" | "Square"): Sketch
+
 ### `Shape`
+
+Thin immutable wrapper around a runtime geometry backend payload.
 
 **Properties:**
 
@@ -1176,6 +1331,8 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `geometryInfo()` — Inspect which backend/representation produced this solid.
 - `withReferences()` — Attach named placement references that survive normal transforms and imports.
 - `referenceNames()` — List named placement references carried by this shape.
+- `withPorts()` — Attach named assembly ports (origin + axis + up) that survive transforms and imports.
+- `portNames()` — List named port identifiers carried by this shape.
 - `referencePoint()` — Resolve a named placement reference or built-in anchor to a 3D point.
 - `face()` — Resolve a defended semantic face by name on compile-covered shapes.
 - `faceNames()` — List defended semantic face names currently available on this shape.
@@ -1186,16 +1343,11 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `moveToLocal()` — Move so bounding box min corner is at target's bounding box min + (x, y, z) offset
 - `rotate()` — rotate(x: number, y: number, z: number): Shape
 - `transform()` — Apply a 4x4 affine transform matrix (column-major) or a Transform object.
-- `scale()` — scale(v: number | [number, number, number]): Shape
-- `mirror()` — mirror(normal: [number, number, number]): Shape
+- `scale()` — scale(v: number | [ number, number, number ]): Shape
+- `mirror()` — mirror(normal: [ number, number, number ]): Shape
 - `pointAlong()` — Reorient a shape so its primary axis (Z) points along the given direction. Useful for laying cylinders/extrusions along X or Y without thinking about Euler angles. Example: cylinder(40, 5).pointAlong([1, 0, 0]) — lays cylinder along X
 - `rotateAround()` — Rotate around an arbitrary axis through a pivot point. Equivalent to: translate(-pivot) → rotate around axis → translate(+pivot)
 - `rotateAroundTo()` — Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point. `movingPoint` / `targetPoint` may be raw world points or this shape's anchors/references.
-- `smoothOut()` — Mark edges for smoothing based on angle. Call refine() after to apply.
-- `refine()` — Subdivide mesh, interpolating smooth surfaces set by smoothOut().
-- `refineToLength()` — Subdivide until edges are shorter than length.
-- `refineToTolerance()` — Subdivide until surface is within tolerance of smooth surface.
-- `warp()` — Warp vertices with a function.
 - `add()` — add(...others: ShapeOperandInput[]): Shape
 - `subtract()` — subtract(...others: ShapeOperandInput[]): Shape
 - `intersect()` — intersect(...others: ShapeOperandInput[]): Shape
@@ -1203,11 +1355,9 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `splitByPlane()` — Split by infinite plane. Returns [positive-side, negative-side].
 - `trimByPlane()` — Keep the positive side of the plane and discard the opposite side.
 - `shell()` — Hollow out compile-covered boxes, cylinders, and straight extrudes. `openFaces` names any subset of the base shape's faces to leave open (no wall). Box bases accept any of: top, bottom, front (=side-bottom), back (=side-top), left (=side-left), right (=side-right), or the raw internal names. Cylinder and extrude bases accept top and bottom only.
-- `simplify()` — Reduce mesh complexity. Vertices closer than tolerance are merged.
-- `boundingBox()` — boundingBox(): unknown
+- `boundingBox()` — boundingBox(): ShapeRuntimeBounds
 - `volume()` — volume(): number
 - `surfaceArea()` — surfaceArea(): number
-- `minGap()` — Minimum distance between this shape and another.
 - `isEmpty()` — isEmpty(): boolean
 - `numTri()` — numTri(): number
 - `getMesh()` — Extract triangle mesh for Three.js rendering
@@ -1217,6 +1367,28 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `onFace()` — Place this shape on a face of a parent shape. Think of it like sticking a label on a box surface: - `face` picks which surface ('front', 'back', 'top', etc.) - `u, v` position within that face's 2D plane (from center) - front/back: u = left/right (X), v = up/down (Z) - left/right: u = forward/back (Y), v = up/down (Z) - top/bottom: u = left/right (X), v = forward/back (Y) - `protrude` = how far the child sticks out (positive = outward from face)
 - `hole()` — hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape
 - `cutout()` — cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape
+
+### `MateBuilder`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `constraints` | `Constraint3D[]` | — |
+
+**Methods:**
+
+- `flush()` — flush(faceA: string, faceB: string): string
+- `align()` — align(faceA: string, faceB: string): string
+- `parallel()` — parallel(faceA: string, faceB: string): string
+- `faceDistance()` — faceDistance(faceA: string, faceB: string, distance: number): string
+- `concentric()` — concentric(axisA: string, axisB: string): string
+- `axisParallel()` — axisParallel(axisA: string, axisB: string): string
+- `pointCoincident()` — pointCoincident(pointA: string, pointB: string): string
+- `pointOnFace()` — pointOnFace(point: string, face: string): string
+- `pointOnAxis()` — pointOnAxis(point: string, axis: string): string
+- `angle()` — angle(faceA: string, faceB: string, degrees: number): string
+- `get totalEquations()` — Total constraint equations.
 
 ### `ShapeGroup`
 
@@ -1234,21 +1406,23 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `clone()` — Return a deep-cloned ShapeGroup tree (refs copied).
 - `duplicate()` — Alias for clone()
 - `translate()` — translate(x: number, y: number, z: number): ShapeGroup
-- `boundingBox()` — boundingBox(): { min: [number, number, number]; max: [number, number, number]; }
+- `boundingBox()` — boundingBox(): { min: [ number, number, number ]; max: [ number, number, number 
 - `moveTo()` — Move so combined bounding box min corner is at the given global coordinate
 - `moveToLocal()` — Move so combined bounding box min corner is at target's bounding box min + (x, y, z) offset
-- `attachTo()` — attachTo( target: Shape | TrackedShape | ShapeGroup, targetAnchor: Anchor3D | st
+- `attachTo()` — attachTo(target: Shape | TrackedShape | ShapeGroup, targetAnchor: Anchor3D | str
 - `onFace()` — Place this group on a face of a parent shape. See Shape.onFace() for full documentation.
 - `rotate()` — rotate(x: number, y: number, z: number): ShapeGroup
 - `rotateAround()` — Rotate around an arbitrary axis through a pivot point. Sugar for: group.transform(Transform.rotationAxis(axis, angleDeg, pivot))
 - `rotateAroundTo()` — Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point. ShapeGroup string points use built-in anchors only.
 - `pointAlong()` — Reorient all 3D children so their primary axis (Z) points along direction. Sugar for a single group-wide axis rotation via Transform.rotationAxis(...).
 - `transform()` — Apply a 4x4 transform matrix or Transform object to all 3D children.
-- `scale()` — scale(v: number | [number, number, number]): ShapeGroup
-- `mirror()` — mirror(normal: [number, number, number]): ShapeGroup
+- `scale()` — scale(v: number | [ number, number, number ]): ShapeGroup
+- `mirror()` — mirror(normal: [ number, number, number ]): ShapeGroup
 - `color()` — color(hex: string): ShapeGroup
 - `withReferences()` — Attach named placement references to this group. References survive normal transforms (translate/rotate/scale/mirror/transform). ```javascript const bracket = group( { name: 'Left', shape: leftShape }, { name: 'Right', shape: rightShape }, ).withReferences({ points: { mountCenter: [0, 0, 0] }, }); ```
 - `referenceNames()` — List named placement references carried by this group.
+- `withPorts()` — Attach named assembly ports (origin + axis + up) that survive transforms.
+- `portNames()` — List named port identifiers carried by this group.
 - `referencePoint()` — Resolve a named placement reference or built-in Anchor3D to a 3D point. Named refs take priority over built-in anchors.
 - `placeReference()` — Translate the group so the given reference lands on the target coordinate. ```javascript const placed = importGroup('bracket-assembly.forge.js') .placeReference('mountCenter', [0, 0, 50]); ```
 
@@ -1264,6 +1438,9 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 
 - `warnings()` — warnings(): string[]
 - `getJointState()` — getJointState(): JointState
+- `get mateExplodeHints()` — Explode direction hints derived from mate constraints, or null if no mates.
+- `get mateDof()` — Remaining degrees of freedom after mate constraints, or null if no mates.
+- `get mateConverged()` — Whether the mate constraint solver converged, or null if no mates.
 - `getTransform()` — getTransform(partName: string): Transform
 - `getPart()` — getPart(partName: string): AssemblyPart
 - `toScene()` — toScene(): Array<{ name: string; shape?: Shape; group?: Array<{ name: string; sh
@@ -1282,18 +1459,25 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 
 **Methods:**
 
+- `mate()` — Register mate constraints between parts. Constraints are solved during `solve()` to derive part positions and explode hints. Part references use "partName:featureName" format.
 - `withReferences()` — Attach named placement reference points to this assembly. These are surfaced automatically on the ImportedAssembly when this file is imported with importAssembly(), so consumers can use placeReference() without re-declaring them. Returns `this` for chaining.
 - `getReferences()` — getReferences(): PlacementReferences
+- `withPorts()` — Attach named ports to a specific part or the assembly root. Ports declared this way are in the part's local coordinate system.
+- `getPorts()` — Get ports declared on a part (in part-local space).
+- `getAllPorts()` — getAllPorts(): Map<string, PortMap>
+- `getPort()` — Parse a "PartName.portName" reference and return the resolved port. Throws descriptive errors if the part or port doesn't exist.
 - `addFrame()` — Add a virtual reference frame (no geometry) to the assembly graph.
 - `addPart()` — addPart(name: string, part: AssemblyPart, options?: PartOptions): Assembly
 - `addJoint()` — addJoint(name: string, type: JointType, parent: string, child: string, options?:
 - `addRevolute()` — addRevolute(name: string, parent: string, child: string, options?: JointOptions)
 - `addPrismatic()` — addPrismatic(name: string, parent: string, child: string, options?: JointOptions
 - `addFixed()` — addFixed(name: string, parent: string, child: string, options?: JointOptions): A
+- `connect()` — Connect two parts by aligning their declared ports. `parentPortRef` and `childPortRef` use "PartName.portName" format. The system computes the joint frame and axis automatically from port alignment. ```javascript const mech = assembly("Arm") .addPart("Base", base) .addPart("Link", link) .connect("Base.top", "Link.bottom", { as: "J1", type: "revolute" }); ```
 - `addJointCoupling()` — addJointCoupling(jointName: string, options: JointCouplingOptions): Assembly
 - `addGearCoupling()` — addGearCoupling(drivenJointName: string, driverJointName: string, options?: Gear
 - `solve()` — solve(state?: JointState): SolvedAssembly
-- `sweepJoint()` — sweepJoint( jointName: string, from: number, to: number, steps: number, baseStat
+- `sweepJoint()` — sweepJoint(jointName: string, from: number, to: number, steps: number, baseState
+- `toJointsView()` — Derive `jointsView()` configuration from this assembly's joint graph and call it. Computes world-space pivots and axes from the solved rest pose, so you don't have to manually restate joint kinematics for the viewport runtime.
 - `describe()` — describe(): AssemblyDefinition
 
 ### `ImportedAssembly`
@@ -1325,6 +1509,8 @@ Wraps an imported Assembly, giving access to named parts and group conversion wi
 
 ## Constants
 
+### `ANCHOR3D_NAMES`
+
 ### `Constraint`
 
 **Members:**
@@ -1341,32 +1527,6 @@ Wraps an imported Assembly, giving access to named parts and group conversion wi
 - `length()` — length(builder: ConstrainedSketchBuilder, line: LineArg, value: number): Constra
 
 ### `SHEET_METAL_EDGES`
-
-### `ANCHOR3D_NAMES`
-
-### `verify`
-
-**Members:**
-
-- `that()` — Custom predicate check.
-- `equal()` — Check that two numbers are approximately equal (within tolerance).
-- `notEqual()` — Check that two numbers are NOT equal (differ by more than tolerance).
-- `greaterThan()` — Check that actual > min.
-- `lessThan()` — Check that actual < max.
-- `inRange()` — Check that min <= actual <= max.
-- `centersCoincide()` — Check that the bounding-box centers of two shapes coincide within tolerance (mm).
-- `notColliding()` — Check that two shapes do not collide (minGap > 0).
-- `minClearance()` — Check that a minimum clearance gap exists between two shapes.
-- `parallel()` — Check that two face normals are parallel (within toleranceDeg degrees).
-- `perpendicular()` — Check that two face normals are perpendicular (within toleranceDeg degrees).
-- `coplanar()` — Check that a face is coplanar with (same plane as) another face, meaning they are parallel AND their centers lie on the same plane.
-- `faceAt()` — Check that a face center lies at a specific position (within toleranceMm).
-- `sameDirection()` — Check that two face normals point in the same direction (not antiparallel). Stricter than parallel — both |angle| AND sign must match.
-- `isEmpty()` — Check that a shape is empty.
-- `notEmpty()` — Check that a shape is NOT empty.
-- `volumeApprox()` — Check that a shape's volume is approximately equal to expected (mm³).
-- `areaApprox()` — Check that a shape's surface area is approximately equal to expected (mm²).
-- `boundingBoxSize()` — Check that a shape's bounding box has approximately the given size.
 
 ### `partLibrary`
 
@@ -1405,3 +1565,27 @@ All library parts, keyed by name
 - `bevelGearPair()` — bevelGearPair: typeof bevelGearPair
 - `faceGearPair()` — faceGearPair: typeof faceGearPair
 - `sideGearPair()` — sideGearPair: typeof sideGearPair
+
+### `verify`
+
+**Members:**
+
+- `that()` — Custom predicate check.
+- `equal()` — Check that two numbers are approximately equal (within tolerance).
+- `notEqual()` — Check that two numbers are NOT equal (differ by more than tolerance).
+- `greaterThan()` — Check that actual > min.
+- `lessThan()` — Check that actual < max.
+- `inRange()` — Check that min <= actual <= max.
+- `centersCoincide()` — Check that the bounding-box centers of two shapes coincide within tolerance (mm).
+- `notColliding()` — Check that two shapes do not collide (minGap > 0).
+- `minClearance()` — Check that a minimum clearance gap exists between two shapes.
+- `parallel()` — Check that two face normals are parallel (within toleranceDeg degrees).
+- `perpendicular()` — Check that two face normals are perpendicular (within toleranceDeg degrees).
+- `coplanar()` — Check that a face is coplanar with (same plane as) another face, meaning they are parallel AND their centers lie on the same plane.
+- `faceAt()` — Check that a face center lies at a specific position (within toleranceMm).
+- `sameDirection()` — Check that two face normals point in the same direction (not antiparallel). Stricter than parallel — both |angle| AND sign must match.
+- `isEmpty()` — Check that a shape is empty.
+- `notEmpty()` — Check that a shape is NOT empty.
+- `volumeApprox()` — Check that a shape's volume is approximately equal to expected (mm³).
+- `areaApprox()` — Check that a shape's surface area is approximately equal to expected (mm²).
+- `boundingBoxSize()` — Check that a shape's bounding box has approximately the given size.

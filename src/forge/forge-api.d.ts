@@ -166,6 +166,41 @@ interface FaceDescendantMetadata {
 	memberNames: string[];
 	coplanar: boolean;
 }
+interface PortDef {
+	origin: Vec3;
+	axis: Vec3;
+	up: Vec3;
+	kind?: JointType;
+	min?: number;
+	max?: number;
+}
+interface PortInput {
+	origin: [
+		number,
+		number,
+		number
+	];
+	axis: [
+		number,
+		number,
+		number
+	];
+	up?: [
+		number,
+		number,
+		number
+	];
+	kind?: JointType;
+	min?: number;
+	max?: number;
+}
+type PortMap = Record<string, PortDef>;
+declare function portFactory(input: PortInput): PortDef;
+declare namespace portFactory {
+	var revolute: (input: PortInput) => PortDef;
+	var prismatic: (input: PortInput) => PortDef;
+	var fixed: (input: PortInput) => PortDef;
+}
 interface ConstraintTypeMap {
 	/**
 	 * Forces two points to occupy the same position.
@@ -2935,12 +2970,12 @@ declare class Shape {
 	geometryInfo(): GeometryInfo;
 	/** Attach named placement references that survive normal transforms and imports. */
 	withReferences(refs: PlacementReferenceInput): Shape;
+	/** List named placement references carried by this shape. */
+	referenceNames(kind?: PlacementReferenceKind): string[];
 	/** Attach named assembly ports (origin + axis + up) that survive transforms and imports. */
 	withPorts(ports: Record<string, PortInput>): Shape;
 	/** List named port identifiers carried by this shape. */
 	portNames(): string[];
-	/** List named placement references carried by this shape. */
-	referenceNames(kind?: PlacementReferenceKind): string[];
 	/** Resolve a named placement reference or built-in anchor to a 3D point. */
 	referencePoint(ref: PlacementAnchorLike): [
 		number,
@@ -3250,12 +3285,12 @@ declare class ShapeGroup {
 	 * ```
 	 */
 	withReferences(refs: PlacementReferenceInput): ShapeGroup;
+	/** List named placement references carried by this group. */
+	referenceNames(kind?: PlacementReferenceKind): string[];
 	/** Attach named assembly ports (origin + axis + up) that survive transforms. */
 	withPorts(ports: Record<string, PortInput>): ShapeGroup;
 	/** List named port identifiers carried by this group. */
 	portNames(): string[];
-	/** List named placement references carried by this group. */
-	referenceNames(kind?: PlacementReferenceKind): string[];
 	/**
 	 * Resolve a named placement reference or built-in Anchor3D to a 3D point.
 	 * Named refs take priority over built-in anchors.
@@ -3284,53 +3319,60 @@ declare class ShapeGroup {
 	]): ShapeGroup;
 }
 declare function group(...items: GroupInput[]): ShapeGroup;
-// --- Port types ---
-interface PortDef {
-	origin: Vec3;
-	axis: Vec3;
-	up: Vec3;
-	kind?: "fixed" | "revolute" | "prismatic";
-	min?: number;
-	max?: number;
-}
-interface PortInput {
-	origin: [number, number, number];
-	axis: [number, number, number];
-	up?: [number, number, number];
-	kind?: "fixed" | "revolute" | "prismatic";
-	min?: number;
-	max?: number;
-}
-type PortMap = Record<string, PortDef>;
-interface PortFactory {
-	(input: PortInput): PortDef;
-	revolute(input: PortInput): PortDef;
-	prismatic(input: PortInput): PortDef;
-	fixed(input: PortInput): PortDef;
-}
-declare const port: PortFactory;
-interface ConnectOptions {
-	as?: string;
-	type?: "fixed" | "revolute" | "prismatic";
+type JointViewType = "revolute" | "prismatic";
+type JointViewAxis = [
+	number,
+	number,
+	number
+];
+interface JointViewInput {
+	name: string;
+	child: string;
+	parent?: string;
+	type?: JointViewType;
+	axis?: JointViewAxis;
+	pivot?: [
+		number,
+		number,
+		number
+	];
 	min?: number;
 	max?: number;
 	default?: number;
 	unit?: string;
-	flip?: boolean;
-	effort?: number;
-	velocity?: number;
-	damping?: number;
-	friction?: number;
 }
-interface ToJointsViewOptions {
-	defaults?: Record<string, number>;
-	overrides?: Record<string, Partial<JointViewInput>>;
-	animations?: JointViewAnimationInput[];
-	couplings?: JointViewCouplingInput[];
-	defaultAnimation?: string;
+interface JointViewAnimationKeyframeInput {
+	at: number;
+	values: Record<string, number>;
+}
+interface JointViewAnimationInput {
+	name: string;
+	duration?: number;
+	loop?: boolean;
+	continuous?: boolean;
+	keyframes: JointViewAnimationKeyframeInput[];
+}
+interface JointViewCouplingTermInput {
+	joint: string;
+	ratio?: number;
+}
+interface JointViewCouplingInput {
+	joint: string;
+	terms: JointViewCouplingTermInput[];
+	offset?: number;
+}
+interface JointsViewOptions {
 	enabled?: boolean;
+	joints?: JointViewInput[];
+	couplings?: JointViewCouplingInput[];
+	animations?: JointViewAnimationInput[];
+	defaultAnimation?: string;
 }
-// --- Assembly types ---
+/**
+ * Configure runtime joint controls that animate object transforms in the viewport
+ * without re-running the script.
+ */
+declare function jointsView(options?: JointsViewOptions): void;
 type AssemblyPart = Shape | TrackedShape | ShapeGroup;
 type JointType = "fixed" | "revolute" | "prismatic";
 type JointState = Record<string, number | undefined>;
@@ -3509,6 +3551,27 @@ declare class SolvedAssembly {
 	collisionReport(options?: CollisionOptions): CollisionFinding[];
 	minClearance(partA: string, partB: string, searchLength?: number): number;
 }
+interface ConnectOptions {
+	as?: string;
+	type?: JointType;
+	min?: number;
+	max?: number;
+	default?: number;
+	unit?: string;
+	flip?: boolean;
+	effort?: number;
+	velocity?: number;
+	damping?: number;
+	friction?: number;
+}
+interface ToJointsViewOptions {
+	defaults?: Record<string, number>;
+	overrides?: Record<string, Partial<JointViewInput>>;
+	animations?: JointViewAnimationInput[];
+	couplings?: JointViewCouplingInput[];
+	defaultAnimation?: string;
+	enabled?: boolean;
+}
 declare class Assembly {
 	readonly name: string;
 	private readonly parts;
@@ -3516,6 +3579,8 @@ declare class Assembly {
 	private readonly jointCouplings;
 	private readonly _mateFns;
 	private _refs;
+	private readonly _portsByPart;
+	private _connectCounter;
 	constructor(name?: string);
 	/**
 	 * Register mate constraints between parts.
@@ -3533,6 +3598,27 @@ declare class Assembly {
 	withReferences(refs: Pick<PlacementReferenceInput, "points">): Assembly;
 	/** @internal — used by importAssembly() to seed ImportedAssembly refs. */
 	getReferences(): PlacementReferences;
+	/**
+	 * Attach named ports to a specific part or the assembly root.
+	 * Ports declared this way are in the part's local coordinate system.
+	 */
+	withPorts(partName: string, ports: Record<string, PortInput>): Assembly;
+	withPorts(ports: Record<string, PortInput>): Assembly;
+	/** Get ports declared on a part (in part-local space). */
+	getPorts(partName: string): PortMap;
+	/** @internal — set already-normalized ports directly (used by mergeInto). */
+	_setPortsDirect(partName: string, ports: PortMap): void;
+	/** @internal — get all port maps, keyed by part name. */
+	getAllPorts(): Map<string, PortMap>;
+	/**
+	 * Parse a "PartName.portName" reference and return the resolved port.
+	 * Throws descriptive errors if the part or port doesn't exist.
+	 */
+	getPort(ref: string): {
+		partName: string;
+		portName: string;
+		port: PortDef;
+	};
 	/** Add a virtual reference frame (no geometry) to the assembly graph. */
 	addFrame(name: string, options?: PartOptions): Assembly;
 	addPart(name: string, part: AssemblyPart, options?: PartOptions): Assembly;
@@ -3540,22 +3626,31 @@ declare class Assembly {
 	addRevolute(name: string, parent: string, child: string, options?: JointOptions): Assembly;
 	addPrismatic(name: string, parent: string, child: string, options?: JointOptions): Assembly;
 	addFixed(name: string, parent: string, child: string, options?: JointOptions): Assembly;
-	/** Connect two parts by aligning their declared ports. */
+	/**
+	 * Connect two parts by aligning their declared ports.
+	 *
+	 * `parentPortRef` and `childPortRef` use "PartName.portName" format.
+	 * The system computes the joint frame and axis automatically from port alignment.
+	 *
+	 * ```javascript
+	 * const mech = assembly("Arm")
+	 *   .addPart("Base", base)
+	 *   .addPart("Link", link)
+	 *   .connect("Base.top", "Link.bottom", { as: "J1", type: "revolute" });
+	 * ```
+	 */
 	connect(parentPortRef: string, childPortRef: string, options?: ConnectOptions): Assembly;
-	/** Attach named ports to a specific part. */
-	withPorts(partName: string, ports: Record<string, PortInput>): Assembly;
-	/** Attach assembly-level ports. */
-	withPorts(ports: Record<string, PortInput>): Assembly;
-	/** Get ports declared on a part. */
-	getPorts(partName: string): PortMap;
-	/** Parse "PartName.portName" and return the resolved port. */
-	getPort(ref: string): { partName: string; portName: string; port: PortDef };
 	addJointCoupling(jointName: string, options: JointCouplingOptions): Assembly;
 	addGearCoupling(drivenJointName: string, driverJointName: string, options?: GearCouplingOptions): Assembly;
 	private assertJointCouplingsAcyclic;
 	solve(state?: JointState): SolvedAssembly;
 	sweepJoint(jointName: string, from: number, to: number, steps: number, baseState?: JointState, collisionOptions?: CollisionOptions): JointSweepFrame[];
-	/** Derive jointsView() configuration from this assembly's joint graph and call it. */
+	/**
+	 * Derive `jointsView()` configuration from this assembly's joint graph and call it.
+	 *
+	 * Computes world-space pivots and axes from the solved rest pose, so you don't
+	 * have to manually restate joint kinematics for the viewport runtime.
+	 */
 	toJointsView(options?: ToJointsViewOptions): void;
 	describe(): AssemblyDefinition;
 }
@@ -3967,60 +4062,6 @@ declare function joint(name: string, shape: Shape, pivot: [
 	number,
 	number
 ], opts?: RevoluteJointOpts): Shape;
-type JointViewType = "revolute" | "prismatic";
-type JointViewAxis = [
-	number,
-	number,
-	number
-];
-interface JointViewInput {
-	name: string;
-	child: string;
-	parent?: string;
-	type?: JointViewType;
-	axis?: JointViewAxis;
-	pivot?: [
-		number,
-		number,
-		number
-	];
-	min?: number;
-	max?: number;
-	default?: number;
-	unit?: string;
-}
-interface JointViewAnimationKeyframeInput {
-	at: number;
-	values: Record<string, number>;
-}
-interface JointViewAnimationInput {
-	name: string;
-	duration?: number;
-	loop?: boolean;
-	continuous?: boolean;
-	keyframes: JointViewAnimationKeyframeInput[];
-}
-interface JointViewCouplingTermInput {
-	joint: string;
-	ratio?: number;
-}
-interface JointViewCouplingInput {
-	joint: string;
-	terms: JointViewCouplingTermInput[];
-	offset?: number;
-}
-interface JointsViewOptions {
-	enabled?: boolean;
-	joints?: JointViewInput[];
-	couplings?: JointViewCouplingInput[];
-	animations?: JointViewAnimationInput[];
-	defaultAnimation?: string;
-}
-/**
- * Configure runtime joint controls that animate object transforms in the viewport
- * without re-running the script.
- */
-declare function jointsView(options?: JointsViewOptions): void;
 type MetricSize = "M2" | "M2.5" | "M3" | "M4" | "M5" | "M6" | "M8" | "M10";
 type FastenerFit = "close" | "normal" | "loose" | "tap";
 interface FastenerHoleOptions {
