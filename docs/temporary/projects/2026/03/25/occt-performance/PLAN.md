@@ -4,19 +4,15 @@
 
 **Goal**: Make ForgeCAD models execute within the 30s UI timeout with the OCCT backend.
 
-## Architecture Summary
-
-OCCT operations flow: `CompilePlan → lower.ts → OCCT WASM → TopoDS_Shape → tessellation → mesh`
-
-The 30s timeout covers script evaluation only (WASM init has a separate 120s timeout).
+**Result**: Identified and fixed the critical loft hang. Identified text2d as the main remaining bottleneck (~4s per label). Added a runtime warning for text2d on OCCT. Assembly dropped from timeout → 17s after user removed text labels.
 
 ## Progress Tracker
 
 | # | Change | Target | Before | After | Status |
 |---|--------|--------|--------|-------|--------|
 | P1 | B-spline wire conversion for ThruSections | curves-surfacing-basics | timeout (∞) | 11.2s | ✅ |
-| P2 | N-shape boolean strategies | fruit robot parts | varies | no clear winner | ❌ Reverted |
-| — | Assembly (sum of parts) | fruit robot assembly | ~33s | 32.5s | ⚠️ Borderline |
+| P2 | N-shape boolean strategies | fruit robot parts | varies | no universal winner | ❌ Reverted |
+| P3 | text2d OCCT warning | all models with text | silent slowdown | console warning | ✅ |
 
 ## Experiment Log
 
@@ -41,50 +37,42 @@ The 30s timeout covers script evaluation only (WASM init has a separate 120s tim
 
 | File (tool count) | N-shape | Sequential | Fuse-then-cut |
 |-------------------|---------|------------|---------------|
-| base-plate (52 tools) | **10.8s** | 15.7s | 12.2s |
+| base-plate (52 cylinders) | **10.8s** | 15.7s | 12.2s |
 | motor-mount (10 tools) | **0.5s** | 2.2s | 0.75s |
-| peeling-arm (20 tools) | 9.5s | **4.5s** | 8.4s |
-| carriage (moderate) | **0.6s** | 1.4s | 0.8s |
+| peeling-arm (20 polygon extrusions) | 9.5s | **4.5s** | 8.4s |
 
-**Why no winner**: N-shape is fast when tools are simple non-overlapping primitives (cylinders in a grid). Sequential is faster when tools are complex shapes that cause expensive interference detection. No static threshold correctly distinguishes these cases.
+**Why no winner**: N-shape is fast for simple non-overlapping tools (cylinders in a grid). Sequential wins for complex polygon-based tools. No static threshold correctly distinguishes these cases.
 
-**Decision**: Keep N-shape API (original). Most models have simple tools (holes, slots). The peeling-arm case (9.5s) is within the 30s timeout individually.
+### P3: text2d OCCT Warning (SUCCESS)
 
-### Fruit Robot Part Benchmarks
+**What**: Added `console.warn()` in `text2d()` when OCCT backend is active, warning users that text engraving is slow.
 
-| Part | OCCT Time | Main Cost |
-|------|-----------|-----------|
-| base-plate | 11.8s | text2d engraving (4s) + 52 mount holes |
-| blade-holder | 8.8s | 1× loft + 3× sweep (B-spline curves) |
-| peeling-arm | 9.5s | 20-tool boolean (complex polygon shapes) |
-| waste-tray | 0.8s | Simple booleans |
-| fruit-chuck | 0.8s | Simple booleans |
-| carriage | 0.6s | Simple booleans |
-| motor-mount | 0.5s | Simple booleans |
-| **Assembly** | **32.5s** | Sum of all parts (19 objects) |
+**Why**: text2d produces extremely dense glyph polygons via bezier curve sampling. A single "PEELBOT v1" label costs ~4s in OCCT (1.8s extrude + 2.2s subtract) vs 42ms in Manifold. This was the single biggest contributor to the fruit robot assembly timeout.
+
+**Impact**: User removed 2 text labels → assembly dropped from 32.5s to 17s.
 
 ## Emerging Pattern: Why OCCT Is Slow
 
-Three categories of slow OCCT operations:
+Three categories:
 
-### 1. ThruSections with High-Edge-Count Wires (FIXED by P1)
-- **Trigger**: `spline2d()` → polygon sampling → many-edge wire → loft/sweep
-- **Cost**: O(n²+) in wire edge count. 120+ edges = hangs indefinitely.
-- **Fix**: Convert polygon wires to B-spline wires before ThruSections.
+### 1. ThruSections with High-Edge-Count Wires (FIXED)
+- **Trigger**: `spline2d()` / `offset()` → many-edge polygon wires → loft/sweep
+- **Cost**: O(n²+) — hangs indefinitely with >100 edges
+- **Fix**: B-spline wire conversion reduces to 1 edge per wire
 
-### 2. Boolean Operations Scale with Shape Complexity
-- **Trigger**: Many `.subtract()` or `.add()` operations accumulate faces/edges
-- **Cost**: Each boolean must evaluate full topology. 50+ simple holes = ~0.5s. Complex polygon tools = 9.5s.
-- **No easy fix**: This is fundamental to B-rep boolean evaluation. Could batch similar operations but no universal strategy wins.
+### 2. Boolean Operations Scale with Shape + Tool Complexity
+- **Trigger**: `.subtract(many tools)` or booleans on complex B-rep shapes
+- **Cost**: Inherent to B-rep topology evaluation. No universal optimization.
 
-### 3. text2d Produces Extremely Complex Profiles
-- **Trigger**: `text2d("PEELBOT v1")` → complex glyph polygons → extrude → subtract
-- **Cost**: Text extrude = 1.8s, text boolean subtract = 2.2s = ~4s total per text label
-- **Potential fix**: Reduce text polygon complexity, or defer text engraving to export-only quality.
+### 3. text2d Produces Extremely Dense Geometry (WARNED)
+- **Trigger**: `text2d()` → bezier glyph sampling → hundreds of polygon points per character
+- **Cost**: ~4s per text label in OCCT
+- **Mitigation**: Runtime warning tells users to expect slowness or remove text
 
 ## Files Modified
 
 | File | Purpose |
 |------|---------|
 | `src/forge/backends/occt/lower.ts` | B-spline wire conversion for ThruSections |
+| `src/forge/sketch/text.ts` | OCCT performance warning for text2d |
 | `examples/api/curves-surfacing-basics.forge.js` | Remove Manifold-only smoothOut/refine calls |
