@@ -175,8 +175,6 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
 
   const sheets: PackedSheet[] = [];
   const sheetFreeRects: FreeRect[][] = [];
-  // Track raw cuts per sheet before final numbering
-  const sheetCutsRaw: Array<Omit<GuillotineCut, 'step'>[]> = [];
 
   function createSheet(): number {
     const idx = sheets.length;
@@ -190,7 +188,6 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
       cuts: [],
     });
     sheetFreeRects.push([{ x: 0, y: 0, w: sheetW, h: sheetH }]);
-    sheetCutsRaw.push([]);
     return idx;
   }
 
@@ -284,43 +281,150 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
     const splitA = Math.max(rightFullH.w * rightFullH.h, topPartW.w * topPartW.h);
     const splitB = Math.max(rightPartH.w * rightPartH.h, topFullW.w * topFullW.h);
 
-    const cuts = sheetCutsRaw[bestSheetIdx];
-
     if (splitA >= splitB) {
-      // Vertical-primary split: cut at x = rect.x + slotW across full rect height
-      if (rightFullH.w > 0 && rightFullH.h > 0) {
-        freeRects.push(rightFullH);
-        const cx = rect.x + slotW;
-        cuts.push({ direction: 'V', x1: cx, y1: rect.y, x2: cx, y2: rect.y + rect.h, lengthMm: rect.h });
-      }
-      // Secondary horizontal cut at y = rect.y + slotH across slot width
-      if (topPartW.w > 0 && topPartW.h > 0) {
-        freeRects.push(topPartW);
-        const cy = rect.y + slotH;
-        cuts.push({ direction: 'H', x1: rect.x, y1: cy, x2: rect.x + slotW, y2: cy, lengthMm: slotW });
+      if (rightFullH.w > 0 && rightFullH.h > 0) freeRects.push(rightFullH);
+      if (topPartW.w > 0 && topPartW.h > 0) freeRects.push(topPartW);
+    } else {
+      if (rightPartH.w > 0 && rightPartH.h > 0) freeRects.push(rightPartH);
+      if (topFullW.w > 0 && topFullW.h > 0) freeRects.push(topFullW);
+    }
+  }
+
+  // Compute depth-first cut sequence from placed pieces
+  for (const sheet of sheets) {
+    sheet.cuts = computeSheetCutSequence(sheet);
+  }
+
+  return sheets;
+}
+
+// ── Depth-first cut sequence from placed pieces ─────────────────
+
+/**
+ * Reconstruct the guillotine cut sequence from placed piece positions.
+ * Uses recursive decomposition: at each level, find a valid edge-to-edge
+ * cut that divides the pieces into two groups, then recurse depth-first
+ * (smaller group first for a natural "peel off" ordering).
+ */
+function computeSheetCutSequence(sheet: PackedSheet): GuillotineCut[] {
+  const result: Omit<GuillotineCut, 'step'>[] = [];
+
+  function decompose(
+    rx: number, ry: number, rw: number, rh: number,
+    pieces: PackedPiece[],
+  ): void {
+    if (pieces.length <= 1) return; // 0-1 pieces need no cuts
+
+    // Collect candidate cut positions from piece boundaries within the region
+    const EPS = 0.01;
+    const bestCut = findBestCut(rx, ry, rw, rh, pieces, EPS);
+    if (!bestCut) return; // shouldn't happen for guillotine-packed pieces
+
+    const { axis, pos, groupA, groupB } = bestCut;
+
+    if (axis === 'V') {
+      // Vertical cut at x = pos, spanning full region height
+      result.push({ direction: 'V', x1: pos, y1: ry, x2: pos, y2: ry + rh, lengthMm: rh });
+      // Depth-first: smaller group first (the side with fewer pieces)
+      const leftPieces = groupA;
+      const rightPieces = groupB;
+      if (leftPieces.length <= rightPieces.length) {
+        decompose(rx, ry, pos - rx, rh, leftPieces);
+        decompose(pos, ry, rx + rw - pos, rh, rightPieces);
+      } else {
+        decompose(pos, ry, rx + rw - pos, rh, rightPieces);
+        decompose(rx, ry, pos - rx, rh, leftPieces);
       }
     } else {
-      // Horizontal-primary split: cut at y = rect.y + slotH across full rect width
-      if (topFullW.w > 0 && topFullW.h > 0) {
-        freeRects.push(topFullW);
-        const cy = rect.y + slotH;
-        cuts.push({ direction: 'H', x1: rect.x, y1: cy, x2: rect.x + rect.w, y2: cy, lengthMm: rect.w });
-      }
-      // Secondary vertical cut at x = rect.x + slotW across slot height
-      if (rightPartH.w > 0 && rightPartH.h > 0) {
-        freeRects.push(rightPartH);
-        const cx = rect.x + slotW;
-        cuts.push({ direction: 'V', x1: cx, y1: rect.y, x2: cx, y2: rect.y + slotH, lengthMm: slotH });
+      // Horizontal cut at y = pos, spanning full region width
+      result.push({ direction: 'H', x1: rx, y1: pos, x2: rx + rw, y2: pos, lengthMm: rw });
+      const topPieces = groupA;
+      const bottomPieces = groupB;
+      if (topPieces.length <= bottomPieces.length) {
+        decompose(rx, ry, rw, pos - ry, topPieces);
+        decompose(rx, pos, rw, ry + rh - pos, bottomPieces);
+      } else {
+        decompose(rx, pos, rw, ry + rh - pos, bottomPieces);
+        decompose(rx, ry, rw, pos - ry, topPieces);
       }
     }
   }
 
-  // Number cuts sequentially per sheet
-  for (let si = 0; si < sheets.length; si++) {
-    sheets[si].cuts = sheetCutsRaw[si].map((c, i) => ({ ...c, step: i + 1 }));
+  decompose(0, 0, sheet.sheetWidth, sheet.sheetHeight, sheet.pieces);
+  return result.map((c, i) => ({ ...c, step: i + 1 }));
+}
+
+/**
+ * Find the best guillotine cut within a region. Tries all piece-boundary
+ * positions on both axes. A valid cut must not intersect any piece interior.
+ * Prefers shorter cuts (less material to cut through).
+ */
+function findBestCut(
+  rx: number, ry: number, rw: number, rh: number,
+  pieces: PackedPiece[], eps: number,
+): { axis: 'V' | 'H'; pos: number; groupA: PackedPiece[]; groupB: PackedPiece[] } | null {
+  let best: { axis: 'V' | 'H'; pos: number; groupA: PackedPiece[]; groupB: PackedPiece[]; length: number } | null = null;
+
+  // Collect candidate X positions (piece left and right edges)
+  const xCandidates = new Set<number>();
+  const yCandidates = new Set<number>();
+  for (const p of pieces) {
+    if (p.x > rx + eps) xCandidates.add(p.x);
+    const pr = p.x + p.width;
+    if (pr < rx + rw - eps) xCandidates.add(pr);
+    if (p.y > ry + eps) yCandidates.add(p.y);
+    const pb = p.y + p.height;
+    if (pb < ry + rh - eps) yCandidates.add(pb);
   }
 
-  return sheets;
+  // Try vertical cuts
+  for (const xPos of xCandidates) {
+    // Check no piece straddles this x position
+    let valid = true;
+    const left: PackedPiece[] = [];
+    const right: PackedPiece[] = [];
+    for (const p of pieces) {
+      const pLeft = p.x;
+      const pRight = p.x + p.width;
+      if (pLeft < xPos - eps && pRight > xPos + eps) {
+        valid = false;
+        break;
+      }
+      if (pRight <= xPos + eps) left.push(p);
+      else right.push(p);
+    }
+    if (valid && left.length > 0 && right.length > 0) {
+      const length = rh; // vertical cut spans full region height
+      if (!best || length < best.length) {
+        best = { axis: 'V', pos: xPos, groupA: left, groupB: right, length };
+      }
+    }
+  }
+
+  // Try horizontal cuts
+  for (const yPos of yCandidates) {
+    let valid = true;
+    const top: PackedPiece[] = [];
+    const bottom: PackedPiece[] = [];
+    for (const p of pieces) {
+      const pTop = p.y;
+      const pBottom = p.y + p.height;
+      if (pTop < yPos - eps && pBottom > yPos + eps) {
+        valid = false;
+        break;
+      }
+      if (pBottom <= yPos + eps) top.push(p);
+      else bottom.push(p);
+    }
+    if (valid && top.length > 0 && bottom.length > 0) {
+      const length = rw; // horizontal cut spans full region width
+      if (!best || length < best.length) {
+        best = { axis: 'H', pos: yPos, groupA: top, groupB: bottom, length };
+      }
+    }
+  }
+
+  return best;
 }
 
 export function computeCuttingLayout(entries: SheetStockDef[], sheetWidth: number, sheetHeight: number, kerf: number = 0): CuttingLayoutResult {
