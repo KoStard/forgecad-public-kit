@@ -217,6 +217,23 @@ that globally would break intentional multi-turn tracks.
 - `animations`: `{ name, duration?, loop?, continuous?, keyframes }[]`
 - `defaultAnimation`
 
+**Keyframe `at` is optional (tick-based mode):** If you omit `at` from all
+keyframes, they are spaced across the timeline as sequential ticks. By default
+all ticks are equal, but you can use `ticks` to weight individual segments:
+
+```javascript
+keyframes: [
+  { ticks: 3, values: { "Shoulder": 20 } },   // slow move (3× weight)
+  { ticks: 1, values: { "Shoulder": -10 } },   // fast snap (1× weight)
+  { values: { "Shoulder": 20 } },               // last keyframe's ticks is ignored
+]
+// Positions: 0, 0.75, 1.0  (weights 3,1 → total 4 → at 0/4, 3/4, 4/4)
+```
+
+You can still use explicit `at` values when you need precise non-uniform
+spacing, but mixing explicit and omitted `at` within the same animation is not
+allowed. `ticks` is only valid in tick-based mode.
+
 ```javascript
 jointsView({
   joints: [
@@ -238,9 +255,9 @@ jointsView({
       duration: 1.6,
       loop: true,
       keyframes: [
-        { at: 0.0, values: { "Shoulder": 20 } },
-        { at: 0.5, values: { "Shoulder": -10 } },
-        { at: 1.0, values: { "Shoulder": 20 } },
+        { values: { "Shoulder": 20 } },
+        { values: { "Shoulder": -10 } },
+        { values: { "Shoulder": 20 } },
       ],
     },
   ],

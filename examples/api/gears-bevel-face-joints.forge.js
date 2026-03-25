@@ -128,9 +128,9 @@ jointsView({
       duration: 2.4,
       loop: true,
       keyframes: [
-        { at: 0.0, values: { "Bevel Driver": 0, "Face Driver": 0 } },
-        { at: 0.5, values: { "Bevel Driver": 180, "Face Driver": 120 } },
-        { at: 1.0, values: { "Bevel Driver": 360, "Face Driver": 240 } },
+        { values: { "Bevel Driver": 0, "Face Driver": 0 } },
+        { values: { "Bevel Driver": 180, "Face Driver": 120 } },
+        { values: { "Bevel Driver": 360, "Face Driver": 240 } },
       ],
     },
   ],

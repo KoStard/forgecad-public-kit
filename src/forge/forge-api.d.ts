@@ -3354,7 +3354,10 @@ interface JointViewInput {
 	unit?: string;
 }
 interface JointViewAnimationKeyframeInput {
-	at: number;
+	/** Timeline position [0, 1]. If omitted from ALL keyframes, positions are auto-computed from tick weights. */
+	at?: number;
+	/** Relative weight of the segment from this keyframe to the next (default 1). Only used in tick-based mode (when `at` is omitted). Last keyframe's ticks value is ignored. */
+	ticks?: number;
 	values: Record<string, number>;
 }
 interface JointViewAnimationInput {
