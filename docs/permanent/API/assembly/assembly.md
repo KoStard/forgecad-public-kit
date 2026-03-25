@@ -29,9 +29,18 @@ const solved = mech.solve();
 return solved.toScene();
 ```
 
-## Port-based assembly (recommended for mechanisms)
+## Port-based assembly
 
-Instead of manually computing `frame` and `axis`, declare **ports** on parts and let `connect()` align them automatically.
+Declare **ports** on parts and let `connect()` align them automatically — no manual `frame` or `axis` math.
+
+### When to use `connect()` vs `addRevolute()`
+
+| Pattern | Use | Example |
+|---------|-----|---------|
+| **Ports physically meet** | `connect()` | Flange-to-flange, bolt-to-hole, motor shaft into gear bore |
+| **Shared axis, offset position** | `addRevolute()` | Hinge with arm between two ear brackets, scissor linkage |
+
+`connect()` aligns port origins — child port lands exactly on parent port. Use it when the attachment points should coincide. For mechanisms where parts share a rotation axis but are deliberately spaced apart along it (e.g. a folding hinge arm that sits between bracket ears), use `addRevolute()` with pre-positioned parts and let the transform cancellation handle placement.
 
 ### Declaring ports
 
@@ -74,7 +83,15 @@ return solved.toScene();
 
 `connect()` computes the joint `frame` and `axis` from port alignment, then delegates to `addJoint()` internally. The kinematic solver is unchanged.
 
-**ConnectOptions:** `as`, `type` (override port kind), `min`, `max`, `default`, `unit`, `flip` (oppose axes), `effort`, `velocity`, `damping`, `friction`.
+**ConnectOptions:** `as`, `type` (override port kind), `min`, `max`, `default`, `unit`, `flip` (oppose axes for mirrored parts), `effort`, `velocity`, `damping`, `friction`.
+
+**Mirrored parts:** When a part is created with `.mirror()`, its port axis flips direction. Use `flip: true` on the connect call so the axes oppose rather than align:
+
+```javascript
+.connect("Right Base.hinge", "Right Arm.pivot", {
+  as: "Fold Right", flip: true,
+})
+```
 
 ### Derived jointsView
 
@@ -96,9 +113,26 @@ mech.toJointsView({
     },
   ],
 });
+
+// IMPORTANT: solve at REST when using toJointsView — the viewport handles posing.
+return mech.solve().toScene();
 ```
 
 `toJointsView()` solves the assembly at rest, computes world-space pivots and axes, and calls the existing `jointsView()` function. No manual pivot coordinates needed.
+
+**Fixed attachments are handled automatically.** Parts connected with `addFixed()` are emitted as zero-range revolute joints in the viewport chain, so they follow their parent during animation (e.g. a stick bolted to an arm will rotate with it).
+
+**Do not solve at a non-zero angle when using `toJointsView()`.** The viewport applies `toJointsView` transforms on top of the scene — solving at the same angle would double-rotate parts. Use `defaults` to set the initial pose instead:
+
+```javascript
+// BAD — double rotation
+mech.toJointsView({ defaults: { J1: 45 } });
+return mech.solve({ J1: 45 }).toScene();
+
+// GOOD — solve at rest, viewport poses via defaults
+mech.toJointsView({ defaults: { J1: 45 } });
+return mech.solve().toScene();
+```
 
 ### Port API on shapes
 

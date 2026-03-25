@@ -415,8 +415,67 @@ The first phase of the recommended API has been implemented:
 - `forgecad debug assembly <file>` CLI command
 - Assembly-level port export for sub-assembly composition
 
+## Field Test: Foldable Handle (2026-03-25)
+
+Applied the port API to `PersonalForgeCADProjects/2026/03/11/case/foldable_handle_2.forge.js`.
+
+#### P6. Field test — connect() on foldable handle (FAILED → LEARNED)
+**What**: Tried to replace `addRevolute` with `connect()` on a folding hinge mechanism.
+
+**Result**: `connect()` didn't fit this mechanism. The arm and base share a rotation axis (Y) but are deliberately offset along it — the arm sits between two bracket ears, ~89mm from either base. `connect()` aligns port origins, which placed the arm ON the base instead of between the ears.
+
+**Why it failed**: `connect()` assumes the two ports should physically meet — it computes a frame that moves the child port origin onto the parent port origin. In this hinge, the arm's pivot bore IS at origin and the base's hinge IS at origin, but the arm body should be ~89mm away from the base along the shared axis. The original code achieved this through pre-translation cancellation (`arm at -89mm` + `base at +89mm` → arm at Y=0).
+
+**Lesson**: `connect()` is for joints where ports physically align (flange-to-flange, shaft-into-bore). For "shared axis, offset position" mechanisms (hinge ears, scissor linkages), `addRevolute()` with explicit positioning is the right tool.
+
+**Action**: Added a "When to use `connect()` vs `addRevolute()`" guide to the docs.
+
+#### P7. Field test — toJointsView() fixed joints (BUG → FIXED)
+**What**: After switching to `toJointsView()`, the wooden stick (fixed to the arm via `addFixed`) didn't follow the arm during viewport animation.
+
+**Result**: `toJointsView()` was skipping fixed joints entirely (`if (j.type === 'fixed') continue`). Fixed parts need to be represented as zero-range revolute joints in the jointsView chain so the viewport knows they follow their parent.
+
+**Fix**: Changed `toJointsView()` to emit fixed joints as `{ type: 'revolute', min: 0, max: 0, default: 0, parent: parentName }`.
+
+**Lesson**: The viewport docs already describe this pattern for manual `jointsView()`, but `toJointsView()` must handle it automatically. Any automatic derivation must be tested against mechanisms that have mixed joint types.
+
+#### P8. Field test — mirrored parts flip port axis (LEARNED)
+**What**: Right arm was created with `.mirror([0, 1, 0])`, which flips the port axis from `[0, 1, 0]` to `[0, -1, 0]`. `connect()` then rotated the arm 180° to re-align the axes, producing wrong geometry.
+
+**Fix**: Use `flip: true` in ConnectOptions to tell `connect()` the axes should oppose.
+
+**Lesson**: `flip: true` is essential for mirrored parts. Should be documented prominently. Consider auto-detecting mirror scenarios in the future.
+
+#### P9. Field test — double rotation with toJointsView (LEARNED)
+**What**: The scene was solved at `foldAngle` AND `toJointsView()` also posed at `foldAngle` → viewport double-rotated.
+
+**Fix**: Scene must be solved at REST (all joints = 0) when using `toJointsView()`. The viewport applies poses via `defaults` and animations.
+
+**Lesson**: This is the same "double rotation" gotcha from the manual `jointsView()` docs. `toJointsView()` docs now include a prominent warning with good/bad examples.
+
+#### Final foldable handle result
+The model works correctly with:
+- `addRevolute` for the hinge joints (shared axis, offset position pattern)
+- `toJointsView()` for viewport animation (automatic pivot computation, fold animation, fixed joint follow)
+- `addJointCoupling` for linked hinges
+- Rest-pose solve for the returned scene
+
+Net improvement: removed the silently-ignored `pivot` parameter on `addRevolute`, gained automatic viewport animation with `toJointsView()`, added fold animation for free.
+
+## Updated Progress Tracker
+
+| # | Change | Status |
+|---|--------|--------|
+| — | Baseline robot-arm audit | ✅ |
+| P1–P4 | Investigation & root cause | ✅ |
+| P5 | Implement port + connect + toJointsView | ✅ Core API |
+| P6 | Field test: connect() on foldable handle | ✅ Learned: connect() has limited sweet spot |
+| P7 | Field test: fixed joints in toJointsView | ✅ Bug fixed |
+| P8 | Field test: mirrored parts | ✅ Documented flip: true |
+| P9 | Field test: double rotation | ✅ Documented rest-pose requirement |
+
 ## Files Modified
 
 | File | Purpose |
 |------|---------|
-| `docs/temporary/projects/2026/03/24/assembly-api-investigation/PLAN.md` | Investigation log, baseline, findings, proposed API direction, and implementation record |
+| `docs/temporary/projects/2026/03/24/assembly-api-investigation/PLAN.md` | Investigation log, baseline, findings, proposed API direction, implementation record, and field test learnings |
