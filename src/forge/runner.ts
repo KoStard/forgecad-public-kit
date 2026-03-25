@@ -40,7 +40,7 @@ import {
 } from './kernel';
 import { partLibrary } from './library';
 import { detectMeshFormat } from './mesh/meshParsers';
-import { boolParam, getCollectedParams, type ParamDef, param, resetParams, runWithParamScope } from './params';
+import { boolParam, createTrackedScope, getCollectedParams, type ParamDef, param, resetParams, runWithParamScope, setParamOverrides, validateConsumedOverrides } from './params';
 import { type ForgeQualityPreset, resolveForgeQualityPreset, runWithForgeQuality } from './quality';
 import { type CollectedRobotExport, getCollectedRobotExport, resetRobotExport, robotExport } from './export/robotExport';
 import { getCollectedScene, resetScene, type SceneConfig, scene } from './scene';
@@ -274,7 +274,7 @@ function executeFile(
       }
 
       const localOverrides = parseImportParamArgs('importSketch', name, paramOverrides);
-      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
       logImportTrace(_collectedLogs, fileName, scope, options, 'importSketch', resolvedPath, 'start', {
         requested: name,
         overrides: localOverrides,
@@ -289,6 +289,7 @@ function executeFile(
         });
         throw error;
       }
+      validateConsumedOverrides(childScope, 'importSketch', resolvedPath);
       if (result instanceof Sketch) {
         logImportTrace(_collectedLogs, fileName, scope, options, 'importSketch', resolvedPath, 'success', {
           requested: name,
@@ -375,7 +376,7 @@ function executeFile(
     const importPart = (name: string, paramOverrides?: Record<string, number>): Shape => {
       const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
       const localOverrides = parseImportParamArgs('importPart', name, paramOverrides);
-      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
       const dimStart = getCollectedDimensions().length;
       logImportTrace(_collectedLogs, fileName, scope, options, 'importPart', resolvedPath, 'start', {
         requested: name,
@@ -391,6 +392,7 @@ function executeFile(
         });
         throw error;
       }
+      validateConsumedOverrides(childScope, 'importPart', resolvedPath);
       const importedDims = takeCollectedDimensions(dimStart);
       if (result instanceof Shape) {
         logImportTrace(_collectedLogs, fileName, scope, options, 'importPart', resolvedPath, 'success', {
@@ -418,7 +420,7 @@ function executeFile(
     const importGroup = (name: string, paramOverrides?: Record<string, number>): ShapeGroup => {
       const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
       const localOverrides = parseImportParamArgs('importGroup', name, paramOverrides);
-      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
       logImportTrace(_collectedLogs, fileName, scope, options, 'importGroup', resolvedPath, 'start', {
         requested: name,
         overrides: localOverrides,
@@ -433,6 +435,7 @@ function executeFile(
         });
         throw error;
       }
+      validateConsumedOverrides(childScope, 'importGroup', resolvedPath);
       if (result instanceof ShapeGroup) {
         logImportTrace(_collectedLogs, fileName, scope, options, 'importGroup', resolvedPath, 'success', {
           requested: name,
@@ -451,7 +454,7 @@ function executeFile(
     const importAssembly = (name: string, paramOverrides?: Record<string, number>): ImportedAssembly => {
       const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
       const localOverrides = parseImportParamArgs('importAssembly', name, paramOverrides);
-      const childScope = { namePrefix: makeChildScopePrefix(resolvedPath), localOverrides };
+      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
       logImportTrace(_collectedLogs, fileName, scope, options, 'importAssembly', resolvedPath, 'start', {
         requested: name,
         overrides: localOverrides,
@@ -466,6 +469,7 @@ function executeFile(
         });
         throw error;
       }
+      validateConsumedOverrides(childScope, 'importAssembly', resolvedPath);
       if (result instanceof Assembly) {
         logImportTrace(_collectedLogs, fileName, scope, options, 'importAssembly', resolvedPath, 'success', {
           requested: name,
