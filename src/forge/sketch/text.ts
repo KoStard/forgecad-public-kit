@@ -17,6 +17,7 @@
  */
 
 import type opentype from 'opentype.js';
+import { getActiveBackend } from '../kernel';
 import { Sketch } from './core';
 import { fontText2d, loadFont } from './fontText';
 
@@ -105,6 +106,14 @@ export function text2d(content: string, options: TextOptions = {}): Sketch {
   }
   if (!(size > 0)) {
     throw new Error('text2d: size must be a positive number');
+  }
+
+  if (getActiveBackend() === 'occt') {
+    const preview = content.length > 20 ? content.slice(0, 20) + '…' : content;
+    console.warn(
+      `⚠ text2d("${preview}") is slow with the OCCT backend — ` +
+        'text engraving may add several seconds. Remove text or switch to the Manifold backend for faster previews.',
+    );
   }
 
   // Resolve font: use provided font, or default to bundled Inter
