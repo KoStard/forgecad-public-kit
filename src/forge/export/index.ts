@@ -37,7 +37,8 @@ export { type UrdfPackageOutput, buildUrdfRobotPackage } from './urdfExport';
 
 export { type SdfPackageOutput, buildSdfRobotPackage } from './sdfExport';
 
-export { generateCuttingLayoutPdf } from './cuttingLayout';
+export { computeCuttingLayout, formatCutSequence, generateCuttingLayoutPdf } from './cuttingLayout';
+export type { CuttingLayoutResult, GuillotineCut, PackedSheet } from './cuttingLayout';
 
 export {
   type ColorRgb,

@@ -66,6 +66,26 @@ export interface PackedSheet {
   sheetWidth: number;
   sheetHeight: number;
   usedArea: number;
+  /** Ordered guillotine cuts to separate all pieces on this sheet. */
+  cuts: GuillotineCut[];
+}
+
+/** A single end-to-end guillotine cut on a sheet. */
+export interface GuillotineCut {
+  /** 1-based sequence number. */
+  step: number;
+  /** 'V' = vertical cut (splits left/right), 'H' = horizontal cut (splits top/bottom). */
+  direction: 'V' | 'H';
+  /** Cut line start X (mm from sheet origin). */
+  x1: number;
+  /** Cut line start Y (mm from sheet origin). */
+  y1: number;
+  /** Cut line end X (mm from sheet origin). */
+  x2: number;
+  /** Cut line end Y (mm from sheet origin). */
+  y2: number;
+  /** Cut length in mm. */
+  lengthMm: number;
 }
 
 export interface CuttingLayoutResult {
@@ -76,6 +96,8 @@ export interface CuttingLayoutResult {
   totalSheetArea: number;
   wastePercent: number;
   kerf: number;
+  /** Total length of all cuts across all sheets (mm). */
+  totalCutLength: number;
 }
 
 export interface CuttingLayoutPdfResult {
@@ -153,6 +175,8 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
 
   const sheets: PackedSheet[] = [];
   const sheetFreeRects: FreeRect[][] = [];
+  // Track raw cuts per sheet before final numbering
+  const sheetCutsRaw: Array<Omit<GuillotineCut, 'step'>[]> = [];
 
   function createSheet(): number {
     const idx = sheets.length;
@@ -163,8 +187,10 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
       sheetWidth: sheetW,
       sheetHeight: sheetH,
       usedArea: 0,
+      cuts: [],
     });
     sheetFreeRects.push([{ x: 0, y: 0, w: sheetW, h: sheetH }]);
+    sheetCutsRaw.push([]);
     return idx;
   }
 
@@ -258,13 +284,40 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
     const splitA = Math.max(rightFullH.w * rightFullH.h, topPartW.w * topPartW.h);
     const splitB = Math.max(rightPartH.w * rightPartH.h, topFullW.w * topFullW.h);
 
+    const cuts = sheetCutsRaw[bestSheetIdx];
+
     if (splitA >= splitB) {
-      if (rightFullH.w > 0 && rightFullH.h > 0) freeRects.push(rightFullH);
-      if (topPartW.w > 0 && topPartW.h > 0) freeRects.push(topPartW);
+      // Vertical-primary split: cut at x = rect.x + slotW across full rect height
+      if (rightFullH.w > 0 && rightFullH.h > 0) {
+        freeRects.push(rightFullH);
+        const cx = rect.x + slotW;
+        cuts.push({ direction: 'V', x1: cx, y1: rect.y, x2: cx, y2: rect.y + rect.h, lengthMm: rect.h });
+      }
+      // Secondary horizontal cut at y = rect.y + slotH across slot width
+      if (topPartW.w > 0 && topPartW.h > 0) {
+        freeRects.push(topPartW);
+        const cy = rect.y + slotH;
+        cuts.push({ direction: 'H', x1: rect.x, y1: cy, x2: rect.x + slotW, y2: cy, lengthMm: slotW });
+      }
     } else {
-      if (rightPartH.w > 0 && rightPartH.h > 0) freeRects.push(rightPartH);
-      if (topFullW.w > 0 && topFullW.h > 0) freeRects.push(topFullW);
+      // Horizontal-primary split: cut at y = rect.y + slotH across full rect width
+      if (topFullW.w > 0 && topFullW.h > 0) {
+        freeRects.push(topFullW);
+        const cy = rect.y + slotH;
+        cuts.push({ direction: 'H', x1: rect.x, y1: cy, x2: rect.x + rect.w, y2: cy, lengthMm: rect.w });
+      }
+      // Secondary vertical cut at x = rect.x + slotW across slot height
+      if (rightPartH.w > 0 && rightPartH.h > 0) {
+        freeRects.push(rightPartH);
+        const cx = rect.x + slotW;
+        cuts.push({ direction: 'V', x1: cx, y1: rect.y, x2: cx, y2: rect.y + slotH, lengthMm: slotH });
+      }
     }
+  }
+
+  // Number cuts sequentially per sheet
+  for (let si = 0; si < sheets.length; si++) {
+    sheets[si].cuts = sheetCutsRaw[si].map((c, i) => ({ ...c, step: i + 1 }));
   }
 
   return sheets;
@@ -287,6 +340,7 @@ export function computeCuttingLayout(entries: SheetStockDef[], sheetWidth: numbe
 
   const totalUsedArea = allSheets.reduce((sum, s) => sum + s.usedArea, 0);
   const totalSheetArea = allSheets.length * sheetWidth * sheetHeight;
+  const totalCutLength = allSheets.reduce((sum, s) => sum + s.cuts.reduce((cs, c) => cs + c.lengthMm, 0), 0);
 
   return {
     sheets: allSheets,
@@ -296,10 +350,74 @@ export function computeCuttingLayout(entries: SheetStockDef[], sheetWidth: numbe
     totalSheetArea,
     wastePercent: totalSheetArea > 0 ? ((totalSheetArea - totalUsedArea) / totalSheetArea) * 100 : 0,
     kerf,
+    totalCutLength,
   };
 }
 
+// ── CLI text output ─────────────────────────────────────────────
+
+/**
+ * Format the cut sequence for all sheets as a human-readable text table.
+ * Suitable for CLI output.
+ */
+export function formatCutSequence(layout: CuttingLayoutResult): string {
+  const lines: string[] = [];
+
+  for (const sheet of layout.sheets) {
+    lines.push(`\n  Sheet ${sheet.sheetIndex + 1} — ${sheet.material} (${sheet.sheetWidth} x ${sheet.sheetHeight} mm, ${sheet.pieces.length} pieces)`);
+
+    if (sheet.cuts.length === 0) {
+      lines.push('    (no cuts needed — single piece fills sheet)');
+      continue;
+    }
+
+    // Header
+    lines.push('    Step  Dir  From               To                 Length');
+    lines.push('    ────  ───  ─────────────────  ─────────────────  ──────');
+
+    for (const cut of sheet.cuts) {
+      const dir = cut.direction === 'V' ? 'V  ' : 'H  ';
+      const from = `(${fmt(cut.x1)}, ${fmt(cut.y1)})`.padEnd(17);
+      const to = `(${fmt(cut.x2)}, ${fmt(cut.y2)})`.padEnd(17);
+      const len = `${fmt(cut.lengthMm)} mm`;
+      lines.push(`    ${String(cut.step).padStart(4)}  ${dir}  ${from}  ${to}  ${len}`);
+    }
+
+    const sheetCutLen = sheet.cuts.reduce((s, c) => s + c.lengthMm, 0);
+    lines.push(`    Total: ${fmt(sheetCutLen)} mm in ${sheet.cuts.length} cuts`);
+  }
+
+  lines.push(`\n  All sheets: ${fmt(layout.totalCutLength)} mm total cut length`);
+  return lines.join('\n');
+}
+
+function fmt(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
 // ── PDF generation ─────────────────────────────────────────────
+
+/** Color gradient for cut step labels: blue (early) → red (late). */
+function cutStepColor(t: number): ColorRgb {
+  // Blue → teal → red
+  const r = Math.min(1, t * 2);
+  const g = t < 0.5 ? t * 1.2 : (1 - t) * 1.2;
+  const b = Math.max(0, 1 - t * 2);
+  return [r * 0.7 + 0.1, g * 0.5 + 0.1, b * 0.7 + 0.1];
+}
+
+/** Emit a PDF circle path (4 Bezier arcs, not stroked/filled — caller adds operator). */
+function pdfCircle(cx: number, cy: number, r: number): string {
+  // Approximate circle with 4 cubic Bezier curves (kappa = 0.5522847498)
+  const k = 0.5522847498 * r;
+  return [
+    `${cx - r} ${cy} m`,
+    `${cx - r} ${cy + k} ${cx - k} ${cy + r} ${cx} ${cy + r} c`,
+    `${cx + k} ${cy + r} ${cx + r} ${cy + k} ${cx + r} ${cy} c`,
+    `${cx + r} ${cy - k} ${cx + k} ${cy - r} ${cx} ${cy - r} c`,
+    `${cx - k} ${cy - r} ${cx - r} ${cy - k} ${cx - r} ${cy} c`,
+  ].join('\n') + '\n';
+}
 
 const HEADER_HEIGHT = 44;
 const DRAW_AREA_TOP = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT;
@@ -324,7 +442,8 @@ function renderSheetPage(sheet: PackedSheet, totalSheets: number, layout: Cuttin
   const sheetArea = sheet.sheetWidth * sheet.sheetHeight;
   const wastePercent = sheetArea > 0 ? ((sheetArea - sheet.usedArea) / sheetArea) * 100 : 0;
   const title = `CUTTING LAYOUT — ${sheet.material.toUpperCase()}`;
-  let subtitle = `Sheet ${sheet.sheetIndex + 1} of ${totalSheets} | ${sheet.sheetWidth} x ${sheet.sheetHeight} mm | ${sheet.pieces.length} pieces | ${formatNumber(wastePercent)}% waste`;
+  const sheetCutLen = sheet.cuts.reduce((s, c) => s + c.lengthMm, 0);
+  let subtitle = `Sheet ${sheet.sheetIndex + 1} of ${totalSheets} | ${sheet.sheetWidth} x ${sheet.sheetHeight} mm | ${sheet.pieces.length} pieces | ${sheet.cuts.length} cuts (${formatNumber(sheetCutLen)} mm) | ${formatNumber(wastePercent)}% waste`;
   if (kerf > 0) subtitle += ` | Kerf: ${formatNumber(kerf)} mm`;
 
   cmd.push(commandSetFill([0.12, 0.12, 0.14]));
@@ -387,22 +506,6 @@ function renderSheetPage(sheet: PackedSheet, totalSheets: number, layout: Cuttin
   const sortedX = [...xPositions].sort((a, b) => a - b);
   const sortedY = [...yPositions].sort((a, b) => a - b);
 
-  // ── Cut reference lines (drawn behind pieces) ──
-  if (sortedX.length > 0 || sortedY.length > 0) {
-    cmd.push(commandSetStroke([0.78, 0.78, 0.82]));
-    cmd.push('[2 2] 0 d\n'); // dashed
-    cmd.push('0.3 w\n');
-    for (const xMm of sortedX) {
-      const xPdf = sheetLeft + xMm * scale;
-      cmd.push(commandLine([xPdf, sheetBottom], [xPdf, sheetBottom + drawH]));
-    }
-    for (const yMm of sortedY) {
-      const yPdf = sheetBottom + drawH - yMm * scale;
-      cmd.push(commandLine([sheetLeft, yPdf], [sheetLeft + drawW, yPdf]));
-    }
-    cmd.push('[] 0 d\n'); // reset dash
-  }
-
   // ── Sheet outline ──
   cmd.push(commandSetStroke([0.4, 0.4, 0.44]));
   cmd.push('1.5 w\n');
@@ -457,6 +560,45 @@ function renderSheetPage(sheet: PackedSheet, totalSheets: number, layout: Cuttin
       }
     }
   });
+
+  // ── Numbered cut sequence lines (drawn on top of pieces) ──
+  const CUT_NUM_FONT = 7;
+  const CUT_CIRCLE_R = 6;
+  if (sheet.cuts.length > 0) {
+    for (const cut of sheet.cuts) {
+      // Convert mm coordinates to PDF coordinates
+      const px1 = sheetLeft + cut.x1 * scale;
+      const py1 = sheetBottom + drawH - cut.y1 * scale;
+      const px2 = sheetLeft + cut.x2 * scale;
+      const py2 = sheetBottom + drawH - cut.y2 * scale;
+
+      // Cut line — dashed, colored by step order
+      const hue = (cut.step - 1) / Math.max(1, sheet.cuts.length - 1); // 0..1
+      const cutColor: ColorRgb = cutStepColor(hue);
+      cmd.push(commandSetStroke(cutColor));
+      cmd.push('[4 2] 0 d\n');
+      cmd.push('0.6 w\n');
+      cmd.push(commandLine([px1, py1], [px2, py2]));
+      cmd.push('[] 0 d\n');
+
+      // Step number label at midpoint of the cut line
+      const mx = (px1 + px2) / 2;
+      const my = (py1 + py2) / 2;
+      const numStr = String(cut.step);
+      const numW = estimateTextWidth(numStr, CUT_NUM_FONT);
+
+      // White circle background for readability
+      cmd.push(commandSetFill([1, 1, 1]));
+      cmd.push(commandSetStroke(cutColor));
+      cmd.push('0.5 w\n');
+      cmd.push(pdfCircle(mx, my, CUT_CIRCLE_R));
+      cmd.push('B\n'); // fill + stroke
+
+      // Step number text
+      cmd.push(commandSetFill(cutColor));
+      cmd.push(commandText(numStr, mx - numW / 2, my - CUT_NUM_FONT * 0.35, CUT_NUM_FONT));
+    }
+  }
 
   // ── Ruler marks ──
   // Greedy label placement: each label is pushed to the nearest non-overlapping
@@ -609,13 +751,15 @@ function renderSummaryPage(layout: CuttingLayoutResult, sheetWidth: number, shee
 
   // Table header
   const colMaterial = tableX;
-  const colSheets = tableX + 260;
-  const colArea = tableX + 360;
-  const colWaste = tableX + 480;
+  const colSheets = tableX + 220;
+  const colCuts = tableX + 300;
+  const colArea = tableX + 400;
+  const colWaste = tableX + 540;
 
   cmd.push(commandSetFill([0.22, 0.22, 0.24]));
   cmd.push(commandText('Material', colMaterial + 4, tableY, 9));
   cmd.push(commandText('Sheets', colSheets + 4, tableY, 9));
+  cmd.push(commandText('Cuts (length)', colCuts + 4, tableY, 9));
   cmd.push(commandText('Used Area (mm\u00b2)', colArea + 4, tableY, 9));
   cmd.push(commandText('Waste %', colWaste + 4, tableY, 9));
   tableY -= 4;
@@ -640,9 +784,12 @@ function renderSummaryPage(layout: CuttingLayoutResult, sheetWidth: number, shee
     const usedArea = sheets.reduce((s, sh) => s + sh.usedArea, 0);
     const totalArea = sheets.length * sheetWidth * sheetHeight;
     const waste = totalArea > 0 ? ((totalArea - usedArea) / totalArea) * 100 : 0;
+    const matCuts = sheets.reduce((s, sh) => s + sh.cuts.length, 0);
+    const matCutLen = sheets.reduce((s, sh) => s + sh.cuts.reduce((cs, c) => cs + c.lengthMm, 0), 0);
 
     cmd.push(commandText(material, colMaterial + 4, tableY, 9));
     cmd.push(commandText(String(sheets.length), colSheets + 4, tableY, 9));
+    cmd.push(commandText(`${matCuts} (${formatNumber(matCutLen)} mm)`, colCuts + 4, tableY, 9));
     cmd.push(commandText(formatNumber(usedArea), colArea + 4, tableY, 9));
     cmd.push(commandText(`${formatNumber(waste)}%`, colWaste + 4, tableY, 9));
     tableY -= 16;
@@ -704,18 +851,27 @@ function renderSummaryPage(layout: CuttingLayoutResult, sheetWidth: number, shee
     tableY -= 15;
   }
 
-  // Total area
+  // Totals
   tableY -= 8;
   cmd.push(commandSetStroke([0.7, 0.7, 0.74]));
   cmd.push(commandLine([tableX, tableY + 6], [tableX + tableW, tableY + 6]));
   cmd.push(commandSetFill([0.12, 0.12, 0.14]));
   const totalAreaM2 = layout.totalUsedArea / 1_000_000;
   const totalStockM2 = layout.totalSheetArea / 1_000_000;
+  const totalCuts = layout.sheets.reduce((s, sh) => s + sh.cuts.length, 0);
   cmd.push(
     commandText(
       `Total: ${formatNumber(totalAreaM2)} m\\262 material on ${layout.totalSheets} sheet${layout.totalSheets > 1 ? 's' : ''} (${formatNumber(totalStockM2)} m\\262 stock, ${formatNumber(layout.wastePercent)}% waste)`,
       tableX + 4,
       tableY - 6,
+      10,
+    ),
+  );
+  cmd.push(
+    commandText(
+      `Cuts: ${totalCuts} total (${formatNumber(layout.totalCutLength)} mm total cut length)`,
+      tableX + 4,
+      tableY - 20,
       10,
     ),
   );

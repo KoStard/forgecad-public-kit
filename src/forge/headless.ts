@@ -157,6 +157,8 @@ export { intersectWithPlane, projectToPlane } from './section';
 export * from './sheetMetal';
 export type { SheetStockDef, SheetStockOpts } from './export/sheetStock';
 export { getCollectedSheetStock, resetSheetStock, sheetStock } from './export/sheetStock';
+export type { CuttingLayoutResult, GuillotineCut, PackedSheet } from './export/cuttingLayout';
+export { computeCuttingLayout, formatCutSequence, generateCuttingLayoutPdf } from './export/cuttingLayout';
 export * from './sketch';
 export type { Mat4, RotateAroundToMode, RotateAroundToOptions, TransformInput, Vec3 } from './transform';
 export { composeChain, Transform } from './transform';
