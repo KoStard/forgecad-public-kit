@@ -175,17 +175,37 @@ interface PortDef {
 	min?: number;
 	max?: number;
 }
+type PortAlign = "middle" | "start" | "end";
 interface PortInput {
-	origin?: [number, number, number];
-	axis?: [number, number, number];
-	start?: [number, number, number];
-	end?: [number, number, number];
-	up?: [number, number, number];
+	origin?: [
+		number,
+		number,
+		number
+	];
+	axis?: [
+		number,
+		number,
+		number
+	];
+	start?: [
+		number,
+		number,
+		number
+	];
+	end?: [
+		number,
+		number,
+		number
+	];
+	up?: [
+		number,
+		number,
+		number
+	];
 	kind?: JointType;
 	min?: number;
 	max?: number;
 }
-type PortAlign = "middle" | "start" | "end";
 type PortMap = Record<string, PortDef>;
 declare function portFactory(input: PortInput): PortDef;
 declare namespace portFactory {
@@ -2887,7 +2907,7 @@ declare function text2d(content: string, options?: TextOptions): Sketch;
 declare function textWidth(content: string, options?: Pick<TextOptions, "size" | "letterSpacing" | "font">): number;
 type GeometryBackend = "manifold" | "occt" | "hybrid" | "unknown";
 type GeometryRepresentation = "mesh-solid" | "brep-solid" | "surface" | "mixed";
-type GeometryFidelity = "kernel-native" | "sampled" | "deformed" | "mixed" | "unknown";
+type GeometryFidelity = "kernel-native" | "exact" | "sampled" | "deformed" | "mixed" | "unknown";
 type GeometryTopology = "none" | "synthetic" | "kernel";
 type GeometrySource = "primitive" | "extrude" | "revolve" | "boolean" | "sheet-metal" | "shell" | "fillet" | "chamfer" | "level-set" | "loft" | "sweep" | "deform" | "draft" | "offset-solid" | "imported" | "unknown";
 interface GeometryInfo {
@@ -3537,7 +3557,9 @@ declare class SolvedAssembly {
 	toGroup(): ShapeGroup;
 	/**
 	 * Return an array of named scene objects for the viewport renderer.
-	 * Prefer `toGroup()` for most uses; this method exists for advanced scene-graph control.
+	 * Each part becomes `{ name, shape }` or `{ name, group: [...] }` if the part
+	 * is a ShapeGroup.  Prefer `toGroup()` for most uses; this method exists for
+	 * advanced scene-graph control.
 	 */
 	toSceneObjects(): Array<{
 		name: string;
@@ -3747,13 +3769,21 @@ declare class ImportedAssembly {
 	/** Solve at defaults and return a rotated ShapeGroup (Euler XYZ degrees). */
 	rotate(x: number, y: number, z: number): ShapeGroup;
 	/** Solve at defaults and return a scaled ShapeGroup. */
-	scale(v: number | [number, number, number]): ShapeGroup;
+	scale(v: number | [
+		number,
+		number,
+		number
+	]): ShapeGroup;
 	/** Solve at defaults and return a mirrored ShapeGroup. */
-	mirror(normal: [number, number, number]): ShapeGroup;
+	mirror(normal: [
+		number,
+		number,
+		number
+	]): ShapeGroup;
 	/** Solve at defaults and return a colored ShapeGroup. */
 	color(hex: string): ShapeGroup;
 	/** Solve at defaults, get a named child part from the resulting group. */
-	child(name: string): GroupChild;
+	child(name: string): Shape | Sketch | TrackedShape | ShapeGroup;
 	/**
 	 * Flatten this sub-assembly's parts and joints into `parent`, then wire a
 	 * mount joint connecting `mountParent` (a part already in `parent`) to the

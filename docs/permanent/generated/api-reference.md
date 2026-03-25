@@ -1444,7 +1444,7 @@ Thin immutable wrapper around a runtime geometry backend payload.
 - `getTransform()` — getTransform(partName: string): Transform
 - `getPart()` — getPart(partName: string): AssemblyPart
 - `toGroup()` — Convert all solved parts to a ShapeGroup with named children. Each part becomes a child, positioned at its solved transform. This is the primary way to get a group for rendering, `show()`, or embedding.
-- `toSceneObjects()` — Return an array of named scene objects for the viewport renderer. Prefer `toGroup()` for most uses; this method exists for advanced scene-graph control.
+- `toSceneObjects()` — Return an array of named scene objects for the viewport renderer. Each part becomes `{ name, shape }` or `{ name, group: [...] }` if the part is a ShapeGroup.  Prefer `toGroup()` for most uses; this method exists for advanced scene-graph control.
 - `toScene()` — toScene(): Array<{ name: string; shape?: Shape; group?: Array<{ name: string; sh
 - `bom()` — bom(): BomRow[]
 - `bomCsv()` — bomCsv(): string
