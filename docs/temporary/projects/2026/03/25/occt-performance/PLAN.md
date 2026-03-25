@@ -1,61 +1,90 @@
-# OCCT Performance: ThruSections Loft Timeout
+# OCCT Performance Investigation
 
 ## Goal & Current State
 
-**Goal**: Make `curves-surfacing-basics.forge.js` execute within the 30s UI timeout with the OCCT backend.
-
-**Baseline**: The first `loft()` call never completed — `ThruSections.Build()` hung indefinitely with 5 profiles of 120+ polygon edges each.
-
-**Result**: Script evaluation dropped from ∞ (timeout) to **11.2 seconds**. All 3 shapes render correctly.
+**Goal**: Make ForgeCAD models execute within the 30s UI timeout with the OCCT backend.
 
 ## Architecture Summary
 
-```
-spline2d(12 pts, samplesPerSegment:10, closed:true)
-  → sampleCatmullRom2D() → 120-point polygon
-  → .offset(corner * 0.08, 'Round') → ~224-edge wire
-  → ProfileCompilePlan { kind: 'offset', base: { kind: 'polygon' } }
+OCCT operations flow: `CompilePlan → lower.ts → OCCT WASM → TopoDS_Shape → tessellation → mesh`
 
-loft([5 profiles], [5 heights])
-  → lowerLoftPlan()
-    → lowerProfileToFace() × 5  (each ~50ms)
-    → extractOuterWire() → 224-edge polygon wire
-    → toBSplineWireIfNeeded() → 1-edge B-spline wire  ← NEW
-    → BRepOffsetAPI_ThruSections.Build()
-```
-
-**Root cause**: OCCT's `BRepOffsetAPI_ThruSections` performance is O(n²) or worse in the number of wire edges. With 224 line-segment edges per profile × 5 profiles, it hangs. Converting to a single B-spline edge per profile makes it complete in milliseconds.
+The 30s timeout covers script evaluation only (WASM init has a separate 120s timeout).
 
 ## Progress Tracker
 
-| # | Change | ThruSections | Boolean | Total | Status |
-|---|--------|-------------|---------|-------|--------|
-| — | Baseline (224-edge polygons) | >60s (hangs) | — | timeout | Baseline |
-| P1 | B-spline wire conversion (all pts) | ~200ms | 4.9s | 11.2s | ✅ Fixed |
-| P1a | B-spline wire (subsampled 80pts) | ~100ms | 22s | 23s | ❌ Worse |
+| # | Change | Target | Before | After | Status |
+|---|--------|--------|--------|-------|--------|
+| P1 | B-spline wire conversion for ThruSections | curves-surfacing-basics | timeout (∞) | 11.2s | ✅ |
+| P2 | N-shape boolean strategies | fruit robot parts | varies | no clear winner | ❌ Reverted |
+| — | Assembly (sum of parts) | fruit robot assembly | ~33s | 32.5s | ⚠️ Borderline |
 
 ## Experiment Log
 
-#### Baseline (MEASURED)
-**What**: Run curves-surfacing-basics.forge.js with OCCT backend as-is.
-**Result**: Profile prep: 5 × ~50ms. ThruSections.Build: never completes (>60s).
-**Why**: 224 linear BRep edges per wire after offset. OCCT's ThruSections performs compatibility checking and parametric surface fitting across all edges — O(n²) or worse.
+### P1: B-spline Wire Conversion for ThruSections (SUCCESS)
 
-#### P1: B-spline Wire Conversion — All Points (SUCCESS)
-**What**: Added `toBSplineWireIfNeeded()` — when a wire has >20 edges, extract vertices, fit a `GeomAPI_PointsToBSpline` curve, create a single-edge wire.
-**Result**: Lofts: 2.4s each (including ~400ms B-spline fit × 5 profiles). Boolean: 4.9s. Total: 11.2s.
-**Why it worked**: ThruSections with 1-edge B-spline wires is ~1000× faster than with 224-edge polygon wires. The smooth B-spline surfaces also produce faster boolean intersections.
-**Lesson**: OCCT algorithmic complexity is dominated by edge count, not geometric complexity. One smooth B-spline edge is vastly better than many linear edges for surfacing operations.
+**What**: When a wire has >20 edges, extract vertices, fit `GeomAPI_PointsToBSpline`, create a 1-edge wire. Applied to loft, twist-extrude, and scale-top-extrude ThruSections paths.
 
-#### P1a: B-spline Wire Conversion — Subsampled 80 Points (FAILED)
-**What**: Same as P1 but subsampled wire points to 80 before B-spline fitting (to speed up the fit itself).
-**Result**: Lofts: 0.6s each (faster fit). Boolean: **22s** (4.5× slower!). Total: 23s.
-**Why it failed**: Fewer fit points → less smooth B-spline → harder boolean intersection topology. The B-spline fit cost (400ms) is a minor fraction compared to the boolean savings from smoother surfaces.
-**Lesson**: For B-rep workflows, surface smoothness dominates downstream performance. Never sacrifice surface quality to save on fitting cost.
+**Result**: `curves-surfacing-basics.forge.js` dropped from ∞ (timeout) to 11.2s.
+
+**Root cause**: `spline2d()` samples Catmull-Rom → 120-point polygon → offset → 224-edge wire. `BRepOffsetAPI_ThruSections` is O(n²+) in wire edge count. With B-spline wires (1 edge each), ThruSections completes in ~200ms.
+
+**Key finding**: Surface smoothness matters — subsampling to fewer fit points made B-spline fitting 4× faster but boolean operations 4.5× slower (5s → 22s). All points = best overall.
+
+### P2: Multi-Tool Boolean Strategies (FAILED — No Universal Winner)
+
+**What**: Tested three strategies for `.subtract(many tools)`:
+1. **N-shape API** (original): `BRepAlgoAPI_Cut_1` with all tools at once
+2. **Sequential pairwise**: `A - B`, then `(A-B) - C`, then...
+3. **Fuse-then-cut**: Fuse all tools, then single cut
+
+**Results**:
+
+| File (tool count) | N-shape | Sequential | Fuse-then-cut |
+|-------------------|---------|------------|---------------|
+| base-plate (52 tools) | **10.8s** | 15.7s | 12.2s |
+| motor-mount (10 tools) | **0.5s** | 2.2s | 0.75s |
+| peeling-arm (20 tools) | 9.5s | **4.5s** | 8.4s |
+| carriage (moderate) | **0.6s** | 1.4s | 0.8s |
+
+**Why no winner**: N-shape is fast when tools are simple non-overlapping primitives (cylinders in a grid). Sequential is faster when tools are complex shapes that cause expensive interference detection. No static threshold correctly distinguishes these cases.
+
+**Decision**: Keep N-shape API (original). Most models have simple tools (holes, slots). The peeling-arm case (9.5s) is within the 30s timeout individually.
+
+### Fruit Robot Part Benchmarks
+
+| Part | OCCT Time | Main Cost |
+|------|-----------|-----------|
+| base-plate | 11.8s | text2d engraving (4s) + 52 mount holes |
+| blade-holder | 8.8s | 1× loft + 3× sweep (B-spline curves) |
+| peeling-arm | 9.5s | 20-tool boolean (complex polygon shapes) |
+| waste-tray | 0.8s | Simple booleans |
+| fruit-chuck | 0.8s | Simple booleans |
+| carriage | 0.6s | Simple booleans |
+| motor-mount | 0.5s | Simple booleans |
+| **Assembly** | **32.5s** | Sum of all parts (19 objects) |
+
+## Emerging Pattern: Why OCCT Is Slow
+
+Three categories of slow OCCT operations:
+
+### 1. ThruSections with High-Edge-Count Wires (FIXED by P1)
+- **Trigger**: `spline2d()` → polygon sampling → many-edge wire → loft/sweep
+- **Cost**: O(n²+) in wire edge count. 120+ edges = hangs indefinitely.
+- **Fix**: Convert polygon wires to B-spline wires before ThruSections.
+
+### 2. Boolean Operations Scale with Shape Complexity
+- **Trigger**: Many `.subtract()` or `.add()` operations accumulate faces/edges
+- **Cost**: Each boolean must evaluate full topology. 50+ simple holes = ~0.5s. Complex polygon tools = 9.5s.
+- **No easy fix**: This is fundamental to B-rep boolean evaluation. Could batch similar operations but no universal strategy wins.
+
+### 3. text2d Produces Extremely Complex Profiles
+- **Trigger**: `text2d("PEELBOT v1")` → complex glyph polygons → extrude → subtract
+- **Cost**: Text extrude = 1.8s, text boolean subtract = 2.2s = ~4s total per text label
+- **Potential fix**: Reduce text polygon complexity, or defer text engraving to export-only quality.
 
 ## Files Modified
 
 | File | Purpose |
 |------|---------|
-| `src/forge/backends/occt/lower.ts` | B-spline wire conversion for ThruSections (loft, twist extrude, scale-top extrude) |
-| `examples/api/curves-surfacing-basics.forge.js` | Removed `smoothOut`/`refine` calls (Manifold-only, not in public API) |
+| `src/forge/backends/occt/lower.ts` | B-spline wire conversion for ThruSections |
+| `examples/api/curves-surfacing-basics.forge.js` | Remove Manifold-only smoothOut/refine calls |
