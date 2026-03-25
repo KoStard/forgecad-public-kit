@@ -10,14 +10,19 @@ export interface PortDef {
   origin: Vec3;
   axis: Vec3;
   up: Vec3;
+  extent?: number;
   kind?: JointType;
   min?: number;
   max?: number;
 }
 
+export type PortAlign = 'middle' | 'start' | 'end';
+
 export interface PortInput {
-  origin: [number, number, number];
-  axis: [number, number, number];
+  origin?: [number, number, number];
+  axis?: [number, number, number];
+  start?: [number, number, number];
+  end?: [number, number, number];
   up?: [number, number, number];
   kind?: JointType;
   min?: number;
@@ -88,13 +93,45 @@ function perpendicularTo(axis: Vec3): Vec3 {
 // ---------------------------------------------------------------------------
 
 export function normalizePortInput(input: PortInput): PortDef {
-  const origin = requireFiniteVec3(input.origin, 'port origin');
-  const rawAxis = requireFiniteVec3(input.axis, 'port axis');
+  let origin: Vec3;
+  let axis: Vec3;
+  let extent: number | undefined;
 
-  if (len3(rawAxis) < 1e-10) {
-    throw new Error('Port axis must be non-zero');
+  const hasStartEnd = input.start != null && input.end != null;
+  const hasOriginAxis = input.origin != null && input.axis != null;
+
+  if (hasStartEnd) {
+    const start = requireFiniteVec3(input.start!, 'port start');
+    const end = requireFiniteVec3(input.end!, 'port end');
+    origin = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2];
+    const dir: Vec3 = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
+    const dirLen = len3(dir);
+    if (dirLen < 1e-10) {
+      throw new Error('Port start and end must not be the same point');
+    }
+    axis = normalize3(dir);
+    extent = dirLen / 2;
+    // Allow origin/axis override even when start/end are provided
+    if (input.origin != null) origin = requireFiniteVec3(input.origin, 'port origin');
+    if (input.axis != null) axis = normalize3(requireFiniteVec3(input.axis, 'port axis'));
+  } else if (hasOriginAxis) {
+    origin = requireFiniteVec3(input.origin!, 'port origin');
+    const rawAxis = requireFiniteVec3(input.axis!, 'port axis');
+    if (len3(rawAxis) < 1e-10) {
+      throw new Error('Port axis must be non-zero');
+    }
+    axis = normalize3(rawAxis);
+    // Preserve extent if already present (e.g. re-normalizing a PortDef)
+    if ('extent' in input && typeof (input as any).extent === 'number' && Number.isFinite((input as any).extent)) {
+      extent = (input as any).extent;
+    }
+  } else if (input.origin != null) {
+    // Origin only — default axis
+    origin = requireFiniteVec3(input.origin, 'port origin');
+    axis = [0, 0, 1];
+  } else {
+    throw new Error('Port requires either { origin, axis } or { start, end }');
   }
-  const axis = normalize3(rawAxis);
 
   let up: Vec3;
   if (input.up != null) {
@@ -114,6 +151,7 @@ export function normalizePortInput(input: PortInput): PortDef {
   }
 
   const def: PortDef = { origin, axis, up };
+  if (extent != null) def.extent = extent;
   if (input.kind != null) def.kind = input.kind;
   if (input.min != null) {
     if (!Number.isFinite(input.min)) throw new Error('Port min must be finite');
@@ -124,6 +162,23 @@ export function normalizePortInput(input: PortInput): PortDef {
     def.max = input.max;
   }
   return def;
+}
+
+/**
+ * Resolve the alignment point on a port: start, middle (default), or end.
+ * - middle: port origin
+ * - start: origin - axis * extent
+ * - end: origin + axis * extent
+ * Falls back to origin if no extent is defined.
+ */
+export function resolvePortAlignPoint(port: PortDef, align: PortAlign = 'middle'): Vec3 {
+  if (align === 'middle' || port.extent == null) return port.origin;
+  const offset = align === 'start' ? -port.extent : port.extent;
+  return [
+    port.origin[0] + port.axis[0] * offset,
+    port.origin[1] + port.axis[1] * offset,
+    port.origin[2] + port.axis[2] * offset,
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +213,7 @@ export function clonePortDef(p: PortDef): PortDef {
     axis: [...p.axis] as Vec3,
     up: [...p.up] as Vec3,
   };
+  if (p.extent != null) out.extent = p.extent;
   if (p.kind != null) out.kind = p.kind;
   if (p.min != null) out.min = p.min;
   if (p.max != null) out.max = p.max;
@@ -211,6 +267,8 @@ export function transformPort(port: PortDef, matrix: Mat4): PortDef {
     axis: axisLen > 1e-10 ? normalize3(rawAxis) : port.axis,
     up: upLen > 1e-10 ? normalize3(rawUp) : port.up,
   };
+  // Scale extent by the axis length change (handles uniform scale)
+  if (port.extent != null) out.extent = port.extent * axisLen;
   if (port.kind != null) out.kind = port.kind;
   if (port.min != null) out.min = port.min;
   if (port.max != null) out.max = port.max;
@@ -249,15 +307,21 @@ export function computeConnectFrame(
   childPort: PortDef,
   parentPort: PortDef,
   flip: boolean,
+  childAlign: PortAlign = 'middle',
+  parentAlign: PortAlign = 'middle',
 ): { frame: Transform; axis: Vec3 } {
+  // Resolve alignment points (start/middle/end)
+  const childAlignPt = resolvePortAlignPoint(childPort, childAlign);
+  const parentAlignPt = resolvePortAlignPoint(parentPort, parentAlign);
+
   // Child port vectors in intermediate space (after childBase)
-  const cI = childBase.point(childPort.origin);
+  const cI = childBase.point(childAlignPt);
   const cAxis = normalize3(childBase.vector(childPort.axis));
   const cUp = normalize3(childBase.vector(childPort.up));
   const cRight = normalize3(cross3(cAxis, cUp));
 
   // Parent port vectors in parent-local space
-  const pOrigin = parentPort.origin;
+  const pOrigin = parentAlignPt;
   const pAxis: Vec3 = flip ? negate3(parentPort.axis) : [...parentPort.axis] as Vec3;
   const pUp: Vec3 = [...parentPort.up] as Vec3;
   const pRight = normalize3(cross3(pAxis, pUp));

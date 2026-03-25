@@ -170,30 +170,22 @@ interface PortDef {
 	origin: Vec3;
 	axis: Vec3;
 	up: Vec3;
+	extent?: number;
 	kind?: JointType;
 	min?: number;
 	max?: number;
 }
 interface PortInput {
-	origin: [
-		number,
-		number,
-		number
-	];
-	axis: [
-		number,
-		number,
-		number
-	];
-	up?: [
-		number,
-		number,
-		number
-	];
+	origin?: [number, number, number];
+	axis?: [number, number, number];
+	start?: [number, number, number];
+	end?: [number, number, number];
+	up?: [number, number, number];
 	kind?: JointType;
 	min?: number;
 	max?: number;
 }
+type PortAlign = "middle" | "start" | "end";
 type PortMap = Record<string, PortDef>;
 declare function portFactory(input: PortInput): PortDef;
 declare namespace portFactory {
@@ -3559,6 +3551,12 @@ interface ConnectOptions {
 	default?: number;
 	unit?: string;
 	flip?: boolean;
+	/** Which point on the parent port to align: 'start', 'middle' (default), or 'end'. */
+	parentAlign?: PortAlign;
+	/** Which point on the child port to align: 'start', 'middle' (default), or 'end'. */
+	childAlign?: PortAlign;
+	/** Shorthand: set both parentAlign and childAlign at once. */
+	align?: PortAlign;
 	effort?: number;
 	velocity?: number;
 	damping?: number;

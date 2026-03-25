@@ -8,7 +8,7 @@ import type { ExplodeViewDirective } from './explodeView';
 import { explodeView } from './explodeView';
 import { group, ShapeGroup, getShapeGroupPorts } from '../group';
 import { getShapeRuntimeBackend, getShapePorts, Shape, union } from '../kernel';
-import type { PortInput, PortMap, PortDef } from '../port';
+import type { PortInput, PortMap, PortDef, PortAlign } from '../port';
 import { normalizePortMapInput, clonePortMap, mergePortMaps, computeConnectFrame } from '../port';
 import {
   jointsView as jointsViewFn,
@@ -566,6 +566,12 @@ export interface ConnectOptions {
   default?: number;
   unit?: string;
   flip?: boolean;
+  /** Which point on the parent port to align: 'start', 'middle' (default), or 'end'. */
+  parentAlign?: PortAlign;
+  /** Which point on the child port to align: 'start', 'middle' (default), or 'end'. */
+  childAlign?: PortAlign;
+  /** Shorthand: set both parentAlign and childAlign at once. */
+  align?: PortAlign;
   effort?: number;
   velocity?: number;
   damping?: number;
@@ -797,11 +803,15 @@ export class Assembly {
     const childBase = childRecord.base;
 
     // Compute frame and axis from port alignment
+    const childAlign = options.childAlign ?? options.align ?? 'middle';
+    const parentAlign = options.parentAlign ?? options.align ?? 'middle';
     const { frame, axis } = computeConnectFrame(
       childBase,
       child.port,
       parent.port,
       options.flip ?? false,
+      childAlign,
+      parentAlign,
     );
 
     // Determine limits (options override port hints)

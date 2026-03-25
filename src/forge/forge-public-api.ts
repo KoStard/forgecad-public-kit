@@ -34,7 +34,7 @@ export type {
 } from './assembly/assembly';
 export { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly/assembly';
 export { port } from './port';
-export type { PortInput, PortDef, PortMap } from './port';
+export type { PortInput, PortDef, PortMap, PortAlign } from './port';
 export { bom } from './bom';
 export { cutPlane } from './cutPlane';
 export type { BoundingRegion, EdgeQuery, EdgeSegment } from './query/edgeQuery';

@@ -63,6 +63,20 @@ const arm = box(120, 20, 20).translate(60, 0, 0).withPorts({
 
 Port factories: `port.revolute(...)`, `port.prismatic(...)`, `port.fixed(...)`, or generic `port(...)`.
 
+**Alternative: define by physical extent** — use `start`/`end` instead of `origin`/`axis`:
+
+```javascript
+// Origin and axis auto-computed from start→end
+const arm = arm3D.withPorts({
+  bore: port.revolute({
+    start: [0, -armWidth/2, 0],   // bore entrance
+    end: [0, armWidth/2, 0],       // bore exit
+  }),
+});
+```
+
+This also stores the extent length for alignment (see below).
+
 Ports survive transforms — if you `translate()` or `rotate()` a shape, its ports move with it.
 
 ### Connecting parts
@@ -83,7 +97,18 @@ return solved.toScene();
 
 `connect()` computes the joint `frame` and `axis` from port alignment, then delegates to `addJoint()` internally. The kinematic solver is unchanged.
 
-**ConnectOptions:** `as`, `type` (override port kind), `min`, `max`, `default`, `unit`, `flip` (oppose axes for mirrored parts), `effort`, `velocity`, `damping`, `friction`.
+**ConnectOptions:** `as`, `type` (override port kind), `min`, `max`, `default`, `unit`, `flip` (oppose axes for mirrored parts), `align` / `parentAlign` / `childAlign` (start/middle/end), `effort`, `velocity`, `damping`, `friction`.
+
+**Alignment along port extent:** When ports are defined with `start`/`end`, you can control which points align:
+
+```javascript
+.connect("Pin.shaft", "Arm.bore", { align: "middle" })  // default — midpoints meet
+.connect("Pin.shaft", "Arm.bore", { align: "start" })   // start points meet
+.connect("Pin.shaft", "Arm.bore", { align: "end" })     // end points meet
+.connect("Pin.shaft", "Arm.bore", {
+  parentAlign: "start", childAlign: "middle",            // independent control
+})
+```
 
 **Mirrored parts:** When a part is created with `.mirror()`, its port axis flips direction. Use `flip: true` on the connect call so the axes oppose rather than align:
 
