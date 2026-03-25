@@ -24,6 +24,103 @@ import { getOCCT, type OCCTModule } from './init';
 import { wrapOCCTProfileBackend } from './profileBackend';
 import { wrapOCCTShapeBackend } from './shapeBackend';
 
+// ─── Wire Utilities ──────────────────────────────────────────────────
+
+/** Edge count threshold above which polygon wires are converted to B-spline wires for loft/sweep. */
+const BSPLINE_WIRE_THRESHOLD = 20;
+
+/**
+ * Extract ordered 3D vertices from a wire's edges.
+ * Returns the points along the wire, in order.
+ */
+function extractWirePoints(oc: OCCTModule, wire: any): [number, number, number][] {
+  const points: [number, number, number][] = [];
+  const edgeExpl = new oc.TopExp_Explorer_2(wire, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+
+  while (edgeExpl.More()) {
+    const edge = oc.TopoDS.Edge_1(edgeExpl.Current());
+    const first = { current: 0 };
+    const last = { current: 0 };
+    const curve = oc.BRep_Tool.Curve_2(edge, first, last);
+    if (!curve.IsNull()) {
+      const isReversed = edge.Orientation_1() === oc.TopAbs_Orientation.TopAbs_REVERSED;
+      const pt = curve.get().Value(isReversed ? last.current : first.current);
+      points.push([pt.X(), pt.Y(), pt.Z()]);
+    }
+    edgeExpl.Next();
+  }
+  return points;
+}
+
+/**
+ * Count the number of edges in a wire.
+ */
+function countWireEdges(oc: OCCTModule, wire: any): number {
+  let count = 0;
+  const edgeExpl = new oc.TopExp_Explorer_2(wire, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+  while (edgeExpl.More()) {
+    count++;
+    edgeExpl.Next();
+  }
+  return count;
+}
+
+/**
+ * Build a B-spline wire from 3D points.
+ *
+ * For polygon wires with many edges (>BSPLINE_WIRE_THRESHOLD), fitting a B-spline
+ * through the vertices produces a single-edge wire. This is critical for
+ * BRepOffsetAPI_ThruSections performance: loft with 5 × 120-edge polygon wires
+ * hangs (>60s), while 5 × 1-edge B-spline wires completes in ~30ms.
+ */
+function buildBSplineWireFromPoints(oc: OCCTModule, points: [number, number, number][], closed: boolean): any {
+  const n = points.length;
+  // For closed curves, duplicate the first point to ensure closure
+  const count = closed ? n + 1 : n;
+  const pts = new oc.TColgp_Array1OfPnt_2(1, count);
+  for (let i = 0; i < n; i++) {
+    pts.SetValue(i + 1, new oc.gp_Pnt_3(points[i][0], points[i][1], points[i][2]));
+  }
+  if (closed) {
+    pts.SetValue(count, new oc.gp_Pnt_3(points[0][0], points[0][1], points[0][2]));
+  }
+
+  const bspline = new oc.GeomAPI_PointsToBSpline_2(
+    pts,
+    3, // DegMin
+    8, // DegMax
+    oc.GeomAbs_Shape.GeomAbs_C2,
+    1e-3, // Tol3D
+  );
+  if (!bspline.IsDone()) {
+    throw new Error('B-spline fit failed for wire with ' + n + ' points');
+  }
+  // Upcast Handle_Geom_BSplineCurve → Handle_Geom_Curve for MakeEdge
+  const curveHandle = new oc.Handle_Geom_Curve_2(bspline.Curve().get());
+  const edge = new oc.BRepBuilderAPI_MakeEdge_24(curveHandle);
+  return new oc.BRepBuilderAPI_MakeWire_2(edge.Edge()).Wire();
+}
+
+/**
+ * Convert a multi-edge polygon wire to a B-spline wire if it has many edges.
+ * Returns the original wire if edge count is below threshold.
+ *
+ * Using all extracted points (no subsampling) produces smoother B-spline
+ * surfaces, which dramatically speeds up downstream boolean operations
+ * (5s vs 22s with subsampled points).
+ */
+function toBSplineWireIfNeeded(oc: OCCTModule, wire: any): any {
+  const edgeCount = countWireEdges(oc, wire);
+  if (edgeCount < BSPLINE_WIRE_THRESHOLD) return wire;
+
+  const points = extractWirePoints(oc, wire);
+  if (points.length < 3) return wire;
+
+  // Polygon wires from profiles are always closed (polygon loop → face → outerWire).
+  const isClosed = edgeCount >= BSPLINE_WIRE_THRESHOLD;
+  return buildBSplineWireFromPoints(oc, points, isClosed);
+}
+
 // ─── Profile → OCCT Wire/Face ──────────────────────────────────────
 
 /**
@@ -937,7 +1034,11 @@ function lowerLoftPlan(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: '
 
   for (let i = 0; i < plan.profiles.length; i++) {
     const face = lowerProfileToFace(oc, plan.profiles[i]);
-    const wire = extractOuterWire(oc, face);
+    let wire = extractOuterWire(oc, face);
+    // Convert high-edge-count polygon wires to B-spline wires.
+    // ThruSections with 120+ line-segment edges per profile hangs;
+    // a single B-spline edge per profile completes in milliseconds.
+    wire = toBSplineWireIfNeeded(oc, wire);
     const z = plan.heights[i];
     if (Math.abs(z) > 1e-10) {
       const trsf = new oc.gp_Trsf_1();
@@ -1048,7 +1149,7 @@ function lowerExtrudeWithTwist(oc: OCCTModule, plan: Extract<ShapeCompilePlan, {
   const height = plan.height;
   const totalTwistDeg = plan.twist ?? 0;
   const nSections = Math.max(2, (plan.twistSegments ?? 12) + 1);
-  const bottomWire = extractOuterWire(oc, bottomFace);
+  const bottomWire = toBSplineWireIfNeeded(oc, extractOuterWire(oc, bottomFace));
 
   const thruSections = new oc.BRepOffsetAPI_ThruSections(true, false, 1e-6);
   for (let i = 0; i < nSections; i++) {
@@ -1086,7 +1187,7 @@ function lowerExtrudeWithTwist(oc: OCCTModule, plan: Extract<ShapeCompilePlan, {
  */
 function lowerExtrudeWithScaleTop(oc: OCCTModule, plan: Extract<ShapeCompilePlan, { kind: 'extrude' }>): any {
   const bottomFace = lowerProfileToFace(oc, plan.profile);
-  const bottomWire = extractOuterWire(oc, bottomFace);
+  const bottomWire = toBSplineWireIfNeeded(oc, extractOuterWire(oc, bottomFace));
 
   const scaleX = plan.scaleTop![0];
   const scaleY = plan.scaleTop![1];
