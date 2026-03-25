@@ -102,7 +102,7 @@ export function getActiveBackend(): ActiveBackend {
 
 export type GeometryBackend = 'manifold' | 'occt' | 'hybrid' | 'unknown';
 export type GeometryRepresentation = 'mesh-solid' | 'brep-solid' | 'surface' | 'mixed';
-export type GeometryFidelity = 'kernel-native' | 'sampled' | 'deformed' | 'mixed' | 'unknown';
+export type GeometryFidelity = 'kernel-native' | 'exact' | 'sampled' | 'deformed' | 'mixed' | 'unknown';
 export type GeometryTopology = 'none' | 'synthetic' | 'kernel';
 export type GeometrySource =
   | 'primitive'

@@ -113,4 +113,4 @@ jointsView({
   defaultAnimation: 'Step',
 });
 
-return solved.toScene();
+return solved;

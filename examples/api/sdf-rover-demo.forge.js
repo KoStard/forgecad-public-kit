@@ -156,4 +156,4 @@ robotExport({
   },
 });
 
-return rover.solve().toScene();
+return rover.solve();

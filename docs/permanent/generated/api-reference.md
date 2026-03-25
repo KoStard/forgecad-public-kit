@@ -1443,6 +1443,8 @@ Thin immutable wrapper around a runtime geometry backend payload.
 - `get mateConverged()` — Whether the mate constraint solver converged, or null if no mates.
 - `getTransform()` — getTransform(partName: string): Transform
 - `getPart()` — getPart(partName: string): AssemblyPart
+- `toGroup()` — Convert all solved parts to a ShapeGroup with named children. Each part becomes a child, positioned at its solved transform. This is the primary way to get a group for rendering, `show()`, or embedding.
+- `toSceneObjects()` — Return an array of named scene objects for the viewport renderer. Prefer `toGroup()` for most uses; this method exists for advanced scene-graph control.
 - `toScene()` — toScene(): Array<{ name: string; shape?: Shape; group?: Array<{ name: string; sh
 - `bom()` — bom(): BomRow[]
 - `bomCsv()` — bomCsv(): string
@@ -1493,6 +1495,12 @@ Wraps an imported Assembly, giving access to named parts and group conversion wi
 - `withReferences()` — Attach named placement reference points to this assembly. Points are simple 3D coordinates (relative to the assembly's own origin). Returns a new ImportedAssembly — does not mutate.
 - `referenceNames()` — List all attached placement reference names.
 - `placeReference()` — Translate the assembly so the named reference point lands on `target`. Returns a new ImportedAssembly — does not mutate. All point refs are translated by the same delta.
+- `translate()` — Solve at defaults and return a translated ShapeGroup.
+- `rotate()` — Solve at defaults and return a rotated ShapeGroup (Euler XYZ degrees).
+- `scale()` — Solve at defaults and return a scaled ShapeGroup.
+- `mirror()` — Solve at defaults and return a mirrored ShapeGroup.
+- `color()` — Solve at defaults and return a colored ShapeGroup.
+- `child()` — Solve at defaults, get a named child part from the resulting group.
 - `mergeInto()` — Flatten this sub-assembly's parts and joints into `parent`, then wire a mount joint connecting `mountParent` (a part already in `parent`) to the sub-assembly root. All part names and joint names from the sub-assembly are prefixed with `"${options.prefix}."` to avoid collisions. After the merge you can drive sub-assembly joints from the parent: `parent.solve({ "Left Arm.shoulder": 45 })`. Throws if the sub-assembly has multiple root parts (connect them with addFixed first). Returns `parent` for chaining.
 
 ### `SheetMetalPart`

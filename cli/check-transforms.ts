@@ -186,7 +186,7 @@ function testAssemblyNamedGroupLabels() {
     const mech = assembly("Named Group Labels")
       .addPart("Base Assembly", housing);
 
-    return mech.solve().toScene();
+    return mech.solve();
   `;
 
   const result = runScript(script, 'named-group-labels.forge.js', {

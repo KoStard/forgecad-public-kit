@@ -50,7 +50,7 @@
         "});\n",
         "\n",
         "console.log(\"Collision report\", collisions);\n",
-        "show(solved.toScene());\n"
+        "show(solved);\n"
       ]
     },
     {
@@ -64,7 +64,7 @@
         "const collidingSteps = sweepFrames.filter((step) => step.collisions.length > 0).length;\n",
         "\n",
         "console.log(\"Sweep collisions\", collidingSteps, \"of\", sweepFrames.length);\n",
-        "show(mech.solve({ shoulder: 38, elbow: 90 }).toScene());\n"
+        "show(mech.solve({ shoulder: 38, elbow: 90 }));\n"
       ]
     }
   ],
