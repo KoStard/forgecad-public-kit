@@ -1,12 +1,14 @@
 /**
  * ForgeCAD — Mesh to Three.js Geometry
  *
- * Converts Manifold mesh data into Three.js BufferGeometry.
+ * Converts mesh data into Three.js BufferGeometry.
  * Shared between the browser Viewport and the CLI renderer.
  *
  * Fast path: if the shape is a FrozenShape with pre-computed arrays from the
  * eval worker, geometry assembly is zero-CPU — just wraps existing TypedArrays
  * in BufferAttribute. No triangle loop, no EdgesGeometry computation.
+ * The `hasSmoothNormals` flag indicates whether normals come from B-rep
+ * surfaces (OCCT) or flat face cross products (Manifold).
  *
  * Fallback: computes positions/normals inline and runs EdgesGeometry for live
  * shapes evaluated directly on the main thread (e.g. notebook cells).
@@ -19,12 +21,14 @@ import type { Shape } from '../kernel';
 export interface ForgeGeometry {
   solid: THREE.BufferGeometry;
   edges: THREE.BufferGeometry;
+  /** True when normals are smooth per-vertex from B-rep surface — disable flatShading. */
+  hasSmoothNormals: boolean;
 }
 
 export function shapeToGeometry(shape: Shape): ForgeGeometry {
   // Fast path: pre-computed arrays from the eval worker
   if (shape instanceof FrozenShape) {
-    const { positions, normals, edgePositions } = shape.getPrecomputedGeometry();
+    const { positions, normals, edgePositions, hasSmoothNormals } = shape.getPrecomputedGeometry();
 
     const solid = new THREE.BufferGeometry();
     solid.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -33,7 +37,7 @@ export function shapeToGeometry(shape: Shape): ForgeGeometry {
     const edges = new THREE.BufferGeometry();
     edges.setAttribute('position', new THREE.BufferAttribute(edgePositions, 3));
 
-    return { solid, edges };
+    return { solid, edges, hasSmoothNormals };
   }
 
   // Fallback: compute from mesh (live shapes, main-thread eval)
@@ -104,5 +108,5 @@ function shapeToGeometryFallback(shape: Shape): ForgeGeometry {
 
   const edges = new THREE.EdgesGeometry(solid, 1);
 
-  return { solid, edges };
+  return { solid, edges, hasSmoothNormals: false };
 }

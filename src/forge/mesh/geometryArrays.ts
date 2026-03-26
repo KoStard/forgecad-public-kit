@@ -1,19 +1,20 @@
 /**
  * ForgeCAD — Geometry Array Computation
  *
- * Pure-math conversion of Manifold mesh data into flat Float32Arrays ready
- * for Three.js BufferGeometry. No Three.js dependency — safe to run in a
+ * Converts indexed triangle mesh data into flat Float32Arrays ready for
+ * Three.js BufferGeometry. No Three.js dependency — safe to run in a
  * Web Worker.
  *
  * Computes:
  *   - positions: non-indexed triangle vertex positions (triCount * 9)
- *   - normals:   flat face normals, one per triangle vertex (triCount * 9)
+ *   - normals:   per-vertex normals (triCount * 9) — either:
+ *       - smooth B-rep surface normals when `vertNormals` is provided (OCCT)
+ *       - flat face normals via cross product (Manifold fallback)
  *   - edgePositions: sharp edge line segment endpoints (edgeCount * 6)
+ *     (for OCCT, the caller typically replaces these with B-rep edge curves)
  *
  * Edge detection matches THREE.EdgesGeometry(solid, 1): an edge is "sharp"
- * when the dihedral angle between adjacent faces exceeds 1°. Uses integer
- * vertex indices from the Manifold mesh for O(N) detection instead of the
- * O(N log N) float-position hashing that Three.js performs.
+ * when the dihedral angle between adjacent faces exceeds 1°.
  */
 
 export interface GeometryArrays {
@@ -32,8 +33,10 @@ export function computeGeometryArrays(mesh: {
   vertProperties: Float32Array;
   mergeFromVert?: Uint32Array;
   mergeToVert?: Uint32Array;
+  /** Per-vertex normals from B-rep surface (3 floats per vertex, same vertex count as vertProperties). */
+  vertNormals?: Float32Array;
 }): GeometryArrays {
-  const { numProp, numTri: triCount, triVerts, vertProperties } = mesh;
+  const { numProp, numTri: triCount, triVerts, vertProperties, vertNormals } = mesh;
 
   const positions = new Float32Array(triCount * 9);
   const normals = new Float32Array(triCount * 9);
@@ -56,19 +59,20 @@ export function computeGeometryArrays(mesh: {
       cy = vertProperties[i2 * numProp + 1],
       cz = vertProperties[i2 * numProp + 2];
 
+    // Compute face normal (always needed for edge detection)
     const e1x = bx - ax,
       e1y = by - ay,
       e1z = bz - az;
     const e2x = cx - ax,
       e2y = cy - ay,
       e2z = cz - az;
-    let nx = e1y * e2z - e1z * e2y;
-    let ny = e1z * e2x - e1x * e2z;
-    let nz = e1x * e2y - e1y * e2x;
-    const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-    nx /= len;
-    ny /= len;
-    nz /= len;
+    let fnx = e1y * e2z - e1z * e2y;
+    let fny = e1z * e2x - e1x * e2z;
+    let fnz = e1x * e2y - e1y * e2x;
+    const len = Math.sqrt(fnx * fnx + fny * fny + fnz * fnz) || 1;
+    fnx /= len;
+    fny /= len;
+    fnz /= len;
 
     const o = t * 9;
     positions[o] = ax;
@@ -80,19 +84,34 @@ export function computeGeometryArrays(mesh: {
     positions[o + 6] = cx;
     positions[o + 7] = cy;
     positions[o + 8] = cz;
-    normals[o] = nx;
-    normals[o + 1] = ny;
-    normals[o + 2] = nz;
-    normals[o + 3] = nx;
-    normals[o + 4] = ny;
-    normals[o + 5] = nz;
-    normals[o + 6] = nx;
-    normals[o + 7] = ny;
-    normals[o + 8] = nz;
 
-    faceNx[t] = nx;
-    faceNy[t] = ny;
-    faceNz[t] = nz;
+    if (vertNormals) {
+      // Use per-vertex normals from B-rep surface (smooth shading)
+      normals[o] = vertNormals[i0 * 3];
+      normals[o + 1] = vertNormals[i0 * 3 + 1];
+      normals[o + 2] = vertNormals[i0 * 3 + 2];
+      normals[o + 3] = vertNormals[i1 * 3];
+      normals[o + 4] = vertNormals[i1 * 3 + 1];
+      normals[o + 5] = vertNormals[i1 * 3 + 2];
+      normals[o + 6] = vertNormals[i2 * 3];
+      normals[o + 7] = vertNormals[i2 * 3 + 1];
+      normals[o + 8] = vertNormals[i2 * 3 + 2];
+    } else {
+      // Flat face normals (same normal for all 3 vertices)
+      normals[o] = fnx;
+      normals[o + 1] = fny;
+      normals[o + 2] = fnz;
+      normals[o + 3] = fnx;
+      normals[o + 4] = fny;
+      normals[o + 5] = fnz;
+      normals[o + 6] = fnx;
+      normals[o + 7] = fny;
+      normals[o + 8] = fnz;
+    }
+
+    faceNx[t] = fnx;
+    faceNy[t] = fny;
+    faceNz[t] = fnz;
   }
 
   const edgePositions = computeSharpEdges(

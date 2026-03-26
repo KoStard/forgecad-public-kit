@@ -5,11 +5,15 @@
  * the eval worker. The underlying ShapeBackend is lazy — it answers getMesh(),
  * boundingBox(), isEmpty(), and numTri() from cached data with zero WASM calls.
  * A real backend is only reconstructed on demand, when geometric operations
- * like splitByPlane() are actually needed (e.g. cut planes).
+ * like splitByPlane() are actually needed (e.g. cut planes). Reconstruction
+ * always uses Manifold because OCCT B-rep topology cannot be recovered from
+ * a triangle mesh.
  *
  * Also exposes pre-computed Three.js-ready geometry arrays (positions, normals,
  * edge positions) built in the worker, so shapeToGeometry() on the main thread
- * is a zero-cost BufferGeometry assembly with no CPU work.
+ * is a zero-cost BufferGeometry assembly with no CPU work. For OCCT-backed
+ * shapes, normals are smooth per-vertex from the B-rep surface and edges are
+ * smooth polylines from parametric curves — indicated by `hasSmoothNormals`.
  */
 
 import type { SerializedShapeData } from '../workers/evalWorkerProtocol';
@@ -29,6 +33,7 @@ export interface PrecomputedGeometry {
   positions: Float32Array;
   normals: Float32Array;
   edgePositions: Float32Array;
+  hasSmoothNormals: boolean;
 }
 
 /**
@@ -54,6 +59,7 @@ class FrozenShapeBackend implements ShapeBackend {
       positions: this._data.geometryPositions,
       normals: this._data.geometryNormals,
       edgePositions: this._data.geometryEdgePositions,
+      hasSmoothNormals: this._data.hasSmoothNormals ?? false,
     };
   }
 

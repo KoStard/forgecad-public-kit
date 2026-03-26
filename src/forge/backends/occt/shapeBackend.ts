@@ -1,9 +1,19 @@
 /**
  * ForgeCAD — OCCT Shape Backend
  *
- * Implements ShapeBackend by wrapping an OCCT TopoDS_Shape.
- * Provides mesh extraction via BRepMesh_IncrementalMesh,
- * producing data compatible with Manifold's getMesh() format.
+ * Implements ShapeBackend by wrapping an OCCT TopoDS_Shape (B-rep solid).
+ *
+ * Unlike the Manifold backend (which only has triangle meshes), OCCT retains
+ * the full boundary representation: exact parametric curves on edges and
+ * analytic surface normals on faces. This module extracts that richer data
+ * for rendering:
+ *
+ *   - Triangle mesh via BRepMesh_IncrementalMesh (face shading)
+ *   - Per-vertex normals from B-rep surfaces (smooth shading on curved faces)
+ *   - Edge polylines from parametric curves (smooth edge lines on arcs/circles)
+ *
+ * The mesh is also produced in Manifold-compatible format so downstream code
+ * (edge detection fallback, FrozenShape reconstruction) can consume it.
  */
 
 import {
@@ -24,22 +34,42 @@ const DEFAULT_LINEAR_DEFLECTION = 0.1;
 const DEFAULT_ANGULAR_DEFLECTION = 0.5;
 
 /**
+ * Default angular deflection for edge curve sampling (radians).
+ * Controls how finely curved edges are sampled — smaller = smoother.
+ * 5° gives visually smooth circles/arcs without excessive point counts.
+ */
+const EDGE_CURVE_ANGULAR_DEFLECTION = (5 * Math.PI) / 180;
+
+/**
+ * Result of extracting mesh + normals from an OCCT shape.
+ * Extends ShapeRuntimeMesh with optional per-vertex normals from the B-rep surface.
+ */
+interface OCCTMeshResult {
+  mesh: ShapeRuntimeMesh;
+  /** Per-vertex normals from the B-rep surface (3 floats per vertex). */
+  vertNormals: Float32Array | null;
+}
+
+/**
  * Extract triangle mesh from a TopoDS_Shape, producing data in
  * Manifold-compatible format: { numProp, numTri, triVerts, vertProperties }.
+ * Also extracts per-vertex normals from the B-rep surface when available.
  */
 function extractMeshFromShape(
   oc: OCCTModule,
   shape: any,
   linearDeflection = DEFAULT_LINEAR_DEFLECTION,
   angularDeflection = DEFAULT_ANGULAR_DEFLECTION,
-): ShapeRuntimeMesh {
+): OCCTMeshResult {
   // Tessellate
   new oc.BRepMesh_IncrementalMesh_2(shape, linearDeflection, false, angularDeflection, false);
 
   let totalVerts = 0;
   let totalTris = 0;
   const allPositions: number[] = [];
+  const allNormals: number[] = [];
   const allIndices: number[] = [];
+  let hasAllNormals = true;
 
   const expl = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
 
@@ -54,15 +84,42 @@ function extractMeshFromShape(
       const nTris = tri.NbTriangles();
       const baseIndex = totalVerts;
 
-      // Check face orientation for correct winding
+      // Check face orientation for correct winding and normal direction
       const orientation = face.Orientation_1();
       const reversed = orientation === oc.TopAbs_Orientation.TopAbs_REVERSED;
 
-      // Extract vertices (apply location transform if present)
+      // Ensure normals are computed on the triangulation
+      if (!tri.HasNormals()) {
+        try {
+          tri.ComputeNormals();
+        } catch {
+          // Some triangulations can't compute normals
+        }
+      }
+
+      const faceHasNormals = tri.HasNormals();
+      if (!faceHasNormals) hasAllNormals = false;
+
+      // Extract vertices and normals (apply location transform if present)
       const trsf = loc.Transformation();
       for (let i = 1; i <= nVerts; i++) {
         const pt = tri.Node(i).Transformed(trsf);
         allPositions.push(pt.X(), pt.Y(), pt.Z());
+
+        if (faceHasNormals) {
+          const normal = tri.Normal_1(i);
+          // Transform normal by the location (rotation only, not translation)
+          const transformedNormal = normal.Transformed(trsf);
+          // Flip normal for reversed faces
+          const sign = reversed ? -1 : 1;
+          allNormals.push(
+            transformedNormal.X() * sign,
+            transformedNormal.Y() * sign,
+            transformedNormal.Z() * sign,
+          );
+        } else {
+          allNormals.push(0, 0, 0); // Placeholder — will be discarded if hasAllNormals is false
+        }
       }
 
       // Extract triangles with correct winding
@@ -112,19 +169,163 @@ function extractMeshFromShape(
   }
 
   return {
-    numProp: 3,
-    numTri: totalTris,
-    triVerts,
-    vertProperties,
-    numVert: totalVerts,
-    mergeFromVert: new Uint32Array(mergeFrom),
-    mergeToVert: new Uint32Array(mergeTo),
-    runIndex: new Uint32Array([0, totalTris]),
-    runOriginalID: new Uint32Array([0]),
-    runTransform: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]),
-    faceID: new Uint32Array(0),
-    halfedgeTangent: new Float32Array(0),
-  } as unknown as ShapeRuntimeMesh;
+    mesh: {
+      numProp: 3,
+      numTri: totalTris,
+      triVerts,
+      vertProperties,
+      numVert: totalVerts,
+      mergeFromVert: new Uint32Array(mergeFrom),
+      mergeToVert: new Uint32Array(mergeTo),
+      runIndex: new Uint32Array([0, totalTris]),
+      runOriginalID: new Uint32Array([0]),
+      runTransform: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]),
+      faceID: new Uint32Array(0),
+      halfedgeTangent: new Float32Array(0),
+    } as unknown as ShapeRuntimeMesh,
+    vertNormals: hasAllNormals ? new Float32Array(allNormals) : null,
+  };
+}
+
+/**
+ * Extract smooth edge curves from a TopoDS_Shape's B-rep topology.
+ *
+ * Instead of deriving edges from the tessellated triangle mesh (which produces
+ * visible straight-line segments on curved surfaces), this function iterates
+ * the actual B-rep edges and samples their parametric curves (Geom_Circle,
+ * Geom_BSplineCurve, etc.) to produce smooth polylines.
+ *
+ * Returns a Float32Array of line segment endpoints: [x0,y0,z0, x1,y1,z1, ...]
+ * where each consecutive pair of points forms one line segment (same format as
+ * computeSharpEdges in geometryArrays.ts).
+ */
+function extractEdgeCurvesFromShape(
+  oc: OCCTModule,
+  shape: any,
+  angularDeflection = EDGE_CURVE_ANGULAR_DEFLECTION,
+): Float32Array {
+  const segments: number[] = [];
+
+  // Use TopExp.MapShapes to get unique edges — the explorer visits each edge
+  // once per adjacent face, but the indexed map deduplicates by TShape identity.
+  const edgeMap = new oc.TopTools_IndexedMapOfShape_1();
+  oc.TopExp.MapShapes_1(shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE, edgeMap);
+
+  const numEdges = edgeMap.Size();
+  for (let idx = 1; idx <= numEdges; idx++) {
+    const edge = oc.TopoDS.Edge_1(edgeMap.FindKey(idx));
+
+    const first = { current: 0 };
+    const last = { current: 0 };
+    const curveHandle = oc.BRep_Tool.Curve_2(edge, first, last);
+
+    if (curveHandle.IsNull()) continue;
+
+    const curve = curveHandle.get();
+    const t0 = first.current;
+    const t1 = last.current;
+    if (t1 - t0 <= 0) continue;
+
+    // Sample the curve adaptively based on angular deflection.
+    // Produces more points on high-curvature regions, fewer on straight segments.
+    const points = sampleCurveAdaptive(curve, t0, t1, angularDeflection);
+
+    // Convert sampled points to line segments
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i];
+      const p1 = points[i + 1];
+      segments.push(p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
+    }
+  }
+
+  edgeMap.delete();
+  return new Float32Array(segments);
+}
+
+/**
+ * Adaptively sample a parametric curve based on angular deflection.
+ * Subdivides intervals where the chord direction changes by more than
+ * the angular threshold, producing more points on high-curvature regions
+ * and fewer on straight segments.
+ */
+function sampleCurveAdaptive(
+  curve: any,
+  t0: number,
+  t1: number,
+  angularDeflection: number,
+): [number, number, number][] {
+  const cosThreshold = Math.cos(angularDeflection);
+
+  // Start with a reasonable initial subdivision
+  const MIN_SEGMENTS = 2;
+  const MAX_DEPTH = 6; // Limit recursion depth to prevent runaway on degenerate curves
+
+  const p0 = curve.Value(t0);
+  const startPt: [number, number, number] = [p0.X(), p0.Y(), p0.Z()];
+
+  const result: [number, number, number][] = [startPt];
+
+  subdivide(curve, t0, t1, startPt, cosThreshold, MAX_DEPTH, MIN_SEGMENTS, result);
+
+  return result;
+}
+
+function subdivide(
+  curve: any,
+  t0: number,
+  t1: number,
+  p0: [number, number, number],
+  cosThreshold: number,
+  depthRemaining: number,
+  minSegments: number,
+  result: [number, number, number][],
+): void {
+  const tMid = (t0 + t1) / 2;
+  const pMidOcct = curve.Value(tMid);
+  const pMid: [number, number, number] = [pMidOcct.X(), pMidOcct.Y(), pMidOcct.Z()];
+
+  const p1Occt = curve.Value(t1);
+  const p1: [number, number, number] = [p1Occt.X(), p1Occt.Y(), p1Occt.Z()];
+
+  const needsSubdivision = depthRemaining > 0 && (minSegments > 1 || !isFlat(p0, pMid, p1, cosThreshold));
+
+  if (needsSubdivision) {
+    const nextMin = Math.max(0, Math.ceil(minSegments / 2) - 1);
+    subdivide(curve, t0, tMid, p0, cosThreshold, depthRemaining - 1, nextMin, result);
+    subdivide(curve, tMid, t1, pMid, cosThreshold, depthRemaining - 1, nextMin, result);
+  } else {
+    // Leaf: emit midpoint and endpoint
+    result.push(pMid);
+    result.push(p1);
+  }
+}
+
+/** Check if three points are approximately collinear (chord angle < threshold). */
+function isFlat(
+  p0: [number, number, number],
+  pMid: [number, number, number],
+  p1: [number, number, number],
+  cosThreshold: number,
+): boolean {
+  // Direction from p0 to pMid
+  const d1x = pMid[0] - p0[0];
+  const d1y = pMid[1] - p0[1];
+  const d1z = pMid[2] - p0[2];
+  // Direction from pMid to p1
+  const d2x = p1[0] - pMid[0];
+  const d2y = p1[1] - pMid[1];
+  const d2z = p1[2] - pMid[2];
+
+  const len1sq = d1x * d1x + d1y * d1y + d1z * d1z;
+  const len2sq = d2x * d2x + d2y * d2y + d2z * d2z;
+
+  // Degenerate (zero-length) segments are considered flat
+  if (len1sq < 1e-20 || len2sq < 1e-20) return true;
+
+  const dot = d1x * d2x + d1y * d2y + d1z * d2z;
+  const cosAngle = dot / Math.sqrt(len1sq * len2sq);
+
+  return cosAngle >= cosThreshold;
 }
 
 /**
@@ -317,7 +518,24 @@ export class OCCTShapeBackend implements ShapeBackend {
   }
 
   getMesh(): ShapeRuntimeMesh {
+    return extractMeshFromShape(getOCCT(), this._shape).mesh;
+  }
+
+  /**
+   * Extract mesh with per-vertex normals from the B-rep surface.
+   * Returns both the Manifold-compatible mesh and smooth normals.
+   */
+  getMeshWithNormals(): OCCTMeshResult {
     return extractMeshFromShape(getOCCT(), this._shape);
+  }
+
+  /**
+   * Extract smooth edge curves from the B-rep topology.
+   * Returns a Float32Array of line segment endpoints in the same format
+   * as geometryEdgePositions (pairs of xyz points, 6 floats per segment).
+   */
+  getEdgeCurves(): Float32Array {
+    return extractEdgeCurvesFromShape(getOCCT(), this._shape);
   }
 
   slice(_offset: number): ShapeRuntimeCrossSection {

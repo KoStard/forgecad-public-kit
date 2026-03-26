@@ -122,7 +122,10 @@ export function buildScene(
   }
 
   // Mesh
-  const material = new THREE.MeshPhysicalMaterial(CAD_MATERIAL_PROPS);
+  const material = new THREE.MeshPhysicalMaterial({
+    ...CAD_MATERIAL_PROPS,
+    flatShading: !geo.hasSmoothNormals,
+  });
   const mesh = new THREE.Mesh(geo.solid, material);
   scene.add(mesh);
 

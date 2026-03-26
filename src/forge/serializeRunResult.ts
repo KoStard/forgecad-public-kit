@@ -7,8 +7,9 @@
  */
 
 import type { SerializedRunResult, SerializedSceneObject, SerializedShapeData, SerializedSketchData } from '../workers/evalWorkerProtocol';
+import { isOCCTShapeBackend } from './backends/occt/shapeBackend';
 import { computeGeometryArrays } from './mesh/geometryArrays';
-import { getShapeCompilePlan } from './kernel';
+import { getShapeCompilePlan, getShapeRuntimeBackend } from './kernel';
 import type { RunResult, SceneObject } from './runner';
 import { isConstraintSketch } from './sketch/constraints';
 import type { SolverWasmRunDebugSnapshot } from './sketch/constraints/solver-wasm';
@@ -27,8 +28,26 @@ function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShap
   if (!shape) return null;
 
   try {
+    // Detect OCCT backend for B-rep edge curves and smooth normals
+    let occtBackend: import('./backends/occt/shapeBackend').OCCTShapeBackend | null = null;
+    try {
+      const backend = getShapeRuntimeBackend(shape);
+      if (isOCCTShapeBackend(backend)) occtBackend = backend;
+    } catch {
+      // Not OCCT — use standard mesh pipeline
+    }
+
     let t = performance.now();
-    const rawMesh = shape.getMesh();
+    let rawMesh;
+    let vertNormals: Float32Array | null = null;
+    if (occtBackend) {
+      // OCCT: extract mesh + per-vertex normals from B-rep surface in one pass
+      const result = occtBackend.getMeshWithNormals();
+      rawMesh = result.mesh;
+      vertNormals = result.vertNormals;
+    } else {
+      rawMesh = shape.getMesh();
+    }
     timings.getMeshMs += performance.now() - t;
 
     t = performance.now();
@@ -57,10 +76,11 @@ function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShap
     const numTriangles = shape.numTri();
 
     const tGeom = performance.now();
+    const hasSmoothNormals = vertNormals !== null;
     const {
       positions: geometryPositions,
       normals: geometryNormals,
-      edgePositions: geometryEdgePositions,
+      edgePositions: meshEdgePositions,
     } = computeGeometryArrays({
       numProp: rawMesh.numProp,
       numTri: numTriangles,
@@ -68,7 +88,15 @@ function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShap
       vertProperties: meshVertProperties,
       mergeFromVert: meshMergeFromVert.length > 0 ? meshMergeFromVert : undefined,
       mergeToVert: meshMergeToVert.length > 0 ? meshMergeToVert : undefined,
+      vertNormals: vertNormals ?? undefined,
     });
+
+    // For OCCT-backed shapes, extract smooth edge curves from the B-rep
+    // topology instead of using the mesh-derived sharp edges.
+    let geometryEdgePositions = meshEdgePositions;
+    if (occtBackend) {
+      geometryEdgePositions = occtBackend.getEdgeCurves();
+    }
     timings.geomArraysMs += performance.now() - tGeom;
 
     return {
@@ -87,6 +115,7 @@ function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShap
       geometryPositions,
       geometryNormals,
       geometryEdgePositions,
+      hasSmoothNormals,
     };
   } catch {
     return null;
