@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FLAG_DEFINITIONS, useFeatureFlagStore } from '../featureFlags';
 import { fileSystem } from '../fs';
-import { fetchGistModel } from '../share';
+import { fetchGistModel, fetchUrlModel } from '../share';
 import { useForgeStore } from '../store/forgeStore';
 import { exportMeshFromStore, exportOrbitGifFromStore, exportReportFromStore, exportSketchFromStore } from './exportActions';
 
@@ -218,6 +218,20 @@ export function CommandPalette() {
         const match = input.match(/gist\.github\.com\/(?:[^/]+\/)?([a-f0-9]+)/i);
         const gistId = match ? match[1] : input.trim();
         fetchGistModel(gistId)
+          .then((model) => {
+            useForgeStore.getState().loadFromText(model.code, model.filename);
+          })
+          .catch(handleCommandError);
+      },
+    },
+    {
+      id: 'open-url',
+      label: 'Open from URL',
+      action: () => {
+        close();
+        const input = window.prompt('Paste a URL to a .forge.js file:');
+        if (!input) return;
+        fetchUrlModel(input.trim())
           .then((model) => {
             useForgeStore.getState().loadFromText(model.code, model.filename);
           })

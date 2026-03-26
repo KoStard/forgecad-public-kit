@@ -132,6 +132,32 @@ export function getGistId(): string | null {
   return getQueryParams().get('gist');
 }
 
+/** Get raw URL from query params if present. */
+export function getExternalUrl(): string | null {
+  return getQueryParams().get('url');
+}
+
+/** Fetch a ForgeCAD model from a raw URL. */
+export async function fetchUrlModel(url: string): Promise<SharedModel> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch model: ${res.status} ${res.statusText}`);
+  const code = await res.text();
+  // Extract filename from URL path
+  const pathname = new URL(url).pathname;
+  const filename = pathname.split('/').pop() || 'model.forge.js';
+  return { filename, code };
+}
+
+/** Build a share URL that loads from a raw URL. */
+export function buildUrlShareUrl(url: string): string {
+  return `${PROD_BASE}?url=${encodeURIComponent(url)}`;
+}
+
+/** Build an embed URL that loads from a raw URL. */
+export function buildUrlEmbedUrl(url: string): string {
+  return `${PROD_BASE}?url=${encodeURIComponent(url)}&embed=1`;
+}
+
 /** Fetch a ForgeCAD model from a GitHub Gist. Returns the first .forge.js file found. */
 export async function fetchGistModel(gistId: string): Promise<SharedModel> {
   const res = await fetch(`https://api.github.com/gists/${gistId}`);

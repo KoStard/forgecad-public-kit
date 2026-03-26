@@ -26,7 +26,18 @@ import { collectDependencies, hasImports } from './importAnalysis';
 import { isMobile } from './mobile/isMobile';
 import { MobileApp } from './mobile/MobileApp';
 import { isNotebookFile } from './notebook/model';
-import { buildBundleEmbedUrl, buildBundleShareUrl, buildEmbedSnippet, buildEmbedUrl, buildShareUrl, isEmbedMode } from './share';
+import {
+  buildBundleEmbedUrl,
+  buildBundleShareUrl,
+  buildEmbedSnippet,
+  buildEmbedUrl,
+  buildShareUrl,
+  fetchGistModel,
+  fetchUrlModel,
+  getExternalUrl,
+  getGistId,
+  isEmbedMode,
+} from './share';
 import { useForgeStore } from './store/forgeStore';
 
 const GITHUB_REPO = 'KoStard/ForgeCAD';
@@ -320,6 +331,25 @@ function FullApp() {
       setKernelReady(true);
       execute();
     });
+  }, []);
+
+  // Auto-load from ?url= or ?gist= query params when opening the full editor
+  useEffect(() => {
+    const externalUrl = getExternalUrl();
+    const gistId = getGistId();
+    const fetcher = externalUrl
+      ? fetchUrlModel(externalUrl)
+      : gistId
+        ? fetchGistModel(gistId)
+        : null;
+    if (!fetcher) return;
+    fetcher
+      .then((model) => {
+        useForgeStore.getState().loadFromText(model.code, model.filename);
+      })
+      .catch((err) => {
+        showToast(`Failed to load external model: ${err.message}`, 'error');
+      });
   }, []);
 
   // Sync project files via the active FileSystemProvider

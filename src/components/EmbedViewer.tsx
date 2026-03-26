@@ -1,7 +1,7 @@
 import { initKernel } from '@forge/kernel';
 import { initSolverWasm } from '@forge/sketch/constraints/solver-wasm';
 import { useEffect, useState } from 'react';
-import { buildShareUrl, fetchGistModel, getGistId } from '../share';
+import { buildShareUrl, fetchGistModel, fetchUrlModel, getExternalUrl, getGistId } from '../share';
 import { useForgeStore } from '../store/forgeStore';
 import { Viewport } from './Viewport';
 
@@ -20,22 +20,36 @@ export function EmbedViewer() {
   const [gistError, setGistError] = useState<string | null>(null);
   const [gistLoading, setGistLoading] = useState(false);
 
-  // Load gist if ?gist=<id> is present
+  // Load external model if ?url=<url> or ?gist=<id> is present
   useEffect(() => {
+    const externalUrl = getExternalUrl();
     const gistId = getGistId();
-    if (!gistId) return;
 
-    setGistLoading(true);
-    fetchGistModel(gistId)
-      .then((model) => {
-        updateFileCode(model.filename, model.code);
-        setActiveFile(model.filename);
-        setGistLoading(false);
-      })
-      .catch((err) => {
-        setGistError(err.message);
-        setGistLoading(false);
-      });
+    if (externalUrl) {
+      setGistLoading(true);
+      fetchUrlModel(externalUrl)
+        .then((model) => {
+          updateFileCode(model.filename, model.code);
+          setActiveFile(model.filename);
+          setGistLoading(false);
+        })
+        .catch((err) => {
+          setGistError(err.message);
+          setGistLoading(false);
+        });
+    } else if (gistId) {
+      setGistLoading(true);
+      fetchGistModel(gistId)
+        .then((model) => {
+          updateFileCode(model.filename, model.code);
+          setActiveFile(model.filename);
+          setGistLoading(false);
+        })
+        .catch((err) => {
+          setGistError(err.message);
+          setGistLoading(false);
+        });
+    }
   }, []);
 
   // Init kernel
@@ -55,6 +69,11 @@ export function EmbedViewer() {
 
   // Build the "Open in ForgeCAD" link — point to the full editor with the same model
   const openUrl = (() => {
+    const externalUrl = getExternalUrl();
+    if (externalUrl) {
+      const base = `${window.location.origin}${window.location.pathname}`;
+      return `${base}?url=${encodeURIComponent(externalUrl)}`;
+    }
     const gistId = getGistId();
     if (gistId) {
       const base = `${window.location.origin}${window.location.pathname}`;
