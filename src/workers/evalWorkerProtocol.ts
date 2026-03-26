@@ -26,6 +26,8 @@ export interface SerializedShapeData {
   geometryPositions: Float32Array;
   geometryNormals: Float32Array;
   geometryEdgePositions: Float32Array;
+  /** True when normals are smooth per-vertex normals from B-rep surface (OCCT). */
+  hasSmoothNormals: boolean;
 }
 
 /** Wire format for a serialized Sketch — polygon data extracted into plain arrays. */

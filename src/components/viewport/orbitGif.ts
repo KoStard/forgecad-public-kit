@@ -147,7 +147,7 @@ export function createOverrideSessionFromRunResult(
         roughness: mp?.roughness ?? 0.35,
         clearcoat: mp?.clearcoat ?? 0.1,
         clearcoatRoughness: mp?.clearcoatRoughness ?? 0.4,
-        flatShading: true,
+        flatShading: !geo.hasSmoothNormals,
         side: THREE.DoubleSide,
         ...(mp?.emissive !== undefined && { emissive: new THREE.Color(mp.emissive) }),
         ...(mp?.emissiveIntensity !== undefined && { emissiveIntensity: mp.emissiveIntensity }),

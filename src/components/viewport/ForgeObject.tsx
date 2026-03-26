@@ -12,16 +12,21 @@ import { resolveSectionHatchMetrics, resolveSectionSurfaceLift } from './section
 import type { CutSurfaceDef } from './types';
 
 /**
- * Renders the solid body with proper CAD-style shading.
+ * Renders a solid body with CAD-appropriate shading.
  *
- * The key insight for CAD rendering vs game rendering:
- * - CAD needs FLAT shading on planar faces (each triangle keeps its own normal)
- * - CAD needs visible edges to show topology
- * - Games use smooth shading everywhere — that's what makes a box look "blobby"
+ * Shading depends on the geometry backend:
  *
- * computeVertexNormals() averages normals at shared vertices, which smooths
- * the box corners. For CAD we need non-indexed geometry so each face has
- * independent flat normals.
+ * - **OCCT (B-rep)**: Smooth per-vertex normals extracted from the actual
+ *   surface geometry. Curved faces (cylinders, fillets) shade smoothly;
+ *   sharp edges between faces stay sharp because each face has its own
+ *   vertices with independent normals. `flatShading` is OFF.
+ *
+ * - **Manifold (mesh-only)**: Flat face normals computed from triangle cross
+ *   products. Every triangle is independently shaded. `flatShading` is ON.
+ *   Without B-rep data, this is the only correct option — averaging normals
+ *   at shared vertices would blur intentional sharp edges (box corners).
+ *
+ * The `hasSmoothNormals` flag on ForgeGeometry controls the switch.
  */
 export function ForgeObject({
   obj,
@@ -60,11 +65,12 @@ export function ForgeObject({
 }) {
   const hasCutPlanes = (cutPlanes?.length ?? 0) > 0;
   const clippingTransformKey = hasCutPlanes ? matrix : null;
-  const { solidGeo, edgesGeo, cutSurfaces, useFallbackClipping } = useMemo(() => {
+  const { solidGeo, edgesGeo, hasSmoothNormals, cutSurfaces, useFallbackClipping } = useMemo(() => {
     if (!obj.shape) {
       return {
         solidGeo: null,
         edgesGeo: null,
+        hasSmoothNormals: false,
         cutSurfaces: [] as CutSurfaceDef[],
         useFallbackClipping: false,
       };
@@ -143,17 +149,18 @@ export function ForgeObject({
     }
 
     try {
-      const { solid, edges } = shapeToGeometry(shapeForRender);
+      const { solid, edges, hasSmoothNormals: smooth } = shapeToGeometry(shapeForRender);
       return {
         solidGeo: solid,
         edgesGeo: edges,
+        hasSmoothNormals: smooth,
         cutSurfaces: fallbackToGpuClip ? [] : nextCutSurfaces,
         useFallbackClipping: fallbackToGpuClip,
       };
     } catch {
       if (!fallbackToGpuClip && hasCutPlanes) {
         try {
-          const { solid, edges } = shapeToGeometry(obj.shape);
+          const { solid, edges, hasSmoothNormals: smooth } = shapeToGeometry(obj.shape);
           nextCutSurfaces.forEach((surface) => {
             surface.geometry.dispose();
             surface.outlineGeometry?.dispose();
@@ -161,6 +168,7 @@ export function ForgeObject({
           return {
             solidGeo: solid,
             edgesGeo: edges,
+            hasSmoothNormals: smooth,
             cutSurfaces: [] as CutSurfaceDef[],
             useFallbackClipping: true,
           };
@@ -172,6 +180,7 @@ export function ForgeObject({
           return {
             solidGeo: null,
             edgesGeo: null,
+            hasSmoothNormals: false,
             cutSurfaces: [] as CutSurfaceDef[],
             useFallbackClipping: false,
           };
@@ -184,6 +193,7 @@ export function ForgeObject({
       return {
         solidGeo: null,
         edgesGeo: null,
+        hasSmoothNormals: false,
         cutSurfaces: [] as CutSurfaceDef[],
         useFallbackClipping: false,
       };
@@ -229,7 +239,7 @@ export function ForgeObject({
             roughness={obj.materialProps?.roughness ?? 0.35}
             clearcoat={obj.materialProps?.clearcoat ?? 0.1}
             clearcoatRoughness={obj.materialProps?.clearcoatRoughness ?? 0.4}
-            flatShading
+            flatShading={!hasSmoothNormals}
             side={THREE.DoubleSide}
             transparent={meshOpacity < 1 || (obj.materialProps?.opacity !== undefined && obj.materialProps.opacity < 1)}
             opacity={obj.materialProps?.opacity !== undefined ? Math.min(meshOpacity, obj.materialProps.opacity) : meshOpacity}
