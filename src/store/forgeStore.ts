@@ -190,6 +190,10 @@ interface ForgeStore {
   /** When set, execute() renders this mesh file instead of the active script. Cleared on file switch or code edit. */
   meshPreviewFile: string | null;
   setMeshPreview: (meshPath: string | null) => void;
+
+  /** When set, the viewport shows an SVG preview instead of the 3D canvas. Cleared on file switch or code edit. */
+  svgPreviewFile: string | null;
+  setSvgPreview: (svgPath: string | null) => void;
   execute: () => Promise<void>;
   setParam: (name: string, value: number) => void;
   resetParamOverrides: () => void;
@@ -368,7 +372,8 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const restored = name && nextByFile[name] ? nextByFile[name] : {};
     set({
       activeFile: name,
-      meshPreviewFile: null, // Clear mesh preview when switching files
+      meshPreviewFile: null, // Clear mesh/svg preview when switching files
+      svgPreviewFile: null,
       lastValidResult: null,
       paramOverrides: restored,
       paramOverridesByFile: nextByFile,
@@ -382,7 +387,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     setTimeout(() => get().execute(), 0);
   },
   updateFileCode: (name, code) => {
-    set((s) => ({ files: { ...s.files, [name]: code }, dirty: true, meshPreviewFile: null }));
+    set((s) => ({ files: { ...s.files, [name]: code }, dirty: true, meshPreviewFile: null, svgPreviewFile: null }));
   },
   createFile: (name) => {
     const normalized = normalizePath(name);
@@ -654,8 +659,15 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     if (meshPath) {
       window.history.replaceState(null, '', `#${meshPath}`);
     }
-    set({ meshPreviewFile: meshPath });
+    set({ meshPreviewFile: meshPath, svgPreviewFile: null });
     if (meshPath) get().execute();
+  },
+  svgPreviewFile: null,
+  setSvgPreview: (svgPath) => {
+    if (svgPath) {
+      window.history.replaceState(null, '', `#${svgPath}`);
+    }
+    set({ svgPreviewFile: svgPath, meshPreviewFile: null });
   },
   activeBackend: (initialViewPreferences.activeBackend as 'occt' | 'manifold') || 'manifold',
   setActiveBackend: (backend) => {
