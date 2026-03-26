@@ -263,6 +263,16 @@ function Toolbar() {
         <button className={btn()} onClick={() => setSkillDialogOpen(true)} title="Get AI skill for writing ForgeCAD models">
           🤖 AI Skill
         </button>
+        <a
+          className={btn()}
+          href={`${import.meta.env.BASE_URL}docs/`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open ForgeCAD documentation"
+          style={{ textDecoration: 'none' }}
+        >
+          📖 Docs
+        </a>
         <div className="fc-separator" />
         <ShareButton />
         {__FORGE_MODE__ === 'web' && <GitHubStarButton />}

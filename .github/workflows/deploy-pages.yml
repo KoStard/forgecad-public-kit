@@ -43,6 +43,9 @@ jobs:
       - name: Build web app
         run: npm run build:web
 
+      - name: Build docs site
+        run: npm run build:docs
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

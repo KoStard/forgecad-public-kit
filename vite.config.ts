@@ -673,6 +673,39 @@ function forgeSkillStaticPlugin() {
   };
 }
 
+/**
+ * Serves docs-web/ at /docs/ during dev and copies it into dist/docs/ for
+ * production builds, so the docs site is available at /ForgeCAD/docs/ on
+ * GitHub Pages and at /docs/ during local development.
+ */
+function forgeDocsPlugin() {
+  const docsDir = path.resolve(__dirname, 'docs-web');
+  return {
+    name: 'forge-docs',
+    configureServer(server: any) {
+      // Serve docs-web/ at /docs/ during dev
+      server.middlewares.use((req: any, res: any, next: any) => {
+        if (req.url === '/docs' || req.url === '/docs/') {
+          const indexPath = path.join(docsDir, 'index.html');
+          if (fs.existsSync(indexPath)) {
+            res.setHeader('Content-Type', 'text/html');
+            res.end(fs.readFileSync(indexPath, 'utf-8'));
+            return;
+          }
+        }
+        next();
+      });
+    },
+    closeBundle() {
+      // Copy docs-web/ into dist/docs/ for production builds
+      if (!fs.existsSync(docsDir)) return;
+      const dest = path.resolve(__dirname, 'dist/docs');
+      fs.cpSync(docsDir, dest, { recursive: true });
+      console.log('✓ Docs site copied to dist/docs/');
+    },
+  };
+}
+
 export default defineConfig(({ command }) => {
   // Ensure the CONTEXT.md stub exists so the ?raw import doesn't break dev server
   if (command === 'serve') ensureSkillContextStub();
@@ -688,6 +721,8 @@ export default defineConfig(({ command }) => {
     react(),
     // Copy skill files into the web build output for static serving
     ...(forgeMode === 'web' && command === 'build' ? [forgeSkillStaticPlugin()] : []),
+    // Serve docs at /docs/ in dev and copy into dist/docs/ for production
+    forgeDocsPlugin(),
   ],
   // GitHub Pages serves at /ForgeCAD/; local dev serves at /
   base: forgeMode === 'web' ? '/ForgeCAD/' : '/',

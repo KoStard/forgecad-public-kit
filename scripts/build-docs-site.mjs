@@ -191,7 +191,7 @@ function generateSite(docs) {
   const fuseJs = readFileSync(fusePath, 'utf-8');
 
   const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -224,6 +224,7 @@ ${getStyles()}
       <div class="sidebar-header">
         <span class="logo">ForgeCAD</span>
         <span class="logo-sub">Docs</span>
+        <button id="theme-toggle" class="theme-toggle" title="Toggle light/dark theme" aria-label="Toggle theme"></button>
       </div>
       <button id="search-trigger" class="search-trigger">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -278,6 +279,16 @@ function escapeHtml(s) {
 function getStyles() {
   return `
 :root {
+  --sidebar-w: 280px;
+  --search-w: 600px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, monospace;
+  --radius: 8px;
+  --radius-sm: 4px;
+}
+
+/* Dark theme (default) */
+[data-theme="dark"] {
   --bg: #1a1b26;
   --bg-surface: #1f2029;
   --bg-elevated: #24253a;
@@ -296,12 +307,28 @@ function getStyles() {
   --purple: #bb9af7;
   --cyan: #7dcfff;
   --yellow: #e0af68;
-  --sidebar-w: 280px;
-  --search-w: 600px;
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, monospace;
-  --radius: 8px;
-  --radius-sm: 4px;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg: #f8f9fc;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f0f1f5;
+  --bg-hover: #e8eaf0;
+  --bg-active: #dde0ea;
+  --text: #1e2030;
+  --text-muted: #5b6078;
+  --text-dim: #8c8fa1;
+  --accent: #2e5cb8;
+  --accent-dim: #a0b8e0;
+  --border: #dce0e8;
+  --code-bg: #eff1f5;
+  --green: #40a02b;
+  --orange: #d56a00;
+  --red: #d20f39;
+  --purple: #8839ef;
+  --cyan: #0b7285;
+  --yellow: #df8e1d;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -351,6 +378,26 @@ html, body {
   font-size: 13px;
   color: var(--text-dim);
   font-weight: 400;
+}
+
+.theme-toggle {
+  margin-left: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 7px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  transition: border-color 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent-dim);
+  color: var(--text);
 }
 
 .search-trigger {
@@ -630,7 +677,7 @@ html, body {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.5);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-start;
@@ -786,6 +833,36 @@ function getAppJs() {
   return `
 (function() {
   'use strict';
+
+  // -----------------------------------------------------------------------
+  // Theme toggle
+  // -----------------------------------------------------------------------
+
+  const themeToggle = document.getElementById('theme-toggle');
+  const THEME_KEY = 'forgecad-docs-theme';
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    themeToggle.textContent = theme === 'dark' ? '\\u2600' : '\\u263E';
+    themeToggle.title = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+  }
+
+  // Restore saved preference or use system preference
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved) {
+    applyTheme(saved);
+  } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+    applyTheme('light');
+  } else {
+    applyTheme('dark');
+  }
+
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem(THEME_KEY, next);
+  });
 
   let pages = [];
   let searchEntries = [];
