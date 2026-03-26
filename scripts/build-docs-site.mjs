@@ -208,10 +208,12 @@ function generateSite(docs) {
   const hljsDarkCss = readFileSync(join(ROOT, 'node_modules/highlight.js/styles/tokyo-night-dark.min.css'), 'utf-8');
   const hljsLightCss = readFileSync(join(ROOT, 'node_modules/highlight.js/styles/tokyo-night-light.min.css'), 'utf-8');
 
-  // Extract only the color rules (skip the base pre/code layout rules which we handle ourselves)
+  // Extract only the color rules (skip base layout and background — we handle those ourselves)
   function scopeHljsTheme(css, themeAttr) {
     // Remove the base layout rules (pre code.hljs{...}code.hljs{...})
-    const colorRules = css.replace(/^pre code\.hljs\{[^}]*\}code\.hljs\{[^}]*\}/, '');
+    let colorRules = css.replace(/^pre code\.hljs\{[^}]*\}code\.hljs\{[^}]*\}/, '');
+    // Remove the .hljs{background:...;color:...} rule — our own pre/code styles handle bg
+    colorRules = colorRules.replace(/\.hljs\{background:#[0-9a-f]+;color:#[0-9a-f]+\}/, '');
     // Scope .hljs selectors under [data-theme="..."]
     return colorRules.replace(/\.hljs/g, `[data-theme="${themeAttr}"] .hljs`);
   }
