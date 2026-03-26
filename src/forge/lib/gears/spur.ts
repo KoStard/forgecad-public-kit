@@ -176,6 +176,13 @@ export function buildSpurGearProfile(meta: GearMeta, segmentsPerTooth: number): 
   return union2d(base, ...teeth);
 }
 
+/**
+ * Involute external spur gear with optional center bore.
+ *
+ * Specify module, teeth, faceWidth as required parameters. Optional tuning includes
+ * pressureAngleDeg (default 20), backlash, clearance, addendum, dedendum, boreDiameter,
+ * and segmentsPerTooth (default 10).
+ */
 export function spurGear(options: SpurGearOptions): Shape {
   const normalized = normalizeSpurGearOptions(options);
   const meta = buildSpurGearMeta(normalized);

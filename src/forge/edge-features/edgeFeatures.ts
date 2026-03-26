@@ -95,6 +95,7 @@ function buildEdgeFeatureResult(target: Shape, plan: ShapeCompilePlan | null, so
   return result;
 }
 
+/** Round a named edge of a shape with a circular fillet of the given radius. Requires a compile-covered target. */
 export function filletEdge(shape: ShapeArg, edge: EdgeRef, radius: number, quadrant: [number, number] = [-1, -1], segments = 16): Shape {
   if (!Number.isFinite(radius) || !(radius > 0)) {
     throw new Error('filletEdge() requires a positive finite radius.');
@@ -132,6 +133,7 @@ export function filletEdge(shape: ShapeArg, edge: EdgeRef, radius: number, quadr
   return buildEdgeFeatureResult(target, plan, 'fillet');
 }
 
+/** Bevel a named edge of a shape with a 45-degree chamfer of the given size. Requires a compile-covered target. */
 export function chamferEdge(shape: ShapeArg, edge: EdgeRef, size: number, quadrant: [number, number] = [-1, -1]): Shape {
   if (!Number.isFinite(size) || !(size > 0)) {
     throw new Error('chamferEdge() requires a positive finite size.');

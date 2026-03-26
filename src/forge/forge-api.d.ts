@@ -1508,6 +1508,13 @@ interface ProfileBackend {
 }
 type Anchor = "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right" | "top" | "bottom" | "left" | "right";
 type SketchOperandInput = Sketch | readonly Sketch[];
+/**
+ * 2D profile for extrusion, revolve, and other operations.
+ *
+ * Supports transforms (translate, rotate, scale, mirror), booleans (add, subtract, intersect),
+ * offset, simplify, warp, extrude, revolve, and queries (area, bounds, isEmpty, numVert).
+ * All operations are immutable and return new sketches.
+ */
 declare class Sketch {
 	readonly cross: ProfileBackend;
 	colorHex: string | undefined;
@@ -1518,9 +1525,13 @@ declare class Sketch {
 	clone(): Sketch;
 	/** Alias for clone() */
 	duplicate(): Sketch;
+	/** Area in mm squared. */
 	area(): number;
+	/** Bounding box as { min: [x,y], max: [x,y] }. */
 	bounds(): ProfileBounds;
+	/** True if the sketch contains no area. */
 	isEmpty(): boolean;
+	/** Vertex count of the polygon representation. */
 	numVert(): number;
 	toPolygons(): number[][][];
 	translate(_x: number, _y?: number): Sketch;
@@ -1554,6 +1565,7 @@ declare class Sketch {
 		number,
 		number
 	]): Sketch;
+	/** Extrude this 2D sketch along Z to create a 3D solid. Supports twist, scale tapering, and centering. */
 	extrude(_height: number, _opts?: {
 		twist?: number;
 		divisions?: number;
@@ -1563,6 +1575,7 @@ declare class Sketch {
 		];
 		center?: boolean;
 	}): Shape | any;
+	/** Revolve this 2D sketch around the Y axis to create a 3D solid of revolution. */
 	revolve(_degrees?: number, _segments?: number): Shape;
 	attachTo(_target: Sketch, _targetAnchor: Anchor, _selfAnchor?: Anchor, _offset?: [
 		number,
@@ -1795,6 +1808,7 @@ declare class ConstrainedSketchBuilder {
 		maxY: number;
 	} | null;
 }
+/** Build a parametric 2D sketch with geometric constraints solved by the built-in constraint solver. */
 declare function constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder;
 interface SketchGroupHandle {
 	readonly id: GroupId;
@@ -1850,6 +1864,7 @@ declare class Point2D {
 		number
 	];
 }
+/** Create an analytic 2D point for measurement and construction geometry. */
 declare function point(x: number, y: number): Point2D;
 declare class Line2D {
 	readonly start: Point2D;
@@ -1881,6 +1896,7 @@ declare class Line2D {
 		number
 	], length: number): Line2D;
 }
+/** Create an analytic 2D line segment between two points. Provides length, midpoint, angle, intersection, and parallel helpers. */
 declare function line(x1: number, y1: number, x2: number, y2: number): Line2D;
 declare class Circle2D {
 	readonly center: Point2D;
@@ -1898,6 +1914,7 @@ declare class Circle2D {
 	static fromCenterAndRadius(center: Point2D, radius: number): Circle2D;
 	static fromDiameter(center: Point2D, diameter: number): Circle2D;
 }
+/** Create an analytic 2D circle for measurement, construction, and extrusion. Provides diameter, circumference, area, and toSketch(). */
 declare function circle(cx: number, cy: number, radius: number): Circle2D;
 type RectSide = "top" | "bottom" | "left" | "right";
 type RectVertex = "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -1945,6 +1962,7 @@ declare class Rectangle2D {
 	/** Extrude this rectangle into a 3D TrackedShape with named faces and edges */
 	extrude(height: number, up?: boolean): TrackedShape;
 }
+/** Create an analytic 2D rectangle with named sides and vertices. Provides side(), vertex(), contains(), toSketch(), and extrude(). */
 declare function rectangle(x: number, y: number, width: number, height: number): Rectangle2D;
 /** Convert degrees to degrees (identity — for readability in scripts) */
 declare function degrees(deg: number): number;
@@ -2328,8 +2346,11 @@ type RectAreaArg = RectAreaRef | Rectangle2D;
  * @returns Shape — the arc surface as a thin solid
  */
 declare function arcBridgeBetweenRects(rectA: RectAreaArg, rectB: RectAreaArg, segments?: number): Shape;
+/** Combine 2D sketches into a single profile (additive boolean). Accepts individual sketches or arrays. */
 declare function union2d(...inputs: SketchOperandInput[]): Sketch;
+/** Subtract 2D sketches from a base sketch. The first sketch is the base; all others are subtracted. */
 declare function difference2d(...inputs: SketchOperandInput[]): Sketch;
+/** Keep only the overlapping area of the input sketches (intersection boolean). */
 declare function intersection2d(...inputs: SketchOperandInput[]): Sketch;
 type RectVertexName = "bottomLeft" | "bottomRight" | "topRight" | "topLeft";
 type RectSideName = "bottom" | "right" | "top" | "left";
@@ -2631,29 +2652,40 @@ declare class Curve3D {
 	length(samples?: number): number;
 }
 /**
- * Create a smooth 2D spline sketch from control points.
+ * Build a smooth Catmull-Rom spline sketch from 2D control points.
  *
- * - Closed spline returns a filled profile.
- * - Open spline requires strokeWidth to return a solid sketch.
+ * A closed spline (default) returns a filled profile. An open spline requires
+ * a strokeWidth option to produce a solid sketch. Use tension (0..1, default 0.5)
+ * to control curve tightness.
  */
 declare function spline2d(points: Vec2[], options?: Spline2DOptions): Sketch;
-/** Create a reusable 3D spline curve object. */
+/**
+ * Create a reusable 3D spline curve object (Catmull-Rom).
+ *
+ * The returned Curve3D provides sample(), pointAt(t), tangentAt(t), and length() for
+ * downstream use in sweep() or manual path operations.
+ */
 declare function spline3d(points: Vec3$2[], options?: Spline3DOptions): Curve3D;
 /**
- * Loft between sketches along Z stations.
+ * Loft between multiple sketches along Z stations.
  *
- * Profiles can differ in topology/vertex count: interpolation is done on
- * signed-distance fields and meshed with level-set extraction.
+ * Profiles can differ in topology and vertex count: interpolation is done on
+ * signed-distance fields and meshed with level-set extraction. Heights must be
+ * strictly increasing. Compatible loft stacks can export through the OCCT exact route.
+ *
+ * Performance note: loft is significantly heavier than primitive/extrude/revolve.
+ * If the part is axis-symmetric (bottles, vases, knobs), prefer revolve().
  */
 declare function loft(profiles: Sketch[], heights: number[], options?: LoftOptions): Shape;
 /**
- * Sweep a 2D profile along a 3D path.
+ * Sweep a 2D profile along a 3D path to create a solid.
  *
- * Path can be:
- * - `Curve3D` from spline3d(...)
- * - array of [x,y,z] points (polyline)
+ * Path can be a Curve3D from spline3d() or an array of [x,y,z] points (polyline).
+ * The profile is interpreted in the local frame normal plane. Compatible sweeps can
+ * export through the OCCT exact route using the canonical path representation.
  *
- * The profile is interpreted in the local frame normal plane (x,y axes).
+ * Performance note: sweep uses level-set meshing internally. Prefer direct
+ * primitives/extrude/revolve when they can express the same shape.
  */
 declare function sweep(profile: Sketch, path: Curve3D | Vec3$2[], options?: SweepOptions): Shape;
 type PointArg$1 = [
@@ -2717,10 +2749,12 @@ interface SketchSvgOptions {
  */
 declare function sketchToSvg(sketch: Sketch, options?: SketchSvgOptions): string;
 type ShapeArg = Shape | TrackedShape;
+/** Round a named edge of a shape with a circular fillet of the given radius. Requires a compile-covered target. */
 declare function filletEdge(shape: ShapeArg, edge: EdgeRef, radius: number, quadrant?: [
 	number,
 	number
 ], segments?: number): Shape;
+/** Bevel a named edge of a shape with a 45-degree chamfer of the given size. Requires a compile-covered target. */
 declare function chamferEdge(shape: ShapeArg, edge: EdgeRef, size: number, quadrant?: [
 	number,
 	number
@@ -2734,6 +2768,7 @@ type PointInput = [
 	number,
 	number
 ] | Point2D;
+/** Create a polygon from points with specified corners rounded to arc fillets. Each corner spec identifies a vertex index and radius. */
 declare function filletCorners(points: PointInput[], corners: FilletCornerSpec[]): Sketch;
 /**
  * Load and cache a font.
@@ -2758,37 +2793,47 @@ declare class PathBuilder {
 	close(): Sketch;
 	stroke(width: number, join?: "Round" | "Square"): Sketch;
 }
+/** Create a path builder for constructing 2D outlines with moveTo/lineTo/arcTo/close/stroke. */
 declare function path(): PathBuilder;
+/** Create a stroked polyline sketch from an array of 2D points with the given width and corner join style. */
 declare function stroke(points: [
 	number,
 	number
 ][], width: number, join?: "Round" | "Square"): Sketch;
 type ShapeArg$1 = Shape | TrackedShape;
-/** Repeat a shape along a direction vector */
+/** Repeat a shape in a linear pattern along a direction vector and union the copies. */
 declare function linearPattern(shape: ShapeArg$1, count: number, dx: number, dy: number, dz?: number): Shape;
-/** Repeat a shape around the Z axis */
+/** Repeat a shape in a circular pattern around the Z axis and union the copies. */
 declare function circularPattern(shape: ShapeArg$1, count: number, centerX?: number, centerY?: number): Shape;
 /** Repeat a sketch in a linear pattern */
 declare function linearPattern2d(sketch: Sketch, count: number, dx: number, dy?: number): Sketch;
 /** Repeat a sketch in a circular pattern around a center point */
 declare function circularPattern2d(sketch: Sketch, count: number, centerX?: number, centerY?: number): Sketch;
-/** Mirror a shape and union with original */
+/** Mirror a shape across a plane defined by its normal and union the mirror with the original. */
 declare function mirrorCopy(shape: ShapeArg$1, normal: [
 	number,
 	number,
 	number
 ]): Shape;
 type SketchFaceTarget = SketchFace3D | string | FaceRef;
+/** Create a 2D rectangle. When center is true, the origin is at the rectangle center; otherwise at the bottom-left corner. */
 declare function rect(width: number, height: number, center?: boolean): Sketch;
+/** Create a 2D circle centered at the origin. Use segments for lower-poly approximations. */
 declare function circle2d(radius: number, segments?: number): Sketch;
+/** Create a 2D rectangle with rounded corners. The radius is clamped to fit within the dimensions. */
 declare function roundedRect(width: number, height: number, radius: number, center?: boolean): Sketch;
+/** Create a 2D polygon from an array of [x, y] points or Point2D objects. Winding is normalized to CCW. */
 declare function polygon(points: ([
 	number,
 	number
 ] | Point2D)[]): Sketch;
+/** Create a regular polygon (equilateral triangle, hexagon, etc.) inscribed in a circle of the given radius. */
 declare function ngon(sides: number, radius: number): Sketch;
+/** Create a 2D ellipse centered at the origin with the given X and Y radii. */
 declare function ellipse(rx: number, ry: number, segments?: number): Sketch;
+/** Create a slot (stadium/discorectangle) — a rectangle with semicircular ends, centered at origin. */
 declare function slot(length: number, width: number): Sketch;
+/** Create a star shape with alternating outer and inner radii. */
 declare function star(points: number, outerR: number, innerR: number): Sketch;
 interface SvgImportOptions {
 	/**
@@ -2953,7 +2998,14 @@ interface ShapeMaterialProps {
 	/** Clearcoat roughness (0–1). Default: 0.4 */
 	clearcoatRoughness?: number;
 }
-/** Thin immutable wrapper around a runtime geometry backend payload. */
+/**
+ * Core 3D solid shape. All operations are immutable and return new shapes.
+ *
+ * Supports transforms (translate, rotate, scale, mirror, transform, rotateAround, pointAlong),
+ * booleans (add, subtract, intersect), cutting (split, splitByPlane, trimByPlane),
+ * shelling, anchor positioning (attachTo, onFace), placement references, and queries
+ * (volume, surfaceArea, boundingBox, isEmpty, numTri, geometryInfo).
+ */
 declare class Shape {
 	colorHex: string | undefined;
 	materialProps: ShapeMaterialProps | undefined;
@@ -3010,21 +3062,25 @@ declare class Shape {
 		number,
 		number
 	]): Shape;
+	/** Move the shape relative to its current position. All transforms are immutable and return new shapes. */
 	translate(x: number, y: number, z: number): Shape;
-	/** Move so bounding box min corner is at the given global coordinate */
+	/** Position the shape so its bounding box min corner is at the given global coordinate. */
 	moveTo(x: number, y: number, z: number): Shape;
-	/** Move so bounding box min corner is at target's bounding box min + (x, y, z) offset */
+	/** Position the shape relative to another shape's local coordinate system (bounding box min corner). */
 	moveToLocal(target: Shape | {
 		toShape(): Shape;
 	}, x: number, y: number, z: number): Shape;
+	/** Rotate using Euler angles in degrees around each axis. */
 	rotate(x: number, y: number, z: number): Shape;
 	/** Apply a 4x4 affine transform matrix (column-major) or a Transform object. */
 	transform(m: Mat4 | Transform): Shape;
+	/** Scale the shape uniformly or per-axis. Accepts a single number or [x, y, z] array. */
 	scale(v: number | [
 		number,
 		number,
 		number
 	]): Shape;
+	/** Mirror across a plane defined by its normal vector (does not need to be unit length). */
 	mirror(normal: [
 		number,
 		number,
@@ -3069,8 +3125,11 @@ declare class Shape {
 	], movingPoint: RotationPointLike, targetPoint: RotationPointLike, options?: RotateAroundToOptions): Shape;
 	/** Unwrap TrackedShape (or any object with toShape()) without circular import. */
 	private static _unwrap;
+	/** Union this shape with others (additive boolean). Method form of union(). */
 	add(...others: ShapeOperandInput[]): Shape;
+	/** Subtract other shapes from this one. Method form of difference(). */
 	subtract(...others: ShapeOperandInput[]): Shape;
+	/** Keep only the overlap with other shapes. Method form of intersection(). */
 	intersect(...others: ShapeOperandInput[]): Shape;
 	/** Split into [inside, outside] by another shape. */
 	split(cutter: Shape | {
@@ -3103,10 +3162,15 @@ declare class Shape {
 	shell(thickness: number, opts?: {
 		openFaces?: string[];
 	}): Shape;
+	/** Get the axis-aligned bounding box as { min: [x,y,z], max: [x,y,z] }. */
 	boundingBox(): ShapeRuntimeBounds;
+	/** Volume in mm cubed. */
 	volume(): number;
+	/** Surface area in mm squared. */
 	surfaceArea(): number;
+	/** True if the shape contains no geometry. */
 	isEmpty(): boolean;
+	/** Triangle count of the mesh representation. */
 	numTri(): number;
 	/** Extract triangle mesh for Three.js rendering */
 	getMesh(): ShapeRuntimeMesh;
@@ -3114,7 +3178,14 @@ declare class Shape {
 	slice(offset?: number): any;
 	/** Orthographically project the runtime solid onto the local XY plane. */
 	project(): any;
-	/** Position this shape relative to another using named 3D anchor points */
+	/**
+	 * Position this shape relative to another using named 3D anchor points.
+	 *
+	 * Anchors are bounding-box-relative: 'center', face centers ('top', 'front', ...),
+	 * edge midpoints ('top-front', 'back-left', ...), and corners ('top-front-left', ...).
+	 * Anchor word order is flexible: 'front-left' and 'left-front' are equivalent.
+	 * Named placement references (from withReferences) can also be used as anchors.
+	 */
 	attachTo(target: ShapeAnchorTarget, targetAnchor: PlacementAnchorLike, selfAnchor?: PlacementAnchorLike, offset?: [
 		number,
 		number,
@@ -3330,6 +3401,13 @@ declare class ShapeGroup {
 		number
 	]): ShapeGroup;
 }
+/**
+ * Group multiple shapes/sketches for joint transforms without merging into a single mesh.
+ *
+ * Unlike union(), colors and individual identities are preserved. Children can be
+ * plain shapes, named descriptors ({ name, shape/sketch/group }), or nested groups.
+ * The returned ShapeGroup supports all Shape transforms (translate, rotate, etc.).
+ */
 declare function group(...items: GroupInput[]): ShapeGroup;
 type JointViewType = "revolute" | "prismatic";
 type JointViewAxis = [
@@ -3525,6 +3603,7 @@ interface JointSweepFrame {
 	collisions: CollisionFinding[];
 	warnings: string[];
 }
+/** Convert BOM rows from a solved assembly into a CSV string. */
 declare function bomToCsv(rows: BomRow[]): string;
 interface MateMetadata {
 	explodeHints: Record<string, {
@@ -3698,6 +3777,12 @@ declare class Assembly {
 	toJointsView(options?: ToJointsViewOptions): void;
 	describe(): AssemblyDefinition;
 }
+/**
+ * Create an assembly container with named parts and joints for kinematic mechanisms.
+ *
+ * Build with addPart(), addJoint(), addJointCoupling(), addGearCoupling(), then
+ * solve() to get positioned parts. Supports revolute, prismatic, and fixed joint types.
+ */
 declare function assembly(name?: string): Assembly;
 interface MergeIntoOptions {
 	/**
@@ -4667,6 +4752,11 @@ interface CollectedRobotExport {
 	};
 	world: RobotWorldOptions | null;
 }
+/**
+ * Declare that the current script should export an assembly as a robot package for the SDF CLI.
+ *
+ * Configures inertial properties, joint limits, and optional plugins (e.g. diff-drive for Gazebo).
+ */
 declare function robotExport(options: RobotExportOptions): CollectedRobotExport;
 /**
  * ForgeCAD — Scene Configuration API
@@ -5039,7 +5129,9 @@ declare const verify: {
 		number
 	], tolerance?: number): void;
 };
+/** Cross-section: slice a 3D shape with a plane and return the intersection as a 2D Sketch. */
 declare function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch;
+/** Orthographically project a 3D shape onto a plane and return the silhouette as a 2D Sketch. */
 declare function projectToPlane(shape: Shape, plane: PlaneSpec): Sketch;
 interface SheetMetalOptions {
 	panel: {
@@ -5083,19 +5175,46 @@ declare class SheetMetalPart {
 	flatPattern(): Shape;
 	private buildOutput;
 }
+/**
+ * Create a sheet-metal part with flanges, bend allowances, and flat pattern unfolding.
+ *
+ * Define the base panel, thickness, bend radius, and K-factor, then chain
+ * .flange() and .cutout() calls. Materialize with .folded() or .flatPattern().
+ */
 declare function sheetMetal(options: SheetMetalOptions): SheetMetalPart;
 type _ShapeOperand = Shape | TrackedShape;
+/**
+ * Create a rectangular box with named faces and edges.
+ * When center is false (default), one corner sits at the origin.
+ * Returns a TrackedShape with faces (top, bottom, side-left, side-right, side-top, side-bottom)
+ * and edges (vert-bl, vert-br, vert-tr, vert-tl, etc.).
+ */
 declare function box(x: number, y: number, z: number, center?: boolean): TrackedShape;
+/**
+ * Create a cylinder or cone with named faces and edges.
+ * When radiusTop differs from radius, creates a tapered cone. Use segments for regular prisms.
+ * Returns a TrackedShape with faces (top, bottom, side) and edges (top-rim, bottom-rim).
+ */
 declare function cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape;
+/** Create a sphere centered at the origin. Use segments for lower-poly approximations. */
 declare function sphere(radius: number, segments?: number): Shape;
+/** Create a torus (donut shape) centered at the origin, lying in the XY plane. */
 declare function torus(majorRadius: number, minorRadius: number, segments?: number): Shape;
+/** Combine shapes into a single solid (additive boolean). Accepts individual shapes or arrays. */
 declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
+/** Subtract shapes from a base shape. The first shape is the base; all subsequent shapes are subtracted. */
 declare function difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
+/** Keep only the overlapping volume of the input shapes (intersection boolean). */
 declare function intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
+/** Import a sketch from another ForgeCAD file or SVG. For .forge.js files, pass param overrides; for .svg files, pass SVG import options. */
 declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch;
+/** Import a part from another ForgeCAD file. Returns a chainable Shape. The target file must return a Shape or TrackedShape. */
 declare function importPart(fileName: string, paramOverrides?: Record<string, number>): Shape;
+/** Import a group from another ForgeCAD file. The target file must return a ShapeGroup via group(). */
 declare function importGroup(fileName: string, paramOverrides?: Record<string, number>): ShapeGroup;
+/** Import an assembly from another ForgeCAD file. The target file must return an unsolved Assembly instance. */
 declare function importAssembly(fileName: string, paramOverrides?: Record<string, number>): ImportedAssembly;
+/** Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification. */
 declare function importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch;
 /** Import an external mesh file (STL, OBJ, 3MF) as a Shape. */
 declare function importMesh(fileName: string, options?: {

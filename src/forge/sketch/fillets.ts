@@ -129,6 +129,7 @@ function buildCornerGeometry(points: [number, number][], spec: FilletCornerSpec,
   };
 }
 
+/** Create a polygon from points with specified corners rounded to arc fillets. Each corner spec identifies a vertex index and radius. */
 export function filletCorners(points: PointInput[], corners: FilletCornerSpec[]): Sketch {
   if (points.length < 3) throw new Error('filletCorners requires at least 3 points');
   if (corners.length === 0) return polygon(points);

@@ -186,6 +186,12 @@ function resolveGearPairMember(value: Shape | GearPairSpec, label: 'pinion' | 'g
   return { shape, meta };
 }
 
+/**
+ * Build or validate a spur-gear pair and return ratio, backlash, and mesh diagnostics.
+ *
+ * Accepts either shapes from spurGear() or analytical specs for each member.
+ * When place is true (default), the gear is auto-positioned at the correct center distance.
+ */
 export function gearPair(options: GearPairOptions): GearPairResult {
   const pinion = resolveGearPairMember(options.pinion, 'pinion');
   const gear = resolveGearPairMember(options.gear, 'gear');
@@ -344,6 +350,7 @@ function resolveBevelPairMember(
   return { shape, meta };
 }
 
+/** Build or validate a bevel-gear pair and return ratio diagnostics plus recommended joint placement vectors. */
 export function bevelGearPair(options: BevelGearPairOptions): BevelGearPairResult {
   const shaftAngleDeg = normalizeShaftAngle('bevelGearPair', options.shaftAngleDeg ?? 90);
   const pinionTeeth =
@@ -662,6 +669,7 @@ export function sideGearPair(options: SideGearPairOptions): SideGearPairResult {
   };
 }
 
+/** Build or validate a perpendicular pair between a face gear and a vertical spur gear. */
 export function faceGearPair(options: FaceGearPairOptions): FaceGearPairResult {
   let pair: SideGearPairResult;
   try {

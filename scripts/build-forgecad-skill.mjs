@@ -64,6 +64,64 @@ const docs = {
   generatedApiRef: "docs/permanent/generated/api-reference.md",
 };
 
+// ---------------------------------------------------------------------------
+// One-file slim docs — condensed versions for the CONTEXT.md paste target.
+// The full docs above are used for dev SKILL.md and installed SKILL.md
+// (which load files on demand). The one-file output inlines everything, so
+// we use slimmer versions to keep the token count manageable.
+// ---------------------------------------------------------------------------
+const oneFileDocs = {
+  // Slim concepts & patterns guide replaces the full reference.md
+  skillGuide: "docs/permanent/API/core/skill-guide.md",
+
+  // Auto-generated API index (enriched with JSDoc from source)
+  generatedApiRef: "docs/permanent/generated/api-reference.md",
+
+  // Core supporting docs (kept as-is — already concise)
+  topology: "docs/permanent/API/core/topology.md",
+  parameters: "docs/permanent/API/core/parameters.md",
+  edgeQueries: "docs/permanent/API/core/edge-queries.md",
+
+  // Guides
+  coordinateSystem: "docs/permanent/guides/coordinate-system.md",
+  geometryConventions: "docs/permanent/guides/geometry-conventions.md",
+  positioning: "docs/permanent/guides/positioning.md",
+  modelingRecipes: "docs/permanent/guides/modeling-recipes.md",
+
+  // Sketch (kept — already concise individual files)
+  sketchCore: "docs/permanent/API/sketch/core.md",
+  sketchPrimitives: "docs/permanent/API/sketch/primitives.md",
+  sketchPath: "docs/permanent/API/sketch/path.md",
+  sketchTransforms: "docs/permanent/API/sketch/transforms.md",
+  sketchBooleans: "docs/permanent/API/sketch/booleans.md",
+  sketchOperations: "docs/permanent/API/sketch/operations.md",
+  sketchOnFace: "docs/permanent/API/sketch/on-face.md",
+  sketchExtrude: "docs/permanent/API/sketch/extrude.md",
+  sketchAnchor: "docs/permanent/API/sketch/anchor.md",
+  sketchText: "docs/permanent/API/sketch/text.md",
+  sketchRegions: "docs/permanent/API/sketch/regions.md",
+
+  // Assembly
+  assembly: "docs/permanent/API/assembly/assembly.md",
+
+  // Sheet Metal
+  sheetMetal: "docs/permanent/API/sheet-metal/sheet-metal.md",
+
+  // Runtime
+  viewport: "docs/permanent/API/runtime/viewport.md",
+
+  // Output (brep-export parity table omitted — essentials in export.md and skill-cli.md)
+  export: "docs/permanent/API/output/export.md",
+  bom: "docs/permanent/API/output/bom.md",
+  dimensions: "docs/permanent/API/output/dimensions.md",
+
+  // Toolbox
+  fasteners: "docs/permanent/API/toolbox/fasteners.md",
+
+  // Slim CLI excerpt — model-authoring commands only
+  skillCli: "docs/permanent/API/core/skill-cli.md",
+};
+
 const docGroups = [
   {
     title: "1. Core API (always read first)",
@@ -138,6 +196,7 @@ const docGroups = [
 ];
 
 const allDocs = Object.values(docs);
+const allOneFileDocs = Object.values(oneFileDocs);
 
 function normalizePath(relativePath) {
   return relativePath.replaceAll(path.sep, "/");
@@ -290,7 +349,7 @@ ${renderDocGroupsForInstall(docGroups)}
 const oneFileOutputPath = path.join(repoRoot, "dist-skill/CONTEXT.md");
 
 function buildOneFileContent() {
-  const docSections = allDocs
+  const docSections = allOneFileDocs
     .map((docPath) => {
       const content = readDoc(docPath);
       const label = normalizePath(docPath.replace(/^docs\/permanent\//, ""));
@@ -353,7 +412,7 @@ ${docSections}
 // Run
 // ---------------------------------------------------------------------------
 
-allDocs.forEach((docPath) => assertReadableFile(docPath));
+[...new Set([...allDocs, ...allOneFileDocs])].forEach((docPath) => assertReadableFile(docPath));
 
 writeFileSync(devOutputPath, devSkillContent);
 console.log(`Wrote ${devOutputPath}`);
@@ -368,4 +427,4 @@ console.log(`Copied docs -> ${installDocsOutputDir}`);
 writeFileSync(oneFileOutputPath, buildOneFileContent());
 console.log(`Wrote ${oneFileOutputPath}`);
 
-console.log(`Indexed ${allDocs.length} source files.`);
+console.log(`Indexed ${allDocs.length} source files (${allOneFileDocs.length} for one-file output).`);

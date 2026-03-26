@@ -129,6 +129,7 @@ export function createRingSpaceSketch(meta: GearMeta, segmentsPerTooth: number):
   return polygon(pts);
 }
 
+/** Internal ring gear with involute-derived tooth spaces. Specify rimWidth or outerDiameter for the annular body. */
 export function ringGear(options: RingGearOptions): Shape {
   const normalized = normalizeRingGearOptions(options);
   const pitchRadius = normalized.module * normalized.teeth * 0.5;

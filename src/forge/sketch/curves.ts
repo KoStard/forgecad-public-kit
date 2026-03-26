@@ -247,10 +247,11 @@ export class Curve3D {
 }
 
 /**
- * Create a smooth 2D spline sketch from control points.
+ * Build a smooth Catmull-Rom spline sketch from 2D control points.
  *
- * - Closed spline returns a filled profile.
- * - Open spline requires strokeWidth to return a solid sketch.
+ * A closed spline (default) returns a filled profile. An open spline requires
+ * a strokeWidth option to produce a solid sketch. Use tension (0..1, default 0.5)
+ * to control curve tightness.
  */
 export function spline2d(points: Vec2[], options: Spline2DOptions = {}): Sketch {
   const closed = options.closed ?? true;
@@ -265,16 +266,25 @@ export function spline2d(points: Vec2[], options: Spline2DOptions = {}): Sketch 
   return stroke(sampled, options.strokeWidth, options.join ?? 'Round');
 }
 
-/** Create a reusable 3D spline curve object. */
+/**
+ * Create a reusable 3D spline curve object (Catmull-Rom).
+ *
+ * The returned Curve3D provides sample(), pointAt(t), tangentAt(t), and length() for
+ * downstream use in sweep() or manual path operations.
+ */
 export function spline3d(points: Vec3[], options: Spline3DOptions = {}): Curve3D {
   return new Curve3D(points, options);
 }
 
 /**
- * Loft between sketches along Z stations.
+ * Loft between multiple sketches along Z stations.
  *
- * Profiles can differ in topology/vertex count: interpolation is done on
- * signed-distance fields and meshed with level-set extraction.
+ * Profiles can differ in topology and vertex count: interpolation is done on
+ * signed-distance fields and meshed with level-set extraction. Heights must be
+ * strictly increasing. Compatible loft stacks can export through the OCCT exact route.
+ *
+ * Performance note: loft is significantly heavier than primitive/extrude/revolve.
+ * If the part is axis-symmetric (bottles, vases, knobs), prefer revolve().
  */
 export function loft(profiles: Sketch[], heights: number[], options: LoftOptions = {}): Shape {
   if (profiles.length < 2) throw new Error('loft requires at least two profiles');
@@ -328,13 +338,14 @@ export function loft(profiles: Sketch[], heights: number[], options: LoftOptions
 }
 
 /**
- * Sweep a 2D profile along a 3D path.
+ * Sweep a 2D profile along a 3D path to create a solid.
  *
- * Path can be:
- * - `Curve3D` from spline3d(...)
- * - array of [x,y,z] points (polyline)
+ * Path can be a Curve3D from spline3d() or an array of [x,y,z] points (polyline).
+ * The profile is interpreted in the local frame normal plane. Compatible sweeps can
+ * export through the OCCT exact route using the canonical path representation.
  *
- * The profile is interpreted in the local frame normal plane (x,y axes).
+ * Performance note: sweep uses level-set meshing internally. Prefer direct
+ * primitives/extrude/revolve when they can express the same shape.
  */
 export function sweep(profile: Sketch, path: Curve3D | Vec3[], options: SweepOptions = {}): Shape {
   const requestedPathSamples = Math.max(4, options.samples ?? 48);

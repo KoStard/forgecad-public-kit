@@ -231,6 +231,12 @@ export class SheetMetalPart {
   }
 }
 
+/**
+ * Create a sheet-metal part with flanges, bend allowances, and flat pattern unfolding.
+ *
+ * Define the base panel, thickness, bend radius, and K-factor, then chain
+ * .flange() and .cutout() calls. Materialize with .folded() or .flatPattern().
+ */
 export function sheetMetal(options: SheetMetalOptions): SheetMetalPart {
   const model = normalizeSheetMetalModel(options);
   const issue = validateSheetMetalModel(model);

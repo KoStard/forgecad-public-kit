@@ -102,10 +102,12 @@ export class PathBuilder {
   }
 }
 
+/** Create a path builder for constructing 2D outlines with moveTo/lineTo/arcTo/close/stroke. */
 export function path(): PathBuilder {
   return new PathBuilder();
 }
 
+/** Create a stroked polyline sketch from an array of 2D points with the given width and corner join style. */
 export function stroke(points: [number, number][], width: number, join: 'Round' | 'Square' = 'Square'): Sketch {
   const builder = new PathBuilder();
   builder.moveTo(points[0][0], points[0][1]);

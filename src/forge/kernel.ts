@@ -678,7 +678,14 @@ export interface ShapeMaterialProps {
   clearcoatRoughness?: number;
 }
 
-/** Thin immutable wrapper around a runtime geometry backend payload. */
+/**
+ * Core 3D solid shape. All operations are immutable and return new shapes.
+ *
+ * Supports transforms (translate, rotate, scale, mirror, transform, rotateAround, pointAlong),
+ * booleans (add, subtract, intersect), cutting (split, splitByPlane, trimByPlane),
+ * shelling, anchor positioning (attachTo, onFace), placement references, and queries
+ * (volume, surfaceArea, boundingBox, isEmpty, numTri, geometryInfo).
+ */
 export class Shape {
   public colorHex: string | undefined;
   public materialProps: ShapeMaterialProps | undefined;
@@ -807,6 +814,7 @@ export class Shape {
 
   // --- Transforms (all return new Shape, immutable) ---
 
+  /** Move the shape relative to its current position. All transforms are immutable and return new shapes. */
   translate(x: number, y: number, z: number): Shape {
     const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'translate', x, y, z });
     return setShapeCompilePlanInternal(
@@ -815,19 +823,20 @@ export class Shape {
     );
   }
 
-  /** Move so bounding box min corner is at the given global coordinate */
+  /** Position the shape so its bounding box min corner is at the given global coordinate. */
   moveTo(x: number, y: number, z: number): Shape {
     const bb = this.boundingBox();
     return this.translate(x - (bb.min as number[])[0], y - (bb.min as number[])[1], z - (bb.min as number[])[2]);
   }
 
-  /** Move so bounding box min corner is at target's bounding box min + (x, y, z) offset */
+  /** Position the shape relative to another shape's local coordinate system (bounding box min corner). */
   moveToLocal(target: Shape | { toShape(): Shape }, x: number, y: number, z: number): Shape {
     const s = 'toShape' in target ? target.toShape() : target;
     const tbb = s.boundingBox();
     return this.moveTo((tbb.min as number[])[0] + x, (tbb.min as number[])[1] + y, (tbb.min as number[])[2] + z);
   }
 
+  /** Rotate using Euler angles in degrees around each axis. */
   rotate(x: number, y: number, z: number): Shape {
     const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'rotate', xDeg: x, yDeg: y, zDeg: z });
     return setShapeCompilePlanInternal(
@@ -852,6 +861,7 @@ export class Shape {
     return setShapeCompilePlanInternal(withTransformedDimensions(this, buildShapeFromCompilePlan(nextPlan, this.colorHex), mat), nextPlan);
   }
 
+  /** Scale the shape uniformly or per-axis. Accepts a single number or [x, y, z] array. */
   scale(v: number | [number, number, number]): Shape {
     const scale = normalizeShapeScale(v);
     if (scale) {
@@ -872,6 +882,7 @@ export class Shape {
     );
   }
 
+  /** Mirror across a plane defined by its normal vector (does not need to be unit length). */
   mirror(normal: [number, number, number]): Shape {
     const transformedPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), {
       kind: 'mirror',
@@ -965,6 +976,7 @@ export class Shape {
     return unwrapShapeLike(value);
   }
 
+  /** Union this shape with others (additive boolean). Method form of union(). */
   add(...others: ShapeOperandInput[]): Shape {
     const shapes = [
       this,
@@ -987,6 +999,7 @@ export class Shape {
     );
   }
 
+  /** Subtract other shapes from this one. Method form of difference(). */
   subtract(...others: ShapeOperandInput[]): Shape {
     const shapes = [
       this,
@@ -1011,6 +1024,7 @@ export class Shape {
     );
   }
 
+  /** Keep only the overlap with other shapes. Method form of intersection(). */
   intersect(...others: ShapeOperandInput[]): Shape {
     const shapes = [
       this,
@@ -1141,22 +1155,27 @@ export class Shape {
 
   // --- Query ---
 
+  /** Get the axis-aligned bounding box as { min: [x,y,z], max: [x,y,z] }. */
   boundingBox() {
     return getShapeRuntimeBackendInternal(this).boundingBox();
   }
 
+  /** Volume in mm cubed. */
   volume(): number {
     return getShapeRuntimeBackendInternal(this).volume();
   }
 
+  /** Surface area in mm squared. */
   surfaceArea(): number {
     return getShapeRuntimeBackendInternal(this).surfaceArea();
   }
 
+  /** True if the shape contains no geometry. */
   isEmpty(): boolean {
     return getShapeRuntimeBackendInternal(this).isEmpty();
   }
 
+  /** Triangle count of the mesh representation. */
   numTri(): number {
     return getShapeRuntimeBackendInternal(this).numTri();
   }
@@ -1176,7 +1195,14 @@ export class Shape {
     return getShapeRuntimeBackendInternal(this).project();
   }
 
-  /** Position this shape relative to another using named 3D anchor points */
+  /**
+   * Position this shape relative to another using named 3D anchor points.
+   *
+   * Anchors are bounding-box-relative: 'center', face centers ('top', 'front', ...),
+   * edge midpoints ('top-front', 'back-left', ...), and corners ('top-front-left', ...).
+   * Anchor word order is flexible: 'front-left' and 'left-front' are equivalent.
+   * Named placement references (from withReferences) can also be used as anchors.
+   */
   attachTo(
     target: ShapeAnchorTarget,
     targetAnchor: PlacementAnchorLike,
@@ -1280,6 +1306,13 @@ function resolveTargetAnchorLikePoint(target: ShapeAnchorTarget, ref: PlacementA
 
 // --- Primitive constructors ---
 
+/**
+ * Create a rectangular box with named faces and edges.
+ *
+ * Returns a TrackedShape with faces: top, bottom, side-left, side-right,
+ * side-top, side-bottom; and edges: vert-bl, vert-br, vert-tr, vert-tl, etc.
+ * When center is false (the default), one corner sits at the origin.
+ */
 export function box(x: number, y: number, z: number, center = false): Shape {
   return buildShapeFromCompilePlan(createOwnedShapeCompilePlan({ kind: 'box', x, y, z, center }, 'primitive:box')!, undefined, {
     fidelity: 'kernel-native',
@@ -1287,6 +1320,13 @@ export function box(x: number, y: number, z: number, center = false): Shape {
   });
 }
 
+/**
+ * Create a cylinder or cone with named faces and edges.
+ *
+ * When radiusTop differs from radius, creates a tapered cone. Use the segments
+ * parameter to create regular prisms (e.g. 6 for a hexagonal prism). Returns a
+ * TrackedShape with faces: top, bottom, side; and edges: top-rim, bottom-rim.
+ */
 export function cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center = false): Shape {
   return buildShapeFromCompilePlan(
     createOwnedShapeCompilePlan(
@@ -1305,6 +1345,7 @@ export function cylinder(height: number, radius: number, radiusTop?: number, seg
   );
 }
 
+/** Create a sphere centered at the origin. Use segments for lower-poly approximations. */
 export function sphere(radius: number, segments?: number): Shape {
   return buildShapeFromCompilePlan(
     createOwnedShapeCompilePlan(
@@ -1320,6 +1361,7 @@ export function sphere(radius: number, segments?: number): Shape {
   );
 }
 
+/** Create a torus (donut shape) centered at the origin, lying in the XY plane. */
 export function torus(majorRadius: number, minorRadius: number, segments?: number): Shape {
   const plan: ShapeCompilePlan = {
     kind: 'torus',
@@ -1353,6 +1395,12 @@ function _normalizePoint3(value: unknown, apiName: string, index: number): [numb
 
 // --- Boolean helpers ---
 
+/**
+ * Combine shapes into a single solid (additive boolean).
+ *
+ * Accepts individual shapes, or an array of shapes.
+ * The first operand's color is preserved in the result.
+ */
 export function union(...inputs: ShapeOperandInput[]): Shape {
   const shapes = normalizeShapeOperands('union()', inputs, 1, 'Use union(shape1, shape2) or union([shape1, shape2]).');
   if (shapes.length === 0) throw new Error('union requires at least one shape');
@@ -1374,6 +1422,12 @@ export function union(...inputs: ShapeOperandInput[]): Shape {
   );
 }
 
+/**
+ * Subtract shapes from a base shape (subtractive boolean).
+ *
+ * The first shape is the base; all subsequent shapes are subtracted from it.
+ * Accepts individual shapes, or an array of shapes.
+ */
 export function difference(...inputs: ShapeOperandInput[]): Shape {
   const shapes = normalizeShapeOperands(
     'difference()',
@@ -1399,6 +1453,11 @@ export function difference(...inputs: ShapeOperandInput[]): Shape {
   );
 }
 
+/**
+ * Keep only the overlapping volume of the input shapes (intersection boolean).
+ *
+ * Requires at least two shapes. Accepts individual shapes, or an array.
+ */
 export function intersection(...inputs: ShapeOperandInput[]): Shape {
   const shapes = normalizeShapeOperands('intersection()', inputs, 2, 'Use intersection(shape1, shape2) or intersection([shape1, shape2]).');
   if (shapes.length < 2) throw new Error('intersection requires at least two shapes');

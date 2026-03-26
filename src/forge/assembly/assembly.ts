@@ -194,6 +194,7 @@ export interface JointSweepFrame {
   warnings: string[];
 }
 
+/** Convert BOM rows from a solved assembly into a CSV string. */
 export function bomToCsv(rows: BomRow[]): string {
   const header = ['part', 'qty', 'material', 'process', 'tolerance', 'notes'];
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -1308,6 +1309,12 @@ export class Assembly {
   }
 }
 
+/**
+ * Create an assembly container with named parts and joints for kinematic mechanisms.
+ *
+ * Build with addPart(), addJoint(), addJointCoupling(), addGearCoupling(), then
+ * solve() to get positioned parts. Supports revolute, prismatic, and fixed joint types.
+ */
 export function assembly(name?: string): Assembly {
   return new Assembly(name);
 }

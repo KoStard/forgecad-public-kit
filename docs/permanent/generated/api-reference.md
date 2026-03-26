@@ -75,17 +75,23 @@ Create basic 3D shapes.
 box(x: number, y: number, z: number, center?: boolean): TrackedShape
 ```
 
+Create a rectangular box with named faces and edges. When center is false (default), one corner sits at the origin. Returns a TrackedShape with faces (top, bottom, side-left, side-right, side-top, side-bottom) and edges (vert-bl, vert-br, vert-tr, vert-tl, etc.).
+
 #### `cylinder()`
 
 ```ts
 cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape
 ```
 
+Create a cylinder or cone with named faces and edges. When radiusTop differs from radius, creates a tapered cone. Use segments for regular prisms. Returns a TrackedShape with faces (top, bottom, side) and edges (top-rim, bottom-rim).
+
 #### `sphere()`
 
 ```ts
 sphere(radius: number, segments?: number): Shape
 ```
+
+Create a sphere centered at the origin. Use segments for lower-poly approximations.
 
 ### Boolean Operations
 
@@ -97,17 +103,23 @@ Combine shapes using set operations.
 union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape
 ```
 
+Combine shapes into a single solid (additive boolean). Accepts individual shapes or arrays.
+
 #### `difference()`
 
 ```ts
 difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape
 ```
 
+Subtract shapes from a base shape. The first shape is the base; all subsequent shapes are subtracted.
+
 #### `intersection()`
 
 ```ts
 intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape
 ```
+
+Keep only the overlapping volume of the input shapes (intersection boolean).
 
 ### 2D Sketch Primitives
 
@@ -119,11 +131,15 @@ Create 2D profiles for extrusion and other operations.
 path(): PathBuilder
 ```
 
+Create a path builder for constructing 2D outlines with moveTo/lineTo/arcTo/close/stroke.
+
 #### `stroke()`
 
 ```ts
 stroke(points: [ number, number ][], width: number, join?: "Round" | "Square"): Sketch
 ```
+
+Create a stroked polyline sketch from an array of 2D points with the given width and corner join style.
 
 #### `rect()`
 
@@ -131,11 +147,15 @@ stroke(points: [ number, number ][], width: number, join?: "Round" | "Square"): 
 rect(width: number, height: number, center?: boolean): Sketch
 ```
 
+Create a 2D rectangle. When center is true, the origin is at the rectangle center; otherwise at the bottom-left corner.
+
 #### `circle2d()`
 
 ```ts
 circle2d(radius: number, segments?: number): Sketch
 ```
+
+Create a 2D circle centered at the origin. Use segments for lower-poly approximations.
 
 #### `roundedRect()`
 
@@ -143,11 +163,15 @@ circle2d(radius: number, segments?: number): Sketch
 roundedRect(width: number, height: number, radius: number, center?: boolean): Sketch
 ```
 
+Create a 2D rectangle with rounded corners. The radius is clamped to fit within the dimensions.
+
 #### `polygon()`
 
 ```ts
 polygon(points: ([ number, number ] | Point2D)[]): Sketch
 ```
+
+Create a 2D polygon from an array of [x, y] points or Point2D objects. Winding is normalized to CCW.
 
 #### `ngon()`
 
@@ -155,11 +179,15 @@ polygon(points: ([ number, number ] | Point2D)[]): Sketch
 ngon(sides: number, radius: number): Sketch
 ```
 
+Create a regular polygon (equilateral triangle, hexagon, etc.) inscribed in a circle of the given radius.
+
 #### `ellipse()`
 
 ```ts
 ellipse(rx: number, ry: number, segments?: number): Sketch
 ```
+
+Create a 2D ellipse centered at the origin with the given X and Y radii.
 
 #### `slot()`
 
@@ -167,11 +195,15 @@ ellipse(rx: number, ry: number, segments?: number): Sketch
 slot(length: number, width: number): Sketch
 ```
 
+Create a slot (stadium/discorectangle) — a rectangle with semicircular ends, centered at origin.
+
 #### `star()`
 
 ```ts
 star(points: number, outerR: number, innerR: number): Sketch
 ```
+
+Create a star shape with alternating outer and inner radii.
 
 ### 2D Sketch Booleans
 
@@ -183,17 +215,23 @@ Combine 2D sketches.
 union2d(...inputs: SketchOperandInput[]): Sketch
 ```
 
+Combine 2D sketches into a single profile (additive boolean). Accepts individual sketches or arrays.
+
 #### `difference2d()`
 
 ```ts
 difference2d(...inputs: SketchOperandInput[]): Sketch
 ```
 
+Subtract 2D sketches from a base sketch. The first sketch is the base; all others are subtracted.
+
 #### `intersection2d()`
 
 ```ts
 intersection2d(...inputs: SketchOperandInput[]): Sketch
 ```
+
+Keep only the overlapping area of the input sketches (intersection boolean).
 
 ### 2D Text
 
@@ -224,6 +262,8 @@ Build parametric 2D geometry with geometric constraints and a solver.
 ```ts
 constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder
 ```
+
+Build a parametric 2D sketch with geometric constraints solved by the built-in constraint solver.
 
 #### `addRect()`
 
@@ -259,11 +299,15 @@ Analytic 2D geometry classes for measurement and construction.
 point(x: number, y: number): Point2D
 ```
 
+Create an analytic 2D point for measurement and construction geometry.
+
 #### `line()`
 
 ```ts
 line(x1: number, y1: number, x2: number, y2: number): Line2D
 ```
+
+Create an analytic 2D line segment between two points. Provides length, midpoint, angle, intersection, and parallel helpers.
 
 #### `circle()`
 
@@ -271,11 +315,15 @@ line(x1: number, y1: number, x2: number, y2: number): Line2D
 circle(cx: number, cy: number, radius: number): Circle2D
 ```
 
+Create an analytic 2D circle for measurement, construction, and extrusion. Provides diameter, circumference, area, and toSketch().
+
 #### `rectangle()`
 
 ```ts
 rectangle(x: number, y: number, width: number, height: number): Rectangle2D
 ```
+
+Create an analytic 2D rectangle with named sides and vertices. Provides side(), vertex(), contains(), toSketch(), and extrude().
 
 #### `degrees()`
 
@@ -303,7 +351,7 @@ Create smooth curves, lofted surfaces, and swept solids.
 spline2d(points: Vec2[], options?: Spline2DOptions): Sketch
 ```
 
-Create a smooth 2D spline sketch from control points. - Closed spline returns a filled profile. - Open spline requires strokeWidth to return a solid sketch.
+Build a smooth Catmull-Rom spline sketch from 2D control points. A closed spline (default) returns a filled profile. An open spline requires a strokeWidth option to produce a solid sketch. Use tension (0..1, default 0.5) to control curve tightness.
 
 #### `spline3d()`
 
@@ -311,7 +359,7 @@ Create a smooth 2D spline sketch from control points. - Closed spline returns a 
 spline3d(points: Vec3$2[], options?: Spline3DOptions): Curve3D
 ```
 
-Create a reusable 3D spline curve object.
+Create a reusable 3D spline curve object (Catmull-Rom). The returned Curve3D provides sample(), pointAt(t), tangentAt(t), and length() for downstream use in sweep() or manual path operations.
 
 #### `loft()`
 
@@ -319,7 +367,7 @@ Create a reusable 3D spline curve object.
 loft(profiles: Sketch[], heights: number[], options?: LoftOptions): Shape
 ```
 
-Loft between sketches along Z stations. Profiles can differ in topology/vertex count: interpolation is done on signed-distance fields and meshed with level-set extraction.
+Loft between multiple sketches along Z stations. Profiles can differ in topology and vertex count: interpolation is done on signed-distance fields and meshed with level-set extraction. Heights must be strictly increasing. Compatible loft stacks can export through the OCCT exact route. Performance note: loft is significantly heavier than primitive/extrude/revolve. If the part is axis-symmetric (bottles, vases, knobs), prefer revolve().
 
 #### `sweep()`
 
@@ -327,7 +375,7 @@ Loft between sketches along Z stations. Profiles can differ in topology/vertex c
 sweep(profile: Sketch, path: Curve3D | Vec3$2[], options?: SweepOptions): Shape
 ```
 
-Sweep a 2D profile along a 3D path. Path can be: - `Curve3D` from spline3d(...) - array of [x,y,z] points (polyline) The profile is interpreted in the local frame normal plane (x,y axes).
+Sweep a 2D profile along a 3D path to create a solid. Path can be a Curve3D from spline3d() or an array of [x,y,z] points (polyline). The profile is interpreted in the local frame normal plane. Compatible sweeps can export through the OCCT exact route using the canonical path representation. Performance note: sweep uses level-set meshing internally. Prefer direct primitives/extrude/revolve when they can express the same shape.
 
 ### Patterns & Topology
 
@@ -347,11 +395,15 @@ Build an arc bridge between two rectangular areas.
 filletEdge(shape: ShapeArg, edge: EdgeRef, radius: number, quadrant?: [ number, number ], segments?: number): Shape
 ```
 
+Round a named edge of a shape with a circular fillet of the given radius. Requires a compile-covered target.
+
 #### `chamferEdge()`
 
 ```ts
 chamferEdge(shape: ShapeArg, edge: EdgeRef, size: number, quadrant?: [ number, number ]): Shape
 ```
+
+Bevel a named edge of a shape with a 45-degree chamfer of the given size. Requires a compile-covered target.
 
 #### `filletCorners()`
 
@@ -359,13 +411,15 @@ chamferEdge(shape: ShapeArg, edge: EdgeRef, size: number, quadrant?: [ number, n
 filletCorners(points: PointInput[], corners: FilletCornerSpec[]): Sketch
 ```
 
+Create a polygon from points with specified corners rounded to arc fillets. Each corner spec identifies a vertex index and radius.
+
 #### `linearPattern()`
 
 ```ts
 linearPattern(shape: ShapeArg$1, count: number, dx: number, dy: number, dz?: number): Shape
 ```
 
-Repeat a shape along a direction vector
+Repeat a shape in a linear pattern along a direction vector and union the copies.
 
 #### `circularPattern()`
 
@@ -373,7 +427,7 @@ Repeat a shape along a direction vector
 circularPattern(shape: ShapeArg$1, count: number, centerX?: number, centerY?: number): Shape
 ```
 
-Repeat a shape around the Z axis
+Repeat a shape in a circular pattern around the Z axis and union the copies.
 
 #### `mirrorCopy()`
 
@@ -381,7 +435,7 @@ Repeat a shape around the Z axis
 mirrorCopy(shape: ShapeArg$1, normal: [ number, number, number ]): Shape
 ```
 
-Mirror a shape and union with original
+Mirror a shape across a plane defined by its normal and union the mirror with the original.
 
 #### `selectEdges()`
 
@@ -433,11 +487,15 @@ Import parts, sketches, and assemblies from other files.
 importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch
 ```
 
+Import a sketch from another ForgeCAD file or SVG. For .forge.js files, pass param overrides; for .svg files, pass SVG import options.
+
 #### `importPart()`
 
 ```ts
 importPart(fileName: string, paramOverrides?: Record<string, number>): Shape
 ```
+
+Import a part from another ForgeCAD file. Returns a chainable Shape. The target file must return a Shape or TrackedShape.
 
 #### `importGroup()`
 
@@ -445,17 +503,23 @@ importPart(fileName: string, paramOverrides?: Record<string, number>): Shape
 importGroup(fileName: string, paramOverrides?: Record<string, number>): ShapeGroup
 ```
 
+Import a group from another ForgeCAD file. The target file must return a ShapeGroup via group().
+
 #### `importAssembly()`
 
 ```ts
 importAssembly(fileName: string, paramOverrides?: Record<string, number>): ImportedAssembly
 ```
 
+Import an assembly from another ForgeCAD file. The target file must return an unsolved Assembly instance.
+
 #### `importSvgSketch()`
 
 ```ts
 importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch
 ```
+
+Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification.
 
 ### Parameters
 
@@ -487,6 +551,8 @@ Organize multiple shapes into named groups.
 group(...items: GroupInput[]): ShapeGroup
 ```
 
+Group multiple shapes/sketches for joint transforms without merging into a single mesh. Unlike union(), colors and individual identities are preserved. Children can be plain shapes, named descriptors ({ name, shape/sketch/group }), or nested groups. The returned ShapeGroup supports all Shape transforms (translate, rotate, etc.).
+
 ### Assembly & Joints
 
 Build kinematic assemblies with joints and couplings.
@@ -497,11 +563,15 @@ Build kinematic assemblies with joints and couplings.
 bomToCsv(rows: BomRow[]): string
 ```
 
+Convert BOM rows from a solved assembly into a CSV string.
+
 #### `assembly()`
 
 ```ts
 assembly(name?: string): Assembly
 ```
+
+Create an assembly container with named parts and joints for kinematic mechanisms. Build with addPart(), addJoint(), addJointCoupling(), addGearCoupling(), then solve() to get positioned parts. Supports revolute, prismatic, and fixed joint types.
 
 #### `joint()`
 
@@ -521,6 +591,8 @@ Create folded sheet metal parts with flanges and flat patterns.
 sheetMetal(options: SheetMetalOptions): SheetMetalPart
 ```
 
+Create a sheet-metal part with flanges, bend allowances, and flat pattern unfolding. Define the base panel, thickness, bend radius, and K-factor, then chain .flange() and .cutout() calls. Materialize with .folded() or .flatPattern().
+
 ### Section & Projection
 
 Slice or project 3D shapes to 2D.
@@ -531,11 +603,15 @@ Slice or project 3D shapes to 2D.
 intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch
 ```
 
+Cross-section: slice a 3D shape with a plane and return the intersection as a 2D Sketch.
+
 #### `projectToPlane()`
 
 ```ts
 projectToPlane(shape: Shape, plane: PlaneSpec): Sketch
 ```
+
+Orthographically project a 3D shape onto a plane and return the silhouette as a 2D Sketch.
 
 ### Viewport & Runtime
 
@@ -620,6 +696,8 @@ Add a bill-of-materials entry.
 ```ts
 robotExport(options: RobotExportOptions): CollectedRobotExport
 ```
+
+Declare that the current script should export an assembly as a robot package for the SDF CLI. Configures inertial properties, joint limits, and optional plugins (e.g. diff-drive for Gazebo).
 
 ### Sketch Export
 
@@ -925,6 +1003,8 @@ Uniformly offset all surfaces of a solid inward or outward by a thickness value.
 torus(majorRadius: number, minorRadius: number, segments?: number): Shape
 ```
 
+Create a torus (donut shape) centered at the origin, lying in the XY plane.
+
 #### `importMesh()`
 
 ```ts
@@ -1089,6 +1169,8 @@ highlight(edge: EdgeRef, opts?: HighlightOptions): void
 
 ### `Sketch`
 
+2D profile for extrusion, revolve, and other operations. Supports transforms (translate, rotate, scale, mirror), booleans (add, subtract, intersect), offset, simplify, warp, extrude, revolve, and queries (area, bounds, isEmpty, numVert). All operations are immutable and return new sketches.
+
 **Properties:**
 
 | Property | Type | Description |
@@ -1100,10 +1182,10 @@ highlight(edge: EdgeRef, opts?: HighlightOptions): void
 - `color()` — Set the color of this sketch (hex string, e.g. "#ff0000")
 - `clone()` — Return a new Sketch wrapper for explicit duplication in scripts.
 - `duplicate()` — Alias for clone()
-- `area()` — area(): number
-- `bounds()` — bounds(): ProfileBounds
-- `isEmpty()` — isEmpty(): boolean
-- `numVert()` — numVert(): number
+- `area()` — Area in mm squared.
+- `bounds()` — Bounding box as { min: [x,y], max: [x,y] }.
+- `isEmpty()` — True if the sketch contains no area.
+- `numVert()` — Vertex count of the polygon representation.
 - `toPolygons()` — toPolygons(): number[][][]
 - `translate()` — translate(_x: number, _y?: number): Sketch
 - `rotate()` — rotate(_degrees: number): Sketch
@@ -1116,8 +1198,8 @@ highlight(edge: EdgeRef, opts?: HighlightOptions): void
 - `offset()` — offset(_delta: number, _join?: "Square" | "Round" | "Miter"): Sketch
 - `regions()` — Decompose this sketch into its distinct filled regions. See `sketchRegions()`. Regions are returned largest-first by area.
 - `region()` — Select the single filled region that contains the given 2D seed point. Throws if the seed is outside all regions. See `sketchRegion()`.
-- `extrude()` — extrude(_height: number, _opts?: { twist?: number; divisions?: number; scaleTop?
-- `revolve()` — revolve(_degrees?: number, _segments?: number): Shape
+- `extrude()` — Extrude this 2D sketch along Z to create a 3D solid. Supports twist, scale tapering, and centering.
+- `revolve()` — Revolve this 2D sketch around the Y axis to create a 3D solid of revolution.
 - `attachTo()` — attachTo(_target: Sketch, _targetAnchor: Anchor, _selfAnchor?: Anchor, _offset?:
 - `onFace()` — onFace(_parentOrFace: Shape | { toShape(): Shape; } | { _bbox(): { min: number[]
 
@@ -1313,7 +1395,7 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 
 ### `Shape`
 
-Thin immutable wrapper around a runtime geometry backend payload.
+Core 3D solid shape. All operations are immutable and return new shapes. Supports transforms (translate, rotate, scale, mirror, transform, rotateAround, pointAlong), booleans (add, subtract, intersect), cutting (split, splitByPlane, trimByPlane), shelling, anchor positioning (attachTo, onFace), placement references, and queries (volume, surfaceArea, boundingBox, isEmpty, numTri, geometryInfo).
 
 **Properties:**
 
@@ -1338,32 +1420,32 @@ Thin immutable wrapper around a runtime geometry backend payload.
 - `faceNames()` — List defended semantic face names currently available on this shape.
 - `faceHistory()` — Get the transformation history for a specific face.
 - `placeReference()` — Translate the shape so the given reference lands on the target coordinate.
-- `translate()` — translate(x: number, y: number, z: number): Shape
-- `moveTo()` — Move so bounding box min corner is at the given global coordinate
-- `moveToLocal()` — Move so bounding box min corner is at target's bounding box min + (x, y, z) offset
-- `rotate()` — rotate(x: number, y: number, z: number): Shape
+- `translate()` — Move the shape relative to its current position. All transforms are immutable and return new shapes.
+- `moveTo()` — Position the shape so its bounding box min corner is at the given global coordinate.
+- `moveToLocal()` — Position the shape relative to another shape's local coordinate system (bounding box min corner).
+- `rotate()` — Rotate using Euler angles in degrees around each axis.
 - `transform()` — Apply a 4x4 affine transform matrix (column-major) or a Transform object.
-- `scale()` — scale(v: number | [ number, number, number ]): Shape
-- `mirror()` — mirror(normal: [ number, number, number ]): Shape
+- `scale()` — Scale the shape uniformly or per-axis. Accepts a single number or [x, y, z] array.
+- `mirror()` — Mirror across a plane defined by its normal vector (does not need to be unit length).
 - `pointAlong()` — Reorient a shape so its primary axis (Z) points along the given direction. Useful for laying cylinders/extrusions along X or Y without thinking about Euler angles. Example: cylinder(40, 5).pointAlong([1, 0, 0]) — lays cylinder along X
 - `rotateAround()` — Rotate around an arbitrary axis through a pivot point. Equivalent to: translate(-pivot) → rotate around axis → translate(+pivot)
 - `rotateAroundTo()` — Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point. `movingPoint` / `targetPoint` may be raw world points or this shape's anchors/references.
-- `add()` — add(...others: ShapeOperandInput[]): Shape
-- `subtract()` — subtract(...others: ShapeOperandInput[]): Shape
-- `intersect()` — intersect(...others: ShapeOperandInput[]): Shape
+- `add()` — Union this shape with others (additive boolean). Method form of union().
+- `subtract()` — Subtract other shapes from this one. Method form of difference().
+- `intersect()` — Keep only the overlap with other shapes. Method form of intersection().
 - `split()` — Split into [inside, outside] by another shape.
 - `splitByPlane()` — Split by infinite plane. Returns [positive-side, negative-side].
 - `trimByPlane()` — Keep the positive side of the plane and discard the opposite side.
 - `shell()` — Hollow out compile-covered boxes, cylinders, and straight extrudes. `openFaces` names any subset of the base shape's faces to leave open (no wall). Box bases accept any of: top, bottom, front (=side-bottom), back (=side-top), left (=side-left), right (=side-right), or the raw internal names. Cylinder and extrude bases accept top and bottom only.
-- `boundingBox()` — boundingBox(): ShapeRuntimeBounds
-- `volume()` — volume(): number
-- `surfaceArea()` — surfaceArea(): number
-- `isEmpty()` — isEmpty(): boolean
-- `numTri()` — numTri(): number
+- `boundingBox()` — Get the axis-aligned bounding box as { min: [x,y,z], max: [x,y,z] }.
+- `volume()` — Volume in mm cubed.
+- `surfaceArea()` — Surface area in mm squared.
+- `isEmpty()` — True if the shape contains no geometry.
+- `numTri()` — Triangle count of the mesh representation.
 - `getMesh()` — Extract triangle mesh for Three.js rendering
 - `slice()` — Slice the runtime solid by a plane normal to local Z at the given offset.
 - `project()` — Orthographically project the runtime solid onto the local XY plane.
-- `attachTo()` — Position this shape relative to another using named 3D anchor points
+- `attachTo()` — Position this shape relative to another using named 3D anchor points. Anchors are bounding-box-relative: 'center', face centers ('top', 'front', ...), edge midpoints ('top-front', 'back-left', ...), and corners ('top-front-left', ...). Anchor word order is flexible: 'front-left' and 'left-front' are equivalent. Named placement references (from withReferences) can also be used as anchors.
 - `onFace()` — Place this shape on a face of a parent shape. Think of it like sticking a label on a box surface: - `face` picks which surface ('front', 'back', 'top', etc.) - `u, v` position within that face's 2D plane (from center) - front/back: u = left/right (X), v = up/down (Z) - left/right: u = forward/back (Y), v = up/down (Z) - top/bottom: u = left/right (X), v = forward/back (Y) - `protrude` = how far the child sticks out (positive = outward from face)
 - `hole()` — hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape
 - `cutout()` — cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape

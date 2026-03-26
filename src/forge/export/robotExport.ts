@@ -139,6 +139,11 @@ export function getCollectedRobotExport(): CollectedRobotExport | null {
   return _collectedRobotExport;
 }
 
+/**
+ * Declare that the current script should export an assembly as a robot package for the SDF CLI.
+ *
+ * Configures inertial properties, joint limits, and optional plugins (e.g. diff-drive for Gazebo).
+ */
 export function robotExport(options: RobotExportOptions): CollectedRobotExport {
   if (!options || typeof options !== 'object') {
     throw new Error('robotExport(...) expects an options object');
