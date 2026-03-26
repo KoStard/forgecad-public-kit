@@ -1,13 +1,13 @@
 import { useForgeStore } from '../store/forgeStore';
 
 export function SvgPreview() {
-  const svgPreviewFile = useForgeStore((s) => s.svgPreviewFile);
+  const activeFile = useForgeStore((s) => s.activeFile);
   const files = useForgeStore((s) => s.files);
 
-  if (!svgPreviewFile) return null;
+  if (!activeFile || !activeFile.toLowerCase().endsWith('.svg')) return null;
 
-  const svgContent = files[svgPreviewFile];
-  if (svgContent == null) return null;
+  const svgContent = files[activeFile];
+  if (!svgContent) return null;
 
   return (
     <div
@@ -40,7 +40,7 @@ export function SvgPreview() {
           userSelect: 'none',
         }}
       >
-        {svgPreviewFile}
+        {activeFile}
       </div>
     </div>
   );
