@@ -13,15 +13,18 @@ import { join, relative, basename, dirname, extname } from 'path';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 
-// Configure marked to use highlight.js for code blocks
-marked.setOptions({
-  highlight(code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      return hljs.highlight(code, { language: lang }).value;
-    }
-    return hljs.highlightAuto(code).value;
-  },
-});
+// Configure marked to use highlight.js for code blocks via custom renderer
+const renderer = new marked.Renderer();
+renderer.code = function({ text, lang }) {
+  let highlighted;
+  if (lang && hljs.getLanguage(lang)) {
+    highlighted = hljs.highlight(text, { language: lang }).value;
+  } else {
+    highlighted = hljs.highlightAuto(text).value;
+  }
+  return `<pre><code class="hljs language-${lang || ''}">${highlighted}</code></pre>`;
+};
+marked.use({ renderer });
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const DOCS_DIR = join(ROOT, 'docs', 'permanent');
