@@ -134,6 +134,12 @@ export function sideGear(options: SideGearOptions): Shape {
   return attachGearMeta(shape, meta);
 }
 
+/**
+ * Face gear (crown style) where teeth are on one face (top or bottom) instead of the outer rim.
+ *
+ * Uses the same involute tooth sizing as spurGear, then projects the tooth band axially from one side.
+ * Alias for sideGear (which is kept for backward compatibility).
+ */
 export function faceGear(options: FaceGearOptions): Shape {
   try {
     return sideGear(options);

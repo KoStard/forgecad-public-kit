@@ -22,6 +22,7 @@ export interface RackGearOptions {
   center?: boolean;
 }
 
+/** Linear rack gear with pressure-angle flanks. Use with spurGear for rack-and-pinion mechanisms. */
 export function rackGear(options: RackGearOptions): Shape {
   if (!isFinitePositive(options.module)) throw new Error('rackGear: "module" must be > 0');
   if (!Number.isInteger(options.teeth) || options.teeth < 2) throw new Error('rackGear: "teeth" must be an integer >= 2');

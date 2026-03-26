@@ -159,18 +159,39 @@ import type { Sketch as _Sketch, SvgImportOptions as _SvgImportOptions, TrackedS
 
 type _ShapeOperand = _Shape | TrackedShape;
 
+/**
+ * Create a rectangular box with named faces and edges.
+ * When center is false (default), one corner sits at the origin.
+ * Returns a TrackedShape with faces (top, bottom, side-left, side-right, side-top, side-bottom)
+ * and edges (vert-bl, vert-br, vert-tr, vert-tl, etc.).
+ */
 export declare function box(x: number, y: number, z: number, center?: boolean): TrackedShape;
+/**
+ * Create a cylinder or cone with named faces and edges.
+ * When radiusTop differs from radius, creates a tapered cone. Use segments for regular prisms.
+ * Returns a TrackedShape with faces (top, bottom, side) and edges (top-rim, bottom-rim).
+ */
 export declare function cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape;
+/** Create a sphere centered at the origin. Use segments for lower-poly approximations. */
 export declare function sphere(radius: number, segments?: number): _Shape;
+/** Create a torus (donut shape) centered at the origin, lying in the XY plane. */
 export declare function torus(majorRadius: number, minorRadius: number, segments?: number): _Shape;
+/** Combine shapes into a single solid (additive boolean). Accepts individual shapes or arrays. */
 export declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
+/** Subtract shapes from a base shape. The first shape is the base; all subsequent shapes are subtracted. */
 export declare function difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
+/** Keep only the overlapping volume of the input shapes (intersection boolean). */
 export declare function intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): _Shape;
 // Cross-file imports (runtime-provided; types declared here for completeness)
+/** Import a sketch from another ForgeCAD file or SVG. For .forge.js files, pass param overrides; for .svg files, pass SVG import options. */
 export declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | _SvgImportOptions): _Sketch;
+/** Import a part from another ForgeCAD file. Returns a chainable Shape. The target file must return a Shape or TrackedShape. */
 export declare function importPart(fileName: string, paramOverrides?: Record<string, number>): _Shape;
+/** Import a group from another ForgeCAD file. The target file must return a ShapeGroup via group(). */
 export declare function importGroup(fileName: string, paramOverrides?: Record<string, number>): _ShapeGroup;
+/** Import an assembly from another ForgeCAD file. The target file must return an unsolved Assembly instance. */
 export declare function importAssembly(fileName: string, paramOverrides?: Record<string, number>): _ImportedAssembly;
+/** Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification. */
 export declare function importSvgSketch(fileName: string, options?: _SvgImportOptions): _Sketch;
 /** Import an external mesh file (STL, OBJ, 3MF) as a Shape. */
 export declare function importMesh(fileName: string, options?: { scale?: number; center?: boolean }): _Shape;

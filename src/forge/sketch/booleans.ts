@@ -75,6 +75,7 @@ export function sketchIntersect(sketch: Sketch, ...others: SketchOperandInput[])
   );
 }
 
+/** Combine 2D sketches into a single profile (additive boolean). Accepts individual sketches or arrays. */
 export function union2d(...inputs: SketchOperandInput[]): Sketch {
   const sketches = normalizeSketchOperands('union2d()', inputs, 1, 'Use union2d(sketch1, sketch2) or union2d([sketch1, sketch2]).');
   if (sketches.length === 0) throw new Error('union2d requires at least one sketch');
@@ -89,6 +90,7 @@ export function union2d(...inputs: SketchOperandInput[]): Sketch {
   );
 }
 
+/** Subtract 2D sketches from a base sketch. The first sketch is the base; all others are subtracted. */
 export function difference2d(...inputs: SketchOperandInput[]): Sketch {
   const sketches = normalizeSketchOperands(
     'difference2d()',
@@ -107,6 +109,7 @@ export function difference2d(...inputs: SketchOperandInput[]): Sketch {
   );
 }
 
+/** Keep only the overlapping area of the input sketches (intersection boolean). */
 export function intersection2d(...inputs: SketchOperandInput[]): Sketch {
   const sketches = normalizeSketchOperands(
     'intersection2d()',

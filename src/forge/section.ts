@@ -13,12 +13,14 @@ function toPlaneSpace(shape: Shape, plane: PlaneSpec) {
   return shape.transform(rotation);
 }
 
+/** Cross-section: slice a 3D shape with a plane and return the intersection as a 2D Sketch. */
 export function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch {
   const transformed = toPlaneSpace(shape, plane);
   const cross = transformed.slice(0);
   return setSketchCompileProfilePlan(new Sketch(cross), profilePlanFromCrossSection(cross));
 }
 
+/** Orthographically project a 3D shape onto a plane and return the silhouette as a 2D Sketch. */
 export function projectToPlane(shape: Shape, plane: PlaneSpec): Sketch {
   const transformed = toPlaneSpace(shape, plane);
   const cross = transformed.project();

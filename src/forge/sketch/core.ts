@@ -34,6 +34,13 @@ function setSketchPlacementModelInternal(sketch: Sketch, model: SketchPlacementM
   return sketch;
 }
 
+/**
+ * 2D profile for extrusion, revolve, and other operations.
+ *
+ * Supports transforms (translate, rotate, scale, mirror), booleans (add, subtract, intersect),
+ * offset, simplify, warp, extrude, revolve, and queries (area, bounds, isEmpty, numVert).
+ * All operations are immutable and return new sketches.
+ */
 export class Sketch {
   public colorHex: string | undefined;
 
@@ -74,15 +81,19 @@ export class Sketch {
     return this.clone();
   }
 
+  /** Area in mm squared. */
   area(): number {
     return this.cross.area();
   }
+  /** Bounding box as { min: [x,y], max: [x,y] }. */
   bounds() {
     return this.cross.bounds();
   }
+  /** True if the sketch contains no area. */
   isEmpty(): boolean {
     return this.cross.isEmpty();
   }
+  /** Vertex count of the polygon representation. */
   numVert(): number {
     return this.cross.numVert();
   }
@@ -134,12 +145,14 @@ export class Sketch {
     throw new Error('Not implemented');
   }
 
+  /** Extrude this 2D sketch along Z to create a 3D solid. Supports twist, scale tapering, and centering. */
   extrude(
     _height: number,
     _opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean },
   ): Shape | any {
     throw new Error('Not implemented');
   }
+  /** Revolve this 2D sketch around the Y axis to create a 3D solid of revolution. */
   revolve(_degrees?: number, _segments?: number): Shape {
     throw new Error('Not implemented');
   }

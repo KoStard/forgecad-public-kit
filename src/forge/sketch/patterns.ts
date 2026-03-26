@@ -16,7 +16,7 @@ function withPatternOwnership(shape: Shape, kind: 'linear' | 'circular', index: 
   return setShapeCompilePlan(shape, wrapRepeatedShapeCompilePlan(getShapeCompilePlan(shape), buildPatternOwnershipOperation(kind, index)));
 }
 
-/** Repeat a shape along a direction vector */
+/** Repeat a shape in a linear pattern along a direction vector and union the copies. */
 export function linearPattern(shape: ShapeArg, count: number, dx: number, dy: number, dz = 0): Shape {
   const base = unwrap(shape);
   const copies: Shape[] = [];
@@ -27,7 +27,7 @@ export function linearPattern(shape: ShapeArg, count: number, dx: number, dy: nu
   return union(...copies);
 }
 
-/** Repeat a shape around the Z axis */
+/** Repeat a shape in a circular pattern around the Z axis and union the copies. */
 export function circularPattern(shape: ShapeArg, count: number, centerX = 0, centerY = 0): Shape {
   const base = unwrap(shape);
   const step = 360 / count;
@@ -72,7 +72,7 @@ export function circularPattern2d(sketch: Sketch, count: number, centerX: number
   return union2d(...copies);
 }
 
-/** Mirror a shape and union with original */
+/** Mirror a shape across a plane defined by its normal and union the mirror with the original. */
 export function mirrorCopy(shape: ShapeArg, normal: [number, number, number]): Shape {
   const base = unwrap(shape);
   return union(base, base.mirror(normal));

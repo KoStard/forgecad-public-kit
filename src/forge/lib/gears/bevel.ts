@@ -110,6 +110,7 @@ export function normalizeBevelGearOptions(options: BevelGearOptions): Normalized
   };
 }
 
+/** Conical bevel gear generated from a tapered involute extrusion. Specify pitchAngleDeg directly or derive it from mateTeeth + shaftAngleDeg. */
 export function bevelGear(options: BevelGearOptions): Shape {
   const normalized = normalizeBevelGearOptions(options);
   const meta = buildSpurGearMeta(normalized);

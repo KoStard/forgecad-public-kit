@@ -626,6 +626,7 @@ export class ConstrainedSketchBuilder {
   }
 }
 
+/** Build a parametric 2D sketch with geometric constraints solved by the built-in constraint solver. */
 export function constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder {
   return new ConstrainedSketchBuilder(options);
 }

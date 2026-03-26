@@ -30,7 +30,7 @@ export const METRIC_HOLE_TABLE: Record<MetricSize, { close: number; normal: numb
   M10: { close: 10.5, normal: 11.0, loose: 12.0, tap: 8.5, head: 18.0 },
 };
 
-/** M-series bolt hole (through-hole) */
+/** Through-hole cylinder centered at origin, intended as a cutter (subtract from part). */
 export function boltHole(diameter: number, depth: number): Shape {
   return cylinder(depth, diameter / 2, undefined, 32, true);
 }
@@ -100,7 +100,7 @@ export function pipe(height: number, outerRadius: number, wall: number, segments
   return outer.subtract(inner);
 }
 
-/** Hex nut profile (2D extruded) */
+/** Hex nut via intersection of three rotated slabs with a center bore. */
 export function hexNut(acrossFlats: number, height: number, holeDia: number): Shape {
   const _r = acrossFlats / 2;
   const w = acrossFlats * 1.2; // oversized box
@@ -110,7 +110,7 @@ export function hexNut(acrossFlats: number, height: number, holeDia: number): Sh
   return hex.subtract(hole);
 }
 
-/** Rounded box — box with spheres at corners (approximate fillet) */
+/** Approximate rounded box via union of axis-aligned slabs. Corner radius is applied by inset. */
 export function roundedBox(x: number, y: number, z: number, radius: number): Shape {
   // Intersect 3 axis-aligned rounded slabs
   const sx = box(x - radius * 2, y, z, true);
@@ -119,7 +119,7 @@ export function roundedBox(x: number, y: number, z: number, radius: number): Sha
   return union(sx, sy, sz).translate(x / 2, y / 2, z / 2);
 }
 
-/** Mounting bracket — L-shaped with optional holes */
+/** L-shaped mounting bracket with optional through-holes in both the base and wall. */
 export function bracket(width: number, height: number, depth: number, thick: number, holeDia = 0): Shape {
   const base = box(width, depth, thick);
   const wall = box(width, thick, height).translate(0, 0, thick);
@@ -136,7 +136,7 @@ export function bracket(width: number, height: number, depth: number, thick: num
   return shape;
 }
 
-/** Grid pattern of holes */
+/** Grid of cylindrical holes intended as a cutter pattern (subtract from part). */
 export function holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape {
   const holes: Shape[] = [];
   for (let r = 0; r < rows; r++) {

@@ -557,6 +557,13 @@ export class ShapeGroup {
   }
 }
 
+/**
+ * Group multiple shapes/sketches for joint transforms without merging into a single mesh.
+ *
+ * Unlike union(), colors and individual identities are preserved. Children can be
+ * plain shapes, named descriptors ({ name, shape/sketch/group }), or nested groups.
+ * The returned ShapeGroup supports all Shape transforms (translate, rotate, etc.).
+ */
 export function group(...items: GroupInput[]): ShapeGroup {
   const normalized = normalizeGroupInputs(items);
   return new ShapeGroup(normalized.children, normalized.childNames);

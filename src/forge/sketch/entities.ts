@@ -41,6 +41,7 @@ export class Point2D {
   }
 }
 
+/** Create an analytic 2D point for measurement and construction geometry. */
 export function point(x: number, y: number): Point2D {
   return new Point2D(x, y);
 }
@@ -133,6 +134,7 @@ export class Line2D {
   }
 }
 
+/** Create an analytic 2D line segment between two points. Provides length, midpoint, angle, intersection, and parallel helpers. */
 export function line(x1: number, y1: number, x2: number, y2: number): Line2D {
   return Line2D.fromCoordinates(x1, y1, x2, y2);
 }
@@ -193,6 +195,7 @@ export class Circle2D {
   }
 }
 
+/** Create an analytic 2D circle for measurement, construction, and extrusion. Provides diameter, circumference, area, and toSketch(). */
 export function circle(cx: number, cy: number, radius: number): Circle2D {
   return new Circle2D(new Point2D(cx, cy), radius);
 }
@@ -326,6 +329,7 @@ export class Rectangle2D {
   }
 }
 
+/** Create an analytic 2D rectangle with named sides and vertices. Provides side(), vertex(), contains(), toSketch(), and extrude(). */
 export function rectangle(x: number, y: number, width: number, height: number): Rectangle2D {
   return Rectangle2D.fromDimensions(x, y, width, height);
 }
