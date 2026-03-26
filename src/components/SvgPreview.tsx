@@ -9,6 +9,14 @@ export function SvgPreview() {
   const svgContent = files[activeFile];
   if (!svgContent) return null;
 
+  // Ensure the SVG element fills its container by injecting width/height="100%"
+  // if the SVG tag doesn't already have them. SVGs with only viewBox and no
+  // explicit dimensions collapse to 0×0 inside a flex container.
+  const sized = svgContent.replace(
+    /(<svg\b)(?![^>]*\bwidth\s*=)/i,
+    '$1 width="100%" height="100%"',
+  );
+
   return (
     <div
       style={{
@@ -19,15 +27,15 @@ export function SvgPreview() {
         justifyContent: 'center',
         background: 'var(--fc-bg)',
         zIndex: 10,
-        overflow: 'auto',
+        padding: 40,
       }}
     >
       <div
         style={{
-          maxWidth: '80%',
-          maxHeight: '80%',
+          width: '100%',
+          height: '100%',
         }}
-        dangerouslySetInnerHTML={{ __html: svgContent }}
+        dangerouslySetInnerHTML={{ __html: sized }}
       />
       <div
         style={{
