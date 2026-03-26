@@ -11,6 +11,17 @@
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, relative, basename, dirname, extname } from 'path';
 import { marked } from 'marked';
+import hljs from 'highlight.js';
+
+// Configure marked to use highlight.js for code blocks
+marked.setOptions({
+  highlight(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value;
+    }
+    return hljs.highlightAuto(code).value;
+  },
+});
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const DOCS_DIR = join(ROOT, 'docs', 'permanent');
@@ -190,6 +201,19 @@ function generateSite(docs) {
   const fusePath = join(ROOT, 'node_modules', 'fuse.js', 'dist', 'fuse.min.js');
   const fuseJs = readFileSync(fusePath, 'utf-8');
 
+  // highlight.js theme CSS — scope dark/light by data-theme attribute
+  const hljsDarkCss = readFileSync(join(ROOT, 'node_modules/highlight.js/styles/tokyo-night-dark.min.css'), 'utf-8');
+  const hljsLightCss = readFileSync(join(ROOT, 'node_modules/highlight.js/styles/tokyo-night-light.min.css'), 'utf-8');
+
+  // Extract only the color rules (skip the base pre/code layout rules which we handle ourselves)
+  function scopeHljsTheme(css, themeAttr) {
+    // Remove the base layout rules (pre code.hljs{...}code.hljs{...})
+    const colorRules = css.replace(/^pre code\.hljs\{[^}]*\}code\.hljs\{[^}]*\}/, '');
+    // Scope .hljs selectors under [data-theme="..."]
+    return colorRules.replace(/\.hljs/g, `[data-theme="${themeAttr}"] .hljs`);
+  }
+  const hljsScopedCss = scopeHljsTheme(hljsDarkCss, 'dark') + '\n' + scopeHljsTheme(hljsLightCss, 'light');
+
   const html = `<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -198,6 +222,7 @@ function generateSite(docs) {
 <title>ForgeCAD Docs</title>
 <style>
 ${getStyles()}
+${hljsScopedCss}
 </style>
 </head>
 <body>

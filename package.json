@@ -83,6 +83,7 @@
     "@vitejs/plugin-react": "^4.5.2",
     "dts-bundle-generator": "^9.5.1",
     "fuse.js": "^7.1.0",
+    "highlight.js": "^11.11.1",
     "marked": "^17.0.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
