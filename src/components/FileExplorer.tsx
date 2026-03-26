@@ -7,6 +7,10 @@ function isMeshFile(name: string): boolean {
   return MESH_EXTS.some((ext) => lower.endsWith(ext));
 }
 
+function isSvgFile(name: string): boolean {
+  return name.toLowerCase().endsWith('.svg');
+}
+
 export function FileExplorer() {
   const files = useForgeStore((s) => s.files);
   const savedFiles = useForgeStore((s) => s.savedFiles);
@@ -23,6 +27,8 @@ export function FileExplorer() {
   const loadFromText = useForgeStore((s) => s.loadFromText);
   const setMeshPreview = useForgeStore((s) => s.setMeshPreview);
   const meshPreviewFile = useForgeStore((s) => s.meshPreviewFile);
+  const setSvgPreview = useForgeStore((s) => s.setSvgPreview);
+  const svgPreviewFile = useForgeStore((s) => s.svgPreviewFile);
 
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState<'file' | 'folder' | null>(null);
@@ -134,12 +140,12 @@ export function FileExplorer() {
   }, [files, folders]);
 
   useEffect(() => {
-    const target = meshPreviewFile || activeFile;
+    const target = svgPreviewFile || meshPreviewFile || activeFile;
     if (!target) return;
     const parents = collectParentPaths(target);
     if (parents.length === 0) return;
     setExpandedFolders((prev) => Array.from(new Set([...prev, ...parents])));
-  }, [activeFile, meshPreviewFile]);
+  }, [activeFile, meshPreviewFile, svgPreviewFile]);
 
   const handleCreate = () => {
     const name = normalizePath(newName.trim());
@@ -277,18 +283,21 @@ export function FileExplorer() {
         if (isMeshFile(node.path)) {
           // Mesh file clicked — preview it in the viewport without changing active file
           setMeshPreview(node.path);
+        } else if (isSvgFile(node.path)) {
+          // SVG file clicked — preview it visually in the viewport
+          setSvgPreview(node.path);
         } else {
           setActiveFile(node.path);
         }
       }
     },
-    [flatVisiblePaths, setActiveFile, setMeshPreview],
+    [flatVisiblePaths, setActiveFile, setMeshPreview, setSvgPreview],
   );
 
   const renderNode = (node: TreeNode, depth: number) => {
     const isFolder = node.type === 'folder';
     const isExpanded = !isFolder || expandedFolders.includes(node.path);
-    const isActive = node.type === 'file' && (node.path === activeFile || node.path === meshPreviewFile);
+    const isActive = node.type === 'file' && (node.path === activeFile || node.path === meshPreviewFile || node.path === svgPreviewFile);
     const isMesh = node.type === 'file' && isMeshFile(node.path);
     const isModified = node.type === 'file' && !isMesh && files[node.path] !== savedFiles[node.path];
     const isRenaming = renamingPath === node.path;
@@ -369,7 +378,7 @@ export function FileExplorer() {
           ) : (
             <span style={{ width: 14, flexShrink: 0 }} />
           )}
-          <span style={{ width: 16 }}>{isFolder ? '📁' : isMeshFile(node.path) ? '🔶' : '📄'}</span>
+          <span style={{ width: 16 }}>{isFolder ? '📁' : isMeshFile(node.path) ? '🔶' : isSvgFile(node.path) ? '🖼' : '📄'}</span>
           {isRenaming ? (
             <input
               autoFocus

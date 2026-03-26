@@ -39,8 +39,10 @@ import {
 import { ViewController, ViewManager, ViewPersistence } from './viewport/ViewController';
 import { useViewportState } from './viewport/useViewportState';
 import { useViewportHandlers } from './viewport/useViewportHandlers';
+import { SvgPreview } from './SvgPreview';
 
 export function Viewport() {
+  const svgPreviewFile = useForgeStore((s) => s.svgPreviewFile);
   const state = useViewportState();
 
   const {
@@ -181,6 +183,7 @@ export function Viewport() {
       style={{ width: '100%', height: '100%', position: 'relative' }}
       onContextMenu={(event) => event.preventDefault()}
     >
+      {svgPreviewFile && <SvgPreview />}
       <Canvas
         style={{ background: t.viewportBg, cursor: measureMode ? 'crosshair' : 'default' }}
         dpr={canvasDpr}
