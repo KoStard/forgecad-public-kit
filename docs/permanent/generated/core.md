@@ -66,66 +66,10 @@ Keep only the overlapping volume of the input shapes (intersection boolean).
 
 Repeat, mirror, fillet, and chamfer geometry.
 
-#### `arcBridgeBetweenRects()`
-
-```ts
-arcBridgeBetweenRects(rectA: RectAreaArg, rectB: RectAreaArg, segments?: number): Shape
-```
-
-Build an arc bridge between two rectangular areas.
-
-#### `filletEdge()`
-
-```ts
-filletEdge(shape: ShapeArg, edge: EdgeRef, radius: number, quadrant?: [ number, number ], segments?: number): Shape
-```
-
-Round a named edge of a shape with a circular fillet of the given radius. Requires a compile-covered target.
-
-#### `chamferEdge()`
-
-```ts
-chamferEdge(shape: ShapeArg, edge: EdgeRef, size: number, quadrant?: [ number, number ]): Shape
-```
-
-Bevel a named edge of a shape with a 45-degree chamfer of the given size. Requires a compile-covered target.
-
-#### `filletCorners()`
-
-```ts
-filletCorners(points: PointInput[], corners: FilletCornerSpec[]): Sketch
-```
-
-Create a polygon from points with specified corners rounded to arc fillets. Each corner spec identifies a vertex index and radius.
-
-#### `linearPattern()`
-
-```ts
-linearPattern(shape: ShapeArg$1, count: number, dx: number, dy: number, dz?: number): Shape
-```
-
-Repeat a shape in a linear pattern along a direction vector and union the copies.
-
-#### `circularPattern()`
-
-```ts
-circularPattern(shape: ShapeArg$1, count: number, centerX?: number, centerY?: number): Shape
-```
-
-Repeat a shape in a circular pattern around the Z axis and union the copies.
-
-#### `mirrorCopy()`
-
-```ts
-mirrorCopy(shape: ShapeArg$1, normal: [ number, number, number ]): Shape
-```
-
-Mirror a shape across a plane defined by its normal and union the mirror with the original.
-
 #### `filletEdgeSegment()`
 
 ```ts
-filletEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, radius: number, segments?: number): Shape
+filletEdgeSegment(shape: ShapeArg, segment: EdgeSegment, radius: number, segments?: number): Shape
 ```
 
 Apply a fillet (rounded edge) to a mesh-selected edge. Works on any straight edge of any shape — not limited to tracked box edges. The edge must have been obtained from selectEdge() / selectEdges().
@@ -133,7 +77,7 @@ Apply a fillet (rounded edge) to a mesh-selected edge. Works on any straight edg
 #### `chamferEdgeSegment()`
 
 ```ts
-chamferEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, size: number): Shape
+chamferEdgeSegment(shape: ShapeArg, segment: EdgeSegment, size: number): Shape
 ```
 
 Apply a chamfer (beveled edge) to a mesh-selected edge. Works on any straight edge of any shape — not limited to tracked box edges.
@@ -161,6 +105,62 @@ coalesceEdges(segments: EdgeSegment[], tolerance?: number): EdgeSegment[]
 ```
 
 Coalesce collinear edge segments into longer logical edges. Multiple short mesh segments along the same line (e.g. from tessellation) are merged into a single EdgeSegment spanning the full extent. The `tolerance` controls how far endpoints can deviate from collinearity.
+
+#### `arcBridgeBetweenRects()`
+
+```ts
+arcBridgeBetweenRects(rectA: RectAreaArg, rectB: RectAreaArg, segments?: number): Shape
+```
+
+Build an arc bridge between two rectangular areas.
+
+#### `filletEdge()`
+
+```ts
+filletEdge(shape: ShapeArg$2, edge: EdgeRef, radius: number, quadrant?: [ number, number ], segments?: number): Shape
+```
+
+Round a named edge of a shape with a circular fillet of the given radius. Requires a compile-covered target.
+
+#### `chamferEdge()`
+
+```ts
+chamferEdge(shape: ShapeArg$2, edge: EdgeRef, size: number, quadrant?: [ number, number ]): Shape
+```
+
+Bevel a named edge of a shape with a 45-degree chamfer of the given size. Requires a compile-covered target.
+
+#### `filletCorners()`
+
+```ts
+filletCorners(points: PointInput[], corners: FilletCornerSpec[]): Sketch
+```
+
+Create a polygon from points with specified corners rounded to arc fillets. Each corner spec identifies a vertex index and radius.
+
+#### `linearPattern()`
+
+```ts
+linearPattern(shape: ShapeArg$3, count: number, dx: number, dy: number, dz?: number): Shape
+```
+
+Repeat a shape in a linear pattern along a direction vector and union the copies.
+
+#### `circularPattern()`
+
+```ts
+circularPattern(shape: ShapeArg$3, count: number, centerX?: number, centerY?: number): Shape
+```
+
+Repeat a shape in a circular pattern around the Z axis and union the copies.
+
+#### `mirrorCopy()`
+
+```ts
+mirrorCopy(shape: ShapeArg$3, normal: [ number, number, number ]): Shape
+```
+
+Mirror a shape across a plane defined by its normal and union the mirror with the original.
 
 ### Imports & Composition
 
@@ -274,6 +274,38 @@ Compose transforms in chain order. Equivalent to Transform.identity().mul(a).mul
 portFactory(input: PortInput): PortDef
 ```
 
+#### `fillet()`
+
+```ts
+fillet(shape: ShapeArg$1, radius: number, edges?: EdgeSelector, segments?: number): Shape
+```
+
+Apply fillets (rounded edges) to one or more edges of a shape. Works on both straight and curved edges. Supports OCCT and Manifold backends. When using OCCT, all edges are filleted in a single kernel operation for best quality. When using Manifold, edges are filleted sequentially. - EdgeSegment: a single edge from selectEdge() - EdgeSegment[]: multiple edges from selectEdges() - EdgeQuery: inline query (same options as selectEdges) - undefined: all sharp edges on the shape // Fillet all edges fillet(myShape, 2) // Fillet edges at the top fillet(myShape, 1.5, { atZ: 20, convex: true }) // Fillet specific edges const edges = selectEdges(myShape, { parallel: [0, 0, 1] }) fillet(myShape, 3, edges)
+
+#### `chamfer()`
+
+```ts
+chamfer(shape: ShapeArg$1, size: number, edges?: EdgeSelector): Shape
+```
+
+Apply chamfers (beveled edges) to one or more edges of a shape. Works on both straight and curved edges. Supports OCCT and Manifold backends. // Chamfer all edges chamfer(myShape, 1) // Chamfer vertical edges only chamfer(myShape, 2, { parallel: [0, 0, 1] })
+
+#### `draft()`
+
+```ts
+draft(shape: ShapeArg$1, angleDeg: number, pullDirection?: [ number, number, number ], neutralPlaneOffset?: number): Shape
+```
+
+Apply a draft angle (taper) to all faces of a solid for mold extraction. Draft angle is a manufacturing feature that adds taper to the vertical faces of a solid so that it can be extracted from a mold. The neutral plane is where the draft angle is zero — faces above and below are tapered symmetrically. Requires the OCCT backend. Throws on Manifold. // Add 3° draft to a box for injection molding draft(myBox, 3) // Draft with custom pull direction and neutral plane draft(myShape, 2, [0, 0, 1], 10)
+
+#### `offsetSolid()`
+
+```ts
+offsetSolid(shape: ShapeArg$1, thickness: number): Shape
+```
+
+Uniformly offset all surfaces of a solid inward or outward by a thickness value. Unlike shell(), which hollows a solid, offsetSolid() produces a new solid whose surfaces are all shifted by the given thickness. Positive = outward, negative = inward. Requires the OCCT backend. Throws on Manifold. // Grow a box outward by 1mm on all sides offsetSolid(myBox, 1) // Shrink a shape inward by 0.5mm offsetSolid(myShape, -0.5)
+
 #### `loadFont()`
 
 ```ts
@@ -360,42 +392,10 @@ Pick a connection point from an EdgeSegment (from selectEdge/selectEdges). EdgeS
 connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options?: ConnectEdgesOptions): Shape
 ```
 
-#### `fillet()`
-
-```ts
-fillet(shape: ShapeArg$3, radius: number, edges?: EdgeSelector, segments?: number): Shape
-```
-
-Apply fillets (rounded edges) to one or more edges of a shape. Works on both straight and curved edges. Supports OCCT and Manifold backends. When using OCCT, all edges are filleted in a single kernel operation for best quality. When using Manifold, edges are filleted sequentially. - EdgeSegment: a single edge from selectEdge() - EdgeSegment[]: multiple edges from selectEdges() - EdgeQuery: inline query (same options as selectEdges) - undefined: all sharp edges on the shape // Fillet all edges fillet(myShape, 2) // Fillet edges at the top fillet(myShape, 1.5, { atZ: 20, convex: true }) // Fillet specific edges const edges = selectEdges(myShape, { parallel: [0, 0, 1] }) fillet(myShape, 3, edges)
-
-#### `chamfer()`
-
-```ts
-chamfer(shape: ShapeArg$3, size: number, edges?: EdgeSelector): Shape
-```
-
-Apply chamfers (beveled edges) to one or more edges of a shape. Works on both straight and curved edges. Supports OCCT and Manifold backends. // Chamfer all edges chamfer(myShape, 1) // Chamfer vertical edges only chamfer(myShape, 2, { parallel: [0, 0, 1] })
-
-#### `draft()`
-
-```ts
-draft(shape: ShapeArg$3, angleDeg: number, pullDirection?: [ number, number, number ], neutralPlaneOffset?: number): Shape
-```
-
-Apply a draft angle (taper) to all faces of a solid for mold extraction. Draft angle is a manufacturing feature that adds taper to the vertical faces of a solid so that it can be extracted from a mold. The neutral plane is where the draft angle is zero — faces above and below are tapered symmetrically. Requires the OCCT backend. Throws on Manifold. // Add 3° draft to a box for injection molding draft(myBox, 3) // Draft with custom pull direction and neutral plane draft(myShape, 2, [0, 0, 1], 10)
-
-#### `offsetSolid()`
-
-```ts
-offsetSolid(shape: ShapeArg$3, thickness: number): Shape
-```
-
-Uniformly offset all surfaces of a solid inward or outward by a thickness value. Unlike shell(), which hollows a solid, offsetSolid() produces a new solid whose surfaces are all shifted by the given thickness. Positive = outward, negative = inward. Requires the OCCT backend. Throws on Manifold. // Grow a box outward by 1mm on all sides offsetSolid(myBox, 1) // Shrink a shape inward by 0.5mm offsetSolid(myShape, -0.5)
-
 #### `faceProfile()`
 
 ```ts
-faceProfile(shape: Shape | TrackedShape, faceName: string): Sketch
+faceProfile(shape: Shape | TrackedShape, face: FaceSelector): Sketch
 ```
 
 #### `torus()`
@@ -491,7 +491,8 @@ Core 3D solid shape. All operations are immutable and return new shapes. Support
 - `withPorts()` — Attach named assembly ports (origin + axis + up) that survive transforms and imports.
 - `portNames()` — List named port identifiers carried by this shape.
 - `referencePoint()` — Resolve a named placement reference or built-in anchor to a 3D point.
-- `face()` — Resolve a semantic face by name.  Works on compile-covered shapes and, as a fallback, on any planar-faced mesh (e.g. the result of boolean ops) via coplanar triangle clustering.
+- `face()` — Resolve a semantic face by name or query.  Works on compile-covered shapes and, as a fallback, on any planar-faced mesh (e.g. the result of boolean ops) via coplanar triangle clustering.
+- `faces()` — Return all faces matching a query, or all mesh-detected faces when no query is given.
 - `faceNames()` — List defended semantic face names currently available on this shape.
 - `faceHistory()` — Get the transformation history for a specific face.
 - `placeReference()` — Translate the shape so the given reference lands on the target coordinate.
@@ -522,8 +523,8 @@ Core 3D solid shape. All operations are immutable and return new shapes. Support
 - `project()` — Orthographically project the runtime solid onto the local XY plane.
 - `attachTo()` — Position this shape relative to another using named 3D anchor points. Anchors are bounding-box-relative: 'center', face centers ('top', 'front', ...), edge midpoints ('top-front', 'back-left', ...), and corners ('top-front-left', ...). Anchor word order is flexible: 'front-left' and 'left-front' are equivalent. Named placement references (from withReferences) can also be used as anchors.
 - `onFace()` — Place this shape on a face of a parent shape. Think of it like sticking a label on a box surface: - `face` picks which surface ('front', 'back', 'top', etc.) - `u, v` position within that face's 2D plane (from center) - front/back: u = left/right (X), v = up/down (Z) - left/right: u = forward/back (Y), v = up/down (Z) - top/bottom: u = left/right (X), v = forward/back (Y) - `protrude` = how far the child sticks out (positive = outward from face)
-- `pocket()` — pocket(faceName: string, depth: number, opts?: PocketOptions): Shape
-- `boss()` — boss(faceName: string, height: number, opts?: BossOptions): Shape
+- `pocket()` — pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape
+- `boss()` — boss(face: FaceSelector, height: number, opts?: BossOptions): Shape
 - `hole()` — hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape
 - `cutout()` — cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape
 
@@ -540,7 +541,8 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 
 **Methods:**
 
-- `face()` — Get a named face
+- `face()` — Get a named face or a face matching a query
+- `faces()` — Return all faces matching a query, or all mesh-detected faces when no query is given.
 - `edge()` — Get a named edge
 - `faceNames()` — List all face names
 - `edgeNames()` — List all edge names
@@ -578,8 +580,8 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `shell()` — Shelling returns a plain Shape because tracked topology is not preserved.
 - `boundingBox()` — boundingBox(): ShapeRuntimeBounds
 - `get volume()` — get volume(): number
-- `pocket()` — pocket(faceName: string, depth: number, opts?: PocketOptions): Shape
-- `boss()` — boss(faceName: string, height: number, opts?: BossOptions): Shape
+- `pocket()` — pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape
+- `boss()` — boss(face: FaceSelector, height: number, opts?: BossOptions): Shape
 - `hole()` — hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape
 - `cutout()` — cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape
 

@@ -10,22 +10,6 @@ Dimensions, BOM entries, verification checks, and sketch export.
 
 Add dimensions, BOM entries, verification checks, and robot export.
 
-#### `dim()`
-
-```ts
-dim(from: PointArg$1, to: PointArg$1, opts?: DimOpts): void
-```
-
-Add a dimension annotation between two points.
-
-#### `dimLine()`
-
-```ts
-dimLine(l: Line2D, opts?: DimOpts): void
-```
-
-Add a dimension annotation along a Line2D.
-
 #### `bom()`
 
 ```ts
@@ -41,6 +25,22 @@ robotExport(options: RobotExportOptions): CollectedRobotExport
 ```
 
 Declare that the current script should export an assembly as a robot package for the SDF CLI. Configures inertial properties, joint limits, and optional plugins (e.g. diff-drive for Gazebo).
+
+#### `dim()`
+
+```ts
+dim(from: PointArg$1, to: PointArg$1, opts?: DimOpts): void
+```
+
+Add a dimension annotation between two points.
+
+#### `dimLine()`
+
+```ts
+dimLine(l: Line2D, opts?: DimOpts): void
+```
+
+Add a dimension annotation along a Line2D.
 
 ### Sketch Export
 

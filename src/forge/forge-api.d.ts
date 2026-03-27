@@ -165,6 +165,46 @@ interface FaceDescendantMetadata {
 	memberNames: string[];
 	coplanar: boolean;
 }
+/**
+ * FaceQuery — declarative face selector types and canonical name resolution.
+ *
+ * Downstream workstreams use `FaceSelector` to identify faces either by a
+ * string name (compile-plan name or canonical direction) or by a structured
+ * `FaceQuery` object that matches by geometry.
+ */
+interface FaceQuery {
+	/** Filter by face normal direction (cosine similarity > 0.9998) */
+	normal?: [
+		number,
+		number,
+		number
+	];
+	/** Pick face whose centroid is nearest to this point (XY or XYZ) */
+	nearest?: [
+		number,
+		number
+	] | [
+		number,
+		number,
+		number
+	];
+	/** Pick face containing/nearest to this world point */
+	at?: [
+		number,
+		number,
+		number
+	];
+	/** Disambiguation when multiple faces match */
+	pick?: "largest" | "smallest" | "max-x" | "max-y" | "max-z" | "min-x" | "min-y" | "min-z";
+	/** Filter by area range (mm²) */
+	area?: {
+		min?: number;
+		max?: number;
+	};
+	/** Only match planar faces (default: true) */
+	planar?: boolean;
+}
+type FaceSelector = string | FaceQuery;
 interface PortDef {
 	origin: Vec3;
 	axis: Vec3;
@@ -2047,8 +2087,10 @@ declare class TrackedShape {
 	private readonly baseHeight;
 	private readonly extrudeUp;
 	constructor(shape: Shape, topology: Topology, baseHeight: number, extrudeUp: boolean);
-	/** Get a named face */
-	face(name: FaceName): FaceRef;
+	/** Get a named face or a face matching a query */
+	face(selector: FaceSelector): FaceRef;
+	/** Return all faces matching a query, or all mesh-detected faces when no query is given. */
+	faces(query?: FaceQuery): FaceRef[];
 	/** Get a named edge */
 	edge(name: EdgeName): EdgeRef;
 	/** List all face names */
@@ -2321,1108 +2363,6 @@ interface PlacementReferenceInput {
 	objects?: Record<string, PlacementObjectInput>;
 }
 type PlacementAnchorLike = Anchor3D | string;
-type Vec3$1 = [
-	number,
-	number,
-	number
-];
-interface RectAreaRef {
-	/** Rectangle corners in order: bottom-left, bottom-right, top-right, top-left */
-	corners: [
-		Vec3$1,
-		Vec3$1,
-		Vec3$1,
-		Vec3$1
-	];
-}
-type RectAreaArg = RectAreaRef | Rectangle2D;
-/**
- * Build an arc bridge between two rectangular areas.
- *
- * @param rectA - First rectangle (2D Rectangle2D or 3D corners)
- * @param rectB - Second rectangle (2D Rectangle2D or 3D corners)
- * @param segments - Number of arc segments (more = smoother)
- * @returns Shape — the arc surface as a thin solid
- */
-declare function arcBridgeBetweenRects(rectA: RectAreaArg, rectB: RectAreaArg, segments?: number): Shape;
-/** Combine 2D sketches into a single profile (additive boolean). Accepts individual sketches or arrays. */
-declare function union2d(...inputs: SketchOperandInput[]): Sketch;
-/** Subtract 2D sketches from a base sketch. The first sketch is the base; all others are subtracted. */
-declare function difference2d(...inputs: SketchOperandInput[]): Sketch;
-/** Keep only the overlapping area of the input sketches (intersection boolean). */
-declare function intersection2d(...inputs: SketchOperandInput[]): Sketch;
-type RectVertexName = "bottomLeft" | "bottomRight" | "topRight" | "topLeft";
-type RectSideName = "bottom" | "right" | "top" | "left";
-interface RectOptions {
-	/** Bottom-left x coordinate. Default: 0. */
-	x?: number;
-	/** Bottom-left y coordinate. Default: 0. */
-	y?: number;
-	/** Width (along x). Default: 10. */
-	width?: number;
-	/** Height (along y). Default: 10. */
-	height?: number;
-	/** Prevent 180° rotation (ensures bottom edge points rightward). Default: false. */
-	blockRotation?: boolean;
-}
-/**
- * Typed handle for a constrained axis-aligned rectangle in the solver.
- *
- * Structural constraints pre-applied:
- * `horizontal(bottom)`, `horizontal(top)`, `vertical(left)`, `vertical(right)`,
- * `ccw(bl, br, tr, tl)`.
- *
- * This leaves **4 DOF** (position x/y, width, height). Use `sk.fix()`,
- * `sk.length()`, `sk.shapeWidth()`, etc. to pin them.
- */
-interface ConstrainedRect {
-	readonly bottomLeft: PointId;
-	readonly bottomRight: PointId;
-	readonly topRight: PointId;
-	readonly topLeft: PointId;
-	/** bottom-left → bottom-right */
-	readonly bottom: LineId;
-	/** bottom-right → top-right */
-	readonly right: LineId;
-	/** top-right → top-left */
-	readonly top: LineId;
-	/** top-left → bottom-left */
-	readonly left: LineId;
-	/**
-	 * Center point constrained to the geometric center via `midpoint` on the diagonal.
-	 * Can be used in further constraints: `sk.fix(rect.center, 0, 0)`,
-	 * `sk.coincident(rect.center, other)`.
-	 */
-	readonly center: PointId;
-	/** ShapeId for `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX/Y`. */
-	readonly shape: ShapeId;
-	/** CCW-ordered vertex array: [bottomLeft, bottomRight, topRight, topLeft]. */
-	readonly vertices: [
-		PointId,
-		PointId,
-		PointId,
-		PointId
-	];
-	/** CCW-ordered side array: [bottom, right, top, left]. */
-	readonly sides: [
-		LineId,
-		LineId,
-		LineId,
-		LineId
-	];
-	/** Named vertex lookup. */
-	vertex(name: RectVertexName): PointId;
-	/** Named side lookup. */
-	side(name: RectSideName): LineId;
-}
-/**
- * Add an axis-aligned rectangle concept to the builder.
- *
- * Creates 4 vertices (CCW: bl→br→tr→tl), 4 sides, applies 4 structural
- * constraints (`horizontal`/`vertical` on each side), enforces CCW winding,
- * registers a loop and a shape, and returns a `ConstrainedRect` handle.
- *
- * @example
- * ```ts
- * const sk = constrainedSketch();
- * const rect = addRect(sk, { x: 0, y: 0, width: 100, height: 50 });
- * sk.fix(rect.bottomLeft, 0, 0);
- * sk.length(rect.bottom, 120);
- * ```
- */
-declare function addRect(sk: ConstrainedSketchBuilder, options?: RectOptions): ConstrainedRect;
-interface ConstrainedSketchBuilder {
-	/**
-	 * Add an axis-aligned rectangle concept.
-	 * Returns a `ConstrainedRect` handle with named vertices, sides, and center.
-	 */
-	rect(options?: RectOptions): ConstrainedRect;
-}
-interface PolygonOptions {
-	/** Initial vertex coordinates. Minimum 3 points. */
-	points: ReadonlyArray<readonly [
-		number,
-		number
-	]>;
-	/**
-	 * Whether to register a closed loop for sketch generation.
-	 * Default: true.
-	 */
-	addLoop?: boolean;
-	/** Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false. */
-	blockRotation?: boolean;
-}
-/**
- * Typed handle for a general constrained polygon in the solver.
- *
- * Structural constraints pre-applied: `ccw(vertices)` for winding enforcement.
- *
- * `sides[i]` goes from `vertices[i]` → `vertices[(i+1) % n]`.
- */
-interface ConstrainedPolygon {
-	/** CCW-ordered PointIds. */
-	readonly vertices: PointId[];
-	/**
-	 * CCW-ordered LineIds.
-	 * `sides[i]` runs from `vertices[i]` → `vertices[(i+1) % n]`.
-	 */
-	readonly sides: LineId[];
-	/** ShapeId for `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX/Y`. */
-	readonly shape: ShapeId;
-	/** Get vertex by index. */
-	vertex(index: number): PointId;
-	/** Get side by index (side `i` goes vertex `i` → vertex `(i+1) % n`). */
-	side(index: number): LineId;
-}
-/**
- * Add a general polygon concept to the builder.
- *
- * Creates n vertices and n sides (CCW: `sides[i]` from `vertices[i]` →
- * `vertices[(i+1) % n]`). Applies a `ccw` constraint to enforce winding.
- * The user is responsible for all dimensional constraints.
- *
- * @example
- * ```ts
- * const sk = constrainedSketch();
- * const tri = addPolygon(sk, { points: [[0,0],[100,0],[50,80]] });
- * sk.fix(tri.vertex(0), 0, 0);
- * sk.length(tri.side(0), 100);
- * ```
- */
-declare function addPolygon(sk: ConstrainedSketchBuilder, options: PolygonOptions): ConstrainedPolygon;
-interface ConstrainedSketchBuilder {
-	/**
-	 * Add a general polygon concept (CCW winding enforced).
-	 * Returns a `ConstrainedPolygon` handle.
-	 */
-	addPolygon(options: PolygonOptions): ConstrainedPolygon;
-}
-interface RegularPolygonOptions {
-	/** Number of sides (minimum 3). */
-	sides: number;
-	/** Circumradius — distance from center to vertex. Default: 10. */
-	radius?: number;
-	/** Center x coordinate. Default: 0. */
-	cx?: number;
-	/** Center y coordinate. Default: 0. */
-	cy?: number;
-	/**
-	 * Angle (in degrees) of vertex[0] measured from the +X axis (CCW positive).
-	 * Default: 0 (rightmost vertex).
-	 */
-	startAngle?: number;
-	/** Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false. */
-	blockRotation?: boolean;
-}
-/**
- * Typed handle for a constrained regular polygon in the solver.
- *
- * Structural constraints pre-applied:
- * - `equal(sides[0], sides[1])`, ..., `equal(sides[n-2], sides[n-1])` — equal sides
- * - `ccw(vertices)` — CCW winding
- *
- * Leaves **4 DOF** (center x/y, radius/scale, rotation). The center point is
- * tracked by the solver and exposed for further constraints.
- *
- * Note: Equal sides + CCW + regular initial placement makes this
- * "practically regular" for the solver. If you need geometrically exact
- * regularity (equal angles too), add `angleBetween` constraints on each pair
- * of adjacent sides.
- */
-interface ConstrainedRegularPolygon extends ConstrainedPolygon {
-	/**
-	 * Center point. Use `sk.fix(poly.center, x, y)` to pin location,
-	 * or `sk.coincident(poly.center, other)` to align with other geometry.
-	 */
-	readonly center: PointId;
-}
-/**
- * Add a regular n-gon concept to the builder.
- *
- * Vertices are placed at `(cx + r·cos(startAngle + i·2π/n), cy + r·sin(...))`.
- * Equal-side constraints enforce regularity. The center point is constrained
- * to the centroid via midpoint constraints on the first diagonal.
- *
- * @example
- * ```ts
- * const sk = constrainedSketch();
- * const hex = addRegularPolygon(sk, { sides: 6, radius: 25, cx: 0, cy: 0 });
- * sk.fix(hex.center, 0, 0);
- * sk.length(hex.side(0), 30);  // changes all sides (equal constraint)
- * ```
- */
-declare function addRegularPolygon(sk: ConstrainedSketchBuilder, options: RegularPolygonOptions): ConstrainedRegularPolygon;
-interface ConstrainedSketchBuilder {
-	/**
-	 * Add a regular n-gon concept (equal sides, CCW winding).
-	 * Returns a `ConstrainedRegularPolygon` handle with a center point.
-	 */
-	regularPolygon(options: RegularPolygonOptions): ConstrainedRegularPolygon;
-}
-interface GroupRectOptions {
-	/** Bottom-left x coordinate (world). Default: 0. */
-	x?: number;
-	/** Bottom-left y coordinate (world). Default: 0. */
-	y?: number;
-	/** Width (along x in local coords). Required. */
-	width: number;
-	/** Height (along y in local coords). Required. */
-	height: number;
-	/** Allow the solver to rotate this rectangle. Default: false. */
-	allowRotation?: boolean;
-}
-interface ConstrainedGroupRect extends SketchGroupHandle {
-	readonly bottomLeft: PointId;
-	readonly bottomRight: PointId;
-	readonly topRight: PointId;
-	readonly topLeft: PointId;
-	readonly bottom: LineId;
-	readonly right: LineId;
-	readonly top: LineId;
-	readonly left: LineId;
-	readonly shape: ShapeId;
-}
-interface ConstrainedSketchBuilder {
-	/**
-	 * Add a rigid rectangle as a group concept.
-	 * Returns a `ConstrainedGroupRect` handle with named vertices and sides.
-	 * The rectangle is fixed in shape — only position (and optionally rotation) varies.
-	 */
-	groupRect(options: GroupRectOptions): ConstrainedGroupRect;
-}
-type Vec2 = [
-	number,
-	number
-];
-type Vec3$2 = [
-	number,
-	number,
-	number
-];
-interface Spline2DOptions {
-	/** Closed loop (default true). */
-	closed?: boolean;
-	/** Catmull-Rom tension in [0, 1]. 0 = very round, 1 = linear-ish. Default 0.5. */
-	tension?: number;
-	/** Samples per segment (minimum 3). Default 16. */
-	samplesPerSegment?: number;
-	/**
-	 * For open splines, provide stroke width to return a solid Sketch.
-	 * If omitted for open splines, an error is thrown.
-	 */
-	strokeWidth?: number;
-	/** Stroke join for open splines. Default 'Round'. */
-	join?: "Round" | "Square";
-}
-interface Spline3DOptions {
-	/** Closed loop (default false). */
-	closed?: boolean;
-	/** Catmull-Rom tension in [0, 1]. 0 = very round, 1 = linear-ish. Default 0.5. */
-	tension?: number;
-}
-interface LoftOptions {
-	/** Marching-grid edge length for level-set meshing. Smaller = finer. */
-	edgeLength?: number;
-	/** Optional extra bounds padding. */
-	boundsPadding?: number;
-}
-interface SweepOptions {
-	/** Number of samples when path is a Curve3D. Default 48. */
-	samples?: number;
-	/** Marching-grid edge length for level-set meshing. Smaller = finer. */
-	edgeLength?: number;
-	/** Optional extra bounds padding. */
-	boundsPadding?: number;
-	/**
-	 * Preferred "up" vector for local profile frame.
-	 * Auto fallback is used near parallel segments.
-	 */
-	up?: Vec3$2;
-}
-declare class Curve3D {
-	readonly points: Vec3$2[];
-	readonly closed: boolean;
-	readonly tension: number;
-	constructor(points: Vec3$2[], options?: Spline3DOptions);
-	sampleBySegment(samplesPerSegment?: number): Vec3$2[];
-	sample(count?: number): Vec3$2[];
-	pointAt(t: number): Vec3$2;
-	tangentAt(t: number): Vec3$2;
-	length(samples?: number): number;
-}
-/**
- * Build a smooth Catmull-Rom spline sketch from 2D control points.
- *
- * A closed spline (default) returns a filled profile. An open spline requires
- * a strokeWidth option to produce a solid sketch. Use tension (0..1, default 0.5)
- * to control curve tightness.
- */
-declare function spline2d(points: Vec2[], options?: Spline2DOptions): Sketch;
-/**
- * Create a reusable 3D spline curve object (Catmull-Rom).
- *
- * The returned Curve3D provides sample(), pointAt(t), tangentAt(t), and length() for
- * downstream use in sweep() or manual path operations.
- */
-declare function spline3d(points: Vec3$2[], options?: Spline3DOptions): Curve3D;
-/**
- * Loft between multiple sketches along Z stations.
- *
- * Profiles can differ in topology and vertex count: interpolation is done on
- * signed-distance fields and meshed with level-set extraction. Heights must be
- * strictly increasing. Compatible loft stacks can export through the OCCT exact route.
- *
- * Performance note: loft is significantly heavier than primitive/extrude/revolve.
- * If the part is axis-symmetric (bottles, vases, knobs), prefer revolve().
- */
-declare function loft(profiles: Sketch[], heights: number[], options?: LoftOptions): Shape;
-/**
- * Sweep a 2D profile along a 3D path to create a solid.
- *
- * Path can be a Curve3D from spline3d() or an array of [x,y,z] points (polyline).
- * The profile is interpreted in the local frame normal plane. Compatible sweeps can
- * export through the OCCT exact route using the canonical path representation.
- *
- * Performance note: sweep uses level-set meshing internally. Prefer direct
- * primitives/extrude/revolve when they can express the same shape.
- */
-declare function sweep(profile: Sketch, path: Curve3D | Vec3$2[], options?: SweepOptions): Shape;
-type PointArg$1 = [
-	number,
-	number
-] | [
-	number,
-	number,
-	number
-] | Point2D;
-interface DimOpts {
-	offset?: number;
-	label?: string;
-	color?: string;
-	component?: string | string[];
-	currentComponent?: boolean;
-}
-/**
- * Add a dimension annotation between two points.
- */
-declare function dim(from: PointArg$1, to: PointArg$1, opts?: DimOpts): void;
-/**
- * Add a dimension annotation along a Line2D.
- */
-declare function dimLine(l: Line2D, opts?: DimOpts): void;
-interface SketchDxfOptions {
-	/** DXF layer name. Default: "0" */
-	layer?: string;
-	/** DXF color index (1–255, AutoCAD ACI). Default: 7 (white/black) */
-	colorIndex?: number;
-}
-/**
- * Export a 2D sketch as a DXF string (R12/AC1009 — maximally compatible).
- *
- * For regular sketches, each polygon loop becomes a closed LWPOLYLINE.
- * For constraint sketches, exports LINE, CIRCLE, and ARC entities from
- * the constraint edge geometry.
- */
-declare function sketchToDxf(sketch: Sketch, options?: SketchDxfOptions): string;
-interface SketchSvgOptions {
-	/** Stroke color. Default: "black" */
-	stroke?: string;
-	/** Stroke width in sketch units. Default: 0.5 */
-	strokeWidth?: number;
-	/** Fill color. Default: "none" */
-	fill?: string;
-	/** Padding around the sketch bounding box in sketch units. Default: 2 */
-	padding?: number;
-	/** If set, scale so 1 sketch-unit = this many px. Otherwise auto-fit. */
-	pixelsPerUnit?: number;
-}
-/**
- * Export a 2D sketch as an SVG string.
- *
- * For regular sketches, exports filled polygon regions.
- * For constraint sketches, exports line/arc/circle edge geometry.
- *
- * The SVG uses the sketch's native coordinate system (Y-up) with a
- * transform that flips Y so the output renders correctly in SVG's Y-down
- * space. Coordinates are in sketch units (typically mm).
- */
-declare function sketchToSvg(sketch: Sketch, options?: SketchSvgOptions): string;
-type ShapeArg = Shape | TrackedShape;
-/** Round a named edge of a shape with a circular fillet of the given radius. Requires a compile-covered target. */
-declare function filletEdge(shape: ShapeArg, edge: EdgeRef, radius: number, quadrant?: [
-	number,
-	number
-], segments?: number): Shape;
-/** Bevel a named edge of a shape with a 45-degree chamfer of the given size. Requires a compile-covered target. */
-declare function chamferEdge(shape: ShapeArg, edge: EdgeRef, size: number, quadrant?: [
-	number,
-	number
-]): Shape;
-interface FilletCornerSpec {
-	index: number;
-	radius: number;
-	segments?: number;
-}
-type PointInput = [
-	number,
-	number
-] | Point2D;
-/** Create a polygon from points with specified corners rounded to arc fillets. Each corner spec identifies a vertex index and radius. */
-declare function filletCorners(points: PointInput[], corners: FilletCornerSpec[]): Sketch;
-/**
- * Load and cache a font.
- *
- * @param source - One of:
- *   - A built-in font name: `'sans-serif'` or `'inter'` (works everywhere)
- *   - A file path to a TTF/OTF/WOFF file (CLI/Node only)
- *   - An ArrayBuffer of font data (works everywhere)
- * @param cacheKey - Optional cache key when passing ArrayBuffer.
- * @returns Parsed opentype.Font object.
- */
-declare function loadFont(source: string | ArrayBuffer, cacheKey?: string): opentype$1.Font;
-type Vec3$3 = [
-	number,
-	number,
-	number
-];
-interface HermiteCurveEndpoint {
-	/** Position */
-	point: Vec3$3;
-	/** Tangent direction (will be normalized internally) */
-	tangent: Vec3$3;
-	/** Weight: scales tangent magnitude relative to chord length. Default 1.0. */
-	weight?: number;
-}
-/**
- * A cubic Hermite curve in 3D space.
- *
- * Interpolates between two endpoints matching position and tangent (G1 continuity).
- * Weight parameters control tangent magnitude, affecting the "reach" of the curve
- * along each edge's direction before turning.
- */
-declare class HermiteCurve3D {
-	/** Start position */
-	readonly p0: Vec3$3;
-	/** End position */
-	readonly p1: Vec3$3;
-	/** Scaled tangent at start (direction * weight * chordLength) */
-	readonly t0: Vec3$3;
-	/** Scaled tangent at end (direction * weight * chordLength) */
-	readonly t1: Vec3$3;
-	/** Chord length (straight-line distance between endpoints) */
-	readonly chordLength: number;
-	constructor(start: HermiteCurveEndpoint, end: HermiteCurveEndpoint);
-	/** Evaluate position at parameter t ∈ [0, 1] */
-	pointAt(t: number): Vec3$3;
-	/** Evaluate tangent (first derivative) at parameter t ∈ [0, 1] */
-	tangentAt(t: number): Vec3$3;
-	/** Evaluate curvature vector (second derivative) at parameter t ∈ [0, 1] */
-	curvatureAt(t: number): Vec3$3;
-	/** Sample the curve as a polyline of evenly-spaced parameter values. */
-	sample(count?: number): Vec3$3[];
-	/** Approximate arc length by sampling. */
-	length(samples?: number): number;
-	/**
-	 * Sample with adaptive density — more points where curvature is higher.
-	 * Returns at least `minCount` points, up to `maxCount`.
-	 */
-	sampleAdaptive(minCount?: number, maxCount?: number): Vec3$3[];
-	/** Convert to a format compatible with sweep() path input. */
-	toPolyline(samples?: number): Vec3$3[];
-}
-interface EdgeEndpoint {
-	/** Connection point on the edge */
-	point: Vec3$3;
-	/** Tangent direction along the edge at the connection point */
-	tangent: Vec3$3;
-	/** Surface normal at the connection point (optional, for future G2 support) */
-	normal?: Vec3$3;
-	/** Weight controlling how far the curve follows this edge's tangent. Default 1.0. */
-	weight?: number;
-}
-/**
- * Create a Hermite transition curve between two edge endpoints.
- *
- * The curve starts at `a.point` tangent to `a.tangent` and ends at `b.point`
- * tangent to `b.tangent`, with smooth G1-continuous interpolation.
- *
- * Weight controls:
- * - weight = 1.0 (default): balanced transition
- * - weight > 1.0: curve follows this edge's direction longer before turning
- * - weight < 1.0: curve turns sooner, shorter tangent influence
- *
- * @param a - Start edge endpoint
- * @param b - End edge endpoint
- * @returns HermiteCurve3D instance
- */
-declare function hermiteTransition(a: EdgeEndpoint, b: EdgeEndpoint): HermiteCurve3D;
-interface QuinticHermiteCurveEndpoint {
-	/** Position */
-	point: Vec3$3;
-	/** Tangent direction (will be normalized internally) */
-	tangent: Vec3$3;
-	/** Second derivative / curvature vector. Default [0, 0, 0]. */
-	curvature?: Vec3$3;
-	/** Weight: scales tangent magnitude relative to chord length. Default 1.0. */
-	weight?: number;
-}
-/**
- * A quintic Hermite curve in 3D space.
- *
- * Interpolates between two endpoints matching position, tangent, and second derivative
- * (G2 / curvature continuity). Uses degree-5 Hermite basis functions.
- *
- * Weight parameters scale tangent magnitudes relative to chord length.
- * Curvature vectors are scaled by weight² * chordLength² for consistent behavior.
- */
-declare class QuinticHermiteCurve3D {
-	/** Start position */
-	readonly p0: Vec3$3;
-	/** End position */
-	readonly p1: Vec3$3;
-	/** Scaled tangent at start (direction * weight * chordLength) */
-	readonly t0: Vec3$3;
-	/** Scaled tangent at end (direction * weight * chordLength) */
-	readonly t1: Vec3$3;
-	/** Scaled second derivative at start (curvature * weight² * chordLength²) */
-	readonly c0: Vec3$3;
-	/** Scaled second derivative at end (curvature * weight² * chordLength²) */
-	readonly c1: Vec3$3;
-	/** Chord length (straight-line distance between endpoints) */
-	readonly chordLength: number;
-	constructor(start: QuinticHermiteCurveEndpoint, end: QuinticHermiteCurveEndpoint);
-	/** Evaluate position at parameter t ∈ [0, 1] */
-	pointAt(t: number): Vec3$3;
-	/** Evaluate tangent (first derivative, normalized) at parameter t ∈ [0, 1] */
-	tangentAt(t: number): Vec3$3;
-	/** Evaluate curvature vector (second derivative) at parameter t ∈ [0, 1] */
-	curvatureAt(t: number): Vec3$3;
-	/** Sample the curve as a polyline of evenly-spaced parameter values. */
-	sample(count?: number): Vec3$3[];
-	/** Approximate arc length by sampling. */
-	length(samples?: number): number;
-	/**
-	 * Sample with adaptive density — more points where curvature is higher.
-	 * Returns at least `minCount` points, up to `maxCount`.
-	 */
-	sampleAdaptive(minCount?: number, maxCount?: number): Vec3$3[];
-	/** Convert to a format compatible with sweep() path input. */
-	toPolyline(samples?: number): Vec3$3[];
-}
-/**
- * Create a quintic Hermite transition curve between two edge endpoints (G2 continuity).
- *
- * The curve starts at `a.point` tangent to `a.tangent` with curvature `a.curvature`,
- * and ends at `b.point` tangent to `b.tangent` with curvature `b.curvature`,
- * with smooth G2-continuous interpolation matching position, tangent, and curvature.
- *
- * @param a - Start endpoint with position, tangent, optional curvature and weight
- * @param b - End endpoint with position, tangent, optional curvature and weight
- * @returns QuinticHermiteCurve3D instance
- */
-declare function hermiteTransitionG2(a: QuinticHermiteCurveEndpoint, b: QuinticHermiteCurveEndpoint): QuinticHermiteCurve3D;
-declare class PathBuilder {
-	private segs;
-	private x;
-	private y;
-	/** Current departure tangent unit vector. */
-	private dirX;
-	private dirY;
-	moveTo(x: number, y: number): this;
-	lineTo(x: number, y: number): this;
-	lineH(dx: number): this;
-	lineV(dy: number): this;
-	lineAngled(length: number, degrees: number): this;
-	lineBy(dx: number, dy: number): this;
-	arcBy(dx: number, dy: number, radius: number, clockwise?: boolean): this;
-	bezierBy(dcp1x: number, dcp1y: number, dcp2x: number, dcp2y: number, dx: number, dy: number): this;
-	/**
-	 * Draw a circular arc from the current position to (x, y) with the given radius.
-	 * `clockwise=true`  → arc curves to the right of the start→end direction.
-	 * `clockwise=false` → arc curves to the left  of the start→end direction.
-	 */
-	arcTo(x: number, y: number, radius: number, clockwise?: boolean): this;
-	/**
-	 * G1-continuous arc — radius derived from current tangent + endpoint.
-	 * Throws if endpoint is collinear with current direction.
-	 */
-	tangentArcTo(x: number, y: number): this;
-	/**
-	 * Smooth three-arc end cap from the current position to (endX, endY).
-	 * Inserts: small corner arc → large cap arc → small corner arc, all G1-continuous.
-	 */
-	smoothCapTo(endX: number, endY: number, cornerRadius: number, capRadius: number): this;
-	/**
-	 * Cubic bezier from current position to (x, y) via two control points.
-	 */
-	bezierTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): this;
-	/**
-	 * G1-continuous cubic bezier — first control point is auto-derived from
-	 * the current tangent direction. `weight` controls how far the auto-placed
-	 * control point extends along the tangent (default: 1/3 of the chord).
-	 *
-	 * The second control point `(cp2x, cp2y)` must be provided — it controls
-	 * the arrival curvature. For a fully automatic smooth curve, see `smoothThrough`.
-	 */
-	tangentBezierTo(cp2x: number, cp2y: number, x: number, y: number, weight?: number): this;
-	/**
-	 * Catmull-Rom spline through a list of waypoints from the current position.
-	 * The current position is included as the first point. The last waypoint
-	 * becomes the new cursor position.
-	 *
-	 * @param waypoints — intermediate + final points (at least 1)
-	 * @param tension — 0 = very round, 1 = linear (default 0.5)
-	 */
-	smoothThrough(waypoints: [
-		number,
-		number
-	][], tension?: number): this;
-	/**
-	 * Round the last corner (the junction between the previous two segments)
-	 * with a tangent arc of the given radius.
-	 *
-	 * Must be called after at least two line/arc segments that form a corner.
-	 * The fillet trims back both segments and inserts a tangent arc.
-	 *
-	 * ```js
-	 * path().moveTo(0,0).lineTo(10,0).lineTo(10,10).fillet(2).lineTo(0,10).close()
-	 * ```
-	 */
-	fillet(radius: number): this;
-	/**
-	 * Chamfer the last corner with a straight cut of the given distance.
-	 *
-	 * ```js
-	 * path().moveTo(0,0).lineTo(10,0).lineTo(10,10).chamfer(2).lineTo(0,10).close()
-	 * ```
-	 */
-	chamfer(distance: number): this;
-	private computeFilletGeom;
-	private computeChamferGeom;
-	private getSegEnd;
-	private getSegDirAt;
-	private trimLastSegEnd;
-	/**
-	 * Mirror all existing segments across an axis and append the mirrored copy
-	 * in reverse order, creating a symmetric path. The axis passes through the
-	 * current cursor position.
-	 *
-	 * @param axis — 'x' mirrors across the local X-axis (flips Y),
-	 *               'y' mirrors across the local Y-axis (flips X),
-	 *               or `[nx, ny]` for an arbitrary axis direction.
-	 *
-	 * ```js
-	 * // Build right half, mirror to get full symmetric profile
-	 * path().moveTo(0,0).lineTo(10,0).lineTo(10,5).mirror('x').close()
-	 * ```
-	 */
-	mirror(axis: "x" | "y" | [
-		number,
-		number
-	]): this;
-	/** Expand all segments into a flat tessellated polyline. */
-	private tessellate;
-	/**
-	 * Close the path and return a filled Sketch.
-	 *
-	 * If the path contains multiple sub-paths (multiple moveTo calls), the
-	 * first sub-path is the outer contour and subsequent sub-paths are holes
-	 * (subtracted from the outer contour).
-	 */
-	close(): Sketch;
-	/**
-	 * Close the path and return an offset version of the filled Sketch.
-	 * Positive delta expands outward, negative shrinks inward.
-	 */
-	closeOffset(delta: number, join?: "Round" | "Square" | "Miter"): Sketch;
-	stroke(width: number, join?: "Round" | "Square"): Sketch;
-	/** Split segments into sub-paths at each moveTo. */
-	private splitSubPaths;
-	/** Tessellate a sub-path (sequence of segments). */
-	private tessellateSegs;
-}
-/** Create a path builder for constructing 2D outlines. */
-declare function path(): PathBuilder;
-/** Create a stroked polyline sketch from an array of 2D points. */
-declare function stroke(points: [
-	number,
-	number
-][], width: number, join?: "Round" | "Square"): Sketch;
-type ShapeArg$1 = Shape | TrackedShape;
-/** Repeat a shape in a linear pattern along a direction vector and union the copies. */
-declare function linearPattern(shape: ShapeArg$1, count: number, dx: number, dy: number, dz?: number): Shape;
-/** Repeat a shape in a circular pattern around the Z axis and union the copies. */
-declare function circularPattern(shape: ShapeArg$1, count: number, centerX?: number, centerY?: number): Shape;
-/** Repeat a sketch in a linear pattern */
-declare function linearPattern2d(sketch: Sketch, count: number, dx: number, dy?: number): Sketch;
-/** Repeat a sketch in a circular pattern around a center point */
-declare function circularPattern2d(sketch: Sketch, count: number, centerX?: number, centerY?: number): Sketch;
-/** Mirror a shape across a plane defined by its normal and union the mirror with the original. */
-declare function mirrorCopy(shape: ShapeArg$1, normal: [
-	number,
-	number,
-	number
-]): Shape;
-type SketchFaceTarget = SketchFace3D | string | FaceRef;
-/** Create a 2D rectangle. When center is true, the origin is at the rectangle center; otherwise at the bottom-left corner. */
-declare function rect(width: number, height: number, center?: boolean): Sketch;
-/** Create a 2D circle centered at the origin. Use segments for lower-poly approximations. */
-declare function circle2d(radius: number, segments?: number): Sketch;
-/** Create a 2D rectangle with rounded corners. The radius is clamped to fit within the dimensions. */
-declare function roundedRect(width: number, height: number, radius: number, center?: boolean): Sketch;
-/** Create a 2D polygon from an array of [x, y] points or Point2D objects. Winding is normalized to CCW. */
-declare function polygon(points: ([
-	number,
-	number
-] | Point2D)[]): Sketch;
-/** Create a regular polygon (equilateral triangle, hexagon, etc.) inscribed in a circle of the given radius. */
-declare function ngon(sides: number, radius: number): Sketch;
-/** Create a 2D ellipse centered at the origin with the given X and Y radii. */
-declare function ellipse(rx: number, ry: number, segments?: number): Sketch;
-/** Create a slot (stadium/discorectangle) — a rectangle with semicircular ends, centered at origin. */
-declare function slot(length: number, width: number): Sketch;
-/** Create a star shape with alternating outer and inner radii. */
-declare function star(points: number, outerR: number, innerR: number): Sketch;
-interface SvgImportOptions {
-	/**
-	 * Which geometry channels to include:
-	 * - `auto`: prefer fills; if no fill geometry exists, fall back to strokes
-	 * - `fill`: import only filled regions
-	 * - `stroke`: import only stroke geometry
-	 * - `fill-and-stroke`: include both
-	 */
-	include?: "auto" | "fill" | "stroke" | "fill-and-stroke";
-	/** Keep all disconnected regions, or only the largest. */
-	regionSelection?: "all" | "largest";
-	/** Keep at most this many regions (largest-first). */
-	maxRegions?: number;
-	/** Drop regions below this absolute area threshold. */
-	minRegionArea?: number;
-	/** Drop regions below this ratio of largest-region area. */
-	minRegionAreaRatio?: number;
-	/**
-	 * Curve flattening tolerance in SVG user units.
-	 * Smaller = more segments, higher fidelity.
-	 */
-	flattenTolerance?: number;
-	/** Minimum segment count for arc discretization. */
-	arcSegments?: number;
-	/** Global scale applied after SVG parsing. */
-	scale?: number;
-	/**
-	 * Maximum imported sketch width.
-	 * If exceeded, geometry is uniformly downscaled to fit.
-	 */
-	maxWidth?: number;
-	/**
-	 * Maximum imported sketch height.
-	 * If exceeded, geometry is uniformly downscaled to fit.
-	 */
-	maxHeight?: number;
-	/**
-	 * Recenter imported geometry so its 2D bounds center is at CAD origin.
-	 */
-	centerOnOrigin?: boolean;
-	/** Simplification tolerance for final sketch cleanup. */
-	simplify?: number;
-	/**
-	 * Flip SVG Y-down coordinates to CAD Y-up.
-	 * Enabled by default.
-	 */
-	invertY?: boolean;
-}
-interface TextOptions {
-	/**
-	 * Cap height of the text in model units.
-	 * All other dimensions (stroke weight, spacing) scale proportionally.
-	 * @default 10
-	 */
-	size?: number;
-	/**
-	 * Extra space between characters in model units.
-	 * Negative values tighten the tracking.
-	 * @default 0
-	 */
-	letterSpacing?: number;
-	/**
-	 * Horizontal alignment relative to x = 0.
-	 * - `'left'`   — left edge at x = 0 (default)
-	 * - `'center'` — centred on x = 0
-	 * - `'right'`  — right edge at x = 0
-	 * @default 'left'
-	 */
-	align?: "left" | "center" | "right";
-	/**
-	 * Vertical alignment relative to y = 0.
-	 * - `'baseline'` — y = 0 is the text baseline (bottom of capital letters)
-	 * - `'center'`   — y = 0 is the vertical midpoint of the cap height
-	 * - `'top'`      — y = 0 is the top of capital letters
-	 * @default 'baseline'
-	 */
-	baseline?: "baseline" | "center" | "top";
-	/**
-	 * Font to use for text rendering.
-	 *
-	 * - `'sans-serif'` or `'inter'` — bundled Inter font (works everywhere, including browser)
-	 * - **file path** — path to a TTF, OTF, or WOFF font file (CLI/Node only)
-	 * - **Font object** — a previously loaded opentype.js Font (from `loadFont()`)
-	 * - **omitted** — uses the bundled Inter font (same as `'sans-serif'`)
-	 *
-	 * @example
-	 *   text2d('Hello World', { size: 10 })                          // default Inter
-	 *   text2d('Custom Font', { size: 10, font: '/path/to/font.ttf' })
-	 */
-	font?: string | opentype$1.Font;
-	/**
-	 * Bezier flattening tolerance in model units.
-	 * Smaller = more polygon segments = smoother curves.
-	 * @default auto (0.5% of size)
-	 */
-	flattenTolerance?: number;
-}
-/**
- * Build a 2-D filled Sketch from a text string.
- *
- * The Sketch origin is at the left end of the text baseline by default (see
- * `align` and `baseline` options to adjust placement). Text is rendered using
- * the bundled Inter font by default, or any TTF/OTF/WOFF font you provide.
- *
- * @example
- * // Extruded nameplate
- * text2d('FORGE CAD', { size: 8 }).extrude(1.2)
- *
- * @example
- * // Centered label on the XY plane
- * text2d('V 2.0', { size: 6, align: 'center', baseline: 'center' })
- */
-declare function text2d(content: string, options?: TextOptions): Sketch;
-/** Returns the rendered width of a string in model units (same options as text2d). */
-declare function textWidth(content: string, options?: Pick<TextOptions, "size" | "letterSpacing" | "font">): number;
-interface EdgeSegment {
-	/** Stable index within the extraction (deterministic for a given mesh). */
-	index: number;
-	start: Vec3;
-	end: Vec3;
-	midpoint: Vec3;
-	/** Normalized direction from start → end. */
-	direction: Vec3;
-	length: number;
-	/** Dihedral angle in degrees (0 = coplanar, 180 = knife edge). */
-	dihedralAngle: number;
-	/** true = outside corner (convex), false = inside corner (concave). */
-	convex: boolean;
-	/** Normal of first adjacent face. */
-	normalA: Vec3;
-	/** Normal of second adjacent face (same as normalA for boundary edges). */
-	normalB: Vec3;
-	/** true if this is a boundary (unmatched) edge — unusual for closed solids. */
-	boundary: boolean;
-}
-type Vec3$4 = [
-	number,
-	number,
-	number
-];
-interface TransitionCurveOptions {
-	/**
-	 * Weight for the start edge. Controls tangent magnitude at the start.
-	 * - 1.0 (default): balanced transition
-	 * - > 1.0: curve follows start edge longer before turning
-	 * - < 1.0: curve turns sooner at the start
-	 */
-	weightA?: number;
-	/**
-	 * Weight for the end edge. Controls tangent magnitude at the end.
-	 * - 1.0 (default): balanced transition
-	 * - > 1.0: curve follows end edge longer before turning
-	 * - < 1.0: curve turns sooner at the end
-	 */
-	weightB?: number;
-	/**
-	 * Number of sample points for the output polyline. Default 64.
-	 * Higher values give smoother curves at the cost of more geometry.
-	 */
-	samples?: number;
-}
-interface TransitionSurfaceOptions extends TransitionCurveOptions {
-	/**
-	 * Cross-section profile to sweep along the transition curve.
-	 * If omitted, a circular profile with `radius` is used.
-	 */
-	profile?: Sketch;
-	/**
-	 * Radius of circular cross-section (used when `profile` is omitted).
-	 * Default: 5% of chord length.
-	 */
-	radius?: number;
-	/**
-	 * Width and height for rectangular cross-section.
-	 * Alternative to `radius` when `profile` is omitted.
-	 */
-	rectangleSection?: {
-		width: number;
-		height: number;
-	};
-	/**
-	 * Preferred up vector for the sweep frame. Default: auto-detected.
-	 */
-	up?: Vec3$4;
-	/** Edge length for level-set meshing. Smaller = finer. */
-	edgeLength?: number;
-	/** Extra bounds padding for level-set meshing. */
-	boundsPadding?: number;
-}
-interface TransitionEdge {
-	/**
-	 * Connection point on the edge.
-	 * Can be any point along the edge where the transition should connect.
-	 */
-	point: Vec3$4;
-	/**
-	 * Tangent direction at the connection point.
-	 * This is the direction the curve should initially follow when leaving this edge.
-	 * For a straight edge, this is typically the edge direction pointing "outward"
-	 * (away from the body of the edge, toward the other edge).
-	 */
-	tangent: Vec3$4;
-	/**
-	 * Surface normal at the connection point (optional).
-	 * Used as a hint for the sweep frame's up vector.
-	 */
-	normal?: Vec3$4;
-}
-/**
- * Create a smooth transition curve between two edges.
- *
- * Returns a `HermiteCurve3D` that starts at `edgeA.point` tangent to
- * `edgeA.tangent` and ends at `edgeB.point` tangent to `edgeB.tangent`.
- *
- * The curve maintains G1 continuity (matching tangent direction) at both
- * endpoints. Weight parameters control the shape of the transition.
- *
- * @example
- * ```js
- * // Connect two edges with a balanced transition
- * const curve = transitionCurve(
- *   { point: [0, 0, 0], tangent: [1, 0, 0] },
- *   { point: [10, 5, 0], tangent: [1, 0, 0] },
- * );
- *
- * // Weighted: curve hugs edge A longer
- * const weighted = transitionCurve(
- *   { point: [0, 0, 0], tangent: [1, 0, 0] },
- *   { point: [10, 5, 0], tangent: [1, 0, 0] },
- *   { weightA: 2.0, weightB: 0.5 },
- * );
- * ```
- */
-declare function transitionCurve(edgeA: TransitionEdge, edgeB: TransitionEdge, options?: TransitionCurveOptions): HermiteCurve3D;
-/**
- * Create a solid transition surface between two edges by sweeping a profile
- * along a Hermite transition curve.
- *
- * This produces a watertight solid that smoothly connects the two edges.
- * Works with both Manifold and OCCT backends.
- *
- * @example
- * ```js
- * // Circular tube connecting two edges
- * const tube = transitionSurface(
- *   { point: [0, 0, 0], tangent: [1, 0, 0] },
- *   { point: [10, 5, 3], tangent: [0, 1, 0] },
- *   { radius: 0.5 },
- * );
- *
- * // Custom profile with weights
- * const custom = transitionSurface(
- *   { point: [0, 0, 0], tangent: [1, 0, 0] },
- *   { point: [10, 5, 3], tangent: [0, 1, 0] },
- *   { profile: mySketch, weightA: 1.5, weightB: 0.8 },
- * );
- * ```
- */
-declare function transitionSurface(edgeA: TransitionEdge, edgeB: TransitionEdge, options?: TransitionSurfaceOptions): Shape;
-/**
- * Convenience: create a transition curve from raw coordinate data.
- *
- * Useful when you have endpoints and directions as plain arrays
- * without constructing TransitionEdge objects.
- */
-declare function transitionCurveFromPoints(startPoint: Vec3$4, startTangent: Vec3$4, endPoint: Vec3$4, endTangent: Vec3$4, options?: TransitionCurveOptions): HermiteCurve3D;
-type EdgeEnd = "start" | "end" | "mid";
-type TangentMode = "along" | "outward" | "auto";
-interface EdgePickOptions {
-	/** Which end of the edge to connect. Default: 'start'. */
-	end?: EdgeEnd;
-	/**
-	 * How to determine the tangent direction. Default: 'along'.
-	 * - 'along': tangent follows the edge direction
-	 * - 'outward': tangent points along surface normal (requires EdgeSegment)
-	 * - 'auto': automatically computed (toward the other edge)
-	 */
-	tangentMode?: TangentMode;
-	/** Explicit tangent override (ignores tangentMode). */
-	tangent?: Vec3$4;
-	/** Flip the computed tangent direction (useful for 'along' mode). */
-	flip?: boolean;
-}
-/**
- * Pick a connection point from an EdgeRef (tracked topology edge).
- *
- * EdgeRef has `start` and `end` positions. The tangent is inferred
- * from the edge direction.
- *
- * @example
- * ```js
- * const box1 = rect(10, 10).extrude(10);
- * const topEdge = box1.edge('top-front');
- *
- * // Connect from the start of the top-front edge, tangent along the edge
- * const edgeA = pickEdge(topEdge, { end: 'start' });
- *
- * // Connect from the end, with flipped tangent
- * const edgeB = pickEdge(topEdge, { end: 'end', flip: true });
- * ```
- */
-declare function pickEdge(edge: EdgeRef, options?: EdgePickOptions): TransitionEdge;
-/**
- * Pick a connection point from an EdgeSegment (from selectEdge/selectEdges).
- *
- * EdgeSegment has richer data including surface normals on both sides,
- * enabling 'outward' tangent mode for transitions that leave the surface.
- *
- * @example
- * ```js
- * const myBox = box(20, 20, 20);
- * const topEdge = selectEdge(myBox, { atZ: 20, parallel: [1, 0, 0] });
- *
- * // Connect from edge start, tangent along the edge direction
- * const edgeA = pickEdgeSegment(topEdge, { end: 'start' });
- *
- * // Connect from midpoint, tangent pointing outward (away from surface)
- * const edgeB = pickEdgeSegment(topEdge, { end: 'mid', tangentMode: 'outward' });
- * ```
- */
-declare function pickEdgeSegment(edge: EdgeSegment, options?: EdgePickOptions): TransitionEdge;
-interface ConnectEdgesOptions extends TransitionSurfaceOptions {
-	/** Which end of edge A to connect. Default: 'start'. */
-	endA?: EdgeEnd;
-	/** Which end of edge B to connect. Default: 'start'. */
-	endB?: EdgeEnd;
-	/** Tangent mode for edge A. Default: 'along'. */
-	tangentModeA?: TangentMode;
-	/** Tangent mode for edge B. Default: 'along'. */
-	tangentModeB?: TangentMode;
-	/** Explicit tangent for edge A. */
-	tangentA?: Vec3$4;
-	/** Explicit tangent for edge B. */
-	tangentB?: Vec3$4;
-	/** Flip tangent A. */
-	flipA?: boolean;
-	/** Flip tangent B. */
-	flipB?: boolean;
-}
-declare function connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options?: ConnectEdgesOptions): Shape;
 type GeometryBackend = "manifold" | "occt" | "hybrid" | "unknown";
 type GeometryRepresentation = "mesh-solid" | "brep-solid" | "surface" | "mixed";
 type GeometryFidelity = "kernel-native" | "exact" | "sampled" | "deformed" | "mixed" | "unknown";
@@ -3519,10 +2459,12 @@ declare class Shape {
 		number,
 		number
 	];
-	/** Resolve a semantic face by name.  Works on compile-covered shapes and, as a
+	/** Resolve a semantic face by name or query.  Works on compile-covered shapes and, as a
 	 *  fallback, on any planar-faced mesh (e.g. the result of boolean ops) via
 	 *  coplanar triangle clustering. */
-	face(name: string): FaceRef;
+	face(selector: FaceSelector): FaceRef;
+	/** Return all faces matching a query, or all mesh-detected faces when no query is given. */
+	faces(query?: FaceQuery): FaceRef[];
 	/** List defended semantic face names currently available on this shape. */
 	faceNames(): string[];
 	/** Get the transformation history for a specific face. */
@@ -4484,7 +3426,27 @@ declare function cutPlane(name: string, normal: [
 	number,
 	number
 ], options?: CutPlaneOptions): void;
-type ShapeArg$2 = Shape | TrackedShape;
+interface EdgeSegment {
+	/** Stable index within the extraction (deterministic for a given mesh). */
+	index: number;
+	start: Vec3;
+	end: Vec3;
+	midpoint: Vec3;
+	/** Normalized direction from start → end. */
+	direction: Vec3;
+	length: number;
+	/** Dihedral angle in degrees (0 = coplanar, 180 = knife edge). */
+	dihedralAngle: number;
+	/** true = outside corner (convex), false = inside corner (concave). */
+	convex: boolean;
+	/** Normal of first adjacent face. */
+	normalA: Vec3;
+	/** Normal of second adjacent face (same as normalA for boundary edges). */
+	normalB: Vec3;
+	/** true if this is a boundary (unmatched) edge — unusual for closed solids. */
+	boundary: boolean;
+}
+type ShapeArg = Shape | TrackedShape;
 /**
  * Apply a fillet (rounded edge) to a mesh-selected edge.
  *
@@ -4496,7 +3458,7 @@ type ShapeArg$2 = Shape | TrackedShape;
  * @param radius - Fillet radius
  * @param segments - Number of arc segments (default: 16)
  */
-declare function filletEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, radius: number, segments?: number): Shape;
+declare function filletEdgeSegment(shape: ShapeArg, segment: EdgeSegment, radius: number, segments?: number): Shape;
 /**
  * Apply a chamfer (beveled edge) to a mesh-selected edge.
  *
@@ -4506,7 +3468,7 @@ declare function filletEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, radi
  * @param segment - Edge segment from selectEdge() / selectEdges()
  * @param size - Chamfer size (distance from edge)
  */
-declare function chamferEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, size: number): Shape;
+declare function chamferEdgeSegment(shape: ShapeArg, segment: EdgeSegment, size: number): Shape;
 interface RobotLinkExportOptions {
 	massKg?: number;
 	densityKgM3?: number;
@@ -4610,12 +3572,12 @@ interface PocketOptions {
 }
 type BossOptions = PocketOptions;
 interface Shape {
-	pocket(faceName: string, depth: number, opts?: PocketOptions): Shape;
-	boss(faceName: string, height: number, opts?: BossOptions): Shape;
+	pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape;
+	boss(face: FaceSelector, height: number, opts?: BossOptions): Shape;
 }
 interface TrackedShape {
-	pocket(faceName: string, depth: number, opts?: PocketOptions): Shape;
-	boss(faceName: string, height: number, opts?: BossOptions): Shape;
+	pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape;
+	boss(face: FaceSelector, height: number, opts?: BossOptions): Shape;
 }
 interface BoundingRegion {
 	xMin?: number;
@@ -4684,7 +3646,7 @@ declare function coalesceEdges(segments: EdgeSegment[], tolerance?: number): Edg
  * - undefined: all sharp edges on the shape
  */
 type EdgeSelector = EdgeSegment | EdgeSegment[] | EdgeQuery;
-type ShapeArg$3 = Shape | TrackedShape;
+type ShapeArg$1 = Shape | TrackedShape;
 /**
  * Apply fillets (rounded edges) to one or more edges of a shape.
  *
@@ -4712,7 +3674,7 @@ type ShapeArg$3 = Shape | TrackedShape;
  * const edges = selectEdges(myShape, { parallel: [0, 0, 1] })
  * fillet(myShape, 3, edges)
  */
-declare function fillet(shape: ShapeArg$3, radius: number, edges?: EdgeSelector, segments?: number): Shape;
+declare function fillet(shape: ShapeArg$1, radius: number, edges?: EdgeSelector, segments?: number): Shape;
 /**
  * Apply chamfers (beveled edges) to one or more edges of a shape.
  *
@@ -4729,7 +3691,7 @@ declare function fillet(shape: ShapeArg$3, radius: number, edges?: EdgeSelector,
  * // Chamfer vertical edges only
  * chamfer(myShape, 2, { parallel: [0, 0, 1] })
  */
-declare function chamfer(shape: ShapeArg$3, size: number, edges?: EdgeSelector): Shape;
+declare function chamfer(shape: ShapeArg$1, size: number, edges?: EdgeSelector): Shape;
 /**
  * Apply a draft angle (taper) to all faces of a solid for mold extraction.
  *
@@ -4751,7 +3713,7 @@ declare function chamfer(shape: ShapeArg$3, size: number, edges?: EdgeSelector):
  * // Draft with custom pull direction and neutral plane
  * draft(myShape, 2, [0, 0, 1], 10)
  */
-declare function draft(shape: ShapeArg$3, angleDeg: number, pullDirection?: [
+declare function draft(shape: ShapeArg$1, angleDeg: number, pullDirection?: [
 	number,
 	number,
 	number
@@ -4775,7 +3737,7 @@ declare function draft(shape: ShapeArg$3, angleDeg: number, pullDirection?: [
  * // Shrink a shape inward by 0.5mm
  * offsetSolid(myShape, -0.5)
  */
-declare function offsetSolid(shape: ShapeArg$3, thickness: number): Shape;
+declare function offsetSolid(shape: ShapeArg$1, thickness: number): Shape;
 type MetricSize = "M2" | "M2.5" | "M3" | "M4" | "M5" | "M6" | "M8" | "M10";
 type FastenerFit = "close" | "normal" | "loose" | "tap";
 interface FastenerHoleOptions {
@@ -5458,6 +4420,7 @@ interface ViewConfigOptions {
  * Multiple calls merge; later values override earlier ones.
  */
 declare function viewConfig(options?: ViewConfigOptions): void;
+type SketchFaceTarget = SketchFace3D | string | FaceRef;
 interface ShapeFeatureExtentSideOptions {
 	depth?: number;
 	upToFace?: SketchFaceTarget | FaceRef;
@@ -5509,6 +4472,1087 @@ interface TrackedShape {
 	hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape;
 	cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape;
 }
+type Vec3$1 = [
+	number,
+	number,
+	number
+];
+interface RectAreaRef {
+	/** Rectangle corners in order: bottom-left, bottom-right, top-right, top-left */
+	corners: [
+		Vec3$1,
+		Vec3$1,
+		Vec3$1,
+		Vec3$1
+	];
+}
+type RectAreaArg = RectAreaRef | Rectangle2D;
+/**
+ * Build an arc bridge between two rectangular areas.
+ *
+ * @param rectA - First rectangle (2D Rectangle2D or 3D corners)
+ * @param rectB - Second rectangle (2D Rectangle2D or 3D corners)
+ * @param segments - Number of arc segments (more = smoother)
+ * @returns Shape — the arc surface as a thin solid
+ */
+declare function arcBridgeBetweenRects(rectA: RectAreaArg, rectB: RectAreaArg, segments?: number): Shape;
+/** Combine 2D sketches into a single profile (additive boolean). Accepts individual sketches or arrays. */
+declare function union2d(...inputs: SketchOperandInput[]): Sketch;
+/** Subtract 2D sketches from a base sketch. The first sketch is the base; all others are subtracted. */
+declare function difference2d(...inputs: SketchOperandInput[]): Sketch;
+/** Keep only the overlapping area of the input sketches (intersection boolean). */
+declare function intersection2d(...inputs: SketchOperandInput[]): Sketch;
+type RectVertexName = "bottomLeft" | "bottomRight" | "topRight" | "topLeft";
+type RectSideName = "bottom" | "right" | "top" | "left";
+interface RectOptions {
+	/** Bottom-left x coordinate. Default: 0. */
+	x?: number;
+	/** Bottom-left y coordinate. Default: 0. */
+	y?: number;
+	/** Width (along x). Default: 10. */
+	width?: number;
+	/** Height (along y). Default: 10. */
+	height?: number;
+	/** Prevent 180° rotation (ensures bottom edge points rightward). Default: false. */
+	blockRotation?: boolean;
+}
+/**
+ * Typed handle for a constrained axis-aligned rectangle in the solver.
+ *
+ * Structural constraints pre-applied:
+ * `horizontal(bottom)`, `horizontal(top)`, `vertical(left)`, `vertical(right)`,
+ * `ccw(bl, br, tr, tl)`.
+ *
+ * This leaves **4 DOF** (position x/y, width, height). Use `sk.fix()`,
+ * `sk.length()`, `sk.shapeWidth()`, etc. to pin them.
+ */
+interface ConstrainedRect {
+	readonly bottomLeft: PointId;
+	readonly bottomRight: PointId;
+	readonly topRight: PointId;
+	readonly topLeft: PointId;
+	/** bottom-left → bottom-right */
+	readonly bottom: LineId;
+	/** bottom-right → top-right */
+	readonly right: LineId;
+	/** top-right → top-left */
+	readonly top: LineId;
+	/** top-left → bottom-left */
+	readonly left: LineId;
+	/**
+	 * Center point constrained to the geometric center via `midpoint` on the diagonal.
+	 * Can be used in further constraints: `sk.fix(rect.center, 0, 0)`,
+	 * `sk.coincident(rect.center, other)`.
+	 */
+	readonly center: PointId;
+	/** ShapeId for `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX/Y`. */
+	readonly shape: ShapeId;
+	/** CCW-ordered vertex array: [bottomLeft, bottomRight, topRight, topLeft]. */
+	readonly vertices: [
+		PointId,
+		PointId,
+		PointId,
+		PointId
+	];
+	/** CCW-ordered side array: [bottom, right, top, left]. */
+	readonly sides: [
+		LineId,
+		LineId,
+		LineId,
+		LineId
+	];
+	/** Named vertex lookup. */
+	vertex(name: RectVertexName): PointId;
+	/** Named side lookup. */
+	side(name: RectSideName): LineId;
+}
+/**
+ * Add an axis-aligned rectangle concept to the builder.
+ *
+ * Creates 4 vertices (CCW: bl→br→tr→tl), 4 sides, applies 4 structural
+ * constraints (`horizontal`/`vertical` on each side), enforces CCW winding,
+ * registers a loop and a shape, and returns a `ConstrainedRect` handle.
+ *
+ * @example
+ * ```ts
+ * const sk = constrainedSketch();
+ * const rect = addRect(sk, { x: 0, y: 0, width: 100, height: 50 });
+ * sk.fix(rect.bottomLeft, 0, 0);
+ * sk.length(rect.bottom, 120);
+ * ```
+ */
+declare function addRect(sk: ConstrainedSketchBuilder, options?: RectOptions): ConstrainedRect;
+interface ConstrainedSketchBuilder {
+	/**
+	 * Add an axis-aligned rectangle concept.
+	 * Returns a `ConstrainedRect` handle with named vertices, sides, and center.
+	 */
+	rect(options?: RectOptions): ConstrainedRect;
+}
+interface PolygonOptions {
+	/** Initial vertex coordinates. Minimum 3 points. */
+	points: ReadonlyArray<readonly [
+		number,
+		number
+	]>;
+	/**
+	 * Whether to register a closed loop for sketch generation.
+	 * Default: true.
+	 */
+	addLoop?: boolean;
+	/** Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false. */
+	blockRotation?: boolean;
+}
+/**
+ * Typed handle for a general constrained polygon in the solver.
+ *
+ * Structural constraints pre-applied: `ccw(vertices)` for winding enforcement.
+ *
+ * `sides[i]` goes from `vertices[i]` → `vertices[(i+1) % n]`.
+ */
+interface ConstrainedPolygon {
+	/** CCW-ordered PointIds. */
+	readonly vertices: PointId[];
+	/**
+	 * CCW-ordered LineIds.
+	 * `sides[i]` runs from `vertices[i]` → `vertices[(i+1) % n]`.
+	 */
+	readonly sides: LineId[];
+	/** ShapeId for `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX/Y`. */
+	readonly shape: ShapeId;
+	/** Get vertex by index. */
+	vertex(index: number): PointId;
+	/** Get side by index (side `i` goes vertex `i` → vertex `(i+1) % n`). */
+	side(index: number): LineId;
+}
+/**
+ * Add a general polygon concept to the builder.
+ *
+ * Creates n vertices and n sides (CCW: `sides[i]` from `vertices[i]` →
+ * `vertices[(i+1) % n]`). Applies a `ccw` constraint to enforce winding.
+ * The user is responsible for all dimensional constraints.
+ *
+ * @example
+ * ```ts
+ * const sk = constrainedSketch();
+ * const tri = addPolygon(sk, { points: [[0,0],[100,0],[50,80]] });
+ * sk.fix(tri.vertex(0), 0, 0);
+ * sk.length(tri.side(0), 100);
+ * ```
+ */
+declare function addPolygon(sk: ConstrainedSketchBuilder, options: PolygonOptions): ConstrainedPolygon;
+interface ConstrainedSketchBuilder {
+	/**
+	 * Add a general polygon concept (CCW winding enforced).
+	 * Returns a `ConstrainedPolygon` handle.
+	 */
+	addPolygon(options: PolygonOptions): ConstrainedPolygon;
+}
+interface RegularPolygonOptions {
+	/** Number of sides (minimum 3). */
+	sides: number;
+	/** Circumradius — distance from center to vertex. Default: 10. */
+	radius?: number;
+	/** Center x coordinate. Default: 0. */
+	cx?: number;
+	/** Center y coordinate. Default: 0. */
+	cy?: number;
+	/**
+	 * Angle (in degrees) of vertex[0] measured from the +X axis (CCW positive).
+	 * Default: 0 (rightmost vertex).
+	 */
+	startAngle?: number;
+	/** Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false. */
+	blockRotation?: boolean;
+}
+/**
+ * Typed handle for a constrained regular polygon in the solver.
+ *
+ * Structural constraints pre-applied:
+ * - `equal(sides[0], sides[1])`, ..., `equal(sides[n-2], sides[n-1])` — equal sides
+ * - `ccw(vertices)` — CCW winding
+ *
+ * Leaves **4 DOF** (center x/y, radius/scale, rotation). The center point is
+ * tracked by the solver and exposed for further constraints.
+ *
+ * Note: Equal sides + CCW + regular initial placement makes this
+ * "practically regular" for the solver. If you need geometrically exact
+ * regularity (equal angles too), add `angleBetween` constraints on each pair
+ * of adjacent sides.
+ */
+interface ConstrainedRegularPolygon extends ConstrainedPolygon {
+	/**
+	 * Center point. Use `sk.fix(poly.center, x, y)` to pin location,
+	 * or `sk.coincident(poly.center, other)` to align with other geometry.
+	 */
+	readonly center: PointId;
+}
+/**
+ * Add a regular n-gon concept to the builder.
+ *
+ * Vertices are placed at `(cx + r·cos(startAngle + i·2π/n), cy + r·sin(...))`.
+ * Equal-side constraints enforce regularity. The center point is constrained
+ * to the centroid via midpoint constraints on the first diagonal.
+ *
+ * @example
+ * ```ts
+ * const sk = constrainedSketch();
+ * const hex = addRegularPolygon(sk, { sides: 6, radius: 25, cx: 0, cy: 0 });
+ * sk.fix(hex.center, 0, 0);
+ * sk.length(hex.side(0), 30);  // changes all sides (equal constraint)
+ * ```
+ */
+declare function addRegularPolygon(sk: ConstrainedSketchBuilder, options: RegularPolygonOptions): ConstrainedRegularPolygon;
+interface ConstrainedSketchBuilder {
+	/**
+	 * Add a regular n-gon concept (equal sides, CCW winding).
+	 * Returns a `ConstrainedRegularPolygon` handle with a center point.
+	 */
+	regularPolygon(options: RegularPolygonOptions): ConstrainedRegularPolygon;
+}
+interface GroupRectOptions {
+	/** Bottom-left x coordinate (world). Default: 0. */
+	x?: number;
+	/** Bottom-left y coordinate (world). Default: 0. */
+	y?: number;
+	/** Width (along x in local coords). Required. */
+	width: number;
+	/** Height (along y in local coords). Required. */
+	height: number;
+	/** Allow the solver to rotate this rectangle. Default: false. */
+	allowRotation?: boolean;
+}
+interface ConstrainedGroupRect extends SketchGroupHandle {
+	readonly bottomLeft: PointId;
+	readonly bottomRight: PointId;
+	readonly topRight: PointId;
+	readonly topLeft: PointId;
+	readonly bottom: LineId;
+	readonly right: LineId;
+	readonly top: LineId;
+	readonly left: LineId;
+	readonly shape: ShapeId;
+}
+interface ConstrainedSketchBuilder {
+	/**
+	 * Add a rigid rectangle as a group concept.
+	 * Returns a `ConstrainedGroupRect` handle with named vertices and sides.
+	 * The rectangle is fixed in shape — only position (and optionally rotation) varies.
+	 */
+	groupRect(options: GroupRectOptions): ConstrainedGroupRect;
+}
+type Vec2 = [
+	number,
+	number
+];
+type Vec3$2 = [
+	number,
+	number,
+	number
+];
+interface Spline2DOptions {
+	/** Closed loop (default true). */
+	closed?: boolean;
+	/** Catmull-Rom tension in [0, 1]. 0 = very round, 1 = linear-ish. Default 0.5. */
+	tension?: number;
+	/** Samples per segment (minimum 3). Default 16. */
+	samplesPerSegment?: number;
+	/**
+	 * For open splines, provide stroke width to return a solid Sketch.
+	 * If omitted for open splines, an error is thrown.
+	 */
+	strokeWidth?: number;
+	/** Stroke join for open splines. Default 'Round'. */
+	join?: "Round" | "Square";
+}
+interface Spline3DOptions {
+	/** Closed loop (default false). */
+	closed?: boolean;
+	/** Catmull-Rom tension in [0, 1]. 0 = very round, 1 = linear-ish. Default 0.5. */
+	tension?: number;
+}
+interface LoftOptions {
+	/** Marching-grid edge length for level-set meshing. Smaller = finer. */
+	edgeLength?: number;
+	/** Optional extra bounds padding. */
+	boundsPadding?: number;
+}
+interface SweepOptions {
+	/** Number of samples when path is a Curve3D. Default 48. */
+	samples?: number;
+	/** Marching-grid edge length for level-set meshing. Smaller = finer. */
+	edgeLength?: number;
+	/** Optional extra bounds padding. */
+	boundsPadding?: number;
+	/**
+	 * Preferred "up" vector for local profile frame.
+	 * Auto fallback is used near parallel segments.
+	 */
+	up?: Vec3$2;
+}
+declare class Curve3D {
+	readonly points: Vec3$2[];
+	readonly closed: boolean;
+	readonly tension: number;
+	constructor(points: Vec3$2[], options?: Spline3DOptions);
+	sampleBySegment(samplesPerSegment?: number): Vec3$2[];
+	sample(count?: number): Vec3$2[];
+	pointAt(t: number): Vec3$2;
+	tangentAt(t: number): Vec3$2;
+	length(samples?: number): number;
+}
+/**
+ * Build a smooth Catmull-Rom spline sketch from 2D control points.
+ *
+ * A closed spline (default) returns a filled profile. An open spline requires
+ * a strokeWidth option to produce a solid sketch. Use tension (0..1, default 0.5)
+ * to control curve tightness.
+ */
+declare function spline2d(points: Vec2[], options?: Spline2DOptions): Sketch;
+/**
+ * Create a reusable 3D spline curve object (Catmull-Rom).
+ *
+ * The returned Curve3D provides sample(), pointAt(t), tangentAt(t), and length() for
+ * downstream use in sweep() or manual path operations.
+ */
+declare function spline3d(points: Vec3$2[], options?: Spline3DOptions): Curve3D;
+/**
+ * Loft between multiple sketches along Z stations.
+ *
+ * Profiles can differ in topology and vertex count: interpolation is done on
+ * signed-distance fields and meshed with level-set extraction. Heights must be
+ * strictly increasing. Compatible loft stacks can export through the OCCT exact route.
+ *
+ * Performance note: loft is significantly heavier than primitive/extrude/revolve.
+ * If the part is axis-symmetric (bottles, vases, knobs), prefer revolve().
+ */
+declare function loft(profiles: Sketch[], heights: number[], options?: LoftOptions): Shape;
+/**
+ * Sweep a 2D profile along a 3D path to create a solid.
+ *
+ * Path can be a Curve3D from spline3d() or an array of [x,y,z] points (polyline).
+ * The profile is interpreted in the local frame normal plane. Compatible sweeps can
+ * export through the OCCT exact route using the canonical path representation.
+ *
+ * Performance note: sweep uses level-set meshing internally. Prefer direct
+ * primitives/extrude/revolve when they can express the same shape.
+ */
+declare function sweep(profile: Sketch, path: Curve3D | Vec3$2[], options?: SweepOptions): Shape;
+type PointArg$1 = [
+	number,
+	number
+] | [
+	number,
+	number,
+	number
+] | Point2D;
+interface DimOpts {
+	offset?: number;
+	label?: string;
+	color?: string;
+	component?: string | string[];
+	currentComponent?: boolean;
+}
+/**
+ * Add a dimension annotation between two points.
+ */
+declare function dim(from: PointArg$1, to: PointArg$1, opts?: DimOpts): void;
+/**
+ * Add a dimension annotation along a Line2D.
+ */
+declare function dimLine(l: Line2D, opts?: DimOpts): void;
+interface SketchDxfOptions {
+	/** DXF layer name. Default: "0" */
+	layer?: string;
+	/** DXF color index (1–255, AutoCAD ACI). Default: 7 (white/black) */
+	colorIndex?: number;
+}
+/**
+ * Export a 2D sketch as a DXF string (R12/AC1009 — maximally compatible).
+ *
+ * For regular sketches, each polygon loop becomes a closed LWPOLYLINE.
+ * For constraint sketches, exports LINE, CIRCLE, and ARC entities from
+ * the constraint edge geometry.
+ */
+declare function sketchToDxf(sketch: Sketch, options?: SketchDxfOptions): string;
+interface SketchSvgOptions {
+	/** Stroke color. Default: "black" */
+	stroke?: string;
+	/** Stroke width in sketch units. Default: 0.5 */
+	strokeWidth?: number;
+	/** Fill color. Default: "none" */
+	fill?: string;
+	/** Padding around the sketch bounding box in sketch units. Default: 2 */
+	padding?: number;
+	/** If set, scale so 1 sketch-unit = this many px. Otherwise auto-fit. */
+	pixelsPerUnit?: number;
+}
+/**
+ * Export a 2D sketch as an SVG string.
+ *
+ * For regular sketches, exports filled polygon regions.
+ * For constraint sketches, exports line/arc/circle edge geometry.
+ *
+ * The SVG uses the sketch's native coordinate system (Y-up) with a
+ * transform that flips Y so the output renders correctly in SVG's Y-down
+ * space. Coordinates are in sketch units (typically mm).
+ */
+declare function sketchToSvg(sketch: Sketch, options?: SketchSvgOptions): string;
+type ShapeArg$2 = Shape | TrackedShape;
+/** Round a named edge of a shape with a circular fillet of the given radius. Requires a compile-covered target. */
+declare function filletEdge(shape: ShapeArg$2, edge: EdgeRef, radius: number, quadrant?: [
+	number,
+	number
+], segments?: number): Shape;
+/** Bevel a named edge of a shape with a 45-degree chamfer of the given size. Requires a compile-covered target. */
+declare function chamferEdge(shape: ShapeArg$2, edge: EdgeRef, size: number, quadrant?: [
+	number,
+	number
+]): Shape;
+interface FilletCornerSpec {
+	index: number;
+	radius: number;
+	segments?: number;
+}
+type PointInput = [
+	number,
+	number
+] | Point2D;
+/** Create a polygon from points with specified corners rounded to arc fillets. Each corner spec identifies a vertex index and radius. */
+declare function filletCorners(points: PointInput[], corners: FilletCornerSpec[]): Sketch;
+/**
+ * Load and cache a font.
+ *
+ * @param source - One of:
+ *   - A built-in font name: `'sans-serif'` or `'inter'` (works everywhere)
+ *   - A file path to a TTF/OTF/WOFF file (CLI/Node only)
+ *   - An ArrayBuffer of font data (works everywhere)
+ * @param cacheKey - Optional cache key when passing ArrayBuffer.
+ * @returns Parsed opentype.Font object.
+ */
+declare function loadFont(source: string | ArrayBuffer, cacheKey?: string): opentype$1.Font;
+type Vec3$3 = [
+	number,
+	number,
+	number
+];
+interface HermiteCurveEndpoint {
+	/** Position */
+	point: Vec3$3;
+	/** Tangent direction (will be normalized internally) */
+	tangent: Vec3$3;
+	/** Weight: scales tangent magnitude relative to chord length. Default 1.0. */
+	weight?: number;
+}
+/**
+ * A cubic Hermite curve in 3D space.
+ *
+ * Interpolates between two endpoints matching position and tangent (G1 continuity).
+ * Weight parameters control tangent magnitude, affecting the "reach" of the curve
+ * along each edge's direction before turning.
+ */
+declare class HermiteCurve3D {
+	/** Start position */
+	readonly p0: Vec3$3;
+	/** End position */
+	readonly p1: Vec3$3;
+	/** Scaled tangent at start (direction * weight * chordLength) */
+	readonly t0: Vec3$3;
+	/** Scaled tangent at end (direction * weight * chordLength) */
+	readonly t1: Vec3$3;
+	/** Chord length (straight-line distance between endpoints) */
+	readonly chordLength: number;
+	constructor(start: HermiteCurveEndpoint, end: HermiteCurveEndpoint);
+	/** Evaluate position at parameter t ∈ [0, 1] */
+	pointAt(t: number): Vec3$3;
+	/** Evaluate tangent (first derivative) at parameter t ∈ [0, 1] */
+	tangentAt(t: number): Vec3$3;
+	/** Evaluate curvature vector (second derivative) at parameter t ∈ [0, 1] */
+	curvatureAt(t: number): Vec3$3;
+	/** Sample the curve as a polyline of evenly-spaced parameter values. */
+	sample(count?: number): Vec3$3[];
+	/** Approximate arc length by sampling. */
+	length(samples?: number): number;
+	/**
+	 * Sample with adaptive density — more points where curvature is higher.
+	 * Returns at least `minCount` points, up to `maxCount`.
+	 */
+	sampleAdaptive(minCount?: number, maxCount?: number): Vec3$3[];
+	/** Convert to a format compatible with sweep() path input. */
+	toPolyline(samples?: number): Vec3$3[];
+}
+interface EdgeEndpoint {
+	/** Connection point on the edge */
+	point: Vec3$3;
+	/** Tangent direction along the edge at the connection point */
+	tangent: Vec3$3;
+	/** Surface normal at the connection point (optional, for future G2 support) */
+	normal?: Vec3$3;
+	/** Weight controlling how far the curve follows this edge's tangent. Default 1.0. */
+	weight?: number;
+}
+/**
+ * Create a Hermite transition curve between two edge endpoints.
+ *
+ * The curve starts at `a.point` tangent to `a.tangent` and ends at `b.point`
+ * tangent to `b.tangent`, with smooth G1-continuous interpolation.
+ *
+ * Weight controls:
+ * - weight = 1.0 (default): balanced transition
+ * - weight > 1.0: curve follows this edge's direction longer before turning
+ * - weight < 1.0: curve turns sooner, shorter tangent influence
+ *
+ * @param a - Start edge endpoint
+ * @param b - End edge endpoint
+ * @returns HermiteCurve3D instance
+ */
+declare function hermiteTransition(a: EdgeEndpoint, b: EdgeEndpoint): HermiteCurve3D;
+interface QuinticHermiteCurveEndpoint {
+	/** Position */
+	point: Vec3$3;
+	/** Tangent direction (will be normalized internally) */
+	tangent: Vec3$3;
+	/** Second derivative / curvature vector. Default [0, 0, 0]. */
+	curvature?: Vec3$3;
+	/** Weight: scales tangent magnitude relative to chord length. Default 1.0. */
+	weight?: number;
+}
+/**
+ * A quintic Hermite curve in 3D space.
+ *
+ * Interpolates between two endpoints matching position, tangent, and second derivative
+ * (G2 / curvature continuity). Uses degree-5 Hermite basis functions.
+ *
+ * Weight parameters scale tangent magnitudes relative to chord length.
+ * Curvature vectors are scaled by weight² * chordLength² for consistent behavior.
+ */
+declare class QuinticHermiteCurve3D {
+	/** Start position */
+	readonly p0: Vec3$3;
+	/** End position */
+	readonly p1: Vec3$3;
+	/** Scaled tangent at start (direction * weight * chordLength) */
+	readonly t0: Vec3$3;
+	/** Scaled tangent at end (direction * weight * chordLength) */
+	readonly t1: Vec3$3;
+	/** Scaled second derivative at start (curvature * weight² * chordLength²) */
+	readonly c0: Vec3$3;
+	/** Scaled second derivative at end (curvature * weight² * chordLength²) */
+	readonly c1: Vec3$3;
+	/** Chord length (straight-line distance between endpoints) */
+	readonly chordLength: number;
+	constructor(start: QuinticHermiteCurveEndpoint, end: QuinticHermiteCurveEndpoint);
+	/** Evaluate position at parameter t ∈ [0, 1] */
+	pointAt(t: number): Vec3$3;
+	/** Evaluate tangent (first derivative, normalized) at parameter t ∈ [0, 1] */
+	tangentAt(t: number): Vec3$3;
+	/** Evaluate curvature vector (second derivative) at parameter t ∈ [0, 1] */
+	curvatureAt(t: number): Vec3$3;
+	/** Sample the curve as a polyline of evenly-spaced parameter values. */
+	sample(count?: number): Vec3$3[];
+	/** Approximate arc length by sampling. */
+	length(samples?: number): number;
+	/**
+	 * Sample with adaptive density — more points where curvature is higher.
+	 * Returns at least `minCount` points, up to `maxCount`.
+	 */
+	sampleAdaptive(minCount?: number, maxCount?: number): Vec3$3[];
+	/** Convert to a format compatible with sweep() path input. */
+	toPolyline(samples?: number): Vec3$3[];
+}
+/**
+ * Create a quintic Hermite transition curve between two edge endpoints (G2 continuity).
+ *
+ * The curve starts at `a.point` tangent to `a.tangent` with curvature `a.curvature`,
+ * and ends at `b.point` tangent to `b.tangent` with curvature `b.curvature`,
+ * with smooth G2-continuous interpolation matching position, tangent, and curvature.
+ *
+ * @param a - Start endpoint with position, tangent, optional curvature and weight
+ * @param b - End endpoint with position, tangent, optional curvature and weight
+ * @returns QuinticHermiteCurve3D instance
+ */
+declare function hermiteTransitionG2(a: QuinticHermiteCurveEndpoint, b: QuinticHermiteCurveEndpoint): QuinticHermiteCurve3D;
+declare class PathBuilder {
+	private segs;
+	private x;
+	private y;
+	/** Current departure tangent unit vector. */
+	private dirX;
+	private dirY;
+	moveTo(x: number, y: number): this;
+	lineTo(x: number, y: number): this;
+	lineH(dx: number): this;
+	lineV(dy: number): this;
+	lineAngled(length: number, degrees: number): this;
+	lineBy(dx: number, dy: number): this;
+	arcBy(dx: number, dy: number, radius: number, clockwise?: boolean): this;
+	bezierBy(dcp1x: number, dcp1y: number, dcp2x: number, dcp2y: number, dx: number, dy: number): this;
+	/**
+	 * Draw a circular arc from the current position to (x, y) with the given radius.
+	 * `clockwise=true`  → arc curves to the right of the start→end direction.
+	 * `clockwise=false` → arc curves to the left  of the start→end direction.
+	 */
+	arcTo(x: number, y: number, radius: number, clockwise?: boolean): this;
+	/**
+	 * G1-continuous arc — radius derived from current tangent + endpoint.
+	 * Throws if endpoint is collinear with current direction.
+	 */
+	tangentArcTo(x: number, y: number): this;
+	/**
+	 * Smooth three-arc end cap from the current position to (endX, endY).
+	 * Inserts: small corner arc → large cap arc → small corner arc, all G1-continuous.
+	 */
+	smoothCapTo(endX: number, endY: number, cornerRadius: number, capRadius: number): this;
+	/**
+	 * Cubic bezier from current position to (x, y) via two control points.
+	 */
+	bezierTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): this;
+	/**
+	 * G1-continuous cubic bezier — first control point is auto-derived from
+	 * the current tangent direction. `weight` controls how far the auto-placed
+	 * control point extends along the tangent (default: 1/3 of the chord).
+	 *
+	 * The second control point `(cp2x, cp2y)` must be provided — it controls
+	 * the arrival curvature. For a fully automatic smooth curve, see `smoothThrough`.
+	 */
+	tangentBezierTo(cp2x: number, cp2y: number, x: number, y: number, weight?: number): this;
+	/**
+	 * Catmull-Rom spline through a list of waypoints from the current position.
+	 * The current position is included as the first point. The last waypoint
+	 * becomes the new cursor position.
+	 *
+	 * @param waypoints — intermediate + final points (at least 1)
+	 * @param tension — 0 = very round, 1 = linear (default 0.5)
+	 */
+	smoothThrough(waypoints: [
+		number,
+		number
+	][], tension?: number): this;
+	/**
+	 * Round the last corner (the junction between the previous two segments)
+	 * with a tangent arc of the given radius.
+	 *
+	 * Must be called after at least two line/arc segments that form a corner.
+	 * The fillet trims back both segments and inserts a tangent arc.
+	 *
+	 * ```js
+	 * path().moveTo(0,0).lineTo(10,0).lineTo(10,10).fillet(2).lineTo(0,10).close()
+	 * ```
+	 */
+	fillet(radius: number): this;
+	/**
+	 * Chamfer the last corner with a straight cut of the given distance.
+	 *
+	 * ```js
+	 * path().moveTo(0,0).lineTo(10,0).lineTo(10,10).chamfer(2).lineTo(0,10).close()
+	 * ```
+	 */
+	chamfer(distance: number): this;
+	private computeFilletGeom;
+	private computeChamferGeom;
+	private getSegEnd;
+	private getSegDirAt;
+	private trimLastSegEnd;
+	/**
+	 * Mirror all existing segments across an axis and append the mirrored copy
+	 * in reverse order, creating a symmetric path. The axis passes through the
+	 * current cursor position.
+	 *
+	 * @param axis — 'x' mirrors across the local X-axis (flips Y),
+	 *               'y' mirrors across the local Y-axis (flips X),
+	 *               or `[nx, ny]` for an arbitrary axis direction.
+	 *
+	 * ```js
+	 * // Build right half, mirror to get full symmetric profile
+	 * path().moveTo(0,0).lineTo(10,0).lineTo(10,5).mirror('x').close()
+	 * ```
+	 */
+	mirror(axis: "x" | "y" | [
+		number,
+		number
+	]): this;
+	/** Expand all segments into a flat tessellated polyline. */
+	private tessellate;
+	/**
+	 * Close the path and return a filled Sketch.
+	 *
+	 * If the path contains multiple sub-paths (multiple moveTo calls), the
+	 * first sub-path is the outer contour and subsequent sub-paths are holes
+	 * (subtracted from the outer contour).
+	 */
+	close(): Sketch;
+	/**
+	 * Close the path and return an offset version of the filled Sketch.
+	 * Positive delta expands outward, negative shrinks inward.
+	 */
+	closeOffset(delta: number, join?: "Round" | "Square" | "Miter"): Sketch;
+	stroke(width: number, join?: "Round" | "Square"): Sketch;
+	/** Split segments into sub-paths at each moveTo. */
+	private splitSubPaths;
+	/** Tessellate a sub-path (sequence of segments). */
+	private tessellateSegs;
+}
+/** Create a path builder for constructing 2D outlines. */
+declare function path(): PathBuilder;
+/** Create a stroked polyline sketch from an array of 2D points. */
+declare function stroke(points: [
+	number,
+	number
+][], width: number, join?: "Round" | "Square"): Sketch;
+type ShapeArg$3 = Shape | TrackedShape;
+/** Repeat a shape in a linear pattern along a direction vector and union the copies. */
+declare function linearPattern(shape: ShapeArg$3, count: number, dx: number, dy: number, dz?: number): Shape;
+/** Repeat a shape in a circular pattern around the Z axis and union the copies. */
+declare function circularPattern(shape: ShapeArg$3, count: number, centerX?: number, centerY?: number): Shape;
+/** Repeat a sketch in a linear pattern */
+declare function linearPattern2d(sketch: Sketch, count: number, dx: number, dy?: number): Sketch;
+/** Repeat a sketch in a circular pattern around a center point */
+declare function circularPattern2d(sketch: Sketch, count: number, centerX?: number, centerY?: number): Sketch;
+/** Mirror a shape across a plane defined by its normal and union the mirror with the original. */
+declare function mirrorCopy(shape: ShapeArg$3, normal: [
+	number,
+	number,
+	number
+]): Shape;
+/** Create a 2D rectangle. When center is true, the origin is at the rectangle center; otherwise at the bottom-left corner. */
+declare function rect(width: number, height: number, center?: boolean): Sketch;
+/** Create a 2D circle centered at the origin. Use segments for lower-poly approximations. */
+declare function circle2d(radius: number, segments?: number): Sketch;
+/** Create a 2D rectangle with rounded corners. The radius is clamped to fit within the dimensions. */
+declare function roundedRect(width: number, height: number, radius: number, center?: boolean): Sketch;
+/** Create a 2D polygon from an array of [x, y] points or Point2D objects. Winding is normalized to CCW. */
+declare function polygon(points: ([
+	number,
+	number
+] | Point2D)[]): Sketch;
+/** Create a regular polygon (equilateral triangle, hexagon, etc.) inscribed in a circle of the given radius. */
+declare function ngon(sides: number, radius: number): Sketch;
+/** Create a 2D ellipse centered at the origin with the given X and Y radii. */
+declare function ellipse(rx: number, ry: number, segments?: number): Sketch;
+/** Create a slot (stadium/discorectangle) — a rectangle with semicircular ends, centered at origin. */
+declare function slot(length: number, width: number): Sketch;
+/** Create a star shape with alternating outer and inner radii. */
+declare function star(points: number, outerR: number, innerR: number): Sketch;
+interface SvgImportOptions {
+	/**
+	 * Which geometry channels to include:
+	 * - `auto`: prefer fills; if no fill geometry exists, fall back to strokes
+	 * - `fill`: import only filled regions
+	 * - `stroke`: import only stroke geometry
+	 * - `fill-and-stroke`: include both
+	 */
+	include?: "auto" | "fill" | "stroke" | "fill-and-stroke";
+	/** Keep all disconnected regions, or only the largest. */
+	regionSelection?: "all" | "largest";
+	/** Keep at most this many regions (largest-first). */
+	maxRegions?: number;
+	/** Drop regions below this absolute area threshold. */
+	minRegionArea?: number;
+	/** Drop regions below this ratio of largest-region area. */
+	minRegionAreaRatio?: number;
+	/**
+	 * Curve flattening tolerance in SVG user units.
+	 * Smaller = more segments, higher fidelity.
+	 */
+	flattenTolerance?: number;
+	/** Minimum segment count for arc discretization. */
+	arcSegments?: number;
+	/** Global scale applied after SVG parsing. */
+	scale?: number;
+	/**
+	 * Maximum imported sketch width.
+	 * If exceeded, geometry is uniformly downscaled to fit.
+	 */
+	maxWidth?: number;
+	/**
+	 * Maximum imported sketch height.
+	 * If exceeded, geometry is uniformly downscaled to fit.
+	 */
+	maxHeight?: number;
+	/**
+	 * Recenter imported geometry so its 2D bounds center is at CAD origin.
+	 */
+	centerOnOrigin?: boolean;
+	/** Simplification tolerance for final sketch cleanup. */
+	simplify?: number;
+	/**
+	 * Flip SVG Y-down coordinates to CAD Y-up.
+	 * Enabled by default.
+	 */
+	invertY?: boolean;
+}
+interface TextOptions {
+	/**
+	 * Cap height of the text in model units.
+	 * All other dimensions (stroke weight, spacing) scale proportionally.
+	 * @default 10
+	 */
+	size?: number;
+	/**
+	 * Extra space between characters in model units.
+	 * Negative values tighten the tracking.
+	 * @default 0
+	 */
+	letterSpacing?: number;
+	/**
+	 * Horizontal alignment relative to x = 0.
+	 * - `'left'`   — left edge at x = 0 (default)
+	 * - `'center'` — centred on x = 0
+	 * - `'right'`  — right edge at x = 0
+	 * @default 'left'
+	 */
+	align?: "left" | "center" | "right";
+	/**
+	 * Vertical alignment relative to y = 0.
+	 * - `'baseline'` — y = 0 is the text baseline (bottom of capital letters)
+	 * - `'center'`   — y = 0 is the vertical midpoint of the cap height
+	 * - `'top'`      — y = 0 is the top of capital letters
+	 * @default 'baseline'
+	 */
+	baseline?: "baseline" | "center" | "top";
+	/**
+	 * Font to use for text rendering.
+	 *
+	 * - `'sans-serif'` or `'inter'` — bundled Inter font (works everywhere, including browser)
+	 * - **file path** — path to a TTF, OTF, or WOFF font file (CLI/Node only)
+	 * - **Font object** — a previously loaded opentype.js Font (from `loadFont()`)
+	 * - **omitted** — uses the bundled Inter font (same as `'sans-serif'`)
+	 *
+	 * @example
+	 *   text2d('Hello World', { size: 10 })                          // default Inter
+	 *   text2d('Custom Font', { size: 10, font: '/path/to/font.ttf' })
+	 */
+	font?: string | opentype$1.Font;
+	/**
+	 * Bezier flattening tolerance in model units.
+	 * Smaller = more polygon segments = smoother curves.
+	 * @default auto (0.5% of size)
+	 */
+	flattenTolerance?: number;
+}
+/**
+ * Build a 2-D filled Sketch from a text string.
+ *
+ * The Sketch origin is at the left end of the text baseline by default (see
+ * `align` and `baseline` options to adjust placement). Text is rendered using
+ * the bundled Inter font by default, or any TTF/OTF/WOFF font you provide.
+ *
+ * @example
+ * // Extruded nameplate
+ * text2d('FORGE CAD', { size: 8 }).extrude(1.2)
+ *
+ * @example
+ * // Centered label on the XY plane
+ * text2d('V 2.0', { size: 6, align: 'center', baseline: 'center' })
+ */
+declare function text2d(content: string, options?: TextOptions): Sketch;
+/** Returns the rendered width of a string in model units (same options as text2d). */
+declare function textWidth(content: string, options?: Pick<TextOptions, "size" | "letterSpacing" | "font">): number;
+type Vec3$4 = [
+	number,
+	number,
+	number
+];
+interface TransitionCurveOptions {
+	/**
+	 * Weight for the start edge. Controls tangent magnitude at the start.
+	 * - 1.0 (default): balanced transition
+	 * - > 1.0: curve follows start edge longer before turning
+	 * - < 1.0: curve turns sooner at the start
+	 */
+	weightA?: number;
+	/**
+	 * Weight for the end edge. Controls tangent magnitude at the end.
+	 * - 1.0 (default): balanced transition
+	 * - > 1.0: curve follows end edge longer before turning
+	 * - < 1.0: curve turns sooner at the end
+	 */
+	weightB?: number;
+	/**
+	 * Number of sample points for the output polyline. Default 64.
+	 * Higher values give smoother curves at the cost of more geometry.
+	 */
+	samples?: number;
+}
+interface TransitionSurfaceOptions extends TransitionCurveOptions {
+	/**
+	 * Cross-section profile to sweep along the transition curve.
+	 * If omitted, a circular profile with `radius` is used.
+	 */
+	profile?: Sketch;
+	/**
+	 * Radius of circular cross-section (used when `profile` is omitted).
+	 * Default: 5% of chord length.
+	 */
+	radius?: number;
+	/**
+	 * Width and height for rectangular cross-section.
+	 * Alternative to `radius` when `profile` is omitted.
+	 */
+	rectangleSection?: {
+		width: number;
+		height: number;
+	};
+	/**
+	 * Preferred up vector for the sweep frame. Default: auto-detected.
+	 */
+	up?: Vec3$4;
+	/** Edge length for level-set meshing. Smaller = finer. */
+	edgeLength?: number;
+	/** Extra bounds padding for level-set meshing. */
+	boundsPadding?: number;
+}
+interface TransitionEdge {
+	/**
+	 * Connection point on the edge.
+	 * Can be any point along the edge where the transition should connect.
+	 */
+	point: Vec3$4;
+	/**
+	 * Tangent direction at the connection point.
+	 * This is the direction the curve should initially follow when leaving this edge.
+	 * For a straight edge, this is typically the edge direction pointing "outward"
+	 * (away from the body of the edge, toward the other edge).
+	 */
+	tangent: Vec3$4;
+	/**
+	 * Surface normal at the connection point (optional).
+	 * Used as a hint for the sweep frame's up vector.
+	 */
+	normal?: Vec3$4;
+}
+/**
+ * Create a smooth transition curve between two edges.
+ *
+ * Returns a `HermiteCurve3D` that starts at `edgeA.point` tangent to
+ * `edgeA.tangent` and ends at `edgeB.point` tangent to `edgeB.tangent`.
+ *
+ * The curve maintains G1 continuity (matching tangent direction) at both
+ * endpoints. Weight parameters control the shape of the transition.
+ *
+ * @example
+ * ```js
+ * // Connect two edges with a balanced transition
+ * const curve = transitionCurve(
+ *   { point: [0, 0, 0], tangent: [1, 0, 0] },
+ *   { point: [10, 5, 0], tangent: [1, 0, 0] },
+ * );
+ *
+ * // Weighted: curve hugs edge A longer
+ * const weighted = transitionCurve(
+ *   { point: [0, 0, 0], tangent: [1, 0, 0] },
+ *   { point: [10, 5, 0], tangent: [1, 0, 0] },
+ *   { weightA: 2.0, weightB: 0.5 },
+ * );
+ * ```
+ */
+declare function transitionCurve(edgeA: TransitionEdge, edgeB: TransitionEdge, options?: TransitionCurveOptions): HermiteCurve3D;
+/**
+ * Create a solid transition surface between two edges by sweeping a profile
+ * along a Hermite transition curve.
+ *
+ * This produces a watertight solid that smoothly connects the two edges.
+ * Works with both Manifold and OCCT backends.
+ *
+ * @example
+ * ```js
+ * // Circular tube connecting two edges
+ * const tube = transitionSurface(
+ *   { point: [0, 0, 0], tangent: [1, 0, 0] },
+ *   { point: [10, 5, 3], tangent: [0, 1, 0] },
+ *   { radius: 0.5 },
+ * );
+ *
+ * // Custom profile with weights
+ * const custom = transitionSurface(
+ *   { point: [0, 0, 0], tangent: [1, 0, 0] },
+ *   { point: [10, 5, 3], tangent: [0, 1, 0] },
+ *   { profile: mySketch, weightA: 1.5, weightB: 0.8 },
+ * );
+ * ```
+ */
+declare function transitionSurface(edgeA: TransitionEdge, edgeB: TransitionEdge, options?: TransitionSurfaceOptions): Shape;
+/**
+ * Convenience: create a transition curve from raw coordinate data.
+ *
+ * Useful when you have endpoints and directions as plain arrays
+ * without constructing TransitionEdge objects.
+ */
+declare function transitionCurveFromPoints(startPoint: Vec3$4, startTangent: Vec3$4, endPoint: Vec3$4, endTangent: Vec3$4, options?: TransitionCurveOptions): HermiteCurve3D;
+type EdgeEnd = "start" | "end" | "mid";
+type TangentMode = "along" | "outward" | "auto";
+interface EdgePickOptions {
+	/** Which end of the edge to connect. Default: 'start'. */
+	end?: EdgeEnd;
+	/**
+	 * How to determine the tangent direction. Default: 'along'.
+	 * - 'along': tangent follows the edge direction
+	 * - 'outward': tangent points along surface normal (requires EdgeSegment)
+	 * - 'auto': automatically computed (toward the other edge)
+	 */
+	tangentMode?: TangentMode;
+	/** Explicit tangent override (ignores tangentMode). */
+	tangent?: Vec3$4;
+	/** Flip the computed tangent direction (useful for 'along' mode). */
+	flip?: boolean;
+}
+/**
+ * Pick a connection point from an EdgeRef (tracked topology edge).
+ *
+ * EdgeRef has `start` and `end` positions. The tangent is inferred
+ * from the edge direction.
+ *
+ * @example
+ * ```js
+ * const box1 = rect(10, 10).extrude(10);
+ * const topEdge = box1.edge('top-front');
+ *
+ * // Connect from the start of the top-front edge, tangent along the edge
+ * const edgeA = pickEdge(topEdge, { end: 'start' });
+ *
+ * // Connect from the end, with flipped tangent
+ * const edgeB = pickEdge(topEdge, { end: 'end', flip: true });
+ * ```
+ */
+declare function pickEdge(edge: EdgeRef, options?: EdgePickOptions): TransitionEdge;
+/**
+ * Pick a connection point from an EdgeSegment (from selectEdge/selectEdges).
+ *
+ * EdgeSegment has richer data including surface normals on both sides,
+ * enabling 'outward' tangent mode for transitions that leave the surface.
+ *
+ * @example
+ * ```js
+ * const myBox = box(20, 20, 20);
+ * const topEdge = selectEdge(myBox, { atZ: 20, parallel: [1, 0, 0] });
+ *
+ * // Connect from edge start, tangent along the edge direction
+ * const edgeA = pickEdgeSegment(topEdge, { end: 'start' });
+ *
+ * // Connect from midpoint, tangent pointing outward (away from surface)
+ * const edgeB = pickEdgeSegment(topEdge, { end: 'mid', tangentMode: 'outward' });
+ * ```
+ */
+declare function pickEdgeSegment(edge: EdgeSegment, options?: EdgePickOptions): TransitionEdge;
+interface ConnectEdgesOptions extends TransitionSurfaceOptions {
+	/** Which end of edge A to connect. Default: 'start'. */
+	endA?: EdgeEnd;
+	/** Which end of edge B to connect. Default: 'start'. */
+	endB?: EdgeEnd;
+	/** Tangent mode for edge A. Default: 'along'. */
+	tangentModeA?: TangentMode;
+	/** Tangent mode for edge B. Default: 'along'. */
+	tangentModeB?: TangentMode;
+	/** Explicit tangent for edge A. */
+	tangentA?: Vec3$4;
+	/** Explicit tangent for edge B. */
+	tangentB?: Vec3$4;
+	/** Flip tangent A. */
+	flipA?: boolean;
+	/** Flip tangent B. */
+	flipB?: boolean;
+}
+declare function connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options?: ConnectEdgesOptions): Shape;
 interface ShapeLike$1 {
 	boundingBox(): {
 		min: number[];
@@ -5629,7 +5673,7 @@ declare const verify: {
 };
 /** Cross-section: slice a 3D shape with a plane and return the intersection as a 2D Sketch. */
 declare function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch;
-declare function faceProfile(shape: Shape | TrackedShape, faceName: string): Sketch;
+declare function faceProfile(shape: Shape | TrackedShape, face: FaceSelector): Sketch;
 /** Orthographically project a 3D shape onto a plane and return the silhouette as a 2D Sketch. */
 declare function projectToPlane(shape: Shape, plane: PlaneSpec): Sketch;
 interface SheetMetalOptions {
