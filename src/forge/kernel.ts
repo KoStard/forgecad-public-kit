@@ -24,8 +24,11 @@ import {
   findShapeWorkplanePlacement,
   wrapShapeCompilePlanWithQueryOwner,
 } from './compilePlan';
+import { explainNoFaceQueryMatch } from './face-tracking/faceDiagnostics';
 import { type FaceTransformationHistory, traceFaceTransformationHistory } from './face-tracking/faceHistory';
-import { detectFaceByName } from './face-tracking/meshFaceDetect';
+import type { FaceQuery, FaceSelector } from './face-tracking/faceQuery';
+import { normalizeFaceSelector } from './face-tracking/faceQuery';
+import { queryMeshFace, queryMeshFaces } from './face-tracking/meshFaceDetect';
 import { wrapRepeatedShapeCompilePlan } from './face-tracking/repetitionOwnership';
 import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './face-tracking/shapeFaces';
 import {
@@ -776,16 +779,37 @@ export class Shape {
     return resolveAnchorLikePoint(this, ref);
   }
 
-  /** Resolve a semantic face by name.  Works on compile-covered shapes and, as a
+  /** Resolve a semantic face by name or query.  Works on compile-covered shapes and, as a
    *  fallback, on any planar-faced mesh (e.g. the result of boolean ops) via
    *  coplanar triangle clustering. */
-  face(name: string) {
-    const plan = getShapeCompilePlanInternal(this);
-    const face = resolveShapeFace(plan, name);
-    if (face) return face;
-    const detected = detectFaceByName(this, name);
-    if (detected) return detected;
-    throw new Error(explainMissingShapeFace(plan, name));
+  face(selector: FaceSelector): FaceRef {
+    const { compilePlanName, query } = normalizeFaceSelector(selector);
+
+    // 1. Compile-plan lookup (string names only — preserves tracked lineage for BREP)
+    if (compilePlanName) {
+      const plan = getShapeCompilePlanInternal(this);
+      const face = resolveShapeFace(plan, compilePlanName);
+      if (face) return face;
+    }
+
+    // 2. Mesh query engine
+    if (query) {
+      const detected = queryMeshFace(this, query);
+      if (detected) return detected;
+    }
+
+    // 3. Error
+    if (compilePlanName) {
+      const plan = getShapeCompilePlanInternal(this);
+      throw new Error(explainMissingShapeFace(plan, compilePlanName));
+    }
+    const allFaces = queryMeshFaces(this, {});
+    throw new Error(explainNoFaceQueryMatch(query!, allFaces));
+  }
+
+  /** Return all faces matching a query, or all mesh-detected faces when no query is given. */
+  faces(query?: FaceQuery): FaceRef[] {
+    return queryMeshFaces(this, query ?? {});
   }
 
   /** List defended semantic face names currently available on this shape. */

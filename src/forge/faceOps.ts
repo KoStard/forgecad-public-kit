@@ -15,6 +15,7 @@
  *   shape.boss('top', 5, { scale: 0.6 })
  */
 
+import type { FaceSelector } from './face-tracking/faceQuery';
 import { Shape } from './kernel';
 import { planeFrameToWorldToPlaneMatrix, resolvePlaneFrame } from './planeFrame';
 import { intersectWithPlane } from './section';
@@ -73,8 +74,8 @@ export type BossOptions = PocketOptions;
  * // Pocket at 80 % of face area:
  * box(100, 100, 20).pocket('top', 8, { scale: 0.8 })
  */
-function shapePocket(rawShape: Shape, faceName: string, depth: number, opts?: PocketOptions): Shape {
-  const faceRef = rawShape.face(faceName);
+function shapePocket(rawShape: Shape, face: FaceSelector, depth: number, opts?: PocketOptions): Shape {
+  const faceRef = rawShape.face(face);
   const frame = resolvePlaneFrame({ face: faceRef });
 
   let profile = extractFaceProfile(rawShape, faceRef);
@@ -111,8 +112,8 @@ function shapePocket(rawShape: Shape, faceName: string, depth: number, opts?: Po
  * // Tapered post at 60 % of face area, 10 mm tall:
  * box(100, 100, 20).boss('top', 10, { scale: 0.6 })
  */
-function shapeBoss(rawShape: Shape, faceName: string, height: number, opts?: BossOptions): Shape {
-  const faceRef = rawShape.face(faceName);
+function shapeBoss(rawShape: Shape, face: FaceSelector, height: number, opts?: BossOptions): Shape {
+  const faceRef = rawShape.face(face);
   const frame = resolvePlaneFrame({ face: faceRef });
 
   let profile = extractFaceProfile(rawShape, faceRef);
@@ -134,30 +135,30 @@ function shapeBoss(rawShape: Shape, faceName: string, height: number, opts?: Bos
 
 declare module './kernel' {
   interface Shape {
-    pocket(faceName: string, depth: number, opts?: PocketOptions): Shape;
-    boss(faceName: string, height: number, opts?: BossOptions): Shape;
+    pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape;
+    boss(face: FaceSelector, height: number, opts?: BossOptions): Shape;
   }
 }
 
 declare module './sketch/topology' {
   interface TrackedShape {
-    pocket(faceName: string, depth: number, opts?: PocketOptions): Shape;
-    boss(faceName: string, height: number, opts?: BossOptions): Shape;
+    pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape;
+    boss(face: FaceSelector, height: number, opts?: BossOptions): Shape;
   }
 }
 
-Shape.prototype.pocket = function pocket(faceName: string, depth: number, opts?: PocketOptions): Shape {
-  return shapePocket(this, faceName, depth, opts);
+Shape.prototype.pocket = function pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape {
+  return shapePocket(this, face, depth, opts);
 };
 
-Shape.prototype.boss = function boss(faceName: string, height: number, opts?: BossOptions): Shape {
-  return shapeBoss(this, faceName, height, opts);
+Shape.prototype.boss = function boss(face: FaceSelector, height: number, opts?: BossOptions): Shape {
+  return shapeBoss(this, face, height, opts);
 };
 
-TrackedShape.prototype.pocket = function pocket(faceName: string, depth: number, opts?: PocketOptions): Shape {
-  return shapePocket(this.toShape(), faceName, depth, opts);
+TrackedShape.prototype.pocket = function pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape {
+  return shapePocket(this.toShape(), face, depth, opts);
 };
 
-TrackedShape.prototype.boss = function boss(faceName: string, height: number, opts?: BossOptions): Shape {
-  return shapeBoss(this.toShape(), faceName, height, opts);
+TrackedShape.prototype.boss = function boss(face: FaceSelector, height: number, opts?: BossOptions): Shape {
+  return shapeBoss(this.toShape(), face, height, opts);
 };

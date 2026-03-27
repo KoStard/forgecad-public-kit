@@ -9,7 +9,10 @@
  */
 
 import type { FaceDescendantMetadata } from '../face-tracking/descendantResolution';
-import type { PortInput } from '../port';
+import { explainNoFaceQueryMatch } from '../face-tracking/faceDiagnostics';
+import type { FaceQuery, FaceSelector } from '../face-tracking/faceQuery';
+import { normalizeFaceSelector } from '../face-tracking/faceQuery';
+import { queryMeshFace, queryMeshFaces } from '../face-tracking/meshFaceDetect';
 import {
   type GeometryInfo,
   getShapePrimaryQueryOwner,
@@ -19,6 +22,7 @@ import {
   type ShapeOperandInput,
   setShapePlacementReferences,
 } from '../kernel';
+import type { PortInput } from '../port';
 import { cloneEdgeQueryRef, cloneFaceQueryRef, cloneShapeQueryOwner, type EdgeQueryRef, type FaceQueryRef } from '../queryModel';
 import { type Mat4, normalizeAxis, type RotateAroundToOptions, Transform } from '../transform';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
@@ -86,26 +90,48 @@ export class TrackedShape {
     setShapePlacementReferences(this.shape, topologyToPlacementReferences(this.topology), { merge: true });
   }
 
-  /** Get a named face */
-  face(name: FaceName): FaceRef {
-    const f = this.topology.faces.get(name);
-    if (!f) {
-      const available = [...this.topology.faces.keys()].join(', ');
-      throw new Error(`Face "${name}" not found. Available: ${available}`);
+  /** Get a named face or a face matching a query */
+  face(selector: FaceSelector): FaceRef {
+    const { compilePlanName, query } = normalizeFaceSelector(selector);
+
+    // 1. Topology map lookup (string names only)
+    if (compilePlanName) {
+      const f = this.topology.faces.get(compilePlanName);
+      if (f) {
+        const owner = getShapePrimaryQueryOwner(this.shape);
+        return {
+          ...f,
+          normal: [f.normal[0], f.normal[1], f.normal[2]],
+          center: [f.center[0], f.center[1], f.center[2]],
+          query: cloneFaceQueryRef({
+            kind: 'tracked-face',
+            faceName: compilePlanName,
+            owner: cloneShapeQueryOwner(owner ?? f.query?.owner),
+          }),
+          uAxis: f.uAxis ? [f.uAxis[0], f.uAxis[1], f.uAxis[2]] : undefined,
+          vAxis: f.vAxis ? [f.vAxis[0], f.vAxis[1], f.vAxis[2]] : undefined,
+        };
+      }
     }
-    const owner = getShapePrimaryQueryOwner(this.shape);
-    return {
-      ...f,
-      normal: [f.normal[0], f.normal[1], f.normal[2]],
-      center: [f.center[0], f.center[1], f.center[2]],
-      query: cloneFaceQueryRef({
-        kind: 'tracked-face',
-        faceName: name,
-        owner: cloneShapeQueryOwner(owner ?? f.query?.owner),
-      }),
-      uAxis: f.uAxis ? [f.uAxis[0], f.uAxis[1], f.uAxis[2]] : undefined,
-      vAxis: f.vAxis ? [f.vAxis[0], f.vAxis[1], f.vAxis[2]] : undefined,
-    };
+
+    // 2. Fall through to mesh query (works for FaceQuery objects and canonical names not in topology)
+    if (query) {
+      const detected = queryMeshFace(this.toShape(), query);
+      if (detected) return detected;
+    }
+
+    // 3. Error
+    if (compilePlanName) {
+      const available = [...this.topology.faces.keys()].join(', ');
+      throw new Error(`Face "${compilePlanName}" not found. Available: ${available}`);
+    }
+    const allFaces = queryMeshFaces(this.toShape(), {});
+    throw new Error(explainNoFaceQueryMatch(query!, allFaces));
+  }
+
+  /** Return all faces matching a query, or all mesh-detected faces when no query is given. */
+  faces(query?: FaceQuery): FaceRef[] {
+    return queryMeshFaces(this.toShape(), query ?? {});
   }
 
   /** Get a named edge */
@@ -166,12 +192,7 @@ export class TrackedShape {
 
   /** Attach named assembly ports (origin + axis + up) that survive transforms and imports. */
   withPorts(ports: Record<string, PortInput>): TrackedShape {
-    return new TrackedShape(
-      this.shape.withPorts(ports),
-      cloneTopology(this.topology),
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.withPorts(ports), cloneTopology(this.topology), this.baseHeight, this.extrudeUp);
   }
 
   /** List named port identifiers carried by this shape. */

@@ -1,4 +1,5 @@
 import { profilePlanFromCrossSection } from './compilePlan';
+import type { FaceSelector } from './face-tracking/faceQuery';
 import { Shape } from './kernel';
 import { type PlaneSpec, planeFrameToWorldToPlaneMatrix, resolvePlaneFrame } from './planeFrame';
 import { buildProjectionProfileCompilePlan } from './projectionCompile';
@@ -44,17 +45,17 @@ export function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch {
  *  The offset is invisible in any practical output. */
 const FACE_SLICE_EPSILON = 0.001;
 
-export function faceProfile(shape: Shape | TrackedShape, faceName: string): Sketch {
+export function faceProfile(shape: Shape | TrackedShape, face: FaceSelector): Sketch {
   const rawShape = requireShape(shape);
-  const face = rawShape.face(faceName);
+  const faceRef = rawShape.face(face);
   // Shift the slice plane slightly inside the solid along the inward normal so
   // Manifold doesn't see an empty cross-section at the exact face boundary.
   const origin: [number, number, number] = [
-    face.center[0] - face.normal[0] * FACE_SLICE_EPSILON,
-    face.center[1] - face.normal[1] * FACE_SLICE_EPSILON,
-    face.center[2] - face.normal[2] * FACE_SLICE_EPSILON,
+    faceRef.center[0] - faceRef.normal[0] * FACE_SLICE_EPSILON,
+    faceRef.center[1] - faceRef.normal[1] * FACE_SLICE_EPSILON,
+    faceRef.center[2] - faceRef.normal[2] * FACE_SLICE_EPSILON,
   ];
-  return intersectWithPlane(rawShape, { origin, normal: face.normal });
+  return intersectWithPlane(rawShape, { origin, normal: faceRef.normal });
 }
 
 /** Orthographically project a 3D shape onto a plane and return the silhouette as a 2D Sketch. */

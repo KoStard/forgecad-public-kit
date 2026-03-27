@@ -86,6 +86,11 @@ export const EXPERIMENTAL_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
     'Integration test for pocket/boss/faceProfile — temporary test model, not a maintained architecture example.',
     'tasks/280-example-gap-recovery-and-legacy-fence.md',
   ),
+  experimentalExample(
+    'examples/face-query-test.forge.js',
+    'Integration test for FaceQuery API — query-based face selection on complex models.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
   ...Array.from({ length: 13 }, (_, i) => {
     const num = String(i + 1).padStart(2, '0');
     const names = [

@@ -14,6 +14,8 @@
 import type { Shape } from '../kernel';
 import type { FaceRef } from '../sketch/topology';
 import type { Vec3 } from '../transform';
+import type { FaceQuery } from './faceQuery';
+import { canonicalQuery } from './faceQuery';
 
 // ─── Math helpers ─────────────────────────────────────────────────────────────
 
@@ -52,6 +54,7 @@ interface FaceCluster {
   planeOffset: number;
   centroidSum: Vec3;
   count: number;
+  area: number;
 }
 
 function clusterMeshFaces(shape: Shape): FaceCluster[] {
@@ -71,8 +74,13 @@ function clusterMeshFaces(shape: Shape): FaceCluster[] {
 
     const e1: Vec3 = [v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]];
     const e2: Vec3 = [v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]];
-    const normal = normVec3(cross(e1, e2));
+    const rawCross = cross(e1, e2);
+    const normal = normVec3(rawCross);
     if (!normal) continue; // degenerate triangle — skip
+
+    // Triangle area = magnitude of cross product / 2
+    const crossLen = Math.sqrt(rawCross[0] * rawCross[0] + rawCross[1] * rawCross[1] + rawCross[2] * rawCross[2]);
+    const triArea = crossLen / 2;
 
     const planeOffset = dot(normal, v0);
     const triCentroid: Vec3 = [(v0[0] + v1[0] + v2[0]) / 3, (v0[1] + v1[1] + v2[1]) / 3, (v0[2] + v1[2] + v2[2]) / 3];
@@ -84,6 +92,7 @@ function clusterMeshFaces(shape: Shape): FaceCluster[] {
         c.centroidSum[1] += triCentroid[1];
         c.centroidSum[2] += triCentroid[2];
         c.count++;
+        c.area += triArea;
         merged = true;
         break;
       }
@@ -95,6 +104,7 @@ function clusterMeshFaces(shape: Shape): FaceCluster[] {
         planeOffset,
         centroidSum: [triCentroid[0], triCentroid[1], triCentroid[2]],
         count: 1,
+        area: triArea,
       });
     }
   }
@@ -102,24 +112,157 @@ function clusterMeshFaces(shape: Shape): FaceCluster[] {
   return clusters;
 }
 
-// ─── Canonical name matching ───────────────────────────────────────────────────
+// ─── Cluster → FaceRef conversion ─────────────────────────────────────────────
 
-interface CanonicalFaceSpec {
-  normal: Vec3;
-  /** Which axis centroid to use when multiple matching clusters exist. */
-  axis: 0 | 1 | 2;
-  /** Whether to pick the cluster with the highest (max) or lowest (min) centroid on that axis. */
-  pick: 'max' | 'min';
+function clusterToFaceRef(cluster: FaceCluster, name = ''): FaceRef {
+  const center: Vec3 = [
+    cluster.centroidSum[0] / cluster.count,
+    cluster.centroidSum[1] / cluster.count,
+    cluster.centroidSum[2] / cluster.count,
+  ];
+  const { u, v } = tangentFrame(cluster.normal);
+  return {
+    name,
+    normal: cluster.normal,
+    center,
+    planar: true,
+    uAxis: u,
+    vAxis: v,
+  };
 }
 
-const CANONICAL: Record<string, CanonicalFaceSpec> = {
-  top: { normal: [0, 0, 1], axis: 2, pick: 'max' },
-  bottom: { normal: [0, 0, -1], axis: 2, pick: 'min' },
-  front: { normal: [0, -1, 0], axis: 1, pick: 'min' },
-  back: { normal: [0, 1, 0], axis: 1, pick: 'max' },
-  left: { normal: [-1, 0, 0], axis: 0, pick: 'min' },
-  right: { normal: [1, 0, 0], axis: 0, pick: 'max' },
-};
+// ─── Query evaluation ─────────────────────────────────────────────────────────
+
+/**
+ * Return all faces of `shape` that match the given `FaceQuery`.
+ * Each surviving cluster is converted to a `FaceRef`.
+ */
+export function queryMeshFaces(shape: Shape, query: FaceQuery): FaceRef[] {
+  let clusters = clusterMeshFaces(shape);
+
+  // Filter by normal direction
+  if (query.normal) {
+    const qn = query.normal;
+    clusters = clusters.filter((c) => dot(c.normal, qn) > NORMAL_COS_EPS);
+  }
+
+  // Filter by planar (all mesh clusters are planar — this is for future-proofing)
+  if (query.planar !== false) {
+    clusters = clusters.filter((c) => c.normal !== null);
+  }
+
+  // Filter by area range
+  if (query.area) {
+    const { min, max } = query.area;
+    if (min !== undefined) clusters = clusters.filter((c) => c.area >= min);
+    if (max !== undefined) clusters = clusters.filter((c) => c.area <= max);
+  }
+
+  return clusters.map((c) => clusterToFaceRef(c));
+}
+
+/**
+ * Return the single best face of `shape` matching the given `FaceQuery`,
+ * or `null` if no match is found.
+ */
+export function queryMeshFace(shape: Shape, query: FaceQuery): FaceRef | null {
+  let clusters = clusterMeshFaces(shape);
+
+  // Filter by normal direction
+  if (query.normal) {
+    const qn = query.normal;
+    clusters = clusters.filter((c) => dot(c.normal, qn) > NORMAL_COS_EPS);
+  }
+
+  // Filter by planar
+  if (query.planar !== false) {
+    clusters = clusters.filter((c) => c.normal !== null);
+  }
+
+  // Filter by area range
+  if (query.area) {
+    const { min, max } = query.area;
+    if (min !== undefined) clusters = clusters.filter((c) => c.area >= min);
+    if (max !== undefined) clusters = clusters.filter((c) => c.area <= max);
+  }
+
+  if (clusters.length === 0) return null;
+  if (clusters.length === 1) return clusterToFaceRef(clusters[0]);
+
+  // Disambiguate via query.pick
+  if (query.pick) {
+    const pick = query.pick;
+    if (pick === 'largest') {
+      clusters.sort((a, b) => b.area - a.area);
+      return clusterToFaceRef(clusters[0]);
+    }
+    if (pick === 'smallest') {
+      clusters.sort((a, b) => a.area - b.area);
+      return clusterToFaceRef(clusters[0]);
+    }
+    // Axis-based picks: 'max-x' | 'min-x' | 'max-y' | 'min-y' | 'max-z' | 'min-z'
+    const axisMap: Record<string, { axis: 0 | 1 | 2; dir: 1 | -1 }> = {
+      'max-x': { axis: 0, dir: -1 },
+      'min-x': { axis: 0, dir: 1 },
+      'max-y': { axis: 1, dir: -1 },
+      'min-y': { axis: 1, dir: 1 },
+      'max-z': { axis: 2, dir: -1 },
+      'min-z': { axis: 2, dir: 1 },
+    };
+    const spec = axisMap[pick];
+    if (spec) {
+      clusters.sort((a, b) => {
+        const ca = a.centroidSum[spec.axis] / a.count;
+        const cb = b.centroidSum[spec.axis] / b.count;
+        return spec.dir * (ca - cb);
+      });
+      return clusterToFaceRef(clusters[0]);
+    }
+  }
+
+  // Disambiguate via query.nearest (centroid distance)
+  if (query.nearest) {
+    const pt = query.nearest;
+    const is2D = pt.length === 2;
+    clusters.sort((a, b) => {
+      const ax = a.centroidSum[0] / a.count;
+      const ay = a.centroidSum[1] / a.count;
+      const az = a.centroidSum[2] / a.count;
+      const bx = b.centroidSum[0] / b.count;
+      const by = b.centroidSum[1] / b.count;
+      const bz = b.centroidSum[2] / b.count;
+      const dx_a = ax - pt[0];
+      const dy_a = ay - pt[1];
+      const dx_b = bx - pt[0];
+      const dy_b = by - pt[1];
+      const distA = is2D ? dx_a * dx_a + dy_a * dy_a : dx_a * dx_a + dy_a * dy_a + (az - (pt as [number, number, number])[2]) ** 2;
+      const distB = is2D ? dx_b * dx_b + dy_b * dy_b : dx_b * dx_b + dy_b * dy_b + (bz - (pt as [number, number, number])[2]) ** 2;
+      return distA - distB;
+    });
+    return clusterToFaceRef(clusters[0]);
+  }
+
+  // Disambiguate via query.at (centroid distance, same as nearest for now)
+  if (query.at) {
+    const pt = query.at;
+    clusters.sort((a, b) => {
+      const ax = a.centroidSum[0] / a.count - pt[0];
+      const ay = a.centroidSum[1] / a.count - pt[1];
+      const az = a.centroidSum[2] / a.count - pt[2];
+      const bx = b.centroidSum[0] / b.count - pt[0];
+      const by = b.centroidSum[1] / b.count - pt[1];
+      const bz = b.centroidSum[2] / b.count - pt[2];
+      return ax * ax + ay * ay + az * az - (bx * bx + by * by + bz * bz);
+    });
+    return clusterToFaceRef(clusters[0]);
+  }
+
+  // No disambiguation specified — return first by area desc
+  clusters.sort((a, b) => b.area - a.area);
+  return clusterToFaceRef(clusters[0]);
+}
+
+// ─── Canonical name matching ───────────────────────────────────────────────────
 
 /**
  * Detect a canonical face (top / bottom / front / back / left / right) from
@@ -129,33 +272,7 @@ const CANONICAL: Record<string, CanonicalFaceSpec> = {
  * is unavailable — e.g. on shapes produced by raw boolean ops.
  */
 export function detectFaceByName(shape: Shape, name: string): FaceRef | null {
-  const spec = CANONICAL[name];
-  if (!spec) return null;
-
-  const clusters = clusterMeshFaces(shape);
-
-  // Filter: normal must point within ~1° of the expected direction.
-  const matching = clusters.filter((c) => dot(c.normal, spec.normal) > NORMAL_COS_EPS);
-  if (matching.length === 0) return null;
-
-  // When multiple matching clusters exist (e.g. two horizontal planes at different Z),
-  // pick by centroid position along the relevant axis.
-  const best = matching.reduce((prev, curr) => {
-    const pa = prev.centroidSum[spec.axis] / prev.count;
-    const ca = curr.centroidSum[spec.axis] / curr.count;
-    return spec.pick === 'max' ? (ca > pa ? curr : prev) : ca < pa ? curr : prev;
-  });
-
-  const center: Vec3 = [best.centroidSum[0] / best.count, best.centroidSum[1] / best.count, best.centroidSum[2] / best.count];
-
-  const { u, v } = tangentFrame(best.normal);
-
-  return {
-    name,
-    normal: best.normal,
-    center,
-    planar: true,
-    uAxis: u,
-    vAxis: v,
-  };
+  const query = canonicalQuery(name);
+  if (!query) return null;
+  return queryMeshFace(shape, query);
 }

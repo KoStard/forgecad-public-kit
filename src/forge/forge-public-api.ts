@@ -40,6 +40,7 @@ export { bom } from './bom';
 export { cutPlane } from './cutPlane';
 export { chamferEdgeSegment, filletEdgeSegment } from './edge-features/edgeSegmentFeatures';
 export { robotExport } from './export/robotExport';
+export type { FaceQuery, FaceSelector } from './face-tracking/faceQuery';
 export type { BossOptions, PocketOptions } from './faceOps';
 export type { EdgeSelector } from './fillet';
 export { chamfer, draft, fillet, offsetSolid } from './fillet';
@@ -94,13 +95,13 @@ export {
   Circle2D,
   Constraint,
   ConstraintSketch,
-  connectEdges,
   Curve3D,
   chamferEdge,
   circle,
   circle2d,
   circularPattern,
   circularPattern2d,
+  connectEdges,
   constrainedSketch,
   degrees,
   difference2d,
@@ -121,12 +122,13 @@ export {
   loft,
   mirrorCopy,
   ngon,
-  pickEdge,
-  pickEdgeSegment,
   Point2D,
   path,
+  pickEdge,
+  pickEdgeSegment,
   point,
   polygon,
+  QuinticHermiteCurve3D,
   Rectangle2D,
   radians,
   rect,
@@ -142,13 +144,12 @@ export {
   stroke,
   sweep,
   TrackedShape,
+  text2d,
+  textWidth,
   transitionCurve,
   transitionCurveFromPoints,
   transitionSurface,
-  text2d,
-  textWidth,
   union2d,
-  QuinticHermiteCurve3D,
 } from './sketch';
 export type { CircleId, LineDistanceConstraint, LineId, PointId } from './sketch/constraints';
 // ConstrainedSketchBuilder is the main win: all constraint methods are inlined
