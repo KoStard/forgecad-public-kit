@@ -14,8 +14,8 @@ const installDocsOutputDir = path.join(repoRoot, "dist-skill/docs");
 const sourceDocsDir = path.join(repoRoot, "docs/permanent");
 
 const docs = {
-  // Core API
-  apiReference: "docs/permanent/API/core/reference.md",
+  // Core concepts and gotchas
+  concepts: "docs/permanent/API/core/concepts.md",
   topology: "docs/permanent/API/core/topology.md",
   parameters: "docs/permanent/API/core/parameters.md",
   edgeQueries: "docs/permanent/API/core/edge-queries.md",
@@ -60,8 +60,15 @@ const docs = {
   // CLI
   cli: "docs/permanent/CLI.md",
 
-  // Auto-generated
-  generatedApiRef: "docs/permanent/generated/api-reference.md",
+  // Auto-generated per-module API references
+  genCore: "docs/permanent/generated/core.md",
+  genSketch: "docs/permanent/generated/sketch.md",
+  genAssembly: "docs/permanent/generated/assembly.md",
+  genCurves: "docs/permanent/generated/curves.md",
+  genSheetMetal: "docs/permanent/generated/sheet-metal.md",
+  genViewport: "docs/permanent/generated/viewport.md",
+  genOutput: "docs/permanent/generated/output.md",
+  genLib: "docs/permanent/generated/lib.md",
 };
 
 // ---------------------------------------------------------------------------
@@ -71,13 +78,11 @@ const docs = {
 // we use slimmer versions to keep the token count manageable.
 // ---------------------------------------------------------------------------
 const oneFileDocs = {
-  // Slim concepts & patterns guide replaces the full reference.md
+  // Core concepts and slim skill guide
+  concepts: "docs/permanent/API/core/concepts.md",
   skillGuide: "docs/permanent/API/core/skill-guide.md",
 
-  // Auto-generated API index (enriched with JSDoc from source)
-  generatedApiRef: "docs/permanent/generated/api-reference.md",
-
-  // Core supporting docs (kept as-is — already concise)
+  // Core supporting docs (concise)
   topology: "docs/permanent/API/core/topology.md",
   parameters: "docs/permanent/API/core/parameters.md",
   edgeQueries: "docs/permanent/API/core/edge-queries.md",
@@ -88,7 +93,7 @@ const oneFileDocs = {
   positioning: "docs/permanent/guides/positioning.md",
   modelingRecipes: "docs/permanent/guides/modeling-recipes.md",
 
-  // Sketch (kept — already concise individual files)
+  // Sketch (already concise individual files)
   sketchCore: "docs/permanent/API/sketch/core.md",
   sketchPrimitives: "docs/permanent/API/sketch/primitives.md",
   sketchPath: "docs/permanent/API/sketch/path.md",
@@ -110,7 +115,7 @@ const oneFileDocs = {
   // Runtime
   viewport: "docs/permanent/API/runtime/viewport.md",
 
-  // Output (brep-export parity table omitted — essentials in export.md and skill-cli.md)
+  // Output (brep-export omitted — essentials in export.md and skill-cli.md)
   export: "docs/permanent/API/output/export.md",
   bom: "docs/permanent/API/output/bom.md",
   dimensions: "docs/permanent/API/output/dimensions.md",
@@ -120,14 +125,24 @@ const oneFileDocs = {
 
   // Slim CLI excerpt — model-authoring commands only
   skillCli: "docs/permanent/API/core/skill-cli.md",
+
+  // Auto-generated per-module API references
+  genCore: "docs/permanent/generated/core.md",
+  genSketch: "docs/permanent/generated/sketch.md",
+  genAssembly: "docs/permanent/generated/assembly.md",
+  genCurves: "docs/permanent/generated/curves.md",
+  genSheetMetal: "docs/permanent/generated/sheet-metal.md",
+  genViewport: "docs/permanent/generated/viewport.md",
+  genOutput: "docs/permanent/generated/output.md",
+  genLib: "docs/permanent/generated/lib.md",
 };
 
 const docGroups = [
   {
     title: "1. Core API (always read first)",
     guidance:
-      "Primitives, transforms, booleans, imports, parameters, topology, edge queries, return formats, curves/surfacing.",
-    paths: [docs.apiReference, docs.parameters, docs.topology, docs.edgeQueries],
+      "Execution model, colors, coordinate system, primitives, booleans, patterns, imports, parameters, topology, edge queries.",
+    paths: [docs.concepts, docs.parameters, docs.topology, docs.edgeQueries, docs.genCore],
   },
   {
     title: "2. Geometry and Positioning (when placement/orientation matters)",
@@ -150,48 +165,48 @@ const docGroups = [
       docs.sketchAnchor,
       docs.sketchText,
       docs.sketchRegions,
+      docs.genSketch,
     ],
   },
   {
-    title: "4. Assemblies and Mechanisms (for joints or kinematics)",
+    title: "4. Curves and Surfacing (for lofts, sweeps, splines)",
+    guidance: "Smooth curves, Hermite splines, lofted and swept solids.",
+    paths: [docs.genCurves],
+  },
+  {
+    title: "5. Assemblies and Mechanisms (for joints or kinematics)",
     guidance: "Assembly graph, joint types, couplings, validation, robot export.",
-    paths: [docs.assembly],
+    paths: [docs.assembly, docs.genAssembly],
   },
   {
-    title: "5. Sheet Metal (for bent parts, K-factor, flat patterns)",
+    title: "6. Sheet Metal (for bent parts, K-factor, flat patterns)",
     guidance: "Bend operations, flat pattern unfolding, K-factor configuration.",
-    paths: [docs.sheetMetal],
+    paths: [docs.sheetMetal, docs.genSheetMetal],
   },
   {
-    title: "6. Output and Export (for STL/3MF/STEP, BOM, dimensions)",
+    title: "7. Output and Export (for STL/3MF/STEP, BOM, dimensions)",
     guidance: "Mesh export, exact geometry export, bill of materials, dimension annotations.",
-    paths: [docs.export, docs.brepExport, docs.bom, docs.dimensions],
+    paths: [docs.export, docs.brepExport, docs.bom, docs.dimensions, docs.genOutput],
   },
   {
-    title: "7. Toolbox (fasteners and standard parts)",
-    guidance: "Parametric bolts, nuts, washers, and standard hardware.",
-    paths: [docs.fasteners],
+    title: "8. Toolbox (fasteners and standard parts)",
+    guidance: "Parametric bolts, nuts, washers, standard hardware, gears, pipes, and structural profiles.",
+    paths: [docs.fasteners, docs.genLib],
   },
   {
-    title: "8. Runtime Viewport APIs (for cut planes, jointsView, and animation playback)",
+    title: "9. Runtime Viewport APIs (for cut planes, jointsView, and animation playback)",
     guidance: "Viewer-only APIs such as cutPlane, explodeView, jointsView, and animation behavior.",
-    paths: [docs.viewport],
+    paths: [docs.viewport, docs.genViewport],
   },
   {
-    title: "9. Recipes and Debugging (for patterns and troubleshooting)",
+    title: "10. Recipes and Debugging (for patterns and troubleshooting)",
     guidance: "Modeling patterns, debugging tactics, copyable snippets.",
     paths: [docs.modelingRecipes],
   },
   {
-    title: "10. CLI (for validation/render/export tasks)",
+    title: "11. CLI (for validation/render/export tasks)",
     guidance: "Test-run, notebook execution, export pipelines, debug flags.",
     paths: [docs.cli],
-  },
-  {
-    title: "11. Auto-Generated API Index (lookup unknown functions)",
-    guidance:
-      "Complete function/class/constant index auto-generated from the type definitions. Use when you encounter an unfamiliar API name.",
-    paths: [docs.generatedApiRef],
   },
 ];
 

@@ -594,7 +594,7 @@ function forgeTypesPlugin() {
         // Chain: docs and skill depend on the freshly generated .d.ts
         try {
           execSync('node scripts/gen-api-docs.mjs', { cwd: __dirname, stdio: 'pipe' });
-          console.log('✓ api-reference.md regenerated');
+          console.log('✓ generated API docs regenerated');
         } catch (e: any) {
           console.error('✗ gen:docs failed:', e.stderr?.toString() ?? e.message);
         }
