@@ -8,4 +8,4 @@
  * Implementation lives in src/forge/lib/
  */
 
-export * from './lib';
+export { partLibrary } from './lib/fasteners';

@@ -81,6 +81,42 @@ content = content
   .replace(/^export (class |function |const |let |var )/gm, 'declare $1')
   .trim();
 
+// ── Remove lib-only declarations from global scope ──────────────────────────
+// Members of `partLibrary` (exposed as `lib.*`) are NOT in the global eval
+// context — only `lib` itself is. Remove standalone top-level `declare
+// function` globals for each lib member and inline their signatures directly
+// into the partLibrary object type so Monaco shows `lib.foo(...)` correctly
+// but never offers `foo(...)` as a global.
+const libBlockMatch = content.match(/declare const partLibrary:\s*\{([^}]+)\}/s);
+if (libBlockMatch) {
+  const libMembers = new Set(
+    [...libBlockMatch[1].matchAll(/^\s{1,4}(\w+):/gm)].map(m => m[1])
+  );
+  // Collect signatures before removing — handles optional generics <T extends ...>
+  const signatures = new Map();
+  for (const name of libMembers) {
+    const fnMatch = content.match(
+      new RegExp(`^declare function (${name})(<[^>]*>)?(\\([^)]*(?:\\([^)]*\\)[^)]*)*\\)[^;\\n]*);`, 'm')
+    );
+    if (fnMatch) {
+      const generics = fnMatch[2] ?? '';
+      signatures.set(name, `${name}${generics}${fnMatch[3]}`);
+    }
+    // Always remove the standalone top-level declaration
+    content = content.replace(
+      new RegExp(`^declare function ${name}\\b[^\\n]*\\n`, 'gm'),
+      '',
+    );
+  }
+  // Replace `name: typeof name` with the inlined method signature
+  for (const [name, sig] of signatures) {
+    content = content.replace(
+      new RegExp(`(\\s+)${name}: typeof ${name};`, 'g'),
+      `$1${sig};`,
+    );
+  }
+}
+
 // Prepend header and stubs for external types
 const header = '// AUTO-GENERATED — do not edit by hand.\n// Regenerate: npm run gen:types  (source: src/forge/forge-public-api.ts)\n';
 if (importStubs.length > 0) {

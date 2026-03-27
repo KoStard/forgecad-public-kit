@@ -26,12 +26,12 @@
 - [Viewport & Runtime](#viewport-runtime) — `jointsView`, `cutPlane`, `cutPlane`, `explodeView`, `scene`, `viewConfig`
 - [Annotations & Output](#annotations-output) — `dim`, `dimLine`, `bom`, `robotExport`
 - [Sketch Export](#sketch-export) — `sketchToDxf`, `sketchToSvg`
-- [Fasteners & Hardware](#fasteners-hardware) — `boltHole`, `fastenerHole`, `counterbore`, `hexNut`, `holePattern`, `thread`, `bolt`, `nut`, `washer`, `fastenerSet`
-- [Structural Profiles](#structural-profiles) — `tSlotProfile`, `tSlotExtrusion`, `profile2020BSlot6Profile`, `profile2020BSlot6`
-- [Pipes & Routing](#pipes-routing) — `tube`, `pipe`, `pipeRoute`, `elbow`
-- [Gears](#gears) — `spurGear`, `sideGear`, `faceGear`, `ringGear`, `rackGear`, `bevelGear`, `gearPair`, `bevelGearPair`, `sideGearPair`, `faceGearPair`
-- [Utility Shapes](#utility-shapes) — `roundedBox`, `bracket`, `explode`
-- [Other](#other) — `composeChain`, `portFactory`, `loadFont`, `linearPattern2d`, `circularPattern2d`, `fillet`, `chamfer`, `draft`, `offsetSolid`, `torus`, `importMesh`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`
+- [Fasteners & Hardware](#fasteners-hardware) — `lib.boltHole`, `lib.fastenerHole`, `lib.counterbore`, `lib.hexNut`, `lib.holePattern`, `lib.thread`, `lib.bolt`, `lib.nut`, `lib.washer`, `lib.fastenerSet`
+- [Structural Profiles](#structural-profiles) — `lib.tSlotProfile`, `lib.tSlotExtrusion`, `lib.profile2020BSlot6Profile`, `lib.profile2020BSlot6`
+- [Pipes & Routing](#pipes-routing) — `lib.tube`, `lib.pipe`, `lib.pipeRoute`, `lib.elbow`
+- [Gears](#gears) — `lib.spurGear`, `lib.bevelGear`, `lib.faceGear`, `lib.sideGear`, `lib.ringGear`, `lib.rackGear`, `lib.gearPair`, `lib.bevelGearPair`, `lib.faceGearPair`, `lib.sideGearPair`
+- [Utility Shapes](#utility-shapes) — `lib.roundedBox`, `lib.bracket`
+- [Other](#other) — `composeChain`, `portFactory`, `loadFont`, `hermiteTransition`, `hermiteTransitionG2`, `linearPattern2d`, `circularPattern2d`, `transitionCurve`, `transitionSurface`, `transitionCurveFromPoints`, `pickEdge`, `pickEdgeSegment`, `connectEdges`, `fillet`, `chamfer`, `draft`, `offsetSolid`, `torus`, `importMesh`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`, `highlight`
 
 **Classes:**
 - [`Transform`](#transform)
@@ -45,6 +45,8 @@
 - [`Rectangle2D`](#rectangle2d)
 - [`TrackedShape`](#trackedshape)
 - [`Curve3D`](#curve3d)
+- [`HermiteCurve3D`](#hermitecurve3d)
+- [`QuinticHermiteCurve3D`](#quintichermitecurve3d)
 - [`PathBuilder`](#pathbuilder)
 - [`Shape`](#shape)
 - [`MateBuilder`](#matebuilder)
@@ -721,208 +723,202 @@ Export a 2D sketch as an SVG string. For regular sketches, exports filled polygo
 
 ### Fasteners & Hardware
 
-Pre-built fastener shapes and hole helpers. Also available via `lib.*`.
+Pre-built fastener shapes and hole helpers. Access via `lib.*`.
 
-#### `boltHole()`
+#### `lib.boltHole()`
 
 ```ts
-boltHole(diameter: number, depth: number): Shape
+lib.boltHole(diameter: number, depth: number): Shape
 ```
 
-#### `fastenerHole()`
+#### `lib.fastenerHole()`
 
 ```ts
-fastenerHole(opts: FastenerHoleOptions): Shape
+lib.fastenerHole(opts: FastenerHoleOptions): Shape
 ```
 
-#### `counterbore()`
+#### `lib.counterbore()`
 
 ```ts
-counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: number): Shape
+lib.counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: number): Shape
 ```
 
-#### `hexNut()`
+#### `lib.hexNut()`
 
 ```ts
-hexNut(acrossFlats: number, height: number, holeDia: number): Shape
+lib.hexNut(acrossFlats: number, height: number, holeDia: number): Shape
 ```
 
-#### `holePattern()`
+#### `lib.holePattern()`
 
 ```ts
-holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape
+lib.holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape
 ```
 
-#### `thread()`
+#### `lib.thread()`
 
 ```ts
-thread(diameter: number, pitch: number, length: number, options?: { depth?: number; segments?: number; }): Shape
+lib.thread(diameter: number, pitch: number, length: number, options?: { depth?: number; segments?: number; }): Shape
 ```
 
-#### `bolt()`
+#### `lib.bolt()`
 
 ```ts
-bolt(diameter: number, length: number, options?: { ... }): Shape
+lib.bolt(diameter: number, length: number, options?: { ... }): Shape
 ```
 
-#### `nut()`
+#### `lib.nut()`
 
 ```ts
-nut(diameter: number, options?: { pitch?: number; height?: number; acrossFlats?: number; segments?: number; }): Shape
+lib.nut(diameter: number, options?: { pitch?: number; height?: number; acrossFlats?: number; segments?: number; }): Shape
 ```
 
-#### `washer()`
+#### `lib.washer()`
 
 ```ts
-washer(size: MetricSize, options?: { standard?: WasherStandard; segments?: number; }): Shape
+lib.washer(size: MetricSize, options?: { standard?: WasherStandard; segments?: number; }): Shape
 ```
 
-#### `fastenerSet()`
+#### `lib.fastenerSet()`
 
 ```ts
-fastenerSet(size: MetricSize, boltLength: number, options?: FastenerSetOptions): FastenerSetResult
+lib.fastenerSet(size: MetricSize, boltLength: number, options?: FastenerSetOptions): FastenerSetResult
 ```
 
 ### Structural Profiles
 
-Extrusion profiles for aluminum framing and similar applications.
+Extrusion profiles for aluminum framing and similar applications. Access via `lib.*`.
 
-#### `tSlotProfile()`
+#### `lib.tSlotProfile()`
 
 ```ts
-tSlotProfile(options?: TSlotProfileOptions): Sketch
+lib.tSlotProfile(options?: TSlotProfileOptions): Sketch
 ```
 
-#### `tSlotExtrusion()`
+#### `lib.tSlotExtrusion()`
 
 ```ts
-tSlotExtrusion(length: number, options?: TSlotExtrusionOptions): Shape
+lib.tSlotExtrusion(length: number, options?: TSlotExtrusionOptions): Shape
 ```
 
-#### `profile2020BSlot6Profile()`
+#### `lib.profile2020BSlot6Profile()`
 
 ```ts
-profile2020BSlot6Profile(options?: Profile2020BSlot6ProfileOptions): Sketch
+lib.profile2020BSlot6Profile(options?: Profile2020BSlot6ProfileOptions): Sketch
 ```
 
-#### `profile2020BSlot6()`
+#### `lib.profile2020BSlot6()`
 
 ```ts
-profile2020BSlot6(length: number, options?: Profile2020BSlot6Options): Shape
+lib.profile2020BSlot6(length: number, options?: Profile2020BSlot6Options): Shape
 ```
 
 ### Pipes & Routing
 
-Create pipe runs, elbows, and tubes.
+Create pipe runs, elbows, and tubes. Access via `lib.*`.
 
-#### `tube()`
+#### `lib.tube()`
 
 ```ts
-tube(outerX: number, outerY: number, outerZ: number, wall: number): Shape
+lib.tube(outerX: number, outerY: number, outerZ: number, wall: number): Shape
 ```
 
-#### `pipe()`
+#### `lib.pipe()`
 
 ```ts
-pipe(height: number, outerRadius: number, wall: number, segments?: number): Shape
+lib.pipe(height: number, outerRadius: number, wall: number, segments?: number): Shape
 ```
 
-#### `pipeRoute()`
+#### `lib.pipeRoute()`
 
 ```ts
-pipeRoute(points: [ number, number, number ][], radius: number, options?: { bendRadius?: number; wall?: number; segments?: number; }): Shape
+lib.pipeRoute(points: [ number,
 ```
 
-#### `elbow()`
+#### `lib.elbow()`
 
 ```ts
-elbow(pipeRadius: number, bendRadius: number, angle?: number | { ... }, options?: { ... }): Shape
+lib.elbow(pipeRadius: number, bendRadius: number, angle?: number | { ... }, options?: { ... }): Shape
 ```
 
 ### Gears
 
-Parametric gear geometry with meshing analysis.
+Parametric gear geometry with meshing analysis. Access via `lib.*`.
 
-#### `spurGear()`
+#### `lib.spurGear()`
 
 ```ts
-spurGear(options: SpurGearOptions): Shape
+lib.spurGear(options: SpurGearOptions): Shape
 ```
 
-#### `sideGear()`
+#### `lib.bevelGear()`
 
 ```ts
-sideGear(options: SideGearOptions): Shape
+lib.bevelGear(options: BevelGearOptions): Shape
 ```
 
-#### `faceGear()`
+#### `lib.faceGear()`
 
 ```ts
-faceGear(options: FaceGearOptions): Shape
+lib.faceGear(options: FaceGearOptions): Shape
 ```
 
-#### `ringGear()`
+#### `lib.sideGear()`
 
 ```ts
-ringGear(options: RingGearOptions): Shape
+lib.sideGear(options: SideGearOptions): Shape
 ```
 
-#### `rackGear()`
+#### `lib.ringGear()`
 
 ```ts
-rackGear(options: RackGearOptions): Shape
+lib.ringGear(options: RingGearOptions): Shape
 ```
 
-#### `bevelGear()`
+#### `lib.rackGear()`
 
 ```ts
-bevelGear(options: BevelGearOptions): Shape
+lib.rackGear(options: RackGearOptions): Shape
 ```
 
-#### `gearPair()`
+#### `lib.gearPair()`
 
 ```ts
-gearPair(options: GearPairOptions): GearPairResult
+lib.gearPair(options: GearPairOptions): GearPairResult
 ```
 
-#### `bevelGearPair()`
+#### `lib.bevelGearPair()`
 
 ```ts
-bevelGearPair(options: BevelGearPairOptions): BevelGearPairResult
+lib.bevelGearPair(options: BevelGearPairOptions): BevelGearPairResult
 ```
 
-#### `sideGearPair()`
+#### `lib.faceGearPair()`
 
 ```ts
-sideGearPair(options: SideGearPairOptions): SideGearPairResult
+lib.faceGearPair(options: FaceGearPairOptions): FaceGearPairResult
 ```
 
-#### `faceGearPair()`
+#### `lib.sideGearPair()`
 
 ```ts
-faceGearPair(options: FaceGearPairOptions): FaceGearPairResult
+lib.sideGearPair(options: SideGearPairOptions): SideGearPairResult
 ```
 
 ### Utility Shapes
 
-Pre-built parametric shapes for common patterns.
+Pre-built parametric shapes for common patterns. Access via `lib.*`.
 
-#### `roundedBox()`
+#### `lib.roundedBox()`
 
 ```ts
-roundedBox(x: number, y: number, z: number, radius: number): Shape
+lib.roundedBox(x: number, y: number, z: number, radius: number): Shape
 ```
 
-#### `bracket()`
+#### `lib.bracket()`
 
 ```ts
-bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape
-```
-
-#### `explode()`
-
-```ts
-explode<T extends ExplodeItem[] | ShapeGroup>(items: T, options?: ExplodeOptions): T
+lib.bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape
 ```
 
 ### Other
@@ -949,6 +945,22 @@ loadFont(source: string | ArrayBuffer, cacheKey?: string): opentype$1.Font
 
 Load and cache a font. - A built-in font name: `'sans-serif'` or `'inter'` (works everywhere) - A file path to a TTF/OTF/WOFF file (CLI/Node only) - An ArrayBuffer of font data (works everywhere)
 
+#### `hermiteTransition()`
+
+```ts
+hermiteTransition(a: EdgeEndpoint, b: EdgeEndpoint): HermiteCurve3D
+```
+
+Create a Hermite transition curve between two edge endpoints. The curve starts at `a.point` tangent to `a.tangent` and ends at `b.point` tangent to `b.tangent`, with smooth G1-continuous interpolation. Weight controls: - weight = 1.0 (default): balanced transition - weight > 1.0: curve follows this edge's direction longer before turning - weight < 1.0: curve turns sooner, shorter tangent influence
+
+#### `hermiteTransitionG2()`
+
+```ts
+hermiteTransitionG2(a: QuinticHermiteCurveEndpoint, b: QuinticHermiteCurveEndpoint): QuinticHermiteCurve3D
+```
+
+Create a quintic Hermite transition curve between two edge endpoints (G2 continuity). The curve starts at `a.point` tangent to `a.tangent` with curvature `a.curvature`, and ends at `b.point` tangent to `b.tangent` with curvature `b.curvature`, with smooth G2-continuous interpolation matching position, tangent, and curvature.
+
 #### `linearPattern2d()`
 
 ```ts
@@ -964,6 +976,52 @@ circularPattern2d(sketch: Sketch, count: number, centerX?: number, centerY?: num
 ```
 
 Repeat a sketch in a circular pattern around a center point
+
+#### `transitionCurve()`
+
+```ts
+transitionCurve(edgeA: TransitionEdge, edgeB: TransitionEdge, options?: TransitionCurveOptions): HermiteCurve3D
+```
+
+Create a smooth transition curve between two edges. Returns a `HermiteCurve3D` that starts at `edgeA.point` tangent to `edgeA.tangent` and ends at `edgeB.point` tangent to `edgeB.tangent`. The curve maintains G1 continuity (matching tangent direction) at both endpoints. Weight parameters control the shape of the transition. ```js // Connect two edges with a balanced transition const curve = transitionCurve( { point: [0, 0, 0], tangent: [1, 0, 0] }, { point: [10, 5, 0], tangent: [1, 0, 0] }, ); // Weighted: curve hugs edge A longer const weighted = transitionCurve( { point: [0, 0, 0], tangent: [1, 0, 0] }, { point: [10, 5, 0], tangent: [1, 0, 0] }, { weightA: 2.0, weightB: 0.5 }, ); ```
+
+#### `transitionSurface()`
+
+```ts
+transitionSurface(edgeA: TransitionEdge, edgeB: TransitionEdge, options?: TransitionSurfaceOptions): Shape
+```
+
+Create a solid transition surface between two edges by sweeping a profile along a Hermite transition curve. This produces a watertight solid that smoothly connects the two edges. Works with both Manifold and OCCT backends. ```js // Circular tube connecting two edges const tube = transitionSurface( { point: [0, 0, 0], tangent: [1, 0, 0] }, { point: [10, 5, 3], tangent: [0, 1, 0] }, { radius: 0.5 }, ); // Custom profile with weights const custom = transitionSurface( { point: [0, 0, 0], tangent: [1, 0, 0] }, { point: [10, 5, 3], tangent: [0, 1, 0] }, { profile: mySketch, weightA: 1.5, weightB: 0.8 }, ); ```
+
+#### `transitionCurveFromPoints()`
+
+```ts
+transitionCurveFromPoints(startPoint: Vec3$4, startTangent: Vec3$4, endPoint: Vec3$4, endTangent: Vec3$4, options?: TransitionCurveOptions): HermiteCurve3D
+```
+
+Convenience: create a transition curve from raw coordinate data. Useful when you have endpoints and directions as plain arrays without constructing TransitionEdge objects.
+
+#### `pickEdge()`
+
+```ts
+pickEdge(edge: EdgeRef, options?: EdgePickOptions): TransitionEdge
+```
+
+Pick a connection point from an EdgeRef (tracked topology edge). EdgeRef has `start` and `end` positions. The tangent is inferred from the edge direction. ```js const box1 = rect(10, 10).extrude(10); const topEdge = box1.edge('top-front'); // Connect from the start of the top-front edge, tangent along the edge const edgeA = pickEdge(topEdge, { end: 'start' }); // Connect from the end, with flipped tangent const edgeB = pickEdge(topEdge, { end: 'end', flip: true }); ```
+
+#### `pickEdgeSegment()`
+
+```ts
+pickEdgeSegment(edge: EdgeSegment, options?: EdgePickOptions): TransitionEdge
+```
+
+Pick a connection point from an EdgeSegment (from selectEdge/selectEdges). EdgeSegment has richer data including surface normals on both sides, enabling 'outward' tangent mode for transitions that leave the surface. ```js const myBox = box(20, 20, 20); const topEdge = selectEdge(myBox, { atZ: 20, parallel: [1, 0, 0] }); // Connect from edge start, tangent along the edge direction const edgeA = pickEdgeSegment(topEdge, { end: 'start' }); // Connect from midpoint, tangent pointing outward (away from surface) const edgeB = pickEdgeSegment(topEdge, { end: 'mid', tangentMode: 'outward' }); ```
+
+#### `connectEdges()`
+
+```ts
+connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options?: ConnectEdgesOptions): Shape
+```
 
 #### `fillet()`
 
@@ -1381,6 +1439,56 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `tangentAt()` — tangentAt(t: number): Vec3$2
 - `length()` — length(samples?: number): number
 
+### `HermiteCurve3D`
+
+A cubic Hermite curve in 3D space. Interpolates between two endpoints matching position and tangent (G1 continuity). Weight parameters control tangent magnitude, affecting the "reach" of the curve along each edge's direction before turning.
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `p0` | `Vec3$3` | Start position |
+| `p1` | `Vec3$3` | End position |
+| `t0` | `Vec3$3` | Scaled tangent at start (direction * weight * chordLength) |
+| `t1` | `Vec3$3` | Scaled tangent at end (direction * weight * chordLength) |
+| `chordLength` | `number` | Chord length (straight-line distance between endpoints) |
+
+**Methods:**
+
+- `pointAt()` — Evaluate position at parameter t ∈ [0, 1]
+- `tangentAt()` — Evaluate tangent (first derivative) at parameter t ∈ [0, 1]
+- `curvatureAt()` — Evaluate curvature vector (second derivative) at parameter t ∈ [0, 1]
+- `sample()` — Sample the curve as a polyline of evenly-spaced parameter values.
+- `length()` — Approximate arc length by sampling.
+- `sampleAdaptive()` — Sample with adaptive density — more points where curvature is higher. Returns at least `minCount` points, up to `maxCount`.
+- `toPolyline()` — Convert to a format compatible with sweep() path input.
+
+### `QuinticHermiteCurve3D`
+
+A quintic Hermite curve in 3D space. Interpolates between two endpoints matching position, tangent, and second derivative (G2 / curvature continuity). Uses degree-5 Hermite basis functions. Weight parameters scale tangent magnitudes relative to chord length. Curvature vectors are scaled by weight² * chordLength² for consistent behavior.
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `p0` | `Vec3$3` | Start position |
+| `p1` | `Vec3$3` | End position |
+| `t0` | `Vec3$3` | Scaled tangent at start (direction * weight * chordLength) |
+| `t1` | `Vec3$3` | Scaled tangent at end (direction * weight * chordLength) |
+| `c0` | `Vec3$3` | Scaled second derivative at start (curvature * weight² * chordLength²) |
+| `c1` | `Vec3$3` | Scaled second derivative at end (curvature * weight² * chordLength²) |
+| `chordLength` | `number` | Chord length (straight-line distance between endpoints) |
+
+**Methods:**
+
+- `pointAt()` — Evaluate position at parameter t ∈ [0, 1]
+- `tangentAt()` — Evaluate tangent (first derivative, normalized) at parameter t ∈ [0, 1]
+- `curvatureAt()` — Evaluate curvature vector (second derivative) at parameter t ∈ [0, 1]
+- `sample()` — Sample the curve as a polyline of evenly-spaced parameter values.
+- `length()` — Approximate arc length by sampling.
+- `sampleAdaptive()` — Sample with adaptive density — more points where curvature is higher. Returns at least `minCount` points, up to `maxCount`.
+- `toPolyline()` — Convert to a format compatible with sweep() path input.
+
 ### `PathBuilder`
 
 **Methods:**
@@ -1624,37 +1732,36 @@ All library parts, keyed by name
 
 **Members:**
 
-- `boltHole()` — boltHole: typeof boltHole
-- `fastenerHole()` — fastenerHole: typeof fastenerHole
-- `counterbore()` — counterbore: typeof counterbore
-- `tube()` — tube: typeof tube
-- `pipe()` — pipe: typeof pipe
-- `explode()` — explode: typeof explode
-- `hexNut()` — hexNut: typeof hexNut
-- `roundedBox()` — roundedBox: typeof roundedBox
-- `bracket()` — bracket: typeof bracket
-- `holePattern()` — holePattern: typeof holePattern
-- `thread()` — thread: typeof thread
-- `bolt()` — bolt: typeof bolt
-- `nut()` — nut: typeof nut
-- `washer()` — washer: typeof washer
-- `fastenerSet()` — fastenerSet: typeof fastenerSet
-- `pipeRoute()` — pipeRoute: typeof pipeRoute
-- `elbow()` — elbow: typeof elbow
-- `tSlotProfile()` — tSlotProfile: typeof tSlotProfile
-- `tSlotExtrusion()` — tSlotExtrusion: typeof tSlotExtrusion
-- `profile2020BSlot6Profile()` — profile2020BSlot6Profile: typeof profile2020BSlot6Profile
-- `profile2020BSlot6()` — profile2020BSlot6: typeof profile2020BSlot6
-- `spurGear()` — spurGear: typeof spurGear
-- `bevelGear()` — bevelGear: typeof bevelGear
-- `faceGear()` — faceGear: typeof faceGear
-- `sideGear()` — sideGear: typeof sideGear
-- `ringGear()` — ringGear: typeof ringGear
-- `rackGear()` — rackGear: typeof rackGear
-- `gearPair()` — gearPair: typeof gearPair
-- `bevelGearPair()` — bevelGearPair: typeof bevelGearPair
-- `faceGearPair()` — faceGearPair: typeof faceGearPair
-- `sideGearPair()` — sideGearPair: typeof sideGearPair
+- `boltHole()` — boltHole(diameter: number, depth: number): Shape
+- `fastenerHole()` — fastenerHole(opts: FastenerHoleOptions): Shape
+- `counterbore()` — counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: num
+- `tube()` — tube(outerX: number, outerY: number, outerZ: number, wall: number): Shape
+- `pipe()` — pipe(height: number, outerRadius: number, wall: number, segments?: number): Shap
+- `hexNut()` — hexNut(acrossFlats: number, height: number, holeDia: number): Shape
+- `roundedBox()` — roundedBox(x: number, y: number, z: number, radius: number): Shape
+- `bracket()` — bracket(width: number, height: number, depth: number, thick: number, holeDia?: n
+- `holePattern()` — holePattern(rows: number, cols: number, spacingX: number, spacingY: number, hole
+- `thread()` — thread(diameter: number, pitch: number, length: number, options?: { depth?: numb
+- `bolt()` — bolt(diameter: number, length: number, options?: { ... }): Shape
+- `nut()` — nut(diameter: number, options?: { pitch?: number; height?: number; acrossFlats?:
+- `washer()` — washer(size: MetricSize, options?: { standard?: WasherStandard; segments?: numbe
+- `fastenerSet()` — fastenerSet(size: MetricSize, boltLength: number, options?: FastenerSetOptions):
+- `pipeRoute()` — pipeRoute(points: [ number,
+- `elbow()` — elbow(pipeRadius: number, bendRadius: number, angle?: number | { ... }, options?
+- `tSlotProfile()` — tSlotProfile(options?: TSlotProfileOptions): Sketch
+- `tSlotExtrusion()` — tSlotExtrusion(length: number, options?: TSlotExtrusionOptions): Shape
+- `profile2020BSlot6Profile()` — profile2020BSlot6Profile(options?: Profile2020BSlot6ProfileOptions): Sketch
+- `profile2020BSlot6()` — profile2020BSlot6(length: number, options?: Profile2020BSlot6Options): Shape
+- `spurGear()` — spurGear(options: SpurGearOptions): Shape
+- `bevelGear()` — bevelGear(options: BevelGearOptions): Shape
+- `faceGear()` — faceGear(options: FaceGearOptions): Shape
+- `sideGear()` — sideGear(options: SideGearOptions): Shape
+- `ringGear()` — ringGear(options: RingGearOptions): Shape
+- `rackGear()` — rackGear(options: RackGearOptions): Shape
+- `gearPair()` — gearPair(options: GearPairOptions): GearPairResult
+- `bevelGearPair()` — bevelGearPair(options: BevelGearPairOptions): BevelGearPairResult
+- `faceGearPair()` — faceGearPair(options: FaceGearPairOptions): FaceGearPairResult
+- `sideGearPair()` — sideGearPair(options: SideGearPairOptions): SideGearPairResult
 
 ### `verify`
 

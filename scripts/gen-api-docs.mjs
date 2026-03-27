@@ -453,34 +453,34 @@ const CATEGORIES = [
   },
   {
     title: "Fasteners & Hardware",
-    desc: "Pre-built fastener shapes and hole helpers. Also available via `lib.*`.",
+    desc: "Pre-built fastener shapes and hole helpers. Access via `lib.*`.",
     names: [
-      "boltHole", "fastenerHole", "counterbore", "hexNut",
-      "thread", "bolt", "nut", "washer", "fastenerSet", "holePattern",
+      "lib.boltHole", "lib.fastenerHole", "lib.counterbore", "lib.hexNut",
+      "lib.thread", "lib.bolt", "lib.nut", "lib.washer", "lib.fastenerSet", "lib.holePattern",
     ],
   },
   {
     title: "Structural Profiles",
-    desc: "Extrusion profiles for aluminum framing and similar applications.",
-    names: ["tSlotProfile", "tSlotExtrusion", "profile2020BSlot6Profile", "profile2020BSlot6"],
+    desc: "Extrusion profiles for aluminum framing and similar applications. Access via `lib.*`.",
+    names: ["lib.tSlotProfile", "lib.tSlotExtrusion", "lib.profile2020BSlot6Profile", "lib.profile2020BSlot6"],
   },
   {
     title: "Pipes & Routing",
-    desc: "Create pipe runs, elbows, and tubes.",
-    names: ["pipeRoute", "elbow", "pipe", "tube"],
+    desc: "Create pipe runs, elbows, and tubes. Access via `lib.*`.",
+    names: ["lib.pipeRoute", "lib.elbow", "lib.pipe", "lib.tube"],
   },
   {
     title: "Gears",
-    desc: "Parametric gear geometry with meshing analysis.",
+    desc: "Parametric gear geometry with meshing analysis. Access via `lib.*`.",
     names: [
-      "spurGear", "bevelGear", "faceGear", "sideGear", "ringGear", "rackGear",
-      "gearPair", "bevelGearPair", "faceGearPair", "sideGearPair",
+      "lib.spurGear", "lib.bevelGear", "lib.faceGear", "lib.sideGear", "lib.ringGear", "lib.rackGear",
+      "lib.gearPair", "lib.bevelGearPair", "lib.faceGearPair", "lib.sideGearPair",
     ],
   },
   {
     title: "Utility Shapes",
-    desc: "Pre-built parametric shapes for common patterns.",
-    names: ["roundedBox", "bracket", "explode"],
+    desc: "Pre-built parametric shapes for common patterns. Access via `lib.*`.",
+    names: ["lib.roundedBox", "lib.bracket", "lib.explode"],
   },
 ];
 
@@ -514,6 +514,19 @@ function categorize(fns) {
     result.push({ title: "Other", desc: "", functions: uncategorized });
   }
   return result;
+}
+
+// ── Inject partLibrary members into functions ────────────────────────────────
+// lib.* members are no longer standalone top-level declares, so we pull them
+// from the parsed partLibrary constant and inject them as categorisable entries.
+const libConst = constants.find(c => c.name === "partLibrary");
+if (libConst) {
+  for (const m of libConst.members) {
+    // Only inject if it looks like a callable (has parens in signature)
+    if (m.signature.includes("(")) {
+      functions.push({ name: `lib.${m.name}`, signature: `lib.${m.signature}`, jsdoc: m.jsdoc });
+    }
+  }
 }
 
 // ── Render Markdown ─────────────────────────────────────────────────────────

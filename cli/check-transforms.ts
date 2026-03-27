@@ -18,7 +18,7 @@ import {
   resolveJointViewValues,
 } from '../src/forge/assembly/jointsView';
 import { box, initKernel } from '../src/forge/kernel';
-import { bevelGear } from '../src/forge/library';
+import { bevelGear } from '../src/forge/lib';
 import { runScript } from '../src/forge/runner';
 import { Transform } from '../src/forge/transform';
 

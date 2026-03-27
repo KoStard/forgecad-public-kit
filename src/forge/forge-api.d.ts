@@ -4574,15 +4574,6 @@ interface FastenerHoleOptions {
 	center?: boolean;
 	segments?: number;
 }
-declare function boltHole(diameter: number, depth: number): Shape;
-declare function fastenerHole(opts: FastenerHoleOptions): Shape;
-declare function counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: number): Shape;
-declare function tube(outerX: number, outerY: number, outerZ: number, wall: number): Shape;
-declare function pipe(height: number, outerRadius: number, wall: number, segments?: number): Shape;
-declare function hexNut(acrossFlats: number, height: number, holeDia: number): Shape;
-declare function roundedBox(x: number, y: number, z: number, radius: number): Shape;
-declare function bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape;
-declare function holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape;
 interface TSlotProfileOptions {
 	/** Outer profile size (square). */
 	size?: number;
@@ -4611,8 +4602,6 @@ interface TSlotExtrusionOptions extends TSlotProfileOptions {
 	/** Center the extrusion around Z=0 instead of starting at Z=0. */
 	center?: boolean;
 }
-declare function tSlotProfile(options?: TSlotProfileOptions): Sketch;
-declare function tSlotExtrusion(length: number, options?: TSlotExtrusionOptions): Shape;
 interface Profile2020BSlot6ProfileOptions {
 	/** Slot mouth width. */
 	slotWidth?: number;
@@ -4637,8 +4626,6 @@ interface Profile2020BSlot6Options extends Profile2020BSlot6ProfileOptions {
 	/** Center the extrusion around Z=0 instead of starting at Z=0. */
 	center?: boolean;
 }
-declare function profile2020BSlot6Profile(options?: Profile2020BSlot6ProfileOptions): Sketch;
-declare function profile2020BSlot6(length: number, options?: Profile2020BSlot6Options): Shape;
 interface ExplodeNamedItem {
 	name: string;
 	shape?: Shape | TrackedShape | ShapeGroup;
@@ -4650,8 +4637,6 @@ interface ExplodeNamedItem {
 type ExplodeItem = Shape | Sketch | TrackedShape | ShapeGroup | ExplodeNamedItem;
 interface ExplodeOptions extends ExplodeConfigOptions {
 }
-declare function explode<T extends ExplodeItem[] | ShapeGroup>(items: T, options?: ExplodeOptions): T;
-declare function pipeRoute(points: [
 	number,
 	number,
 	number
@@ -4660,7 +4645,6 @@ declare function pipeRoute(points: [
 	wall?: number;
 	segments?: number;
 }): Shape;
-declare function elbow(pipeRadius: number, bendRadius: number, angle?: number | {
 	from?: [
 		number,
 		number,
@@ -4700,15 +4684,12 @@ interface SpurGearOptions {
 	center?: boolean;
 	segmentsPerTooth?: number;
 }
-declare function spurGear(options: SpurGearOptions): Shape;
 interface SideGearOptions extends SpurGearOptions {
 	side?: "top" | "bottom";
 	toothHeight?: number;
 }
 interface FaceGearOptions extends SideGearOptions {
 }
-declare function sideGear(options: SideGearOptions): Shape;
-declare function faceGear(options: FaceGearOptions): Shape;
 interface RingGearOptions {
 	module: number;
 	teeth: number;
@@ -4723,7 +4704,6 @@ interface RingGearOptions {
 	center?: boolean;
 	segmentsPerTooth?: number;
 }
-declare function ringGear(options: RingGearOptions): Shape;
 interface RackGearOptions {
 	module: number;
 	teeth: number;
@@ -4736,7 +4716,6 @@ interface RackGearOptions {
 	baseHeight?: number;
 	center?: boolean;
 }
-declare function rackGear(options: RackGearOptions): Shape;
 interface BevelGearOptions {
 	module: number;
 	teeth: number;
@@ -4753,7 +4732,6 @@ interface BevelGearOptions {
 	center?: boolean;
 	segmentsPerTooth?: number;
 }
-declare function bevelGear(options: BevelGearOptions): Shape;
 interface GearPairSpec {
 	module: number;
 	teeth: number;
@@ -4900,29 +4878,21 @@ interface FaceGearPairResult {
 	diagnostics: GearPairDiagnostic[];
 	status: "ok" | "warn" | "error";
 }
-declare function gearPair(options: GearPairOptions): GearPairResult;
-declare function bevelGearPair(options: BevelGearPairOptions): BevelGearPairResult;
-declare function sideGearPair(options: SideGearPairOptions): SideGearPairResult;
-declare function faceGearPair(options: FaceGearPairOptions): FaceGearPairResult;
-declare function thread(diameter: number, pitch: number, length: number, options?: {
 	depth?: number;
 	segments?: number;
 }): Shape;
-declare function bolt(diameter: number, length: number, options?: {
 	pitch?: number;
 	headHeight?: number;
 	headAcrossFlats?: number;
 	threadLength?: number;
 	segments?: number;
 }): Shape;
-declare function nut(diameter: number, options?: {
 	pitch?: number;
 	height?: number;
 	acrossFlats?: number;
 	segments?: number;
 }): Shape;
 type WasherStandard = "din-125-a";
-declare function washer(size: MetricSize, options?: {
 	standard?: WasherStandard;
 	segments?: number;
 }): Shape;
@@ -4964,40 +4934,90 @@ interface FastenerSetResult {
 	/** Reference dimensions for BOM, placement calculations, and documentation. */
 	dims: FastenerSetDimensions;
 }
-declare function fastenerSet(size: MetricSize, boltLength: number, options?: FastenerSetOptions): FastenerSetResult;
 /** All library parts, keyed by name */
 declare const partLibrary: {
-	boltHole: typeof boltHole;
-	fastenerHole: typeof fastenerHole;
-	counterbore: typeof counterbore;
-	tube: typeof tube;
-	pipe: typeof pipe;
-	explode: typeof explode;
-	hexNut: typeof hexNut;
-	roundedBox: typeof roundedBox;
-	bracket: typeof bracket;
-	holePattern: typeof holePattern;
-	thread: typeof thread;
-	bolt: typeof bolt;
-	nut: typeof nut;
-	washer: typeof washer;
-	fastenerSet: typeof fastenerSet;
-	pipeRoute: typeof pipeRoute;
-	elbow: typeof elbow;
-	tSlotProfile: typeof tSlotProfile;
-	tSlotExtrusion: typeof tSlotExtrusion;
-	profile2020BSlot6Profile: typeof profile2020BSlot6Profile;
-	profile2020BSlot6: typeof profile2020BSlot6;
-	spurGear: typeof spurGear;
-	bevelGear: typeof bevelGear;
-	faceGear: typeof faceGear;
-	sideGear: typeof sideGear;
-	ringGear: typeof ringGear;
-	rackGear: typeof rackGear;
-	gearPair: typeof gearPair;
-	bevelGearPair: typeof bevelGearPair;
-	faceGearPair: typeof faceGearPair;
-	sideGearPair: typeof sideGearPair;
+	boltHole(diameter: number, depth: number): Shape;
+	fastenerHole(opts: FastenerHoleOptions): Shape;
+	counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: number): Shape;
+	tube(outerX: number, outerY: number, outerZ: number, wall: number): Shape;
+	pipe(height: number, outerRadius: number, wall: number, segments?: number): Shape;
+	explode<T extends ExplodeItem[] | ShapeGroup>(items: T, options?: ExplodeOptions): T;
+	hexNut(acrossFlats: number, height: number, holeDia: number): Shape;
+	roundedBox(x: number, y: number, z: number, radius: number): Shape;
+	bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape;
+	holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape;
+	thread(diameter: number, pitch: number, length: number, options?: {
+	depth?: number;
+	segments?: number;
+}): Shape;
+	bolt(diameter: number, length: number, options?: {
+	pitch?: number;
+	headHeight?: number;
+	headAcrossFlats?: number;
+	threadLength?: number;
+	segments?: number;
+}): Shape;
+	nut(diameter: number, options?: {
+	pitch?: number;
+	height?: number;
+	acrossFlats?: number;
+	segments?: number;
+}): Shape;
+	washer(size: MetricSize, options?: {
+	standard?: WasherStandard;
+	segments?: number;
+}): Shape;
+	fastenerSet(size: MetricSize, boltLength: number, options?: FastenerSetOptions): FastenerSetResult;
+	pipeRoute(points: [
+	number,
+	number,
+	number
+][], radius: number, options?: {
+	bendRadius?: number;
+	wall?: number;
+	segments?: number;
+}): Shape;
+	elbow(pipeRadius: number, bendRadius: number, angle?: number | {
+	from?: [
+		number,
+		number,
+		number
+	];
+	to?: [
+		number,
+		number,
+		number
+	];
+	wall?: number;
+	segments?: number;
+}, options?: {
+	wall?: number;
+	segments?: number;
+	from?: [
+		number,
+		number,
+		number
+	];
+	to?: [
+		number,
+		number,
+		number
+	];
+}): Shape;
+	tSlotProfile(options?: TSlotProfileOptions): Sketch;
+	tSlotExtrusion(length: number, options?: TSlotExtrusionOptions): Shape;
+	profile2020BSlot6Profile(options?: Profile2020BSlot6ProfileOptions): Sketch;
+	profile2020BSlot6(length: number, options?: Profile2020BSlot6Options): Shape;
+	spurGear(options: SpurGearOptions): Shape;
+	bevelGear(options: BevelGearOptions): Shape;
+	faceGear(options: FaceGearOptions): Shape;
+	sideGear(options: SideGearOptions): Shape;
+	ringGear(options: RingGearOptions): Shape;
+	rackGear(options: RackGearOptions): Shape;
+	gearPair(options: GearPairOptions): GearPairResult;
+	bevelGearPair(options: BevelGearPairOptions): BevelGearPairResult;
+	faceGearPair(options: FaceGearPairOptions): FaceGearPairResult;
+	sideGearPair(options: SideGearPairOptions): SideGearPairResult;
 };
 /**
  * Declare a parameter. Returns the current value (default or overridden).
