@@ -44,6 +44,13 @@ interface Stage {
 }
 
 const STAGES: Stage[] = [
+  {
+    label: 'Unit tests',
+    insight: 'vitest — pure geometry and integration contracts',
+    run: async () => {
+      execSync('npx vitest run', { stdio: 'pipe' });
+    },
+  },
   { label: 'Constraints', insight: 'solver convergence & snapshot fidelity', run: () => runCheckConstraintsCli([]) },
   { label: 'Transforms', insight: 'matrix composition & assembly trees', run: () => runCheckTransformsCli() },
   { label: 'Dimensions', insight: 'parametric dimension propagation', run: () => runCheckDimensionsCli() },
